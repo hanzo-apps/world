@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 /**
- * AIS WebSocket Relay Server
- * Proxies aisstream.io data to browsers via WebSocket
+ * AIS WebSocket Relay Server + Static File Server
+ * Serves frontend and proxies aisstream.io data via WebSocket
  *
- * Deploy on Railway/Fly.io/Render with:
+ * Deploy on Railway with:
  *   AISSTREAM_API_KEY=your_key
  *
  * Local: node scripts/ais-relay.cjs
  */
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
 const API_KEY = process.env.AISSTREAM_API_KEY || process.env.VITE_AISSTREAM_API_KEY;
 const PORT = process.env.PORT || 3004;
+const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 if (!API_KEY) {
   console.error('[Relay] Error: AISSTREAM_API_KEY environment variable not set');
@@ -22,9 +25,23 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// HTTP server for health checks (Railway requirement)
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+// HTTP server for static files + health check
 const server = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
+  // Health check endpoint
+  if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
@@ -32,10 +49,40 @@ const server = http.createServer((req, res) => {
       messages: messageCount,
       connected: upstreamSocket?.readyState === WebSocket.OPEN
     }));
-  } else {
-    res.writeHead(404);
-    res.end();
+    return;
   }
+
+  // Serve static files from dist/
+  let filePath = req.url === '/' ? '/index.html' : req.url;
+  filePath = path.join(DIST_DIR, filePath);
+
+  // Security: prevent directory traversal
+  if (!filePath.startsWith(DIST_DIR)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      // SPA fallback: serve index.html for client-side routing
+      fs.readFile(path.join(DIST_DIR, 'index.html'), (err2, indexData) => {
+        if (err2) {
+          res.writeHead(404);
+          res.end('Not found');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(indexData);
+      });
+      return;
+    }
+
+    const ext = path.extname(filePath);
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
 });
 
 let upstreamSocket = null;
