@@ -76,7 +76,7 @@ export class StatusPanel {
     const feedNames = [
       'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
       'Gov', 'Intel', 'Layoffs', 'Congress', 'Thinktanks',
-      'Polymarket', 'Weather', 'NetBlocks', 'Shipping'
+      'Polymarket', 'Weather', 'NetBlocks', 'Ships'
     ];
     feedNames.forEach(name => {
       this.feeds.set(name, { name, lastUpdate: null, status: 'warning', itemCount: 0 });

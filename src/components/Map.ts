@@ -228,9 +228,9 @@ export class MapComponent {
     toggles.className = 'layer-toggles';
     toggles.id = 'layerToggles';
 
-    const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways', 'protests', 'flights'];
+    const layers: (keyof MapLayers)[] = ['conflicts', 'protests', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'flights', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways'];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
-      ais: 'Shipping',
+      ais: 'Ships',
     };
 
     layers.forEach((layer) => {

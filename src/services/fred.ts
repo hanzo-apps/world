@@ -59,53 +59,55 @@ async function fetchSeriesData(seriesId: string): Promise<{ date: string; value:
 }
 
 export async function fetchFredData(): Promise<FredSeries[]> {
-  const fetchPromises = FRED_SERIES.map(async (config): Promise<FredSeries | null> => {
-    const data = await fetchSeriesData(config.id);
+  return breaker.execute(async () => {
+    const fetchPromises = FRED_SERIES.map(async (config): Promise<FredSeries | null> => {
+      const data = await fetchSeriesData(config.id);
 
-    if (data.length >= 2) {
-      const latest = data[data.length - 1]!;
-      const previous = data[data.length - 2]!;
-      const change = latest.value - previous.value;
-      const changePercent = (change / previous.value) * 100;
+      if (data.length >= 2) {
+        const latest = data[data.length - 1]!;
+        const previous = data[data.length - 2]!;
+        const change = latest.value - previous.value;
+        const changePercent = (change / previous.value) * 100;
 
-      let displayValue = latest.value;
-      if (config.id === 'WALCL') {
-        displayValue = latest.value / 1000;
+        let displayValue = latest.value;
+        if (config.id === 'WALCL') displayValue = latest.value / 1000;
+
+        return {
+          id: config.id,
+          name: config.name,
+          value: Number(displayValue.toFixed(config.precision)),
+          previousValue: Number(previous.value.toFixed(config.precision)),
+          change: Number(change.toFixed(config.precision)),
+          changePercent: Number(changePercent.toFixed(2)),
+          date: latest.date,
+          unit: config.unit,
+        };
+      } else if (data.length === 1) {
+        const latest = data[0]!;
+        let displayValue = latest.value;
+        if (config.id === 'WALCL') displayValue = latest.value / 1000;
+
+        return {
+          id: config.id,
+          name: config.name,
+          value: Number(displayValue.toFixed(config.precision)),
+          previousValue: null,
+          change: null,
+          changePercent: null,
+          date: latest.date,
+          unit: config.unit,
+        };
       }
+      return null;
+    });
 
-      return {
-        id: config.id,
-        name: config.name,
-        value: Number(displayValue.toFixed(config.precision)),
-        previousValue: Number(previous.value.toFixed(config.precision)),
-        change: Number(change.toFixed(config.precision)),
-        changePercent: Number(changePercent.toFixed(2)),
-        date: latest.date,
-        unit: config.unit,
-      };
-    } else if (data.length === 1) {
-      const latest = data[0]!;
-      let displayValue = latest.value;
-      if (config.id === 'WALCL') {
-        displayValue = latest.value / 1000;
-      }
+    const results = await Promise.all(fetchPromises);
+    return results.filter((r): r is FredSeries => r !== null);
+  }, []);
+}
 
-      return {
-        id: config.id,
-        name: config.name,
-        value: Number(displayValue.toFixed(config.precision)),
-        previousValue: null,
-        change: null,
-        changePercent: null,
-        date: latest.date,
-        unit: config.unit,
-      };
-    }
-    return null;
-  });
-
-  const results = await Promise.all(fetchPromises);
-  return results.filter((r): r is FredSeries => r !== null);
+export function getFredStatus(): string {
+  return breaker.getStatus();
 }
 
 export function getChangeClass(change: number | null): string {

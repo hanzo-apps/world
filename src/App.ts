@@ -1194,10 +1194,10 @@ export class App {
     try {
       const { disruptions, density } = await fetchAisSignals();
       const aisStatus = getAisStatus();
-      console.log('[Shipping] Events:', { disruptions: disruptions.length, density: density.length, vessels: aisStatus.vessels });
+      console.log('[Ships] Events:', { disruptions: disruptions.length, density: density.length, vessels: aisStatus.vessels });
       this.map?.setAisData(disruptions, density);
 
-      this.statusPanel?.updateFeed('Shipping', {
+      this.statusPanel?.updateFeed('Ships', {
         status: aisStatus.connected ? 'ok' : 'error',
         itemCount: disruptions.length + density.length,
         errorMessage: !aisStatus.connected ? 'WebSocket disconnected' : undefined,
@@ -1206,7 +1206,7 @@ export class App {
         status: aisStatus.connected ? 'ok' : 'error',
       });
     } catch (error) {
-      this.statusPanel?.updateFeed('Shipping', { status: 'error', errorMessage: String(error) });
+      this.statusPanel?.updateFeed('Ships', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('AISStream', { status: 'error' });
     }
   }

@@ -1,6 +1,6 @@
 import type { SocialUnrestEvent, ProtestSeverity, ProtestEventType } from '@/types';
 import { INTEL_HOTSPOTS } from '@/config';
-import { generateId } from '@/utils';
+import { generateId, createCircuitBreaker } from '@/utils';
 
 // ACLED API - requires free registration at acleddata.com
 const ACLED_API_URL = '/api/acled/api/acled/read';
@@ -8,6 +8,9 @@ const ACLED_ACCESS_TOKEN = import.meta.env.VITE_ACLED_ACCESS_TOKEN || '';
 
 // GDELT GEO 2.0 API - no auth required
 const GDELT_GEO_URL = '/api/gdelt-geo';
+
+const acledBreaker = createCircuitBreaker<SocialUnrestEvent[]>({ name: 'ACLED Protests' });
+const gdeltBreaker = createCircuitBreaker<SocialUnrestEvent[]>({ name: 'GDELT Events' });
 
 // Haversine distance calculation
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -69,11 +72,10 @@ interface AcledEvent {
 
 async function fetchAcledEvents(): Promise<SocialUnrestEvent[]> {
   if (!ACLED_ACCESS_TOKEN) {
-    console.warn('[Protests] ACLED access token not configured. Get token at acleddata.com');
     return [];
   }
 
-  try {
+  return acledBreaker.execute(async () => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const startDate = thirtyDaysAgo.toISOString().split('T')[0] || '';
@@ -87,16 +89,10 @@ async function fetchAcledEvents(): Promise<SocialUnrestEvent[]> {
     params.set('_format', 'json');
 
     const response = await fetch(`${ACLED_API_URL}?${params}`, {
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${ACLED_ACCESS_TOKEN}`,
-      },
+      headers: { Accept: 'application/json', Authorization: `Bearer ${ACLED_ACCESS_TOKEN}` },
     });
 
-    if (!response.ok) {
-      console.error('[Protests] ACLED API error:', response.status);
-      return [];
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
     const events: AcledEvent[] = data.data || [];
@@ -128,10 +124,7 @@ async function fetchAcledEvents(): Promise<SocialUnrestEvent[]> {
         validated: true,
       };
     });
-  } catch (error) {
-    console.error('[Protests] ACLED fetch error:', error);
-    return [];
-  }
+  }, []);
 }
 
 interface GdeltGeoFeature {
@@ -154,9 +147,7 @@ interface GdeltGeoResponse {
 }
 
 async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
-  try {
-    // GDELT GEO API - use simple query to avoid encoding issues
-    // "protest" captures most civil unrest events
+  return gdeltBreaker.execute(async () => {
     const params = new URLSearchParams({
       query: 'protest',
       format: 'geojson',
@@ -168,10 +159,7 @@ async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
       headers: { Accept: 'application/json' },
     });
 
-    if (!response.ok) {
-      console.error('[Protests] GDELT API error:', response.status);
-      return [];
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: GdeltGeoResponse = await response.json();
     const allEvents: SocialUnrestEvent[] = [];
@@ -182,7 +170,6 @@ async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
       if (!name || seenLocations.has(name)) continue;
 
       const count = feature.properties.count || 1;
-      // Only show high-signal locations (200+ reports)
       if (count < 200) continue;
 
       seenLocations.add(name);
@@ -223,12 +210,8 @@ async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
       });
     }
 
-    console.log(`[Protests] GDELT returned ${allEvents.length} locations`);
     return allEvents;
-  } catch (error) {
-    console.error('[Protests] GDELT fetch error:', error);
-    return [];
-  }
+  }, []);
 }
 
 // Deduplicate events from multiple sources

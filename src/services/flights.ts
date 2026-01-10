@@ -1,5 +1,6 @@
 import type { AirportDelayAlert, FlightDelaySeverity, FlightDelayType, MonitoredAirport } from '@/types';
 import { MONITORED_AIRPORTS, FAA_AIRPORTS, DELAY_SEVERITY_THRESHOLDS } from '@/config/airports';
+import { createCircuitBreaker } from '@/utils';
 
 interface FAADelayInfo {
   airport: string;
@@ -8,6 +9,7 @@ interface FAADelayInfo {
   type: FlightDelayType;
 }
 
+const breaker = createCircuitBreaker<AirportDelayAlert[]>({ name: 'FAA Flight Delays' });
 let faaCache: { data: Map<string, FAADelayInfo>; timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -207,51 +209,51 @@ function generateSimulatedDelay(airport: MonitoredAirport): AirportDelayAlert {
 }
 
 export async function fetchFlightDelays(): Promise<AirportDelayAlert[]> {
-  console.log('[Flights] Fetching flight delay data...');
-  const alerts: AirportDelayAlert[] = [];
+  return breaker.execute(async () => {
+    const alerts: AirportDelayAlert[] = [];
+    const faaDelays = await fetchFAADelays();
 
-  // Fetch all FAA delays in single call
-  const faaDelays = await fetchFAADelays();
+    for (const iata of FAA_AIRPORTS) {
+      const airport = MONITORED_AIRPORTS.find((a) => a.iata === iata);
+      if (!airport) continue;
 
-  // Process US airports with real FAA data
-  for (const iata of FAA_AIRPORTS) {
-    const airport = MONITORED_AIRPORTS.find((a) => a.iata === iata);
-    if (!airport) continue;
-
-    const faaDelay = faaDelays.get(iata);
-    if (faaDelay) {
-      alerts.push({
-        id: `faa-${iata}`,
-        iata,
-        icao: airport.icao,
-        name: airport.name,
-        city: airport.city,
-        country: airport.country,
-        lat: airport.lat,
-        lon: airport.lon,
-        region: airport.region,
-        delayType: faaDelay.type,
-        severity: determineSeverity(faaDelay.avgDelay || 30),
-        avgDelayMinutes: faaDelay.avgDelay || 30,
-        reason: faaDelay.reason,
-        source: 'faa',
-        updatedAt: new Date(),
-      });
+      const faaDelay = faaDelays.get(iata);
+      if (faaDelay) {
+        alerts.push({
+          id: `faa-${iata}`,
+          iata,
+          icao: airport.icao,
+          name: airport.name,
+          city: airport.city,
+          country: airport.country,
+          lat: airport.lat,
+          lon: airport.lon,
+          region: airport.region,
+          delayType: faaDelay.type,
+          severity: determineSeverity(faaDelay.avgDelay || 30),
+          avgDelayMinutes: faaDelay.avgDelay || 30,
+          reason: faaDelay.reason,
+          source: 'faa',
+          updatedAt: new Date(),
+        });
+      }
     }
-  }
 
-  // For non-US airports, generate simulated data
-  // TODO: Replace with real APIs (Eurocontrol, AeroDataBox) when available
-  const nonUsAirports = MONITORED_AIRPORTS.filter((a) => a.country !== 'USA');
-  for (const airport of nonUsAirports) {
-    const simulated = generateSimulatedDelay(airport);
-    if (simulated.severity !== 'normal') {
-      alerts.push(simulated);
+    // For non-US airports, generate simulated data
+    const nonUsAirports = MONITORED_AIRPORTS.filter((a) => a.country !== 'USA');
+    for (const airport of nonUsAirports) {
+      const simulated = generateSimulatedDelay(airport);
+      if (simulated.severity !== 'normal') {
+        alerts.push(simulated);
+      }
     }
-  }
 
-  console.log(`[Flights] Found ${alerts.length} airports with delays`);
-  return alerts;
+    return alerts;
+  }, []);
+}
+
+export function getFlightsStatus(): string {
+  return breaker.getStatus();
 }
 
 export function getAirportByCode(code: string): MonitoredAirport | undefined {

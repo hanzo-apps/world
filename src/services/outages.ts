@@ -1,6 +1,8 @@
 import type { InternetOutage } from '@/types';
+import { createCircuitBreaker } from '@/utils';
 
 const CLOUDFLARE_API_URL = '/api/cloudflare-outages';
+const breaker = createCircuitBreaker<InternetOutage[]>({ name: 'Cloudflare Outages' });
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
   'AF': { lat: 33.9391, lon: 67.7100 },
@@ -183,28 +185,18 @@ interface CloudflareResponse {
 }
 
 export async function fetchInternetOutages(): Promise<InternetOutage[]> {
-  console.log('[Outages] Fetching from Cloudflare Radar...');
-  try {
+  return breaker.execute(async () => {
     const response = await fetch(`${CLOUDFLARE_API_URL}?dateRange=7d&limit=50`);
-
-    if (!response.ok) {
-      console.error('[Outages] Failed to fetch:', response.status);
-      return [];
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: CloudflareResponse = await response.json();
-
     if (!data.success || data.errors?.length > 0) {
-      console.error('[Outages] API error:', data.errors);
-      return [];
+      throw new Error(data.errors?.[0]?.message || 'API error');
     }
-
-    console.log('[Outages] Received', data.result.annotations?.length || 0, 'outages from Cloudflare');
 
     const outages: InternetOutage[] = [];
 
     for (const outage of data.result.annotations || []) {
-      // Skip if no location
       if (!outage.locations?.length) continue;
 
       const countryCode = outage.locations[0];
@@ -215,33 +207,21 @@ export async function fetchInternetOutages(): Promise<InternetOutage[]> {
 
       const countryName = outage.locationsDetails?.[0]?.name ?? countryCode;
 
-      // Determine severity based on outage type
       let severity: 'partial' | 'major' | 'total' = 'partial';
-      if (outage.outage?.outageType === 'NATIONWIDE') {
-        severity = 'total';
-      } else if (outage.outage?.outageType === 'REGIONAL') {
-        severity = 'major';
-      }
+      if (outage.outage?.outageType === 'NATIONWIDE') severity = 'total';
+      else if (outage.outage?.outageType === 'REGIONAL') severity = 'major';
 
-      // Format categories from cause and type
       const categories: string[] = ['Cloudflare Radar'];
-      if (outage.outage?.outageCause) {
-        categories.push(outage.outage.outageCause.replace(/_/g, ' '));
-      }
-      if (outage.outage?.outageType) {
-        categories.push(outage.outage.outageType);
-      }
+      if (outage.outage?.outageCause) categories.push(outage.outage.outageCause.replace(/_/g, ' '));
+      if (outage.outage?.outageType) categories.push(outage.outage.outageType);
 
-      // Add ASN names if available
       for (const asn of outage.asnsDetails?.slice(0, 2) || []) {
         if (asn.name) categories.push(asn.name);
       }
 
       outages.push({
         id: `cf-${outage.id}`,
-        title: outage.scope
-          ? `${outage.scope} outage in ${countryName}`
-          : `Internet disruption in ${countryName}`,
+        title: outage.scope ? `${outage.scope} outage in ${countryName}` : `Internet disruption in ${countryName}`,
         link: outage.linkedUrl || `https://radar.cloudflare.com/outage-center`,
         description: outage.description,
         pubDate: new Date(outage.startDate),
@@ -256,10 +236,10 @@ export async function fetchInternetOutages(): Promise<InternetOutage[]> {
       });
     }
 
-    console.log('[Outages] Mapped', outages.length, 'outages');
     return outages;
-  } catch (e) {
-    console.error('[Outages] Error fetching outages:', e);
-    return [];
-  }
+  }, []);
+}
+
+export function getOutagesStatus(): string {
+  return breaker.getStatus();
 }
