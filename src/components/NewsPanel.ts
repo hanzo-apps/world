@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
 import { formatTime } from '@/utils';
-import { clusterNews, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM } from '@/services';
+import { clusterNews, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
 
 export class NewsPanel extends Panel {
   private clusteredMode = true;
@@ -10,10 +10,33 @@ export class NewsPanel extends Panel {
   private onRelatedAssetClick?: (asset: RelatedAsset) => void;
   private onRelatedAssetsFocus?: (assets: RelatedAsset[], originLabel: string) => void;
   private onRelatedAssetsClear?: () => void;
+  private isFirstRender = true;
 
   constructor(id: string, title: string) {
-    super({ id, title, showCount: true });
+    super({ id, title, showCount: true, trackActivity: true });
     this.createDeviationIndicator();
+    this.setupActivityTracking();
+  }
+
+  private setupActivityTracking(): void {
+    // Register with activity tracker
+    activityTracker.register(this.panelId);
+
+    // Listen for new count changes
+    activityTracker.onChange(this.panelId, (newCount) => {
+      // Pulse if there are new items
+      this.setNewBadge(newCount, newCount > 0);
+    });
+
+    // Mark as seen when panel content is scrolled
+    this.content.addEventListener('scroll', () => {
+      activityTracker.markAsSeen(this.panelId);
+    });
+
+    // Mark as seen on click anywhere in panel
+    this.element.addEventListener('click', () => {
+      activityTracker.markAsSeen(this.panelId);
+    });
   }
 
   public setRelatedAssetHandlers(options: {
@@ -92,8 +115,28 @@ export class NewsPanel extends Panel {
     this.setCount(totalItems);
     this.relatedAssetContext.clear();
 
+    // Track items with activity tracker (skip first render to avoid marking everything as "new")
+    const clusterIds = clusters.map(c => c.id);
+    let newItemIds: Set<string>;
+
+    if (this.isFirstRender) {
+      // First render: mark all items as seen
+      activityTracker.updateItems(this.panelId, clusterIds);
+      activityTracker.markAsSeen(this.panelId);
+      newItemIds = new Set();
+      this.isFirstRender = false;
+    } else {
+      // Subsequent renders: track new items
+      const newIds = activityTracker.updateItems(this.panelId, clusterIds);
+      newItemIds = new Set(newIds);
+    }
+
     const html = clusters
       .map((cluster) => {
+        const isNew = newItemIds.has(cluster.id);
+        const shouldHighlight = activityTracker.shouldHighlight(this.panelId, cluster.id);
+        const showNewTag = activityTracker.isNewItem(this.panelId, cluster.id) && isNew;
+
         const sourceBadge = cluster.sourceCount > 1
           ? `<span class="source-count">${cluster.sourceCount} sources</span>`
           : '';
@@ -107,6 +150,8 @@ export class NewsPanel extends Panel {
         const sentimentBadge = sentimentIcon && Math.abs(velocity?.sentimentScore || 0) > 2
           ? `<span class="sentiment-badge ${velocity?.sentiment}">${sentimentIcon}</span>`
           : '';
+
+        const newTag = showNewTag ? '<span class="new-tag">NEW</span>' : '';
 
         const topSourcesHtml = cluster.topSources
           .map(s => `<span class="top-source tier-${s.tier}">${s.name}</span>`)
@@ -137,10 +182,20 @@ export class NewsPanel extends Panel {
           `
           : '';
 
+        // Build class list for item
+        const itemClasses = [
+          'item',
+          'clustered',
+          cluster.isAlert ? 'alert' : '',
+          shouldHighlight ? 'item-new-highlight' : '',
+          isNew ? 'item-new' : '',
+        ].filter(Boolean).join(' ');
+
         return `
-      <div class="item clustered ${cluster.isAlert ? 'alert' : ''}" ${cluster.monitorColor ? `style="border-left-color: ${cluster.monitorColor}"` : ''} data-cluster-id="${cluster.id}">
+      <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-left-color: ${cluster.monitorColor}"` : ''} data-cluster-id="${cluster.id}" data-news-id="${cluster.primaryLink}">
         <div class="item-source">
           ${cluster.primarySource}
+          ${newTag}
           ${sourceBadge}
           ${velocityBadge}
           ${sentimentBadge}
