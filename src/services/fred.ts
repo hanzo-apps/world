@@ -37,8 +37,7 @@ const FRED_SERIES: FredConfig[] = [
   { id: 'VIXCLS', name: 'VIX', unit: '', precision: 2 },
 ];
 
-const FRED_API_KEY = '74adf7652674f7527be1f07321ce39c5';
-const FRED_API_BASE = '/api/fred-api';
+const FRED_API_BASE = '/api/fred-data';
 const breaker = createCircuitBreaker<FredSeries[]>({ name: 'FRED Economic' });
 
 async function fetchSeriesData(seriesId: string): Promise<{ date: string; value: number }[]> {
@@ -47,12 +46,8 @@ async function fetchSeriesData(seriesId: string): Promise<{ date: string; value:
 
   const params = new URLSearchParams();
   params.set('series_id', seriesId);
-  params.set('api_key', FRED_API_KEY);
-  params.set('file_type', 'json');
   params.set('observation_start', startDate);
   params.set('observation_end', endDate);
-  params.set('sort_order', 'desc');
-  params.set('limit', '10');
 
   const response = await fetch(`${FRED_API_BASE}?${params}`, {
     headers: { Accept: 'application/json' },
