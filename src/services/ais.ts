@@ -205,10 +205,9 @@ function detectDisruptions(): AisDisruptionEvent[] {
   const disruptions: AisDisruptionEvent[] = [];
   const now = Date.now();
 
-  // Check chokepoints for congestion
+  // Report on all chokepoints with vessel activity
   for (const chokepoint of CHOKEPOINTS) {
     let vesselCount = 0;
-    const nearbyVessels: string[] = [];
 
     for (const vessel of vessels.values()) {
       const distance = Math.sqrt(
@@ -217,15 +216,14 @@ function detectDisruptions(): AisDisruptionEvent[] {
       );
       if (distance <= chokepoint.radius) {
         vesselCount++;
-        nearbyVessels.push(vessel.mmsi);
       }
     }
 
-    // Detect congestion (threshold varies by chokepoint)
-    const baseThreshold = chokepoint.radius * 20;
-    if (vesselCount > baseThreshold) {
-      const severity = vesselCount > baseThreshold * 2 ? 'high' :
-                       vesselCount > baseThreshold * 1.5 ? 'elevated' : 'low';
+    // Show any chokepoint with vessels (lower threshold: 5+ vessels)
+    if (vesselCount >= 5) {
+      const normalTraffic = chokepoint.radius * 10; // Expected baseline
+      const severity = vesselCount > normalTraffic * 1.5 ? 'high' :
+                       vesselCount > normalTraffic ? 'elevated' : 'low';
 
       disruptions.push({
         id: `chokepoint-${chokepoint.name.toLowerCase().replace(/\s+/g, '-')}`,
@@ -234,11 +232,11 @@ function detectDisruptions(): AisDisruptionEvent[] {
         lat: chokepoint.lat,
         lon: chokepoint.lon,
         severity,
-        changePct: Math.round((vesselCount / baseThreshold - 1) * 100),
+        changePct: normalTraffic > 0 ? Math.round((vesselCount / normalTraffic - 1) * 100) : 0,
         windowHours: 1,
         vesselCount,
         region: chokepoint.name,
-        description: `${vesselCount} vessels detected in ${chokepoint.name} region`,
+        description: `${vesselCount} vessels in ${chokepoint.name}`,
       });
     }
   }
@@ -257,7 +255,7 @@ function detectDisruptions(): AisDisruptionEvent[] {
     }
   }
 
-  if (darkShipCount > 5) {
+  if (darkShipCount >= 1) {
     disruptions.push({
       id: 'global-gap-spike',
       name: 'AIS Gap Spike Detected',
