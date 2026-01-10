@@ -403,82 +403,39 @@ function mergeAndDeduplicateBases(): MilitaryBase[] {
 export const MILITARY_BASES: MilitaryBase[] = mergeAndDeduplicateBases();
 
 export const UNDERSEA_CABLES: UnderseaCable[] = [
-  // === TRANS-ATLANTIC ===
-  { id: 'tat14', name: 'TAT-14', points: [[-74.0, 40.7], [-30.0, 45.0], [-9.0, 52.0]], major: true },
+  // === TRANS-ATLANTIC (3 - south/central/north routes) ===
   { id: 'marea', name: 'MAREA', points: [[-73.0, 39.0], [-30.0, 42.0], [-9.0, 37.0]], major: true },
-  { id: 'dunant', name: 'Dunant', points: [[-73.5, 39.5], [-35.0, 43.0], [-9.0, 38.0]], major: true },
-  { id: 'apollo', name: 'Apollo', points: [[-74.0, 40.0], [-40.0, 42.0], [-6.0, 50.0]], major: true },
-  { id: 'hibernia', name: 'Hibernia Atlantic', points: [[-73.5, 40.5], [-50.0, 48.0], [-10.0, 52.0]], major: true },
-  { id: 'aec1', name: 'AEC-1', points: [[-80.0, 26.0], [-65.0, 20.0], [-17.0, 15.0]], major: true },
-  { id: 'ellalink', name: 'EllaLink', points: [[-9.0, 38.0], [-25.0, 20.0], [-35.0, -5.0]], major: true },
-  { id: 'equiano', name: 'Equiano', points: [[-9.0, 38.0], [-17.0, 15.0], [8.0, 4.0], [18.0, -34.0]], major: true },
   { id: 'grace_hopper', name: 'Grace Hopper', points: [[-74.0, 40.0], [-30.0, 44.0], [-6.0, 53.0], [-9.0, 37.0]], major: true },
   { id: 'havfrue', name: 'Havfrue', points: [[-74.0, 40.5], [-30.0, 55.0], [5.0, 58.0], [12.0, 56.0]], major: true },
 
-  // === TRANS-PACIFIC ===
-  { id: 'unity', name: 'Unity', points: [[-122.4, 37.8], [-155.0, 25.0], [139.7, 35.7]], major: true },
+  // === TRANS-PACIFIC (3 - US-Asia, US-Australia, US-South America) ===
   { id: 'faster', name: 'FASTER', points: [[-122.0, 37.0], [-155.0, 22.0], [139.0, 35.0]], major: true },
-  { id: 'jupiter', name: 'Jupiter', points: [[-118.0, 34.0], [-155.0, 20.0], [121.0, 14.5]], major: true },
-  { id: 'apg', name: 'APG', points: [[139.7, 35.7], [121.5, 25.0], [114.0, 22.3], [103.8, 1.3]], major: true },
-  { id: 'aag', name: 'AAG', points: [[103.8, 1.3], [114.0, 22.3], [121.5, 25.0], [139.7, 35.7], [-155.0, 20.0], [-122.0, 34.0]], major: true },
-  { id: 'ncp', name: 'NCP', points: [[-122.0, 37.0], [-155.0, 21.0], [139.0, 35.0], [129.0, 35.0]], major: true },
-  { id: 'plcn', name: 'PLCN', points: [[-118.0, 34.0], [114.0, 22.3]], major: true },
-  { id: 'hk_g', name: 'HK-G', points: [[114.0, 22.3], [-155.0, 20.0], [-122.0, 34.0]], major: true },
-  { id: 'curie', name: 'Curie', points: [[-122.4, 37.8], [-90.0, 10.0], [-77.0, -12.0]], major: true },
   { id: 'southern_cross', name: 'Southern Cross', points: [[151.0, -34.0], [-175.0, -40.0], [-122.0, 34.0]], major: true },
+  { id: 'curie', name: 'Curie', points: [[-122.4, 37.8], [-90.0, 10.0], [-77.0, -12.0]], major: true },
 
-  // === ASIA-EUROPE (SEA-ME-WE corridor) ===
-  { id: 'seamewe3', name: 'SEA-ME-WE 3', points: [[141.0, 39.0], [121.5, 25.0], [103.8, 1.3], [73.0, 15.0], [55.0, 24.0], [43.0, 12.0], [32.5, 30.0], [12.5, 42.0], [-6.0, 36.0]], major: true },
-  { id: 'seamewe4', name: 'SEA-ME-WE 4', points: [[103.8, 1.3], [73.0, 15.0], [55.0, 24.0], [43.0, 12.0], [32.5, 30.0], [12.5, 42.0]], major: true },
-  { id: 'seamewe5', name: 'SEA-ME-WE 5', points: [[103.8, 1.3], [73.0, 15.0], [43.0, 12.0], [32.5, 30.0], [12.5, 42.0]], major: true },
+  // === ASIA-EUROPE (2 - SEA-ME-WE corridor + alternative) ===
   { id: 'seamewe6', name: 'SEA-ME-WE 6', points: [[103.8, 1.3], [80.0, 6.0], [55.0, 24.0], [43.0, 12.0], [32.5, 30.0], [12.5, 42.0], [-9.0, 38.0]], major: true },
-  { id: 'aae1', name: 'AAE-1', points: [[103.8, 1.3], [80.0, 6.0], [55.0, 15.0], [43.0, 12.0], [36.0, 32.0]], major: true },
-  { id: 'flag', name: 'FLAG', points: [[0.0, 51.0], [-6.0, 36.0], [32.5, 30.0], [55.0, 24.0], [73.0, 15.0], [103.8, 1.3], [139.7, 35.7]], major: true },
-  { id: 'imewe', name: 'IMEWE', points: [[73.0, 15.0], [55.0, 24.0], [43.0, 12.0], [32.5, 30.0], [12.5, 42.0]], major: true },
-  { id: 'europe_india', name: 'Europe India Gateway', points: [[-6.0, 36.0], [32.5, 30.0], [55.0, 24.0], [73.0, 15.0]], major: true },
+  { id: 'flag', name: 'FLAG Europe-Asia', points: [[0.0, 51.0], [-6.0, 36.0], [32.5, 30.0], [55.0, 24.0], [73.0, 15.0], [103.8, 1.3], [139.7, 35.7]], major: true },
 
-  // === AFRICA ===
-  { id: 'wacs', name: 'WACS', points: [[18.0, -34.0], [12.0, -6.0], [4.0, 6.0], [-17.0, 15.0], [-6.0, 36.0], [0.0, 51.0]], major: true },
-  { id: 'sat3', name: 'SAT-3/WASC', points: [[18.0, -34.0], [12.0, -6.0], [-17.0, 15.0], [-9.0, 38.0]], major: true },
-  { id: 'ace', name: 'ACE', points: [[-17.0, 15.0], [-6.0, 36.0], [-9.0, 38.0], [0.0, 51.0]], major: true },
-  { id: 'mainone', name: 'MainOne', points: [[-6.0, 36.0], [-17.0, 15.0], [3.0, 6.0]], major: true },
-  { id: 'eassy', name: 'EASSy', points: [[18.0, -34.0], [32.0, -26.0], [40.0, -15.0], [44.0, -12.0], [50.0, -20.0], [55.0, 24.0]], major: true },
-  { id: 'seacom', name: 'SEACOM', points: [[18.0, -34.0], [40.0, -15.0], [44.0, -12.0], [55.0, 24.0], [73.0, 15.0]], major: true },
+  // === AFRICA (3 - circumnavigation + west + east backbones) ===
   { id: '2africa', name: '2Africa', points: [[0.0, 51.0], [-9.0, 38.0], [-17.0, 15.0], [4.0, 6.0], [18.0, -34.0], [55.0, -20.0], [55.0, 24.0], [32.5, 30.0]], major: true },
+  { id: 'wacs', name: 'WACS', points: [[18.0, -34.0], [12.0, -6.0], [4.0, 6.0], [-17.0, 15.0], [-6.0, 36.0], [0.0, 51.0]], major: true },
+  { id: 'eassy', name: 'EASSy', points: [[18.0, -34.0], [32.0, -26.0], [40.0, -15.0], [44.0, -12.0], [50.0, -20.0], [55.0, 24.0]], major: true },
 
-  // === AMERICAS ===
-  { id: 'sac', name: 'SAC', points: [[-43.0, -23.0], [-35.0, -5.0], [-65.0, 18.0], [-80.0, 26.0]], major: true },
-  { id: 'monet', name: 'Monet', points: [[-43.0, -23.0], [-80.0, 26.0]], major: true },
-  { id: 'sacs', name: 'SACS', points: [[-43.0, -23.0], [12.0, -6.0]], major: true },
-  { id: 'pccs', name: 'PCCS', points: [[-77.0, -12.0], [-90.0, 5.0], [-118.0, 34.0]], major: true },
+  // === AMERICAS (2 - South America backbone + Europe direct) ===
   { id: 'sam1', name: 'SAm-1', points: [[-43.0, -23.0], [-55.0, -35.0], [-70.0, -33.0], [-77.0, -12.0]], major: true },
-  { id: 'tannat', name: 'Tannat', points: [[-56.0, -35.0], [-43.0, -23.0]], major: true },
-  { id: 'americas2', name: 'Americas-II', points: [[-43.0, -23.0], [-65.0, 18.0], [-80.0, 26.0], [-74.0, 40.0]], major: true },
-  { id: 'maya1', name: 'MAYA-1', points: [[-80.0, 26.0], [-87.0, 21.0], [-90.0, 14.0], [-85.0, 10.0]], major: true },
-  { id: 'arcos', name: 'ARCOS', points: [[-80.0, 26.0], [-77.0, 18.0], [-65.0, 18.0], [-66.0, 10.0]], major: true },
+  { id: 'ellalink', name: 'EllaLink', points: [[-9.0, 38.0], [-25.0, 20.0], [-35.0, -5.0]], major: true },
 
-  // === ASIA-PACIFIC ===
-  { id: 'apcn2', name: 'APCN-2', points: [[103.8, 1.3], [114.0, 22.3], [121.5, 25.0], [139.7, 35.7], [129.0, 35.0]], major: true },
-  { id: 'tgn_ia', name: 'TGN-Intra Asia', points: [[103.8, 1.3], [114.0, 22.3], [139.7, 35.7]], major: true },
-  { id: 'c2c', name: 'C2C', points: [[103.8, 1.3], [114.0, 22.3], [139.7, 35.7]], major: true },
-  { id: 'sea_h2x', name: 'SEA-H2X', points: [[103.8, 1.3], [114.0, 22.3]], major: true },
-  { id: 'sjc', name: 'SJC', points: [[103.8, 1.3], [114.0, 22.3], [139.7, 35.7], [-122.0, 34.0]], major: true },
-  { id: 'sjc2', name: 'SJC2', points: [[103.8, 1.3], [121.5, 14.5], [121.5, 25.0], [139.7, 35.7]], major: true },
+  // === ASIA-PACIFIC (3 - regional backbone + Australia) ===
+  { id: 'apg', name: 'APG', points: [[139.7, 35.7], [121.5, 25.0], [114.0, 22.3], [103.8, 1.3]], major: true },
   { id: 'indigo', name: 'Indigo', points: [[103.8, 1.3], [115.0, -8.0], [151.0, -34.0]], major: true },
-  { id: 'jga_n', name: 'JGA-N', points: [[139.7, 35.7], [-170.0, 25.0], [-157.0, 21.0]], major: true },
-  { id: 'jga_s', name: 'JGA-S', points: [[139.7, 35.7], [-157.0, 21.0]], major: true },
-  { id: 'australia_singapore', name: 'Australia-Singapore', points: [[151.0, -34.0], [115.0, -8.0], [103.8, 1.3]], major: true },
+  { id: 'sjc', name: 'SJC', points: [[103.8, 1.3], [114.0, 22.3], [139.7, 35.7], [-122.0, 34.0]], major: true },
 
-  // === MIDDLE EAST ===
-  { id: 'falcon', name: 'Falcon', points: [[55.0, 24.0], [56.0, 25.0], [51.5, 26.0], [48.0, 29.0]], major: true },
-  { id: 'gulf_bridge', name: 'Gulf Bridge', points: [[51.0, 26.0], [55.0, 24.0], [57.0, 22.0]], major: true },
-
-  // === EUROPE INTERNAL ===
-  { id: 'celtic_norse', name: 'Celtic Norse', points: [[-6.0, 53.0], [-10.0, 60.0], [5.0, 62.0]], major: true },
+  // === ARCTIC/EUROPE (1 - Iceland connectivity) ===
   { id: 'farice', name: 'FARICE', points: [[-22.0, 64.0], [-7.0, 62.0], [-6.0, 53.0]], major: true },
-  { id: 'greenland_connect', name: 'Greenland Connect', points: [[-43.0, 64.0], [-22.0, 64.0]], major: true },
-  { id: 'uk_france', name: 'UK-France', points: [[0.0, 51.0], [1.0, 50.0], [1.5, 49.0]], major: true },
-  { id: 'baltic', name: 'Baltic Sea cables', points: [[12.0, 56.0], [18.0, 59.0], [25.0, 60.0]], major: true },
+
+  // === MIDDLE EAST (1 - Gulf region) ===
+  { id: 'falcon', name: 'Falcon', points: [[55.0, 24.0], [56.0, 25.0], [51.5, 26.0], [48.0, 29.0]], major: true },
 ];
 
 export const NUCLEAR_FACILITIES: NuclearFacility[] = [
