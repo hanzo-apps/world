@@ -5,7 +5,7 @@ import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 // Prod: Railway WebSocket relay (Vercel serves frontend)
 const AISSTREAM_URL = import.meta.env.DEV
   ? 'ws://localhost:3004'
-  : 'wss://worldmonitor-production.up.railway.app';
+  : 'wss://worldmonitor-production-ws.up.railway.app';
 
 // Grid cell size for density aggregation (degrees)
 const GRID_SIZE = 2;
