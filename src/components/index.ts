@@ -10,3 +10,4 @@ export * from './PlaybackControl';
 export * from './StatusPanel';
 export * from './EconomicPanel';
 export * from './SearchModal';
+export * from './MobileWarningModal';
