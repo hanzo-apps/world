@@ -315,6 +315,21 @@ body {
   background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.panel-header-error {
+  background: rgba(255, 50, 50, 0.15);
+  border-bottom-color: rgba(255, 80, 80, 0.5);
+}
+
+.panel-header-error .panel-title {
+  color: #ff6b6b;
+}
+
+.panel-header-error .panel-count {
+  background: rgba(255, 80, 80, 0.3);
+  color: #ff6b6b;
 }
 
 .panel-header-left {

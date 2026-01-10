@@ -1565,7 +1565,8 @@ export class MapComponent {
     btn?.classList.toggle('active');
 
     this.onLayerChange?.(layer, this.state.layers[layer]);
-    this.render();
+    // Defer render to next frame to avoid blocking the click handler
+    requestAnimationFrame(() => this.render());
   }
 
   public setOnLayerChange(callback: (layer: keyof MapLayers, enabled: boolean) => void): void {
