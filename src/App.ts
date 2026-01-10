@@ -28,6 +28,7 @@ import {
   StatusPanel,
   EconomicPanel,
   SearchModal,
+  MobileWarningModal,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
@@ -51,6 +52,7 @@ export class App {
   private exportPanel: ExportPanel | null = null;
   private economicPanel: EconomicPanel | null = null;
   private searchModal: SearchModal | null = null;
+  private mobileWarningModal: MobileWarningModal | null = null;
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
   private latestClusters: ClusteredEvent[] = [];
@@ -86,6 +88,7 @@ export class App {
 
     this.renderLayout();
     this.signalModal = new SignalModal();
+    this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
     this.setupExportPanel();
@@ -106,6 +109,13 @@ export class App {
     this.setupRefreshIntervals();
     this.setupSnapshotSaving();
     cleanOldSnapshots();
+  }
+
+  private setupMobileWarning(): void {
+    if (MobileWarningModal.shouldShow()) {
+      this.mobileWarningModal = new MobileWarningModal();
+      this.mobileWarningModal.show();
+    }
   }
 
   private setupStatusPanel(): void {
