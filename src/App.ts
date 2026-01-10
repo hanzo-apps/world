@@ -11,7 +11,7 @@ import {
   STORAGE_KEYS,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
-import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel } from '@/utils';
+import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
   MapComponent,
@@ -151,7 +151,7 @@ export class App {
       economicContainer.classList.add('hidden');
     }
 
-    const main = this.container.querySelector('.main');
+    const main = this.container.querySelector('.main-content');
     if (main) {
       main.appendChild(economicContainer);
     }
@@ -1334,13 +1334,38 @@ export class App {
   }
 
   private async loadFredData(): Promise<void> {
+    const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
+    if (cbInfo.onCooldown) {
+      this.economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${cbInfo.remainingSeconds}s)`);
+      this.statusPanel?.updateApi('FRED', { status: 'error' });
+      return;
+    }
+
     try {
       this.economicPanel?.setLoading(true);
       const data = await fetchFredData();
+
+      // Check if circuit breaker tripped after fetch
+      const postInfo = getCircuitBreakerCooldownInfo('FRED Economic');
+      if (postInfo.onCooldown) {
+        this.economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${postInfo.remainingSeconds}s)`);
+        this.statusPanel?.updateApi('FRED', { status: 'error' });
+        return;
+      }
+
+      if (data.length === 0) {
+        // Data fetch failed but not yet on cooldown - show error state
+        this.economicPanel?.setErrorState(true, 'Failed to load economic data');
+        this.statusPanel?.updateApi('FRED', { status: 'error' });
+        return;
+      }
+
+      this.economicPanel?.setErrorState(false);
       this.economicPanel?.update(data);
       this.statusPanel?.updateApi('FRED', { status: 'ok' });
     } catch {
       this.statusPanel?.updateApi('FRED', { status: 'error' });
+      this.economicPanel?.setErrorState(true, 'Failed to load data');
       this.economicPanel?.setLoading(false);
     }
   }
