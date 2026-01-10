@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -1117,8 +1117,12 @@ export class App {
     // Update monitors
     this.updateMonitorResults();
 
-    // Update clusters for correlation analysis
-    this.latestClusters = clusterNews(this.allNews);
+    // Update clusters for correlation analysis (off main thread via Web Worker)
+    try {
+      this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+    } catch (error) {
+      console.error('[App] Worker clustering failed, clusters unchanged:', error);
+    }
   }
 
   private async loadMarkets(): Promise<void> {
@@ -1187,7 +1191,8 @@ export class App {
       this.statusPanel?.updateFeed('Polymarket', { status: 'ok', itemCount: predictions.length });
       this.statusPanel?.updateApi('Polymarket', { status: 'ok' });
 
-      this.runCorrelationAnalysis();
+      // Run correlation analysis in background (fire-and-forget via Web Worker)
+      void this.runCorrelationAnalysis();
     } catch (error) {
       this.statusPanel?.updateFeed('Polymarket', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('Polymarket', { status: 'error' });
@@ -1340,20 +1345,26 @@ export class App {
     monitorPanel.renderResults(this.allNews);
   }
 
-  private runCorrelationAnalysis(): void {
-    if (this.latestClusters.length === 0) {
-      this.latestClusters = clusterNews(this.allNews);
-    }
+  private async runCorrelationAnalysis(): Promise<void> {
+    try {
+      // Ensure we have clusters (compute via worker if needed)
+      if (this.latestClusters.length === 0 && this.allNews.length > 0) {
+        this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+      }
 
-    const signals = analyzeCorrelations(
-      this.latestClusters,
-      this.latestPredictions,
-      this.latestMarkets
-    );
+      // Run correlation analysis off main thread via Web Worker
+      const signals = await analysisWorker.analyzeCorrelations(
+        this.latestClusters,
+        this.latestPredictions,
+        this.latestMarkets
+      );
 
-    if (signals.length > 0) {
-      addToSignalHistory(signals);
-      this.signalModal?.show(signals);
+      if (signals.length > 0) {
+        addToSignalHistory(signals);
+        this.signalModal?.show(signals);
+      }
+    } catch (error) {
+      console.error('[App] Correlation analysis failed:', error);
     }
   }
 
