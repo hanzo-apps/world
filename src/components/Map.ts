@@ -50,6 +50,19 @@ interface USTopology extends Topology {
   };
 }
 
+type ClusterLayerConfig = {
+  minZoom: number;
+  color: string;
+  baseSize: number;
+};
+
+type ClusterPoint = {
+  x: number;
+  y: number;
+  color: [number, number, number, number];
+  baseSize: number;
+};
+
 export class MapComponent {
   private static readonly LAYER_ZOOM_THRESHOLDS: Partial<
     Record<keyof MapLayers, { minZoom: number; showLabels?: number }>
@@ -60,11 +73,33 @@ export class MapComponent {
     economic: { minZoom: 2, showLabels: 4 },
     earthquakes: { minZoom: 1, showLabels: 2 },
   };
+  private static readonly CLUSTER_LAYER_CONFIG: Partial<Record<keyof MapLayers, ClusterLayerConfig>> = {
+    hotspots: { minZoom: 2.2, color: '#6ee7ff', baseSize: 8 },
+    bases: { minZoom: 2.8, color: '#ff8b6a', baseSize: 9 },
+    nuclear: { minZoom: 2.4, color: '#f472b6', baseSize: 10 },
+    irradiators: { minZoom: 2.4, color: '#f59e0b', baseSize: 8 },
+    earthquakes: { minZoom: 2.2, color: '#ffd166', baseSize: 9 },
+    economic: { minZoom: 2.4, color: '#34d399', baseSize: 9 },
+    weather: { minZoom: 2.4, color: '#60a5fa', baseSize: 9 },
+    outages: { minZoom: 2.4, color: '#e879f9', baseSize: 9 },
+    datacenters: { minZoom: 2.4, color: '#a78bfa', baseSize: 9 },
+    protests: { minZoom: 2.4, color: '#fb7185', baseSize: 9 },
+    flights: { minZoom: 2.4, color: '#fbbf24', baseSize: 9 },
+    ais: { minZoom: 2.2, color: '#22d3ee', baseSize: 10 },
+  };
 
   private container: HTMLElement;
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   private wrapper: HTMLElement;
   private overlays: HTMLElement;
+  private clusterCanvas: HTMLCanvasElement;
+  private clusterGl: WebGLRenderingContext | null = null;
+  private clusterProgram: WebGLProgram | null = null;
+  private clusterBuffers: {
+    position: WebGLBuffer;
+    color: WebGLBuffer;
+    size: WebGLBuffer;
+  } | null = null;
   private state: MapState;
   private worldData: WorldTopology | null = null;
   private usData: USTopology | null = null;
@@ -92,6 +127,7 @@ export class MapComponent {
     base: new Set(),
     nuclear: new Set(),
   };
+  private clusterModeEnabled = false;
 
   constructor(container: HTMLElement, initialState: MapState) {
     this.container = container;
@@ -107,6 +143,11 @@ export class MapComponent {
     svgElement.id = 'mapSvg';
     this.wrapper.appendChild(svgElement);
 
+    this.clusterCanvas = document.createElement('canvas');
+    this.clusterCanvas.className = 'map-cluster-canvas';
+    this.clusterCanvas.id = 'mapClusterCanvas';
+    this.wrapper.appendChild(this.clusterCanvas);
+
     // Overlays inside wrapper so they transform together on zoom/pan
     this.overlays = document.createElement('div');
     this.overlays.id = 'mapOverlays';
@@ -121,6 +162,7 @@ export class MapComponent {
 
     this.svg = d3.select(svgElement);
     this.popup = new MapPopup(container);
+    this.initClusterRenderer();
 
     this.setupZoomHandlers();
     this.loadMapData();
@@ -441,6 +483,334 @@ export class MapComponent {
     }
   }
 
+  private initClusterRenderer(): void {
+    const gl = this.clusterCanvas.getContext('webgl');
+    if (!gl) {
+      console.warn('[Map] WebGL not available; cluster renderer disabled.');
+      return;
+    }
+
+    const vertexSource = `
+      attribute vec2 a_position;
+      attribute vec4 a_color;
+      attribute float a_size;
+      varying vec4 v_color;
+      void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        gl_PointSize = a_size;
+        v_color = a_color;
+      }
+    `;
+    const fragmentSource = `
+      precision mediump float;
+      varying vec4 v_color;
+      void main() {
+        vec2 coord = gl_PointCoord.xy - vec2(0.5);
+        float dist = length(coord);
+        if (dist > 0.5) {
+          discard;
+        }
+        gl_FragColor = v_color;
+      }
+    `;
+
+    const vertexShader = this.compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = this.compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+    if (!vertexShader || !fragmentShader) return;
+
+    const program = gl.createProgram();
+    if (!program) return;
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.warn('[Map] Failed to link WebGL program', gl.getProgramInfoLog(program));
+      return;
+    }
+
+    const positionBuffer = gl.createBuffer();
+    const colorBuffer = gl.createBuffer();
+    const sizeBuffer = gl.createBuffer();
+    if (!positionBuffer || !colorBuffer || !sizeBuffer) return;
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    this.clusterGl = gl;
+    this.clusterProgram = program;
+    this.clusterBuffers = {
+      position: positionBuffer,
+      color: colorBuffer,
+      size: sizeBuffer,
+    };
+  }
+
+  private compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
+    const shader = gl.createShader(type);
+    if (!shader) return null;
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.warn('[Map] Shader compile error', gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+
+  private resizeClusterCanvas(): void {
+    const gl = this.clusterGl;
+    if (!gl) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    const displayWidth = Math.floor(width * dpr);
+    const displayHeight = Math.floor(height * dpr);
+    if (this.clusterCanvas.width !== displayWidth || this.clusterCanvas.height !== displayHeight) {
+      this.clusterCanvas.width = displayWidth;
+      this.clusterCanvas.height = displayHeight;
+      this.clusterCanvas.style.width = `${width}px`;
+      this.clusterCanvas.style.height = `${height}px`;
+    }
+    gl.viewport(0, 0, this.clusterCanvas.width, this.clusterCanvas.height);
+  }
+
+  private clearClusterCanvas(): void {
+    if (!this.clusterGl) return;
+    this.clusterGl.clearColor(0, 0, 0, 0);
+    this.clusterGl.clear(this.clusterGl.COLOR_BUFFER_BIT);
+  }
+
+  private isLayerClustered(layer: keyof MapLayers, clustersActive: boolean): boolean {
+    if (!clustersActive) return false;
+    const config = MapComponent.CLUSTER_LAYER_CONFIG[layer];
+    if (!config) return false;
+    return this.state.zoom < config.minZoom;
+  }
+
+  private renderClusterLayer(projection: d3.GeoProjection): void {
+    if (!this.clusterGl || !this.clusterProgram || !this.clusterBuffers) {
+      this.clusterModeEnabled = false;
+      return;
+    }
+
+    const activeLayers = (Object.keys(MapComponent.CLUSTER_LAYER_CONFIG) as (keyof MapLayers)[])
+      .filter((layer) => this.state.layers[layer])
+      .filter((layer) => this.isLayerClustered(layer, true));
+
+    this.clusterModeEnabled = activeLayers.length > 0;
+    this.wrapper.classList.toggle('cluster-active', this.clusterModeEnabled);
+    this.resizeClusterCanvas();
+
+    if (!this.clusterModeEnabled) {
+      this.clearClusterCanvas();
+      return;
+    }
+
+    const points: ClusterPoint[] = [];
+    const isGlobalOrMena = this.state.view === 'global' || this.state.view === 'mena';
+
+    if (this.state.layers.hotspots && this.isLayerClustered('hotspots', true) && isGlobalOrMena) {
+      this.hotspots.forEach((spot) => {
+        const pos = projection([spot.lon, spot.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'hotspots'));
+      });
+    }
+
+    if (this.state.layers.bases && this.isLayerClustered('bases', true)) {
+      MILITARY_BASES.forEach((base) => {
+        const pos = projection([base.lon, base.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'bases'));
+      });
+    }
+
+    if (this.state.layers.nuclear && this.isLayerClustered('nuclear', true)) {
+      NUCLEAR_FACILITIES.forEach((facility) => {
+        const pos = projection([facility.lon, facility.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'nuclear'));
+      });
+    }
+
+    if (this.state.layers.irradiators && this.isLayerClustered('irradiators', true)) {
+      GAMMA_IRRADIATORS.forEach((irradiator) => {
+        const pos = projection([irradiator.lon, irradiator.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'irradiators'));
+      });
+    }
+
+    if (this.state.layers.earthquakes && this.isLayerClustered('earthquakes', true)) {
+      const filteredQuakes = this.filterByTime(this.earthquakes);
+      filteredQuakes.forEach((eq) => {
+        const pos = projection([eq.lon, eq.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'earthquakes'));
+      });
+    }
+
+    if (this.state.layers.economic && this.isLayerClustered('economic', true)) {
+      ECONOMIC_CENTERS.forEach((center) => {
+        const pos = projection([center.lon, center.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'economic'));
+      });
+    }
+
+    if (this.state.layers.weather && this.isLayerClustered('weather', true)) {
+      this.weatherAlerts.forEach((alert) => {
+        if (!alert.centroid) return;
+        const pos = projection(alert.centroid);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'weather'));
+      });
+    }
+
+    if (this.state.layers.outages && this.isLayerClustered('outages', true)) {
+      this.outages.forEach((outage) => {
+        const pos = projection([outage.lon, outage.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'outages'));
+      });
+    }
+
+    if (this.state.layers.datacenters && this.isLayerClustered('datacenters', true)) {
+      const MIN_GPU_COUNT = 10000;
+      AI_DATA_CENTERS.filter(dc => (dc.chipCount || 0) >= MIN_GPU_COUNT).forEach((dc) => {
+        const pos = projection([dc.lon, dc.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'datacenters'));
+      });
+    }
+
+    if (this.state.layers.protests && this.isLayerClustered('protests', true)) {
+      this.protests.forEach((event) => {
+        const pos = projection([event.lon, event.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'protests'));
+      });
+    }
+
+    if (this.state.layers.flights && this.isLayerClustered('flights', true)) {
+      this.flightDelays.forEach((delay) => {
+        const pos = projection([delay.lon, delay.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'flights'));
+      });
+    }
+
+    if (this.state.layers.ais && this.isLayerClustered('ais', true) && isGlobalOrMena) {
+      this.aisDisruptions.forEach((event) => {
+        const pos = projection([event.lon, event.lat]);
+        if (!pos) return;
+        points.push(this.buildClusterPoint(pos[0], pos[1], 'ais'));
+      });
+    }
+
+    this.drawClusterPoints(points);
+  }
+
+  private buildClusterPoint(x: number, y: number, layer: keyof MapLayers): ClusterPoint {
+    const config = MapComponent.CLUSTER_LAYER_CONFIG[layer];
+    const color = this.hexToRgba(config?.color ?? '#ffffff', 0.85);
+    return {
+      x,
+      y,
+      color,
+      baseSize: config?.baseSize ?? 8,
+    };
+  }
+
+  private hexToRgba(hex: string, alpha: number): [number, number, number, number] {
+    const normalized = hex.replace('#', '');
+    const value = normalized.length === 3
+      ? normalized.split('').map((c) => c + c).join('')
+      : normalized.padEnd(6, '0');
+    const intVal = parseInt(value, 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return [r / 255, g / 255, b / 255, alpha];
+  }
+
+  private drawClusterPoints(points: ClusterPoint[]): void {
+    const gl = this.clusterGl;
+    const program = this.clusterProgram;
+    const buffers = this.clusterBuffers;
+    if (!gl || !program || !buffers) return;
+
+    this.clearClusterCanvas();
+    if (points.length === 0) return;
+
+    const zoom = this.state.zoom;
+    const cellSize = Math.max(20, 80 / zoom);
+    const clusters = new Map<string, { x: number; y: number; count: number; color: [number, number, number, number]; baseSize: number }>();
+
+    points.forEach((point) => {
+      const gridX = Math.floor(point.x / cellSize);
+      const gridY = Math.floor(point.y / cellSize);
+      const key = `${gridX}:${gridY}:${point.color.join(',')}:${point.baseSize}`;
+      const bucket = clusters.get(key);
+      if (bucket) {
+        bucket.x += point.x;
+        bucket.y += point.y;
+        bucket.count += 1;
+      } else {
+        clusters.set(key, {
+          x: point.x,
+          y: point.y,
+          count: 1,
+          color: point.color,
+          baseSize: point.baseSize,
+        });
+      }
+    });
+
+    const positions: number[] = [];
+    const colors: number[] = [];
+    const sizes: number[] = [];
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+
+    clusters.forEach((cluster) => {
+      const count = cluster.count;
+      const avgX = cluster.x / count;
+      const avgY = cluster.y / count;
+      const x = (avgX / width) * 2 - 1;
+      const y = (avgY / height) * -2 + 1;
+      const size = Math.min(48, cluster.baseSize + Math.log2(count + 1) * 6);
+
+      positions.push(x, y);
+      colors.push(cluster.color[0], cluster.color[1], cluster.color[2], cluster.color[3]);
+      sizes.push(size * (window.devicePixelRatio || 1));
+    });
+
+    gl.useProgram(program);
+
+    const positionLoc = gl.getAttribLocation(program, 'a_position');
+    const colorLoc = gl.getAttribLocation(program, 'a_color');
+    const sizeLoc = gl.getAttribLocation(program, 'a_size');
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(positionLoc);
+    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(colorLoc);
+    gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.size);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sizes), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(sizeLoc);
+    gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.POINTS, 0, sizes.length);
+  }
+
   public render(): void {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
@@ -490,6 +860,9 @@ export class MapComponent {
     if (this.state.layers.sanctions && showGlobalLayers) {
       this.renderSanctions();
     }
+
+    // GPU-accelerated cluster markers (LOD)
+    this.renderClusterLayer(projection);
 
     // Overlays
     this.renderOverlays(projection);
@@ -740,6 +1113,7 @@ export class MapComponent {
     this.overlays.innerHTML = '';
 
     const isGlobalOrMena = this.state.view === 'global' || this.state.view === 'mena';
+    const clustersActive = this.clusterModeEnabled;
 
     // Global/MENA only overlays
     if (isGlobalOrMena) {
@@ -758,7 +1132,7 @@ export class MapComponent {
         this.renderWaterways(projection);
       }
 
-      if (this.state.layers.ais) {
+      if (this.state.layers.ais && !this.isLayerClustered('ais', clustersActive)) {
         this.renderAisDisruptions(projection);
       }
 
@@ -767,7 +1141,7 @@ export class MapComponent {
     }
 
     // Nuclear facilities
-    if (this.state.layers.nuclear) {
+    if (this.state.layers.nuclear && !this.isLayerClustered('nuclear', clustersActive)) {
       NUCLEAR_FACILITIES.forEach((facility) => {
         const pos = projection([facility.lon, facility.lat]);
         if (!pos) return;
@@ -800,7 +1174,7 @@ export class MapComponent {
     }
 
     // Gamma irradiators (IAEA DIIF)
-    if (this.state.layers.irradiators) {
+    if (this.state.layers.irradiators && !this.isLayerClustered('irradiators', clustersActive)) {
       GAMMA_IRRADIATORS.forEach((irradiator) => {
         const pos = projection([irradiator.lon, irradiator.lat]);
         if (!pos) return;
@@ -861,7 +1235,7 @@ export class MapComponent {
     }
 
     // Hotspots
-    if (this.state.layers.hotspots) {
+    if (this.state.layers.hotspots && !this.isLayerClustered('hotspots', clustersActive)) {
       this.hotspots.forEach((spot) => {
         const pos = projection([spot.lon, spot.lat]);
         if (!pos) return;
@@ -905,7 +1279,7 @@ export class MapComponent {
     }
 
     // Military bases
-    if (this.state.layers.bases) {
+    if (this.state.layers.bases && !this.isLayerClustered('bases', clustersActive)) {
       MILITARY_BASES.forEach((base) => {
         const pos = projection([base.lon, base.lat]);
         if (!pos) return;
@@ -937,7 +1311,7 @@ export class MapComponent {
     }
 
     // Earthquakes
-    if (this.state.layers.earthquakes) {
+    if (this.state.layers.earthquakes && !this.isLayerClustered('earthquakes', clustersActive)) {
       console.log('[Map] Rendering earthquakes. Total:', this.earthquakes.length, 'Layer enabled:', this.state.layers.earthquakes);
       const filteredQuakes = this.filterByTime(this.earthquakes);
       console.log('[Map] After time filter:', filteredQuakes.length, 'earthquakes. TimeRange:', this.state.timeRange);
@@ -981,7 +1355,7 @@ export class MapComponent {
     }
 
     // Economic Centers
-    if (this.state.layers.economic) {
+    if (this.state.layers.economic && !this.isLayerClustered('economic', clustersActive)) {
       ECONOMIC_CENTERS.forEach((center) => {
         const pos = projection([center.lon, center.lat]);
         if (!pos) return;
@@ -1017,7 +1391,7 @@ export class MapComponent {
     }
 
     // Weather Alerts
-    if (this.state.layers.weather) {
+    if (this.state.layers.weather && !this.isLayerClustered('weather', clustersActive)) {
       this.weatherAlerts.forEach((alert) => {
         if (!alert.centroid) return;
         const pos = projection(alert.centroid);
@@ -1055,7 +1429,7 @@ export class MapComponent {
     }
 
     // Internet Outages
-    if (this.state.layers.outages) {
+    if (this.state.layers.outages && !this.isLayerClustered('outages', clustersActive)) {
       this.outages.forEach((outage) => {
         const pos = projection([outage.lon, outage.lat]);
         if (!pos) return;
@@ -1161,7 +1535,7 @@ export class MapComponent {
 
     // AI Data Centers (filter to significant clusters only: ≥10k GPUs)
     const MIN_GPU_COUNT = 10000;
-    if (this.state.layers.datacenters) {
+    if (this.state.layers.datacenters && !this.isLayerClustered('datacenters', clustersActive)) {
       AI_DATA_CENTERS.filter(dc => (dc.chipCount || 0) >= MIN_GPU_COUNT).forEach((dc) => {
         const pos = projection([dc.lon, dc.lat]);
         if (!pos) return;
@@ -1198,7 +1572,7 @@ export class MapComponent {
     }
 
     // Protests / Social Unrest Events
-    if (this.state.layers.protests) {
+    if (this.state.layers.protests && !this.isLayerClustered('protests', clustersActive)) {
       this.protests.forEach((event) => {
         const pos = projection([event.lon, event.lat]);
         if (!pos) return;
@@ -1240,7 +1614,7 @@ export class MapComponent {
     }
 
     // Flight Delays
-    if (this.state.layers.flights) {
+    if (this.state.layers.flights && !this.isLayerClustered('flights', clustersActive)) {
       this.flightDelays.forEach((delay) => {
         const pos = projection([delay.lon, delay.lat]);
         if (!pos) return;
