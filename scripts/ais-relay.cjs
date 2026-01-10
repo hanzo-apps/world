@@ -8,7 +8,13 @@
 const { WebSocketServer, WebSocket } = require('ws');
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
-const API_KEY = process.env.VITE_AISSTREAM_API_KEY || '89d016072ccfbf8ba2e06c0e9888dbfe6ec74c86';
+const API_KEY = process.env.VITE_AISSTREAM_API_KEY;
+
+if (!API_KEY) {
+  console.error('[Relay] Error: VITE_AISSTREAM_API_KEY environment variable not set');
+  console.error('[Relay] Get a free key at https://aisstream.io');
+  process.exit(1);
+}
 const LOCAL_PORT = 3004;
 
 let upstreamSocket = null;
