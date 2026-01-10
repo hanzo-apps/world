@@ -3,9 +3,8 @@ import { INTEL_HOTSPOTS } from '@/config';
 import { generateId } from '@/utils';
 
 // ACLED API - requires free registration at acleddata.com
-const ACLED_API_URL = '/api/acled/acled/read';
-const ACLED_API_KEY = import.meta.env.VITE_ACLED_API_KEY || '';
-const ACLED_EMAIL = import.meta.env.VITE_ACLED_EMAIL || '';
+const ACLED_API_URL = '/api/acled/api/acled/read';
+const ACLED_ACCESS_TOKEN = import.meta.env.VITE_ACLED_ACCESS_TOKEN || '';
 
 // GDELT GEO 2.0 API - no auth required
 const GDELT_GEO_URL = '/api/gdelt/api/v2/geo/geo';
@@ -69,26 +68,29 @@ interface AcledEvent {
 }
 
 async function fetchAcledEvents(): Promise<SocialUnrestEvent[]> {
-  if (!ACLED_API_KEY || !ACLED_EMAIL) {
-    console.warn('[Protests] ACLED API key not configured. Get free key at acleddata.com');
+  if (!ACLED_ACCESS_TOKEN) {
+    console.warn('[Protests] ACLED access token not configured. Get token at acleddata.com');
     return [];
   }
 
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const dateStr = thirtyDaysAgo.toISOString().split('T')[0] || '';
+    const startDate = thirtyDaysAgo.toISOString().split('T')[0] || '';
+    const endDate = new Date().toISOString().split('T')[0] || '';
 
     const params = new URLSearchParams();
-    params.set('key', ACLED_API_KEY);
-    params.set('email', ACLED_EMAIL);
     params.set('event_type', 'Protests');
-    params.set('event_date', dateStr);
-    params.set('event_date_where', '>=');
+    params.set('event_date', `${startDate}|${endDate}`);
+    params.set('event_date_where', 'BETWEEN');
     params.set('limit', '500');
+    params.set('_format', 'json');
 
     const response = await fetch(`${ACLED_API_URL}?${params}`, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${ACLED_ACCESS_TOKEN}`,
+      },
     });
 
     if (!response.ok) {
@@ -132,102 +134,96 @@ async function fetchAcledEvents(): Promise<SocialUnrestEvent[]> {
   }
 }
 
-interface GdeltFeature {
+interface GdeltGeoFeature {
   type: 'Feature';
   geometry: {
     type: 'Point';
     coordinates: [number, number];
   };
   properties: {
-    url: string;
-    urlmobile?: string;
-    title: string;
-    seendate: string;
-    socialimage?: string;
-    domain: string;
-    language: string;
-    sourcecountry?: string;
-    tone?: number;
+    name: string;
+    count: number;
+    shareimage?: string;
+    html?: string;
   };
 }
 
 interface GdeltGeoResponse {
   type: 'FeatureCollection';
-  features: GdeltFeature[];
+  features: GdeltGeoFeature[];
 }
 
 async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
   try {
-    const queries = [
-      'protest OR demonstration',
-      'riot OR unrest',
-      'strike workers',
-    ];
+    // GDELT GEO API - use simple query to avoid encoding issues
+    // "protest" captures most civil unrest events
+    const params = new URLSearchParams({
+      query: 'protest',
+      format: 'geojson',
+      maxrecords: '250',
+      timespan: '7d',
+    });
 
-    const allEvents: SocialUnrestEvent[] = [];
-    const seenUrls = new Set<string>();
+    const response = await fetch(`${GDELT_GEO_URL}?${params}`, {
+      headers: { Accept: 'application/json' },
+    });
 
-    for (const query of queries) {
-      const params = new URLSearchParams({
-        query,
-        format: 'geojson',
-        maxrecords: '100',
-        timespan: '7d',
-      });
-
-      const response = await fetch(`${GDELT_GEO_URL}?${params}`, {
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) continue;
-
-      const data: GdeltGeoResponse = await response.json();
-
-      for (const feature of data.features || []) {
-        if (seenUrls.has(feature.properties.url)) continue;
-        seenUrls.add(feature.properties.url);
-
-        const [lon, lat] = feature.geometry.coordinates;
-        const title = feature.properties.title;
-        const tone = feature.properties.tone || 0;
-
-        let sentiment: 'angry' | 'peaceful' | 'mixed' = 'mixed';
-        if (tone < -3) sentiment = 'angry';
-        else if (tone > 1) sentiment = 'peaceful';
-
-        let severity: ProtestSeverity = 'medium';
-        const lowerTitle = title.toLowerCase();
-        if (lowerTitle.includes('riot') || lowerTitle.includes('clash') || lowerTitle.includes('violence')) {
-          severity = 'high';
-        } else if (lowerTitle.includes('peaceful') || lowerTitle.includes('march')) {
-          severity = 'low';
-        }
-
-        let eventType: ProtestEventType = 'protest';
-        if (lowerTitle.includes('riot')) eventType = 'riot';
-        else if (lowerTitle.includes('strike')) eventType = 'strike';
-        else if (lowerTitle.includes('demonstration')) eventType = 'demonstration';
-
-        allEvents.push({
-          id: `gdelt-${generateId()}`,
-          title,
-          eventType,
-          country: feature.properties.sourcecountry || 'Unknown',
-          lat,
-          lon,
-          time: new Date(feature.properties.seendate),
-          severity,
-          sources: [feature.properties.domain],
-          sourceType: 'gdelt',
-          relatedHotspots: findNearbyHotspots(lat, lon),
-          confidence: 'medium',
-          validated: false,
-          imageUrl: feature.properties.socialimage,
-          sentiment,
-        });
-      }
+    if (!response.ok) {
+      console.error('[Protests] GDELT API error:', response.status);
+      return [];
     }
 
+    const data: GdeltGeoResponse = await response.json();
+    const allEvents: SocialUnrestEvent[] = [];
+    const seenLocations = new Set<string>();
+
+    for (const feature of data.features || []) {
+      const name = feature.properties.name || '';
+      if (!name || seenLocations.has(name)) continue;
+
+      const count = feature.properties.count || 1;
+      // Only show high-signal locations (200+ reports)
+      if (count < 200) continue;
+
+      seenLocations.add(name);
+
+      const [lon, lat] = feature.geometry.coordinates;
+      const lowerName = name.toLowerCase();
+
+      let severity: ProtestSeverity = 'medium';
+      if (count > 100 || lowerName.includes('riot') || lowerName.includes('clash')) {
+        severity = 'high';
+      } else if (count < 25) {
+        severity = 'low';
+      }
+
+      let eventType: ProtestEventType = 'protest';
+      if (lowerName.includes('riot')) eventType = 'riot';
+      else if (lowerName.includes('strike')) eventType = 'strike';
+      else if (lowerName.includes('demonstration')) eventType = 'demonstration';
+
+      const country = name.split(',').pop()?.trim() || name;
+
+      allEvents.push({
+        id: `gdelt-${generateId()}`,
+        title: `${name} (${count} reports)`,
+        eventType,
+        country,
+        city: name.split(',')[0]?.trim(),
+        lat,
+        lon,
+        time: new Date(),
+        severity,
+        sources: ['GDELT'],
+        sourceType: 'gdelt',
+        relatedHotspots: findNearbyHotspots(lat, lon),
+        confidence: count > 20 ? 'high' : 'medium',
+        validated: count > 30,
+        imageUrl: feature.properties.shareimage,
+      });
+    }
+
+    console.log(`[Protests] GDELT returned ${allEvents.length} locations`);
     return allEvents;
   } catch (error) {
     console.error('[Protests] GDELT fetch error:', error);
@@ -326,7 +322,7 @@ export async function fetchProtestEvents(): Promise<ProtestData> {
 
 export function getProtestStatus(): { acledConfigured: boolean; gdeltAvailable: boolean } {
   return {
-    acledConfigured: Boolean(ACLED_API_KEY && ACLED_EMAIL),
+    acledConfigured: Boolean(ACLED_ACCESS_TOKEN),
     gdeltAvailable: true,
   };
 }

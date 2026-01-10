@@ -332,7 +332,7 @@ export default defineConfig({
       },
       // ACLED - Armed Conflict Location & Event Data (protests, riots)
       '/api/acled': {
-        target: 'https://api.acleddata.com',
+        target: 'https://acleddata.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/acled/, ''),
       },

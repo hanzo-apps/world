@@ -54,7 +54,12 @@ export function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const stored = localStorage.getItem(key);
     if (stored) {
-      return JSON.parse(stored) as T;
+      const parsed = JSON.parse(stored) as T;
+      // Merge with defaults for object types to handle new properties
+      if (typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)) {
+        return { ...defaultValue, ...parsed };
+      }
+      return parsed;
     }
   } catch (e) {
     console.warn(`Failed to load ${key} from storage:`, e);

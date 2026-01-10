@@ -227,7 +227,7 @@ export class MapComponent {
     toggles.className = 'layer-toggles';
     toggles.id = 'layerToggles';
 
-    const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways'];
+    const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways', 'protests'];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'AIS',
     };
@@ -434,21 +434,41 @@ export class MapComponent {
   public render(): void {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+    const mapHeight = width / 2; // Equirectangular 2:1 ratio
+    const renderHeight = Math.max(height, mapHeight);
+    const yOffset = (height - renderHeight) / 2; // Negative when map > container
 
-    this.svg.attr('viewBox', `0 0 ${width} ${height}`);
+    // ViewBox includes full map extent
+    this.svg.attr('viewBox', `0 ${yOffset} ${width} ${renderHeight}`);
     this.svg.selectAll('*').remove();
 
-    // Background
+    // Reset SVG and overlays positioning
+    const svgElement = this.svg.node() as SVGElement;
+    svgElement.style.position = '';
+    svgElement.style.top = '';
+    svgElement.style.left = '';
+    svgElement.style.width = '';
+    svgElement.style.height = '';
+    svgElement.style.overflow = 'visible';
+
+    this.overlays.style.position = '';
+    this.overlays.style.top = '';
+    this.overlays.style.left = '';
+    this.overlays.style.width = '';
+    this.overlays.style.height = '';
+
+    // Background covers full map extent
     this.svg
       .append('rect')
+      .attr('y', yOffset)
       .attr('width', width)
-      .attr('height', height)
+      .attr('height', renderHeight)
       .attr('fill', '#020a08');
 
-    // Grid
-    this.renderGrid(width, height);
+    // Grid covers full map extent
+    this.renderGrid(width, renderHeight, yOffset);
 
-    // Setup projection
+    // Setup projection centered in container
     const projection = this.getProjection(width, height);
     const path = d3.geoPath().projection(projection);
 
@@ -486,21 +506,21 @@ export class MapComponent {
     this.applyTransform();
   }
 
-  private renderGrid(width: number, height: number): void {
+  private renderGrid(width: number, height: number, yStart = 0): void {
     const gridGroup = this.svg.append('g').attr('class', 'grid');
 
     for (let x = 0; x < width; x += 20) {
       gridGroup
         .append('line')
         .attr('x1', x)
-        .attr('y1', 0)
+        .attr('y1', yStart)
         .attr('x2', x)
-        .attr('y2', height)
+        .attr('y2', yStart + height)
         .attr('stroke', '#0a2a20')
         .attr('stroke-width', 0.5);
     }
 
-    for (let y = 0; y < height; y += 20) {
+    for (let y = yStart; y < yStart + height; y += 20) {
       gridGroup
         .append('line')
         .attr('x1', 0)
@@ -514,6 +534,7 @@ export class MapComponent {
 
   private getProjection(width: number, height: number): d3.GeoProjection {
     if (this.state.view === 'global' || this.state.view === 'mena') {
+      // Scale by width to fill horizontally, center vertically
       return d3
         .geoEquirectangular()
         .scale(width / (2 * Math.PI))
@@ -1689,7 +1710,26 @@ export class MapComponent {
     this.render();
   }
 
+  private clampPan(): void {
+    const zoom = this.state.zoom;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    const mapHeight = width / 2; // Equirectangular 2:1 ratio
+
+    // Horizontal: at zoom 1, no pan. At higher zooms, allow proportional pan
+    const maxPanX = ((zoom - 1) / zoom) * (width / 2);
+
+    // Vertical: allow panning to see poles if map extends beyond container
+    const extraVertical = Math.max(0, (mapHeight - height) / 2);
+    const zoomPanY = ((zoom - 1) / zoom) * (height / 2);
+    const maxPanY = extraVertical + zoomPanY;
+
+    this.state.pan.x = Math.max(-maxPanX, Math.min(maxPanX, this.state.pan.x));
+    this.state.pan.y = Math.max(-maxPanY, Math.min(maxPanY, this.state.pan.y));
+  }
+
   private applyTransform(): void {
+    this.clampPan();
     const zoom = this.state.zoom;
     this.wrapper.style.transform = `scale(${zoom}) translate(${this.state.pan.x}px, ${this.state.pan.y}px)`;
 

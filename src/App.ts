@@ -503,7 +503,7 @@ export class App {
     // Initialize map in the map section
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.map = new MapComponent(mapContainer, {
-      zoom: 1,
+      zoom: 1.5,
       pan: { x: 0, y: 0 },
       view: 'global',
       layers: this.mapLayers,
