@@ -16,21 +16,49 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 
 ### Data Layers
 
+Layers are organized into logical groups for efficient monitoring:
+
+**Geopolitical**
 | Layer | Description |
 |-------|-------------|
+| **Conflicts** | Active conflict zones with involved parties and status |
 | **Hotspots** | Intelligence hotspots with activity levels based on news correlation |
-| **Conflicts** | Active conflict zones with party information |
-| **Military Bases** | Global military installations |
-| **Pipelines** | 88 major oil & gas pipelines worldwide |
-| **Undersea Cables** | Critical internet infrastructure |
-| **Nuclear Facilities** | Power plants and research reactors |
-| **Gamma Irradiators** | IAEA-tracked radiation sources |
-| **AI Datacenters** | Major AI compute infrastructure |
-| **Earthquakes** | Live USGS seismic data |
-| **Weather Alerts** | Severe weather warnings |
-| **Internet Outages** | Network connectivity disruptions |
-| **Sanctions** | Countries under economic sanctions |
-| **Economic Centers** | Major exchanges and central banks |
+| **Sanctions** | Countries under economic sanctions regimes |
+| **Protests** | Live social unrest events from ACLED and GDELT |
+
+**Military & Strategic**
+| Layer | Description |
+|-------|-------------|
+| **Military Bases** | 220+ global military installations from 9 operators |
+| **Nuclear Facilities** | Power plants, weapons labs, enrichment sites |
+| **Gamma Irradiators** | IAEA-tracked Category 1-3 radiation sources |
+
+**Infrastructure**
+| Layer | Description |
+|-------|-------------|
+| **Undersea Cables** | 55 major submarine cable routes worldwide |
+| **Pipelines** | 88 operating oil & gas pipelines across all continents |
+| **Internet Outages** | Network disruptions via Cloudflare Radar |
+| **AI Datacenters** | 111 major AI compute clusters (≥10,000 GPUs) |
+
+**Transport**
+| Layer | Description |
+|-------|-------------|
+| **Ships (AIS)** | Live vessel tracking via AIS with chokepoint monitoring |
+| **Flights** | FAA airport delay status and ground stops |
+
+**Natural Events**
+| Layer | Description |
+|-------|-------------|
+| **Earthquakes** | Live USGS seismic data (M4.5+ global) |
+| **Weather Alerts** | NWS severe weather warnings |
+
+**Economic & Labels**
+| Layer | Description |
+|-------|-------------|
+| **Economic** | FRED indicators panel (Fed assets, rates, yields) |
+| **Countries** | Country boundary labels |
+| **Waterways** | Strategic waterways and chokepoints |
 
 ### News Aggregation
 
@@ -227,6 +255,227 @@ Baselines (7-day and 30-day averages) are stored in IndexedDB for deviation anal
 
 ---
 
+## Maritime Intelligence
+
+The Ships layer provides real-time vessel tracking and maritime domain awareness through AIS (Automatic Identification System) data.
+
+### Chokepoint Monitoring
+
+The system monitors eight critical maritime chokepoints where disruptions could impact global trade:
+
+| Chokepoint | Strategic Importance |
+|------------|---------------------|
+| **Strait of Hormuz** | 20% of global oil transits; Iran control |
+| **Suez Canal** | Europe-Asia shipping; single point of failure |
+| **Strait of Malacca** | Primary Asia-Pacific oil route |
+| **Bab el-Mandeb** | Red Sea access; Yemen/Houthi activity |
+| **Panama Canal** | Americas east-west transit |
+| **Taiwan Strait** | Semiconductor supply chain; PLA activity |
+| **South China Sea** | Contested waters; island disputes |
+| **Black Sea** | Ukraine grain exports; Russian naval activity |
+
+### Density Analysis
+
+Vessel positions are aggregated into a 2° grid to calculate traffic density. Each cell tracks:
+- Current vessel count
+- Historical baseline (30-minute rolling window)
+- Change percentage from baseline
+
+Density changes of ±30% trigger alerts, indicating potential congestion, diversions, or blockades.
+
+### Dark Ship Detection
+
+The system monitors for AIS gaps—vessels that stop transmitting their position. An AIS gap exceeding 60 minutes in monitored regions may indicate:
+- Sanctions evasion (ship-to-ship transfers)
+- Illegal fishing
+- Military activity
+- Equipment failure
+
+Vessels reappearing after gaps are flagged for the duration of the session.
+
+### WebSocket Architecture
+
+AIS data flows through a WebSocket relay for real-time updates without polling:
+
+```
+AISStream → WebSocket Relay → Browser
+              (ws://relay)
+```
+
+The connection automatically reconnects on disconnection with a 30-second backoff. When the Ships layer is disabled, the WebSocket disconnects to conserve resources.
+
+---
+
+## Social Unrest Tracking
+
+The Protests layer aggregates civil unrest data from two independent sources, providing corroboration and global coverage.
+
+### ACLED (Armed Conflict Location & Event Data)
+
+Academic-grade conflict data with human-verified events:
+- **Coverage**: Global, 30-day rolling window
+- **Event types**: Protests, riots, strikes, demonstrations
+- **Metadata**: Actors involved, fatalities, detailed notes
+- **Confidence**: High (human-curated)
+
+### GDELT (Global Database of Events, Language, and Tone)
+
+Real-time news-derived event data:
+- **Coverage**: Global, 7-day rolling window
+- **Event types**: Geocoded protest mentions from news
+- **Volume**: Reports per location (signal strength)
+- **Confidence**: Medium (algorithmic extraction)
+
+### Multi-Source Corroboration
+
+Events from both sources are deduplicated using a 0.5° spatial grid and date matching. When both ACLED and GDELT report events in the same area:
+- Confidence is elevated to "high"
+- ACLED data takes precedence (higher accuracy)
+- Source list shows corroboration
+
+### Severity Classification
+
+| Severity | Criteria |
+|----------|----------|
+| **High** | Fatalities reported, riots, or clashes |
+| **Medium** | Large demonstrations, strikes |
+| **Low** | Smaller protests, localized events |
+
+Events near intelligence hotspots are cross-referenced to provide geopolitical context.
+
+---
+
+## Aviation Monitoring
+
+The Flights layer tracks airport delays and ground stops at major US airports using FAA NASSTATUS data.
+
+### Delay Types
+
+| Type | Description |
+|------|-------------|
+| **Ground Stop** | No departures permitted; severe disruption |
+| **Ground Delay** | Departures held; arrival rate limiting |
+| **Arrival Delay** | Inbound traffic backed up |
+| **Departure Delay** | Outbound traffic delayed |
+
+### Severity Thresholds
+
+| Severity | Average Delay | Visual |
+|----------|--------------|--------|
+| **Severe** | ≥60 minutes | Red |
+| **Major** | 45-59 minutes | Orange |
+| **Moderate** | 25-44 minutes | Yellow |
+| **Minor** | 15-24 minutes | Gray |
+
+### Monitored Airports
+
+The 30 largest US airports are tracked:
+- Major hubs: JFK, LAX, ORD, ATL, DFW, DEN, SFO
+- International gateways with high traffic volume
+- Airports frequently affected by weather or congestion
+
+Ground stops are particularly significant—they indicate severe disruption (weather, security, or infrastructure failure) and can cascade across the network.
+
+---
+
+## Fault Tolerance
+
+External APIs are unreliable. Rate limits, outages, and network errors are inevitable. The system implements **circuit breaker** patterns to maintain availability.
+
+### Circuit Breaker Pattern
+
+Each external service is wrapped in a circuit breaker that tracks failures:
+
+```
+Normal → Failure #1 → Failure #2 → OPEN (cooldown)
+                                      ↓
+                              5 minutes pass
+                                      ↓
+                                   CLOSED
+```
+
+**Behavior during cooldown:**
+- New requests return cached data (if available)
+- UI shows "temporarily unavailable" status
+- No API calls are made (prevents hammering)
+
+### Protected Services
+
+| Service | Cooldown | Cache TTL |
+|---------|----------|-----------|
+| Yahoo Finance | 5 min | 10 min |
+| Polymarket | 5 min | 10 min |
+| USGS Earthquakes | 5 min | 10 min |
+| NWS Weather | 5 min | 10 min |
+| FRED Economic | 5 min | 10 min |
+| Cloudflare Radar | 5 min | 10 min |
+| ACLED | 5 min | 10 min |
+| GDELT | 5 min | 10 min |
+| FAA Status | 5 min | 5 min |
+| RSS Feeds | 5 min per feed | 10 min |
+
+RSS feeds use per-feed circuit breakers—one failing feed doesn't affect others.
+
+### Graceful Degradation
+
+When a service enters cooldown:
+1. Cached data continues to display (stale but available)
+2. Status panel shows service health
+3. Automatic recovery when cooldown expires
+4. No user intervention required
+
+---
+
+## Conditional Data Loading
+
+API calls are expensive. The system only fetches data for **enabled layers**, reducing unnecessary network traffic and rate limit consumption.
+
+### Layer-Aware Loading
+
+When a layer is toggled OFF:
+- No API calls for that data source
+- No refresh interval scheduled
+- WebSocket connections closed (for AIS)
+
+When a layer is toggled ON:
+- Data is fetched immediately
+- Refresh interval begins
+- Loading indicator shown on toggle button
+
+### Unconfigured Services
+
+Some data sources require API keys (AIS relay, Cloudflare Radar). If credentials are not configured:
+- The layer toggle is hidden entirely
+- No failed requests pollute the console
+- Users see only functional layers
+
+This prevents confusion when deploying without full API access.
+
+---
+
+## Prediction Market Filtering
+
+The Prediction Markets panel focuses on **geopolitically relevant** markets, filtering out sports and entertainment.
+
+### Inclusion Keywords
+
+Markets matching these topics are displayed:
+- **Conflicts**: war, military, invasion, ceasefire, NATO, nuclear
+- **Countries**: Russia, Ukraine, China, Taiwan, Iran, Israel, Gaza
+- **Leaders**: Putin, Zelensky, Trump, Biden, Xi Jinping, Netanyahu
+- **Economics**: Fed, interest rate, inflation, recession, tariffs, sanctions
+- **Global**: UN, EU, treaties, summits, coups, refugees
+
+### Exclusion Keywords
+
+Markets matching these are filtered out:
+- **Sports**: NBA, NFL, FIFA, World Cup, championships, playoffs
+- **Entertainment**: Oscars, movies, celebrities, TikTok, streaming
+
+This ensures the panel shows markets like "Will Russia withdraw from Ukraine?" rather than "Will the Lakers win the championship?"
+
+---
+
 ## Tech Stack
 
 - **Frontend**: TypeScript, Vite
@@ -253,50 +502,86 @@ npm run build
 
 ## API Dependencies
 
-The dashboard fetches data from various public APIs:
+The dashboard fetches data from various public APIs and data sources:
 
-| Service | Data |
-|---------|------|
-| RSS2JSON | News feed parsing |
-| Alpha Vantage | Stock quotes |
-| CoinGecko | Cryptocurrency prices |
-| USGS | Earthquake data |
-| NWS | Weather alerts |
-| FRED | Economic indicators |
-| Polymarket | Prediction markets |
+| Service | Data | Auth Required |
+|---------|------|---------------|
+| RSS2JSON | News feed parsing | No |
+| Yahoo Finance | Stock quotes, indices | No |
+| CoinGecko | Cryptocurrency prices | No |
+| USGS | Earthquake data | No |
+| NWS | Weather alerts | No |
+| FRED | Economic indicators (Fed data) | No |
+| Polymarket | Prediction markets | No |
+| ACLED | Armed conflict & protest data | Yes (free) |
+| GDELT | News-derived event geolocation | No |
+| FAA NASSTATUS | Airport delay status | No |
+| Cloudflare Radar | Internet outage data | Yes (free) |
+| AISStream | Live vessel positions | Yes (relay) |
+
+### Optional API Keys
+
+Some features require API credentials. Without them, the corresponding layer is hidden:
+
+| Variable | Service | How to Get |
+|----------|---------|------------|
+| `VITE_WS_RELAY_URL` | AIS vessel tracking | Deploy AIS relay or use hosted service |
+| `CLOUDFLARE_API_TOKEN` | Internet outages | Free Cloudflare account with Radar access |
+| `VITE_ACLED_ACCESS_TOKEN` | Protest data | Free registration at acleddata.com |
+
+The dashboard functions fully without these keys—affected layers simply don't appear.
 
 ## Project Structure
 
 ```
 src/
-├── App.ts              # Main application orchestrator
-├── main.ts             # Entry point
-├── components/         # UI components
-│   ├── Map.ts          # D3 map with all layers
-│   ├── MapPopup.ts     # Info popups for map elements
-│   ├── SearchModal.ts  # Universal search (⌘K)
-│   ├── SignalModal.ts  # Signal intelligence display
-│   ├── NewsPanel.ts    # News feed display
-│   ├── MarketPanel.ts  # Stock/commodity display
-│   ├── MonitorPanel.ts # Custom keyword monitors
+├── App.ts                  # Main application orchestrator
+├── main.ts                 # Entry point
+├── components/
+│   ├── Map.ts              # D3.js map with 18 toggleable layers
+│   ├── MapPopup.ts         # Contextual info popups
+│   ├── SearchModal.ts      # Universal search (⌘K)
+│   ├── SignalModal.ts      # Signal intelligence display
+│   ├── EconomicPanel.ts    # FRED economic indicators
+│   ├── NewsPanel.ts        # News feed display
+│   ├── MarketPanel.ts      # Stock/commodity display
+│   ├── MonitorPanel.ts     # Custom keyword monitors
 │   └── ...
-├── config/             # Static data & configuration
-│   ├── feeds.ts        # RSS feeds, source tiers, source types
-│   ├── geo.ts          # Hotspots, conflicts, bases, cables
-│   ├── pipelines.ts    # Pipeline data (88 entries)
-│   ├── ai-datacenters.ts
-│   ├── irradiators.ts
-│   └── markets.ts
-├── services/           # Data fetching & processing
-│   ├── rss.ts          # RSS parsing
-│   ├── markets.ts      # Stock/crypto APIs
-│   ├── earthquakes.ts  # USGS integration
-│   ├── clustering.ts   # Jaccard similarity clustering
-│   ├── correlation.ts  # Signal detection engine
-│   ├── velocity.ts     # Velocity & sentiment analysis
-│   └── storage.ts      # IndexedDB snapshots & baselines
-├── styles/             # CSS
-└── types/              # TypeScript definitions
+├── config/
+│   ├── feeds.ts            # 45+ RSS feeds, source tiers
+│   ├── geo.ts              # Hotspots, conflicts, 55 cables, waterways
+│   ├── pipelines.ts        # 88 oil & gas pipelines
+│   ├── bases-expanded.ts   # 220+ military bases
+│   ├── ai-datacenters.ts   # 313 AI clusters (filtered to 111)
+│   ├── airports.ts         # 30 monitored US airports
+│   ├── irradiators.ts      # IAEA gamma irradiator sites
+│   └── markets.ts          # Stock symbols, sectors
+├── services/
+│   ├── ais.ts              # WebSocket vessel tracking
+│   ├── protests.ts         # ACLED + GDELT integration
+│   ├── flights.ts          # FAA delay parsing
+│   ├── outages.ts          # Cloudflare Radar integration
+│   ├── rss.ts              # RSS parsing with circuit breakers
+│   ├── markets.ts          # Yahoo Finance, CoinGecko
+│   ├── earthquakes.ts      # USGS integration
+│   ├── weather.ts          # NWS alerts
+│   ├── fred.ts             # Federal Reserve data
+│   ├── polymarket.ts       # Prediction markets (filtered)
+│   ├── clustering.ts       # Jaccard similarity clustering
+│   ├── correlation.ts      # Signal detection engine
+│   ├── velocity.ts         # Velocity & sentiment analysis
+│   └── storage.ts          # IndexedDB snapshots & baselines
+├── utils/
+│   ├── circuit-breaker.ts  # Fault tolerance pattern
+│   └── ...
+├── styles/
+└── types/
+api/                        # Vercel serverless proxies
+├── cloudflare-outages.js
+├── faa-status.js
+├── fred-data.js
+├── gdelt-geo.js
+└── nga-warnings.js
 ```
 
 ## Usage
@@ -320,20 +605,29 @@ src/
 ## Data Sources
 
 ### News Feeds
-Aggregates 40+ RSS feeds from major news outlets, government sources, and specialty publications with source-tier prioritization.
+Aggregates **45+ RSS feeds** from major news outlets, government sources, and specialty publications with source-tier prioritization. Categories include world news, MENA, technology, AI/ML, finance, government releases, defense/intel, and think tanks.
 
 ### Geospatial Data
 - **Hotspots**: 25+ global intelligence hotspots with keyword correlation
-- **Conflicts**: Active conflict zones with involved parties
+- **Conflicts**: 10+ active conflict zones with involved parties
+- **Military Bases**: 220+ installations from US, NATO, Russia, China, and allies
 - **Pipelines**: 88 operating oil/gas pipelines across all continents
-- **Military Bases**: Major global installations
-- **Nuclear**: Power plants, research reactors, irradiator facilities
+- **Undersea Cables**: 55 major submarine cable routes
+- **Nuclear**: 100+ power plants, weapons labs, enrichment facilities
+- **AI Infrastructure**: 111 major compute clusters (≥10k GPUs)
+- **Strategic Waterways**: 8 critical chokepoints
 
 ### Live APIs
-- USGS earthquake feed (M4.5+ global)
-- National Weather Service alerts
-- Internet outage monitoring
-- Cryptocurrency prices (real-time)
+- **USGS**: Earthquake feed (M4.5+ global)
+- **NWS**: Severe weather alerts (US)
+- **FAA**: Airport delays and ground stops
+- **Cloudflare Radar**: Internet outage detection
+- **AIS**: Real-time vessel positions
+- **ACLED/GDELT**: Protest and unrest events
+- **Yahoo Finance**: Stock quotes and indices
+- **CoinGecko**: Cryptocurrency prices
+- **FRED**: Federal Reserve economic data
+- **Polymarket**: Prediction market odds
 
 ---
 
