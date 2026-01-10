@@ -14,3 +14,4 @@ export * from './ais';
 export * from './cable-activity';
 export * from './protests';
 export * from './flights';
+export { analysisWorker } from './analysis-worker';
