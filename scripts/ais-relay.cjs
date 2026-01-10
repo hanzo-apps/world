@@ -9,6 +9,7 @@
  * Local: node scripts/ais-relay.cjs
  */
 
+const http = require('http');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
@@ -20,6 +21,22 @@ if (!API_KEY) {
   console.error('[Relay] Get a free key at https://aisstream.io');
   process.exit(1);
 }
+
+// HTTP server for health checks (Railway requirement)
+const server = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      clients: clients.size,
+      messages: messageCount,
+      connected: upstreamSocket?.readyState === WebSocket.OPEN
+    }));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
 
 let upstreamSocket = null;
 let clients = new Set();
@@ -63,10 +80,10 @@ function connectUpstream() {
   });
 }
 
-// Start WebSocket server for browser clients
-const wss = new WebSocketServer({ port: PORT });
+// Start WebSocket server attached to HTTP server
+const wss = new WebSocketServer({ server });
 
-wss.on('listening', () => {
+server.listen(PORT, () => {
   console.log(`[Relay] Server listening on port ${PORT}`);
 });
 
