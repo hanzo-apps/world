@@ -1531,6 +1531,13 @@ export class MapComponent {
     this.onLayerChange = callback;
   }
 
+  public hideLayerToggle(layer: keyof MapLayers): void {
+    const btn = this.container.querySelector(`.layer-toggle[data-layer="${layer}"]`);
+    if (btn) {
+      (btn as HTMLElement).style.display = 'none';
+    }
+  }
+
   public onStateChanged(callback: (state: MapState) => void): void {
     this.onStateChange = callback;
   }

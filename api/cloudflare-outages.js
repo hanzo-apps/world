@@ -7,8 +7,8 @@ export default async function handler(req) {
 
   const token = process.env.CLOUDFLARE_API_TOKEN;
   if (!token) {
-    // Return empty result instead of error so client handles gracefully
-    return new Response(JSON.stringify({ success: true, result: { annotations: [] } }), {
+    // Signal to client that outages feature is not configured
+    return new Response(JSON.stringify({ configured: false }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });

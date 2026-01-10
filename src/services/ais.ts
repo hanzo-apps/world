@@ -5,6 +5,14 @@ import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 // Prod: configured via VITE_WS_RELAY_URL env var
 const AISSTREAM_URL = import.meta.env.VITE_WS_RELAY_URL || 'ws://localhost:3004';
 
+// AIS is configured if VITE_WS_RELAY_URL is set OR we're on localhost (dev mode)
+const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const aisConfigured = Boolean(import.meta.env.VITE_WS_RELAY_URL) || isLocalhost;
+
+export function isAisConfigured(): boolean {
+  return aisConfigured;
+}
+
 // Grid cell size for density aggregation (degrees)
 const GRID_SIZE = 2;
 // Time window for density calculation (ms)

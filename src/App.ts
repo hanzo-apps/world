@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -76,9 +76,14 @@ export class App {
 
   public async init(): Promise<void> {
     await initDB();
-    if (this.mapLayers.ais) {
+
+    // Check AIS configuration before init
+    if (!isAisConfigured()) {
+      this.mapLayers.ais = false;
+    } else if (this.mapLayers.ais) {
       initAisStream();
     }
+
     this.renderLayout();
     this.signalModal = new SignalModal();
     this.setupPlaybackControl();
@@ -89,6 +94,15 @@ export class App {
     this.setupEventListeners();
     this.setupUrlStateSync();
     await this.loadAllData();
+
+    // Hide unconfigured layers after first data load
+    if (!isAisConfigured()) {
+      this.map?.hideLayerToggle('ais');
+    }
+    if (isOutagesConfigured() === false) {
+      this.map?.hideLayerToggle('outages');
+    }
+
     this.setupRefreshIntervals();
     this.setupSnapshotSaving();
     cleanOldSnapshots();

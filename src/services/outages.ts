@@ -177,11 +177,18 @@ interface CloudflareOutage {
 }
 
 interface CloudflareResponse {
-  success: boolean;
-  errors: Array<{ code: number; message: string }>;
-  result: {
+  configured?: boolean;
+  success?: boolean;
+  errors?: Array<{ code: number; message: string }>;
+  result?: {
     annotations: CloudflareOutage[];
   };
+}
+
+let outagesConfigured: boolean | null = null;
+
+export function isOutagesConfigured(): boolean | null {
+  return outagesConfigured;
 }
 
 export async function fetchInternetOutages(): Promise<InternetOutage[]> {
@@ -190,13 +197,21 @@ export async function fetchInternetOutages(): Promise<InternetOutage[]> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: CloudflareResponse = await response.json();
-    if (!data.success || data.errors?.length > 0) {
+
+    if (data.configured === false) {
+      outagesConfigured = false;
+      return [];
+    }
+
+    outagesConfigured = true;
+
+    if (!data.success || data.errors?.length) {
       throw new Error(data.errors?.[0]?.message || 'API error');
     }
 
     const outages: InternetOutage[] = [];
 
-    for (const outage of data.result.annotations || []) {
+    for (const outage of data.result?.annotations || []) {
       if (!outage.locations?.length) continue;
 
       const countryCode = outage.locations[0];
