@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, fetchAisSignals, initAisStream, getAisStatus, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -76,7 +76,9 @@ export class App {
 
   public async init(): Promise<void> {
     await initDB();
-    initAisStream(); // Connect to aisstream.io for live vessel tracking
+    if (this.mapLayers.ais) {
+      initAisStream();
+    }
     this.renderLayout();
     this.signalModal = new SignalModal();
     this.setupPlaybackControl();
@@ -138,6 +140,17 @@ export class App {
       // Save layer settings
       this.mapLayers[layer] = enabled;
       saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
+
+      // Handle AIS WebSocket connection
+      if (layer === 'ais') {
+        if (enabled) {
+          initAisStream();
+          this.loadAisSignals();
+        } else {
+          disconnectAisStream();
+        }
+        return;
+      }
 
       // Load data when layer is enabled (if not already loaded)
       if (enabled) {
