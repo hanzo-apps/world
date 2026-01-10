@@ -228,7 +228,16 @@ export class MapComponent {
     toggles.className = 'layer-toggles';
     toggles.id = 'layerToggles';
 
-    const layers: (keyof MapLayers)[] = ['conflicts', 'protests', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'flights', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways'];
+    // Grouped: geopolitical | military | infrastructure | transport | natural | economic | labels
+    const layers: (keyof MapLayers)[] = [
+      'conflicts', 'hotspots', 'sanctions', 'protests',  // geopolitical
+      'bases', 'nuclear', 'irradiators',                 // military/strategic
+      'cables', 'pipelines', 'outages', 'datacenters',   // infrastructure
+      'ais', 'flights',                                   // transport
+      'earthquakes', 'weather',                           // natural
+      'economic',                                         // economic
+      'countries', 'waterways',                           // labels
+    ];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'Ships',
     };
