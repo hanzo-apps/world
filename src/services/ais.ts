@@ -38,7 +38,6 @@ const vesselHistory = new Map<string, number[]>(); // MMSI -> last seen timestam
 
 let socket: WebSocket | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-let apiKey: string | null = null;
 let isConnected = false;
 let messageCount = 0;
 
@@ -126,11 +125,6 @@ function handleMessage(event: MessageEvent): void {
 }
 
 function connect(): void {
-  if (!apiKey) {
-    console.warn('[Shipping] No API key configured. Set VITE_AISSTREAM_API_KEY to enable live AIS data.');
-    return;
-  }
-
   if (socket?.readyState === WebSocket.OPEN) return;
 
   console.log('[Shipping] Opening WebSocket to:', AISSTREAM_URL);
@@ -139,16 +133,8 @@ function connect(): void {
     console.log('[Shipping] WebSocket created, readyState:', socket.readyState);
 
     socket.onopen = () => {
-      console.log('[Shipping] Connected to aisstream.io');
+      console.log('[Shipping] Connected to relay');
       isConnected = true;
-
-      const subscription = {
-        APIKey: apiKey,
-        BoundingBoxes: [[[-90, -180], [90, 180]]],
-        FilterMessageTypes: ['PositionReport'],
-      };
-      socket?.send(JSON.stringify(subscription));
-      console.log('[Shipping] Subscribed to global vessel positions');
     };
 
     socket.onmessage = handleMessage;
@@ -317,16 +303,8 @@ function calculateDensityZones(): AisDensityZone[] {
   return zones.sort((a, b) => b.intensity - a.intensity).slice(0, 50);
 }
 
-export function initAisStream(key?: string): void {
+export function initAisStream(): void {
   console.log('[Shipping] Initializing AIS stream...');
-  apiKey = key || import.meta.env.VITE_AISSTREAM_API_KEY || null;
-
-  if (!apiKey) {
-    console.warn('[Shipping] No API key provided. Get a free key at https://aisstream.io');
-    return;
-  }
-
-  console.log('[Shipping] API key configured, connecting...');
   connect();
 
   // Cleanup old data periodically
@@ -355,7 +333,7 @@ export function getAisStatus(): { connected: boolean; vessels: number; messages:
 
 export async function fetchAisSignals(): Promise<{ disruptions: AisDisruptionEvent[]; density: AisDensityZone[] }> {
   // Initialize stream if not already running
-  if (!socket && apiKey) {
+  if (!socket) {
     connect();
   }
 
