@@ -342,6 +342,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
       },
+      // GDELT GEO 2.0 API - Geolocation endpoint
+      '/api/gdelt-geo': {
+        target: 'https://api.gdeltproject.org/api/v2/geo',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/gdelt-geo/, '/geo'),
+      },
       // AISStream WebSocket proxy for live vessel tracking
       '/ws/aisstream': {
         target: 'wss://stream.aisstream.io',
