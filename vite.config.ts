@@ -47,17 +47,19 @@ export default defineConfig({
           });
         },
       },
-      // FRED Official API (requires API key)
-      '/api/fred-api': {
+      // FRED Economic Data - handled by Vercel serverless function in prod
+      // In dev, we proxy to the API directly with the key from .env
+      '/api/fred-data': {
         target: 'https://api.stlouisfed.org',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/fred-api/, '/fred/series/observations'),
-      },
-      // FRED Economic Data (legacy)
-      '/api/fred': {
-        target: 'https://fred.stlouisfed.org',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/fred/, ''),
+        rewrite: (path) => {
+          const url = new URL(path, 'http://localhost');
+          const seriesId = url.searchParams.get('series_id');
+          const start = url.searchParams.get('observation_start');
+          const end = url.searchParams.get('observation_end');
+          const apiKey = process.env.FRED_API_KEY || '';
+          return `/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=10${start ? `&observation_start=${start}` : ''}${end ? `&observation_end=${end}` : ''}`;
+        },
       },
       // RSS Feeds - BBC
       '/rss/bbc': {
