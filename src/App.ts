@@ -1194,24 +1194,17 @@ export class App {
     try {
       const { disruptions, density } = await fetchAisSignals();
       const aisStatus = getAisStatus();
+      console.log('[Shipping] Events:', { disruptions: disruptions.length, density: density.length, vessels: aisStatus.vessels });
       this.map?.setAisData(disruptions, density);
 
-      if (aisStatus.connected) {
-        this.statusPanel?.updateFeed('Shipping', {
-          status: 'ok',
-          itemCount: disruptions.length + density.length,
-        });
-        this.statusPanel?.updateApi('AISStream', { status: 'ok' });
-      } else {
-        this.statusPanel?.updateFeed('Shipping', {
-          status: aisStatus.vessels > 0 ? 'ok' : 'error',
-          itemCount: disruptions.length + density.length,
-          errorMessage: aisStatus.vessels === 0 ? 'No API key - set VITE_AISSTREAM_API_KEY' : undefined,
-        });
-        this.statusPanel?.updateApi('AISStream', {
-          status: aisStatus.vessels > 0 ? 'ok' : 'error',
-        });
-      }
+      this.statusPanel?.updateFeed('Shipping', {
+        status: aisStatus.connected ? 'ok' : 'error',
+        itemCount: disruptions.length + density.length,
+        errorMessage: !aisStatus.connected ? 'WebSocket disconnected' : undefined,
+      });
+      this.statusPanel?.updateApi('AISStream', {
+        status: aisStatus.connected ? 'ok' : 'error',
+      });
     } catch (error) {
       this.statusPanel?.updateFeed('Shipping', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('AISStream', { status: 'error' });
