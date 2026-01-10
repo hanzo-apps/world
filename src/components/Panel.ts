@@ -3,14 +3,18 @@ export interface PanelOptions {
   title: string;
   showCount?: boolean;
   className?: string;
+  trackActivity?: boolean;
 }
 
 export class Panel {
   protected element: HTMLElement;
   protected content: HTMLElement;
   protected countEl: HTMLElement | null = null;
+  protected newBadgeEl: HTMLElement | null = null;
+  protected panelId: string;
 
   constructor(options: PanelOptions) {
+    this.panelId = options.id;
     this.element = document.createElement('div');
     this.element.className = `panel ${options.className || ''}`;
     this.element.dataset.panel = options.id;
@@ -25,6 +29,14 @@ export class Panel {
     title.className = 'panel-title';
     title.textContent = options.title;
     headerLeft.appendChild(title);
+
+    // Add "new" badge element (hidden by default)
+    if (options.trackActivity !== false) {
+      this.newBadgeEl = document.createElement('span');
+      this.newBadgeEl.className = 'panel-new-badge';
+      this.newBadgeEl.style.display = 'none';
+      headerLeft.appendChild(this.newBadgeEl);
+    }
 
     header.appendChild(headerLeft);
 
@@ -78,5 +90,45 @@ export class Panel {
   public toggle(visible: boolean): void {
     if (visible) this.show();
     else this.hide();
+  }
+
+  /**
+   * Update the "new items" badge
+   * @param count Number of new items (0 hides badge)
+   * @param pulse Whether to pulse the badge (for important updates)
+   */
+  public setNewBadge(count: number, pulse = false): void {
+    if (!this.newBadgeEl) return;
+
+    if (count <= 0) {
+      this.newBadgeEl.style.display = 'none';
+      this.newBadgeEl.classList.remove('pulse');
+      this.element.classList.remove('has-new');
+      return;
+    }
+
+    this.newBadgeEl.textContent = count > 99 ? '99+' : `${count} new`;
+    this.newBadgeEl.style.display = 'inline-flex';
+    this.element.classList.add('has-new');
+
+    if (pulse) {
+      this.newBadgeEl.classList.add('pulse');
+    } else {
+      this.newBadgeEl.classList.remove('pulse');
+    }
+  }
+
+  /**
+   * Clear the new items badge
+   */
+  public clearNewBadge(): void {
+    this.setNewBadge(0);
+  }
+
+  /**
+   * Get the panel ID
+   */
+  public getId(): string {
+    return this.panelId;
   }
 }

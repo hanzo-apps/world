@@ -3556,3 +3556,123 @@ body.playback-mode .status-dot {
   color: var(--text-dim);
   margin-bottom: 8px;
 }
+
+/* ============================================
+   Activity Indicators & New Item Badges
+   ============================================ */
+
+/* Panel "new" badge in header */
+.panel-new-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 8px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.panel-new-badge.pulse {
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Panel header glow when has new items */
+.panel.has-new .panel-header {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, transparent 100%);
+}
+
+.panel.has-new .panel-title {
+  color: var(--accent);
+}
+
+/* "NEW" tag on individual news items */
+.new-tag {
+  display: inline-block;
+  background: var(--green);
+  color: var(--bg);
+  font-size: 8px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+  letter-spacing: 0.5px;
+  animation: new-tag-fade 2s ease-out forwards;
+}
+
+@keyframes new-tag-fade {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+/* Highlight glow on new items (first 30 seconds) */
+.item.item-new-highlight {
+  background: linear-gradient(90deg, rgba(68, 255, 136, 0.1) 0%, transparent 50%);
+  border-left-color: var(--green) !important;
+  animation: item-glow 2s ease-out;
+}
+
+@keyframes item-glow {
+  0% {
+    background: linear-gradient(90deg, rgba(68, 255, 136, 0.25) 0%, transparent 60%);
+  }
+  100% {
+    background: linear-gradient(90deg, rgba(68, 255, 136, 0.1) 0%, transparent 50%);
+  }
+}
+
+/* Subtle indicator for items user hasn't seen */
+.item.item-new {
+  border-left-color: var(--accent);
+}
+
+/* Flash highlight animation (for search results) */
+.flash-highlight {
+  animation: flash-highlight 1.5s ease-out;
+}
+
+@keyframes flash-highlight {
+  0% {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* Panel flash when new items arrive */
+.panel.flash-new {
+  animation: panel-flash 0.5s ease-out;
+}
+
+@keyframes panel-flash {
+  0% {
+    box-shadow: 0 0 20px rgba(68, 255, 136, 0.4);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
