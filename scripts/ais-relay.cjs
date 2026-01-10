@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 /**
  * AIS WebSocket Relay Server
- * Proxies aisstream.io data to the browser via a local WebSocket
- * Run: node scripts/ais-relay.js
+ * Proxies aisstream.io data to browsers via WebSocket
+ *
+ * Deploy on Railway/Fly.io/Render with:
+ *   AISSTREAM_API_KEY=your_key
+ *
+ * Local: node scripts/ais-relay.cjs
  */
 
 const { WebSocketServer, WebSocket } = require('ws');
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
-const API_KEY = process.env.VITE_AISSTREAM_API_KEY;
+const API_KEY = process.env.AISSTREAM_API_KEY || process.env.VITE_AISSTREAM_API_KEY;
+const PORT = process.env.PORT || 3004;
 
 if (!API_KEY) {
-  console.error('[Relay] Error: VITE_AISSTREAM_API_KEY environment variable not set');
+  console.error('[Relay] Error: AISSTREAM_API_KEY environment variable not set');
   console.error('[Relay] Get a free key at https://aisstream.io');
   process.exit(1);
 }
-const LOCAL_PORT = 3004;
 
 let upstreamSocket = null;
 let clients = new Set();
@@ -59,11 +63,11 @@ function connectUpstream() {
   });
 }
 
-// Start local WebSocket server for browser clients
-const wss = new WebSocketServer({ port: LOCAL_PORT });
+// Start WebSocket server for browser clients
+const wss = new WebSocketServer({ port: PORT });
 
 wss.on('listening', () => {
-  console.log(`[Relay] Server listening on ws://localhost:${LOCAL_PORT}`);
+  console.log(`[Relay] Server listening on port ${PORT}`);
 });
 
 wss.on('error', (err) => {
@@ -87,4 +91,4 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-console.log(`[Relay] Starting AIS relay on port ${LOCAL_PORT}...`);
+console.log(`[Relay] Starting AIS relay on port ${PORT}...`);
