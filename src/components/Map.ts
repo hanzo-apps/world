@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import type { Topology, GeometryCollection } from 'topojson-specification';
-import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent } from '@/types';
+import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { getSeverityColor } from '@/services/weather';
 import {
@@ -77,6 +77,7 @@ export class MapComponent {
   private cableAdvisories: CableAdvisory[] = [];
   private repairShips: RepairShip[] = [];
   private protests: SocialUnrestEvent[] = [];
+  private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = [];
   private popup: MapPopup;
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -227,7 +228,7 @@ export class MapComponent {
     toggles.className = 'layer-toggles';
     toggles.id = 'layerToggles';
 
-    const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways', 'protests'];
+    const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways', 'protests', 'flights'];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'Shipping',
     };
@@ -1227,6 +1228,44 @@ export class MapComponent {
         this.overlays.appendChild(div);
       });
     }
+
+    // Flight Delays
+    if (this.state.layers.flights) {
+      this.flightDelays.forEach((delay) => {
+        const pos = projection([delay.lon, delay.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `flight-delay-marker ${delay.severity}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'flight-delay-icon';
+        icon.textContent = delay.delayType === 'ground_stop' ? '🛑' : delay.severity === 'severe' ? '✈️' : '🛫';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 3) {
+          const label = document.createElement('div');
+          label.className = 'flight-delay-label';
+          label.textContent = `${delay.iata} ${delay.avgDelayMinutes > 0 ? `+${delay.avgDelayMinutes}m` : ''}`;
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'flight',
+            data: delay,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
   }
 
   private renderCountryLabels(projection: d3.GeoProjection): void {
@@ -1918,6 +1957,11 @@ export class MapComponent {
 
   public setProtests(events: SocialUnrestEvent[]): void {
     this.protests = events;
+    this.render();
+  }
+
+  public setFlightDelays(delays: AirportDelayAlert[]): void {
+    this.flightDelays = delays;
     this.render();
   }
 

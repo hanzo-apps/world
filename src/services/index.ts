@@ -13,3 +13,4 @@ export * from './outages';
 export * from './ais';
 export * from './cable-activity';
 export * from './protests';
+export * from './flights';

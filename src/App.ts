@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, fetchAisSignals, initAisStream, getAisStatus, fetchCableActivity, fetchProtestEvents, getProtestStatus, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, fetchAisSignals, initAisStream, getAisStatus, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, analyzeCorrelations, clusterNews, addToSignalHistory, saveSnapshot, cleanOldSnapshots } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -965,6 +965,7 @@ export class App {
       this.loadAisSignals(),
       this.loadCableActivity(),
       this.loadProtests(),
+      this.loadFlightDelays(),
     ]);
 
     // Update search index after all data loads
@@ -1213,6 +1214,21 @@ export class App {
     }
   }
 
+  private async loadFlightDelays(): Promise<void> {
+    try {
+      const delays = await fetchFlightDelays();
+      this.map?.setFlightDelays(delays);
+      this.statusPanel?.updateFeed('Flights', {
+        status: 'ok',
+        itemCount: delays.length,
+      });
+      this.statusPanel?.updateApi('FAA', { status: 'ok' });
+    } catch (error) {
+      this.statusPanel?.updateFeed('Flights', { status: 'error', errorMessage: String(error) });
+      this.statusPanel?.updateApi('FAA', { status: 'error' });
+    }
+  }
+
   private async loadFredData(): Promise<void> {
     try {
       this.economicPanel?.setLoading(true);
@@ -1258,5 +1274,6 @@ export class App {
     setInterval(() => this.loadAisSignals(), REFRESH_INTERVALS.ais);
     setInterval(() => this.loadCableActivity(), 30 * 60 * 1000);
     setInterval(() => this.loadProtests(), 15 * 60 * 1000); // 15 min - GDELT updates frequently
+    setInterval(() => this.loadFlightDelays(), 10 * 60 * 1000); // 10 min - FAA updates every 5-10 min
   }
 }

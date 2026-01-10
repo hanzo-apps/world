@@ -349,6 +349,18 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path.replace(/^\/ws\/aisstream/, ''),
       },
+      // FAA Airport Status Web Service (ASWS)
+      '/api/faa': {
+        target: 'https://soa.smext.faa.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/faa/, ''),
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('FAA ASWS proxy error:', err.message);
+          });
+        },
+      },
     },
   },
 });

@@ -1,12 +1,12 @@
-import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent } from '@/types';
+import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight';
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -111,6 +111,8 @@ export class MapPopup {
         return this.renderAisPopup(data.data as AisDisruptionEvent);
       case 'protest':
         return this.renderProtestPopup(data.data as SocialUnrestEvent);
+      case 'flight':
+        return this.renderFlightPopup(data.data as AirportDelayAlert);
       default:
         return '';
     }
@@ -433,6 +435,74 @@ export class MapPopup {
         ${event.title ? `<p class="popup-description">${event.title}</p>` : ''}
         ${tagsSection}
         ${relatedHotspots}
+      </div>
+    `;
+  }
+
+  private renderFlightPopup(delay: AirportDelayAlert): string {
+    const severityClass = delay.severity;
+    const severityLabel = delay.severity.toUpperCase();
+    const delayTypeLabels: Record<string, string> = {
+      'ground_stop': 'GROUND STOP',
+      'ground_delay': 'GROUND DELAY PROGRAM',
+      'departure_delay': 'DEPARTURE DELAYS',
+      'arrival_delay': 'ARRIVAL DELAYS',
+      'general': 'DELAYS REPORTED',
+    };
+    const delayTypeLabel = delayTypeLabels[delay.delayType] || 'DELAYS';
+    const icon = delay.delayType === 'ground_stop' ? '🛑' : delay.severity === 'severe' ? '✈️' : '🛫';
+    const sourceLabels: Record<string, string> = {
+      'faa': 'FAA ASWS',
+      'eurocontrol': 'Eurocontrol',
+      'computed': 'Computed',
+    };
+    const sourceLabel = sourceLabels[delay.source] || delay.source;
+    const regionLabels: Record<string, string> = {
+      'americas': 'Americas',
+      'europe': 'Europe',
+      'apac': 'Asia-Pacific',
+      'mena': 'Middle East',
+      'africa': 'Africa',
+    };
+    const regionLabel = regionLabels[delay.region] || delay.region;
+
+    const avgDelaySection = delay.avgDelayMinutes > 0
+      ? `<div class="popup-stat"><span class="stat-label">AVG DELAY</span><span class="stat-value alert">+${delay.avgDelayMinutes} min</span></div>`
+      : '';
+    const reasonSection = delay.reason
+      ? `<div class="popup-stat"><span class="stat-label">REASON</span><span class="stat-value">${delay.reason}</span></div>`
+      : '';
+    const cancelledSection = delay.cancelledFlights
+      ? `<div class="popup-stat"><span class="stat-label">CANCELLED</span><span class="stat-value alert">${delay.cancelledFlights} flights</span></div>`
+      : '';
+
+    return `
+      <div class="popup-header flight ${severityClass}">
+        <span class="popup-icon">${icon}</span>
+        <span class="popup-title">${delay.iata} - ${delayTypeLabel}</span>
+        <span class="popup-badge ${severityClass}">${severityLabel}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${delay.name}</div>
+        <div class="popup-location">${delay.city}, ${delay.country}</div>
+        <div class="popup-stats">
+          ${avgDelaySection}
+          ${reasonSection}
+          ${cancelledSection}
+          <div class="popup-stat">
+            <span class="stat-label">REGION</span>
+            <span class="stat-value">${regionLabel}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">SOURCE</span>
+            <span class="stat-value">${sourceLabel}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">UPDATED</span>
+            <span class="stat-value">${delay.updatedAt.toLocaleTimeString()}</span>
+          </div>
+        </div>
       </div>
     `;
   }

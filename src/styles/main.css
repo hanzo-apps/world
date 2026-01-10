@@ -3458,3 +3458,90 @@ body.playback-mode .status-dot {
   border-radius: 2px;
   margin-right: 4px;
 }
+
+/* Flight Delay Markers */
+.flight-delay-marker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
+  transform-origin: center;
+  cursor: pointer;
+  z-index: 22;
+  --flight-color: #4a9eff;
+}
+
+.flight-delay-marker.normal {
+  --flight-color: #44ff88;
+}
+
+.flight-delay-marker.minor {
+  --flight-color: #ffcc00;
+}
+
+.flight-delay-marker.moderate {
+  --flight-color: #ff9900;
+}
+
+.flight-delay-marker.major {
+  --flight-color: #ff6600;
+  animation: flight-pulse 2s ease-in-out infinite;
+}
+
+.flight-delay-marker.severe {
+  --flight-color: #ff2222;
+  animation: flight-pulse 1s ease-in-out infinite;
+}
+
+.flight-delay-icon {
+  font-size: 18px;
+  filter: drop-shadow(0 0 6px var(--flight-color));
+}
+
+.flight-delay-label {
+  font-size: 9px;
+  color: var(--flight-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  white-space: nowrap;
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
+  font-weight: bold;
+}
+
+@keyframes flight-pulse {
+  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(var(--marker-scale, 1)); }
+  50% { opacity: 0.7; transform: translate(-50%, -50%) scale(calc(var(--marker-scale, 1) * 1.15)); }
+}
+
+/* Flight Popup Styles */
+.popup-header.flight {
+  background: linear-gradient(90deg, var(--flight-color, #4a9eff) 0%, transparent 100%);
+}
+
+.popup-header.flight.normal {
+  --flight-color: #44ff88;
+}
+
+.popup-header.flight.minor {
+  --flight-color: #ffcc00;
+}
+
+.popup-header.flight.moderate {
+  --flight-color: #ff9900;
+}
+
+.popup-header.flight.major {
+  --flight-color: #ff6600;
+}
+
+.popup-header.flight.severe {
+  --flight-color: #ff2222;
+}
+
+.popup-location {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
