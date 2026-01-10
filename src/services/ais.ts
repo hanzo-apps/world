@@ -2,10 +2,8 @@ import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 
 // WebSocket relay for live vessel tracking
 // Dev: local relay (node scripts/ais-relay.cjs)
-// Prod: Railway WebSocket relay (Vercel serves frontend)
-const AISSTREAM_URL = import.meta.env.DEV
-  ? 'ws://localhost:3004'
-  : 'wss://worldmonitor-production-ws.up.railway.app';
+// Prod: configured via VITE_WS_RELAY_URL env var
+const AISSTREAM_URL = import.meta.env.VITE_WS_RELAY_URL || 'ws://localhost:3004';
 
 // Grid cell size for density aggregation (degrees)
 const GRID_SIZE = 2;
