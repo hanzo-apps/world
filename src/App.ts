@@ -1302,16 +1302,35 @@ export class App {
   }
 
   private setupRefreshIntervals(): void {
+    // Always refresh news, markets, predictions
     setInterval(() => this.loadNews(), REFRESH_INTERVALS.feeds);
     setInterval(() => this.loadMarkets(), REFRESH_INTERVALS.markets);
     setInterval(() => this.loadPredictions(), REFRESH_INTERVALS.predictions);
-    setInterval(() => this.loadEarthquakes(), 5 * 60 * 1000);
-    setInterval(() => this.loadWeatherAlerts(), 10 * 60 * 1000);
-    setInterval(() => this.loadFredData(), 30 * 60 * 1000);
-    setInterval(() => this.loadOutages(), 60 * 60 * 1000); // 1 hour - Cloudflare rate limit
-    setInterval(() => this.loadAisSignals(), REFRESH_INTERVALS.ais);
-    setInterval(() => this.loadCableActivity(), 30 * 60 * 1000);
-    setInterval(() => this.loadProtests(), 15 * 60 * 1000); // 15 min - GDELT updates frequently
-    setInterval(() => this.loadFlightDelays(), 10 * 60 * 1000); // 10 min - FAA updates every 5-10 min
+
+    // Only refresh layer data if layer is enabled
+    setInterval(() => {
+      if (this.mapLayers.earthquakes) this.loadEarthquakes();
+    }, 5 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.weather) this.loadWeatherAlerts();
+    }, 10 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.economic) this.loadFredData();
+    }, 30 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.outages) this.loadOutages();
+    }, 60 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.ais) this.loadAisSignals();
+    }, REFRESH_INTERVALS.ais);
+    setInterval(() => {
+      if (this.mapLayers.cables) this.loadCableActivity();
+    }, 30 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.protests) this.loadProtests();
+    }, 15 * 60 * 1000);
+    setInterval(() => {
+      if (this.mapLayers.flights) this.loadFlightDelays();
+    }, 10 * 60 * 1000);
   }
 }
