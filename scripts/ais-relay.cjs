@@ -109,10 +109,12 @@ function connectUpstream() {
     if (messageCount % 100 === 0) {
       console.log(`[Relay] Received ${messageCount} messages, ${clients.size} clients connected`);
     }
+    // Convert Buffer to string for browser clients
+    const message = data.toString();
     // Broadcast to all connected browser clients
     for (const client of clients) {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(data);
+        client.send(message);
       }
     }
   });
