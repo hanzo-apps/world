@@ -1,7 +1,7 @@
 import type { InternetOutage } from '@/types';
 
 const CLOUDFLARE_API_URL = '/api/cloudflare-radar/client/v4/radar/annotations/outages';
-const CLOUDFLARE_API_TOKEN = 'NgxU8rHEEG6ep5B0z-JiuQbOf-LgrpSNJt27FQg0';
+const CLOUDFLARE_API_TOKEN = import.meta.env.VITE_CLOUDFLARE_API_TOKEN || '';
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
   'AF': { lat: 33.9391, lon: 67.7100 },
