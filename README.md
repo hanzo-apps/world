@@ -6,6 +6,8 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
 
+![World Monitor Dashboard](Screenshot.png)
+
 ## Features
 
 ### Interactive Global Map
