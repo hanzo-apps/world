@@ -1108,6 +1108,7 @@ export class App {
       const deviation = calculateDeviation(intel.length, baseline);
       intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
     }
+    this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
     this.allNews.push(...intel);
 
     // Update map hotspots
