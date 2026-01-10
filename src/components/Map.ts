@@ -73,16 +73,14 @@ export class MapComponent {
     economic: { minZoom: 2, showLabels: 4 },
     earthquakes: { minZoom: 1, showLabels: 2 },
   };
+  // WebGL clustering for layers where generic circles are acceptable.
+  // Shape-critical layers (bases, nuclear, economic, datacenters, hotspots) excluded
+  // to preserve their distinct visual identity (nation colors, status icons, emojis).
   private static readonly CLUSTER_LAYER_CONFIG: Partial<Record<keyof MapLayers, ClusterLayerConfig>> = {
-    hotspots: { minZoom: 2.2, color: '#6ee7ff', baseSize: 8 },
-    bases: { minZoom: 2.8, color: '#ff8b6a', baseSize: 9 },
-    nuclear: { minZoom: 2.4, color: '#f472b6', baseSize: 10 },
     irradiators: { minZoom: 2.4, color: '#f59e0b', baseSize: 8 },
     earthquakes: { minZoom: 2.2, color: '#ffd166', baseSize: 9 },
-    economic: { minZoom: 2.4, color: '#34d399', baseSize: 9 },
     weather: { minZoom: 2.4, color: '#60a5fa', baseSize: 9 },
     outages: { minZoom: 2.4, color: '#e879f9', baseSize: 9 },
-    datacenters: { minZoom: 2.4, color: '#a78bfa', baseSize: 9 },
     protests: { minZoom: 2.4, color: '#fb7185', baseSize: 9 },
     flights: { minZoom: 2.4, color: '#fbbf24', baseSize: 9 },
     ais: { minZoom: 2.2, color: '#22d3ee', baseSize: 10 },
@@ -610,30 +608,6 @@ export class MapComponent {
     const points: ClusterPoint[] = [];
     const isGlobalOrMena = this.state.view === 'global' || this.state.view === 'mena';
 
-    if (this.state.layers.hotspots && this.isLayerClustered('hotspots', true) && isGlobalOrMena) {
-      this.hotspots.forEach((spot) => {
-        const pos = projection([spot.lon, spot.lat]);
-        if (!pos) return;
-        points.push(this.buildClusterPoint(pos[0], pos[1], 'hotspots'));
-      });
-    }
-
-    if (this.state.layers.bases && this.isLayerClustered('bases', true)) {
-      MILITARY_BASES.forEach((base) => {
-        const pos = projection([base.lon, base.lat]);
-        if (!pos) return;
-        points.push(this.buildClusterPoint(pos[0], pos[1], 'bases'));
-      });
-    }
-
-    if (this.state.layers.nuclear && this.isLayerClustered('nuclear', true)) {
-      NUCLEAR_FACILITIES.forEach((facility) => {
-        const pos = projection([facility.lon, facility.lat]);
-        if (!pos) return;
-        points.push(this.buildClusterPoint(pos[0], pos[1], 'nuclear'));
-      });
-    }
-
     if (this.state.layers.irradiators && this.isLayerClustered('irradiators', true)) {
       GAMMA_IRRADIATORS.forEach((irradiator) => {
         const pos = projection([irradiator.lon, irradiator.lat]);
@@ -651,14 +625,6 @@ export class MapComponent {
       });
     }
 
-    if (this.state.layers.economic && this.isLayerClustered('economic', true)) {
-      ECONOMIC_CENTERS.forEach((center) => {
-        const pos = projection([center.lon, center.lat]);
-        if (!pos) return;
-        points.push(this.buildClusterPoint(pos[0], pos[1], 'economic'));
-      });
-    }
-
     if (this.state.layers.weather && this.isLayerClustered('weather', true)) {
       this.weatherAlerts.forEach((alert) => {
         if (!alert.centroid) return;
@@ -673,15 +639,6 @@ export class MapComponent {
         const pos = projection([outage.lon, outage.lat]);
         if (!pos) return;
         points.push(this.buildClusterPoint(pos[0], pos[1], 'outages'));
-      });
-    }
-
-    if (this.state.layers.datacenters && this.isLayerClustered('datacenters', true)) {
-      const MIN_GPU_COUNT = 10000;
-      AI_DATA_CENTERS.filter(dc => (dc.chipCount || 0) >= MIN_GPU_COUNT).forEach((dc) => {
-        const pos = projection([dc.lon, dc.lat]);
-        if (!pos) return;
-        points.push(this.buildClusterPoint(pos[0], pos[1], 'datacenters'));
       });
     }
 
@@ -1140,8 +1097,8 @@ export class MapComponent {
       this.renderAPTMarkers(projection);
     }
 
-    // Nuclear facilities
-    if (this.state.layers.nuclear && !this.isLayerClustered('nuclear', clustersActive)) {
+    // Nuclear facilities (always HTML - shapes convey status)
+    if (this.state.layers.nuclear) {
       NUCLEAR_FACILITIES.forEach((facility) => {
         const pos = projection([facility.lon, facility.lat]);
         if (!pos) return;
@@ -1234,8 +1191,8 @@ export class MapComponent {
       });
     }
 
-    // Hotspots
-    if (this.state.layers.hotspots && !this.isLayerClustered('hotspots', clustersActive)) {
+    // Hotspots (always HTML - level colors and BREAKING badges)
+    if (this.state.layers.hotspots) {
       this.hotspots.forEach((spot) => {
         const pos = projection([spot.lon, spot.lat]);
         if (!pos) return;
@@ -1278,8 +1235,8 @@ export class MapComponent {
       });
     }
 
-    // Military bases
-    if (this.state.layers.bases && !this.isLayerClustered('bases', clustersActive)) {
+    // Military bases (always HTML - nation colors matter)
+    if (this.state.layers.bases) {
       MILITARY_BASES.forEach((base) => {
         const pos = projection([base.lon, base.lat]);
         if (!pos) return;
@@ -1354,8 +1311,8 @@ export class MapComponent {
       console.log('[Map] Actually rendered', rendered, 'earthquake markers');
     }
 
-    // Economic Centers
-    if (this.state.layers.economic && !this.isLayerClustered('economic', clustersActive)) {
+    // Economic Centers (always HTML - emoji icons for type distinction)
+    if (this.state.layers.economic) {
       ECONOMIC_CENTERS.forEach((center) => {
         const pos = projection([center.lon, center.lat]);
         if (!pos) return;
@@ -1533,9 +1490,9 @@ export class MapComponent {
       });
     }
 
-    // AI Data Centers (filter to significant clusters only: ≥10k GPUs)
+    // AI Data Centers (always HTML - 🖥️ icons, filter to ≥10k GPUs)
     const MIN_GPU_COUNT = 10000;
-    if (this.state.layers.datacenters && !this.isLayerClustered('datacenters', clustersActive)) {
+    if (this.state.layers.datacenters) {
       AI_DATA_CENTERS.filter(dc => (dc.chipCount || 0) >= MIN_GPU_COUNT).forEach((dc) => {
         const pos = projection([dc.lon, dc.lat]);
         if (!pos) return;
