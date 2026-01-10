@@ -119,7 +119,7 @@ async function fetchFAADelays(): Promise<Map<string, FAADelayInfo>> {
   }
 
   try {
-    const url = '/api/faa/api/airport-status-information';
+    const url = '/api/faa-status';
 
     const response = await fetch(url, {
       headers: { Accept: 'application/xml' },

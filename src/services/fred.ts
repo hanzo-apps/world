@@ -1,3 +1,5 @@
+import { createCircuitBreaker } from '@/utils';
+
 export interface FredSeries {
   id: string;
   name: string;
@@ -26,46 +28,34 @@ const FRED_SERIES: FredConfig[] = [
   { id: 'VIXCLS', name: 'VIX', unit: '', precision: 2 },
 ];
 
-const FRED_CSV_BASE = '/api/fred/graph/fredgraph.csv';
+const FRED_CSV_BASE = '/api/fred-data';
+const breaker = createCircuitBreaker<FredSeries[]>({ name: 'FRED Economic' });
 
 async function fetchSeriesData(seriesId: string): Promise<{ date: string; value: number }[]> {
-  try {
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const url = `${FRED_CSV_BASE}?id=${seriesId}&cosd=${startDate}&coed=${endDate}`;
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'text/csv',
-        'User-Agent': 'WorldMonitor/1.0'
-      }
-    });
+  const url = `${FRED_CSV_BASE}?id=${seriesId}&cosd=${startDate}&coed=${endDate}`;
+  const response = await fetch(url, {
+    headers: { 'Accept': 'text/csv', 'User-Agent': 'WorldMonitor/1.0' }
+  });
 
-    if (!response.ok) {
-      console.warn(`FRED API returned ${response.status} for ${seriesId}`);
-      return [];
-    }
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const csv = await response.text();
-    const lines = csv.trim().split('\n').slice(1);
+  const csv = await response.text();
+  const lines = csv.trim().split('\n').slice(1);
 
-    return lines
-      .map(line => {
-        const parts = line.split(',');
-        const date = parts[0];
-        const valueStr = parts[1];
-        if (!date || !valueStr) return null;
-        const value = parseFloat(valueStr);
-        if (!isNaN(value)) {
-          return { date, value };
-        }
-        return null;
-      })
-      .filter((d): d is { date: string; value: number } => d !== null);
-  } catch (error) {
-    console.error(`Failed to fetch FRED series ${seriesId}:`, error);
-    return [];
-  }
+  return lines
+    .map(line => {
+      const parts = line.split(',');
+      const date = parts[0];
+      const valueStr = parts[1];
+      if (!date || !valueStr) return null;
+      const value = parseFloat(valueStr);
+      if (!isNaN(value)) return { date, value };
+      return null;
+    })
+    .filter((d): d is { date: string; value: number } => d !== null);
 }
 
 export async function fetchFredData(): Promise<FredSeries[]> {

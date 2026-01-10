@@ -1,5 +1,6 @@
 import type { Earthquake } from '@/types';
 import { API_URLS } from '@/config';
+import { createCircuitBreaker } from '@/utils';
 
 interface USGSFeature {
   id: string;
@@ -21,6 +22,8 @@ interface USGSResponse {
 const CORS_PROXY = 'https://corsproxy.io/?';
 const DIRECT_USGS_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson';
 
+const breaker = createCircuitBreaker<Earthquake[]>({ name: 'USGS Earthquakes' });
+
 async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -34,42 +37,14 @@ async function fetchWithTimeout(url: string, timeoutMs: number = 10000): Promise
   }
 }
 
-async function fetchWithRetry(url: string, retries = 2): Promise<Response> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const proxiedUrl = import.meta.env.DEV ? url : (CORS_PROXY + encodeURIComponent(DIRECT_USGS_URL));
-      const response = await fetchWithTimeout(proxiedUrl, 8000);
-      if (response.ok) return response;
-      console.warn(`[Earthquakes] Attempt ${i + 1} failed with status ${response.status}`);
-    } catch (e) {
-      console.warn(`[Earthquakes] Attempt ${i + 1} failed:`, e);
-      if (i === retries - 1) {
-        if (import.meta.env.DEV) {
-          console.log('[Earthquakes] Trying CORS proxy fallback...');
-          try {
-            const corsResponse = await fetchWithTimeout(CORS_PROXY + encodeURIComponent(DIRECT_USGS_URL), 10000);
-            if (corsResponse.ok) return corsResponse;
-          } catch (corsErr) {
-            console.error('[Earthquakes] CORS proxy also failed:', corsErr);
-          }
-        }
-        throw e;
-      }
-      await new Promise((r) => setTimeout(r, 500 * (i + 1)));
-    }
-  }
-  throw new Error('All retries failed');
-}
-
 export async function fetchEarthquakes(): Promise<Earthquake[]> {
-  console.log('[Earthquakes] Fetching from:', API_URLS.earthquakes);
-  try {
-    const response = await fetchWithRetry(API_URLS.earthquakes);
-    console.log('[Earthquakes] Response status:', response.status);
-    const data: USGSResponse = await response.json();
-    console.log('[Earthquakes] Got', data.features?.length ?? 0, 'features');
+  return breaker.execute(async () => {
+    const url = import.meta.env.DEV ? API_URLS.earthquakes : (CORS_PROXY + encodeURIComponent(DIRECT_USGS_URL));
+    const response = await fetchWithTimeout(url, 8000);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const earthquakes = data.features.map((feature) => ({
+    const data: USGSResponse = await response.json();
+    return data.features.map((feature) => ({
       id: feature.id,
       place: feature.properties.place || 'Unknown',
       magnitude: feature.properties.mag,
@@ -79,11 +54,9 @@ export async function fetchEarthquakes(): Promise<Earthquake[]> {
       time: new Date(feature.properties.time),
       url: feature.properties.url,
     }));
+  }, []);
+}
 
-    console.log('[Earthquakes] Mapped', earthquakes.length, 'earthquakes');
-    return earthquakes;
-  } catch (e) {
-    console.error('[Earthquakes] Failed to fetch after retries:', e);
-    return [];
-  }
+export function getEarthquakesStatus(): string {
+  return breaker.getStatus();
 }

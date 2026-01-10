@@ -1,6 +1,6 @@
 import type { InternetOutage } from '@/types';
 
-const CLOUDFLARE_API_URL = '/api/cloudflare-radar/client/v4/radar/annotations/outages';
+const CLOUDFLARE_API_URL = '/api/cloudflare-outages';
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
   'AF': { lat: 33.9391, lon: 67.7100 },

@@ -17,7 +17,7 @@ interface NgaWarning {
   authority: string;
 }
 
-const NGA_API_URL = '/api/nga-msi/api/publications/broadcast-warn?output=json&status=A';
+const NGA_API_URL = '/api/nga-warnings';
 
 const CABLE_KEYWORDS = [
   'CABLE',

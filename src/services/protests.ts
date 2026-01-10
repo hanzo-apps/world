@@ -7,7 +7,7 @@ const ACLED_API_URL = '/api/acled/api/acled/read';
 const ACLED_ACCESS_TOKEN = import.meta.env.VITE_ACLED_ACCESS_TOKEN || '';
 
 // GDELT GEO 2.0 API - no auth required
-const GDELT_GEO_URL = '/api/gdelt/api/v2/geo/geo';
+const GDELT_GEO_URL = '/api/gdelt-geo';
 
 // Haversine distance calculation
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

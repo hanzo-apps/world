@@ -1,3 +1,5 @@
+import { createCircuitBreaker } from '@/utils';
+
 export interface WeatherAlert {
   id: string;
   event: string;
@@ -33,14 +35,15 @@ interface NWSResponse {
 }
 
 const NWS_API = 'https://api.weather.gov/alerts/active';
+const breaker = createCircuitBreaker<WeatherAlert[]>({ name: 'NWS Weather' });
 
 export async function fetchWeatherAlerts(): Promise<WeatherAlert[]> {
-  try {
+  return breaker.execute(async () => {
     const response = await fetch(NWS_API, {
       headers: { 'User-Agent': 'WorldMonitor/1.0' }
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: NWSResponse = await response.json();
 
@@ -62,10 +65,11 @@ export async function fetchWeatherAlerts(): Promise<WeatherAlert[]> {
           centroid: calculateCentroid(coords),
         };
       });
-  } catch (error) {
-    console.error('Failed to fetch weather alerts:', error);
-    return [];
-  }
+  }, []);
+}
+
+export function getWeatherStatus(): string {
+  return breaker.getStatus();
 }
 
 function extractCoordinates(geometry?: NWSAlert['geometry']): [number, number][] {
