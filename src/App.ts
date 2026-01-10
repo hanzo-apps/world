@@ -1008,32 +1008,37 @@ export class App {
     this.updateSearchIndex();
   }
 
-  private loadDataForLayer(layer: keyof MapLayers): void {
-    switch (layer) {
-      case 'earthquakes':
-        this.loadEarthquakes();
-        break;
-      case 'weather':
-        this.loadWeatherAlerts();
-        break;
-      case 'economic':
-        this.loadFredData();
-        break;
-      case 'outages':
-        this.loadOutages();
-        break;
-      case 'ais':
-        this.loadAisSignals();
-        break;
-      case 'cables':
-        this.loadCableActivity();
-        break;
-      case 'protests':
-        this.loadProtests();
-        break;
-      case 'flights':
-        this.loadFlightDelays();
-        break;
+  private async loadDataForLayer(layer: keyof MapLayers): Promise<void> {
+    this.map?.setLayerLoading(layer, true);
+    try {
+      switch (layer) {
+        case 'earthquakes':
+          await this.loadEarthquakes();
+          break;
+        case 'weather':
+          await this.loadWeatherAlerts();
+          break;
+        case 'economic':
+          await this.loadFredData();
+          break;
+        case 'outages':
+          await this.loadOutages();
+          break;
+        case 'ais':
+          await this.loadAisSignals();
+          break;
+        case 'cables':
+          await this.loadCableActivity();
+          break;
+        case 'protests':
+          await this.loadProtests();
+          break;
+        case 'flights':
+          await this.loadFlightDelays();
+          break;
+      }
+    } finally {
+      this.map?.setLayerLoading(layer, false);
     }
   }
 

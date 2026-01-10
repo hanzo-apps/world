@@ -1539,6 +1539,13 @@ export class MapComponent {
     }
   }
 
+  public setLayerLoading(layer: keyof MapLayers, loading: boolean): void {
+    const btn = this.container.querySelector(`.layer-toggle[data-layer="${layer}"]`);
+    if (btn) {
+      btn.classList.toggle('loading', loading);
+    }
+  }
+
   public onStateChanged(callback: (state: MapState) => void): void {
     this.onStateChange = callback;
   }

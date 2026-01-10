@@ -1093,6 +1093,17 @@ body.playback-mode .status-dot {
   opacity: 0.7;
 }
 
+.layer-toggle.loading {
+  animation: layer-loading 0.8s ease-in-out infinite;
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+@keyframes layer-loading {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .hotspot {
   position: absolute;
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
