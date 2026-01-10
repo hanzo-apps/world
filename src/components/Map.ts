@@ -1509,7 +1509,12 @@ export class MapComponent {
   public reset(): void {
     this.state.zoom = 1;
     this.state.pan = { x: 0, y: 0 };
-    this.applyTransform();
+    if (this.state.view !== 'global') {
+      this.state.view = 'global';
+      this.render();
+    } else {
+      this.applyTransform();
+    }
   }
 
   public triggerHotspotClick(id: string): void {

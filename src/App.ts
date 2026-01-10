@@ -807,7 +807,10 @@ export class App {
       history.replaceState(null, '', shareUrl);
     }, 250);
 
-    this.map.onStateChanged(() => update());
+    this.map.onStateChanged((state) => {
+      update();
+      this.setActiveViewButton(state.view);
+    });
     update();
   }
 
