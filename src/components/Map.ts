@@ -434,41 +434,22 @@ export class MapComponent {
   public render(): void {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-    const mapHeight = width / 2; // Equirectangular 2:1 ratio
-    const renderHeight = Math.max(height, mapHeight);
-    const yOffset = (height - renderHeight) / 2; // Negative when map > container
 
-    // ViewBox includes full map extent
-    this.svg.attr('viewBox', `0 ${yOffset} ${width} ${renderHeight}`);
+    // Simple viewBox matching container - keeps SVG and overlays aligned
+    this.svg.attr('viewBox', `0 0 ${width} ${height}`);
     this.svg.selectAll('*').remove();
 
-    // Reset SVG and overlays positioning
-    const svgElement = this.svg.node() as SVGElement;
-    svgElement.style.position = '';
-    svgElement.style.top = '';
-    svgElement.style.left = '';
-    svgElement.style.width = '';
-    svgElement.style.height = '';
-    svgElement.style.overflow = 'visible';
-
-    this.overlays.style.position = '';
-    this.overlays.style.top = '';
-    this.overlays.style.left = '';
-    this.overlays.style.width = '';
-    this.overlays.style.height = '';
-
-    // Background covers full map extent
+    // Background
     this.svg
       .append('rect')
-      .attr('y', yOffset)
       .attr('width', width)
-      .attr('height', renderHeight)
+      .attr('height', height)
       .attr('fill', '#020a08');
 
-    // Grid covers full map extent
-    this.renderGrid(width, renderHeight, yOffset);
+    // Grid
+    this.renderGrid(width, height);
 
-    // Setup projection centered in container
+    // Setup projection
     const projection = this.getProjection(width, height);
     const path = d3.geoPath().projection(projection);
 
