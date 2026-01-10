@@ -56,6 +56,25 @@ export async function fetchStockQuote(
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+async function fetchWithRetry(
+  symbol: string,
+  name: string,
+  display: string,
+  retries = 3,
+  baseDelay = 1000
+): Promise<MarketData> {
+  for (let i = 0; i < retries; i++) {
+    const result = await fetchStockQuote(symbol, name, display);
+    if (result.price !== null) return result;
+
+    if (i < retries - 1) {
+      const waitTime = baseDelay * Math.pow(2, i) + Math.random() * 500;
+      await delay(waitTime);
+    }
+  }
+  return { symbol, name, display, price: null, change: null };
+}
+
 export async function fetchMultipleStocks(
   symbols: Array<{ symbol: string; name: string; display: string }>,
   options: {
@@ -65,21 +84,22 @@ export async function fetchMultipleStocks(
   } = {}
 ): Promise<MarketData[]> {
   const results: MarketData[] = [];
-  const batchSize = options.batchSize ?? 5;
-  const delayMs = options.delayMs ?? 2500;
+  const batchSize = options.batchSize ?? 2;
+  const delayMs = options.delayMs ?? 3000;
   const batches = chunkArray(symbols, batchSize);
 
   for (const [index, batch] of batches.entries()) {
     const batchResults = await Promise.all(
-      batch.map((s) => fetchStockQuote(s.symbol, s.name, s.display))
+      batch.map((s) => fetchWithRetry(s.symbol, s.name, s.display))
     );
     results.push(...batchResults);
 
     const visibleResults = results.filter((r) => r.price !== null);
     options.onBatch?.(visibleResults);
 
-    if (delayMs > 0 && index < batches.length - 1) {
-      await delay(delayMs);
+    if (index < batches.length - 1) {
+      const jitter = Math.random() * 1000;
+      await delay(delayMs + jitter);
     }
   }
 

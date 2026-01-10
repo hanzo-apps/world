@@ -1,34 +1,14 @@
 import type { AirportDelayAlert, FlightDelaySeverity, FlightDelayType, MonitoredAirport } from '@/types';
 import { MONITORED_AIRPORTS, FAA_AIRPORTS, DELAY_SEVERITY_THRESHOLDS } from '@/config/airports';
 
-interface FAAStatusResponse {
-  Name: string;
-  City: string;
-  State: string;
-  ICAO: string;
-  IATA: string;
-  SupportedAirport: boolean;
-  Delay: boolean;
-  DelayCount: number;
-  Status: Array<{
-    Reason: string;
-    ClosureBegin?: string;
-    EndTime?: string;
-    MinDelay?: string;
-    MaxDelay?: string;
-    AvgDelay?: string;
-    Trend?: string;
-    Type?: string;
-  }>;
-  Weather?: {
-    Weather: string;
-    Visibility: number;
-    Temp: string;
-    Wind: string;
-  };
+interface FAADelayInfo {
+  airport: string;
+  reason: string;
+  avgDelay?: number;
+  type: FlightDelayType;
 }
 
-const cache = new Map<string, { data: AirportDelayAlert; timestamp: number }>();
+let faaCache: { data: Map<string, FAADelayInfo>; timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function determineSeverity(avgDelayMinutes: number, delayedPct?: number): FlightDelaySeverity {
@@ -48,93 +28,119 @@ function determineSeverity(avgDelayMinutes: number, delayedPct?: number): Flight
   return 'normal';
 }
 
-function parseDelayType(status: FAAStatusResponse['Status'][0]): FlightDelayType {
-  const type = status.Type?.toLowerCase() || '';
-  const reason = status.Reason?.toLowerCase() || '';
-
-  if (type.includes('ground stop') || reason.includes('ground stop')) {
-    return 'ground_stop';
-  }
-  if (type.includes('ground delay') || reason.includes('ground delay') || reason.includes('gdp')) {
-    return 'ground_delay';
-  }
-  if (type.includes('departure') || reason.includes('departure')) {
-    return 'departure_delay';
-  }
-  if (type.includes('arrival') || reason.includes('arrival')) {
-    return 'arrival_delay';
-  }
+function parseDelayTypeFromReason(reason: string): FlightDelayType {
+  const r = reason.toLowerCase();
+  if (r.includes('ground stop')) return 'ground_stop';
+  if (r.includes('ground delay') || r.includes('gdp')) return 'ground_delay';
+  if (r.includes('departure')) return 'departure_delay';
+  if (r.includes('arrival')) return 'arrival_delay';
+  if (r.includes('clos')) return 'ground_stop';
   return 'general';
 }
 
-function parseAvgDelay(status: FAAStatusResponse['Status'][0]): number {
-  if (status.AvgDelay) {
-    const match = status.AvgDelay.match(/(\d+)/);
-    if (match?.[1]) return parseInt(match[1], 10);
-  }
-  if (status.MinDelay && status.MaxDelay) {
-    const minMatch = status.MinDelay.match(/(\d+)/);
-    const maxMatch = status.MaxDelay.match(/(\d+)/);
-    if (minMatch?.[1] && maxMatch?.[1]) {
-      return Math.round((parseInt(minMatch[1], 10) + parseInt(maxMatch[1], 10)) / 2);
+function parseXMLDelays(xml: string): Map<string, FAADelayInfo> {
+  const delays = new Map<string, FAADelayInfo>();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+
+  // Parse ground delays
+  const groundDelays = doc.querySelectorAll('Ground_Delay_List Ground_Delay');
+  groundDelays.forEach((node) => {
+    const arpt = node.querySelector('ARPT')?.textContent;
+    const reason = node.querySelector('Reason')?.textContent || 'Ground delay';
+    const avgDelay = node.querySelector('Avg')?.textContent;
+    if (arpt) {
+      delays.set(arpt, {
+        airport: arpt,
+        reason,
+        avgDelay: avgDelay ? parseInt(avgDelay, 10) : 30,
+        type: 'ground_delay',
+      });
     }
-  }
-  return 0;
+  });
+
+  // Parse ground stops
+  const groundStops = doc.querySelectorAll('Ground_Stop_List Ground_Stop');
+  groundStops.forEach((node) => {
+    const arpt = node.querySelector('ARPT')?.textContent;
+    const reason = node.querySelector('Reason')?.textContent || 'Ground stop';
+    if (arpt) {
+      delays.set(arpt, {
+        airport: arpt,
+        reason,
+        avgDelay: 60,
+        type: 'ground_stop',
+      });
+    }
+  });
+
+  // Parse arrival/departure delays
+  const arrDepDelays = doc.querySelectorAll('Arrival_Departure_Delay_List Delay');
+  arrDepDelays.forEach((node) => {
+    const arpt = node.querySelector('ARPT')?.textContent;
+    const reason = node.querySelector('Reason')?.textContent || 'Delays';
+    const minDelay = node.querySelector('Arrival_Delay Min')?.textContent || node.querySelector('Departure_Delay Min')?.textContent;
+    const maxDelay = node.querySelector('Arrival_Delay Max')?.textContent || node.querySelector('Departure_Delay Max')?.textContent;
+    if (arpt) {
+      const min = minDelay ? parseInt(minDelay, 10) : 15;
+      const max = maxDelay ? parseInt(maxDelay, 10) : 30;
+      const existing = delays.get(arpt);
+      if (!existing || existing.type !== 'ground_stop') {
+        delays.set(arpt, {
+          airport: arpt,
+          reason,
+          avgDelay: Math.round((min + max) / 2),
+          type: parseDelayTypeFromReason(reason),
+        });
+      }
+    }
+  });
+
+  // Parse closures
+  const closures = doc.querySelectorAll('Airport_Closure_List Airport');
+  closures.forEach((node) => {
+    const arpt = node.querySelector('ARPT')?.textContent;
+    if (arpt && FAA_AIRPORTS.includes(arpt)) {
+      delays.set(arpt, {
+        airport: arpt,
+        reason: 'Airport closure',
+        avgDelay: 120,
+        type: 'ground_stop',
+      });
+    }
+  });
+
+  return delays;
 }
 
-async function fetchFAAStatus(iata: string): Promise<AirportDelayAlert | null> {
-  const airport = MONITORED_AIRPORTS.find((a) => a.iata === iata);
-  if (!airport) return null;
-
-  const cacheKey = `faa-${iata}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.data;
+async function fetchFAADelays(): Promise<Map<string, FAADelayInfo>> {
+  if (faaCache && Date.now() - faaCache.timestamp < CACHE_TTL) {
+    return faaCache.data;
   }
 
   try {
     const url = import.meta.env.DEV
-      ? `/api/faa/asws/api/airport/status/${iata}`
-      : `https://soa.smext.faa.gov/asws/api/airport/status/${iata}`;
+      ? '/api/faa/api/airport-status-information'
+      : 'https://nasstatus.faa.gov/api/airport-status-information';
 
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/xml' },
     });
 
     if (!response.ok) {
-      console.warn(`[Flights] FAA API error for ${iata}: ${response.status}`);
-      return null;
+      console.warn(`[Flights] FAA NASSTATUS error: ${response.status}`);
+      return new Map();
     }
 
-    const data: FAAStatusResponse = await response.json();
+    const xml = await response.text();
+    const delays = parseXMLDelays(xml);
 
-    const primaryStatus = data.Status?.[0];
-    const avgDelayMinutes = primaryStatus ? parseAvgDelay(primaryStatus) : 0;
-    const delayType = primaryStatus ? parseDelayType(primaryStatus) : 'general';
-
-    const alert: AirportDelayAlert = {
-      id: `faa-${iata}`,
-      iata: data.IATA || iata,
-      icao: data.ICAO || airport.icao,
-      name: data.Name || airport.name,
-      city: data.City || airport.city,
-      country: airport.country,
-      lat: airport.lat,
-      lon: airport.lon,
-      region: airport.region,
-      delayType: data.Delay ? delayType : 'general',
-      severity: data.Delay ? determineSeverity(avgDelayMinutes) : 'normal',
-      avgDelayMinutes,
-      reason: primaryStatus?.Reason || (data.Delay ? 'Delays reported' : undefined),
-      source: 'faa',
-      updatedAt: new Date(),
-    };
-
-    cache.set(cacheKey, { data: alert, timestamp: Date.now() });
-    return alert;
+    faaCache = { data: delays, timestamp: Date.now() };
+    console.log(`[Flights] FAA reports ${delays.size} airports with delays`);
+    return delays;
   } catch (error) {
-    console.error(`[Flights] Failed to fetch FAA status for ${iata}:`, error);
-    return null;
+    console.error('[Flights] Failed to fetch FAA NASSTATUS:', error);
+    return new Map();
   }
 }
 
@@ -206,13 +212,33 @@ export async function fetchFlightDelays(): Promise<AirportDelayAlert[]> {
   console.log('[Flights] Fetching flight delay data...');
   const alerts: AirportDelayAlert[] = [];
 
-  // Fetch FAA data for US airports (in parallel batches)
-  const faaPromises = FAA_AIRPORTS.map((iata) => fetchFAAStatus(iata));
-  const faaResults = await Promise.allSettled(faaPromises);
+  // Fetch all FAA delays in single call
+  const faaDelays = await fetchFAADelays();
 
-  for (const result of faaResults) {
-    if (result.status === 'fulfilled' && result.value) {
-      alerts.push(result.value);
+  // Process US airports with real FAA data
+  for (const iata of FAA_AIRPORTS) {
+    const airport = MONITORED_AIRPORTS.find((a) => a.iata === iata);
+    if (!airport) continue;
+
+    const faaDelay = faaDelays.get(iata);
+    if (faaDelay) {
+      alerts.push({
+        id: `faa-${iata}`,
+        iata,
+        icao: airport.icao,
+        name: airport.name,
+        city: airport.city,
+        country: airport.country,
+        lat: airport.lat,
+        lon: airport.lon,
+        region: airport.region,
+        delayType: faaDelay.type,
+        severity: determineSeverity(faaDelay.avgDelay || 30),
+        avgDelayMinutes: faaDelay.avgDelay || 30,
+        reason: faaDelay.reason,
+        source: 'faa',
+        updatedAt: new Date(),
+      });
     }
   }
 
@@ -221,14 +247,13 @@ export async function fetchFlightDelays(): Promise<AirportDelayAlert[]> {
   const nonUsAirports = MONITORED_AIRPORTS.filter((a) => a.country !== 'USA');
   for (const airport of nonUsAirports) {
     const simulated = generateSimulatedDelay(airport);
-    alerts.push(simulated);
+    if (simulated.severity !== 'normal') {
+      alerts.push(simulated);
+    }
   }
 
-  // Only return airports with delays (severity > normal)
-  const activeAlerts = alerts.filter((a) => a.severity !== 'normal');
-
-  console.log(`[Flights] Found ${activeAlerts.length} airports with delays out of ${alerts.length} monitored`);
-  return activeAlerts;
+  console.log(`[Flights] Found ${alerts.length} airports with delays`);
+  return alerts;
 }
 
 export function getAirportByCode(code: string): MonitoredAirport | undefined {

@@ -138,6 +138,11 @@ export class App {
       // Save layer settings
       this.mapLayers[layer] = enabled;
       saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
+
+      // Load data when layer is enabled (if not already loaded)
+      if (enabled) {
+        this.loadDataForLayer(layer);
+      }
     });
   }
 
@@ -954,22 +959,55 @@ export class App {
   }
 
   private async loadAllData(): Promise<void> {
-    await Promise.all([
+    const tasks: Promise<void>[] = [
       this.loadNews(),
       this.loadMarkets(),
       this.loadPredictions(),
-      this.loadEarthquakes(),
-      this.loadWeatherAlerts(),
-      this.loadFredData(),
-      this.loadOutages(),
-      this.loadAisSignals(),
-      this.loadCableActivity(),
-      this.loadProtests(),
-      this.loadFlightDelays(),
-    ]);
+    ];
+
+    // Conditionally load based on layer settings
+    if (this.mapLayers.earthquakes) tasks.push(this.loadEarthquakes());
+    if (this.mapLayers.weather) tasks.push(this.loadWeatherAlerts());
+    if (this.mapLayers.economic) tasks.push(this.loadFredData());
+    if (this.mapLayers.outages) tasks.push(this.loadOutages());
+    if (this.mapLayers.ais) tasks.push(this.loadAisSignals());
+    if (this.mapLayers.cables) tasks.push(this.loadCableActivity());
+    if (this.mapLayers.protests) tasks.push(this.loadProtests());
+    if (this.mapLayers.flights) tasks.push(this.loadFlightDelays());
+
+    await Promise.all(tasks);
 
     // Update search index after all data loads
     this.updateSearchIndex();
+  }
+
+  private loadDataForLayer(layer: keyof MapLayers): void {
+    switch (layer) {
+      case 'earthquakes':
+        this.loadEarthquakes();
+        break;
+      case 'weather':
+        this.loadWeatherAlerts();
+        break;
+      case 'economic':
+        this.loadFredData();
+        break;
+      case 'outages':
+        this.loadOutages();
+        break;
+      case 'ais':
+        this.loadAisSignals();
+        break;
+      case 'cables':
+        this.loadCableActivity();
+        break;
+      case 'protests':
+        this.loadProtests();
+        break;
+      case 'flights':
+        this.loadFlightDelays();
+        break;
+    }
   }
 
   private async loadNewsCategory(category: string, feeds: typeof FEEDS.politics): Promise<NewsItem[]> {

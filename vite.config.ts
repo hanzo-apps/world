@@ -349,15 +349,15 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path.replace(/^\/ws\/aisstream/, ''),
       },
-      // FAA Airport Status Web Service (ASWS)
+      // FAA NASSTATUS - Airport delays and closures
       '/api/faa': {
-        target: 'https://soa.smext.faa.gov',
+        target: 'https://nasstatus.faa.gov',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/faa/, ''),
         configure: (proxy) => {
           proxy.on('error', (err) => {
-            console.log('FAA ASWS proxy error:', err.message);
+            console.log('FAA NASSTATUS proxy error:', err.message);
           });
         },
       },
