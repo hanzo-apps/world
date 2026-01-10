@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * AIS WebSocket Relay Server + Static File Server
- * Serves frontend and proxies aisstream.io data via WebSocket
+ * AIS WebSocket Relay Server
+ * Proxies aisstream.io data to browsers via WebSocket
  *
  * Deploy on Railway with:
  *   AISSTREAM_API_KEY=your_key
@@ -10,14 +10,11 @@
  */
 
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
 const API_KEY = process.env.AISSTREAM_API_KEY || process.env.VITE_AISSTREAM_API_KEY;
 const PORT = process.env.PORT || 3004;
-const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 if (!API_KEY) {
   console.error('[Relay] Error: AISSTREAM_API_KEY environment variable not set');
@@ -25,23 +22,15 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const MIME_TYPES = {
-  '.html': 'text/html',
-  '.js': 'application/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-};
+let upstreamSocket = null;
+let clients = new Set();
+let messageCount = 0;
 
-// HTTP server for static files + health check
+// HTTP server for health checks
 const server = http.createServer((req, res) => {
-  // Health check endpoint
-  if (req.url === '/health') {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
@@ -49,45 +38,11 @@ const server = http.createServer((req, res) => {
       messages: messageCount,
       connected: upstreamSocket?.readyState === WebSocket.OPEN
     }));
-    return;
-  }
-
-  // Serve static files from dist/
-  let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = path.join(DIST_DIR, filePath);
-
-  // Security: prevent directory traversal
-  if (!filePath.startsWith(DIST_DIR)) {
-    res.writeHead(403);
+  } else {
+    res.writeHead(404);
     res.end();
-    return;
   }
-
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      // SPA fallback: serve index.html for client-side routing
-      fs.readFile(path.join(DIST_DIR, 'index.html'), (err2, indexData) => {
-        if (err2) {
-          res.writeHead(404);
-          res.end('Not found');
-          return;
-        }
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(indexData);
-      });
-      return;
-    }
-
-    const ext = path.extname(filePath);
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
-    res.end(data);
-  });
 });
-
-let upstreamSocket = null;
-let clients = new Set();
-let messageCount = 0;
 
 function connectUpstream() {
   if (upstreamSocket?.readyState === WebSocket.OPEN) return;
@@ -106,12 +61,10 @@ function connectUpstream() {
 
   upstreamSocket.on('message', (data) => {
     messageCount++;
-    if (messageCount % 100 === 0) {
-      console.log(`[Relay] Received ${messageCount} messages, ${clients.size} clients connected`);
+    if (messageCount % 1000 === 0) {
+      console.log(`[Relay] ${messageCount} messages, ${clients.size} clients`);
     }
-    // Convert Buffer to string for browser clients
     const message = data.toString();
-    // Broadcast to all connected browser clients
     for (const client of clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
@@ -120,7 +73,7 @@ function connectUpstream() {
   });
 
   upstreamSocket.on('close', () => {
-    console.log('[Relay] Disconnected from aisstream.io, reconnecting in 5s...');
+    console.log('[Relay] Disconnected, reconnecting in 5s...');
     setTimeout(connectUpstream, 5000);
   });
 
@@ -129,26 +82,18 @@ function connectUpstream() {
   });
 }
 
-// Start WebSocket server attached to HTTP server
 const wss = new WebSocketServer({ server });
 
 server.listen(PORT, () => {
-  console.log(`[Relay] Server listening on port ${PORT}`);
-});
-
-wss.on('error', (err) => {
-  console.error('[Relay] Server error:', err.message);
+  console.log(`[Relay] WebSocket relay on port ${PORT}`);
 });
 
 wss.on('connection', (ws, req) => {
-  console.log('[Relay] Client connected from:', req.socket.remoteAddress);
+  console.log('[Relay] Client connected');
   clients.add(ws);
-
-  // Connect to upstream if not already connected
   connectUpstream();
 
   ws.on('close', () => {
-    console.log('[Relay] Client disconnected');
     clients.delete(ws);
   });
 
@@ -156,5 +101,3 @@ wss.on('connection', (ws, req) => {
     console.error('[Relay] Client error:', err.message);
   });
 });
-
-console.log(`[Relay] Starting AIS relay on port ${PORT}...`);

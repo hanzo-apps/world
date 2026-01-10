@@ -1,7 +1,6 @@
 import type { InternetOutage } from '@/types';
 
 const CLOUDFLARE_API_URL = '/api/cloudflare-radar/client/v4/radar/annotations/outages';
-const CLOUDFLARE_API_TOKEN = import.meta.env.VITE_CLOUDFLARE_API_TOKEN || '';
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
   'AF': { lat: 33.9391, lon: 67.7100 },
@@ -186,11 +185,7 @@ interface CloudflareResponse {
 export async function fetchInternetOutages(): Promise<InternetOutage[]> {
   console.log('[Outages] Fetching from Cloudflare Radar...');
   try {
-    const response = await fetch(`${CLOUDFLARE_API_URL}?dateRange=7d&limit=50`, {
-      headers: {
-        'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
-      },
-    });
+    const response = await fetch(`${CLOUDFLARE_API_URL}?dateRange=7d&limit=50`);
 
     if (!response.ok) {
       console.error('[Outages] Failed to fetch:', response.status);
