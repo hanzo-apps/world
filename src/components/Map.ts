@@ -229,7 +229,7 @@ export class MapComponent {
 
     const layers: (keyof MapLayers)[] = ['conflicts', 'bases', 'cables', 'pipelines', 'hotspots', 'ais', 'earthquakes', 'weather', 'nuclear', 'irradiators', 'outages', 'datacenters', 'sanctions', 'economic', 'countries', 'waterways', 'protests'];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
-      ais: 'AIS',
+      ais: 'Shipping',
     };
 
     layers.forEach((layer) => {

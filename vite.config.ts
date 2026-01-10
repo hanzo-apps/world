@@ -342,6 +342,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
       },
+      // AISStream WebSocket proxy for live vessel tracking
+      '/ws/aisstream': {
+        target: 'wss://stream.aisstream.io',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/ws\/aisstream/, ''),
+      },
     },
   },
 });

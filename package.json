@@ -13,7 +13,8 @@
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "ws": "^8.19.0"
   },
   "dependencies": {
     "d3": "^7.9.0",

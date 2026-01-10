@@ -1158,13 +1158,13 @@ export class App {
       this.map?.setAisData(disruptions, density);
 
       if (aisStatus.connected) {
-        this.statusPanel?.updateFeed('AIS', {
+        this.statusPanel?.updateFeed('Shipping', {
           status: 'ok',
           itemCount: disruptions.length + density.length,
         });
         this.statusPanel?.updateApi('AISStream', { status: 'ok' });
       } else {
-        this.statusPanel?.updateFeed('AIS', {
+        this.statusPanel?.updateFeed('Shipping', {
           status: aisStatus.vessels > 0 ? 'ok' : 'error',
           itemCount: disruptions.length + density.length,
           errorMessage: aisStatus.vessels === 0 ? 'No API key - set VITE_AISSTREAM_API_KEY' : undefined,
@@ -1174,7 +1174,7 @@ export class App {
         });
       }
     } catch (error) {
-      this.statusPanel?.updateFeed('AIS', { status: 'error', errorMessage: String(error) });
+      this.statusPanel?.updateFeed('Shipping', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('AISStream', { status: 'error' });
     }
   }

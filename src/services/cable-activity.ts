@@ -256,7 +256,8 @@ export async function fetchCableActivity(): Promise<CableActivity> {
       throw new Error(`NGA API error: ${response.status}`);
     }
 
-    const warnings = await response.json() as NgaWarning[];
+    const data = await response.json();
+    const warnings: NgaWarning[] = Array.isArray(data) ? data : (data?.warnings ?? []);
     console.log(`[CableActivity] Fetched ${warnings.length} NGA warnings`);
 
     const activity = processWarnings(warnings);

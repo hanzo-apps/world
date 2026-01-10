@@ -1,6 +1,10 @@
 import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 
-const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
+// Use local relay in dev mode (browser WebSocket to aisstream.io has issues)
+// Run: node scripts/ais-relay.js
+const AISSTREAM_URL = import.meta.env.DEV
+  ? 'ws://localhost:3004'
+  : 'wss://stream.aisstream.io/v0/stream';
 
 // Grid cell size for density aggregation (degrees)
 const GRID_SIZE = 2;
@@ -111,6 +115,9 @@ function handleMessage(event: MessageEvent): void {
 
     if (data.MessageType === 'PositionReport') {
       processPositionReport(data);
+      if (messageCount % 100 === 0) {
+        console.log(`[Shipping] Received ${messageCount} position reports, tracking ${vessels.size} vessels`);
+      }
     }
   } catch (e) {
     // Ignore parse errors
@@ -119,42 +126,52 @@ function handleMessage(event: MessageEvent): void {
 
 function connect(): void {
   if (!apiKey) {
-    console.warn('[AIS] No API key configured. Set VITE_AISSTREAM_API_KEY to enable live AIS data.');
+    console.warn('[Shipping] No API key configured. Set VITE_AISSTREAM_API_KEY to enable live AIS data.');
     return;
   }
 
   if (socket?.readyState === WebSocket.OPEN) return;
 
+  console.log('[Shipping] Opening WebSocket to:', AISSTREAM_URL);
   try {
     socket = new WebSocket(AISSTREAM_URL);
+    console.log('[Shipping] WebSocket created, readyState:', socket.readyState);
 
     socket.onopen = () => {
-      console.log('[AIS] Connected to aisstream.io');
+      console.log('[Shipping] Connected to aisstream.io');
       isConnected = true;
 
-      // Subscribe to global position reports (all vessels)
       const subscription = {
         APIKey: apiKey,
         BoundingBoxes: [[[-90, -180], [90, 180]]],
         FilterMessageTypes: ['PositionReport'],
       };
       socket?.send(JSON.stringify(subscription));
+      console.log('[Shipping] Subscribed to global vessel positions');
     };
 
     socket.onmessage = handleMessage;
 
-    socket.onclose = () => {
-      console.log('[AIS] Disconnected from aisstream.io');
+    socket.onclose = (event) => {
+      console.log('[Shipping] Disconnected:', event.code, event.reason || 'No reason');
       isConnected = false;
       scheduleReconnect();
     };
 
     socket.onerror = (error) => {
-      console.warn('[AIS] WebSocket error:', error);
+      console.error('[Shipping] WebSocket error:', error);
       isConnected = false;
     };
+
+    // Check readyState after a short delay
+    setTimeout(() => {
+      if (socket) {
+        const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+        console.log('[Shipping] WebSocket state after 3s:', states[socket.readyState]);
+      }
+    }, 3000);
   } catch (e) {
-    console.warn('[AIS] Failed to connect:', e);
+    console.error('[Shipping] Failed to connect:', e);
     scheduleReconnect();
   }
 }
@@ -300,13 +317,15 @@ function calculateDensityZones(): AisDensityZone[] {
 }
 
 export function initAisStream(key?: string): void {
+  console.log('[Shipping] Initializing AIS stream...');
   apiKey = key || import.meta.env.VITE_AISSTREAM_API_KEY || null;
 
   if (!apiKey) {
-    console.warn('[AIS] No API key provided. Get a free key at https://aisstream.io');
+    console.warn('[Shipping] No API key provided. Get a free key at https://aisstream.io');
     return;
   }
 
+  console.log('[Shipping] API key configured, connecting to aisstream.io...');
   connect();
 
   // Cleanup old data periodically
