@@ -21,14 +21,43 @@ interface CoinGeckoResponse {
   };
 }
 
+// Circuit breaker for Yahoo Finance rate limiting
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+let rateLimitedUntil = 0;
+let lastSuccessfulResults: MarketData[] = [];
+
+function isRateLimited(): boolean {
+  if (Date.now() < rateLimitedUntil) {
+    const remaining = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+    console.warn(`[Markets] Rate limited, ${remaining}s remaining`);
+    return true;
+  }
+  return false;
+}
+
+function triggerRateLimit(): void {
+  rateLimitedUntil = Date.now() + COOLDOWN_MS;
+  console.warn(`[Markets] Rate limit detected, pausing for 5 minutes`);
+}
+
 export async function fetchStockQuote(
   symbol: string,
   name: string,
   display: string
-): Promise<MarketData> {
+): Promise<MarketData & { rateLimited?: boolean }> {
+  if (isRateLimited()) {
+    return { symbol, name, display, price: null, change: null };
+  }
+
   try {
     const url = API_URLS.yahooFinance(symbol);
     const response = await fetchWithProxy(url);
+
+    if (response.status === 429) {
+      triggerRateLimit();
+      return { symbol, name, display, price: null, change: null, rateLimited: true };
+    }
+
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data: YahooFinanceResponse = await response.json();
 
@@ -41,39 +70,19 @@ export async function fetchStockQuote(
     const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     const change = ((price - prevClose) / prevClose) * 100;
 
-    return {
-      symbol,
-      name,
-      display,
-      price,
-      change,
-    };
+    return { symbol, name, display, price, change };
   } catch (e) {
+    const msg = String(e);
+    if (msg.includes('429')) {
+      triggerRateLimit();
+      return { symbol, name, display, price: null, change: null, rateLimited: true };
+    }
     console.error(`Failed to fetch ${symbol}:`, e);
     return { symbol, name, display, price: null, change: null };
   }
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function fetchWithRetry(
-  symbol: string,
-  name: string,
-  display: string,
-  retries = 3,
-  baseDelay = 1000
-): Promise<MarketData> {
-  for (let i = 0; i < retries; i++) {
-    const result = await fetchStockQuote(symbol, name, display);
-    if (result.price !== null) return result;
-
-    if (i < retries - 1) {
-      const waitTime = baseDelay * Math.pow(2, i) + Math.random() * 500;
-      await delay(waitTime);
-    }
-  }
-  return { symbol, name, display, price: null, change: null };
-}
 
 export async function fetchMultipleStocks(
   symbols: Array<{ symbol: string; name: string; display: string }>,
@@ -83,15 +92,38 @@ export async function fetchMultipleStocks(
     onBatch?: (results: MarketData[]) => void;
   } = {}
 ): Promise<MarketData[]> {
+  // Return cached results if rate limited
+  if (isRateLimited()) {
+    if (lastSuccessfulResults.length > 0) {
+      options.onBatch?.(lastSuccessfulResults);
+      return lastSuccessfulResults;
+    }
+    return [];
+  }
+
   const results: MarketData[] = [];
   const batchSize = options.batchSize ?? 2;
   const delayMs = options.delayMs ?? 3000;
   const batches = chunkArray(symbols, batchSize);
 
   for (const [index, batch] of batches.entries()) {
+    // Check rate limit before each batch
+    if (isRateLimited()) {
+      console.log(`[Markets] Stopping fetch after ${results.length} symbols due to rate limit`);
+      break;
+    }
+
     const batchResults = await Promise.all(
-      batch.map((s) => fetchWithRetry(s.symbol, s.name, s.display))
+      batch.map((s) => fetchStockQuote(s.symbol, s.name, s.display))
     );
+
+    // Check if any result triggered rate limit
+    const hitRateLimit = batchResults.some((r) => (r as { rateLimited?: boolean }).rateLimited);
+    if (hitRateLimit) {
+      console.log(`[Markets] Rate limit hit, stopping fetch`);
+      break;
+    }
+
     results.push(...batchResults);
 
     const visibleResults = results.filter((r) => r.price !== null);
@@ -103,7 +135,11 @@ export async function fetchMultipleStocks(
     }
   }
 
-  return results.filter((r) => r.price !== null);
+  const successful = results.filter((r) => r.price !== null);
+  if (successful.length > 0) {
+    lastSuccessfulResults = successful;
+  }
+  return successful;
 }
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
