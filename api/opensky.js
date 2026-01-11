@@ -28,6 +28,19 @@ export default async function handler(req) {
       });
     }
 
+    // Check if response is OK
+    if (!response.ok) {
+      const text = await response.text();
+      return Response.json({
+        error: `OpenSky HTTP ${response.status}: ${text.substring(0, 200)}`,
+        time: Date.now(),
+        states: null
+      }, {
+        status: response.status,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
     const data = await response.json();
     return Response.json(data, {
       status: response.status,
@@ -38,7 +51,7 @@ export default async function handler(req) {
     });
   } catch (error) {
     return Response.json({
-      error: `OpenSky error: ${error.message}`,
+      error: `Fetch failed: ${error.name} - ${error.message}`,
       time: Date.now(),
       states: null
     }, {

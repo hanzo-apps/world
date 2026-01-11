@@ -47,6 +47,17 @@ export default defineConfig({
           });
         },
       },
+      // PizzINT - Pentagon Pizza Index
+      '/api/pizzint': {
+        target: 'https://www.pizzint.watch',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pizzint/, '/api'),
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('PizzINT proxy error:', err.message);
+          });
+        },
+      },
       // FRED Economic Data - handled by Vercel serverless function in prod
       // In dev, we proxy to the API directly with the key from .env
       '/api/fred-data': {
