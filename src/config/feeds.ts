@@ -166,9 +166,6 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
     { name: 'Layoffs News', url: rss('https://news.google.com/rss/search?q=(layoffs+OR+"job+cuts"+OR+"workforce+reduction")+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
-  congress: [
-    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q=("congress+stock"+OR+"senator+trade"+OR+"representative+stock")+when:7d&hl=en-US&gl=US&ceid=US:en') },
-  ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
     { name: 'Brookings', url: rss('https://www.brookings.edu/feed/') },
