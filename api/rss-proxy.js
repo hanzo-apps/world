@@ -54,6 +54,13 @@ const ALLOWED_DOMAINS = [
   'www.reutersagency.com',
   'feeds.reuters.com',
   'rsshub.app',
+  'www.cfr.org',
+  'www.csis.org',
+  'www.politico.com',
+  'www.telegraph.co.uk',
+  'www.brookings.edu',
+  'layoffs.fyi',
+  'www.defensenews.com',
 ];
 
 export default async function handler(req) {
