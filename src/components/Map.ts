@@ -265,7 +265,86 @@ export class MapComponent {
       toggles.appendChild(btn);
     });
 
+    // Add help button
+    const helpBtn = document.createElement('button');
+    helpBtn.className = 'layer-help-btn';
+    helpBtn.textContent = '?';
+    helpBtn.title = 'Layer descriptions';
+    helpBtn.addEventListener('click', () => this.showLayerHelp());
+    toggles.appendChild(helpBtn);
+
     return toggles;
+  }
+
+  private showLayerHelp(): void {
+    const existing = this.container.querySelector('.layer-help-popup');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const popup = document.createElement('div');
+    popup.className = 'layer-help-popup';
+    popup.innerHTML = `
+      <div class="layer-help-header">
+        <span>Map Layers Guide</span>
+        <button class="layer-help-close">×</button>
+      </div>
+      <div class="layer-help-content">
+        <div class="layer-help-section">
+          <div class="layer-help-title">Geopolitical</div>
+          <div class="layer-help-item"><span>CONFLICTS</span> Active war zones and armed conflicts (ACLED data)</div>
+          <div class="layer-help-item"><span>HOTSPOTS</span> Regions with elevated geopolitical tensions</div>
+          <div class="layer-help-item"><span>SANCTIONS</span> Countries/entities under international sanctions</div>
+          <div class="layer-help-item"><span>PROTESTS</span> Civil unrest, riots, and demonstrations (ACLED/GDELT)</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Military & Strategic</div>
+          <div class="layer-help-item"><span>BASES</span> Major US/NATO, China, and Russia military installations</div>
+          <div class="layer-help-item"><span>NUCLEAR</span> Nuclear power plants, enrichment, and weapons facilities</div>
+          <div class="layer-help-item"><span>IRRADIATORS</span> Industrial gamma irradiator facilities (IAEA)</div>
+          <div class="layer-help-item"><span>MILITARY</span> Live military aircraft tracking via OpenSky Network (crosshairs)</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Infrastructure</div>
+          <div class="layer-help-item"><span>CABLES</span> Undersea fiber optic cables carrying global internet traffic</div>
+          <div class="layer-help-item"><span>PIPELINES</span> Major oil and gas pipeline infrastructure</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and connectivity disruptions</div>
+          <div class="layer-help-item"><span>DATACENTERS</span> Major AI/GPU compute clusters worldwide</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Transport</div>
+          <div class="layer-help-item"><span>SHIPPING</span> Live vessel tracking in strategic waterways (AIS)</div>
+          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays, ground stops, and disruptions</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Natural & Economic</div>
+          <div class="layer-help-item"><span>EARTHQUAKES</span> Recent seismic events M4.5+ (USGS)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts and warnings (NWS)</div>
+          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges and central banks</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Labels</div>
+          <div class="layer-help-item"><span>COUNTRIES</span> Country name labels</div>
+          <div class="layer-help-item"><span>WATERWAYS</span> Strategic chokepoints (Hormuz, Suez, etc.)</div>
+        </div>
+      </div>
+    `;
+
+    popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
+
+    // Close on click outside
+    setTimeout(() => {
+      const closeHandler = (e: MouseEvent) => {
+        if (!popup.contains(e.target as Node)) {
+          popup.remove();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      document.addEventListener('click', closeHandler);
+    }, 100);
+
+    this.container.appendChild(popup);
   }
 
   private syncLayerButtons(): void {
