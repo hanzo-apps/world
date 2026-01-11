@@ -1,7 +1,7 @@
 export const config = { runtime: 'edge' };
 
 // Fetch with timeout
-async function fetchWithTimeout(url, options, timeoutMs = 10000) {
+async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -78,12 +78,17 @@ export default async function handler(req) {
       });
     }
 
+    // Google News is slow - use longer timeout
+    const isGoogleNews = feedUrl.includes('news.google.com');
+    const timeout = isGoogleNews ? 20000 : 12000;
+
     const response = await fetchWithTimeout(feedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
-    }, 8000); // 8s timeout
+    }, timeout);
 
     const data = await response.text();
     return new Response(data, {
