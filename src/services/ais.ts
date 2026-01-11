@@ -350,7 +350,9 @@ function detectDisruptions(): AisDisruptionEvent[] {
 
 function calculateDensityZones(): AisDensityZone[] {
   const zones: AisDensityZone[] = [];
-  const allCells = Array.from(densityGrid.values()).filter(c => c.vessels.size >= 3);
+  const allCells = Array.from(densityGrid.values()).filter(c => c.vessels.size >= 1);
+
+  console.log(`[AIS Density] Grid has ${densityGrid.size} cells, ${allCells.length} with vessels`);
 
   if (allCells.length === 0) return zones;
 
@@ -359,7 +361,7 @@ function calculateDensityZones(): AisDensityZone[] {
   const minVessels = Math.min(...vesselCounts);
 
   for (const [key, cell] of densityGrid) {
-    if (cell.vessels.size < 3) continue;
+    if (cell.vessels.size < 1) continue;
 
     // Use logarithmic scaling to make smaller zones visible
     // This ensures zones with fewer ships still appear on the map
