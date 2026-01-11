@@ -1030,23 +1030,33 @@ export class App {
   }
 
   private async loadAllData(): Promise<void> {
+    const runGuarded = async (name: string, fn: () => Promise<void>): Promise<void> => {
+      if (this.inFlight.has(name)) return;
+      this.inFlight.add(name);
+      try {
+        await fn();
+      } finally {
+        this.inFlight.delete(name);
+      }
+    };
+
     const tasks: Array<{ name: string; task: Promise<void> }> = [
-      { name: 'news', task: this.loadNews() },
-      { name: 'markets', task: this.loadMarkets() },
-      { name: 'predictions', task: this.loadPredictions() },
-      { name: 'pizzint', task: this.loadPizzInt() },
-      { name: 'fred', task: this.loadFredData() },
+      { name: 'news', task: runGuarded('news', () => this.loadNews()) },
+      { name: 'markets', task: runGuarded('markets', () => this.loadMarkets()) },
+      { name: 'predictions', task: runGuarded('predictions', () => this.loadPredictions()) },
+      { name: 'pizzint', task: runGuarded('pizzint', () => this.loadPizzInt()) },
+      { name: 'fred', task: runGuarded('fred', () => this.loadFredData()) },
     ];
 
     // Conditionally load based on layer settings
-    if (this.mapLayers.earthquakes) tasks.push({ name: 'earthquakes', task: this.loadEarthquakes() });
-    if (this.mapLayers.weather) tasks.push({ name: 'weather', task: this.loadWeatherAlerts() });
-    if (this.mapLayers.outages) tasks.push({ name: 'outages', task: this.loadOutages() });
-    if (this.mapLayers.ais) tasks.push({ name: 'ais', task: this.loadAisSignals() });
-    if (this.mapLayers.cables) tasks.push({ name: 'cables', task: this.loadCableActivity() });
-    if (this.mapLayers.protests) tasks.push({ name: 'protests', task: this.loadProtests() });
-    if (this.mapLayers.flights) tasks.push({ name: 'flights', task: this.loadFlightDelays() });
-    if (this.mapLayers.military) tasks.push({ name: 'military', task: this.loadMilitary() });
+    if (this.mapLayers.earthquakes) tasks.push({ name: 'earthquakes', task: runGuarded('earthquakes', () => this.loadEarthquakes()) });
+    if (this.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
+    if (this.mapLayers.outages) tasks.push({ name: 'outages', task: runGuarded('outages', () => this.loadOutages()) });
+    if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
+    if (this.mapLayers.cables) tasks.push({ name: 'cables', task: runGuarded('cables', () => this.loadCableActivity()) });
+    if (this.mapLayers.protests) tasks.push({ name: 'protests', task: runGuarded('protests', () => this.loadProtests()) });
+    if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
+    if (this.mapLayers.military) tasks.push({ name: 'military', task: runGuarded('military', () => this.loadMilitary()) });
 
     // Use allSettled to ensure all tasks complete and search index always updates
     const results = await Promise.allSettled(tasks.map(t => t.task));
@@ -1063,6 +1073,8 @@ export class App {
   }
 
   private async loadDataForLayer(layer: keyof MapLayers): Promise<void> {
+    if (this.inFlight.has(layer)) return;
+    this.inFlight.add(layer);
     this.map?.setLayerLoading(layer, true);
     try {
       switch (layer) {
@@ -1092,6 +1104,7 @@ export class App {
           break;
       }
     } finally {
+      this.inFlight.delete(layer);
       this.map?.setLayerLoading(layer, false);
     }
   }
