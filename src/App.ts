@@ -574,7 +574,7 @@ export class App {
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.map = new MapComponent(mapContainer, {
       zoom: this.isMobile ? 2.5 : 1.5,
-      pan: { x: 0, y: 0 },
+      pan: { x: 0, y: this.isMobile ? 0 : 60 },  // Pan north to show Europe/UK by default
       view: this.isMobile ? 'mena' : 'global',
       layers: this.mapLayers,
       timeRange: '7d',
@@ -722,7 +722,9 @@ export class App {
       this.map.setZoom(zoom);
     }
 
-    if (lat !== undefined && lon !== undefined) {
+    // Only apply lat/lon if user has zoomed in significantly (zoom > 2)
+    // At default zoom (~1-1.5), show centered global view to avoid clipping issues
+    if (lat !== undefined && lon !== undefined && zoom !== undefined && zoom > 2) {
       this.map.setCenter(lat, lon);
     }
   }
