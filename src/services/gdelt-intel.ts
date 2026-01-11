@@ -73,14 +73,14 @@ export const INTEL_TOPICS: IntelTopic[] = [
 const CACHE_TTL = 5 * 60 * 1000;
 const articleCache = new Map<string, { articles: GdeltArticle[]; timestamp: number }>();
 
-function buildGdeltDocUrl(query: string, maxrecords = 10, timespan = '72h'): string {
+function buildGdeltDocUrl(query: string, maxrecords = 10, timespan = '24h'): string {
   return `/api/gdelt-doc?query=${encodeURIComponent(query)}&maxrecords=${maxrecords}&timespan=${timespan}`;
 }
 
 export async function fetchGdeltArticles(
   query: string,
   maxrecords = 10,
-  timespan = '72h'
+  timespan = '24h'
 ): Promise<GdeltArticle[]> {
   const cacheKey = `${query}:${maxrecords}:${timespan}`;
   const cached = articleCache.get(cacheKey);
@@ -115,7 +115,7 @@ export async function fetchHotspotContext(hotspot: Hotspot): Promise<GdeltArticl
 }
 
 export async function fetchTopicIntelligence(topic: IntelTopic): Promise<TopicIntelligence> {
-  const articles = await fetchGdeltArticles(topic.query, 10, '72h');
+  const articles = await fetchGdeltArticles(topic.query, 10, '24h');
   return {
     topic,
     articles,
