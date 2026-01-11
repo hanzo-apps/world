@@ -1,5 +1,45 @@
 export const config = { runtime: 'edge' };
 
+// Token cache for OAuth2
+let tokenCache = { token: null, expiresAt: 0 };
+
+async function getAccessToken() {
+  const clientId = process.env.OPENSKY_CLIENT_ID;
+  const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) return null;
+
+  // Return cached token if still valid (with 60s buffer)
+  if (tokenCache.token && Date.now() < tokenCache.expiresAt - 60000) {
+    return tokenCache.token;
+  }
+
+  try {
+    const response = await fetch('https://opensky-network.org/api/auth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    tokenCache = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in * 1000),
+    };
+    return tokenCache.token;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
 
@@ -18,13 +58,13 @@ export default async function handler(req) {
   const openskyUrl = `https://opensky-network.org/api/states/all${params.toString() ? '?' + params.toString() : ''}`;
 
   try {
+    // Get OAuth token if credentials configured
+    const token = await getAccessToken();
+
     const response = await fetch(openskyUrl, {
       headers: {
         'Accept': 'application/json',
-        // Add auth if credentials are configured
-        ...(process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD && {
-          'Authorization': 'Basic ' + btoa(`${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`)
-        }),
+        ...(token && { 'Authorization': `Bearer ${token}` }),
       },
     });
 
