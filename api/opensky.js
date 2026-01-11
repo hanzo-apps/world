@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     const isTimeout = error.name === 'AbortError';
     res.setHeader('Cache-Control', 'no-cache');
     return res.status(isTimeout ? 504 : 500).json({
-      error: isTimeout ? 'Request timeout' : 'Failed to fetch data',
+      error: isTimeout ? 'Request timeout' : `Fetch error: ${error.message}`,
       time: Date.now(),
       states: null
     });
