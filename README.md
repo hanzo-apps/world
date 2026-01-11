@@ -827,7 +827,8 @@ The dashboard fetches data from various public APIs and data sources:
 | FRED | Economic indicators (Fed data) | No |
 | Polymarket | Prediction markets | No |
 | ACLED | Armed conflict & protest data | Yes (free) |
-| GDELT | News-derived event geolocation + tensions | No |
+| GDELT Geo | News-derived event geolocation + tensions | No |
+| GDELT Doc | Topic-based intelligence feeds (cyber, military, nuclear) | No |
 | FAA NASSTATUS | Airport delay status | No |
 | Cloudflare Radar | Internet outage data | Yes (free) |
 | AISStream | Live vessel positions | Yes (relay) |
@@ -862,6 +863,7 @@ src/
 │   ├── PizzIntIndicator.ts   # Pentagon Pizza Index display
 │   ├── VirtualList.ts        # Virtual/windowed scrolling
 │   ├── EconomicPanel.ts      # FRED economic indicators
+│   ├── GdeltIntelPanel.ts    # Topic-based intelligence (cyber, military, etc.)
 │   ├── NewsPanel.ts          # News feed with clustering
 │   ├── MarketPanel.ts        # Stock/commodity display
 │   ├── MonitorPanel.ts       # Custom keyword monitors
@@ -882,6 +884,7 @@ src/
 │   ├── military-flights.ts   # Aircraft tracking via OpenSky
 │   ├── pizzint.ts            # Pentagon Pizza Index + GDELT tensions
 │   ├── protests.ts           # ACLED + GDELT integration
+│   ├── gdelt-intel.ts        # GDELT Doc API topic intelligence
 │   ├── flights.ts            # FAA delay parsing
 │   ├── outages.ts            # Cloudflare Radar integration
 │   ├── rss.ts                # RSS parsing with circuit breakers
@@ -912,7 +915,8 @@ api/                          # Vercel Edge serverless proxies
 ├── faa-status.js             # FAA ground stops/delays
 ├── finnhub.js                # Stock quotes (batch, primary)
 ├── fred-data.js              # Federal Reserve economic data
-├── gdelt-geo.js              # GDELT event geolocation
+├── gdelt-doc.js              # GDELT Doc API (topic intelligence)
+├── gdelt-geo.js              # GDELT Geo API (event geolocation)
 ├── polymarket.js             # Prediction markets with validation
 ├── yahoo-finance.js          # Stock indices/commodities (backup)
 └── opensky-relay.js          # Military aircraft tracking
