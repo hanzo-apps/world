@@ -46,8 +46,10 @@ Layers are organized into logical groups for efficient monitoring:
 **Transport**
 | Layer | Description |
 |-------|-------------|
-| **Ships (AIS)** | Live vessel tracking via AIS with chokepoint monitoring |
+| **Ships (AIS)** | Live vessel tracking via AIS with chokepoint monitoring* |
 | **Delays** | FAA airport delay status and ground stops |
+
+*\*AIS data via [AISStream.io](https://aisstream.io) uses terrestrial receivers with stronger coverage in European/Atlantic waters. Middle East, Asia, and open ocean coverage is limited. Satellite AIS providers (Spire, Kpler) offer global coverage but require commercial licenses.*
 
 **Natural Events**
 | Layer | Description |
@@ -66,13 +68,13 @@ Layers are organized into logical groups for efficient monitoring:
 
 Multi-source RSS aggregation across categories:
 - **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR, Politico, The Telegraph
-- **Middle East / MENA** - Al Jazeera, BBC ME, CNN ME, Al Arabiya
+- **Middle East / MENA** - Al Jazeera, BBC ME, Guardian ME, CNN World
 - **Technology** - Hacker News, Ars Technica, The Verge, MIT Tech Review
 - **AI / ML** - ArXiv, Hugging Face, VentureBeat, OpenAI
 - **Finance** - CNBC, MarketWatch, Financial Times, Yahoo Finance
 - **Government** - White House, State Dept, Pentagon, Treasury, Fed, SEC
 - **Intel Feed** - Defense One, Breaking Defense, Bellingcat, Krebs Security
-- **Think Tanks** - Foreign Policy, Brookings, CSIS, CFR
+- **Think Tanks** - Foreign Policy, Atlantic Council, Foreign Affairs
 - **Layoffs Tracker** - Tech industry job cuts
 
 ### Live News Streams
