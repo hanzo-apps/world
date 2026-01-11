@@ -46,6 +46,67 @@ const server = http.createServer(async (req, res) => {
       messages: messageCount,
       connected: upstreamSocket?.readyState === WebSocket.OPEN
     }));
+  } else if (req.url.startsWith('/rss')) {
+    // Proxy RSS feeds that block Vercel IPs
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const feedUrl = url.searchParams.get('url');
+
+      if (!feedUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Missing url parameter' }));
+      }
+
+      // Only allow specific blocked domains
+      const allowedDomains = [
+        'www.telegraph.co.uk',
+        'rss.cnn.com',
+        'www.defensenews.com',
+        'layoffs.fyi',
+      ];
+      const parsed = new URL(feedUrl);
+      if (!allowedDomains.includes(parsed.hostname)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
+      }
+
+      console.log('[Relay] RSS request:', feedUrl);
+
+      const https = require('https');
+      const request = https.get(feedUrl, {
+        headers: {
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        timeout: 15000
+      }, (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => {
+          res.writeHead(response.statusCode, {
+            'Content-Type': 'application/xml',
+            'Cache-Control': 'public, max-age=300'
+          });
+          res.end(data);
+        });
+      });
+
+      request.on('error', (err) => {
+        console.error('[Relay] RSS error:', err.message);
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      });
+
+      request.on('timeout', () => {
+        request.destroy();
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request timeout' }));
+      });
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
   } else if (req.url.startsWith('/opensky')) {
     // Proxy OpenSky API requests (Vercel is blocked, Railway isn't)
     try {
