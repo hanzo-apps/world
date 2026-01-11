@@ -8,7 +8,7 @@ import {
 } from '@/config/military';
 
 // OpenSky Network API - authenticated users get 4000 credits/day
-const OPENSKY_BASE_URL = '/api/opensky';
+const OPENSKY_BASE_URL = '/api/opensky2';
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes - match refresh interval
