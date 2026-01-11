@@ -1696,10 +1696,10 @@ export class MapComponent {
       if (!pos) return;
 
       const intensity = Math.min(Math.max(zone.intensity, 0.15), 1);
-      const radius = 15 + intensity * 30;  // Moderate circles
+      const radius = 4 + intensity * 8;  // Small dots (4-12px)
       const isCongested = zone.deltaPct >= 15;
       const color = isCongested ? '#ffb703' : '#00d1ff';
-      const fillOpacity = 0.06 + intensity * 0.12;  // Moderate opacity
+      const fillOpacity = 0.15 + intensity * 0.25;  // More visible individual dots
 
       densityGroup
         .append('circle')
@@ -1709,9 +1709,7 @@ export class MapComponent {
         .attr('r', radius)
         .attr('fill', color)
         .attr('fill-opacity', fillOpacity)
-        .attr('stroke', color)
-        .attr('stroke-opacity', 0.2)
-        .attr('stroke-width', 1);
+        .attr('stroke', 'none');
     });
   }
 
