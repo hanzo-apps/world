@@ -134,8 +134,8 @@ export class StatusPanel {
       <div class="status-row">
         <span class="status-dot ${escapeHtml(feed.status)}"></span>
         <span class="status-name">${escapeHtml(feed.name)}</span>
-        <span class="status-detail">${feed.itemCount} items</span>
-        <span class="status-time">${feed.lastUpdate ? this.formatTime(feed.lastUpdate) : 'Never'}</span>
+        <span class="status-detail">${escapeHtml(String(feed.itemCount))} items</span>
+        <span class="status-time">${escapeHtml(feed.lastUpdate ? this.formatTime(feed.lastUpdate) : 'Never')}</span>
       </div>
     `).join('');
 
@@ -143,7 +143,7 @@ export class StatusPanel {
       <div class="status-row">
         <span class="status-dot ${escapeHtml(api.status)}"></span>
         <span class="status-name">${escapeHtml(api.name)}</span>
-        ${api.latency ? `<span class="status-detail">${api.latency}ms</span>` : ''}
+        ${api.latency ? `<span class="status-detail">${escapeHtml(String(api.latency))}ms</span>` : ''}
       </div>
     `).join('');
 
