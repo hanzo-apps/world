@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import type { PredictionMarket } from '@/types';
+import { escapeHtml } from '@/utils/sanitize';
 
 export class PredictionPanel extends Panel {
   constructor() {
@@ -27,7 +28,7 @@ export class PredictionPanel extends Panel {
 
         return `
       <div class="prediction-item">
-        <div class="prediction-question">${p.title}</div>
+        <div class="prediction-question">${escapeHtml(p.title)}</div>
         ${volumeStr ? `<div class="prediction-volume">Vol: ${volumeStr}</div>` : ''}
         <div class="prediction-bar">
           <div class="prediction-yes" style="width: ${yesPercent}%">
