@@ -391,17 +391,6 @@ function calculateDensityZones(): AisDensityZone[] {
   // Return all qualifying zones (increased from 50 to 200 for global coverage)
   const sorted = zones.sort((a, b) => b.intensity - a.intensity).slice(0, 200);
 
-  // Debug: log zone distribution by region
-  const regions = { europe: 0, mideast: 0, asia: 0, americas: 0, africa: 0, other: 0 };
-  for (const z of sorted) {
-    if (z.lon >= -30 && z.lon <= 50 && z.lat >= 35 && z.lat <= 70) regions.europe++;
-    else if (z.lon >= 30 && z.lon <= 80 && z.lat >= 10 && z.lat <= 40) regions.mideast++;
-    else if (z.lon >= 80 && z.lon <= 180 && z.lat >= -10 && z.lat <= 60) regions.asia++;
-    else if (z.lon >= -130 && z.lon <= -30) regions.americas++;
-    else if (z.lon >= -20 && z.lon <= 55 && z.lat >= -35 && z.lat <= 35) regions.africa++;
-    else regions.other++;
-  }
-  console.log(`[Shipping] Zones: ${sorted.length} | EU:${regions.europe} ME:${regions.mideast} AS:${regions.asia} AM:${regions.americas} AF:${regions.africa} | Vessels: ${vessels.size} | Cells: ${densityGrid.size}`);
 
   return sorted;
 }
