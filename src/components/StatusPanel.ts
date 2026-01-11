@@ -1,3 +1,5 @@
+import { escapeHtml } from '@/utils/sanitize';
+
 interface FeedStatus {
   name: string;
   lastUpdate: Date | null;
@@ -130,8 +132,8 @@ export class StatusPanel {
 
     feedsList.innerHTML = [...this.feeds.values()].map(feed => `
       <div class="status-row">
-        <span class="status-dot ${feed.status}"></span>
-        <span class="status-name">${feed.name}</span>
+        <span class="status-dot ${escapeHtml(feed.status)}"></span>
+        <span class="status-name">${escapeHtml(feed.name)}</span>
         <span class="status-detail">${feed.itemCount} items</span>
         <span class="status-time">${feed.lastUpdate ? this.formatTime(feed.lastUpdate) : 'Never'}</span>
       </div>
@@ -139,8 +141,8 @@ export class StatusPanel {
 
     apisList.innerHTML = [...this.apis.values()].map(api => `
       <div class="status-row">
-        <span class="status-dot ${api.status}"></span>
-        <span class="status-name">${api.name}</span>
+        <span class="status-dot ${escapeHtml(api.status)}"></span>
+        <span class="status-name">${escapeHtml(api.name)}</span>
         ${api.latency ? `<span class="status-detail">${api.latency}ms</span>` : ''}
       </div>
     `).join('');
