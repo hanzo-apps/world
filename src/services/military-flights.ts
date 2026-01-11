@@ -127,30 +127,30 @@ function isMilitaryFlight(state: OpenSkyStateArray): boolean {
   const callsign = (state[1] || '').trim();
   const icao24 = state[0];
   const originCountry = state[2];
-  const squawk = state[14];
 
-  // Check for known military callsigns
+  // Check for known military callsigns (covers all patterns from config)
   if (callsign && identifyByCallsign(callsign)) {
     return true;
   }
 
-  // Check for military hex code ranges
+  // Check for military hex code ranges (expanded list)
   if (isKnownMilitaryHex(icao24)) {
     return true;
   }
 
-  // Check for military squawk codes
-  const militarySquawks = ['7777', '7600', '7700', '7500', '0000', '1200', '1277'];
-  if (squawk && militarySquawks.includes(squawk)) {
-    // These could be military but need further validation
-    // Not returning true here to avoid false positives
-  }
+  // Extended list of countries with recognizable military patterns
+  const militaryCountries = [
+    'United States', 'United Kingdom', 'France', 'Germany', 'Israel',
+    'Turkey', 'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait',
+    'Japan', 'South Korea', 'Australia', 'Canada', 'Italy', 'Spain',
+    'Netherlands', 'Poland', 'Greece', 'Norway', 'Sweden', 'India',
+    'Pakistan', 'Egypt', 'Singapore', 'Taiwan'
+  ];
 
-  // Some countries have recognizable military patterns
-  const militaryCountries = ['United States', 'United Kingdom', 'France', 'Germany', 'Israel'];
   if (militaryCountries.includes(originCountry)) {
-    // Check for common military callsign patterns
-    if (callsign && /^(RCH|REACH|DUKE|KING|GOLD|NAVY|ARMY|MARINE|NATO|RAF|GAF|FAF)/.test(callsign)) {
+    // Check for expanded military callsign patterns
+    const militaryPattern = /^(RCH|REACH|DUKE|KING|GOLD|NAVY|ARMY|MARINE|NATO|RAF|GAF|FAF|IAF|THK|TUR|SVA|RSAF|UAF|JPN|JASDF|ROKAF|KAF|RAAF|CANFORCE|CFC|AME|PLF|HAF|EGY|PAF|FORTE|HAWK|REAPER|COBRA|RIVET|OLIVE|SNTRY|DRAGN|BONE|DEATH|DOOM|TRIDENT|ASCOT|CNV|HMX|DUSTOFF|EVAC|MOOSE|HERKY)/i.test(callsign);
+    if (callsign && militaryPattern) {
       return true;
     }
   }
