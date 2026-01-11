@@ -7,6 +7,7 @@ import type { PanelConfig, MapLayers } from '@/types';
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   intel: { name: 'Intel Feed', enabled: true, priority: 1 },
+  'gdelt-intel': { name: 'Live Intelligence', enabled: true, priority: 1 },
   politics: { name: 'World News', enabled: true, priority: 1 },
   middleeast: { name: 'Middle East', enabled: true, priority: 1 },
   gov: { name: 'Government', enabled: true, priority: 1 },
