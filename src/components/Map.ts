@@ -1522,24 +1522,9 @@ export class MapComponent {
         div.style.top = `${pos[1]}px`;
 
         const icon = document.createElement('div');
-        icon.className = 'military-vessel-icon';
+        icon.className = `military-vessel-icon ${vessel.vesselType}`;
         icon.style.transform = `rotate(${vessel.heading}deg)`;
-
-        // Different icons for vessel types
-        const iconMap: Record<string, string> = {
-          carrier: '🚢',
-          destroyer: '⚓',
-          frigate: '🛳️',
-          submarine: '🐋',
-          amphibious: '🚀',
-          patrol: '🚤',
-          auxiliary: '🛥️',
-          research: '🔬',
-          icebreaker: '🧊',
-          special: '⚡',
-          unknown: '🚢',
-        };
-        icon.textContent = iconMap[vessel.vesselType] || '🚢';
+        // CSS handles the diamond/anchor rendering
         div.appendChild(icon);
 
         // Dark vessel warning indicator
