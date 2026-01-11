@@ -198,6 +198,82 @@ function matchKnownVessel(name: string): typeof KNOWN_NAVAL_VESSELS[number] | un
 }
 
 /**
+ * Map AIS ship type code to human-readable name
+ */
+function getAisShipTypeName(shipType: number | undefined): string | undefined {
+  if (shipType === undefined || shipType === null) return undefined;
+
+  const aisTypeMap: Record<number, string> = {
+    0: 'Not Available',
+    20: 'Wing in Ground',
+    21: 'Wing in Ground (Hazardous A)',
+    22: 'Wing in Ground (Hazardous B)',
+    23: 'Wing in Ground (Hazardous C)',
+    24: 'Wing in Ground (Hazardous D)',
+    30: 'Fishing',
+    31: 'Towing',
+    32: 'Towing (Large)',
+    33: 'Dredging/Underwater Ops',
+    34: 'Diving Ops',
+    35: 'Military Ops',
+    36: 'Sailing',
+    37: 'Pleasure Craft',
+    40: 'High Speed Craft',
+    41: 'High Speed Craft (Hazardous A)',
+    42: 'High Speed Craft (Hazardous B)',
+    43: 'High Speed Craft (Hazardous C)',
+    44: 'High Speed Craft (Hazardous D)',
+    50: 'Pilot Vessel',
+    51: 'Search & Rescue',
+    52: 'Tug',
+    53: 'Port Tender',
+    54: 'Anti-Pollution',
+    55: 'Law Enforcement',
+    56: 'Local Vessel',
+    57: 'Local Vessel',
+    58: 'Medical Transport',
+    59: 'Special Craft',
+    60: 'Passenger',
+    61: 'Passenger (Hazardous A)',
+    62: 'Passenger (Hazardous B)',
+    63: 'Passenger (Hazardous C)',
+    64: 'Passenger (Hazardous D)',
+    69: 'Passenger',
+    70: 'Cargo',
+    71: 'Cargo (Hazardous A)',
+    72: 'Cargo (Hazardous B)',
+    73: 'Cargo (Hazardous C)',
+    74: 'Cargo (Hazardous D)',
+    79: 'Cargo',
+    80: 'Tanker',
+    81: 'Tanker (Hazardous A)',
+    82: 'Tanker (Hazardous B)',
+    83: 'Tanker (Hazardous C)',
+    84: 'Tanker (Hazardous D)',
+    89: 'Tanker',
+    90: 'Other',
+    91: 'Other (Hazardous A)',
+    92: 'Other (Hazardous B)',
+    93: 'Other (Hazardous C)',
+    94: 'Other (Hazardous D)',
+    99: 'Other',
+  };
+
+  // Direct match
+  if (aisTypeMap[shipType]) return aisTypeMap[shipType];
+
+  // Range-based fallbacks
+  if (shipType >= 20 && shipType <= 29) return 'Wing in Ground';
+  if (shipType >= 40 && shipType <= 49) return 'High Speed Craft';
+  if (shipType >= 60 && shipType <= 69) return 'Passenger';
+  if (shipType >= 70 && shipType <= 79) return 'Cargo';
+  if (shipType >= 80 && shipType <= 89) return 'Tanker';
+  if (shipType >= 90 && shipType <= 99) return 'Other';
+
+  return undefined;
+}
+
+/**
  * Determine vessel type from AIS ship type code
  */
 function getVesselTypeFromAis(shipType: number): MilitaryVesselType | undefined {
@@ -307,6 +383,7 @@ function processAisPosition(data: AisPositionData): void {
     mmsi,
     name: name || (knownVessel?.name || `Vessel ${mmsi}`),
     vesselType: knownVessel?.vesselType || aisType || 'unknown',
+    aisShipType: getAisShipTypeName(data.shipType),
     hullNumber: knownVessel?.hullNumber,
     operator,
     operatorCountry,

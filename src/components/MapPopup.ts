@@ -1096,11 +1096,19 @@ export class MapPopup {
       ? '<span class="popup-badge high">AIS DARK</span>'
       : '';
 
+    // Show AIS ship type when military type is unknown
+    const displayType = vessel.vesselType === 'unknown' && vessel.aisShipType
+      ? vessel.aisShipType
+      : (typeLabels[vessel.vesselType] || vessel.vesselType);
+    const badgeType = vessel.vesselType === 'unknown' && vessel.aisShipType
+      ? vessel.aisShipType.toUpperCase()
+      : vessel.vesselType.toUpperCase();
+
     return `
       <div class="popup-header military-vessel ${vessel.operator}">
         <span class="popup-title">${vessel.name}</span>
         ${darkWarning}
-        <span class="popup-badge elevated">${vessel.vesselType.toUpperCase()}</span>
+        <span class="popup-badge elevated">${badgeType}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
@@ -1108,7 +1116,7 @@ export class MapPopup {
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">TYPE</span>
-            <span class="stat-value">${typeLabels[vessel.vesselType] || vessel.vesselType}</span>
+            <span class="stat-value">${displayType}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">SPEED</span>
