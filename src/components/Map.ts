@@ -307,26 +307,26 @@ export class MapComponent {
         <div class="layer-help-section">
           <div class="layer-help-title">Military & Strategic</div>
           <div class="layer-help-item"><span>BASES</span> US/NATO, China, Russia military installations (150+)</div>
-          <div class="layer-help-item"><span>NUCLEAR</span> Power plants, enrichment, weapons facilities (IAEA)</div>
+          <div class="layer-help-item"><span>NUCLEAR</span> Power plants, enrichment, weapons facilities</div>
           <div class="layer-help-item"><span>IRRADIATORS</span> Industrial gamma irradiator facilities</div>
-          <div class="layer-help-item"><span>MILITARY</span> Live aircraft/vessel tracking (OpenSky) - crosshairs</div>
+          <div class="layer-help-item"><span>MILITARY</span> Live military aircraft and vessel tracking</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Infrastructure</div>
           <div class="layer-help-item"><span>CABLES</span> Major undersea fiber optic cables (20 backbone routes)</div>
           <div class="layer-help-item"><span>PIPELINES</span> Oil/gas pipelines (Nord Stream, TAPI, etc.)</div>
-          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts via Cloudflare Radar</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and disruptions</div>
           <div class="layer-help-item"><span>DATACENTERS</span> AI compute clusters ≥10,000 GPUs only</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Transport</div>
-          <div class="layer-help-item"><span>SHIPPING</span> AIS vessel tracking in chokepoints (Hormuz, Suez)</div>
-          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays/ground stops (FAA, global)</div>
+          <div class="layer-help-item"><span>SHIPPING</span> Vessel tracking in chokepoints (Hormuz, Suez)</div>
+          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays and ground stops</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Natural & Economic</div>
-          <div class="layer-help-item"><span>EARTHQUAKES</span> M4.5+ seismic events (USGS, time-filtered)</div>
-          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts (NWS)</div>
+          <div class="layer-help-item"><span>EARTHQUAKES</span> M4.5+ seismic events (time-filtered)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts</div>
           <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
         </div>
         <div class="layer-help-section">
@@ -1305,11 +1305,6 @@ export class MapComponent {
         icon.className = 'datacenter-icon';
         icon.textContent = '🖥️';
         div.appendChild(icon);
-
-        const label = document.createElement('div');
-        label.className = 'datacenter-label';
-        label.textContent = dc.owner;
-        div.appendChild(label);
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
