@@ -1486,7 +1486,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 16;
+  z-index: 52;
 }
 
 .cable-advisory-marker.fault {
@@ -1550,7 +1550,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 18;
+  z-index: 53;
   --protest-color: #ff9900;
 }
 
@@ -1663,7 +1663,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 15;
+  z-index: 51;
 }
 
 .outage-marker.partial {
@@ -1773,7 +1773,7 @@ body.playback-mode .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  z-index: 40;
+  z-index: 51;
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
@@ -1890,7 +1890,7 @@ body.playback-mode .status-dot {
   box-shadow: 0 0 10px rgba(255, 165, 0, 0.8);
   animation: quake-pulse 1.5s ease-in-out infinite;
   cursor: pointer;
-  z-index: 45;
+  z-index: 53;
   transition: opacity 0.2s ease;
 }
 
@@ -1926,7 +1926,7 @@ body.playback-mode .status-dot {
   width: 10px;
   height: 10px;
   border-radius: 2px;
-  z-index: 42;
+  z-index: 52;
   cursor: pointer;
   transition: opacity 0.2s ease;
 }
@@ -1987,7 +1987,7 @@ body.playback-mode .status-dot {
   border-radius: 50%;
   background: #00ffaa;
   box-shadow: 0 0 6px #00ffaa, 0 0 12px #00ffaa40;
-  z-index: 41;
+  z-index: 51;
   cursor: pointer;
   border: 1px solid #00aa77;
 }
@@ -2027,7 +2027,7 @@ body.playback-mode .status-dot {
   border-radius: 2px;
   background: #8844ff;
   box-shadow: 0 0 8px #8844ff80, 0 0 16px #8844ff40;
-  z-index: 42;
+  z-index: 52;
   cursor: pointer;
   border: 1px solid #6633cc;
   display: flex;
@@ -2747,7 +2747,7 @@ body.playback-mode .status-dot {
   align-items: center;
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   cursor: pointer;
-  z-index: 40;
+  z-index: 53;
   gap: 2px;
 }
 
@@ -2790,7 +2790,7 @@ body.playback-mode .status-dot {
   transform-origin: center;
   white-space: nowrap;
   cursor: pointer;
-  z-index: 36;
+  z-index: 53;
   opacity: 0.7;
 }
 
@@ -3608,7 +3608,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 22;
+  z-index: 53;
   --flight-color: #4a9eff;
 }
 
@@ -4020,7 +4020,7 @@ body.playback-mode .status-dot {
   align-items: center;
   transform: translate(-50%, -50%);
   cursor: pointer;
-  z-index: 27;
+  z-index: 57;
   --cluster-color: #39ff14;
   opacity: 0.65;
 }
