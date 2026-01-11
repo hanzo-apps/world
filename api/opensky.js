@@ -1,4 +1,5 @@
-// OpenSky Network API proxy - v2
+// OpenSky Network API proxy - v3
+// Note: OpenSky seems to block some cloud provider IPs
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
@@ -14,11 +15,14 @@ export default async function handler(req) {
   const openskyUrl = `https://opensky-network.org/api/states/all${params.toString() ? '?' + params.toString() : ''}`;
 
   try {
-    // Simple fetch without auth (anonymous access: 400 credits/day)
+    // Try fetching with different headers to avoid blocks
     const response = await fetch(openskyUrl, {
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'WorldMonitor/1.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
       },
     });
 
