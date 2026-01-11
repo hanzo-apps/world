@@ -37,6 +37,10 @@ class AnalysisWorkerManager {
   private isReady = false;
   private readyPromise: Promise<void> | null = null;
   private readyResolve: (() => void) | null = null;
+  private readyReject: ((error: Error) => void) | null = null;
+  private readyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  private static readonly READY_TIMEOUT_MS = 10000; // 10 seconds to become ready
 
   /**
    * Initialize the worker. Called lazily on first use.
@@ -44,17 +48,39 @@ class AnalysisWorkerManager {
   private initWorker(): void {
     if (this.worker) return;
 
-    this.readyPromise = new Promise((resolve) => {
+    this.readyPromise = new Promise((resolve, reject) => {
       this.readyResolve = resolve;
+      this.readyReject = reject;
     });
 
-    this.worker = new AnalysisWorker();
+    // Set ready timeout - reject if worker doesn't become ready in time
+    this.readyTimeout = setTimeout(() => {
+      if (!this.isReady) {
+        const error = new Error('Worker failed to become ready within timeout');
+        console.error('[AnalysisWorker]', error.message);
+        this.readyReject?.(error);
+        this.cleanup();
+      }
+    }, AnalysisWorkerManager.READY_TIMEOUT_MS);
+
+    try {
+      this.worker = new AnalysisWorker();
+    } catch (error) {
+      console.error('[AnalysisWorker] Failed to create worker:', error);
+      this.readyReject?.(error instanceof Error ? error : new Error(String(error)));
+      this.cleanup();
+      return;
+    }
 
     this.worker.onmessage = (event: MessageEvent<WorkerResult>) => {
       const data = event.data;
 
       if (data.type === 'ready') {
         this.isReady = true;
+        if (this.readyTimeout) {
+          clearTimeout(this.readyTimeout);
+          this.readyTimeout = null;
+        }
         this.readyResolve?.();
         return;
       }
@@ -91,6 +117,14 @@ class AnalysisWorkerManager {
 
     this.worker.onerror = (error) => {
       console.error('[AnalysisWorker] Error:', error);
+
+      // If not ready yet, reject the ready promise
+      if (!this.isReady) {
+        this.readyReject?.(new Error(`Worker failed to initialize: ${error.message}`));
+        this.cleanup();
+        return;
+      }
+
       // Reject all pending requests
       for (const [id, pending] of this.pendingRequests) {
         clearTimeout(pending.timeout);
@@ -98,6 +132,24 @@ class AnalysisWorkerManager {
         this.pendingRequests.delete(id);
       }
     };
+  }
+
+  /**
+   * Cleanup worker state (for re-initialization)
+   */
+  private cleanup(): void {
+    if (this.readyTimeout) {
+      clearTimeout(this.readyTimeout);
+      this.readyTimeout = null;
+    }
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    this.isReady = false;
+    this.readyPromise = null;
+    this.readyResolve = null;
+    this.readyReject = null;
   }
 
   /**
@@ -197,20 +249,13 @@ class AnalysisWorkerManager {
    * Terminate worker (cleanup)
    */
   terminate(): void {
-    if (this.worker) {
-      // Reject all pending requests
-      for (const [id, pending] of this.pendingRequests) {
-        clearTimeout(pending.timeout);
-        pending.reject(new Error('Worker terminated'));
-        this.pendingRequests.delete(id);
-      }
-
-      this.worker.terminate();
-      this.worker = null;
-      this.isReady = false;
-      this.readyPromise = null;
-      this.readyResolve = null;
+    // Reject all pending requests
+    for (const [id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error('Worker terminated'));
+      this.pendingRequests.delete(id);
     }
+    this.cleanup();
   }
 
   /**
