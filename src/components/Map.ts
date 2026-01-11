@@ -1691,8 +1691,8 @@ export class MapComponent {
   private renderAisDensity(projection: d3.GeoProjection): void {
     const densityGroup = this.svg.append('g').attr('class', 'ais-density');
 
-    // Filter: only show zones with significant traffic (intensity > 0.4)
-    const significantZones = this.aisDensity.filter(z => z.intensity > 0.4);
+    // Filter: only show zones with moderate traffic (intensity > 0.2)
+    const significantZones = this.aisDensity.filter(z => z.intensity > 0.2);
 
     significantZones.forEach((zone) => {
       const pos = projection([zone.lon, zone.lat]);
