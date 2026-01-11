@@ -95,6 +95,56 @@ export const NATO_ALLIED_CALLSIGNS: CallsignPattern[] = [
   // Israeli Air Force
   { pattern: '^IAF', operator: 'iaf', description: 'Israeli Air Force' },
   { pattern: '^ELAL', operator: 'iaf', description: 'IAF transport (covers)' },
+
+  // Turkey
+  { pattern: '^THK', operator: 'other', description: 'Turkish Air Force' },
+  { pattern: '^TUR', operator: 'other', description: 'Turkish military' },
+
+  // Saudi Arabia
+  { pattern: '^SVA', operator: 'other', description: 'Saudi Air Force' },
+  { pattern: '^RSAF', operator: 'other', description: 'Royal Saudi Air Force' },
+
+  // UAE
+  { pattern: '^UAF', operator: 'other', description: 'UAE Air Force' },
+
+  // India
+  { pattern: '^AIR INDIA ONE', operator: 'other', aircraftType: 'vip', description: 'Indian Air Force One' },
+  { pattern: '^IAM', operator: 'other', description: 'Indian Air Force' },
+
+  // Japan ASDF
+  { pattern: '^JPN', operator: 'other', description: 'Japan Self-Defense Force' },
+  { pattern: '^JASDF', operator: 'other', description: 'Japan Air Self-Defense Force' },
+
+  // South Korea
+  { pattern: '^ROKAF', operator: 'other', description: 'Republic of Korea Air Force' },
+  { pattern: '^KAF', operator: 'other', description: 'Korean Air Force' },
+
+  // Australia
+  { pattern: '^RAAF', operator: 'other', description: 'Royal Australian Air Force' },
+  { pattern: '^AUSSIE', operator: 'other', description: 'Australian military' },
+
+  // Canada
+  { pattern: '^CANFORCE', operator: 'other', aircraftType: 'transport', description: 'Canadian Armed Forces' },
+  { pattern: '^CFC', operator: 'other', description: 'Canadian Forces' },
+
+  // Italy
+  { pattern: '^IAM', operator: 'other', description: 'Italian Air Force' },
+  { pattern: '^ITALY', operator: 'other', description: 'Italian military' },
+
+  // Spain
+  { pattern: '^AME', operator: 'other', description: 'Spanish Air Force' },
+
+  // Poland
+  { pattern: '^PLF', operator: 'other', description: 'Polish Air Force' },
+
+  // Greece
+  { pattern: '^HAF', operator: 'other', description: 'Hellenic Air Force' },
+
+  // Egypt
+  { pattern: '^EGY', operator: 'other', description: 'Egyptian Air Force' },
+
+  // Pakistan
+  { pattern: '^PAF', operator: 'other', description: 'Pakistan Air Force' },
 ];
 
 // Russian/Chinese callsign patterns (less common due to transponder usage)
@@ -228,20 +278,89 @@ export const MILITARY_AIRCRAFT_TYPES: Record<string, { type: MilitaryAircraftTyp
 /**
  * ICAO 24-bit hex code ranges for military aircraft
  * These help identify military aircraft even without callsigns
+ * Reference: https://www.ads-b.nl/icao.php
  */
 export const MILITARY_HEX_RANGES: { start: string; end: string; operator: MilitaryOperator; country: string }[] = [
-  // United States Military
-  { start: 'AE0000', end: 'AFFFFF', operator: 'usaf', country: 'USA' },
-  // Note: Many US military aircraft use 'Mode S' codes in civilian ranges
+  // United States Military (largest block)
+  { start: 'ADF7C7', end: 'ADF7CF', operator: 'usaf', country: 'USA' }, // Known USAF tankers
+  { start: 'AE0000', end: 'AFFFFF', operator: 'usaf', country: 'USA' }, // Main USAF block
+  { start: 'A00000', end: 'A3FFFF', operator: 'usaf', country: 'USA' }, // Additional US military
 
   // UK Military
   { start: '43C000', end: '43CFFF', operator: 'raf', country: 'UK' },
 
   // France Military
   { start: '3A0000', end: '3AFFFF', operator: 'faf', country: 'France' },
+  { start: '3B0000', end: '3BFFFF', operator: 'faf', country: 'France' },
 
   // Germany Military
   { start: '3F0000', end: '3FFFFF', operator: 'gaf', country: 'Germany' },
+
+  // Israel Military (critical for Middle East)
+  { start: '738000', end: '73FFFF', operator: 'iaf', country: 'Israel' },
+
+  // NATO AWACS (Luxembourg registration but NATO operated)
+  { start: '4D0000', end: '4D03FF', operator: 'nato', country: 'NATO' },
+
+  // Italy Military
+  { start: '300000', end: '33FFFF', operator: 'other', country: 'Italy' },
+
+  // Spain Military
+  { start: '340000', end: '37FFFF', operator: 'other', country: 'Spain' },
+
+  // Netherlands Military
+  { start: '480000', end: '480FFF', operator: 'other', country: 'Netherlands' },
+
+  // Turkey Military (important for Middle East)
+  { start: '4BA000', end: '4BCFFF', operator: 'other', country: 'Turkey' },
+
+  // Saudi Arabia Military
+  { start: '710000', end: '717FFF', operator: 'other', country: 'Saudi Arabia' },
+
+  // UAE Military
+  { start: '896000', end: '896FFF', operator: 'other', country: 'UAE' },
+
+  // Qatar Military
+  { start: '06A000', end: '06AFFF', operator: 'other', country: 'Qatar' },
+
+  // Kuwait Military
+  { start: '706000', end: '706FFF', operator: 'other', country: 'Kuwait' },
+
+  // Japan Self-Defense Forces
+  { start: '840000', end: '87FFFF', operator: 'other', country: 'Japan' },
+
+  // South Korea Military
+  { start: '718000', end: '71FFFF', operator: 'other', country: 'South Korea' },
+
+  // Australia Military
+  { start: '7CF800', end: '7CFFFF', operator: 'other', country: 'Australia' },
+
+  // Canada Military
+  { start: 'C00000', end: 'C0FFFF', operator: 'other', country: 'Canada' },
+
+  // India Military
+  { start: '800000', end: '83FFFF', operator: 'other', country: 'India' },
+
+  // Pakistan Military
+  { start: '760000', end: '767FFF', operator: 'other', country: 'Pakistan' },
+
+  // Egypt Military
+  { start: '500000', end: '5003FF', operator: 'other', country: 'Egypt' },
+
+  // Poland Military
+  { start: '488000', end: '48FFFF', operator: 'other', country: 'Poland' },
+
+  // Greece Military
+  { start: '468000', end: '46FFFF', operator: 'other', country: 'Greece' },
+
+  // Sweden Military
+  { start: '4A8000', end: '4AFFFF', operator: 'other', country: 'Sweden' },
+
+  // Norway Military
+  { start: '478000', end: '47FFFF', operator: 'other', country: 'Norway' },
+
+  // Singapore Military
+  { start: '768000', end: '76FFFF', operator: 'other', country: 'Singapore' },
 ];
 
 /**
