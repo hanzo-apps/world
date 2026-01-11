@@ -349,7 +349,7 @@ function clusterFlights(flights: MilitaryFlight[]): MilitaryFlightCluster[] {
 
       clusters.push({
         id: `cluster-${hotspot.name.toLowerCase().replace(/\s+/g, '-')}`,
-        name: `${hotspot.name} Activity`,
+        name: hotspot.name,
         lat: avgLat,
         lon: avgLon,
         flightCount: nearbyFlights.length,

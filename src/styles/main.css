@@ -3557,44 +3557,61 @@ body.playback-mode .status-dot {
   transform-origin: center;
   cursor: pointer;
   z-index: 25;
-  --mil-color: #00ccff;
+  --mil-color: #39ff14;
+  --mil-bg: #0a0a0a;
 }
 
+/* US Military - olive/khaki */
 .military-flight-marker.usaf,
 .military-flight-marker.usn,
 .military-flight-marker.usmc,
 .military-flight-marker.usa {
-  --mil-color: #4488ff;
+  --mil-color: #9acd32;
+  --mil-bg: #1a1a0a;
 }
 
+/* UK Military - forest green */
 .military-flight-marker.raf,
 .military-flight-marker.rn {
-  --mil-color: #ff4488;
+  --mil-color: #228b22;
+  --mil-bg: #0a1a0a;
 }
 
+/* French - darker blue-green */
 .military-flight-marker.faf {
-  --mil-color: #4488ff;
+  --mil-color: #20b2aa;
+  --mil-bg: #0a1a1a;
 }
 
+/* German - olive */
 .military-flight-marker.gaf {
-  --mil-color: #ffcc00;
+  --mil-color: #6b8e23;
+  --mil-bg: #1a1a0a;
 }
 
+/* China - red accent on dark */
 .military-flight-marker.plaaf,
 .military-flight-marker.plan {
-  --mil-color: #ff3333;
+  --mil-color: #dc143c;
+  --mil-bg: #1a0a0a;
 }
 
+/* Russia - orange-red */
 .military-flight-marker.vks {
-  --mil-color: #ff6600;
+  --mil-color: #ff4500;
+  --mil-bg: #1a0a0a;
 }
 
+/* Israel - light military green */
 .military-flight-marker.iaf {
-  --mil-color: #00aaff;
+  --mil-color: #00ff7f;
+  --mil-bg: #0a1a0f;
 }
 
+/* NATO - dark military blue */
 .military-flight-marker.nato {
-  --mil-color: #0066cc;
+  --mil-color: #4169e1;
+  --mil-bg: #0a0a1a;
 }
 
 .military-flight-marker.interesting {
@@ -3603,13 +3620,23 @@ body.playback-mode .status-dot {
 
 .military-flight-marker.bomber,
 .military-flight-marker.reconnaissance {
-  --mil-color: #ff00ff;
+  --mil-color: #ff1493;
+  --mil-bg: #1a0a1a;
   animation: mil-alert 1s ease-in-out infinite;
 }
 
 .military-flight-icon {
-  font-size: 20px;
-  filter: drop-shadow(0 0 6px var(--mil-color)) drop-shadow(0 0 10px var(--mil-color));
+  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mil-bg);
+  border: 2px solid var(--mil-color);
+  border-radius: 4px;
+  color: var(--mil-color);
+  box-shadow: 0 0 8px var(--mil-color), inset 0 0 4px rgba(0,0,0,0.8);
   transition: transform 0.3s ease;
 }
 
@@ -3623,13 +3650,19 @@ body.playback-mode .status-dot {
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
   font-weight: bold;
   font-family: 'Courier New', monospace;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 1px 4px;
+  border-radius: 2px;
 }
 
 .military-flight-altitude {
   font-size: 7px;
-  color: var(--text-dim);
+  color: var(--mil-color);
   font-family: 'Courier New', monospace;
   opacity: 0.8;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0 3px;
+  border-radius: 2px;
 }
 
 .military-flight-track {
@@ -3771,50 +3804,53 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%);
   cursor: pointer;
   z-index: 27;
-  background: rgba(0, 20, 40, 0.85);
-  border: 2px solid var(--cluster-color, #00ccff);
-  border-radius: 50%;
-  padding: 8px;
-  min-width: 40px;
-  min-height: 40px;
-  box-shadow: 0 0 15px var(--cluster-color, #00ccff);
+  background: rgba(10, 15, 10, 0.95);
+  border: 2px solid var(--cluster-color, #39ff14);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 50px;
+  box-shadow: 0 0 12px var(--cluster-color, #39ff14), inset 0 0 8px rgba(0,0,0,0.8);
 }
 
 .military-cluster-marker.flight-cluster {
-  --cluster-color: #00ccff;
+  --cluster-color: #39ff14;
 }
 
 .military-cluster-marker.vessel-cluster {
-  --cluster-color: #00ffcc;
+  --cluster-color: #00ff7f;
 }
 
 .military-cluster-marker.exercise {
-  --cluster-color: #ff00ff;
+  --cluster-color: #ff6600;
   animation: cluster-pulse 2s ease-in-out infinite;
 }
 
-.military-cluster-marker.deployment {
-  --cluster-color: #ffcc00;
-  animation: cluster-pulse 2s ease-in-out infinite;
+.military-cluster-marker.patrol {
+  --cluster-color: #9acd32;
+}
+
+.military-cluster-marker.deployment,
+.military-cluster-marker.transport {
+  --cluster-color: #6b8e23;
 }
 
 .military-cluster-marker .cluster-count {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
   color: var(--cluster-color);
   font-family: 'Courier New', monospace;
+  text-shadow: 0 0 6px var(--cluster-color);
 }
 
 .military-cluster-marker .cluster-label {
-  font-size: 8px;
-  color: var(--text-dim);
+  font-size: 9px;
+  color: var(--cluster-color);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   margin-top: 4px;
   white-space: nowrap;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
 }
 
 @keyframes cluster-pulse {
@@ -3837,6 +3873,76 @@ body.playback-mode .status-dot {
 .popup-header.militaryFlightCluster,
 .popup-header.militaryVesselCluster {
   background: linear-gradient(90deg, var(--cluster-color, #00ccff) 0%, transparent 100%);
+}
+
+.popup-header.military-flight,
+.popup-header.military-vessel {
+  background: linear-gradient(90deg, #00ccff 0%, transparent 100%);
+}
+
+.popup-header.military-cluster {
+  background: linear-gradient(90deg, #ff6600 0%, transparent 100%);
+}
+
+.popup-header.military-flight.usaf,
+.popup-header.military-flight.usn,
+.popup-header.military-flight.usmc,
+.popup-header.military-flight.usa {
+  background: linear-gradient(90deg, #3b82f6 0%, transparent 100%);
+}
+
+.popup-header.military-flight.nato,
+.popup-header.military-flight.raf {
+  background: linear-gradient(90deg, #6366f1 0%, transparent 100%);
+}
+
+.popup-header.military-flight.iaf {
+  background: linear-gradient(90deg, #60a5fa 0%, transparent 100%);
+}
+
+.popup-header.military-flight.plaaf,
+.popup-header.military-flight.plan {
+  background: linear-gradient(90deg, #ef4444 0%, transparent 100%);
+}
+
+.popup-header.military-flight.vks {
+  background: linear-gradient(90deg, #dc2626 0%, transparent 100%);
+}
+
+.cluster-flights,
+.cluster-vessels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.cluster-flight-item,
+.cluster-vessel-item {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  border-left: 2px solid var(--accent);
+}
+
+.cluster-more {
+  padding: 4px 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+.popup-description.alert {
+  color: #ff4444;
+  font-weight: bold;
+}
+
+.popup-attribution {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 12px;
+  text-align: right;
 }
 
 /* ============================================
