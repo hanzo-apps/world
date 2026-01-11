@@ -656,7 +656,7 @@ export class MapComponent {
 
   private getProjection(width: number, height: number): d3.GeoProjection {
     if (this.state.view === 'global' || this.state.view === 'mena') {
-      // Scale by width to fill horizontally, center vertically
+      // Scale by width to fill horizontally, center at equator
       return d3
         .geoEquirectangular()
         .scale(width / (2 * Math.PI))
@@ -1846,7 +1846,7 @@ export class MapComponent {
     this.state.view = view;
     // Reset zoom when changing views for better UX
     this.state.zoom = view === 'mena' ? 2.5 : 1;
-    this.state.pan = view === 'mena' ? { x: -180, y: 60 } : { x: 0, y: 0 };
+    this.state.pan = view === 'mena' ? { x: -180, y: 60 } : { x: 0, y: 60 };  // Pan north for global view
     this.applyTransform();
     this.render();
   }
@@ -1933,7 +1933,7 @@ export class MapComponent {
 
   public reset(): void {
     this.state.zoom = 1;
-    this.state.pan = { x: 0, y: 0 };
+    this.state.pan = { x: 0, y: 60 };  // Pan north for global view
     if (this.state.view !== 'global') {
       this.state.view = 'global';
       this.render();
