@@ -1250,6 +1250,15 @@ body.playback-mode .status-dot {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.layer-help-note {
+  font-size: 9px;
+  color: var(--yellow);
+  font-style: italic;
+  padding: 2px 6px;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
 .hotspot {
   position: absolute;
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
