@@ -442,15 +442,16 @@ export const KNOWN_NAVAL_VESSELS: KnownNavalVessel[] = [
  * Regions of interest for military activity monitoring
  */
 // Consolidated regions to reduce API calls (max 4 queries)
+// Names kept short for map cluster labels
 export const MILITARY_HOTSPOTS = [
   // East Asia: Taiwan + SCS + Korea + Japan Sea (combined)
-  { name: 'East Asia', lat: 28.0, lon: 125.0, radius: 18, priority: 'high' },
+  { name: 'INDO-PACIFIC', lat: 28.0, lon: 125.0, radius: 18, priority: 'high' },
   // Middle East: Persian Gulf + Aden + Mediterranean (combined)
-  { name: 'Middle East', lat: 28.0, lon: 42.0, radius: 15, priority: 'high' },
+  { name: 'CENTCOM', lat: 28.0, lon: 42.0, radius: 15, priority: 'high' },
   // Europe: Black Sea + Baltic (combined)
-  { name: 'Europe Theater', lat: 52.0, lon: 28.0, radius: 15, priority: 'medium' },
+  { name: 'EUCOM', lat: 52.0, lon: 28.0, radius: 15, priority: 'medium' },
   // Keep Arctic separate (large but low activity)
-  { name: 'Arctic', lat: 75.0, lon: 0.0, radius: 10, priority: 'low' },
+  { name: 'ARCTIC', lat: 75.0, lon: 0.0, radius: 10, priority: 'low' },
 ] as const;
 
 /**
