@@ -1,4 +1,5 @@
 import type { CorrelationSignal } from '@/services/correlation';
+import { escapeHtml } from '@/utils';
 
 export class SignalModal {
   private element: HTMLElement;
@@ -132,17 +133,17 @@ export class SignalModal {
     };
 
     const html = this.currentSignals.map(signal => `
-      <div class="signal-item ${signal.type}">
-        <div class="signal-type">${signalTypeLabels[signal.type] || signal.type}</div>
-        <div class="signal-title">${signal.title}</div>
-        <div class="signal-description">${signal.description}</div>
+      <div class="signal-item ${escapeHtml(signal.type)}">
+        <div class="signal-type">${signalTypeLabels[signal.type] || escapeHtml(signal.type)}</div>
+        <div class="signal-title">${escapeHtml(signal.title)}</div>
+        <div class="signal-description">${escapeHtml(signal.description)}</div>
         <div class="signal-meta">
           <span class="signal-confidence">Confidence: ${Math.round(signal.confidence * 100)}%</span>
           <span class="signal-time">${this.formatTime(signal.timestamp)}</span>
         </div>
         ${signal.data.relatedTopics?.length ? `
           <div class="signal-topics">
-            ${signal.data.relatedTopics.map(t => `<span class="signal-topic">${t}</span>`).join('')}
+            ${signal.data.relatedTopics.map(t => `<span class="signal-topic">${escapeHtml(t)}</span>`).join('')}
           </div>
         ` : ''}
       </div>
