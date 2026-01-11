@@ -1,10 +1,36 @@
 export const config = { runtime: 'edge' };
 
+const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'btc', 'eth'];
+const MAX_COIN_IDS = 20;
+const COIN_ID_PATTERN = /^[a-z0-9-]+$/;
+
+function validateCoinIds(idsParam) {
+  if (!idsParam) return 'bitcoin,ethereum,solana';
+
+  const ids = idsParam.split(',')
+    .map(id => id.trim().toLowerCase())
+    .filter(id => COIN_ID_PATTERN.test(id) && id.length <= 50)
+    .slice(0, MAX_COIN_IDS);
+
+  return ids.length > 0 ? ids.join(',') : 'bitcoin,ethereum,solana';
+}
+
+function validateCurrency(val) {
+  const currency = (val || 'usd').toLowerCase();
+  return ALLOWED_CURRENCIES.includes(currency) ? currency : 'usd';
+}
+
+function validateBoolean(val, defaultVal) {
+  if (val === 'true' || val === 'false') return val;
+  return defaultVal;
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
-  const ids = url.searchParams.get('ids') || 'bitcoin,ethereum,solana';
-  const vsCurrencies = url.searchParams.get('vs_currencies') || 'usd';
-  const include24hrChange = url.searchParams.get('include_24hr_change') || 'true';
+
+  const ids = validateCoinIds(url.searchParams.get('ids'));
+  const vsCurrencies = validateCurrency(url.searchParams.get('vs_currencies'));
+  const include24hrChange = validateBoolean(url.searchParams.get('include_24hr_change'), 'true');
 
   try {
     const geckoUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${vsCurrencies}&include_24hr_change=${include24hrChange}`;
