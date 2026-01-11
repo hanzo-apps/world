@@ -3621,10 +3621,61 @@ body.playback-mode .status-dot {
 }
 
 .military-flight-icon {
-  font-size: 10px;
-  color: var(--mil-color);
-  text-shadow: 0 0 3px rgba(0,0,0,0.8);
+  width: 12px;
+  height: 12px;
+  position: relative;
   transition: transform 0.3s ease;
+}
+
+/* Crosshair horizontal line */
+.military-flight-icon::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--mil-color);
+  transform: translateY(-50%);
+  box-shadow: 0 0 3px var(--mil-color);
+}
+
+/* Crosshair vertical line */
+.military-flight-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mil-color);
+  transform: translateX(-50%);
+  box-shadow: 0 0 3px var(--mil-color);
+}
+
+/* Special aircraft types get different crosshair styles */
+.military-flight-icon.bomber::before,
+.military-flight-icon.bomber::after {
+  background: #ff1493;
+  box-shadow: 0 0 4px #ff1493;
+}
+
+.military-flight-icon.reconnaissance::before,
+.military-flight-icon.reconnaissance::after,
+.military-flight-icon.awacs::before,
+.military-flight-icon.awacs::after {
+  background: #00ffff;
+  box-shadow: 0 0 4px #00ffff;
+}
+
+.military-flight-icon.fighter {
+  width: 14px;
+  height: 14px;
+}
+
+.military-flight-icon.fighter::before,
+.military-flight-icon.fighter::after {
+  box-shadow: 0 0 5px var(--mil-color);
 }
 
 .military-flight-label {
@@ -3788,7 +3839,7 @@ body.playback-mode .status-dot {
   cursor: pointer;
   z-index: 27;
   --cluster-color: #39ff14;
-  opacity: 0.6;
+  opacity: 0.65;
 }
 
 .military-cluster-marker:hover {
@@ -3805,7 +3856,7 @@ body.playback-mode .status-dot {
 
 .military-cluster-marker.exercise {
   --cluster-color: #ff6600;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .military-cluster-marker.patrol {
@@ -3817,16 +3868,38 @@ body.playback-mode .status-dot {
   --cluster-color: #6b8e23;
 }
 
+/* Targeting reticle style for cluster count */
 .military-cluster-marker .cluster-count {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
   color: var(--cluster-color);
   font-family: 'Courier New', monospace;
   text-shadow: 0 0 4px rgba(0,0,0,0.9);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 6px;
-  border-radius: 10px;
-  border: 1px solid var(--cluster-color);
+  position: relative;
+  padding: 4px 8px;
+}
+
+/* Corner brackets for targeting look */
+.military-cluster-marker .cluster-count::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--cluster-color);
+  border-top: 2px solid var(--cluster-color);
+}
+
+.military-cluster-marker .cluster-count::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--cluster-color);
+  border-top: 2px solid var(--cluster-color);
 }
 
 .military-cluster-marker .cluster-label {
@@ -3834,12 +3907,36 @@ body.playback-mode .status-dot {
   color: var(--cluster-color);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 2px;
+  margin-top: 3px;
   white-space: nowrap;
   font-weight: bold;
   font-family: 'Courier New', monospace;
   text-shadow: 0 0 3px rgba(0,0,0,0.9);
-  opacity: 0.8;
+  opacity: 0.85;
+  position: relative;
+}
+
+/* Bottom brackets */
+.military-cluster-marker .cluster-label::before {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: -4px;
+  width: 6px;
+  height: 6px;
+  border-left: 1px solid var(--cluster-color);
+  border-bottom: 1px solid var(--cluster-color);
+}
+
+.military-cluster-marker .cluster-label::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid var(--cluster-color);
+  border-bottom: 1px solid var(--cluster-color);
 }
 
 @keyframes cluster-pulse {
