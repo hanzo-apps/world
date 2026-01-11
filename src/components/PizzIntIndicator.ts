@@ -250,7 +250,7 @@ export class PizzIntIndicator {
     const color = DEFCON_COLORS[this.status.defconLevel] || '#888';
     defconEl.textContent = `DEFCON ${this.status.defconLevel}`;
     defconEl.style.background = color;
-    defconEl.style.color = this.status.defconLevel >= 4 ? '#fff' : '#000';
+    defconEl.style.color = this.status.defconLevel === 4 ? '#fff' : '#000';
 
     scoreEl.textContent = `${this.status.aggregateActivity}%`;
     labelEl.textContent = this.status.defconLabel;
