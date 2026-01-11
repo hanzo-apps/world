@@ -1,5 +1,5 @@
 import type { PredictionMarket } from '@/types';
-import { fetchWithProxy, createCircuitBreaker } from '@/utils';
+import { createCircuitBreaker } from '@/utils';
 
 interface PolymarketMarket {
   question: string;
@@ -54,10 +54,7 @@ function isGeopoliticallyRelevant(title: string): boolean {
 
 export async function fetchPredictions(): Promise<PredictionMarket[]> {
   return breaker.execute(async () => {
-    // Fetch more to have enough after filtering
-    const response = await fetchWithProxy(
-      '/api/polymarket/markets?closed=false&order=volume&ascending=false&limit=100'
-    );
+    const response = await fetch('/api/polymarket?closed=false&order=volume&ascending=false&limit=100');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data: PolymarketMarket[] = await response.json();
 
