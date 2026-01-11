@@ -3951,48 +3951,74 @@ body.playback-mode .status-dot {
 }
 
 /* Military Popup Styles */
+/* Military popup headers - ensure readable text */
 .popup-header.militaryFlight,
-.popup-header.militaryVessel {
-  background: linear-gradient(90deg, var(--mil-color, #00ccff) 0%, transparent 100%);
+.popup-header.militaryVessel,
+.popup-header.military-flight,
+.popup-header.military-vessel {
+  background: linear-gradient(90deg, rgba(0, 180, 180, 0.4) 0%, transparent 100%);
 }
 
 .popup-header.militaryFlightCluster,
-.popup-header.militaryVesselCluster {
-  background: linear-gradient(90deg, var(--cluster-color, #00ccff) 0%, transparent 100%);
-}
-
-.popup-header.military-flight,
-.popup-header.military-vessel {
-  background: linear-gradient(90deg, #00ccff 0%, transparent 100%);
-}
-
+.popup-header.militaryVesselCluster,
 .popup-header.military-cluster {
-  background: linear-gradient(90deg, #ff6600 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(57, 255, 20, 0.3) 0%, transparent 100%);
 }
 
+/* US Military - blue tint */
 .popup-header.military-flight.usaf,
 .popup-header.military-flight.usn,
 .popup-header.military-flight.usmc,
 .popup-header.military-flight.usa {
-  background: linear-gradient(90deg, #3b82f6 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.4) 0%, transparent 100%);
 }
 
+/* NATO/UK - purple tint */
 .popup-header.military-flight.nato,
 .popup-header.military-flight.raf {
-  background: linear-gradient(90deg, #6366f1 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.4) 0%, transparent 100%);
 }
 
+/* Israel - light blue tint */
 .popup-header.military-flight.iaf {
-  background: linear-gradient(90deg, #60a5fa 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.4) 0%, transparent 100%);
 }
 
+/* China - lighter red tint for contrast */
 .popup-header.military-flight.plaaf,
 .popup-header.military-flight.plan {
-  background: linear-gradient(90deg, #ef4444 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.4) 0%, transparent 100%);
 }
 
+/* Russia - orange tint for better contrast */
 .popup-header.military-flight.vks {
-  background: linear-gradient(90deg, #dc2626 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0.4) 0%, transparent 100%);
+}
+
+/* Military popup content - ensure readable text */
+.popup-header.military-flight .popup-title,
+.popup-header.military-vessel .popup-title,
+.popup-header.military-cluster .popup-title,
+.popup-header.militaryFlight .popup-title,
+.popup-header.militaryVessel .popup-title,
+.popup-header.militaryFlightCluster .popup-title,
+.popup-header.militaryVesselCluster .popup-title {
+  color: #fff;
+}
+
+/* Military popup subtitle - always white for contrast */
+.popup-body .popup-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Stat values in military popups - green for readability */
+.popup-body .stat-value {
+  color: var(--green, #39ff14);
+}
+
+/* Attribution text - brighter */
+.popup-attribution {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .cluster-flights,
