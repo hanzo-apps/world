@@ -4529,3 +4529,195 @@ body.playback-mode .status-dot {
 .mobile-warning-btn:active {
   transform: translateY(0);
 }
+
+/* ==========================================================================
+   Mobile Touch Optimization
+   ========================================================================== */
+
+/* Touch device detection - applies to both small screens and touch devices */
+@media (pointer: coarse), (max-width: 768px) {
+  /* Expand touch targets for all map markers using ::before pseudo-element */
+  /* This creates an invisible touch area around small markers */
+
+  .hotspot::before,
+  .base-marker::before,
+  .earthquake-marker::before,
+  .nuclear-marker::before,
+  .economic-marker::before,
+  .datacenter-marker::before,
+  .protest-marker::before,
+  .flight-marker::before,
+  .outage-marker::before,
+  .weather-marker::before,
+  .military-flight-marker::before,
+  .military-vessel-marker::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
+    /* Uncomment to debug: background: rgba(255, 0, 0, 0.2); */
+  }
+
+  /* Ensure hotspot container is large enough for touch */
+  .hotspot {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Increase marker visual sizes slightly for better visibility */
+  .hotspot-marker {
+    width: 16px;
+    height: 16px;
+  }
+
+  .base-marker {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Add spacing to prevent marker overlap on dense areas */
+  .hotspot,
+  .base-marker,
+  .nuclear-marker,
+  .economic-marker {
+    z-index: 50;
+  }
+
+  /* Ensure labels don't interfere with touch targets */
+  .hotspot-label,
+  .base-label,
+  .earthquake-label,
+  .nuclear-label,
+  .economic-label {
+    pointer-events: none;
+  }
+
+  /* Make layer toggle buttons larger for touch */
+  .layer-toggle {
+    padding: 8px 12px;
+    font-size: 10px;
+    min-height: 36px;
+    min-width: 60px;
+  }
+
+  .layer-toggles {
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+
+  /* Larger map controls */
+  .map-control-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  /* Time slider buttons */
+  .time-btn {
+    padding: 8px 12px;
+    min-height: 36px;
+  }
+
+  /* Map popup positioning for mobile - ensure it's visible */
+  .map-popup {
+    max-width: calc(100vw - 32px);
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  /* Hide some UI elements that clutter mobile view */
+  .map-timestamp {
+    font-size: 9px;
+  }
+
+  .map-legend {
+    display: none;
+  }
+
+  /* Reduce header clutter on mobile */
+  .header-center {
+    gap: 4px;
+  }
+
+  .view-btn {
+    padding: 6px 10px;
+    font-size: 10px;
+    min-height: 32px;
+  }
+
+  /* Hide search button keyboard shortcut on mobile */
+  .search-btn kbd {
+    display: none;
+  }
+
+  /* Simplify layer help popup for mobile */
+  .layer-help-popup {
+    max-width: calc(100vw - 20px);
+    max-height: 70vh;
+  }
+
+  /* Ensure conflict click areas are large enough */
+  .conflict-click-area {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .layer-toggles {
+    max-height: 80px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .layer-toggle {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 9px;
+    min-width: 50px;
+  }
+
+  .map-popup {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none;
+  }
+
+  /* Stack header on very small screens */
+  .header {
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+
+  .header-left,
+  .header-center,
+  .header-right {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+
+  .header-center {
+    order: -1;
+    margin-bottom: 8px;
+  }
+
+  /* Hide non-essential header items */
+  .copy-link-btn,
+  .time-display {
+    display: none;
+  }
+}

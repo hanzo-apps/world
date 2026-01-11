@@ -9,19 +9,19 @@ export class MobileWarningModal {
     this.element.innerHTML = `
       <div class="mobile-warning-modal">
         <div class="mobile-warning-header">
-          <span class="mobile-warning-icon">🖥️</span>
-          <span class="mobile-warning-title">Desktop Recommended</span>
+          <span class="mobile-warning-icon">📱</span>
+          <span class="mobile-warning-title">Mobile View</span>
         </div>
         <div class="mobile-warning-content">
-          <p>This dashboard is optimized for desktop viewing. Some features may not work as expected on mobile devices.</p>
-          <p>For the best experience, please visit on a desktop or laptop computer.</p>
+          <p>You're viewing a simplified mobile version focused on MENA region with essential layers enabled.</p>
+          <p>Tip: Use the view buttons (GLOBAL/US/MENA) to switch regions. Tap markers to see details.</p>
         </div>
         <div class="mobile-warning-footer">
           <label class="mobile-warning-remember">
             <input type="checkbox" id="mobileWarningRemember">
             <span>Don't show again</span>
           </label>
-          <button class="mobile-warning-btn">Continue Anyway</button>
+          <button class="mobile-warning-btn">Got it</button>
         </div>
       </div>
     `;
