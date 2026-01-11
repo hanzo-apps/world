@@ -1839,7 +1839,9 @@ export class MapComponent {
     this.state.view = view;
     // Reset zoom when changing views for better UX
     this.state.zoom = view === 'mena' ? 2.5 : 1;
-    this.state.pan = view === 'mena' ? { x: -180, y: 60 } : { x: 0, y: 60 };  // Pan north for global view
+    // MENA: pan to center on Middle East region
+    // Global: no pan offset (SVG viewBox clips at boundaries, so translate creates blank space)
+    this.state.pan = view === 'mena' ? { x: -180, y: 60 } : { x: 0, y: 0 };
     this.applyTransform();
     this.render();
   }
@@ -1926,7 +1928,7 @@ export class MapComponent {
 
   public reset(): void {
     this.state.zoom = 1;
-    this.state.pan = { x: 0, y: 60 };  // Pan north for global view
+    this.state.pan = { x: 0, y: 0 };
     if (this.state.view !== 'global') {
       this.state.view = 'global';
       this.render();
