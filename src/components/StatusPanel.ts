@@ -77,7 +77,7 @@ export class StatusPanel {
     // Names must match what App.ts sends: category.charAt(0).toUpperCase() + category.slice(1)
     const feedNames = [
       'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
-      'Gov', 'Intel', 'Layoffs', 'Congress', 'Thinktanks',
+      'Gov', 'Intel', 'Layoffs', 'Thinktanks',
       'Polymarket', 'Weather', 'NetBlocks', 'Shipping'
     ];
     feedNames.forEach(name => {
