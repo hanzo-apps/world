@@ -4721,3 +4721,187 @@ body.playback-mode .status-dot {
     display: none;
   }
 }
+
+/* ==========================================================================
+   GDELT Intelligence Panel
+   ========================================================================== */
+
+.gdelt-intel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gdelt-intel-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.gdelt-intel-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gdelt-intel-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gdelt-intel-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.gdelt-intel-tab .tab-icon {
+  font-size: 12px;
+}
+
+.gdelt-intel-tab .tab-label {
+  font-weight: 500;
+}
+
+.gdelt-intel-articles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gdelt-intel-article {
+  display: block;
+  padding: 10px 12px;
+  background: var(--surface);
+  text-decoration: none;
+  transition: background 0.15s ease;
+  border-left: 2px solid transparent;
+}
+
+.gdelt-intel-article:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: var(--accent);
+}
+
+.gdelt-intel-article.tone-negative {
+  border-left-color: var(--danger);
+}
+
+.gdelt-intel-article.tone-positive {
+  border-left-color: var(--success);
+}
+
+.gdelt-intel-article .article-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.gdelt-intel-article .article-source {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.gdelt-intel-article .article-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.gdelt-intel-article .article-title {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hotspot GDELT Context */
+.hotspot-gdelt-context {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.hotspot-gdelt-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.hotspot-gdelt-header::before {
+  content: '📡';
+  font-size: 12px;
+}
+
+.hotspot-gdelt-articles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hotspot-gdelt-article {
+  display: block;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.hotspot-gdelt-article:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.hotspot-gdelt-article .article-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+
+.hotspot-gdelt-article .article-title {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hotspot-gdelt-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 11px;
+}

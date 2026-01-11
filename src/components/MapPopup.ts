@@ -3,6 +3,7 @@ import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { isMobileDevice } from '@/utils';
+import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticle } from '@/services/gdelt-intel';
 
 export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster';
 
@@ -230,7 +231,61 @@ export class MapPopup {
             </div>
           </div>
         ` : ''}
+        <div class="hotspot-gdelt-context" data-hotspot-id="${escapeHtml(hotspot.id)}">
+          <div class="hotspot-gdelt-header">Live Intelligence</div>
+          <div class="hotspot-gdelt-loading">Loading global news...</div>
+        </div>
       </div>
+    `;
+  }
+
+  public async loadHotspotGdeltContext(hotspot: Hotspot): Promise<void> {
+    if (!this.popup) return;
+
+    const container = this.popup.querySelector('.hotspot-gdelt-context');
+    if (!container) return;
+
+    try {
+      const articles = await fetchHotspotContext(hotspot);
+
+      if (!this.popup || !container.isConnected) return;
+
+      if (articles.length === 0) {
+        container.innerHTML = `
+          <div class="hotspot-gdelt-header">Live Intelligence</div>
+          <div class="hotspot-gdelt-loading">No recent global coverage</div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="hotspot-gdelt-header">Live Intelligence</div>
+        <div class="hotspot-gdelt-articles">
+          ${articles.slice(0, 5).map(article => this.renderGdeltArticle(article)).join('')}
+        </div>
+      `;
+    } catch (error) {
+      if (container.isConnected) {
+        container.innerHTML = `
+          <div class="hotspot-gdelt-header">Live Intelligence</div>
+          <div class="hotspot-gdelt-loading">Failed to load</div>
+        `;
+      }
+    }
+  }
+
+  private renderGdeltArticle(article: GdeltArticle): string {
+    const domain = article.source || extractDomain(article.url);
+    const timeAgo = formatArticleDate(article.date);
+
+    return `
+      <a href="${sanitizeUrl(article.url)}" target="_blank" rel="noopener" class="hotspot-gdelt-article">
+        <div class="article-meta">
+          <span>${escapeHtml(domain)}</span>
+          <span>${escapeHtml(timeAgo)}</span>
+        </div>
+        <div class="article-title">${escapeHtml(article.title)}</div>
+      </a>
     `;
   }
 
