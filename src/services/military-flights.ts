@@ -235,6 +235,35 @@ function parseOpenSkyResponse(data: OpenSkyResponse): MilitaryFlight[] {
 }
 
 /**
+ * Fetch flights for a single hotspot region
+ */
+async function fetchHotspotRegion(hotspot: typeof MILITARY_HOTSPOTS[number]): Promise<MilitaryFlight[]> {
+  try {
+    const lamin = hotspot.lat - hotspot.radius;
+    const lamax = hotspot.lat + hotspot.radius;
+    const lomin = hotspot.lon - hotspot.radius;
+    const lomax = hotspot.lon + hotspot.radius;
+
+    const response = await fetch(
+      `${OPENSKY_BASE_URL}?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.warn(`[Military Flights] Rate limited for ${hotspot.name}`);
+      }
+      return [];
+    }
+
+    const data: OpenSkyResponse = await response.json();
+    return parseOpenSkyResponse(data);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Fetch military flights from OpenSky Network
  * Uses regional queries to reduce API usage and bandwidth
  */
@@ -242,39 +271,14 @@ async function fetchFromOpenSky(): Promise<MilitaryFlight[]> {
   const allFlights: MilitaryFlight[] = [];
   const seenHexCodes = new Set<string>();
 
-  // Query each hotspot region instead of global (saves API credits)
-  // Global = 4 credits, regional = 1-3 credits depending on area
-  const regionQueries = MILITARY_HOTSPOTS.map(async (hotspot) => {
-    try {
-      const lamin = hotspot.lat - hotspot.radius;
-      const lamax = hotspot.lat + hotspot.radius;
-      const lomin = hotspot.lon - hotspot.radius;
-      const lomax = hotspot.lon + hotspot.radius;
-
-      const response = await fetch(
-        `${OPENSKY_BASE_URL}?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`,
-        { headers: { 'Accept': 'application/json' } }
-      );
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn(`[Military Flights] Rate limited for ${hotspot.name}`);
-        }
-        return [];
-      }
-
-      const data: OpenSkyResponse = await response.json();
-      return parseOpenSkyResponse(data);
-    } catch {
-      return [];
-    }
-  });
-
-  // Execute in batches of 3 to avoid rate limiting
+  // Execute in batches to avoid rate limiting
+  // Note: Requests are started when the batch executes, not when defined
   const batchSize = 3;
-  for (let i = 0; i < regionQueries.length; i += batchSize) {
-    const batch = regionQueries.slice(i, i + batchSize);
-    const results = await Promise.all(batch);
+  for (let i = 0; i < MILITARY_HOTSPOTS.length; i += batchSize) {
+    const batch = MILITARY_HOTSPOTS.slice(i, i + batchSize);
+
+    // Start requests for this batch only
+    const results = await Promise.all(batch.map(hotspot => fetchHotspotRegion(hotspot)));
 
     for (const flights of results) {
       for (const flight of flights) {
@@ -286,7 +290,7 @@ async function fetchFromOpenSky(): Promise<MilitaryFlight[]> {
     }
 
     // Small delay between batches to be respectful of rate limits
-    if (i + batchSize < regionQueries.length) {
+    if (i + batchSize < MILITARY_HOTSPOTS.length) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
