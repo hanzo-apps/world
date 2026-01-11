@@ -1,11 +1,22 @@
 export const config = { runtime: 'edge' };
 
+const SYMBOL_PATTERN = /^[A-Za-z0-9.^=\-]+$/;
+const MAX_SYMBOL_LENGTH = 20;
+
+function validateSymbol(symbol) {
+  if (!symbol) return null;
+  const trimmed = symbol.trim().toUpperCase();
+  if (trimmed.length > MAX_SYMBOL_LENGTH) return null;
+  if (!SYMBOL_PATTERN.test(trimmed)) return null;
+  return trimmed;
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
-  const symbol = url.searchParams.get('symbol');
+  const symbol = validateSymbol(url.searchParams.get('symbol'));
 
   if (!symbol) {
-    return new Response(JSON.stringify({ error: 'Missing symbol parameter' }), {
+    return new Response(JSON.stringify({ error: 'Invalid or missing symbol parameter' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
