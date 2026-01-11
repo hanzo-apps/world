@@ -325,12 +325,28 @@ function detectDisruptions(): AisDisruptionEvent[] {
 
 function calculateDensityZones(): AisDensityZone[] {
   const zones: AisDensityZone[] = [];
-  const maxVessels = Math.max(1, ...Array.from(densityGrid.values()).map(c => c.vessels.size));
+  const allCells = Array.from(densityGrid.values()).filter(c => c.vessels.size >= 3);
+
+  if (allCells.length === 0) return zones;
+
+  const vesselCounts = allCells.map(c => c.vessels.size);
+  const maxVessels = Math.max(...vesselCounts);
+  const minVessels = Math.min(...vesselCounts);
 
   for (const [key, cell] of densityGrid) {
-    if (cell.vessels.size < 3) continue; // Skip sparse cells
+    if (cell.vessels.size < 3) continue;
 
-    const intensity = cell.vessels.size / maxVessels;
+    // Use logarithmic scaling to make smaller zones visible
+    // This ensures zones with fewer ships still appear on the map
+    const logMax = Math.log(maxVessels + 1);
+    const logMin = Math.log(minVessels + 1);
+    const logCurrent = Math.log(cell.vessels.size + 1);
+
+    // Normalize to 0.2-1.0 range (minimum 20% intensity for visibility)
+    const intensity = logMax > logMin
+      ? 0.2 + 0.8 * (logCurrent - logMin) / (logMax - logMin)
+      : 0.5;
+
     const deltaPct = cell.previousCount > 0
       ? Math.round(((cell.vessels.size - cell.previousCount) / cell.previousCount) * 100)
       : 0;
@@ -342,13 +358,28 @@ function calculateDensityZones(): AisDensityZone[] {
       lon: cell.lon,
       intensity,
       deltaPct,
-      shipsPerDay: cell.vessels.size * 48, // Extrapolate from 30min window
+      shipsPerDay: cell.vessels.size * 48,
       note: cell.vessels.size >= 10 ? 'High traffic area' : undefined,
     });
   }
 
-  // Sort by intensity and return top zones
-  return zones.sort((a, b) => b.intensity - a.intensity).slice(0, 50);
+  // Return all qualifying zones (increased from 50 to 200 for global coverage)
+  const sorted = zones.sort((a, b) => b.intensity - a.intensity).slice(0, 200);
+
+  // Debug: log zone distribution by region
+  if (sorted.length > 0 && messageCount % 500 === 0) {
+    const regions = { europe: 0, asia: 0, americas: 0, africa: 0, other: 0 };
+    for (const z of sorted) {
+      if (z.lon >= -30 && z.lon <= 50 && z.lat >= 35 && z.lat <= 70) regions.europe++;
+      else if (z.lon >= 60 && z.lon <= 180 && z.lat >= -10 && z.lat <= 60) regions.asia++;
+      else if (z.lon >= -130 && z.lon <= -30) regions.americas++;
+      else if (z.lon >= -20 && z.lon <= 55 && z.lat >= -35 && z.lat <= 35) regions.africa++;
+      else regions.other++;
+    }
+    console.log(`[Shipping] Density zones: ${sorted.length} total | EU:${regions.europe} AS:${regions.asia} AM:${regions.americas} AF:${regions.africa} OT:${regions.other} | Ships: min=${minVessels} max=${maxVessels}`);
+  }
+
+  return sorted;
 }
 
 export function initAisStream(): void {

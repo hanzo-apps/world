@@ -96,8 +96,13 @@ export default async function handler(req) {
     });
   } catch (error) {
     const isTimeout = error.name === 'AbortError';
-    return new Response(JSON.stringify({ error: isTimeout ? 'Feed timeout' : 'Failed to fetch feed' }), {
-      status: isTimeout ? 504 : 500,
+    console.error('RSS proxy error:', feedUrl, error.message);
+    return new Response(JSON.stringify({
+      error: isTimeout ? 'Feed timeout' : 'Failed to fetch feed',
+      details: error.message,
+      url: feedUrl
+    }), {
+      status: isTimeout ? 504 : 502,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
