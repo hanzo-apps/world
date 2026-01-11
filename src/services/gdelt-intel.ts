@@ -136,15 +136,14 @@ export async function fetchAllTopicIntelligence(): Promise<TopicIntelligence[]> 
 export function formatArticleDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
-    const year = dateStr.slice(0, 4);
-    const month = dateStr.slice(4, 6);
-    const day = dateStr.slice(6, 8);
-    const hour = dateStr.slice(8, 10);
-    const min = dateStr.slice(10, 12);
-    const date = new Date(`${year}-${month}-${day}T${hour}:${min}:00Z`);
+    // GDELT returns ISO 8601 format: "2025-01-11T14:30:00Z"
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+
     const now = Date.now();
     const diff = now - date.getTime();
 
+    if (diff < 0) return 'just now';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     return `${Math.floor(diff / 86400000)}d ago`;
