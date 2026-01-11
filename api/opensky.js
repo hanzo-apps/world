@@ -1,3 +1,4 @@
+// OpenSky Network API proxy - v2
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
