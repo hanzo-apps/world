@@ -133,7 +133,7 @@ export class MapPopup {
 
     return `
       <div class="popup-header conflict">
-        <span class="popup-title">${conflict.name.toUpperCase()}</span>
+        <span class="popup-title">${escapeHtml(conflict.name).toUpperCase()}</span>
         <span class="popup-badge ${severityClass}">${severityLabel}</span>
         <button class="popup-close">×</button>
       </div>
@@ -141,27 +141,27 @@ export class MapPopup {
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">START DATE</span>
-            <span class="stat-value">${conflict.startDate || 'Unknown'}</span>
+            <span class="stat-value">${escapeHtml(conflict.startDate || 'Unknown')}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">CASUALTIES</span>
-            <span class="stat-value">${conflict.casualties || 'Unknown'}</span>
+            <span class="stat-value">${escapeHtml(conflict.casualties || 'Unknown')}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">DISPLACED</span>
-            <span class="stat-value">${conflict.displaced || 'Unknown'}</span>
+            <span class="stat-value">${escapeHtml(conflict.displaced || 'Unknown')}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">LOCATION</span>
-            <span class="stat-value">${conflict.location || `${conflict.center[1]}°N, ${conflict.center[0]}°E`}</span>
+            <span class="stat-value">${escapeHtml(conflict.location || `${conflict.center[1]}°N, ${conflict.center[0]}°E`)}</span>
           </div>
         </div>
-        ${conflict.description ? `<p class="popup-description">${conflict.description}</p>` : ''}
+        ${conflict.description ? `<p class="popup-description">${escapeHtml(conflict.description)}</p>` : ''}
         ${conflict.parties && conflict.parties.length > 0 ? `
           <div class="popup-section">
             <span class="section-label">BELLIGERENTS</span>
             <div class="popup-tags">
-              ${conflict.parties.map(p => `<span class="popup-tag">${p}</span>`).join('')}
+              ${conflict.parties.map(p => `<span class="popup-tag">${escapeHtml(p)}</span>`).join('')}
             </div>
           </div>
         ` : ''}
@@ -169,7 +169,7 @@ export class MapPopup {
           <div class="popup-section">
             <span class="section-label">KEY DEVELOPMENTS</span>
             <ul class="popup-list">
-              ${conflict.keyDevelopments.map(d => `<li>${d}</li>`).join('')}
+              ${conflict.keyDevelopments.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
             </ul>
           </div>
         ` : ''}
