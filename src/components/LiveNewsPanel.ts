@@ -7,13 +7,13 @@ interface LiveChannel {
 }
 
 const LIVE_CHANNELS: LiveChannel[] = [
-  { id: 'aljazeera', name: 'Al Jazeera', videoId: 'gCNeDWCI0vo' },
-  { id: 'sky', name: 'Sky News', videoId: 'YDvsBbKfLPA' },
+  { id: 'aljazeera', name: 'AlJazeera', videoId: 'gCNeDWCI0vo' },
+  { id: 'sky', name: 'SkyNews', videoId: 'YDvsBbKfLPA' },
   { id: 'bloomberg', name: 'Bloomberg', videoId: 'iEpJwprxDdk' },
-  { id: 'france24', name: 'France 24', videoId: 'Ap-UM1O9RBU' },
-  { id: 'dw', name: 'DW News', videoId: 'LuKwFajn37U' },
+  { id: 'france24', name: 'France24', videoId: 'Ap-UM1O9RBU' },
+  { id: 'dw', name: 'DW', videoId: 'LuKwFajn37U' },
   { id: 'euronews', name: 'Euronews', videoId: 'pykpO5kQJ98' },
-  { id: 'alarabiya', name: 'Al Arabiya', videoId: 'n7eQejkXbnM' },
+  { id: 'alarabiya', name: 'AlArabiya', videoId: 'n7eQejkXbnM' },
 ];
 
 export class LiveNewsPanel extends Panel {
