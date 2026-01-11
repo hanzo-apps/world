@@ -17,6 +17,7 @@
     "ws": "^8.19.0"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "d3": "^7.9.0",
     "topojson-client": "^3.1.0"
   }
