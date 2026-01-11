@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -29,6 +29,7 @@ import {
   EconomicPanel,
   SearchModal,
   MobileWarningModal,
+  PizzIntIndicator,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
@@ -53,6 +54,7 @@ export class App {
   private economicPanel: EconomicPanel | null = null;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
+  private pizzintIndicator: PizzIntIndicator | null = null;
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
   private latestClusters: ClusteredEvent[] = [];
@@ -91,6 +93,7 @@ export class App {
     this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
+    this.setupPizzIntIndicator();
     this.setupExportPanel();
     this.setupEconomicPanel();
     this.setupSearchModal();
@@ -123,6 +126,26 @@ export class App {
     const headerLeft = this.container.querySelector('.header-left');
     if (headerLeft) {
       headerLeft.appendChild(this.statusPanel.getElement());
+    }
+  }
+
+  private setupPizzIntIndicator(): void {
+    this.pizzintIndicator = new PizzIntIndicator();
+    document.body.appendChild(this.pizzintIndicator.getElement());
+  }
+
+  private async loadPizzInt(): Promise<void> {
+    try {
+      const [status, tensions] = await Promise.all([
+        fetchPizzIntStatus(),
+        fetchGdeltTensions()
+      ]);
+      this.pizzintIndicator?.updateStatus(status);
+      this.pizzintIndicator?.updateTensions(tensions);
+      this.statusPanel?.updateApi('PizzINT', { status: 'ok' });
+    } catch (error) {
+      console.error('[App] PizzINT load failed:', error);
+      this.statusPanel?.updateApi('PizzINT', { status: 'error' });
     }
   }
 
@@ -1001,6 +1024,7 @@ export class App {
       this.loadNews(),
       this.loadMarkets(),
       this.loadPredictions(),
+      this.loadPizzInt(),
     ];
 
     // Conditionally load based on layer settings
@@ -1454,10 +1478,11 @@ export class App {
   }
 
   private setupRefreshIntervals(): void {
-    // Always refresh news, markets, predictions
+    // Always refresh news, markets, predictions, pizzint
     setInterval(() => this.loadNews(), REFRESH_INTERVALS.feeds);
     setInterval(() => this.loadMarkets(), REFRESH_INTERVALS.markets);
     setInterval(() => this.loadPredictions(), REFRESH_INTERVALS.predictions);
+    setInterval(() => this.loadPizzInt(), 10 * 60 * 1000); // 10 minutes
 
     // Only refresh layer data if layer is enabled
     setInterval(() => {
