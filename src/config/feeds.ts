@@ -44,6 +44,8 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Defense One': 3,
   'Breaking Defense': 3,
   'The War Zone': 3,
+  'Defense News': 3,
+  'Janes': 3,
   'Foreign Policy': 3,
   'The Diplomat': 3,
   'Bellingcat': 3,
@@ -52,15 +54,21 @@ export const SOURCE_TIERS: Record<string, number> = {
   'SEC': 3,
   'MIT Tech Review': 3,
   'Ars Technica': 3,
+  'Brookings': 3,
+  'CSIS': 3,
+  'CFR': 3,
+  'Layoffs.fyi': 3,
 
   // Tier 4 - Aggregators
   'Hacker News': 4,
   'The Verge': 4,
+  'The Verge AI': 4,
   'VentureBeat AI': 4,
   'Yahoo Finance': 4,
   'TechCrunch Layoffs': 4,
-  'Hugging Face': 4,
   'ArXiv AI': 4,
+  'AI News': 4,
+  'Layoffs News': 4,
 };
 
 export function getSourceTier(sourceName: string): number {
@@ -81,8 +89,9 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
 
   // Intel/Defense specialty
   'Defense One': 'intel', 'Breaking Defense': 'intel', 'The War Zone': 'intel',
-  'Defense News': 'intel', 'Bellingcat': 'intel', 'Krebs Security': 'intel',
+  'Defense News': 'intel', 'Janes': 'intel', 'Bellingcat': 'intel', 'Krebs Security': 'intel',
   'Foreign Policy': 'intel', 'The Diplomat': 'intel',
+  'Brookings': 'intel', 'CSIS': 'intel', 'CFR': 'intel',
 
   // Mainstream outlets
   'BBC World': 'mainstream', 'BBC Middle East': 'mainstream',
@@ -96,9 +105,9 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
 
   // Tech
   'Hacker News': 'tech', 'Ars Technica': 'tech', 'The Verge': 'tech',
-  'MIT Tech Review': 'tech', 'TechCrunch Layoffs': 'tech',
-  'AI News': 'tech', 'Hugging Face': 'tech', 'ArXiv AI': 'tech',
-  'VentureBeat AI': 'tech', 'OpenAI News': 'tech',
+  'The Verge AI': 'tech', 'MIT Tech Review': 'tech', 'TechCrunch Layoffs': 'tech',
+  'AI News': 'tech', 'ArXiv AI': 'tech', 'VentureBeat AI': 'tech',
+  'Layoffs.fyi': 'tech', 'Layoffs News': 'tech',
 };
 
 export function getSourceType(sourceName: string): SourceType {
@@ -127,12 +136,11 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
   ],
   ai: [
-    { name: 'AI News', url: rss('https://news.google.com/rss/search?q=artificial+intelligence+AI+news&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'Hugging Face', url: rss('https://huggingface.co/blog/feed.xml') },
+    { name: 'AI News', url: rss('https://news.google.com/rss/search?q=(OpenAI+OR+Anthropic+OR+Google+AI+OR+"large+language+model"+OR+ChatGPT)+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'VentureBeat AI', url: rss('https://venturebeat.com/category/ai/feed/') },
+    { name: 'The Verge AI', url: rss('https://www.theverge.com/rss/ai-artificial-intelligence/index.xml') },
+    { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/topic/artificial-intelligence/feed') },
     { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
-    { name: 'VentureBeat AI', url: rss('https://venturebeat.com/feed/') },
-    // OpenAI blocks proxied requests, use Google News instead
-    { name: 'OpenAI News', url: rss('https://news.google.com/rss/search?q=site:openai.com&hl=en-US&gl=US&ceid=US:en') },
   ],
   finance: [
     { name: 'CNBC', url: rss('https://www.cnbc.com/id/100003114/device/rss/rss.html') },
@@ -154,24 +162,27 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'DHS', url: rss('https://news.google.com/rss/search?q=site:dhs.gov+OR+"Homeland+Security"&hl=en-US&gl=US&ceid=US:en') },
   ],
   layoffs: [
+    { name: 'Layoffs.fyi', url: rss('https://layoffs.fyi/feed/') },
     { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
-    { name: 'Layoffs News', url: rss('https://news.google.com/rss/search?q=tech+layoffs+2026+job+cuts&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Layoffs News', url: rss('https://news.google.com/rss/search?q=(layoffs+OR+"job+cuts"+OR+"workforce+reduction")+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
   congress: [
-    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q="congress"+("stock+trade"+OR+"disclosed"+OR+"bought"+OR+"sold")+when:7d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'Capitol Trades', url: rss('https://news.google.com/rss/search?q="senator"+OR+"representative"+("stock+purchase"+OR+"stock+sale"+OR+"financial+disclosure")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q=("congress+stock"+OR+"senator+trade"+OR+"representative+stock")+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
-    { name: 'Think Tank News', url: rss('https://news.google.com/rss/search?q=brookings+CSIS+CFR+analysis&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Brookings', url: rss('https://www.brookings.edu/feed/') },
+    { name: 'CSIS', url: rss('https://www.csis.org/analysis/feed') },
+    { name: 'CFR', url: rss('https://www.cfr.org/rss/publications.xml') },
   ],
 };
 
 export const INTEL_SOURCES: Feed[] = [
   { name: 'Defense One', url: rss('https://www.defenseone.com/rss/all/'), type: 'defense' },
   { name: 'Breaking Defense', url: rss('https://breakingdefense.com/feed/'), type: 'defense' },
-  { name: 'The War Zone', url: rss('https://news.google.com/rss/search?q=site:thedrive.com/the-war-zone&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
-  { name: 'Defense News', url: rss('https://news.google.com/rss/search?q=defense+military+pentagon&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
+  { name: 'The War Zone', url: rss('https://www.thedrive.com/the-war-zone/rss'), type: 'defense' },
+  { name: 'Defense News', url: rss('https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml'), type: 'defense' },
+  { name: 'Janes', url: rss('https://news.google.com/rss/search?q=site:janes.com+when:3d&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
   { name: 'Bellingcat', url: rss('https://www.bellingcat.com/feed/'), type: 'osint' },
   { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/'), type: 'cyber' },
 ];
