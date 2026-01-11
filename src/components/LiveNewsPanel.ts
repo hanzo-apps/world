@@ -19,11 +19,42 @@ const LIVE_CHANNELS: LiveChannel[] = [
 export class LiveNewsPanel extends Panel {
   private activeChannel: LiveChannel = LIVE_CHANNELS[0]!;
   private channelSwitcher: HTMLElement | null = null;
+  private isMuted = true;
+  private muteBtn: HTMLButtonElement | null = null;
 
   constructor() {
     super({ id: 'live-news', title: 'Live News', showCount: false, trackActivity: false });
     this.element.classList.add('panel-wide');
+    this.createMuteButton();
     this.createChannelSwitcher();
+    this.renderPlayer();
+  }
+
+  private createMuteButton(): void {
+    this.muteBtn = document.createElement('button');
+    this.muteBtn.className = 'live-mute-btn';
+    this.muteBtn.title = 'Toggle sound';
+    this.updateMuteIcon();
+    this.muteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMute();
+    });
+
+    const header = this.element.querySelector('.panel-header');
+    header?.appendChild(this.muteBtn);
+  }
+
+  private updateMuteIcon(): void {
+    if (!this.muteBtn) return;
+    this.muteBtn.innerHTML = this.isMuted
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+    this.muteBtn.classList.toggle('unmuted', !this.isMuted);
+  }
+
+  private toggleMute(): void {
+    this.isMuted = !this.isMuted;
+    this.updateMuteIcon();
     this.renderPlayer();
   }
 
@@ -56,7 +87,8 @@ export class LiveNewsPanel extends Panel {
   }
 
   private renderPlayer(): void {
-    const embedUrl = `https://www.youtube.com/embed/${this.activeChannel.videoId}?autoplay=1&mute=1&rel=0`;
+    const muteParam = this.isMuted ? '1' : '0';
+    const embedUrl = `https://www.youtube.com/embed/${this.activeChannel.videoId}?autoplay=1&mute=${muteParam}&rel=0`;
 
     this.content.innerHTML = `
       <div class="live-news-player">
