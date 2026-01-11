@@ -331,8 +331,7 @@ export interface MapLayers {
   datacenters: boolean;
   protests: boolean;
   flights: boolean;
-  militaryFlights: boolean;
-  militaryVessels: boolean;
+  military: boolean;
 }
 
 export interface AIDataCenter {
