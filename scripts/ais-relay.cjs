@@ -59,7 +59,6 @@ const server = http.createServer(async (req, res) => {
 
       // Only allow specific blocked domains
       const allowedDomains = [
-        'www.telegraph.co.uk',
         'rss.cnn.com',
         'www.defensenews.com',
         'layoffs.fyi',
