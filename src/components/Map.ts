@@ -254,6 +254,7 @@ export class MapComponent {
     ];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'Shipping',
+      flights: 'Delays',
       military: 'Military',
     };
 
@@ -322,7 +323,7 @@ export class MapComponent {
         <div class="layer-help-section">
           <div class="layer-help-title">Transport</div>
           <div class="layer-help-item"><span>SHIPPING</span> Vessel tracking in chokepoints (Hormuz, Suez)</div>
-          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays and ground stops</div>
+          <div class="layer-help-item"><span>DELAYS</span> Airport delays and ground stops (FAA)</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Natural & Economic</div>
