@@ -3698,7 +3698,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 25;
+  z-index: 55;
   --mil-color: #39ff14;
   opacity: 0.7;
 }
@@ -3882,7 +3882,7 @@ body.playback-mode .status-dot {
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
   transform-origin: center;
   cursor: pointer;
-  z-index: 24;
+  z-index: 54;
   --vessel-color: #00ffcc;
 }
 
@@ -3904,7 +3904,7 @@ body.playback-mode .status-dot {
 
 .military-vessel-marker.carrier {
   --vessel-color: #ffcc00;
-  z-index: 26;
+  z-index: 56;
 }
 
 .military-vessel-marker.submarine {
