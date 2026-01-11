@@ -158,7 +158,8 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Layoffs News', url: rss('https://news.google.com/rss/search?q=tech+layoffs+2026+job+cuts&hl=en-US&gl=US&ceid=US:en') },
   ],
   congress: [
-    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q=congress+stock+trading+pelosi+tuberville&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q="congress"+("stock+trade"+OR+"disclosed"+OR+"bought"+OR+"sold")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Capitol Trades', url: rss('https://news.google.com/rss/search?q="senator"+OR+"representative"+("stock+purchase"+OR+"stock+sale"+OR+"financial+disclosure")+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
