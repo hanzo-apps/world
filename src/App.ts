@@ -1379,11 +1379,13 @@ export class App {
       this.statusPanel?.updateFeed('Protests', {
         status: 'ok',
         itemCount: protestData.events.length,
-        errorMessage: !status.acledConfigured ? 'ACLED not configured - using GDELT only' : undefined,
+        errorMessage: status.acledConfigured === false ? 'ACLED not configured - using GDELT only' : undefined,
       });
 
-      if (status.acledConfigured) {
+      if (status.acledConfigured === true) {
         this.statusPanel?.updateApi('ACLED', { status: 'ok' });
+      } else if (status.acledConfigured === null) {
+        this.statusPanel?.updateApi('ACLED', { status: 'warning' });
       }
       this.statusPanel?.updateApi('GDELT', { status: 'ok' });
     } catch (error) {
