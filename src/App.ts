@@ -638,11 +638,6 @@ export class App {
     this.newsPanels['layoffs'] = layoffsPanel;
     this.panels['layoffs'] = layoffsPanel;
 
-    const congressPanel = new NewsPanel('congress', 'Congress Trades');
-    this.attachRelatedAssetHandlers(congressPanel);
-    this.newsPanels['congress'] = congressPanel;
-    this.panels['congress'] = congressPanel;
-
     const aiPanel = new NewsPanel('ai', 'AI / ML');
     this.attachRelatedAssetHandlers(aiPanel);
     this.newsPanels['ai'] = aiPanel;
@@ -661,7 +656,7 @@ export class App {
 
     // Add panels to grid in saved order (optimized for geopolitical analysis)
     // Row 1: Intel + breaking events | Row 2: Market signals | Row 3: Supporting context
-    const defaultOrder = ['intel', 'gdelt-intel', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'congress', 'ai', 'layoffs', 'monitors'];
+    const defaultOrder = ['intel', 'gdelt-intel', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
@@ -1175,7 +1170,6 @@ export class App {
       { key: 'gov', feeds: FEEDS.gov },
       { key: 'middleeast', feeds: FEEDS.middleeast },
       { key: 'layoffs', feeds: FEEDS.layoffs },
-      { key: 'congress', feeds: FEEDS.congress },
       { key: 'ai', feeds: FEEDS.ai },
       { key: 'thinktanks', feeds: FEEDS.thinktanks },
     ];
