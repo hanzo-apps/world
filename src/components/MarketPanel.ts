@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import type { MarketData, CryptoData } from '@/types';
 import { formatPrice, formatChange, getChangeClass, getHeatmapClass } from '@/utils';
+import { escapeHtml } from '@/utils/sanitize';
 
 export class MarketPanel extends Panel {
   constructor() {
@@ -18,8 +19,8 @@ export class MarketPanel extends Panel {
         (stock) => `
       <div class="market-item">
         <div class="market-info">
-          <span class="market-name">${stock.name}</span>
-          <span class="market-symbol">${stock.display}</span>
+          <span class="market-name">${escapeHtml(stock.name)}</span>
+          <span class="market-symbol">${escapeHtml(stock.display)}</span>
         </div>
         <div class="market-data">
           <span class="market-price">${formatPrice(stock.price!)}</span>
@@ -53,7 +54,7 @@ export class HeatmapPanel extends Panel {
         .map(
           (sector) => `
         <div class="heatmap-cell ${getHeatmapClass(sector.change!)}">
-          <div class="sector-name">${sector.name}</div>
+          <div class="sector-name">${escapeHtml(sector.name)}</div>
           <div class="sector-change ${getChangeClass(sector.change!)}">${formatChange(sector.change!)}</div>
         </div>
       `
@@ -84,7 +85,7 @@ export class CommoditiesPanel extends Panel {
         .map(
           (c) => `
         <div class="commodity-item">
-          <div class="commodity-name">${c.display}</div>
+          <div class="commodity-name">${escapeHtml(c.display)}</div>
           <div class="commodity-price">${formatPrice(c.price!)}</div>
           <div class="commodity-change ${getChangeClass(c.change!)}">${formatChange(c.change!)}</div>
         </div>
@@ -113,8 +114,8 @@ export class CryptoPanel extends Panel {
         (coin) => `
       <div class="market-item">
         <div class="market-info">
-          <span class="market-name">${coin.name}</span>
-          <span class="market-symbol">${coin.symbol}</span>
+          <span class="market-name">${escapeHtml(coin.name)}</span>
+          <span class="market-symbol">${escapeHtml(coin.symbol)}</span>
         </div>
         <div class="market-data">
           <span class="market-price">$${coin.price.toLocaleString()}</span>
