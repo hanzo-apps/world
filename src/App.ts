@@ -1218,7 +1218,7 @@ export class App {
       });
       this.latestMarkets = stocks;
       (this.panels['markets'] as MarketPanel).renderMarkets(stocks);
-      this.statusPanel?.updateApi('Alpha Vantage', { status: 'ok' });
+      this.statusPanel?.updateApi('Finnhub', { status: 'ok' });
 
       // Sectors
       const sectors = await fetchMultipleStocks(
@@ -1251,7 +1251,7 @@ export class App {
         commodities.map((c) => ({ display: c.display, price: c.price, change: c.change }))
       );
     } catch {
-      this.statusPanel?.updateApi('Alpha Vantage', { status: 'error' });
+      this.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }
 
     try {

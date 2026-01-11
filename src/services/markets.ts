@@ -1,6 +1,24 @@
 import type { MarketData, CryptoData } from '@/types';
 import { API_URLS, CRYPTO_MAP } from '@/config';
-import { chunkArray, fetchWithProxy } from '@/utils';
+import { fetchWithProxy } from '@/utils';
+
+interface FinnhubQuote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  high: number;
+  low: number;
+  open: number;
+  previousClose: number;
+  timestamp: number;
+  error?: string;
+}
+
+interface FinnhubResponse {
+  quotes: FinnhubQuote[];
+  error?: string;
+}
 
 interface YahooFinanceResponse {
   chart: {
@@ -21,125 +39,128 @@ interface CoinGeckoResponse {
   };
 }
 
-// Circuit breaker for Yahoo Finance rate limiting
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-let rateLimitedUntil = 0;
+// Symbols that need Yahoo Finance (indices and futures not supported by Finnhub free tier)
+const YAHOO_ONLY_SYMBOLS = new Set([
+  '^GSPC', '^DJI', '^IXIC', '^VIX',
+  'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F',
+]);
+
 let lastSuccessfulResults: MarketData[] = [];
 
-function isRateLimited(): boolean {
-  if (Date.now() < rateLimitedUntil) {
-    const remaining = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
-    console.warn(`[Markets] Rate limited, ${remaining}s remaining`);
-    return true;
+async function fetchFromFinnhub(
+  symbols: Array<{ symbol: string; name: string; display: string }>
+): Promise<MarketData[]> {
+  const symbolList = symbols.map(s => s.symbol);
+  const url = API_URLS.finnhub(symbolList);
+
+  try {
+    const response = await fetchWithProxy(url);
+
+    if (!response.ok) {
+      console.warn(`[Markets] Finnhub returned ${response.status}`);
+      return [];
+    }
+
+    const data: FinnhubResponse = await response.json();
+
+    if (data.error) {
+      console.warn(`[Markets] Finnhub error: ${data.error}`);
+      return [];
+    }
+
+    const symbolMap = new Map(symbols.map(s => [s.symbol, s]));
+
+    return data.quotes
+      .filter(q => !q.error && q.price > 0)
+      .map(q => {
+        const info = symbolMap.get(q.symbol);
+        return {
+          symbol: q.symbol,
+          name: info?.name || q.symbol,
+          display: info?.display || q.symbol,
+          price: q.price,
+          change: q.changePercent,
+        };
+      });
+  } catch (error) {
+    console.error('[Markets] Finnhub fetch failed:', error);
+    return [];
   }
-  return false;
 }
 
-function triggerRateLimit(): void {
-  rateLimitedUntil = Date.now() + COOLDOWN_MS;
-  console.warn(`[Markets] Rate limit detected, pausing for 5 minutes`);
-}
-
-export async function fetchStockQuote(
+async function fetchFromYahoo(
   symbol: string,
   name: string,
   display: string
-): Promise<MarketData & { rateLimited?: boolean }> {
-  if (isRateLimited()) {
-    return { symbol, name, display, price: null, change: null };
-  }
-
+): Promise<MarketData | null> {
   try {
     const url = API_URLS.yahooFinance(symbol);
     const response = await fetchWithProxy(url);
 
-    if (response.status === 429) {
-      triggerRateLimit();
-      return { symbol, name, display, price: null, change: null, rateLimited: true };
-    }
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) return null;
     const data: YahooFinanceResponse = await response.json();
 
     const meta = data.chart.result[0]?.meta;
-    if (!meta) {
-      return { symbol, name, display, price: null, change: null };
-    }
+    if (!meta) return null;
 
     const price = meta.regularMarketPrice;
     const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     const change = ((price - prevClose) / prevClose) * 100;
 
     return { symbol, name, display, price, change };
-  } catch (e) {
-    const msg = String(e);
-    if (msg.includes('429')) {
-      triggerRateLimit();
-      return { symbol, name, display, price: null, change: null, rateLimited: true };
-    }
-    console.error(`Failed to fetch ${symbol}:`, e);
-    return { symbol, name, display, price: null, change: null };
+  } catch {
+    return null;
   }
 }
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function fetchMultipleStocks(
   symbols: Array<{ symbol: string; name: string; display: string }>,
   options: {
-    batchSize?: number;
-    delayMs?: number;
     onBatch?: (results: MarketData[]) => void;
   } = {}
 ): Promise<MarketData[]> {
-  // Return cached results if rate limited
-  if (isRateLimited()) {
-    if (lastSuccessfulResults.length > 0) {
-      options.onBatch?.(lastSuccessfulResults);
-      return lastSuccessfulResults;
-    }
-    return [];
-  }
+  // Split symbols into Finnhub-compatible and Yahoo-only
+  const finnhubSymbols = symbols.filter(s => !YAHOO_ONLY_SYMBOLS.has(s.symbol));
+  const yahooSymbols = symbols.filter(s => YAHOO_ONLY_SYMBOLS.has(s.symbol));
 
   const results: MarketData[] = [];
-  const batchSize = options.batchSize ?? 2;
-  const delayMs = options.delayMs ?? 3000;
-  const batches = chunkArray(symbols, batchSize);
 
-  for (const [index, batch] of batches.entries()) {
-    // Check rate limit before each batch
-    if (isRateLimited()) {
-      console.log(`[Markets] Stopping fetch after ${results.length} symbols due to rate limit`);
-      break;
-    }
+  // Fetch from Finnhub (batch request)
+  if (finnhubSymbols.length > 0) {
+    const finnhubResults = await fetchFromFinnhub(finnhubSymbols);
+    results.push(...finnhubResults);
+    options.onBatch?.(results);
+  }
 
-    const batchResults = await Promise.all(
-      batch.map((s) => fetchStockQuote(s.symbol, s.name, s.display))
+  // Fetch indices/commodities from Yahoo (parallel)
+  if (yahooSymbols.length > 0) {
+    const yahooResults = await Promise.all(
+      yahooSymbols.map(s => fetchFromYahoo(s.symbol, s.name, s.display))
     );
-
-    // Check if any result triggered rate limit
-    const hitRateLimit = batchResults.some((r) => (r as { rateLimited?: boolean }).rateLimited);
-    if (hitRateLimit) {
-      console.log(`[Markets] Rate limit hit, stopping fetch`);
-      break;
-    }
-
-    results.push(...batchResults);
-
-    const visibleResults = results.filter((r) => r.price !== null);
-    options.onBatch?.(visibleResults);
-
-    if (index < batches.length - 1) {
-      const jitter = Math.random() * 1000;
-      await delay(delayMs + jitter);
-    }
+    results.push(...yahooResults.filter((r): r is MarketData => r !== null));
+    options.onBatch?.(results);
   }
 
-  const successful = results.filter((r) => r.price !== null);
-  if (successful.length > 0) {
-    lastSuccessfulResults = successful;
+  if (results.length > 0) {
+    lastSuccessfulResults = results;
   }
-  return successful;
+
+  return results.length > 0 ? results : lastSuccessfulResults;
+}
+
+// Legacy single-symbol function (still used by some components)
+export async function fetchStockQuote(
+  symbol: string,
+  name: string,
+  display: string
+): Promise<MarketData> {
+  if (YAHOO_ONLY_SYMBOLS.has(symbol)) {
+    const result = await fetchFromYahoo(symbol, name, display);
+    return result || { symbol, name, display, price: null, change: null };
+  }
+
+  const results = await fetchFromFinnhub([{ symbol, name, display }]);
+  return results[0] || { symbol, name, display, price: null, change: null };
 }
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
