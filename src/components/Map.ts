@@ -1326,28 +1326,11 @@ export class MapComponent {
         div.style.left = `${pos[0]}px`;
         div.style.top = `${pos[1]}px`;
 
-        // Rotate icon based on heading
+        // Crosshair icon - rotates with heading
         const icon = document.createElement('div');
-        icon.className = 'military-flight-icon';
+        icon.className = `military-flight-icon ${flight.aircraftType}`;
         icon.style.transform = `rotate(${flight.heading}deg)`;
-
-        // Different icons for different aircraft types
-        // Using distinct symbols to differentiate from commercial flights (which use ✈️)
-        const iconMap: Record<string, string> = {
-          fighter: '⬡',      // Hexagon for fighters (angular, military)
-          bomber: '◆',       // Diamond for bombers
-          transport: '▲',    // Triangle for transport
-          tanker: '◉',       // Circle with dot for tankers
-          awacs: '◎',        // Double circle for AWACS
-          reconnaissance: '◇', // Open diamond for recon
-          helicopter: '⬢',   // Filled hexagon for helos
-          drone: '△',        // Open triangle for drones
-          patrol: '◈',       // Diamond in diamond for patrol
-          special_ops: '★',  // Star for special ops
-          vip: '✦',          // Four-pointed star for VIP
-          unknown: '●',      // Filled circle for unknown military
-        };
-        icon.textContent = iconMap[flight.aircraftType] || '●';
+        // CSS handles the crosshair rendering
         div.appendChild(icon);
 
         // Show callsign at higher zoom levels
