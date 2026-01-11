@@ -3,15 +3,6 @@ import type { Feed } from '@/types';
 // Helper to create RSS proxy URL (Vercel)
 const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
 
-// Railway relay URL for feeds that block Vercel IPs
-const RAILWAY_RELAY = import.meta.env.VITE_WS_RELAY_URL?.replace('wss://', 'https://').replace('ws://', 'http://') || '';
-
-// Helper for feeds that block Vercel (uses Railway relay)
-const railwayRss = (url: string) => {
-  if (!RAILWAY_RELAY) return rss(url); // Fallback to Vercel if no Railway
-  return `${RAILWAY_RELAY}/rss?url=${encodeURIComponent(url)}`;
-};
-
 // Source tier system for prioritization (lower = more authoritative)
 // Tier 1: Wire services - fastest, most reliable breaking news
 // Tier 2: Major outlets - high-quality journalism
@@ -36,7 +27,6 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Al Jazeera': 2,
   'Financial Times': 2,
   'Politico': 2,
-  'The Telegraph': 2,
   'Reuters World': 1,
   'Reuters Business': 1,
   'OpenAI News': 3,
@@ -107,7 +97,7 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'BBC World': 'mainstream', 'BBC Middle East': 'mainstream',
   'Guardian World': 'mainstream', 'Guardian ME': 'mainstream',
   'NPR News': 'mainstream', 'Al Jazeera': 'mainstream',
-  'CNN World': 'mainstream', 'Politico': 'mainstream', 'The Telegraph': 'mainstream',
+  'CNN World': 'mainstream', 'Politico': 'mainstream',
 
   // Market/Finance
   'CNBC': 'market', 'MarketWatch': 'market', 'Yahoo Finance': 'market',
@@ -132,7 +122,6 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'AP News', url: rss('https://news.google.com/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Reuters World', url: rss('https://news.google.com/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Politico', url: rss('https://www.politico.com/rss/politicopicks.xml') },
-    { name: 'The Telegraph', url: railwayRss('https://www.telegraph.co.uk/news/rss.xml') },
     { name: 'The Diplomat', url: rss('https://thediplomat.com/feed/') },
   ],
   middleeast: [
