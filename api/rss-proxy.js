@@ -62,6 +62,7 @@ const ALLOWED_DOMAINS = [
   'layoffs.fyi',
   'www.defensenews.com',
   'www.foreignaffairs.com',
+  'www.atlanticcouncil.org',
 ];
 
 export default async function handler(req) {
