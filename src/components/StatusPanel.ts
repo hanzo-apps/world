@@ -84,7 +84,7 @@ export class StatusPanel {
       this.feeds.set(name, { name, lastUpdate: null, status: 'warning', itemCount: 0 });
     });
 
-    const apiNames = ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream'];
+    const apiNames = ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc'];
     apiNames.forEach(name => {
       this.apis.set(name, { name, status: 'warning' });
     });
