@@ -2,6 +2,7 @@ import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, Strateg
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { isMobileDevice } from '@/utils';
 
 export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster';
 
@@ -33,16 +34,14 @@ export class MapPopup {
     const content = this.renderContent(data);
     this.popup.innerHTML = content;
 
-    // Detect mobile/touch devices
-    const isMobile = window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
-
-    if (isMobile) {
+    if (isMobileDevice()) {
       // On mobile, center the popup horizontally and position in lower half
       this.popup.style.left = '50%';
       this.popup.style.transform = 'translateX(-50%)';
       this.popup.style.top = `${Math.max(60, Math.min(data.y, this.container.clientHeight * 0.4))}px`;
     } else {
       // Desktop: position near click with bounds checking
+      this.popup.style.transform = '';
       const maxX = this.container.clientWidth - 400;
       const maxY = this.container.clientHeight - 300;
       this.popup.style.left = `${Math.min(data.x + 20, maxX)}px`;
