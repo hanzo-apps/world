@@ -136,8 +136,14 @@ export async function fetchAllTopicIntelligence(): Promise<TopicIntelligence[]> 
 export function formatArticleDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
-    // GDELT returns ISO 8601 format: "2025-01-11T14:30:00Z"
-    const date = new Date(dateStr);
+    // GDELT returns compact format: "20260111T093000Z"
+    const year = dateStr.slice(0, 4);
+    const month = dateStr.slice(4, 6);
+    const day = dateStr.slice(6, 8);
+    const hour = dateStr.slice(9, 11);
+    const min = dateStr.slice(11, 13);
+    const sec = dateStr.slice(13, 15);
+    const date = new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}Z`);
     if (isNaN(date.getTime())) return '';
 
     const now = Date.now();
