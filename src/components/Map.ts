@@ -292,46 +292,59 @@ export class MapComponent {
       </div>
       <div class="layer-help-content">
         <div class="layer-help-section">
+          <div class="layer-help-title">Time Filter (top-right)</div>
+          <div class="layer-help-item"><span>1H/6H/24H</span> Filter time-based data to recent hours</div>
+          <div class="layer-help-item"><span>7D/30D/ALL</span> Show data from past week, month, or all time</div>
+          <div class="layer-help-note">Affects: Earthquakes, Weather, Protests, Outages</div>
+        </div>
+        <div class="layer-help-section">
           <div class="layer-help-title">Geopolitical</div>
-          <div class="layer-help-item"><span>CONFLICTS</span> Active war zones and armed conflicts (ACLED data)</div>
-          <div class="layer-help-item"><span>HOTSPOTS</span> Regions with elevated geopolitical tensions</div>
-          <div class="layer-help-item"><span>SANCTIONS</span> Countries/entities under international sanctions</div>
-          <div class="layer-help-item"><span>PROTESTS</span> Civil unrest, riots, and demonstrations (ACLED/GDELT)</div>
+          <div class="layer-help-item"><span>CONFLICTS</span> Active war zones (Ukraine, Gaza, etc.) with boundaries</div>
+          <div class="layer-help-item"><span>HOTSPOTS</span> Tension regions - color-coded by news activity level</div>
+          <div class="layer-help-item"><span>SANCTIONS</span> Countries under US/EU/UN economic sanctions</div>
+          <div class="layer-help-item"><span>PROTESTS</span> Civil unrest, demonstrations (time-filtered)</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Military & Strategic</div>
-          <div class="layer-help-item"><span>BASES</span> Major US/NATO, China, and Russia military installations</div>
-          <div class="layer-help-item"><span>NUCLEAR</span> Nuclear power plants, enrichment, and weapons facilities</div>
-          <div class="layer-help-item"><span>IRRADIATORS</span> Industrial gamma irradiator facilities (IAEA)</div>
-          <div class="layer-help-item"><span>MILITARY</span> Live military aircraft tracking via OpenSky Network (crosshairs)</div>
+          <div class="layer-help-item"><span>BASES</span> US/NATO, China, Russia military installations (150+)</div>
+          <div class="layer-help-item"><span>NUCLEAR</span> Power plants, enrichment, weapons facilities (IAEA)</div>
+          <div class="layer-help-item"><span>IRRADIATORS</span> Industrial gamma irradiator facilities</div>
+          <div class="layer-help-item"><span>MILITARY</span> Live aircraft/vessel tracking (OpenSky) - crosshairs</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Infrastructure</div>
-          <div class="layer-help-item"><span>CABLES</span> Undersea fiber optic cables carrying global internet traffic</div>
-          <div class="layer-help-item"><span>PIPELINES</span> Major oil and gas pipeline infrastructure</div>
-          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and connectivity disruptions</div>
-          <div class="layer-help-item"><span>DATACENTERS</span> Major AI/GPU compute clusters worldwide</div>
+          <div class="layer-help-item"><span>CABLES</span> Major undersea fiber optic cables (20 backbone routes)</div>
+          <div class="layer-help-item"><span>PIPELINES</span> Oil/gas pipelines (Nord Stream, TAPI, etc.)</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts via Cloudflare Radar</div>
+          <div class="layer-help-item"><span>DATACENTERS</span> AI compute clusters ≥10,000 GPUs only</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Transport</div>
-          <div class="layer-help-item"><span>SHIPPING</span> Live vessel tracking in strategic waterways (AIS)</div>
-          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays, ground stops, and disruptions</div>
+          <div class="layer-help-item"><span>SHIPPING</span> AIS vessel tracking in chokepoints (Hormuz, Suez)</div>
+          <div class="layer-help-item"><span>FLIGHTS</span> Airport delays/ground stops (FAA, global)</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Natural & Economic</div>
-          <div class="layer-help-item"><span>EARTHQUAKES</span> Recent seismic events M4.5+ (USGS)</div>
-          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts and warnings (NWS)</div>
-          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges and central banks</div>
+          <div class="layer-help-item"><span>EARTHQUAKES</span> M4.5+ seismic events (USGS, time-filtered)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts (NWS)</div>
+          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Labels</div>
-          <div class="layer-help-item"><span>COUNTRIES</span> Country name labels</div>
-          <div class="layer-help-item"><span>WATERWAYS</span> Strategic chokepoints (Hormuz, Suez, etc.)</div>
+          <div class="layer-help-item"><span>COUNTRIES</span> Country name overlays</div>
+          <div class="layer-help-item"><span>WATERWAYS</span> Strategic chokepoint labels</div>
         </div>
       </div>
     `;
 
     popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
+
+    // Prevent scroll events from propagating to map
+    const content = popup.querySelector('.layer-help-content');
+    if (content) {
+      content.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
+      content.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+    }
 
     // Close on click outside
     setTimeout(() => {
