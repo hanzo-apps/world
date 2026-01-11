@@ -7,6 +7,8 @@ export * from './pipelines';
 export * from './ai-datacenters';
 
 export const API_URLS = {
+  finnhub: (symbols: string[]) =>
+    `/api/finnhub?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`,
   yahooFinance: (symbol: string) =>
     `/api/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
   coingecko:
