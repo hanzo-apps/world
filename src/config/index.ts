@@ -8,11 +8,11 @@ export * from './ai-datacenters';
 
 export const API_URLS = {
   yahooFinance: (symbol: string) =>
-    `/api/yahoo/v8/finance/chart/${encodeURIComponent(symbol)}`,
+    `/api/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
   coingecko:
-    '/api/coingecko/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
-  polymarket: '/api/polymarket/events?closed=false&limit=20',
-  earthquakes: '/api/earthquake/earthquakes/feed/v1.0/summary/4.5_day.geojson',
+    '/api/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
+  polymarket: '/api/polymarket?closed=false&order=volume&ascending=false&limit=100',
+  earthquakes: '/api/earthquakes',
 };
 
 export const REFRESH_INTERVALS = {
