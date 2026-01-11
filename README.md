@@ -1028,6 +1028,161 @@ Original dashboard concept inspired by Reggie James ([@HipCityReg](https://x.com
 
 ---
 
+## Contributing
+
+Contributions are welcome! Whether you're fixing bugs, adding features, improving documentation, or suggesting ideas, your help makes this project better.
+
+### Getting Started
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/worldmonitor.git
+   cd worldmonitor
+   ```
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+4. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+5. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+### Code Style & Conventions
+
+This project follows specific patterns to maintain consistency:
+
+**TypeScript**
+- Strict type checking enabled—avoid `any` where possible
+- Use interfaces for data structures, types for unions
+- Prefer `const` over `let`, never use `var`
+
+**Architecture**
+- Services (`src/services/`) handle data fetching and business logic
+- Components (`src/components/`) handle UI rendering
+- Config (`src/config/`) contains static data and constants
+- Utils (`src/utils/`) contain shared helper functions
+
+**Security**
+- Always use `escapeHtml()` when rendering user-controlled or external data
+- Use `sanitizeUrl()` for any URLs from external sources
+- Validate and clamp parameters in API proxy endpoints
+
+**Performance**
+- Expensive computations should run in the Web Worker
+- Use virtual scrolling for lists with 50+ items
+- Implement circuit breakers for external API calls
+
+**No Comments Policy**
+- Code should be self-documenting through clear naming
+- Only add comments for non-obvious algorithms or workarounds
+- Never commit commented-out code
+
+### Submitting a Pull Request
+
+1. **Ensure your code builds**:
+   ```bash
+   npm run build
+   ```
+
+2. **Test your changes** manually in the browser
+
+3. **Write a clear commit message**:
+   ```
+   Add earthquake magnitude filtering to map layer
+
+   - Adds slider control to filter by minimum magnitude
+   - Persists preference to localStorage
+   - Updates URL state for shareable links
+   ```
+
+4. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+5. **Open a Pull Request** with:
+   - A clear title describing the change
+   - Description of what the PR does and why
+   - Screenshots for UI changes
+   - Any breaking changes or migration notes
+
+### What Makes a Good PR
+
+| Do | Don't |
+|----|-------|
+| Focus on one feature or fix | Bundle unrelated changes |
+| Follow existing code patterns | Introduce new frameworks without discussion |
+| Keep changes minimal and targeted | Refactor surrounding code unnecessarily |
+| Update README if adding features | Add features without documentation |
+| Test edge cases | Assume happy path only |
+
+### Types of Contributions
+
+**🐛 Bug Fixes**
+- Found something broken? Fix it and submit a PR
+- Include steps to reproduce in the PR description
+
+**✨ New Features**
+- New data layers (with public API sources)
+- UI/UX improvements
+- Performance optimizations
+- New signal detection algorithms
+
+**📊 Data Sources**
+- Additional RSS feeds for news aggregation
+- New geospatial datasets (bases, infrastructure, etc.)
+- Alternative APIs for existing data
+
+**📝 Documentation**
+- Clarify existing documentation
+- Add examples and use cases
+- Fix typos and improve readability
+
+**🔒 Security**
+- Report vulnerabilities via GitHub Issues (non-critical) or email (critical)
+- XSS prevention improvements
+- Input validation enhancements
+
+### Review Process
+
+1. **Automated checks** run on PR submission
+2. **Maintainer review** within a few days
+3. **Feedback addressed** through commits to the same branch
+4. **Merge** once approved
+
+PRs that don't follow the code style or introduce security issues will be asked to revise.
+
+### Development Tips
+
+**Adding a New Data Layer**
+
+1. Create service in `src/services/` for data fetching
+2. Add layer toggle in `src/components/Map.ts`
+3. Add rendering logic for map markers/overlays
+4. Add to help panel documentation
+5. Update README with layer description
+
+**Adding a New API Proxy**
+
+1. Create handler in `api/` directory
+2. Implement input validation (see existing proxies)
+3. Add appropriate cache headers
+4. Document any required environment variables
+
+**Debugging**
+
+- Browser DevTools → Network tab for API issues
+- Console logs prefixed with `[ServiceName]` for easy filtering
+- Circuit breaker status visible in browser console
+
+---
+
 ## License
 
 MIT
