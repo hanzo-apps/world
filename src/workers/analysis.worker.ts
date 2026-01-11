@@ -1,6 +1,26 @@
 /**
  * Web Worker for heavy computational tasks (clustering & correlation analysis).
  * Runs O(n²) Jaccard clustering and correlation detection off the main thread.
+ *
+ * IMPORTANT: This worker contains duplicated logic from:
+ * - src/services/clustering.ts
+ * - src/services/correlation.ts
+ *
+ * The constants and pure functions are defined in:
+ * - src/utils/analysis-constants.ts
+ *
+ * Workers can't easily import from other modules, so this file maintains its own
+ * copy. If you change any thresholds or logic, update BOTH places!
+ *
+ * Key constants to keep in sync:
+ * - SIMILARITY_THRESHOLD (0.5)
+ * - STOP_WORDS
+ * - PREDICTION_SHIFT_THRESHOLD (5)
+ * - MARKET_MOVE_THRESHOLD (2)
+ * - NEWS_VELOCITY_THRESHOLD (3)
+ * - FLOW_PRICE_THRESHOLD (1.5)
+ * - PIPELINE_KEYWORDS, FLOW_DROP_KEYWORDS
+ * - tokenize(), jaccardSimilarity(), findRelatedTopics()
  */
 
 // Types needed for worker (duplicated to avoid import issues in worker context)

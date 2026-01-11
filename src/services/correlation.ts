@@ -1,5 +1,19 @@
 import type { ClusteredEvent, PredictionMarket, MarketData } from '@/types';
 import { getSourceType, type SourceType } from '@/config/feeds';
+import {
+  PREDICTION_SHIFT_THRESHOLD,
+  MARKET_MOVE_THRESHOLD,
+  NEWS_VELOCITY_THRESHOLD,
+  FLOW_PRICE_THRESHOLD,
+  ENERGY_COMMODITY_SYMBOLS,
+  PIPELINE_KEYWORDS,
+  FLOW_DROP_KEYWORDS,
+  TOPIC_KEYWORDS,
+  findRelatedTopics,
+  includesKeyword,
+  generateSignalId,
+  generateDedupeKey,
+} from '@/utils/analysis-constants';
 
 export type SignalType =
   | 'prediction_leads_news'
@@ -33,32 +47,9 @@ interface StreamSnapshot {
   timestamp: number;
 }
 
-const PREDICTION_SHIFT_THRESHOLD = 5;
-const MARKET_MOVE_THRESHOLD = 2;
-const NEWS_VELOCITY_THRESHOLD = 3;
-const FLOW_PRICE_THRESHOLD = 1.5;
-const ENERGY_COMMODITY_SYMBOLS = new Set(['CL=F', 'NG=F']);
-
-const PIPELINE_KEYWORDS = ['pipeline', 'pipelines', 'line', 'terminal'];
-const FLOW_DROP_KEYWORDS = [
-  'flow', 'throughput', 'capacity', 'outage', 'leak', 'rupture', 'shutdown',
-  'maintenance', 'curtailment', 'force majeure', 'halt', 'halted', 'reduced',
-  'reduction', 'drop', 'offline', 'suspend', 'suspended', 'stoppage',
-];
-
 let previousSnapshot: StreamSnapshot | null = null;
 const signalHistory: CorrelationSignal[] = [];
 const recentSignalKeys = new Set<string>();
-
-function generateSignalId(): string {
-  return `sig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function generateDedupeKey(type: SignalType, identifier: string, value: number): string {
-  // Round value to avoid minor fluctuations creating new signals
-  const roundedValue = Math.round(value * 10) / 10;
-  return `${type}:${identifier}:${roundedValue}`;
-}
 
 function isRecentDuplicate(key: string): boolean {
   return recentSignalKeys.has(key);
@@ -66,22 +57,15 @@ function isRecentDuplicate(key: string): boolean {
 
 function markSignalSeen(key: string): void {
   recentSignalKeys.add(key);
-  // Clean old keys after 30 minutes
   setTimeout(() => recentSignalKeys.delete(key), 30 * 60 * 1000);
 }
 
 function extractTopics(events: ClusteredEvent[]): Map<string, number> {
   const topics = new Map<string, number>();
 
-  const keywords = [
-    'iran', 'israel', 'ukraine', 'russia', 'china', 'taiwan', 'oil', 'crypto',
-    'fed', 'interest', 'inflation', 'recession', 'war', 'sanctions', 'tariff',
-    'ai', 'tech', 'layoff', 'trump', 'biden', 'election',
-  ];
-
   for (const event of events) {
     const title = event.primaryTitle.toLowerCase();
-    for (const kw of keywords) {
+    for (const kw of TOPIC_KEYWORDS) {
       if (title.includes(kw)) {
         const velocity = event.velocity?.sourcesPerHour ?? 0;
         topics.set(kw, (topics.get(kw) ?? 0) + velocity + event.sourceCount);
@@ -90,36 +74,6 @@ function extractTopics(events: ClusteredEvent[]): Map<string, number> {
   }
 
   return topics;
-}
-
-function findRelatedTopics(prediction: string): string[] {
-  const title = prediction.toLowerCase();
-  const related: string[] = [];
-
-  const mappings: Record<string, string[]> = {
-    'iran': ['iran', 'israel', 'oil', 'sanctions'],
-    'israel': ['israel', 'iran', 'war', 'gaza'],
-    'ukraine': ['ukraine', 'russia', 'war', 'nato'],
-    'russia': ['russia', 'ukraine', 'sanctions'],
-    'china': ['china', 'taiwan', 'tariff', 'trade'],
-    'taiwan': ['taiwan', 'china'],
-    'trump': ['trump', 'election', 'tariff'],
-    'fed': ['fed', 'interest', 'inflation', 'recession'],
-    'bitcoin': ['crypto', 'bitcoin'],
-    'recession': ['recession', 'fed', 'inflation'],
-  };
-
-  for (const [key, topics] of Object.entries(mappings)) {
-    if (title.includes(key)) {
-      related.push(...topics);
-    }
-  }
-
-  return [...new Set(related)];
-}
-
-function includesKeyword(text: string, keywords: string[]): boolean {
-  return keywords.some(keyword => text.includes(keyword));
 }
 
 function detectPipelineFlowDrops(events: ClusteredEvent[]): CorrelationSignal[] {
