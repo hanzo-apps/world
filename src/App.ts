@@ -10,7 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -1012,6 +1012,7 @@ export class App {
     if (this.mapLayers.cables) tasks.push(this.loadCableActivity());
     if (this.mapLayers.protests) tasks.push(this.loadProtests());
     if (this.mapLayers.flights) tasks.push(this.loadFlightDelays());
+    if (this.mapLayers.military) tasks.push(this.loadMilitary());
 
     await Promise.all(tasks);
 
@@ -1046,6 +1047,9 @@ export class App {
           break;
         case 'flights':
           await this.loadFlightDelays();
+          break;
+        case 'military':
+          await this.loadMilitary();
           break;
       }
     } finally {
@@ -1353,6 +1357,37 @@ export class App {
     }
   }
 
+  private async loadMilitary(): Promise<void> {
+    try {
+      // Initialize vessel stream if not already running
+      if (isMilitaryVesselTrackingConfigured()) {
+        initMilitaryVesselStream();
+      }
+
+      // Load both flights and vessels in parallel
+      const [flightData, vesselData] = await Promise.all([
+        fetchMilitaryFlights(),
+        fetchMilitaryVessels(),
+      ]);
+
+      this.map?.setMilitaryFlights(flightData.flights, flightData.clusters);
+      this.map?.setMilitaryVessels(vesselData.vessels, vesselData.clusters);
+
+      const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
+      this.map?.setLayerReady('military', hasData);
+
+      this.statusPanel?.updateFeed('Military', {
+        status: 'ok',
+        itemCount: flightData.flights.length + vesselData.vessels.length,
+      });
+      this.statusPanel?.updateApi('OpenSky', { status: 'ok' });
+    } catch (error) {
+      this.map?.setLayerReady('military', false);
+      this.statusPanel?.updateFeed('Military', { status: 'error', errorMessage: String(error) });
+      this.statusPanel?.updateApi('OpenSky', { status: 'error' });
+    }
+  }
+
   private async loadFredData(): Promise<void> {
     const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
     if (cbInfo.onCooldown) {
@@ -1449,5 +1484,9 @@ export class App {
     setInterval(() => {
       if (this.mapLayers.flights) this.loadFlightDelays();
     }, 10 * 60 * 1000);
+    // Military tracking - refresh every 2 minutes
+    setInterval(() => {
+      if (this.mapLayers.military) this.loadMilitary();
+    }, 2 * 60 * 1000);
   }
 }
