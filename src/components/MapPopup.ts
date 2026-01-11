@@ -113,6 +113,14 @@ export class MapPopup {
         return this.renderProtestPopup(data.data as SocialUnrestEvent);
       case 'flight':
         return this.renderFlightPopup(data.data as AirportDelayAlert);
+      case 'militaryFlight':
+        return this.renderMilitaryFlightPopup(data.data as MilitaryFlight);
+      case 'militaryVessel':
+        return this.renderMilitaryVesselPopup(data.data as MilitaryVessel);
+      case 'militaryFlightCluster':
+        return this.renderMilitaryFlightClusterPopup(data.data as MilitaryFlightCluster);
+      case 'militaryVesselCluster':
+        return this.renderMilitaryVesselClusterPopup(data.data as MilitaryVesselCluster);
       default:
         return '';
     }
@@ -975,5 +983,271 @@ export class MapPopup {
     } catch {
       return 'UNKNOWN';
     }
+  }
+
+  private renderMilitaryFlightPopup(flight: MilitaryFlight): string {
+    const operatorLabels: Record<string, string> = {
+      usaf: 'US Air Force',
+      usn: 'US Navy',
+      usmc: 'US Marines',
+      usa: 'US Army',
+      raf: 'Royal Air Force',
+      rn: 'Royal Navy',
+      faf: 'French Air Force',
+      gaf: 'German Air Force',
+      plaaf: 'PLA Air Force',
+      plan: 'PLA Navy',
+      vks: 'Russian Aerospace',
+      iaf: 'Israeli Air Force',
+      nato: 'NATO',
+      other: 'Unknown',
+    };
+    const typeLabels: Record<string, string> = {
+      fighter: 'Fighter',
+      bomber: 'Bomber',
+      transport: 'Transport',
+      tanker: 'Tanker',
+      awacs: 'AWACS/AEW',
+      reconnaissance: 'Reconnaissance',
+      helicopter: 'Helicopter',
+      drone: 'UAV/Drone',
+      patrol: 'Patrol',
+      special_ops: 'Special Operations',
+      vip: 'VIP Transport',
+      unknown: 'Unknown',
+    };
+    const confidenceColors: Record<string, string> = {
+      high: 'elevated',
+      medium: 'low',
+      low: 'low',
+    };
+
+    return `
+      <div class="popup-header military-flight ${flight.operator}">
+        <span class="popup-title">${flight.callsign}</span>
+        <span class="popup-badge ${confidenceColors[flight.confidence] || 'low'}">${flight.aircraftType.toUpperCase()}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${operatorLabels[flight.operator] || flight.operatorCountry}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">ALTITUDE</span>
+            <span class="stat-value">${flight.altitude > 0 ? `FL${Math.round(flight.altitude / 100)}` : 'Ground'}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">SPEED</span>
+            <span class="stat-value">${flight.speed} kts</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">HEADING</span>
+            <span class="stat-value">${Math.round(flight.heading)}°</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">HEX CODE</span>
+            <span class="stat-value">${flight.hexCode}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">TYPE</span>
+            <span class="stat-value">${typeLabels[flight.aircraftType] || flight.aircraftType}</span>
+          </div>
+          ${flight.squawk ? `
+          <div class="popup-stat">
+            <span class="stat-label">SQUAWK</span>
+            <span class="stat-value">${flight.squawk}</span>
+          </div>
+          ` : ''}
+        </div>
+        ${flight.note ? `<p class="popup-description">${flight.note}</p>` : ''}
+        <div class="popup-attribution">Source: OpenSky Network</div>
+      </div>
+    `;
+  }
+
+  private renderMilitaryVesselPopup(vessel: MilitaryVessel): string {
+    const operatorLabels: Record<string, string> = {
+      usn: 'US Navy',
+      uscg: 'US Coast Guard',
+      rn: 'Royal Navy',
+      fn: 'French Navy',
+      plan: 'PLA Navy',
+      ruf: 'Russian Navy',
+      jmsdf: 'Japan Maritime SDF',
+      rokn: 'ROK Navy',
+      other: 'Unknown',
+    };
+    const typeLabels: Record<string, string> = {
+      carrier: 'Aircraft Carrier',
+      destroyer: 'Destroyer',
+      frigate: 'Frigate',
+      submarine: 'Submarine',
+      amphibious: 'Amphibious',
+      patrol: 'Patrol',
+      auxiliary: 'Auxiliary',
+      research: 'Research',
+      icebreaker: 'Icebreaker',
+      special: 'Special',
+      unknown: 'Unknown',
+    };
+
+    const darkWarning = vessel.isDark
+      ? '<span class="popup-badge high">AIS DARK</span>'
+      : '';
+
+    return `
+      <div class="popup-header military-vessel ${vessel.operator}">
+        <span class="popup-title">${vessel.name}</span>
+        ${darkWarning}
+        <span class="popup-badge elevated">${vessel.vesselType.toUpperCase()}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${operatorLabels[vessel.operator] || vessel.operatorCountry}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">TYPE</span>
+            <span class="stat-value">${typeLabels[vessel.vesselType] || vessel.vesselType}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">SPEED</span>
+            <span class="stat-value">${vessel.speed} kts</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">HEADING</span>
+            <span class="stat-value">${Math.round(vessel.heading)}°</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">MMSI</span>
+            <span class="stat-value">${vessel.mmsi}</span>
+          </div>
+          ${vessel.hullNumber ? `
+          <div class="popup-stat">
+            <span class="stat-label">HULL #</span>
+            <span class="stat-value">${vessel.hullNumber}</span>
+          </div>
+          ` : ''}
+        </div>
+        ${vessel.note ? `<p class="popup-description">${vessel.note}</p>` : ''}
+        ${vessel.isDark ? '<p class="popup-description alert">⚠ Vessel has gone dark - AIS signal lost. May indicate sensitive operations.</p>' : ''}
+      </div>
+    `;
+  }
+
+  private renderMilitaryFlightClusterPopup(cluster: MilitaryFlightCluster): string {
+    const activityLabels: Record<string, string> = {
+      exercise: 'Military Exercise',
+      patrol: 'Patrol Activity',
+      transport: 'Transport Operations',
+      unknown: 'Military Activity',
+    };
+    const activityColors: Record<string, string> = {
+      exercise: 'high',
+      patrol: 'elevated',
+      transport: 'low',
+      unknown: 'low',
+    };
+
+    const activityType = cluster.activityType || 'unknown';
+    const flightSummary = cluster.flights
+      .slice(0, 5)
+      .map(f => `<div class="cluster-flight-item">${f.callsign} - ${f.aircraftType}</div>`)
+      .join('');
+    const moreFlights = cluster.flightCount > 5
+      ? `<div class="cluster-more">+${cluster.flightCount - 5} more aircraft</div>`
+      : '';
+
+    return `
+      <div class="popup-header military-cluster">
+        <span class="popup-title">${cluster.name}</span>
+        <span class="popup-badge ${activityColors[activityType] || 'low'}">${cluster.flightCount} AIRCRAFT</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${activityLabels[activityType] || 'Military Activity'}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">AIRCRAFT</span>
+            <span class="stat-value">${cluster.flightCount}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">ACTIVITY</span>
+            <span class="stat-value">${activityType.toUpperCase()}</span>
+          </div>
+          ${cluster.dominantOperator ? `
+          <div class="popup-stat">
+            <span class="stat-label">PRIMARY</span>
+            <span class="stat-value">${cluster.dominantOperator.toUpperCase()}</span>
+          </div>
+          ` : ''}
+        </div>
+        <div class="popup-section">
+          <span class="section-label">TRACKED AIRCRAFT</span>
+          <div class="cluster-flights">
+            ${flightSummary}
+            ${moreFlights}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderMilitaryVesselClusterPopup(cluster: MilitaryVesselCluster): string {
+    const activityLabels: Record<string, string> = {
+      exercise: 'Naval Exercise',
+      deployment: 'Naval Deployment',
+      patrol: 'Patrol Activity',
+      transit: 'Fleet Transit',
+      unknown: 'Naval Activity',
+    };
+    const activityColors: Record<string, string> = {
+      exercise: 'high',
+      deployment: 'high',
+      patrol: 'elevated',
+      transit: 'low',
+      unknown: 'low',
+    };
+
+    const activityType = cluster.activityType || 'unknown';
+    const vesselSummary = cluster.vessels
+      .slice(0, 5)
+      .map(v => `<div class="cluster-vessel-item">${v.name} - ${v.vesselType}</div>`)
+      .join('');
+    const moreVessels = cluster.vesselCount > 5
+      ? `<div class="cluster-more">+${cluster.vesselCount - 5} more vessels</div>`
+      : '';
+
+    return `
+      <div class="popup-header military-cluster">
+        <span class="popup-title">${cluster.name}</span>
+        <span class="popup-badge ${activityColors[activityType] || 'low'}">${cluster.vesselCount} VESSELS</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${activityLabels[activityType] || 'Naval Activity'}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">VESSELS</span>
+            <span class="stat-value">${cluster.vesselCount}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">ACTIVITY</span>
+            <span class="stat-value">${activityType.toUpperCase()}</span>
+          </div>
+          ${cluster.region ? `
+          <div class="popup-stat">
+            <span class="stat-label">REGION</span>
+            <span class="stat-value">${cluster.region}</span>
+          </div>
+          ` : ''}
+        </div>
+        <div class="popup-section">
+          <span class="section-label">TRACKED VESSELS</span>
+          <div class="cluster-vessels">
+            ${vesselSummary}
+            ${moreVessels}
+          </div>
+        </div>
+      </div>
+    `;
   }
 }

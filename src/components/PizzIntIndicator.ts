@@ -5,7 +5,7 @@ const DEFCON_COLORS: Record<number, string> = {
   2: '#ff4400',
   3: '#ffaa00',
   4: '#00aaff',
-  5: '#00ff88',
+  5: '#2d8a6e',
 };
 
 export class PizzIntIndicator {
@@ -250,7 +250,7 @@ export class PizzIntIndicator {
     const color = DEFCON_COLORS[this.status.defconLevel] || '#888';
     defconEl.textContent = `DEFCON ${this.status.defconLevel}`;
     defconEl.style.background = color;
-    defconEl.style.color = this.status.defconLevel === 4 ? '#fff' : '#000';
+    defconEl.style.color = this.status.defconLevel <= 3 ? '#000' : '#fff';
 
     scoreEl.textContent = `${this.status.aggregateActivity}%`;
     labelEl.textContent = this.status.defconLabel;
@@ -317,5 +317,13 @@ export class PizzIntIndicator {
 
   public getElement(): HTMLElement {
     return this.element;
+  }
+
+  public hide(): void {
+    this.element.style.display = 'none';
+  }
+
+  public show(): void {
+    this.element.style.display = '';
   }
 }
