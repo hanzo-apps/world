@@ -61,6 +61,7 @@ const ALLOWED_DOMAINS = [
   'www.brookings.edu',
   'layoffs.fyi',
   'www.defensenews.com',
+  'www.foreignaffairs.com',
 ];
 
 export default async function handler(req) {
