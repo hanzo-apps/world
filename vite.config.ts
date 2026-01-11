@@ -7,6 +7,16 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'd3': ['d3'],
+          'topojson': ['topojson-client'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     open: true,
