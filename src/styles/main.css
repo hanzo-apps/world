@@ -451,6 +451,26 @@ body {
   color: white;
 }
 
+.live-mute-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.live-mute-btn:hover {
+  color: var(--text);
+}
+
+.live-mute-btn.unmuted {
+  color: var(--green);
+}
+
 #live-news .panel-content {
   padding: 0;
   flex: 1;
