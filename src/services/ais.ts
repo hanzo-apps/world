@@ -46,6 +46,7 @@ let socket: WebSocket | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 let isConnected = false;
+let isConnecting = false;
 let messageCount = 0;
 
 // Callback system for external listeners (e.g., military vessel tracking)
@@ -176,16 +177,19 @@ function handleMessage(event: MessageEvent): void {
 }
 
 function connect(): void {
+  if (isConnecting || isConnected) return;
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
 
+  isConnecting = true;
   console.log('[Shipping] Opening WebSocket to:', AISSTREAM_URL);
   try {
     socket = new WebSocket(AISSTREAM_URL);
-    console.log('[Shipping] WebSocket created, readyState:', socket.readyState);
 
     socket.onopen = () => {
       console.log('[Shipping] Connected to relay');
       isConnected = true;
+      isConnecting = false;
+      ensureCleanupInterval();
     };
 
     socket.onmessage = handleMessage;
@@ -193,29 +197,30 @@ function connect(): void {
     socket.onclose = (event) => {
       console.log('[Shipping] Disconnected:', event.code, event.reason || 'No reason');
       isConnected = false;
+      isConnecting = false;
+      socket = null;
       scheduleReconnect();
     };
 
     socket.onerror = (error) => {
       console.error('[Shipping] WebSocket error:', error);
       isConnected = false;
+      isConnecting = false;
       if (socket) {
         socket.close();
         socket = null;
       }
-      scheduleReconnect();
     };
-
-    // Check readyState after a short delay
-    setTimeout(() => {
-      if (socket) {
-        const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
-        console.log('[Shipping] WebSocket state after 3s:', states[socket.readyState]);
-      }
-    }, 3000);
   } catch (e) {
     console.error('[Shipping] Failed to connect:', e);
+    isConnecting = false;
     scheduleReconnect();
+  }
+}
+
+function ensureCleanupInterval(): void {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(cleanupOldData, 60 * 1000);
   }
 }
 
@@ -405,17 +410,10 @@ function calculateDensityZones(): AisDensityZone[] {
 export function initAisStream(): void {
   console.log('[Shipping] Initializing AIS stream...');
   connect();
-
-  if (!cleanupInterval) {
-    cleanupInterval = setInterval(cleanupOldData, 60 * 1000);
-  }
+  ensureCleanupInterval();
 }
 
 export function disconnectAisStream(): void {
-  if (socket) {
-    socket.close();
-    socket = null;
-  }
   if (reconnectTimeout) {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
@@ -424,7 +422,12 @@ export function disconnectAisStream(): void {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
   isConnected = false;
+  isConnecting = false;
 }
 
 export function getAisStatus(): { connected: boolean; vessels: number; messages: number } {
@@ -437,9 +440,10 @@ export function getAisStatus(): { connected: boolean; vessels: number; messages:
 
 export async function fetchAisSignals(): Promise<{ disruptions: AisDisruptionEvent[]; density: AisDensityZone[] }> {
   // Initialize stream if not already running
-  if (!socket) {
+  if (!socket && !isConnecting) {
     connect();
   }
+  ensureCleanupInterval();
 
   // Return aggregated data from in-memory tracking
   cleanupOldData();

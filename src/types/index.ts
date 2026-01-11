@@ -566,6 +566,7 @@ export interface MilitaryVessel {
   mmsi: string;
   name: string;
   vesselType: MilitaryVesselType;
+  aisShipType?: string;        // Human-readable AIS ship type (Cargo, Tanker, etc.)
   hullNumber?: string;         // E.g., "DDG-51", "CVN-78"
   operator: MilitaryOperator | 'other';
   operatorCountry: string;

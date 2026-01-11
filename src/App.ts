@@ -59,6 +59,7 @@ export class App {
   private latestClusters: ClusteredEvent[] = [];
   private isPlaybackMode = false;
   private initialUrlState: ParsedMapUrlState | null = null;
+  private inFlight: Set<string> = new Set();
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -1119,8 +1120,6 @@ export class App {
   }
 
   private async loadNews(): Promise<void> {
-    this.allNews = [];
-
     const categories = [
       { key: 'politics', feeds: FEEDS.politics },
       { key: 'tech', feeds: FEEDS.tech },
@@ -1133,22 +1132,39 @@ export class App {
       { key: 'thinktanks', feeds: FEEDS.thinktanks },
     ];
 
-    for (const { key, feeds } of categories) {
-      const items = await this.loadNewsCategory(key, feeds);
-      this.allNews.push(...items);
+    // Fetch all categories in parallel
+    const categoryResults = await Promise.allSettled(
+      categories.map(({ key, feeds }) => this.loadNewsCategory(key, feeds))
+    );
+
+    // Collect successful results
+    const collectedNews: NewsItem[] = [];
+    categoryResults.forEach((result, idx) => {
+      if (result.status === 'fulfilled') {
+        collectedNews.push(...result.value);
+      } else {
+        console.error(`[App] News category ${categories[idx]?.key} failed:`, result.reason);
+      }
+    });
+
+    // Intel (uses different source) - run in parallel with category processing
+    const intelResult = await Promise.allSettled([fetchCategoryFeeds(INTEL_SOURCES)]);
+    if (intelResult[0]?.status === 'fulfilled') {
+      const intel = intelResult[0].value;
+      const intelPanel = this.newsPanels['intel'];
+      if (intelPanel) {
+        intelPanel.renderNews(intel);
+        const baseline = await updateBaseline('news:intel', intel.length);
+        const deviation = calculateDeviation(intel.length, baseline);
+        intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+      }
+      this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
+      collectedNews.push(...intel);
+    } else {
+      console.error('[App] Intel feed failed:', intelResult[0]?.reason);
     }
 
-    // Intel (uses different source)
-    const intel = await fetchCategoryFeeds(INTEL_SOURCES);
-    const intelPanel = this.newsPanels['intel'];
-    if (intelPanel) {
-      intelPanel.renderNews(intel);
-      const baseline = await updateBaseline('news:intel', intel.length);
-      const deviation = calculateDeviation(intel.length, baseline);
-      intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
-    }
-    this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
-    this.allNews.push(...intel);
+    this.allNews = collectedNews;
 
     // Update map hotspots
     this.map?.updateHotspotActivity(this.allNews);
@@ -1478,39 +1494,50 @@ export class App {
     }
   }
 
+  private scheduleRefresh(
+    name: string,
+    fn: () => Promise<void>,
+    intervalMs: number,
+    condition?: () => boolean
+  ): void {
+    const run = async () => {
+      if (condition && !condition()) {
+        setTimeout(run, intervalMs);
+        return;
+      }
+      if (this.inFlight.has(name)) {
+        setTimeout(run, intervalMs);
+        return;
+      }
+      this.inFlight.add(name);
+      try {
+        await fn();
+      } catch (e) {
+        console.error(`[App] Refresh ${name} failed:`, e);
+      } finally {
+        this.inFlight.delete(name);
+        setTimeout(run, intervalMs);
+      }
+    };
+    setTimeout(run, intervalMs);
+  }
+
   private setupRefreshIntervals(): void {
     // Always refresh news, markets, predictions, pizzint
-    setInterval(() => this.loadNews(), REFRESH_INTERVALS.feeds);
-    setInterval(() => this.loadMarkets(), REFRESH_INTERVALS.markets);
-    setInterval(() => this.loadPredictions(), REFRESH_INTERVALS.predictions);
-    setInterval(() => this.loadPizzInt(), 10 * 60 * 1000); // 10 minutes
+    this.scheduleRefresh('news', () => this.loadNews(), REFRESH_INTERVALS.feeds);
+    this.scheduleRefresh('markets', () => this.loadMarkets(), REFRESH_INTERVALS.markets);
+    this.scheduleRefresh('predictions', () => this.loadPredictions(), REFRESH_INTERVALS.predictions);
+    this.scheduleRefresh('pizzint', () => this.loadPizzInt(), 10 * 60 * 1000);
 
     // Only refresh layer data if layer is enabled
-    setInterval(() => {
-      if (this.mapLayers.earthquakes) this.loadEarthquakes();
-    }, 5 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.weather) this.loadWeatherAlerts();
-    }, 10 * 60 * 1000);
-    setInterval(() => this.loadFredData(), 30 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.outages) this.loadOutages();
-    }, 60 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.ais) this.loadAisSignals();
-    }, REFRESH_INTERVALS.ais);
-    setInterval(() => {
-      if (this.mapLayers.cables) this.loadCableActivity();
-    }, 30 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.protests) this.loadProtests();
-    }, 15 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.flights) this.loadFlightDelays();
-    }, 10 * 60 * 1000);
-    // Military tracking - refresh every 5 minutes (OpenSky rate limits)
-    setInterval(() => {
-      if (this.mapLayers.military) this.loadMilitary();
-    }, 5 * 60 * 1000);
+    this.scheduleRefresh('earthquakes', () => this.loadEarthquakes(), 5 * 60 * 1000, () => this.mapLayers.earthquakes);
+    this.scheduleRefresh('weather', () => this.loadWeatherAlerts(), 10 * 60 * 1000, () => this.mapLayers.weather);
+    this.scheduleRefresh('fred', () => this.loadFredData(), 30 * 60 * 1000);
+    this.scheduleRefresh('outages', () => this.loadOutages(), 60 * 60 * 1000, () => this.mapLayers.outages);
+    this.scheduleRefresh('ais', () => this.loadAisSignals(), REFRESH_INTERVALS.ais, () => this.mapLayers.ais);
+    this.scheduleRefresh('cables', () => this.loadCableActivity(), 30 * 60 * 1000, () => this.mapLayers.cables);
+    this.scheduleRefresh('protests', () => this.loadProtests(), 15 * 60 * 1000, () => this.mapLayers.protests);
+    this.scheduleRefresh('flights', () => this.loadFlightDelays(), 10 * 60 * 1000, () => this.mapLayers.flights);
+    this.scheduleRefresh('military', () => this.loadMilitary(), 5 * 60 * 1000, () => this.mapLayers.military);
   }
 }
