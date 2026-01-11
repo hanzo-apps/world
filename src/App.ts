@@ -1016,27 +1016,35 @@ export class App {
   }
 
   private async loadAllData(): Promise<void> {
-    const tasks: Promise<void>[] = [
-      this.loadNews(),
-      this.loadMarkets(),
-      this.loadPredictions(),
-      this.loadPizzInt(),
-      this.loadFredData(),
+    const tasks: Array<{ name: string; task: Promise<void> }> = [
+      { name: 'news', task: this.loadNews() },
+      { name: 'markets', task: this.loadMarkets() },
+      { name: 'predictions', task: this.loadPredictions() },
+      { name: 'pizzint', task: this.loadPizzInt() },
+      { name: 'fred', task: this.loadFredData() },
     ];
 
     // Conditionally load based on layer settings
-    if (this.mapLayers.earthquakes) tasks.push(this.loadEarthquakes());
-    if (this.mapLayers.weather) tasks.push(this.loadWeatherAlerts());
-    if (this.mapLayers.outages) tasks.push(this.loadOutages());
-    if (this.mapLayers.ais) tasks.push(this.loadAisSignals());
-    if (this.mapLayers.cables) tasks.push(this.loadCableActivity());
-    if (this.mapLayers.protests) tasks.push(this.loadProtests());
-    if (this.mapLayers.flights) tasks.push(this.loadFlightDelays());
-    if (this.mapLayers.military) tasks.push(this.loadMilitary());
+    if (this.mapLayers.earthquakes) tasks.push({ name: 'earthquakes', task: this.loadEarthquakes() });
+    if (this.mapLayers.weather) tasks.push({ name: 'weather', task: this.loadWeatherAlerts() });
+    if (this.mapLayers.outages) tasks.push({ name: 'outages', task: this.loadOutages() });
+    if (this.mapLayers.ais) tasks.push({ name: 'ais', task: this.loadAisSignals() });
+    if (this.mapLayers.cables) tasks.push({ name: 'cables', task: this.loadCableActivity() });
+    if (this.mapLayers.protests) tasks.push({ name: 'protests', task: this.loadProtests() });
+    if (this.mapLayers.flights) tasks.push({ name: 'flights', task: this.loadFlightDelays() });
+    if (this.mapLayers.military) tasks.push({ name: 'military', task: this.loadMilitary() });
 
-    await Promise.all(tasks);
+    // Use allSettled to ensure all tasks complete and search index always updates
+    const results = await Promise.allSettled(tasks.map(t => t.task));
 
-    // Update search index after all data loads
+    // Log any failures but don't block
+    results.forEach((result, idx) => {
+      if (result.status === 'rejected') {
+        console.error(`[App] ${tasks[idx]?.name} load failed:`, result.reason);
+      }
+    });
+
+    // Always update search index regardless of individual task failures
     this.updateSearchIndex();
   }
 
