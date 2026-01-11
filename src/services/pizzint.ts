@@ -94,9 +94,17 @@ export async function fetchPizzIntStatus(): Promise<PizzIntStatus> {
     }));
 
     const openLocations = locations.filter(l => !l.is_closed_now);
-    const aggregateActivity = openLocations.length > 0
-      ? Math.round(openLocations.reduce((sum, l) => sum + l.current_popularity, 0) / openLocations.length)
-      : 0;
+
+    // Use percentage_of_usual (comparison to baseline) as primary metric
+    // This matches PizzINT's calculation which compares current to expected activity
+    // Cap at 100 since values can exceed 100% (e.g., 200% = 2x normal)
+    const locationsWithUsual = locations.filter(l => l.percentage_of_usual !== null && l.percentage_of_usual > 0);
+    const aggregateActivity = locationsWithUsual.length > 0
+      ? Math.round(locationsWithUsual.reduce((sum, l) => sum + Math.min(l.percentage_of_usual ?? 0, 100), 0) / locationsWithUsual.length)
+      : openLocations.length > 0
+        ? Math.round(openLocations.reduce((sum, l) => sum + l.current_popularity, 0) / openLocations.length)
+        : 0;
+
     const activeSpikes = locations.filter(l => l.is_spike).length;
     const freshness = locations.some(l => l.data_freshness === 'fresh') ? 'fresh' : 'stale';
 
