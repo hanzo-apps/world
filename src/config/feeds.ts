@@ -27,7 +27,6 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Al Jazeera': 2,
   'Financial Times': 2,
   'Politico': 2,
-  'The Telegraph': 2,
   'Reuters World': 1,
   'Reuters Business': 1,
   'OpenAI News': 3,
@@ -58,7 +57,7 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Ars Technica': 3,
   'Brookings': 3,
   'CSIS': 3,
-  'CFR': 3,
+  'Foreign Affairs': 3,
   'Layoffs.fyi': 3,
 
   // Tier 4 - Aggregators
@@ -93,13 +92,13 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'Defense One': 'intel', 'Breaking Defense': 'intel', 'The War Zone': 'intel',
   'Defense News': 'intel', 'Janes': 'intel', 'Bellingcat': 'intel', 'Krebs Security': 'intel',
   'Foreign Policy': 'intel', 'The Diplomat': 'intel',
-  'Brookings': 'intel', 'CSIS': 'intel', 'CFR': 'intel',
+  'Brookings': 'intel', 'CSIS': 'intel', 'Foreign Affairs': 'intel',
 
   // Mainstream outlets
   'BBC World': 'mainstream', 'BBC Middle East': 'mainstream',
   'Guardian World': 'mainstream', 'Guardian ME': 'mainstream',
   'NPR News': 'mainstream', 'Al Jazeera': 'mainstream',
-  'CNN Middle East': 'mainstream', 'Politico': 'mainstream', 'The Telegraph': 'mainstream',
+  'CNN Middle East': 'mainstream', 'Politico': 'mainstream',
 
   // Market/Finance
   'CNBC': 'market', 'MarketWatch': 'market', 'Yahoo Finance': 'market',
@@ -124,7 +123,6 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'AP News', url: rss('https://news.google.com/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Reuters World', url: rss('https://news.google.com/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Politico', url: rss('https://www.politico.com/rss/politicopicks.xml') },
-    { name: 'The Telegraph', url: rss('https://www.telegraph.co.uk/news/rss.xml') },
     { name: 'The Diplomat', url: rss('https://thediplomat.com/feed/') },
   ],
   middleeast: [
@@ -172,9 +170,9 @@ export const FEEDS: Record<string, Feed[]> = {
   ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
-    { name: 'Brookings', url: rss('https://www.brookings.edu/feed/') },
+    { name: 'Brookings', url: rss('https://www.brookings.edu/feeds/rss/research/') },
     { name: 'CSIS', url: rss('https://www.csis.org/analysis/feed') },
-    { name: 'CFR', url: rss('https://www.cfr.org/rss/publications.xml') },
+    { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml') },
   ],
 };
 
