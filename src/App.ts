@@ -8,6 +8,7 @@ import {
   REFRESH_INTERVALS,
   DEFAULT_PANELS,
   DEFAULT_MAP_LAYERS,
+  MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions } from '@/services';
@@ -38,6 +39,13 @@ import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
+// Helper to detect mobile devices
+function isMobileDevice(): boolean {
+  const isMobileWidth = window.innerWidth < 768;
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  return isMobileWidth || isTouchDevice;
+}
+
 export class App {
   private container: HTMLElement;
   private map: MapComponent | null = null;
@@ -60,18 +68,23 @@ export class App {
   private isPlaybackMode = false;
   private initialUrlState: ParsedMapUrlState | null = null;
   private inFlight: Set<string> = new Set();
+  private isMobile: boolean;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
     if (!el) throw new Error(`Container ${containerId} not found`);
     this.container = el;
 
+    this.isMobile = isMobileDevice();
     this.monitors = loadFromStorage<Monitor[]>(STORAGE_KEYS.monitors, []);
     this.panelSettings = loadFromStorage<Record<string, PanelConfig>>(
       STORAGE_KEYS.panels,
       DEFAULT_PANELS
     );
-    this.mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, DEFAULT_MAP_LAYERS);
+
+    // Use mobile-specific defaults on first load (no saved layers)
+    const defaultLayers = this.isMobile ? MOBILE_DEFAULT_MAP_LAYERS : DEFAULT_MAP_LAYERS;
+    this.mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers);
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
     if (this.initialUrlState.layers) {
       this.mapLayers = this.initialUrlState.layers;
@@ -561,11 +574,12 @@ export class App {
     const panelsGrid = document.getElementById('panelsGrid')!;
 
     // Initialize map in the map section
+    // Default to MENA view on mobile for better focus
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.map = new MapComponent(mapContainer, {
-      zoom: 1.5,
+      zoom: this.isMobile ? 2.5 : 1.5,
       pan: { x: 0, y: 0 },
-      view: 'global',
+      view: this.isMobile ? 'mena' : 'global',
       layers: this.mapLayers,
       timeRange: '7d',
     });
@@ -678,6 +692,12 @@ export class App {
 
     this.applyPanelSettings();
     this.applyInitialUrlState();
+
+    // Set correct view button state (especially for mobile defaults)
+    const currentView = this.map?.getState().view;
+    if (currentView) {
+      this.setActiveViewButton(currentView);
+    }
   }
 
   private applyInitialUrlState(): void {

@@ -33,11 +33,21 @@ export class MapPopup {
     const content = this.renderContent(data);
     this.popup.innerHTML = content;
 
-    // Position popup
-    const maxX = this.container.clientWidth - 400;
-    const maxY = this.container.clientHeight - 300;
-    this.popup.style.left = `${Math.min(data.x + 20, maxX)}px`;
-    this.popup.style.top = `${Math.min(data.y - 20, maxY)}px`;
+    // Detect mobile/touch devices
+    const isMobile = window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
+
+    if (isMobile) {
+      // On mobile, center the popup horizontally and position in lower half
+      this.popup.style.left = '50%';
+      this.popup.style.transform = 'translateX(-50%)';
+      this.popup.style.top = `${Math.max(60, Math.min(data.y, this.container.clientHeight * 0.4))}px`;
+    } else {
+      // Desktop: position near click with bounds checking
+      const maxX = this.container.clientWidth - 400;
+      const maxY = this.container.clientHeight - 300;
+      this.popup.style.left = `${Math.min(data.x + 20, maxX)}px`;
+      this.popup.style.top = `${Math.min(data.y - 20, maxY)}px`;
+    }
 
     this.container.appendChild(this.popup);
 
