@@ -1,5 +1,8 @@
 import type { Feed } from '@/types';
 
+// Helper to create RSS proxy URL
+const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+
 // Source tier system for prioritization (lower = more authoritative)
 // Tier 1: Wire services - fastest, most reliable breaking news
 // Tier 2: Major outlets - high-quality journalism
@@ -104,72 +107,71 @@ export function getSourceType(sourceName: string): SourceType {
 
 export const FEEDS: Record<string, Feed[]> = {
   politics: [
-    { name: 'BBC World', url: '/rss/bbc/news/world/rss.xml' },
-    { name: 'NPR News', url: '/rss/npr/1001/rss.xml' },
-    { name: 'Guardian World', url: '/rss/guardian/world/rss' },
-    { name: 'AP News', url: '/rss/googlenews/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'The Diplomat', url: '/rss/diplomat/feed/' },
-    { name: 'Reuters World', url: '/rss/googlenews/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'BBC World', url: rss('https://feeds.bbci.co.uk/news/world/rss.xml') },
+    { name: 'NPR News', url: rss('https://feeds.npr.org/1001/rss.xml') },
+    { name: 'Guardian World', url: rss('https://www.theguardian.com/world/rss') },
+    { name: 'AP News', url: rss('https://news.google.com/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'The Diplomat', url: rss('https://thediplomat.com/feed/') },
+    { name: 'Reuters World', url: rss('https://news.google.com/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en') },
   ],
   middleeast: [
-    { name: 'BBC Middle East', url: '/rss/bbc/news/world/middle_east/rss.xml' },
-    { name: 'Al Jazeera', url: '/rss/aljazeera/xml/rss/all.xml' },
-    { name: 'Guardian ME', url: '/rss/guardian/world/middleeast/rss' },
-    { name: 'CNN Middle East', url: '/rss/cnn/rss/edition_meast.rss' },
+    { name: 'BBC Middle East', url: rss('https://feeds.bbci.co.uk/news/world/middle_east/rss.xml') },
+    { name: 'Al Jazeera', url: rss('https://www.aljazeera.com/xml/rss/all.xml') },
+    { name: 'Guardian ME', url: rss('https://www.theguardian.com/world/middleeast/rss') },
+    { name: 'CNN Middle East', url: rss('https://rss.cnn.com/rss/edition_meast.rss') },
   ],
   tech: [
-    { name: 'Hacker News', url: '/rss/hn/frontpage' },
-    { name: 'Ars Technica', url: '/rss/arstechnica/arstechnica/technology-lab' },
-    { name: 'The Verge', url: '/rss/verge/rss/index.xml' },
-    { name: 'MIT Tech Review', url: '/rss/techreview/feed/' },
+    { name: 'Hacker News', url: rss('https://hnrss.org/frontpage') },
+    { name: 'Ars Technica', url: rss('https://feeds.arstechnica.com/arstechnica/technology-lab') },
+    { name: 'The Verge', url: rss('https://www.theverge.com/rss/index.xml') },
+    { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
   ],
   ai: [
-    { name: 'AI News', url: '/rss/googlenews/rss/search?q=artificial+intelligence+AI+news&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'Hugging Face', url: '/rss/huggingface/blog/feed.xml' },
-    { name: 'ArXiv AI', url: '/rss/arxiv/rss/cs.AI' },
-    { name: 'VentureBeat AI', url: '/rss/venturebeat/feed/' },
-    { name: 'OpenAI News', url: '/rss/openai/news/rss.xml' },
+    { name: 'AI News', url: rss('https://news.google.com/rss/search?q=artificial+intelligence+AI+news&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Hugging Face', url: rss('https://huggingface.co/blog/feed.xml') },
+    { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
+    { name: 'VentureBeat AI', url: rss('https://venturebeat.com/feed/') },
+    { name: 'OpenAI News', url: rss('https://openai.com/news/rss.xml') },
   ],
   finance: [
-    { name: 'CNBC', url: '/rss/cnbc/id/100003114/device/rss/rss.html' },
-    { name: 'MarketWatch', url: '/rss/marketwatch/marketwatch/topstories' },
-    { name: 'Yahoo Finance', url: '/rss/yahoonews/news/rssindex' },
-    { name: 'Financial Times', url: '/rss/ft/rss/home' },
-    { name: 'Reuters Business', url: '/rss/googlenews/rss/search?q=site:reuters.com+business+markets&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'CNBC', url: rss('https://www.cnbc.com/id/100003114/device/rss/rss.html') },
+    { name: 'MarketWatch', url: rss('https://feeds.marketwatch.com/marketwatch/topstories') },
+    { name: 'Yahoo Finance', url: rss('https://finance.yahoo.com/news/rssindex') },
+    { name: 'Financial Times', url: rss('https://www.ft.com/rss/home') },
+    { name: 'Reuters Business', url: rss('https://news.google.com/rss/search?q=site:reuters.com+business+markets&hl=en-US&gl=US&ceid=US:en') },
   ],
   gov: [
-    // Many gov sites deprecated RSS - use Google News aggregation
-    { name: 'White House', url: '/rss/googlenews/rss/search?q=site:whitehouse.gov&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'State Dept', url: '/rss/googlenews/rss/search?q=site:state.gov+OR+"State+Department"&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'Pentagon', url: '/rss/googlenews/rss/search?q=site:defense.gov+OR+Pentagon&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'Treasury', url: '/rss/googlenews/rss/search?q=site:treasury.gov+OR+"Treasury+Department"&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'DOJ', url: '/rss/googlenews/rss/search?q=site:justice.gov+OR+"Justice+Department"+DOJ&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'Federal Reserve', url: '/rss/fedreserve/feeds/press_all.xml' },
-    { name: 'SEC', url: '/rss/sec/news/pressreleases.rss' },
-    { name: 'CDC', url: '/rss/googlenews/rss/search?q=site:cdc.gov+OR+CDC+health&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'FEMA', url: '/rss/googlenews/rss/search?q=site:fema.gov+OR+FEMA+emergency&hl=en-US&gl=US&ceid=US:en' },
-    { name: 'DHS', url: '/rss/googlenews/rss/search?q=site:dhs.gov+OR+"Homeland+Security"&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'White House', url: rss('https://news.google.com/rss/search?q=site:whitehouse.gov&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'State Dept', url: rss('https://news.google.com/rss/search?q=site:state.gov+OR+"State+Department"&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Pentagon', url: rss('https://news.google.com/rss/search?q=site:defense.gov+OR+Pentagon&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Treasury', url: rss('https://news.google.com/rss/search?q=site:treasury.gov+OR+"Treasury+Department"&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'DOJ', url: rss('https://news.google.com/rss/search?q=site:justice.gov+OR+"Justice+Department"+DOJ&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Federal Reserve', url: rss('https://www.federalreserve.gov/feeds/press_all.xml') },
+    { name: 'SEC', url: rss('https://www.sec.gov/news/pressreleases.rss') },
+    { name: 'CDC', url: rss('https://news.google.com/rss/search?q=site:cdc.gov+OR+CDC+health&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'FEMA', url: rss('https://news.google.com/rss/search?q=site:fema.gov+OR+FEMA+emergency&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'DHS', url: rss('https://news.google.com/rss/search?q=site:dhs.gov+OR+"Homeland+Security"&hl=en-US&gl=US&ceid=US:en') },
   ],
   layoffs: [
-    { name: 'TechCrunch Layoffs', url: '/rss/techcrunch/tag/layoffs/feed/' },
-    { name: 'Layoffs News', url: '/rss/googlenews/rss/search?q=tech+layoffs+2026+job+cuts&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
+    { name: 'Layoffs News', url: rss('https://news.google.com/rss/search?q=tech+layoffs+2026+job+cuts&hl=en-US&gl=US&ceid=US:en') },
   ],
   congress: [
-    { name: 'Congress Trades', url: '/rss/googlenews/rss/search?q=congress+stock+trading+pelosi+tuberville&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'Congress Trades', url: rss('https://news.google.com/rss/search?q=congress+stock+trading+pelosi+tuberville&hl=en-US&gl=US&ceid=US:en') },
   ],
   thinktanks: [
-    { name: 'Foreign Policy', url: '/rss/foreignpolicy/feed/' },
-    { name: 'Think Tank News', url: '/rss/googlenews/rss/search?q=brookings+CSIS+CFR+analysis&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
+    { name: 'Think Tank News', url: rss('https://news.google.com/rss/search?q=brookings+CSIS+CFR+analysis&hl=en-US&gl=US&ceid=US:en') },
   ],
 };
 
 export const INTEL_SOURCES: Feed[] = [
-  { name: 'Defense One', url: '/rss/defenseone/rss/all/', type: 'defense' },
-  { name: 'Breaking Defense', url: '/rss/breakingdefense/feed/', type: 'defense' },
-  { name: 'The War Zone', url: '/rss/googlenews/rss/search?q=site:thedrive.com/the-war-zone&hl=en-US&gl=US&ceid=US:en', type: 'defense' },
-  { name: 'Defense News', url: '/rss/googlenews/rss/search?q=defense+military+pentagon&hl=en-US&gl=US&ceid=US:en', type: 'defense' },
-  { name: 'Bellingcat', url: '/rss/bellingcat/feed/', type: 'osint' },
-  { name: 'Krebs Security', url: '/rss/krebs/feed/', type: 'cyber' },
+  { name: 'Defense One', url: rss('https://www.defenseone.com/rss/all/'), type: 'defense' },
+  { name: 'Breaking Defense', url: rss('https://breakingdefense.com/feed/'), type: 'defense' },
+  { name: 'The War Zone', url: rss('https://news.google.com/rss/search?q=site:thedrive.com/the-war-zone&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
+  { name: 'Defense News', url: rss('https://news.google.com/rss/search?q=defense+military+pentagon&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
+  { name: 'Bellingcat', url: rss('https://www.bellingcat.com/feed/'), type: 'osint' },
+  { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/'), type: 'cyber' },
 ];
 
 export const ALERT_KEYWORDS = [
