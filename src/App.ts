@@ -142,11 +142,21 @@ export class App {
         fetchPizzIntStatus(),
         fetchGdeltTensions()
       ]);
+
+      // Hide indicator if no valid data (API returned default/empty)
+      if (status.locationsMonitored === 0) {
+        this.pizzintIndicator?.hide();
+        this.statusPanel?.updateApi('PizzINT', { status: 'error' });
+        return;
+      }
+
+      this.pizzintIndicator?.show();
       this.pizzintIndicator?.updateStatus(status);
       this.pizzintIndicator?.updateTensions(tensions);
       this.statusPanel?.updateApi('PizzINT', { status: 'ok' });
     } catch (error) {
       console.error('[App] PizzINT load failed:', error);
+      this.pizzintIndicator?.hide();
       this.statusPanel?.updateApi('PizzINT', { status: 'error' });
     }
   }

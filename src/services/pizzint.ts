@@ -19,9 +19,7 @@ interface PizzIntApiResponse {
 }
 
 interface GdeltApiResponse {
-  [key: string]: {
-    data: Array<{ date: string; value: number }>;
-  };
+  [key: string]: Array<{ t: number; v: number }>;
 }
 
 const pizzintBreaker = createCircuitBreaker<PizzIntStatus>({
@@ -150,12 +148,12 @@ export async function fetchGdeltTensions(): Promise<GdeltTensionPair[]> {
     const data: GdeltApiResponse = await response.json();
 
     return TENSION_PAIRS.map(pair => {
-      const pairData = data[pair.id]?.data || [];
+      const pairData = data[pair.id] || [];
       const recent = pairData.slice(-7);
       const older = pairData.slice(-14, -7);
 
-      const recentAvg = recent.length > 0 ? recent.reduce((s, d) => s + d.value, 0) / recent.length : 0;
-      const olderAvg = older.length > 0 ? older.reduce((s, d) => s + d.value, 0) / older.length : recentAvg;
+      const recentAvg = recent.length > 0 ? recent.reduce((s, d) => s + d.v, 0) / recent.length : 0;
+      const olderAvg = older.length > 0 ? older.reduce((s, d) => s + d.v, 0) / older.length : recentAvg;
 
       const changePercent = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
       const trend = changePercent > 5 ? 'rising' : changePercent < -5 ? 'falling' : 'stable';
