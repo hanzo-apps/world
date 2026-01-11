@@ -231,6 +231,95 @@ This creates a dynamic "heat map" of global attention based on live news flow.
 
 ---
 
+## Pentagon Pizza Index (PizzINT)
+
+The dashboard integrates real-time foot traffic data from strategic locations near government and military facilities. This "Pizza Index" concept—tracking late-night activity spikes at restaurants near the Pentagon, Langley, and other facilities—provides an unconventional indicator of crisis activity.
+
+### How It Works
+
+The system aggregates percentage-of-usual metrics from monitored locations:
+
+1. **Locations**: Fast food, pizza shops, and convenience stores near Pentagon, CIA, NSA, State Dept, and other facilities
+2. **Aggregation**: Activity percentages are averaged, capped at 100%
+3. **Spike Detection**: Locations exceeding their baseline are flagged
+
+### DEFCON-Style Alerting
+
+Aggregate activity maps to a 5-level readiness scale:
+
+| Level | Threshold | Label | Meaning |
+|-------|-----------|-------|---------|
+| **DEFCON 1** | ≥90% | COCKED PISTOL | Maximum readiness; crisis response active |
+| **DEFCON 2** | ≥75% | FAST PACE | High activity; significant event underway |
+| **DEFCON 3** | ≥50% | ROUND HOUSE | Elevated; above-normal operations |
+| **DEFCON 4** | ≥25% | DOUBLE TAKE | Increased vigilance |
+| **DEFCON 5** | <25% | FADE OUT | Normal peacetime operations |
+
+### GDELT Tension Pairs
+
+The indicator also displays geopolitical tension scores from GDELT (Global Database of Events, Language, and Tone):
+
+| Pair | Monitored Relationship |
+|------|----------------------|
+| USA ↔ Russia | Primary nuclear peer adversary |
+| USA ↔ China | Economic and military competition |
+| USA ↔ Iran | Middle East regional tensions |
+| Israel ↔ Iran | Direct conflict potential |
+| China ↔ Taiwan | Cross-strait relations |
+| Russia ↔ Ukraine | Active conflict zone |
+
+Each pair shows:
+- **Current tension score** (GDELT's normalized metric)
+- **7-day trend** (rising, falling, stable)
+- **Percentage change** from previous period
+
+This provides context for the activity levels—a spike at Pentagon locations during a rising China-Taiwan tension score carries different weight than during a quiet period.
+
+---
+
+## Related Assets
+
+News clusters are automatically enriched with nearby critical infrastructure. When a story mentions a geographic region, the system identifies relevant assets within 600km, providing immediate operational context.
+
+### Asset Types
+
+| Type | Source | Examples |
+|------|--------|----------|
+| **Pipelines** | 88 global routes | Nord Stream, Keystone, Trans-Siberian |
+| **Undersea Cables** | 55 major cables | TAT-14, SEA-ME-WE, Pacific Crossing |
+| **AI Datacenters** | 111 clusters (≥10k GPUs) | Azure East US, GCP Council Bluffs |
+| **Military Bases** | 220+ installations | Ramstein, Diego Garcia, Guam |
+| **Nuclear Facilities** | 100+ sites | Power plants, weapons labs, enrichment |
+
+### Location Inference
+
+The system infers the geographic focus of news stories through:
+
+1. **Keyword matching**: Headlines are scanned against hotspot keyword lists (e.g., "Taiwan" → Taiwan Strait hotspot)
+2. **Confidence scoring**: Multiple keyword matches increase location confidence
+3. **Fallback to conflicts**: If no hotspot matches, active conflict zones are checked
+
+### Distance Calculation
+
+Assets are ranked by Haversine distance from the inferred location:
+
+```
+d = 2r × arcsin(√(sin²(Δφ/2) + cos(φ₁) × cos(φ₂) × sin²(Δλ/2)))
+```
+
+Up to 3 assets per type are displayed, sorted by proximity.
+
+### Example Context
+
+A news cluster about "pipeline explosion in Germany" would show:
+- **Pipelines**: Nord Stream (23km), Yamal-Europe (156km)
+- **Cables**: TAT-14 landing (89km)
+- **Bases**: Ramstein (234km)
+
+Clicking an asset zooms the map to its location and displays detailed information.
+
+---
+
 ## Custom Monitors
 
 Create personalized keyword alerts that scan all incoming news:
@@ -241,6 +330,39 @@ Create personalized keyword alerts that scan all incoming news:
 4. Matching articles in clusters inherit the monitor color
 
 Monitors persist across sessions via LocalStorage.
+
+---
+
+## Activity Tracking
+
+The dashboard highlights newly-arrived items so you can quickly identify what changed since your last look.
+
+### Visual Indicators
+
+| Indicator | Duration | Purpose |
+|-----------|----------|---------|
+| **NEW tag** | 2 minutes | Badge on items that just appeared |
+| **Glow highlight** | 30 seconds | Subtle animation drawing attention |
+| **Panel badge** | Until viewed | Count of new items in collapsed panels |
+
+### Automatic "Seen" Detection
+
+The system uses IntersectionObserver to detect when panels become visible:
+
+- When a panel is >50% visible for >500ms, items are marked as "seen"
+- Scrolling through a panel marks visible items progressively
+- Switching panels resets the "new" state appropriately
+
+### Panel-Specific Tracking
+
+Each panel maintains independent activity state:
+
+- **News**: New clusters since last view
+- **Markets**: Price changes exceeding thresholds
+- **Predictions**: Probability shifts >5%
+- **Earthquakes**: New seismic events
+
+This enables focused monitoring—you can collapse panels you've reviewed and see at a glance which have new activity.
 
 ---
 
@@ -305,6 +427,84 @@ AISStream → WebSocket Relay → Browser
 ```
 
 The connection automatically reconnects on disconnection with a 30-second backoff. When the Ships layer is disabled, the WebSocket disconnects to conserve resources.
+
+---
+
+## Military Tracking
+
+The Military layer provides specialized tracking of military vessels and aircraft, identifying assets by their transponder characteristics and monitoring activity patterns.
+
+### Military Vessel Identification
+
+Vessels are identified as military through multiple methods:
+
+**MMSI Analysis**: Maritime Mobile Service Identity numbers encode the vessel's flag state. The system maintains a mapping of 150+ country codes to identify naval vessels:
+
+| MID Range | Country | Notes |
+|-----------|---------|-------|
+| 338-339 | USA | US Navy, Coast Guard |
+| 273 | Russia | Russian Navy |
+| 412-414 | China | PLAN vessels |
+| 232-235 | UK | Royal Navy |
+| 226-228 | France | Marine Nationale |
+
+**Callsign Patterns**: Known military callsign prefixes (NAVY, GUARD, etc.) provide secondary identification.
+
+### Naval Chokepoint Monitoring
+
+The system monitors 12 critical maritime chokepoints with configurable detection radii:
+
+| Chokepoint | Strategic Significance |
+|------------|----------------------|
+| Strait of Hormuz | Persian Gulf access, oil transit |
+| Suez Canal | Mediterranean-Red Sea link |
+| Strait of Malacca | Pacific-Indian Ocean route |
+| Taiwan Strait | Cross-strait tensions |
+| Bosphorus | Black Sea access |
+| GIUK Gap | North Atlantic submarine route |
+
+When military vessels enter these zones, proximity alerts are generated.
+
+### Naval Base Proximity
+
+Activity near 12 major naval installations is tracked:
+
+- **Norfolk** (USA) - Atlantic Fleet headquarters
+- **Pearl Harbor** (USA) - Pacific Fleet base
+- **Sevastopol** (Russia) - Black Sea Fleet
+- **Qingdao** (China) - North Sea Fleet
+- **Yokosuka** (Japan) - US 7th Fleet
+
+Vessels within 50km of these bases are flagged, enabling detection of unusual activity patterns.
+
+### Aircraft Tracking (OpenSky)
+
+Military aircraft are tracked via the OpenSky Network using ADS-B data:
+
+**Identification Methods**:
+- **Callsign matching**: Known military callsign patterns (RCH, REACH, DUKE, etc.)
+- **ICAO hex ranges**: Military aircraft use assigned hex code blocks by country
+- **Altitude/speed profiles**: Unusual flight characteristics
+
+**Tracked Metrics**:
+- Position history (20-point trails over 5-minute windows)
+- Altitude and ground speed
+- Heading and track
+
+**Activity Detection**:
+- Formations (multiple military aircraft in proximity)
+- Unusual patterns (holding, reconnaissance orbits)
+- Chokepoint transits
+
+### Vessel Position History
+
+The system maintains position trails for tracked vessels:
+
+- **30-point history** per MMSI
+- **10-minute cleanup interval** for stale data
+- **Trail visualization** on map for recent movement
+
+This enables detection of loitering, circling, or other anomalous behavior patterns.
 
 ---
 
@@ -377,6 +577,48 @@ The 30 largest US airports are tracked:
 - Airports frequently affected by weather or congestion
 
 Ground stops are particularly significant—they indicate severe disruption (weather, security, or infrastructure failure) and can cascade across the network.
+
+---
+
+## Security & Input Validation
+
+The dashboard handles untrusted data from dozens of external sources. Defense-in-depth measures prevent injection attacks and API abuse.
+
+### XSS Prevention
+
+All user-visible content is sanitized before DOM insertion:
+
+```typescript
+escapeHtml(str)  // Encodes & < > " ' as HTML entities
+sanitizeUrl(url) // Allows only http/https protocols
+```
+
+This applies to:
+- News headlines and sources (RSS feeds)
+- Search results and highlights
+- Monitor keywords (user input)
+- Map popup content
+- Tension pair labels
+
+The `<mark>` highlighting in search escapes text *before* wrapping matches, preventing injection via crafted search queries.
+
+### Proxy Endpoint Validation
+
+Serverless proxy functions validate and clamp all parameters:
+
+| Endpoint | Validation |
+|----------|------------|
+| `/api/yahoo-finance` | Symbol format `[A-Za-z0-9.^=-]`, max 20 chars |
+| `/api/coingecko` | Coin IDs alphanumeric+hyphen, max 20 IDs |
+| `/api/polymarket` | Order field allowlist, limit clamped 1-100 |
+
+This prevents upstream API abuse and rate limit exhaustion from malformed requests.
+
+### Content Security
+
+- URLs are validated via `URL()` constructor—only `http:` and `https:` protocols are permitted
+- External links use `rel="noopener"` to prevent reverse tabnapping
+- No inline scripts or `eval()`—all code is bundled at build time
 
 ---
 
@@ -455,6 +697,58 @@ This prevents confusion when deploying without full API access.
 
 ---
 
+## Performance Optimizations
+
+The dashboard processes thousands of data points in real-time. Several techniques keep the UI responsive even with heavy data loads.
+
+### Web Worker for Analysis
+
+CPU-intensive operations run in a dedicated Web Worker to avoid blocking the main thread:
+
+| Operation | Complexity | Worker? |
+|-----------|------------|---------|
+| News clustering (Jaccard) | O(n²) | ✅ Yes |
+| Correlation detection | O(n × m) | ✅ Yes |
+| DOM rendering | O(n) | ❌ Main thread |
+
+The worker manager implements:
+- **Lazy initialization**: Worker spawns on first use
+- **10-second ready timeout**: Rejects if worker fails to initialize
+- **30-second request timeout**: Prevents hanging on stuck operations
+- **Automatic cleanup**: Terminates worker on fatal errors
+
+### Virtual Scrolling
+
+Large lists (100+ news items) use virtualized rendering:
+
+**Fixed-Height Mode** (VirtualList):
+- Only renders items visible in viewport + 3-item overscan buffer
+- Element pooling—reuses DOM nodes rather than creating new ones
+- Invisible spacers maintain scroll position without rendering all items
+
+**Variable-Height Mode** (WindowedList):
+- Chunk-based rendering (10 items per chunk)
+- Renders chunks on-scroll with 1-chunk buffer
+- CSS containment for performance isolation
+
+This reduces DOM node count from thousands to ~30, dramatically improving scroll performance.
+
+### Request Deduplication
+
+Identical requests within a short window are deduplicated:
+- Market quotes batch multiple symbols into single API call
+- Concurrent layer toggles don't spawn duplicate fetches
+- `Promise.allSettled` ensures one failing request doesn't block others
+
+### Efficient Data Updates
+
+When refreshing data:
+- **Incremental updates**: Only changed items trigger re-renders
+- **Stale-while-revalidate**: Old data displays while fetch completes
+- **Delta compression**: Baselines store 7-day/30-day deltas, not raw history
+
+---
+
 ## Prediction Market Filtering
 
 The Prediction Markets panel focuses on **geopolitically relevant** markets, filtering out sports and entertainment.
@@ -480,10 +774,26 @@ This ensures the panel shows markets like "Will Russia withdraw from Ukraine?" r
 
 ## Tech Stack
 
-- **Frontend**: TypeScript, Vite
-- **Visualization**: D3.js, TopoJSON
-- **Data**: RSS feeds, REST APIs
-- **Storage**: IndexedDB for snapshots/baselines, LocalStorage for preferences
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Language** | TypeScript 5.x | Type safety across 50+ source files |
+| **Build** | Vite | Fast HMR, optimized production builds |
+| **Visualization** | D3.js + TopoJSON | SVG map rendering, zoom/pan, animations |
+| **Concurrency** | Web Workers | Off-main-thread clustering and correlation |
+| **Networking** | WebSocket + REST | Real-time AIS stream, HTTP for other APIs |
+| **Storage** | IndexedDB | Snapshots, baselines (megabytes of state) |
+| **Preferences** | LocalStorage | User settings, monitors, panel order |
+| **Deployment** | Vercel Edge | Serverless proxies with global distribution |
+
+### Key Libraries
+
+- **D3.js**: Map projection, SVG rendering, zoom behavior
+- **TopoJSON**: Efficient geographic data encoding
+- **DOMPurify pattern**: HTML escaping (custom implementation)
+
+### No External UI Frameworks
+
+The entire UI is hand-crafted DOM manipulation—no React, Vue, or Angular. This keeps the bundle small (~200KB gzipped) and provides fine-grained control over rendering performance.
 
 ## Installation
 
@@ -516,10 +826,12 @@ The dashboard fetches data from various public APIs and data sources:
 | FRED | Economic indicators (Fed data) | No |
 | Polymarket | Prediction markets | No |
 | ACLED | Armed conflict & protest data | Yes (free) |
-| GDELT | News-derived event geolocation | No |
+| GDELT | News-derived event geolocation + tensions | No |
 | FAA NASSTATUS | Airport delay status | No |
 | Cloudflare Radar | Internet outage data | Yes (free) |
 | AISStream | Live vessel positions | Yes (relay) |
+| OpenSky Network | Military aircraft tracking | Yes (free) |
+| PizzINT | Pentagon-area activity metrics | No |
 
 ### Optional API Keys
 
@@ -528,62 +840,79 @@ Some features require API credentials. Without them, the corresponding layer is 
 | Variable | Service | How to Get |
 |----------|---------|------------|
 | `VITE_WS_RELAY_URL` | AIS vessel tracking | Deploy AIS relay or use hosted service |
+| `VITE_OPENSKY_RELAY_URL` | Military aircraft | Deploy OpenSky relay (rate limit bypass) |
 | `CLOUDFLARE_API_TOKEN` | Internet outages | Free Cloudflare account with Radar access |
 | `ACLED_ACCESS_TOKEN` | Protest data (server-side) | Free registration at acleddata.com |
 
-The dashboard functions fully without these keys—affected layers simply don't appear.
+The dashboard functions fully without these keys—affected layers simply don't appear. Core functionality (news, markets, earthquakes, weather) requires no configuration.
 
 ## Project Structure
 
 ```
 src/
-├── App.ts                  # Main application orchestrator
-├── main.ts                 # Entry point
+├── App.ts                    # Main application orchestrator
+├── main.ts                   # Entry point
 ├── components/
-│   ├── Map.ts              # D3.js map with 18 toggleable layers
-│   ├── MapPopup.ts         # Contextual info popups
-│   ├── SearchModal.ts      # Universal search (⌘K)
-│   ├── SignalModal.ts      # Signal intelligence display
-│   ├── EconomicPanel.ts    # FRED economic indicators
-│   ├── NewsPanel.ts        # News feed display
-│   ├── MarketPanel.ts      # Stock/commodity display
-│   ├── MonitorPanel.ts     # Custom keyword monitors
+│   ├── Map.ts                # D3.js map with 20+ toggleable layers
+│   ├── MapPopup.ts           # Contextual info popups
+│   ├── SearchModal.ts        # Universal search (⌘K)
+│   ├── SignalModal.ts        # Signal intelligence display
+│   ├── PizzIntIndicator.ts   # Pentagon Pizza Index display
+│   ├── VirtualList.ts        # Virtual/windowed scrolling
+│   ├── EconomicPanel.ts      # FRED economic indicators
+│   ├── NewsPanel.ts          # News feed with clustering
+│   ├── MarketPanel.ts        # Stock/commodity display
+│   ├── MonitorPanel.ts       # Custom keyword monitors
 │   └── ...
 ├── config/
-│   ├── feeds.ts            # 45+ RSS feeds, source tiers
-│   ├── geo.ts              # Hotspots, conflicts, 55 cables, waterways
-│   ├── pipelines.ts        # 88 oil & gas pipelines
-│   ├── bases-expanded.ts   # 220+ military bases
-│   ├── ai-datacenters.ts   # 313 AI clusters (filtered to 111)
-│   ├── airports.ts         # 30 monitored US airports
-│   ├── irradiators.ts      # IAEA gamma irradiator sites
-│   └── markets.ts          # Stock symbols, sectors
+│   ├── feeds.ts              # 45+ RSS feeds, source tiers
+│   ├── geo.ts                # Hotspots, conflicts, 55 cables, waterways
+│   ├── pipelines.ts          # 88 oil & gas pipelines
+│   ├── bases-expanded.ts     # 220+ military bases
+│   ├── ai-datacenters.ts     # 313 AI clusters (filtered to 111)
+│   ├── airports.ts           # 30 monitored US airports
+│   ├── irradiators.ts        # IAEA gamma irradiator sites
+│   ├── nuclear-facilities.ts # Global nuclear infrastructure
+│   └── markets.ts            # Stock symbols, sectors
 ├── services/
-│   ├── ais.ts              # WebSocket vessel tracking
-│   ├── protests.ts         # ACLED + GDELT integration
-│   ├── flights.ts          # FAA delay parsing
-│   ├── outages.ts          # Cloudflare Radar integration
-│   ├── rss.ts              # RSS parsing with circuit breakers
-│   ├── markets.ts          # Yahoo Finance, CoinGecko
-│   ├── earthquakes.ts      # USGS integration
-│   ├── weather.ts          # NWS alerts
-│   ├── fred.ts             # Federal Reserve data
-│   ├── polymarket.ts       # Prediction markets (filtered)
-│   ├── clustering.ts       # Jaccard similarity clustering
-│   ├── correlation.ts      # Signal detection engine
-│   ├── velocity.ts         # Velocity & sentiment analysis
-│   └── storage.ts          # IndexedDB snapshots & baselines
+│   ├── ais.ts                # WebSocket vessel tracking
+│   ├── military-vessels.ts   # Naval vessel identification
+│   ├── military-flights.ts   # Aircraft tracking via OpenSky
+│   ├── pizzint.ts            # Pentagon Pizza Index + GDELT tensions
+│   ├── protests.ts           # ACLED + GDELT integration
+│   ├── flights.ts            # FAA delay parsing
+│   ├── outages.ts            # Cloudflare Radar integration
+│   ├── rss.ts                # RSS parsing with circuit breakers
+│   ├── markets.ts            # Yahoo Finance, CoinGecko
+│   ├── earthquakes.ts        # USGS integration
+│   ├── weather.ts            # NWS alerts
+│   ├── fred.ts               # Federal Reserve data
+│   ├── polymarket.ts         # Prediction markets (filtered)
+│   ├── clustering.ts         # Jaccard similarity clustering
+│   ├── correlation.ts        # Signal detection engine
+│   ├── velocity.ts           # Velocity & sentiment analysis
+│   ├── related-assets.ts     # Infrastructure near news events
+│   ├── activity-tracker.ts   # New item detection & highlighting
+│   ├── analysis-worker.ts    # Web Worker manager
+│   └── storage.ts            # IndexedDB snapshots & baselines
+├── workers/
+│   └── analysis.worker.ts    # Off-thread clustering & correlation
 ├── utils/
-│   ├── circuit-breaker.ts  # Fault tolerance pattern
-│   └── ...
+│   ├── circuit-breaker.ts    # Fault tolerance pattern
+│   ├── sanitize.ts           # XSS prevention (escapeHtml, sanitizeUrl)
+│   ├── urlState.ts           # Shareable link encoding/decoding
+│   └── analysis-constants.ts # Shared thresholds for worker sync
 ├── styles/
 └── types/
-api/                        # Vercel serverless proxies
-├── cloudflare-outages.js
-├── faa-status.js
-├── fred-data.js
-├── gdelt-geo.js
-└── nga-warnings.js
+api/                          # Vercel Edge serverless proxies
+├── cloudflare-outages.js     # Proxies Cloudflare Radar
+├── coingecko.js              # Crypto prices with validation
+├── faa-status.js             # FAA ground stops/delays
+├── fred-data.js              # Federal Reserve economic data
+├── gdelt-geo.js              # GDELT event geolocation
+├── polymarket.js             # Prediction markets with validation
+├── yahoo-finance.js          # Stock quotes with validation
+└── opensky-relay.js          # Military aircraft tracking
 ```
 
 ## Usage
@@ -603,6 +932,26 @@ api/                        # Vercel serverless proxies
 ### Panel Management
 - **Drag panels** - Reorder layout
 - **Settings (⚙)** - Toggle panel visibility
+
+### Shareable Links
+
+The current view state is encoded in the URL, enabling:
+- **Bookmarking**: Save specific views for quick access
+- **Sharing**: Send colleagues a link to your exact map position and layer configuration
+- **Deep linking**: Link directly to a specific region or feature
+
+**Encoded Parameters**:
+| Parameter | Description |
+|-----------|-------------|
+| `lat`, `lon` | Map center coordinates |
+| `zoom` | Zoom level (1-10) |
+| `time` | Active time filter (1h, 6h, 24h, 7d) |
+| `view` | Preset view (global, us, mena) |
+| `layers` | Comma-separated enabled layer IDs |
+
+Example: `?lat=38.9&lon=-77&zoom=6&layers=bases,conflicts,hotspots`
+
+Values are validated and clamped to prevent invalid states.
 
 ## Data Sources
 
