@@ -152,22 +152,30 @@ export class SearchModal {
   private renderRecent(): void {
     if (!this.resultsList) return;
 
-    this.resultsList.innerHTML = `
-      <div class="search-section-header">Recent Searches</div>
-      ${this.recentSearches.map((term, i) => `
-        <div class="search-result-item recent ${i === this.selectedIndex ? 'selected' : ''}" data-recent="${term}">
-          <span class="search-result-icon">🕐</span>
-          <span class="search-result-title">${term}</span>
-        </div>
-      `).join('')}
-    `;
+    this.resultsList.innerHTML = '<div class="search-section-header">Recent Searches</div>';
 
-    this.resultsList.querySelectorAll('.search-result-item.recent').forEach((el) => {
-      el.addEventListener('click', () => {
-        const term = (el as HTMLElement).dataset.recent || '';
+    this.recentSearches.forEach((term, i) => {
+      const item = document.createElement('div');
+      item.className = `search-result-item recent${i === this.selectedIndex ? ' selected' : ''}`;
+      item.dataset.recent = term;
+
+      const icon = document.createElement('span');
+      icon.className = 'search-result-icon';
+      icon.textContent = '🕐';
+
+      const title = document.createElement('span');
+      title.className = 'search-result-title';
+      title.textContent = term;
+
+      item.appendChild(icon);
+      item.appendChild(title);
+
+      item.addEventListener('click', () => {
         if (this.input) this.input.value = term;
         this.handleSearch();
       });
+
+      this.resultsList!.appendChild(item);
     });
   }
 
