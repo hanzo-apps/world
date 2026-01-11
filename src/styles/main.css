@@ -3184,53 +3184,6 @@ body.playback-mode .status-dot {
 }
 
 /* Economic Panel */
-.economic-panel-container {
-  position: absolute;
-  bottom: 60px;
-  right: 12px;
-  z-index: 100;
-}
-
-.economic-panel-container.hidden {
-  display: none;
-}
-
-.economic-panel {
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  min-width: 220px;
-  max-width: 280px;
-}
-
-.economic-panel .panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.economic-panel .panel-title {
-  font-size: 10px;
-  font-weight: bold;
-  color: var(--accent);
-  letter-spacing: 1px;
-}
-
-.economic-panel .panel-source {
-  font-size: 9px;
-  color: var(--text-dim);
-}
-
-.economic-panel .panel-loading,
-.economic-panel .panel-empty {
-  padding: 16px;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 11px;
-}
 
 .economic-indicators {
   display: flex;
@@ -3292,6 +3245,17 @@ body.playback-mode .status-dot {
   font-size: 9px;
   color: var(--text-dim);
   margin-top: 2px;
+}
+
+.economic-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+}
+
+.economic-source {
+  font-size: 9px;
+  color: var(--text-dim);
 }
 
 /* Country Labels */
