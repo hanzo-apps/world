@@ -79,6 +79,12 @@ export function generateId(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export function isMobileDevice(): boolean {
+  const isMobileWidth = window.innerWidth < 768;
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  return isMobileWidth || isTouchDevice;
+}
+
 export function chunkArray<T>(items: T[], size: number): T[][] {
   const chunkSize = Math.max(1, size);
   const chunks: T[][] = [];
