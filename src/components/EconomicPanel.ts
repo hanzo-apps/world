@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import type { FredSeries } from '@/services/fred';
 import { getChangeClass, formatChange } from '@/services/fred';
+import { escapeHtml } from '@/utils/sanitize';
 
 export class EconomicPanel extends Panel {
   private data: FredSeries[] = [];
@@ -36,16 +37,16 @@ export class EconomicPanel extends Panel {
         : '';
 
       return `
-        <div class="economic-indicator" data-series="${series.id}">
+        <div class="economic-indicator" data-series="${escapeHtml(series.id)}">
           <div class="indicator-header">
-            <span class="indicator-name">${series.name}</span>
-            <span class="indicator-id">${series.id}</span>
+            <span class="indicator-name">${escapeHtml(series.name)}</span>
+            <span class="indicator-id">${escapeHtml(series.id)}</span>
           </div>
           <div class="indicator-value">
-            <span class="value">${series.value !== null ? series.value : 'N/A'}${series.unit}</span>
+            <span class="value">${series.value !== null ? series.value : 'N/A'}${escapeHtml(series.unit)}</span>
             <span class="change ${changeClass}">${arrow} ${changeStr}</span>
           </div>
-          <div class="indicator-date">${series.date}</div>
+          <div class="indicator-date">${escapeHtml(series.date)}</div>
         </div>
       `;
     }).join('');
