@@ -56,12 +56,12 @@ function calculateDefcon(aggregateActivity: number, activeSpikes: number): { lev
       return { level: threshold.level, label: threshold.label };
     }
   }
-  return { level: 5, label: DEFCON_THRESHOLDS[4].label };
+  return { level: 5, label: 'FADE OUT • LOWEST READINESS' };
 }
 
 function extractCoordinates(address: string): { lat?: number; lng?: number } {
   const match = address.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-  if (match) {
+  if (match && match[1] && match[2]) {
     return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
   }
   return {};
@@ -81,7 +81,7 @@ const defaultStatus: PizzIntStatus = {
 
 export async function fetchPizzIntStatus(): Promise<PizzIntStatus> {
   return pizzintBreaker.execute(async () => {
-    const response = await fetch('/api/pizzint/dashboard');
+    const response = await fetch('/api/pizzint/dashboard-data');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: PizzIntApiResponse = await response.json();
@@ -136,7 +136,7 @@ export async function fetchGdeltTensions(): Promise<GdeltTensionPair[]> {
     const endDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
 
-    const response = await fetch(`/api/pizzint/gdelt?pairs=${pairs}&dateStart=${startDate}&dateEnd=${endDate}`);
+    const response = await fetch(`/api/pizzint/gdelt/batch?pairs=${pairs}&method=gpr&dateStart=${startDate}&dateEnd=${endDate}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: GdeltApiResponse = await response.json();
