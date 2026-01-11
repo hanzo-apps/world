@@ -1045,6 +1045,38 @@ Original dashboard concept inspired by Reggie James ([@HipCityReg](https://x.com
 
 ---
 
+## Limitations & Caveats
+
+This project is a **proof of concept** demonstrating what's possible with publicly available data. While functional, there are important limitations:
+
+### Data Completeness
+
+Some data sources require paid accounts for full access:
+- **ACLED**: Free tier has API restrictions; Research tier required for programmatic access
+- **OpenSky Network**: Rate-limited; commercial tiers offer higher quotas
+- **Satellite AIS**: Global coverage requires commercial providers (Spire, Kpler, etc.)
+
+The dashboard works with free tiers but may have gaps in coverage or update frequency.
+
+### AIS Coverage Bias
+
+The Ships layer uses terrestrial AIS receivers via [AISStream.io](https://aisstream.io). This creates a **geographic bias**:
+- **Strong coverage**: European waters, Atlantic, major ports
+- **Weak coverage**: Middle East, open ocean, remote regions
+
+Terrestrial receivers only detect vessels within ~50km of shore. Satellite AIS (commercial) provides true global coverage but is not included in this free implementation.
+
+### Blocked Data Sources
+
+Some publishers block requests from cloud providers (Vercel, Railway, AWS):
+- RSS feeds from certain outlets may fail with 403 errors
+- This is a common anti-bot measure, not a bug in the dashboard
+- Affected feeds are automatically disabled via circuit breakers
+
+The system degrades gracefully—blocked sources are skipped while others continue functioning.
+
+---
+
 ## Design Philosophy
 
 **Information density over aesthetics.** Every pixel should convey signal. The dark interface minimizes eye strain during extended monitoring sessions.
