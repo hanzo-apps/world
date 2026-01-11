@@ -244,7 +244,7 @@ export class MapComponent {
     const layers: (keyof MapLayers)[] = [
       'conflicts', 'hotspots', 'sanctions', 'protests',  // geopolitical
       'bases', 'nuclear', 'irradiators',                 // military/strategic
-      'militaryFlights', 'militaryVessels',              // military tracking
+      'military',                                         // military tracking (flights + vessels)
       'cables', 'pipelines', 'outages', 'datacenters',   // infrastructure
       'ais', 'flights',                                   // transport
       'earthquakes', 'weather',                           // natural
@@ -253,8 +253,7 @@ export class MapComponent {
     ];
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'Ships',
-      militaryFlights: 'Mil Aircraft',
-      militaryVessels: 'Mil Vessels',
+      military: 'Military',
     };
 
     layers.forEach((layer) => {
@@ -1315,8 +1314,8 @@ export class MapComponent {
       });
     }
 
-    // Military Flights (fighter jets, bombers, recon aircraft)
-    if (this.state.layers.militaryFlights) {
+    // Military Tracking (flights and vessels)
+    if (this.state.layers.military) {
       // Render individual flights
       this.militaryFlights.forEach((flight) => {
         const pos = projection([flight.lon, flight.lat]);
@@ -1434,10 +1433,8 @@ export class MapComponent {
 
         this.overlays.appendChild(div);
       });
-    }
 
-    // Military Vessels (warships, carriers, submarines)
-    if (this.state.layers.militaryVessels) {
+      // Military Vessels (warships, carriers, submarines)
       // Render individual vessels
       this.militaryVessels.forEach((vessel) => {
         const pos = projection([vessel.lon, vessel.lat]);
@@ -1796,7 +1793,7 @@ export class MapComponent {
   }
 
   private static readonly ASYNC_DATA_LAYERS: Set<keyof MapLayers> = new Set([
-    'earthquakes', 'weather', 'outages', 'ais', 'protests', 'flights',
+    'earthquakes', 'weather', 'outages', 'ais', 'protests', 'flights', 'military',
   ]);
 
   public toggleLayer(layer: keyof MapLayers): void {
