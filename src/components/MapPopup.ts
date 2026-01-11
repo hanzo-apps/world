@@ -1,6 +1,7 @@
 import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster';
 
@@ -203,7 +204,7 @@ export class MapPopup {
           <div class="popup-section">
             <span class="section-label">KEY ENTITIES</span>
             <div class="popup-tags">
-              ${hotspot.agencies.map(a => `<span class="popup-tag">${a}</span>`).join('')}
+              ${hotspot.agencies.map(a => `<span class="popup-tag">${escapeHtml(a)}</span>`).join('')}
             </div>
           </div>
         ` : ''}
@@ -213,8 +214,8 @@ export class MapPopup {
             <div class="popup-news">
               ${relatedNews.slice(0, 5).map(n => `
                 <div class="popup-news-item">
-                  <span class="news-source">${n.source}</span>
-                  <a href="${n.link}" target="_blank" class="news-title">${n.title}</a>
+                  <span class="news-source">${escapeHtml(n.source)}</span>
+                  <a href="${sanitizeUrl(n.link)}" target="_blank" class="news-title">${escapeHtml(n.title)}</a>
                 </div>
               `).join('')}
             </div>
@@ -269,28 +270,28 @@ export class MapPopup {
   }
 
   private renderWeatherPopup(alert: WeatherAlert): string {
-    const severityClass = alert.severity.toLowerCase();
+    const severityClass = escapeHtml(alert.severity.toLowerCase());
     const expiresIn = this.getTimeUntil(alert.expires);
 
     return `
       <div class="popup-header weather ${severityClass}">
-        <span class="popup-title">${alert.event.toUpperCase()}</span>
-        <span class="popup-badge ${severityClass}">${alert.severity.toUpperCase()}</span>
+        <span class="popup-title">${escapeHtml(alert.event.toUpperCase())}</span>
+        <span class="popup-badge ${severityClass}">${escapeHtml(alert.severity.toUpperCase())}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <p class="popup-headline">${alert.headline}</p>
+        <p class="popup-headline">${escapeHtml(alert.headline)}</p>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">Area</span>
-            <span class="stat-value">${alert.areaDesc}</span>
+            <span class="stat-value">${escapeHtml(alert.areaDesc)}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">Expires</span>
             <span class="stat-value">${expiresIn}</span>
           </div>
         </div>
-        <p class="popup-description">${alert.description.slice(0, 300)}${alert.description.length > 300 ? '...' : ''}</p>
+        <p class="popup-description">${escapeHtml(alert.description.slice(0, 300))}${alert.description.length > 300 ? '...' : ''}</p>
       </div>
     `;
   }
@@ -358,8 +359,8 @@ export class MapPopup {
   }
 
   private renderAisPopup(event: AisDisruptionEvent): string {
-    const severityClass = event.severity;
-    const severityLabel = event.severity.toUpperCase();
+    const severityClass = escapeHtml(event.severity);
+    const severityLabel = escapeHtml(event.severity.toUpperCase());
     const typeLabel = event.type === 'gap_spike' ? 'AIS GAP SPIKE' : 'CHOKEPOINT CONGESTION';
     const changeLabel = event.type === 'gap_spike' ? 'DARKENING' : 'DENSITY';
     const countLabel = event.type === 'gap_spike' ? 'DARK SHIPS' : 'VESSEL COUNT';
@@ -369,7 +370,7 @@ export class MapPopup {
 
     return `
       <div class="popup-header ais">
-        <span class="popup-title">${event.name.toUpperCase()}</span>
+        <span class="popup-title">${escapeHtml(event.name.toUpperCase())}</span>
         <span class="popup-badge ${severityClass}">${severityLabel}</span>
         <button class="popup-close">×</button>
       </div>
@@ -390,18 +391,18 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">REGION</span>
-            <span class="stat-value">${event.region || `${event.lat.toFixed(2)}°, ${event.lon.toFixed(2)}°`}</span>
+            <span class="stat-value">${escapeHtml(event.region || `${event.lat.toFixed(2)}°, ${event.lon.toFixed(2)}°`)}</span>
           </div>
         </div>
-        <p class="popup-description">${event.description}</p>
+        <p class="popup-description">${escapeHtml(event.description)}</p>
       </div>
     `;
   }
 
   private renderProtestPopup(event: SocialUnrestEvent): string {
-    const severityClass = event.severity;
-    const severityLabel = event.severity.toUpperCase();
-    const eventTypeLabel = event.eventType.replace('_', ' ').toUpperCase();
+    const severityClass = escapeHtml(event.severity);
+    const severityLabel = escapeHtml(event.severity.toUpperCase());
+    const eventTypeLabel = escapeHtml(event.eventType.replace('_', ' ').toUpperCase());
     const icon = event.eventType === 'riot' ? '🔥' : event.eventType === 'strike' ? '✊' : '📢';
     const sourceLabel = event.sourceType === 'acled' ? 'ACLED (verified)' : 'GDELT';
     const validatedBadge = event.validated ? '<span class="popup-badge verified">VERIFIED</span>' : '';
@@ -409,13 +410,13 @@ export class MapPopup {
       ? `<div class="popup-stat"><span class="stat-label">FATALITIES</span><span class="stat-value alert">${event.fatalities}</span></div>`
       : '';
     const actorsSection = event.actors?.length
-      ? `<div class="popup-stat"><span class="stat-label">ACTORS</span><span class="stat-value">${event.actors.join(', ')}</span></div>`
+      ? `<div class="popup-stat"><span class="stat-label">ACTORS</span><span class="stat-value">${event.actors.map(a => escapeHtml(a)).join(', ')}</span></div>`
       : '';
     const tagsSection = event.tags?.length
-      ? `<div class="popup-tags">${event.tags.map(t => `<span class="popup-tag">${t}</span>`).join('')}</div>`
+      ? `<div class="popup-tags">${event.tags.map(t => `<span class="popup-tag">${escapeHtml(t)}</span>`).join('')}</div>`
       : '';
     const relatedHotspots = event.relatedHotspots?.length
-      ? `<div class="popup-related">Near: ${event.relatedHotspots.join(', ')}</div>`
+      ? `<div class="popup-related">Near: ${event.relatedHotspots.map(h => escapeHtml(h)).join(', ')}</div>`
       : '';
 
     return `
@@ -427,7 +428,7 @@ export class MapPopup {
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${event.city ? `${event.city}, ` : ''}${event.country}</div>
+        <div class="popup-subtitle">${event.city ? `${escapeHtml(event.city)}, ` : ''}${escapeHtml(event.country)}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">TIME</span>
@@ -440,7 +441,7 @@ export class MapPopup {
           ${fatalitiesSection}
           ${actorsSection}
         </div>
-        ${event.title ? `<p class="popup-description">${event.title}</p>` : ''}
+        ${event.title ? `<p class="popup-description">${escapeHtml(event.title)}</p>` : ''}
         ${tagsSection}
         ${relatedHotspots}
       </div>
@@ -448,8 +449,8 @@ export class MapPopup {
   }
 
   private renderFlightPopup(delay: AirportDelayAlert): string {
-    const severityClass = delay.severity;
-    const severityLabel = delay.severity.toUpperCase();
+    const severityClass = escapeHtml(delay.severity);
+    const severityLabel = escapeHtml(delay.severity.toUpperCase());
     const delayTypeLabels: Record<string, string> = {
       'ground_stop': 'GROUND STOP',
       'ground_delay': 'GROUND DELAY PROGRAM',
@@ -464,7 +465,7 @@ export class MapPopup {
       'eurocontrol': 'Eurocontrol',
       'computed': 'Computed',
     };
-    const sourceLabel = sourceLabels[delay.source] || delay.source;
+    const sourceLabel = sourceLabels[delay.source] || escapeHtml(delay.source);
     const regionLabels: Record<string, string> = {
       'americas': 'Americas',
       'europe': 'Europe',
@@ -472,13 +473,13 @@ export class MapPopup {
       'mena': 'Middle East',
       'africa': 'Africa',
     };
-    const regionLabel = regionLabels[delay.region] || delay.region;
+    const regionLabel = regionLabels[delay.region] || escapeHtml(delay.region);
 
     const avgDelaySection = delay.avgDelayMinutes > 0
       ? `<div class="popup-stat"><span class="stat-label">AVG DELAY</span><span class="stat-value alert">+${delay.avgDelayMinutes} min</span></div>`
       : '';
     const reasonSection = delay.reason
-      ? `<div class="popup-stat"><span class="stat-label">REASON</span><span class="stat-value">${delay.reason}</span></div>`
+      ? `<div class="popup-stat"><span class="stat-label">REASON</span><span class="stat-value">${escapeHtml(delay.reason)}</span></div>`
       : '';
     const cancelledSection = delay.cancelledFlights
       ? `<div class="popup-stat"><span class="stat-label">CANCELLED</span><span class="stat-value alert">${delay.cancelledFlights} flights</span></div>`
@@ -487,13 +488,13 @@ export class MapPopup {
     return `
       <div class="popup-header flight ${severityClass}">
         <span class="popup-icon">${icon}</span>
-        <span class="popup-title">${delay.iata} - ${delayTypeLabel}</span>
+        <span class="popup-title">${escapeHtml(delay.iata)} - ${delayTypeLabel}</span>
         <span class="popup-badge ${severityClass}">${severityLabel}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${delay.name}</div>
-        <div class="popup-location">${delay.city}, ${delay.country}</div>
+        <div class="popup-subtitle">${escapeHtml(delay.name)}</div>
+        <div class="popup-location">${escapeHtml(delay.city)}, ${escapeHtml(delay.country)}</div>
         <div class="popup-stats">
           ${avgDelaySection}
           ${reasonSection}
@@ -867,19 +868,20 @@ export class MapPopup {
       'partial': 'PARTIAL DISRUPTION',
     };
     const timeAgo = this.getTimeAgo(outage.pubDate);
+    const severityClass = escapeHtml(outage.severity);
 
     return `
-      <div class="popup-header outage ${outage.severity}">
-        <span class="popup-title">📡 ${outage.country.toUpperCase()}</span>
+      <div class="popup-header outage ${severityClass}">
+        <span class="popup-title">📡 ${escapeHtml(outage.country.toUpperCase())}</span>
         <span class="popup-badge ${severityColors[outage.severity] || 'low'}">${severityLabels[outage.severity] || 'DISRUPTION'}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${outage.title}</div>
+        <div class="popup-subtitle">${escapeHtml(outage.title)}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">SEVERITY</span>
-            <span class="stat-value">${outage.severity.toUpperCase()}</span>
+            <span class="stat-value">${escapeHtml(outage.severity.toUpperCase())}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">REPORTED</span>
@@ -894,12 +896,12 @@ export class MapPopup {
           <div class="popup-section">
             <span class="section-label">CATEGORIES</span>
             <div class="popup-tags">
-              ${outage.categories.slice(0, 5).map(c => `<span class="popup-tag">${c}</span>`).join('')}
+              ${outage.categories.slice(0, 5).map(c => `<span class="popup-tag">${escapeHtml(c)}</span>`).join('')}
             </div>
           </div>
         ` : ''}
-        <p class="popup-description">${outage.description.slice(0, 250)}${outage.description.length > 250 ? '...' : ''}</p>
-        <a href="${outage.link}" target="_blank" class="popup-link">Read full report →</a>
+        <p class="popup-description">${escapeHtml(outage.description.slice(0, 250))}${outage.description.length > 250 ? '...' : ''}</p>
+        <a href="${sanitizeUrl(outage.link)}" target="_blank" class="popup-link">Read full report →</a>
       </div>
     `;
   }

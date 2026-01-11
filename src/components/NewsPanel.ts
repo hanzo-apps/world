@@ -2,6 +2,7 @@ import { Panel } from './Panel';
 import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
 import { formatTime } from '@/utils';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { clusterNews, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
 
 /** Threshold for enabling virtual scrolling */
@@ -123,12 +124,12 @@ export class NewsPanel extends Panel {
     const html = items
       .map(
         (item) => `
-      <div class="item ${item.isAlert ? 'alert' : ''}" ${item.monitorColor ? `style="border-left-color: ${item.monitorColor}"` : ''}>
+      <div class="item ${item.isAlert ? 'alert' : ''}" ${item.monitorColor ? `style="border-left-color: ${escapeHtml(item.monitorColor)}"` : ''}>
         <div class="item-source">
-          ${item.source}
+          ${escapeHtml(item.source)}
           ${item.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
         </div>
-        <a class="item-title" href="${item.link}" target="_blank" rel="noopener">${item.title}</a>
+        <a class="item-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
         <div class="item-time">${formatTime(item.pubDate)}</div>
       </div>
     `
@@ -211,7 +212,7 @@ export class NewsPanel extends Panel {
     const newTag = showNewTag ? '<span class="new-tag">NEW</span>' : '';
 
     const topSourcesHtml = cluster.topSources
-      .map(s => `<span class="top-source tier-${s.tier}">${s.name}</span>`)
+      .map(s => `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}</span>`)
       .join('');
 
     const assetContext = getClusterAssetContext(cluster);
@@ -221,16 +222,16 @@ export class NewsPanel extends Panel {
 
     const relatedAssetsHtml = assetContext && assetContext.assets.length > 0
       ? `
-        <div class="related-assets" data-cluster-id="${cluster.id}">
+        <div class="related-assets" data-cluster-id="${escapeHtml(cluster.id)}">
           <div class="related-assets-header">
-            Related assets near ${assetContext.origin.label}
+            Related assets near ${escapeHtml(assetContext.origin.label)}
             <span class="related-assets-range">(${MAX_DISTANCE_KM}km)</span>
           </div>
           <div class="related-assets-list">
             ${assetContext.assets.map(asset => `
-              <button class="related-asset" data-cluster-id="${cluster.id}" data-asset-id="${asset.id}" data-asset-type="${asset.type}">
-                <span class="related-asset-type">${getAssetLabel(asset.type)}</span>
-                <span class="related-asset-name">${asset.name}</span>
+              <button class="related-asset" data-cluster-id="${escapeHtml(cluster.id)}" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}">
+                <span class="related-asset-type">${escapeHtml(getAssetLabel(asset.type))}</span>
+                <span class="related-asset-name">${escapeHtml(asset.name)}</span>
                 <span class="related-asset-distance">${Math.round(asset.distanceKm)}km</span>
               </button>
             `).join('')}
@@ -249,16 +250,16 @@ export class NewsPanel extends Panel {
     ].filter(Boolean).join(' ');
 
     return `
-      <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-left-color: ${cluster.monitorColor}"` : ''} data-cluster-id="${cluster.id}" data-news-id="${cluster.primaryLink}">
+      <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-left-color: ${escapeHtml(cluster.monitorColor)}"` : ''} data-cluster-id="${escapeHtml(cluster.id)}" data-news-id="${escapeHtml(cluster.primaryLink)}">
         <div class="item-source">
-          ${cluster.primarySource}
+          ${escapeHtml(cluster.primarySource)}
           ${newTag}
           ${sourceBadge}
           ${velocityBadge}
           ${sentimentBadge}
           ${cluster.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
         </div>
-        <a class="item-title" href="${cluster.primaryLink}" target="_blank" rel="noopener">${cluster.primaryTitle}</a>
+        <a class="item-title" href="${sanitizeUrl(cluster.primaryLink)}" target="_blank" rel="noopener">${escapeHtml(cluster.primaryTitle)}</a>
         <div class="cluster-meta">
           <span class="top-sources">${topSourcesHtml}</span>
           <span class="item-time">${formatTime(cluster.lastUpdated)}</span>
