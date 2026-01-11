@@ -51,7 +51,6 @@ export class App {
   private playbackControl: PlaybackControl | null = null;
   private statusPanel: StatusPanel | null = null;
   private exportPanel: ExportPanel | null = null;
-  private economicPanel: EconomicPanel | null = null;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
@@ -95,8 +94,8 @@ export class App {
     this.setupStatusPanel();
     this.setupPizzIntIndicator();
     this.setupExportPanel();
-    this.setupEconomicPanel();
     this.setupSearchModal();
+    this.setupMapLayerHandlers();
     this.setupEventListeners();
     this.setupUrlStateSync();
     await this.loadAllData();
@@ -131,7 +130,10 @@ export class App {
 
   private setupPizzIntIndicator(): void {
     this.pizzintIndicator = new PizzIntIndicator();
-    document.body.appendChild(this.pizzintIndicator.getElement());
+    const headerLeft = this.container.querySelector('.header-left');
+    if (headerLeft) {
+      headerLeft.appendChild(this.pizzintIndicator.getElement());
+    }
   }
 
   private async loadPizzInt(): Promise<void> {
@@ -163,27 +165,8 @@ export class App {
     }
   }
 
-  private setupEconomicPanel(): void {
-    const economicContainer = document.createElement('div');
-    economicContainer.className = 'economic-panel-container';
-    economicContainer.id = 'economicPanel';
-    this.economicPanel = new EconomicPanel(economicContainer);
-
-    // Apply initial visibility from layer settings
-    if (!this.mapLayers.economic) {
-      economicContainer.classList.add('hidden');
-    }
-
-    const main = this.container.querySelector('.main-content');
-    if (main) {
-      main.appendChild(economicContainer);
-    }
-
-    // Listen for layer toggle changes
+  private setupMapLayerHandlers(): void {
     this.map?.setOnLayerChange((layer, enabled) => {
-      if (layer === 'economic') {
-        economicContainer.classList.toggle('hidden', !enabled);
-      }
       // Save layer settings
       this.mapLayers[layer] = enabled;
       saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
@@ -650,8 +633,11 @@ export class App {
     this.newsPanels['thinktanks'] = thinktanksPanel;
     this.panels['thinktanks'] = thinktanksPanel;
 
+    const economicPanel = new EconomicPanel();
+    this.panels['economic'] = economicPanel;
+
     // Add panels to grid in saved order
-    const defaultOrder = ['politics', 'middleeast', 'tech', 'ai', 'finance', 'layoffs', 'congress', 'heatmap', 'markets', 'commodities', 'crypto', 'polymarket', 'gov', 'thinktanks', 'intel', 'monitors'];
+    const defaultOrder = ['politics', 'middleeast', 'tech', 'ai', 'finance', 'layoffs', 'congress', 'heatmap', 'markets', 'commodities', 'economic', 'crypto', 'polymarket', 'gov', 'thinktanks', 'intel', 'monitors'];
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
@@ -1025,12 +1011,12 @@ export class App {
       this.loadMarkets(),
       this.loadPredictions(),
       this.loadPizzInt(),
+      this.loadFredData(),
     ];
 
     // Conditionally load based on layer settings
     if (this.mapLayers.earthquakes) tasks.push(this.loadEarthquakes());
     if (this.mapLayers.weather) tasks.push(this.loadWeatherAlerts());
-    if (this.mapLayers.economic) tasks.push(this.loadFredData());
     if (this.mapLayers.outages) tasks.push(this.loadOutages());
     if (this.mapLayers.ais) tasks.push(this.loadAisSignals());
     if (this.mapLayers.cables) tasks.push(this.loadCableActivity());
@@ -1053,9 +1039,6 @@ export class App {
           break;
         case 'weather':
           await this.loadWeatherAlerts();
-          break;
-        case 'economic':
-          await this.loadFredData();
           break;
         case 'outages':
           await this.loadOutages();
@@ -1413,39 +1396,39 @@ export class App {
   }
 
   private async loadFredData(): Promise<void> {
+    const economicPanel = this.panels['economic'] as EconomicPanel;
     const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
     if (cbInfo.onCooldown) {
-      this.economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${cbInfo.remainingSeconds}s)`);
+      economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${cbInfo.remainingSeconds}s)`);
       this.statusPanel?.updateApi('FRED', { status: 'error' });
       return;
     }
 
     try {
-      this.economicPanel?.setLoading(true);
+      economicPanel?.setLoading(true);
       const data = await fetchFredData();
 
       // Check if circuit breaker tripped after fetch
       const postInfo = getCircuitBreakerCooldownInfo('FRED Economic');
       if (postInfo.onCooldown) {
-        this.economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${postInfo.remainingSeconds}s)`);
+        economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${postInfo.remainingSeconds}s)`);
         this.statusPanel?.updateApi('FRED', { status: 'error' });
         return;
       }
 
       if (data.length === 0) {
-        // Data fetch failed but not yet on cooldown - show error state
-        this.economicPanel?.setErrorState(true, 'Failed to load economic data');
+        economicPanel?.setErrorState(true, 'Failed to load economic data');
         this.statusPanel?.updateApi('FRED', { status: 'error' });
         return;
       }
 
-      this.economicPanel?.setErrorState(false);
-      this.economicPanel?.update(data);
+      economicPanel?.setErrorState(false);
+      economicPanel?.update(data);
       this.statusPanel?.updateApi('FRED', { status: 'ok' });
     } catch {
       this.statusPanel?.updateApi('FRED', { status: 'error' });
-      this.economicPanel?.setErrorState(true, 'Failed to load data');
-      this.economicPanel?.setLoading(false);
+      economicPanel?.setErrorState(true, 'Failed to load data');
+      economicPanel?.setLoading(false);
     }
   }
 
@@ -1491,9 +1474,7 @@ export class App {
     setInterval(() => {
       if (this.mapLayers.weather) this.loadWeatherAlerts();
     }, 10 * 60 * 1000);
-    setInterval(() => {
-      if (this.mapLayers.economic) this.loadFredData();
-    }, 30 * 60 * 1000);
+    setInterval(() => this.loadFredData(), 30 * 60 * 1000);
     setInterval(() => {
       if (this.mapLayers.outages) this.loadOutages();
     }, 60 * 60 * 1000);
