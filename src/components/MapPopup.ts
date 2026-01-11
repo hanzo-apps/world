@@ -247,7 +247,7 @@ export class MapPopup {
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <p class="popup-location">${earthquake.place}</p>
+        <p class="popup-location">${escapeHtml(earthquake.place)}</p>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">Depth</span>
@@ -262,7 +262,7 @@ export class MapPopup {
             <span class="stat-value">${timeAgo}</span>
           </div>
         </div>
-        <a href="${earthquake.url}" target="_blank" class="popup-link">View on USGS →</a>
+        <a href="${sanitizeUrl(earthquake.url)}" target="_blank" class="popup-link">View on USGS →</a>
       </div>
     `;
   }
