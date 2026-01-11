@@ -31,6 +31,7 @@ import {
   SearchModal,
   MobileWarningModal,
   PizzIntIndicator,
+  GdeltIntelPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
@@ -654,9 +655,12 @@ export class App {
     const economicPanel = new EconomicPanel();
     this.panels['economic'] = economicPanel;
 
+    const gdeltIntelPanel = new GdeltIntelPanel();
+    this.panels['gdelt-intel'] = gdeltIntelPanel;
+
     // Add panels to grid in saved order (optimized for geopolitical analysis)
     // Row 1: Intel + breaking events | Row 2: Market signals | Row 3: Supporting context
-    const defaultOrder = ['intel', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'congress', 'ai', 'layoffs', 'monitors'];
+    const defaultOrder = ['intel', 'gdelt-intel', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'congress', 'ai', 'layoffs', 'monitors'];
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
