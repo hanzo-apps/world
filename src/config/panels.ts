@@ -18,6 +18,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 2 },
   congress: { name: 'Congress Trades', enabled: true, priority: 2 },
   thinktanks: { name: 'Think Tanks', enabled: true, priority: 2 },
+  economic: { name: 'Economic Indicators', enabled: true, priority: 2 },
 };
 
 export const DEFAULT_MAP_LAYERS: MapLayers = {

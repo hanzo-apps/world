@@ -53,44 +53,43 @@ export class PizzIntIndicator {
     style.id = 'pizzint-styles';
     style.textContent = `
       .pizzint-indicator {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
+        position: relative;
         z-index: 1000;
         font-family: 'JetBrains Mono', monospace;
       }
       .pizzint-toggle {
         display: flex;
         align-items: center;
-        gap: 8px;
-        background: rgba(0, 0, 0, 0.85);
+        gap: 6px;
+        background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        padding: 8px 12px;
+        border-radius: 4px;
+        padding: 4px 8px;
         cursor: pointer;
         transition: all 0.2s;
       }
       .pizzint-toggle:hover {
-        background: rgba(0, 0, 0, 0.95);
+        background: rgba(255, 255, 255, 0.1);
         border-color: rgba(255, 255, 255, 0.4);
       }
-      .pizzint-icon { font-size: 18px; }
+      .pizzint-icon { font-size: 14px; }
       .pizzint-defcon {
-        font-size: 12px;
+        font-size: 10px;
         font-weight: bold;
-        padding: 2px 6px;
-        border-radius: 4px;
+        padding: 2px 5px;
+        border-radius: 3px;
         background: #444;
         color: #fff;
       }
       .pizzint-score {
-        font-size: 12px;
+        font-size: 10px;
         color: rgba(255, 255, 255, 0.7);
       }
       .pizzint-panel {
         position: absolute;
-        bottom: 50px;
+        top: 100%;
         left: 0;
+        margin-top: 8px;
         width: 320px;
         background: rgba(0, 0, 0, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.2);
