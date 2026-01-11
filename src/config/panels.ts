@@ -43,6 +43,29 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   military: false,
 };
 
+// Mobile-specific defaults: minimal layers for better usability
+export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
+  conflicts: true,
+  bases: false,
+  cables: false,
+  pipelines: false,
+  hotspots: true,
+  ais: false,
+  nuclear: false,
+  irradiators: false,
+  sanctions: false,
+  earthquakes: false,
+  weather: false,
+  economic: false,
+  countries: false,
+  waterways: false,
+  outages: true,
+  datacenters: false,
+  protests: false,
+  flights: false,
+  military: false,
+};
+
 export const MONITOR_COLORS = [
   '#44ff88',
   '#ff8844',
