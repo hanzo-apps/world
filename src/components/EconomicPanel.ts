@@ -1,65 +1,30 @@
+import { Panel } from './Panel';
 import type { FredSeries } from '@/services/fred';
 import { getChangeClass, formatChange } from '@/services/fred';
 
-export class EconomicPanel {
-  private container: HTMLElement;
+export class EconomicPanel extends Panel {
   private data: FredSeries[] = [];
-  private isLoading = true;
   private lastUpdate: Date | null = null;
-  private hasError = false;
-  private errorMessage = '';
 
-  constructor(container: HTMLElement) {
-    this.container = container;
-    this.render();
+  constructor() {
+    super({ id: 'economic', title: 'Economic Indicators' });
   }
 
   public update(data: FredSeries[]): void {
     this.data = data;
-    this.isLoading = false;
-    this.hasError = false;
     this.lastUpdate = new Date();
     this.render();
   }
 
   public setLoading(loading: boolean): void {
-    this.isLoading = loading;
-    this.render();
-  }
-
-  public setErrorState(hasError: boolean, message = ''): void {
-    this.hasError = hasError;
-    this.errorMessage = message;
-    this.render();
+    if (loading) {
+      this.showLoading();
+    }
   }
 
   private render(): void {
-    const headerClass = this.hasError ? 'panel-header panel-header-error' : 'panel-header';
-    const headerTitle = this.hasError && this.errorMessage ? ` title="${this.errorMessage}"` : '';
-
-    if (this.isLoading) {
-      this.container.innerHTML = `
-        <div class="economic-panel">
-          <div class="${headerClass}"${headerTitle}>
-            <span class="panel-title">ECONOMIC INDICATORS</span>
-            <span class="panel-source">FRED</span>
-          </div>
-          <div class="panel-loading">Loading economic data...</div>
-        </div>
-      `;
-      return;
-    }
-
     if (this.data.length === 0) {
-      this.container.innerHTML = `
-        <div class="economic-panel">
-          <div class="${headerClass}"${headerTitle}>
-            <span class="panel-title">ECONOMIC INDICATORS</span>
-            <span class="panel-source">FRED</span>
-          </div>
-          <div class="panel-empty">${this.hasError ? this.errorMessage || 'Failed to load data' : 'No data available'}</div>
-        </div>
-      `;
+      this.showError('No economic data available');
       return;
     }
 
@@ -89,20 +54,13 @@ export class EconomicPanel {
       ? this.lastUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
 
-    this.container.innerHTML = `
-      <div class="economic-panel">
-        <div class="${headerClass}"${headerTitle}>
-          <span class="panel-title">ECONOMIC INDICATORS</span>
-          <span class="panel-source">FRED • ${updateTime}</span>
-        </div>
-        <div class="economic-indicators">
-          ${indicatorsHtml}
-        </div>
+    this.setContent(`
+      <div class="economic-indicators">
+        ${indicatorsHtml}
       </div>
-    `;
-  }
-
-  public getElement(): HTMLElement {
-    return this.container;
+      <div class="economic-footer">
+        <span class="economic-source">FRED • ${updateTime}</span>
+      </div>
+    `);
   }
 }
