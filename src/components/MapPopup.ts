@@ -138,11 +138,11 @@ export class MapPopup {
 
   private renderConflictPopup(conflict: ConflictZone): string {
     const severityClass = conflict.intensity === 'high' ? 'high' : conflict.intensity === 'medium' ? 'medium' : 'low';
-    const severityLabel = conflict.intensity?.toUpperCase() || 'UNKNOWN';
+    const severityLabel = escapeHtml(conflict.intensity?.toUpperCase() || 'UNKNOWN');
 
     return `
       <div class="popup-header conflict">
-        <span class="popup-title">${escapeHtml(conflict.name).toUpperCase()}</span>
+        <span class="popup-title">${escapeHtml(conflict.name.toUpperCase())}</span>
         <span class="popup-badge ${severityClass}">${severityLabel}</span>
         <button class="popup-close">×</button>
       </div>
@@ -188,11 +188,11 @@ export class MapPopup {
 
   private renderHotspotPopup(hotspot: Hotspot, relatedNews?: NewsItem[]): string {
     const severityClass = hotspot.level || 'low';
-    const severityLabel = (hotspot.level || 'low').toUpperCase();
+    const severityLabel = escapeHtml((hotspot.level || 'low').toUpperCase());
 
     return `
       <div class="popup-header hotspot">
-        <span class="popup-title">${escapeHtml(hotspot.name).toUpperCase()}</span>
+        <span class="popup-title">${escapeHtml(hotspot.name.toUpperCase())}</span>
         <span class="popup-badge ${severityClass}">${severityLabel}</span>
         <button class="popup-close">×</button>
       </div>
@@ -202,7 +202,7 @@ export class MapPopup {
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">COORDINATES</span>
-            <span class="stat-value">${hotspot.lat.toFixed(2)}°N, ${hotspot.lon.toFixed(2)}°E</span>
+            <span class="stat-value">${escapeHtml(`${hotspot.lat.toFixed(2)}°N, ${hotspot.lon.toFixed(2)}°E`)}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">STATUS</span>
