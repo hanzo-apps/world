@@ -26,9 +26,17 @@ let upstreamSocket = null;
 let clients = new Set();
 let messageCount = 0;
 
-// HTTP server for health checks
-const server = http.createServer((req, res) => {
+// HTTP server for health checks and OpenSky proxy
+const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
 
   if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -38,6 +46,57 @@ const server = http.createServer((req, res) => {
       messages: messageCount,
       connected: upstreamSocket?.readyState === WebSocket.OPEN
     }));
+  } else if (req.url.startsWith('/opensky')) {
+    // Proxy OpenSky API requests (Vercel is blocked, Railway isn't)
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const params = url.searchParams;
+
+      let openskyUrl = 'https://opensky-network.org/api/states/all';
+      const queryParams = [];
+      for (const key of ['lamin', 'lomin', 'lamax', 'lomax']) {
+        if (params.has(key)) queryParams.push(`${key}=${params.get(key)}`);
+      }
+      if (queryParams.length > 0) {
+        openskyUrl += '?' + queryParams.join('&');
+      }
+
+      console.log('[Relay] OpenSky request:', openskyUrl);
+
+      const https = require('https');
+      const request = https.get(openskyUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'WorldMonitor/1.0'
+        },
+        timeout: 15000
+      }, (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => {
+          res.writeHead(response.statusCode, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=30'
+          });
+          res.end(data);
+        });
+      });
+
+      request.on('error', (err) => {
+        console.error('[Relay] OpenSky error:', err.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
+      });
+
+      request.on('timeout', () => {
+        request.destroy();
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request timeout', time: Date.now(), states: null }));
+      });
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
+    }
   } else {
     res.writeHead(404);
     res.end();
