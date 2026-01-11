@@ -65,8 +65,8 @@ Layers are organized into logical groups for efficient monitoring:
 ### News Aggregation
 
 Multi-source RSS aggregation across categories:
-- **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR
-- **Middle East / MENA** - Al Jazeera, BBC ME, CNN ME
+- **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR, Politico, The Telegraph
+- **Middle East / MENA** - Al Jazeera, BBC ME, CNN ME, Al Arabiya
 - **Technology** - Hacker News, Ars Technica, The Verge, MIT Tech Review
 - **AI / ML** - ArXiv, Hugging Face, VentureBeat, OpenAI
 - **Finance** - CNBC, MarketWatch, Financial Times, Yahoo Finance
@@ -74,7 +74,26 @@ Multi-source RSS aggregation across categories:
 - **Intel Feed** - Defense One, Breaking Defense, Bellingcat, Krebs Security
 - **Think Tanks** - Foreign Policy, Brookings, CSIS, CFR
 - **Layoffs Tracker** - Tech industry job cuts
-- **Congress Trades** - Congressional stock trading activity
+
+### Live News Streams
+
+Embedded YouTube live streams from major news networks with channel switching:
+
+| Channel | Coverage |
+|---------|----------|
+| **Bloomberg** | Business & financial news |
+| **Sky News** | UK & international news |
+| **Euronews** | European perspective |
+| **DW News** | German international broadcaster |
+| **France 24** | French global news |
+| **Al Arabiya** | Middle East news (Arabic perspective) |
+| **Al Jazeera** | Middle East & international news |
+
+Features:
+- **Channel Switcher** - One-click switching between networks
+- **Live Indicator** - Blinking dot shows stream status, click to pause/play
+- **Mute Toggle** - Audio control (muted by default)
+- **Double-Width Panel** - Larger video player for better viewing
 
 ### Market Data
 - **Stocks** - Major indices and tech stocks via Finnhub (Yahoo Finance backup)
@@ -96,7 +115,7 @@ Universal search across all data sources:
 - Markets and predictions
 
 ### Data Export
-- JSON export of current dashboard state
+- CSV and JSON export of current dashboard state
 - Historical playback from snapshots
 
 ---
@@ -864,6 +883,7 @@ src/
 │   ├── VirtualList.ts        # Virtual/windowed scrolling
 │   ├── EconomicPanel.ts      # FRED economic indicators
 │   ├── GdeltIntelPanel.ts    # Topic-based intelligence (cyber, military, etc.)
+│   ├── LiveNewsPanel.ts      # YouTube live news streams with channel switching
 │   ├── NewsPanel.ts          # News feed with clustering
 │   ├── MarketPanel.ts        # Stock/commodity display
 │   ├── MonitorPanel.ts       # Custom keyword monitors
