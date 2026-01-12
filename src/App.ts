@@ -529,7 +529,7 @@ export class App {
           <label class="focus-label">FOCUS</label>
           <select class="focus-select" id="focusSelect">
             <option value="global">GLOBAL</option>
-            <option value="us">US</option>
+            <option value="america">AMERICA</option>
             <option value="eu">EUROPE</option>
             <option value="mena">MENA</option>
             <option value="asia">ASIA</option>

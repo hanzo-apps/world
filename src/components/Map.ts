@@ -25,7 +25,7 @@ import {
 import { MapPopup } from './MapPopup';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type MapView = 'global' | 'us' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 
 interface MapState {
   zoom: number;
@@ -42,12 +42,6 @@ interface HotspotWithBreaking extends Hotspot {
 interface WorldTopology extends Topology {
   objects: {
     countries: GeometryCollection;
-  };
-}
-
-interface USTopology extends Topology {
-  objects: {
-    states: GeometryCollection;
   };
 }
 
@@ -70,7 +64,6 @@ export class MapComponent {
   private clusterGl: WebGLRenderingContext | null = null;
   private state: MapState;
   private worldData: WorldTopology | null = null;
-  private usData: USTopology | null = null;
   private hotspots: HotspotWithBreaking[];
   private earthquakes: Earthquake[] = [];
   private weatherAlerts: WeatherAlert[] = [];
@@ -535,14 +528,8 @@ export class MapComponent {
 
   private async loadMapData(): Promise<void> {
     try {
-      const [worldResponse, usResponse] = await Promise.all([
-        fetch(MAP_URLS.world),
-        fetch(MAP_URLS.us),
-      ]);
-
+      const worldResponse = await fetch(MAP_URLS.world);
       this.worldData = await worldResponse.json();
-      this.usData = await usResponse.json();
-
       this.render();
     } catch (e) {
       console.error('Failed to load map data:', e);
@@ -597,25 +584,24 @@ export class MapComponent {
     // Countries
     this.renderCountries(path);
 
-    // Layers (show on global and mena views)
-    const showGlobalLayers = this.state.view !== 'us';
-    if (this.state.layers.cables && showGlobalLayers) {
+    // Render map layers
+    if (this.state.layers.cables) {
       this.renderCables(projection);
     }
 
-    if (this.state.layers.pipelines && showGlobalLayers) {
+    if (this.state.layers.pipelines) {
       this.renderPipelines(projection);
     }
 
-    if (this.state.layers.conflicts && showGlobalLayers) {
+    if (this.state.layers.conflicts) {
       this.renderConflicts(projection);
     }
 
-    if (this.state.layers.ais && showGlobalLayers) {
+    if (this.state.layers.ais) {
       this.renderAisDensity(projection);
     }
 
-    if (this.state.layers.sanctions && showGlobalLayers) {
+    if (this.state.layers.sanctions) {
       this.renderSanctions();
     }
 
@@ -655,15 +641,7 @@ export class MapComponent {
   }
 
   private getProjection(width: number, height: number): d3.GeoProjection {
-    // US view uses Albers USA projection, all others use equirectangular world projection
-    if (this.state.view === 'us') {
-      return d3
-        .geoAlbersUsa()
-        .scale(width * 1.3)
-        .translate([width / 2, height / 2]);
-    }
-
-    // All global/regional views use equirectangular projection
+    // All views use equirectangular projection (regional framing via zoom/pan)
     return d3
       .geoEquirectangular()
       .scale(width / (2 * Math.PI))
@@ -684,43 +662,25 @@ export class MapComponent {
   }
 
   private renderCountries(path: d3.GeoPath): void {
-    if (this.state.view !== 'us' && this.worldData) {
-      const countries = topojson.feature(
-        this.worldData,
-        this.worldData.objects.countries
-      );
+    if (!this.worldData) return;
 
-      const features = 'features' in countries ? countries.features : [countries];
+    const countries = topojson.feature(
+      this.worldData,
+      this.worldData.objects.countries
+    );
 
-      this.svg
-        .selectAll('.country')
-        .data(features)
-        .enter()
-        .append('path')
-        .attr('class', 'country')
-        .attr('d', path as unknown as string)
-        .attr('fill', '#0d3028')
-        .attr('stroke', '#1a8060')
-        .attr('stroke-width', 0.7);
-    } else if (this.state.view === 'us' && this.usData) {
-      const states = topojson.feature(
-        this.usData,
-        this.usData.objects.states
-      );
+    const features = 'features' in countries ? countries.features : [countries];
 
-      const features = 'features' in states ? states.features : [states];
-
-      this.svg
-        .selectAll('.state')
-        .data(features)
-        .enter()
-        .append('path')
-        .attr('class', 'state')
-        .attr('d', path as unknown as string)
-        .attr('fill', '#0d3028')
-        .attr('stroke', '#1a8060')
-        .attr('stroke-width', 0.7);
-    }
+    this.svg
+      .selectAll('.country')
+      .data(features)
+      .enter()
+      .append('path')
+      .attr('class', 'country')
+      .attr('d', path as unknown as string)
+      .attr('fill', '#0d3028')
+      .attr('stroke', '#1a8060')
+      .attr('stroke-width', 0.7);
   }
 
   private renderCables(projection: d3.GeoProjection): void {
@@ -871,32 +831,27 @@ export class MapComponent {
   private renderOverlays(projection: d3.GeoProjection): void {
     this.overlays.innerHTML = '';
 
-    const isWorldView = this.state.view !== 'us';
-
-    // Global/MENA only overlays
-    if (isWorldView) {
-      // Country labels (rendered first so they appear behind other overlays)
-      if (this.state.layers.countries) {
-        this.renderCountryLabels(projection);
-      }
-
-      // Conflict zone labels (HTML overlay with counter-scaling)
-      if (this.state.layers.conflicts) {
-        this.renderConflictLabels(projection);
-      }
-
-      // Strategic waterways
-      if (this.state.layers.waterways) {
-        this.renderWaterways(projection);
-      }
-
-      if (this.state.layers.ais) {
-        this.renderAisDisruptions(projection);
-      }
-
-      // APT groups
-      this.renderAPTMarkers(projection);
+    // Country labels (rendered first so they appear behind other overlays)
+    if (this.state.layers.countries) {
+      this.renderCountryLabels(projection);
     }
+
+    // Conflict zone labels (HTML overlay with counter-scaling)
+    if (this.state.layers.conflicts) {
+      this.renderConflictLabels(projection);
+    }
+
+    // Strategic waterways
+    if (this.state.layers.waterways) {
+      this.renderWaterways(projection);
+    }
+
+    if (this.state.layers.ais) {
+      this.renderAisDisruptions(projection);
+    }
+
+    // APT groups
+    this.renderAPTMarkers(projection);
 
     // Nuclear facilities (always HTML - shapes convey status)
     if (this.state.layers.nuclear) {
@@ -1219,7 +1174,7 @@ export class MapComponent {
     }
 
     // Cable advisories & repair ships
-    if (this.state.layers.cables && isWorldView) {
+    if (this.state.layers.cables) {
       this.cableAdvisories.forEach((advisory) => {
         const pos = projection([advisory.lon, advisory.lat]);
         if (!pos) return;
@@ -1842,9 +1797,9 @@ export class MapComponent {
     // Region-specific zoom and pan settings
     const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
       global: { zoom: 1, pan: { x: 0, y: 60 } },
-      us: { zoom: 2.5, pan: { x: 350, y: 120 } },
+      america: { zoom: 1.5, pan: { x: 350, y: 120 } },
       mena: { zoom: 2.5, pan: { x: -180, y: 60 } },
-      eu: { zoom: 2.8, pan: { x: 30, y: 20 } },
+      eu: { zoom: 2.5, pan: { x: -30, y: 140 } },
       asia: { zoom: 2.2, pan: { x: -350, y: 80 } },
       latam: { zoom: 2, pan: { x: 200, y: -80 } },
       africa: { zoom: 2.2, pan: { x: -20, y: -40 } },

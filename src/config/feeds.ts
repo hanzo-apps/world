@@ -31,10 +31,12 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Reuters Business': 1,
   'OpenAI News': 3,
 
-  // Tier 1.5 - Official Government Sources
+  // Tier 1 - Official Government & International Orgs
   'White House': 1,
   'State Dept': 1,
   'Pentagon': 1,
+  'UN News': 1,
+  'CISA': 1,
   'Treasury': 2,
   'DOJ': 2,
   'DHS': 2,
@@ -57,6 +59,8 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Ars Technica': 3,
   'Atlantic Council': 3,
   'Foreign Affairs': 3,
+  'Stratfor': 3,
+  'CrisisWatch': 3,
   'Layoffs.fyi': 3,
 
   // Tier 4 - Aggregators
@@ -82,16 +86,18 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'Reuters': 'wire', 'Reuters World': 'wire', 'Reuters Business': 'wire',
   'AP News': 'wire', 'AFP': 'wire', 'Bloomberg': 'wire',
 
-  // Government sources
+  // Government & International Org sources
   'White House': 'gov', 'State Dept': 'gov', 'Pentagon': 'gov',
   'Treasury': 'gov', 'DOJ': 'gov', 'DHS': 'gov', 'CDC': 'gov',
   'FEMA': 'gov', 'Federal Reserve': 'gov', 'SEC': 'gov',
+  'UN News': 'gov', 'CISA': 'gov',
 
   // Intel/Defense specialty
   'Defense One': 'intel', 'Breaking Defense': 'intel', 'The War Zone': 'intel',
   'Defense News': 'intel', 'Janes': 'intel', 'Bellingcat': 'intel', 'Krebs Security': 'intel',
   'Foreign Policy': 'intel', 'The Diplomat': 'intel',
   'Atlantic Council': 'intel', 'Foreign Affairs': 'intel',
+  'Stratfor': 'intel', 'CrisisWatch': 'intel',
 
   // Mainstream outlets
   'BBC World': 'mainstream', 'BBC Middle East': 'mainstream',
@@ -161,6 +167,8 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'CDC', url: rss('https://news.google.com/rss/search?q=site:cdc.gov+OR+CDC+health&hl=en-US&gl=US&ceid=US:en') },
     { name: 'FEMA', url: rss('https://news.google.com/rss/search?q=site:fema.gov+OR+FEMA+emergency&hl=en-US&gl=US&ceid=US:en') },
     { name: 'DHS', url: rss('https://news.google.com/rss/search?q=site:dhs.gov+OR+"Homeland+Security"&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'UN News', url: rss('https://news.un.org/feed/subscribe/en/news/all/rss.xml') },
+    { name: 'CISA', url: rss('https://www.cisa.gov/cybersecurity-advisories/all.xml') },
   ],
   layoffs: [
     { name: 'Layoffs.fyi', url: rss('https://layoffs.fyi/feed/') },
@@ -171,6 +179,10 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
     { name: 'Atlantic Council', url: rss('https://www.atlanticcouncil.org/feed/') },
     { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml') },
+    { name: 'Stratfor', url: rss('https://worldview.stratfor.com/rss') },
+  ],
+  crisis: [
+    { name: 'CrisisWatch', url: rss('https://www.crisisgroup.org/rss') },
   ],
 };
 
