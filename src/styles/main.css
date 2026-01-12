@@ -110,25 +110,41 @@ body {
   gap: 8px;
 }
 
-.view-btn {
-  padding: 4px 12px;
-  background: transparent;
-  border: 1px solid var(--border);
+.focus-label {
+  font-size: 10px;
   color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+
+.focus-select {
+  padding: 4px 24px 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-family: inherit;
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2388a0a8' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  min-width: 100px;
 }
 
-.view-btn:hover {
+.focus-select:hover {
   border-color: var(--text-dim);
 }
 
-.view-btn.active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
+.focus-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.focus-select option {
+  background: var(--panel-bg);
+  color: var(--text);
 }
 
 .header-right {
@@ -4792,10 +4808,15 @@ body.playback-mode .status-dot {
     gap: 4px;
   }
 
-  .view-btn {
-    padding: 6px 10px;
+  .focus-select {
+    padding: 6px 20px 6px 8px;
     font-size: 10px;
     min-height: 32px;
+    min-width: 80px;
+  }
+
+  .focus-label {
+    display: none;
   }
 
   /* Hide search button keyboard shortcut on mobile */
