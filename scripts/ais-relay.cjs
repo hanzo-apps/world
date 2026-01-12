@@ -62,6 +62,8 @@ const server = http.createServer(async (req, res) => {
         'rss.cnn.com',
         'www.defensenews.com',
         'layoffs.fyi',
+        'news.un.org',
+        'www.cisa.gov',
       ];
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
