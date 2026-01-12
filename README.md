@@ -54,8 +54,8 @@ Layers are organized into logical groups for efficient monitoring:
 **Natural Events**
 | Layer | Description |
 |-------|-------------|
-| **Earthquakes** | Live USGS seismic data (M4.5+ global) |
-| **Weather Alerts** | NWS severe weather warnings |
+| **Natural** | USGS earthquakes (M4.5+) + NASA EONET events (storms, wildfires, volcanoes, floods) |
+| **Weather** | NWS severe weather warnings |
 
 **Economic & Labels**
 | Layer | Description |
@@ -381,7 +381,7 @@ Each panel maintains independent activity state:
 - **News**: New clusters since last view
 - **Markets**: Price changes exceeding thresholds
 - **Predictions**: Probability shifts >5%
-- **Earthquakes**: New seismic events
+- **Natural Events**: New earthquakes and EONET events
 
 This enables focused monitoring—you can collapse panels you've reviewed and see at a glance which have new activity.
 
@@ -844,6 +844,7 @@ The dashboard fetches data from various public APIs and data sources:
 | Yahoo Finance | Stock indices & commodities (backup) | No |
 | CoinGecko | Cryptocurrency prices | No |
 | USGS | Earthquake data | No |
+| NASA EONET | Natural events (storms, fires, volcanoes, floods) | No |
 | NWS | Weather alerts | No |
 | FRED | Economic indicators (Fed data) | No |
 | Polymarket | Prediction markets | No |
@@ -912,6 +913,7 @@ src/
 │   ├── rss.ts                # RSS parsing with circuit breakers
 │   ├── markets.ts            # Finnhub, Yahoo Finance, CoinGecko
 │   ├── earthquakes.ts        # USGS integration
+│   ├── eonet.ts              # NASA EONET natural events
 │   ├── weather.ts            # NWS alerts
 │   ├── fred.ts               # Federal Reserve data
 │   ├── polymarket.ts         # Prediction markets (filtered)
@@ -999,6 +1001,7 @@ Aggregates **45+ RSS feeds** from major news outlets, government sources, and sp
 
 ### Live APIs
 - **USGS**: Earthquake feed (M4.5+ global)
+- **NASA EONET**: Natural events (storms, wildfires, volcanoes, floods)
 - **NWS**: Severe weather alerts (US)
 - **FAA**: Airport delays and ground stops
 - **Cloudflare Radar**: Internet outage detection
@@ -1029,6 +1032,7 @@ Data provided by [The OpenSky Network](https://opensky-network.org). If you use 
 
 ### Geophysical Data
 - **Earthquakes**: [U.S. Geological Survey](https://earthquake.usgs.gov/), ANSS Comprehensive Catalog
+- **Natural Events**: [NASA EONET](https://eonet.gsfc.nasa.gov/) - Earth Observatory Natural Event Tracker (storms, wildfires, volcanoes, floods)
 - **Weather Alerts**: [National Weather Service](https://www.weather.gov/) - Open data, free to use
 
 ### Infrastructure & Transport

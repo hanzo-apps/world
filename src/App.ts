@@ -11,7 +11,7 @@ import {
   MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -515,7 +515,7 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <span class="logo">WORLD MONITOR</span><span class="version">v1.2</span>
+          <span class="logo">WORLD MONITOR</span><span class="version">v1.3</span>
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">@eliehabib</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -1079,7 +1079,7 @@ export class App {
     ];
 
     // Conditionally load based on layer settings
-    if (this.mapLayers.earthquakes) tasks.push({ name: 'earthquakes', task: runGuarded('earthquakes', () => this.loadEarthquakes()) });
+    if (this.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (this.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
     if (this.mapLayers.outages) tasks.push({ name: 'outages', task: runGuarded('outages', () => this.loadOutages()) });
     if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
@@ -1108,8 +1108,8 @@ export class App {
     this.map?.setLayerLoading(layer, true);
     try {
       switch (layer) {
-        case 'earthquakes':
-          await this.loadEarthquakes();
+        case 'natural':
+          await this.loadNatural();
           break;
         case 'weather':
           await this.loadWeatherAlerts();
@@ -1309,16 +1309,40 @@ export class App {
     }
   }
 
-  private async loadEarthquakes(): Promise<void> {
-    try {
-      const earthquakes = await fetchEarthquakes();
-      this.map?.setEarthquakes(earthquakes);
-      this.map?.setLayerReady('earthquakes', earthquakes.length > 0);
+  private async loadNatural(): Promise<void> {
+    // Load both USGS earthquakes and NASA EONET natural events in parallel
+    const [earthquakeResult, eonetResult] = await Promise.allSettled([
+      fetchEarthquakes(),
+      fetchNaturalEvents(30),
+    ]);
+
+    // Handle earthquakes (USGS)
+    if (earthquakeResult.status === 'fulfilled') {
+      this.map?.setEarthquakes(earthquakeResult.value);
       this.statusPanel?.updateApi('USGS', { status: 'ok' });
-    } catch {
-      this.map?.setLayerReady('earthquakes', false);
+    } else {
+      this.map?.setEarthquakes([]);
       this.statusPanel?.updateApi('USGS', { status: 'error' });
     }
+
+    // Handle natural events (EONET - storms, fires, volcanoes, etc.)
+    if (eonetResult.status === 'fulfilled') {
+      this.map?.setNaturalEvents(eonetResult.value);
+      this.statusPanel?.updateFeed('EONET', {
+        status: 'ok',
+        itemCount: eonetResult.value.length,
+      });
+      this.statusPanel?.updateApi('NASA EONET', { status: 'ok' });
+    } else {
+      this.map?.setNaturalEvents([]);
+      this.statusPanel?.updateFeed('EONET', { status: 'error', errorMessage: String(eonetResult.reason) });
+      this.statusPanel?.updateApi('NASA EONET', { status: 'error' });
+    }
+
+    // Set layer ready based on combined data
+    const hasEarthquakes = earthquakeResult.status === 'fulfilled' && earthquakeResult.value.length > 0;
+    const hasEonet = eonetResult.status === 'fulfilled' && eonetResult.value.length > 0;
+    this.map?.setLayerReady('natural', hasEarthquakes || hasEonet);
   }
 
   private async loadWeatherAlerts(): Promise<void> {
@@ -1486,6 +1510,7 @@ export class App {
     }
   }
 
+
   private async loadFredData(): Promise<void> {
     const economicPanel = this.panels['economic'] as EconomicPanel;
     const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
@@ -1587,7 +1612,7 @@ export class App {
     this.scheduleRefresh('pizzint', () => this.loadPizzInt(), 10 * 60 * 1000);
 
     // Only refresh layer data if layer is enabled
-    this.scheduleRefresh('earthquakes', () => this.loadEarthquakes(), 5 * 60 * 1000, () => this.mapLayers.earthquakes);
+    this.scheduleRefresh('natural', () => this.loadNatural(), 5 * 60 * 1000, () => this.mapLayers.natural);
     this.scheduleRefresh('weather', () => this.loadWeatherAlerts(), 10 * 60 * 1000, () => this.mapLayers.weather);
     this.scheduleRefresh('fred', () => this.loadFredData(), 30 * 60 * 1000);
     this.scheduleRefresh('outages', () => this.loadOutages(), 60 * 60 * 1000, () => this.mapLayers.outages);

@@ -2077,6 +2077,82 @@ body.playback-mode .status-dot {
   50% { opacity: 1; }
 }
 
+/* Natural Event markers (NASA EONET) */
+.nat-event-marker {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
+  transform-origin: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 54;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nat-event-marker:hover {
+  transform: translate(-50%, -50%) scale(calc(var(--marker-scale, 1) * 1.2));
+}
+
+.nat-event-icon {
+  font-size: 20px;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+}
+
+.nat-event-label {
+  font-size: 8px;
+  color: #fff;
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
+  font-weight: bold;
+  white-space: nowrap;
+  margin-top: 2px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nat-event-magnitude {
+  font-size: 7px;
+  color: var(--yellow);
+  text-shadow: 0 0 4px var(--bg);
+  font-weight: bold;
+}
+
+/* Category-specific colors */
+.nat-event-marker.severeStorms .nat-event-label { color: #00bfff; }
+.nat-event-marker.wildfires .nat-event-label { color: #ff6600; }
+.nat-event-marker.volcanoes .nat-event-label { color: #ff3300; }
+.nat-event-marker.floods .nat-event-label { color: #4169e1; }
+.nat-event-marker.landslides .nat-event-label { color: #8b4513; }
+.nat-event-marker.drought .nat-event-label { color: #daa520; }
+.nat-event-marker.dustHaze .nat-event-label { color: #a9a9a9; }
+.nat-event-marker.snow .nat-event-label { color: #87ceeb; }
+.nat-event-marker.tempExtremes .nat-event-label { color: #ff4444; }
+.nat-event-marker.seaLakeIce .nat-event-label { color: #b0e0e6; }
+.nat-event-marker.waterColor .nat-event-label { color: #20b2aa; }
+.nat-event-marker.manmade .nat-event-label { color: #9932cc; }
+
+/* Popup header for natural events */
+.popup-header.nat-event {
+  background: rgba(255, 136, 0, 0.1);
+}
+
+.popup-header.nat-event .popup-title {
+  color: #ff8800;
+}
+
+.popup-header.nat-event.severeStorms { background: rgba(0, 191, 255, 0.1); }
+.popup-header.nat-event.severeStorms .popup-title { color: #00bfff; }
+
+.popup-header.nat-event.wildfires { background: rgba(255, 102, 0, 0.15); }
+.popup-header.nat-event.wildfires .popup-title { color: #ff6600; }
+
+.popup-header.nat-event.volcanoes { background: rgba(255, 51, 0, 0.15); }
+.popup-header.nat-event.volcanoes .popup-title { color: #ff3300; }
+
+.popup-header.nat-event.floods { background: rgba(65, 105, 225, 0.1); }
+.popup-header.nat-event.floods .popup-title { color: #4169e1; }
+
 /* Nuclear markers */
 .nuclear-marker {
   position: absolute;
@@ -3450,7 +3526,8 @@ body.playback-mode .status-dot {
 
 .map-wrapper[data-layer-hidden-bases="true"] .base-marker,
 .map-wrapper[data-layer-hidden-nuclear="true"] .nuclear-marker,
-.map-wrapper[data-layer-hidden-earthquakes="true"] .earthquake-marker,
+.map-wrapper[data-layer-hidden-natural="true"] .earthquake-marker,
+.map-wrapper[data-layer-hidden-natural="true"] .nat-event-marker,
 .map-wrapper[data-layer-hidden-economic="true"] .economic-marker,
 .map-wrapper[data-layer-hidden-conflicts="true"] .conflicts,
 .map-wrapper[data-layer-hidden-conflicts="true"] .conflict-label-overlay,
@@ -3466,7 +3543,8 @@ body.playback-mode .status-dot {
 
 .map-wrapper[data-labels-hidden-bases="true"] .base-label,
 .map-wrapper[data-labels-hidden-nuclear="true"] .nuclear-label,
-.map-wrapper[data-labels-hidden-earthquakes="true"] .earthquake-label,
+.map-wrapper[data-labels-hidden-natural="true"] .earthquake-label,
+.map-wrapper[data-labels-hidden-natural="true"] .nat-event-label,
 .map-wrapper[data-labels-hidden-economic="true"] .economic-label,
 .map-wrapper[data-labels-hidden-conflicts="true"] .conflict-label-overlay {
   opacity: 0;

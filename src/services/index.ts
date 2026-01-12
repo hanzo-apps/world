@@ -17,5 +17,6 @@ export * from './flights';
 export * from './military-flights';
 export * from './military-vessels';
 export * from './pizzint';
+export * from './eonet';
 export { analysisWorker } from './analysis-worker';
 export { activityTracker } from './activity-tracker';

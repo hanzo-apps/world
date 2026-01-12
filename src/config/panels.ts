@@ -36,7 +36,6 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   nuclear: true,
   irradiators: false,
   sanctions: true,
-  earthquakes: true,
   weather: true,
   economic: true,
   countries: true,
@@ -46,6 +45,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   protests: true,
   flights: false,
   military: false,
+  natural: true,
 };
 
 // Mobile-specific defaults: minimal layers for better usability
@@ -59,7 +59,6 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   nuclear: false,
   irradiators: false,
   sanctions: false,
-  earthquakes: false,
   weather: false,
   economic: false,
   countries: false,
@@ -69,6 +68,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   protests: false,
   flights: false,
   military: false,
+  natural: false,
 };
 
 export const MONITOR_COLORS = [
