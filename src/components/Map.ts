@@ -2,7 +2,8 @@ import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import { escapeHtml } from '@/utils/sanitize';
 import type { Topology, GeometryCollection } from 'topojson-specification';
-import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster } from '@/types';
+import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent } from '@/types';
+import { getNaturalEventIcon } from '@/services/eonet';
 import type { WeatherAlert } from '@/services/weather';
 import { getSeverityColor } from '@/services/weather';
 import {
@@ -53,7 +54,7 @@ export class MapComponent {
     nuclear: { minZoom: 2, showLabels: 4 },
     conflicts: { minZoom: 1, showLabels: 3 },
     economic: { minZoom: 2, showLabels: 4 },
-    earthquakes: { minZoom: 1, showLabels: 2 },
+    natural: { minZoom: 1, showLabels: 2 },
   };
 
   private container: HTMLElement;
@@ -78,6 +79,7 @@ export class MapComponent {
   private militaryFlightClusters: MilitaryFlightCluster[] = [];
   private militaryVessels: MilitaryVessel[] = [];
   private militaryVesselClusters: MilitaryVesselCluster[] = [];
+  private naturalEvents: NaturalEvent[] = [];
   private news: NewsItem[] = [];
   private popup: MapPopup;
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -241,7 +243,7 @@ export class MapComponent {
       'military',                                         // military tracking (flights + vessels)
       'cables', 'pipelines', 'outages', 'datacenters',   // infrastructure
       'ais', 'flights',                                   // transport
-      'earthquakes', 'weather',                           // natural
+      'natural', 'weather',                               // natural
       'economic',                                         // economic
       'countries', 'waterways',                           // labels
     ];
@@ -320,7 +322,7 @@ export class MapComponent {
         </div>
         <div class="layer-help-section">
           <div class="layer-help-title">Natural & Economic</div>
-          <div class="layer-help-item"><span>EARTHQUAKES</span> M4.5+ seismic events (time-filtered)</div>
+          <div class="layer-help-item"><span>NATURAL</span> Earthquakes (USGS) + storms, fires, volcanoes, floods (NASA EONET)</div>
           <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts</div>
           <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
         </div>
@@ -1019,9 +1021,9 @@ export class MapComponent {
       });
     }
 
-    // Earthquakes (magnitude-based sizing)
-    if (this.state.layers.earthquakes) {
-      console.log('[Map] Rendering earthquakes. Total:', this.earthquakes.length, 'Layer enabled:', this.state.layers.earthquakes);
+    // Earthquakes (magnitude-based sizing) - part of NATURAL layer
+    if (this.state.layers.natural) {
+      console.log('[Map] Rendering earthquakes. Total:', this.earthquakes.length, 'Layer enabled:', this.state.layers.natural);
       const filteredQuakes = this.filterByTime(this.earthquakes);
       console.log('[Map] After time filter:', filteredQuakes.length, 'earthquakes. TimeRange:', this.state.timeRange);
       let rendered = 0;
@@ -1561,6 +1563,51 @@ export class MapComponent {
         this.overlays.appendChild(div);
       });
     }
+
+    // Natural Events (NASA EONET) - part of NATURAL layer
+    if (this.state.layers.natural) {
+      this.naturalEvents.forEach((event) => {
+        const pos = projection([event.lon, event.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `nat-event-marker ${event.category}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'nat-event-icon';
+        icon.textContent = getNaturalEventIcon(event.category);
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 2) {
+          const label = document.createElement('div');
+          label.className = 'nat-event-label';
+          label.textContent = event.title.length > 25 ? event.title.slice(0, 25) + '…' : event.title;
+          div.appendChild(label);
+        }
+
+        if (event.magnitude) {
+          const mag = document.createElement('div');
+          mag.className = 'nat-event-magnitude';
+          mag.textContent = `${event.magnitude}${event.magnitudeUnit ? ` ${event.magnitudeUnit}` : ''}`;
+          div.appendChild(mag);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'natEvent',
+            data: event,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
   }
 
   private renderCountryLabels(projection: d3.GeoProjection): void {
@@ -1814,7 +1861,7 @@ export class MapComponent {
   }
 
   private static readonly ASYNC_DATA_LAYERS: Set<keyof MapLayers> = new Set([
-    'earthquakes', 'weather', 'outages', 'ais', 'protests', 'flights', 'military',
+    'natural', 'weather', 'outages', 'ais', 'protests', 'flights', 'military',
   ]);
 
   public toggleLayer(layer: keyof MapLayers): void {
@@ -2323,6 +2370,11 @@ export class MapComponent {
   public setMilitaryVessels(vessels: MilitaryVessel[], clusters: MilitaryVesselCluster[] = []): void {
     this.militaryVessels = vessels;
     this.militaryVesselClusters = clusters;
+    this.render();
+  }
+
+  public setNaturalEvents(events: NaturalEvent[]): void {
+    this.naturalEvents = events;
     this.render();
   }
 
