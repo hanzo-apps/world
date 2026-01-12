@@ -25,7 +25,7 @@ import {
 import { MapPopup } from './MapPopup';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type MapView = 'global' | 'us' | 'mena';
+export type MapView = 'global' | 'us' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 
 interface MapState {
   zoom: number;
@@ -598,7 +598,7 @@ export class MapComponent {
     this.renderCountries(path);
 
     // Layers (show on global and mena views)
-    const showGlobalLayers = this.state.view === 'global' || this.state.view === 'mena';
+    const showGlobalLayers = this.state.view !== 'us';
     if (this.state.layers.cables && showGlobalLayers) {
       this.renderCables(projection);
     }
@@ -655,18 +655,19 @@ export class MapComponent {
   }
 
   private getProjection(width: number, height: number): d3.GeoProjection {
-    if (this.state.view === 'global' || this.state.view === 'mena') {
-      // Scale by width to fill horizontally, center at equator
+    // US view uses Albers USA projection, all others use equirectangular world projection
+    if (this.state.view === 'us') {
       return d3
-        .geoEquirectangular()
-        .scale(width / (2 * Math.PI))
-        .center([0, 0])
+        .geoAlbersUsa()
+        .scale(width * 1.3)
         .translate([width / 2, height / 2]);
     }
 
+    // All global/regional views use equirectangular projection
     return d3
-      .geoAlbersUsa()
-      .scale(width * 1.3)
+      .geoEquirectangular()
+      .scale(width / (2 * Math.PI))
+      .center([0, 0])
       .translate([width / 2, height / 2]);
   }
 
@@ -683,7 +684,7 @@ export class MapComponent {
   }
 
   private renderCountries(path: d3.GeoPath): void {
-    if ((this.state.view === 'global' || this.state.view === 'mena') && this.worldData) {
+    if (this.state.view !== 'us' && this.worldData) {
       const countries = topojson.feature(
         this.worldData,
         this.worldData.objects.countries
@@ -870,10 +871,10 @@ export class MapComponent {
   private renderOverlays(projection: d3.GeoProjection): void {
     this.overlays.innerHTML = '';
 
-    const isGlobalOrMena = this.state.view === 'global' || this.state.view === 'mena';
+    const isWorldView = this.state.view !== 'us';
 
     // Global/MENA only overlays
-    if (isGlobalOrMena) {
+    if (isWorldView) {
       // Country labels (rendered first so they appear behind other overlays)
       if (this.state.layers.countries) {
         this.renderCountryLabels(projection);
@@ -1218,7 +1219,7 @@ export class MapComponent {
     }
 
     // Cable advisories & repair ships
-    if (this.state.layers.cables && isGlobalOrMena) {
+    if (this.state.layers.cables && isWorldView) {
       this.cableAdvisories.forEach((advisory) => {
         const pos = projection([advisory.lon, advisory.lat]);
         if (!pos) return;
@@ -1837,11 +1838,22 @@ export class MapComponent {
 
   public setView(view: MapView): void {
     this.state.view = view;
-    // Reset zoom when changing views for better UX
-    this.state.zoom = view === 'mena' ? 2.5 : 1;
-    // MENA: pan to center on Middle East region
-    // Global: no pan offset (SVG viewBox clips at boundaries, so translate creates blank space)
-    this.state.pan = view === 'mena' ? { x: -180, y: 60 } : { x: 0, y: 0 };
+
+    // Region-specific zoom and pan settings
+    const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
+      global: { zoom: 1, pan: { x: 0, y: 60 } },
+      us: { zoom: 2.5, pan: { x: 350, y: 120 } },
+      mena: { zoom: 2.5, pan: { x: -180, y: 60 } },
+      eu: { zoom: 2.8, pan: { x: 30, y: 20 } },
+      asia: { zoom: 2.2, pan: { x: -350, y: 80 } },
+      latam: { zoom: 2, pan: { x: 200, y: -80 } },
+      africa: { zoom: 2.2, pan: { x: -20, y: -40 } },
+      oceania: { zoom: 2.5, pan: { x: -450, y: -120 } },
+    };
+
+    const settings = viewSettings[view];
+    this.state.zoom = settings.zoom;
+    this.state.pan = settings.pan;
     this.applyTransform();
     this.render();
   }
