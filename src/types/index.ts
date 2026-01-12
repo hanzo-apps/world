@@ -322,7 +322,6 @@ export interface MapLayers {
   nuclear: boolean;
   irradiators: boolean;
   sanctions: boolean;
-  earthquakes: boolean;
   weather: boolean;
   economic: boolean;
   countries: boolean;
@@ -332,6 +331,7 @@ export interface MapLayers {
   protests: boolean;
   flights: boolean;
   military: boolean;
+  natural: boolean;
 }
 
 export interface AIDataCenter {
@@ -650,4 +650,36 @@ export interface GdeltTensionPair {
   trend: 'rising' | 'stable' | 'falling';
   changePercent: number;
   region: string;
+}
+
+// NASA EONET Natural Events
+export type NaturalEventCategory =
+  | 'severeStorms'
+  | 'wildfires'
+  | 'volcanoes'
+  | 'earthquakes'
+  | 'floods'
+  | 'landslides'
+  | 'drought'
+  | 'dustHaze'
+  | 'snow'
+  | 'tempExtremes'
+  | 'seaLakeIce'
+  | 'waterColor'
+  | 'manmade';
+
+export interface NaturalEvent {
+  id: string;
+  title: string;
+  description?: string;
+  category: NaturalEventCategory;
+  categoryTitle: string;
+  lat: number;
+  lon: number;
+  date: Date;
+  magnitude?: number;
+  magnitudeUnit?: string;
+  sourceUrl?: string;
+  sourceName?: string;
+  closed: boolean;
 }
