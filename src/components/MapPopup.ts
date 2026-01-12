@@ -1,15 +1,16 @@
-import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster } from '@/types';
+import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { isMobileDevice } from '@/utils';
 import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticle } from '@/services/gdelt-intel';
+import { getNaturalEventIcon } from '@/services/eonet';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent';
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -132,6 +133,8 @@ export class MapPopup {
         return this.renderMilitaryFlightClusterPopup(data.data as MilitaryFlightCluster);
       case 'militaryVesselCluster':
         return this.renderMilitaryVesselClusterPopup(data.data as MilitaryVesselCluster);
+      case 'natEvent':
+        return this.renderNaturalEventPopup(data.data as NaturalEvent);
       default:
         return '';
     }
@@ -1321,6 +1324,64 @@ export class MapPopup {
             ${moreVessels}
           </div>
         </div>
+      </div>
+    `;
+  }
+
+  private renderNaturalEventPopup(event: NaturalEvent): string {
+    const categoryColors: Record<string, string> = {
+      severeStorms: 'high',
+      wildfires: 'high',
+      volcanoes: 'high',
+      earthquakes: 'elevated',
+      floods: 'elevated',
+      landslides: 'elevated',
+      drought: 'medium',
+      dustHaze: 'low',
+      snow: 'low',
+      tempExtremes: 'elevated',
+      seaLakeIce: 'low',
+      waterColor: 'low',
+      manmade: 'elevated',
+    };
+    const icon = getNaturalEventIcon(event.category);
+    const severityClass = categoryColors[event.category] || 'low';
+    const timeAgo = this.getTimeAgo(event.date);
+
+    return `
+      <div class="popup-header nat-event ${event.category}">
+        <span class="popup-icon">${icon}</span>
+        <span class="popup-title">${escapeHtml(event.categoryTitle.toUpperCase())}</span>
+        <span class="popup-badge ${severityClass}">${event.closed ? 'CLOSED' : 'ACTIVE'}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(event.title)}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">REPORTED</span>
+            <span class="stat-value">${timeAgo}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">COORDINATES</span>
+            <span class="stat-value">${event.lat.toFixed(2)}°, ${event.lon.toFixed(2)}°</span>
+          </div>
+          ${event.magnitude ? `
+          <div class="popup-stat">
+            <span class="stat-label">MAGNITUDE</span>
+            <span class="stat-value">${event.magnitude}${event.magnitudeUnit ? ` ${escapeHtml(event.magnitudeUnit)}` : ''}</span>
+          </div>
+          ` : ''}
+          ${event.sourceName ? `
+          <div class="popup-stat">
+            <span class="stat-label">SOURCE</span>
+            <span class="stat-value">${escapeHtml(event.sourceName)}</span>
+          </div>
+          ` : ''}
+        </div>
+        ${event.description ? `<p class="popup-description">${escapeHtml(event.description)}</p>` : ''}
+        ${event.sourceUrl ? `<a href="${sanitizeUrl(event.sourceUrl)}" target="_blank" class="popup-link">View on ${escapeHtml(event.sourceName || 'source')} →</a>` : ''}
+        <div class="popup-attribution">Data: NASA EONET</div>
       </div>
     `;
   }
