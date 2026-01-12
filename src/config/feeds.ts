@@ -59,8 +59,16 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Ars Technica': 3,
   'Atlantic Council': 3,
   'Foreign Affairs': 3,
-  'Stratfor': 3,
   'CrisisWatch': 3,
+  'CSIS': 3,
+  'RAND': 3,
+  'Brookings': 3,
+  'Carnegie': 3,
+  'IAEA': 1,
+  'WHO': 1,
+  'UNHCR': 1,
+  'Xinhua': 3,
+  'TASS': 3,
   'Layoffs.fyi': 3,
 
   // Tier 4 - Aggregators
@@ -97,7 +105,10 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'Defense News': 'intel', 'Janes': 'intel', 'Bellingcat': 'intel', 'Krebs Security': 'intel',
   'Foreign Policy': 'intel', 'The Diplomat': 'intel',
   'Atlantic Council': 'intel', 'Foreign Affairs': 'intel',
-  'Stratfor': 'intel', 'CrisisWatch': 'intel',
+  'CrisisWatch': 'intel',
+  'CSIS': 'intel', 'RAND': 'intel', 'Brookings': 'intel', 'Carnegie': 'intel',
+  'IAEA': 'gov', 'WHO': 'gov', 'UNHCR': 'gov',
+  'Xinhua': 'wire', 'TASS': 'wire',
 
   // Mainstream outlets
   'BBC World': 'mainstream', 'BBC Middle East': 'mainstream',
@@ -179,10 +190,20 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
     { name: 'Atlantic Council', url: rss('https://www.atlanticcouncil.org/feed/') },
     { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml') },
-    { name: 'Stratfor', url: rss('https://worldview.stratfor.com/rss') },
+    { name: 'CSIS', url: rss('https://news.google.com/rss/search?q=site:csis.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'RAND', url: rss('https://news.google.com/rss/search?q=site:rand.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Brookings', url: rss('https://news.google.com/rss/search?q=site:brookings.edu+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Carnegie', url: rss('https://news.google.com/rss/search?q=site:carnegieendowment.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   crisis: [
     { name: 'CrisisWatch', url: rss('https://www.crisisgroup.org/rss') },
+    { name: 'IAEA', url: rss('https://www.iaea.org/feeds/topnews') },
+    { name: 'WHO', url: rss('https://www.who.int/rss-feeds/news-english.xml') },
+    { name: 'UNHCR', url: rss('https://news.google.com/rss/search?q=site:unhcr.org+OR+UNHCR+refugees+when:3d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  regional: [
+    { name: 'Xinhua', url: rss('https://news.google.com/rss/search?q=site:xinhuanet.com+OR+Xinhua+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'TASS', url: rss('https://news.google.com/rss/search?q=site:tass.com+OR+TASS+Russia+when:1d&hl=en-US&gl=US&ceid=US:en') },
   ],
 };
 
