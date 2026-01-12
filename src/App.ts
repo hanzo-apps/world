@@ -34,6 +34,7 @@ import {
   GdeltIntelPanel,
   LiveNewsPanel,
 } from '@/components';
+import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
 import { PIPELINES } from '@/config/pipelines';
@@ -525,9 +526,17 @@ export class App {
           </div>
         </div>
         <div class="header-center">
-          <button class="view-btn active" data-view="global">GLOBAL</button>
-          <button class="view-btn" data-view="us">US</button>
-          <button class="view-btn" data-view="mena">MENA</button>
+          <label class="focus-label">FOCUS</label>
+          <select class="focus-select" id="focusSelect">
+            <option value="global">GLOBAL</option>
+            <option value="us">US</option>
+            <option value="eu">EUROPE</option>
+            <option value="mena">MENA</option>
+            <option value="asia">ASIA</option>
+            <option value="africa">AFRICA</option>
+            <option value="latam">LAT AM</option>
+            <option value="oceania">OCEANIA</option>
+          </select>
         </div>
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> Search</button>
@@ -694,7 +703,7 @@ export class App {
     // Set correct view button state (especially for mobile defaults)
     const currentView = this.map?.getState().view;
     if (currentView) {
-      this.setActiveViewButton(currentView);
+      this.setActiveFocusRegion(currentView);
     }
   }
 
@@ -705,7 +714,7 @@ export class App {
 
     if (view) {
       this.map.setView(view);
-      this.setActiveViewButton(view);
+      this.setActiveFocusRegion(view);
     }
 
     if (timeRange) {
@@ -829,13 +838,11 @@ export class App {
   }
 
   private setupEventListeners(): void {
-    // View buttons
-    document.querySelectorAll('.view-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const view = (btn as HTMLElement).dataset.view as 'global' | 'us' | 'mena';
-        this.setActiveViewButton(view);
-        this.map?.setView(view);
-      });
+    // Focus region selector
+    const focusSelect = document.getElementById('focusSelect') as HTMLSelectElement;
+    focusSelect?.addEventListener('change', () => {
+      const view = focusSelect.value as MapView;
+      this.map?.setView(view);
     });
 
     // Search button
@@ -900,7 +907,7 @@ export class App {
 
     this.map.onStateChanged((state) => {
       update();
-      this.setActiveViewButton(state.view);
+      this.setActiveFocusRegion(state.view);
     });
     update();
   }
@@ -945,11 +952,11 @@ export class App {
     }, 1500);
   }
 
-  private setActiveViewButton(view: 'global' | 'us' | 'mena'): void {
-    document.querySelectorAll('.view-btn').forEach((btn) => {
-      const isActive = (btn as HTMLElement).dataset.view === view;
-      btn.classList.toggle('active', isActive);
-    });
+  private setActiveFocusRegion(view: MapView): void {
+    const focusSelect = document.getElementById('focusSelect') as HTMLSelectElement;
+    if (focusSelect) {
+      focusSelect.value = view;
+    }
   }
 
   private toggleFullscreen(): void {
