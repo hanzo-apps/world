@@ -1,4 +1,4 @@
-import type { GeoConvergenceAlert } from './geo-convergence';
+import { getLocationName, type GeoConvergenceAlert } from './geo-convergence';
 import type { CountryScore } from './country-instability';
 import type { CascadeResult, CascadeImpactLevel } from '@/types';
 import { calculateCII, TIER1_COUNTRIES } from './country-instability';
@@ -408,7 +408,8 @@ function identifyTopRisks(
 
   const top = convergence[0];
   if (top) {
-    risks.push(`Convergence zone at ${top.lat.toFixed(0)}°, ${top.lon.toFixed(0)}° (score: ${top.score})`);
+    const location = getLocationName(top.lat, top.lon);
+    risks.push(`Convergence: ${location} (score: ${top.score})`);
   }
 
   const critical = cii.filter(s => s.level === 'critical' || s.level === 'high');
