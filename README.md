@@ -1083,6 +1083,20 @@ The system degrades gracefully—blocked sources are skipped while others contin
 
 ---
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned enhancements focused on intelligence correlation:
+
+1. **Multi-Signal Geographic Convergence** - Alert when 3+ data types converge on same region
+2. **Country Instability Index** - Real-time composite risk score per country
+3. **Temporal Anomaly Detection** - Flag activity unusual for time of day/week/year
+4. **Trade Route Risk Scoring** - Supply chain vulnerability assessment
+5. **Infrastructure Cascade Visualization** - Show downstream effects of disruptions
+
+The roadmap also documents 30+ free APIs and RSS feeds for future integration (World Bank, OFAC Sanctions, UNHCR, FAO food security, think tanks, etc.).
+
+---
+
 ## Design Philosophy
 
 **Information density over aesthetics.** Every pixel should convey signal. The dark interface minimizes eye strain during extended monitoring sessions.
