@@ -731,13 +731,16 @@ export interface InfrastructureNode {
 }
 
 export type DependencyType =
-  | 'serves'              // Cable serves country
+  | 'serves'              // Infrastructure serves country
   | 'terminates_at'       // Pipeline terminates at port
   | 'transits_through'    // Route transits chokepoint
   | 'lands_at'            // Cable lands at country
   | 'depends_on'          // Port depends on pipeline
   | 'shares_risk'         // Assets share vulnerability
-  | 'alternative_to';     // Provides redundancy
+  | 'alternative_to'      // Provides redundancy
+  | 'trade_route'         // Port enables trade route
+  | 'controls_access'     // Chokepoint controls access
+  | 'trade_dependency';   // Country depends on trade route
 
 export interface DependencyEdge {
   from: string;           // Node ID
@@ -749,6 +752,8 @@ export interface DependencyEdge {
     capacityShare?: number;
     alternativeRoutes?: number;
     estimatedImpact?: string;
+    portType?: string;
+    relationship?: string;
   };
 }
 
