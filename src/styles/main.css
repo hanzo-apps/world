@@ -1251,6 +1251,7 @@ body.playback-mode .status-dot {
   height: 100%;
   transition: transform 0.3s ease;
   position: relative;
+  transform-origin: 0 0;
 }
 
 .map-cluster-canvas {

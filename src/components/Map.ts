@@ -1898,15 +1898,16 @@ export class MapComponent {
     this.state.view = view;
 
     // Region-specific zoom and pan settings
+    // Pan values shift view: +x shows west, -x shows east, +y shows north, -y shows south
     const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
-      global: { zoom: 1, pan: { x: 0, y: 60 } },
-      america: { zoom: 1.5, pan: { x: 350, y: 120 } },
-      mena: { zoom: 2.5, pan: { x: -180, y: 60 } },
-      eu: { zoom: 2.5, pan: { x: -30, y: 140 } },
-      asia: { zoom: 2.2, pan: { x: -350, y: 80 } },
-      latam: { zoom: 2, pan: { x: 200, y: -80 } },
-      africa: { zoom: 2.2, pan: { x: -20, y: -40 } },
-      oceania: { zoom: 2.5, pan: { x: -450, y: -120 } },
+      global: { zoom: 1, pan: { x: 0, y: 30 } },
+      america: { zoom: 1.8, pan: { x: 220, y: 60 } },
+      mena: { zoom: 2.8, pan: { x: -100, y: 60 } },
+      eu: { zoom: 3.2, pan: { x: -25, y: 180 } },
+      asia: { zoom: 2.2, pan: { x: -200, y: 70 } },
+      latam: { zoom: 2.2, pan: { x: 150, y: -50 } },
+      africa: { zoom: 2.2, pan: { x: -30, y: 0 } },
+      oceania: { zoom: 2.8, pan: { x: -280, y: -60 } },
     };
 
     const settings = viewSettings[view];
@@ -2191,15 +2192,11 @@ export class MapComponent {
     const zoom = this.state.zoom;
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-    const mapHeight = width / 2; // Equirectangular 2:1 ratio
 
-    // Horizontal: at zoom 1, no pan. At higher zooms, allow proportional pan
-    const maxPanX = ((zoom - 1) / zoom) * (width / 2);
-
-    // Vertical: allow panning to see poles if map extends beyond container
-    const extraVertical = Math.max(0, (mapHeight - height) / 2);
-    const zoomPanY = ((zoom - 1) / zoom) * (height / 2);
-    const maxPanY = extraVertical + zoomPanY;
+    // Allow generous panning - maps should be explorable
+    // Scale limits with zoom to allow reaching edges at higher zoom
+    const maxPanX = (width / 2) * Math.max(1, zoom * 0.8);
+    const maxPanY = (height / 2) * Math.max(1, zoom * 0.8);
 
     this.state.pan.x = Math.max(-maxPanX, Math.min(maxPanX, this.state.pan.x));
     this.state.pan.y = Math.max(-maxPanY, Math.min(maxPanY, this.state.pan.y));
@@ -2208,7 +2205,17 @@ export class MapComponent {
   private applyTransform(): void {
     this.clampPan();
     const zoom = this.state.zoom;
-    this.wrapper.style.transform = `scale(${zoom}) translate(${this.state.pan.x}px, ${this.state.pan.y}px)`;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+
+    // With transform-origin: 0 0, we need to offset to keep center in view
+    // Formula: translate first to re-center, then scale
+    const centerOffsetX = (width / 2) * (1 - zoom);
+    const centerOffsetY = (height / 2) * (1 - zoom);
+    const tx = centerOffsetX + this.state.pan.x * zoom;
+    const ty = centerOffsetY + this.state.pan.y * zoom;
+
+    this.wrapper.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
 
     // Set CSS variable for counter-scaling labels/markers
     // Labels: max 1.5x scale, so counter-scale = min(1.5, zoom) / zoom
