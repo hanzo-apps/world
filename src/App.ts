@@ -1462,8 +1462,10 @@ export class App {
       ingestProtestsForCII(protestData.events);
 
       // Record data freshness AFTER CII ingestion to avoid race conditions
-      if (protestData.sources.acled > 0) {
-        dataFreshness.recordUpdate('acled', protestData.sources.acled);
+      // For 'acled' source: count GDELT protests too since GDELT serves as fallback
+      const protestCount = protestData.sources.acled + protestData.sources.gdelt;
+      if (protestCount > 0) {
+        dataFreshness.recordUpdate('acled', protestCount);
       }
       if (protestData.sources.gdelt > 0) {
         dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
