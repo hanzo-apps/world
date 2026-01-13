@@ -116,5 +116,12 @@ export async function fetchCategoryFeeds(
     options.onBatch?.(items.slice(0, 20));
   }
 
+  // Record data freshness if we got items
+  if (items.length > 0) {
+    import('./data-freshness').then(({ dataFreshness }) => {
+      dataFreshness.recordUpdate('rss', items.length);
+    });
+  }
+
   return items.slice(0, 20);
 }
