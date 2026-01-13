@@ -19,7 +19,21 @@ export class CascadePanel extends Panel {
   private onSelectCallback: ((nodeId: string | null) => void) | null = null;
 
   constructor() {
-    super({ id: 'cascade', title: 'Infrastructure Cascade', showCount: true, trackActivity: true });
+    super({
+      id: 'cascade',
+      title: 'Infrastructure Cascade',
+      showCount: true,
+      trackActivity: true,
+      infoTooltip: `<strong>Cascade Analysis</strong>
+        Models infrastructure dependencies:
+        <ul>
+          <li>Subsea cables, pipelines, ports, chokepoints</li>
+          <li>Select infrastructure to simulate failure</li>
+          <li>Shows affected countries and capacity loss</li>
+          <li>Identifies redundant routes</li>
+        </ul>
+        Data from TeleGeography and industry sources.`,
+    });
     this.init();
   }
 

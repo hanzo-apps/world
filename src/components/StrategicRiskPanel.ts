@@ -26,7 +26,20 @@ export class StrategicRiskPanel extends Panel {
   private unsubscribeFreshness: (() => void) | null = null;
 
   constructor() {
-    super({ id: 'strategic-risk', title: 'Strategic Risk Overview', showCount: false, trackActivity: true });
+    super({
+      id: 'strategic-risk',
+      title: 'Strategic Risk Overview',
+      showCount: false,
+      trackActivity: true,
+      infoTooltip: `<strong>Methodology</strong>
+        Composite score (0-100) blending:
+        <ul>
+          <li>50% Country Instability (top 5 weighted)</li>
+          <li>30% Geographic convergence zones</li>
+          <li>20% Infrastructure incidents</li>
+        </ul>
+        Auto-refreshes every 5 minutes.`,
+    });
     this.init();
   }
 

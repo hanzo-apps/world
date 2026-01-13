@@ -4,7 +4,18 @@ import { escapeHtml } from '@/utils/sanitize';
 
 export class PredictionPanel extends Panel {
   constructor() {
-    super({ id: 'polymarket', title: 'Prediction Markets' });
+    super({
+      id: 'polymarket',
+      title: 'Prediction Markets',
+      infoTooltip: `<strong>Prediction Markets</strong>
+        Real-money forecasting markets:
+        <ul>
+          <li>Prices reflect crowd probability estimates</li>
+          <li>Higher volume = more reliable signal</li>
+          <li>Geopolitical and current events focus</li>
+        </ul>
+        Source: Polymarket (polymarket.com)`,
+    });
   }
 
   private formatVolume(volume?: number): string {
