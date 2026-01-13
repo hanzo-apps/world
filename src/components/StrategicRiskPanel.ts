@@ -105,6 +105,14 @@ export class StrategicRiskPanel extends Panel {
     }
   }
 
+  private getActiveSourceNames(): string[] {
+    const sources = dataFreshness.getAllSources();
+    return sources
+      .filter(s => s.status === 'fresh' || s.status === 'stale')
+      .map(s => s.name.split(' ')[0]!)
+      .slice(0, 4);
+  }
+
   private getPriorityColor(priority: AlertPriority): string {
     switch (priority) {
       case 'critical': return '#ff4444';
@@ -196,7 +204,7 @@ export class StrategicRiskPanel extends Panel {
         <div class="risk-warning-banner">
           <span class="risk-warning-icon">⚠️</span>
           <span class="risk-warning-text">
-            Limited Assessment (${this.freshnessSummary.activeSources}/${this.freshnessSummary.totalSources} feeds)
+            Limited Data - ${this.getActiveSourceNames().join(', ') || 'waiting for sources'}
           </span>
         </div>
 
@@ -262,7 +270,7 @@ export class StrategicRiskPanel extends Panel {
         <div class="risk-status-banner risk-status-ok">
           <span class="risk-status-icon">✓</span>
           <span class="risk-status-text">
-            Full coverage (${this.freshnessSummary.activeSources} feeds active)
+            All data sources active
           </span>
         </div>
 
