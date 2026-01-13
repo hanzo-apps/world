@@ -1,4 +1,5 @@
-import type { SocialUnrestEvent, MilitaryFlight, MilitaryVessel, ClusteredEvent } from '@/types';
+import type { SocialUnrestEvent, MilitaryFlight, MilitaryVessel, ClusteredEvent, InternetOutage } from '@/types';
+import { INTEL_HOTSPOTS, CONFLICT_ZONES, STRATEGIC_WATERWAYS } from '@/config/geo';
 
 export interface CountryScore {
   code: string;
@@ -22,6 +23,7 @@ interface CountryData {
   militaryFlights: MilitaryFlight[];
   militaryVessels: MilitaryVessel[];
   newsEvents: ClusteredEvent[];
+  outages: InternetOutage[];
 }
 
 export const TIER1_COUNTRIES: Record<string, string> = {
@@ -125,11 +127,12 @@ const countryDataMap = new Map<string, CountryData>();
 const previousScores = new Map<string, number>();
 
 function initCountryData(): CountryData {
-  return { protests: [], militaryFlights: [], militaryVessels: [], newsEvents: [] };
+  return { protests: [], militaryFlights: [], militaryVessels: [], newsEvents: [], outages: [] };
 }
 
 export function clearCountryData(): void {
   countryDataMap.clear();
+  hotspotActivityMap.clear();
 }
 
 function normalizeCountryName(name: string): string | null {
@@ -149,21 +152,157 @@ export function ingestProtestsForCII(events: SocialUnrestEvent[]): void {
     if (!code || !TIER1_COUNTRIES[code]) continue;
     if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
     countryDataMap.get(code)!.protests.push(e);
+    trackHotspotActivity(e.lat, e.lon, e.severity === 'high' ? 2 : 1);
   }
 }
 
-export function ingestMilitaryForCII(flights: MilitaryFlight[], vessels: MilitaryVessel[]): void {
-  for (const f of flights) {
-    const code = normalizeCountryName(f.operatorCountry);
-    if (!code || !TIER1_COUNTRIES[code]) continue;
-    if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
-    countryDataMap.get(code)!.militaryFlights.push(f);
+// Country bounding boxes for location-based attribution [minLat, maxLat, minLon, maxLon]
+const COUNTRY_BOUNDS: Record<string, [number, number, number, number]> = {
+  IR: [25, 40, 44, 63],      // Iran
+  IL: [29, 34, 34, 36],      // Israel
+  UA: [44, 53, 22, 40],      // Ukraine
+  TW: [21, 26, 119, 122],    // Taiwan
+  KP: [37, 43, 124, 131],    // North Korea
+  SY: [32, 37, 35, 42],      // Syria
+  YE: [12, 19, 42, 54],      // Yemen
+  SA: [16, 32, 34, 56],      // Saudi Arabia
+  TR: [36, 42, 26, 45],      // Turkey
+  PK: [23, 37, 60, 77],      // Pakistan
+  IN: [6, 36, 68, 97],       // India
+  CN: [18, 54, 73, 135],     // China
+  RU: [41, 82, 19, 180],     // Russia (simplified)
+};
+
+function getCountryFromLocation(lat: number, lon: number): string | null {
+  for (const [code, [minLat, maxLat, minLon, maxLon]] of Object.entries(COUNTRY_BOUNDS)) {
+    if (lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon) {
+      return code;
+    }
   }
+  return null;
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const HOTSPOT_COUNTRY_MAP: Record<string, string> = {
+  tehran: 'IR', moscow: 'RU', beijing: 'CN', kyiv: 'UA', taipei: 'TW',
+  telaviv: 'IL', pyongyang: 'KP', riyadh: 'SA', ankara: 'TR', damascus: 'SY',
+  sanaa: 'YE', caracas: 'VE', dc: 'US', london: 'GB', brussels: 'DE',
+  baghdad: 'IR', beirut: 'IL', cairo: 'IL', doha: 'SA', abudhabi: 'SA',
+};
+
+const hotspotActivityMap = new Map<string, number>();
+
+function trackHotspotActivity(lat: number, lon: number, weight: number = 1): void {
+  for (const hotspot of INTEL_HOTSPOTS) {
+    const dist = haversineKm(lat, lon, hotspot.lat, hotspot.lon);
+    if (dist < 150) {
+      const countryCode = HOTSPOT_COUNTRY_MAP[hotspot.id];
+      if (countryCode && TIER1_COUNTRIES[countryCode]) {
+        const current = hotspotActivityMap.get(countryCode) || 0;
+        hotspotActivityMap.set(countryCode, current + weight);
+      }
+    }
+  }
+  for (const zone of CONFLICT_ZONES) {
+    const [zoneLon, zoneLat] = zone.center;
+    const dist = haversineKm(lat, lon, zoneLat, zoneLon);
+    if (dist < 300) {
+      const zoneCountries: Record<string, string[]> = {
+        ukraine: ['UA', 'RU'], gaza: ['IL'], sudan: ['SA'], myanmar: ['MM'],
+      };
+      const countries = zoneCountries[zone.id] || [];
+      for (const code of countries) {
+        if (TIER1_COUNTRIES[code]) {
+          const current = hotspotActivityMap.get(code) || 0;
+          hotspotActivityMap.set(code, current + weight * 2);
+        }
+      }
+    }
+  }
+  for (const waterway of STRATEGIC_WATERWAYS) {
+    const dist = haversineKm(lat, lon, waterway.lat, waterway.lon);
+    if (dist < 200) {
+      const waterwayCountries: Record<string, string[]> = {
+        taiwan_strait: ['TW', 'CN'], hormuz_strait: ['IR', 'SA'],
+        bab_el_mandeb: ['YE', 'SA'], suez: ['IL'], bosphorus: ['TR'],
+      };
+      const countries = waterwayCountries[waterway.id] || [];
+      for (const code of countries) {
+        if (TIER1_COUNTRIES[code]) {
+          const current = hotspotActivityMap.get(code) || 0;
+          hotspotActivityMap.set(code, current + weight * 1.5);
+        }
+      }
+    }
+  }
+}
+
+function getHotspotBoost(countryCode: string): number {
+  const activity = hotspotActivityMap.get(countryCode) || 0;
+  return Math.min(30, activity * 3);
+}
+
+export function ingestMilitaryForCII(flights: MilitaryFlight[], vessels: MilitaryVessel[]): void {
+  // Track foreign military activity per country
+  const foreignMilitaryByCountry = new Map<string, { flights: number; vessels: number }>();
+
+  for (const f of flights) {
+    // 1. Credit operator country (their own military activity)
+    const operatorCode = normalizeCountryName(f.operatorCountry);
+    if (operatorCode && TIER1_COUNTRIES[operatorCode]) {
+      if (!countryDataMap.has(operatorCode)) countryDataMap.set(operatorCode, initCountryData());
+      countryDataMap.get(operatorCode)!.militaryFlights.push(f);
+    }
+
+    // 2. Credit LOCATION country if different (foreign military over their territory = threat)
+    const locationCode = getCountryFromLocation(f.lat, f.lon);
+    if (locationCode && TIER1_COUNTRIES[locationCode] && locationCode !== operatorCode) {
+      if (!foreignMilitaryByCountry.has(locationCode)) {
+        foreignMilitaryByCountry.set(locationCode, { flights: 0, vessels: 0 });
+      }
+      foreignMilitaryByCountry.get(locationCode)!.flights++;
+    }
+    trackHotspotActivity(f.lat, f.lon, 1.5);
+  }
+
   for (const v of vessels) {
-    const code = normalizeCountryName(v.operatorCountry);
-    if (!code || !TIER1_COUNTRIES[code]) continue;
+    // 1. Credit operator country
+    const operatorCode = normalizeCountryName(v.operatorCountry);
+    if (operatorCode && TIER1_COUNTRIES[operatorCode]) {
+      if (!countryDataMap.has(operatorCode)) countryDataMap.set(operatorCode, initCountryData());
+      countryDataMap.get(operatorCode)!.militaryVessels.push(v);
+    }
+
+    // 2. Credit LOCATION country if different (foreign naval presence = threat)
+    const locationCode = getCountryFromLocation(v.lat, v.lon);
+    if (locationCode && TIER1_COUNTRIES[locationCode] && locationCode !== operatorCode) {
+      if (!foreignMilitaryByCountry.has(locationCode)) {
+        foreignMilitaryByCountry.set(locationCode, { flights: 0, vessels: 0 });
+      }
+      foreignMilitaryByCountry.get(locationCode)!.vessels++;
+    }
+    trackHotspotActivity(v.lat, v.lon, 2);
+  }
+
+  // Store foreign military counts for security calculation
+  for (const [code, counts] of foreignMilitaryByCountry) {
     if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
-    countryDataMap.get(code)!.militaryVessels.push(v);
+    const data = countryDataMap.get(code)!;
+    // Add synthetic entries to represent foreign military presence
+    // Each foreign flight/vessel counts MORE than own military (it's a threat)
+    for (let i = 0; i < counts.flights * 2; i++) {
+      data.militaryFlights.push({} as MilitaryFlight);
+    }
+    for (let i = 0; i < counts.vessels * 2; i++) {
+      data.militaryVessels.push({} as MilitaryVessel);
+    }
   }
 }
 
@@ -180,21 +319,48 @@ export function ingestNewsForCII(events: ClusteredEvent[]): void {
   }
 }
 
+export function ingestOutagesForCII(outages: InternetOutage[]): void {
+  for (const o of outages) {
+    const code = normalizeCountryName(o.country);
+    if (!code || !TIER1_COUNTRIES[code]) continue;
+    if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
+    countryDataMap.get(code)!.outages.push(o);
+  }
+}
+
 function calcUnrestScore(data: CountryData, countryCode: string): number {
-  const count = data.protests.length;
-  if (count === 0) return 0;
-
+  const protestCount = data.protests.length;
   const multiplier = EVENT_MULTIPLIER[countryCode] ?? 1.0;
-  const fatalities = data.protests.reduce((sum, p) => sum + (p.fatalities || 0), 0);
-  const highSeverity = data.protests.filter(p => p.severity === 'high').length;
 
-  // Apply event multiplier to account for reporting bias
-  const adjustedCount = count * multiplier;
-  const baseScore = Math.min(50, adjustedCount * 8);
-  const fatalityBoost = Math.min(30, fatalities * 5 * multiplier);
-  const severityBoost = Math.min(20, highSeverity * 10 * multiplier);
+  let baseScore = 0;
+  let fatalityBoost = 0;
+  let severityBoost = 0;
 
-  return Math.min(100, baseScore + fatalityBoost + severityBoost);
+  if (protestCount > 0) {
+    const fatalities = data.protests.reduce((sum, p) => sum + (p.fatalities || 0), 0);
+    const highSeverity = data.protests.filter(p => p.severity === 'high').length;
+
+    const adjustedCount = protestCount * multiplier;
+    baseScore = Math.min(50, adjustedCount * 8);
+    fatalityBoost = Math.min(30, fatalities * 5 * multiplier);
+    severityBoost = Math.min(20, highSeverity * 10 * multiplier);
+  }
+
+  // Internet outages are a MAJOR signal of instability
+  // Governments cut internet during crackdowns, conflicts, coups
+  let outageBoost = 0;
+  if (data.outages.length > 0) {
+    const totalOutages = data.outages.filter(o => o.severity === 'total').length;
+    const majorOutages = data.outages.filter(o => o.severity === 'major').length;
+    const partialOutages = data.outages.filter(o => o.severity === 'partial').length;
+
+    // Total blackout = major red flag (30 points)
+    // Major outage = significant (15 points)
+    // Partial = moderate (5 points)
+    outageBoost = Math.min(50, totalOutages * 30 + majorOutages * 15 + partialOutages * 5);
+  }
+
+  return Math.min(100, baseScore + fatalityBoost + severityBoost + outageBoost);
 }
 
 function calcSecurityScore(data: CountryData): number {
@@ -256,11 +422,14 @@ export function calculateCII(): CountryScore[] {
     // Calculate event-based score (weighted components)
     const eventScore = components.unrest * 0.4 + components.security * 0.3 + components.information * 0.3;
 
-    // Blend baseline risk with detected events
-    // Formula: baseline provides floor, events can push it higher
+    // Hotspot proximity boost - events near strategic locations are more significant
+    const hotspotBoost = getHotspotBoost(code);
+
+    // Blend baseline risk with detected events + hotspot boost
     // - 40% baseline risk (geopolitical context always matters)
     // - 60% event-based (current detected activity)
-    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6;
+    // - Hotspot boost adds up to 30 points for activity near strategic locations
+    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
     const score = Math.round(Math.min(100, blendedScore));
 
     const prev = previousScores.get(code) ?? score;

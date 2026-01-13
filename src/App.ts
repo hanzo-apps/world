@@ -13,7 +13,7 @@ import {
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII } from '@/services/country-instability';
 import { dataFreshness } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
@@ -1379,6 +1379,7 @@ export class App {
       const outages = await fetchInternetOutages();
       this.map?.setOutages(outages);
       this.map?.setLayerReady('outages', outages.length > 0);
+      ingestOutagesForCII(outages);
       this.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
     } catch {
       this.map?.setLayerReady('outages', false);
