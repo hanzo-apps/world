@@ -6,7 +6,22 @@ export class CIIPanel extends Panel {
   private scores: CountryScore[] = [];
 
   constructor() {
-    super({ id: 'cii', title: 'Country Instability Index', showCount: true, trackActivity: true });
+    super({
+      id: 'cii',
+      title: 'Country Instability Index',
+      showCount: true,
+      trackActivity: true,
+      infoTooltip: `<strong>CII Methodology</strong>
+        Score (0-100) per country based on:
+        <ul>
+          <li>40% baseline geopolitical risk</li>
+          <li>Unrest: protests, fatalities, internet outages</li>
+          <li>Security: military flights/vessels over territory</li>
+          <li>Information: news velocity and alerts</li>
+          <li>Hotspot proximity boost (strategic locations)</li>
+        </ul>
+        Event multipliers adjust for media coverage bias.`,
+    });
     this.refresh();
   }
 

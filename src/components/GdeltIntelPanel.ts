@@ -16,7 +16,20 @@ export class GdeltIntelPanel extends Panel {
   private tabsEl: HTMLElement | null = null;
 
   constructor() {
-    super({ id: 'gdelt-intel', title: 'Live Intelligence', showCount: true, trackActivity: true });
+    super({
+      id: 'gdelt-intel',
+      title: 'Live Intelligence',
+      showCount: true,
+      trackActivity: true,
+      infoTooltip: `<strong>GDELT Intelligence</strong>
+        Real-time global news monitoring:
+        <ul>
+          <li>Curated topic categories (conflicts, cyber, etc.)</li>
+          <li>Articles from 100+ languages translated</li>
+          <li>Updates every 15 minutes</li>
+        </ul>
+        Source: GDELT Project (gdeltproject.org)`,
+    });
     this.createTabs();
     this.loadActiveTopic();
   }
