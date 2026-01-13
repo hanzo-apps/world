@@ -203,6 +203,251 @@ function buildPipelineCountryEdges(graph: DependencyGraph): void {
   }
 }
 
+// Country code normalization for ports
+function normalizeCountryCode(country: string): string {
+  const mappings: Record<string, string> = {
+    'USA': 'US', 'China': 'CN', 'China (SAR)': 'CN', 'Taiwan': 'TW',
+    'South Korea': 'KR', 'Netherlands': 'NL', 'Belgium': 'BE',
+    'Malaysia': 'MY', 'Thailand': 'TH', 'Greece': 'GR',
+    'Saudi Arabia': 'SA', 'Iran': 'IR', 'Qatar': 'QA', 'Russia': 'RU',
+    'Egypt': 'EG', 'UK (Gibraltar)': 'GB', 'Djibouti': 'DJ',
+    'Yemen': 'YE', 'Panama': 'PA', 'Spain': 'ES', 'Pakistan': 'PK',
+    'Sri Lanka': 'LK', 'Japan': 'JP', 'UK': 'GB', 'France': 'FR',
+    'Brazil': 'BR', 'India': 'IN', 'Singapore': 'SG', 'Germany': 'DE',
+    'UAE': 'AE',
+  };
+  return mappings[country] || country;
+}
+
+// Port importance by type for impact calculation
+function getPortImportance(port: Port): number {
+  const typeWeight: Record<string, number> = {
+    'oil': 0.9,     // Oil disruption = major
+    'lng': 0.85,    // LNG disruption = major
+    'container': 0.7,
+    'mixed': 0.6,
+    'bulk': 0.5,
+    'naval': 0.4,   // Naval = geopolitical but less economic
+  };
+  const baseWeight = typeWeight[port.type] || 0.5;
+  // Higher rank = more important (rank 1-10 get boost)
+  const rankBoost = port.rank ? Math.max(0, (20 - port.rank) / 20) * 0.3 : 0;
+  return Math.min(1, baseWeight + rankBoost);
+}
+
+function buildPortCountryEdges(graph: DependencyGraph): void {
+  for (const port of PORTS) {
+    const portId = `port:${port.id}`;
+    const countryCode = normalizeCountryCode(port.country);
+    const countryId = `country:${countryCode}`;
+
+    // Create country node if it doesn't exist
+    if (!graph.nodes.has(countryId)) {
+      graph.nodes.set(countryId, {
+        id: countryId,
+        type: 'country',
+        name: COUNTRY_NAMES[countryCode] || port.country,
+        metadata: { code: countryCode },
+      });
+    }
+
+    const importance = getPortImportance(port);
+
+    // Port → Country edge
+    addEdge(graph, {
+      from: portId,
+      to: countryId,
+      type: 'serves',
+      strength: importance,
+      redundancy: port.rank && port.rank <= 5 ? 0.2 : 0.4, // Major ports harder to replace
+      metadata: {
+        portType: port.type,
+        estimatedImpact: importance > 0.7 ? 'Critical port for country' : 'Regional port',
+      },
+    });
+
+    // Add dependencies for countries this port serves beyond its own
+    // Strategic ports affect multiple countries
+    const affectedCountries = getAffectedCountries(port);
+    for (const affected of affectedCountries) {
+      const affectedCountryId = `country:${affected.code}`;
+      if (!graph.nodes.has(affectedCountryId)) {
+        graph.nodes.set(affectedCountryId, {
+          id: affectedCountryId,
+          type: 'country',
+          name: COUNTRY_NAMES[affected.code] || affected.code,
+          metadata: { code: affected.code },
+        });
+      }
+      addEdge(graph, {
+        from: portId,
+        to: affectedCountryId,
+        type: 'trade_route',
+        strength: affected.strength,
+        redundancy: 0.5,
+        metadata: {
+          relationship: affected.reason,
+        },
+      });
+    }
+  }
+}
+
+// Strategic ports affect countries beyond their location
+function getAffectedCountries(port: Port): { code: string; strength: number; reason: string }[] {
+  const affected: { code: string; strength: number; reason: string }[] = [];
+
+  // Suez Canal ports affect Europe-Asia trade
+  if (port.id === 'port_said' || port.id === 'suez_port') {
+    affected.push(
+      { code: 'DE', strength: 0.6, reason: 'Major EU importer via Suez' },
+      { code: 'GB', strength: 0.5, reason: 'UK-Asia trade' },
+      { code: 'NL', strength: 0.5, reason: 'Rotterdam connection' },
+      { code: 'CN', strength: 0.4, reason: 'China-EU trade route' },
+      { code: 'IT', strength: 0.4, reason: 'Mediterranean trade' },
+    );
+  }
+
+  // Strait of Hormuz ports
+  if (port.id === 'bandar_abbas' || port.id === 'fujairah' || port.id === 'ras_tanura') {
+    affected.push(
+      { code: 'JP', strength: 0.7, reason: 'Oil import dependency' },
+      { code: 'KR', strength: 0.6, reason: 'Oil import dependency' },
+      { code: 'IN', strength: 0.5, reason: 'Oil imports' },
+      { code: 'CN', strength: 0.5, reason: 'Oil imports' },
+    );
+  }
+
+  // Malacca Strait ports
+  if (port.id === 'singapore' || port.id === 'klang' || port.id === 'tanjung_pelepas') {
+    affected.push(
+      { code: 'CN', strength: 0.6, reason: 'Trade route dependency' },
+      { code: 'JP', strength: 0.5, reason: 'Trade route' },
+      { code: 'KR', strength: 0.5, reason: 'Trade route' },
+    );
+  }
+
+  // Panama Canal ports
+  if (port.id === 'colon' || port.id === 'balboa') {
+    affected.push(
+      { code: 'US', strength: 0.5, reason: 'East-West coast shipping' },
+      { code: 'CN', strength: 0.4, reason: 'Trade route to US East Coast' },
+    );
+  }
+
+  // Red Sea/Aden ports (especially relevant with Houthi disruptions)
+  if (port.id === 'aden' || port.id === 'djibouti' || port.id === 'hodeidah') {
+    affected.push(
+      { code: 'DE', strength: 0.5, reason: 'Europe-Asia shipping route' },
+      { code: 'GB', strength: 0.5, reason: 'Shipping route' },
+      { code: 'IT', strength: 0.4, reason: 'Mediterranean access' },
+      { code: 'SA', strength: 0.4, reason: 'Regional trade' },
+    );
+  }
+
+  return affected;
+}
+
+function buildChokepointEdges(graph: DependencyGraph): void {
+  // Connect chokepoints to nearby ports and countries they affect
+  for (const waterway of STRATEGIC_WATERWAYS) {
+    const chokepointId = `chokepoint:${waterway.id}`;
+
+    // Find ports near this chokepoint
+    const nearbyPorts = PORTS.filter(port => {
+      const dist = haversineDistance(waterway.lat, waterway.lon, port.lat, port.lon);
+      return dist < 500; // Within 500km
+    });
+
+    for (const port of nearbyPorts) {
+      addEdge(graph, {
+        from: chokepointId,
+        to: `port:${port.id}`,
+        type: 'controls_access',
+        strength: 0.7,
+        redundancy: 0.2,
+        metadata: {
+          relationship: 'Access controlled by chokepoint',
+        },
+      });
+    }
+
+    // Add dependent countries based on chokepoint
+    const dependentCountries = getChokepointDependentCountries(waterway.id);
+    for (const dep of dependentCountries) {
+      const countryId = `country:${dep.code}`;
+      if (!graph.nodes.has(countryId)) {
+        graph.nodes.set(countryId, {
+          id: countryId,
+          type: 'country',
+          name: COUNTRY_NAMES[dep.code] || dep.code,
+          metadata: { code: dep.code },
+        });
+      }
+      addEdge(graph, {
+        from: chokepointId,
+        to: countryId,
+        type: 'trade_dependency',
+        strength: dep.strength,
+        redundancy: dep.redundancy,
+        metadata: {
+          relationship: dep.reason,
+        },
+      });
+    }
+  }
+}
+
+function getChokepointDependentCountries(chokepointId: string): { code: string; strength: number; redundancy: number; reason: string }[] {
+  const dependencies: Record<string, { code: string; strength: number; redundancy: number; reason: string }[]> = {
+    'suez': [
+      { code: 'DE', strength: 0.6, redundancy: 0.3, reason: 'EU-Asia trade' },
+      { code: 'IT', strength: 0.5, redundancy: 0.3, reason: 'Mediterranean' },
+      { code: 'GB', strength: 0.5, redundancy: 0.4, reason: 'UK-Asia trade' },
+      { code: 'CN', strength: 0.4, redundancy: 0.5, reason: 'China-EU exports' },
+    ],
+    'hormuz': [
+      { code: 'JP', strength: 0.8, redundancy: 0.2, reason: '80% oil imports' },
+      { code: 'KR', strength: 0.7, redundancy: 0.2, reason: '70% oil imports' },
+      { code: 'IN', strength: 0.6, redundancy: 0.3, reason: '60% oil imports' },
+      { code: 'CN', strength: 0.5, redundancy: 0.4, reason: '40% oil imports' },
+    ],
+    'malacca': [
+      { code: 'CN', strength: 0.7, redundancy: 0.3, reason: '80% oil imports transit' },
+      { code: 'JP', strength: 0.6, redundancy: 0.3, reason: 'Trade route' },
+      { code: 'KR', strength: 0.6, redundancy: 0.3, reason: 'Trade route' },
+    ],
+    'bab_el_mandeb': [
+      { code: 'DE', strength: 0.5, redundancy: 0.4, reason: 'EU shipping' },
+      { code: 'GB', strength: 0.5, redundancy: 0.4, reason: 'UK shipping' },
+      { code: 'SA', strength: 0.4, redundancy: 0.5, reason: 'Red Sea access' },
+    ],
+    'panama': [
+      { code: 'US', strength: 0.5, redundancy: 0.4, reason: 'Inter-coast shipping' },
+      { code: 'CN', strength: 0.4, redundancy: 0.5, reason: 'US East trade' },
+    ],
+    'gibraltar': [
+      { code: 'ES', strength: 0.4, redundancy: 0.5, reason: 'Med access' },
+      { code: 'IT', strength: 0.3, redundancy: 0.5, reason: 'Atlantic trade' },
+    ],
+    'turkish_straits': [
+      { code: 'RU', strength: 0.6, redundancy: 0.3, reason: 'Black Sea access' },
+      { code: 'UA', strength: 0.6, redundancy: 0.3, reason: 'Grain exports' },
+      { code: 'RO', strength: 0.4, redundancy: 0.4, reason: 'Black Sea trade' },
+    ],
+  };
+  return dependencies[chokepointId] || [];
+}
+
+// Haversine distance for chokepoint proximity
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function buildDependencyGraph(): DependencyGraph {
   if (cachedGraph) return cachedGraph;
 
@@ -213,14 +458,18 @@ export function buildDependencyGraph(): DependencyGraph {
     incoming: new Map(),
   };
 
+  // Add all infrastructure nodes
   addCablesAsNodes(graph);
   addPipelinesAsNodes(graph);
   addPortsAsNodes(graph);
   addChokepointsAsNodes(graph);
   addCountriesAsNodes(graph);
 
+  // Build dependency edges
   buildCableCountryEdges(graph);
   buildPipelineCountryEdges(graph);
+  buildPortCountryEdges(graph);      // NEW: Port → Country dependencies
+  buildChokepointEdges(graph);       // NEW: Chokepoint → Port/Country dependencies
 
   cachedGraph = graph;
   return graph;
