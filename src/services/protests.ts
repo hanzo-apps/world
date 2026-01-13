@@ -170,7 +170,7 @@ async function fetchGdeltEvents(): Promise<SocialUnrestEvent[]> {
       if (!name || seenLocations.has(name)) continue;
 
       const count = feature.properties.count || 1;
-      if (count < 200) continue;
+      if (count < 5) continue; // Filter noise but keep meaningful events
 
       seenLocations.add(name);
 
