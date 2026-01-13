@@ -272,6 +272,9 @@ export interface ProtestData {
 }
 
 export async function fetchProtestEvents(): Promise<ProtestData> {
+  // Import data freshness tracker dynamically to avoid circular deps
+  const { dataFreshness } = await import('./data-freshness');
+
   // Fetch from both sources in parallel
   const [acledEvents, gdeltEvents] = await Promise.all([
     fetchAcledEvents(),
@@ -279,6 +282,14 @@ export async function fetchProtestEvents(): Promise<ProtestData> {
   ]);
 
   console.log(`[Protests] Fetched ${acledEvents.length} ACLED, ${gdeltEvents.length} GDELT events`);
+
+  // Record data freshness
+  if (acledEvents.length > 0) {
+    dataFreshness.recordUpdate('acled', acledEvents.length);
+  }
+  if (gdeltEvents.length > 0) {
+    dataFreshness.recordUpdate('gdelt', gdeltEvents.length);
+  }
 
   // Combine and deduplicate
   const allEvents = deduplicateEvents([...acledEvents, ...gdeltEvents]);

@@ -9,12 +9,21 @@ import {
   type AlertPriority,
 } from '@/services/cross-module-integration';
 import { detectConvergence, type GeoConvergenceAlert } from '@/services/geo-convergence';
+import {
+  dataFreshness,
+  getStatusColor,
+  getStatusIcon,
+  type DataSourceState,
+  type DataFreshnessSummary,
+} from '@/services/data-freshness';
 
 export class StrategicRiskPanel extends Panel {
   private overview: StrategicRiskOverview | null = null;
   private alerts: UnifiedAlert[] = [];
   private convergenceAlerts: GeoConvergenceAlert[] = [];
+  private freshnessSummary: DataFreshnessSummary | null = null;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private unsubscribeFreshness: (() => void) | null = null;
 
   constructor() {
     super({ id: 'strategic-risk', title: 'Strategic Risk Overview', showCount: false, trackActivity: true });
@@ -24,6 +33,8 @@ export class StrategicRiskPanel extends Panel {
   private async init(): Promise<void> {
     this.showLoading();
     try {
+      // Subscribe to data freshness changes
+      this.unsubscribeFreshness = dataFreshness.subscribe(() => this.render());
       await this.refresh();
       this.startAutoRefresh();
     } catch (error) {
@@ -37,6 +48,7 @@ export class StrategicRiskPanel extends Panel {
   }
 
   public async refresh(): Promise<void> {
+    this.freshnessSummary = dataFreshness.getSummary();
     this.convergenceAlerts = detectConvergence();
     this.overview = calculateStrategicRiskOverview(this.convergenceAlerts);
     this.alerts = getRecentAlerts(24);
@@ -101,8 +113,124 @@ export class StrategicRiskPanel extends Panel {
     }
   }
 
-  private renderScoreGauge(): string {
-    if (!this.overview) return '';
+  /**
+   * Render when we have insufficient data - can't assess risk
+   */
+  private renderInsufficientData(): string {
+    const sources = dataFreshness.getAllSources();
+    const riskSources = sources.filter(s => s.requiredForRisk);
+
+    return `
+      <div class="strategic-risk-panel">
+        <div class="risk-no-data">
+          <div class="risk-no-data-icon">⚠️</div>
+          <div class="risk-no-data-title">Insufficient Data</div>
+          <div class="risk-no-data-desc">
+            Unable to assess risk level.<br>
+            Enable data sources to begin monitoring.
+          </div>
+        </div>
+
+        <div class="risk-section">
+          <div class="risk-section-title">Required Data Sources</div>
+          <div class="risk-sources">
+            ${riskSources.map(source => this.renderSourceRow(source)).join('')}
+          </div>
+        </div>
+
+        <div class="risk-section">
+          <div class="risk-section-title">Optional Sources</div>
+          <div class="risk-sources">
+            ${sources.filter(s => !s.requiredForRisk).slice(0, 4).map(source => this.renderSourceRow(source)).join('')}
+          </div>
+        </div>
+
+        <div class="risk-actions">
+          <button class="risk-action-btn risk-action-primary" data-action="enable-core">
+            Enable Core Feeds
+          </button>
+        </div>
+
+        <div class="risk-footer">
+          <span class="risk-updated">Waiting for data...</span>
+          <button class="risk-refresh-btn">Refresh</button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render when we have limited data - can assess but with caveats
+   */
+  private renderLimitedData(): string {
+    if (!this.overview || !this.freshnessSummary) return '';
+
+    const score = this.overview.compositeScore;
+    const color = this.getScoreColor(score);
+    const level = this.getScoreLevel(score);
+    const scoreDeg = Math.round((score / 100) * 270);
+    const sources = dataFreshness.getAllSources();
+
+    return `
+      <div class="strategic-risk-panel">
+        <div class="risk-warning-banner">
+          <span class="risk-warning-icon">⚠️</span>
+          <span class="risk-warning-text">
+            Limited Assessment (${this.freshnessSummary.activeSources}/${this.freshnessSummary.totalSources} feeds)
+          </span>
+        </div>
+
+        <div class="risk-gauge">
+          <div class="risk-score-container">
+            <div class="risk-score-ring" style="--score-color: ${color}; --score-deg: ${scoreDeg}deg;">
+              <div class="risk-score-inner">
+                <div class="risk-score" style="color: ${color}">${score}</div>
+                <div class="risk-level" style="color: ${color}">${level}</div>
+              </div>
+            </div>
+          </div>
+          <div class="risk-trend-container">
+            <span class="risk-trend-label">Trend</span>
+            <div class="risk-trend" style="color: ${this.getTrendColor(this.overview.trend)}">
+              ${this.getTrendEmoji(this.overview.trend)} ${this.overview.trend.charAt(0).toUpperCase() + this.overview.trend.slice(1)}
+            </div>
+          </div>
+        </div>
+
+        <div class="risk-section">
+          <div class="risk-section-title">Data Sources</div>
+          <div class="risk-sources-compact">
+            ${sources.filter(s => s.requiredForRisk).map(source => `
+              <div class="risk-source-chip" style="border-color: ${getStatusColor(source.status)}">
+                <span class="risk-source-dot" style="color: ${getStatusColor(source.status)}">${getStatusIcon(source.status)}</span>
+                <span class="risk-source-name">${source.name.split(' ')[0]}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        ${this.renderMetrics()}
+        ${this.renderTopRisks()}
+
+        <div class="risk-actions">
+          <button class="risk-action-btn" data-action="enable-all">
+            Enable More Feeds
+          </button>
+        </div>
+
+        <div class="risk-footer">
+          <span class="risk-updated">Updated: ${this.overview.timestamp.toLocaleTimeString()}</span>
+          <button class="risk-refresh-btn">Refresh</button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render full data view - normal operation
+   */
+  private renderFullData(): string {
+    if (!this.overview || !this.freshnessSummary) return '';
 
     const score = this.overview.compositeScore;
     const color = this.getScoreColor(score);
@@ -110,21 +238,58 @@ export class StrategicRiskPanel extends Panel {
     const scoreDeg = Math.round((score / 100) * 270);
 
     return `
-      <div class="risk-gauge">
-        <div class="risk-score-container">
-          <div class="risk-score-ring" style="--score-color: ${color}; --score-deg: ${scoreDeg}deg;">
-            <div class="risk-score-inner">
-              <div class="risk-score" style="color: ${color}">${score}</div>
-              <div class="risk-level" style="color: ${color}">${level}</div>
+      <div class="strategic-risk-panel">
+        <div class="risk-status-banner risk-status-ok">
+          <span class="risk-status-icon">✓</span>
+          <span class="risk-status-text">
+            Full coverage (${this.freshnessSummary.activeSources} feeds active)
+          </span>
+        </div>
+
+        <div class="risk-gauge">
+          <div class="risk-score-container">
+            <div class="risk-score-ring" style="--score-color: ${color}; --score-deg: ${scoreDeg}deg;">
+              <div class="risk-score-inner">
+                <div class="risk-score" style="color: ${color}">${score}</div>
+                <div class="risk-level" style="color: ${color}">${level}</div>
+              </div>
+            </div>
+          </div>
+          <div class="risk-trend-container">
+            <span class="risk-trend-label">Trend</span>
+            <div class="risk-trend" style="color: ${this.getTrendColor(this.overview.trend)}">
+              ${this.getTrendEmoji(this.overview.trend)} ${this.overview.trend.charAt(0).toUpperCase() + this.overview.trend.slice(1)}
             </div>
           </div>
         </div>
-        <div class="risk-trend-container">
-          <span class="risk-trend-label">Trend</span>
-          <div class="risk-trend" style="color: ${this.getTrendColor(this.overview.trend)}">
-            ${this.getTrendEmoji(this.overview.trend)} ${this.overview.trend.charAt(0).toUpperCase() + this.overview.trend.slice(1)}
-          </div>
+
+        ${this.renderMetrics()}
+        ${this.renderTopRisks()}
+        ${this.renderUnstableCountries()}
+        ${this.renderRecentAlerts()}
+
+        <div class="risk-footer">
+          <span class="risk-updated">Updated: ${this.overview.timestamp.toLocaleTimeString()}</span>
+          <button class="risk-refresh-btn">Refresh</button>
         </div>
+      </div>
+    `;
+  }
+
+  private renderSourceRow(source: DataSourceState): string {
+    const panelId = dataFreshness.getPanelIdForSource(source.id);
+    const timeSince = dataFreshness.getTimeSince(source.id);
+
+    return `
+      <div class="risk-source-row">
+        <span class="risk-source-status" style="color: ${getStatusColor(source.status)}">
+          ${getStatusIcon(source.status)}
+        </span>
+        <span class="risk-source-name">${escapeHtml(source.name)}</span>
+        <span class="risk-source-time">${source.status === 'no_data' ? 'no data' : timeSince}</span>
+        ${panelId && source.status !== 'fresh' ? `
+          <button class="risk-source-enable" data-panel="${panelId}">Enable</button>
+        ` : ''}
       </div>
     `;
   }
@@ -237,38 +402,78 @@ export class StrategicRiskPanel extends Panel {
   }
 
   private render(): void {
+    this.freshnessSummary = dataFreshness.getSummary();
+
     if (!this.overview) {
       this.showLoading();
       return;
     }
 
-    this.content.innerHTML = `
-      <div class="strategic-risk-panel">
-        ${this.renderScoreGauge()}
-        ${this.renderMetrics()}
-        ${this.renderTopRisks()}
-        ${this.renderUnstableCountries()}
-        ${this.renderRecentAlerts()}
-        <div class="risk-footer">
-          <span class="risk-updated">Updated: ${this.overview.timestamp.toLocaleTimeString()}</span>
-          <button class="risk-refresh-btn">Refresh</button>
-        </div>
-      </div>
-    `;
+    // Choose render mode based on data availability
+    let html: string;
+    switch (this.freshnessSummary.overallStatus) {
+      case 'insufficient':
+        html = this.renderInsufficientData();
+        break;
+      case 'limited':
+        html = this.renderLimitedData();
+        break;
+      case 'sufficient':
+      default:
+        html = this.renderFullData();
+        break;
+    }
 
+    this.content.innerHTML = html;
     this.attachEventListeners();
   }
 
   private attachEventListeners(): void {
+    // Refresh button
     const refreshBtn = this.content.querySelector('.risk-refresh-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.refresh());
     }
+
+    // Enable source buttons
+    const enableBtns = this.content.querySelectorAll('.risk-source-enable');
+    enableBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const panelId = (e.target as HTMLElement).dataset.panel;
+        if (panelId) {
+          this.emitEnablePanel(panelId);
+        }
+      });
+    });
+
+    // Action buttons
+    const actionBtns = this.content.querySelectorAll('.risk-action-btn');
+    actionBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const action = (e.target as HTMLElement).dataset.action;
+        if (action === 'enable-core') {
+          this.emitEnablePanels(['protests', 'intel', 'live-news']);
+        } else if (action === 'enable-all') {
+          this.emitEnablePanels(['protests', 'intel', 'live-news', 'military', 'shipping']);
+        }
+      });
+    });
+  }
+
+  private emitEnablePanel(panelId: string): void {
+    window.dispatchEvent(new CustomEvent('enable-panel', { detail: { panelId } }));
+  }
+
+  private emitEnablePanels(panelIds: string[]): void {
+    panelIds.forEach(id => this.emitEnablePanel(id));
   }
 
   public destroy(): void {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
+    }
+    if (this.unsubscribeFreshness) {
+      this.unsubscribeFreshness();
     }
   }
 

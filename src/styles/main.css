@@ -5812,3 +5812,187 @@ body.playback-mode .status-dot {
   padding: 12px;
   font-style: italic;
 }
+
+/* Data Availability States */
+.risk-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 12px;
+  text-align: center;
+  background: rgba(255, 136, 0, 0.08);
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 136, 0, 0.3);
+}
+
+.risk-no-data-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.risk-no-data-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ff8800;
+  margin-bottom: 4px;
+}
+
+.risk-no-data-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.risk-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 170, 0, 0.15);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  margin-bottom: 4px;
+}
+
+.risk-warning-icon {
+  font-size: 12px;
+}
+
+.risk-warning-text {
+  font-size: 10px;
+  color: #ffaa00;
+  font-weight: 500;
+}
+
+.risk-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.risk-status-ok {
+  background: rgba(68, 170, 68, 0.12);
+  border: 1px solid rgba(68, 170, 68, 0.25);
+}
+
+.risk-status-icon {
+  font-size: 11px;
+  color: #44aa44;
+}
+
+.risk-status-text {
+  font-size: 10px;
+  color: #44aa44;
+  font-weight: 500;
+}
+
+/* Data Sources */
+.risk-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.risk-source-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.risk-source-status {
+  font-size: 10px;
+  text-align: center;
+}
+
+.risk-source-name {
+  color: var(--text);
+}
+
+.risk-source-time {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.risk-source-enable {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--accent);
+  font-size: 9px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.risk-source-enable:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Compact source chips */
+.risk-sources-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.risk-source-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid;
+  font-size: 9px;
+}
+
+.risk-source-dot {
+  font-size: 8px;
+}
+
+.risk-source-chip .risk-source-name {
+  font-size: 9px;
+}
+
+/* Action buttons */
+.risk-actions {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.risk-action-btn {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.risk-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.risk-action-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.risk-action-primary:hover {
+  background: #00ccaa;
+  border-color: #00ccaa;
+}
