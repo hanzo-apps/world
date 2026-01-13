@@ -138,7 +138,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 // Reverse geocode coordinates to human-readable location
-function getLocationName(lat: number, lon: number): string {
+export function getLocationName(lat: number, lon: number): string {
   // Check conflict zones first (most relevant for convergence)
   for (const zone of CONFLICT_ZONES) {
     const [zoneLon, zoneLat] = zone.center;
