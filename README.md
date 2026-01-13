@@ -64,6 +64,20 @@ Layers are organized into logical groups for efficient monitoring:
 | **Countries** | Country boundary labels |
 | **Waterways** | Strategic waterways and chokepoints |
 
+### Intelligence Panels
+
+Beyond raw data feeds, the dashboard provides synthesized intelligence panels:
+
+| Panel | Purpose |
+|-------|---------|
+| **Strategic Risk Overview** | Composite risk score combining all intelligence modules |
+| **Country Instability Index** | Real-time stability scores for 20 monitored countries |
+| **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
+| **Live Intelligence** | GDELT-powered topic feeds (Military, Cyber, Nuclear, Sanctions) |
+| **Intel Feed** | Curated defense and security news sources |
+
+These panels transform raw signals into actionable intelligence by applying scoring algorithms, trend detection, and cross-source correlation.
+
 ### News Aggregation
 
 Multi-source RSS aggregation across categories:
@@ -249,6 +263,265 @@ The system counts matching news articles in the current feed, applies velocity a
 | **High** | >6 matches OR spike velocity | Red pulse |
 
 This creates a dynamic "heat map" of global attention based on live news flow.
+
+---
+
+## Country Instability Index (CII)
+
+The dashboard maintains a **real-time instability score** for 20 strategically significant countries. Rather than relying on static risk ratings, the CII dynamically reflects current conditions based on multiple input streams.
+
+### Monitored Countries (Tier 1)
+
+| Region | Countries |
+|--------|-----------|
+| **Americas** | United States, Venezuela |
+| **Europe** | Germany, France, United Kingdom, Poland |
+| **Eastern Europe** | Russia, Ukraine |
+| **Middle East** | Iran, Israel, Saudi Arabia, Turkey, Syria, Yemen |
+| **Asia-Pacific** | China, Taiwan, North Korea, India, Pakistan, Myanmar |
+
+### Three Component Scores
+
+Each country's CII is computed from three weighted components:
+
+| Component | Weight | Data Sources | What It Measures |
+|-----------|--------|--------------|------------------|
+| **Unrest** | 40% | ACLED protests, GDELT events | Civil unrest intensity, fatalities, event severity |
+| **Security** | 30% | Military flights, naval vessels | Unusual military activity patterns |
+| **Information** | 30% | News velocity, alert clusters | Media attention intensity and acceleration |
+
+### Scoring Algorithm
+
+```
+Unrest Score:
+  base = min(50, protest_count × 8)
+  fatality_boost = min(30, total_fatalities × 5)
+  severity_boost = min(20, high_severity_count × 10)
+  unrest = min(100, base + fatality_boost + severity_boost)
+
+Security Score:
+  flight_score = min(50, military_flights × 3)
+  vessel_score = min(30, naval_vessels × 5)
+  security = min(100, flight_score + vessel_score)
+
+Information Score:
+  base = min(40, news_count × 5)
+  velocity_boost = min(40, avg_velocity × 10)
+  alert_boost = 20 if any_alert else 0
+  information = min(100, base + velocity_boost + alert_boost)
+
+Final CII = round(unrest × 0.4 + security × 0.3 + information × 0.3)
+```
+
+### Instability Levels
+
+| Level | Score Range | Visual | Meaning |
+|-------|-------------|--------|---------|
+| **Critical** | 81-100 | Red | Active crisis or major escalation |
+| **High** | 66-80 | Orange | Significant instability requiring close monitoring |
+| **Elevated** | 51-65 | Yellow | Above-normal activity patterns |
+| **Normal** | 31-50 | Gray | Baseline geopolitical activity |
+| **Low** | 0-30 | Green | Unusually quiet period |
+
+### Trend Detection
+
+The CII tracks 24-hour changes to identify trajectory:
+- **Rising**: Score increased by ≥5 points (escalating situation)
+- **Stable**: Change within ±5 points (steady state)
+- **Falling**: Score decreased by ≥5 points (de-escalation)
+
+### Keyword Attribution
+
+Countries are matched to data via keyword lists:
+- **Russia**: `russia`, `moscow`, `kremlin`, `putin`
+- **China**: `china`, `beijing`, `xi jinping`, `prc`
+- **Taiwan**: `taiwan`, `taipei`
+
+This enables attribution of news and events to specific countries even when formal country codes aren't present in the source data.
+
+---
+
+## Geographic Convergence Detection
+
+One of the most valuable intelligence signals is when **multiple independent data streams converge on the same geographic area**. This often precedes significant events.
+
+### How It Works
+
+The system maintains a real-time grid of geographic cells (1° × 1° resolution). Each cell tracks four event types:
+
+| Event Type | Source | Detection Method |
+|------------|--------|-----------------|
+| **Protests** | ACLED/GDELT | Direct geolocation |
+| **Military Flights** | OpenSky | ADS-B position |
+| **Naval Vessels** | AIS stream | Ship position |
+| **Earthquakes** | USGS | Epicenter location |
+
+When **3 or more different event types** occur within the same cell during a 24-hour window, a **convergence alert** is generated.
+
+### Convergence Scoring
+
+```
+type_score = event_types × 25      # Max 100 (4 types)
+count_boost = min(25, total_events × 2)
+convergence_score = min(100, type_score + count_boost)
+```
+
+### Alert Thresholds
+
+| Types Converging | Score Range | Alert Level |
+|-----------------|-------------|-------------|
+| **4 types** | 80-100 | Critical |
+| **3 types** | 60-80 | High |
+| **3 types** (low count) | 40-60 | Medium |
+
+### Example Scenarios
+
+**Taiwan Strait Buildup**
+- Cell: `25°N, 121°E`
+- Events: Military flights (3), Naval vessels (2), Protests (1)
+- Score: 75 + 12 = 87 (Critical)
+- Signal: "Geographic Convergence (3 types) - military flights, naval vessels, protests"
+
+**Middle East Flashpoint**
+- Cell: `32°N, 35°E`
+- Events: Military flights (5), Protests (8), Earthquake (1)
+- Score: 75 + 25 = 100 (Critical)
+- Signal: Multiple activity streams converging on region
+
+### Why This Matters
+
+Individual data points are often noise. But when **protests break out, military assets reposition, and seismic monitors detect anomalies** in the same location simultaneously, it warrants attention—regardless of whether any single source is reporting a crisis.
+
+---
+
+## Infrastructure Cascade Analysis
+
+Critical infrastructure is interdependent. A cable cut doesn't just affect connectivity—it creates cascading effects across dependent countries and systems. The cascade analysis system visualizes these dependencies.
+
+### Dependency Graph
+
+The system builds a graph of **279 infrastructure nodes** and **280 dependency edges**:
+
+| Node Type | Count | Examples |
+|-----------|-------|----------|
+| **Undersea Cables** | 18 | MAREA, FLAG Europe-Asia, SEA-ME-WE 6 |
+| **Pipelines** | 88 | Nord Stream, Trans-Siberian, Keystone |
+| **Ports** | 61 | Singapore, Rotterdam, Shenzhen |
+| **Chokepoints** | 8 | Suez, Hormuz, Malacca |
+| **Countries** | 105 | End nodes representing national impact |
+
+### Cascade Calculation
+
+When a user selects an infrastructure asset for analysis, a **breadth-first cascade** propagates through the graph:
+
+```
+1. Start at source node (e.g., "cable:marea")
+2. For each dependent node:
+   impact = edge_strength × disruption_level × (1 - redundancy)
+3. Categorize impact:
+   - Critical: impact > 0.8
+   - High: impact > 0.5
+   - Medium: impact > 0.2
+   - Low: impact ≤ 0.2
+4. Recurse to depth 3 (prevent infinite loops)
+```
+
+### Redundancy Modeling
+
+The system accounts for alternative routes:
+- Cables with high redundancy show reduced impact
+- Countries with multiple cable landings show lower vulnerability
+- Alternative routes are displayed with capacity percentages
+
+### Example Analysis
+
+**MAREA Cable Disruption**:
+```
+Source: MAREA (US ↔ Spain, 200 Tbps)
+Countries Affected: 4
+- Spain: Medium (redundancy via other Atlantic cables)
+- Portugal: Low (secondary landing)
+- France: Low (alternative routes via UK)
+- US: Low (high redundancy)
+Alternative Routes: TAT-14 (35%), Hibernia (22%), AEConnect (18%)
+```
+
+**FLAG Europe-Asia Disruption**:
+```
+Source: FLAG Europe-Asia (UK ↔ Japan)
+Countries Affected: 7
+- India: Medium (major capacity share)
+- UAE, Saudi Arabia: Medium (limited alternatives)
+- UK, Japan: Low (high redundancy)
+Alternative Routes: SEA-ME-WE 6 (11%), 2Africa (8%), Falcon (8%)
+```
+
+### Use Cases
+
+- **Pre-positioning**: Understand which countries are most vulnerable to specific infrastructure failures
+- **Risk Assessment**: Evaluate supply chain exposure to chokepoint disruptions
+- **Incident Response**: Quickly identify downstream effects of reported cable cuts or pipeline damage
+
+---
+
+## Strategic Risk Overview
+
+The Strategic Risk Overview provides a **composite dashboard** that synthesizes all intelligence modules into a single risk assessment.
+
+### Composite Score (0-100)
+
+The strategic risk score combines three components:
+
+| Component | Weight | Calculation |
+|-----------|--------|-------------|
+| **Convergence** | 40% | `min(100, convergence_zones × 20)` |
+| **CII Deviation** | 35% | `min(100, avg_deviation × 2)` |
+| **Infrastructure** | 25% | `min(100, incidents × 25)` |
+
+### Risk Levels
+
+| Score | Level | Trend Icon | Meaning |
+|-------|-------|------------|---------|
+| 70-100 | **Critical** | 📈 Escalating | Multiple converging crises |
+| 50-69 | **Elevated** | ➡️ Stable | Heightened global tension |
+| 30-49 | **Moderate** | ➡️ Stable | Normal fluctuation |
+| 0-29 | **Low** | 📉 De-escalating | Unusually quiet period |
+
+### Unified Alert System
+
+Alerts from all modules are merged using **temporal and spatial deduplication**:
+
+- **Time window**: Alerts within 2 hours may be merged
+- **Distance threshold**: Alerts within 200km may be merged
+- **Same country**: Alerts affecting the same country may be merged
+
+When alerts merge, they become **composite alerts** that show the full picture:
+
+```
+Type: Composite Alert
+Title: Convergence + CII + Infrastructure: Ukraine
+Components:
+  - Geographic Convergence: 4 event types in Kyiv region
+  - CII Spike: Ukraine +15 points (Critical)
+  - Infrastructure: Black Sea cables at risk
+Priority: Critical
+```
+
+### Alert Priority
+
+| Priority | Criteria |
+|----------|----------|
+| **Critical** | CII critical level, convergence score ≥80, cascade critical impact |
+| **High** | CII high level, convergence score ≥60, cascade affecting ≥5 countries |
+| **Medium** | CII change ≥10 points, convergence score ≥40 |
+| **Low** | Minor changes and low-impact events |
+
+### Trend Detection
+
+The system tracks the composite score over time:
+- First measurement establishes baseline (shows "Stable")
+- Subsequent changes of ±5 points trigger trend changes
+- This prevents false "escalating" signals on initialization
 
 ---
 
@@ -890,6 +1163,9 @@ src/
 │   ├── NewsPanel.ts          # News feed with clustering
 │   ├── MarketPanel.ts        # Stock/commodity display
 │   ├── MonitorPanel.ts       # Custom keyword monitors
+│   ├── CIIPanel.ts           # Country Instability Index display
+│   ├── CascadePanel.ts       # Infrastructure cascade analysis
+│   ├── StrategicRiskPanel.ts # Strategic risk overview dashboard
 │   └── ...
 ├── config/
 │   ├── feeds.ts              # 45+ RSS feeds, source tiers
@@ -924,7 +1200,11 @@ src/
 │   ├── related-assets.ts     # Infrastructure near news events
 │   ├── activity-tracker.ts   # New item detection & highlighting
 │   ├── analysis-worker.ts    # Web Worker manager
-│   └── storage.ts            # IndexedDB snapshots & baselines
+│   ├── storage.ts            # IndexedDB snapshots & baselines
+│   ├── country-instability.ts    # CII scoring algorithm
+│   ├── geo-convergence.ts        # Geographic convergence detection
+│   ├── infrastructure-cascade.ts # Dependency graph and cascade analysis
+│   └── cross-module-integration.ts # Unified alerts and strategic risk
 ├── workers/
 │   └── analysis.worker.ts    # Off-thread clustering & correlation
 ├── utils/
@@ -1085,15 +1365,34 @@ The system degrades gracefully—blocked sources are skipped while others contin
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned enhancements focused on intelligence correlation:
+See [ROADMAP.md](ROADMAP.md) for detailed planning. Recent intelligence enhancements:
 
-1. **Multi-Signal Geographic Convergence** - Alert when 3+ data types converge on same region
-2. **Country Instability Index** - Real-time composite risk score per country
-3. **Temporal Anomaly Detection** - Flag activity unusual for time of day/week/year
-4. **Trade Route Risk Scoring** - Supply chain vulnerability assessment
-5. **Infrastructure Cascade Visualization** - Show downstream effects of disruptions
+### Completed
 
-The roadmap also documents 30+ free APIs and RSS feeds for future integration (World Bank, OFAC Sanctions, UNHCR, FAO food security, think tanks, etc.).
+- ✅ **Multi-Signal Geographic Convergence** - Alerts when 3+ data types converge on same region within 24h
+- ✅ **Country Instability Index (CII)** - Real-time composite risk score for 20 Tier-1 countries
+- ✅ **Infrastructure Cascade Visualization** - Dependency graph showing downstream effects of disruptions
+- ✅ **Strategic Risk Overview** - Unified alert system with cross-module correlation and deduplication
+- ✅ **GDELT Topic Intelligence** - Categorized feeds for military, cyber, nuclear, and sanctions topics
+
+### Planned
+
+**High Priority:**
+- **Temporal Anomaly Detection** - Flag activity unusual for time of day/week/year (e.g., "military flights 3x normal for Tuesday")
+- **Trade Route Risk Scoring** - Real-time supply chain vulnerability for major shipping routes (Asia→Europe, Middle East→Europe, etc.)
+
+**Medium Priority:**
+- **Historical Playback** - Review past dashboard states with timeline scrubbing
+- **Election Calendar Integration** - Auto-boost sensitivity 30 days before major elections
+- **Choropleth CII Map Layer** - Country-colored overlay showing instability scores
+
+**Future Enhancements:**
+- **Alert Webhooks** - Push critical alerts to Slack, Discord, email
+- **Custom Country Watchlists** - User-defined Tier-2 country monitoring
+- **Additional Data Sources** - World Bank, IMF, OFAC sanctions, UNHCR refugee data, FAO food security
+- **Think Tank Feeds** - RUSI, Chatham House, ECFR, CFR, Wilson Center, CNAS, Arms Control Association
+
+The full [ROADMAP.md](ROADMAP.md) documents implementation details, API endpoints, and 30+ free data sources for future integration.
 
 ---
 
