@@ -20,3 +20,7 @@ export * from './pizzint';
 export * from './eonet';
 export { analysisWorker } from './analysis-worker';
 export { activityTracker } from './activity-tracker';
+export * from './geo-convergence';
+export * from './country-instability';
+export * from './infrastructure-cascade';
+export * from './cross-module-integration';
