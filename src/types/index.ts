@@ -190,11 +190,31 @@ export interface MilitaryBase {
   source?: string;            // Reference URL
 }
 
+export interface CableLandingPoint {
+  country: string;       // ISO code
+  countryName: string;
+  city?: string;
+  lat: number;
+  lon: number;
+}
+
+export interface CountryCapacity {
+  country: string;       // ISO code
+  capacityShare: number; // 0-1, what % of country's int'l capacity
+  isRedundant: boolean;  // Has alternative routes
+}
+
 export interface UnderseaCable {
   id: string;
   name: string;
   points: [number, number][];
   major?: boolean;
+  // Enhanced fields for cascade analysis
+  landingPoints?: CableLandingPoint[];
+  countriesServed?: CountryCapacity[];
+  capacityTbps?: number;
+  rfsYear?: number;      // Ready for service year
+  owners?: string[];
 }
 
 export type CableAdvisorySeverity = 'fault' | 'degraded';
@@ -274,6 +294,14 @@ export interface GammaIrradiator {
 export type PipelineType = 'oil' | 'gas' | 'products';
 export type PipelineStatus = 'operating' | 'construction';
 
+export interface PipelineTerminal {
+  country: string;       // ISO code
+  name?: string;         // Terminal/field name
+  portId?: string;       // Link to port if applicable
+  lat?: number;
+  lon?: number;
+}
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -284,6 +312,13 @@ export interface Pipeline {
   length?: string;             // e.g., "1,768 km"
   operator?: string;
   countries?: string[];
+  // Enhanced fields for cascade analysis
+  origin?: PipelineTerminal;
+  destination?: PipelineTerminal;
+  transitCountries?: string[];   // ISO codes
+  capacityMbpd?: number;         // Million barrels per day (oil)
+  capacityBcmY?: number;         // Billion cubic meters/year (gas)
+  alternatives?: string[];       // Pipeline IDs that could substitute
 }
 
 export interface Earthquake {
@@ -682,6 +717,73 @@ export interface NaturalEvent {
   sourceUrl?: string;
   sourceName?: string;
   closed: boolean;
+}
+
+// Infrastructure Cascade Types
+export type InfrastructureNodeType = 'cable' | 'pipeline' | 'port' | 'chokepoint' | 'country' | 'route';
+
+export interface InfrastructureNode {
+  id: string;
+  type: InfrastructureNodeType;
+  name: string;
+  coordinates?: [number, number];
+  metadata?: Record<string, unknown>;
+}
+
+export type DependencyType =
+  | 'serves'              // Cable serves country
+  | 'terminates_at'       // Pipeline terminates at port
+  | 'transits_through'    // Route transits chokepoint
+  | 'lands_at'            // Cable lands at country
+  | 'depends_on'          // Port depends on pipeline
+  | 'shares_risk'         // Assets share vulnerability
+  | 'alternative_to';     // Provides redundancy
+
+export interface DependencyEdge {
+  from: string;           // Node ID
+  to: string;             // Node ID
+  type: DependencyType;
+  strength: number;       // 0-1 criticality
+  redundancy?: number;    // 0-1 how replaceable
+  metadata?: {
+    capacityShare?: number;
+    alternativeRoutes?: number;
+    estimatedImpact?: string;
+  };
+}
+
+export type CascadeImpactLevel = 'critical' | 'high' | 'medium' | 'low';
+
+export interface CascadeAffectedNode {
+  node: InfrastructureNode;
+  impactLevel: CascadeImpactLevel;
+  pathLength: number;
+  dependencyChain: string[];
+  redundancyAvailable: boolean;
+  estimatedRecovery?: string;
+}
+
+export interface CascadeCountryImpact {
+  country: string;
+  countryName: string;
+  impactLevel: CascadeImpactLevel;
+  affectedCapacity: number;
+  criticalSectors?: string[];
+}
+
+export interface CascadeResult {
+  source: InfrastructureNode;
+  affectedNodes: CascadeAffectedNode[];
+  countriesAffected: CascadeCountryImpact[];
+  economicImpact?: {
+    dailyTradeLoss?: number;
+    affectedThroughput?: number;
+  };
+  redundancies?: {
+    id: string;
+    name: string;
+    capacityShare: number;
+  }[];
 }
 
 // Re-export port types
