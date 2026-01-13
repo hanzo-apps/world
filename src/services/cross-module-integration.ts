@@ -317,27 +317,32 @@ export function calculateStrategicRiskOverview(
   convergenceAlerts: GeoConvergenceAlert[]
 ): StrategicRiskOverview {
   const ciiScores = calculateCII();
-  const avgCIIDeviation = calculateAvgDeviation(ciiScores);
+  const ciiRiskScore = calculateCIIRiskScore(ciiScores);
 
-  const convergenceWeight = 0.4;
-  const ciiWeight = 0.35;
-  const infraWeight = 0.25;
+  // Weights for composite score
+  const convergenceWeight = 0.3;  // Geo convergence of multiple event types
+  const ciiWeight = 0.5;          // Country instability (main driver)
+  const infraWeight = 0.2;        // Infrastructure incidents
 
-  const convergenceScore = Math.min(100, convergenceAlerts.length * 20);
-  const ciiScore = Math.min(100, avgCIIDeviation * 2);
+  const convergenceScore = Math.min(100, convergenceAlerts.length * 25);
   const infraScore = Math.min(100, countInfrastructureIncidents() * 25);
 
+  // CII score is already 0-100 from calculateCIIRiskScore
   const composite = Math.round(
     convergenceScore * convergenceWeight +
-    ciiScore * ciiWeight +
+    ciiRiskScore * ciiWeight +
     infraScore * infraWeight
   );
 
   const trend = determineTrend(composite);
 
+  // Top country score for display
+  const topCountry = ciiScores[0];
+  const topCIIScore = topCountry ? topCountry.score : 0;
+
   return {
     convergenceAlerts: convergenceAlerts.length,
-    avgCIIDeviation,
+    avgCIIDeviation: topCIIScore,  // Now shows top country score
     infrastructureIncidents: countInfrastructureIncidents(),
     compositeScore: composite,
     trend,
@@ -350,10 +355,32 @@ export function calculateStrategicRiskOverview(
   };
 }
 
-function calculateAvgDeviation(scores: CountryScore[]): number {
+function calculateCIIRiskScore(scores: CountryScore[]): number {
   if (scores.length === 0) return 0;
-  const total = scores.reduce((sum, s) => sum + Math.max(0, s.score - 30), 0);
-  return total / scores.length;
+
+  // Use top 5 highest-scoring countries to determine risk
+  // Don't dilute with stable countries
+  const sorted = [...scores].sort((a, b) => b.score - a.score);
+  const top5 = sorted.slice(0, 5);
+
+  // Weighted: highest country contributes most
+  // Top country: 40%, 2nd: 25%, 3rd: 20%, 4th: 10%, 5th: 5%
+  const weights = [0.4, 0.25, 0.2, 0.1, 0.05];
+  let weightedScore = 0;
+
+  for (let i = 0; i < top5.length; i++) {
+    const country = top5[i];
+    const weight = weights[i];
+    if (country && weight !== undefined) {
+      weightedScore += country.score * weight;
+    }
+  }
+
+  // Count of elevated countries (score >= 50) adds bonus
+  const elevatedCount = scores.filter(s => s.score >= 50).length;
+  const elevatedBonus = Math.min(20, elevatedCount * 5);
+
+  return Math.min(100, weightedScore + elevatedBonus);
 }
 
 let previousCompositeScore: number | null = null;
