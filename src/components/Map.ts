@@ -551,6 +551,8 @@ export class MapComponent {
       const worldResponse = await fetch(MAP_URLS.world);
       this.worldData = await worldResponse.json();
       this.render();
+      // Re-render after layout stabilizes to catch full container width
+      requestAnimationFrame(() => requestAnimationFrame(() => this.render()));
     } catch (e) {
       console.error('Failed to load map data:', e);
     }
