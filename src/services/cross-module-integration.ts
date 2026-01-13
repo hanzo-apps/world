@@ -313,10 +313,47 @@ function getHighestComponent(score: CountryScore): string {
   return 'Information Velocity';
 }
 
+// Populate alerts from convergence and CII data
+function updateAlerts(convergenceAlerts: GeoConvergenceAlert[]): void {
+  // Prune old alerts (older than 24 hours)
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  while (alerts.length > 0 && alerts[0]!.timestamp.getTime() < cutoff) {
+    alerts.shift();
+  }
+
+  // Add convergence alerts (avoid duplicates by checking existing IDs)
+  const existingIds = new Set(alerts.map(a => a.id));
+  for (const conv of convergenceAlerts) {
+    const alertId = `conv-${conv.cellId}`;
+    if (!existingIds.has(alertId)) {
+      const alert = createConvergenceAlert(conv);
+      alert.id = alertId; // Use stable ID for deduplication
+      alerts.push(alert);
+      existingIds.add(alertId);
+    }
+  }
+
+  // Check for CII changes and add those alerts
+  const ciiAlerts = checkCIIChanges();
+  for (const alert of ciiAlerts) {
+    alerts.push(alert);
+  }
+
+  // Sort by timestamp (newest first) and limit to 100
+  alerts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  if (alerts.length > 100) {
+    alerts.length = 100;
+  }
+}
+
 export function calculateStrategicRiskOverview(
   convergenceAlerts: GeoConvergenceAlert[]
 ): StrategicRiskOverview {
   const ciiScores = calculateCII();
+
+  // Update the alerts array with current data
+  updateAlerts(convergenceAlerts);
+
   const ciiRiskScore = calculateCIIRiskScore(ciiScores);
 
   // Weights for composite score
