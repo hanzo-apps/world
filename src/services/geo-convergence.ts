@@ -165,7 +165,8 @@ function getLocationName(lat: number, lon: number): string {
     }
   }
   if (nearestHotspot) {
-    return `near ${nearestHotspot.name}`;
+    // Return just the name - caller adds "in" prefix
+    return nearestHotspot.name;
   }
 
   // Regional fallback based on lat/lon ranges
