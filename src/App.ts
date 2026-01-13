@@ -1397,13 +1397,15 @@ export class App {
       const hasData = disruptions.length > 0 || density.length > 0;
       this.map?.setLayerReady('ais', hasData);
 
+      const shippingCount = disruptions.length + density.length;
+      const shippingStatus = shippingCount > 0 ? 'ok' : (aisStatus.connected ? 'warning' : 'error');
       this.statusPanel?.updateFeed('Shipping', {
-        status: aisStatus.connected ? 'ok' : 'error',
-        itemCount: disruptions.length + density.length,
-        errorMessage: !aisStatus.connected ? 'WebSocket disconnected' : undefined,
+        status: shippingStatus,
+        itemCount: shippingCount,
+        errorMessage: !aisStatus.connected && shippingCount === 0 ? 'WebSocket disconnected' : undefined,
       });
       this.statusPanel?.updateApi('AISStream', {
-        status: aisStatus.connected ? 'ok' : 'error',
+        status: aisStatus.connected ? 'ok' : 'warning',
       });
     } catch (error) {
       this.map?.setLayerReady('ais', false);
@@ -1534,11 +1536,13 @@ export class App {
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
 
+      const militaryCount = flightData.flights.length + vesselData.vessels.length;
       this.statusPanel?.updateFeed('Military', {
-        status: 'ok',
-        itemCount: flightData.flights.length + vesselData.vessels.length,
+        status: militaryCount > 0 ? 'ok' : 'warning',
+        itemCount: militaryCount,
+        errorMessage: militaryCount === 0 ? 'No military activity in view' : undefined,
       });
-      this.statusPanel?.updateApi('OpenSky', { status: 'ok' });
+      this.statusPanel?.updateApi('OpenSky', { status: 'ok' }); // API worked, just no data in view
     } catch (error) {
       this.map?.setLayerReady('military', false);
       this.statusPanel?.updateFeed('Military', { status: 'error', errorMessage: String(error) });
