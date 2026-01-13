@@ -133,6 +133,23 @@ export class MapComponent {
 
     this.setupZoomHandlers();
     this.loadMapData();
+    this.setupResizeObserver();
+  }
+
+  private setupResizeObserver(): void {
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0 && (width !== lastWidth || height !== lastHeight)) {
+          lastWidth = width;
+          lastHeight = height;
+          requestAnimationFrame(() => this.render());
+        }
+      }
+    });
+    resizeObserver.observe(this.container);
   }
 
   private createControls(): HTMLElement {
