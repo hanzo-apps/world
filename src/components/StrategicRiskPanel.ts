@@ -1,0 +1,282 @@
+import { Panel } from './Panel';
+import { escapeHtml } from '@/utils/sanitize';
+import {
+  calculateStrategicRiskOverview,
+  getRecentAlerts,
+  getAlertCount,
+  type StrategicRiskOverview,
+  type UnifiedAlert,
+  type AlertPriority,
+} from '@/services/cross-module-integration';
+import { detectConvergence, type GeoConvergenceAlert } from '@/services/geo-convergence';
+
+export class StrategicRiskPanel extends Panel {
+  private overview: StrategicRiskOverview | null = null;
+  private alerts: UnifiedAlert[] = [];
+  private convergenceAlerts: GeoConvergenceAlert[] = [];
+  private refreshInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    super({ id: 'strategic-risk', title: 'Strategic Risk Overview', showCount: false, trackActivity: true });
+    this.init();
+  }
+
+  private async init(): Promise<void> {
+    this.showLoading();
+    try {
+      await this.refresh();
+      this.startAutoRefresh();
+    } catch (error) {
+      console.error('[StrategicRiskPanel] Init error:', error);
+      this.showError('Failed to calculate risk overview');
+    }
+  }
+
+  private startAutoRefresh(): void {
+    this.refreshInterval = setInterval(() => this.refresh(), 5 * 60 * 1000);
+  }
+
+  public async refresh(): Promise<void> {
+    this.convergenceAlerts = detectConvergence();
+    this.overview = calculateStrategicRiskOverview(this.convergenceAlerts);
+    this.alerts = getRecentAlerts(24);
+    this.render();
+  }
+
+  private getScoreColor(score: number): string {
+    if (score >= 70) return '#ff4444';
+    if (score >= 50) return '#ff8800';
+    if (score >= 30) return '#ffaa00';
+    return '#44aa44';
+  }
+
+  private getScoreLevel(score: number): string {
+    if (score >= 70) return 'Critical';
+    if (score >= 50) return 'Elevated';
+    if (score >= 30) return 'Moderate';
+    return 'Low';
+  }
+
+  private getTrendEmoji(trend: string): string {
+    switch (trend) {
+      case 'escalating': return '📈';
+      case 'de-escalating': return '📉';
+      default: return '➡️';
+    }
+  }
+
+  private getTrendColor(trend: string): string {
+    switch (trend) {
+      case 'escalating': return '#ff4444';
+      case 'de-escalating': return '#44aa44';
+      default: return '#888888';
+    }
+  }
+
+  private getPriorityColor(priority: AlertPriority): string {
+    switch (priority) {
+      case 'critical': return '#ff4444';
+      case 'high': return '#ff8800';
+      case 'medium': return '#ffaa00';
+      case 'low': return '#88aa44';
+    }
+  }
+
+  private getPriorityEmoji(priority: AlertPriority): string {
+    switch (priority) {
+      case 'critical': return '🔴';
+      case 'high': return '🟠';
+      case 'medium': return '🟡';
+      case 'low': return '🟢';
+    }
+  }
+
+  private getTypeEmoji(type: string): string {
+    switch (type) {
+      case 'convergence': return '🎯';
+      case 'cii_spike': return '📊';
+      case 'cascade': return '🔗';
+      case 'composite': return '⚠️';
+      default: return '📍';
+    }
+  }
+
+  private renderScoreGauge(): string {
+    if (!this.overview) return '';
+
+    const score = this.overview.compositeScore;
+    const color = this.getScoreColor(score);
+    const level = this.getScoreLevel(score);
+    const scoreDeg = Math.round((score / 100) * 270);
+
+    return `
+      <div class="risk-gauge">
+        <div class="risk-score-container">
+          <div class="risk-score-ring" style="--score-color: ${color}; --score-deg: ${scoreDeg}deg;">
+            <div class="risk-score-inner">
+              <div class="risk-score" style="color: ${color}">${score}</div>
+              <div class="risk-level" style="color: ${color}">${level}</div>
+            </div>
+          </div>
+        </div>
+        <div class="risk-trend-container">
+          <span class="risk-trend-label">Trend</span>
+          <div class="risk-trend" style="color: ${this.getTrendColor(this.overview.trend)}">
+            ${this.getTrendEmoji(this.overview.trend)} ${this.overview.trend.charAt(0).toUpperCase() + this.overview.trend.slice(1)}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderMetrics(): string {
+    if (!this.overview) return '';
+
+    const alertCounts = getAlertCount();
+
+    return `
+      <div class="risk-metrics">
+        <div class="risk-metric">
+          <span class="risk-metric-value">${this.overview.convergenceAlerts}</span>
+          <span class="risk-metric-label">Convergence</span>
+        </div>
+        <div class="risk-metric">
+          <span class="risk-metric-value">${this.overview.avgCIIDeviation.toFixed(1)}</span>
+          <span class="risk-metric-label">CII Deviation</span>
+        </div>
+        <div class="risk-metric">
+          <span class="risk-metric-value">${this.overview.infrastructureIncidents}</span>
+          <span class="risk-metric-label">Infra Events</span>
+        </div>
+        <div class="risk-metric">
+          <span class="risk-metric-value">${alertCounts.critical + alertCounts.high}</span>
+          <span class="risk-metric-label">High Alerts</span>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderTopRisks(): string {
+    if (!this.overview || this.overview.topRisks.length === 0) {
+      return '<div class="risk-empty">No significant risks detected</div>';
+    }
+
+    return `
+      <div class="risk-section">
+        <div class="risk-section-title">Top Risks</div>
+        <div class="risk-list">
+          ${this.overview.topRisks.map((risk, i) => `
+            <div class="risk-item">
+              <span class="risk-rank">${i + 1}.</span>
+              <span class="risk-text">${escapeHtml(risk)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderUnstableCountries(): string {
+    if (!this.overview || this.overview.unstableCountries.length === 0) {
+      return '';
+    }
+
+    return `
+      <div class="risk-section">
+        <div class="risk-section-title">Unstable Countries</div>
+        <div class="risk-countries">
+          ${this.overview.unstableCountries.map(c => `
+            <div class="risk-country" style="border-left: 3px solid ${this.getScoreColor(c.score)}">
+              <span class="risk-country-name">${escapeHtml(c.name)}</span>
+              <span class="risk-country-score">${c.score}</span>
+              <span class="risk-country-level">${c.level}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderRecentAlerts(): string {
+    if (this.alerts.length === 0) {
+      return '';
+    }
+
+    const displayAlerts = this.alerts.slice(0, 5);
+
+    return `
+      <div class="risk-section">
+        <div class="risk-section-title">Recent Alerts (${this.alerts.length})</div>
+        <div class="risk-alerts">
+          ${displayAlerts.map(alert => `
+            <div class="risk-alert" style="border-left: 3px solid ${this.getPriorityColor(alert.priority)}">
+              <div class="risk-alert-header">
+                <span class="risk-alert-type">${this.getTypeEmoji(alert.type)}</span>
+                <span class="risk-alert-priority">${this.getPriorityEmoji(alert.priority)}</span>
+                <span class="risk-alert-title">${escapeHtml(alert.title)}</span>
+              </div>
+              <div class="risk-alert-summary">${escapeHtml(alert.summary)}</div>
+              <div class="risk-alert-time">${this.formatTime(alert.timestamp)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  private formatTime(date: Date): string {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+  }
+
+  private render(): void {
+    if (!this.overview) {
+      this.showLoading();
+      return;
+    }
+
+    this.content.innerHTML = `
+      <div class="strategic-risk-panel">
+        ${this.renderScoreGauge()}
+        ${this.renderMetrics()}
+        ${this.renderTopRisks()}
+        ${this.renderUnstableCountries()}
+        ${this.renderRecentAlerts()}
+        <div class="risk-footer">
+          <span class="risk-updated">Updated: ${this.overview.timestamp.toLocaleTimeString()}</span>
+          <button class="risk-refresh-btn">Refresh</button>
+        </div>
+      </div>
+    `;
+
+    this.attachEventListeners();
+  }
+
+  private attachEventListeners(): void {
+    const refreshBtn = this.content.querySelector('.risk-refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.refresh());
+    }
+  }
+
+  public destroy(): void {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+  }
+
+  public getOverview(): StrategicRiskOverview | null {
+    return this.overview;
+  }
+
+  public getAlerts(): UnifiedAlert[] {
+    return this.alerts;
+  }
+}
