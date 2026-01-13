@@ -144,6 +144,10 @@ export function geoConvergenceToSignal(alert: GeoConvergenceAlert): CorrelationS
   };
 }
 
+export function detectConvergence(): GeoConvergenceAlert[] {
+  return detectGeoConvergence(new Set());
+}
+
 export function clearCells(): void {
   cells.clear();
 }

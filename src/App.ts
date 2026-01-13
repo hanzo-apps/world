@@ -13,6 +13,7 @@ import {
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII } from '@/services/country-instability';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -34,6 +35,9 @@ import {
   PizzIntIndicator,
   GdeltIntelPanel,
   LiveNewsPanel,
+  CIIPanel,
+  CascadePanel,
+  StrategicRiskPanel,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -517,7 +521,7 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <span class="logo">WORLD MONITOR</span><span class="version">v1.3</span>
+          <span class="logo">WORLD MONITOR</span><span class="version">v1.4</span>
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">@eliehabib</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -666,12 +670,21 @@ export class App {
     const gdeltIntelPanel = new GdeltIntelPanel();
     this.panels['gdelt-intel'] = gdeltIntelPanel;
 
+    const ciiPanel = new CIIPanel();
+    this.panels['cii'] = ciiPanel;
+
+    const cascadePanel = new CascadePanel();
+    this.panels['cascade'] = cascadePanel;
+
+    const strategicRiskPanel = new StrategicRiskPanel();
+    this.panels['strategic-risk'] = strategicRiskPanel;
+
     const liveNewsPanel = new LiveNewsPanel();
     this.panels['live-news'] = liveNewsPanel;
 
     // Add panels to grid in saved order (optimized for geopolitical analysis)
     // Row 1: Intel + breaking events | Row 2: Market signals | Row 3: Supporting context
-    const defaultOrder = ['live-news', 'intel', 'gdelt-intel', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
+    const defaultOrder = ['strategic-risk', 'live-news', 'intel', 'gdelt-intel', 'cii', 'cascade', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
@@ -1444,6 +1457,8 @@ export class App {
       this.map?.setProtests(protestData.events);
       this.map?.setLayerReady('protests', protestData.events.length > 0);
       ingestProtests(protestData.events);
+      ingestProtestsForCII(protestData.events);
+      (this.panels['cii'] as CIIPanel)?.refresh();
       const status = getProtestStatus();
 
       this.statusPanel?.updateFeed('Protests', {
@@ -1500,6 +1515,8 @@ export class App {
       this.map?.setMilitaryVessels(vesselData.vessels, vesselData.clusters);
       ingestFlights(flightData.flights);
       ingestVessels(vesselData.vessels);
+      ingestMilitaryForCII(flightData.flights, vesselData.vessels);
+      (this.panels['cii'] as CIIPanel)?.refresh();
 
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
@@ -1564,6 +1581,12 @@ export class App {
       // Ensure we have clusters (compute via worker if needed)
       if (this.latestClusters.length === 0 && this.allNews.length > 0) {
         this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+      }
+
+      // Ingest news clusters for CII
+      if (this.latestClusters.length > 0) {
+        ingestNewsForCII(this.latestClusters);
+        (this.panels['cii'] as CIIPanel)?.refresh();
       }
 
       // Run correlation analysis off main thread via Web Worker
