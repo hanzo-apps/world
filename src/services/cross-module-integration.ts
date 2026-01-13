@@ -187,11 +187,12 @@ function shouldMergeAlerts(a: UnifiedAlert, b: UnifiedAlert): boolean {
   const sameCountry = a.countries.some(c => b.countries.includes(c));
   const sameTime =
     Math.abs(a.timestamp.getTime() - b.timestamp.getTime()) < ALERT_MERGE_WINDOW_MS;
-  const sameLocation =
+  const sameLocation = !!(
     a.location &&
     b.location &&
     haversineDistance(a.location.lat, a.location.lon, b.location.lat, b.location.lon) <
-      ALERT_MERGE_DISTANCE_KM;
+      ALERT_MERGE_DISTANCE_KM
+  );
 
   return (sameCountry || sameLocation) && sameTime;
 }
@@ -239,9 +240,11 @@ function generateCompositeSummary(a: UnifiedAlert, b: UnifiedAlert): string {
 
 function addAndMergeAlert(alert: UnifiedAlert): UnifiedAlert {
   for (let i = 0; i < alerts.length; i++) {
-    if (shouldMergeAlerts(alerts[i], alert)) {
-      alerts[i] = mergeAlerts(alerts[i], alert);
-      return alerts[i];
+    const existing = alerts[i];
+    if (existing && shouldMergeAlerts(existing, alert)) {
+      const merged = mergeAlerts(existing, alert);
+      alerts[i] = merged;
+      return merged;
     }
   }
 
@@ -253,24 +256,24 @@ function addAndMergeAlert(alert: UnifiedAlert): UnifiedAlert {
 function getCountriesNearLocation(lat: number, lon: number): string[] {
   const countries: string[] = [];
 
-  const regionCountries: Record<string, string[]> = {
-    'europe': ['DE', 'FR', 'GB', 'PL', 'UA'],
-    'middle_east': ['IR', 'IL', 'SA', 'TR', 'SY', 'YE'],
-    'east_asia': ['CN', 'TW', 'KP'],
-    'south_asia': ['IN', 'PK', 'MM'],
-    'americas': ['US', 'VE'],
-  };
+  const regionCountries = {
+    europe: ['DE', 'FR', 'GB', 'PL', 'UA'],
+    middle_east: ['IR', 'IL', 'SA', 'TR', 'SY', 'YE'],
+    east_asia: ['CN', 'TW', 'KP'],
+    south_asia: ['IN', 'PK', 'MM'],
+    americas: ['US', 'VE'],
+  } as const;
 
   if (lat > 35 && lat < 70 && lon > -10 && lon < 40) {
-    countries.push(...regionCountries['europe']);
+    countries.push(...regionCountries.europe);
   } else if (lat > 15 && lat < 45 && lon > 25 && lon < 65) {
-    countries.push(...regionCountries['middle_east']);
+    countries.push(...regionCountries.middle_east);
   } else if (lat > 15 && lat < 55 && lon > 100 && lon < 145) {
-    countries.push(...regionCountries['east_asia']);
+    countries.push(...regionCountries.east_asia);
   } else if (lat > 5 && lat < 40 && lon > 65 && lon < 100) {
-    countries.push(...regionCountries['south_asia']);
+    countries.push(...regionCountries.south_asia);
   } else if (lat > -60 && lat < 70 && lon > -130 && lon < -30) {
-    countries.push(...regionCountries['americas']);
+    countries.push(...regionCountries.americas);
   }
 
   return countries.filter(c => TIER1_COUNTRIES[c]);
@@ -376,8 +379,8 @@ function identifyTopRisks(
 ): string[] {
   const risks: string[] = [];
 
-  if (convergence.length > 0) {
-    const top = convergence[0];
+  const top = convergence[0];
+  if (top) {
     risks.push(`Convergence zone at ${top.lat.toFixed(0)}°, ${top.lon.toFixed(0)}° (score: ${top.score})`);
   }
 
