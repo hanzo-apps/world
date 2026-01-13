@@ -14,6 +14,7 @@ import {
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII } from '@/services/country-instability';
+import { dataFreshness } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -1458,6 +1459,15 @@ export class App {
       this.map?.setLayerReady('protests', protestData.events.length > 0);
       ingestProtests(protestData.events);
       ingestProtestsForCII(protestData.events);
+
+      // Record data freshness AFTER CII ingestion to avoid race conditions
+      if (protestData.sources.acled > 0) {
+        dataFreshness.recordUpdate('acled', protestData.sources.acled);
+      }
+      if (protestData.sources.gdelt > 0) {
+        dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
+      }
+
       (this.panels['cii'] as CIIPanel)?.refresh();
       const status = getProtestStatus();
 
@@ -1586,6 +1596,7 @@ export class App {
       // Ingest news clusters for CII
       if (this.latestClusters.length > 0) {
         ingestNewsForCII(this.latestClusters);
+        dataFreshness.recordUpdate('gdelt', this.latestClusters.length);
         (this.panels['cii'] as CIIPanel)?.refresh();
       }
 
