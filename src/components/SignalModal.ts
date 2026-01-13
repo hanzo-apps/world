@@ -130,6 +130,7 @@ export class SignalModal {
       'triangulation': '△ Triangulation',
       'flow_drop': '🛢️ Flow Drop',
       'flow_price_divergence': '📈 Flow/Price Divergence',
+      'geo_convergence': '🌐 Geographic Convergence',
     };
 
     const html = this.currentSignals.map(signal => `
