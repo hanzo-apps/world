@@ -50,7 +50,7 @@ export const TIER1_COUNTRIES: Record<string, string> = {
 };
 
 const COUNTRY_KEYWORDS: Record<string, string[]> = {
-  US: ['united states', 'america', 'washington', 'biden', 'trump', 'pentagon'],
+  US: ['united states', 'usa', 'america', 'washington', 'biden', 'trump', 'pentagon'],
   RU: ['russia', 'moscow', 'kremlin', 'putin'],
   CN: ['china', 'beijing', 'xi jinping', 'prc'],
   UA: ['ukraine', 'kyiv', 'zelensky', 'donbas'],
@@ -193,8 +193,8 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 const HOTSPOT_COUNTRY_MAP: Record<string, string> = {
   tehran: 'IR', moscow: 'RU', beijing: 'CN', kyiv: 'UA', taipei: 'TW',
   telaviv: 'IL', pyongyang: 'KP', riyadh: 'SA', ankara: 'TR', damascus: 'SY',
-  sanaa: 'YE', caracas: 'VE', dc: 'US', london: 'GB', brussels: 'DE',
-  baghdad: 'IR', beirut: 'IL', cairo: 'IL', doha: 'SA', abudhabi: 'SA',
+  sanaa: 'YE', caracas: 'VE', dc: 'US', london: 'GB', brussels: 'FR',
+  baghdad: 'IR', beirut: 'IR', doha: 'SA', abudhabi: 'SA',
 };
 
 const hotspotActivityMap = new Map<string, number>();
@@ -215,7 +215,7 @@ function trackHotspotActivity(lat: number, lon: number, weight: number = 1): voi
     const dist = haversineKm(lat, lon, zoneLat, zoneLon);
     if (dist < 300) {
       const zoneCountries: Record<string, string[]> = {
-        ukraine: ['UA', 'RU'], gaza: ['IL'], sudan: ['SA'], myanmar: ['MM'],
+        ukraine: ['UA', 'RU'], gaza: ['IL', 'IR'], sudan: ['SA'], myanmar: ['MM'],
       };
       const countries = zoneCountries[zone.id] || [];
       for (const code of countries) {
