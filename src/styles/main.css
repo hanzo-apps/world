@@ -2038,6 +2038,88 @@ body.playback-mode .status-dot {
 .base-marker.japan .base-label { color: #bc002d; }
 .base-marker.other .base-label { color: #888888; }
 
+/* Port markers */
+.port-marker {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
+  transform-origin: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  z-index: 50;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.port-marker:hover {
+  transform: translate(-50%, -50%) scale(calc(var(--marker-scale, 1) * 1.3));
+}
+
+.port-marker.port-container {
+  background: #22aa88;
+  box-shadow: 0 0 6px #22aa88;
+}
+
+.port-marker.port-oil {
+  background: #aa4422;
+  box-shadow: 0 0 6px #aa4422;
+}
+
+.port-marker.port-lng {
+  background: #ff6622;
+  box-shadow: 0 0 6px #ff6622;
+}
+
+.port-marker.port-naval {
+  background: #4466aa;
+  box-shadow: 0 0 6px #4466aa;
+}
+
+.port-marker.port-mixed {
+  background: #6688aa;
+  box-shadow: 0 0 6px #6688aa;
+}
+
+.port-marker.port-bulk {
+  background: #888866;
+  box-shadow: 0 0 6px #888866;
+}
+
+.port-icon {
+  display: none;
+}
+
+.port-label {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) scale(calc(var(--label-scale, 1) * var(--marker-scale, 1)));
+  transform-origin: top center;
+  font-size: 7px;
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
+  white-space: nowrap;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.port-marker:hover .port-label {
+  opacity: 1;
+}
+
+.port-marker.port-container .port-label { color: #22aa88; }
+.port-marker.port-oil .port-label { color: #aa4422; }
+.port-marker.port-lng .port-label { color: #ff6622; }
+.port-marker.port-naval .port-label { color: #4466aa; }
+.port-marker.port-mixed .port-label { color: #6688aa; }
+.port-marker.port-bulk .port-label { color: #888866; }
+
 /* Earthquake markers */
 .earthquake-marker {
   position: absolute;

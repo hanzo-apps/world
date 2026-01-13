@@ -683,3 +683,6 @@ export interface NaturalEvent {
   sourceName?: string;
   closed: boolean;
 }
+
+// Re-export port types
+export type { Port, PortType } from '@/config/ports';
