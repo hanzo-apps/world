@@ -22,6 +22,7 @@ import {
   COUNTRY_LABELS,
   ECONOMIC_CENTERS,
   AI_DATA_CENTERS,
+  PORTS,
 } from '@/config';
 import { MapPopup } from './MapPopup';
 
@@ -850,6 +851,7 @@ export class MapComponent {
 
     if (this.state.layers.ais) {
       this.renderAisDisruptions(projection);
+      this.renderPorts(projection);
     }
 
     // APT groups
@@ -1713,6 +1715,41 @@ export class MapComponent {
         .attr('fill', color)
         .attr('fill-opacity', fillOpacity)
         .attr('stroke', 'none');
+    });
+  }
+
+  private renderPorts(projection: d3.GeoProjection): void {
+    PORTS.forEach((port) => {
+      const pos = projection([port.lon, port.lat]);
+      if (!pos) return;
+
+      const div = document.createElement('div');
+      div.className = `port-marker port-${port.type}`;
+      div.style.left = `${pos[0]}px`;
+      div.style.top = `${pos[1]}px`;
+
+      const icon = document.createElement('div');
+      icon.className = 'port-icon';
+      icon.textContent = port.type === 'naval' ? '⚓' : port.type === 'oil' || port.type === 'lng' ? '🛢️' : '🏭';
+      div.appendChild(icon);
+
+      const label = document.createElement('div');
+      label.className = 'port-label';
+      label.textContent = port.name;
+      div.appendChild(label);
+
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const rect = this.container.getBoundingClientRect();
+        this.popup.show({
+          type: 'port',
+          data: port,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      });
+
+      this.overlays.appendChild(div);
     });
   }
 
