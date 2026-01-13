@@ -33,8 +33,15 @@ export class StrategicRiskPanel extends Panel {
   private async init(): Promise<void> {
     this.showLoading();
     try {
-      // Subscribe to data freshness changes
-      this.unsubscribeFreshness = dataFreshness.subscribe(() => this.render());
+      // Subscribe to data freshness changes - debounce to avoid excessive recalculations
+      let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+      this.unsubscribeFreshness = dataFreshness.subscribe(() => {
+        // Debounce refresh to batch multiple rapid updates
+        if (refreshTimeout) clearTimeout(refreshTimeout);
+        refreshTimeout = setTimeout(() => {
+          this.refresh();
+        }, 500);
+      });
       await this.refresh();
       this.startAutoRefresh();
     } catch (error) {
