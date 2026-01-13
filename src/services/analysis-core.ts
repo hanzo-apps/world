@@ -89,7 +89,8 @@ export type SignalType =
   | 'convergence'
   | 'triangulation'
   | 'flow_drop'
-  | 'flow_price_divergence';
+  | 'flow_price_divergence'
+  | 'geo_convergence';
 
 export interface CorrelationSignalCore {
   id: string;

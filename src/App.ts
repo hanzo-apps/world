@@ -12,6 +12,7 @@ import {
   STORAGE_KEYS,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
+import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -65,6 +66,7 @@ export class App {
   private initialUrlState: ParsedMapUrlState | null = null;
   private inFlight: Set<string> = new Set();
   private isMobile: boolean;
+  private seenGeoAlerts: Set<string> = new Set();
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -1319,6 +1321,7 @@ export class App {
     // Handle earthquakes (USGS)
     if (earthquakeResult.status === 'fulfilled') {
       this.map?.setEarthquakes(earthquakeResult.value);
+      ingestEarthquakes(earthquakeResult.value);
       this.statusPanel?.updateApi('USGS', { status: 'ok' });
     } else {
       this.map?.setEarthquakes([]);
@@ -1440,6 +1443,7 @@ export class App {
       const protestData = await fetchProtestEvents();
       this.map?.setProtests(protestData.events);
       this.map?.setLayerReady('protests', protestData.events.length > 0);
+      ingestProtests(protestData.events);
       const status = getProtestStatus();
 
       this.statusPanel?.updateFeed('Protests', {
@@ -1494,6 +1498,8 @@ export class App {
 
       this.map?.setMilitaryFlights(flightData.flights, flightData.clusters);
       this.map?.setMilitaryVessels(vesselData.vessels, vesselData.clusters);
+      ingestFlights(flightData.flights);
+      ingestVessels(vesselData.vessels);
 
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
@@ -1567,9 +1573,14 @@ export class App {
         this.latestMarkets
       );
 
-      if (signals.length > 0) {
-        addToSignalHistory(signals);
-        this.signalModal?.show(signals);
+      // Detect geographic convergence
+      const geoAlerts = detectGeoConvergence(this.seenGeoAlerts);
+      const geoSignals = geoAlerts.map(geoConvergenceToSignal);
+
+      const allSignals = [...signals, ...geoSignals];
+      if (allSignals.length > 0) {
+        addToSignalHistory(allSignals);
+        this.signalModal?.show(allSignals);
       }
     } catch (error) {
       console.error('[App] Correlation analysis failed:', error);
