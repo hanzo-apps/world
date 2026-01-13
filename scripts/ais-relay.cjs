@@ -109,10 +109,22 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: err.message }));
     }
   } else if (req.url.startsWith('/opensky')) {
-    // Proxy OpenSky API requests (Vercel is blocked, Railway isn't)
+    // Proxy OpenSky API requests with OAuth2 authentication
+    // OpenSky blocks unauthenticated cloud IPs, so we need to use credentials
     try {
       const url = new URL(req.url, `http://localhost:${PORT}`);
       const params = url.searchParams;
+
+      // Get OAuth2 credentials from env
+      const clientId = process.env.OPENSKY_CLIENT_ID;
+      const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        console.error('[Relay] OpenSky credentials not configured');
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'OpenSky not configured', time: Date.now(), states: [] }));
+        return;
+      }
 
       let openskyUrl = 'https://opensky-network.org/api/states/all';
       const queryParams = [];
@@ -125,11 +137,15 @@ const server = http.createServer(async (req, res) => {
 
       console.log('[Relay] OpenSky request:', openskyUrl);
 
+      // Use Basic Auth with client credentials
+      const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
       const https = require('https');
       const request = https.get(openskyUrl, {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'WorldMonitor/1.0'
+          'User-Agent': 'WorldMonitor/1.0',
+          'Authorization': `Basic ${auth}`,
         },
         timeout: 15000
       }, (response) => {
