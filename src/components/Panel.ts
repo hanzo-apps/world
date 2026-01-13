@@ -4,6 +4,7 @@ export interface PanelOptions {
   showCount?: boolean;
   className?: string;
   trackActivity?: boolean;
+  infoTooltip?: string;
 }
 
 export class Panel {
@@ -30,6 +31,30 @@ export class Panel {
     title.className = 'panel-title';
     title.textContent = options.title;
     headerLeft.appendChild(title);
+
+    if (options.infoTooltip) {
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'panel-info-btn';
+      infoBtn.innerHTML = '?';
+      infoBtn.setAttribute('aria-label', 'Show methodology info');
+
+      const tooltip = document.createElement('div');
+      tooltip.className = 'panel-info-tooltip';
+      tooltip.innerHTML = options.infoTooltip;
+
+      infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tooltip.classList.toggle('visible');
+      });
+
+      document.addEventListener('click', () => tooltip.classList.remove('visible'));
+
+      const infoWrapper = document.createElement('div');
+      infoWrapper.className = 'panel-info-wrapper';
+      infoWrapper.appendChild(infoBtn);
+      infoWrapper.appendChild(tooltip);
+      headerLeft.appendChild(infoWrapper);
+    }
 
     // Add "new" badge element (hidden by default)
     if (options.trackActivity !== false) {
