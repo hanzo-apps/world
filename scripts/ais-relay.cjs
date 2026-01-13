@@ -166,21 +166,31 @@ const server = http.createServer(async (req, res) => {
 });
 
 function connectUpstream() {
-  if (upstreamSocket?.readyState === WebSocket.OPEN) return;
+  // Skip if already connected or connecting
+  if (upstreamSocket?.readyState === WebSocket.OPEN ||
+      upstreamSocket?.readyState === WebSocket.CONNECTING) return;
 
   console.log('[Relay] Connecting to aisstream.io...');
-  upstreamSocket = new WebSocket(AISSTREAM_URL);
+  const socket = new WebSocket(AISSTREAM_URL);
+  upstreamSocket = socket;
 
-  upstreamSocket.on('open', () => {
+  socket.on('open', () => {
+    // Verify this socket is still the current one (race condition guard)
+    if (upstreamSocket !== socket) {
+      console.log('[Relay] Stale socket open event, closing');
+      socket.close();
+      return;
+    }
     console.log('[Relay] Connected to aisstream.io');
-    upstreamSocket.send(JSON.stringify({
+    socket.send(JSON.stringify({
       APIKey: API_KEY,
       BoundingBoxes: [[[-90, -180], [90, 180]]],
       FilterMessageTypes: ['PositionReport'],
     }));
   });
 
-  upstreamSocket.on('message', (data) => {
+  socket.on('message', (data) => {
+    if (upstreamSocket !== socket) return; // Stale socket
     messageCount++;
     if (messageCount % 1000 === 0) {
       console.log(`[Relay] ${messageCount} messages, ${clients.size} clients`);
@@ -193,12 +203,15 @@ function connectUpstream() {
     }
   });
 
-  upstreamSocket.on('close', () => {
-    console.log('[Relay] Disconnected, reconnecting in 5s...');
-    setTimeout(connectUpstream, 5000);
+  socket.on('close', () => {
+    if (upstreamSocket === socket) {
+      upstreamSocket = null;
+      console.log('[Relay] Disconnected, reconnecting in 5s...');
+      setTimeout(connectUpstream, 5000);
+    }
   });
 
-  upstreamSocket.on('error', (err) => {
+  socket.on('error', (err) => {
     console.error('[Relay] Upstream error:', err.message);
   });
 }
