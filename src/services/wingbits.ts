@@ -4,6 +4,7 @@
  */
 
 import { createCircuitBreaker } from '@/utils';
+import { dataFreshness } from './data-freshness';
 
 export interface WingbitsAircraftDetails {
   icao24: string;
@@ -92,10 +93,12 @@ export async function checkWingbitsStatus(): Promise<boolean> {
     const response = await fetch(`${WINGBITS_PROXY_URL}/health`);
     const data = await response.json();
     wingbitsConfigured = data.configured === true;
+    dataFreshness.setEnabled('wingbits', wingbitsConfigured);
     console.log(`[Wingbits] Status: ${wingbitsConfigured ? 'configured' : 'not configured'}`);
     return wingbitsConfigured;
   } catch {
     wingbitsConfigured = false;
+    dataFreshness.setEnabled('wingbits', false);
     return false;
   }
 }
@@ -196,8 +199,12 @@ export async function getAircraftDetailsBatch(icao24List: string[]): Promise<Map
     }
 
     console.log(`[Wingbits] Batch: ${results.size} enriched, ${data.cached || 0} cached, ${data.fetched || 0} fetched`);
+    if (results.size > 0) {
+      dataFreshness.recordUpdate('wingbits', results.size);
+    }
   } catch (error) {
     console.warn('[Wingbits] Batch fetch failed:', error);
+    dataFreshness.recordError('wingbits', error instanceof Error ? error.message : 'Unknown error');
   }
 
   return results;
