@@ -7,7 +7,7 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.3.3-blue)
+![Version](https://img.shields.io/badge/version-1.3.4-blue)
 
 ![World Monitor Dashboard](Screenshot.png)
 
@@ -810,6 +810,67 @@ This enables detection of loitering, circling, or other anomalous behavior patte
 
 ---
 
+## Aircraft Enrichment
+
+Military aircraft tracking is enhanced with **Wingbits** enrichment data, providing detailed aircraft information that goes beyond basic transponder data.
+
+### What Wingbits Provides
+
+When an aircraft is detected via OpenSky ADS-B, the system queries Wingbits for:
+
+| Field | Description | Use Case |
+|-------|-------------|----------|
+| **Registration** | Aircraft tail number (e.g., N12345) | Unique identification |
+| **Owner** | Legal owner of the aircraft | Military branch detection |
+| **Operator** | Operating entity | Distinguish military vs. contractor |
+| **Manufacturer** | Boeing, Lockheed Martin, etc. | Aircraft type classification |
+| **Model** | Specific aircraft model | Capability assessment |
+| **Built Year** | Year of manufacture | Fleet age analysis |
+
+### Military Classification Algorithm
+
+The enrichment service analyzes owner and operator fields against curated keyword lists:
+
+**Confirmed Military** (owner/operator match):
+- Government: "United States Air Force", "Department of Defense", "Royal Air Force"
+- International: "NATO", "Ministry of Defence", "Bundeswehr"
+
+**Likely Military** (operator ICAO codes):
+- `AIO` (Air Mobility Command), `RRR` (Royal Air Force), `GAF` (German Air Force)
+- `RCH` (REACH flights), `CNV` (Convoy flights), `DOD` (Department of Defense)
+
+**Possible Military** (defense contractors):
+- Northrop Grumman, Lockheed Martin, General Atomics, Raytheon, Boeing Defense, L3Harris
+
+**Aircraft Type Matching**:
+- Transport: C-17, C-130, C-5, KC-135, KC-46
+- Reconnaissance: RC-135, U-2, RQ-4, E-3, E-8
+- Combat: F-15, F-16, F-22, F-35, B-52, B-2
+- European: Eurofighter, Typhoon, Rafale, Tornado, Gripen
+
+### Confidence Levels
+
+Each enriched aircraft receives a confidence classification:
+
+| Level | Criteria | Display |
+|-------|----------|---------|
+| **Confirmed** | Direct military owner/operator match | Green badge |
+| **Likely** | Military ICAO code or aircraft type | Yellow badge |
+| **Possible** | Defense contractor ownership | Gray badge |
+| **Civilian** | No military indicators | No badge |
+
+### Caching Strategy
+
+Aircraft details rarely change, so aggressive caching reduces API load:
+
+- **Server-side**: HTTP Cache-Control headers (24-hour max-age)
+- **Client-side**: 1-hour local cache per aircraft
+- **Batch optimization**: Up to 20 aircraft per API call
+
+This means an aircraft's details are fetched at most once per day, regardless of how many times it appears on the map.
+
+---
+
 ## Social Unrest Tracking
 
 The Protests layer aggregates civil unrest data from two independent sources, providing corroboration and global coverage.
@@ -1136,6 +1197,7 @@ The dashboard fetches data from various public APIs and data sources:
 | Cloudflare Radar | Internet outage data | Yes (free) |
 | AISStream | Live vessel positions | Yes (relay) |
 | OpenSky Network | Military aircraft tracking | Yes (free) |
+| Wingbits | Aircraft enrichment (owner, operator) | Yes (free) |
 | PizzINT | Pentagon-area activity metrics | No |
 
 ### Optional API Keys
@@ -1151,6 +1213,7 @@ Some features require API credentials. Without them, the corresponding layer is 
 | `OPENSKY_CLIENT_SECRET` | OpenSky auth (relay) | API key from OpenSky account settings |
 | `CLOUDFLARE_API_TOKEN` | Internet outages | Free Cloudflare account with Radar access |
 | `ACLED_ACCESS_TOKEN` | Protest data (server-side) | Free registration at acleddata.com |
+| `WINGBITS_API_KEY` | Aircraft enrichment | Contact [Wingbits](https://wingbits.com) for API access |
 
 The dashboard functions fully without these keys—affected layers simply don't appear. Core functionality (news, markets, earthquakes, weather) requires no configuration.
 
@@ -1192,6 +1255,7 @@ src/
 │   ├── ais.ts                # WebSocket vessel tracking
 │   ├── military-vessels.ts   # Naval vessel identification
 │   ├── military-flights.ts   # Aircraft tracking via OpenSky
+│   ├── wingbits.ts           # Aircraft enrichment (owner, operator, type)
 │   ├── pizzint.ts            # Pentagon Pizza Index + GDELT tensions
 │   ├── protests.ts           # ACLED + GDELT integration
 │   ├── gdelt-intel.ts        # GDELT Doc API topic intelligence
@@ -1234,7 +1298,8 @@ api/                          # Vercel Edge serverless proxies
 ├── gdelt-geo.js              # GDELT Geo API (event geolocation)
 ├── polymarket.js             # Prediction markets with validation
 ├── yahoo-finance.js          # Stock indices/commodities (backup)
-└── opensky-relay.js          # Military aircraft tracking
+├── opensky-relay.js          # Military aircraft tracking
+└── wingbits.js               # Aircraft enrichment proxy
 ```
 
 ## Usage
@@ -1338,6 +1403,8 @@ Data provided by [The OpenSky Network](https://opensky-network.org). If you use 
 ## Acknowledgments
 
 Original dashboard concept inspired by Reggie James ([@HipCityReg](https://x.com/HipCityReg/status/2009003048044220622)) - with thanks for the vision of a comprehensive situation awareness tool
+
+Special thanks to **Yanal at [Wingbits](https://wingbits.com)** for providing API access for aircraft enrichment data, enabling military aircraft classification and ownership tracking
 
 ---
 
