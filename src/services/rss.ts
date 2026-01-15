@@ -104,24 +104,51 @@ export async function fetchCategoryFeeds(
     onBatch?: (items: NewsItem[]) => void;
   } = {}
 ): Promise<NewsItem[]> {
+  const topLimit = 20;
   const batchSize = options.batchSize ?? 5;
   const batches = chunkArray(feeds, batchSize);
-  const items: NewsItem[] = [];
+  const topItems: NewsItem[] = [];
+  let totalItems = 0;
+
+  const ensureSortedDescending = () =>
+    [...topItems].sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime());
+
+  const insertTopItem = (item: NewsItem) => {
+    totalItems += 1;
+    if (topItems.length < topLimit) {
+      topItems.push(item);
+      if (topItems.length === topLimit) {
+        topItems.sort((a, b) => a.pubDate.getTime() - b.pubDate.getTime());
+      }
+      return;
+    }
+
+    const itemTime = item.pubDate.getTime();
+    if (itemTime <= topItems[0].pubDate.getTime()) {
+      return;
+    }
+
+    topItems[0] = item;
+    for (let i = 0; i < topItems.length - 1; i += 1) {
+      if (topItems[i].pubDate.getTime() <= topItems[i + 1].pubDate.getTime()) {
+        break;
+      }
+      [topItems[i], topItems[i + 1]] = [topItems[i + 1], topItems[i]];
+    }
+  };
 
   for (const batch of batches) {
     const results = await Promise.all(batch.map(fetchFeed));
-    items.push(...results.flat());
-
-    items.sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime());
-    options.onBatch?.(items.slice(0, 20));
+    results.flat().forEach(insertTopItem);
+    options.onBatch?.(ensureSortedDescending());
   }
 
   // Record data freshness if we got items
-  if (items.length > 0) {
+  if (totalItems > 0) {
     import('./data-freshness').then(({ dataFreshness }) => {
-      dataFreshness.recordUpdate('rss', items.length);
+      dataFreshness.recordUpdate('rss', totalItems);
     });
   }
 
-  return items.slice(0, 20);
+  return ensureSortedDescending();
 }
