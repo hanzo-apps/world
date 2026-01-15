@@ -7,6 +7,7 @@
 export type DataSourceId =
   | 'acled'      // Protests/conflicts
   | 'opensky'    // Military flights
+  | 'wingbits'   // Aircraft enrichment
   | 'ais'        // Vessel tracking
   | 'usgs'       // Earthquakes
   | 'gdelt'      // News velocity
@@ -53,6 +54,7 @@ const CORE_SOURCES: DataSourceId[] = ['gdelt', 'rss'];
 const SOURCE_METADATA: Record<DataSourceId, { name: string; requiredForRisk: boolean; panelId?: string }> = {
   acled: { name: 'Protests & Conflicts', requiredForRisk: false, panelId: 'protests' },
   opensky: { name: 'Military Flights', requiredForRisk: false, panelId: 'military' },
+  wingbits: { name: 'Aircraft Enrichment', requiredForRisk: false, panelId: 'military' },
   ais: { name: 'Vessel Tracking', requiredForRisk: false, panelId: 'shipping' },
   usgs: { name: 'Earthquakes', requiredForRisk: false, panelId: 'natural' },
   gdelt: { name: 'News Intelligence', requiredForRisk: true, panelId: 'intel' },
