@@ -725,6 +725,37 @@ AISStream → WebSocket Relay → Browser
 
 The connection automatically reconnects on disconnection with a 30-second backoff. When the Ships layer is disabled, the WebSocket disconnects to conserve resources.
 
+### Railway Relay Architecture
+
+Some APIs block requests from cloud providers (Vercel, AWS, Cloudflare Workers). A Railway relay server provides authenticated access:
+
+```
+Browser → Railway Relay → External APIs
+           (Node.js)      (AIS, OpenSky, RSS)
+```
+
+**Relay Functions**:
+
+| Endpoint | Purpose | Authentication |
+|----------|---------|----------------|
+| `/` (WebSocket) | AIS vessel stream | AISStream API key |
+| `/opensky` | Military aircraft | OAuth2 Bearer token |
+| `/rss` | Blocked RSS feeds | None (user-agent spoofing) |
+| `/health` | Status check | None |
+
+**Environment Variables** (Railway):
+- `AISSTREAM_API_KEY` - AIS data access
+- `OPENSKY_CLIENT_ID` - OAuth2 client ID
+- `OPENSKY_CLIENT_SECRET` - OAuth2 client secret
+
+**Why Railway?**
+- Residential IP ranges (not blocked like cloud providers)
+- WebSocket support for persistent connections
+- Global edge deployment for low latency
+- Free tier sufficient for moderate traffic
+
+The relay is stateless—it simply authenticates and proxies requests. All caching and processing happens client-side or in Vercel Edge Functions.
+
 ---
 
 ## Military Tracking
@@ -781,7 +812,8 @@ Military aircraft are tracked via the OpenSky Network using ADS-B data. OpenSky 
 **Authentication**:
 - Register for a free account at [opensky-network.org](https://opensky-network.org)
 - Create an API client in account settings to get `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`
-- The relay uses Basic Auth with these credentials to bypass cloud IP blocks
+- The relay uses **OAuth2 client credentials flow** to obtain Bearer tokens
+- Tokens are cached (30-minute expiry) and automatically refreshed
 
 **Identification Methods**:
 - **Callsign matching**: Known military callsign patterns (RCH, REACH, DUKE, etc.)
