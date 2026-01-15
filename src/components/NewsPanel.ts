@@ -3,7 +3,7 @@ import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
 import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { clusterNews, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
+import { analysisWorker, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
 
 /** Threshold for enabling virtual scrolling */
 const VIRTUAL_SCROLL_THRESHOLD = 15;
@@ -27,6 +27,7 @@ export class NewsPanel extends Panel {
   private isFirstRender = true;
   private windowedList: WindowedList<PreparedCluster> | null = null;
   private useVirtualScroll = true;
+  private renderRequestId = 0;
 
   constructor(id: string, title: string) {
     super({ id, title, showCount: true, trackActivity: true });
@@ -110,11 +111,24 @@ export class NewsPanel extends Panel {
     }
 
     if (this.clusteredMode) {
-      const clusters = clusterNews(items);
-      const enriched = enrichWithVelocity(clusters);
-      this.renderClusters(enriched);
+      void this.renderClustersAsync(items);
     } else {
       this.renderFlat(items);
+    }
+  }
+
+  private async renderClustersAsync(items: NewsItem[]): Promise<void> {
+    const requestId = ++this.renderRequestId;
+
+    try {
+      const clusters = await analysisWorker.clusterNews(items);
+      if (requestId !== this.renderRequestId) return;
+      const enriched = enrichWithVelocity(clusters);
+      this.renderClusters(enriched);
+    } catch (error) {
+      if (requestId !== this.renderRequestId) return;
+      console.error('[NewsPanel] Failed to cluster news:', error);
+      this.showError('Failed to cluster news');
     }
   }
 
