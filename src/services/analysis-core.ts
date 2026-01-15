@@ -142,8 +142,24 @@ export function clusterNewsCore(
   }));
 
   const tokenCache = new Map<string, Set<string>>();
+  const tokenList: Set<string>[] = [];
+  const invertedIndex = new Map<string, number[]>();
   for (const item of itemsWithTier) {
-    tokenCache.set(item.title, tokenize(item.title));
+    const tokens = tokenize(item.title);
+    tokenCache.set(item.title, tokens);
+    tokenList.push(tokens);
+  }
+
+  for (let index = 0; index < tokenList.length; index++) {
+    const tokens = tokenList[index]!;
+    for (const token of tokens) {
+      const bucket = invertedIndex.get(token);
+      if (bucket) {
+        bucket.push(index);
+      } else {
+        invertedIndex.set(token, [index]);
+      }
+    }
   }
 
   const clusters: NewsItemWithTier[][] = [];
@@ -155,13 +171,27 @@ export function clusterNewsCore(
     const currentItem = itemsWithTier[i]!;
     const cluster: NewsItemWithTier[] = [currentItem];
     assigned.add(i);
-    const tokensI = tokenCache.get(currentItem.title)!;
+    const tokensI = tokenList[i]!;
 
-    for (let j = i + 1; j < itemsWithTier.length; j++) {
-      if (assigned.has(j)) continue;
+    const candidateIndices = new Set<number>();
+    for (const token of tokensI) {
+      const bucket = invertedIndex.get(token);
+      if (!bucket) continue;
+      for (const idx of bucket) {
+        if (idx > i) {
+          candidateIndices.add(idx);
+        }
+      }
+    }
+
+    const sortedCandidates = Array.from(candidateIndices).sort((a, b) => a - b);
+    for (const j of sortedCandidates) {
+      if (assigned.has(j)) {
+        continue;
+      }
 
       const otherItem = itemsWithTier[j]!;
-      const tokensJ = tokenCache.get(otherItem.title)!;
+      const tokensJ = tokenList[j]!;
       const similarity = jaccardSimilarity(tokensI, tokensJ);
 
       if (similarity >= SIMILARITY_THRESHOLD) {
