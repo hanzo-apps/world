@@ -47,11 +47,11 @@ const STALE_THRESHOLD = 60 * 60 * 1000;      // 1 hour
 const VERY_STALE_THRESHOLD = 6 * 60 * 60 * 1000; // 6 hours
 
 // Core sources needed for meaningful risk assessment
-const CORE_SOURCES: DataSourceId[] = ['acled', 'gdelt', 'rss'];
-// Future: const RECOMMENDED_SOURCES: DataSourceId[] = ['acled', 'opensky', 'ais', 'gdelt', 'rss'];
+// Note: ACLED is optional since GDELT provides protest data as fallback
+const CORE_SOURCES: DataSourceId[] = ['gdelt', 'rss'];
 
 const SOURCE_METADATA: Record<DataSourceId, { name: string; requiredForRisk: boolean; panelId?: string }> = {
-  acled: { name: 'Protests & Conflicts', requiredForRisk: true, panelId: 'protests' },
+  acled: { name: 'Protests & Conflicts', requiredForRisk: false, panelId: 'protests' },
   opensky: { name: 'Military Flights', requiredForRisk: false, panelId: 'military' },
   ais: { name: 'Vessel Tracking', requiredForRisk: false, panelId: 'shipping' },
   usgs: { name: 'Earthquakes', requiredForRisk: false, panelId: 'natural' },
