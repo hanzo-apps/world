@@ -1158,15 +1158,49 @@ export class App {
   private async loadNewsCategory(category: string, feeds: typeof FEEDS.politics): Promise<NewsItem[]> {
     try {
       const panel = this.newsPanels[category];
-      const items = await fetchCategoryFeeds(feeds ?? [], {
-        onBatch: (partialItems) => {
-          if (panel) {
-            panel.renderNews(partialItems);
+      const renderIntervalMs = 250;
+      let lastRenderTime = 0;
+      let renderTimeout: ReturnType<typeof setTimeout> | null = null;
+      let pendingItems: NewsItem[] | null = null;
+
+      const flushPendingRender = () => {
+        if (!panel || !pendingItems) return;
+        panel.renderNews(pendingItems);
+        pendingItems = null;
+        lastRenderTime = Date.now();
+      };
+
+      const scheduleRender = (partialItems: NewsItem[]) => {
+        if (!panel) return;
+        pendingItems = partialItems;
+        const elapsed = Date.now() - lastRenderTime;
+        if (elapsed >= renderIntervalMs) {
+          if (renderTimeout) {
+            clearTimeout(renderTimeout);
+            renderTimeout = null;
           }
-        },
+          flushPendingRender();
+          return;
+        }
+
+        if (!renderTimeout) {
+          renderTimeout = setTimeout(() => {
+            renderTimeout = null;
+            flushPendingRender();
+          }, renderIntervalMs - elapsed);
+        }
+      };
+
+      const items = await fetchCategoryFeeds(feeds ?? [], {
+        onBatch: (partialItems) => scheduleRender(partialItems),
       });
 
       if (panel) {
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+          renderTimeout = null;
+          pendingItems = null;
+        }
         panel.renderNews(items);
 
         const baseline = await updateBaseline(`news:${category}`, items.length);
