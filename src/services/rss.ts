@@ -124,16 +124,16 @@ export async function fetchCategoryFeeds(
     }
 
     const itemTime = item.pubDate.getTime();
-    if (itemTime <= topItems[0].pubDate.getTime()) {
+    if (itemTime <= topItems[0]!.pubDate.getTime()) {
       return;
     }
 
     topItems[0] = item;
     for (let i = 0; i < topItems.length - 1; i += 1) {
-      if (topItems[i].pubDate.getTime() <= topItems[i + 1].pubDate.getTime()) {
+      if (topItems[i]!.pubDate.getTime() <= topItems[i + 1]!.pubDate.getTime()) {
         break;
       }
-      [topItems[i], topItems[i + 1]] = [topItems[i + 1], topItems[i]];
+      [topItems[i], topItems[i + 1]] = [topItems[i + 1]!, topItems[i]!];
     }
   };
 
