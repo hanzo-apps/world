@@ -569,6 +569,15 @@ export interface MilitaryFlight {
   confidence: 'high' | 'medium' | 'low';
   isInteresting?: boolean;     // Flagged for unusual activity
   note?: string;
+  // Wingbits enrichment data
+  enriched?: {
+    manufacturer?: string;
+    owner?: string;
+    operatorName?: string;
+    builtYear?: string;
+    confirmedMilitary?: boolean;
+    militaryBranch?: string;
+  };
 }
 
 export interface MilitaryFlightCluster {
