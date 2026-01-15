@@ -6,6 +6,11 @@ import {
   getNearbyHotspot,
   MILITARY_HOTSPOTS,
 } from '@/config/military';
+import {
+  getAircraftDetailsBatch,
+  analyzeAircraftDetails,
+  checkWingbitsStatus,
+} from './wingbits';
 
 // OpenSky Network API - use Railway relay (Vercel is blocked by OpenSky)
 // Convert WebSocket URL to HTTP URL for the same Railway server
@@ -301,6 +306,81 @@ async function fetchFromOpenSky(): Promise<MilitaryFlight[]> {
 
 
 /**
+ * Enrich flights with Wingbits aircraft details
+ * Updates confidence and adds owner/operator info
+ */
+async function enrichFlightsWithWingbits(flights: MilitaryFlight[]): Promise<MilitaryFlight[]> {
+  // Check if Wingbits is configured
+  const isConfigured = await checkWingbitsStatus();
+  if (!isConfigured) {
+    console.log('[Military Flights] Wingbits not configured, skipping enrichment');
+    return flights;
+  }
+
+  // Get hex codes for all flights
+  const hexCodes = flights.map(f => f.hexCode.toLowerCase());
+
+  // Batch fetch aircraft details
+  const detailsMap = await getAircraftDetailsBatch(hexCodes);
+
+  if (detailsMap.size === 0) {
+    return flights;
+  }
+
+  console.log(`[Military Flights] Enriching ${detailsMap.size} of ${flights.length} aircraft with Wingbits data`);
+
+  // Enrich each flight
+  return flights.map(flight => {
+    const details = detailsMap.get(flight.hexCode.toLowerCase());
+    if (!details) return flight;
+
+    const analysis = analyzeAircraftDetails(details);
+
+    // Update flight with enrichment data
+    const enrichedFlight = { ...flight };
+
+    // Add enrichment info
+    enrichedFlight.enriched = {
+      manufacturer: analysis.manufacturer || undefined,
+      owner: analysis.owner || undefined,
+      operatorName: analysis.operator || undefined,
+      builtYear: analysis.builtYear || undefined,
+      confirmedMilitary: analysis.isMilitary,
+      militaryBranch: analysis.militaryBranch || undefined,
+    };
+
+    // Add registration if not already set
+    if (!enrichedFlight.registration && analysis.registration) {
+      enrichedFlight.registration = analysis.registration;
+    }
+
+    // Add model if available
+    if (!enrichedFlight.aircraftModel && analysis.model) {
+      enrichedFlight.aircraftModel = analysis.model;
+    }
+
+    // Upgrade confidence if Wingbits confirms military
+    if (analysis.isMilitary) {
+      if (analysis.confidence === 'confirmed') {
+        enrichedFlight.confidence = 'high';
+      } else if (analysis.confidence === 'likely' && enrichedFlight.confidence === 'low') {
+        enrichedFlight.confidence = 'medium';
+      }
+
+      // Mark as interesting if confirmed military with known branch
+      if (analysis.militaryBranch) {
+        enrichedFlight.isInteresting = true;
+        if (!enrichedFlight.note) {
+          enrichedFlight.note = `${analysis.militaryBranch}${analysis.owner ? ` - ${analysis.owner}` : ''}`;
+        }
+      }
+    }
+
+    return enrichedFlight;
+  });
+}
+
+/**
  * Cluster nearby flights for map display
  */
 function clusterFlights(flights: MilitaryFlight[]): MilitaryFlightCluster[] {
@@ -395,7 +475,10 @@ export async function fetchMilitaryFlights(): Promise<{
     }
 
     // Fetch from OpenSky (regional queries for efficiency)
-    const flights = await fetchFromOpenSky();
+    let flights = await fetchFromOpenSky();
+
+    // Enrich with Wingbits aircraft details (owner, operator, type)
+    flights = await enrichFlightsWithWingbits(flights);
 
     // Update cache
     flightCache = { data: flights, timestamp: Date.now() };
