@@ -1,9 +1,6 @@
 // Wingbits API proxy - keeps API key server-side
+// Note: Edge runtime is stateless - caching happens client-side and via HTTP Cache-Control
 export const config = { runtime: 'edge' };
-
-// In-memory cache for aircraft details (they rarely change)
-const detailsCache = new Map();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 export default async function handler(req) {
   const url = new URL(req.url);
@@ -34,21 +31,10 @@ export default async function handler(req) {
     });
   }
 
-  // Route: GET /details/:icao24 - Aircraft details with caching
+  // Route: GET /details/:icao24 - Aircraft details
   const detailsMatch = path.match(/^\/details\/([a-fA-F0-9]+)$/);
   if (detailsMatch) {
     const icao24 = detailsMatch[1].toLowerCase();
-
-    // Check cache
-    const cached = detailsCache.get(icao24);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return Response.json(cached.data, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'X-Cache': 'HIT',
-        },
-      });
-    }
 
     try {
       const response = await fetch(`https://customer-api.wingbits.com/v1/flights/details/${icao24}`, {
@@ -70,24 +56,10 @@ export default async function handler(req) {
 
       const data = await response.json();
 
-      // Cache the result
-      detailsCache.set(icao24, { data, timestamp: Date.now() });
-
-      // Cleanup old cache entries periodically
-      if (detailsCache.size > 1000) {
-        const cutoff = Date.now() - CACHE_TTL;
-        for (const [key, value] of detailsCache) {
-          if (value.timestamp < cutoff) {
-            detailsCache.delete(key);
-          }
-        }
-      }
-
       return Response.json(data, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=3600',
-          'X-Cache': 'MISS',
+          'Cache-Control': 'public, max-age=86400', // 24h - aircraft details rarely change
         },
       });
     } catch (error) {
@@ -101,7 +73,7 @@ export default async function handler(req) {
     }
   }
 
-  // Route: POST /details/batch - Batch lookup multiple aircraft
+  // Route: POST /details/batch - Batch lookup multiple aircraft (parallel)
   if (path === '/details/batch' && req.method === 'POST') {
     try {
       const body = await req.json();
@@ -114,24 +86,12 @@ export default async function handler(req) {
         });
       }
 
-      // Limit batch size
-      const limitedList = icao24List.slice(0, 50);
+      // Limit batch size to avoid overwhelming the API
+      const limitedList = icao24List.slice(0, 20).map(id => id.toLowerCase());
       const results = {};
-      const toFetch = [];
 
-      // Check cache first
-      for (const icao24 of limitedList) {
-        const key = icao24.toLowerCase();
-        const cached = detailsCache.get(key);
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-          results[key] = cached.data;
-        } else {
-          toFetch.push(key);
-        }
-      }
-
-      // Fetch uncached items (with rate limiting)
-      for (const icao24 of toFetch.slice(0, 20)) { // Max 20 new fetches per batch
+      // Fetch all in parallel
+      const fetchPromises = limitedList.map(async (icao24) => {
         try {
           const response = await fetch(`https://customer-api.wingbits.com/v1/flights/details/${icao24}`, {
             headers: {
@@ -142,18 +102,26 @@ export default async function handler(req) {
 
           if (response.ok) {
             const data = await response.json();
-            results[icao24] = data;
-            detailsCache.set(icao24, { data, timestamp: Date.now() });
+            return { icao24, data };
           }
         } catch {
           // Skip failed lookups
+        }
+        return null;
+      });
+
+      const fetchResults = await Promise.all(fetchPromises);
+
+      for (const result of fetchResults) {
+        if (result) {
+          results[result.icao24] = result.data;
         }
       }
 
       return Response.json({
         results,
-        cached: limitedList.length - toFetch.length,
-        fetched: Math.min(toFetch.length, 20),
+        fetched: Object.keys(results).length,
+        requested: limitedList.length,
       }, {
         headers: {
           'Access-Control-Allow-Origin': '*',
@@ -179,7 +147,6 @@ export default async function handler(req) {
       return Response.json({
         ...data,
         configured: true,
-        cacheSize: detailsCache.size,
       }, {
         headers: { 'Access-Control-Allow-Origin': '*' },
       });
