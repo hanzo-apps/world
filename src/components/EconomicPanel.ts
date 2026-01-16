@@ -134,8 +134,8 @@ export class EconomicPanel extends Panel {
                 <span class="indicator-id">${escapeHtml(series.id)}</span>
               </div>
               <div class="indicator-value">
-                <span class="value">${series.value !== null ? series.value : 'N/A'}${escapeHtml(series.unit)}</span>
-                <span class="change ${changeClass}">${arrow} ${changeStr}</span>
+                <span class="value">${escapeHtml(String(series.value !== null ? series.value : 'N/A'))}${escapeHtml(series.unit)}</span>
+                <span class="change ${escapeHtml(changeClass)}">${escapeHtml(arrow)} ${escapeHtml(changeStr)}</span>
               </div>
               <div class="indicator-date">${escapeHtml(series.date)}</div>
             </div>
@@ -174,9 +174,9 @@ export class EconomicPanel extends Panel {
                 <span class="indicator-name">${escapeHtml(metric.name)}</span>
               </div>
               <div class="indicator-value">
-                <span class="value">${formatOilValue(metric.current, metric.unit)} ${escapeHtml(metric.unit)}</span>
-                <span class="change" style="color: ${trendColor}">
-                  ${trendIcon} ${metric.changePct > 0 ? '+' : ''}${metric.changePct}%
+                <span class="value">${escapeHtml(formatOilValue(metric.current, metric.unit))} ${escapeHtml(metric.unit)}</span>
+                <span class="change" style="color: ${escapeHtml(trendColor)}">
+                  ${escapeHtml(trendIcon)} ${escapeHtml(String(metric.changePct > 0 ? '+' : ''))}${escapeHtml(String(metric.changePct))}%
                 </span>
               </div>
               <div class="indicator-date">vs previous week</div>
@@ -197,16 +197,16 @@ export class EconomicPanel extends Panel {
     return `
       <div class="spending-summary">
         <div class="spending-total">
-          ${formatAwardAmount(totalAmount)} in ${awards.length} awards
-          <span class="spending-period">${periodStart} – ${periodEnd}</span>
+          ${escapeHtml(formatAwardAmount(totalAmount))} in ${escapeHtml(String(awards.length))} awards
+          <span class="spending-period">${escapeHtml(periodStart)} – ${escapeHtml(periodEnd)}</span>
         </div>
       </div>
       <div class="spending-list">
         ${awards.slice(0, 8).map(award => `
           <div class="spending-award">
             <div class="award-header">
-              <span class="award-icon">${getAwardTypeIcon(award.awardType)}</span>
-              <span class="award-amount">${formatAwardAmount(award.amount)}</span>
+              <span class="award-icon">${escapeHtml(getAwardTypeIcon(award.awardType))}</span>
+              <span class="award-amount">${escapeHtml(formatAwardAmount(award.amount))}</span>
             </div>
             <div class="award-recipient">${escapeHtml(award.recipientName)}</div>
             <div class="award-agency">${escapeHtml(award.agency)}</div>
