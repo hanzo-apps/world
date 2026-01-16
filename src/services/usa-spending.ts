@@ -108,7 +108,7 @@ export async function fetchRecentAwards(options: {
 
     // Record data freshness
     if (awards.length > 0) {
-      dataFreshness.recordUpdate('economic', awards.length);
+      dataFreshness.recordUpdate('spending', awards.length);
     }
 
     return {
@@ -120,7 +120,7 @@ export async function fetchRecentAwards(options: {
     };
   } catch (error) {
     console.error('[USASpending] Fetch failed:', error);
-    dataFreshness.recordError('economic', error instanceof Error ? error.message : 'Unknown error');
+    dataFreshness.recordError('spending', error instanceof Error ? error.message : 'Unknown error');
     return {
       awards: [],
       totalAmount: 0,

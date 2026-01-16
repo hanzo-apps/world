@@ -87,7 +87,7 @@ export class StatusPanel {
       this.feeds.set(name, { name, lastUpdate: null, status: 'disabled', itemCount: 0 });
     });
 
-    const apiNames = ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc'];
+    const apiNames = ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc', 'EIA', 'USASpending'];
     apiNames.forEach(name => {
       this.apis.set(name, { name, status: 'disabled' });
     });

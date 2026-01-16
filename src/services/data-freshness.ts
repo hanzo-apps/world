@@ -15,7 +15,9 @@ export type DataSourceId =
   | 'polymarket' // Prediction markets
   | 'outages'    // Internet outages
   | 'weather'    // Weather alerts
-  | 'economic';  // Economic indicators
+  | 'economic'   // Economic indicators (FRED)
+  | 'oil'        // EIA oil analytics
+  | 'spending';  // USASpending.gov
 
 export type FreshnessStatus = 'fresh' | 'stale' | 'very_stale' | 'no_data' | 'disabled' | 'error';
 
@@ -62,7 +64,9 @@ const SOURCE_METADATA: Record<DataSourceId, { name: string; requiredForRisk: boo
   polymarket: { name: 'Prediction Markets', requiredForRisk: false, panelId: 'polymarket' },
   outages: { name: 'Internet Outages', requiredForRisk: false, panelId: 'outages' },
   weather: { name: 'Weather Alerts', requiredForRisk: false, panelId: 'weather' },
-  economic: { name: 'Economic Data', requiredForRisk: false, panelId: 'economic' },
+  economic: { name: 'Economic Data (FRED)', requiredForRisk: false, panelId: 'economic' },
+  oil: { name: 'Oil Analytics (EIA)', requiredForRisk: false, panelId: 'economic' },
+  spending: { name: 'Gov Spending', requiredForRisk: false, panelId: 'economic' },
 };
 
 class DataFreshnessTracker {

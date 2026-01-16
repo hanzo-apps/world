@@ -109,13 +109,13 @@ export async function fetchOilAnalytics(): Promise<OilAnalytics> {
     const metricCount = [result.wtiPrice, result.brentPrice, result.usProduction, result.usInventory]
       .filter(Boolean).length;
     if (metricCount > 0) {
-      dataFreshness.recordUpdate('economic', metricCount);
+      dataFreshness.recordUpdate('oil', metricCount);
     }
 
     console.log(`[EIA] Fetched ${metricCount} oil metrics`);
   } catch (error) {
     console.error('[EIA] Fetch failed:', error);
-    dataFreshness.recordError('economic', error instanceof Error ? error.message : 'Unknown error');
+    dataFreshness.recordError('oil', error instanceof Error ? error.message : 'Unknown error');
   }
 
   return result;
