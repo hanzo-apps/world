@@ -11,7 +11,7 @@ import {
   MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII } from '@/services/country-instability';
 import { dataFreshness } from '@/services/data-freshness';
@@ -1092,6 +1092,8 @@ export class App {
       { name: 'predictions', task: runGuarded('predictions', () => this.loadPredictions()) },
       { name: 'pizzint', task: runGuarded('pizzint', () => this.loadPizzInt()) },
       { name: 'fred', task: runGuarded('fred', () => this.loadFredData()) },
+      { name: 'oil', task: runGuarded('oil', () => this.loadOilAnalytics()) },
+      { name: 'spending', task: runGuarded('spending', () => this.loadGovernmentSpending()) },
     ];
 
     // Conditionally load based on layer settings
@@ -1622,6 +1624,26 @@ export class App {
     }
   }
 
+  private async loadOilAnalytics(): Promise<void> {
+    const economicPanel = this.panels['economic'] as EconomicPanel;
+    try {
+      const data = await fetchOilAnalytics();
+      economicPanel?.updateOil(data);
+    } catch (e) {
+      console.error('[App] Oil analytics failed:', e);
+    }
+  }
+
+  private async loadGovernmentSpending(): Promise<void> {
+    const economicPanel = this.panels['economic'] as EconomicPanel;
+    try {
+      const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
+      economicPanel?.updateSpending(data);
+    } catch (e) {
+      console.error('[App] Government spending failed:', e);
+    }
+  }
+
   private updateMonitorResults(): void {
     const monitorPanel = this.panels['monitors'] as MonitorPanel;
     monitorPanel.renderResults(this.allNews);
@@ -1715,6 +1737,8 @@ export class App {
     this.scheduleRefresh('natural', () => this.loadNatural(), 5 * 60 * 1000, () => this.mapLayers.natural);
     this.scheduleRefresh('weather', () => this.loadWeatherAlerts(), 10 * 60 * 1000, () => this.mapLayers.weather);
     this.scheduleRefresh('fred', () => this.loadFredData(), 30 * 60 * 1000);
+    this.scheduleRefresh('oil', () => this.loadOilAnalytics(), 30 * 60 * 1000);
+    this.scheduleRefresh('spending', () => this.loadGovernmentSpending(), 60 * 60 * 1000);
     this.scheduleRefresh('outages', () => this.loadOutages(), 60 * 60 * 1000, () => this.mapLayers.outages);
     this.scheduleRefresh('ais', () => this.loadAisSignals(), REFRESH_INTERVALS.ais, () => this.mapLayers.ais);
     this.scheduleRefresh('cables', () => this.loadCableActivity(), 30 * 60 * 1000, () => this.mapLayers.cables);

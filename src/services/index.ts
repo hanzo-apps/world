@@ -25,3 +25,5 @@ export * from './country-instability';
 export * from './infrastructure-cascade';
 export * from './cross-module-integration';
 export * from './data-freshness';
+export * from './usa-spending';
+export * from './oil-analytics';
