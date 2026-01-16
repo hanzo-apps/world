@@ -3832,6 +3832,129 @@ body.playback-mode .status-dot {
   color: var(--text-dim);
 }
 
+/* Economic Panel Tabs */
+.economic-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.economic-tab {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.economic-tab:hover {
+  background: rgba(68, 255, 136, 0.1);
+  color: var(--text);
+}
+
+.economic-tab.active {
+  background: rgba(68, 255, 136, 0.2);
+  color: var(--green);
+}
+
+.economic-content {
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.economic-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* Government Spending */
+.spending-summary {
+  padding: 8px;
+  background: rgba(68, 255, 136, 0.05);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.spending-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.spending-period {
+  display: block;
+  font-size: 9px;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.spending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spending-award {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border-left: 2px solid var(--border);
+}
+
+.spending-award:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: var(--green);
+}
+
+.award-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.award-icon {
+  font-size: 12px;
+}
+
+.award-amount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.award-recipient {
+  font-size: 11px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.award-agency {
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.award-desc {
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
 /* Country Labels */
 .country-label {
   position: absolute;
