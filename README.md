@@ -7,7 +7,7 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.3.4-blue)
+![Version](https://img.shields.io/badge/version-1.3.8-blue)
 
 ![World Monitor Dashboard](Screenshot.png)
 
@@ -63,7 +63,7 @@ Layers are organized into logical groups for efficient monitoring:
 **Economic & Labels**
 | Layer | Description |
 |-------|-------------|
-| **Economic** | FRED indicators panel (Fed assets, rates, yields) |
+| **Economic** | Tabbed economic panel with FRED indicators, EIA oil analytics, and USASpending.gov government contracts |
 | **Countries** | Country boundary labels |
 | **Waterways** | Strategic waterways and chokepoints |
 
@@ -120,6 +120,8 @@ Features:
 - **Crypto** - Bitcoin, Ethereum, Solana via CoinGecko
 - **Sector Heatmap** - Visual sector performance (11 SPDR sectors)
 - **Economic Indicators** - Fed data via FRED (assets, rates, yields)
+- **Oil Analytics** - EIA data: WTI/Brent prices, US production, US inventory with weekly changes
+- **Government Spending** - USASpending.gov: Recent federal contracts and awards
 
 ### Prediction Markets
 - Polymarket integration for event probability tracking
@@ -1422,6 +1424,8 @@ The dashboard fetches data from various public APIs and data sources:
 | NASA EONET | Natural events (storms, fires, volcanoes, floods) | No |
 | NWS | Weather alerts | No |
 | FRED | Economic indicators (Fed data) | No |
+| EIA | Oil analytics (prices, production, inventory) | Yes (free) |
+| USASpending.gov | Federal government contracts & awards | No |
 | Polymarket | Prediction markets | No |
 | ACLED | Armed conflict & protest data | Yes (free) |
 | GDELT Geo | News-derived event geolocation + tensions | No |
@@ -1440,6 +1444,7 @@ Some features require API credentials. Without them, the corresponding layer is 
 | Variable | Service | How to Get |
 |----------|---------|------------|
 | `FINNHUB_API_KEY` | Stock quotes (primary) | Free registration at [finnhub.io](https://finnhub.io/) |
+| `EIA_API_KEY` | Oil analytics | Free registration at [eia.gov/opendata](https://www.eia.gov/opendata/) |
 | `VITE_WS_RELAY_URL` | AIS vessel tracking | Deploy AIS relay or use hosted service |
 | `VITE_OPENSKY_RELAY_URL` | Military aircraft | Deploy relay with OpenSky credentials |
 | `OPENSKY_CLIENT_ID` | OpenSky auth (relay) | Free registration at [opensky-network.org](https://opensky-network.org) |
@@ -1500,6 +1505,8 @@ src/
 │   ├── eonet.ts              # NASA EONET natural events
 │   ├── weather.ts            # NWS alerts
 │   ├── fred.ts               # Federal Reserve data
+│   ├── oil-analytics.ts      # EIA oil prices, production, inventory
+│   ├── usa-spending.ts       # USASpending.gov contracts & awards
 │   ├── polymarket.ts         # Prediction markets (filtered)
 │   ├── clustering.ts         # Jaccard similarity clustering
 │   ├── correlation.ts        # Signal detection engine
@@ -1524,6 +1531,7 @@ src/
 api/                          # Vercel Edge serverless proxies
 ├── cloudflare-outages.js     # Proxies Cloudflare Radar
 ├── coingecko.js              # Crypto prices with validation
+├── eia.js                    # EIA petroleum data (oil prices, production)
 ├── faa-status.js             # FAA ground stops/delays
 ├── finnhub.js                # Stock quotes (batch, primary)
 ├── fred-data.js              # Federal Reserve economic data
