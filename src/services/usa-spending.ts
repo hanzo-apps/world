@@ -44,6 +44,20 @@ function getToday(): string {
   return new Date().toISOString().split('T')[0]!;
 }
 
+// Input validation bounds
+const MAX_DAYS_BACK = 90;
+const MIN_DAYS_BACK = 1;
+const MAX_LIMIT = 50;
+const MIN_LIMIT = 1;
+
+function validateDaysBack(val: number): number {
+  return Math.max(MIN_DAYS_BACK, Math.min(MAX_DAYS_BACK, Math.floor(val)));
+}
+
+function validateLimit(val: number): number {
+  return Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.floor(val)));
+}
+
 /**
  * Fetch recent government awards/contracts
  */
@@ -52,7 +66,9 @@ export async function fetchRecentAwards(options: {
   limit?: number;
   awardTypes?: ('contract' | 'grant' | 'loan')[];
 } = {}): Promise<SpendingSummary> {
-  const { daysBack = 7, limit = 15, awardTypes = ['contract'] } = options;
+  const daysBack = validateDaysBack(options.daysBack ?? 7);
+  const limit = validateLimit(options.limit ?? 15);
+  const awardTypes = options.awardTypes ?? ['contract'];
 
   const periodStart = getDateDaysAgo(daysBack);
   const periodEnd = getToday();
