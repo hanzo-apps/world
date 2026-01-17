@@ -41,7 +41,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   sanctions: true,
   weather: true,
   economic: true,
-  countries: true,
+  countries: false,
   waterways: true,
   outages: true,
   datacenters: false,
