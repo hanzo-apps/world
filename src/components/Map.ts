@@ -1153,11 +1153,6 @@ export class MapComponent {
         icon.textContent = '⚠';
         div.appendChild(icon);
 
-        const label = document.createElement('div');
-        label.className = 'weather-label';
-        label.textContent = alert.event;
-        div.appendChild(label);
-
         div.addEventListener('click', (e) => {
           e.stopPropagation();
           const rect = this.container.getBoundingClientRect();
