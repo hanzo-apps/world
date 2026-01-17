@@ -663,10 +663,15 @@ export class MapComponent {
   }
 
   private getProjection(width: number, height: number): d3.GeoProjection {
-    // All views use equirectangular projection (regional framing via zoom/pan)
+    // Equirectangular: 360° longitude, 180° latitude
+    // Scale to fit whichever dimension is more constrained
+    const scaleForWidth = width / (2 * Math.PI);   // fit 360° in width
+    const scaleForHeight = height / Math.PI;        // fit 180° in height
+    const scale = Math.min(scaleForWidth, scaleForHeight);
+
     return d3
       .geoEquirectangular()
-      .scale(width / (2 * Math.PI))
+      .scale(scale)
       .center([0, 0])
       .translate([width / 2, height / 2]);
   }
@@ -1900,7 +1905,7 @@ export class MapComponent {
     // Region-specific zoom and pan settings
     // Pan values shift view: +x shows west, -x shows east, +y shows north, -y shows south
     const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
-      global: { zoom: 1, pan: { x: 0, y: 30 } },
+      global: { zoom: 1, pan: { x: 0, y: 0 } },
       america: { zoom: 1.8, pan: { x: 220, y: 60 } },
       mena: { zoom: 2.8, pan: { x: -100, y: 60 } },
       eu: { zoom: 3.2, pan: { x: -25, y: 180 } },
