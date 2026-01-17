@@ -999,7 +999,6 @@ export class MapComponent {
         div.innerHTML = `
           ${breakingBadge}
           <div class="hotspot-marker ${escapeHtml(spot.level || 'low')}"></div>
-          <div class="hotspot-label">${escapeHtml(spot.name)}</div>
         `;
 
         div.addEventListener('click', (e) => {
@@ -1908,23 +1907,22 @@ export class MapComponent {
   public setView(view: MapView): void {
     this.state.view = view;
 
-    // Region-specific zoom and pan settings
-    // Pan: +x = west, -x = east, +y = north, -y = south
-    const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
-      global: { zoom: 1, pan: { x: 0, y: 0 } },
-      america: { zoom: 1.8, pan: { x: 180, y: 30 } },
-      mena: { zoom: 2.8, pan: { x: -80, y: 30 } },
-      eu: { zoom: 2.4, pan: { x: -30, y: 125 } },
-      asia: { zoom: 2.0, pan: { x: -320, y: 40 } },
-      latam: { zoom: 2.0, pan: { x: 120, y: -100 } },
-      africa: { zoom: 2.2, pan: { x: -40, y: -30 } },
-      oceania: { zoom: 2.2, pan: { x: -420, y: -100 } },
+    // Region-specific zoom and center coordinates (lat/lon)
+    // Using setCenter() calculates pan values relative to container size
+    const viewSettings: Record<MapView, { zoom: number; lat: number; lon: number }> = {
+      global: { zoom: 1, lat: 8, lon: 0 },
+      america: { zoom: 1.8, lat: 40, lon: -100 },
+      mena: { zoom: 2.8, lat: 28, lon: 40 },
+      eu: { zoom: 2.4, lat: 54, lon: 15 },
+      asia: { zoom: 2.0, lat: 35, lon: 105 },
+      latam: { zoom: 2.0, lat: -15, lon: -60 },
+      africa: { zoom: 2.2, lat: 5, lon: 20 },
+      oceania: { zoom: 2.2, lat: -25, lon: 140 },
     };
 
     const settings = viewSettings[view];
     this.state.zoom = settings.zoom;
-    this.state.pan = settings.pan;
-    this.applyTransform();
+    this.setCenter(settings.lat, settings.lon);
     this.render();
   }
 

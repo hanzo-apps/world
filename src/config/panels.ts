@@ -45,7 +45,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   waterways: true,
   outages: true,
   datacenters: false,
-  protests: true,
+  protests: false,
   flights: false,
   military: false,
   natural: true,
