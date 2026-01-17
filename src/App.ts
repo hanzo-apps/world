@@ -748,14 +748,18 @@ export class App {
       this.map.setLayers(layers);
     }
 
-    if (zoom !== undefined) {
-      this.map.setZoom(zoom);
-    }
+    // Only apply custom lat/lon/zoom if NO view preset is specified
+    // When a view is specified (eu, mena, etc.), use the preset's positioning
+    if (!view) {
+      if (zoom !== undefined) {
+        this.map.setZoom(zoom);
+      }
 
-    // Only apply lat/lon if user has zoomed in significantly (zoom > 2)
-    // At default zoom (~1-1.5), show centered global view to avoid clipping issues
-    if (lat !== undefined && lon !== undefined && zoom !== undefined && zoom > 2) {
-      this.map.setCenter(lat, lon);
+      // Only apply lat/lon if user has zoomed in significantly (zoom > 2)
+      // At default zoom (~1-1.5), show centered global view to avoid clipping issues
+      if (lat !== undefined && lon !== undefined && zoom !== undefined && zoom > 2) {
+        this.map.setCenter(lat, lon);
+      }
     }
   }
 

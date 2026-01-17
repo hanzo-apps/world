@@ -5272,6 +5272,13 @@ body.playback-mode .status-dot {
     display: none;
   }
 
+  /* Hide DEFCON indicator and FOCUS region selector on mobile */
+  .pizzint-indicator,
+  .focus-label,
+  .focus-select {
+    display: none !important;
+  }
+
   /* Reduce header clutter on mobile */
   .header-center {
     gap: 4px;
