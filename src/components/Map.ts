@@ -1910,15 +1910,16 @@ export class MapComponent {
 
     // Region-specific zoom and pan settings
     // Pan values shift view: +x shows west, -x shows east, +y shows north, -y shows south
+    // Calibrated for projection centered at (0°, 8°N) with 72°N to 56°S latitude range
     const viewSettings: Record<MapView, { zoom: number; pan: { x: number; y: number } }> = {
       global: { zoom: 1, pan: { x: 0, y: 0 } },
-      america: { zoom: 1.8, pan: { x: 220, y: 60 } },
-      mena: { zoom: 2.8, pan: { x: -100, y: 60 } },
-      eu: { zoom: 3.2, pan: { x: -25, y: 180 } },
-      asia: { zoom: 2.2, pan: { x: -200, y: 70 } },
-      latam: { zoom: 2.2, pan: { x: 150, y: -50 } },
-      africa: { zoom: 2.2, pan: { x: -30, y: 0 } },
-      oceania: { zoom: 2.8, pan: { x: -280, y: -60 } },
+      america: { zoom: 1.8, pan: { x: 180, y: 30 } },
+      mena: { zoom: 2.8, pan: { x: -80, y: 30 } },
+      eu: { zoom: 2.6, pan: { x: -20, y: 130 } },
+      asia: { zoom: 2.0, pan: { x: -320, y: 40 } },
+      latam: { zoom: 2.0, pan: { x: 120, y: -100 } },
+      africa: { zoom: 2.2, pan: { x: -40, y: -30 } },
+      oceania: { zoom: 2.2, pan: { x: -420, y: -100 } },
     };
 
     const settings = viewSettings[view];
