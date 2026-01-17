@@ -586,11 +586,14 @@ export class MapComponent {
     this.svg.attr('viewBox', `0 0 ${width} ${height}`);
     this.svg.selectAll('*').remove();
 
-    // Background
+    // Background - extend well beyond viewBox to cover pan/zoom transforms
+    // 3x size in each direction ensures no black bars when panning
     this.svg
       .append('rect')
-      .attr('width', width)
-      .attr('height', height)
+      .attr('x', -width)
+      .attr('y', -height)
+      .attr('width', width * 3)
+      .attr('height', height * 3)
       .attr('fill', '#020a08');
 
     // Grid
@@ -1913,7 +1916,7 @@ export class MapComponent {
       global: { zoom: 1, pan: { x: 0, y: 0 } },
       america: { zoom: 1.8, pan: { x: 180, y: 30 } },
       mena: { zoom: 2.8, pan: { x: -80, y: 30 } },
-      eu: { zoom: 2.0, pan: { x: -30, y: 50 } },
+      eu: { zoom: 2.4, pan: { x: -30, y: 100 } },
       asia: { zoom: 2.0, pan: { x: -320, y: 40 } },
       latam: { zoom: 2.0, pan: { x: 120, y: -100 } },
       africa: { zoom: 2.2, pan: { x: -40, y: -30 } },
