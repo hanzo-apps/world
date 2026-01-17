@@ -101,6 +101,11 @@ body {
   color: var(--accent);
 }
 
+/* Hide X logo on desktop, show text */
+.credit-link .x-logo {
+  display: none;
+}
+
 .status-indicator {
   display: flex;
   align-items: center;
@@ -5277,6 +5282,15 @@ body.playback-mode .status-dot {
   .focus-label,
   .focus-select {
     display: none !important;
+  }
+
+  /* Show only X logo on mobile, hide @eliehabib text */
+  .credit-link .credit-text {
+    display: none;
+  }
+
+  .credit-link .x-logo {
+    display: inline-block;
   }
 
   /* Reduce header clutter on mobile */
