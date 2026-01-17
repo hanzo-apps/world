@@ -589,8 +589,8 @@ export class App {
     // Default to MENA view on mobile for better focus
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.map = new MapComponent(mapContainer, {
-      zoom: this.isMobile ? 2.5 : 1.5,
-      pan: { x: 0, y: this.isMobile ? 0 : 60 },  // Pan north to show Europe/UK by default
+      zoom: this.isMobile ? 2.5 : 1.0,
+      pan: { x: 0, y: 0 },  // Centered view to show full world
       view: this.isMobile ? 'mena' : 'global',
       layers: this.mapLayers,
       timeRange: '7d',
