@@ -138,3 +138,11 @@ export function getCircuitBreakerCooldownInfo(name: string): { onCooldown: boole
     remainingSeconds: breaker.getCooldownRemaining()
   };
 }
+
+export function removeCircuitBreaker(name: string): void {
+  breakers.delete(name);
+}
+
+export function clearAllCircuitBreakers(): void {
+  breakers.clear();
+}
