@@ -134,6 +134,135 @@ export const ENTITY_REGISTRY: EntityEntry[] = [
   },
 
   // ============================================================================
+  // DEFENSE & AEROSPACE
+  // ============================================================================
+  {
+    id: 'LMT',
+    type: 'company',
+    name: 'Lockheed Martin',
+    aliases: ['lockheed', 'lockheed martin', 'lmt', 'skunk works'],
+    keywords: ['f-35', 'defense', 'missile', 'aerospace', 'himars', 'javeline'],
+    sector: 'Defense',
+    related: ['RTX', 'NOC', 'GD', 'BA'],
+  },
+  {
+    id: 'RTX',
+    type: 'company',
+    name: 'RTX Corp',
+    aliases: ['raytheon', 'rtx', 'pratt & whitney', 'collins aerospace'],
+    keywords: ['missile', 'patriot', 'defense', 'radar', 'engine'],
+    sector: 'Defense',
+    related: ['LMT', 'NOC', 'GD'],
+  },
+  {
+    id: 'NOC',
+    type: 'company',
+    name: 'Northrop Grumman',
+    aliases: ['northrop', 'northrop grumman', 'noc'],
+    keywords: ['b-21', 'bomber', 'space', 'defense', 'drone'],
+    sector: 'Defense',
+    related: ['LMT', 'RTX', 'L3H'],
+  },
+  {
+    id: 'BA',
+    type: 'company',
+    name: 'Boeing',
+    aliases: ['boeing', 'ba'],
+    keywords: ['airplane', '737 max', 'defense', 'space', 'starliner'],
+    sector: 'Defense',
+    related: ['AIR.PA', 'LMT'],
+  },
+  {
+    id: 'GD',
+    type: 'company',
+    name: 'General Dynamics',
+    aliases: ['general dynamics', 'gd'],
+    keywords: ['submarine', 'tank', 'abrams', 'gulfstream', 'defense'],
+    sector: 'Defense',
+    related: ['LMT', 'HII'],
+  },
+  {
+    id: 'RHM.DE',
+    type: 'company',
+    name: 'Rheinmetall AG',
+    aliases: ['rheinmetall', 'rhm'],
+    keywords: ['tank', 'leopard', 'ammunition', 'defense', 'germany'],
+    sector: 'Defense',
+    related: ['KMW', 'BAE.L'],
+  },
+  {
+    id: 'AIR.PA',
+    type: 'company',
+    name: 'Airbus SE',
+    aliases: ['airbus', 'eads'],
+    keywords: ['airplane', 'defense', 'helicopter', 'space', 'europe'],
+    sector: 'Defense',
+    related: ['BA', 'SAF.PA'],
+  },
+
+  // ============================================================================
+  // SEMICONDUCTORS & CRITICAL TECH (GLOBAL)
+  // ============================================================================
+  {
+    id: 'ASML',
+    type: 'company',
+    name: 'ASML Holding',
+    aliases: ['asml'],
+    keywords: ['lithography', 'euv', 'duv', 'chip equipment', 'semiconductor'],
+    sector: 'Technology',
+    related: ['TSM', 'INTC', 'SAMSUNG'],
+  },
+  {
+    id: '005930.KS',
+    type: 'company',
+    name: 'Samsung Electronics',
+    aliases: ['samsung', 'samsung electronics'],
+    keywords: ['memory', 'chip', 'phone', 'display', 'foundry'],
+    sector: 'Technology',
+    related: ['SK hynix', 'AAPL', 'TSM'],
+  },
+
+  // ============================================================================
+  // CRITICAL MINERALS
+  // ============================================================================
+  {
+    id: 'ALB',
+    type: 'company',
+    name: 'Albemarle',
+    aliases: ['albemarle', 'alb'],
+    keywords: ['lithium', 'battery', 'ev', 'mining'],
+    sector: 'Materials',
+    related: ['SQM', 'TSLA'],
+  },
+  {
+    id: 'SQM',
+    type: 'company',
+    name: 'SQM',
+    aliases: ['sqm', 'sociedad quimica'],
+    keywords: ['lithium', 'chile', 'mining', 'battery'],
+    sector: 'Materials',
+    related: ['ALB'],
+  },
+  {
+    id: 'MP',
+    type: 'company',
+    name: 'MP Materials',
+    aliases: ['mp materials', 'mountain pass'],
+    keywords: ['rare earth', 'neodymium', 'magnet', 'mining', 'china alternative'],
+    sector: 'Materials',
+    related: ['ARE'],
+  },
+  {
+    id: 'FCX',
+    type: 'company',
+    name: 'Freeport-McMoRan',
+    aliases: ['freeport', 'fcx'],
+    keywords: ['copper', 'gold', 'mining', 'indonesia', 'grasberg'],
+    sector: 'Materials',
+    related: ['SCCO', 'RIO'],
+  },
+
+  // ============================================================================
   // FINANCIAL SERVICES
   // ============================================================================
   {
@@ -466,6 +595,38 @@ export const ENTITY_REGISTRY: EntityEntry[] = [
     aliases: ['saudi', 'saudi arabia', 'riyadh', 'mbs', 'aramco'],
     keywords: ['opec', 'oil', 'production', 'cut', 'crude', 'energy'],
     related: ['CL=F', 'IR', 'XOM'],
+  },
+  {
+    id: 'AE',
+    type: 'country',
+    name: 'UAE',
+    aliases: ['uae', 'united arab emirates', 'emirates', 'abu dhabi', 'dubai', 'mbz'],
+    keywords: ['oil', 'trade', 'g42', 'ai', 'logistics', 'dp world'],
+    related: ['SA', 'CL=F', 'MSFT'],
+  },
+  {
+    id: 'QA',
+    type: 'country',
+    name: 'Qatar',
+    aliases: ['qatar', 'doha', 'al thani'],
+    keywords: ['lng', 'gas', 'mediator', 'hamas', 'al udeid', 'energy'],
+    related: ['NG=F', 'XOM', 'US'],
+  },
+  {
+    id: 'TR',
+    type: 'country',
+    name: 'Turkey',
+    aliases: ['turkey', 'turkiye', 'erdogan', 'ankara'],
+    keywords: ['nato', 'bosphorus', 'drone', 'bayraktar', 'kurds', 'lira'],
+    related: ['RU', 'UA', 'RHM.DE'],
+  },
+  {
+    id: 'EG',
+    type: 'country',
+    name: 'Egypt',
+    aliases: ['egypt', 'cairo', 'sisi'],
+    keywords: ['suez canal', 'gaza', 'rafah', 'imf', 'debt', 'tourism'],
+    related: ['IL', 'SA', 'AE'],
   },
 ];
 

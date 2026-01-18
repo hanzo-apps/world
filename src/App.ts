@@ -522,7 +522,7 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <span class="logo">WORLD MONITOR</span><span class="version">v1.3.8</span>
+          <span class="logo">WORLD MONITOR</span><span class="version">v1.3.9</span>
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
             <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
             <span class="credit-text">@eliehabib</span>
@@ -676,6 +676,27 @@ export class App {
     const economicPanel = new EconomicPanel();
     this.panels['economic'] = economicPanel;
 
+    // New Regional Panels
+    const africaPanel = new NewsPanel('africa', 'Africa');
+    this.attachRelatedAssetHandlers(africaPanel);
+    this.newsPanels['africa'] = africaPanel;
+    this.panels['africa'] = africaPanel;
+
+    const latamPanel = new NewsPanel('latam', 'Latin America');
+    this.attachRelatedAssetHandlers(latamPanel);
+    this.newsPanels['latam'] = latamPanel;
+    this.panels['latam'] = latamPanel;
+
+    const asiaPanel = new NewsPanel('asia', 'Asia-Pacific');
+    this.attachRelatedAssetHandlers(asiaPanel);
+    this.newsPanels['asia'] = asiaPanel;
+    this.panels['asia'] = asiaPanel;
+
+    const energyPanel = new NewsPanel('energy', 'Energy & Resources');
+    this.attachRelatedAssetHandlers(energyPanel);
+    this.newsPanels['energy'] = energyPanel;
+    this.panels['energy'] = energyPanel;
+
     const gdeltIntelPanel = new GdeltIntelPanel();
     this.panels['gdelt-intel'] = gdeltIntelPanel;
 
@@ -693,7 +714,7 @@ export class App {
 
     // Add panels to grid in saved order (optimized for geopolitical analysis)
     // Row 1: Intel + breaking events | Row 2: Market signals | Row 3: Supporting context
-    const defaultOrder = ['strategic-risk', 'live-news', 'intel', 'gdelt-intel', 'cii', 'cascade', 'politics', 'middleeast', 'gov', 'thinktanks', 'polymarket', 'commodities', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
+    const defaultOrder = ['strategic-risk', 'live-news', 'intel', 'gdelt-intel', 'cii', 'cascade', 'politics', 'middleeast', 'asia', 'africa', 'latam', 'gov', 'thinktanks', 'polymarket', 'commodities', 'energy', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
@@ -1268,6 +1289,10 @@ export class App {
       { key: 'finance', feeds: FEEDS.finance },
       { key: 'gov', feeds: FEEDS.gov },
       { key: 'middleeast', feeds: FEEDS.middleeast },
+      { key: 'africa', feeds: FEEDS.africa },
+      { key: 'latam', feeds: FEEDS.latam },
+      { key: 'asia', feeds: FEEDS.asia },
+      { key: 'energy', feeds: FEEDS.energy },
       { key: 'layoffs', feeds: FEEDS.layoffs },
       { key: 'ai', feeds: FEEDS.ai },
       { key: 'thinktanks', feeds: FEEDS.thinktanks },

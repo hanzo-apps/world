@@ -14,6 +14,10 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   'strategic-risk': { name: 'Strategic Risk Overview', enabled: true, priority: 1 },
   politics: { name: 'World News', enabled: true, priority: 1 },
   middleeast: { name: 'Middle East', enabled: true, priority: 1 },
+  africa: { name: 'Africa', enabled: true, priority: 1 },
+  latam: { name: 'Latin America', enabled: true, priority: 1 },
+  asia: { name: 'Asia-Pacific', enabled: true, priority: 1 },
+  energy: { name: 'Energy & Resources', enabled: true, priority: 1 },
   gov: { name: 'Government', enabled: true, priority: 1 },
   thinktanks: { name: 'Think Tanks', enabled: true, priority: 1 },
   polymarket: { name: 'Predictions', enabled: true, priority: 1 },
@@ -49,6 +53,8 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   flights: false,
   military: false,
   natural: true,
+  spaceports: false,
+  minerals: false,
 };
 
 // Mobile-specific defaults: minimal layers for better usability
@@ -73,6 +79,8 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   flights: false,
   military: false,
   natural: true,
+  spaceports: false,
+  minerals: false,
 };
 
 export const MONITOR_COLORS = [
