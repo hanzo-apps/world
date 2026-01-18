@@ -379,11 +379,8 @@ function updateAlerts(convergenceAlerts: GeoConvergenceAlert[]): void {
     }
   }
 
-  // Check for CII changes and add those alerts
-  const ciiAlerts = checkCIIChanges();
-  for (const alert of ciiAlerts) {
-    alerts.push(alert);
-  }
+  // Check for CII changes (alerts are added internally via addAndMergeAlert)
+  checkCIIChanges();
 
   // Sort by timestamp (newest first) and limit to 100
   alerts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
