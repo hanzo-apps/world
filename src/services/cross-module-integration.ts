@@ -150,10 +150,10 @@ export function createCIIAlert(
   const changeStr = change > 0 ? `+${change}` : String(change);
 
   const alert: UnifiedAlert = {
-    id: generateAlertId(),
+    id: `cii-${country}`, // Stable ID for deduplication by country
     type: 'cii_spike',
     priority: getPriorityFromCIIChange(change, level),
-    title: `${countryName} Instability ${change > 0 ? 'Spike' : 'Drop'}`,
+    title: `${countryName} Instability ${change > 0 ? 'Rising' : 'Falling'}`,
     summary: `Instability index ${direction} from ${previousScore} to ${currentScore} (${changeStr}). Driver: ${driver}`,
     components: { ciiChange },
     countries: [country],
@@ -282,6 +282,21 @@ function generateCompositeSummary(a: UnifiedAlert, b: UnifiedAlert): string {
 }
 
 function addAndMergeAlert(alert: UnifiedAlert): UnifiedAlert {
+  // First check for existing alert with same ID (stable deduplication)
+  const existingByIdIndex = alerts.findIndex(a => a.id === alert.id);
+  if (existingByIdIndex !== -1) {
+    const existing = alerts[existingByIdIndex]!;
+    // Update existing alert with new data, keeping higher priority
+    const updated: UnifiedAlert = {
+      ...alert,
+      priority: getHigherPriority(existing.priority, alert.priority),
+      timestamp: new Date(Math.max(existing.timestamp.getTime(), alert.timestamp.getTime())),
+    };
+    alerts[existingByIdIndex] = updated;
+    return updated;
+  }
+
+  // Then check for merge candidates based on location/country
   for (let i = 0; i < alerts.length; i++) {
     const existing = alerts[i];
     if (existing && shouldMergeAlerts(existing, alert)) {
