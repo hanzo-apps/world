@@ -90,10 +90,10 @@ These panels transform raw signals into actionable intelligence by applying scor
 Multi-source RSS aggregation across categories:
 - **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR, Politico, The Diplomat
 - **Middle East / MENA** - Al Jazeera, BBC ME, Guardian ME, Al Arabiya, Times of Israel
-- **Africa** - AllAfrica, News24, African Arguments, Jeune Afrique
-- **Latin America** - MercoPress, LatAm Investor, Buenos Aires Times, Mexico News Daily
-- **Asia-Pacific** - Nikkei Asia, South China Morning Post, Times of India, Straits Times, Korea Herald
-- **Energy & Resources** - OilPrice.com, Energy Intelligence, Upstream, World Nuclear News
+- **Africa** - BBC Africa, News24, Google News aggregation (regional & Sahel coverage)
+- **Latin America** - BBC Latin America, Guardian Americas, Google News aggregation
+- **Asia-Pacific** - BBC Asia, South China Morning Post, Google News aggregation
+- **Energy & Resources** - Google News aggregation (oil/gas, nuclear, mining, Reuters Energy)
 - **Technology** - Hacker News, Ars Technica, The Verge, MIT Tech Review
 - **AI / ML** - ArXiv, VentureBeat AI, The Verge AI, MIT Tech Review
 - **Finance** - CNBC, MarketWatch, Financial Times, Yahoo Finance
