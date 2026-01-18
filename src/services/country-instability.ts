@@ -379,11 +379,23 @@ function calcInformationScore(data: CountryData, countryCode: string): number {
   const velocitySum = data.newsEvents.reduce((sum, e) => sum + (e.velocity?.sourcesPerHour || 0), 0);
   const avgVelocity = velocitySum / count;
 
-  // Apply multiplier - news about authoritarian states is more significant
-  const adjustedCount = count * multiplier;
+  // For high-volume countries (US, UK, DE, FR), use logarithmic scaling
+  // This prevents routine news volume from triggering instability
+  const isHighVolume = multiplier < 0.7;
+  const adjustedCount = isHighVolume
+    ? Math.log2(count + 1) * multiplier * 3  // Log scale for media-saturated countries
+    : count * multiplier;
+
   const baseScore = Math.min(40, adjustedCount * 5);
-  const velocityBoost = Math.min(40, avgVelocity * 10);
-  const alertBoost = data.newsEvents.some(e => e.isAlert) ? 20 : 0;
+
+  // Velocity only matters if it's actually high (breaking news style)
+  const velocityThreshold = isHighVolume ? 5 : 2;
+  const velocityBoost = avgVelocity > velocityThreshold
+    ? Math.min(40, (avgVelocity - velocityThreshold) * 10 * multiplier)
+    : 0;
+
+  // Alert boost also scaled by multiplier
+  const alertBoost = data.newsEvents.some(e => e.isAlert) ? 20 * multiplier : 0;
 
   return Math.min(100, baseScore + velocityBoost + alertBoost);
 }
@@ -430,7 +442,18 @@ export function calculateCII(): CountryScore[] {
     // - 60% event-based (current detected activity)
     // - Hotspot boost adds up to 30 points for activity near strategic locations
     const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
-    const score = Math.round(Math.min(100, blendedScore));
+
+    // Active conflict zones have a FLOOR score - they're inherently more unstable
+    // than peaceful countries regardless of detected events
+    const conflictFloor: Record<string, number> = {
+      UA: 55,  // Active war
+      SY: 50,  // Civil war
+      YE: 50,  // Civil war
+      MM: 45,  // Coup/civil conflict
+      IL: 45,  // Active Gaza conflict
+    };
+    const floor = conflictFloor[code] ?? 0;
+    const score = Math.round(Math.min(100, Math.max(floor, blendedScore)));
 
     const prev = previousScores.get(code) ?? score;
 
@@ -470,5 +493,11 @@ export function getCountryScore(code: string): number | null {
   const hotspotBoost = getHotspotBoost(code);
   const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
 
-  return Math.round(Math.min(100, blendedScore));
+  // Active conflict zones have floor scores
+  const conflictFloor: Record<string, number> = {
+    UA: 55, SY: 50, YE: 50, MM: 45, IL: 45,
+  };
+  const floor = conflictFloor[code] ?? 0;
+
+  return Math.round(Math.min(100, Math.max(floor, blendedScore)));
 }

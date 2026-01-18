@@ -63,6 +63,8 @@ export class SignalModal {
     if (signals.length === 0) return;
 
     this.currentSignals = [...signals, ...this.currentSignals].slice(0, 50);
+    this.renderSignals();
+    this.element.classList.add('active');
     this.playSound();
   }
 
