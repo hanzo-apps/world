@@ -94,7 +94,9 @@ export function generateSignalId(): string {
 }
 
 export function generateDedupeKey(type: string, identifier: string, value: number): string {
-  const marketSignals = ['silent_divergence', 'flow_price_divergence'];
+  // Market signals dedupe by symbol only (not by change value)
+  // This prevents duplicates when price fluctuates slightly
+  const marketSignals = ['silent_divergence', 'flow_price_divergence', 'explained_market_move'];
   if (marketSignals.includes(type)) {
     return `${type}:${identifier}`;
   }
