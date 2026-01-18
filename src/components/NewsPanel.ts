@@ -28,6 +28,8 @@ export class NewsPanel extends Panel {
   private windowedList: WindowedList<PreparedCluster> | null = null;
   private useVirtualScroll = true;
   private renderRequestId = 0;
+  private boundScrollHandler: (() => void) | null = null;
+  private boundClickHandler: (() => void) | null = null;
 
   constructor(id: string, title: string) {
     super({ id, title, showCount: true, trackActivity: true });
@@ -64,14 +66,16 @@ export class NewsPanel extends Panel {
     });
 
     // Mark as seen when panel content is scrolled
-    this.content.addEventListener('scroll', () => {
+    this.boundScrollHandler = () => {
       activityTracker.markAsSeen(this.panelId);
-    });
+    };
+    this.content.addEventListener('scroll', this.boundScrollHandler);
 
     // Mark as seen on click anywhere in panel
-    this.element.addEventListener('click', () => {
+    this.boundClickHandler = () => {
       activityTracker.markAsSeen(this.panelId);
-    });
+    };
+    this.element.addEventListener('click', this.boundClickHandler);
   }
 
   public setRelatedAssetHandlers(options: {
@@ -343,6 +347,16 @@ export class NewsPanel extends Panel {
     // Clean up windowed list
     this.windowedList?.destroy();
     this.windowedList = null;
+
+    // Remove activity tracking listeners
+    if (this.boundScrollHandler) {
+      this.content.removeEventListener('scroll', this.boundScrollHandler);
+      this.boundScrollHandler = null;
+    }
+    if (this.boundClickHandler) {
+      this.element.removeEventListener('click', this.boundClickHandler);
+      this.boundClickHandler = null;
+    }
 
     // Unregister from activity tracker
     activityTracker.unregister(this.panelId);

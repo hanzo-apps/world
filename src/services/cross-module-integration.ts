@@ -86,17 +86,19 @@ function haversineDistance(
 }
 
 function getPriorityFromScore(score: number): AlertPriority {
-  if (score >= 80) return 'critical';
-  if (score >= 60) return 'high';
-  if (score >= 40) return 'medium';
+  // Match CII thresholds: critical at 81+, high at 66+
+  if (score >= 81) return 'critical';
+  if (score >= 66) return 'high';
+  if (score >= 51) return 'medium';
   return 'low';
 }
 
 function getPriorityFromCIIChange(change: number, level: CountryScore['level']): AlertPriority {
   const absChange = Math.abs(change);
-  if (level === 'critical' || absChange >= 20) return 'critical';
-  if (level === 'high' || absChange >= 15) return 'high';
-  if (absChange >= 10) return 'medium';
+  // Match CII thresholds: critical at 81+, high at 66+
+  if (level === 'critical') return 'critical';
+  if (level === 'high' || absChange >= 30) return 'high';
+  if (level === 'elevated' || absChange >= 15) return 'medium';
   return 'low';
 }
 
