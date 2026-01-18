@@ -7,7 +7,7 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.3.8-blue)
+![Version](https://img.shields.io/badge/version-1.3.9-blue)
 
 ![World Monitor Dashboard](Screenshot.png)
 
@@ -39,6 +39,8 @@ Layers are organized into logical groups for efficient monitoring:
 | **Nuclear Facilities** | Power plants, weapons labs, enrichment sites |
 | **Gamma Irradiators** | IAEA-tracked Category 1-3 radiation sources |
 | **APT Groups** | State-sponsored cyber threat actors with geographic attribution |
+| **Spaceports** | 12 major launch facilities (NASA, SpaceX, Roscosmos, CNSA, ESA, ISRO, JAXA) |
+| **Critical Minerals** | Strategic mineral deposits (lithium, cobalt, rare earths) with operator info |
 
 **Infrastructure**
 | Layer | Description |
@@ -86,15 +88,35 @@ These panels transform raw signals into actionable intelligence by applying scor
 ### News Aggregation
 
 Multi-source RSS aggregation across categories:
-- **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR, Politico, The Telegraph
-- **Middle East / MENA** - Al Jazeera, BBC ME, Guardian ME, CNN World
+- **World / Geopolitical** - BBC, Reuters, AP, Guardian, NPR, Politico, The Diplomat
+- **Middle East / MENA** - Al Jazeera, BBC ME, Guardian ME, Al Arabiya, Times of Israel
+- **Africa** - AllAfrica, News24, African Arguments, Jeune Afrique
+- **Latin America** - MercoPress, LatAm Investor, Buenos Aires Times, Mexico News Daily
+- **Asia-Pacific** - Nikkei Asia, South China Morning Post, Times of India, Straits Times, Korea Herald
+- **Energy & Resources** - OilPrice.com, Energy Intelligence, Upstream, World Nuclear News
 - **Technology** - Hacker News, Ars Technica, The Verge, MIT Tech Review
-- **AI / ML** - ArXiv, Hugging Face, VentureBeat, OpenAI
+- **AI / ML** - ArXiv, VentureBeat AI, The Verge AI, MIT Tech Review
 - **Finance** - CNBC, MarketWatch, Financial Times, Yahoo Finance
-- **Government** - White House, State Dept, Pentagon, Treasury, Fed, SEC
-- **Intel Feed** - Defense One, Breaking Defense, Bellingcat, Krebs Security
-- **Think Tanks** - Foreign Policy, Atlantic Council, Foreign Affairs
+- **Government** - White House, State Dept, Pentagon, Treasury, Fed, SEC, UN News, CISA
+- **Intel Feed** - Defense One, Breaking Defense, Bellingcat, Krebs Security, Janes
+- **Think Tanks** - Foreign Policy, Atlantic Council, Foreign Affairs, CSIS, RAND, Brookings, Carnegie
+- **Crisis Watch** - International Crisis Group, IAEA, WHO, UNHCR
+- **Regional Sources** - Xinhua, TASS, Kyiv Independent, Moscow Times
 - **Layoffs Tracker** - Tech industry job cuts
+
+### Regional Intelligence Panels
+
+Dedicated panels provide focused coverage for strategically significant regions:
+
+| Panel | Coverage | Key Topics |
+|-------|----------|------------|
+| **Middle East** | MENA region | Israel-Gaza, Iran, Gulf states, Red Sea |
+| **Africa** | Sub-Saharan Africa | Sahel instability, coups, insurgencies, resources |
+| **Latin America** | Central & South America | Venezuela, drug trafficking, regional politics |
+| **Asia-Pacific** | East & Southeast Asia | China-Taiwan, Korean peninsula, ASEAN |
+| **Energy & Resources** | Global | Oil markets, nuclear, mining, energy security |
+
+Each panel aggregates region-specific sources to provide concentrated situational awareness for that theater. This enables focused monitoring when global events warrant attention to a particular region.
 
 ### Live News Streams
 
@@ -170,7 +192,7 @@ Each refresh cycle compares current state to previous snapshot, applying thresho
 
 ### Entity-Aware Correlation
 
-The signal engine uses a **knowledge base of 45+ entities** to intelligently correlate market movements with news coverage. Rather than simple keyword matching, the system understands that "AVGO" (the ticker) relates to "Broadcom" (the company), "AI chips" (the sector), and entities like "Nvidia" (a competitor).
+The signal engine uses a **knowledge base of 100+ entities** to intelligently correlate market movements with news coverage. Rather than simple keyword matching, the system understands that "AVGO" (the ticker) relates to "Broadcom" (the company), "AI chips" (the sector), and entities like "Nvidia" (a competitor).
 
 #### Entity Knowledge Base
 
@@ -190,11 +212,12 @@ Each entity in the registry contains:
 
 | Type | Count | Examples |
 |------|-------|----------|
-| **Companies** | 30+ | Nvidia, Apple, Tesla, Broadcom, Boeing |
-| **Commodities** | 5+ | Oil, Gold, Natural Gas, Copper |
+| **Companies** | 50+ | Nvidia, Apple, Tesla, Broadcom, Boeing, Lockheed Martin, TSMC, Rheinmetall |
+| **Indices** | 5+ | S&P 500, Dow Jones, NASDAQ |
+| **Sectors** | 10+ | Technology (XLK), Finance (XLF), Energy (XLE), Healthcare (XLV), Semiconductors (SMH) |
+| **Commodities** | 10+ | Oil (WTI), Gold, Natural Gas, Copper, Silver, VIX |
 | **Crypto** | 3 | Bitcoin, Ethereum, Solana |
-| **Countries** | 5+ | China, Russia, Iran, Israel, Ukraine |
-| **People** | 5+ | Trump, Musk, Powell, Xi Jinping |
+| **Countries** | 15+ | China, Russia, Iran, Israel, Ukraine, Taiwan, Saudi Arabia, UAE, Qatar, Turkey, Egypt |
 
 #### How Entity Matching Works
 
@@ -222,6 +245,23 @@ If no correlation after exhaustive search → **"Silent Divergence"** signal.
 ```
 
 Without this system, the same move would generate a generic "Silent Divergence: AVGO +2.5%" signal.
+
+#### Sector Coverage
+
+The entity registry spans strategically significant sectors:
+
+| Sector | Examples | Keywords Tracked |
+|--------|----------|------------------|
+| **Technology** | Apple, Microsoft, Nvidia, Google, Meta, TSMC | AI, cloud, chips, datacenter, streaming |
+| **Defense & Aerospace** | Lockheed Martin, Raytheon, Northrop Grumman, Boeing, Rheinmetall, Airbus | F-35, missiles, drones, tanks, defense contracts |
+| **Semiconductors** | ASML, Samsung, AMD, Intel, Broadcom | Lithography, EUV, foundry, fab, wafer |
+| **Critical Minerals** | Albemarle, SQM, MP Materials, Freeport-McMoRan | Lithium, rare earth, cobalt, copper |
+| **Finance** | JPMorgan, Berkshire Hathaway, Visa, Mastercard | Banking, credit, investment, interest rates |
+| **Healthcare** | Eli Lilly, Novo Nordisk, UnitedHealth, J&J | Pharma, drugs, GLP-1, obesity, diabetes |
+| **Energy** | Exxon, Chevron, ConocoPhillips | Oil, gas, drilling, refinery, LNG |
+| **Consumer** | Tesla, Walmart, Costco, Home Depot | EV, retail, grocery, housing |
+
+This broad coverage enables correlation detection across diverse geopolitical and market events.
 
 ### Signal Deduplication
 
@@ -277,10 +317,25 @@ Related articles are grouped using **Jaccard similarity** on tokenized headlines
 similarity(A, B) = |A ∩ B| / |A ∪ B|
 ```
 
-- Headlines are tokenized, lowercased, and stripped of stop words
+**Tokenization**:
+- Headlines are lowercased and split on word boundaries
+- Stop words removed: "the", "a", "an", "in", "on", "at", "to", "for", "of", "and", "or"
+- Short tokens (<3 characters) filtered out
+- Result cached per headline for performance
+
+**Inverted Index Optimization**:
+Rather than O(n²) pairwise comparison, the algorithm uses an inverted index:
+
+1. Build token → article indices map
+2. For each article, find candidate matches via shared tokens
+3. Only compute Jaccard for candidates with token overlap
+4. This reduces comparisons from ~10,000 to ~500 for typical news loads
+
+**Clustering Rules**:
 - Articles with similarity ≥ 0.5 are grouped into clusters
 - Clusters are sorted by source tier, then recency
 - The most authoritative source becomes the "primary" headline
+- Clusters maintain full item list for multi-source attribution
 
 ### Velocity Analysis
 
@@ -337,9 +392,9 @@ The entity index pre-builds five lookup maps for O(1) access:
 
 **Performance**:
 - Index builds once on first access (cached singleton)
-- Alias map has ~150 entries for 45 entities
-- Keyword map has ~200 entries
-- Full news scan: O(aliases × clusters) ≈ 150 × 50 = 7,500 comparisons
+- Alias map has ~300 entries for 100+ entities
+- Keyword map has ~400 entries
+- Full news scan: O(aliases × clusters) ≈ 300 × 50 = 15,000 comparisons
 
 ### Baseline Deviation (Z-Score)
 
@@ -634,6 +689,55 @@ Alternative Routes: SEA-ME-WE 6 (11%), 2Africa (8%), Falcon (8%)
 - **Pre-positioning**: Understand which countries are most vulnerable to specific infrastructure failures
 - **Risk Assessment**: Evaluate supply chain exposure to chokepoint disruptions
 - **Incident Response**: Quickly identify downstream effects of reported cable cuts or pipeline damage
+
+---
+
+## Undersea Cable Activity Monitoring
+
+The dashboard monitors real-time cable operations and advisories from official maritime warning systems, providing early warning of potential connectivity disruptions.
+
+### Data Sources
+
+| Source | Coverage | Data Type |
+|--------|----------|-----------|
+| **NGA Warnings** | Global | NAVAREA maritime warnings |
+| **Cable Operators** | Route-specific | Maintenance advisories |
+
+### How It Works
+
+The system parses NGA (National Geospatial-Intelligence Agency) maritime warnings for cable-related activity:
+
+1. **Keyword filtering**: Warnings containing "CABLE", "CABLESHIP", "SUBMARINE CABLE", "FIBER OPTIC" are extracted
+2. **Coordinate parsing**: DMS and decimal coordinates are extracted from warning text
+3. **Cable matching**: Coordinates are matched to nearest cable routes within 5° radius
+4. **Severity classification**: Keywords like "FAULT", "BREAK", "DAMAGE" indicate faults; others indicate maintenance
+
+### Alert Types
+
+| Type | Trigger | Map Display |
+|------|---------|-------------|
+| **Cable Advisory** | Any cable-related NAVAREA warning | ⚠ Yellow marker at location |
+| **Repair Ship** | Cableship name detected in warning | 🚢 Ship icon with status |
+
+### Repair Ship Tracking
+
+When a cableship is mentioned in warnings, the system extracts:
+- **Vessel name**: CS Reliance, Cable Innovator, etc.
+- **Status**: "En route" or "On station"
+- **Location**: Current working area
+- **Associated cable**: Nearest cable route
+
+This enables monitoring of ongoing repair operations before official carrier announcements.
+
+### Why This Matters
+
+Undersea cables carry 95% of intercontinental data traffic. A cable cut can:
+- Cause regional internet outages
+- Disrupt financial transactions
+- Impact military communications
+- Create economic cascading effects
+
+Early visibility into cable operations—even maintenance windows—provides advance warning for contingency planning.
 
 ---
 
@@ -1073,6 +1177,71 @@ This means an aircraft's details are fetched at most once per day, regardless of
 
 ---
 
+## Space Launch Infrastructure
+
+The Spaceports layer displays global launch facilities for monitoring space-related activity and supply chain implications.
+
+### Tracked Launch Sites
+
+| Site | Country | Operator | Activity Level |
+|------|---------|----------|----------------|
+| **Kennedy Space Center** | USA | NASA/Space Force | High |
+| **Vandenberg SFB** | USA | US Space Force | Medium |
+| **Starbase** | USA | SpaceX | High |
+| **Baikonur Cosmodrome** | Kazakhstan | Roscosmos | Medium |
+| **Plesetsk Cosmodrome** | Russia | Roscosmos/Military | Medium |
+| **Vostochny Cosmodrome** | Russia | Roscosmos | Low |
+| **Jiuquan SLC** | China | CNSA | High |
+| **Xichang SLC** | China | CNSA | High |
+| **Wenchang SLC** | China | CNSA | Medium |
+| **Guiana Space Centre** | France | ESA/CNES | Medium |
+| **Satish Dhawan SC** | India | ISRO | Medium |
+| **Tanegashima SC** | Japan | JAXA | Low |
+
+### Why This Matters
+
+Space launches are geopolitically significant:
+- **Military implications**: Many launches are dual-use (civilian/military)
+- **Technology competition**: Launch cadence indicates space program advancement
+- **Supply chain**: Satellite services affect communications, GPS, reconnaissance
+- **Incident correlation**: News about space debris, failed launches, or policy changes
+
+---
+
+## Critical Mineral Deposits
+
+The Minerals layer displays strategic mineral extraction sites essential for modern technology and defense supply chains.
+
+### Tracked Resources
+
+| Mineral | Strategic Importance | Major Producers |
+|---------|---------------------|-----------------|
+| **Lithium** | EV batteries, energy storage | Australia, Chile, China |
+| **Cobalt** | Battery cathodes, superalloys | DRC (60%+ global), Australia |
+| **Rare Earths** | Magnets, electronics, defense | China (60%+ global), Australia, USA |
+
+### Key Sites
+
+| Site | Mineral | Country | Significance |
+|------|---------|---------|--------------|
+| Greenbushes | Lithium | Australia | World's largest hard-rock lithium mine |
+| Salar de Atacama | Lithium | Chile | Largest brine lithium source |
+| Mutanda | Cobalt | DRC | World's largest cobalt mine |
+| Tenke Fungurume | Cobalt | DRC | Major Chinese-owned cobalt source |
+| Bayan Obo | Rare Earths | China | 45% of global REE production |
+| Mountain Pass | Rare Earths | USA | Only active US rare earth mine |
+
+### Supply Chain Risks
+
+Critical minerals are geopolitically concentrated:
+- **Cobalt**: 70% from DRC, significant artisanal mining concerns
+- **Rare Earths**: 60% from China, processing nearly monopolized
+- **Lithium**: Expanding production but demand outpacing supply
+
+News about these regions or mining companies can signal supply disruptions affecting technology and defense sectors.
+
+---
+
 ## Cyber Threat Actors (APT Groups)
 
 The map displays geographic attribution markers for major state-sponsored Advanced Persistent Threat (APT) groups. These markers show the approximate operational centers of known threat actors.
@@ -1307,6 +1476,51 @@ This transparency enables informed interpretation of the dashboard data.
 
 ---
 
+## Data Freshness Tracking
+
+Beyond simple "online/offline" status, the system tracks fine-grained freshness for each data source to indicate data reliability and staleness.
+
+### Freshness Levels
+
+| Status | Color | Criteria | Meaning |
+|--------|-------|----------|---------|
+| **Fresh** | Green | Updated within expected interval | Data is current |
+| **Aging** | Yellow | 1-2× expected interval elapsed | Data may be slightly stale |
+| **Stale** | Orange | 2-4× expected interval elapsed | Data is outdated |
+| **Critical** | Red | >4× expected interval elapsed | Data unreliable |
+| **Disabled** | Gray | Layer toggled off | Not fetching |
+
+### Source-Specific Thresholds
+
+Each data source has calibrated freshness expectations:
+
+| Source | Expected Interval | "Fresh" Threshold |
+|--------|------------------|-------------------|
+| News feeds | 5 minutes | <10 minutes |
+| Stock quotes | 1 minute | <5 minutes |
+| Earthquakes | 5 minutes | <15 minutes |
+| Weather | 10 minutes | <30 minutes |
+| Flight delays | 10 minutes | <20 minutes |
+| AIS vessels | Real-time | <1 minute |
+
+### Visual Indicators
+
+The status panel displays freshness for each source:
+- **Colored dot** indicates freshness level
+- **Time since update** shows exact staleness
+- **Next refresh countdown** shows when data will update
+
+### Why This Matters
+
+Understanding data freshness is critical for decision-making:
+- A "fresh" earthquake feed means recent events are displayed
+- A "stale" news feed means you may be missing breaking stories
+- A "critical" AIS stream means vessel positions are unreliable
+
+This visibility enables appropriate confidence calibration when interpreting the dashboard.
+
+---
+
 ## Conditional Data Loading
 
 API calls are expensive. The system only fetches data for **enabled layers**, reducing unnecessary network traffic and rate limit consumption.
@@ -1459,6 +1673,14 @@ Panel state survives browser restarts:
 
 The dashboard is optimized for mobile devices with a streamlined interface that prioritizes usability on smaller screens.
 
+### First-Time Mobile Welcome
+
+When accessing the dashboard on a mobile device for the first time, a welcome modal explains the mobile-optimized experience:
+
+- **Simplified view notice** - Informs users they're seeing a curated mobile version
+- **Navigation tip** - Explains regional view buttons and marker interaction
+- **"Don't show again" option** - Checkbox to skip on future visits (persisted to localStorage)
+
 ### Mobile-First Design
 
 On screens narrower than 768px or touch devices:
@@ -1469,6 +1691,9 @@ On screens narrower than 768px or touch devices:
 - **Fixed layer set** - Layer toggle buttons are hidden; a curated set of layers is enabled by default
 - **Simplified controls** - Map resize handle and pin button are hidden
 - **Touch-optimized markers** - Expanded touch targets (44px) for easy tapping
+- **Hidden DEFCON indicator** - Pentagon Pizza Index hidden to reduce header clutter
+- **Hidden FOCUS selector** - Regional focus buttons hidden (use preset views instead)
+- **Compact header** - Social link shows X logo instead of username text
 
 ### Mobile Default Layers
 
@@ -1483,7 +1708,13 @@ The mobile experience focuses on the most essential intelligence layers:
 | **Natural** | Earthquakes, storms, wildfires |
 | **Weather** | Severe weather warnings |
 
-This curated set provides situational awareness without overwhelming the interface or consuming excessive data.
+Layers disabled by default on mobile (but available on desktop):
+- Military bases, nuclear facilities, spaceports, minerals
+- Undersea cables, pipelines, datacenters
+- AIS vessels, military flights
+- Protests, economic centers
+
+This curated set provides situational awareness without overwhelming the interface or consuming excessive data/battery.
 
 ### Touch Gestures
 
@@ -1494,6 +1725,17 @@ Map navigation supports:
 - **Tap markers** - Show popup (replaces hover)
 - **Double-tap** - Quick zoom
 
+### Performance Considerations
+
+Mobile optimizations reduce resource consumption:
+
+| Optimization | Benefit |
+|--------------|---------|
+| Fewer layers | Reduced API calls, lower battery usage |
+| No labels | Faster rendering, cleaner interface |
+| Hidden controls | More screen space for content |
+| Simplified header | Reduced visual processing |
+
 ### Desktop Experience
 
 On larger screens, the full feature set is available:
@@ -1503,6 +1745,8 @@ On larger screens, the full feature set is available:
 - Map labels visible at appropriate zoom levels
 - Resizable map section
 - Pinnable map (keeps map visible while scrolling panels)
+- Full DEFCON indicator with tension pairs
+- FOCUS regional selector for rapid navigation
 
 ---
 
@@ -1737,8 +1981,8 @@ src/
 │   ├── StrategicRiskPanel.ts # Strategic risk overview dashboard
 │   └── ...
 ├── config/
-│   ├── feeds.ts              # 45+ RSS feeds, source tiers
-│   ├── geo.ts                # Hotspots, conflicts, 55 cables, waterways
+│   ├── feeds.ts              # 70+ RSS feeds, source tiers, regional sources
+│   ├── geo.ts                # 30+ hotspots, conflicts, 55 cables, waterways, spaceports, minerals
 │   ├── pipelines.ts          # 88 oil & gas pipelines
 │   ├── ports.ts              # 61 strategic ports worldwide
 │   ├── bases-expanded.ts     # 220+ military bases
@@ -1747,7 +1991,8 @@ src/
 │   ├── irradiators.ts        # IAEA gamma irradiator sites
 │   ├── nuclear-facilities.ts # Global nuclear infrastructure
 │   ├── markets.ts            # Stock symbols, sectors
-│   └── entities.ts           # 45+ entity definitions (companies, commodities, people)
+│   ├── entities.ts           # 100+ entity definitions (companies, indices, commodities, countries)
+│   └── panels.ts             # Panel configs, layer defaults, mobile optimizations
 ├── services/
 │   ├── ais.ts                # WebSocket vessel tracking
 │   ├── military-vessels.ts   # Naval vessel identification
@@ -1845,10 +2090,10 @@ Values are validated and clamped to prevent invalid states.
 ## Data Sources
 
 ### News Feeds
-Aggregates **45+ RSS feeds** from major news outlets, government sources, and specialty publications with source-tier prioritization. Categories include world news, MENA, technology, AI/ML, finance, government releases, defense/intel, and think tanks.
+Aggregates **70+ RSS feeds** from major news outlets, government sources, and specialty publications with source-tier prioritization. Categories include world news, MENA, Africa, Latin America, Asia-Pacific, energy, technology, AI/ML, finance, government releases, defense/intel, think tanks, and international crisis organizations.
 
 ### Geospatial Data
-- **Hotspots**: 25+ global intelligence hotspots with keyword correlation
+- **Hotspots**: 30+ global intelligence hotspots with keyword correlation (including Sahel, Haiti, Horn of Africa)
 - **Conflicts**: 10+ active conflict zones with involved parties
 - **Military Bases**: 220+ installations from US, NATO, Russia, China, and allies
 - **Pipelines**: 88 operating oil/gas pipelines across all continents
