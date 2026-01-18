@@ -95,6 +95,22 @@ export interface CryptoData {
 
 export type EscalationTrend = 'escalating' | 'stable' | 'de-escalating';
 
+export interface DynamicEscalationScore {
+  hotspotId: string;
+  staticBaseline: number;
+  dynamicScore: number;
+  combinedScore: number;
+  trend: EscalationTrend;
+  components: {
+    newsActivity: number;
+    ciiContribution: number;
+    geoConvergence: number;
+    militaryActivity: number;
+  };
+  history: Array<{ timestamp: number; score: number }>;
+  lastUpdated: Date;
+}
+
 export interface HistoricalContext {
   lastMajorEvent?: string;
   lastMajorEventDate?: string;

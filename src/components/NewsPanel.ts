@@ -4,6 +4,7 @@ import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAss
 import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
+import { getSourcePropagandaRisk } from '@/config/feeds';
 
 /** Threshold for enabling virtual scrolling */
 const VIRTUAL_SCROLL_THRESHOLD = 15;
@@ -230,8 +231,20 @@ export class NewsPanel extends Panel {
 
     const newTag = showNewTag ? '<span class="new-tag">NEW</span>' : '';
 
+    // Propaganda risk indicator for primary source
+    const primaryPropRisk = getSourcePropagandaRisk(cluster.primarySource);
+    const primaryPropBadge = primaryPropRisk.risk !== 'low'
+      ? `<span class="propaganda-badge ${primaryPropRisk.risk}" title="${escapeHtml(primaryPropRisk.note || `State-affiliated: ${primaryPropRisk.stateAffiliated || 'Unknown'}`)}">${primaryPropRisk.risk === 'high' ? '⚠ State Media' : '! Caution'}</span>`
+      : '';
+
     const topSourcesHtml = cluster.topSources
-      .map(s => `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}</span>`)
+      .map(s => {
+        const propRisk = getSourcePropagandaRisk(s.name);
+        const propBadge = propRisk.risk !== 'low'
+          ? `<span class="propaganda-badge ${propRisk.risk}" title="${escapeHtml(propRisk.note || `State-affiliated: ${propRisk.stateAffiliated || 'Unknown'}`)}">${propRisk.risk === 'high' ? '⚠' : '!'}</span>`
+          : '';
+        return `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}${propBadge}</span>`;
+      })
       .join('');
 
     const assetContext = getClusterAssetContext(cluster);
@@ -272,6 +285,7 @@ export class NewsPanel extends Panel {
       <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-left-color: ${escapeHtml(cluster.monitorColor)}"` : ''} data-cluster-id="${escapeHtml(cluster.id)}" data-news-id="${escapeHtml(cluster.primaryLink)}">
         <div class="item-source">
           ${escapeHtml(cluster.primarySource)}
+          ${primaryPropBadge}
           ${newTag}
           ${sourceBadge}
           ${velocityBadge}

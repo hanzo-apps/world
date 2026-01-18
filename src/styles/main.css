@@ -6479,3 +6479,497 @@ body.playback-mode .status-dot {
   background: #00ccaa;
   border-color: #00ccaa;
 }
+
+/* ============================================
+   QUICK WINS: Intelligence UI Enhancements
+   ============================================ */
+
+/* --- Hotspot Popup: Escalation Display --- */
+.escalation-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.escalation-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.escalation-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 6px;
+  min-width: 70px;
+}
+
+.escalation-score .score-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.escalation-score .score-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.5px;
+}
+
+.escalation-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.escalation-trend .trend-icon {
+  font-size: 16px;
+}
+
+.escalation-indicators {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.indicator-tag {
+  padding: 2px 0;
+}
+
+/* --- Dynamic Escalation Breakdown --- */
+.escalation-breakdown {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 10px;
+}
+
+.baseline-label {
+  color: var(--text-dim);
+}
+
+.change-label {
+  font-weight: 600;
+}
+
+.change-label.rising {
+  color: #ff4444;
+}
+
+.change-label.falling {
+  color: #44aa44;
+}
+
+.breakdown-components {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.component-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  width: 45px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.component-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.component-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.component-bar.news {
+  background: linear-gradient(90deg, #4a9eff, #6bb5ff);
+}
+
+.component-bar.cii {
+  background: linear-gradient(90deg, #ff9500, #ffaa33);
+}
+
+.component-bar.geo {
+  background: linear-gradient(90deg, #ff4444, #ff6666);
+}
+
+.component-bar.military {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
+.component-value {
+  font-size: 9px;
+  color: var(--text-dim);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* --- Hotspot Popup: Historical Context --- */
+.history-section {
+  background: rgba(100, 100, 255, 0.05);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  border-left: 3px solid rgba(100, 150, 255, 0.4);
+}
+
+.history-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-event {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.history-event .history-label {
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.history-event .history-value {
+  color: var(--text);
+}
+
+.history-event.cyclical {
+  color: var(--warning);
+  font-style: italic;
+}
+
+/* --- Hotspot Popup: Why It Matters --- */
+.why-matters-section {
+  background: rgba(255, 200, 100, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  border-left: 3px solid rgba(255, 180, 0, 0.5);
+}
+
+.why-matters-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+  font-style: italic;
+}
+
+/* --- Signal Modal: Context Display --- */
+.signal-context {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.signal-context-item {
+  margin-bottom: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.signal-context-item:last-child {
+  margin-bottom: 0;
+}
+
+.signal-context-item .context-label {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.signal-context-item .context-value {
+  color: var(--text);
+}
+
+.signal-context-item.why-matters {
+  border-left-color: #ffaa00;
+}
+
+.signal-context-item.actionable .context-label {
+  color: #44dd88;
+}
+
+.signal-context-item.confidence-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* --- News Panel: Propaganda Risk Badges --- */
+.propaganda-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 600;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.propaganda-badge.high {
+  background: rgba(255, 60, 60, 0.2);
+  color: #ff6666;
+  border: 1px solid rgba(255, 60, 60, 0.3);
+}
+
+.propaganda-badge.medium {
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.top-source .propaganda-badge {
+  font-size: 7px;
+  padding: 0 3px;
+  margin-left: 2px;
+}
+
+/* --- Intelligence Gap Badge --- */
+.intel-gap-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.intel-gap-badge:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+}
+
+.intel-gap-badge.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.intel-gap-badge .gap-icon {
+  font-size: 12px;
+}
+
+.intel-gap-badge .gap-count {
+  background: var(--border);
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 14px;
+  text-align: center;
+}
+
+.intel-gap-badge.status-ok {
+  border-color: rgba(68, 170, 68, 0.4);
+}
+
+.intel-gap-badge.status-ok .gap-count {
+  background: rgba(68, 170, 68, 0.3);
+  color: #66cc66;
+}
+
+.intel-gap-badge.status-warning {
+  border-color: rgba(255, 170, 0, 0.4);
+}
+
+.intel-gap-badge.status-warning .gap-count {
+  background: rgba(255, 170, 0, 0.3);
+  color: #ffcc44;
+}
+
+.intel-gap-badge.status-critical {
+  border-color: rgba(255, 68, 68, 0.4);
+  animation: gap-pulse 2s infinite;
+}
+
+.intel-gap-badge.status-critical .gap-count {
+  background: rgba(255, 68, 68, 0.3);
+  color: #ff6666;
+}
+
+@keyframes gap-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(255, 68, 68, 0.3); }
+}
+
+/* --- Intelligence Gap Dropdown --- */
+.intel-gap-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 340px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: none;
+  margin-top: 4px;
+}
+
+.intel-gap-dropdown.open {
+  display: block;
+}
+
+.intel-gap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.intel-gap-header .header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.coverage-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.coverage-badge.ok {
+  background: rgba(68, 170, 68, 0.2);
+  color: #66cc66;
+}
+
+.coverage-badge.warning {
+  background: rgba(255, 170, 0, 0.2);
+  color: #ffcc44;
+}
+
+.coverage-badge.critical {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff6666;
+}
+
+.intel-gap-content {
+  padding: 10px 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.gap-explainer {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.gap-status-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(68, 170, 68, 0.1);
+  border-radius: 6px;
+  color: #66cc66;
+}
+
+.gap-status-ok .status-icon {
+  font-size: 16px;
+}
+
+.gap-status-ok .status-text {
+  font-size: 11px;
+}
+
+.gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 5px;
+  border-left: 3px solid;
+}
+
+.gap-item.critical {
+  border-left-color: #ff4444;
+  background: rgba(255, 68, 68, 0.05);
+}
+
+.gap-item.warning {
+  border-left-color: #ffaa00;
+  background: rgba(255, 170, 0, 0.05);
+}
+
+.gap-severity-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.gap-message {
+  font-size: 10px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.gap-summary {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.summary-stat {
+  font-size: 9px;
+  color: var(--text-dim);
+}
