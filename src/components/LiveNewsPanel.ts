@@ -21,8 +21,11 @@ export class LiveNewsPanel extends Panel {
   private channelSwitcher: HTMLElement | null = null;
   private isMuted = true;
   private isPlaying = true;
+  private wasPlayingBeforeIdle = true;
   private muteBtn: HTMLButtonElement | null = null;
   private liveBtn: HTMLButtonElement | null = null;
+  private idleTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly IDLE_PAUSE_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     super({ id: 'live-news', title: 'Live News', showCount: false, trackActivity: false });
@@ -31,6 +34,48 @@ export class LiveNewsPanel extends Panel {
     this.createMuteButton();
     this.createChannelSwitcher();
     this.renderPlayer();
+    this.setupIdleDetection();
+  }
+
+  private setupIdleDetection(): void {
+    // Pause when tab becomes hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseForIdle();
+      } else {
+        this.resumeFromIdle();
+      }
+    });
+
+    // Track user activity to detect idle
+    const resetIdleTimer = () => {
+      if (this.idleTimeout) clearTimeout(this.idleTimeout);
+      this.idleTimeout = setTimeout(() => this.pauseForIdle(), this.IDLE_PAUSE_MS);
+    };
+
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+      document.addEventListener(event, resetIdleTimer, { passive: true });
+    });
+
+    // Start the idle timer
+    resetIdleTimer();
+  }
+
+  private pauseForIdle(): void {
+    if (this.isPlaying) {
+      this.wasPlayingBeforeIdle = true;
+      this.isPlaying = false;
+      this.updateLiveIndicator();
+      this.renderPlayer();
+    }
+  }
+
+  private resumeFromIdle(): void {
+    if (this.wasPlayingBeforeIdle && !this.isPlaying) {
+      this.isPlaying = true;
+      this.updateLiveIndicator();
+      this.renderPlayer();
+    }
   }
 
   private createLiveButton(): void {
@@ -57,6 +102,7 @@ export class LiveNewsPanel extends Panel {
 
   private togglePlayback(): void {
     this.isPlaying = !this.isPlaying;
+    this.wasPlayingBeforeIdle = this.isPlaying; // Track user intent
     this.updateLiveIndicator();
     this.renderPlayer();
   }
