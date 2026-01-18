@@ -264,7 +264,8 @@ function generateCompositeSummary(a: UnifiedAlert, b: UnifiedAlert): string {
     const earliest = ciiB.currentScore > ciiA.currentScore ? ciiA : ciiB;
     const totalChange = latest.currentScore - earliest.previousScore;
     const direction = totalChange > 0 ? 'rose' : 'fell';
-    return `Instability index ${direction} from ${earliest.previousScore} to ${latest.currentScore} (+${totalChange}). Driver: ${latest.driver}`;
+    const changeStr = totalChange > 0 ? `+${totalChange}` : `${totalChange}`;
+    return `Instability index ${direction} from ${earliest.previousScore} to ${latest.currentScore} (${changeStr}). Driver: ${latest.driver}`;
   }
 
   // Otherwise combine summaries

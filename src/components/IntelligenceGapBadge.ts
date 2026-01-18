@@ -137,7 +137,7 @@ export class IntelligenceFindingsBadge {
 
     // Update badge status based on priority
     const hasCritical = this.findings.some(f => f.priority === 'critical');
-    const hasHigh = this.findings.some(f => f.priority === 'high' || f.confidence >= 70);
+    const hasHigh = this.findings.some(f => f.priority === 'high' || f.confidence >= 0.7);
 
     this.badge.classList.remove('status-none', 'status-low', 'status-high');
     if (count === 0) {
@@ -168,7 +168,7 @@ export class IntelligenceFindingsBadge {
       title: s.title,
       description: s.description,
       confidence: s.confidence,
-      priority: s.confidence >= 70 ? 'high' as const : s.confidence >= 50 ? 'medium' as const : 'low' as const,
+      priority: s.confidence >= 0.7 ? 'high' as const : s.confidence >= 0.5 ? 'medium' as const : 'low' as const,
       timestamp: s.timestamp,
       original: s,
     }));
