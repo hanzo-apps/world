@@ -1,9 +1,42 @@
-import type { Hotspot, ConflictZone, MilitaryBase, UnderseaCable, NuclearFacility, StrategicWaterway, APTGroup, EconomicCenter } from '@/types';
+import type { Hotspot, ConflictZone, MilitaryBase, UnderseaCable, NuclearFacility, StrategicWaterway, APTGroup, EconomicCenter, Spaceport, CriticalMineralProject } from '@/types';
 import { MILITARY_BASES_EXPANDED } from './bases-expanded';
 
 // Hotspot levels are NOT hardcoded - they are dynamically calculated based on news activity
 // All hotspots start at 'low' and rise to 'elevated' or 'high' based on matching news items
 export const INTEL_HOTSPOTS: Hotspot[] = [
+  {
+    id: 'sahel',
+    name: 'Sahel',
+    subtext: 'Insurgency/Coups',
+    lat: 14.0,
+    lon: -1.0,
+    keywords: ['burkina faso', 'mali', 'niger', 'sahel', 'junta', 'coup', 'wagner', 'africa corps'],
+    agencies: ['Wagner', 'Junta Forces'],
+    description: 'Region of instability, military coups, and Islamist insurgency. Russian influence growing.',
+    status: 'Monitoring',
+  },
+  {
+    id: 'haiti',
+    name: 'Port-au-Prince',
+    subtext: 'Haiti Crisis',
+    lat: 18.5,
+    lon: -72.3,
+    keywords: ['haiti', 'port-au-prince', 'gangs', 'kenya mission', 'barbecue'],
+    agencies: ['UN', 'HNP', 'Kenya Police'],
+    description: 'Gang violence, government collapse, international security mission.',
+    status: 'Monitoring',
+  },
+  {
+    id: 'horn_africa',
+    name: 'Horn of Africa',
+    subtext: 'Piracy/Conflict',
+    lat: 10.0,
+    lon: 49.0,
+    keywords: ['somalia', 'piracy', 'al-shabaab', 'ethiopia', 'somaliland', 'red sea'],
+    agencies: ['USAFRICOM', 'EUNAVFOR'],
+    description: 'Resurgent piracy, Al-Shabaab activity, Ethiopia-Somaliland port dispute.',
+    status: 'Monitoring',
+  },
   {
     id: 'dc',
     name: 'DC',
@@ -350,6 +383,36 @@ export const CONFLICT_ZONES: ConflictZone[] = [
     location: '19.0°N, 96.0°E',
     description: 'Civil war following military coup. Resistance forces gaining ground. Multiple ethnic armed organizations. Humanitarian crisis.',
     keyDevelopments: ['Operation 1027', 'Junta airstrikes', 'Border clashes', 'Resistance advances'],
+  },
+  {
+    id: 'yemen_redsea',
+    name: 'Red Sea Crisis',
+    coords: [[12, 42], [16, 42], [16, 44], [13, 45], [12, 44]],
+    center: [14, 43],
+    intensity: 'high',
+    parties: ['Houthis', 'US/UK Coalition', 'Yemen Govt'],
+    casualties: 'Unknown (Maritime)',
+    displaced: '4.5M+ (Yemen Civil War)',
+    keywords: ['houthi', 'red sea', 'yemen', 'missile', 'drone', 'ship'],
+    startDate: 'Nov 19, 2023',
+    location: '14.0°N, 43.0°E',
+    description: 'Houthi maritime campaign against commercial shipping. US/UK airstrikes on Houthi targets. Ongoing blockade attempts.',
+    keyDevelopments: ['Ship hijackings', 'US airstrikes', 'Cable cuts', 'Sinking of Rubymar'],
+  },
+  {
+    id: 'south_lebanon',
+    name: 'Israel-Lebanon Border',
+    coords: [[33.0, 35.1], [33.4, 35.1], [33.4, 35.8], [33.0, 35.8]],
+    center: [33.2, 35.4],
+    intensity: 'high',
+    parties: ['Israel (IDF)', 'Hezbollah'],
+    casualties: '500+ killed',
+    displaced: '150k+ displaced',
+    keywords: ['hezbollah', 'lebanon', 'israel', 'border', 'rocket', 'airstrike'],
+    startDate: 'Oct 8, 2023',
+    location: '33.2°N, 35.4°E',
+    description: 'Cross-border artillery and rocket fire. Targeted assassinations. High risk of full-scale escalation.',
+    keyDevelopments: ['Daily rocket fire', 'IDF airstrikes', 'Buffer zone evacuation', 'Litani River tensions'],
   },
 ];
 
@@ -1072,4 +1135,37 @@ export const ECONOMIC_CENTERS: EconomicCenter[] = [
   { id: 'dubai_hub', name: 'DIFC', type: 'financial-hub', lat: 25.2116, lon: 55.2708, country: 'UAE', description: 'Dubai International Financial Centre' },
   { id: 'cayman', name: 'Cayman Islands', type: 'financial-hub', lat: 19.3133, lon: -81.2546, country: 'Cayman Islands', description: 'Offshore financial center' },
   { id: 'luxembourg', name: 'Luxembourg', type: 'financial-hub', lat: 49.6116, lon: 6.1319, country: 'Luxembourg', description: 'European investment fund center' },
+];
+
+export const SPACEPORTS: Spaceport[] = [
+  { id: 'ksc', name: 'Kennedy Space Center', lat: 28.57, lon: -80.64, country: 'USA', operator: 'NASA/Space Force', status: 'active', launches: 'High' },
+  { id: 'vandenberg', name: 'Vandenberg SFB', lat: 34.74, lon: -120.57, country: 'USA', operator: 'US Space Force', status: 'active', launches: 'Medium' },
+  { id: 'boca_chica', name: 'Starbase', lat: 25.99, lon: -97.15, country: 'USA', operator: 'SpaceX', status: 'active', launches: 'High' },
+  { id: 'baikonur', name: 'Baikonur Cosmodrome', lat: 45.96, lon: 63.30, country: 'Kazakhstan', operator: 'Roscosmos', status: 'active', launches: 'Medium' },
+  { id: 'plesetsk', name: 'Plesetsk Cosmodrome', lat: 62.92, lon: 40.57, country: 'Russia', operator: 'Roscosmos/Military', status: 'active', launches: 'Medium' },
+  { id: 'vostochny', name: 'Vostochny Cosmodrome', lat: 51.88, lon: 128.33, country: 'Russia', operator: 'Roscosmos', status: 'active', launches: 'Low' },
+  { id: 'jiuquan', name: 'Jiuquan SLC', lat: 40.96, lon: 100.29, country: 'China', operator: 'CNSA', status: 'active', launches: 'High' },
+  { id: 'xichang', name: 'Xichang SLC', lat: 28.24, lon: 102.02, country: 'China', operator: 'CNSA', status: 'active', launches: 'High' },
+  { id: 'wenchang', name: 'Wenchang SLC', lat: 19.61, lon: 110.95, country: 'China', operator: 'CNSA', status: 'active', launches: 'Medium' },
+  { id: 'kourou', name: 'Guiana Space Centre', lat: 5.23, lon: -52.76, country: 'France', operator: 'ESA/CNES', status: 'active', launches: 'Medium' },
+  { id: 'sriharikota', name: 'Satish Dhawan SC', lat: 13.72, lon: 80.23, country: 'India', operator: 'ISRO', status: 'active', launches: 'Medium' },
+  { id: 'tanegashima', name: 'Tanegashima SC', lat: 30.40, lon: 130.97, country: 'Japan', operator: 'JAXA', status: 'active', launches: 'Low' },
+];
+
+export const CRITICAL_MINERALS: CriticalMineralProject[] = [
+  // Lithium
+  { id: 'greenbushes', name: 'Greenbushes', lat: -33.86, lon: 116.01, mineral: 'Lithium', country: 'Australia', operator: 'Talison Lithium', status: 'producing', significance: 'Largest hard-rock lithium mine' },
+  { id: 'atacama', name: 'Salar de Atacama', lat: -23.50, lon: -68.33, mineral: 'Lithium', country: 'Chile', operator: 'SQM/Albemarle', status: 'producing', significance: 'Largest brine lithium source' },
+  { id: 'pilgangoora', name: 'Pilgangoora', lat: -21.03, lon: 118.91, mineral: 'Lithium', country: 'Australia', operator: 'Pilbara Minerals', status: 'producing', significance: 'Major hard-rock deposit' },
+  { id: 'silver_peak', name: 'Silver Peak', lat: 37.75, lon: -117.65, country: 'USA', mineral: 'Lithium', operator: 'Albemarle', status: 'producing', significance: 'Only active US lithium mine' },
+  // Cobalt
+  { id: 'mutanda', name: 'Mutanda', lat: -10.78, lon: 25.80, mineral: 'Cobalt', country: 'DRC', operator: 'Glencore', status: 'producing', significance: 'World largest cobalt mine' },
+  { id: 'tenke', name: 'Tenke Fungurume', lat: -10.61, lon: 26.16, mineral: 'Cobalt', country: 'DRC', operator: 'CMOC', status: 'producing', significance: 'Major Chinese-owned cobalt source' },
+  // Rare Earths
+  { id: 'bayan_obo', name: 'Bayan Obo', lat: 41.76, lon: 109.95, mineral: 'Rare Earths', country: 'China', operator: 'China Northern Rare Earth', status: 'producing', significance: 'World largest REE mine (45% global production)' },
+  { id: 'mountain_pass', name: 'Mountain Pass', lat: 35.47, lon: -115.53, mineral: 'Rare Earths', country: 'USA', operator: 'MP Materials', status: 'producing', significance: 'Only major US REE mine' },
+  { id: 'mount_weld', name: 'Mount Weld', lat: -28.86, lon: 122.17, mineral: 'Rare Earths', country: 'Australia', operator: 'Lynas', status: 'producing', significance: 'Major non-Chinese REE source' },
+  // Nickel
+  { id: 'wedabay', name: 'Weda Bay', lat: 0.47, lon: 127.94, mineral: 'Nickel', country: 'Indonesia', operator: 'Tsingshan/Eramet', status: 'producing', significance: 'Massive nickel pig iron production' },
+  { id: 'norilsk', name: 'Norilsk', lat: 69.33, lon: 88.21, mineral: 'Nickel', country: 'Russia', operator: 'Nornickel', status: 'producing', significance: 'Major palladium/nickel source' },
 ];

@@ -153,6 +153,9 @@ export const FEEDS: Record<string, Feed[]> = {
   middleeast: [
     { name: 'BBC Middle East', url: rss('https://feeds.bbci.co.uk/news/world/middle_east/rss.xml') },
     { name: 'Al Jazeera', url: rss('https://www.aljazeera.com/xml/rss/all.xml') },
+    { name: 'Al Arabiya', url: rss('https://english.alarabiya.net/.mrss/en/News/middle-east.xml') },
+    { name: 'Arab News', url: rss('https://www.arabnews.com/cat/1/rss.xml') },
+    { name: 'Times of Israel', url: rss('https://www.timesofisrael.com/feed/') },
     { name: 'Guardian ME', url: rss('https://www.theguardian.com/world/middleeast/rss') },
     { name: 'CNN World', url: rss('http://rss.cnn.com/rss/cnn_world.rss') },
   ],
@@ -213,6 +216,33 @@ export const FEEDS: Record<string, Feed[]> = {
   regional: [
     { name: 'Xinhua', url: rss('https://news.google.com/rss/search?q=site:xinhuanet.com+OR+Xinhua+when:1d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'TASS', url: rss('https://news.google.com/rss/search?q=site:tass.com+OR+TASS+Russia+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Kyiv Independent', url: rss('https://kyivindependent.com/feed/') },
+    { name: 'Moscow Times', url: rss('https://www.themoscowtimes.com/rss/news') },
+  ],
+  africa: [
+    { name: 'AllAfrica', url: rss('https://allafrica.com/tools/headlines/v2/redesign/headlines/main/main/rss.xml') },
+    { name: 'News24', url: rss('https://feeds.24.com/articles/news24/Africa/rss') },
+    { name: 'African Arguments', url: rss('https://africanarguments.org/feed/') },
+    { name: 'Jeune Afrique', url: rss('https://www.jeuneafrique.com/feed/') },
+  ],
+  latam: [
+    { name: 'MercoPress', url: rss('https://en.mercopress.com/rss') },
+    { name: 'LatAm Investor', url: rss('https://lataminvestor.com/feed/') },
+    { name: 'Buenos Aires Times', url: rss('https://www.batimes.com.ar/feed') },
+    { name: 'Mexico News Daily', url: rss('https://mexiconewsdaily.com/feed/') },
+  ],
+  asia: [
+    { name: 'Nikkei Asia', url: rss('https://asia.nikkei.com/rss/feed/nar') },
+    { name: 'South China Morning Post', url: rss('https://www.scmp.com/rss/91/feed') },
+    { name: 'Times of India', url: rss('https://timesofindia.indiatimes.com/rssfeedstopstories.cms') },
+    { name: 'Straits Times', url: rss('https://www.straitstimes.com/news/world/rss.xml') },
+    { name: 'Korea Herald', url: rss('https://www.koreaherald.com/common_prog/rss/index.php?ct=02') },
+  ],
+  energy: [
+    { name: 'OilPrice.com', url: rss('https://oilprice.com/rss/main') },
+    { name: 'Energy Intelligence', url: rss('https://www.energyintel.com/rss') },
+    { name: 'Upstream', url: rss('https://www.upstreamonline.com/rss') },
+    { name: 'World Nuclear News', url: rss('https://www.world-nuclear-news.org/RSS/WNN-News.xml') },
   ],
 };
 
