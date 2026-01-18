@@ -50,9 +50,20 @@ export class IntelligenceFindingsBadge {
       this.toggleDropdown();
     });
 
-    // Event delegation for finding items
+    // Event delegation for finding items and "more" link
     this.dropdown.addEventListener('click', (e) => {
-      const item = (e.target as HTMLElement).closest('.finding-item');
+      const target = e.target as HTMLElement;
+
+      // Handle "more findings" click - show all in modal
+      if (target.closest('.findings-more')) {
+        e.stopPropagation();
+        this.showAllFindings();
+        this.closeDropdown();
+        return;
+      }
+
+      // Handle individual finding click
+      const item = target.closest('.finding-item');
       if (!item) return;
       e.stopPropagation();
       const id = item.getAttribute('data-finding-id');
@@ -265,11 +276,16 @@ export class IntelligenceFindingsBadge {
       const context = getSignalContext((finding.original as CorrelationSignal).type);
       return context.actionableInsight.split('.')[0] || '';
     }
-    // For alerts, extract insight from summary or use type-based default
+    // For alerts, provide actionable insight based on type and severity
     const alert = finding.original as UnifiedAlert;
-    if (alert.type === 'cii_spike') return 'Monitor for escalation';
-    if (alert.type === 'convergence') return 'Multiple events in region';
-    if (alert.type === 'cascade') return 'Infrastructure impact spreading';
+    if (alert.type === 'cii_spike') {
+      const cii = alert.components.ciiChange;
+      if (cii && cii.change >= 30) return 'Critical destabilization - immediate attention';
+      if (cii && cii.change >= 20) return 'Significant shift - monitor closely';
+      return 'Developing situation - track for escalation';
+    }
+    if (alert.type === 'convergence') return 'Multiple events clustering in region';
+    if (alert.type === 'cascade') return 'Infrastructure disruption spreading';
     return 'Review for situational awareness';
   }
 
@@ -318,6 +334,71 @@ export class IntelligenceFindingsBadge {
     this.isOpen = false;
     this.dropdown.classList.remove('open');
     this.badge.classList.remove('active');
+  }
+
+  private showAllFindings(): void {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'findings-modal-overlay';
+
+    const findingsHtml = this.findings.map(finding => {
+      const timeAgo = this.formatTimeAgo(finding.timestamp);
+      const icon = this.getTypeIcon(finding.type);
+      const insight = this.getInsight(finding);
+
+      return `
+        <div class="findings-modal-item ${finding.priority}" data-finding-id="${escapeHtml(finding.id)}">
+          <div class="findings-modal-item-header">
+            <span class="findings-modal-item-type">${icon} ${escapeHtml(finding.title)}</span>
+            <span class="findings-modal-item-priority ${finding.priority}">${finding.priority.toUpperCase()}</span>
+          </div>
+          <div class="findings-modal-item-desc">${escapeHtml(finding.description)}</div>
+          <div class="findings-modal-item-meta">
+            <span class="findings-modal-item-insight">${escapeHtml(insight)}</span>
+            <span class="findings-modal-item-time">${timeAgo}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div class="findings-modal">
+        <div class="findings-modal-header">
+          <span class="findings-modal-title">🎯 All Intelligence Findings (${this.findings.length})</span>
+          <button class="findings-modal-close">×</button>
+        </div>
+        <div class="findings-modal-content">
+          ${findingsHtml}
+        </div>
+      </div>
+    `;
+
+    // Add click handlers
+    overlay.querySelector('.findings-modal-close')?.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).classList.contains('findings-modal-overlay')) {
+        overlay.remove();
+      }
+    });
+
+    // Handle clicking individual items
+    overlay.querySelectorAll('.findings-modal-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.getAttribute('data-finding-id');
+        const finding = this.findings.find(f => f.id === id);
+        if (!finding) return;
+
+        if (finding.source === 'signal' && this.onSignalClick) {
+          this.onSignalClick(finding.original as CorrelationSignal);
+          overlay.remove();
+        } else if (finding.source === 'alert' && this.onAlertClick) {
+          this.onAlertClick(finding.original as UnifiedAlert);
+          overlay.remove();
+        }
+      });
+    });
+
+    document.body.appendChild(overlay);
   }
 
   public destroy(): void {
