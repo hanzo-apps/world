@@ -25,6 +25,7 @@ const DEFAULT_DEDUPE_TTL = 30 * 60 * 1000;
 const DEDUPE_TTLS: Record<string, number> = {
   silent_divergence: 6 * 60 * 60 * 1000,
   flow_price_divergence: 6 * 60 * 60 * 1000,
+  explained_market_move: 6 * 60 * 60 * 1000,
   prediction_leads_news: 2 * 60 * 60 * 1000,
 };
 
