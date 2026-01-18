@@ -1,4 +1,5 @@
 import { getRecentSignals, type CorrelationSignal } from '@/services/correlation';
+import { getRecentAlerts, type UnifiedAlert } from '@/services/cross-module-integration';
 import { getSignalContext } from '@/utils/analysis-constants';
 import { escapeHtml } from '@/utils/sanitize';
 
@@ -6,15 +7,31 @@ const LOW_COUNT_THRESHOLD = 3;
 const MAX_VISIBLE_FINDINGS = 10;
 const SORT_TIME_TOLERANCE_MS = 60000;
 const REFRESH_INTERVAL_MS = 10000;
+const ALERT_HOURS = 6;
+
+type FindingSource = 'signal' | 'alert';
+
+interface UnifiedFinding {
+  id: string;
+  source: FindingSource;
+  type: string;
+  title: string;
+  description: string;
+  confidence: number;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  timestamp: Date;
+  original: CorrelationSignal | UnifiedAlert;
+}
 
 export class IntelligenceFindingsBadge {
   private badge: HTMLElement;
   private dropdown: HTMLElement;
   private isOpen = false;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
-  private lastSignalCount = 0;
+  private lastFindingCount = 0;
   private onSignalClick: ((signal: CorrelationSignal) => void) | null = null;
-  private signals: CorrelationSignal[] = [];
+  private onAlertClick: ((alert: UnifiedAlert) => void) | null = null;
+  private findings: UnifiedFinding[] = [];
   private boundCloseDropdown = () => this.closeDropdown();
   private audio: HTMLAudioElement | null = null;
   private audioEnabled = true;
@@ -38,12 +55,16 @@ export class IntelligenceFindingsBadge {
       const item = (e.target as HTMLElement).closest('.finding-item');
       if (!item) return;
       e.stopPropagation();
-      const id = item.getAttribute('data-signal-id');
-      const signal = this.signals.find(s => s.id === id);
-      if (signal && this.onSignalClick) {
-        this.onSignalClick(signal);
-        this.closeDropdown();
+      const id = item.getAttribute('data-finding-id');
+      const finding = this.findings.find(f => f.id === id);
+      if (!finding) return;
+
+      if (finding.source === 'signal' && this.onSignalClick) {
+        this.onSignalClick(finding.original as CorrelationSignal);
+      } else if (finding.source === 'alert' && this.onAlertClick) {
+        this.onAlertClick(finding.original as UnifiedAlert);
       }
+      this.closeDropdown();
     });
 
     document.addEventListener('click', this.boundCloseDropdown);
@@ -70,6 +91,10 @@ export class IntelligenceFindingsBadge {
     this.onSignalClick = handler;
   }
 
+  public setOnAlertClick(handler: (alert: UnifiedAlert) => void): void {
+    this.onAlertClick = handler;
+  }
+
   private mount(): void {
     const headerRight = document.querySelector('.header-right');
     if (headerRight) {
@@ -83,27 +108,33 @@ export class IntelligenceFindingsBadge {
   }
 
   public update(): void {
-    this.signals = getRecentSignals();
-    const count = this.signals.length;
+    this.findings = this.mergeFindings();
+    const count = this.findings.length;
 
     const countEl = this.badge.querySelector('.findings-count');
     if (countEl) {
       countEl.textContent = String(count);
     }
 
-    // Pulse animation and sound when new signals arrive
-    if (count > this.lastSignalCount && this.lastSignalCount > 0) {
+    // Pulse animation and sound when new findings arrive
+    if (count > this.lastFindingCount && this.lastFindingCount > 0) {
       this.badge.classList.add('pulse');
       setTimeout(() => this.badge.classList.remove('pulse'), 1000);
       this.playSound();
     }
-    this.lastSignalCount = count;
+    this.lastFindingCount = count;
 
-    // Update badge status
+    // Update badge status based on priority
+    const hasCritical = this.findings.some(f => f.priority === 'critical');
+    const hasHigh = this.findings.some(f => f.priority === 'high' || f.confidence >= 70);
+
     this.badge.classList.remove('status-none', 'status-low', 'status-high');
     if (count === 0) {
       this.badge.classList.add('status-none');
       this.badge.title = 'No recent intelligence findings';
+    } else if (hasCritical || hasHigh) {
+      this.badge.classList.add('status-high');
+      this.badge.title = `${count} intelligence findings - review recommended`;
     } else if (count <= LOW_COUNT_THRESHOLD) {
       this.badge.classList.add('status-low');
       this.badge.title = `${count} intelligence finding${count > 1 ? 's' : ''}`;
@@ -115,8 +146,56 @@ export class IntelligenceFindingsBadge {
     this.renderDropdown();
   }
 
+  private mergeFindings(): UnifiedFinding[] {
+    const signals = getRecentSignals();
+    const alerts = getRecentAlerts(ALERT_HOURS);
+
+    const signalFindings: UnifiedFinding[] = signals.map(s => ({
+      id: `signal-${s.id}`,
+      source: 'signal' as FindingSource,
+      type: s.type,
+      title: s.title,
+      description: s.description,
+      confidence: s.confidence,
+      priority: s.confidence >= 70 ? 'high' as const : s.confidence >= 50 ? 'medium' as const : 'low' as const,
+      timestamp: s.timestamp,
+      original: s,
+    }));
+
+    const alertFindings: UnifiedFinding[] = alerts.map(a => ({
+      id: `alert-${a.id}`,
+      source: 'alert' as FindingSource,
+      type: a.type,
+      title: a.title,
+      description: a.summary,
+      confidence: this.priorityToConfidence(a.priority),
+      priority: a.priority,
+      timestamp: a.timestamp,
+      original: a,
+    }));
+
+    // Merge and sort by timestamp (newest first), then by priority
+    return [...signalFindings, ...alertFindings].sort((a, b) => {
+      const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+      if (Math.abs(timeDiff) < SORT_TIME_TOLERANCE_MS) {
+        return this.priorityScore(b.priority) - this.priorityScore(a.priority);
+      }
+      return timeDiff;
+    });
+  }
+
+  private priorityToConfidence(priority: string): number {
+    const map: Record<string, number> = { critical: 95, high: 80, medium: 60, low: 40 };
+    return map[priority] ?? 50;
+  }
+
+  private priorityScore(priority: string): number {
+    const map: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+    return map[priority] ?? 0;
+  }
+
   private renderDropdown(): void {
-    if (this.signals.length === 0) {
+    if (this.findings.length === 0) {
       this.dropdown.innerHTML = `
         <div class="findings-header">
           <span class="header-title">Intelligence Findings</span>
@@ -132,38 +211,41 @@ export class IntelligenceFindingsBadge {
       return;
     }
 
-    // Sort by timestamp (newest first) and confidence
-    const sorted = [...this.signals].sort((a, b) => {
-      const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
-      if (Math.abs(timeDiff) < SORT_TIME_TOLERANCE_MS) return b.confidence - a.confidence;
-      return timeDiff;
-    });
+    const criticalCount = this.findings.filter(f => f.priority === 'critical').length;
+    const highCount = this.findings.filter(f => f.priority === 'high' || f.confidence >= 70).length;
 
-    const highConfidence = sorted.filter(s => s.confidence >= 70).length;
-    const statusClass = highConfidence > 0 ? 'high' : 'moderate';
-    const statusText = highConfidence > 0 ? `${highConfidence} HIGH CONFIDENCE` : `${this.signals.length} DETECTED`;
+    let statusClass = 'moderate';
+    let statusText = `${this.findings.length} DETECTED`;
+    if (criticalCount > 0) {
+      statusClass = 'critical';
+      statusText = `${criticalCount} CRITICAL`;
+    } else if (highCount > 0) {
+      statusClass = 'high';
+      statusText = `${highCount} HIGH PRIORITY`;
+    }
 
-    const findingsHtml = sorted.slice(0, MAX_VISIBLE_FINDINGS).map(signal => {
-      const context = getSignalContext(signal.type);
-      const confidenceClass = signal.confidence >= 70 ? 'high' : signal.confidence >= 50 ? 'medium' : 'low';
-      const timeAgo = this.formatTimeAgo(signal.timestamp);
+    const findingsHtml = this.findings.slice(0, MAX_VISIBLE_FINDINGS).map(finding => {
+      const timeAgo = this.formatTimeAgo(finding.timestamp);
+      const icon = this.getTypeIcon(finding.type);
+      const priorityClass = finding.priority;
+      const insight = this.getInsight(finding);
 
       return `
-        <div class="finding-item" data-signal-id="${escapeHtml(signal.id)}">
+        <div class="finding-item ${priorityClass}" data-finding-id="${escapeHtml(finding.id)}">
           <div class="finding-header">
-            <span class="finding-type">${this.getTypeIcon(signal.type)} ${escapeHtml(signal.title)}</span>
-            <span class="finding-confidence ${confidenceClass}">${signal.confidence}%</span>
+            <span class="finding-type">${icon} ${escapeHtml(finding.title)}</span>
+            <span class="finding-confidence ${priorityClass}">${finding.priority.toUpperCase()}</span>
           </div>
-          <div class="finding-description">${escapeHtml(signal.description)}</div>
+          <div class="finding-description">${escapeHtml(finding.description)}</div>
           <div class="finding-meta">
-            <span class="finding-insight">${escapeHtml(context.actionableInsight.split('.')[0] || '')}</span>
+            <span class="finding-insight">${escapeHtml(insight)}</span>
             <span class="finding-time">${timeAgo}</span>
           </div>
         </div>
       `;
     }).join('');
 
-    const moreCount = this.signals.length - MAX_VISIBLE_FINDINGS;
+    const moreCount = this.findings.length - MAX_VISIBLE_FINDINGS;
     this.dropdown.innerHTML = `
       <div class="findings-header">
         <span class="header-title">Intelligence Findings</span>
@@ -178,8 +260,22 @@ export class IntelligenceFindingsBadge {
     `;
   }
 
+  private getInsight(finding: UnifiedFinding): string {
+    if (finding.source === 'signal') {
+      const context = getSignalContext((finding.original as CorrelationSignal).type);
+      return context.actionableInsight.split('.')[0] || '';
+    }
+    // For alerts, extract insight from summary or use type-based default
+    const alert = finding.original as UnifiedAlert;
+    if (alert.type === 'cii_spike') return 'Monitor for escalation';
+    if (alert.type === 'convergence') return 'Multiple events in region';
+    if (alert.type === 'cascade') return 'Infrastructure impact spreading';
+    return 'Review for situational awareness';
+  }
+
   private getTypeIcon(type: string): string {
     const icons: Record<string, string> = {
+      // Correlation signals
       breaking_surge: '🔥',
       silent_divergence: '🔇',
       flow_price_divergence: '📊',
@@ -193,6 +289,10 @@ export class IntelligenceFindingsBadge {
       triangulation: '🔺',
       flow_drop: '⬇️',
       sector_cascade: '🌊',
+      // Unified alerts
+      cii_spike: '🔴',
+      cascade: '⚡',
+      composite: '🔗',
     };
     return icons[type] || '📌';
   }
