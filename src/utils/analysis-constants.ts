@@ -117,7 +117,8 @@ export type SignalType =
   | 'flow_price_divergence'
   | 'geo_convergence'
   | 'explained_market_move'
-  | 'hotspot_escalation';
+  | 'hotspot_escalation'
+  | 'sector_cascade';
 
 export interface SignalContext {
   whyItMatters: string;
@@ -180,6 +181,11 @@ export const SIGNAL_CONTEXT: Record<SignalType, SignalContext> = {
     whyItMatters: 'Geopolitical hotspot showing significant escalation based on news activity, country instability, geographic convergence, and military presence.',
     actionableInsight: 'Increase monitoring priority; assess downstream impacts on infrastructure, markets, and regional stability.',
     confidenceNote: 'Confidence weighted by multiple data sources—news (35%), country instability (25%), geo-convergence (25%), military activity (15%).',
+  },
+  sector_cascade: {
+    whyItMatters: 'Market movement is cascading across related sectors—indicates systemic reaction to a catalyzing event.',
+    actionableInsight: 'Identify the primary catalyst; assess exposure across correlated assets.',
+    confidenceNote: 'Higher confidence when multiple sectors move with similar velocity and direction.',
   },
 };
 
