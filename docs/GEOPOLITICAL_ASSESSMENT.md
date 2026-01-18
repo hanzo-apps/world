@@ -27,22 +27,22 @@ WorldMonitor is a capable tactical-level intelligence dashboard with strong data
 
 ### Gaps (Confidence: High)
 
-| Gap | Impact |
-|-----|--------|
-| **No Causal Reasoning** | Users see events but don't understand "why" |
-| **No Escalation Indicators** | Can't distinguish routine from dangerous |
-| **Missing Historical Context** | Events appear without precedent analysis |
-| **No Second-Order Effects** | Fails to project cascading consequences |
-| **Static Threat Assessment** | Hotspots don't evolve with changing conditions |
-| **No Intelligence Gaps Surfacing** | System doesn't show what it can't see |
+| Gap | Impact | Status |
+|-----|--------|--------|
+| **No Causal Reasoning** | Users see events but don't understand "why" | ⚡ Partial - "Why it matters" added |
+| **No Escalation Indicators** | Can't distinguish routine from dangerous | ✅ Fixed |
+| **Missing Historical Context** | Events appear without precedent analysis | ✅ Fixed |
+| **No Second-Order Effects** | Fails to project cascading consequences | ❌ Open - Priority 2.1 |
+| **Static Threat Assessment** | Hotspots don't evolve with changing conditions | ⚡ Partial - escalation trends added |
+| **No Intelligence Gaps Surfacing** | System doesn't show what it can't see | ✅ Fixed |
 
 ---
 
 ## Strategic Improvement Roadmap
 
-### Priority 1: Critical (Implement Immediately)
+### Priority 1: Critical (Implement Immediately) ✅ COMPLETE
 
-#### 1.1 Escalation Indicators
+#### 1.1 Escalation Indicators ✅
 
 **Problem:** Conflicts and hotspots show static status without trajectory.
 
@@ -67,7 +67,7 @@ interface EscalationScore {
 }
 ```
 
-#### 1.2 Historical Context Engine
+#### 1.2 Historical Context Engine ✅
 
 **Problem:** Events appear without context (e.g., "Sahel coup" without knowing this is the 4th in 3 years).
 
@@ -139,11 +139,13 @@ interface ActorProfile {
 
 ### Priority 3: Medium (Implement Next Quarter)
 
-#### 3.1 Dynamic Source Reliability
+#### 3.1 Dynamic Source Reliability (Partial)
 
 **Problem:** Source tier system is static; doesn't account for track record.
 
 **Solution:** Dynamic reliability scoring based on accuracy.
+
+> **Implemented:** Static propaganda risk flags for state media sources. Dynamic scoring not yet implemented.
 
 **Metrics:**
 - Stories confirmed by subsequent events
@@ -163,7 +165,7 @@ interface SourceReliability {
 }
 ```
 
-#### 3.2 Intelligence Gaps Surfacing
+#### 3.2 Intelligence Gaps Surfacing ✅
 
 **Problem:** System doesn't show what it can't see.
 
@@ -202,11 +204,36 @@ Human-in-the-loop annotations:
 
 | # | Improvement | Effort | Impact | Status |
 |---|-------------|--------|--------|--------|
-| 1 | Data freshness indicators (staleness warnings) | Low | High | Pending |
-| 2 | Escalation score for conflicts/hotspots | Medium | High | Pending |
-| 3 | "Why it matters" one-liner for signals | Low | Medium | Pending |
-| 4 | Historical context tooltips for hotspots | Medium | High | Pending |
-| 5 | Source propaganda risk flags | Low | Medium | Pending |
+| 1 | Data freshness indicators (staleness warnings) | Low | High | ✅ Done |
+| 2 | Escalation score for conflicts/hotspots | Medium | High | ✅ Done |
+| 3 | "Why it matters" one-liner for signals | Low | Medium | ✅ Done |
+| 4 | Historical context tooltips for hotspots | Medium | High | ✅ Done |
+| 5 | Source propaganda risk flags | Low | Medium | ✅ Done |
+
+### Implementation Details (2026-01-18)
+
+**Quick Win #1: Data Freshness**
+- `src/services/data-freshness.ts` - Added `getIntelligenceGaps()`, `getIntelligenceGapSummary()`, `hasCriticalGaps()`
+- `src/components/IntelligenceGapBadge.ts` - Header badge showing data source status with dropdown
+- Explains what analysts CANNOT see when sources are stale/unavailable
+
+**Quick Win #2: Escalation Scores**
+- `src/types/index.ts` - Added `EscalationTrend`, `escalationScore`, `escalationIndicators` to Hotspot type
+- `src/config/geo.ts` - Added escalation data to 11 major hotspots (Kyiv, Tehran, Taipei, etc.)
+- `src/components/MapPopup.ts` - Displays score (1-5), trend arrow, and indicators in popup
+
+**Quick Win #3: "Why It Matters"**
+- `src/utils/analysis-constants.ts` - Added `SIGNAL_CONTEXT` with explanations for all 10 signal types
+- `src/components/SignalModal.ts` - Each signal now shows why it matters, actionable insight, confidence note
+
+**Quick Win #4: Historical Context**
+- `src/types/index.ts` - Added `HistoricalContext` interface
+- `src/config/geo.ts` - Added history to hotspots (last major event, precedents, cyclical patterns)
+- `src/components/MapPopup.ts` - Displays historical context section in hotspot popups
+
+**Quick Win #5: Propaganda Risk Flags**
+- `src/config/feeds.ts` - Added `SOURCE_PROPAGANDA_RISK` map for state media sources
+- `src/components/NewsPanel.ts` - Shows ⚠ badges on high-risk sources with tooltips
 
 ---
 

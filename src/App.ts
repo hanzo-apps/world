@@ -39,6 +39,7 @@ import {
   CIIPanel,
   CascadePanel,
   StrategicRiskPanel,
+  IntelligenceGapBadge,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -106,6 +107,7 @@ export class App {
 
     this.renderLayout();
     this.signalModal = new SignalModal();
+    new IntelligenceGapBadge();  // Self-mounting badge for intelligence gaps
     this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
@@ -603,6 +605,9 @@ export class App {
       layers: this.mapLayers,
       timeRange: '7d',
     });
+
+    // Initialize escalation service with data getters
+    this.map.initEscalationGetters();
 
     // Create all panels
     const politicsPanel = new NewsPanel('politics', 'World / Geopolitical');
@@ -1626,6 +1631,7 @@ export class App {
       ingestFlights(flightData.flights);
       ingestVessels(vesselData.vessels);
       ingestMilitaryForCII(flightData.flights, vesselData.vessels);
+      this.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
       (this.panels['cii'] as CIIPanel)?.refresh();
 
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
