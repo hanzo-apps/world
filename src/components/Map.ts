@@ -1399,13 +1399,7 @@ export class MapComponent {
         icon.className = 'protest-icon';
         icon.textContent = event.eventType === 'riot' ? '🔥' : event.eventType === 'strike' ? '✊' : '📢';
         div.appendChild(icon);
-
-        if (this.state.zoom >= 4) {
-          const label = document.createElement('div');
-          label.className = 'protest-label';
-          label.textContent = event.city || event.country;
-          div.appendChild(label);
-        }
+        div.title = `${event.city || event.country} - ${event.eventType} (${event.severity})`;
 
         if (event.validated) {
           div.classList.add('validated');
