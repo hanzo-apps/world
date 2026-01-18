@@ -106,6 +106,7 @@ export class MapComponent {
     base: new Set(),
     nuclear: new Set(),
   };
+  private boundVisibilityHandler!: () => void;
 
   constructor(container: HTMLElement, initialState: MapState) {
     this.container = container;
@@ -163,11 +164,16 @@ export class MapComponent {
     resizeObserver.observe(this.container);
 
     // Re-render when page becomes visible again (after browser throttling)
-    document.addEventListener('visibilitychange', () => {
+    this.boundVisibilityHandler = () => {
       if (!document.hidden) {
         requestAnimationFrame(() => this.render());
       }
-    });
+    };
+    document.addEventListener('visibilitychange', this.boundVisibilityHandler);
+  }
+
+  public destroy(): void {
+    document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
   }
 
   private createControls(): HTMLElement {
