@@ -161,6 +161,13 @@ export class MapComponent {
       }
     });
     resizeObserver.observe(this.container);
+
+    // Re-render when page becomes visible again (after browser throttling)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        requestAnimationFrame(() => this.render());
+      }
+    });
   }
 
   private createControls(): HTMLElement {
@@ -592,6 +599,11 @@ export class MapComponent {
   public render(): void {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+
+    // Skip render if container has no dimensions (tab throttled, hidden, etc.)
+    if (width === 0 || height === 0) {
+      return;
+    }
 
     // Simple viewBox matching container - keeps SVG and overlays aligned
     this.svg.attr('viewBox', `0 0 ${width} ${height}`);
