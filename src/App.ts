@@ -107,7 +107,10 @@ export class App {
 
     this.renderLayout();
     this.signalModal = new SignalModal();
-    new IntelligenceGapBadge();  // Self-mounting badge for intelligence gaps
+    const findingsBadge = new IntelligenceGapBadge();
+    findingsBadge.setOnSignalClick((signal) => {
+      this.signalModal?.showSignal(signal);
+    });
     this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
