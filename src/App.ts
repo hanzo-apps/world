@@ -111,6 +111,9 @@ export class App {
     findingsBadge.setOnSignalClick((signal) => {
       this.signalModal?.showSignal(signal);
     });
+    findingsBadge.setOnAlertClick((alert) => {
+      this.signalModal?.showAlert(alert);
+    });
     this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
