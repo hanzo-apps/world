@@ -65,7 +65,7 @@ export class MapComponent {
     bases: { minZoom: 3, showLabels: 5 },
     nuclear: { minZoom: 2 },
     conflicts: { minZoom: 1, showLabels: 3 },
-    economic: { minZoom: 2, showLabels: 4 },
+    economic: { minZoom: 2 },
     natural: { minZoom: 1, showLabels: 2 },
   };
 
@@ -1109,11 +1109,7 @@ export class MapComponent {
         icon.className = 'economic-icon';
         icon.textContent = center.type === 'exchange' ? '📈' : center.type === 'central-bank' ? '🏛' : '💰';
         div.appendChild(icon);
-
-        const label = document.createElement('div');
-        label.className = 'economic-label';
-        label.textContent = center.name;
-        div.appendChild(label);
+        div.title = center.name;
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
