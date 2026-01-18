@@ -23,6 +23,8 @@ import {
   ECONOMIC_CENTERS,
   AI_DATA_CENTERS,
   PORTS,
+  SPACEPORTS,
+  CRITICAL_MINERALS,
 } from '@/config';
 import { MapPopup } from './MapPopup';
 
@@ -1297,6 +1299,79 @@ export class MapComponent {
           this.popup.show({
             type: 'datacenter',
             data: dc,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Spaceports (🚀 icon)
+    if (this.state.layers.spaceports) {
+      SPACEPORTS.forEach((port) => {
+        const pos = projection([port.lon, port.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `spaceport-marker ${port.status}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'spaceport-icon';
+        icon.textContent = '🚀';
+        div.appendChild(icon);
+
+        const label = document.createElement('div');
+        label.className = 'spaceport-label';
+        label.textContent = port.name;
+        div.appendChild(label);
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'spaceport',
+            data: port,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Critical Minerals (💎 icon)
+    if (this.state.layers.minerals) {
+      CRITICAL_MINERALS.forEach((mine) => {
+        const pos = projection([mine.lon, mine.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `mineral-marker ${mine.status}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'mineral-icon';
+        // Select icon based on mineral type
+        icon.textContent = mine.mineral === 'Lithium' ? '🔋' : mine.mineral === 'Rare Earths' ? '🧲' : '💎';
+        div.appendChild(icon);
+
+        const label = document.createElement('div');
+        label.className = 'mineral-label';
+        label.textContent = `${mine.mineral} - ${mine.name}`;
+        div.appendChild(label);
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'mineral',
+            data: mine,
             x: e.clientX - rect.left,
             y: e.clientY - rect.top,
           });

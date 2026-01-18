@@ -3797,6 +3797,156 @@ body.playback-mode .status-dot {
   background: linear-gradient(135deg, #ffc107, #ff9800);
 }
 
+/* Spaceport Markers */
+.spaceport-marker {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
+  transform-origin: center;
+  z-index: 55;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.spaceport-marker:hover {
+  transform: translate(-50%, -50%) scale(calc(var(--marker-scale, 1) * 1.3));
+}
+
+.spaceport-icon {
+  font-size: 16px;
+  filter: drop-shadow(0 0 4px #00aaff);
+}
+
+.spaceport-marker.active .spaceport-icon {
+  filter: drop-shadow(0 0 8px #00ffaa) drop-shadow(0 0 16px #00ffaa);
+}
+
+.spaceport-marker.planned .spaceport-icon {
+  filter: drop-shadow(0 0 4px #ffaa00);
+  opacity: 0.7;
+}
+
+.spaceport-marker.inactive .spaceport-icon {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.spaceport-label {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) scale(calc(var(--label-scale, 1) / var(--marker-scale, 1)));
+  transform-origin: top center;
+  white-space: nowrap;
+  font-size: 7px;
+  color: #00aaff;
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
+  font-weight: bold;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.spaceport-marker:hover .spaceport-label {
+  opacity: 1;
+}
+
+.spaceport-marker.active .spaceport-label {
+  color: #00ffaa;
+}
+
+.spaceport-marker.planned .spaceport-label {
+  color: #ffaa00;
+}
+
+/* Spaceport popup header */
+.popup-header.spaceport {
+  background: linear-gradient(135deg, #00224420, #001a3310);
+  border-left: 3px solid #00aaff;
+}
+
+.popup-header.spaceport.active {
+  border-left-color: #00ffaa;
+}
+
+.popup-header.spaceport.planned {
+  border-left-color: #ffaa00;
+}
+
+/* Critical Minerals Markers */
+.mineral-marker {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--marker-scale, 1));
+  transform-origin: center;
+  z-index: 54;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.mineral-marker:hover {
+  transform: translate(-50%, -50%) scale(calc(var(--marker-scale, 1) * 1.3));
+}
+
+.mineral-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px #aa44ff);
+}
+
+.mineral-marker.producing .mineral-icon {
+  filter: drop-shadow(0 0 6px #44ff88) drop-shadow(0 0 12px #44ff8860);
+}
+
+.mineral-marker.developing .mineral-icon {
+  filter: drop-shadow(0 0 4px #ffaa00);
+  opacity: 0.8;
+}
+
+.mineral-marker.exploration .mineral-icon {
+  filter: drop-shadow(0 0 3px #888);
+  opacity: 0.6;
+}
+
+.mineral-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) scale(calc(var(--label-scale, 1) / var(--marker-scale, 1)));
+  transform-origin: top center;
+  white-space: nowrap;
+  font-size: 7px;
+  color: #aa44ff;
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
+  font-weight: bold;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mineral-marker:hover .mineral-label {
+  opacity: 1;
+}
+
+.mineral-marker.producing .mineral-label {
+  color: #44ff88;
+}
+
+.mineral-marker.developing .mineral-label {
+  color: #ffaa00;
+}
+
+/* Mineral popup header */
+.popup-header.mineral {
+  background: linear-gradient(135deg, #331a4420, #221a3310);
+  border-left: 3px solid #aa44ff;
+}
+
+.popup-header.mineral.producing {
+  border-left-color: #44ff88;
+}
+
+.popup-header.mineral.developing {
+  border-left-color: #ffaa00;
+}
+
 /* Economic Panel */
 
 .economic-indicators {
@@ -5145,7 +5295,9 @@ body.playback-mode .status-dot {
   .outage-marker::before,
   .weather-marker::before,
   .military-flight-marker::before,
-  .military-vessel-marker::before {
+  .military-vessel-marker::before,
+  .spaceport-marker::before,
+  .mineral-marker::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -5203,6 +5355,8 @@ body.playback-mode .status-dot {
   .military-vessel-label,
   .cluster-label,
   .irradiator-label,
+  .spaceport-label,
+  .mineral-label,
   .conflict-label-overlay {
     display: none !important;
   }

@@ -367,6 +367,8 @@ export interface MapLayers {
   flights: boolean;
   military: boolean;
   natural: boolean;
+  spaceports: boolean;
+  minerals: boolean;
 }
 
 export interface AIDataCenter {
@@ -413,6 +415,29 @@ export interface EconomicCenter {
   country: string;
   marketHours?: { open: string; close: string; timezone: string };
   description?: string;
+}
+
+export interface Spaceport {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  country: string;
+  operator: string;
+  status: 'active' | 'construction' | 'inactive';
+  launches: 'High' | 'Medium' | 'Low';
+}
+
+export interface CriticalMineralProject {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  mineral: string;
+  country: string;
+  operator: string;
+  status: 'producing' | 'development' | 'exploration';
+  significance: string;
 }
 
 export interface PredictionMarket {
