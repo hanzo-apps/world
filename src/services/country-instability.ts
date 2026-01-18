@@ -454,3 +454,21 @@ export function calculateCII(): CountryScore[] {
 export function getTopUnstableCountries(limit = 10): CountryScore[] {
   return calculateCII().slice(0, limit);
 }
+
+export function getCountryScore(code: string): number | null {
+  const data = countryDataMap.get(code);
+  if (!data) return null;
+
+  const baselineRisk = BASELINE_RISK[code] ?? 20;
+  const components: ComponentScores = {
+    unrest: calcUnrestScore(data, code),
+    security: calcSecurityScore(data),
+    information: calcInformationScore(data, code),
+  };
+
+  const eventScore = components.unrest * 0.4 + components.security * 0.3 + components.information * 0.3;
+  const hotspotBoost = getHotspotBoost(code);
+  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
+
+  return Math.round(Math.min(100, blendedScore));
+}
