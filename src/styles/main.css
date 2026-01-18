@@ -965,7 +965,7 @@ body {
 }
 
 .signal-modal {
-  background: var(--panel-bg);
+  background: #0a0a0a;
   border: 1px solid var(--accent);
   border-radius: 4px;
   width: 90%;
