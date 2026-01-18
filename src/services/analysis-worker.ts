@@ -240,6 +240,13 @@ class AnalysisWorkerManager {
    * Reset worker state (useful for testing)
    */
   reset(): void {
+    // Reject all pending requests - reset worker won't answer old queries
+    for (const pending of this.pendingRequests.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error('Worker reset'));
+    }
+    this.pendingRequests.clear();
+
     if (this.worker) {
       this.worker.postMessage({ type: 'reset' });
     }
