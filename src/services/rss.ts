@@ -5,9 +5,39 @@ import { chunkArray, fetchWithProxy } from '@/utils';
 // Per-feed circuit breaker: track failures and cooldowns
 const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes after failure
 const MAX_FAILURES = 2; // failures before cooldown
+const MAX_CACHE_ENTRIES = 100; // Prevent unbounded growth
 const feedFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const feedCache = new Map<string, { items: NewsItem[]; timestamp: number }>();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Clean up stale entries to prevent unbounded growth
+function cleanupCaches(): void {
+  const now = Date.now();
+
+  // Remove expired cache entries
+  for (const [key, value] of feedCache) {
+    if (now - value.timestamp > CACHE_TTL * 2) {
+      feedCache.delete(key);
+    }
+  }
+
+  // Remove expired failure entries
+  for (const [key, state] of feedFailures) {
+    if (state.cooldownUntil > 0 && now > state.cooldownUntil) {
+      feedFailures.delete(key);
+    }
+  }
+
+  // If still too large, remove oldest entries
+  if (feedCache.size > MAX_CACHE_ENTRIES) {
+    const entries = Array.from(feedCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_ENTRIES);
+    for (const [key] of toRemove) {
+      feedCache.delete(key);
+    }
+  }
+}
 
 function isFeedOnCooldown(feedName: string): boolean {
   const state = feedFailures.get(feedName);
@@ -37,6 +67,11 @@ function recordFeedSuccess(feedName: string): void {
 }
 
 export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
+  // Periodically clean up stale cache entries
+  if (feedCache.size > MAX_CACHE_ENTRIES / 2) {
+    cleanupCaches();
+  }
+
   // Check cooldown
   if (isFeedOnCooldown(feed.name)) {
     const cached = feedCache.get(feed.name);

@@ -26,6 +26,8 @@ export class LiveNewsPanel extends Panel {
   private liveBtn: HTMLButtonElement | null = null;
   private idleTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly IDLE_PAUSE_MS = 5 * 60 * 1000; // 5 minutes
+  private boundVisibilityHandler!: () => void;
+  private boundIdleResetHandler!: () => void;
 
   constructor() {
     super({ id: 'live-news', title: 'Live News', showCount: false, trackActivity: false });
@@ -39,26 +41,27 @@ export class LiveNewsPanel extends Panel {
 
   private setupIdleDetection(): void {
     // Pause when tab becomes hidden
-    document.addEventListener('visibilitychange', () => {
+    this.boundVisibilityHandler = () => {
       if (document.hidden) {
         this.pauseForIdle();
       } else {
         this.resumeFromIdle();
       }
-    });
+    };
+    document.addEventListener('visibilitychange', this.boundVisibilityHandler);
 
     // Track user activity to detect idle
-    const resetIdleTimer = () => {
+    this.boundIdleResetHandler = () => {
       if (this.idleTimeout) clearTimeout(this.idleTimeout);
       this.idleTimeout = setTimeout(() => this.pauseForIdle(), this.IDLE_PAUSE_MS);
     };
 
     ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-      document.addEventListener(event, resetIdleTimer, { passive: true });
+      document.addEventListener(event, this.boundIdleResetHandler, { passive: true });
     });
 
     // Start the idle timer
-    resetIdleTimer();
+    this.boundIdleResetHandler();
   }
 
   private pauseForIdle(): void {
@@ -182,5 +185,22 @@ export class LiveNewsPanel extends Panel {
 
   public refresh(): void {
     this.renderPlayer();
+  }
+
+  public destroy(): void {
+    // Clear idle timeout
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = null;
+    }
+
+    // Remove global event listeners
+    document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+      document.removeEventListener(event, this.boundIdleResetHandler);
+    });
+
+    // Call parent destroy
+    super.destroy();
   }
 }
