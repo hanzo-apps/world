@@ -140,12 +140,15 @@ export function createCIIAlert(
     driver,
   };
 
+  const direction = change > 0 ? 'rose' : 'fell';
+  const changeStr = change > 0 ? `+${change}` : String(change);
+
   const alert: UnifiedAlert = {
     id: generateAlertId(),
     type: 'cii_spike',
     priority: getPriorityFromCIIChange(change, level),
     title: `${countryName} Instability ${change > 0 ? 'Spike' : 'Drop'}`,
-    summary: `CII: ${previousScore} → ${currentScore} (${change > 0 ? '+' : ''}${change}) - Driver: ${driver}`,
+    summary: `Instability index ${direction} from ${previousScore} to ${currentScore} (${changeStr}). Driver: ${driver}`,
     components: { ciiChange },
     countries: [country],
     timestamp: new Date(),
@@ -221,21 +224,54 @@ function getHigherPriority(a: AlertPriority, b: AlertPriority): AlertPriority {
   return order.indexOf(a) <= order.indexOf(b) ? a : b;
 }
 
-function generateCompositeTitle(a: UnifiedAlert, b: UnifiedAlert): string {
-  const types: string[] = [];
-  if (a.components.convergence || b.components.convergence) types.push('Convergence');
-  if (a.components.ciiChange || b.components.ciiChange) types.push('CII');
-  if (a.components.cascade || b.components.cascade) types.push('Infrastructure');
+function getCountryDisplayName(code: string): string {
+  return TIER1_COUNTRIES[code] || code;
+}
 
-  const location = a.countries[0] || b.countries[0] || 'Multiple Regions';
-  return `${types.join(' + ')}: ${location}`;
+function generateCompositeTitle(a: UnifiedAlert, b: UnifiedAlert): string {
+  // Get country name from CII change component if available
+  const ciiChange = a.components.ciiChange || b.components.ciiChange;
+  if (ciiChange) {
+    const direction = (ciiChange.change > 0) ? 'Rising' : 'Falling';
+    return `${ciiChange.countryName} Instability ${direction}`;
+  }
+
+  // For convergence alerts
+  if (a.components.convergence || b.components.convergence) {
+    const countryCode = a.countries[0] || b.countries[0];
+    const location = countryCode ? getCountryDisplayName(countryCode) : 'Multiple Regions';
+    return `Geographic Alert: ${location}`;
+  }
+
+  // For cascade alerts
+  if (a.components.cascade || b.components.cascade) {
+    return 'Infrastructure Cascade Alert';
+  }
+
+  const countryCode = a.countries[0] || b.countries[0];
+  const location = countryCode ? getCountryDisplayName(countryCode) : 'Multiple Regions';
+  return `Alert: ${location}`;
 }
 
 function generateCompositeSummary(a: UnifiedAlert, b: UnifiedAlert): string {
+  // For CII alerts, combine into a single narrative
+  const ciiA = a.components.ciiChange;
+  const ciiB = b.components.ciiChange;
+
+  if (ciiA && ciiB && ciiA.country === ciiB.country) {
+    // Same country, multiple updates - show the progression
+    const latest = ciiB.currentScore > ciiA.currentScore ? ciiB : ciiA;
+    const earliest = ciiB.currentScore > ciiA.currentScore ? ciiA : ciiB;
+    const totalChange = latest.currentScore - earliest.previousScore;
+    const direction = totalChange > 0 ? 'rose' : 'fell';
+    return `Instability index ${direction} from ${earliest.previousScore} to ${latest.currentScore} (+${totalChange}). Driver: ${latest.driver}`;
+  }
+
+  // Otherwise combine summaries
   const parts: string[] = [];
   if (a.summary) parts.push(a.summary);
   if (b.summary && b.summary !== a.summary) parts.push(b.summary);
-  return parts.join(' | ');
+  return parts.join(' • ');
 }
 
 function addAndMergeAlert(alert: UnifiedAlert): UnifiedAlert {
