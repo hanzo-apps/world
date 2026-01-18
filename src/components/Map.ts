@@ -27,6 +27,15 @@ import {
   CRITICAL_MINERALS,
 } from '@/config';
 import { MapPopup } from './MapPopup';
+import {
+  updateHotspotEscalation,
+  getHotspotEscalation,
+  setMilitaryData,
+  setCIIGetter,
+  setGeoAlertGetter,
+} from '@/services/hotspot-escalation';
+import { getCountryScore } from '@/services/country-instability';
+import { getAlertsNearLocation } from '@/services/geo-convergence';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -1943,9 +1952,26 @@ export class MapComponent {
         spot.level = 'low';
         spot.status = 'Monitoring';
       }
+
+      // Update dynamic escalation score
+      const velocity = matchedCount > 0 ? score / matchedCount : 0;
+      updateHotspotEscalation(spot.id, matchedCount, hasBreaking, velocity);
     });
 
     this.render();
+  }
+
+  public initEscalationGetters(): void {
+    setCIIGetter(getCountryScore);
+    setGeoAlertGetter(getAlertsNearLocation);
+  }
+
+  public updateMilitaryForEscalation(flights: MilitaryFlight[], vessels: MilitaryVessel[]): void {
+    setMilitaryData(flights, vessels);
+  }
+
+  public getHotspotDynamicScore(hotspotId: string) {
+    return getHotspotEscalation(hotspotId);
   }
 
   public setView(view: MapView): void {

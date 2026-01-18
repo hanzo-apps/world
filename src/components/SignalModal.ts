@@ -1,5 +1,6 @@
 import type { CorrelationSignal } from '@/services/correlation';
 import { escapeHtml } from '@/utils/sanitize';
+import { getSignalContext, type SignalType } from '@/utils/analysis-constants';
 
 export class SignalModal {
   private element: HTMLElement;
@@ -135,25 +136,42 @@ export class SignalModal {
       'sector_cascade': '📊 Sector Cascade',
     };
 
-    const html = this.currentSignals.map(signal => `
-      <div class="signal-item ${escapeHtml(signal.type)}">
-        <div class="signal-type">${signalTypeLabels[signal.type] || escapeHtml(signal.type)}</div>
-        <div class="signal-title">${escapeHtml(signal.title)}</div>
-        <div class="signal-description">${escapeHtml(signal.description)}</div>
-        <div class="signal-meta">
-          <span class="signal-confidence">Confidence: ${Math.round(signal.confidence * 100)}%</span>
-          <span class="signal-time">${this.formatTime(signal.timestamp)}</span>
-        </div>
-        ${signal.data.explanation ? `
-          <div class="signal-explanation">${escapeHtml(signal.data.explanation)}</div>
-        ` : ''}
-        ${signal.data.relatedTopics?.length ? `
-          <div class="signal-topics">
-            ${signal.data.relatedTopics.map(t => `<span class="signal-topic">${escapeHtml(t)}</span>`).join('')}
+    const html = this.currentSignals.map(signal => {
+      const context = getSignalContext(signal.type as SignalType);
+      return `
+        <div class="signal-item ${escapeHtml(signal.type)}">
+          <div class="signal-type">${signalTypeLabels[signal.type] || escapeHtml(signal.type)}</div>
+          <div class="signal-title">${escapeHtml(signal.title)}</div>
+          <div class="signal-description">${escapeHtml(signal.description)}</div>
+          <div class="signal-meta">
+            <span class="signal-confidence">Confidence: ${Math.round(signal.confidence * 100)}%</span>
+            <span class="signal-time">${this.formatTime(signal.timestamp)}</span>
           </div>
-        ` : ''}
-      </div>
-    `).join('');
+          ${signal.data.explanation ? `
+            <div class="signal-explanation">${escapeHtml(signal.data.explanation)}</div>
+          ` : ''}
+          <div class="signal-context">
+            <div class="signal-context-item why-matters">
+              <span class="context-label">Why it matters:</span>
+              <span class="context-value">${escapeHtml(context.whyItMatters)}</span>
+            </div>
+            <div class="signal-context-item actionable">
+              <span class="context-label">Action:</span>
+              <span class="context-value">${escapeHtml(context.actionableInsight)}</span>
+            </div>
+            <div class="signal-context-item confidence-note">
+              <span class="context-label">Note:</span>
+              <span class="context-value">${escapeHtml(context.confidenceNote)}</span>
+            </div>
+          </div>
+          ${signal.data.relatedTopics?.length ? `
+            <div class="signal-topics">
+              ${signal.data.relatedTopics.map(t => `<span class="signal-topic">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
 
     content.innerHTML = html;
   }
