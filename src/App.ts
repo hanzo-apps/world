@@ -74,6 +74,13 @@ export class App {
   private isMobile: boolean;
   private seenGeoAlerts: Set<string> = new Set();
   private timeIntervalId: ReturnType<typeof setInterval> | null = null;
+  private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
+  private refreshTimeoutIds: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private isDestroyed = false;
+  private boundKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private boundFullscreenHandler: (() => void) | null = null;
+  private boundResizeHandler: (() => void) | null = null;
+  private boundVisibilityHandler: (() => void) | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -340,7 +347,7 @@ export class App {
     this.searchModal.setOnSelect((result) => this.handleSearchResult(result));
 
     // Global keyboard shortcut
-    document.addEventListener('keydown', (e) => {
+    this.boundKeydownHandler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (this.searchModal?.isOpen()) {
@@ -351,7 +358,8 @@ export class App {
           this.searchModal?.open();
         }
       }
-    });
+    };
+    document.addEventListener('keydown', this.boundKeydownHandler);
   }
 
   private handleSearchResult(result: SearchResult): void {
@@ -526,7 +534,7 @@ export class App {
 
   private setupSnapshotSaving(): void {
     const saveCurrentSnapshot = async () => {
-      if (this.isPlaybackMode) return;
+      if (this.isPlaybackMode || this.isDestroyed) return;
 
       const marketPrices: Record<string, number> = {};
       this.latestMarkets.forEach(m => {
@@ -546,7 +554,7 @@ export class App {
     };
 
     saveCurrentSnapshot();
-    setInterval(saveCurrentSnapshot, 15 * 60 * 1000);
+    this.snapshotIntervalId = setInterval(saveCurrentSnapshot, 15 * 60 * 1000);
   }
 
   private restoreSnapshot(snapshot: import('@/services/storage').DashboardSnapshot): void {
@@ -647,10 +655,45 @@ export class App {
    * Clean up resources (for HMR/testing)
    */
   public destroy(): void {
+    this.isDestroyed = true;
+
+    // Clear time display interval
     if (this.timeIntervalId) {
       clearInterval(this.timeIntervalId);
       this.timeIntervalId = null;
     }
+
+    // Clear snapshot saving interval
+    if (this.snapshotIntervalId) {
+      clearInterval(this.snapshotIntervalId);
+      this.snapshotIntervalId = null;
+    }
+
+    // Clear all refresh timeouts
+    for (const timeoutId of this.refreshTimeoutIds.values()) {
+      clearTimeout(timeoutId);
+    }
+    this.refreshTimeoutIds.clear();
+
+    // Remove global event listeners
+    if (this.boundKeydownHandler) {
+      document.removeEventListener('keydown', this.boundKeydownHandler);
+      this.boundKeydownHandler = null;
+    }
+    if (this.boundFullscreenHandler) {
+      document.removeEventListener('fullscreenchange', this.boundFullscreenHandler);
+      this.boundFullscreenHandler = null;
+    }
+    if (this.boundResizeHandler) {
+      window.removeEventListener('resize', this.boundResizeHandler);
+      this.boundResizeHandler = null;
+    }
+    if (this.boundVisibilityHandler) {
+      document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
+      this.boundVisibilityHandler = null;
+    }
+
+    // Clean up map and AIS
     this.map?.destroy();
     disconnectAisStream();
   }
@@ -1000,15 +1043,17 @@ export class App {
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
-    document.addEventListener('fullscreenchange', () => {
+    this.boundFullscreenHandler = () => {
       fullscreenBtn!.textContent = document.fullscreenElement ? '⛶' : '⛶';
       fullscreenBtn!.classList.toggle('active', !!document.fullscreenElement);
-    });
+    };
+    document.addEventListener('fullscreenchange', this.boundFullscreenHandler);
 
     // Window resize
-    window.addEventListener('resize', () => {
+    this.boundResizeHandler = () => {
       this.map?.render();
-    });
+    };
+    window.addEventListener('resize', this.boundResizeHandler);
 
     // Map section resize handle
     this.setupMapResize();
@@ -1017,9 +1062,10 @@ export class App {
     this.setupMapPin();
 
     // Pause animations when tab is hidden
-    document.addEventListener('visibilitychange', () => {
+    this.boundVisibilityHandler = () => {
       document.body.classList.toggle('animations-paused', document.hidden);
-    });
+    };
+    document.addEventListener('visibilitychange', this.boundVisibilityHandler);
   }
 
   private setupUrlStateSync(): void {
@@ -1846,18 +1892,24 @@ export class App {
       const jittered = adjusted + (Math.random() * 2 - 1) * jitterRange;
       return Math.max(MIN_REFRESH_MS, Math.round(jittered));
     };
+    const scheduleNext = (delay: number) => {
+      if (this.isDestroyed) return;
+      const timeoutId = setTimeout(run, delay);
+      this.refreshTimeoutIds.set(name, timeoutId);
+    };
     const run = async () => {
+      if (this.isDestroyed) return;
       const isHidden = document.visibilityState === 'hidden';
       if (isHidden) {
-        setTimeout(run, computeDelay(intervalMs, true));
+        scheduleNext(computeDelay(intervalMs, true));
         return;
       }
       if (condition && !condition()) {
-        setTimeout(run, computeDelay(intervalMs, false));
+        scheduleNext(computeDelay(intervalMs, false));
         return;
       }
       if (this.inFlight.has(name)) {
-        setTimeout(run, computeDelay(intervalMs, false));
+        scheduleNext(computeDelay(intervalMs, false));
         return;
       }
       this.inFlight.add(name);
@@ -1867,10 +1919,10 @@ export class App {
         console.error(`[App] Refresh ${name} failed:`, e);
       } finally {
         this.inFlight.delete(name);
-        setTimeout(run, computeDelay(intervalMs, false));
+        scheduleNext(computeDelay(intervalMs, false));
       }
     };
-    setTimeout(run, computeDelay(intervalMs, document.visibilityState === 'hidden'));
+    scheduleNext(computeDelay(intervalMs, document.visibilityState === 'hidden'));
   }
 
   private setupRefreshIntervals(): void {
