@@ -73,6 +73,7 @@ export class App {
   private inFlight: Set<string> = new Set();
   private isMobile: boolean;
   private seenGeoAlerts: Set<string> = new Set();
+  private timeIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -639,7 +640,19 @@ export class App {
     this.createPanels();
     this.renderPanelToggles();
     this.updateTime();
-    setInterval(() => this.updateTime(), 1000);
+    this.timeIntervalId = setInterval(() => this.updateTime(), 1000);
+  }
+
+  /**
+   * Clean up resources (for HMR/testing)
+   */
+  public destroy(): void {
+    if (this.timeIntervalId) {
+      clearInterval(this.timeIntervalId);
+      this.timeIntervalId = null;
+    }
+    this.map?.destroy();
+    disconnectAisStream();
   }
 
   private createPanels(): void {
