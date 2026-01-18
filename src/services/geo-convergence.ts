@@ -226,3 +226,28 @@ export function debugInjectTestEvents(): void {
 export function debugGetCells(): Map<string, unknown> {
   return new Map(cells);
 }
+
+export function getAlertsNearLocation(lat: number, lon: number, radiusKm: number): { score: number; types: number } | null {
+  pruneOldEvents();
+
+  let maxScore = 0;
+  let maxTypes = 0;
+
+  for (const cell of cells.values()) {
+    const dist = haversineKm(lat, lon, cell.lat, cell.lon);
+    if (dist <= radiusKm && cell.events.size >= 2) {
+      const types = cell.events.size;
+      const totalEvents = Array.from(cell.events.values()).reduce((sum, d) => sum + d.count, 0);
+      const typeScore = types * 25;
+      const countBoost = Math.min(25, totalEvents * 2);
+      const score = Math.min(100, typeScore + countBoost);
+
+      if (score > maxScore) {
+        maxScore = score;
+        maxTypes = types;
+      }
+    }
+  }
+
+  return maxScore > 0 ? { score: maxScore, types: maxTypes } : null;
+}

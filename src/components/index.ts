@@ -18,3 +18,4 @@ export * from './LiveNewsPanel';
 export * from './CIIPanel';
 export * from './CascadePanel';
 export * from './StrategicRiskPanel';
+export * from './IntelligenceGapBadge';

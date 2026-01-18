@@ -5,6 +5,7 @@ import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { isMobileDevice } from '@/utils';
 import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticle } from '@/services/gdelt-intel';
 import { getNaturalEventIcon } from '@/services/eonet';
+import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
 export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral';
 
@@ -200,6 +201,118 @@ export class MapPopup {
     const severityClass = hotspot.level || 'low';
     const severityLabel = escapeHtml((hotspot.level || 'low').toUpperCase());
 
+    // Get dynamic escalation score
+    const dynamicScore = getHotspotEscalation(hotspot.id);
+    const change24h = getEscalationChange24h(hotspot.id);
+
+    // Escalation score display
+    const escalationColors: Record<number, string> = { 1: '#44aa44', 2: '#88aa44', 3: '#ffaa00', 4: '#ff6600', 5: '#ff2222' };
+    const escalationLabels: Record<number, string> = { 1: 'STABLE', 2: 'WATCH', 3: 'ELEVATED', 4: 'HIGH', 5: 'CRITICAL' };
+    const trendIcons: Record<string, string> = { 'escalating': '↑', 'stable': '→', 'de-escalating': '↓' };
+    const trendColors: Record<string, string> = { 'escalating': '#ff4444', 'stable': '#ffaa00', 'de-escalating': '#44aa44' };
+
+    const displayScore = dynamicScore?.combinedScore ?? hotspot.escalationScore ?? 3;
+    const displayScoreInt = Math.round(displayScore);
+    const displayTrend = dynamicScore?.trend ?? hotspot.escalationTrend ?? 'stable';
+
+    const escalationSection = `
+      <div class="popup-section escalation-section">
+        <span class="section-label">ESCALATION ASSESSMENT</span>
+        <div class="escalation-display">
+          <div class="escalation-score" style="background: ${escalationColors[displayScoreInt] || '#888'}">
+            <span class="score-value">${displayScore.toFixed(1)}/5</span>
+            <span class="score-label">${escalationLabels[displayScoreInt] || 'UNKNOWN'}</span>
+          </div>
+          <div class="escalation-trend" style="color: ${trendColors[displayTrend] || '#888'}">
+            <span class="trend-icon">${trendIcons[displayTrend] || ''}</span>
+            <span class="trend-label">${escapeHtml(displayTrend.toUpperCase())}</span>
+          </div>
+        </div>
+        ${dynamicScore ? `
+          <div class="escalation-breakdown">
+            <div class="breakdown-header">
+              <span class="baseline-label">Baseline: ${dynamicScore.staticBaseline}/5</span>
+              ${change24h ? `
+                <span class="change-label ${change24h.change >= 0 ? 'rising' : 'falling'}">
+                  24h: ${change24h.change >= 0 ? '+' : ''}${change24h.change}
+                </span>
+              ` : ''}
+            </div>
+            <div class="breakdown-components">
+              <div class="breakdown-row">
+                <span class="component-label">News</span>
+                <div class="component-bar-bg">
+                  <div class="component-bar news" style="width: ${dynamicScore.components.newsActivity}%"></div>
+                </div>
+                <span class="component-value">${Math.round(dynamicScore.components.newsActivity)}</span>
+              </div>
+              <div class="breakdown-row">
+                <span class="component-label">CII</span>
+                <div class="component-bar-bg">
+                  <div class="component-bar cii" style="width: ${dynamicScore.components.ciiContribution}%"></div>
+                </div>
+                <span class="component-value">${Math.round(dynamicScore.components.ciiContribution)}</span>
+              </div>
+              <div class="breakdown-row">
+                <span class="component-label">Geo</span>
+                <div class="component-bar-bg">
+                  <div class="component-bar geo" style="width: ${dynamicScore.components.geoConvergence}%"></div>
+                </div>
+                <span class="component-value">${Math.round(dynamicScore.components.geoConvergence)}</span>
+              </div>
+              <div class="breakdown-row">
+                <span class="component-label">Military</span>
+                <div class="component-bar-bg">
+                  <div class="component-bar military" style="width: ${dynamicScore.components.militaryActivity}%"></div>
+                </div>
+                <span class="component-value">${Math.round(dynamicScore.components.militaryActivity)}</span>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        ${hotspot.escalationIndicators && hotspot.escalationIndicators.length > 0 ? `
+          <div class="escalation-indicators">
+            ${hotspot.escalationIndicators.map(i => `<span class="indicator-tag">• ${escapeHtml(i)}</span>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    // Historical context section
+    const historySection = hotspot.history ? `
+      <div class="popup-section history-section">
+        <span class="section-label">HISTORICAL CONTEXT</span>
+        <div class="history-content">
+          ${hotspot.history.lastMajorEvent ? `
+            <div class="history-event">
+              <span class="history-label">Last Major Event:</span>
+              <span class="history-value">${escapeHtml(hotspot.history.lastMajorEvent)} ${hotspot.history.lastMajorEventDate ? `(${escapeHtml(hotspot.history.lastMajorEventDate)})` : ''}</span>
+            </div>
+          ` : ''}
+          ${hotspot.history.precedentDescription ? `
+            <div class="history-event">
+              <span class="history-label">Precedents:</span>
+              <span class="history-value">${escapeHtml(hotspot.history.precedentDescription)}</span>
+            </div>
+          ` : ''}
+          ${hotspot.history.cyclicalRisk ? `
+            <div class="history-event cyclical">
+              <span class="history-label">Cyclical Pattern:</span>
+              <span class="history-value">${escapeHtml(hotspot.history.cyclicalRisk)}</span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    ` : '';
+
+    // "Why it matters" section
+    const whyItMattersSection = hotspot.whyItMatters ? `
+      <div class="popup-section why-matters-section">
+        <span class="section-label">WHY IT MATTERS</span>
+        <p class="why-matters-text">${escapeHtml(hotspot.whyItMatters)}</p>
+      </div>
+    ` : '';
+
     return `
       <div class="popup-header hotspot">
         <span class="popup-title">${escapeHtml(hotspot.name.toUpperCase())}</span>
@@ -209,6 +322,7 @@ export class MapPopup {
       <div class="popup-body">
         ${hotspot.subtext ? `<div class="popup-subtitle">${escapeHtml(hotspot.subtext)}</div>` : ''}
         ${hotspot.description ? `<p class="popup-description">${escapeHtml(hotspot.description)}</p>` : ''}
+        ${escalationSection}
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">COORDINATES</span>
@@ -219,6 +333,8 @@ export class MapPopup {
             <span class="stat-value">${escapeHtml(hotspot.status || 'Monitoring')}</span>
           </div>
         </div>
+        ${whyItMattersSection}
+        ${historySection}
         ${hotspot.agencies && hotspot.agencies.length > 0 ? `
           <div class="popup-section">
             <span class="section-label">KEY ENTITIES</span>
