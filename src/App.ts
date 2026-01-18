@@ -14,7 +14,7 @@ import {
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII } from '@/services/country-instability';
-import { dataFreshness } from '@/services/data-freshness';
+import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -117,6 +117,7 @@ export class App {
     this.setupMapLayerHandlers();
     this.setupEventListeners();
     this.setupUrlStateSync();
+    this.syncDataFreshnessWithLayers();
     await this.loadAllData();
 
     // Hide unconfigured layers after first data load
@@ -194,11 +195,54 @@ export class App {
     }
   }
 
+  private syncDataFreshnessWithLayers(): void {
+    // Map layer toggles to data source IDs
+    const layerToSource: Partial<Record<keyof MapLayers, DataSourceId[]>> = {
+      military: ['opensky', 'wingbits'],
+      ais: ['ais'],
+      natural: ['usgs'],
+      weather: ['weather'],
+      outages: ['outages'],
+      protests: ['acled'],
+    };
+
+    for (const [layer, sourceIds] of Object.entries(layerToSource)) {
+      const enabled = this.mapLayers[layer as keyof MapLayers] ?? false;
+      for (const sourceId of sourceIds) {
+        dataFreshness.setEnabled(sourceId as DataSourceId, enabled);
+      }
+    }
+
+    // Mark sources as disabled if not configured
+    if (!isAisConfigured()) {
+      dataFreshness.setEnabled('ais', false);
+    }
+    if (isOutagesConfigured() === false) {
+      dataFreshness.setEnabled('outages', false);
+    }
+  }
+
   private setupMapLayerHandlers(): void {
     this.map?.setOnLayerChange((layer, enabled) => {
       // Save layer settings
       this.mapLayers[layer] = enabled;
       saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
+
+      // Sync data freshness tracker
+      const layerToSource: Partial<Record<keyof MapLayers, DataSourceId[]>> = {
+        military: ['opensky', 'wingbits'],
+        ais: ['ais'],
+        natural: ['usgs'],
+        weather: ['weather'],
+        outages: ['outages'],
+        protests: ['acled'],
+      };
+      const sourceIds = layerToSource[layer];
+      if (sourceIds) {
+        for (const sourceId of sourceIds) {
+          dataFreshness.setEnabled(sourceId, enabled);
+        }
+      }
 
       // Handle AIS WebSocket connection
       if (layer === 'ais') {
