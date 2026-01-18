@@ -7,8 +7,6 @@ export class SignalModal {
   private currentSignals: CorrelationSignal[] = [];
   private audioEnabled = true;
   private audio: HTMLAudioElement | null = null;
-  private signalBadge: HTMLElement | null = null;
-  private pendingCount = 0;
 
   constructor() {
     this.element = document.createElement('div');
@@ -16,7 +14,7 @@ export class SignalModal {
     this.element.innerHTML = `
       <div class="signal-modal">
         <div class="signal-modal-header">
-          <span class="signal-modal-title">⚡ SIGNAL DETECTED</span>
+          <span class="signal-modal-title">🎯 INTELLIGENCE FINDING</span>
           <button class="signal-modal-close">×</button>
         </div>
         <div class="signal-modal-content"></div>
@@ -33,20 +31,6 @@ export class SignalModal {
     document.body.appendChild(this.element);
     this.setupEventListeners();
     this.initAudio();
-    this.createSignalBadge();
-  }
-
-  private createSignalBadge(): void {
-    this.signalBadge = document.createElement('button');
-    this.signalBadge.className = 'signal-badge';
-    this.signalBadge.title = 'Signal notifications (click to view)';
-    this.signalBadge.innerHTML = '<span class="signal-badge-icon">⚡</span><span class="signal-badge-count">0</span>';
-    this.signalBadge.addEventListener('click', () => this.openModal());
-
-    const headerRight = document.querySelector('.header-right');
-    if (headerRight) {
-      headerRight.insertBefore(this.signalBadge, headerRight.firstChild);
-    }
   }
 
   private initAudio(): void {
@@ -79,44 +63,24 @@ export class SignalModal {
     if (signals.length === 0) return;
 
     this.currentSignals = [...signals, ...this.currentSignals].slice(0, 50);
-    this.pendingCount += signals.length;
-    this.updateBadge();
+    this.playSound();
+  }
 
+  public showSignal(signal: CorrelationSignal): void {
+    this.currentSignals = [signal];
+    this.renderSignals();
+    this.element.classList.add('active');
+  }
+
+  public playSound(): void {
     if (this.audioEnabled && this.audio) {
       this.audio.currentTime = 0;
       this.audio.play().catch(() => {});
-    }
-
-    // Subtle pulse on badge instead of modal popup
-    this.signalBadge?.classList.add('pulse');
-    setTimeout(() => this.signalBadge?.classList.remove('pulse'), 1000);
-  }
-
-  public openModal(): void {
-    if (this.currentSignals.length > 0) {
-      this.renderSignals();
-      this.element.classList.add('active');
-    }
-  }
-
-  private updateBadge(): void {
-    if (!this.signalBadge) return;
-
-    const countEl = this.signalBadge.querySelector('.signal-badge-count');
-    if (countEl) countEl.textContent = String(this.pendingCount);
-
-    // Always show badge, but only pulse when there are signals
-    if (this.pendingCount > 0) {
-      this.signalBadge.classList.add('active');
-    } else {
-      this.signalBadge.classList.remove('active');
     }
   }
 
   public hide(): void {
     this.element.classList.remove('active');
-    this.pendingCount = 0;
-    this.updateBadge();
   }
 
   private renderSignals(): void {
