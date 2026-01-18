@@ -16,6 +16,8 @@ export class IntelligenceFindingsBadge {
   private onSignalClick: ((signal: CorrelationSignal) => void) | null = null;
   private signals: CorrelationSignal[] = [];
   private boundCloseDropdown = () => this.closeDropdown();
+  private audio: HTMLAudioElement | null = null;
+  private audioEnabled = true;
 
   constructor() {
     this.badge = document.createElement('button');
@@ -47,8 +49,21 @@ export class IntelligenceFindingsBadge {
     document.addEventListener('click', this.boundCloseDropdown);
 
     this.mount();
+    this.initAudio();
     this.update();
     this.startRefresh();
+  }
+
+  private initAudio(): void {
+    this.audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYjfKapmWswEjCJvuPQfSoXZZ+3qqBJESSP0unGaxMJVYiytrFeLhR6p8znrFUXRW+bs7V3Qx1hn8Xjp1cYPnegprhkMCFmoLi1k0sZTYGlqqlUIA==');
+    this.audio.volume = 0.3;
+  }
+
+  private playSound(): void {
+    if (this.audioEnabled && this.audio) {
+      this.audio.currentTime = 0;
+      this.audio.play().catch(() => {});
+    }
   }
 
   public setOnSignalClick(handler: (signal: CorrelationSignal) => void): void {
@@ -76,10 +91,11 @@ export class IntelligenceFindingsBadge {
       countEl.textContent = String(count);
     }
 
-    // Pulse animation when new signals arrive
+    // Pulse animation and sound when new signals arrive
     if (count > this.lastSignalCount && this.lastSignalCount > 0) {
       this.badge.classList.add('pulse');
       setTimeout(() => this.badge.classList.remove('pulse'), 1000);
+      this.playSound();
     }
     this.lastSignalCount = count;
 
