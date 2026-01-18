@@ -1,4 +1,5 @@
 import type { CorrelationSignal } from '@/services/correlation';
+import type { UnifiedAlert } from '@/services/cross-module-integration';
 import { escapeHtml } from '@/utils/sanitize';
 import { getSignalContext, type SignalType } from '@/utils/analysis-constants';
 
@@ -71,6 +72,111 @@ export class SignalModal {
   public showSignal(signal: CorrelationSignal): void {
     this.currentSignals = [signal];
     this.renderSignals();
+    this.element.classList.add('active');
+  }
+
+  public showAlert(alert: UnifiedAlert): void {
+    const content = this.element.querySelector('.signal-modal-content')!;
+    const priorityColors: Record<string, string> = {
+      critical: '#ff4444',
+      high: '#ff9944',
+      medium: '#4488ff',
+      low: '#888888',
+    };
+    const typeIcons: Record<string, string> = {
+      cii_spike: '📊',
+      convergence: '🌍',
+      cascade: '⚡',
+      composite: '🔗',
+    };
+
+    const icon = typeIcons[alert.type] || '⚠️';
+    const color = priorityColors[alert.priority] || '#ff9944';
+
+    let detailsHtml = '';
+
+    // CII Change details
+    if (alert.components.ciiChange) {
+      const cii = alert.components.ciiChange;
+      const changeSign = cii.change > 0 ? '+' : '';
+      detailsHtml += `
+        <div class="signal-context-item">
+          <span class="context-label">Country:</span>
+          <span class="context-value">${escapeHtml(cii.countryName)}</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Score Change:</span>
+          <span class="context-value">${cii.previousScore} → ${cii.currentScore} (${changeSign}${cii.change})</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Instability Level:</span>
+          <span class="context-value" style="text-transform: uppercase; color: ${color}">${cii.level}</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Primary Driver:</span>
+          <span class="context-value">${escapeHtml(cii.driver)}</span>
+        </div>
+      `;
+    }
+
+    // Convergence details
+    if (alert.components.convergence) {
+      const conv = alert.components.convergence;
+      detailsHtml += `
+        <div class="signal-context-item">
+          <span class="context-label">Location:</span>
+          <span class="context-value">${conv.lat.toFixed(2)}°, ${conv.lon.toFixed(2)}°</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Event Types:</span>
+          <span class="context-value">${conv.types.join(', ')}</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Event Count:</span>
+          <span class="context-value">${conv.totalEvents} events in 24h</span>
+        </div>
+      `;
+    }
+
+    // Cascade details
+    if (alert.components.cascade) {
+      const cascade = alert.components.cascade;
+      detailsHtml += `
+        <div class="signal-context-item">
+          <span class="context-label">Source:</span>
+          <span class="context-value">${escapeHtml(cascade.sourceName)} (${cascade.sourceType})</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Countries Affected:</span>
+          <span class="context-value">${cascade.countriesAffected}</span>
+        </div>
+        <div class="signal-context-item">
+          <span class="context-label">Impact Level:</span>
+          <span class="context-value">${escapeHtml(cascade.highestImpact)}</span>
+        </div>
+      `;
+    }
+
+    content.innerHTML = `
+      <div class="signal-item" style="border-left-color: ${color}">
+        <div class="signal-type">${icon} ${alert.type.toUpperCase().replace('_', ' ')}</div>
+        <div class="signal-title">${escapeHtml(alert.title)}</div>
+        <div class="signal-description">${escapeHtml(alert.summary)}</div>
+        <div class="signal-meta">
+          <span class="signal-confidence" style="background: ${color}22; color: ${color}">${alert.priority.toUpperCase()}</span>
+          <span class="signal-time">${this.formatTime(alert.timestamp)}</span>
+        </div>
+        <div class="signal-context">
+          ${detailsHtml}
+        </div>
+        ${alert.countries.length > 0 ? `
+          <div class="signal-topics">
+            ${alert.countries.map(c => `<span class="signal-topic">${escapeHtml(c)}</span>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+
     this.element.classList.add('active');
   }
 
