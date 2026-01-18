@@ -1460,12 +1460,14 @@ export class App {
 
       this.statusPanel?.updateFeed('Polymarket', { status: 'ok', itemCount: predictions.length });
       this.statusPanel?.updateApi('Polymarket', { status: 'ok' });
+      dataFreshness.recordUpdate('polymarket', predictions.length);
 
       // Run correlation analysis in background (fire-and-forget via Web Worker)
       void this.runCorrelationAnalysis();
     } catch (error) {
       this.statusPanel?.updateFeed('Polymarket', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('Polymarket', { status: 'error' });
+      dataFreshness.recordError('polymarket', String(error));
     }
   }
 
@@ -1481,9 +1483,11 @@ export class App {
       this.map?.setEarthquakes(earthquakeResult.value);
       ingestEarthquakes(earthquakeResult.value);
       this.statusPanel?.updateApi('USGS', { status: 'ok' });
+      dataFreshness.recordUpdate('usgs', earthquakeResult.value.length);
     } else {
       this.map?.setEarthquakes([]);
       this.statusPanel?.updateApi('USGS', { status: 'error' });
+      dataFreshness.recordError('usgs', String(earthquakeResult.reason));
     }
 
     // Handle natural events (EONET - storms, fires, volcanoes, etc.)
@@ -1512,9 +1516,11 @@ export class App {
       this.map?.setWeatherAlerts(alerts);
       this.map?.setLayerReady('weather', alerts.length > 0);
       this.statusPanel?.updateFeed('Weather', { status: 'ok', itemCount: alerts.length });
-    } catch {
+      dataFreshness.recordUpdate('weather', alerts.length);
+    } catch (error) {
       this.map?.setLayerReady('weather', false);
       this.statusPanel?.updateFeed('Weather', { status: 'error' });
+      dataFreshness.recordError('weather', String(error));
     }
   }
 
@@ -1525,9 +1531,11 @@ export class App {
       this.map?.setLayerReady('outages', outages.length > 0);
       ingestOutagesForCII(outages);
       this.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
-    } catch {
+      dataFreshness.recordUpdate('outages', outages.length);
+    } catch (error) {
       this.map?.setLayerReady('outages', false);
       this.statusPanel?.updateFeed('NetBlocks', { status: 'error' });
+      dataFreshness.recordError('outages', String(error));
     }
   }
 
@@ -1551,10 +1559,14 @@ export class App {
       this.statusPanel?.updateApi('AISStream', {
         status: aisStatus.connected ? 'ok' : 'warning',
       });
+      if (hasData) {
+        dataFreshness.recordUpdate('ais', shippingCount);
+      }
     } catch (error) {
       this.map?.setLayerReady('ais', false);
       this.statusPanel?.updateFeed('Shipping', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('AISStream', { status: 'error' });
+      dataFreshness.recordError('ais', String(error));
     }
   }
 
@@ -1688,10 +1700,12 @@ export class App {
         errorMessage: militaryCount === 0 ? 'No military activity in view' : undefined,
       });
       this.statusPanel?.updateApi('OpenSky', { status: 'ok' }); // API worked, just no data in view
+      dataFreshness.recordUpdate('opensky', flightData.flights.length);
     } catch (error) {
       this.map?.setLayerReady('military', false);
       this.statusPanel?.updateFeed('Military', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('OpenSky', { status: 'error' });
+      dataFreshness.recordError('opensky', String(error));
     }
   }
 
