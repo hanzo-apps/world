@@ -118,6 +118,7 @@ export class MapComponent {
   private lastRenderTime = 0;
   private readonly MIN_RENDER_INTERVAL_MS = 100;
   private timestampIntervalId: ReturnType<typeof setInterval> | null = null;
+  private healthCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(container: HTMLElement, initialState: MapState) {
     this.container = container;
@@ -190,6 +191,10 @@ export class MapComponent {
     if (this.timestampIntervalId) {
       clearInterval(this.timestampIntervalId);
       this.timestampIntervalId = null;
+    }
+    if (this.healthCheckIntervalId) {
+      clearInterval(this.healthCheckIntervalId);
+      this.healthCheckIntervalId = null;
     }
   }
 
@@ -444,7 +449,32 @@ export class MapComponent {
     timestamp.id = 'mapTimestamp';
     this.updateTimestamp(timestamp);
     this.timestampIntervalId = setInterval(() => this.updateTimestamp(timestamp), 60000);
+    // Health check every 30 seconds to detect and recover from base layer issues
+    this.healthCheckIntervalId = setInterval(() => this.runHealthCheck(), 30000);
     return timestamp;
+  }
+
+  private runHealthCheck(): void {
+    // Skip if page is hidden (no need to check while user isn't looking)
+    if (document.hidden) return;
+
+    const svgNode = this.svg.node();
+    if (!svgNode) return;
+
+    // Verify base layer exists and has content
+    const baseGroup = svgNode.querySelector('.map-base');
+    const countryCount = baseGroup?.querySelectorAll('.country').length ?? 0;
+
+    // If we have country data but no rendered countries, something is wrong
+    if (this.countryFeatures && this.countryFeatures.length > 0 && countryCount === 0) {
+      console.warn('[Map] Health check: Base layer missing countries, initiating recovery');
+      this.baseRendered = false;
+      // Also check if d3 selection is stale
+      if (baseGroup && this.baseLayerGroup?.node() !== baseGroup) {
+        console.warn('[Map] Health check: Stale d3 selection detected');
+      }
+      this.render();
+    }
   }
 
   private updateTimestamp(el: HTMLElement): void {
@@ -655,25 +685,36 @@ export class MapComponent {
     // Simple viewBox matching container - keeps SVG and overlays aligned
     this.svg.attr('viewBox', `0 0 ${width} ${height}`);
 
-    // Safety check: verify base layer groups exist in DOM and have content
-    // (protects against external clearing or DOM detachment)
+    // CRITICAL: Always refresh d3 selections from actual DOM to prevent stale references
+    // D3 selections can become stale if the DOM is modified externally
     const svgNode = this.svg.node();
-    const baseNode = this.baseLayerGroup?.node();
-    const dynamicNode = this.dynamicLayerGroup?.node();
-    const baseGroupValid = baseNode && baseNode.parentNode === svgNode;
-    const dynamicGroupValid = dynamicNode && dynamicNode.parentNode === svgNode;
+    if (!svgNode) return;
 
-    // Recreate layer groups if they were removed or detached
-    if (!baseGroupValid || !dynamicGroupValid) {
-      // Clear any orphaned groups
-      svgNode?.querySelectorAll('.map-base, .map-dynamic').forEach(el => el.remove());
+    // Query DOM directly for layer groups
+    const existingBase = svgNode.querySelector('.map-base') as SVGGElement | null;
+    const existingDynamic = svgNode.querySelector('.map-dynamic') as SVGGElement | null;
+
+    // Recreate layer groups if missing or if d3 selections are stale
+    const baseStale = !existingBase || this.baseLayerGroup?.node() !== existingBase;
+    const dynamicStale = !existingDynamic || this.dynamicLayerGroup?.node() !== existingDynamic;
+
+    if (baseStale || dynamicStale) {
+      // Clear any orphaned groups and create fresh ones
+      svgNode.querySelectorAll('.map-base, .map-dynamic').forEach(el => el.remove());
       this.baseLayerGroup = this.svg.append('g').attr('class', 'map-base');
       this.dynamicLayerGroup = this.svg.append('g').attr('class', 'map-dynamic');
       this.baseRendered = false;
+      console.warn('[Map] Layer groups recreated - baseStale:', baseStale, 'dynamicStale:', dynamicStale);
+    }
+
+    // Double-check selections are valid after recreation
+    if (!this.baseLayerGroup?.node() || !this.dynamicLayerGroup?.node()) {
+      console.error('[Map] Failed to create layer groups');
+      return;
     }
 
     // Check if base layer has actual country content (not just empty group)
-    const countryCount = this.baseLayerGroup?.node()?.querySelectorAll('.country').length ?? 0;
+    const countryCount = this.baseLayerGroup.node()!.querySelectorAll('.country').length;
     const shouldRenderBase = !this.baseRendered || countryCount === 0 || width !== this.baseWidth || height !== this.baseHeight;
 
     // Debug: log when base layer needs re-render
@@ -681,10 +722,12 @@ export class MapComponent {
       console.warn('[Map] Base layer missing countries, forcing re-render. countryFeatures:', this.countryFeatures?.length ?? 'null');
     }
 
-    if (shouldRenderBase && this.baseLayerGroup) {
+    if (shouldRenderBase) {
       this.baseWidth = width;
       this.baseHeight = height;
-      this.baseLayerGroup.selectAll('*').remove();
+      // Use native DOM clear for guaranteed effect
+      const baseNode = this.baseLayerGroup.node()!;
+      while (baseNode.firstChild) baseNode.removeChild(baseNode.firstChild);
 
       // Background - extend well beyond viewBox to cover pan/zoom transforms
       // 3x size in each direction ensures no black bars when panning
@@ -711,12 +754,11 @@ export class MapComponent {
       this.baseRendered = true;
     }
 
-    // Always rebuild dynamic layer
-    if (this.dynamicLayerGroup) {
-      this.dynamicLayerGroup.selectAll('*').remove();
-      // Create overlays-svg group for SVG-based overlays (military tracks, etc.)
-      this.dynamicLayerGroup.append('g').attr('class', 'overlays-svg');
-    }
+    // Always rebuild dynamic layer - use native DOM clear for reliability
+    const dynamicNode = this.dynamicLayerGroup.node()!;
+    while (dynamicNode.firstChild) dynamicNode.removeChild(dynamicNode.firstChild);
+    // Create overlays-svg group for SVG-based overlays (military tracks, etc.)
+    this.dynamicLayerGroup.append('g').attr('class', 'overlays-svg');
 
     // Setup projection for dynamic elements
     const projection = this.getProjection(width, height);
@@ -746,6 +788,19 @@ export class MapComponent {
 
     // Overlays
     this.renderOverlays(projection);
+
+    // POST-RENDER VERIFICATION: Ensure base layer actually rendered
+    // This catches silent failures where d3 operations didn't stick
+    if (this.baseRendered && this.countryFeatures && this.countryFeatures.length > 0) {
+      const verifyCount = this.baseLayerGroup?.node()?.querySelectorAll('.country').length ?? 0;
+      if (verifyCount === 0) {
+        console.error('[Map] POST-RENDER: Countries failed to render despite baseRendered=true. Forcing full rebuild.');
+        this.baseRendered = false;
+        // Schedule a retry on next frame instead of immediate recursion
+        requestAnimationFrame(() => this.render());
+        return;
+      }
+    }
 
     this.applyTransform();
   }
@@ -2549,9 +2604,23 @@ export class MapComponent {
   }
 
   private ensureBaseLayerIntact(): void {
-    const countryCount = this.baseLayerGroup?.node()?.querySelectorAll('.country').length ?? 0;
+    // Query DOM directly instead of relying on cached d3 selection
+    const svgNode = this.svg.node();
+    const domBaseGroup = svgNode?.querySelector('.map-base');
+    const selectionNode = this.baseLayerGroup?.node();
+
+    // Check for stale selection (d3 reference doesn't match DOM)
+    if (domBaseGroup && selectionNode !== domBaseGroup) {
+      console.warn('[Map] Stale base layer selection detected, forcing full rebuild');
+      this.baseRendered = false;
+      this.render();
+      return;
+    }
+
+    // Check for missing countries
+    const countryCount = domBaseGroup?.querySelectorAll('.country').length ?? 0;
     if (countryCount === 0 && this.countryFeatures && this.countryFeatures.length > 0) {
-      console.warn('[Map] Base layer missing, triggering recovery render');
+      console.warn('[Map] Base layer missing countries, triggering recovery render');
       this.baseRendered = false;
       this.render();
     }
