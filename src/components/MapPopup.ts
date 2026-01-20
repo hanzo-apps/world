@@ -37,48 +37,56 @@ export class MapPopup {
     const content = this.renderContent(data);
     this.popup.innerHTML = content;
 
+    // Get container's viewport position for absolute positioning
+    const containerRect = this.container.getBoundingClientRect();
+
     if (isMobileDevice()) {
-      // On mobile, center the popup horizontally and position in lower half
+      // On mobile, center the popup horizontally and position in upper area
       this.popup.style.left = '50%';
       this.popup.style.transform = 'translateX(-50%)';
-      this.popup.style.top = `${Math.max(60, Math.min(data.y, this.container.clientHeight * 0.4))}px`;
+      this.popup.style.top = `${Math.max(60, Math.min(containerRect.top + data.y, window.innerHeight * 0.4))}px`;
     } else {
       // Desktop: position near click with smart bounds checking
       this.popup.style.transform = '';
       const popupWidth = 380;
       const popupHeight = 500; // Approximate max height for hotspot popups
-      const bottomPanelHeight = 200; // Bottom panels buffer
+      const bottomBuffer = 50; // Buffer from viewport bottom
       const topBuffer = 60; // Header height
 
-      // Horizontal positioning
-      const maxX = this.container.clientWidth - popupWidth - 20;
-      let left = data.x + 20;
+      // Convert container-relative coords to viewport coords
+      const viewportX = containerRect.left + data.x;
+      const viewportY = containerRect.top + data.y;
+
+      // Horizontal positioning (viewport-relative)
+      const maxX = window.innerWidth - popupWidth - 20;
+      let left = viewportX + 20;
       if (left > maxX) {
         // Position to the left of click if it would overflow right
-        left = Math.max(10, data.x - popupWidth - 20);
+        left = Math.max(10, viewportX - popupWidth - 20);
       }
 
       // Vertical positioning - prefer below click, but flip above if needed
-      const availableBelow = this.container.clientHeight - data.y - bottomPanelHeight;
-      const availableAbove = data.y - topBuffer;
+      const availableBelow = window.innerHeight - viewportY - bottomBuffer;
+      const availableAbove = viewportY - topBuffer;
 
       let top: number;
       if (availableBelow >= popupHeight) {
         // Enough space below - position below click
-        top = data.y + 10;
+        top = viewportY + 10;
       } else if (availableAbove >= popupHeight) {
         // Not enough below, but enough above - position above click
-        top = data.y - popupHeight - 10;
+        top = viewportY - popupHeight - 10;
       } else {
-        // Limited space both ways - position at top of available area
-        top = Math.max(topBuffer, this.container.clientHeight - bottomPanelHeight - popupHeight);
+        // Limited space both ways - position at top with max height
+        top = topBuffer;
       }
 
       this.popup.style.left = `${left}px`;
       this.popup.style.top = `${top}px`;
     }
 
-    this.container.appendChild(this.popup);
+    // Append to body to avoid container overflow clipping
+    document.body.appendChild(this.popup);
 
     // Close button handler
     this.popup.querySelector('.popup-close')?.addEventListener('click', () => this.hide());
