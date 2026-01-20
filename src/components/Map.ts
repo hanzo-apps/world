@@ -2544,6 +2544,17 @@ export class MapComponent {
   public setZoom(zoom: number): void {
     this.state.zoom = Math.max(1, Math.min(10, zoom));
     this.applyTransform();
+    // Ensure base layer is intact after zoom change
+    this.ensureBaseLayerIntact();
+  }
+
+  private ensureBaseLayerIntact(): void {
+    const countryCount = this.baseLayerGroup?.node()?.querySelectorAll('.country').length ?? 0;
+    if (countryCount === 0 && this.countryFeatures && this.countryFeatures.length > 0) {
+      console.warn('[Map] Base layer missing, triggering recovery render');
+      this.baseRendered = false;
+      this.render();
+    }
   }
 
   public setCenter(lat: number, lon: number): void {
@@ -2558,6 +2569,8 @@ export class MapComponent {
       y: height / (2 * zoom) - pos[1],
     };
     this.applyTransform();
+    // Ensure base layer is intact after pan
+    this.ensureBaseLayerIntact();
   }
 
   public setLayers(layers: MapLayers): void {
