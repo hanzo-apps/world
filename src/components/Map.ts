@@ -1070,7 +1070,7 @@ export class MapComponent {
       });
     }
 
-    // Gamma irradiators (IAEA DIIF)
+    // Gamma irradiators (IAEA DIIF) - no labels, click to see details
     if (this.state.layers.irradiators) {
       GAMMA_IRRADIATORS.forEach((irradiator) => {
         const pos = projection([irradiator.lon, irradiator.lat]);
@@ -1081,11 +1081,6 @@ export class MapComponent {
         div.style.left = `${pos[0]}px`;
         div.style.top = `${pos[1]}px`;
         div.title = `${irradiator.city}, ${irradiator.country}`;
-
-        const label = document.createElement('div');
-        label.className = 'irradiator-label';
-        label.textContent = irradiator.city;
-        div.appendChild(label);
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
