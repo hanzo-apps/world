@@ -13,7 +13,7 @@ import {
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import type { ParsedMapUrlState } from '@/utils';
@@ -1874,9 +1874,12 @@ export class App {
         this.latestMarkets
       );
 
-      // Detect geographic convergence
-      const geoAlerts = detectGeoConvergence(this.seenGeoAlerts);
-      const geoSignals = geoAlerts.map(geoConvergenceToSignal);
+      // Detect geographic convergence (suppress during learning mode)
+      let geoSignals: ReturnType<typeof geoConvergenceToSignal>[] = [];
+      if (!isInLearningMode()) {
+        const geoAlerts = detectGeoConvergence(this.seenGeoAlerts);
+        geoSignals = geoAlerts.map(geoConvergenceToSignal);
+      }
 
       const allSignals = [...signals, ...geoSignals];
       if (allSignals.length > 0) {
