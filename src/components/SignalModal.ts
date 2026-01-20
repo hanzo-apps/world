@@ -8,6 +8,7 @@ export class SignalModal {
   private currentSignals: CorrelationSignal[] = [];
   private audioEnabled = true;
   private audio: HTMLAudioElement | null = null;
+  private onLocationClick?: (lat: number, lon: number) => void;
 
   constructor() {
     this.element = document.createElement('div');
@@ -58,6 +59,23 @@ export class SignalModal {
     checkbox?.addEventListener('change', () => {
       this.audioEnabled = checkbox.checked;
     });
+
+    // Delegate click handler for location links
+    this.element.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('location-link')) {
+        const lat = parseFloat(target.dataset.lat || '0');
+        const lon = parseFloat(target.dataset.lon || '0');
+        if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
+          this.onLocationClick(lat, lon);
+          this.hide();
+        }
+      }
+    });
+  }
+
+  public setLocationClickHandler(handler: (lat: number, lon: number) => void): void {
+    this.onLocationClick = handler;
   }
 
   public show(signals: CorrelationSignal[]): void {
@@ -125,7 +143,7 @@ export class SignalModal {
       detailsHtml += `
         <div class="signal-context-item">
           <span class="context-label">Location:</span>
-          <span class="context-value">${conv.lat.toFixed(2)}°, ${conv.lon.toFixed(2)}°</span>
+          <button class="location-link" data-lat="${conv.lat}" data-lon="${conv.lon}">${conv.lat.toFixed(2)}°, ${conv.lon.toFixed(2)}° ↗</button>
         </div>
         <div class="signal-context-item">
           <span class="context-label">Event Types:</span>
