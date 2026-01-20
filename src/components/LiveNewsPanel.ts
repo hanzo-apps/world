@@ -283,6 +283,8 @@ export class LiveNewsPanel extends Panel {
         mute: this.isMuted ? 1 : 0,
         rel: 0,
         playsinline: 1,
+        origin: window.location.origin,
+        enablejsapi: 1,
       },
       events: {
         onReady: () => {
