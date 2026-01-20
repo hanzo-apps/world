@@ -704,6 +704,8 @@ export class MapComponent {
     // Always rebuild dynamic layer
     if (this.dynamicLayerGroup) {
       this.dynamicLayerGroup.selectAll('*').remove();
+      // Create overlays-svg group for SVG-based overlays (military tracks, etc.)
+      this.dynamicLayerGroup.append('g').attr('class', 'overlays-svg');
     }
 
     // Setup projection for dynamic elements
@@ -1601,7 +1603,7 @@ export class MapComponent {
             trackLine.setAttribute('fill', 'none');
             trackLine.setAttribute('stroke-width', '1.5');
             trackLine.setAttribute('stroke-dasharray', '4,2');
-            this.svg.select('.overlays-svg').append(() => trackLine);
+            this.dynamicLayerGroup?.select('.overlays-svg').append(() => trackLine);
           }
         }
       });
@@ -1703,7 +1705,7 @@ export class MapComponent {
             trackLine.setAttribute('class', `military-vessel-track ${vessel.operator}`);
             trackLine.setAttribute('fill', 'none');
             trackLine.setAttribute('stroke-width', '2');
-            this.svg.select('.overlays-svg').append(() => trackLine);
+            this.dynamicLayerGroup?.select('.overlays-svg').append(() => trackLine);
           }
         }
       });
