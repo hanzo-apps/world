@@ -43,12 +43,39 @@ export class MapPopup {
       this.popup.style.transform = 'translateX(-50%)';
       this.popup.style.top = `${Math.max(60, Math.min(data.y, this.container.clientHeight * 0.4))}px`;
     } else {
-      // Desktop: position near click with bounds checking
+      // Desktop: position near click with smart bounds checking
       this.popup.style.transform = '';
-      const maxX = this.container.clientWidth - 400;
-      const maxY = this.container.clientHeight - 300;
-      this.popup.style.left = `${Math.min(data.x + 20, maxX)}px`;
-      this.popup.style.top = `${Math.min(data.y - 20, maxY)}px`;
+      const popupWidth = 380;
+      const popupHeight = 500; // Approximate max height for hotspot popups
+      const bottomPanelHeight = 200; // Bottom panels buffer
+      const topBuffer = 60; // Header height
+
+      // Horizontal positioning
+      const maxX = this.container.clientWidth - popupWidth - 20;
+      let left = data.x + 20;
+      if (left > maxX) {
+        // Position to the left of click if it would overflow right
+        left = Math.max(10, data.x - popupWidth - 20);
+      }
+
+      // Vertical positioning - prefer below click, but flip above if needed
+      const availableBelow = this.container.clientHeight - data.y - bottomPanelHeight;
+      const availableAbove = data.y - topBuffer;
+
+      let top: number;
+      if (availableBelow >= popupHeight) {
+        // Enough space below - position below click
+        top = data.y + 10;
+      } else if (availableAbove >= popupHeight) {
+        // Not enough below, but enough above - position above click
+        top = data.y - popupHeight - 10;
+      } else {
+        // Limited space both ways - position at top of available area
+        top = Math.max(topBuffer, this.container.clientHeight - bottomPanelHeight - popupHeight);
+      }
+
+      this.popup.style.left = `${left}px`;
+      this.popup.style.top = `${top}px`;
     }
 
     this.container.appendChild(this.popup);
