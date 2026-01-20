@@ -55,6 +55,9 @@ export function getNaturalEventIcon(category: NaturalEventCategory): string {
   return CATEGORY_ICONS[category] || '⚠️';
 }
 
+// Wildfires older than 48 hours are filtered out (stale data)
+const WILDFIRE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
 export async function fetchNaturalEvents(days = 30): Promise<NaturalEvent[]> {
   try {
     const url = `${EONET_API_URL}?status=open&days=${days}`;
@@ -66,6 +69,7 @@ export async function fetchNaturalEvents(days = 30): Promise<NaturalEvent[]> {
 
     const data: EonetResponse = await response.json();
     const events: NaturalEvent[] = [];
+    const now = Date.now();
 
     for (const event of data.events) {
       const category = event.categories[0];
@@ -78,8 +82,14 @@ export async function fetchNaturalEvents(days = 30): Promise<NaturalEvent[]> {
       const latestGeo = event.geometry[event.geometry.length - 1];
       if (!latestGeo || latestGeo.type !== 'Point') continue;
 
+      const eventDate = new Date(latestGeo.date);
       const [lon, lat] = latestGeo.coordinates;
       const source = event.sources[0];
+
+      // Filter out wildfires older than 48 hours
+      if (category.id === 'wildfires' && now - eventDate.getTime() > WILDFIRE_MAX_AGE_MS) {
+        continue;
+      }
 
       events.push({
         id: event.id,
@@ -89,7 +99,7 @@ export async function fetchNaturalEvents(days = 30): Promise<NaturalEvent[]> {
         categoryTitle: category.title,
         lat,
         lon,
-        date: new Date(latestGeo.date),
+        date: eventDate,
         magnitude: latestGeo.magnitudeValue,
         magnitudeUnit: latestGeo.magnitudeUnit,
         sourceUrl: source?.url,
