@@ -822,6 +822,10 @@ export class App {
     this.panels['cascade'] = cascadePanel;
 
     const strategicRiskPanel = new StrategicRiskPanel();
+    strategicRiskPanel.setLocationClickHandler((lat, lon) => {
+      this.map?.setCenter(lat, lon);
+      this.map?.setZoom(4);
+    });
     this.panels['strategic-risk'] = strategicRiskPanel;
 
     const liveNewsPanel = new LiveNewsPanel();
