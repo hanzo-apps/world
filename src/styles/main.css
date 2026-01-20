@@ -2938,11 +2938,11 @@ body.playback-mode .status-dot {
 .map-popup {
   position: absolute;
   width: 380px;
-  max-height: 500px;
+  max-height: calc(100vh - 280px);
   background: rgba(10, 10, 10, 0.95);
   border: 1px solid var(--red);
   z-index: 500;
-  overflow: hidden;
+  overflow-y: auto;
   box-shadow: 0 4px 24px rgba(255, 68, 68, 0.3);
 }
 
