@@ -1,5 +1,38 @@
 import { Panel } from './Panel';
 
+// YouTube IFrame Player API types
+type YouTubePlayer = {
+  mute(): void;
+  unMute(): void;
+  playVideo(): void;
+  pauseVideo(): void;
+  loadVideoById(videoId: string): void;
+  cueVideoById(videoId: string): void;
+  destroy(): void;
+};
+
+type YouTubePlayerConstructor = new (
+  elementId: string | HTMLElement,
+  options: {
+    videoId: string;
+    playerVars: Record<string, number | string>;
+    events: {
+      onReady: () => void;
+    };
+  },
+) => YouTubePlayer;
+
+type YouTubeNamespace = {
+  Player: YouTubePlayerConstructor;
+};
+
+declare global {
+  interface Window {
+    YT?: YouTubeNamespace;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
 interface LiveChannel {
   id: string;
   name: string;
@@ -17,6 +50,7 @@ const LIVE_CHANNELS: LiveChannel[] = [
 ];
 
 export class LiveNewsPanel extends Panel {
+  private static apiPromise: Promise<void> | null = null;
   private activeChannel: LiveChannel = LIVE_CHANNELS[0]!;
   private channelSwitcher: HTMLElement | null = null;
   private isMuted = true;
@@ -29,8 +63,17 @@ export class LiveNewsPanel extends Panel {
   private boundVisibilityHandler!: () => void;
   private boundIdleResetHandler!: () => void;
 
+  // YouTube Player API state
+  private player: YouTubePlayer | null = null;
+  private playerContainer: HTMLDivElement | null = null;
+  private playerElement: HTMLDivElement | null = null;
+  private playerElementId: string;
+  private isPlayerReady = false;
+  private currentVideoId: string | null = null;
+
   constructor() {
     super({ id: 'live-news', title: 'Live News', showCount: false, trackActivity: false });
+    this.playerElementId = `live-news-player-${Date.now()}`;
     this.element.classList.add('panel-wide');
     this.createLiveButton();
     this.createMuteButton();
@@ -69,7 +112,7 @@ export class LiveNewsPanel extends Panel {
       this.wasPlayingBeforeIdle = true;
       this.isPlaying = false;
       this.updateLiveIndicator();
-      this.renderPlayer();
+      this.syncPlayerState();
     }
   }
 
@@ -77,7 +120,7 @@ export class LiveNewsPanel extends Panel {
     if (this.wasPlayingBeforeIdle && !this.isPlaying) {
       this.isPlaying = true;
       this.updateLiveIndicator();
-      this.renderPlayer();
+      this.syncPlayerState();
     }
   }
 
@@ -107,7 +150,7 @@ export class LiveNewsPanel extends Panel {
     this.isPlaying = !this.isPlaying;
     this.wasPlayingBeforeIdle = this.isPlaying; // Track user intent
     this.updateLiveIndicator();
-    this.renderPlayer();
+    this.syncPlayerState();
   }
 
   private createMuteButton(): void {
@@ -135,7 +178,7 @@ export class LiveNewsPanel extends Panel {
   private toggleMute(): void {
     this.isMuted = !this.isMuted;
     this.updateMuteIcon();
-    this.renderPlayer();
+    this.syncPlayerState();
   }
 
   private createChannelSwitcher(): void {
@@ -163,28 +206,124 @@ export class LiveNewsPanel extends Panel {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.channelId === channel.id);
     });
 
-    this.renderPlayer();
+    this.syncPlayerState();
   }
 
   private renderPlayer(): void {
-    const muteParam = this.isMuted ? '1' : '0';
-    const autoplayParam = this.isPlaying ? '1' : '0';
-    const embedUrl = `https://www.youtube.com/embed/${this.activeChannel.videoId}?autoplay=${autoplayParam}&mute=${muteParam}&rel=0`;
+    this.ensurePlayerContainer();
+    void this.initializePlayer();
+  }
 
-    this.content.innerHTML = `
-      <div class="live-news-player">
-        <iframe
-          src="${embedUrl}"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen
-        ></iframe>
-      </div>
-    `;
+  private ensurePlayerContainer(): void {
+    if (this.playerContainer && this.playerElement) return;
+
+    this.content.innerHTML = '';
+    this.playerContainer = document.createElement('div');
+    this.playerContainer.className = 'live-news-player';
+
+    this.playerElement = document.createElement('div');
+    this.playerElement.id = this.playerElementId;
+    this.playerContainer.appendChild(this.playerElement);
+
+    this.content.appendChild(this.playerContainer);
+  }
+
+  private static loadYouTubeApi(): Promise<void> {
+    if (LiveNewsPanel.apiPromise) return LiveNewsPanel.apiPromise;
+
+    LiveNewsPanel.apiPromise = new Promise((resolve, reject) => {
+      if (window.YT?.Player) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.querySelector<HTMLScriptElement>(
+        'script[data-youtube-iframe-api="true"]',
+      );
+
+      if (existingScript) {
+        if (window.YT?.Player) {
+          resolve();
+          return;
+        }
+        const previousReady = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+          previousReady?.();
+          resolve();
+        };
+        return;
+      }
+
+      const previousReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousReady?.();
+        resolve();
+      };
+
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.dataset.youtubeIframeApi = 'true';
+      script.onerror = () => reject(new Error('Failed to load YouTube IFrame API'));
+      document.head.appendChild(script);
+    });
+
+    return LiveNewsPanel.apiPromise;
+  }
+
+  private async initializePlayer(): Promise<void> {
+    if (this.player) return;
+    await LiveNewsPanel.loadYouTubeApi();
+    if (this.player || !this.playerElement) return;
+
+    this.player = new window.YT!.Player(this.playerElement, {
+      videoId: this.activeChannel.videoId,
+      playerVars: {
+        autoplay: this.isPlaying ? 1 : 0,
+        mute: this.isMuted ? 1 : 0,
+        rel: 0,
+        playsinline: 1,
+      },
+      events: {
+        onReady: () => {
+          this.isPlayerReady = true;
+          this.currentVideoId = this.activeChannel.videoId;
+          this.syncPlayerState();
+        },
+      },
+    });
+  }
+
+  private syncPlayerState(): void {
+    if (!this.player || !this.isPlayerReady) return;
+
+    // Handle channel switch
+    if (this.currentVideoId !== this.activeChannel.videoId) {
+      this.currentVideoId = this.activeChannel.videoId;
+      if (this.isPlaying) {
+        this.player.loadVideoById(this.activeChannel.videoId);
+      } else {
+        this.player.cueVideoById(this.activeChannel.videoId);
+      }
+    }
+
+    // Handle mute state
+    if (this.isMuted) {
+      this.player.mute();
+    } else {
+      this.player.unMute();
+    }
+
+    // Handle play/pause state
+    if (this.isPlaying) {
+      this.player.playVideo();
+    } else {
+      this.player.pauseVideo();
+    }
   }
 
   public refresh(): void {
-    this.renderPlayer();
+    this.syncPlayerState();
   }
 
   public destroy(): void {
@@ -199,6 +338,15 @@ export class LiveNewsPanel extends Panel {
     ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
       document.removeEventListener(event, this.boundIdleResetHandler);
     });
+
+    // Destroy YouTube player
+    if (this.player) {
+      this.player.destroy();
+      this.player = null;
+    }
+    this.isPlayerReady = false;
+    this.playerContainer = null;
+    this.playerElement = null;
 
     // Call parent destroy
     super.destroy();
