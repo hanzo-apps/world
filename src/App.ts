@@ -115,6 +115,10 @@ export class App {
 
     this.renderLayout();
     this.signalModal = new SignalModal();
+    this.signalModal.setLocationClickHandler((lat, lon) => {
+      this.map?.setCenter(lat, lon);
+      this.map?.setZoom(4);
+    });
     const findingsBadge = new IntelligenceGapBadge();
     findingsBadge.setOnSignalClick((signal) => {
       this.signalModal?.showSignal(signal);
