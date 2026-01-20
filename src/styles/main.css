@@ -6211,6 +6211,30 @@ body.playback-mode .status-dot {
   text-align: right;
 }
 
+.risk-item-clickable,
+.risk-alert-clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.risk-item-clickable:hover,
+.risk-alert-clickable:hover {
+  background: rgba(68, 136, 255, 0.15);
+  border-left-color: #4488ff;
+}
+
+.risk-location-icon {
+  color: #4488ff;
+  font-size: 10px;
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.risk-item-clickable:hover .risk-location-icon,
+.risk-alert-clickable:hover .risk-location-icon {
+  opacity: 1;
+}
+
 .risk-footer {
   display: flex;
   align-items: center;
