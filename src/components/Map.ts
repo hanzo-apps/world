@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import { escapeHtml } from '@/utils/sanitize';
 import type { Topology, GeometryCollection } from 'topojson-specification';
+import type { Feature, Geometry } from 'geojson';
 import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent } from '@/types';
 import { getNaturalEventIcon } from '@/services/eonet';
 import type { WeatherAlert } from '@/services/weather';
@@ -77,6 +78,12 @@ export class MapComponent {
   private clusterGl: WebGLRenderingContext | null = null;
   private state: MapState;
   private worldData: WorldTopology | null = null;
+  private countryFeatures: Feature<Geometry>[] | null = null;
+  private baseLayerGroup: d3.Selection<SVGGElement, unknown, null, undefined> | null = null;
+  private dynamicLayerGroup: d3.Selection<SVGGElement, unknown, null, undefined> | null = null;
+  private baseRendered = false;
+  private baseWidth = 0;
+  private baseHeight = 0;
   private hotspots: HotspotWithBreaking[];
   private earthquakes: Earthquake[] = [];
   private weatherAlerts: WeatherAlert[] = [];
@@ -144,6 +151,8 @@ export class MapComponent {
     container.appendChild(this.createTimestamp());
 
     this.svg = d3.select(svgElement);
+    this.baseLayerGroup = this.svg.append('g').attr('class', 'map-base');
+    this.dynamicLayerGroup = this.svg.append('g').attr('class', 'map-dynamic');
     this.popup = new MapPopup(container);
     this.initClusterRenderer();
 
@@ -582,6 +591,14 @@ export class MapComponent {
     try {
       const worldResponse = await fetch(MAP_URLS.world);
       this.worldData = await worldResponse.json();
+      if (this.worldData) {
+        const countries = topojson.feature(
+          this.worldData,
+          this.worldData.objects.countries
+        );
+        this.countryFeatures = 'features' in countries ? countries.features : [countries];
+      }
+      this.baseRendered = false;
       this.render();
       // Re-render after layout stabilizes to catch full container width
       requestAnimationFrame(() => requestAnimationFrame(() => this.render()));
@@ -637,32 +654,51 @@ export class MapComponent {
 
     // Simple viewBox matching container - keeps SVG and overlays aligned
     this.svg.attr('viewBox', `0 0 ${width} ${height}`);
-    this.svg.selectAll('*').remove();
 
-    // Background - extend well beyond viewBox to cover pan/zoom transforms
-    // 3x size in each direction ensures no black bars when panning
-    this.svg
-      .append('rect')
-      .attr('x', -width)
-      .attr('y', -height)
-      .attr('width', width * 3)
-      .attr('height', height * 3)
-      .attr('fill', '#020a08');
+    // Only rebuild static base layer when size changes
+    const shouldRenderBase = !this.baseRendered || width !== this.baseWidth || height !== this.baseHeight;
+    if (shouldRenderBase && this.baseLayerGroup) {
+      this.baseWidth = width;
+      this.baseHeight = height;
+      this.baseLayerGroup.selectAll('*').remove();
 
-    // Grid
-    this.renderGrid(width, height);
+      // Background - extend well beyond viewBox to cover pan/zoom transforms
+      // 3x size in each direction ensures no black bars when panning
+      this.baseLayerGroup
+        .append('rect')
+        .attr('x', -width)
+        .attr('y', -height)
+        .attr('width', width * 3)
+        .attr('height', height * 3)
+        .attr('fill', '#020a08');
 
-    // Setup projection
+      // Grid
+      this.renderGrid(this.baseLayerGroup, width, height);
+
+      // Setup projection for base elements
+      const baseProjection = this.getProjection(width, height);
+      const basePath = d3.geoPath().projection(baseProjection);
+
+      // Graticule
+      this.renderGraticule(this.baseLayerGroup, basePath);
+
+      // Countries
+      this.renderCountries(this.baseLayerGroup, basePath);
+      this.baseRendered = true;
+    }
+
+    // Always rebuild dynamic layer
+    if (this.dynamicLayerGroup) {
+      this.dynamicLayerGroup.selectAll('*').remove();
+    }
+
+    // Setup projection for dynamic elements
     const projection = this.getProjection(width, height);
-    const path = d3.geoPath().projection(projection);
 
-    // Graticule
-    this.renderGraticule(path);
+    // Update country fills (sanctions toggle without rebuilding geometry)
+    this.updateCountryFills();
 
-    // Countries
-    this.renderCountries(path);
-
-    // Render map layers
+    // Render dynamic map layers
     if (this.state.layers.cables) {
       this.renderCables(projection);
     }
@@ -679,10 +715,6 @@ export class MapComponent {
       this.renderAisDensity(projection);
     }
 
-    if (this.state.layers.sanctions) {
-      this.renderSanctions();
-    }
-
     // GPU-accelerated cluster markers (LOD)
     this.renderClusterLayer(projection);
 
@@ -692,8 +724,13 @@ export class MapComponent {
     this.applyTransform();
   }
 
-  private renderGrid(width: number, height: number, yStart = 0): void {
-    const gridGroup = this.svg.append('g').attr('class', 'grid');
+  private renderGrid(
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    width: number,
+    height: number,
+    yStart = 0
+  ): void {
+    const gridGroup = group.append('g').attr('class', 'grid');
 
     for (let x = 0; x < width; x += 20) {
       gridGroup
@@ -738,9 +775,12 @@ export class MapComponent {
       .translate([width / 2, height / 2]);
   }
 
-  private renderGraticule(path: d3.GeoPath): void {
+  private renderGraticule(
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    path: d3.GeoPath
+  ): void {
     const graticule = d3.geoGraticule();
-    this.svg
+    group
       .append('path')
       .datum(graticule())
       .attr('class', 'graticule')
@@ -750,19 +790,15 @@ export class MapComponent {
       .attr('stroke-width', 0.4);
   }
 
-  private renderCountries(path: d3.GeoPath): void {
-    if (!this.worldData) return;
+  private renderCountries(
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    path: d3.GeoPath
+  ): void {
+    if (!this.countryFeatures) return;
 
-    const countries = topojson.feature(
-      this.worldData,
-      this.worldData.objects.countries
-    );
-
-    const features = 'features' in countries ? countries.features : [countries];
-
-    this.svg
+    group
       .selectAll('.country')
-      .data(features)
+      .data(this.countryFeatures)
       .enter()
       .append('path')
       .attr('class', 'country')
@@ -773,7 +809,8 @@ export class MapComponent {
   }
 
   private renderCables(projection: d3.GeoProjection): void {
-    const cableGroup = this.svg.append('g').attr('class', 'cables');
+    if (!this.dynamicLayerGroup) return;
+    const cableGroup = this.dynamicLayerGroup.append('g').attr('class', 'cables');
 
     UNDERSEA_CABLES.forEach((cable) => {
       const lineGenerator = d3
@@ -808,7 +845,8 @@ export class MapComponent {
   }
 
   private renderPipelines(projection: d3.GeoProjection): void {
-    const pipelineGroup = this.svg.append('g').attr('class', 'pipelines');
+    if (!this.dynamicLayerGroup) return;
+    const pipelineGroup = this.dynamicLayerGroup.append('g').attr('class', 'pipelines');
 
     PIPELINES.forEach((pipeline) => {
       const lineGenerator = d3
@@ -853,7 +891,8 @@ export class MapComponent {
   }
 
   private renderConflicts(projection: d3.GeoProjection): void {
-    const conflictGroup = this.svg.append('g').attr('class', 'conflicts');
+    if (!this.dynamicLayerGroup) return;
+    const conflictGroup = this.dynamicLayerGroup.append('g').attr('class', 'conflicts');
 
     CONFLICT_ZONES.forEach((zone) => {
       const points = zone.coords
@@ -871,24 +910,32 @@ export class MapComponent {
   }
 
 
-  private renderSanctions(): void {
-    if (!this.worldData) return;
+  private updateCountryFills(): void {
+    if (!this.baseLayerGroup || !this.countryFeatures) return;
 
     const sanctionColors: Record<string, string> = {
       severe: 'rgba(255, 0, 0, 0.35)',
       high: 'rgba(255, 100, 0, 0.25)',
       moderate: 'rgba(255, 200, 0, 0.2)',
     };
+    const defaultFill = '#0d3028';
+    const useSanctions = this.state.layers.sanctions;
 
-    this.svg.selectAll('.country').each(function () {
+    this.baseLayerGroup.selectAll('.country').each(function (datum) {
       const el = d3.select(this);
-      const id = el.datum() as { id?: number };
+      const id = datum as { id?: number };
+      if (!useSanctions) {
+        el.attr('fill', defaultFill);
+        return;
+      }
       if (id?.id !== undefined && SANCTIONED_COUNTRIES[id.id]) {
         const level = SANCTIONED_COUNTRIES[id.id];
         if (level) {
-          el.attr('fill', sanctionColors[level] || '#0a2018');
+          el.attr('fill', sanctionColors[level] || defaultFill);
+          return;
         }
       }
+      el.attr('fill', defaultFill);
     });
   }
 
@@ -1810,7 +1857,8 @@ export class MapComponent {
   }
 
   private renderAisDensity(projection: d3.GeoProjection): void {
-    const densityGroup = this.svg.append('g').attr('class', 'ais-density');
+    if (!this.dynamicLayerGroup) return;
+    const densityGroup = this.dynamicLayerGroup.append('g').attr('class', 'ais-density');
 
     this.aisDensity.forEach((zone) => {
       const pos = projection([zone.lon, zone.lat]);
