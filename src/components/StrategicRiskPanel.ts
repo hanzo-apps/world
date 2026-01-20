@@ -24,6 +24,7 @@ export class StrategicRiskPanel extends Panel {
   private freshnessSummary: DataFreshnessSummary | null = null;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private unsubscribeFreshness: (() => void) | null = null;
+  private onLocationClick?: (lat: number, lon: number) => void;
 
   constructor() {
     super({
@@ -353,16 +354,32 @@ export class StrategicRiskPanel extends Panel {
       return '<div class="risk-empty">No significant risks detected</div>';
     }
 
+    // Get convergence zone for first risk if available
+    const topZone = this.overview.topConvergenceZones[0];
+
     return `
       <div class="risk-section">
         <div class="risk-section-title">Top Risks</div>
         <div class="risk-list">
-          ${this.overview.topRisks.map((risk, i) => `
-            <div class="risk-item">
-              <span class="risk-rank">${i + 1}.</span>
-              <span class="risk-text">${escapeHtml(risk)}</span>
-            </div>
-          `).join('')}
+          ${this.overview.topRisks.map((risk, i) => {
+            // First risk is convergence - make it clickable if we have location
+            const isConvergence = i === 0 && risk.startsWith('Convergence:') && topZone;
+            if (isConvergence) {
+              return `
+                <div class="risk-item risk-item-clickable" data-lat="${topZone.lat}" data-lon="${topZone.lon}">
+                  <span class="risk-rank">${i + 1}.</span>
+                  <span class="risk-text">${escapeHtml(risk)}</span>
+                  <span class="risk-location-icon">↗</span>
+                </div>
+              `;
+            }
+            return `
+              <div class="risk-item">
+                <span class="risk-rank">${i + 1}.</span>
+                <span class="risk-text">${escapeHtml(risk)}</span>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -379,17 +396,26 @@ export class StrategicRiskPanel extends Panel {
       <div class="risk-section">
         <div class="risk-section-title">Recent Alerts (${this.alerts.length})</div>
         <div class="risk-alerts">
-          ${displayAlerts.map(alert => `
-            <div class="risk-alert" style="border-left: 3px solid ${this.getPriorityColor(alert.priority)}">
-              <div class="risk-alert-header">
-                <span class="risk-alert-type">${this.getTypeEmoji(alert.type)}</span>
-                <span class="risk-alert-priority">${this.getPriorityEmoji(alert.priority)}</span>
-                <span class="risk-alert-title">${escapeHtml(alert.title)}</span>
+          ${displayAlerts.map(alert => {
+            const hasLocation = alert.location && alert.location.lat && alert.location.lon;
+            const clickableClass = hasLocation ? 'risk-alert-clickable' : '';
+            const locationAttrs = hasLocation
+              ? `data-lat="${alert.location!.lat}" data-lon="${alert.location!.lon}"`
+              : '';
+
+            return `
+              <div class="risk-alert ${clickableClass}" style="border-left: 3px solid ${this.getPriorityColor(alert.priority)}" ${locationAttrs}>
+                <div class="risk-alert-header">
+                  <span class="risk-alert-type">${this.getTypeEmoji(alert.type)}</span>
+                  <span class="risk-alert-priority">${this.getPriorityEmoji(alert.priority)}</span>
+                  <span class="risk-alert-title">${escapeHtml(alert.title)}</span>
+                  ${hasLocation ? '<span class="risk-location-icon">↗</span>' : ''}
+                </div>
+                <div class="risk-alert-summary">${escapeHtml(alert.summary)}</div>
+                <div class="risk-alert-time">${this.formatTime(alert.timestamp)}</div>
               </div>
-              <div class="risk-alert-summary">${escapeHtml(alert.summary)}</div>
-              <div class="risk-alert-time">${this.formatTime(alert.timestamp)}</div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -464,6 +490,30 @@ export class StrategicRiskPanel extends Panel {
         }
       });
     });
+
+    // Clickable risk items (convergence zones)
+    const clickableRisks = this.content.querySelectorAll('.risk-item-clickable');
+    clickableRisks.forEach(item => {
+      item.addEventListener('click', () => {
+        const lat = parseFloat((item as HTMLElement).dataset.lat || '0');
+        const lon = parseFloat((item as HTMLElement).dataset.lon || '0');
+        if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
+          this.onLocationClick(lat, lon);
+        }
+      });
+    });
+
+    // Clickable alerts with location
+    const clickableAlerts = this.content.querySelectorAll('.risk-alert-clickable');
+    clickableAlerts.forEach(alert => {
+      alert.addEventListener('click', () => {
+        const lat = parseFloat((alert as HTMLElement).dataset.lat || '0');
+        const lon = parseFloat((alert as HTMLElement).dataset.lon || '0');
+        if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
+          this.onLocationClick(lat, lon);
+        }
+      });
+    });
   }
 
   private emitEnablePanel(panelId: string): void {
@@ -489,5 +539,9 @@ export class StrategicRiskPanel extends Panel {
 
   public getAlerts(): UnifiedAlert[] {
     return this.alerts;
+  }
+
+  public setLocationClickHandler(handler: (lat: number, lon: number) => void): void {
+    this.onLocationClick = handler;
   }
 }
