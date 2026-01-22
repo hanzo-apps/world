@@ -36,18 +36,58 @@ declare global {
 interface LiveChannel {
   id: string;
   name: string;
-  videoId: string;
+  handle: string; // YouTube channel handle (e.g., @bloomberg)
+  fallbackVideoId?: string; // Fallback if no live stream detected
+  videoId?: string; // Dynamically fetched live video ID
+  isLive?: boolean;
 }
 
-const LIVE_CHANNELS: LiveChannel[] = [
-  { id: 'bloomberg', name: 'Bloomberg', videoId: 'iEpJwprxDdk' },
-  { id: 'sky', name: 'SkyNews', videoId: 'YDvsBbKfLPA' },
-  { id: 'euronews', name: 'Euronews', videoId: 'pykpO5kQJ98' },
-  { id: 'dw', name: 'DW', videoId: 'LuKwFajn37U' },
-  { id: 'france24', name: 'France24', videoId: 'Ap-UM1O9RBU' },
-  { id: 'alarabiya', name: 'AlArabiya', videoId: 'n7eQejkXbnM' },
-  { id: 'aljazeera', name: 'AlJazeera', videoId: 'gCNeDWCI0vo' },
+const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
+
+// Full variant: World news channels (24/7 live streams)
+const FULL_LIVE_CHANNELS: LiveChannel[] = [
+  { id: 'bloomberg', name: 'Bloomberg', handle: '@Bloomberg', fallbackVideoId: 'iEpJwprxDdk' },
+  { id: 'sky', name: 'SkyNews', handle: '@SkyNews', fallbackVideoId: 'YDvsBbKfLPA' },
+  { id: 'euronews', name: 'Euronews', handle: '@euabortnews', fallbackVideoId: 'pykpO5kQJ98' },
+  { id: 'dw', name: 'DW', handle: '@DWNews', fallbackVideoId: 'LuKwFajn37U' },
+  { id: 'france24', name: 'France24', handle: '@FRANCE24English', fallbackVideoId: 'Ap-UM1O9RBU' },
+  { id: 'alarabiya', name: 'AlArabiya', handle: '@AlArabiya', fallbackVideoId: 'n7eQejkXbnM' },
+  { id: 'aljazeera', name: 'AlJazeera', handle: '@AlJazeeraEnglish', fallbackVideoId: 'gCNeDWCI0vo' },
 ];
+
+// Tech variant: Tech & business channels
+const TECH_LIVE_CHANNELS: LiveChannel[] = [
+  { id: 'bloomberg', name: 'Bloomberg', handle: '@Bloomberg', fallbackVideoId: 'iEpJwprxDdk' },
+  { id: 'yahoo', name: 'Yahoo Finance', handle: '@YahooFinance', fallbackVideoId: 'KQp-e_XQnDE' },
+  { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
+  { id: 'tbpn', name: 'TBPN', handle: '@tbpnlive', fallbackVideoId: 'ksM7C7vLmRE' },
+  { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'nA9UZF-SZoQ' },
+];
+
+const LIVE_CHANNELS = SITE_VARIANT === 'tech' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
+
+// Cache for live video IDs
+const liveVideoCache = new Map<string, { videoId: string | null; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchLiveVideoId(channel: LiveChannel): Promise<string | null> {
+  const cached = liveVideoCache.get(channel.handle);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.videoId;
+  }
+
+  try {
+    const res = await fetch(`/api/youtube/live?channel=${encodeURIComponent(channel.handle)}`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    const videoId = data.videoId || null;
+    liveVideoCache.set(channel.handle, { videoId, timestamp: Date.now() });
+    return videoId;
+  } catch (error) {
+    console.warn(`[LiveNews] Failed to fetch live ID for ${channel.name}:`, error);
+    return null;
+  }
+}
 
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
@@ -216,16 +256,49 @@ export class LiveNewsPanel extends Panel {
     this.element.insertBefore(this.channelSwitcher, this.content);
   }
 
-  private switchChannel(channel: LiveChannel): void {
+  private async switchChannel(channel: LiveChannel): Promise<void> {
     if (channel.id === this.activeChannel.id) return;
 
     this.activeChannel = channel;
 
     this.channelSwitcher?.querySelectorAll('.live-channel-btn').forEach(btn => {
-      btn.classList.toggle('active', (btn as HTMLElement).dataset.channelId === channel.id);
+      const btnEl = btn as HTMLElement;
+      btnEl.classList.toggle('active', btnEl.dataset.channelId === channel.id);
+      if (btnEl.dataset.channelId === channel.id) {
+        btnEl.classList.add('loading');
+      }
     });
 
+    // Fetch live video ID dynamically
+    const liveVideoId = await fetchLiveVideoId(channel);
+    channel.videoId = liveVideoId || channel.fallbackVideoId;
+    channel.isLive = !!liveVideoId;
+
+    // Update button state
+    this.channelSwitcher?.querySelectorAll('.live-channel-btn').forEach(btn => {
+      const btnEl = btn as HTMLElement;
+      btnEl.classList.remove('loading');
+      if (btnEl.dataset.channelId === channel.id && !channel.videoId) {
+        btnEl.classList.add('offline');
+      }
+    });
+
+    if (!channel.videoId) {
+      this.showOfflineMessage(channel);
+      return;
+    }
+
     this.syncPlayerState();
+  }
+
+  private showOfflineMessage(channel: LiveChannel): void {
+    this.content.innerHTML = `
+      <div class="live-offline">
+        <div class="offline-icon">📺</div>
+        <div class="offline-text">${channel.name} is not currently live</div>
+        <button class="offline-retry" onclick="this.closest('.panel').querySelector('.live-channel-btn.active')?.click()">Retry</button>
+      </div>
+    `;
   }
 
   private renderPlayer(): void {
@@ -292,6 +365,17 @@ export class LiveNewsPanel extends Panel {
 
   private async initializePlayer(): Promise<void> {
     if (this.player) return;
+
+    // Fetch live video ID for initial channel
+    const liveVideoId = await fetchLiveVideoId(this.activeChannel);
+    this.activeChannel.videoId = liveVideoId || this.activeChannel.fallbackVideoId;
+    this.activeChannel.isLive = !!liveVideoId;
+
+    if (!this.activeChannel.videoId) {
+      this.showOfflineMessage(this.activeChannel);
+      return;
+    }
+
     await LiveNewsPanel.loadYouTubeApi();
     if (this.player || !this.playerElement) return;
 
@@ -308,7 +392,7 @@ export class LiveNewsPanel extends Panel {
       events: {
         onReady: () => {
           this.isPlayerReady = true;
-          this.currentVideoId = this.activeChannel.videoId;
+          this.currentVideoId = this.activeChannel.videoId || null;
           this.syncPlayerState();
         },
       },
@@ -318,13 +402,22 @@ export class LiveNewsPanel extends Panel {
   private syncPlayerState(): void {
     if (!this.player || !this.isPlayerReady) return;
 
+    const videoId = this.activeChannel.videoId;
+    if (!videoId) return;
+
     // Handle channel switch
-    if (this.currentVideoId !== this.activeChannel.videoId) {
-      this.currentVideoId = this.activeChannel.videoId;
+    if (this.currentVideoId !== videoId) {
+      this.currentVideoId = videoId;
+      // Re-render player container if it was showing offline message
+      if (!this.playerElement || !document.getElementById(this.playerElementId)) {
+        this.ensurePlayerContainer();
+        void this.initializePlayer();
+        return;
+      }
       if (this.isPlaying) {
-        this.player.loadVideoById(this.activeChannel.videoId);
+        this.player.loadVideoById(videoId);
       } else {
-        this.player.cueVideoById(this.activeChannel.videoId);
+        this.player.cueVideoById(videoId);
       }
     }
 

@@ -10,6 +10,7 @@ import {
   DEFAULT_MAP_LAYERS,
   MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
+  SITE_VARIANT,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
@@ -17,6 +18,7 @@ import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresen
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
+import { escapeHtml } from '@/utils/sanitize';
 import type { ParsedMapUrlState } from '@/utils';
 import {
   MapComponent,
@@ -86,6 +88,7 @@ export class App {
   private boundIdleResetHandler: (() => void) | null = null;
   private isIdle = false;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000; // 2 minutes - pause animations when idle
+  private disabledSources: Set<string> = new Set();
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -101,11 +104,32 @@ export class App {
 
     // Use mobile-specific defaults on first load (no saved layers)
     const defaultLayers = this.isMobile ? MOBILE_DEFAULT_MAP_LAYERS : DEFAULT_MAP_LAYERS;
-    this.mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers);
+
+    // Check if variant changed - reset layers to variant defaults
+    const storedVariant = localStorage.getItem('worldmonitor-variant');
+    const currentVariant = SITE_VARIANT;
+    if (storedVariant !== currentVariant) {
+      // Variant changed - use defaults for new variant, clear old settings
+      localStorage.setItem('worldmonitor-variant', currentVariant);
+      localStorage.removeItem(STORAGE_KEYS.mapLayers);
+      this.mapLayers = { ...defaultLayers };
+    } else {
+      this.mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers);
+    }
+
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
     if (this.initialUrlState.layers) {
+      // For tech variant, filter out geopolitical layers from URL
+      if (currentVariant === 'tech') {
+        const geoLayers: (keyof MapLayers)[] = ['conflicts', 'bases', 'hotspots', 'nuclear', 'irradiators', 'sanctions', 'military', 'protests', 'pipelines', 'waterways', 'ais', 'flights', 'spaceports', 'minerals'];
+        const urlLayers = this.initialUrlState.layers;
+        geoLayers.forEach(layer => {
+          urlLayers[layer] = false;
+        });
+      }
       this.mapLayers = this.initialUrlState.layers;
     }
+    this.disabledSources = new Set(loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []));
   }
 
   public async init(): Promise<void> {
@@ -175,6 +199,9 @@ export class App {
   }
 
   private setupPizzIntIndicator(): void {
+    // Skip DEFCON indicator for tech/startup variant
+    if (SITE_VARIANT === 'tech') return;
+
     this.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.container.querySelector('.header-left');
     if (headerLeft) {
@@ -595,7 +622,7 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <span class="logo">WORLD MONITOR</span><span class="version">v${__APP_VERSION__}</span>
+          <span class="logo">${SITE_VARIANT === 'tech' ? 'TECH MONITOR' : 'WORLD MONITOR'}</span><span class="version">v${__APP_VERSION__}</span>
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
             <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
             <span class="credit-text">@eliehabib</span>
@@ -627,6 +654,7 @@ export class App {
           <span class="time-display" id="timeDisplay">--:--:-- UTC</span>
           <button class="fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
           <button class="settings-btn" id="settingsBtn">⚙ PANELS</button>
+          <button class="sources-btn" id="sourcesBtn">📡 SOURCES</button>
         </div>
       </div>
       <div class="main-content">
@@ -653,6 +681,23 @@ export class App {
             <button class="modal-close" id="modalClose">×</button>
           </div>
           <div class="panel-toggle-grid" id="panelToggles"></div>
+        </div>
+      </div>
+      <div class="modal-overlay" id="sourcesModal">
+        <div class="modal sources-modal">
+          <div class="modal-header">
+            <span class="modal-title">News Sources</span>
+            <span class="sources-counter" id="sourcesCounter"></span>
+            <button class="modal-close" id="sourcesModalClose">×</button>
+          </div>
+          <div class="sources-search">
+            <input type="text" id="sourcesSearch" placeholder="Filter sources..." />
+          </div>
+          <div class="sources-toggle-grid" id="sourceToggles"></div>
+          <div class="sources-footer">
+            <button class="sources-select-all" id="sourcesSelectAll">Select All</button>
+            <button class="sources-select-none" id="sourcesSelectNone">Select None</button>
+          </div>
         </div>
       </div>
     `;
@@ -803,6 +848,47 @@ export class App {
     this.newsPanels['ai'] = aiPanel;
     this.panels['ai'] = aiPanel;
 
+    // Tech variant panels
+    const startupsPanel = new NewsPanel('startups', 'Startups & VC');
+    this.attachRelatedAssetHandlers(startupsPanel);
+    this.newsPanels['startups'] = startupsPanel;
+    this.panels['startups'] = startupsPanel;
+
+    const securityPanel = new NewsPanel('security', 'Cybersecurity');
+    this.attachRelatedAssetHandlers(securityPanel);
+    this.newsPanels['security'] = securityPanel;
+    this.panels['security'] = securityPanel;
+
+    const policyPanel = new NewsPanel('policy', 'AI Policy & Regulation');
+    this.attachRelatedAssetHandlers(policyPanel);
+    this.newsPanels['policy'] = policyPanel;
+    this.panels['policy'] = policyPanel;
+
+    const hardwarePanel = new NewsPanel('hardware', 'Semiconductors & Hardware');
+    this.attachRelatedAssetHandlers(hardwarePanel);
+    this.newsPanels['hardware'] = hardwarePanel;
+    this.panels['hardware'] = hardwarePanel;
+
+    const cloudPanel = new NewsPanel('cloud', 'Cloud & Infrastructure');
+    this.attachRelatedAssetHandlers(cloudPanel);
+    this.newsPanels['cloud'] = cloudPanel;
+    this.panels['cloud'] = cloudPanel;
+
+    const devPanel = new NewsPanel('dev', 'Developer Community');
+    this.attachRelatedAssetHandlers(devPanel);
+    this.newsPanels['dev'] = devPanel;
+    this.panels['dev'] = devPanel;
+
+    const githubPanel = new NewsPanel('github', 'GitHub Trending');
+    this.attachRelatedAssetHandlers(githubPanel);
+    this.newsPanels['github'] = githubPanel;
+    this.panels['github'] = githubPanel;
+
+    const ipoPanel = new NewsPanel('ipo', 'IPO & SPAC');
+    this.attachRelatedAssetHandlers(ipoPanel);
+    this.newsPanels['ipo'] = ipoPanel;
+    this.panels['ipo'] = ipoPanel;
+
     const thinktanksPanel = new NewsPanel('thinktanks', 'Think Tanks');
     this.attachRelatedAssetHandlers(thinktanksPanel);
     this.newsPanels['thinktanks'] = thinktanksPanel;
@@ -851,9 +937,9 @@ export class App {
     const liveNewsPanel = new LiveNewsPanel();
     this.panels['live-news'] = liveNewsPanel;
 
-    // Add panels to grid in saved order (optimized for geopolitical analysis)
-    // Row 1: Intel + breaking events | Row 2: Market signals | Row 3: Supporting context
-    const defaultOrder = ['strategic-risk', 'live-news', 'intel', 'gdelt-intel', 'cii', 'cascade', 'politics', 'middleeast', 'asia', 'africa', 'latam', 'gov', 'thinktanks', 'polymarket', 'commodities', 'energy', 'markets', 'economic', 'finance', 'tech', 'crypto', 'heatmap', 'ai', 'layoffs', 'monitors'];
+    // Add panels to grid in saved order
+    // Use DEFAULT_PANELS keys for variant-aware panel order
+    const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
     const savedOrder = this.getSavedPanelOrder();
     // Merge saved order with default to include new panels
     let panelOrder = defaultOrder;
@@ -1064,9 +1150,12 @@ export class App {
 
     document.getElementById('settingsModal')?.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-        (e.target as HTMLElement).classList.remove('active');
+        document.getElementById('settingsModal')?.classList.remove('active');
       }
     });
+
+    // Sources modal
+    this.setupSourcesModal();
 
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -1294,6 +1383,95 @@ export class App {
     });
   }
 
+  private getAllSourceNames(): string[] {
+    const sources = new Set<string>();
+    Object.values(FEEDS).forEach(feeds => {
+      if (feeds) feeds.forEach(f => sources.add(f.name));
+    });
+    INTEL_SOURCES.forEach(f => sources.add(f.name));
+    return Array.from(sources).sort((a, b) => a.localeCompare(b));
+  }
+
+  private renderSourceToggles(filter = ''): void {
+    const container = document.getElementById('sourceToggles')!;
+    const allSources = this.getAllSourceNames();
+    const filterLower = filter.toLowerCase();
+    const filteredSources = filter
+      ? allSources.filter(s => s.toLowerCase().includes(filterLower))
+      : allSources;
+
+    container.innerHTML = filteredSources.map(source => {
+      const isEnabled = !this.disabledSources.has(source);
+      const escaped = escapeHtml(source);
+      return `
+        <div class="source-toggle-item ${isEnabled ? 'active' : ''}" data-source="${escaped}">
+          <div class="source-toggle-checkbox">${isEnabled ? '✓' : ''}</div>
+          <span class="source-toggle-label">${escaped}</span>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.source-toggle-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const sourceName = (item as HTMLElement).dataset.source!;
+        if (this.disabledSources.has(sourceName)) {
+          this.disabledSources.delete(sourceName);
+        } else {
+          this.disabledSources.add(sourceName);
+        }
+        saveToStorage(STORAGE_KEYS.disabledFeeds, Array.from(this.disabledSources));
+        this.renderSourceToggles(filter);
+      });
+    });
+
+    // Update counter
+    const enabledCount = allSources.length - this.disabledSources.size;
+    const counterEl = document.getElementById('sourcesCounter');
+    if (counterEl) {
+      counterEl.textContent = `${enabledCount}/${allSources.length} enabled`;
+    }
+  }
+
+  private setupSourcesModal(): void {
+    document.getElementById('sourcesBtn')?.addEventListener('click', () => {
+      document.getElementById('sourcesModal')?.classList.add('active');
+      // Clear search and show all sources on open
+      const searchInput = document.getElementById('sourcesSearch') as HTMLInputElement | null;
+      if (searchInput) searchInput.value = '';
+      this.renderSourceToggles();
+    });
+
+    document.getElementById('sourcesModalClose')?.addEventListener('click', () => {
+      document.getElementById('sourcesModal')?.classList.remove('active');
+    });
+
+    document.getElementById('sourcesModal')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+        document.getElementById('sourcesModal')?.classList.remove('active');
+      }
+    });
+
+    document.getElementById('sourcesSearch')?.addEventListener('input', (e) => {
+      const filter = (e.target as HTMLInputElement).value;
+      this.renderSourceToggles(filter);
+    });
+
+    document.getElementById('sourcesSelectAll')?.addEventListener('click', () => {
+      this.disabledSources.clear();
+      saveToStorage(STORAGE_KEYS.disabledFeeds, []);
+      const filter = (document.getElementById('sourcesSearch') as HTMLInputElement)?.value || '';
+      this.renderSourceToggles(filter);
+    });
+
+    document.getElementById('sourcesSelectNone')?.addEventListener('click', () => {
+      const allSources = this.getAllSourceNames();
+      this.disabledSources = new Set(allSources);
+      saveToStorage(STORAGE_KEYS.disabledFeeds, allSources);
+      const filter = (document.getElementById('sourcesSearch') as HTMLInputElement)?.value || '';
+      this.renderSourceToggles(filter);
+    });
+  }
+
   private applyPanelSettings(): void {
     Object.entries(this.panelSettings).forEach(([key, config]) => {
       if (key === 'map') {
@@ -1406,6 +1584,17 @@ export class App {
       let renderTimeout: ReturnType<typeof setTimeout> | null = null;
       let pendingItems: NewsItem[] | null = null;
 
+      // Filter out disabled sources
+      const enabledFeeds = (feeds ?? []).filter(f => !this.disabledSources.has(f.name));
+      if (enabledFeeds.length === 0) {
+        if (panel) panel.showError('All sources disabled');
+        this.statusPanel?.updateFeed(category.charAt(0).toUpperCase() + category.slice(1), {
+          status: 'ok',
+          itemCount: 0,
+        });
+        return [];
+      }
+
       const flushPendingRender = () => {
         if (!panel || !pendingItems) return;
         panel.renderNews(pendingItems);
@@ -1434,7 +1623,7 @@ export class App {
         }
       };
 
-      const items = await fetchCategoryFeeds(feeds ?? [], {
+      const items = await fetchCategoryFeeds(enabledFeeds, {
         onBatch: (partialItems) => scheduleRender(partialItems),
       });
 
@@ -1500,20 +1689,26 @@ export class App {
     });
 
     // Intel (uses different source) - run in parallel with category processing
-    const intelResult = await Promise.allSettled([fetchCategoryFeeds(INTEL_SOURCES)]);
-    if (intelResult[0]?.status === 'fulfilled') {
-      const intel = intelResult[0].value;
-      const intelPanel = this.newsPanels['intel'];
-      if (intelPanel) {
-        intelPanel.renderNews(intel);
-        const baseline = await updateBaseline('news:intel', intel.length);
-        const deviation = calculateDeviation(intel.length, baseline);
-        intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
-      }
-      this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
-      collectedNews.push(...intel);
+    const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
+    const intelPanel = this.newsPanels['intel'];
+    if (enabledIntelSources.length === 0) {
+      if (intelPanel) intelPanel.showError('All Intel sources disabled');
+      this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: 0 });
     } else {
-      console.error('[App] Intel feed failed:', intelResult[0]?.reason);
+      const intelResult = await Promise.allSettled([fetchCategoryFeeds(enabledIntelSources)]);
+      if (intelResult[0]?.status === 'fulfilled') {
+        const intel = intelResult[0].value;
+        if (intelPanel) {
+          intelPanel.renderNews(intel);
+          const baseline = await updateBaseline('news:intel', intel.length);
+          const deviation = calculateDeviation(intel.length, baseline);
+          intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+        }
+        this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
+        collectedNews.push(...intel);
+      } else {
+        console.error('[App] Intel feed failed:', intelResult[0]?.reason);
+      }
     }
 
     this.allNews = collectedNews;
