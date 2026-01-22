@@ -35,8 +35,8 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Ars Technica', url: rss('https://feeds.arstechnica.com/arstechnica/technology-lab') },
     { name: 'Hacker News', url: rss('https://hnrss.org/frontpage') },
     { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
-    { name: 'Wired', url: rss('https://www.wired.com/feed/rss') },
-    { name: 'Engadget', url: rss('https://www.engadget.com/rss.xml') },
+    { name: 'ZDNet', url: rss('https://www.zdnet.com/news/rss.xml') },
+    { name: 'TechMeme', url: rss('https://www.techmeme.com/feed.xml') },
   ],
 
   // AI & Machine Learning
@@ -47,9 +47,9 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'MIT Tech Review AI', url: rss('https://www.technologyreview.com/topic/artificial-intelligence/feed') },
     { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
     { name: 'ArXiv ML', url: rss('https://export.arxiv.org/rss/cs.LG') },
-    { name: 'Wired AI', url: rss('https://www.wired.com/feed/tag/ai/latest/rss') },
-    { name: 'OpenAI Blog', url: rss('https://openai.com/blog/rss.xml') },
-    { name: 'Google AI Blog', url: rss('https://blog.google/technology/ai/rss/') },
+    { name: 'AI Weekly', url: rss('https://news.google.com/rss/search?q="artificial+intelligence"+OR+"machine+learning"+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Anthropic News', url: rss('https://news.google.com/rss/search?q=Anthropic+Claude+AI+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'OpenAI News', url: rss('https://news.google.com/rss/search?q=OpenAI+ChatGPT+GPT-4+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
 
   // Startups & VC
@@ -78,8 +78,9 @@ export const FEEDS: Record<string, Feed[]> = {
   // Markets & Finance (tech-focused)
   finance: [
     { name: 'CNBC Tech', url: rss('https://www.cnbc.com/id/19854910/device/rss/rss.html') },
-    { name: 'Bloomberg Tech', url: rss('https://feeds.bloomberg.com/technology/news.rss') },
-    { name: 'Reuters Tech', url: rss('https://www.reuters.com/technology/rss') },
+    { name: 'MarketWatch Tech', url: rss('https://feeds.marketwatch.com/marketwatch/topstories/') },
+    { name: 'Yahoo Finance', url: rss('https://finance.yahoo.com/rss/topstories') },
+    { name: 'Seeking Alpha Tech', url: rss('https://seekingalpha.com/market_currents.xml') },
   ],
 
   // Semiconductors & Hardware
