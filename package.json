@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tech": "VITE_VARIANT=tech vite",
     "build": "tsc && vite build",
+    "build:full": "VITE_VARIANT=full tsc && VITE_VARIANT=full vite build",
+    "build:tech": "VITE_VARIANT=tech tsc && VITE_VARIANT=tech vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
@@ -20,6 +23,7 @@
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
     "d3": "^7.9.0",
-    "topojson-client": "^3.1.0"
+    "topojson-client": "^3.1.0",
+    "youtubei.js": "^16.0.1"
   }
 }
