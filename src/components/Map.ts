@@ -26,6 +26,12 @@ import {
   PORTS,
   SPACEPORTS,
   CRITICAL_MINERALS,
+  SITE_VARIANT,
+  // Tech variant data
+  STARTUP_HUBS,
+  ACCELERATORS,
+  TECH_HQS,
+  CLOUD_REGIONS,
 } from '@/config';
 import { MapPopup } from './MapPopup';
 import {
@@ -300,8 +306,8 @@ export class MapComponent {
     toggles.className = 'layer-toggles';
     toggles.id = 'layerToggles';
 
-    // Grouped: geopolitical | military | infrastructure | transport | natural | economic | labels
-    const layers: (keyof MapLayers)[] = [
+    // Variant-aware layer buttons
+    const fullLayers: (keyof MapLayers)[] = [
       'conflicts', 'hotspots', 'sanctions', 'protests',  // geopolitical
       'bases', 'nuclear', 'irradiators',                 // military/strategic
       'military',                                         // military tracking (flights + vessels)
@@ -311,6 +317,13 @@ export class MapComponent {
       'economic',                                         // economic
       'countries', 'waterways',                           // labels
     ];
+    const techLayers: (keyof MapLayers)[] = [
+      'cables', 'datacenters', 'outages',                // tech infrastructure
+      'startupHubs', 'cloudRegions', 'techHQs', 'accelerators', // tech ecosystem
+      'natural', 'weather',                               // natural events
+      'economic', 'countries',                            // economic/geographic
+    ];
+    const layers = SITE_VARIANT === 'tech' ? techLayers : fullLayers;
     const layerLabels: Partial<Record<keyof MapLayers, string>> = {
       ais: 'Shipping',
       flights: 'Delays',
@@ -1508,6 +1521,162 @@ export class MapComponent {
           this.popup.show({
             type: 'mineral',
             data: mine,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // === TECH VARIANT LAYERS ===
+
+    // Startup Hubs (🚀 icon by tier)
+    if (this.state.layers.startupHubs) {
+      STARTUP_HUBS.forEach((hub) => {
+        const pos = projection([hub.lon, hub.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `startup-hub-marker ${hub.tier}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'startup-hub-icon';
+        icon.textContent = hub.tier === 'mega' ? '🦄' : hub.tier === 'major' ? '🚀' : '💡';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 2 || hub.tier === 'mega') {
+          const label = document.createElement('div');
+          label.className = 'startup-hub-label';
+          label.textContent = hub.name;
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'startupHub',
+            data: hub,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Cloud Regions (☁️ icons by provider)
+    if (this.state.layers.cloudRegions) {
+      CLOUD_REGIONS.forEach((region) => {
+        const pos = projection([region.lon, region.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `cloud-region-marker ${region.provider}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'cloud-region-icon';
+        // Provider-specific icons
+        const icons: Record<string, string> = { aws: '🟠', gcp: '🔵', azure: '🟣', cloudflare: '🟡' };
+        icon.textContent = icons[region.provider] || '☁️';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 3) {
+          const label = document.createElement('div');
+          label.className = 'cloud-region-label';
+          label.textContent = region.provider.toUpperCase();
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'cloudRegion',
+            data: region,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Tech HQs (🏢 icons by company type)
+    if (this.state.layers.techHQs) {
+      TECH_HQS.forEach((hq) => {
+        const pos = projection([hq.lon, hq.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `tech-hq-marker ${hq.type}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'tech-hq-icon';
+        icon.textContent = hq.type === 'faang' ? '🏛️' : hq.type === 'unicorn' ? '🦄' : '🏢';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 3 || hq.type === 'faang') {
+          const label = document.createElement('div');
+          label.className = 'tech-hq-label';
+          label.textContent = hq.company;
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'techHQ',
+            data: hq,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Accelerators (🎯 icons)
+    if (this.state.layers.accelerators) {
+      ACCELERATORS.forEach((acc) => {
+        const pos = projection([acc.lon, acc.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `accelerator-marker ${acc.type}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'accelerator-icon';
+        icon.textContent = acc.type === 'accelerator' ? '🎯' : acc.type === 'incubator' ? '🔬' : '🎨';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 3) {
+          const label = document.createElement('div');
+          label.className = 'accelerator-label';
+          label.textContent = acc.name;
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'accelerator',
+            data: acc,
             x: e.clientX - rect.left,
             y: e.clientY - rect.top,
           });

@@ -1,17 +1,18 @@
 import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, Port, Spaceport, CriticalMineralProject } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
+import type { StartupHub, Accelerator, TechHQ, CloudRegion } from '@/config/tech-geo';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { isMobileDevice } from '@/utils';
 import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticle } from '@/services/gdelt-intel';
 import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator';
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -177,6 +178,14 @@ export class MapPopup {
         return this.renderSpaceportPopup(data.data as Spaceport);
       case 'mineral':
         return this.renderMineralPopup(data.data as CriticalMineralProject);
+      case 'startupHub':
+        return this.renderStartupHubPopup(data.data as StartupHub);
+      case 'cloudRegion':
+        return this.renderCloudRegionPopup(data.data as CloudRegion);
+      case 'techHQ':
+        return this.renderTechHQPopup(data.data as TechHQ);
+      case 'accelerator':
+        return this.renderAcceleratorPopup(data.data as Accelerator);
       default:
         return '';
     }
@@ -1186,6 +1195,115 @@ export class MapPopup {
         </div>
         ${dc.note ? `<p class="popup-description">${dc.note}</p>` : ''}
         <div class="popup-attribution">Data: Epoch AI GPU Clusters</div>
+      </div>
+    `;
+  }
+
+  private renderStartupHubPopup(hub: StartupHub): string {
+    const tierLabels: Record<string, string> = { 'mega': 'MEGA HUB', 'major': 'MAJOR HUB', 'emerging': 'EMERGING' };
+    const tierIcons: Record<string, string> = { 'mega': '🦄', 'major': '🚀', 'emerging': '💡' };
+    return `
+      <div class="popup-header startup-hub ${hub.tier}">
+        <span class="popup-title">${tierIcons[hub.tier] || '🚀'} ${escapeHtml(hub.name)}</span>
+        <span class="popup-badge ${hub.tier}">${tierLabels[hub.tier] || 'HUB'}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(hub.city)}, ${escapeHtml(hub.country)}</div>
+        ${hub.unicorns ? `
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">UNICORNS</span>
+            <span class="stat-value">${hub.unicorns}+</span>
+          </div>
+        </div>
+        ` : ''}
+        ${hub.description ? `<p class="popup-description">${escapeHtml(hub.description)}</p>` : ''}
+      </div>
+    `;
+  }
+
+  private renderCloudRegionPopup(region: CloudRegion): string {
+    const providerNames: Record<string, string> = { 'aws': 'Amazon Web Services', 'gcp': 'Google Cloud Platform', 'azure': 'Microsoft Azure', 'cloudflare': 'Cloudflare' };
+    const providerIcons: Record<string, string> = { 'aws': '🟠', 'gcp': '🔵', 'azure': '🟣', 'cloudflare': '🟡' };
+    return `
+      <div class="popup-header cloud-region ${region.provider}">
+        <span class="popup-title">${providerIcons[region.provider] || '☁️'} ${escapeHtml(region.name)}</span>
+        <span class="popup-badge ${region.provider}">${region.provider.toUpperCase()}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(region.city)}, ${escapeHtml(region.country)}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">PROVIDER</span>
+            <span class="stat-value">${providerNames[region.provider] || region.provider}</span>
+          </div>
+          ${region.zones ? `
+          <div class="popup-stat">
+            <span class="stat-label">AVAILABILITY ZONES</span>
+            <span class="stat-value">${region.zones}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderTechHQPopup(hq: TechHQ): string {
+    const typeLabels: Record<string, string> = { 'faang': 'BIG TECH', 'unicorn': 'UNICORN', 'public': 'PUBLIC' };
+    const typeIcons: Record<string, string> = { 'faang': '🏛️', 'unicorn': '🦄', 'public': '🏢' };
+    return `
+      <div class="popup-header tech-hq ${hq.type}">
+        <span class="popup-title">${typeIcons[hq.type] || '🏢'} ${escapeHtml(hq.company)}</span>
+        <span class="popup-badge ${hq.type}">${typeLabels[hq.type] || 'TECH'}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(hq.city)}, ${escapeHtml(hq.country)}</div>
+        <div class="popup-stats">
+          ${hq.marketCap ? `
+          <div class="popup-stat">
+            <span class="stat-label">MARKET CAP</span>
+            <span class="stat-value">${escapeHtml(hq.marketCap)}</span>
+          </div>
+          ` : ''}
+          ${hq.employees ? `
+          <div class="popup-stat">
+            <span class="stat-label">EMPLOYEES</span>
+            <span class="stat-value">${hq.employees.toLocaleString()}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderAcceleratorPopup(acc: Accelerator): string {
+    const typeLabels: Record<string, string> = { 'accelerator': 'ACCELERATOR', 'incubator': 'INCUBATOR', 'studio': 'STARTUP STUDIO' };
+    const typeIcons: Record<string, string> = { 'accelerator': '🎯', 'incubator': '🔬', 'studio': '🎨' };
+    return `
+      <div class="popup-header accelerator ${acc.type}">
+        <span class="popup-title">${typeIcons[acc.type] || '🎯'} ${escapeHtml(acc.name)}</span>
+        <span class="popup-badge ${acc.type}">${typeLabels[acc.type] || 'ACCELERATOR'}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(acc.city)}, ${escapeHtml(acc.country)}</div>
+        <div class="popup-stats">
+          ${acc.founded ? `
+          <div class="popup-stat">
+            <span class="stat-label">FOUNDED</span>
+            <span class="stat-value">${acc.founded}</span>
+          </div>
+          ` : ''}
+        </div>
+        ${acc.notable && acc.notable.length > 0 ? `
+        <div class="popup-notable">
+          <span class="notable-label">NOTABLE ALUMNI</span>
+          <span class="notable-list">${acc.notable.map(n => escapeHtml(n)).join(', ')}</span>
+        </div>
+        ` : ''}
       </div>
     `;
   }

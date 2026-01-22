@@ -7,7 +7,7 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.1-blue)
 
 ![World Monitor Dashboard](Screenshot.png)
 
@@ -103,6 +103,29 @@ Multi-source RSS aggregation across categories:
 - **Crisis Watch** - International Crisis Group, IAEA, WHO, UNHCR
 - **Regional Sources** - Xinhua, TASS, Kyiv Independent, Moscow Times
 - **Layoffs Tracker** - Tech industry job cuts
+
+### Source Filtering
+
+The **📡 SOURCES** button in the header opens a global source management modal, enabling fine-grained control over which news sources appear in the dashboard.
+
+**Capabilities:**
+- **Search**: Filter the source list by name to quickly find specific outlets
+- **Individual Toggle**: Click any source to enable/disable it
+- **Bulk Actions**: "Select All" and "Select None" for quick adjustments
+- **Counter Display**: Shows "45/77 enabled" to indicate current selection
+- **Persistence**: Settings are saved to localStorage and persist across sessions
+
+**Use Cases:**
+- **Noise Reduction**: Disable high-volume aggregators (Google News) to focus on primary sources
+- **Regional Focus**: Enable only sources relevant to a specific geographic area
+- **Source Quality**: Disable sources with poor signal-to-noise ratio
+- **Bias Management**: Balance coverage by enabling/disabling sources with known editorial perspectives
+
+**Technical Details:**
+- Disabled sources are filtered at fetch time (not display time), reducing bandwidth and API calls
+- Affects all news panels simultaneously—disable BBC once, it's gone everywhere
+- Panels with all sources disabled show "All sources disabled" message
+- Changes take effect on the next refresh cycle
 
 ### Regional Intelligence Panels
 
@@ -213,15 +236,40 @@ This provides a unified command center for all intelligence findings, whether ge
 
 ### Signal Types
 
+The system detects 12 distinct signal types across news, markets, military, and infrastructure domains:
+
+**News & Source Signals**
+
 | Signal | Trigger | What It Means |
 |--------|---------|---------------|
 | **◉ Convergence** | 3+ source types report same story within 30 minutes | Multiple independent channels confirming the same event—higher likelihood of significance |
 | **△ Triangulation** | Wire + Government + Intel sources align | The "authority triangle"—when official channels, wire services, and defense specialists all report the same thing |
 | **🔥 Velocity Spike** | Topic mention rate doubles with 6+ sources/hour | A story is accelerating rapidly across the news ecosystem |
+
+**Market Signals**
+
+| Signal | Trigger | What It Means |
+|--------|---------|---------------|
 | **🔮 Prediction Leading** | Prediction market moves 5%+ with low news coverage | Markets pricing in information not yet reflected in news |
+| **📰 News Leads Markets** | High news velocity without corresponding market move | Breaking news not yet priced in—potential mispricing |
 | **✓ Market Move Explained** | Market moves 2%+ with correlated news coverage | Price action has identifiable news catalyst—entity correlation found related stories |
 | **📊 Silent Divergence** | Market moves 2%+ with no correlated news after entity search | Unexplained price action after exhaustive search—possible insider knowledge or algorithm-driven |
+| **📈 Sector Cascade** | Multiple related sectors moving in same direction | Market reaction cascading through correlated industries |
+
+**Infrastructure & Energy Signals**
+
+| Signal | Trigger | What It Means |
+|--------|---------|---------------|
+| **🛢 Flow Drop** | Pipeline flow disruption keywords detected | Physical commodity supply constraint—may precede price spike |
 | **🔁 Flow-Price Divergence** | Pipeline disruption news without corresponding oil price move | Energy supply disruption not yet priced in—potential information edge |
+
+**Geopolitical & Military Signals**
+
+| Signal | Trigger | What It Means |
+|--------|---------|---------------|
+| **🌍 Geographic Convergence** | 3+ event types in same 1°×1° grid cell | Multiple independent data streams converging on same location—heightened regional activity |
+| **🔺 Hotspot Escalation** | Multi-component score exceeds threshold with rising trend | Hotspot showing corroborated escalation across news, CII, convergence, and military data |
+| **✈ Military Surge** | Transport/fighter activity 2× baseline in theater | Unusual military airlift concentration—potential deployment or crisis response |
 
 ### How It Works
 
@@ -346,6 +394,48 @@ Sources are also categorized by function for triangulation detection:
 - **Mainstream** - Major news outlets (BBC, Guardian, NPR, Al Jazeera)
 - **Market** - Financial press (CNBC, MarketWatch, Financial Times)
 - **Tech** - Technology coverage (Hacker News, Ars Technica, MIT Tech Review)
+
+### Propaganda Risk Indicators
+
+The dashboard visually flags sources with known state affiliations or propaganda risk, enabling users to appropriately weight information from these outlets.
+
+**Risk Levels**
+
+| Level | Visual | Meaning |
+|-------|--------|---------|
+| **High** | ⚠ State Media (red) | Direct state control or ownership |
+| **Medium** | ! Caution (orange) | Significant state influence or funding |
+| **Low** | (none) | Independent editorial control |
+
+**Flagged Sources**
+
+| Source | Risk Level | State Affiliation | Notes |
+|--------|------------|-------------------|-------|
+| **Xinhua** | High | China (CCP) | Official news agency of PRC |
+| **TASS** | High | Russia | State-owned news agency |
+| **RT** | High | Russia | Registered foreign agent in US |
+| **CGTN** | High | China (CCP) | China Global Television Network |
+| **PressTV** | High | Iran | IRIB subsidiary |
+| **Al Jazeera** | Medium | Qatar | Qatari government funded |
+| **TRT World** | Medium | Turkey | Turkish state broadcaster |
+
+**Display Locations**
+
+Propaganda risk badges appear in:
+- **Cluster primary source**: Badge next to the main source name
+- **Top sources list**: Small badge next to each flagged source
+- **Cluster view**: Visible when expanding multi-source clusters
+
+**Why Include State Media?**
+
+State-controlled outlets are included rather than filtered because:
+
+1. **Signal Value**: What state media reports (and omits) reveals government priorities
+2. **Rapid Response**: State media often breaks domestic news faster than international outlets
+3. **Narrative Analysis**: Understanding how events are framed by different governments
+4. **Completeness**: Excluding them creates blind spots in coverage
+
+The badges ensure users can **contextualize** state media reports rather than unknowingly treating them as independent journalism.
 
 ---
 
@@ -562,6 +652,61 @@ The system counts matching news articles in the current feed, applies velocity a
 | **High** | >6 matches OR spike velocity | Red pulse |
 
 This creates a dynamic "heat map" of global attention based on live news flow.
+
+### Hotspot Escalation Signals
+
+Beyond visual activity levels, the system generates **escalation signals** when hotspots show significant changes across multiple dimensions. This multi-component approach reduces false positives by requiring corroboration from independent data streams.
+
+**Escalation Components**
+
+Each hotspot's escalation score blends four weighted components:
+
+| Component | Weight | Data Source | What It Measures |
+|-----------|--------|-------------|------------------|
+| **News Activity** | 35% | RSS feeds | Matching news count, breaking flags, velocity |
+| **CII Contribution** | 25% | Country Instability Index | Instability score of associated country |
+| **Geographic Convergence** | 25% | Multi-source events | Event type diversity in geographic cell |
+| **Military Activity** | 15% | OpenSky/AIS | Flights and vessels within 200km |
+
+**Score Calculation**
+
+```
+static_baseline = hotspot.baselineRisk  // 1-5 per hotspot
+dynamic_score = (
+  news_component × 0.35 +
+  cii_component × 0.25 +
+  geo_component × 0.25 +
+  military_component × 0.15
+)
+proximity_boost = hotspot_proximity_multiplier  // 1.0-2.0
+
+final_score = (static_baseline × 0.30 + dynamic_score × 0.70) × proximity_boost
+```
+
+**Trend Detection**
+
+The system maintains 48-point history (24 hours at 30-minute intervals) per hotspot:
+- **Linear regression** calculates slope of recent scores
+- **Rising**: Slope > +0.1 points per interval
+- **Falling**: Slope < -0.1 points per interval
+- **Stable**: Slope within ±0.1
+
+**Signal Generation**
+
+Escalation signals (`hotspot_escalation`) are emitted when:
+1. Final score exceeds threshold (typically 60)
+2. At least 2 hours since last signal for this hotspot (cooldown)
+3. Trend is rising or score is critical (>80)
+
+**Signal Context**
+
+| Field | Content |
+|-------|---------|
+| **Why It Matters** | "Geopolitical hotspot showing significant escalation based on news activity, country instability, geographic convergence, and military presence" |
+| **Actionable Insight** | "Increase monitoring priority; assess downstream impacts on infrastructure, markets, and regional stability" |
+| **Confidence Note** | "Weighted by multiple data sources—news (35%), CII (25%), geo-convergence (25%), military (15%)" |
+
+This multi-signal approach means a hotspot escalation signal represents **corroborated evidence** across independent data streams—not just a spike in news mentions.
 
 ---
 
@@ -1304,6 +1449,109 @@ The system maintains position trails for tracked vessels:
 - **Trail visualization** on map for recent movement
 
 This enables detection of loitering, circling, or other anomalous behavior patterns.
+
+### Military Surge Detection
+
+The system continuously monitors military aircraft activity to detect **surge events**—significant increases above normal operational baselines that may indicate mobilization, exercises, or crisis response.
+
+**Theater Classification**
+
+Military activity is analyzed across five geographic theaters:
+
+| Theater | Coverage | Key Areas |
+|---------|----------|-----------|
+| **Middle East** | Persian Gulf, Levant, Arabian Peninsula | US CENTCOM activity, Iranian airspace |
+| **Eastern Europe** | Ukraine, Baltics, Black Sea | NATO-Russia border activity |
+| **Western Europe** | Central Europe, North Sea | NATO exercises, air policing |
+| **Pacific** | East Asia, Southeast Asia | Taiwan Strait, Korean Peninsula |
+| **Horn of Africa** | Red Sea, East Africa | Counter-piracy, Houthi activity |
+
+**Aircraft Classification**
+
+Aircraft are categorized by callsign pattern matching:
+
+| Type | Callsign Patterns | Significance |
+|------|-------------------|--------------|
+| **Transport** | RCH, REACH, MOOSE, HERKY, EVAC, DUSTOFF | Airlift operations, troop movement |
+| **Fighter** | VIPER, EAGLE, RAPTOR, STRIKE | Combat air patrol, interception |
+| **Reconnaissance** | SIGNT, COBRA, RIVET, JSTARS | Intelligence gathering |
+
+**Baseline Calculation**
+
+The system maintains rolling 48-hour activity baselines per theater:
+- Minimum 6 data samples required for reliable baseline
+- Default baselines when data insufficient: 3 transport, 2 fighter, 1 reconnaissance
+- Activity below 50% of baseline indicates stand-down
+
+**Surge Detection Algorithm**
+
+```
+surge_ratio = current_count / baseline
+surge_triggered = (
+  ratio ≥ 2.0 AND
+  transport ≥ 5 AND
+  fighters ≥ 4
+)
+```
+
+**Surge Signal Output**
+
+When a surge is detected, the system generates a `military_surge` signal:
+
+| Field | Content |
+|-------|---------|
+| **Location** | Theater centroid coordinates |
+| **Message** | "Military Transport Surge in [Theater]: [X] aircraft (baseline: [Y])" |
+| **Details** | Aircraft types, nearby bases (150km radius), top callsigns |
+| **Confidence** | Based on surge ratio (0.6–0.9) |
+
+### Foreign Military Presence Detection
+
+Beyond surge detection, the system monitors for **foreign military aircraft in sensitive regions**—situations where aircraft from one nation appear in geopolitically significant areas outside their normal operating range.
+
+**Sensitive Regions**
+
+The system tracks 18 strategically significant geographic areas:
+
+| Region | Sensitivity | Monitored For |
+|--------|-------------|---------------|
+| **Taiwan Strait** | Critical | PLAAF activity, US transits |
+| **Persian Gulf** | Critical | Iranian, US, Gulf state activity |
+| **Baltic Sea** | High | Russian activity near NATO |
+| **Black Sea** | High | NATO reconnaissance, Russian activity |
+| **South China Sea** | High | PLAAF patrols, US FONOPs |
+| **Korean Peninsula** | High | DPRK activity, US-ROK exercises |
+| **Eastern Mediterranean** | Medium | Russian naval aviation, NATO |
+| **Arctic** | Medium | Russian bomber patrols |
+
+**Detection Logic**
+
+For each sensitive region, the system:
+1. Identifies all military aircraft within the region boundary
+2. Groups aircraft by operating nation
+3. Excludes "home region" operators (e.g., Russian VKS in Baltic excluded from alert)
+4. Applies concentration thresholds (typically 2-3 aircraft per operator)
+
+**Critical Combinations**
+
+Certain operator-region combinations trigger **critical severity** alerts:
+
+| Operator | Region | Rationale |
+|----------|--------|-----------|
+| PLAAF | Taiwan Strait | Potential invasion rehearsal |
+| Russian VKS | Arctic | Nuclear bomber patrols |
+| USAF | Persian Gulf | Potential strike package |
+
+**Signal Output**
+
+Foreign presence detection generates a `foreign_military_presence` signal:
+
+| Field | Content |
+|-------|---------|
+| **Title** | "Foreign Military Presence: [Region]" |
+| **Details** | "[Operator] aircraft detected: [count] [types]" |
+| **Severity** | Critical/High/Medium based on combination |
+| **Confidence** | 0.7–0.95 based on aircraft count and type diversity |
 
 ---
 

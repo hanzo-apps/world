@@ -1,27 +1,100 @@
-export * from './feeds';
-export * from './markets';
-export * from './geo';
-export * from './panels';
-export * from './irradiators';
-export * from './pipelines';
-export * from './ai-datacenters';
-export * from './ports';
+// Configuration exports
+// For variant-specific builds, set VITE_VARIANT environment variable
+// VITE_VARIANT=tech → startups.worldmonitor.app (tech-focused)
+// VITE_VARIANT=full → worldmonitor.app (geopolitical)
 
-export const API_URLS = {
-  finnhub: (symbols: string[]) =>
-    `/api/finnhub?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`,
-  yahooFinance: (symbol: string) =>
-    `/api/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
-  coingecko:
-    '/api/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
-  polymarket: '/api/polymarket?closed=false&order=volume&ascending=false&limit=100',
-  earthquakes: '/api/earthquakes',
-};
+export const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
 
-export const REFRESH_INTERVALS = {
-  feeds: 5 * 60 * 1000,    // 5 minutes
-  markets: 60 * 1000,       // 1 minute
-  crypto: 60 * 1000,        // 1 minute
-  predictions: 5 * 60 * 1000, // 5 minutes
-  ais: 10 * 60 * 1000, // 10 minutes
-};
+// Shared base configuration (always included)
+export {
+  API_URLS,
+  REFRESH_INTERVALS,
+  MONITOR_COLORS,
+  STORAGE_KEYS,
+} from './variants/base';
+
+// Market data (shared)
+export { SECTORS, COMMODITIES, MARKET_SYMBOLS, CRYPTO_MAP } from './markets';
+
+// Geo data (shared base)
+export { UNDERSEA_CABLES, COUNTRY_LABELS, MAP_URLS } from './geo';
+
+// AI Datacenters (shared)
+export { AI_DATA_CENTERS } from './ai-datacenters';
+
+// Feeds configuration (shared functions, variant-specific data)
+export {
+  SOURCE_TIERS,
+  getSourceTier,
+  SOURCE_TYPES,
+  getSourceType,
+  getSourcePropagandaRisk,
+  ALERT_KEYWORDS,
+  type SourceRiskProfile,
+  type SourceType,
+} from './feeds';
+
+// Panel configuration - imported from panels.ts
+export {
+  DEFAULT_PANELS,
+  DEFAULT_MAP_LAYERS,
+  MOBILE_DEFAULT_MAP_LAYERS,
+} from './panels';
+
+// ============================================
+// VARIANT-SPECIFIC EXPORTS
+// Only import what's needed for each variant
+// ============================================
+
+// Full variant (geopolitical) - only included in full builds
+// These are large data files that should be tree-shaken in tech builds
+export {
+  FEEDS,
+  INTEL_SOURCES,
+} from './feeds';
+
+export {
+  INTEL_HOTSPOTS,
+  CONFLICT_ZONES,
+  MILITARY_BASES,
+  NUCLEAR_FACILITIES,
+  APT_GROUPS,
+  STRATEGIC_WATERWAYS,
+  ECONOMIC_CENTERS,
+  SANCTIONED_COUNTRIES,
+  SPACEPORTS,
+  CRITICAL_MINERALS,
+} from './geo';
+
+export { GAMMA_IRRADIATORS } from './irradiators';
+export { PIPELINES, PIPELINE_COLORS } from './pipelines';
+export { PORTS } from './ports';
+export { MONITORED_AIRPORTS, FAA_AIRPORTS } from './airports';
+export {
+  ENTITY_REGISTRY,
+  getEntityById,
+  type EntityType,
+  type EntityEntry,
+} from './entities';
+
+// Tech variant - these are included in tech builds
+export { TECH_COMPANIES } from './tech-companies';
+export { AI_RESEARCH_LABS } from './ai-research-labs';
+export { STARTUP_ECOSYSTEMS } from './startup-ecosystems';
+export {
+  AI_REGULATIONS,
+  REGULATORY_ACTIONS,
+  COUNTRY_REGULATION_PROFILES,
+  getUpcomingDeadlines,
+  getRecentActions,
+} from './ai-regulations';
+export {
+  STARTUP_HUBS,
+  ACCELERATORS,
+  TECH_HQS,
+  CLOUD_REGIONS,
+  type StartupHub,
+  type Accelerator,
+  type TechHQ,
+  type CloudRegion,
+} from './tech-geo';
