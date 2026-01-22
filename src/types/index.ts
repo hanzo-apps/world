@@ -407,6 +407,11 @@ export interface MapLayers {
   natural: boolean;
   spaceports: boolean;
   minerals: boolean;
+  // Tech variant layers
+  startupHubs: boolean;
+  cloudRegions: boolean;
+  accelerators: boolean;
+  techHQs: boolean;
 }
 
 export interface AIDataCenter {
@@ -865,3 +870,102 @@ export interface CascadeResult {
 
 // Re-export port types
 export type { Port, PortType } from '@/config/ports';
+
+// AI Regulation Types
+export type RegulationType = 'comprehensive' | 'sectoral' | 'voluntary' | 'proposed';
+export type ComplianceStatus = 'active' | 'proposed' | 'draft' | 'superseded';
+export type RegulationStance = 'strict' | 'moderate' | 'permissive' | 'undefined';
+
+export interface AIRegulation {
+  id: string;
+  name: string;
+  shortName: string;
+  country: string;
+  region?: string;
+  type: RegulationType;
+  status: ComplianceStatus;
+  announcedDate: string;
+  effectiveDate?: string;
+  complianceDeadline?: string;
+  scope: string[];
+  keyProvisions: string[];
+  penalties?: string;
+  link?: string;
+  description?: string;
+}
+
+export interface RegulatoryAction {
+  id: string;
+  date: string;
+  country: string;
+  title: string;
+  type: 'law-passed' | 'executive-order' | 'guideline' | 'enforcement' | 'consultation';
+  regulationId?: string;
+  description: string;
+  impact: 'high' | 'medium' | 'low';
+  source?: string;
+}
+
+export interface CountryRegulationProfile {
+  country: string;
+  countryCode: string;
+  stance: RegulationStance;
+  activeRegulations: string[];
+  proposedRegulations: string[];
+  lastUpdated: string;
+  summary: string;
+}
+
+// Tech Company & AI Lab Types
+export interface TechCompany {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  country: string;
+  city?: string;
+  sector?: string;
+  officeType?: 'headquarters' | 'regional' | 'engineering' | 'research' | 'campus' | 'major office';
+  employees?: number;
+  foundedYear?: number;
+  keyProducts?: string[];
+  valuation?: number;
+  stockSymbol?: string;
+  description?: string;
+}
+
+export interface AIResearchLab {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  country: string;
+  city?: string;
+  type: 'corporate' | 'academic' | 'government' | 'nonprofit' | 'industry' | 'research institute';
+  parent?: string;
+  focusAreas?: string[];
+  description?: string;
+  foundedYear?: number;
+  notableWork?: string[];
+  publications?: number;
+  faculty?: number;
+}
+
+export interface StartupEcosystem {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  country: string;
+  city: string;
+  ecosystemTier?: 'tier1' | 'tier2' | 'tier3' | 'emerging';
+  totalFunding2024?: number;
+  activeStartups?: number;
+  unicorns?: number;
+  topSectors?: string[];
+  majorVCs?: string[];
+  notableStartups?: string[];
+  avgSeedRound?: number;
+  avgSeriesA?: number;
+  description?: string;
+}

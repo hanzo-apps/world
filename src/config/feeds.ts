@@ -1,5 +1,7 @@
 import type { Feed } from '@/types';
 
+const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
+
 // Helper to create RSS proxy URL (Vercel)
 const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
 
@@ -193,7 +195,7 @@ export function isStateAffiliatedSource(sourceName: string): boolean {
   return !!profile?.stateAffiliated;
 }
 
-export const FEEDS: Record<string, Feed[]> = {
+const FULL_FEEDS: Record<string, Feed[]> = {
   politics: [
     { name: 'BBC World', url: rss('https://feeds.bbci.co.uk/news/world/rss.xml') },
     { name: 'NPR News', url: rss('https://feeds.npr.org/1001/rss.xml') },
@@ -297,6 +299,100 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Mining & Resources', url: rss('https://news.google.com/rss/search?q=(lithium+OR+"rare+earth"+OR+cobalt+OR+mining)+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
 };
+
+// Tech/AI variant feeds
+const TECH_FEEDS: Record<string, Feed[]> = {
+  tech: [
+    { name: 'TechCrunch', url: rss('https://techcrunch.com/feed/') },
+    { name: 'The Verge', url: rss('https://www.theverge.com/rss/index.xml') },
+    { name: 'Ars Technica', url: rss('https://feeds.arstechnica.com/arstechnica/technology-lab') },
+    { name: 'Hacker News', url: rss('https://hnrss.org/frontpage') },
+    { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
+    { name: 'Wired', url: rss('https://www.wired.com/feed/rss') },
+    { name: 'Engadget', url: rss('https://www.engadget.com/rss.xml') },
+  ],
+  ai: [
+    { name: 'AI News', url: rss('https://news.google.com/rss/search?q=(OpenAI+OR+Anthropic+OR+Google+AI+OR+"large+language+model"+OR+ChatGPT+OR+Claude+OR+"AI+model")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'VentureBeat AI', url: rss('https://venturebeat.com/category/ai/feed/') },
+    { name: 'The Verge AI', url: rss('https://www.theverge.com/rss/ai-artificial-intelligence/index.xml') },
+    { name: 'MIT Tech Review AI', url: rss('https://www.technologyreview.com/topic/artificial-intelligence/feed') },
+    { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
+    { name: 'ArXiv ML', url: rss('https://export.arxiv.org/rss/cs.LG') },
+    { name: 'Wired AI', url: rss('https://www.wired.com/feed/tag/ai/latest/rss') },
+    { name: 'OpenAI Blog', url: rss('https://openai.com/blog/rss.xml') },
+    { name: 'Google AI Blog', url: rss('https://blog.google/technology/ai/rss/') },
+  ],
+  startups: [
+    { name: 'TechCrunch Startups', url: rss('https://techcrunch.com/category/startups/feed/') },
+    { name: 'VentureBeat', url: rss('https://venturebeat.com/feed/') },
+    { name: 'Crunchbase News', url: rss('https://news.crunchbase.com/feed/') },
+    { name: 'SaaStr', url: rss('https://www.saastr.com/feed/') },
+    { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
+    { name: 'AngelList News', url: rss('https://news.google.com/rss/search?q=site:angellist.com+OR+"AngelList"+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  github: [
+    { name: 'GitHub Trending', url: rss('https://rsshub.app/github/trending/daily/all') },
+    { name: 'GitHub Trending JS', url: rss('https://rsshub.app/github/trending/daily/javascript') },
+    { name: 'GitHub Trending Python', url: rss('https://rsshub.app/github/trending/daily/python') },
+    { name: 'GitHub Trending TS', url: rss('https://rsshub.app/github/trending/daily/typescript') },
+  ],
+  ipo: [
+    { name: 'IPO News', url: rss('https://news.google.com/rss/search?q=(IPO+OR+"initial+public+offering"+OR+SPAC)+tech+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Renaissance IPO', url: rss('https://news.google.com/rss/search?q=site:renaissancecapital.com+IPO+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'CNBC IPO', url: rss('https://www.cnbc.com/id/28185165/device/rss/rss.html') },
+  ],
+  funding: [
+    { name: 'Crunchbase News', url: rss('https://news.crunchbase.com/feed/') },
+    { name: 'TechCrunch Funding', url: rss('https://techcrunch.com/category/venture/feed/') },
+    { name: 'SEC Filings', url: rss('https://news.google.com/rss/search?q=(S-1+OR+"IPO+filing"+OR+"SEC+filing")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'VC News', url: rss('https://news.google.com/rss/search?q=("Series+A"+OR+"Series+B"+OR+"funding+round"+OR+"venture+capital")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  producthunt: [
+    { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
+  ],
+  outages: [
+    { name: 'AWS Status', url: rss('https://news.google.com/rss/search?q=AWS+outage+OR+"Amazon+Web+Services"+down+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Cloud Outages', url: rss('https://news.google.com/rss/search?q=(Azure+OR+GCP+OR+Cloudflare+OR+Slack+OR+GitHub)+outage+OR+down+when:1d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  security: [
+    { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/') },
+    { name: 'The Hacker News', url: rss('https://feeds.feedburner.com/TheHackersNews') },
+    { name: 'Dark Reading', url: rss('https://www.darkreading.com/rss.xml') },
+    { name: 'Schneier', url: rss('https://www.schneier.com/feed/') },
+  ],
+  policy: [
+    { name: 'Politico Tech', url: rss('https://rss.politico.com/technology.xml') },
+    { name: 'Protocol Policy', url: rss('https://www.protocol.com/feeds/feed.rss') },
+    { name: 'Axios AI', url: rss('https://www.axios.com/technology/artificial-intelligence') },
+  ],
+  finance: [
+    { name: 'CNBC Tech', url: rss('https://www.cnbc.com/id/19854910/device/rss/rss.html') },
+    { name: 'Bloomberg Tech', url: rss('https://feeds.bloomberg.com/technology/news.rss') },
+    { name: 'Reuters Tech', url: rss('https://www.reuters.com/technology/rss') },
+  ],
+  hardware: [
+    { name: 'AnandTech', url: rss('https://www.anandtech.com/rss/') },
+    { name: "Tom's Hardware", url: rss('https://www.tomshardware.com/feeds/all') },
+    { name: 'SemiAnalysis', url: rss('https://www.semianalysis.com/feed') },
+  ],
+  cloud: [
+    { name: 'InfoQ', url: rss('https://feed.infoq.com/') },
+    { name: 'The New Stack', url: rss('https://thenewstack.io/feed/') },
+    { name: 'DevOps.com', url: rss('https://devops.com/feed/') },
+  ],
+  dev: [
+    { name: 'Dev.to', url: rss('https://dev.to/feed') },
+    { name: 'Lobsters', url: rss('https://lobste.rs/rss') },
+    { name: 'Changelog', url: rss('https://changelog.com/feed') },
+  ],
+  layoffs: [
+    { name: 'Layoffs.fyi', url: rss('https://news.google.com/rss/search?q=tech+layoffs+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
+  ],
+};
+
+// Variant-aware exports
+export const FEEDS = SITE_VARIANT === 'tech' ? TECH_FEEDS : FULL_FEEDS;
 
 export const INTEL_SOURCES: Feed[] = [
   { name: 'Defense One', url: rss('https://www.defenseone.com/rss/all/'), type: 'defense' },
