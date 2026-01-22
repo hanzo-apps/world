@@ -1,11 +1,48 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import pkg from './package.json';
+
+function youtubeLivePlugin(): Plugin {
+  return {
+    name: 'youtube-live',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith('/api/youtube/live')) {
+          return next();
+        }
+
+        const url = new URL(req.url, 'http://localhost');
+        const channel = url.searchParams.get('channel');
+
+        if (!channel) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Missing channel parameter' }));
+          return;
+        }
+
+        try {
+          // Use YouTube's oEmbed to check if a video is valid/live
+          // For now, return null to use fallback - will implement proper detection later
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          res.end(JSON.stringify({ videoId: null, channel }));
+        } catch (error) {
+          console.error(`[YouTube Live] Error:`, error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Failed to fetch', videoId: null }));
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  plugins: [youtubeLivePlugin()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
