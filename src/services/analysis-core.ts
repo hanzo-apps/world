@@ -98,7 +98,9 @@ export type SignalType =
   | 'flow_price_divergence'
   | 'geo_convergence'
   | 'explained_market_move'
-  | 'sector_cascade';
+  | 'hotspot_escalation'
+  | 'sector_cascade'
+  | 'military_surge';
 
 export interface CorrelationSignalCore {
   id: string;
