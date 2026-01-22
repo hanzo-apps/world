@@ -1,6 +1,79 @@
-import type { MilitaryFlight } from '@/types';
+import type { MilitaryFlight, MilitaryOperator } from '@/types';
 import type { SignalType } from '@/utils/analysis-constants';
 import { MILITARY_BASES_EXPANDED } from '@/config/bases-expanded';
+
+// Foreign military concentration detection - immediate alerts, no baseline needed
+interface GeoRegion {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  radiusKm: number;
+}
+
+interface OperatorHomeRegions {
+  operator: MilitaryOperator;
+  country: string;
+  homeRegions: string[]; // region IDs where this operator's presence is "normal"
+  alertThreshold: number; // minimum aircraft to trigger alert when outside home
+}
+
+// Sensitive regions where foreign military concentration is notable
+const SENSITIVE_REGIONS: GeoRegion[] = [
+  // Middle East / Iran area
+  { id: 'persian-gulf', name: 'Persian Gulf', lat: 26.5, lon: 52.0, radiusKm: 600 },
+  { id: 'strait-hormuz', name: 'Strait of Hormuz', lat: 26.5, lon: 56.5, radiusKm: 300 },
+  { id: 'iran-border', name: 'Iran Border Region', lat: 33.0, lon: 47.0, radiusKm: 400 },
+  // Eastern Europe / Russia borders
+  { id: 'baltics', name: 'Baltic Region', lat: 56.0, lon: 24.0, radiusKm: 400 },
+  { id: 'poland-border', name: 'Poland-Belarus Border', lat: 52.5, lon: 23.5, radiusKm: 300 },
+  { id: 'black-sea', name: 'Black Sea', lat: 43.5, lon: 34.0, radiusKm: 500 },
+  { id: 'kaliningrad', name: 'Kaliningrad Region', lat: 54.7, lon: 20.5, radiusKm: 250 },
+  // Asia-Pacific
+  { id: 'taiwan-strait', name: 'Taiwan Strait', lat: 24.5, lon: 119.5, radiusKm: 400 },
+  { id: 'south-china-sea', name: 'South China Sea', lat: 14.0, lon: 114.0, radiusKm: 800 },
+  { id: 'korean-dmz', name: 'Korean DMZ', lat: 38.0, lon: 127.0, radiusKm: 300 },
+  { id: 'japan-sea', name: 'Sea of Japan', lat: 40.0, lon: 135.0, radiusKm: 500 },
+  // Arctic / Alaska
+  { id: 'alaska-adiz', name: 'Alaska ADIZ', lat: 62.0, lon: -165.0, radiusKm: 600 },
+  { id: 'arctic-russia', name: 'Arctic (Russian Side)', lat: 72.0, lon: 70.0, radiusKm: 800 },
+  // Mediterranean / Libya
+  { id: 'east-med', name: 'Eastern Mediterranean', lat: 34.5, lon: 33.0, radiusKm: 500 },
+  { id: 'libya-coast', name: 'Libya Coast', lat: 32.5, lon: 15.0, radiusKm: 400 },
+  // Africa
+  { id: 'horn-africa', name: 'Horn of Africa', lat: 10.0, lon: 45.0, radiusKm: 600 },
+  { id: 'sahel', name: 'Sahel Region', lat: 15.0, lon: 5.0, radiusKm: 800 },
+  // South America
+  { id: 'venezuela', name: 'Venezuela', lat: 8.0, lon: -66.0, radiusKm: 500 },
+];
+
+// Define home regions for major military operators
+const OPERATOR_HOMES: OperatorHomeRegions[] = [
+  { operator: 'usaf', country: 'USA', homeRegions: ['alaska-adiz'], alertThreshold: 2 },
+  { operator: 'usn', country: 'USA', homeRegions: ['alaska-adiz'], alertThreshold: 2 },
+  { operator: 'usmc', country: 'USA', homeRegions: ['alaska-adiz'], alertThreshold: 2 },
+  { operator: 'usa', country: 'USA', homeRegions: ['alaska-adiz'], alertThreshold: 2 },
+  { operator: 'vks', country: 'Russia', homeRegions: ['kaliningrad', 'arctic-russia', 'black-sea'], alertThreshold: 2 },
+  { operator: 'plaaf', country: 'China', homeRegions: ['taiwan-strait', 'south-china-sea'], alertThreshold: 2 },
+  { operator: 'plan', country: 'China', homeRegions: ['taiwan-strait', 'south-china-sea'], alertThreshold: 2 },
+  { operator: 'iaf', country: 'Israel', homeRegions: ['east-med', 'iran-border'], alertThreshold: 2 },
+  { operator: 'raf', country: 'UK', homeRegions: ['baltics', 'black-sea'], alertThreshold: 3 },
+  { operator: 'faf', country: 'France', homeRegions: ['sahel', 'east-med', 'libya-coast'], alertThreshold: 3 },
+  { operator: 'gaf', country: 'Germany', homeRegions: ['baltics'], alertThreshold: 3 },
+];
+
+export interface ForeignPresenceAlert {
+  id: string;
+  operator: MilitaryOperator;
+  operatorCountry: string;
+  region: GeoRegion;
+  aircraftCount: number;
+  flights: MilitaryFlight[];
+  firstDetected: Date;
+}
+
+const activeForeignPresence = new Map<string, ForeignPresenceAlert>();
+const seenForeignAlerts = new Set<string>();
 
 export interface MilitaryTheater {
   id: string;
@@ -309,6 +382,165 @@ export function getActiveSurges(): SurgeAlert[] {
 export function getTheaterActivity(theaterId: string): TheaterActivity[] {
   return activityHistory.get(theaterId) || [];
 }
+
+// ============ FOREIGN MILITARY CONCENTRATION DETECTION ============
+
+function getRegionForPosition(lat: number, lon: number): GeoRegion | null {
+  for (const region of SENSITIVE_REGIONS) {
+    const dist = distanceKm(lat, lon, region.lat, region.lon);
+    if (dist <= region.radiusKm) {
+      return region;
+    }
+  }
+  return null;
+}
+
+function isHomeRegion(operator: MilitaryOperator, regionId: string): boolean {
+  const config = OPERATOR_HOMES.find(o => o.operator === operator);
+  if (!config) return true; // Unknown operator - don't alert
+  return config.homeRegions.includes(regionId);
+}
+
+function getOperatorThreshold(operator: MilitaryOperator): number {
+  const config = OPERATOR_HOMES.find(o => o.operator === operator);
+  return config?.alertThreshold ?? 3;
+}
+
+function getOperatorCountry(operator: MilitaryOperator): string {
+  const config = OPERATOR_HOMES.find(o => o.operator === operator);
+  return config?.country ?? 'Unknown';
+}
+
+export function detectForeignMilitaryPresence(flights: MilitaryFlight[]): ForeignPresenceAlert[] {
+  const newAlerts: ForeignPresenceAlert[] = [];
+
+  // Group flights by operator and region
+  const presenceMap = new Map<string, { operator: MilitaryOperator; region: GeoRegion; flights: MilitaryFlight[] }>();
+
+  for (const flight of flights) {
+    const region = getRegionForPosition(flight.lat, flight.lon);
+    if (!region) continue;
+
+    // Skip if this is a home region for this operator
+    if (isHomeRegion(flight.operator, region.id)) continue;
+
+    const key = `${flight.operator}-${region.id}`;
+    const existing = presenceMap.get(key);
+    if (existing) {
+      existing.flights.push(flight);
+    } else {
+      presenceMap.set(key, { operator: flight.operator, region, flights: [flight] });
+    }
+  }
+
+  // Check for concentrations above threshold
+  for (const [key, presence] of presenceMap) {
+    const threshold = getOperatorThreshold(presence.operator);
+    if (presence.flights.length < threshold) continue;
+
+    // Check if we've already alerted on this (within last 2 hours)
+    const alertKey = `${key}-${Math.floor(Date.now() / (2 * 60 * 60 * 1000))}`;
+    if (seenForeignAlerts.has(alertKey)) continue;
+    seenForeignAlerts.add(alertKey);
+
+    const alert: ForeignPresenceAlert = {
+      id: key,
+      operator: presence.operator,
+      operatorCountry: getOperatorCountry(presence.operator),
+      region: presence.region,
+      aircraftCount: presence.flights.length,
+      flights: presence.flights,
+      firstDetected: new Date(),
+    };
+
+    activeForeignPresence.set(key, alert);
+    newAlerts.push(alert);
+  }
+
+  return newAlerts;
+}
+
+export function foreignPresenceToSignal(alert: ForeignPresenceAlert): {
+  id: string;
+  type: SignalType;
+  source: string;
+  title: string;
+  description: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  confidence: number;
+  category: string;
+  timestamp: Date;
+  location?: { lat: number; lon: number; name: string };
+  data: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+} {
+  const aircraftTypes = new Map<string, number>();
+  const callsigns: string[] = [];
+
+  for (const flight of alert.flights) {
+    const typeKey = flight.aircraftModel || flight.aircraftType || 'unknown';
+    aircraftTypes.set(typeKey, (aircraftTypes.get(typeKey) || 0) + 1);
+    callsigns.push(flight.callsign);
+  }
+
+  const aircraftList = Array.from(aircraftTypes.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([type, count]) => `${count}x ${type}`)
+    .join(', ');
+
+  // Severity based on operator and region sensitivity
+  const criticalCombos = [
+    ['vks', 'baltics'], ['vks', 'poland-border'], ['vks', 'alaska-adiz'],
+    ['plaaf', 'taiwan-strait'], ['plan', 'taiwan-strait'],
+    ['usaf', 'iran-border'], ['usn', 'persian-gulf'], ['iaf', 'iran-border'],
+  ];
+
+  const isCritical = criticalCombos.some(
+    ([op, reg]) => alert.operator === op && alert.region.id === reg
+  );
+
+  const severity = isCritical ? 'critical' :
+    alert.aircraftCount >= 5 ? 'high' : 'medium';
+
+  const confidence = Math.min(0.95, 0.7 + alert.aircraftCount * 0.05);
+
+  const metadata = {
+    operator: alert.operator,
+    operatorCountry: alert.operatorCountry,
+    regionId: alert.region.id,
+    regionName: alert.region.name,
+    aircraftCount: alert.aircraftCount,
+    aircraftTypes: Object.fromEntries(aircraftTypes),
+    callsigns,
+  };
+
+  return {
+    id: `foreign-${alert.id}-${alert.firstDetected.getTime()}`,
+    type: 'military_surge',
+    source: 'Military Flight Tracking',
+    title: `🚨 ${alert.operatorCountry} Military in ${alert.region.name}`,
+    description: `${alert.aircraftCount} ${alert.operatorCountry} aircraft detected in ${alert.region.name}. ` +
+      `${aircraftList}. Callsigns: ${callsigns.slice(0, 4).join(', ')}${callsigns.length > 4 ? '...' : ''}`,
+    severity,
+    confidence,
+    category: 'military',
+    timestamp: alert.firstDetected,
+    location: {
+      lat: alert.region.lat,
+      lon: alert.region.lon,
+      name: alert.region.name,
+    },
+    data: metadata,
+    metadata,
+  };
+}
+
+export function getActiveForeignPresence(): ForeignPresenceAlert[] {
+  return Array.from(activeForeignPresence.values());
+}
+
+// ============ SURGE DETECTION (baseline-based) ============
 
 export function surgeAlertToSignal(surge: SurgeAlert): {
   id: string;
