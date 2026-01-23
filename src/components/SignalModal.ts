@@ -80,6 +80,7 @@ export class SignalModal {
 
   public show(signals: CorrelationSignal[]): void {
     if (signals.length === 0) return;
+    if (document.fullscreenElement) return;
 
     this.currentSignals = [...signals, ...this.currentSignals].slice(0, 50);
     this.renderSignals();
@@ -94,6 +95,7 @@ export class SignalModal {
   }
 
   public showAlert(alert: UnifiedAlert): void {
+    if (document.fullscreenElement) return;
     const content = this.element.querySelector('.signal-modal-content')!;
     const priorityColors: Record<string, string> = {
       critical: '#ff4444',
