@@ -33,6 +33,7 @@ export class TechReadinessPanel extends Panel {
         Composite score (0-100) based on World Bank data:<br><br>
         <strong>Metrics shown:</strong><br>
         🌐 Internet Users (% of population)<br>
+        📱 Mobile Subscriptions (per 100 people)<br>
         🔬 R&D Expenditure (% of GDP)<br><br>
         <strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br>
         <em>— = No recent data available</em><br>
@@ -99,6 +100,7 @@ export class TechReadinessPanel extends Panel {
                 <div class="readiness-name">${escapeHtml(country.countryName)}</div>
                 <div class="readiness-components">
                   <span title="Internet Users">🌐${this.formatComponent(country.components.internet)}</span>
+                  <span title="Mobile Subscriptions">📱${this.formatComponent(country.components.mobile)}</span>
                   <span title="R&D Spending">🔬${this.formatComponent(country.components.rdSpend)}</span>
                 </div>
               </div>
