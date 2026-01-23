@@ -20,8 +20,19 @@ const TECH_INDICATORS = {
 };
 
 const TECH_COUNTRIES = [
+  // Major tech economies
   'USA', 'CHN', 'JPN', 'DEU', 'KOR', 'GBR', 'IND', 'ISR', 'SGP', 'TWN',
-  'FRA', 'CAN', 'SWE', 'NLD', 'CHE', 'FIN', 'IRL', 'AUS', 'BRA', 'IDN'
+  'FRA', 'CAN', 'SWE', 'NLD', 'CHE', 'FIN', 'IRL', 'AUS', 'BRA', 'IDN',
+  // Middle East & emerging tech hubs
+  'ARE', 'SAU', 'QAT', 'BHR', 'EGY', 'TUR',
+  // Additional Asia
+  'MYS', 'THA', 'VNM', 'PHL',
+  // Europe
+  'ESP', 'ITA', 'POL', 'CZE', 'DNK', 'NOR', 'AUT', 'BEL', 'PRT', 'EST',
+  // Americas
+  'MEX', 'ARG', 'CHL', 'COL',
+  // Africa
+  'ZAF', 'NGA', 'KEN',
 ];
 
 export default async function handler(req, res) {
