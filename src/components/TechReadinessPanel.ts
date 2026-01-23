@@ -14,6 +14,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
   'NGA': '🇳🇬', 'KEN': '🇰🇪', 'EGY': '🇪🇬', 'ARG': '🇦🇷', 'CHL': '🇨🇱',
   'COL': '🇨🇴', 'PAK': '🇵🇰', 'BGD': '🇧🇩', 'UKR': '🇺🇦', 'ROU': '🇷🇴',
   'EST': '🇪🇪', 'LVA': '🇱🇻', 'LTU': '🇱🇹', 'HUN': '🇭🇺', 'GRC': '🇬🇷',
+  'QAT': '🇶🇦', 'BHR': '🇧🇭', 'KWT': '🇰🇼', 'OMN': '🇴🇲', 'JOR': '🇯🇴',
 };
 
 export class TechReadinessPanel extends Panel {
@@ -29,13 +30,15 @@ export class TechReadinessPanel extends Panel {
       showCount: true,
       infoTooltip: `
         <strong>Global Tech Readiness</strong><br>
-        Composite score based on World Bank indicators:<br><br>
-        • Internet users (% of population)<br>
-        • Mobile & broadband subscriptions<br>
-        • R&D expenditure (% of GDP)<br>
-        • Patent applications<br>
-        • High-tech exports (%)<br><br>
-        <em>Data source: World Bank Open Data</em>
+        Composite score (0-100) based on World Bank data:<br><br>
+        <strong>Metrics shown:</strong><br>
+        🌐 Internet Users (% of population)<br>
+        🔬 R&D Expenditure (% of GDP)<br>
+        📜 Patent Applications<br>
+        📦 High-Tech Exports (%)<br><br>
+        <strong>Weights:</strong> R&D (25%), Internet (20%), Broadband (15%), Patents (15%), Exports (15%), Mobile (10%)<br><br>
+        <em>— = No recent data available</em><br>
+        <em>Source: World Bank Open Data (2019-2024)</em>
       `,
     });
   }

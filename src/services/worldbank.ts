@@ -130,13 +130,14 @@ export async function getTechReadinessRankings(
   countries?: string[]
 ): Promise<TechReadinessScore[]> {
   // Fetch multiple indicators in parallel
+  // Use 7 years to account for delayed data (patents/R&D often 3-4 years behind)
   const [internet, mobile, broadband, rdSpend, patents, highTech] = await Promise.all([
-    getIndicatorData('IT.NET.USER.ZS', { countries, years: 3 }),
-    getIndicatorData('IT.CEL.SETS.P2', { countries, years: 3 }),
-    getIndicatorData('IT.NET.BBND.P2', { countries, years: 3 }),
-    getIndicatorData('GB.XPD.RSDV.GD.ZS', { countries, years: 3 }),
-    getIndicatorData('IP.PAT.RESD', { countries, years: 3 }),
-    getIndicatorData('TX.VAL.TECH.MF.ZS', { countries, years: 3 }),
+    getIndicatorData('IT.NET.USER.ZS', { countries, years: 5 }),
+    getIndicatorData('IT.CEL.SETS.P2', { countries, years: 5 }),
+    getIndicatorData('IT.NET.BBND.P2', { countries, years: 5 }),
+    getIndicatorData('GB.XPD.RSDV.GD.ZS', { countries, years: 7 }),
+    getIndicatorData('IP.PAT.RESD', { countries, years: 7 }),
+    getIndicatorData('TX.VAL.TECH.MF.ZS', { countries, years: 7 }),
   ]);
 
   // Get all unique countries
