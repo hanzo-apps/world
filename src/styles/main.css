@@ -676,6 +676,11 @@ body.animations-paused *::after {
   max-height: none;
 }
 
+/* Live News panel spans 2 rows for video content */
+#live-news {
+  grid-row: span 2;
+}
+
 /* Live News Panel */
 .live-news-switcher {
   display: flex;
