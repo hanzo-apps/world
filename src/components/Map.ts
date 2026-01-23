@@ -1751,19 +1751,11 @@ export class MapComponent {
     if (this.state.layers.techEvents && this.techEvents.length > 0) {
       const mapWidth = this.container.clientWidth;
       const mapHeight = this.container.clientHeight;
-      console.log('[TechEvents] mapWidth:', mapWidth, 'mapHeight:', mapHeight, 'events:', this.techEvents.length);
-      let rendered = 0, skipped = 0;
       this.techEvents.forEach((event) => {
         const pos = projection([event.lng, event.lat]);
-        if (!pos) { skipped++; return; }
+        if (!pos) return;
         // Skip markers outside visible map bounds
-        if (pos[0] < 0 || pos[0] > mapWidth || pos[1] < 0 || pos[1] > mapHeight) {
-          console.log('[TechEvents] SKIP:', event.title.slice(0, 20), 'pos:', pos[0].toFixed(0), pos[1].toFixed(0), 'coords:', event.lng, event.lat);
-          skipped++;
-          return;
-        }
-        console.log('[TechEvents] RENDER:', event.title.slice(0, 20), 'pos:', pos[0].toFixed(0), pos[1].toFixed(0));
-        rendered++;
+        if (pos[0] < 0 || pos[0] > mapWidth || pos[1] < 0 || pos[1] > mapHeight) return;
 
         const div = document.createElement('div');
         const isUpcomingSoon = event.daysUntil <= 14;
@@ -1784,7 +1776,6 @@ export class MapComponent {
 
         this.overlays.appendChild(div);
       });
-      console.log('[TechEvents] Summary: rendered:', rendered, 'skipped:', skipped);
     }
 
     // Protests / Social Unrest Events (severity colors + icons)
