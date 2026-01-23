@@ -1,6 +1,6 @@
 import { escapeHtml } from '@/utils/sanitize';
 
-export type SearchResultType = 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent';
+export type SearchResultType = 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -231,6 +231,8 @@ export class SearchModal {
       ailab: '🧠',
       startup: '🚀',
       techevent: '📅',
+      techhq: '🦄',
+      accelerator: '🚀',
     };
 
     this.resultsList.innerHTML = this.results.map((result, i) => `

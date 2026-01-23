@@ -6,3 +6,5 @@ dist/
 .env.local
 .playwright-mcp/
 .vercel
+.claude/
+.cursor/
