@@ -3,7 +3,7 @@
  * Uses deck.gl for high-performance rendering of large datasets
  * Mobile devices gracefully degrade to the D3/SVG-based Map component
  */
-import { Deck } from '@deck.gl/core';
+import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
@@ -122,7 +122,7 @@ const COLORS = {
 
 export class DeckGLMap {
   private container: HTMLElement;
-  private deck: Deck | null = null;
+  private deckOverlay: MapboxOverlay | null = null;
   private maplibreMap: maplibregl.Map | null = null;
   private state: DeckMapState;
   private popup: MapPopup;
@@ -184,17 +184,11 @@ export class DeckGLMap {
     wrapper.id = 'deckglMapWrapper';
     wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; overflow: hidden;';
 
-    // MapLibre container (base map) - z-index 1
+    // MapLibre container - deck.gl renders directly into MapLibre via MapboxOverlay
     const mapContainer = document.createElement('div');
     mapContainer.id = 'deckgl-basemap';
-    mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;';
+    mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
     wrapper.appendChild(mapContainer);
-
-    // Deck.gl canvas container - z-index 2, on top of MapLibre
-    const deckContainer = document.createElement('div');
-    deckContainer.id = 'deckgl-overlay';
-    deckContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; background: none;';
-    wrapper.appendChild(deckContainer);
 
     this.container.appendChild(wrapper);
   }
@@ -243,76 +237,23 @@ export class DeckGLMap {
       attributionControl: false,
       interactive: true,
     });
-
-    // Don't sync MapLibre -> deck.gl since deck.gl's controller is enabled
-    // deck.gl is the source of truth for view state, syncs to MapLibre via onViewStateChange
-
-    // Initial sync after map loads to ensure alignment
-    this.maplibreMap.on('load', () => {
-      if (this.deck && this.maplibreMap) {
-        const center = this.maplibreMap.getCenter();
-        const zoom = this.maplibreMap.getZoom();
-        this.deck.setProps({
-          viewState: {
-            longitude: center.lng,
-            latitude: center.lat,
-            zoom: zoom,
-            bearing: 0,
-            pitch: 0,
-          },
-        });
-      }
-    });
+    // MapboxOverlay handles all view state sync automatically
   }
 
   private initDeck(): void {
-    const preset = VIEW_PRESETS[this.state.view];
-    const deckContainer = document.getElementById('deckgl-overlay') as HTMLDivElement | null;
-    if (!deckContainer) return;
+    if (!this.maplibreMap) return;
 
-    this.deck = new Deck({
-      parent: deckContainer,
-      viewState: {
-        longitude: preset.longitude,
-        latitude: preset.latitude,
-        zoom: preset.zoom,
-        pitch: 0,
-        bearing: 0,
-      },
-      controller: true, // Enable deck.gl controller for panning/zooming
+    // Use MapboxOverlay for proper integration with MapLibre
+    // This renders deck.gl layers directly into MapLibre's WebGL context
+    // No manual view state sync needed - it's handled automatically
+    this.deckOverlay = new MapboxOverlay({
+      interleaved: true,
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
-      onViewStateChange: ({ viewState }) => {
-        // Sync deck.gl view state changes back to MapLibre
-        // Don't update deck.gl again - it already has the new state
-        if (this.maplibreMap) {
-          this.maplibreMap.jumpTo({
-            center: [viewState.longitude, viewState.latitude],
-            zoom: viewState.zoom,
-            bearing: viewState.bearing || 0,
-            pitch: viewState.pitch || 0,
-          });
-        }
-      },
-      pickingRadius: 5,
-      // Disable any default effects
-      effects: [],
     });
 
-    // After deck initializes, ensure canvas transparency
-    requestAnimationFrame(() => {
-      const canvas = deckContainer.querySelector('canvas');
-      if (canvas) {
-        canvas.style.background = 'none';
-        canvas.style.backgroundColor = 'transparent';
-        // Get the WebGL context and set transparent clear color
-        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-        if (gl) {
-          gl.clearColor(0, 0, 0, 0);
-        }
-      }
-    });
+    this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
   }
 
   private buildLayers(): LayersList {
@@ -1181,8 +1122,8 @@ export class DeckGLMap {
   }
 
   private updateLayers(): void {
-    if (this.deck) {
-      this.deck.setProps({ layers: this.buildLayers() });
+    if (this.deckOverlay) {
+      this.deckOverlay.setProps({ layers: this.buildLayers() });
     }
   }
 
@@ -1601,7 +1542,7 @@ export class DeckGLMap {
       clearInterval(this.timestampIntervalId);
     }
 
-    this.deck?.finalize();
+    this.deckOverlay?.finalize();
     this.maplibreMap?.remove();
 
     this.container.innerHTML = '';
