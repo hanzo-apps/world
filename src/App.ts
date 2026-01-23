@@ -1674,9 +1674,6 @@ export class App {
         return;
       }
       const panel = this.panels[key];
-      if (key === 'events') {
-        console.log('[applyPanelSettings] events panel:', panel ? 'exists' : 'missing', 'enabled:', config.enabled);
-      }
       panel?.toggle(config.enabled);
     });
   }
