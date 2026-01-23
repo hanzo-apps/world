@@ -121,8 +121,6 @@ export interface TechReadinessScore {
     mobile: number | null;
     broadband: number | null;
     rdSpend: number | null;
-    patents: number | null;
-    highTechExports: number | null;
   };
 }
 
@@ -130,19 +128,17 @@ export async function getTechReadinessRankings(
   countries?: string[]
 ): Promise<TechReadinessScore[]> {
   // Fetch multiple indicators in parallel
-  // Use 7 years to account for delayed data (patents/R&D often 3-4 years behind)
-  const [internet, mobile, broadband, rdSpend, patents, highTech] = await Promise.all([
+  // Use 7 years to account for delayed data (R&D often 3-4 years behind)
+  const [internet, mobile, broadband, rdSpend] = await Promise.all([
     getIndicatorData('IT.NET.USER.ZS', { countries, years: 5 }),
     getIndicatorData('IT.CEL.SETS.P2', { countries, years: 5 }),
     getIndicatorData('IT.NET.BBND.P2', { countries, years: 5 }),
     getIndicatorData('GB.XPD.RSDV.GD.ZS', { countries, years: 7 }),
-    getIndicatorData('IP.PAT.RESD', { countries, years: 7 }),
-    getIndicatorData('TX.VAL.TECH.MF.ZS', { countries, years: 7 }),
   ]);
 
   // Get all unique countries
   const allCountries = new Set<string>();
-  [internet, mobile, broadband, rdSpend, patents, highTech].forEach(data => {
+  [internet, mobile, broadband, rdSpend].forEach(data => {
     Object.keys(data.latestByCountry).forEach(c => allCountries.add(c));
   });
 
@@ -154,8 +150,6 @@ export async function getTechReadinessRankings(
     const mobileVal = mobile.latestByCountry[countryCode]?.value;
     const broadbandVal = broadband.latestByCountry[countryCode]?.value;
     const rdVal = rdSpend.latestByCountry[countryCode]?.value;
-    const patentsVal = patents.latestByCountry[countryCode]?.value;
-    const highTechVal = highTech.latestByCountry[countryCode]?.value;
 
     // Normalize each component to 0-100 scale
     const normalize = (val: number | undefined, max: number): number | null => {
@@ -168,12 +162,11 @@ export async function getTechReadinessRankings(
       mobile: normalize(mobileVal, 150),
       broadband: normalize(broadbandVal, 50),
       rdSpend: normalize(rdVal, 5),
-      patents: normalize(patentsVal, 500000),
-      highTechExports: normalize(highTechVal, 50),
     };
 
     // Calculate weighted average (only components with data)
-    const weights = { internet: 20, mobile: 10, broadband: 15, rdSpend: 25, patents: 15, highTechExports: 15 };
+    // Weights: R&D 35%, Internet 30%, Broadband 20%, Mobile 15%
+    const weights = { internet: 30, mobile: 15, broadband: 20, rdSpend: 35 };
     let totalWeight = 0;
     let weightedSum = 0;
 
