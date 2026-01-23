@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/utils/sanitize';
+import { SITE_VARIANT } from '@/config';
 
 type StatusLevel = 'ok' | 'warning' | 'error' | 'disabled';
 
@@ -78,16 +79,24 @@ export class StatusPanel {
   private initDefaultStatuses(): void {
     // Names must match what App.ts sends: category.charAt(0).toUpperCase() + category.slice(1)
     // Default to 'disabled' - only show status when layer is enabled and data is fetched
-    const feedNames = [
-      'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
-      'Gov', 'Intel', 'Layoffs', 'Thinktanks',
-      'Polymarket', 'Weather', 'NetBlocks', 'Shipping'
-    ];
+    const feedNames = SITE_VARIANT === 'tech'
+      ? [
+          'Tech', 'Ai', 'Startups', 'Vcblogs', 'RegionalStartups',
+          'Unicorns', 'Accelerators', 'Security', 'Policy', 'Layoffs',
+          'Finance', 'Hardware', 'Cloud', 'Dev', 'Tech Events'
+        ]
+      : [
+          'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
+          'Gov', 'Intel', 'Layoffs', 'Thinktanks',
+          'Polymarket', 'Weather', 'NetBlocks', 'Shipping'
+        ];
     feedNames.forEach(name => {
       this.feeds.set(name, { name, lastUpdate: null, status: 'disabled', itemCount: 0 });
     });
 
-    const apiNames = ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc', 'EIA', 'USASpending'];
+    const apiNames = SITE_VARIANT === 'tech'
+      ? ['RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status']
+      : ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc', 'EIA', 'USASpending'];
     apiNames.forEach(name => {
       this.apis.set(name, { name, status: 'disabled' });
     });
