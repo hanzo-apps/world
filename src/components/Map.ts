@@ -333,7 +333,7 @@ export class MapComponent {
     ];
     const techLayers: (keyof MapLayers)[] = [
       'cables', 'datacenters', 'outages',                // tech infrastructure
-      'startupHubs', 'cloudRegions', 'techHQs', 'accelerators', // tech ecosystem
+      'startupHubs', 'cloudRegions', 'techHQs', 'techEvents', // tech ecosystem
       'natural', 'weather',                               // natural events
       'economic', 'countries',                            // economic/geographic
     ];
@@ -373,7 +373,37 @@ export class MapComponent {
 
     const popup = document.createElement('div');
     popup.className = 'layer-help-popup';
-    popup.innerHTML = `
+
+    const techHelpContent = `
+      <div class="layer-help-header">
+        <span>Map Layers Guide</span>
+        <button class="layer-help-close">×</button>
+      </div>
+      <div class="layer-help-content">
+        <div class="layer-help-section">
+          <div class="layer-help-title">Tech Ecosystem</div>
+          <div class="layer-help-item"><span>STARTUPHUBS</span> Major startup ecosystems (SF, NYC, London, etc.)</div>
+          <div class="layer-help-item"><span>CLOUDREGIONS</span> AWS, Azure, GCP data center regions</div>
+          <div class="layer-help-item"><span>TECHHQS</span> Headquarters of major tech companies</div>
+          <div class="layer-help-item"><span>ACCELERATORS</span> Y Combinator, Techstars, 500 Startups locations</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Infrastructure</div>
+          <div class="layer-help-item"><span>CABLES</span> Major undersea fiber optic cables (internet backbone)</div>
+          <div class="layer-help-item"><span>DATACENTERS</span> AI compute clusters ≥10,000 GPUs</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and service disruptions</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Natural & Economic</div>
+          <div class="layer-help-item"><span>NATURAL</span> Earthquakes, storms, fires (may affect data centers)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts</div>
+          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
+          <div class="layer-help-item"><span>COUNTRIES</span> Country name overlays</div>
+        </div>
+      </div>
+    `;
+
+    const fullHelpContent = `
       <div class="layer-help-header">
         <span>Map Layers Guide</span>
         <button class="layer-help-close">×</button>
@@ -424,6 +454,8 @@ export class MapComponent {
         </div>
       </div>
     `;
+
+    popup.innerHTML = SITE_VARIANT === 'tech' ? techHelpContent : fullHelpContent;
 
     popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
 
