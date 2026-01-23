@@ -1,4 +1,4 @@
-export const config = { runtime: 'edge' };
+// Use Node.js runtime - Edge gets 403 from World Bank API
 
 // Tech-related World Bank indicators
 const TECH_INDICATORS = {
@@ -83,7 +83,10 @@ export default async function handler(req) {
     const wbUrl = `https://api.worldbank.org/v2/country/${countryList}/indicator/${indicator}?format=json&date=${startYear}:${currentYear}&per_page=1000`;
 
     const response = await fetch(wbUrl, {
-      headers: { 'Accept': 'application/json' },
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'WorldMonitor/1.0 (https://worldmonitor.app)',
+      },
     });
 
     if (!response.ok) {
