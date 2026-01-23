@@ -4,7 +4,7 @@ import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAss
 import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
-import { getSourcePropagandaRisk } from '@/config/feeds';
+import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 
 /** Threshold for enabling virtual scrolling */
 const VIRTUAL_SCROLL_THRESHOLD = 15;
@@ -241,15 +241,27 @@ export class NewsPanel extends Panel {
       ? `<span class="propaganda-badge ${primaryPropRisk.risk}" title="${escapeHtml(primaryPropRisk.note || `State-affiliated: ${primaryPropRisk.stateAffiliated || 'Unknown'}`)}">${primaryPropRisk.risk === 'high' ? '⚠ State Media' : '! Caution'}</span>`
       : '';
 
-    const topSourcesHtml = cluster.topSources
-      .map(s => {
-        const propRisk = getSourcePropagandaRisk(s.name);
-        const propBadge = propRisk.risk !== 'low'
-          ? `<span class="propaganda-badge ${propRisk.risk}" title="${escapeHtml(propRisk.note || `State-affiliated: ${propRisk.stateAffiliated || 'Unknown'}`)}">${propRisk.risk === 'high' ? '⚠' : '!'}</span>`
-          : '';
-        return `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}${propBadge}</span>`;
-      })
-      .join('');
+    // Source credibility badge for primary source
+    const primaryTier = getSourceTier(cluster.primarySource);
+    const primaryType = getSourceType(cluster.primarySource);
+    const tierLabel = primaryTier === 1 ? 'Wire' : primaryTier === 2 ? 'Major' : '';
+    const tierBadge = primaryTier <= 2
+      ? `<span class="tier-badge tier-${primaryTier}" title="${primaryType === 'wire' ? 'Wire Service - Highest reliability' : primaryType === 'gov' ? 'Official Government Source' : 'Major News Outlet'}">${primaryTier === 1 ? '★' : '●'} ${tierLabel}</span>`
+      : '';
+
+    // Build "Also reported by" section for multi-source confirmation
+    const otherSources = cluster.topSources.filter(s => s.name !== cluster.primarySource);
+    const topSourcesHtml = otherSources.length > 0
+      ? `<span class="also-reported">Also:</span>` + otherSources
+          .map(s => {
+            const propRisk = getSourcePropagandaRisk(s.name);
+            const propBadge = propRisk.risk !== 'low'
+              ? `<span class="propaganda-badge ${propRisk.risk}" title="${escapeHtml(propRisk.note || `State-affiliated: ${propRisk.stateAffiliated || 'Unknown'}`)}">${propRisk.risk === 'high' ? '⚠' : '!'}</span>`
+              : '';
+            return `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}${propBadge}</span>`;
+          })
+          .join('')
+      : '';
 
     const assetContext = getClusterAssetContext(cluster);
     if (assetContext && assetContext.assets.length > 0) {
@@ -288,6 +300,7 @@ export class NewsPanel extends Panel {
     return `
       <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-left-color: ${escapeHtml(cluster.monitorColor)}"` : ''} data-cluster-id="${escapeHtml(cluster.id)}" data-news-id="${escapeHtml(cluster.primaryLink)}">
         <div class="item-source">
+          ${tierBadge}
           ${escapeHtml(cluster.primarySource)}
           ${primaryPropBadge}
           ${newTag}
