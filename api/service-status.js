@@ -29,7 +29,7 @@ const SERVICES = [
   { id: 'slack', name: 'Slack', statusPage: 'https://slack-status.com/api/v2.0.0/current', customParser: 'slack', category: 'comm' },
   { id: 'discord', name: 'Discord', statusPage: 'https://discordstatus.com/api/v2/status.json', category: 'comm' },
   { id: 'zoom', name: 'Zoom', statusPage: 'https://status.zoom.us/api/v2/status.json', category: 'comm' },
-  { id: 'notion', name: 'Notion', statusPage: 'https://status.notion.so/api/v2/status.json', category: 'comm' },
+  { id: 'notion', name: 'Notion', statusPage: 'https://www.notion-status.com/api/v2/status.json', category: 'comm' },
 
   // AI Services (incident.io powered)
   { id: 'openai', name: 'OpenAI', statusPage: 'https://status.openai.com/api/v2/status.json', customParser: 'incidentio', category: 'ai' },
