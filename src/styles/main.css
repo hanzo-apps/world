@@ -7806,3 +7806,303 @@ body.playback-mode .status-dot {
 .findings-modal-item-time {
   color: var(--text-dim);
 }
+
+/* ===== Tech Events Panel ===== */
+.tech-events-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.tech-events-loading,
+.tech-events-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--text-dim);
+}
+
+.tech-events-error {
+  color: var(--red);
+}
+
+.tech-events-error .retry-btn {
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.tech-events-error .retry-btn:hover {
+  background: var(--border);
+}
+
+.tech-events-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.tech-events-tabs .tab {
+  flex: 1;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tech-events-tabs .tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.tech-events-tabs .tab.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.tech-events-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.tech-events-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tech-events-stats .source-link {
+  margin-left: auto;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 9px;
+}
+
+.tech-events-stats .source-link:hover {
+  color: var(--accent);
+}
+
+.tech-events-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tech-event {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+  transition: all 0.15s ease;
+}
+
+.tech-event:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tech-event.is-today {
+  background: rgba(255, 170, 0, 0.1);
+  border-left-color: var(--yellow);
+}
+
+.tech-event.is-this-week:not(.is-today) {
+  border-left-color: var(--green);
+}
+
+.tech-event.type-conference {
+  border-left-color: #4a9eff;
+}
+
+.tech-event.type-earnings {
+  border-left-color: #9966ff;
+}
+
+.tech-event.type-ipo {
+  border-left-color: #ff6699;
+}
+
+.event-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.event-month {
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+
+.event-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.today-badge {
+  font-size: 7px;
+  font-weight: 600;
+  color: var(--yellow);
+  margin-top: 2px;
+}
+
+.event-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.event-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-url {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.event-url:hover {
+  color: var(--accent);
+}
+
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.event-dates {
+  color: var(--text-dim);
+}
+
+.event-location {
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.event-map-link {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 10px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.event-map-link:hover {
+  opacity: 1;
+}
+
+/* Tech Events Map Markers */
+.tech-event-marker {
+  background: #4a9eff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.tech-event-marker:hover {
+  transform: scale(1.3);
+  z-index: 1000;
+}
+
+.tech-event-marker.upcoming-soon {
+  background: var(--yellow);
+  animation: pulse-marker 2s ease-in-out infinite;
+}
+
+@keyframes pulse-marker {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 170, 0, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 170, 0, 0); }
+}
+
+.tech-event-popup {
+  min-width: 180px;
+  max-width: 250px;
+}
+
+.tech-event-popup h4 {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.tech-event-popup .popup-meta {
+  font-size: 9px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tech-event-popup .popup-link {
+  margin-top: 6px;
+  font-size: 9px;
+  color: #4a9eff;
+  text-decoration: none;
+}
+
+.tech-event-popup .popup-link:hover {
+  text-decoration: underline;
+}

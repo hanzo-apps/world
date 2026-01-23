@@ -128,6 +128,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   hardware: { name: 'Semiconductors & Hardware', enabled: true, priority: 2 },
   cloud: { name: 'Cloud & Infrastructure', enabled: true, priority: 2 },
   dev: { name: 'Developer Community', enabled: true, priority: 2 },
+  events: { name: 'Tech Events', enabled: true, priority: 1 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -160,6 +161,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   cloudRegions: true,
   accelerators: false,
   techHQs: true,
+  techEvents: true,
 };
 
 // Mobile defaults for tech variant
@@ -190,6 +192,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   cloudRegions: false,
   accelerators: false,
   techHQs: false,
+  techEvents: true,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

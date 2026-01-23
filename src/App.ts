@@ -43,6 +43,7 @@ import {
   CascadePanel,
   StrategicRiskPanel,
   IntelligenceGapBadge,
+  TechEventsPanel,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -937,6 +938,9 @@ export class App {
     const liveNewsPanel = new LiveNewsPanel();
     this.panels['live-news'] = liveNewsPanel;
 
+    // Tech Events Panel (tech variant only - but create for all to allow toggling)
+    this.panels['events'] = new TechEventsPanel('events');
+
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -1524,6 +1528,7 @@ export class App {
     if (this.mapLayers.protests) tasks.push({ name: 'protests', task: runGuarded('protests', () => this.loadProtests()) });
     if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
     if (this.mapLayers.military) tasks.push({ name: 'military', task: runGuarded('military', () => this.loadMilitary()) });
+    if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
     // Use allSettled to ensure all tasks complete and search index always updates
     const results = await Promise.allSettled(tasks.map(t => t.task));
@@ -1568,6 +1573,9 @@ export class App {
           break;
         case 'military':
           await this.loadMilitary();
+          break;
+        case 'techEvents':
+          await this.loadTechEvents();
           break;
       }
     } finally {
@@ -1840,6 +1848,51 @@ export class App {
     const hasEarthquakes = earthquakeResult.status === 'fulfilled' && earthquakeResult.value.length > 0;
     const hasEonet = eonetResult.status === 'fulfilled' && eonetResult.value.length > 0;
     this.map?.setLayerReady('natural', hasEarthquakes || hasEonet);
+  }
+
+  private async loadTechEvents(): Promise<void> {
+    // Only load for tech variant or if techEvents layer is enabled
+    if (SITE_VARIANT !== 'tech' && !this.mapLayers.techEvents) return;
+
+    try {
+      const res = await fetch('/api/tech-events?type=conferences&mappable=true');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Unknown error');
+
+      // Transform events for map markers
+      const now = new Date();
+      const mapEvents = data.events.map((e: {
+        id: string;
+        title: string;
+        location: string;
+        coords: { lat: number; lng: number; country: string };
+        startDate: string;
+        endDate: string;
+        url: string | null;
+      }) => ({
+        id: e.id,
+        title: e.title,
+        location: e.location,
+        lat: e.coords.lat,
+        lng: e.coords.lng,
+        country: e.coords.country,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        url: e.url,
+        daysUntil: Math.ceil((new Date(e.startDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      }));
+
+      this.map?.setTechEvents(mapEvents);
+      this.map?.setLayerReady('techEvents', mapEvents.length > 0);
+      this.statusPanel?.updateFeed('Tech Events', { status: 'ok', itemCount: mapEvents.length });
+    } catch (error) {
+      console.error('[App] Failed to load tech events:', error);
+      this.map?.setTechEvents([]);
+      this.map?.setLayerReady('techEvents', false);
+      this.statusPanel?.updateFeed('Tech Events', { status: 'error', errorMessage: String(error) });
+    }
   }
 
   private async loadWeatherAlerts(): Promise<void> {
