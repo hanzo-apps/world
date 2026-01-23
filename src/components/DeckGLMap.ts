@@ -279,10 +279,23 @@ export class DeckGLMap {
         pitch: 0,
         bearing: 0,
       },
-      controller: false, // MapLibre handles controls
+      controller: true, // Enable deck.gl controller for panning/zooming
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
+      onViewStateChange: ({ viewState }) => {
+        // Sync deck.gl view state changes back to MapLibre
+        if (this.maplibreMap) {
+          this.maplibreMap.jumpTo({
+            center: [viewState.longitude, viewState.latitude],
+            zoom: viewState.zoom,
+            bearing: viewState.bearing || 0,
+            pitch: viewState.pitch || 0,
+          });
+        }
+        // Update deck's view state
+        this.deck?.setProps({ viewState });
+      },
       pickingRadius: 5,
       // Disable any default effects
       effects: [],
