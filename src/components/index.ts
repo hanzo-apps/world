@@ -23,3 +23,4 @@ export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
 export * from './TechHubsPanel';
 export * from './TechReadinessPanel';
+export * from './GeoHubsPanel';
