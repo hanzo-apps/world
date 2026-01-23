@@ -8603,10 +8603,12 @@ body.playback-mode .status-dot {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  background: transparent !important;
 }
 
 #deckgl-overlay canvas {
   pointer-events: auto;
+  background: transparent !important;
 }
 
 /* deck.gl Controls */
