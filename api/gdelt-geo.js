@@ -1,14 +1,6 @@
 // GDELT Geo API proxy with security hardening
 export const config = { runtime: 'edge' };
 
-const ALLOWED_ORIGINS = [
-  'https://worldmonitor.app',
-  'https://www.worldmonitor.app',
-  'https://tech.worldmonitor.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
 const ALLOWED_FORMATS = ['geojson', 'json', 'csv'];
 const MAX_RECORDS = 500;
 const MIN_RECORDS = 1;
@@ -16,7 +8,15 @@ const ALLOWED_TIMESPANS = ['1d', '7d', '14d', '30d', '60d', '90d'];
 
 function getCorsOrigin(req) {
   const origin = req.headers.get('origin') || '';
-  return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Allow *.worldmonitor.app and localhost
+  if (
+    origin.endsWith('.worldmonitor.app') ||
+    origin === 'https://worldmonitor.app' ||
+    origin.startsWith('http://localhost:')
+  ) {
+    return origin;
+  }
+  return 'https://worldmonitor.app';
 }
 
 function validateMaxRecords(val) {
