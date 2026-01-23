@@ -23,7 +23,7 @@ const SERVICES = [
   { id: 'circleci', name: 'CircleCI', statusPage: 'https://status.circleci.com/api/v2/status.json', category: 'dev' },
   { id: 'jira', name: 'Jira', statusPage: 'https://jira-software.status.atlassian.com/api/v2/status.json', category: 'dev' },
   { id: 'confluence', name: 'Confluence', statusPage: 'https://confluence.status.atlassian.com/api/v2/status.json', category: 'dev' },
-  { id: 'linear', name: 'Linear', statusPage: 'https://status.linear.app/api/v2/status.json', category: 'dev' },
+  { id: 'linear', name: 'Linear', statusPage: 'https://linearstatus.com/api/v2/status.json', category: 'dev' },
 
   // Communication
   { id: 'slack', name: 'Slack', statusPage: 'https://slack-status.com/api/v2.0.0/current', customParser: 'slack', category: 'comm' },
@@ -34,16 +34,13 @@ const SERVICES = [
   // AI Services
   { id: 'openai', name: 'OpenAI', statusPage: 'https://status.openai.com/api/v2/status.json', category: 'ai' },
   { id: 'anthropic', name: 'Anthropic', statusPage: 'https://status.anthropic.com/api/v2/status.json', category: 'ai' },
-  { id: 'replicate', name: 'Replicate', statusPage: 'https://status.replicate.com/api/v2/status.json', category: 'ai' },
-  { id: 'together', name: 'Together AI', statusPage: 'https://status.together.ai/api/v2/status.json', category: 'ai' },
+  { id: 'replicate', name: 'Replicate', statusPage: 'https://www.replicatestatus.com/api/v2/status.json', category: 'ai' },
 
   // SaaS
-  { id: 'stripe', name: 'Stripe', statusPage: 'https://status.stripe.com/api/v2/status.json', category: 'saas' },
+  { id: 'stripe', name: 'Stripe', statusPage: 'https://status.stripe.com/current', customParser: 'stripe', category: 'saas' },
   { id: 'twilio', name: 'Twilio', statusPage: 'https://status.twilio.com/api/v2/status.json', category: 'saas' },
   { id: 'datadog', name: 'Datadog', statusPage: 'https://status.datadoghq.com/api/v2/status.json', category: 'saas' },
-  { id: 'pagerduty', name: 'PagerDuty', statusPage: 'https://status.pagerduty.com/api/v2/status.json', category: 'saas' },
   { id: 'sentry', name: 'Sentry', statusPage: 'https://status.sentry.io/api/v2/status.json', category: 'saas' },
-  { id: 'auth0', name: 'Auth0', statusPage: 'https://status.auth0.com/api/v2/status.json', category: 'saas' },
   { id: 'supabase', name: 'Supabase', statusPage: 'https://status.supabase.com/api/v2/status.json', category: 'saas' },
 ];
 
@@ -153,6 +150,19 @@ async function checkStatusPage(service) {
         return { ...service, status: 'degraded', description: `${count} active incident(s)` };
       }
       return { ...service, status: 'unknown', description: data.status || 'Unknown' };
+    }
+
+    if (service.customParser === 'stripe') {
+      // Stripe custom API format at /current
+      const data = await response.json();
+      if (data.largestatus === 'up') {
+        return { ...service, status: 'operational', description: data.message || 'All systems operational' };
+      } else if (data.largestatus === 'degraded') {
+        return { ...service, status: 'degraded', description: data.message || 'Degraded performance' };
+      } else if (data.largestatus === 'down') {
+        return { ...service, status: 'outage', description: data.message || 'Service disruption' };
+      }
+      return { ...service, status: 'unknown', description: data.message || 'Unknown' };
     }
 
     const data = await response.json();
