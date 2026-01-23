@@ -1936,6 +1936,12 @@ export class App {
       { key: 'thinktanks', feeds: FEEDS.thinktanks },
       // Tech variant categories
       { key: 'startups', feeds: FEEDS.startups },
+      { key: 'vcblogs', feeds: FEEDS.vcblogs },
+      { key: 'regionalStartups', feeds: FEEDS.regionalStartups },
+      { key: 'unicorns', feeds: FEEDS.unicorns },
+      { key: 'accelerators', feeds: FEEDS.accelerators },
+      { key: 'funding', feeds: FEEDS.funding },
+      { key: 'producthunt', feeds: FEEDS.producthunt },
       { key: 'security', feeds: FEEDS.security },
       { key: 'policy', feeds: FEEDS.policy },
       { key: 'hardware', feeds: FEEDS.hardware },
