@@ -1140,7 +1140,8 @@ export class DeckGLMap {
 
   private createTimestamp(): void {
     const timestamp = document.createElement('div');
-    timestamp.className = 'map-timestamp deckgl-timestamp';
+    // Only use deckgl-timestamp class - map-timestamp has conflicting positioning
+    timestamp.className = 'deckgl-timestamp';
     timestamp.id = 'deckglTimestamp';
     this.container.appendChild(timestamp);
 
