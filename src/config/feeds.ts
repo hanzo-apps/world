@@ -350,7 +350,10 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'Crunchbase News', url: rss('https://news.crunchbase.com/feed/') },
     { name: 'TechCrunch Funding', url: rss('https://techcrunch.com/category/venture/feed/') },
     { name: 'SEC Filings', url: rss('https://news.google.com/rss/search?q=(S-1+OR+"IPO+filing"+OR+"SEC+filing")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'VC News', url: rss('https://news.google.com/rss/search?q=("Series+A"+OR+"Series+B"+OR+"funding+round"+OR+"venture+capital")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'VC News', url: rss('https://news.google.com/rss/search?q=("Series+A"+OR+"Series+B"+OR+"Series+C"+OR+"funding+round"+OR+"venture+capital")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Seed & Pre-Seed', url: rss('https://news.google.com/rss/search?q=("seed+round"+OR+"pre-seed"+OR+"angel+round"+OR+"seed+funding")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Startup Funding', url: rss('https://news.google.com/rss/search?q=("startup+funding"+OR+"raised+funding"+OR+"raised+$"+OR+"funding+announced")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
   ],
   producthunt: [
     { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
