@@ -23,7 +23,7 @@ const SERVICES = [
   { id: 'circleci', name: 'CircleCI', statusPage: 'https://status.circleci.com/api/v2/status.json', category: 'dev' },
   { id: 'jira', name: 'Jira', statusPage: 'https://jira-software.status.atlassian.com/api/v2/status.json', category: 'dev' },
   { id: 'confluence', name: 'Confluence', statusPage: 'https://confluence.status.atlassian.com/api/v2/status.json', category: 'dev' },
-  { id: 'linear', name: 'Linear', statusPage: 'https://linearstatus.com/api/v2/status.json', category: 'dev' },
+  { id: 'linear', name: 'Linear', statusPage: 'https://linearstatus.com/api/v2/status.json', customParser: 'incidentio', category: 'dev' },
 
   // Communication
   { id: 'slack', name: 'Slack', statusPage: 'https://slack-status.com/api/v2.0.0/current', customParser: 'slack', category: 'comm' },
@@ -31,10 +31,10 @@ const SERVICES = [
   { id: 'zoom', name: 'Zoom', statusPage: 'https://status.zoom.us/api/v2/status.json', category: 'comm' },
   { id: 'notion', name: 'Notion', statusPage: 'https://status.notion.so/api/v2/status.json', category: 'comm' },
 
-  // AI Services
-  { id: 'openai', name: 'OpenAI', statusPage: 'https://status.openai.com/api/v2/status.json', category: 'ai' },
-  { id: 'anthropic', name: 'Anthropic', statusPage: 'https://status.anthropic.com/api/v2/status.json', category: 'ai' },
-  { id: 'replicate', name: 'Replicate', statusPage: 'https://www.replicatestatus.com/api/v2/status.json', category: 'ai' },
+  // AI Services (incident.io powered)
+  { id: 'openai', name: 'OpenAI', statusPage: 'https://status.openai.com/api/v2/status.json', customParser: 'incidentio', category: 'ai' },
+  { id: 'anthropic', name: 'Anthropic', statusPage: 'https://status.anthropic.com/api/v2/status.json', customParser: 'incidentio', category: 'ai' },
+  { id: 'replicate', name: 'Replicate', statusPage: 'https://www.replicatestatus.com/api/v2/status.json', customParser: 'incidentio', category: 'ai' },
 
   // SaaS
   { id: 'stripe', name: 'Stripe', statusPage: 'https://status.stripe.com/current', customParser: 'stripe', category: 'saas' },
@@ -69,12 +69,20 @@ async function checkStatusPage(service) {
   }
 
   try {
+    // Use browser-like headers to avoid being blocked
+    const headers = {
+      'Accept': service.customParser === 'rss' ? 'application/xml, text/xml' : 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+    };
+    // Don't send User-Agent for incident.io - they may block bots
+    if (service.customParser !== 'incidentio') {
+      headers['User-Agent'] = 'Mozilla/5.0 (compatible; WorldMonitor/1.0)';
+    }
+
     const response = await fetch(service.statusPage, {
-      headers: {
-        'Accept': service.customParser === 'rss' ? 'application/xml' : 'application/json',
-        'User-Agent': 'WorldMonitor/1.0 StatusChecker',
-      },
-      signal: AbortSignal.timeout(8000),
+      headers,
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
@@ -163,6 +171,40 @@ async function checkStatusPage(service) {
         return { ...service, status: 'outage', description: data.message || 'Service disruption' };
       }
       return { ...service, status: 'unknown', description: data.message || 'Unknown' };
+    }
+
+    if (service.customParser === 'incidentio') {
+      // incident.io status pages (OpenAI, Linear, Replicate, Anthropic)
+      const text = await response.text();
+      // Check for HTML response (blocked)
+      if (text.startsWith('<!') || text.startsWith('<html')) {
+        // Try parsing HTML for status - incident.io pages have status in HTML
+        const operationalMatch = text.match(/All Systems Operational|fully operational|no issues/i);
+        if (operationalMatch) {
+          return { ...service, status: 'operational', description: 'All systems operational' };
+        }
+        const degradedMatch = text.match(/degraded|partial outage|experiencing issues/i);
+        if (degradedMatch) {
+          return { ...service, status: 'degraded', description: 'Some issues reported' };
+        }
+        return { ...service, status: 'unknown', description: 'Could not parse status' };
+      }
+      // Parse JSON response
+      try {
+        const data = JSON.parse(text);
+        const indicator = data.status?.indicator || '';
+        const description = data.status?.description || '';
+        if (indicator === 'none' || description.toLowerCase().includes('operational')) {
+          return { ...service, status: 'operational', description: description || 'All systems operational' };
+        } else if (indicator === 'minor' || indicator === 'maintenance') {
+          return { ...service, status: 'degraded', description: description || 'Minor issues' };
+        } else if (indicator === 'major' || indicator === 'critical') {
+          return { ...service, status: 'outage', description: description || 'Major outage' };
+        }
+        return { ...service, status: 'operational', description: description || 'Status OK' };
+      } catch {
+        return { ...service, status: 'unknown', description: 'Invalid response' };
+      }
     }
 
     const text = await response.text();
