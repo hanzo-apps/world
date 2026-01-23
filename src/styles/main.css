@@ -669,9 +669,10 @@ body.animations-paused *::after {
   border-radius: 2px;
 }
 
-/* Wide panel (spans 2 columns) */
+/* Wide panel (spans 2 columns and 2 rows for video content) */
 .panel-wide {
   grid-column: span 2;
+  grid-row: span 2;
   min-height: 350px;
   max-height: none;
 }
