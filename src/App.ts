@@ -2043,6 +2043,7 @@ export class App {
         // Aggregate geopolitical hub activity (full variant only)
         if (SITE_VARIANT === 'full') {
           const geoActivity = aggregateGeoActivity(this.latestClusters);
+          this.map?.setGeoActivity(geoActivity);
           this.geoHubsPanel?.setActivities(geoActivity);
         }
       }

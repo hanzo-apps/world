@@ -9021,3 +9021,84 @@ body.playback-mode .status-dot {
 .tech-activity-marker.show-label + .tech-activity-label {
   opacity: 1;
 }
+
+/* Geo Activity Markers (for geopolitical hubs - full variant) */
+.geo-activity-marker {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: all 0.2s ease;
+}
+
+.geo-activity-marker:hover {
+  z-index: 100 !important;
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+.geo-activity-marker.high {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle, rgba(255, 82, 82, 0.9) 0%, rgba(255, 82, 82, 0.2) 60%, transparent 70%);
+  box-shadow: 0 0 20px 8px rgba(255, 82, 82, 0.4);
+  animation: geo-activity-pulse-high 1.2s ease-in-out infinite;
+}
+
+.geo-activity-marker.elevated {
+  width: 16px;
+  height: 16px;
+  background: radial-gradient(circle, rgba(255, 136, 68, 0.8) 0%, rgba(255, 136, 68, 0.2) 60%, transparent 70%);
+  box-shadow: 0 0 15px 5px rgba(255, 136, 68, 0.35);
+  animation: geo-activity-pulse-elevated 1.8s ease-in-out infinite;
+}
+
+.geo-activity-marker.low {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, rgba(200, 150, 100, 0.6) 0%, rgba(200, 150, 100, 0.15) 60%, transparent 70%);
+  box-shadow: 0 0 8px 3px rgba(200, 150, 100, 0.25);
+}
+
+@keyframes geo-activity-pulse-high {
+  0%, 100% {
+    box-shadow: 0 0 20px 8px rgba(255, 82, 82, 0.4);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px 15px rgba(255, 82, 82, 0.2);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+@keyframes geo-activity-pulse-elevated {
+  0%, 100% {
+    box-shadow: 0 0 15px 5px rgba(255, 136, 68, 0.35);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(255, 136, 68, 0.2);
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+.geo-activity-label {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.geo-activity-marker:hover + .geo-activity-label,
+.geo-activity-marker.show-label + .geo-activity-label {
+  opacity: 1;
+}
