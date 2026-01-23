@@ -99,24 +99,27 @@ export class App {
 
     this.isMobile = isMobileDevice();
     this.monitors = loadFromStorage<Monitor[]>(STORAGE_KEYS.monitors, []);
-    this.panelSettings = loadFromStorage<Record<string, PanelConfig>>(
-      STORAGE_KEYS.panels,
-      DEFAULT_PANELS
-    );
 
     // Use mobile-specific defaults on first load (no saved layers)
     const defaultLayers = this.isMobile ? MOBILE_DEFAULT_MAP_LAYERS : DEFAULT_MAP_LAYERS;
 
-    // Check if variant changed - reset layers to variant defaults
+    // Check if variant changed - reset all settings to variant defaults
     const storedVariant = localStorage.getItem('worldmonitor-variant');
     const currentVariant = SITE_VARIANT;
     if (storedVariant !== currentVariant) {
       // Variant changed - use defaults for new variant, clear old settings
       localStorage.setItem('worldmonitor-variant', currentVariant);
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
+      localStorage.removeItem(STORAGE_KEYS.panels);
+      localStorage.removeItem('worldmonitor-panel-order');
       this.mapLayers = { ...defaultLayers };
+      this.panelSettings = { ...DEFAULT_PANELS };
     } else {
       this.mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers);
+      this.panelSettings = loadFromStorage<Record<string, PanelConfig>>(
+        STORAGE_KEYS.panels,
+        DEFAULT_PANELS
+      );
     }
 
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
@@ -1382,11 +1385,14 @@ export class App {
       item.addEventListener('click', () => {
         const panelKey = (item as HTMLElement).dataset.panel!;
         const config = this.panelSettings[panelKey];
+        console.log('[Panel Toggle] Clicked:', panelKey, 'Current enabled:', config?.enabled);
         if (config) {
           config.enabled = !config.enabled;
+          console.log('[Panel Toggle] New enabled:', config.enabled);
           saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
           this.renderPanelToggles();
           this.applyPanelSettings();
+          console.log('[Panel Toggle] After apply - config.enabled:', this.panelSettings[panelKey]?.enabled);
         }
       });
     });
@@ -1491,6 +1497,9 @@ export class App {
         return;
       }
       const panel = this.panels[key];
+      if (key === 'events') {
+        console.log('[applyPanelSettings] events panel:', panel ? 'exists' : 'missing', 'enabled:', config.enabled);
+      }
       panel?.toggle(config.enabled);
     });
   }
