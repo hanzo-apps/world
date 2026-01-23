@@ -1,0 +1,75 @@
+# WorldMonitor Development Notes
+
+## Critical: RSS Proxy Allowlist
+
+When adding new RSS feeds in `src/config/feeds.ts`, you **MUST** also add the feed domains to the allowlist in `api/rss-proxy.js`.
+
+### Why
+The RSS proxy has a security allowlist (`ALLOWED_DOMAINS`) that blocks requests to domains not explicitly listed. Feeds from unlisted domains will return HTTP 403 "Domain not allowed" errors.
+
+### How to Add New Feeds
+
+1. Add the feed to `src/config/feeds.ts`
+2. Extract the domain from the feed URL (e.g., `https://www.ycombinator.com/blog/rss/` → `www.ycombinator.com`)
+3. Add the domain to `ALLOWED_DOMAINS` array in `api/rss-proxy.js`
+4. Deploy changes to Vercel
+
+### Example
+```javascript
+// In api/rss-proxy.js
+const ALLOWED_DOMAINS = [
+  // ... existing domains
+  'www.ycombinator.com',  // Add new domain here
+];
+```
+
+### Debugging Feed Issues
+If a panel shows "No news available":
+1. Open browser DevTools → Console
+2. Look for `HTTP 403` or "Domain not allowed" errors
+3. Check if the domain is in `api/rss-proxy.js` allowlist
+
+## Site Variants
+
+Two variants controlled by `VITE_VARIANT` environment variable:
+
+- `full` (default): Geopolitical focus - worldmonitor.app
+- `tech`: Tech/startup focus - startups.worldmonitor.app
+
+### Running Locally
+```bash
+npm run dev        # Full variant
+npm run dev:tech   # Tech variant
+```
+
+### Building
+```bash
+npm run build:full  # Production build for worldmonitor.app
+npm run build:tech  # Production build for startups.worldmonitor.app
+```
+
+## Custom Feed Scrapers
+
+Some sources don't provide RSS feeds. Custom scrapers are in `/api/`:
+
+| Endpoint | Source | Notes |
+|----------|--------|-------|
+| `/api/fwdstart` | FwdStart Newsletter (Beehiiv) | Scrapes archive page, 30min cache |
+
+### Adding New Scrapers
+1. Create `/api/source-name.js` edge function
+2. Scrape source, return RSS XML format
+3. Add to feeds.ts: `{ name: 'Source', url: '/api/source-name' }`
+4. No need to add to rss-proxy allowlist (direct API, not proxied)
+
+## Service Status Panel
+
+Status page URLs in `api/service-status.js` must match the actual status page endpoint. Common formats:
+- Statuspage.io: `https://status.example.com/api/v2/status.json`
+- Atlassian: `https://example.status.atlassian.com/api/v2/status.json`
+- incident.io: Same endpoint but returns HTML, handled by `incidentio` parser
+
+Current known URLs:
+- Anthropic: `https://status.claude.com/api/v2/status.json`
+- Zoom: `https://www.zoomstatus.com/api/v2/status.json`
+- Notion: `https://www.notion-status.com/api/v2/status.json`

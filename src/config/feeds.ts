@@ -370,6 +370,7 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'Both Sides of Table', url: rss('https://bothsidesofthetable.com/feed') },
     { name: 'Lenny\'s Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
     { name: 'Stratechery', url: rss('https://stratechery.com/feed/') },
+    { name: 'FwdStart Newsletter', url: '/api/fwdstart' },
   ],
   regionalStartups: [
     { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
