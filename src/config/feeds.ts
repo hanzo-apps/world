@@ -82,6 +82,28 @@ export const SOURCE_TIERS: Record<string, number> = {
   'TASS': 3,
   'Layoffs.fyi': 3,
 
+  // Tier 2 - Premium Startup/VC Sources
+  'Y Combinator Blog': 2,
+  'a16z Blog': 2,
+  'First Round Review': 2,
+  'Sequoia Blog': 2,
+  'Crunchbase News': 2,
+  'CB Insights': 2,
+  'PitchBook News': 2,
+  'The Information': 2,
+
+  // Tier 3 - Regional/Specialty Startup Sources
+  'EU Startups': 3,
+  'Tech.eu': 3,
+  'Sifted (Europe)': 3,
+  'Tech in Asia': 3,
+  'TechCabal (Africa)': 3,
+  'Inc42 (India)': 3,
+  'YourStory': 3,
+  'NFX Essays': 3,
+  'Paul Graham Essays': 2,
+  'Stratechery': 2,
+
   // Tier 4 - Aggregators
   'Hacker News': 4,
   'The Verge': 4,
@@ -332,6 +354,35 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'SaaStr', url: rss('https://www.saastr.com/feed/') },
     { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
     { name: 'AngelList News', url: rss('https://news.google.com/rss/search?q=site:angellist.com+OR+"AngelList"+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'TechCrunch Venture', url: rss('https://techcrunch.com/category/venture/feed/') },
+    { name: 'The Information', url: rss('https://news.google.com/rss/search?q=site:theinformation.com+startup+OR+funding+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Fortune Term Sheet', url: rss('https://news.google.com/rss/search?q="Term+Sheet"+venture+capital+OR+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'PitchBook News', url: rss('https://pitchbook.com/feed') },
+    { name: 'CB Insights', url: rss('https://www.cbinsights.com/research/feed/') },
+  ],
+  vcblogs: [
+    { name: 'Y Combinator Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
+    { name: 'a16z Blog', url: rss('https://a16z.com/feed/') },
+    { name: 'First Round Review', url: rss('https://review.firstround.com/feed.xml') },
+    { name: 'Sequoia Blog', url: rss('https://www.sequoiacap.com/feed/') },
+    { name: 'NFX Essays', url: rss('https://www.nfx.com/feed') },
+    { name: 'Paul Graham Essays', url: rss('https://www.aaronsw.com/2002/feeds/pgessays.rss') },
+    { name: 'Both Sides of Table', url: rss('https://bothsidesofthetable.com/feed') },
+    { name: 'Lenny\'s Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
+    { name: 'Stratechery', url: rss('https://stratechery.com/feed/') },
+  ],
+  regionalStartups: [
+    { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
+    { name: 'Tech.eu', url: rss('https://tech.eu/feed/') },
+    { name: 'Sifted (Europe)', url: rss('https://sifted.eu/feed') },
+    { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
+    { name: 'KrASIA', url: rss('https://kr-asia.com/feed') },
+    { name: 'TechCabal (Africa)', url: rss('https://techcabal.com/feed/') },
+    { name: 'Disrupt Africa', url: rss('https://disrupt-africa.com/feed/') },
+    { name: 'LAVCA (LATAM)', url: rss('https://lavca.org/feed/') },
+    { name: 'Contxto (LATAM)', url: rss('https://contxto.com/feed/') },
+    { name: 'Inc42 (India)', url: rss('https://inc42.com/feed/') },
+    { name: 'YourStory', url: rss('https://yourstory.com/feed') },
   ],
   github: [
     { name: 'GitHub Blog', url: rss('https://github.blog/feed/') },
@@ -353,14 +404,6 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'VC News', url: rss('https://news.google.com/rss/search?q=("Series+A"+OR+"Series+B"+OR+"Series+C"+OR+"funding+round"+OR+"venture+capital")+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Seed & Pre-Seed', url: rss('https://news.google.com/rss/search?q=("seed+round"+OR+"pre-seed"+OR+"angel+round"+OR+"seed+funding")+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Startup Funding', url: rss('https://news.google.com/rss/search?q=("startup+funding"+OR+"raised+funding"+OR+"raised+$"+OR+"funding+announced")+when:7d&hl=en-US&gl=US&ceid=US:en') },
-    // Regional startup news
-    { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
-    { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
-    { name: 'e27 Asia', url: rss('https://e27.co/feed/') },
-    { name: 'Inc42 India', url: rss('https://inc42.com/feed/') },
-    { name: 'MENA Funding', url: rss('https://news.google.com/rss/search?q=(MENA+OR+Dubai+OR+"Saudi+Arabia"+OR+UAE)+startup+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'Africa Tech', url: rss('https://news.google.com/rss/search?q=Africa+startup+funding+OR+"African+startup"+raised+when:7d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'LATAM Startups', url: rss('https://news.google.com/rss/search?q=(Brazil+OR+Mexico+OR+"Latin+America")+startup+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   producthunt: [
     { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
@@ -404,6 +447,20 @@ const TECH_FEEDS: Record<string, Feed[]> = {
   layoffs: [
     { name: 'Layoffs.fyi', url: rss('https://news.google.com/rss/search?q=tech+layoffs+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
+  ],
+  unicorns: [
+    { name: 'Unicorn News', url: rss('https://news.google.com/rss/search?q=("unicorn+startup"+OR+"unicorn+valuation"+OR+"$1+billion+valuation")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'CB Insights Unicorn', url: rss('https://news.google.com/rss/search?q=site:cbinsights.com+unicorn+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Decacorn News', url: rss('https://news.google.com/rss/search?q=("decacorn"+OR+"$10+billion+valuation"+OR+"$10B+valuation")+startup+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'New Unicorns', url: rss('https://news.google.com/rss/search?q=("becomes+unicorn"+OR+"joins+unicorn"+OR+"reaches+unicorn"+OR+"achieved+unicorn")+when:14d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  accelerators: [
+    { name: 'YC News', url: rss('https://news.ycombinator.com/rss') },
+    { name: 'YC Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
+    { name: 'Techstars Blog', url: rss('https://www.techstars.com/blog/feed/') },
+    { name: '500 Global News', url: rss('https://news.google.com/rss/search?q="500+Global"+OR+"500+Startups"+accelerator+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Demo Day News', url: rss('https://news.google.com/rss/search?q=("demo+day"+OR+"YC+batch"+OR+"accelerator+batch")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Startup School', url: rss('https://news.google.com/rss/search?q="Startup+School"+OR+"YC+Startup+School"+when:14d&hl=en-US&gl=US&ceid=US:en') },
   ],
 };
 
