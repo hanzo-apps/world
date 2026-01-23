@@ -68,26 +68,41 @@ export function aggregateTechActivity(clusters: ClusteredEvent[]): TechHubActivi
     }
   }
 
-  // Calculate activity scores and build result
-  const activities: TechHubActivity[] = [];
+  // First pass: calculate raw scores to find max
+  const rawScores: Array<{ hubId: string; acc: HubAccumulator; rawScore: number }> = [];
+  let maxRawScore = 0;
 
   for (const [hubId, acc] of hubAccumulators) {
     const newsCount = acc.clusters.length;
     const tierBonus = TIER_BONUS[acc.hub.tier] || 0;
 
-    // Score formula: news count + breaking bonus + velocity bonus + tier bonus
-    const score = Math.min(100,
-      newsCount * 15 +
-      (acc.hasBreaking ? 30 : 0) +
-      acc.totalVelocity * 5 +
-      tierBonus
-    );
+    // Raw score formula
+    const rawScore =
+      newsCount * 10 +
+      (acc.hasBreaking ? 20 : 0) +
+      acc.totalVelocity * 3 +
+      tierBonus;
 
-    // Determine activity level
+    rawScores.push({ hubId, acc, rawScore });
+    maxRawScore = Math.max(maxRawScore, rawScore);
+  }
+
+  // Calculate activity scores and build result
+  const activities: TechHubActivity[] = [];
+
+  for (const { hubId, acc, rawScore } of rawScores) {
+    const newsCount = acc.clusters.length;
+
+    // Normalize to 0-100 scale relative to top hub
+    const score = maxRawScore > 0
+      ? Math.round((rawScore / maxRawScore) * 100)
+      : 0;
+
+    // Determine activity level based on relative position
     let activityLevel: 'high' | 'elevated' | 'low';
-    if (score >= 50 || acc.hasBreaking) {
+    if (score >= 70 || acc.hasBreaking) {
       activityLevel = 'high';
-    } else if (score >= 20) {
+    } else if (score >= 40) {
       activityLevel = 'elevated';
     } else {
       activityLevel = 'low';
