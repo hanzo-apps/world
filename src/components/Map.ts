@@ -5,6 +5,7 @@ import type { Topology, GeometryCollection } from 'topojson-specification';
 import type { Feature, Geometry } from 'geojson';
 import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent } from '@/types';
 import type { TechHubActivity } from '@/services/tech-activity';
+import type { GeoHubActivity } from '@/services/geo-activity';
 import { getNaturalEventIcon } from '@/services/eonet';
 import type { WeatherAlert } from '@/services/weather';
 import { getSeverityColor } from '@/services/weather';
@@ -121,8 +122,10 @@ export class MapComponent {
   private naturalEvents: NaturalEvent[] = [];
   private techEvents: TechEventMarker[] = [];
   private techActivities: TechHubActivity[] = [];
+  private geoActivities: GeoHubActivity[] = [];
   private news: NewsItem[] = [];
   private onTechHubClick?: (hub: TechHubActivity) => void;
+  private onGeoHubClick?: (hub: GeoHubActivity) => void;
   private popup: MapPopup;
   private onHotspotClick?: (hotspot: Hotspot) => void;
   private onTimeRangeChange?: (range: TimeRange) => void;
@@ -1947,6 +1950,48 @@ export class MapComponent {
       });
     }
 
+    // Geo Hub Activity Markers (shows activity heatmap for geopolitical hubs - full variant)
+    if (SITE_VARIANT === 'full' && this.geoActivities.length > 0) {
+      this.geoActivities.forEach((activity) => {
+        const pos = projection([activity.lon, activity.lat]);
+        if (!pos) return;
+
+        // Only show markers for hubs with actual activity
+        if (activity.newsCount === 0) return;
+
+        const div = document.createElement('div');
+        div.className = `geo-activity-marker ${activity.activityLevel}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+        div.style.zIndex = activity.activityLevel === 'high' ? '60' : activity.activityLevel === 'elevated' ? '50' : '40';
+        div.title = `${activity.name}: ${activity.newsCount} stories`;
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onGeoHubClick?.(activity);
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'geoActivity',
+            data: activity,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+
+        // Add label for high/elevated activity hubs at sufficient zoom
+        if ((activity.activityLevel === 'high' || (activity.activityLevel === 'elevated' && this.state.zoom >= 2)) && this.state.zoom >= 1.5) {
+          const label = document.createElement('div');
+          label.className = 'geo-activity-label';
+          label.textContent = activity.name;
+          label.style.left = `${pos[0]}px`;
+          label.style.top = `${pos[1] + 14}px`;
+          this.overlays.appendChild(label);
+        }
+      });
+    }
+
     // Protests / Social Unrest Events (severity colors + icons) - with clustering
     // Filter to show only significant events on map (all events still used for CII analysis)
     if (this.state.layers.protests) {
@@ -3190,6 +3235,15 @@ export class MapComponent {
 
   public setOnTechHubClick(handler: (hub: TechHubActivity) => void): void {
     this.onTechHubClick = handler;
+  }
+
+  public setGeoActivity(activities: GeoHubActivity[]): void {
+    this.geoActivities = activities;
+    this.render();
+  }
+
+  public setOnGeoHubClick(handler: (hub: GeoHubActivity) => void): void {
+    this.onGeoHubClick = handler;
   }
 
   private getCableAdvisory(cableId: string): CableAdvisory | undefined {
