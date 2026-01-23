@@ -1666,7 +1666,8 @@ export class App {
   }
 
   private async loadNews(): Promise<void> {
-    const categories = [
+    // Build categories dynamically based on what feeds exist
+    const allCategories = [
       { key: 'politics', feeds: FEEDS.politics },
       { key: 'tech', feeds: FEEDS.tech },
       { key: 'finance', feeds: FEEDS.finance },
@@ -1679,7 +1680,16 @@ export class App {
       { key: 'layoffs', feeds: FEEDS.layoffs },
       { key: 'ai', feeds: FEEDS.ai },
       { key: 'thinktanks', feeds: FEEDS.thinktanks },
+      // Tech variant categories
+      { key: 'startups', feeds: FEEDS.startups },
+      { key: 'security', feeds: FEEDS.security },
+      { key: 'policy', feeds: FEEDS.policy },
+      { key: 'hardware', feeds: FEEDS.hardware },
+      { key: 'cloud', feeds: FEEDS.cloud },
+      { key: 'dev', feeds: FEEDS.dev },
     ];
+    // Filter to only categories that have feeds defined
+    const categories = allCategories.filter(c => c.feeds && c.feeds.length > 0);
 
     // Fetch all categories in parallel
     const categoryResults = await Promise.allSettled(
