@@ -1382,7 +1382,12 @@ export class MapPopup {
     const faangs = data.items.filter(h => h.type === 'faang');
     const publics = data.items.filter(h => h.type === 'public');
 
-    const listItems = data.items.map(hq => {
+    const sortedItems = [...data.items].sort((a, b) => {
+      const typeOrder = { faang: 0, unicorn: 1, public: 2 };
+      return (typeOrder[a.type] ?? 3) - (typeOrder[b.type] ?? 3);
+    });
+
+    const listItems = sortedItems.map(hq => {
       const icon = hq.type === 'faang' ? '🏛️' : hq.type === 'unicorn' ? '🦄' : '🏢';
       const marketCap = hq.marketCap ? ` (${hq.marketCap})` : '';
       return `<li class="cluster-item ${hq.type}">${icon} ${escapeHtml(hq.company)}${marketCap}</li>`;
@@ -1408,8 +1413,9 @@ export class MapPopup {
 
   private renderTechEventClusterPopup(data: { items: TechEventPopupData[]; location: string; country: string }): string {
     const upcomingSoon = data.items.filter(e => e.daysUntil <= 14);
+    const sortedItems = [...data.items].sort((a, b) => a.daysUntil - b.daysUntil);
 
-    const listItems = data.items.map(event => {
+    const listItems = sortedItems.map(event => {
       const startDate = new Date(event.startDate);
       const dateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const urgencyClass = event.daysUntil <= 7 ? 'urgent' : event.daysUntil <= 30 ? 'soon' : '';

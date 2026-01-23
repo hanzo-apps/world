@@ -385,25 +385,28 @@ export const TECH_HQS: TechHQ[] = [
   { id: 'google-zurich', company: 'Google Zurich', city: 'Zurich', country: 'Switzerland', lat: 47.3667, lon: 8.5247, type: 'faang' },
 
   // ============ MENA - UAE ============
-  { id: 'careem', company: 'Careem', city: 'Dubai', country: 'UAE', lat: 25.0771, lon: 55.1396, type: 'unicorn' },
+  { id: 'careem', company: 'Careem', city: 'Dubai', country: 'UAE', lat: 25.0771, lon: 55.1396, type: 'unicorn', marketCap: '$3.1B' },
   { id: 'noon', company: 'Noon', city: 'Dubai', country: 'UAE', lat: 25.1120, lon: 55.1380, type: 'unicorn' },
   { id: 'talabat', company: 'Talabat', city: 'Dubai', country: 'UAE', lat: 25.0972, lon: 55.1611, type: 'unicorn' },
   { id: 'g42', company: 'G42', city: 'Abu Dhabi', country: 'UAE', lat: 24.4669, lon: 54.3659, type: 'unicorn' },
-  { id: 'anghami', company: 'Anghami', city: 'Abu Dhabi', country: 'UAE', lat: 24.4539, lon: 54.3773, type: 'public' },
-  { id: 'dubizzle', company: 'Dubizzle Group', city: 'Dubai', country: 'UAE', lat: 25.1152, lon: 55.1375, type: 'unicorn' },
-  { id: 'tabby-uae', company: 'Tabby', city: 'Dubai', country: 'UAE', lat: 25.0773, lon: 55.1409, type: 'unicorn', marketCap: '$4.5B' },
+  { id: 'presight', company: 'Presight.ai', city: 'Abu Dhabi', country: 'UAE', lat: 24.4539, lon: 54.3773, type: 'unicorn', marketCap: '$4.8B' },
+  { id: 'dubizzle', company: 'Dubizzle Group', city: 'Dubai', country: 'UAE', lat: 25.1152, lon: 55.1375, type: 'unicorn', marketCap: '$1B' },
+  { id: 'kitopi', company: 'Kitopi', city: 'Dubai', country: 'UAE', lat: 25.0773, lon: 55.1409, type: 'unicorn', marketCap: '$1.6B' },
+  { id: 'property-finder', company: 'Property Finder', city: 'Dubai', country: 'UAE', lat: 25.0850, lon: 55.1500, type: 'unicorn', marketCap: '$2B' },
+  { id: 'xpanceo', company: 'XPANCEO', city: 'Dubai', country: 'UAE', lat: 25.0900, lon: 55.1550, type: 'unicorn', marketCap: '$1.4B' },
+  { id: 'alef-edu', company: 'Alef Education', city: 'Abu Dhabi', country: 'UAE', lat: 24.4700, lon: 54.3600, type: 'unicorn', marketCap: '$1.9B' },
   { id: 'swvl', company: 'Swvl', city: 'Dubai', country: 'UAE', lat: 25.0657, lon: 55.1713, type: 'public' },
   { id: 'aramex', company: 'Aramex', city: 'Dubai', country: 'UAE', lat: 25.0717, lon: 55.1335, type: 'public' },
   { id: 'etisalat', company: 'e&', city: 'Abu Dhabi', country: 'UAE', lat: 24.4872, lon: 54.3563, type: 'public' },
   { id: 'mashreq', company: 'Mashreq Neo', city: 'Dubai', country: 'UAE', lat: 25.2614, lon: 55.2977, type: 'public' },
 
   // MENA - Saudi Arabia
-  { id: 'tamara', company: 'Tamara', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7136, lon: 46.6753, type: 'unicorn', marketCap: '$1B' }, // BNPL
+  { id: 'tabby', company: 'Tabby', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7200, lon: 46.6900, type: 'unicorn', marketCap: '$3.3B' },
+  { id: 'tamara', company: 'Tamara', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7136, lon: 46.6753, type: 'unicorn', marketCap: '$1B' },
+  { id: 'ninja', company: 'Ninja', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7250, lon: 46.7000, type: 'unicorn', marketCap: '$1.5B' },
   { id: 'stc', company: 'STC', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.6877, lon: 46.6850, type: 'public' },
-  { id: 'stc-pay', company: 'stc pay', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7001, lon: 46.6753, type: 'unicorn' },
+  { id: 'stc-pay', company: 'stc pay', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7001, lon: 46.6753, type: 'unicorn', marketCap: '$1.3B' },
   { id: 'jahez', company: 'Jahez', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7070, lon: 46.6890, type: 'public' },
-  { id: 'sary', company: 'Sary', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.6950, lon: 46.7100, type: 'unicorn', marketCap: '$1B' }, // B2B marketplace
-  { id: 'nana', company: 'Nana', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7470, lon: 46.6348, type: 'unicorn', marketCap: '$1B' }, // Grocery delivery
   { id: 'leejam', company: 'Leejam Sports', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.7003, lon: 46.6859, type: 'public' },
 
   // MENA - Egypt
