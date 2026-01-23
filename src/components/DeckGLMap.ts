@@ -46,7 +46,7 @@ import {
   TECH_HQS,
   CLOUD_REGIONS,
 } from '@/config';
-import { MapPopup } from './MapPopup';
+import { MapPopup, type PopupType } from './MapPopup';
 import {
   updateHotspotEscalation,
   getHotspotEscalation,
@@ -882,9 +882,52 @@ export class DeckGLMap {
       return;
     }
 
-    // Show popup for other layers - cast to expected popup data type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.popup.show(info.object as any);
+    // Map layer IDs to popup types
+    const layerToPopupType: Record<string, PopupType> = {
+      'conflict-zones-layer': 'conflict',
+      'bases-layer': 'base',
+      'nuclear-layer': 'nuclear',
+      'datacenters-layer': 'datacenter',
+      'cables-layer': 'cable',
+      'pipelines-layer': 'pipeline',
+      'earthquakes-layer': 'earthquake',
+      'weather-layer': 'weather',
+      'outages-layer': 'outage',
+      'protests-layer': 'protest',
+      'military-flights-layer': 'militaryFlight',
+      'military-vessels-layer': 'militaryVessel',
+      'natural-events-layer': 'natEvent',
+      'waterways-layer': 'waterway',
+      'economic-centers-layer': 'economic',
+      'startup-hubs-layer': 'startupHub',
+      'tech-hqs-layer': 'techHQ',
+      'accelerators-layer': 'accelerator',
+      'cloud-regions-layer': 'cloudRegion',
+      'tech-events-layer': 'techEvent',
+    };
+
+    const popupType = layerToPopupType[layerId];
+    if (!popupType) return;
+
+    // For GeoJSON layers, the data is in properties
+    let data = info.object;
+    if (layerId === 'conflict-zones-layer' && info.object.properties) {
+      // Find the full conflict zone data from config
+      const conflictId = info.object.properties.id;
+      const fullConflict = CONFLICT_ZONES.find(c => c.id === conflictId);
+      if (fullConflict) data = fullConflict;
+    }
+
+    // Get click coordinates relative to container
+    const x = info.x ?? 0;
+    const y = info.y ?? 0;
+
+    this.popup.show({
+      type: popupType,
+      data: data,
+      x,
+      y,
+    });
   }
 
   // Utility methods
@@ -1377,6 +1420,12 @@ export class DeckGLMap {
     }
   }
 
+  // Get center coordinates for programmatic popup positioning
+  private getContainerCenter(): { x: number; y: number } {
+    const rect = this.container.getBoundingClientRect();
+    return { x: rect.width / 2, y: rect.height / 2 };
+  }
+
   // Trigger click methods - find and focus on specific items
   public triggerHotspotClick(id: string): void {
     const hotspot = this.hotspots.find(h => h.id === id);
@@ -1391,8 +1440,8 @@ export class DeckGLMap {
     if (conflict) {
       // center is [lon, lat], but setCenter expects (lat, lon)
       this.setCenter(conflict.center[1], conflict.center[0]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(conflict as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'conflict', data: conflict, x, y });
     }
   }
 
@@ -1400,8 +1449,8 @@ export class DeckGLMap {
     const base = MILITARY_BASES.find(b => b.id === id);
     if (base) {
       this.setCenter(base.lat, base.lon);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(base as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'base', data: base, x, y });
     }
   }
 
@@ -1414,8 +1463,8 @@ export class DeckGLMap {
         // Points are [lon, lat], but setCenter expects (lat, lon)
         this.setCenter(midPoint[1], midPoint[0]);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(pipeline as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'pipeline', data: pipeline, x, y });
     }
   }
 
@@ -1428,8 +1477,8 @@ export class DeckGLMap {
         // Points are [lon, lat], but setCenter expects (lat, lon)
         this.setCenter(midPoint[1], midPoint[0]);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(cable as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'cable', data: cable, x, y });
     }
   }
 
@@ -1437,8 +1486,8 @@ export class DeckGLMap {
     const dc = AI_DATA_CENTERS.find(d => d.id === id);
     if (dc) {
       this.setCenter(dc.lat, dc.lon);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(dc as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'datacenter', data: dc, x, y });
     }
   }
 
@@ -1446,8 +1495,8 @@ export class DeckGLMap {
     const facility = NUCLEAR_FACILITIES.find(n => n.id === id);
     if (facility) {
       this.setCenter(facility.lat, facility.lon);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(facility as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'nuclear', data: facility, x, y });
     }
   }
 
@@ -1455,8 +1504,8 @@ export class DeckGLMap {
     const irradiator = GAMMA_IRRADIATORS.find(i => i.id === id);
     if (irradiator) {
       this.setCenter(irradiator.lat, irradiator.lon);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.popup.show(irradiator as any);
+      const { x, y } = this.getContainerCenter();
+      this.popup.show({ type: 'irradiator', data: irradiator, x, y });
     }
   }
 
