@@ -412,6 +412,7 @@ export interface MapLayers {
   cloudRegions: boolean;
   accelerators: boolean;
   techHQs: boolean;
+  techEvents: boolean;
 }
 
 export interface AIDataCenter {
