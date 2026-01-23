@@ -1902,7 +1902,7 @@ export class MapComponent {
       });
     }
 
-    // Protests / Social Unrest Events (severity colors + icons)
+    // Protests / Social Unrest Events (severity colors + icons) - with clustering
     // Filter to show only significant events on map (all events still used for CII analysis)
     if (this.state.layers.protests) {
       const significantProtests = this.protests.filter((event) => {
@@ -1911,34 +1911,57 @@ export class MapComponent {
         return event.eventType === 'riot' || event.severity === 'high';
       });
 
-      significantProtests.forEach((event) => {
-        const pos = projection([event.lon, event.lat]);
-        if (!pos) return;
+      const clusterRadius = this.state.zoom >= 4 ? 12 : this.state.zoom >= 3 ? 20 : 35;
+      const clusters = this.clusterMarkers(significantProtests, projection, clusterRadius, p => p.country);
 
+      clusters.forEach((cluster) => {
+        if (cluster.items.length === 0) return;
         const div = document.createElement('div');
-        div.className = `protest-marker ${event.severity} ${event.eventType}`;
-        div.style.left = `${pos[0]}px`;
-        div.style.top = `${pos[1]}px`;
+        const isCluster = cluster.items.length > 1;
+        const primaryEvent = cluster.items[0]!;
+        const hasRiot = cluster.items.some(e => e.eventType === 'riot');
+        const hasHighSeverity = cluster.items.some(e => e.severity === 'high');
+
+        div.className = `protest-marker ${hasHighSeverity ? 'high' : primaryEvent.severity} ${hasRiot ? 'riot' : primaryEvent.eventType} ${isCluster ? 'cluster' : ''}`;
+        div.style.left = `${cluster.pos[0]}px`;
+        div.style.top = `${cluster.pos[1]}px`;
 
         const icon = document.createElement('div');
         icon.className = 'protest-icon';
-        icon.textContent = event.eventType === 'riot' ? '🔥' : event.eventType === 'strike' ? '✊' : '📢';
+        icon.textContent = hasRiot ? '🔥' : primaryEvent.eventType === 'strike' ? '✊' : '📢';
         div.appendChild(icon);
-        div.title = `${event.city || event.country} - ${event.eventType} (${event.severity})`;
 
-        if (event.validated) {
-          div.classList.add('validated');
+        if (isCluster) {
+          const badge = document.createElement('div');
+          badge.className = 'cluster-badge';
+          badge.textContent = String(cluster.items.length);
+          div.appendChild(badge);
+          div.title = `${primaryEvent.country}: ${cluster.items.length} events`;
+        } else {
+          div.title = `${primaryEvent.city || primaryEvent.country} - ${primaryEvent.eventType} (${primaryEvent.severity})`;
+          if (primaryEvent.validated) {
+            div.classList.add('validated');
+          }
         }
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
           const rect = this.container.getBoundingClientRect();
-          this.popup.show({
-            type: 'protest',
-            data: event,
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          });
+          if (isCluster) {
+            this.popup.show({
+              type: 'protestCluster',
+              data: { items: cluster.items, country: primaryEvent.country },
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          } else {
+            this.popup.show({
+              type: 'protest',
+              data: primaryEvent,
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          }
         });
 
         this.overlays.appendChild(div);
