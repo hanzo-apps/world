@@ -52,6 +52,9 @@ import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEA
 import { PIPELINES } from '@/config/pipelines';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
+import { TECH_COMPANIES } from '@/config/tech-companies';
+import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
+import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
 export class App {
@@ -282,6 +285,7 @@ export class App {
 
   private setupMapLayerHandlers(): void {
     this.map?.setOnLayerChange((layer, enabled) => {
+      console.log(`[App.onLayerChange] ${layer}: ${enabled}`);
       // Save layer settings
       this.mapLayers[layer] = enabled;
       saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
@@ -322,70 +326,111 @@ export class App {
   }
 
   private setupSearchModal(): void {
-    this.searchModal = new SearchModal(this.container);
+    const searchOptions = SITE_VARIANT === 'tech'
+      ? {
+          placeholder: 'Search tech companies, AI labs, startups, news...',
+          hint: 'Companies • AI Labs • Startups • Datacenters • Cables • News',
+        }
+      : {
+          placeholder: 'Search news, pipelines, bases, markets...',
+          hint: 'News • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
+        };
+    this.searchModal = new SearchModal(this.container, searchOptions);
 
-    // Register static sources (hotspots, conflicts, bases)
-    // Include keywords in subtitle for better searchability
-    this.searchModal.registerSource('hotspot', INTEL_HOTSPOTS.map(h => ({
-      id: h.id,
-      title: h.name,
-      subtitle: `${h.subtext || ''} ${h.keywords?.join(' ') || ''} ${h.description || ''}`.trim(),
-      data: h,
-    })));
+    if (SITE_VARIANT === 'tech') {
+      // Tech variant: tech-specific sources
+      this.searchModal.registerSource('techcompany', TECH_COMPANIES.map(c => ({
+        id: c.id,
+        title: c.name,
+        subtitle: `${c.sector} ${c.city} ${c.keyProducts?.join(' ') || ''}`.trim(),
+        data: c,
+      })));
 
-    this.searchModal.registerSource('conflict', CONFLICT_ZONES.map(c => ({
-      id: c.id,
-      title: c.name,
-      subtitle: `${c.parties?.join(' ') || ''} ${c.keywords?.join(' ') || ''} ${c.description || ''}`.trim(),
-      data: c,
-    })));
+      this.searchModal.registerSource('ailab', AI_RESEARCH_LABS.map(l => ({
+        id: l.id,
+        title: l.name,
+        subtitle: `${l.type} ${l.city} ${l.focusAreas?.join(' ') || ''}`.trim(),
+        data: l,
+      })));
 
-    this.searchModal.registerSource('base', MILITARY_BASES.map(b => ({
-      id: b.id,
-      title: b.name,
-      subtitle: `${b.type} ${b.description || ''}`.trim(),
-      data: b,
-    })));
+      this.searchModal.registerSource('startup', STARTUP_ECOSYSTEMS.map(s => ({
+        id: s.id,
+        title: s.name,
+        subtitle: `${s.ecosystemTier} ${s.topSectors?.join(' ') || ''} ${s.notableStartups?.join(' ') || ''}`.trim(),
+        data: s,
+      })));
 
-    // Register pipelines
-    this.searchModal.registerSource('pipeline', PIPELINES.map(p => ({
-      id: p.id,
-      title: p.name,
-      subtitle: `${p.type} ${p.operator || ''} ${p.countries?.join(' ') || ''}`.trim(),
-      data: p,
-    })));
+      this.searchModal.registerSource('datacenter', AI_DATA_CENTERS.map(d => ({
+        id: d.id,
+        title: d.name,
+        subtitle: `${d.owner} ${d.chipType || ''}`.trim(),
+        data: d,
+      })));
 
-    // Register undersea cables
-    this.searchModal.registerSource('cable', UNDERSEA_CABLES.map(c => ({
-      id: c.id,
-      title: c.name,
-      subtitle: c.major ? 'Major cable' : '',
-      data: c,
-    })));
+      this.searchModal.registerSource('cable', UNDERSEA_CABLES.map(c => ({
+        id: c.id,
+        title: c.name,
+        subtitle: c.major ? 'Major internet backbone' : 'Undersea cable',
+        data: c,
+      })));
+    } else {
+      // Full variant: geopolitical sources
+      this.searchModal.registerSource('hotspot', INTEL_HOTSPOTS.map(h => ({
+        id: h.id,
+        title: h.name,
+        subtitle: `${h.subtext || ''} ${h.keywords?.join(' ') || ''} ${h.description || ''}`.trim(),
+        data: h,
+      })));
 
-    // Register AI datacenters
-    this.searchModal.registerSource('datacenter', AI_DATA_CENTERS.map(d => ({
-      id: d.id,
-      title: d.name,
-      subtitle: `${d.owner} ${d.chipType || ''}`.trim(),
-      data: d,
-    })));
+      this.searchModal.registerSource('conflict', CONFLICT_ZONES.map(c => ({
+        id: c.id,
+        title: c.name,
+        subtitle: `${c.parties?.join(' ') || ''} ${c.keywords?.join(' ') || ''} ${c.description || ''}`.trim(),
+        data: c,
+      })));
 
-    // Register nuclear facilities
-    this.searchModal.registerSource('nuclear', NUCLEAR_FACILITIES.map(n => ({
-      id: n.id,
-      title: n.name,
-      subtitle: `${n.type} ${n.operator || ''}`.trim(),
-      data: n,
-    })));
+      this.searchModal.registerSource('base', MILITARY_BASES.map(b => ({
+        id: b.id,
+        title: b.name,
+        subtitle: `${b.type} ${b.description || ''}`.trim(),
+        data: b,
+      })));
 
-    // Register gamma irradiators
-    this.searchModal.registerSource('irradiator', GAMMA_IRRADIATORS.map(g => ({
-      id: g.id,
-      title: `${g.city}, ${g.country}`,
-      subtitle: g.organization || '',
-      data: g,
-    })));
+      this.searchModal.registerSource('pipeline', PIPELINES.map(p => ({
+        id: p.id,
+        title: p.name,
+        subtitle: `${p.type} ${p.operator || ''} ${p.countries?.join(' ') || ''}`.trim(),
+        data: p,
+      })));
+
+      this.searchModal.registerSource('cable', UNDERSEA_CABLES.map(c => ({
+        id: c.id,
+        title: c.name,
+        subtitle: c.major ? 'Major cable' : '',
+        data: c,
+      })));
+
+      this.searchModal.registerSource('datacenter', AI_DATA_CENTERS.map(d => ({
+        id: d.id,
+        title: d.name,
+        subtitle: `${d.owner} ${d.chipType || ''}`.trim(),
+        data: d,
+      })));
+
+      this.searchModal.registerSource('nuclear', NUCLEAR_FACILITIES.map(n => ({
+        id: n.id,
+        title: n.name,
+        subtitle: `${n.type} ${n.operator || ''}`.trim(),
+        data: n,
+      })));
+
+      this.searchModal.registerSource('irradiator', GAMMA_IRRADIATORS.map(g => ({
+        id: g.id,
+        title: `${g.city}, ${g.country}`,
+        subtitle: g.organization || '',
+        data: g,
+      })));
+    }
 
     // Handle result selection
     this.searchModal.setOnSelect((result) => this.handleSearchResult(result));
@@ -502,6 +547,42 @@ export class App {
       case 'outage':
         // These are dynamic, just switch to map view
         this.map?.setView('global');
+        break;
+      case 'techcompany': {
+        const company = result.data as typeof TECH_COMPANIES[0];
+        this.map?.setView('global');
+        this.map?.enableLayer('techHQs');
+        this.mapLayers.techHQs = true;
+        setTimeout(() => {
+          this.map?.setCenter(company.lat, company.lon);
+          this.map?.setZoom(4);
+        }, 300);
+        break;
+      }
+      case 'ailab': {
+        const lab = result.data as typeof AI_RESEARCH_LABS[0];
+        this.map?.setView('global');
+        setTimeout(() => {
+          this.map?.setCenter(lab.lat, lab.lon);
+          this.map?.setZoom(4);
+        }, 300);
+        break;
+      }
+      case 'startup': {
+        const ecosystem = result.data as typeof STARTUP_ECOSYSTEMS[0];
+        this.map?.setView('global');
+        this.map?.enableLayer('startupHubs');
+        this.mapLayers.startupHubs = true;
+        setTimeout(() => {
+          this.map?.setCenter(ecosystem.lat, ecosystem.lon);
+          this.map?.setZoom(4);
+        }, 300);
+        break;
+      }
+      case 'techevent':
+        this.map?.setView('global');
+        this.map?.enableLayer('techEvents');
+        this.mapLayers.techEvents = true;
         break;
     }
   }
@@ -1589,7 +1670,9 @@ export class App {
           await this.loadMilitary();
           break;
         case 'techEvents':
+          console.log('[loadDataForLayer] Loading techEvents...');
           await this.loadTechEvents();
+          console.log('[loadDataForLayer] techEvents loaded');
           break;
       }
     } finally {
@@ -1877,8 +1960,12 @@ export class App {
   }
 
   private async loadTechEvents(): Promise<void> {
+    console.log('[loadTechEvents] Called. SITE_VARIANT:', SITE_VARIANT, 'techEvents layer:', this.mapLayers.techEvents);
     // Only load for tech variant or if techEvents layer is enabled
-    if (SITE_VARIANT !== 'tech' && !this.mapLayers.techEvents) return;
+    if (SITE_VARIANT !== 'tech' && !this.mapLayers.techEvents) {
+      console.log('[loadTechEvents] Skipping - not tech variant and layer disabled');
+      return;
+    }
 
     try {
       const res = await fetch('/api/tech-events?type=conferences&mappable=true');
