@@ -1,7 +1,8 @@
-// Tech Events API - Parses Techmeme ICS feed and returns structured events
+// Tech Events API - Parses Techmeme ICS feed and dev.events RSS, returns structured events
 export const config = { runtime: 'edge' };
 
 const ICS_URL = 'https://www.techmeme.com/newsy_events.ics';
+const DEV_EVENTS_RSS = 'https://dev.events/rss.xml';
 
 // Comprehensive city geocoding database (500+ cities worldwide)
 const CITY_COORDS = {
@@ -470,11 +471,84 @@ function parseICS(icsText) {
         startDate: `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(6, 8)}`,
         endDate: `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(6, 8)}`,
         url: url,
+        source: 'techmeme',
       });
     }
   }
 
   return events.sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+function parseDevEventsRSS(rssText) {
+  const events = [];
+
+  // Simple regex-based RSS parsing for edge runtime
+  const itemMatches = rssText.matchAll(/<item>([\s\S]*?)<\/item>/g);
+
+  for (const match of itemMatches) {
+    const item = match[1];
+
+    const titleMatch = item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/);
+    const linkMatch = item.match(/<link>(.*?)<\/link>/);
+    const descMatch = item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>|<description>(.*?)<\/description>/s);
+    const guidMatch = item.match(/<guid[^>]*>(.*?)<\/guid>/);
+
+    const title = titleMatch ? (titleMatch[1] || titleMatch[2]) : null;
+    const link = linkMatch ? linkMatch[1] : null;
+    const description = descMatch ? (descMatch[1] || descMatch[2]) : '';
+    const guid = guidMatch ? guidMatch[1] : null;
+
+    if (!title) continue;
+
+    // Parse date from description: "EventName is happening on Month Day, Year"
+    const dateMatch = description.match(/on\s+(\w+\s+\d{1,2},?\s+\d{4})/i);
+    let startDate = null;
+    if (dateMatch) {
+      const parsed = new Date(dateMatch[1]);
+      if (!isNaN(parsed.getTime())) {
+        startDate = parsed.toISOString().split('T')[0];
+      }
+    }
+
+    // Parse location from description: various formats
+    let location = null;
+    const locationMatch = description.match(/(?:in|at)\s+([A-Za-z\s]+,\s*[A-Za-z\s]+)(?:\.|$)/i) ||
+                          description.match(/Location:\s*([^<\n]+)/i);
+    if (locationMatch) {
+      location = locationMatch[1].trim();
+    }
+    // Check for "Online" events
+    if (description.toLowerCase().includes('online')) {
+      location = 'Online';
+    }
+
+    // Skip events without valid dates or in the past
+    if (!startDate) continue;
+    const eventDate = new Date(startDate);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    if (eventDate < now) continue;
+
+    const coords = location && location !== 'Online' ? normalizeLocation(location) : null;
+    if (location === 'Online') {
+      // Mark as virtual
+      if (coords) coords.virtual = true;
+    }
+
+    events.push({
+      id: guid || `dev-events-${title.slice(0, 20)}`,
+      title: title,
+      type: 'conference',
+      location: location,
+      coords: coords || (location === 'Online' ? { virtual: true, original: 'Online' } : null),
+      startDate: startDate,
+      endDate: startDate, // RSS doesn't have end date
+      url: link,
+      source: 'dev.events',
+    });
+  }
+
+  return events;
 }
 
 export default async function handler(req) {
@@ -483,18 +557,46 @@ export default async function handler(req) {
   const mappable = url.searchParams.get('mappable') === 'true'; // Only return events with coords
 
   try {
-    const response = await fetch(ICS_URL, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0)',
-      },
-    });
+    // Fetch both sources in parallel
+    const [icsResponse, rssResponse] = await Promise.allSettled([
+      fetch(ICS_URL, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0)' },
+      }),
+      fetch(DEV_EVENTS_RSS, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0)' },
+      }),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ICS: ${response.status}`);
+    let events = [];
+
+    // Parse Techmeme ICS
+    if (icsResponse.status === 'fulfilled' && icsResponse.value.ok) {
+      const icsText = await icsResponse.value.text();
+      events.push(...parseICS(icsText));
+    } else {
+      console.warn('Failed to fetch Techmeme ICS');
     }
 
-    const icsText = await response.text();
-    let events = parseICS(icsText);
+    // Parse dev.events RSS
+    if (rssResponse.status === 'fulfilled' && rssResponse.value.ok) {
+      const rssText = await rssResponse.value.text();
+      const devEvents = parseDevEventsRSS(rssText);
+      events.push(...devEvents);
+    } else {
+      console.warn('Failed to fetch dev.events RSS');
+    }
+
+    // Deduplicate by title similarity (rough match)
+    const seen = new Set();
+    events = events.filter(e => {
+      const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Sort by date
+    events.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
     // Filter by type if specified
     if (type && type !== 'all') {
