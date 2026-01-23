@@ -244,21 +244,21 @@ export class DeckGLMap {
       interactive: true,
     });
 
-    // Sync map movement with deck.gl
-    this.maplibreMap.on('move', () => {
+    // Don't sync MapLibre -> deck.gl since deck.gl's controller is enabled
+    // deck.gl is the source of truth for view state, syncs to MapLibre via onViewStateChange
+
+    // Initial sync after map loads to ensure alignment
+    this.maplibreMap.on('load', () => {
       if (this.deck && this.maplibreMap) {
         const center = this.maplibreMap.getCenter();
         const zoom = this.maplibreMap.getZoom();
-        const bearing = this.maplibreMap.getBearing();
-        const pitch = this.maplibreMap.getPitch();
-
         this.deck.setProps({
           viewState: {
             longitude: center.lng,
             latitude: center.lat,
             zoom: zoom,
-            bearing: bearing,
-            pitch: pitch,
+            bearing: 0,
+            pitch: 0,
           },
         });
       }
@@ -285,6 +285,7 @@ export class DeckGLMap {
       onClick: (info: PickingInfo) => this.handleClick(info),
       onViewStateChange: ({ viewState }) => {
         // Sync deck.gl view state changes back to MapLibre
+        // Don't update deck.gl again - it already has the new state
         if (this.maplibreMap) {
           this.maplibreMap.jumpTo({
             center: [viewState.longitude, viewState.latitude],
@@ -293,8 +294,6 @@ export class DeckGLMap {
             pitch: viewState.pitch || 0,
           });
         }
-        // Update deck's view state
-        this.deck?.setProps({ viewState });
       },
       pickingRadius: 5,
       // Disable any default effects
