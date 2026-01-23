@@ -2,14 +2,70 @@
 
 Real-time global intelligence dashboard aggregating news, markets, geopolitical data, and infrastructure monitoring into a unified situation awareness interface.
 
-🌐 **[Live Demo: worldmonitor.app](https://worldmonitor.app)**
+🌐 **[Live Demo: worldmonitor.app](https://worldmonitor.app)** | 💻 **[Tech Variant: tech.worldmonitor.app](https://tech.worldmonitor.app)**
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.5.1-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-blue)
 
 ![World Monitor Dashboard](Screenshot.png)
+
+## Platform Variants
+
+World Monitor runs two specialized variants from a single codebase, each optimized for different monitoring needs:
+
+| Variant | URL | Focus |
+|---------|-----|-------|
+| **🌍 World Monitor** | [worldmonitor.app](https://worldmonitor.app) | Geopolitical intelligence, military tracking, conflict monitoring, infrastructure security |
+| **💻 Tech Monitor** | [tech.worldmonitor.app](https://tech.worldmonitor.app) | Technology sector intelligence, AI/startup ecosystems, cloud infrastructure, tech events |
+
+A compact **variant switcher** in the header allows seamless navigation between variants while preserving your map position and panel configuration.
+
+### Tech Monitor Data Layers
+
+The tech variant provides specialized layers for technology sector monitoring:
+
+**Tech Ecosystem**
+| Layer | Description |
+|-------|-------------|
+| **Tech HQs** | Headquarters of major tech companies (Big Tech, unicorns, public companies) |
+| **Startup Hubs** | Major startup ecosystems with ecosystem tier, funding data, and notable companies |
+| **Cloud Regions** | AWS, Azure, GCP data center regions with zone counts |
+| **Accelerators** | Y Combinator, Techstars, 500 Startups, and regional accelerator locations |
+| **Tech Events** | Upcoming conferences and tech events with countdown timers |
+
+**Tech Infrastructure**
+| Layer | Description |
+|-------|-------------|
+| **AI Datacenters** | 111 major AI compute clusters (≥10,000 GPUs) |
+| **Undersea Cables** | Submarine fiber routes critical for cloud connectivity |
+| **Internet Outages** | Network disruptions affecting tech operations |
+
+**Tech News Categories**
+- **Startups & VC** - Funding rounds, acquisitions, startup news
+- **Cybersecurity** - Security vulnerabilities, breaches, threat intelligence
+- **Cloud & Infrastructure** - AWS, Azure, GCP announcements, outages
+- **Hardware & Chips** - Semiconductors, AI accelerators, manufacturing
+- **Developer & Open Source** - Languages, frameworks, open source projects
+- **Tech Policy** - Regulation, antitrust, digital governance
+
+### Regional Tech HQ Coverage
+
+Tech Monitor includes detailed coverage of global tech hubs with verified company data:
+
+| Region | Notable Companies |
+|--------|------------------|
+| **Silicon Valley** | Apple, Google, Meta, Nvidia, Intel, Cisco, Oracle, VMware |
+| **Seattle** | Microsoft, Amazon, Tableau, Expedia |
+| **New York** | Bloomberg, MongoDB, Datadog, Squarespace |
+| **London** | Revolut, Deliveroo, Darktrace, Monzo |
+| **Tel Aviv** | Wix, Check Point, Monday.com, Fiverr |
+| **Dubai/MENA** | Careem, Noon, Anghami, Property Finder, Kitopi |
+| **Riyadh** | Tabby, Presight.ai, Ninja, XPANCEO |
+| **Singapore** | Grab, Razer, Sea Limited |
+| **Berlin** | Zalando, Delivery Hero, N26, Celonis |
+| **Tokyo** | Sony, Toyota, SoftBank, Rakuten |
 
 ## Features
 
@@ -19,6 +75,24 @@ Real-time global intelligence dashboard aggregating news, markets, geopolitical 
 - **Layer System** - Toggle visibility of 20+ data layers organized by category
 - **Time Filtering** - Filter events by time range (1h, 6h, 24h, 48h, 7d)
 - **Pinnable Map** - Pin the map to the top while scrolling through panels, or let it scroll with the page
+- **Smart Marker Clustering** - Nearby markers group at low zoom, expand on zoom in
+
+### Marker Clustering
+
+Dense regions with many data points use intelligent clustering to prevent visual clutter:
+
+**How It Works**
+- Markers within a pixel radius (adaptive to zoom level) merge into cluster badges
+- Cluster badges show the count of grouped items
+- Clicking a cluster opens a popup listing all grouped items
+- Zooming in reduces cluster radius, eventually showing individual markers
+
+**Grouping Logic**
+- **Protests**: Cluster within same country only (riots sorted first, high severity prioritized)
+- **Tech HQs**: Cluster within same city (Big Tech sorted before unicorns before public companies)
+- **Tech Events**: Cluster within same location (sorted by date, soonest first)
+
+This prevents issues like Dubai and Riyadh companies appearing merged at global zoom, while still providing clean visualization at continental scales.
 
 ### Data Layers
 
@@ -2732,6 +2806,11 @@ See [ROADMAP.md](ROADMAP.md) for detailed planning. Recent intelligence enhancem
 - ✅ **Significant Protest Filtering** - Map shows only riots and high-severity protests
 - ✅ **Intelligence Findings Detail Modal** - Click any alert for full context and component breakdown
 - ✅ **Build-Time Version Sync** - Header version auto-syncs with package.json
+- ✅ **Tech Monitor Variant** - Dedicated technology sector dashboard with startup ecosystems, cloud regions, and tech events
+- ✅ **Smart Marker Clustering** - Geographic grouping of nearby markers with click-to-expand popups
+- ✅ **Variant Switcher UI** - Compact orbital navigation between World Monitor and Tech Monitor
+- ✅ **CII Learning Mode** - 15-minute calibration period with visual progress indicator
+- ✅ **Regional Tech Coverage** - Verified tech HQ data for MENA, Europe, Asia-Pacific hubs
 
 ### Planned
 
