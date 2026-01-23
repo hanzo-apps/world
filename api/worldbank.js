@@ -1,70 +1,54 @@
-export const config = { runtime: 'edge' };
+// Node.js serverless function (Edge gets 403 from World Bank)
 
-// Tech-related World Bank indicators
 const TECH_INDICATORS = {
-  // Digital Infrastructure
   'IT.NET.USER.ZS': 'Internet Users (% of population)',
   'IT.CEL.SETS.P2': 'Mobile Subscriptions (per 100 people)',
   'IT.NET.BBND.P2': 'Fixed Broadband Subscriptions (per 100 people)',
   'IT.NET.SECR.P6': 'Secure Internet Servers (per million people)',
-
-  // Innovation & R&D
   'GB.XPD.RSDV.GD.ZS': 'R&D Expenditure (% of GDP)',
   'IP.PAT.RESD': 'Patent Applications (residents)',
   'IP.PAT.NRES': 'Patent Applications (non-residents)',
   'IP.TMK.TOTL': 'Trademark Applications',
-
-  // High-Tech Trade
   'TX.VAL.TECH.MF.ZS': 'High-Tech Exports (% of manufactured exports)',
   'BX.GSR.CCIS.ZS': 'ICT Service Exports (% of service exports)',
   'TM.VAL.ICTG.ZS.UN': 'ICT Goods Imports (% of total goods imports)',
-
-  // Education & Skills
   'SE.TER.ENRR': 'Tertiary Education Enrollment (%)',
   'SE.XPD.TOTL.GD.ZS': 'Education Expenditure (% of GDP)',
-
-  // Economic Context
   'NY.GDP.MKTP.KD.ZG': 'GDP Growth (annual %)',
   'NY.GDP.PCAP.CD': 'GDP per Capita (current US$)',
   'NE.EXP.GNFS.ZS': 'Exports of Goods & Services (% of GDP)',
 };
 
-// Major tech economies to compare
 const TECH_COUNTRIES = [
   'USA', 'CHN', 'JPN', 'DEU', 'KOR', 'GBR', 'IND', 'ISR', 'SGP', 'TWN',
   'FRA', 'CAN', 'SWE', 'NLD', 'CHE', 'FIN', 'IRL', 'AUS', 'BRA', 'IDN'
 ];
 
-export default async function handler(req) {
-  const url = new URL(req.url);
-  const indicator = url.searchParams.get('indicator');
-  const country = url.searchParams.get('country');
-  const countries = url.searchParams.get('countries'); // comma-separated
-  const years = url.searchParams.get('years') || '5';
-  const action = url.searchParams.get('action');
+export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const { indicator, country, countries, years = '5', action } = req.query;
 
   // Return available indicators
   if (action === 'indicators') {
-    return new Response(JSON.stringify({
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.json({
       indicators: TECH_INDICATORS,
       defaultCountries: TECH_COUNTRIES,
-    }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=86400', // Cache for 24h
-      },
     });
   }
 
   // Validate indicator
   if (!indicator) {
-    return new Response(JSON.stringify({
+    return res.status(400).json({
       error: 'Missing indicator parameter',
       availableIndicators: Object.keys(TECH_INDICATORS),
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
     });
   }
 
@@ -86,8 +70,6 @@ export default async function handler(req) {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0; +https://worldmonitor.app)',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
       },
     });
 
@@ -99,19 +81,14 @@ export default async function handler(req) {
 
     // World Bank returns [metadata, data] array
     if (!data || !Array.isArray(data) || data.length < 2 || !data[1]) {
-      return new Response(JSON.stringify({
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.json({
         indicator,
         indicatorName: TECH_INDICATORS[indicator] || indicator,
         metadata: { page: 1, pages: 1, total: 0 },
         byCountry: {},
         latestByCountry: {},
         timeSeries: [],
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=3600',
-        },
       });
     }
 
@@ -126,11 +103,8 @@ export default async function handler(req) {
         pages: metadata.pages,
         total: metadata.total,
       },
-      // Group by country
       byCountry: {},
-      // Latest values for comparison
       latestByCountry: {},
-      // Time series for charts
       timeSeries: [],
     };
 
@@ -142,7 +116,6 @@ export default async function handler(req) {
 
       if (!countryCode || value === null) continue;
 
-      // Group by country
       if (!transformed.byCountry[countryCode]) {
         transformed.byCountry[countryCode] = {
           code: countryCode,
@@ -152,7 +125,6 @@ export default async function handler(req) {
       }
       transformed.byCountry[countryCode].values.push({ year, value });
 
-      // Track latest value
       if (!transformed.latestByCountry[countryCode] ||
           year > transformed.latestByCountry[countryCode].year) {
         transformed.latestByCountry[countryCode] = {
@@ -163,7 +135,6 @@ export default async function handler(req) {
         };
       }
 
-      // Add to time series
       transformed.timeSeries.push({
         countryCode,
         countryName,
@@ -173,27 +144,19 @@ export default async function handler(req) {
     }
 
     // Sort each country's values by year
-    for (const country of Object.values(transformed.byCountry)) {
-      country.values.sort((a, b) => a.year - b.year);
+    for (const c of Object.values(transformed.byCountry)) {
+      c.values.sort((a, b) => a.year - b.year);
     }
 
     // Sort time series by year descending
     transformed.timeSeries.sort((a, b) => b.year - a.year || a.countryCode.localeCompare(b.countryCode));
 
-    return new Response(JSON.stringify(transformed), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=3600', // Cache for 1h
-      },
-    });
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.json(transformed);
   } catch (error) {
-    return new Response(JSON.stringify({
+    return res.status(500).json({
       error: error.message,
       indicator,
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
     });
   }
 }
