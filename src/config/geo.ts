@@ -534,8 +534,9 @@ export const CONFLICT_ZONES: ConflictZone[] = [
   {
     id: 'yemen_redsea',
     name: 'Red Sea Crisis',
-    coords: [[12, 42], [16, 42], [16, 44], [13, 45], [12, 44]],
-    center: [14, 43],
+    // Coords in [lon, lat] format for GeoJSON - Red Sea is around 42-45°E, 12-16°N
+    coords: [[42, 12], [42, 16], [44, 16], [45, 13], [44, 12]],
+    center: [43, 14],
     intensity: 'high',
     parties: ['Houthis', 'US/UK Coalition', 'Yemen Govt'],
     casualties: 'Unknown (Maritime)',
@@ -549,8 +550,9 @@ export const CONFLICT_ZONES: ConflictZone[] = [
   {
     id: 'south_lebanon',
     name: 'Israel-Lebanon Border',
-    coords: [[33.0, 35.1], [33.4, 35.1], [33.4, 35.8], [33.0, 35.8]],
-    center: [33.2, 35.4],
+    // Coords in [lon, lat] format for GeoJSON - Lebanon border is around 35-36°E, 33-34°N
+    coords: [[35.1, 33.0], [35.1, 33.4], [35.8, 33.4], [35.8, 33.0]],
+    center: [35.4, 33.2],
     intensity: 'high',
     parties: ['Israel (IDF)', 'Hezbollah'],
     casualties: '500+ killed',
