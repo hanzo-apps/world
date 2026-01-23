@@ -50,7 +50,7 @@ export class TechEventsPanel extends Panel {
     this.render();
 
     try {
-      const res = await fetch('/api/tech-events');
+      const res = await fetch('/api/tech-events?days=180&limit=100');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data: TechEventsResponse = await res.json();
