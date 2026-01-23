@@ -1122,22 +1122,20 @@ export class App {
     const serviceStatusPanel = new ServiceStatusPanel();
     this.panels['service-status'] = serviceStatusPanel;
 
-    // Tech Hubs Panel - shows active tech hub activity (tech variant only)
-    if (SITE_VARIANT === 'tech') {
-      this.techHubsPanel = new TechHubsPanel();
-      this.panels['tech-hubs'] = this.techHubsPanel;
+    // Tech Hubs Panel - shows active tech hub activity (all variants)
+    this.techHubsPanel = new TechHubsPanel();
+    this.panels['tech-hubs'] = this.techHubsPanel;
 
-      // Set up hub click handler to zoom map to hub location
-      this.techHubsPanel.setOnHubClick((hub) => {
-        this.map?.setCenter(hub.lat, hub.lon);
-        this.map?.flashLocation(hub.lat, hub.lon);
-      });
+    // Set up hub click handler to zoom map to hub location
+    this.techHubsPanel.setOnHubClick((hub) => {
+      this.map?.setCenter(hub.lat, hub.lon);
+      this.map?.flashLocation(hub.lat, hub.lon);
+    });
 
-      // Tech Readiness Panel - World Bank tech indicators
-      this.techReadinessPanel = new TechReadinessPanel();
-      this.panels['tech-readiness'] = this.techReadinessPanel;
-      this.techReadinessPanel.refresh();
-    }
+    // Tech Readiness Panel - World Bank tech indicators (all variants)
+    this.techReadinessPanel = new TechReadinessPanel();
+    this.panels['tech-readiness'] = this.techReadinessPanel;
+    this.techReadinessPanel.refresh();
 
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
@@ -2023,8 +2021,8 @@ export class App {
     try {
       this.latestClusters = await analysisWorker.clusterNews(this.allNews);
 
-      // Aggregate tech hub activity from news clusters (tech variant only)
-      if (SITE_VARIANT === 'tech' && this.latestClusters.length > 0) {
+      // Aggregate tech hub activity from news clusters (all variants)
+      if (this.latestClusters.length > 0) {
         const techActivity = aggregateTechActivity(this.latestClusters);
         this.map?.setTechActivity(techActivity);
         this.techHubsPanel?.setActivities(techActivity);
