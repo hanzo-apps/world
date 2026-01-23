@@ -459,14 +459,27 @@ export class MapComponent {
   private createLegend(): HTMLElement {
     const legend = document.createElement('div');
     legend.className = 'map-legend';
-    legend.innerHTML = `
-      <div class="map-legend-item"><span class="legend-dot high"></span>HIGH ALERT</div>
-      <div class="map-legend-item"><span class="legend-dot elevated"></span>ELEVATED</div>
-      <div class="map-legend-item"><span class="legend-dot low"></span>MONITORING</div>
-      <div class="map-legend-item"><span class="map-legend-icon conflict">⚔</span>CONFLICT</div>
-      <div class="map-legend-item"><span class="map-legend-icon earthquake">●</span>EARTHQUAKE</div>
-      <div class="map-legend-item"><span class="map-legend-icon apt">⚠</span>APT</div>
-    `;
+
+    if (SITE_VARIANT === 'tech') {
+      // Tech variant legend
+      legend.innerHTML = `
+        <div class="map-legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>TECH HQ</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#06b6d4"></span>STARTUP HUB</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#f59e0b"></span>CLOUD REGION</div>
+        <div class="map-legend-item"><span class="map-legend-icon" style="color:#a855f7">📅</span>TECH EVENT</div>
+        <div class="map-legend-item"><span class="map-legend-icon earthquake">●</span>EARTHQUAKE</div>
+      `;
+    } else {
+      // Geopolitical variant legend
+      legend.innerHTML = `
+        <div class="map-legend-item"><span class="legend-dot high"></span>HIGH ALERT</div>
+        <div class="map-legend-item"><span class="legend-dot elevated"></span>ELEVATED</div>
+        <div class="map-legend-item"><span class="legend-dot low"></span>MONITORING</div>
+        <div class="map-legend-item"><span class="map-legend-icon conflict">⚔</span>CONFLICT</div>
+        <div class="map-legend-item"><span class="map-legend-icon earthquake">●</span>EARTHQUAKE</div>
+        <div class="map-legend-item"><span class="map-legend-icon apt">⚠</span>APT</div>
+      `;
+    }
     return legend;
   }
 
@@ -1066,8 +1079,10 @@ export class MapComponent {
       this.renderPorts(projection);
     }
 
-    // APT groups
-    this.renderAPTMarkers(projection);
+    // APT groups (geopolitical variant only)
+    if (SITE_VARIANT !== 'tech') {
+      this.renderAPTMarkers(projection);
+    }
 
     // Nuclear facilities (always HTML - shapes convey status)
     if (this.state.layers.nuclear) {
