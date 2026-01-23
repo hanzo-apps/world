@@ -8885,6 +8885,17 @@ body.playback-mode .status-dot {
   background: transparent !important;
 }
 
+/* Override MapLibre GL default grab cursor - use default pointer */
+.maplibregl-canvas-container.maplibregl-interactive,
+.maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas {
+  cursor: default !important;
+}
+
+.maplibregl-canvas-container.maplibregl-interactive:active,
+.maplibregl-canvas-container.maplibregl-interactive:active .maplibregl-canvas {
+  cursor: grabbing !important;
+}
+
 /* Ensure deck.gl doesn't add any overlay */
 #deckgl-overlay,
 #deckgl-overlay > *,
