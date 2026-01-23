@@ -11,25 +11,31 @@ const SERVICES = [
   { id: 'vercel', name: 'Vercel', statusPage: 'https://www.vercel-status.com/api/v2/status.json', category: 'cloud' },
   { id: 'netlify', name: 'Netlify', statusPage: 'https://www.netlifystatus.com/api/v2/status.json', category: 'cloud' },
   { id: 'digitalocean', name: 'DigitalOcean', statusPage: 'https://status.digitalocean.com/api/v2/status.json', category: 'cloud' },
+  { id: 'render', name: 'Render', statusPage: 'https://status.render.com/api/v2/status.json', category: 'cloud' },
+  { id: 'railway', name: 'Railway', statusPage: 'https://railway.instatus.com/summary.json', customParser: 'instatus', category: 'cloud' },
 
   // Developer Tools
   { id: 'github', name: 'GitHub', statusPage: 'https://www.githubstatus.com/api/v2/status.json', category: 'dev' },
-  { id: 'gitlab', name: 'GitLab', statusPage: 'https://status.gitlab.com/api/v2/status.json', category: 'dev' },
+  { id: 'gitlab', name: 'GitLab', statusPage: 'https://status.gitlab.com/1.0/status/5b36dc6502d06804c08349f7', customParser: 'statusio', category: 'dev' },
   { id: 'npm', name: 'npm', statusPage: 'https://status.npmjs.org/api/v2/status.json', category: 'dev' },
-  { id: 'docker', name: 'Docker Hub', statusPage: 'https://www.dockerstatus.com/api/v2/status.json', category: 'dev' },
+  { id: 'docker', name: 'Docker Hub', statusPage: 'https://www.dockerstatus.com/1.0/status/533c6539221ae15e3f000031', customParser: 'statusio', category: 'dev' },
   { id: 'bitbucket', name: 'Bitbucket', statusPage: 'https://bitbucket.status.atlassian.com/api/v2/status.json', category: 'dev' },
   { id: 'circleci', name: 'CircleCI', statusPage: 'https://status.circleci.com/api/v2/status.json', category: 'dev' },
+  { id: 'jira', name: 'Jira', statusPage: 'https://jira-software.status.atlassian.com/api/v2/status.json', category: 'dev' },
+  { id: 'confluence', name: 'Confluence', statusPage: 'https://confluence.status.atlassian.com/api/v2/status.json', category: 'dev' },
+  { id: 'linear', name: 'Linear', statusPage: 'https://status.linear.app/api/v2/status.json', category: 'dev' },
 
   // Communication
-  { id: 'slack', name: 'Slack', statusPage: 'https://status.slack.com/api/v2.0.0/current', category: 'comm' },
+  { id: 'slack', name: 'Slack', statusPage: 'https://slack-status.com/api/v2.0.0/current', customParser: 'slack', category: 'comm' },
   { id: 'discord', name: 'Discord', statusPage: 'https://discordstatus.com/api/v2/status.json', category: 'comm' },
   { id: 'zoom', name: 'Zoom', statusPage: 'https://status.zoom.us/api/v2/status.json', category: 'comm' },
+  { id: 'notion', name: 'Notion', statusPage: 'https://status.notion.so/api/v2/status.json', category: 'comm' },
 
   // AI Services
   { id: 'openai', name: 'OpenAI', statusPage: 'https://status.openai.com/api/v2/status.json', category: 'ai' },
   { id: 'anthropic', name: 'Anthropic', statusPage: 'https://status.anthropic.com/api/v2/status.json', category: 'ai' },
-  { id: 'huggingface', name: 'Hugging Face', statusPage: 'https://status.huggingface.co/api/v2/status.json', category: 'ai' },
   { id: 'replicate', name: 'Replicate', statusPage: 'https://status.replicate.com/api/v2/status.json', category: 'ai' },
+  { id: 'together', name: 'Together AI', statusPage: 'https://status.together.ai/api/v2/status.json', category: 'ai' },
 
   // SaaS
   { id: 'stripe', name: 'Stripe', statusPage: 'https://status.stripe.com/api/v2/status.json', category: 'saas' },
@@ -37,6 +43,8 @@ const SERVICES = [
   { id: 'datadog', name: 'Datadog', statusPage: 'https://status.datadoghq.com/api/v2/status.json', category: 'saas' },
   { id: 'pagerduty', name: 'PagerDuty', statusPage: 'https://status.pagerduty.com/api/v2/status.json', category: 'saas' },
   { id: 'sentry', name: 'Sentry', statusPage: 'https://status.sentry.io/api/v2/status.json', category: 'saas' },
+  { id: 'auth0', name: 'Auth0', statusPage: 'https://status.auth0.com/api/v2/status.json', category: 'saas' },
+  { id: 'supabase', name: 'Supabase', statusPage: 'https://status.supabase.com/api/v2/status.json', category: 'saas' },
 ];
 
 // Statuspage.io API returns status like: none, minor, major, critical
@@ -105,6 +113,46 @@ async function checkStatusPage(service) {
         status: hasRecentIncident ? 'degraded' : 'operational',
         description: hasRecentIncident ? 'Recent incidents reported' : 'No recent incidents'
       };
+    }
+
+    if (service.customParser === 'instatus') {
+      // Instatus format (Railway, etc.)
+      const data = await response.json();
+      const pageStatus = data.page?.status;
+      if (pageStatus === 'UP') {
+        return { ...service, status: 'operational', description: 'All systems operational' };
+      } else if (pageStatus === 'HASISSUES') {
+        return { ...service, status: 'degraded', description: 'Some issues reported' };
+      } else {
+        return { ...service, status: 'unknown', description: pageStatus || 'Unknown' };
+      }
+    }
+
+    if (service.customParser === 'statusio') {
+      // Status.io format (GitLab, Docker Hub)
+      const data = await response.json();
+      const overall = data.result?.status_overall;
+      const statusCode = overall?.status_code;
+      if (statusCode === 100) {
+        return { ...service, status: 'operational', description: overall.status || 'All systems operational' };
+      } else if (statusCode >= 300 && statusCode < 500) {
+        return { ...service, status: 'degraded', description: overall.status || 'Degraded performance' };
+      } else if (statusCode >= 500) {
+        return { ...service, status: 'outage', description: overall.status || 'Service disruption' };
+      }
+      return { ...service, status: 'unknown', description: overall?.status || 'Unknown status' };
+    }
+
+    if (service.customParser === 'slack') {
+      // Slack custom API format
+      const data = await response.json();
+      if (data.status === 'ok') {
+        return { ...service, status: 'operational', description: 'All systems operational' };
+      } else if (data.status === 'active' || data.active_incidents?.length > 0) {
+        const count = data.active_incidents?.length || 1;
+        return { ...service, status: 'degraded', description: `${count} active incident(s)` };
+      }
+      return { ...service, status: 'unknown', description: data.status || 'Unknown' };
     }
 
     const data = await response.json();

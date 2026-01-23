@@ -2413,10 +2413,11 @@ export class MapComponent {
   }
 
   private static readonly ASYNC_DATA_LAYERS: Set<keyof MapLayers> = new Set([
-    'natural', 'weather', 'outages', 'ais', 'protests', 'flights', 'military',
+    'natural', 'weather', 'outages', 'ais', 'protests', 'flights', 'military', 'techEvents',
   ]);
 
   public toggleLayer(layer: keyof MapLayers): void {
+    console.log(`[Map.toggleLayer] ${layer}: ${this.state.layers[layer]} -> ${!this.state.layers[layer]}`);
     this.state.layers[layer] = !this.state.layers[layer];
     if (this.state.layers[layer]) {
       const thresholds = MapComponent.LAYER_ZOOM_THRESHOLDS[layer];
