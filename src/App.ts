@@ -55,6 +55,7 @@ import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import { TECH_COMPANIES } from '@/config/tech-companies';
 import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
+import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
 export class App {
@@ -328,8 +329,8 @@ export class App {
   private setupSearchModal(): void {
     const searchOptions = SITE_VARIANT === 'tech'
       ? {
-          placeholder: 'Search tech companies, AI labs, startups, news...',
-          hint: 'Companies • AI Labs • Startups • Datacenters • Cables • News',
+          placeholder: 'Search companies, AI labs, startups, events...',
+          hint: 'HQs • Companies • AI Labs • Startups • Accelerators • Events',
         }
       : {
           placeholder: 'Search news, pipelines, bases, markets...',
@@ -372,6 +373,22 @@ export class App {
         title: c.name,
         subtitle: c.major ? 'Major internet backbone' : 'Undersea cable',
         data: c,
+      })));
+
+      // Register Tech HQs (unicorns, FAANG, public companies from map)
+      this.searchModal.registerSource('techhq', TECH_HQS.map(h => ({
+        id: h.id,
+        title: h.company,
+        subtitle: `${h.type === 'faang' ? 'Big Tech' : h.type === 'unicorn' ? 'Unicorn' : 'Public'} • ${h.city}, ${h.country}`,
+        data: h,
+      })));
+
+      // Register Accelerators
+      this.searchModal.registerSource('accelerator', ACCELERATORS.map(a => ({
+        id: a.id,
+        title: a.name,
+        subtitle: `${a.type} • ${a.city}, ${a.country}${a.notable ? ` • ${a.notable.slice(0, 2).join(', ')}` : ''}`,
+        data: a,
       })));
     } else {
       // Full variant: geopolitical sources
@@ -584,6 +601,28 @@ export class App {
         this.map?.enableLayer('techEvents');
         this.mapLayers.techEvents = true;
         break;
+      case 'techhq': {
+        const hq = result.data as typeof TECH_HQS[0];
+        this.map?.setView('global');
+        this.map?.enableLayer('techHQs');
+        this.mapLayers.techHQs = true;
+        setTimeout(() => {
+          this.map?.setCenter(hq.lat, hq.lon);
+          this.map?.setZoom(4);
+        }, 300);
+        break;
+      }
+      case 'accelerator': {
+        const acc = result.data as typeof ACCELERATORS[0];
+        this.map?.setView('global');
+        this.map?.enableLayer('accelerators');
+        this.mapLayers.accelerators = true;
+        setTimeout(() => {
+          this.map?.setCenter(acc.lat, acc.lon);
+          this.map?.setZoom(4);
+        }, 300);
+        break;
+      }
     }
   }
 
@@ -2017,6 +2056,16 @@ export class App {
       this.map?.setTechEvents(mapEvents);
       this.map?.setLayerReady('techEvents', mapEvents.length > 0);
       this.statusPanel?.updateFeed('Tech Events', { status: 'ok', itemCount: mapEvents.length });
+
+      // Register tech events as searchable source
+      if (SITE_VARIANT === 'tech' && this.searchModal) {
+        this.searchModal.registerSource('techevent', mapEvents.map((e: { id: string; title: string; location: string; startDate: string }) => ({
+          id: e.id,
+          title: e.title,
+          subtitle: `${e.location} • ${new Date(e.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+          data: e,
+        })));
+      }
     } catch (error) {
       console.error('[App] Failed to load tech events:', error);
       this.map?.setTechEvents([]);
