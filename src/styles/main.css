@@ -956,6 +956,46 @@ body.animations-paused *::after {
   color: var(--yellow);
 }
 
+/* Source credibility tier badge */
+.tier-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 4px;
+  letter-spacing: 0.3px;
+}
+
+.tier-badge.tier-1 {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.25), rgba(0, 200, 100, 0.15));
+  color: var(--green);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+}
+
+.tier-badge.tier-2 {
+  background: rgba(0, 170, 255, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(0, 170, 255, 0.3);
+}
+
+/* "Also reported by" label */
+.also-reported {
+  font-size: 8px;
+  color: var(--text-dim);
+  margin-right: 4px;
+  font-style: italic;
+}
+
+/* Enhanced tier indicators for top sources */
+.top-source.tier-1 {
+  font-weight: 500;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.top-source.tier-2 {
+  border: 1px solid rgba(0, 170, 255, 0.2);
+}
+
 .item.clustered {
   border-left: 2px solid var(--border);
   padding-left: 8px;
