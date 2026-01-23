@@ -270,8 +270,35 @@ export class DeckGLMap {
     const deckContainer = document.getElementById('deckgl-overlay') as HTMLDivElement | null;
     if (!deckContainer) return;
 
+    // Create canvas with proper alpha support
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width: 100%; height: 100%; background: transparent;';
+    deckContainer.appendChild(canvas);
+
+    // Get WebGL context with alpha enabled
+    const gl = canvas.getContext('webgl2', {
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: true,
+      preserveDrawingBuffer: false,
+    }) || canvas.getContext('webgl', {
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: true,
+      preserveDrawingBuffer: false,
+    });
+
+    if (!gl) {
+      console.error('[DeckGLMap] WebGL not supported');
+      return;
+    }
+
+    // Set transparent clear color
+    gl.clearColor(0, 0, 0, 0);
+
     this.deck = new Deck({
-      parent: deckContainer,
+      canvas: canvas,
+      gl: gl as WebGL2RenderingContext,
       viewState: {
         longitude: preset.longitude,
         latitude: preset.latitude,
@@ -284,12 +311,6 @@ export class DeckGLMap {
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 5,
-      // Ensure transparent canvas background
-      onWebGLInitialized: (gl: WebGLRenderingContext) => {
-        gl.clearColor(0, 0, 0, 0);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      },
     });
   }
 
