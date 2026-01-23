@@ -1092,6 +1092,62 @@ export class MapComponent {
     });
   }
 
+  // Generic marker clustering - groups markers within pixelRadius into clusters
+  private clusterMarkers<T extends { lat: number; lon: number }>(
+    items: T[],
+    projection: d3.GeoProjection,
+    pixelRadius: number
+  ): Array<{ items: T[]; center: [number, number]; pos: [number, number] }> {
+    const clusters: Array<{ items: T[]; center: [number, number]; pos: [number, number] }> = [];
+    const assigned = new Set<number>();
+
+    for (let i = 0; i < items.length; i++) {
+      if (assigned.has(i)) continue;
+
+      const item = items[i]!;
+      const pos = projection([item.lon, item.lat]);
+      if (!pos) continue;
+
+      const cluster: T[] = [item];
+      assigned.add(i);
+
+      // Find nearby items
+      for (let j = i + 1; j < items.length; j++) {
+        if (assigned.has(j)) continue;
+        const other = items[j]!;
+        const otherPos = projection([other.lon, other.lat]);
+        if (!otherPos) continue;
+
+        const dx = pos[0] - otherPos[0];
+        const dy = pos[1] - otherPos[1];
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist <= pixelRadius) {
+          cluster.push(other);
+          assigned.add(j);
+        }
+      }
+
+      // Calculate cluster center
+      let sumLat = 0, sumLon = 0;
+      for (const c of cluster) {
+        sumLat += c.lat;
+        sumLon += c.lon;
+      }
+      const centerLat = sumLat / cluster.length;
+      const centerLon = sumLon / cluster.length;
+      const centerPos = projection([centerLon, centerLat]);
+
+      clusters.push({
+        items: cluster,
+        center: [centerLon, centerLat],
+        pos: centerPos || pos,
+      });
+    }
+
+    return clusters;
+  }
+
   private renderOverlays(projection: d3.GeoProjection): void {
     this.overlays.innerHTML = '';
 
@@ -1671,38 +1727,69 @@ export class MapComponent {
       });
     }
 
-    // Tech HQs (🏢 icons by company type)
+    // Tech HQs (🏢 icons by company type) - with clustering
     if (this.state.layers.techHQs) {
-      TECH_HQS.forEach((hq) => {
-        const pos = projection([hq.lon, hq.lat]);
-        if (!pos) return;
+      // Cluster radius depends on zoom - tighter clustering when zoomed out
+      const clusterRadius = this.state.zoom >= 4 ? 15 : this.state.zoom >= 3 ? 25 : 40;
+      const clusters = this.clusterMarkers(TECH_HQS, projection, clusterRadius);
 
+      clusters.forEach((cluster) => {
+        if (cluster.items.length === 0) return;
         const div = document.createElement('div');
-        div.className = `tech-hq-marker ${hq.type}`;
-        div.style.left = `${pos[0]}px`;
-        div.style.top = `${pos[1]}px`;
+        const isCluster = cluster.items.length > 1;
+        const primaryItem = cluster.items[0]!; // Use first item for styling
+
+        div.className = `tech-hq-marker ${primaryItem.type} ${isCluster ? 'cluster' : ''}`;
+        div.style.left = `${cluster.pos[0]}px`;
+        div.style.top = `${cluster.pos[1]}px`;
 
         const icon = document.createElement('div');
         icon.className = 'tech-hq-icon';
-        icon.textContent = hq.type === 'faang' ? '🏛️' : hq.type === 'unicorn' ? '🦄' : '🏢';
+
+        if (isCluster) {
+          // Show count for clusters
+          const unicornCount = cluster.items.filter(h => h.type === 'unicorn').length;
+          const faangCount = cluster.items.filter(h => h.type === 'faang').length;
+          icon.textContent = faangCount > 0 ? '🏛️' : unicornCount > 0 ? '🦄' : '🏢';
+
+          const badge = document.createElement('div');
+          badge.className = 'cluster-badge';
+          badge.textContent = String(cluster.items.length);
+          div.appendChild(badge);
+
+          div.title = cluster.items.map(h => h.company).join(', ');
+        } else {
+          icon.textContent = primaryItem.type === 'faang' ? '🏛️' : primaryItem.type === 'unicorn' ? '🦄' : '🏢';
+        }
         div.appendChild(icon);
 
-        if (this.state.zoom >= 3 || hq.type === 'faang') {
+        // Show label at higher zoom or for single FAANG markers
+        if (!isCluster && (this.state.zoom >= 3 || primaryItem.type === 'faang')) {
           const label = document.createElement('div');
           label.className = 'tech-hq-label';
-          label.textContent = hq.company;
+          label.textContent = primaryItem.company;
           div.appendChild(label);
         }
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
           const rect = this.container.getBoundingClientRect();
-          this.popup.show({
-            type: 'techHQ',
-            data: hq,
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          });
+          if (isCluster) {
+            // Show cluster popup with list of companies
+            this.popup.show({
+              type: 'techHQCluster',
+              data: { items: cluster.items, city: primaryItem.city, country: primaryItem.country },
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          } else {
+            this.popup.show({
+              type: 'techHQ',
+              data: primaryItem,
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          }
         });
 
         this.overlays.appendChild(div);
@@ -1747,31 +1834,59 @@ export class MapComponent {
       });
     }
 
-    // Tech Events / Conferences (📅 icons)
+    // Tech Events / Conferences (📅 icons) - with clustering
     if (this.state.layers.techEvents && this.techEvents.length > 0) {
       const mapWidth = this.container.clientWidth;
       const mapHeight = this.container.clientHeight;
-      this.techEvents.forEach((event) => {
-        const pos = projection([event.lng, event.lat]);
-        if (!pos) return;
-        // Skip markers outside visible map bounds
-        if (pos[0] < 0 || pos[0] > mapWidth || pos[1] < 0 || pos[1] > mapHeight) return;
 
+      // Map events to have lon property for clustering, filter visible
+      const visibleEvents = this.techEvents
+        .map(e => ({ ...e, lon: e.lng }))
+        .filter(e => {
+          const pos = projection([e.lon, e.lat]);
+          return pos && pos[0] >= 0 && pos[0] <= mapWidth && pos[1] >= 0 && pos[1] <= mapHeight;
+        });
+
+      const clusterRadius = this.state.zoom >= 4 ? 15 : this.state.zoom >= 3 ? 25 : 40;
+      const clusters = this.clusterMarkers(visibleEvents, projection, clusterRadius);
+
+      clusters.forEach((cluster) => {
+        if (cluster.items.length === 0) return;
         const div = document.createElement('div');
-        const isUpcomingSoon = event.daysUntil <= 14;
-        div.className = `tech-event-marker ${isUpcomingSoon ? 'upcoming-soon' : ''}`;
-        div.style.left = `${pos[0]}px`;
-        div.style.top = `${pos[1]}px`;
+        const isCluster = cluster.items.length > 1;
+        const primaryEvent = cluster.items[0]!;
+        const hasUpcomingSoon = cluster.items.some(e => e.daysUntil <= 14);
+
+        div.className = `tech-event-marker ${hasUpcomingSoon ? 'upcoming-soon' : ''} ${isCluster ? 'cluster' : ''}`;
+        div.style.left = `${cluster.pos[0]}px`;
+        div.style.top = `${cluster.pos[1]}px`;
+
+        if (isCluster) {
+          const badge = document.createElement('div');
+          badge.className = 'cluster-badge';
+          badge.textContent = String(cluster.items.length);
+          div.appendChild(badge);
+          div.title = cluster.items.map(e => e.title).join(', ');
+        }
 
         div.addEventListener('click', (e) => {
           e.stopPropagation();
           const rect = this.container.getBoundingClientRect();
-          this.popup.show({
-            type: 'techEvent',
-            data: event,
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          });
+          if (isCluster) {
+            this.popup.show({
+              type: 'techEventCluster',
+              data: { items: cluster.items, location: primaryEvent.location, country: primaryEvent.country },
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          } else {
+            this.popup.show({
+              type: 'techEvent',
+              data: primaryEvent,
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+          }
         });
 
         this.overlays.appendChild(div);
