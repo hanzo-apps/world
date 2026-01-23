@@ -2753,6 +2753,8 @@ Original dashboard concept inspired by Reggie James ([@HipCityReg](https://x.com
 
 Special thanks to **Yanal at [Wingbits](https://wingbits.com)** for providing API access for aircraft enrichment data, enabling military aircraft classification and ownership tracking
 
+Thanks to **[@fai9al](https://github.com/fai9al)** for the inspiration and original PR that led to the Tech Monitor variant
+
 ---
 
 ## Limitations & Caveats
