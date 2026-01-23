@@ -86,6 +86,10 @@ const ALLOWED_DOMAINS = [
   'www.axios.com',
   'github.blog',
   'githubnext.com',
+  'mshibanami.github.io',
+  'www.engadget.com',
+  'news.mit.edu',
+  'dev.events',
 ];
 
 export default async function handler(req) {

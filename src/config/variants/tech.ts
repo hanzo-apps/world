@@ -37,6 +37,8 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
     { name: 'ZDNet', url: rss('https://www.zdnet.com/news/rss.xml') },
     { name: 'TechMeme', url: rss('https://www.techmeme.com/feed.xml') },
+    { name: 'Engadget', url: rss('https://www.engadget.com/rss.xml') },
+    { name: 'Fast Company', url: rss('https://feeds.feedburner.com/fastcompany/headlines') },
   ],
 
   // AI & Machine Learning
@@ -45,6 +47,7 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'VentureBeat AI', url: rss('https://venturebeat.com/category/ai/feed/') },
     { name: 'The Verge AI', url: rss('https://www.theverge.com/rss/ai-artificial-intelligence/index.xml') },
     { name: 'MIT Tech Review AI', url: rss('https://www.technologyreview.com/topic/artificial-intelligence/feed') },
+    { name: 'MIT Research', url: rss('https://news.mit.edu/rss/research') },
     { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
     { name: 'ArXiv ML', url: rss('https://export.arxiv.org/rss/cs.LG') },
     { name: 'AI Weekly', url: rss('https://news.google.com/rss/search?q="artificial+intelligence"+OR+"machine+learning"+when:3d&hl=en-US&gl=US&ceid=US:en') },
@@ -85,9 +88,9 @@ export const FEEDS: Record<string, Feed[]> = {
 
   // Semiconductors & Hardware
   hardware: [
-    { name: 'AnandTech', url: rss('https://www.anandtech.com/rss/') },
-    { name: 'Tom\'s Hardware', url: rss('https://www.tomshardware.com/feeds/all') },
+    { name: "Tom's Hardware", url: rss('https://www.tomshardware.com/feeds/all') },
     { name: 'SemiAnalysis', url: rss('https://www.semianalysis.com/feed') },
+    { name: 'Semiconductor News', url: rss('https://news.google.com/rss/search?q=semiconductor+OR+chip+OR+TSMC+OR+NVIDIA+OR+Intel+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
 
   // Cloud & Infrastructure
@@ -102,6 +105,9 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Dev.to', url: rss('https://dev.to/feed') },
     { name: 'Lobsters', url: rss('https://lobste.rs/rss') },
     { name: 'Changelog', url: rss('https://changelog.com/feed') },
+    { name: 'Show HN', url: rss('https://hnrss.org/show') },
+    { name: 'YC Launches', url: rss('https://hnrss.org/launches') },
+    { name: 'Dev Events', url: rss('https://dev.events/rss.xml') },
   ],
 
   // Layoffs Tracker
