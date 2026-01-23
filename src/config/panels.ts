@@ -99,10 +99,10 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 const TECH_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
+  'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
   tech: { name: 'Technology', enabled: true, priority: 1 },
   startups: { name: 'Startups & VC', enabled: true, priority: 1 },
-  'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
   security: { name: 'Cybersecurity', enabled: true, priority: 1 },
   policy: { name: 'AI Policy & Regulation', enabled: true, priority: 1 },
   regulation: { name: 'AI Regulation Dashboard', enabled: true, priority: 1 },
