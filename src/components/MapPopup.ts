@@ -8,11 +8,24 @@ import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticl
 import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent';
+
+interface TechEventPopupData {
+  id: string;
+  title: string;
+  location: string;
+  lat: number;
+  lng: number;
+  country: string;
+  startDate: string;
+  endDate: string;
+  url: string | null;
+  daysUntil: number;
+}
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -186,6 +199,8 @@ export class MapPopup {
         return this.renderTechHQPopup(data.data as TechHQ);
       case 'accelerator':
         return this.renderAcceleratorPopup(data.data as Accelerator);
+      case 'techEvent':
+        return this.renderTechEventPopup(data.data as TechEventPopupData);
       default:
         return '';
     }
@@ -1303,6 +1318,44 @@ export class MapPopup {
           <span class="notable-label">NOTABLE ALUMNI</span>
           <span class="notable-list">${acc.notable.map(n => escapeHtml(n)).join(', ')}</span>
         </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  private renderTechEventPopup(event: TechEventPopupData): string {
+    const startDate = new Date(event.startDate);
+    const endDate = new Date(event.endDate);
+    const dateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const endDateStr = endDate > startDate && endDate.toDateString() !== startDate.toDateString()
+      ? ` - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      : '';
+
+    const urgencyClass = event.daysUntil <= 7 ? 'urgent' : event.daysUntil <= 30 ? 'soon' : '';
+    const daysLabel = event.daysUntil === 0 ? 'TODAY' : event.daysUntil === 1 ? 'TOMORROW' : `IN ${event.daysUntil} DAYS`;
+
+    return `
+      <div class="popup-header tech-event ${urgencyClass}">
+        <span class="popup-title">📅 ${escapeHtml(event.title)}</span>
+        <span class="popup-badge ${urgencyClass}">${daysLabel}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">📍 ${escapeHtml(event.location)}, ${escapeHtml(event.country)}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">DATE</span>
+            <span class="stat-value">${dateStr}${endDateStr}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">LOCATION</span>
+            <span class="stat-value">${escapeHtml(event.location)}</span>
+          </div>
+        </div>
+        ${event.url ? `
+        <a href="${sanitizeUrl(event.url)}" target="_blank" rel="noopener noreferrer" class="popup-link">
+          More Information →
+        </a>
         ` : ''}
       </div>
     `;

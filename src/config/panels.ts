@@ -61,6 +61,7 @@ const FULL_MAP_LAYERS: MapLayers = {
   cloudRegions: false,
   accelerators: false,
   techHQs: false,
+  techEvents: false,
 };
 
 const FULL_MOBILE_MAP_LAYERS: MapLayers = {
@@ -90,6 +91,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   cloudRegions: false,
   accelerators: false,
   techHQs: false,
+  techEvents: false,
 };
 
 // ============================================
@@ -148,6 +150,7 @@ const TECH_MAP_LAYERS: MapLayers = {
   cloudRegions: true,
   accelerators: false,
   techHQs: true,
+  techEvents: true,
 };
 
 const TECH_MOBILE_MAP_LAYERS: MapLayers = {
@@ -177,6 +180,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   cloudRegions: false,
   accelerators: false,
   techHQs: false,
+  techEvents: true,
 };
 
 // ============================================
