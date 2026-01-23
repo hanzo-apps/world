@@ -1687,6 +1687,8 @@ export class App {
       { key: 'hardware', feeds: FEEDS.hardware },
       { key: 'cloud', feeds: FEEDS.cloud },
       { key: 'dev', feeds: FEEDS.dev },
+      { key: 'github', feeds: FEEDS.github },
+      { key: 'ipo', feeds: FEEDS.ipo },
     ];
     // Filter to only categories that have feeds defined
     const categories = allCategories.filter(c => c.feeds && c.feeds.length > 0);
