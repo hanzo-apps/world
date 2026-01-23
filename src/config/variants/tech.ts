@@ -55,12 +55,45 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'OpenAI News', url: rss('https://news.google.com/rss/search?q=OpenAI+ChatGPT+GPT-4+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
 
-  // Startups & VC
+  // Startups & VC - Comprehensive coverage
   startups: [
     { name: 'TechCrunch Startups', url: rss('https://techcrunch.com/category/startups/feed/') },
     { name: 'VentureBeat', url: rss('https://venturebeat.com/feed/') },
     { name: 'Crunchbase News', url: rss('https://news.crunchbase.com/feed/') },
     { name: 'SaaStr', url: rss('https://www.saastr.com/feed/') },
+    { name: 'TechCrunch Venture', url: rss('https://techcrunch.com/category/venture/feed/') },
+    { name: 'The Information', url: rss('https://news.google.com/rss/search?q=site:theinformation.com+startup+OR+funding+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Fortune Term Sheet', url: rss('https://news.google.com/rss/search?q="Term+Sheet"+venture+capital+OR+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'PitchBook News', url: rss('https://pitchbook.com/feed') },
+    { name: 'CB Insights', url: rss('https://www.cbinsights.com/research/feed/') },
+  ],
+
+  // Accelerator & VC Blogs - Thought leadership
+  vcblogs: [
+    { name: 'Y Combinator Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
+    { name: 'a16z Blog', url: rss('https://a16z.com/feed/') },
+    { name: 'First Round Review', url: rss('https://review.firstround.com/feed.xml') },
+    { name: 'Sequoia Blog', url: rss('https://www.sequoiacap.com/feed/') },
+    { name: 'NFX Essays', url: rss('https://www.nfx.com/feed') },
+    { name: 'Paul Graham Essays', url: rss('https://www.aaronsw.com/2002/feeds/pgessays.rss') },
+    { name: 'Both Sides of Table', url: rss('https://bothsidesofthetable.com/feed') },
+    { name: 'Lenny\'s Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
+    { name: 'Stratechery', url: rss('https://stratechery.com/feed/') },
+  ],
+
+  // Regional Startup News - Global coverage
+  regionalStartups: [
+    { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
+    { name: 'Tech.eu', url: rss('https://tech.eu/feed/') },
+    { name: 'Sifted (Europe)', url: rss('https://sifted.eu/feed') },
+    { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
+    { name: 'KrASIA', url: rss('https://kr-asia.com/feed') },
+    { name: 'TechCabal (Africa)', url: rss('https://techcabal.com/feed/') },
+    { name: 'Disrupt Africa', url: rss('https://disrupt-africa.com/feed/') },
+    { name: 'LAVCA (LATAM)', url: rss('https://lavca.org/feed/') },
+    { name: 'Contxto (LATAM)', url: rss('https://contxto.com/feed/') },
+    { name: 'Inc42 (India)', url: rss('https://inc42.com/feed/') },
+    { name: 'YourStory', url: rss('https://yourstory.com/feed') },
   ],
 
   // Cybersecurity
@@ -117,15 +150,37 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Layoffs.fyi', url: rss('https://news.google.com/rss/search?q=tech+layoffs+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'TechCrunch Layoffs', url: rss('https://techcrunch.com/tag/layoffs/feed/') },
   ],
+
+  // Unicorn Tracker
+  unicorns: [
+    { name: 'Unicorn News', url: rss('https://news.google.com/rss/search?q=("unicorn+startup"+OR+"unicorn+valuation"+OR+"$1+billion+valuation")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'CB Insights Unicorn', url: rss('https://news.google.com/rss/search?q=site:cbinsights.com+unicorn+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Decacorn News', url: rss('https://news.google.com/rss/search?q=("decacorn"+OR+"$10+billion+valuation"+OR+"$10B+valuation")+startup+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'New Unicorns', url: rss('https://news.google.com/rss/search?q=("becomes+unicorn"+OR+"joins+unicorn"+OR+"reaches+unicorn"+OR+"achieved+unicorn")+when:14d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+
+  // Accelerators & Demo Days
+  accelerators: [
+    { name: 'YC News', url: rss('https://news.ycombinator.com/rss') },
+    { name: 'YC Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
+    { name: 'Techstars Blog', url: rss('https://www.techstars.com/blog/feed/') },
+    { name: '500 Global News', url: rss('https://news.google.com/rss/search?q="500+Global"+OR+"500+Startups"+accelerator+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Demo Day News', url: rss('https://news.google.com/rss/search?q=("demo+day"+OR+"YC+batch"+OR+"accelerator+batch")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Startup School', url: rss('https://news.google.com/rss/search?q="Startup+School"+OR+"YC+Startup+School"+when:14d&hl=en-US&gl=US&ceid=US:en') },
+  ],
 };
 
 // Panel configuration for tech/AI analysis
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
+  'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
   tech: { name: 'Technology', enabled: true, priority: 1 },
   startups: { name: 'Startups & VC', enabled: true, priority: 1 },
-  'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
+  vcblogs: { name: 'VC Insights & Essays', enabled: true, priority: 1 },
+  regionalStartups: { name: 'Global Startup News', enabled: true, priority: 1 },
+  unicorns: { name: 'Unicorn Tracker', enabled: true, priority: 1 },
+  accelerators: { name: 'Accelerators & Demo Days', enabled: true, priority: 1 },
   security: { name: 'Cybersecurity', enabled: true, priority: 1 },
   policy: { name: 'AI Policy & Regulation', enabled: true, priority: 1 },
   regulation: { name: 'AI Regulation Dashboard', enabled: true, priority: 1 },
