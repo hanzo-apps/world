@@ -1968,7 +1968,7 @@ export class App {
     }
 
     try {
-      const res = await fetch('/api/tech-events?type=conferences&mappable=true');
+      const res = await fetch('/api/tech-events?type=conferences&mappable=true&days=90&limit=50');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();

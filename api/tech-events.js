@@ -555,6 +555,8 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const type = url.searchParams.get('type'); // 'all', 'conferences', 'earnings', 'ipo'
   const mappable = url.searchParams.get('mappable') === 'true'; // Only return events with coords
+  const limit = parseInt(url.searchParams.get('limit')) || 0; // Max events (0 = unlimited)
+  const days = parseInt(url.searchParams.get('days')) || 0; // Events within N days (0 = unlimited)
 
   try {
     // Fetch both sources in parallel
@@ -606,6 +608,18 @@ export default async function handler(req) {
     // Filter to only mappable events if requested
     if (mappable) {
       events = events.filter(e => e.coords && !e.coords.virtual);
+    }
+
+    // Filter by time range if specified
+    if (days > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + days);
+      events = events.filter(e => new Date(e.startDate) <= cutoff);
+    }
+
+    // Apply limit if specified
+    if (limit > 0) {
+      events = events.slice(0, limit);
     }
 
     // Add metadata
