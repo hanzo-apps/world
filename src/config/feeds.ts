@@ -353,7 +353,14 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'VC News', url: rss('https://news.google.com/rss/search?q=("Series+A"+OR+"Series+B"+OR+"Series+C"+OR+"funding+round"+OR+"venture+capital")+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Seed & Pre-Seed', url: rss('https://news.google.com/rss/search?q=("seed+round"+OR+"pre-seed"+OR+"angel+round"+OR+"seed+funding")+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Startup Funding', url: rss('https://news.google.com/rss/search?q=("startup+funding"+OR+"raised+funding"+OR+"raised+$"+OR+"funding+announced")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Regional startup news
     { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
+    { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
+    { name: 'e27 Asia', url: rss('https://e27.co/feed/') },
+    { name: 'Inc42 India', url: rss('https://inc42.com/feed/') },
+    { name: 'MENA Funding', url: rss('https://news.google.com/rss/search?q=(MENA+OR+Dubai+OR+"Saudi+Arabia"+OR+UAE)+startup+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Africa Tech', url: rss('https://news.google.com/rss/search?q=Africa+startup+funding+OR+"African+startup"+raised+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'LATAM Startups', url: rss('https://news.google.com/rss/search?q=(Brazil+OR+Mexico+OR+"Latin+America")+startup+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   producthunt: [
     { name: 'Product Hunt', url: rss('https://www.producthunt.com/feed') },
