@@ -5,8 +5,8 @@ export default async function handler(req) {
   try {
     const response = await fetch('https://www.fwdstart.me/archive', {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(15000),
     });
@@ -19,91 +19,42 @@ export default async function handler(req) {
     const items = [];
     const seenUrls = new Set();
 
-    // Find all post links and extract data
-    // Pattern: <a href="/p/slug">...<img alt="Title">...<p>Date</p>
-    const postBlockPattern = /<a[^>]*href="(\/p\/[^"]+)"[^>]*class="[^"]*embla[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    // Split by embla__slide to get each post block
+    const slideBlocks = html.split('embla__slide');
 
-    let match;
-    while ((match = postBlockPattern.exec(html)) !== null) {
-      const url = `https://www.fwdstart.me${match[1]}`;
+    for (const block of slideBlocks) {
+      // Extract URL
+      const urlMatch = block.match(/href="(\/p\/[^"]+)"/);
+      if (!urlMatch) continue;
+
+      const url = `https://www.fwdstart.me${urlMatch[1]}`;
       if (seenUrls.has(url)) continue;
       seenUrls.add(url);
 
-      const blockContent = match[2];
+      // Extract title from alt attribute
+      const altMatch = block.match(/alt="([^"]+)"/);
+      const title = altMatch ? altMatch[1] : '';
+      if (!title || title.length < 5) continue;
 
-      // Extract title from img alt attribute
-      const altMatch = blockContent.match(/alt="([^"]+)"/);
-      let title = altMatch ? altMatch[1] : '';
-
-      // If no alt, try to get title from slug
-      if (!title) {
-        const slug = match[1].replace('/p/', '');
-        title = slug
-          .replace(/-/g, ' ')
-          .replace(/\b\w/g, c => c.toUpperCase())
-          .slice(0, 100);
-      }
-
-      // Extract date - look for patterns like "Jan 23, 2026" or "Dec 15, 2025"
-      const dateMatch = blockContent.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i);
+      // Extract date - look for "Mon DD, YYYY" pattern
+      const dateMatch = block.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})/i);
       let pubDate = new Date();
       if (dateMatch) {
-        const parsed = new Date(dateMatch[0]);
+        const dateStr = `${dateMatch[1]} ${dateMatch[2]}, ${dateMatch[3]}`;
+        const parsed = new Date(dateStr);
         if (!isNaN(parsed.getTime())) {
           pubDate = parsed;
         }
       }
 
-      // Extract description/subtitle if available
-      const subtitleMatch = blockContent.match(/subtitle[^>]*>([^<]+)</i);
-      const description = subtitleMatch ? subtitleMatch[1].trim() : '';
-
-      if (title && title.length > 3) {
-        items.push({ title, link: url, date: pubDate.toISOString(), description });
+      // Extract subtitle/description if available
+      let description = '';
+      const subtitleMatch = block.match(/line-clamp-3[^>]*>.*?<span[^>]*>([^<]{20,})<\/span>/s);
+      if (subtitleMatch) {
+        description = subtitleMatch[1].trim();
       }
-    }
 
-    // Fallback: simpler pattern if embla class not found
-    if (items.length === 0) {
-      const simplePattern = /href="(\/p\/[^"]+)"[^>]*>[\s\S]*?alt="([^"]+)"/gi;
-      while ((match = simplePattern.exec(html)) !== null) {
-        const url = `https://www.fwdstart.me${match[1]}`;
-        if (seenUrls.has(url)) continue;
-        seenUrls.add(url);
-
-        const title = match[2];
-        if (title && title.length > 3) {
-          items.push({
-            title,
-            link: url,
-            date: new Date().toISOString(),
-            description: '',
-          });
-        }
-      }
-    }
-
-    // Last fallback: just extract URLs and generate titles from slugs
-    if (items.length === 0) {
-      const urlPattern = /href="(\/p\/[\w-]+)"/g;
-      while ((match = urlPattern.exec(html)) !== null) {
-        const url = `https://www.fwdstart.me${match[1]}`;
-        if (seenUrls.has(url)) continue;
-        seenUrls.add(url);
-
-        const slug = match[1].replace('/p/', '');
-        const title = slug
-          .replace(/-/g, ' ')
-          .replace(/\b\w/g, c => c.toUpperCase())
-          .slice(0, 100);
-
-        items.push({
-          title,
-          link: url,
-          date: new Date().toISOString(),
-          description: '',
-        });
-      }
+      items.push({ title, link: url, date: pubDate.toISOString(), description });
     }
 
     // Build RSS XML
@@ -134,7 +85,7 @@ export default async function handler(req) {
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=1800', // 30 min cache
+        'Cache-Control': 'public, max-age=1800',
       },
     });
   } catch (error) {
