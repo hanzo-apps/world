@@ -168,6 +168,7 @@ export class TechEventsPanel extends Panel {
     const now = new Date();
 
     const isToday = startDate.toDateString() === now.toDateString();
+    const isSoon = !isToday && startDate <= new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // Within 2 days
     const isThisWeek = startDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const dateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -202,11 +203,12 @@ export class TechEventsPanel extends Panel {
       : '';
 
     return `
-      <div class="tech-event ${typeClasses[event.type]} ${isToday ? 'is-today' : ''} ${isThisWeek ? 'is-this-week' : ''}">
+      <div class="tech-event ${typeClasses[event.type]} ${isToday ? 'is-today' : ''} ${isSoon ? 'is-soon' : ''} ${isThisWeek ? 'is-this-week' : ''}">
         <div class="event-date">
           <span class="event-month">${startDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
           <span class="event-day">${startDate.getDate()}</span>
           ${isToday ? '<span class="today-badge">TODAY</span>' : ''}
+          ${isSoon ? '<span class="soon-badge">SOON</span>' : ''}
         </div>
         <div class="event-content">
           <div class="event-header">

@@ -310,12 +310,15 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'MIT Tech Review', url: rss('https://www.technologyreview.com/feed/') },
     { name: 'ZDNet', url: rss('https://www.zdnet.com/news/rss.xml') },
     { name: 'TechMeme', url: rss('https://www.techmeme.com/feed.xml') },
+    { name: 'Engadget', url: rss('https://www.engadget.com/rss.xml') },
+    { name: 'Fast Company', url: rss('https://feeds.feedburner.com/fastcompany/headlines') },
   ],
   ai: [
     { name: 'AI News', url: rss('https://news.google.com/rss/search?q=(OpenAI+OR+Anthropic+OR+Google+AI+OR+"large+language+model"+OR+ChatGPT+OR+Claude+OR+"AI+model")+when:2d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'VentureBeat AI', url: rss('https://venturebeat.com/category/ai/feed/') },
     { name: 'The Verge AI', url: rss('https://www.theverge.com/rss/ai-artificial-intelligence/index.xml') },
     { name: 'MIT Tech Review AI', url: rss('https://www.technologyreview.com/topic/artificial-intelligence/feed') },
+    { name: 'MIT Research', url: rss('https://news.mit.edu/rss/research') },
     { name: 'ArXiv AI', url: rss('https://export.arxiv.org/rss/cs.AI') },
     { name: 'ArXiv ML', url: rss('https://export.arxiv.org/rss/cs.LG') },
     { name: 'AI Weekly', url: rss('https://news.google.com/rss/search?q="artificial+intelligence"+OR+"machine+learning"+when:3d&hl=en-US&gl=US&ceid=US:en') },
@@ -332,7 +335,10 @@ const TECH_FEEDS: Record<string, Feed[]> = {
   ],
   github: [
     { name: 'GitHub Blog', url: rss('https://github.blog/feed/') },
-    { name: 'GitHub Trending', url: rss('https://news.google.com/rss/search?q=site:github.com+trending+OR+"GitHub+trending"+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'GitHub Trending', url: rss('https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml') },
+    { name: 'Show HN', url: rss('https://hnrss.org/show') },
+    { name: 'YC Launches', url: rss('https://hnrss.org/launches') },
+    { name: 'Dev Events', url: rss('https://dev.events/rss.xml') },
     { name: 'Open Source News', url: rss('https://news.google.com/rss/search?q="open+source"+project+release+OR+launch+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
   ipo: [
@@ -361,8 +367,8 @@ const TECH_FEEDS: Record<string, Feed[]> = {
   ],
   policy: [
     { name: 'Politico Tech', url: rss('https://rss.politico.com/technology.xml') },
-    { name: 'Protocol Policy', url: rss('https://www.protocol.com/feeds/feed.rss') },
-    { name: 'Axios AI', url: rss('https://www.axios.com/technology/artificial-intelligence') },
+    { name: 'AI Regulation', url: rss('https://news.google.com/rss/search?q=AI+regulation+OR+"artificial+intelligence"+law+OR+policy+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Tech Antitrust', url: rss('https://news.google.com/rss/search?q=tech+antitrust+OR+FTC+Google+OR+FTC+Apple+OR+FTC+Amazon+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   finance: [
     { name: 'CNBC Tech', url: rss('https://www.cnbc.com/id/19854910/device/rss/rss.html') },
@@ -371,9 +377,9 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'Seeking Alpha Tech', url: rss('https://seekingalpha.com/market_currents.xml') },
   ],
   hardware: [
-    { name: 'AnandTech', url: rss('https://www.anandtech.com/rss/') },
     { name: "Tom's Hardware", url: rss('https://www.tomshardware.com/feeds/all') },
     { name: 'SemiAnalysis', url: rss('https://www.semianalysis.com/feed') },
+    { name: 'Semiconductor News', url: rss('https://news.google.com/rss/search?q=semiconductor+OR+chip+OR+TSMC+OR+NVIDIA+OR+Intel+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
   cloud: [
     { name: 'InfoQ', url: rss('https://feed.infoq.com/') },
