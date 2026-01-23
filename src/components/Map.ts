@@ -1093,10 +1093,12 @@ export class MapComponent {
   }
 
   // Generic marker clustering - groups markers within pixelRadius into clusters
+  // groupKey function ensures only items with same key can cluster (e.g., same city)
   private clusterMarkers<T extends { lat: number; lon: number }>(
     items: T[],
     projection: d3.GeoProjection,
-    pixelRadius: number
+    pixelRadius: number,
+    getGroupKey?: (item: T) => string
   ): Array<{ items: T[]; center: [number, number]; pos: [number, number] }> {
     const clusters: Array<{ items: T[]; center: [number, number]; pos: [number, number] }> = [];
     const assigned = new Set<number>();
@@ -1110,11 +1112,16 @@ export class MapComponent {
 
       const cluster: T[] = [item];
       assigned.add(i);
+      const itemKey = getGroupKey?.(item);
 
-      // Find nearby items
+      // Find nearby items (must share same group key if provided)
       for (let j = i + 1; j < items.length; j++) {
         if (assigned.has(j)) continue;
         const other = items[j]!;
+
+        // Skip if different group keys (e.g., different cities)
+        if (getGroupKey && getGroupKey(other) !== itemKey) continue;
+
         const otherPos = projection([other.lon, other.lat]);
         if (!otherPos) continue;
 
@@ -1727,11 +1734,12 @@ export class MapComponent {
       });
     }
 
-    // Tech HQs (🏢 icons by company type) - with clustering
+    // Tech HQs (🏢 icons by company type) - with clustering by city
     if (this.state.layers.techHQs) {
       // Cluster radius depends on zoom - tighter clustering when zoomed out
       const clusterRadius = this.state.zoom >= 4 ? 15 : this.state.zoom >= 3 ? 25 : 40;
-      const clusters = this.clusterMarkers(TECH_HQS, projection, clusterRadius);
+      // Group by city to prevent clustering companies from different cities
+      const clusters = this.clusterMarkers(TECH_HQS, projection, clusterRadius, hq => hq.city);
 
       clusters.forEach((cluster) => {
         if (cluster.items.length === 0) return;
@@ -1848,7 +1856,8 @@ export class MapComponent {
         });
 
       const clusterRadius = this.state.zoom >= 4 ? 15 : this.state.zoom >= 3 ? 25 : 40;
-      const clusters = this.clusterMarkers(visibleEvents, projection, clusterRadius);
+      // Group by location to prevent clustering events from different cities
+      const clusters = this.clusterMarkers(visibleEvents, projection, clusterRadius, e => e.location);
 
       clusters.forEach((cluster) => {
         if (cluster.items.length === 0) return;
