@@ -1748,7 +1748,9 @@ export class MapComponent {
     }
 
     // Tech Events / Conferences (📅 icons)
+    console.log('[Map.render] techEvents layer:', this.state.layers.techEvents, 'count:', this.techEvents.length);
     if (this.state.layers.techEvents && this.techEvents.length > 0) {
+      console.log('[Map.render] Rendering', this.techEvents.length, 'techEvent markers');
       this.techEvents.forEach((event) => {
         const pos = projection([event.lng, event.lat]);
         if (!pos) return;
@@ -2962,6 +2964,7 @@ export class MapComponent {
   }
 
   public setTechEvents(events: TechEventMarker[]): void {
+    console.log('[Map.setTechEvents] Received', events.length, 'events, layer enabled:', this.state.layers.techEvents);
     this.techEvents = events;
     this.render();
   }
