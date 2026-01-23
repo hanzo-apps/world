@@ -398,6 +398,7 @@ export const TECH_HQS: TechHQ[] = [
   { id: 'swvl', company: 'Swvl', city: 'Dubai', country: 'UAE', lat: 25.0657, lon: 55.1713, type: 'public' },
   { id: 'aramex', company: 'Aramex', city: 'Dubai', country: 'UAE', lat: 25.0717, lon: 55.1335, type: 'public' },
   { id: 'etisalat', company: 'e&', city: 'Abu Dhabi', country: 'UAE', lat: 24.4872, lon: 54.3563, type: 'public' },
+  { id: 'anghami', company: 'Anghami', city: 'Abu Dhabi', country: 'UAE', lat: 24.4600, lon: 54.3700, type: 'public' },
   { id: 'mashreq', company: 'Mashreq Neo', city: 'Dubai', country: 'UAE', lat: 25.2614, lon: 55.2977, type: 'public' },
 
   // MENA - Saudi Arabia
