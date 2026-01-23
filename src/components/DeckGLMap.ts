@@ -1464,11 +1464,18 @@ export class DeckGLMap {
     return { x: rect.width / 2, y: rect.height / 2 };
   }
 
-  // Trigger click methods - find and focus on specific items
+  // Project lat/lon to screen coordinates without moving the map
+  private projectToScreen(lat: number, lon: number): { x: number; y: number } | null {
+    if (!this.maplibreMap) return null;
+    const point = this.maplibreMap.project([lon, lat]);
+    return { x: point.x, y: point.y };
+  }
+
+  // Trigger click methods - show popup at item location without moving the map
   public triggerHotspotClick(id: string): void {
     const hotspot = this.hotspots.find(h => h.id === id);
     if (hotspot) {
-      this.setCenter(hotspot.lat, hotspot.lon);
+      // Don't pan - just trigger the callback (popup will show at screen position)
       this.onHotspotClick?.(hotspot);
     }
   }
@@ -1476,9 +1483,9 @@ export class DeckGLMap {
   public triggerConflictClick(id: string): void {
     const conflict = CONFLICT_ZONES.find(c => c.id === id);
     if (conflict) {
-      // center is [lon, lat], but setCenter expects (lat, lon)
-      this.setCenter(conflict.center[1], conflict.center[0]);
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = this.projectToScreen(conflict.center[1], conflict.center[0]);
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'conflict', data: conflict, x, y });
     }
   }
@@ -1486,8 +1493,9 @@ export class DeckGLMap {
   public triggerBaseClick(id: string): void {
     const base = MILITARY_BASES.find(b => b.id === id);
     if (base) {
-      this.setCenter(base.lat, base.lon);
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = this.projectToScreen(base.lat, base.lon);
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'base', data: base, x, y });
     }
   }
@@ -1497,11 +1505,9 @@ export class DeckGLMap {
     if (pipeline && pipeline.points.length > 0) {
       const midIdx = Math.floor(pipeline.points.length / 2);
       const midPoint = pipeline.points[midIdx];
-      if (midPoint) {
-        // Points are [lon, lat], but setCenter expects (lat, lon)
-        this.setCenter(midPoint[1], midPoint[0]);
-      }
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = midPoint ? this.projectToScreen(midPoint[1], midPoint[0]) : null;
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'pipeline', data: pipeline, x, y });
     }
   }
@@ -1511,11 +1517,9 @@ export class DeckGLMap {
     if (cable && cable.points.length > 0) {
       const midIdx = Math.floor(cable.points.length / 2);
       const midPoint = cable.points[midIdx];
-      if (midPoint) {
-        // Points are [lon, lat], but setCenter expects (lat, lon)
-        this.setCenter(midPoint[1], midPoint[0]);
-      }
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = midPoint ? this.projectToScreen(midPoint[1], midPoint[0]) : null;
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'cable', data: cable, x, y });
     }
   }
@@ -1523,8 +1527,9 @@ export class DeckGLMap {
   public triggerDatacenterClick(id: string): void {
     const dc = AI_DATA_CENTERS.find(d => d.id === id);
     if (dc) {
-      this.setCenter(dc.lat, dc.lon);
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = this.projectToScreen(dc.lat, dc.lon);
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'datacenter', data: dc, x, y });
     }
   }
@@ -1532,8 +1537,9 @@ export class DeckGLMap {
   public triggerNuclearClick(id: string): void {
     const facility = NUCLEAR_FACILITIES.find(n => n.id === id);
     if (facility) {
-      this.setCenter(facility.lat, facility.lon);
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = this.projectToScreen(facility.lat, facility.lon);
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'nuclear', data: facility, x, y });
     }
   }
@@ -1541,17 +1547,19 @@ export class DeckGLMap {
   public triggerIrradiatorClick(id: string): void {
     const irradiator = GAMMA_IRRADIATORS.find(i => i.id === id);
     if (irradiator) {
-      this.setCenter(irradiator.lat, irradiator.lon);
-      const { x, y } = this.getContainerCenter();
+      // Don't pan - show popup at projected screen position or center
+      const screenPos = this.projectToScreen(irradiator.lat, irradiator.lon);
+      const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'irradiator', data: irradiator, x, y });
     }
   }
 
   public flashLocation(lat: number, lon: number, durationMs = 2000): void {
-    // Create a temporary flash marker
-    this.setCenter(lat, lon);
+    // Don't pan - project coordinates to screen position
+    const screenPos = this.projectToScreen(lat, lon);
+    if (!screenPos) return;
 
-    // Flash effect by temporarily adding a highlight
+    // Flash effect by temporarily adding a highlight at the location
     const flashMarker = document.createElement('div');
     flashMarker.className = 'flash-location-marker';
     flashMarker.style.cssText = `
@@ -1564,6 +1572,9 @@ export class DeckGLMap {
       animation: flash-pulse 0.5s ease-out infinite;
       pointer-events: none;
       z-index: 1000;
+      left: ${screenPos.x}px;
+      top: ${screenPos.y}px;
+      transform: translate(-50%, -50%);
     `;
 
     // Add animation keyframes if not present
@@ -1572,8 +1583,8 @@ export class DeckGLMap {
       style.id = 'flash-animation-styles';
       style.textContent = `
         @keyframes flash-pulse {
-          0% { transform: scale(1); opacity: 1; }
-          100% { transform: scale(2); opacity: 0; }
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
       `;
       document.head.appendChild(style);
@@ -1582,11 +1593,6 @@ export class DeckGLMap {
     const wrapper = this.container.querySelector('.deckgl-map-wrapper');
     if (wrapper) {
       wrapper.appendChild(flashMarker);
-      // Position will be approximate since we're not doing precise projection
-      flashMarker.style.left = '50%';
-      flashMarker.style.top = '50%';
-      flashMarker.style.transform = 'translate(-50%, -50%)';
-
       setTimeout(() => flashMarker.remove(), durationMs);
     }
   }
