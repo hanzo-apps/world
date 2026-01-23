@@ -480,7 +480,6 @@ body.animations-paused *::after {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   grid-auto-rows: minmax(200px, 380px);
-  grid-auto-flow: dense;
   gap: 4px;
   padding: 4px;
   align-content: start;
@@ -675,12 +674,6 @@ body.animations-paused *::after {
   grid-column: span 2;
   min-height: 350px;
   max-height: none;
-}
-
-/* Live News panel - explicit positioning to prevent overlap */
-#live-news {
-  grid-column: 1 / span 2;
-  grid-row: 1 / span 2;
 }
 
 /* Live News Panel */
