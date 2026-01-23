@@ -12,7 +12,7 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, aggregateTechActivity } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, aggregateTechActivity, aggregateGeoActivity } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal } from '@/services/military-surge';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
@@ -47,6 +47,7 @@ import {
   ServiceStatusPanel,
   TechHubsPanel,
   TechReadinessPanel,
+  GeoHubsPanel,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -81,6 +82,7 @@ export class App {
   private latestClusters: ClusteredEvent[] = [];
   private techHubsPanel: TechHubsPanel | null = null;
   private techReadinessPanel: TechReadinessPanel | null = null;
+  private geoHubsPanel: GeoHubsPanel | null = null;
   private isPlaybackMode = false;
   private initialUrlState: ParsedMapUrlState | null = null;
   private inFlight: Set<string> = new Set();
@@ -1132,6 +1134,17 @@ export class App {
       this.map?.flashLocation(hub.lat, hub.lon);
     });
 
+    // Geo Hubs Panel - shows geopolitical activity hotspots (full variant only)
+    if (SITE_VARIANT === 'full') {
+      this.geoHubsPanel = new GeoHubsPanel();
+      this.panels['geo-hubs'] = this.geoHubsPanel;
+
+      this.geoHubsPanel.setOnHubClick((hub) => {
+        this.map?.setCenter(hub.lat, hub.lon);
+        this.map?.flashLocation(hub.lat, hub.lon);
+      });
+    }
+
     // Tech Readiness Panel - World Bank tech indicators (all variants)
     this.techReadinessPanel = new TechReadinessPanel();
     this.panels['tech-readiness'] = this.techReadinessPanel;
@@ -2026,6 +2039,12 @@ export class App {
         const techActivity = aggregateTechActivity(this.latestClusters);
         this.map?.setTechActivity(techActivity);
         this.techHubsPanel?.setActivities(techActivity);
+
+        // Aggregate geopolitical hub activity (full variant only)
+        if (SITE_VARIANT === 'full') {
+          const geoActivity = aggregateGeoActivity(this.latestClusters);
+          this.geoHubsPanel?.setActivities(geoActivity);
+        }
       }
     } catch (error) {
       console.error('[App] Worker clustering failed, clusters unchanged:', error);

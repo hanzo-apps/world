@@ -29,4 +29,6 @@ export * from './usa-spending';
 export * from './oil-analytics';
 export * from './tech-hub-index';
 export * from './tech-activity';
+export * from './geo-hub-index';
+export * from './geo-activity';
 export * from './worldbank';
