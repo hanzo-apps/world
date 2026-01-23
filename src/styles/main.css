@@ -9082,23 +9082,3 @@ body.playback-mode .status-dot {
   }
 }
 
-.geo-activity-label {
-  position: absolute;
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text);
-  background: rgba(0, 0, 0, 0.75);
-  padding: 2px 5px;
-  border-radius: 3px;
-  white-space: nowrap;
-  pointer-events: none;
-  transform: translateX(-50%);
-  margin-top: 4px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.geo-activity-marker:hover + .geo-activity-label,
-.geo-activity-marker.show-label + .geo-activity-label {
-  opacity: 1;
-}
