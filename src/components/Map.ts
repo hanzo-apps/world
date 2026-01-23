@@ -2527,6 +2527,27 @@ export class MapComponent {
     this.render();
   }
 
+  public flashLocation(lat: number, lon: number, durationMs = 2000): void {
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    if (!width || !height) return;
+
+    const projection = this.getProjection(width, height);
+    const pos = projection([lon, lat]);
+    if (!pos) return;
+
+    const flash = document.createElement('div');
+    flash.className = 'map-flash';
+    flash.style.left = `${pos[0]}px`;
+    flash.style.top = `${pos[1]}px`;
+    flash.style.setProperty('--flash-duration', `${durationMs}ms`);
+    this.overlays.appendChild(flash);
+
+    window.setTimeout(() => {
+      flash.remove();
+    }, durationMs);
+  }
+
   public initEscalationGetters(): void {
     setCIIGetter(getCountryScore);
     setGeoAlertGetter(getAlertsNearLocation);
