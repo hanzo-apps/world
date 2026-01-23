@@ -470,7 +470,7 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
     { name: 'Tech.eu', url: rss('https://tech.eu/feed/') },
     { name: 'Sifted (Europe)', url: rss('https://sifted.eu/feed') },
-    { name: 'The Next Web', url: rss('https://thenextweb.com/feed/') },
+    { name: 'The Next Web', url: rss('https://news.google.com/rss/search?q=site:thenextweb.com+when:7d&hl=en-US&gl=US&ceid=US:en') },
     // Asia - General
     { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
     { name: 'KrASIA', url: rss('https://kr-asia.com/feed') },
@@ -617,9 +617,9 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'New Unicorns', url: rss('https://news.google.com/rss/search?q=("becomes+unicorn"+OR+"joins+unicorn"+OR+"reaches+unicorn"+OR+"achieved+unicorn")+when:14d&hl=en-US&gl=US&ceid=US:en') },
   ],
   accelerators: [
-    { name: 'YC News', url: rss('https://news.ycombinator.com/rss') },
+    { name: 'YC News', url: rss('https://hnrss.org/frontpage') },
     { name: 'YC Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
-    { name: 'Techstars Blog', url: rss('https://www.techstars.com/blog/feed/') },
+    { name: 'Techstars News', url: rss('https://news.google.com/rss/search?q=Techstars+accelerator+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: '500 Global News', url: rss('https://news.google.com/rss/search?q="500+Global"+OR+"500+Startups"+accelerator+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Demo Day News', url: rss('https://news.google.com/rss/search?q=("demo+day"+OR+"YC+batch"+OR+"accelerator+batch")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Startup School', url: rss('https://news.google.com/rss/search?q="Startup+School"+OR+"YC+Startup+School"+when:14d&hl=en-US&gl=US&ceid=US:en') },
