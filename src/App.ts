@@ -1972,7 +1972,6 @@ export class App {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      console.log('[loadTechEvents] API response:', data.success, 'count:', data.events?.length);
       if (!data.success) throw new Error(data.error || 'Unknown error');
 
       // Transform events for map markers
