@@ -1748,12 +1748,14 @@ export class MapComponent {
     }
 
     // Tech Events / Conferences (📅 icons)
-    console.log('[Map.render] techEvents layer:', this.state.layers.techEvents, 'count:', this.techEvents.length);
     if (this.state.layers.techEvents && this.techEvents.length > 0) {
-      console.log('[Map.render] Rendering', this.techEvents.length, 'techEvent markers');
+      const mapWidth = this.container.clientWidth;
+      const mapHeight = this.container.clientHeight;
       this.techEvents.forEach((event) => {
         const pos = projection([event.lng, event.lat]);
         if (!pos) return;
+        // Skip markers outside visible map bounds
+        if (pos[0] < 0 || pos[0] > mapWidth || pos[1] < 0 || pos[1] > mapHeight) return;
 
         const div = document.createElement('div');
         const isUpcomingSoon = event.daysUntil <= 14;
@@ -2964,7 +2966,6 @@ export class MapComponent {
   }
 
   public setTechEvents(events: TechEventMarker[]): void {
-    console.log('[Map.setTechEvents] Received', events.length, 'events, layer enabled:', this.state.layers.techEvents);
     this.techEvents = events;
     this.render();
   }
