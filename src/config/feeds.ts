@@ -85,7 +85,6 @@ export const SOURCE_TIERS: Record<string, number> = {
   // Tier 2 - Premium Startup/VC Sources
   'Y Combinator Blog': 2,
   'a16z Blog': 2,
-  'First Round Review': 2,
   'Sequoia Blog': 2,
   'Crunchbase News': 2,
   'CB Insights': 2,
@@ -101,7 +100,6 @@ export const SOURCE_TIERS: Record<string, number> = {
   'TechCabal (Africa)': 3,
   'Inc42 (India)': 3,
   'YourStory': 3,
-  'NFX Essays': 3,
   'Paul Graham Essays': 2,
   'Stratechery': 2,
   // Asia - Regional
@@ -459,10 +457,8 @@ const TECH_FEEDS: Record<string, Feed[]> = {
   ],
   vcblogs: [
     { name: 'Y Combinator Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
-    { name: 'a16z Blog', url: rss('https://a16z.com/feed/') },
-    { name: 'First Round Review', url: rss('https://review.firstround.com/feed.xml') },
+    { name: 'a16z Blog', url: rss('https://future.a16z.com/feed') },
     { name: 'Sequoia Blog', url: rss('https://www.sequoiacap.com/feed/') },
-    { name: 'NFX Essays', url: rss('https://www.nfx.com/feed') },
     { name: 'Paul Graham Essays', url: rss('https://www.aaronsw.com/2002/feeds/pgessays.rss') },
     { name: 'Both Sides of Table', url: rss('https://bothsidesofthetable.com/feed') },
     { name: 'Lenny\'s Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
@@ -572,7 +568,7 @@ const TECH_FEEDS: Record<string, Feed[]> = {
   thinktanks: [
     // US Think Tanks
     { name: 'Brookings Tech', url: rss('https://www.brookings.edu/topic/technology/feed/') },
-    { name: 'CSIS Tech', url: rss('https://www.csis.org/topics/technology-policy/feed') },
+    { name: 'CSIS Tech', url: rss('https://news.google.com/rss/search?q=site:csis.org+technology+OR+AI+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'MIT Tech Policy', url: rss('https://news.google.com/rss/search?q=site:techpolicypress.org+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Stanford HAI', url: rss('https://news.google.com/rss/search?q=site:hai.stanford.edu+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'AI Now Institute', url: rss('https://news.google.com/rss/search?q=site:ainowinstitute.org+when:14d&hl=en-US&gl=US&ceid=US:en') },
