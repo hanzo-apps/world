@@ -4,6 +4,7 @@ export const config = { runtime: 'edge' };
 const ALLOWED_ORIGINS = [
   'https://worldmonitor.app',
   'https://www.worldmonitor.app',
+  'https://tech.worldmonitor.app',
   'http://localhost:5173',
   'http://localhost:3000',
 ];
