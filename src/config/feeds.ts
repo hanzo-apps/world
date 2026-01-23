@@ -96,6 +96,7 @@ export const SOURCE_TIERS: Record<string, number> = {
   'EU Startups': 3,
   'Tech.eu': 3,
   'Sifted (Europe)': 3,
+  'The Next Web': 3,
   'Tech in Asia': 3,
   'TechCabal (Africa)': 3,
   'Inc42 (India)': 3,
@@ -103,6 +104,82 @@ export const SOURCE_TIERS: Record<string, number> = {
   'NFX Essays': 3,
   'Paul Graham Essays': 2,
   'Stratechery': 2,
+  // Asia - Regional
+  'e27 (SEA)': 3,
+  'DealStreetAsia': 3,
+  'Pandaily (China)': 3,
+  '36Kr English': 3,
+  'TechNode (China)': 3,
+  'China Tech News': 3,
+  'The Bridge (Japan)': 3,
+  'Japan Tech News': 3,
+  'Nikkei Tech': 2,
+  'Korea Tech News': 3,
+  'KED Global': 3,
+  'Entrackr (India)': 3,
+  'India Tech News': 3,
+  'Taiwan Tech News': 3,
+  'GloNewswire (Taiwan)': 4,
+  // LATAM
+  'LATAM Tech News': 3,
+  'Startups.co (LATAM)': 3,
+  'Contxto (LATAM)': 3,
+  'Brazil Tech News': 3,
+  'Mexico Tech News': 3,
+  'LATAM Fintech': 3,
+  // Africa & MENA
+  'Disrupt Africa': 3,
+  'Wamda (MENA)': 3,
+  'Magnitt': 3,
+
+  // Tier 3 - Think Tanks
+  'Brookings Tech': 3,
+  'CSIS Tech': 3,
+  'MIT Tech Policy': 3,
+  'Stanford HAI': 2,
+  'AI Now Institute': 3,
+  'OECD Digital': 2,
+  'Bruegel (EU)': 3,
+  'Chatham House Tech': 3,
+  'ISEAS (Singapore)': 3,
+  'ORF Tech (India)': 3,
+  'RIETI (Japan)': 3,
+  'Lowy Institute': 3,
+  'China Tech Analysis': 3,
+  'DigiChina': 2,
+
+  // Tier 3 - Policy Sources
+  'Politico Tech': 2,
+  'AI Regulation': 3,
+  'Tech Antitrust': 3,
+  'EFF News': 3,
+  'EU Digital Policy': 3,
+  'Euractiv Digital': 3,
+  'EU Commission Digital': 2,
+  'China Tech Policy': 3,
+  'UK Tech Policy': 3,
+  'India Tech Policy': 3,
+
+  // Tier 2-3 - Podcasts & Newsletters
+  'Acquired Podcast': 2,
+  'All-In Podcast': 2,
+  'a16z Podcast': 2,
+  'This Week in Startups': 3,
+  'The Twenty Minute VC': 2,
+  'Lex Fridman Tech': 3,
+  'The Vergecast': 3,
+  'Decoder (Verge)': 3,
+  'Hard Fork (NYT)': 2,
+  'Pivot (Vox)': 2,
+  'Benedict Evans': 2,
+  'The Pragmatic Engineer': 2,
+  'Lenny Newsletter': 2,
+  'AI Podcast (NVIDIA)': 3,
+  'Gradient Dissent': 3,
+  'Eye on AI': 3,
+  'How I Built This': 2,
+  'Masters of Scale': 2,
+  'The Pitch': 3,
 
   // Tier 4 - Aggregators
   'Hacker News': 4,
@@ -158,6 +235,26 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'The Verge AI': 'tech', 'MIT Tech Review': 'tech', 'TechCrunch Layoffs': 'tech',
   'AI News': 'tech', 'ArXiv AI': 'tech', 'VentureBeat AI': 'tech',
   'Layoffs.fyi': 'tech', 'Layoffs News': 'tech',
+
+  // Regional Tech Startups
+  'EU Startups': 'tech', 'Tech.eu': 'tech', 'Sifted (Europe)': 'tech',
+  'The Next Web': 'tech', 'Tech in Asia': 'tech', 'e27 (SEA)': 'tech',
+  'DealStreetAsia': 'tech', 'Pandaily (China)': 'tech', '36Kr English': 'tech',
+  'TechNode (China)': 'tech', 'The Bridge (Japan)': 'tech', 'Nikkei Tech': 'tech',
+  'Inc42 (India)': 'tech', 'YourStory': 'tech', 'TechCabal (Africa)': 'tech',
+  'Disrupt Africa': 'tech', 'Wamda (MENA)': 'tech', 'Magnitt': 'tech',
+
+  // Think Tanks & Policy
+  'Brookings Tech': 'intel', 'CSIS Tech': 'intel', 'Stanford HAI': 'intel',
+  'AI Now Institute': 'intel', 'OECD Digital': 'intel', 'Bruegel (EU)': 'intel',
+  'Chatham House Tech': 'intel', 'DigiChina': 'intel', 'Lowy Institute': 'intel',
+  'EFF News': 'intel', 'Politico Tech': 'intel',
+
+  // Podcasts & Newsletters
+  'Acquired Podcast': 'tech', 'All-In Podcast': 'tech', 'a16z Podcast': 'tech',
+  'This Week in Startups': 'tech', 'The Twenty Minute VC': 'tech',
+  'Hard Fork (NYT)': 'tech', 'Pivot (Vox)': 'tech', 'Stratechery': 'tech',
+  'Benedict Evans': 'tech', 'How I Built This': 'tech', 'Masters of Scale': 'tech',
 };
 
 export function getSourceType(sourceName: string): SourceType {
@@ -373,17 +470,53 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'FwdStart Newsletter', url: '/api/fwdstart' },
   ],
   regionalStartups: [
+    // Europe
     { name: 'EU Startups', url: rss('https://www.eu-startups.com/feed/') },
     { name: 'Tech.eu', url: rss('https://tech.eu/feed/') },
     { name: 'Sifted (Europe)', url: rss('https://sifted.eu/feed') },
+    { name: 'The Next Web', url: rss('https://thenextweb.com/feed/') },
+    // Asia - General
     { name: 'Tech in Asia', url: rss('https://www.techinasia.com/feed') },
     { name: 'KrASIA', url: rss('https://kr-asia.com/feed') },
-    { name: 'TechCabal (Africa)', url: rss('https://techcabal.com/feed/') },
-    { name: 'Disrupt Africa', url: rss('https://disrupt-africa.com/feed/') },
-    { name: 'LAVCA (LATAM)', url: rss('https://lavca.org/feed/') },
-    { name: 'Contxto (LATAM)', url: rss('https://contxto.com/feed/') },
+    { name: 'e27 (SEA)', url: rss('https://e27.co/feed/') },
+    { name: 'DealStreetAsia', url: rss('https://www.dealstreetasia.com/feed/') },
+    // China
+    { name: 'Pandaily (China)', url: rss('https://pandaily.com/feed/') },
+    { name: '36Kr English', url: rss('https://news.google.com/rss/search?q=site:36kr.com+OR+"36Kr"+startup+china+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'TechNode (China)', url: rss('https://technode.com/feed/') },
+    { name: 'China Tech News', url: rss('https://news.google.com/rss/search?q=(Alibaba+OR+Tencent+OR+ByteDance+OR+Baidu+OR+JD.com+OR+Xiaomi+OR+Huawei)+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    // Japan
+    { name: 'The Bridge (Japan)', url: rss('https://thebridge.jp/en/feed') },
+    { name: 'Japan Tech News', url: rss('https://news.google.com/rss/search?q=(Japan+startup+OR+Japan+tech+OR+SoftBank+OR+Rakuten+OR+Sony)+funding+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Nikkei Tech', url: rss('https://news.google.com/rss/search?q=site:asia.nikkei.com+technology+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    // Korea
+    { name: 'Korea Tech News', url: rss('https://news.google.com/rss/search?q=(Korea+startup+OR+Korean+tech+OR+Samsung+OR+Kakao+OR+Naver+OR+Coupang)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'KED Global', url: rss('https://news.google.com/rss/search?q=site:kedglobal.com+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // India
     { name: 'Inc42 (India)', url: rss('https://inc42.com/feed/') },
     { name: 'YourStory', url: rss('https://yourstory.com/feed') },
+    { name: 'Entrackr (India)', url: rss('https://entrackr.com/feed/') },
+    { name: 'India Tech News', url: rss('https://news.google.com/rss/search?q=(Flipkart+OR+Razorpay+OR+Zerodha+OR+Zomato+OR+Paytm+OR+PhonePe)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Southeast Asia
+    { name: 'SEA Tech News', url: rss('https://news.google.com/rss/search?q=(Grab+OR+GoTo+OR+Sea+Limited+OR+Shopee+OR+Tokopedia)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Vietnam Tech', url: rss('https://news.google.com/rss/search?q=Vietnam+startup+OR+Vietnam+tech+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Indonesia Tech', url: rss('https://news.google.com/rss/search?q=Indonesia+startup+OR+Indonesia+tech+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Taiwan
+    { name: 'Taiwan Tech', url: rss('https://news.google.com/rss/search?q=(Taiwan+startup+OR+TSMC+OR+MediaTek+OR+Foxconn)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Latin America
+    { name: 'LAVCA (LATAM)', url: rss('https://lavca.org/feed/') },
+    { name: 'Contxto (LATAM)', url: rss('https://contxto.com/feed/') },
+    { name: 'Startups LATAM', url: rss('https://news.google.com/rss/search?q=(startup+Brazil+OR+startup+Mexico+OR+startup+Argentina+OR+startup+Colombia+OR+startup+Chile)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Brazil Tech', url: rss('https://news.google.com/rss/search?q=(Nubank+OR+iFood+OR+Mercado+Libre+OR+Rappi+OR+VTEX)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'FinTech LATAM', url: rss('https://news.google.com/rss/search?q=fintech+(Brazil+OR+Mexico+OR+Argentina+OR+"Latin+America")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Africa
+    { name: 'TechCabal (Africa)', url: rss('https://techcabal.com/feed/') },
+    { name: 'Disrupt Africa', url: rss('https://disrupt-africa.com/feed/') },
+    { name: 'Techpoint Africa', url: rss('https://techpoint.africa/feed/') },
+    { name: 'Africa Tech News', url: rss('https://news.google.com/rss/search?q=(Flutterwave+OR+Paystack+OR+Jumia+OR+Andela+OR+"Africa+startup")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Middle East
+    { name: 'Wamda (MENA)', url: rss('https://www.wamda.com/feed/') },
+    { name: 'MENA Tech News', url: rss('https://news.google.com/rss/search?q=(UAE+startup+OR+Saudi+tech+OR+Dubai+startup+OR+NEOM+tech)+when:7d&hl=en-US&gl=US&ceid=US:en') },
   ],
   github: [
     { name: 'GitHub Blog', url: rss('https://github.blog/feed/') },
@@ -420,9 +553,41 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'Schneier', url: rss('https://www.schneier.com/feed/') },
   ],
   policy: [
+    // US Policy
     { name: 'Politico Tech', url: rss('https://rss.politico.com/technology.xml') },
     { name: 'AI Regulation', url: rss('https://news.google.com/rss/search?q=AI+regulation+OR+"artificial+intelligence"+law+OR+policy+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Tech Antitrust', url: rss('https://news.google.com/rss/search?q=tech+antitrust+OR+FTC+Google+OR+FTC+Apple+OR+FTC+Amazon+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'EFF News', url: rss('https://www.eff.org/rss/updates.xml') },
+    // EU Digital Policy
+    { name: 'EU Digital Policy', url: rss('https://news.google.com/rss/search?q=("Digital+Services+Act"+OR+"Digital+Markets+Act"+OR+"EU+AI+Act"+OR+"GDPR")+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Euractiv Digital', url: rss('https://www.euractiv.com/sections/digital/feed/') },
+    { name: 'EU Commission Digital', url: rss('https://news.google.com/rss/search?q=site:ec.europa.eu+digital+OR+technology+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    // China Tech Policy
+    { name: 'China Tech Policy', url: rss('https://news.google.com/rss/search?q=(China+tech+regulation+OR+China+AI+policy+OR+MIIT+technology)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // UK Policy
+    { name: 'UK Tech Policy', url: rss('https://news.google.com/rss/search?q=(UK+AI+safety+OR+"Online+Safety+Bill"+OR+UK+tech+regulation)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // India Policy
+    { name: 'India Tech Policy', url: rss('https://news.google.com/rss/search?q=(India+tech+regulation+OR+India+data+protection+OR+India+AI+policy)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  thinktanks: [
+    // US Think Tanks
+    { name: 'Brookings Tech', url: rss('https://www.brookings.edu/topic/technology/feed/') },
+    { name: 'CSIS Tech', url: rss('https://www.csis.org/topics/technology-policy/feed') },
+    { name: 'MIT Tech Policy', url: rss('https://news.google.com/rss/search?q=site:techpolicypress.org+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Stanford HAI', url: rss('https://news.google.com/rss/search?q=site:hai.stanford.edu+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'AI Now Institute', url: rss('https://news.google.com/rss/search?q=site:ainowinstitute.org+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    // Europe Think Tanks
+    { name: 'OECD Digital', url: rss('https://news.google.com/rss/search?q=site:oecd.org+digital+OR+AI+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Bruegel (EU)', url: rss('https://www.bruegel.org/rss.xml') },
+    { name: 'Chatham House Tech', url: rss('https://news.google.com/rss/search?q=site:chathamhouse.org+technology+OR+AI+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    // Asia Think Tanks
+    { name: 'ISEAS (Singapore)', url: rss('https://news.google.com/rss/search?q=site:iseas.edu.sg+technology+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'ORF Tech (India)', url: rss('https://www.orfonline.org/programmes/technology-media/feed') },
+    { name: 'RIETI (Japan)', url: rss('https://news.google.com/rss/search?q=site:rieti.go.jp+technology+when:30d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Lowy Institute', url: rss('https://www.lowyinstitute.org/the-interpreter/rss.xml') },
+    // China Research (External Views)
+    { name: 'China Tech Analysis', url: rss('https://news.google.com/rss/search?q=("China+tech+strategy"+OR+"Chinese+AI"+OR+"China+semiconductor")+analysis+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'DigiChina', url: rss('https://news.google.com/rss/search?q=site:digichina.stanford.edu+when:14d&hl=en-US&gl=US&ceid=US:en') },
   ],
   finance: [
     { name: 'CNBC Tech', url: rss('https://www.cnbc.com/id/19854910/device/rss/rss.html') },
@@ -462,6 +627,33 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: '500 Global News', url: rss('https://news.google.com/rss/search?q="500+Global"+OR+"500+Startups"+accelerator+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Demo Day News', url: rss('https://news.google.com/rss/search?q=("demo+day"+OR+"YC+batch"+OR+"accelerator+batch")+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Startup School', url: rss('https://news.google.com/rss/search?q="Startup+School"+OR+"YC+Startup+School"+when:14d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  podcasts: [
+    // Major Tech Podcasts
+    { name: 'Acquired Podcast', url: rss('https://acquired.fm/feed/') },
+    { name: 'All-In Podcast', url: rss('https://feeds.megaphone.fm/all-in-with-chamath-jason-sacks-and-friedberg') },
+    { name: 'a16z Podcast', url: rss('https://feeds.simplecast.com/JGE3yC0V') },
+    { name: 'This Week in Startups', url: rss('https://feeds.megaphone.fm/thisweekinstartups') },
+    { name: 'The Twenty Minute VC', url: rss('https://thetwentyminutevc.libsyn.com/rss') },
+    { name: 'Lex Fridman Tech', url: rss('https://news.google.com/rss/search?q=("Lex+Fridman"+interview)+(AI+OR+tech+OR+startup+OR+CEO)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Tech Media Podcasts
+    { name: 'The Vergecast', url: rss('https://feeds.megaphone.fm/vergecast') },
+    { name: 'Decoder (Verge)', url: rss('https://feeds.megaphone.fm/decoder') },
+    { name: 'Hard Fork (NYT)', url: rss('https://feeds.simplecast.com/l2i9YnTd') },
+    { name: 'Pivot (Vox)', url: rss('https://feeds.megaphone.fm/pivot') },
+    // Newsletters (as RSS)
+    { name: 'Stratechery', url: rss('https://stratechery.com/feed/') },
+    { name: 'Benedict Evans', url: rss('https://www.ben-evans.com/benedictevans?format=rss') },
+    { name: 'The Pragmatic Engineer', url: rss('https://newsletter.pragmaticengineer.com/feed') },
+    { name: 'Lenny Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
+    // AI-Focused Podcasts
+    { name: 'AI Podcast (NVIDIA)', url: rss('https://feeds.soundcloud.com/users/soundcloud:users:264034133/sounds.rss') },
+    { name: 'Gradient Dissent', url: rss('https://feeds.soundcloud.com/users/soundcloud:users:681706991/sounds.rss') },
+    { name: 'Eye on AI', url: rss('https://www.eye-on.ai/podcast-archive?format=rss') },
+    // Startup Deep Dives
+    { name: 'How I Built This', url: rss('https://feeds.npr.org/510313/podcast.xml') },
+    { name: 'Masters of Scale', url: rss('https://rss.art19.com/masters-of-scale') },
+    { name: 'The Pitch', url: rss('https://feeds.gimletmedia.com/thepitchshow') },
   ],
 };
 

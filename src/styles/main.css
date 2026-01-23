@@ -8571,3 +8571,364 @@ body.playback-mode .status-dot {
   border-radius: 4px;
   margin-top: 8px;
 }
+
+/* ==========================================================================
+   Tech Hubs Panel - Activity Hotspots
+   ========================================================================== */
+
+.tech-hub-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+  margin-bottom: 2px;
+}
+
+.tech-hub-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(2px);
+}
+
+.tech-hub-item.high {
+  border-left-color: var(--green);
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.08) 0%, transparent 40%);
+}
+
+.tech-hub-item.elevated {
+  border-left-color: var(--yellow);
+  background: linear-gradient(90deg, rgba(255, 200, 0, 0.06) 0%, transparent 40%);
+}
+
+.tech-hub-item.low {
+  border-left-color: var(--text-dim);
+}
+
+.hub-rank {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 14px;
+  text-align: center;
+}
+
+.hub-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hub-indicator.high {
+  background: var(--green);
+  box-shadow: 0 0 8px 2px rgba(0, 255, 136, 0.5);
+  animation: hub-pulse-high 1.5s infinite;
+}
+
+.hub-indicator.elevated {
+  background: var(--yellow);
+  box-shadow: 0 0 6px 2px rgba(255, 200, 0, 0.4);
+  animation: hub-pulse-elevated 2s infinite;
+}
+
+.hub-indicator.low {
+  background: var(--text-dim);
+  opacity: 0.6;
+}
+
+@keyframes hub-pulse-high {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+@keyframes hub-pulse-elevated {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+.hub-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hub-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hub-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-flag {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.hub-breaking {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--red);
+  background: rgba(255, 82, 82, 0.2);
+  padding: 1px 4px;
+  border-radius: 2px;
+  animation: breaking-pulse 1s infinite;
+}
+
+@keyframes breaking-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.hub-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.hub-news-count {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.hub-trend {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.hub-trend.rising {
+  color: var(--green);
+}
+
+.hub-trend.falling {
+  color: var(--red);
+}
+
+.hub-tier {
+  font-size: 8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.hub-score {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 24px;
+  text-align: right;
+}
+
+.hub-top-story {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 4px 10px 8px 35px;
+  text-decoration: none;
+  line-height: 1.4;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-top-story:hover {
+  color: var(--accent);
+}
+
+/* Tech Readiness Panel */
+.tech-readiness-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.readiness-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.readiness-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.readiness-item.high {
+  border-left-color: var(--green);
+}
+
+.readiness-item.medium {
+  border-left-color: var(--yellow);
+}
+
+.readiness-item.low {
+  border-left-color: var(--text-dim);
+}
+
+.readiness-rank {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 24px;
+}
+
+.readiness-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.readiness-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.readiness-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readiness-components {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.readiness-components span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.readiness-score {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
+}
+
+.readiness-score.high {
+  color: var(--green);
+}
+
+.readiness-score.medium {
+  color: var(--yellow);
+}
+
+.readiness-score.low {
+  color: var(--text-dim);
+}
+
+.readiness-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-dim);
+  padding: 8px 10px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 8px;
+}
+
+/* Map Activity Markers */
+.tech-activity-marker {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: all 0.2s ease;
+}
+
+.tech-activity-marker:hover {
+  z-index: 100 !important;
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+.tech-activity-marker.high {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle, rgba(0, 255, 136, 0.9) 0%, rgba(0, 255, 136, 0.2) 60%, transparent 70%);
+  box-shadow: 0 0 20px 8px rgba(0, 255, 136, 0.4);
+  animation: activity-pulse-high 1.5s ease-in-out infinite;
+}
+
+.tech-activity-marker.elevated {
+  width: 16px;
+  height: 16px;
+  background: radial-gradient(circle, rgba(255, 200, 0, 0.8) 0%, rgba(255, 200, 0, 0.2) 60%, transparent 70%);
+  box-shadow: 0 0 15px 5px rgba(255, 200, 0, 0.35);
+  animation: activity-pulse-elevated 2s ease-in-out infinite;
+}
+
+.tech-activity-marker.low {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, rgba(100, 180, 255, 0.6) 0%, rgba(100, 180, 255, 0.15) 60%, transparent 70%);
+  box-shadow: 0 0 8px 3px rgba(100, 180, 255, 0.25);
+}
+
+@keyframes activity-pulse-high {
+  0%, 100% {
+    box-shadow: 0 0 20px 8px rgba(0, 255, 136, 0.4);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px 15px rgba(0, 255, 136, 0.2);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+@keyframes activity-pulse-elevated {
+  0%, 100% {
+    box-shadow: 0 0 15px 5px rgba(255, 200, 0, 0.35);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(255, 200, 0, 0.2);
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+.tech-activity-label {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tech-activity-marker:hover + .tech-activity-label,
+.tech-activity-marker.show-label + .tech-activity-label {
+  opacity: 1;
+}
