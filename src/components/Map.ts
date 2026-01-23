@@ -59,6 +59,19 @@ interface HotspotWithBreaking extends Hotspot {
   hasBreaking?: boolean;
 }
 
+interface TechEventMarker {
+  id: string;
+  title: string;
+  location: string;
+  lat: number;
+  lng: number;
+  country: string;
+  startDate: string;
+  endDate: string;
+  url: string | null;
+  daysUntil: number;
+}
+
 interface WorldTopology extends Topology {
   objects: {
     countries: GeometryCollection;
@@ -105,6 +118,7 @@ export class MapComponent {
   private militaryVessels: MilitaryVessel[] = [];
   private militaryVesselClusters: MilitaryVesselCluster[] = [];
   private naturalEvents: NaturalEvent[] = [];
+  private techEvents: TechEventMarker[] = [];
   private news: NewsItem[] = [];
   private popup: MapPopup;
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -1686,6 +1700,33 @@ export class MapComponent {
       });
     }
 
+    // Tech Events / Conferences (📅 icons)
+    if (this.state.layers.techEvents && this.techEvents.length > 0) {
+      this.techEvents.forEach((event) => {
+        const pos = projection([event.lng, event.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        const isUpcomingSoon = event.daysUntil <= 14;
+        div.className = `tech-event-marker ${isUpcomingSoon ? 'upcoming-soon' : ''}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'techEvent',
+            data: event,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
     // Protests / Social Unrest Events (severity colors + icons)
     // Filter to show only significant events on map (all events still used for CII analysis)
     if (this.state.layers.protests) {
@@ -2869,6 +2910,11 @@ export class MapComponent {
 
   public setNaturalEvents(events: NaturalEvent[]): void {
     this.naturalEvents = events;
+    this.render();
+  }
+
+  public setTechEvents(events: TechEventMarker[]): void {
+    this.techEvents = events;
     this.render();
   }
 
