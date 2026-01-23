@@ -7975,6 +7975,18 @@ body.playback-mode .status-dot {
   margin-top: 2px;
 }
 
+.soon-badge {
+  font-size: 7px;
+  font-weight: 600;
+  color: #ff9966;
+  margin-top: 2px;
+}
+
+.tech-event.is-soon {
+  background: rgba(255, 153, 102, 0.1);
+  border-left-color: #ff9966;
+}
+
 .event-content {
   flex: 1;
   min-width: 0;
@@ -8105,4 +8117,177 @@ body.playback-mode .status-dot {
 
 .tech-event-popup .popup-link:hover {
   text-decoration: underline;
+}
+
+/* Service Status Panel */
+.service-status-loading,
+.service-status-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.service-status-error {
+  color: var(--red);
+}
+
+.service-status-error .retry-btn {
+  margin-top: 4px;
+  padding: 4px 10px;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.service-status-error .retry-btn:hover {
+  background: var(--border);
+}
+
+.service-status-summary {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.service-status-summary .summary-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.service-status-summary .summary-count {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.service-status-summary .summary-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.service-status-summary .summary-item.operational .summary-count {
+  color: var(--green);
+}
+
+.service-status-summary .summary-item.degraded .summary-count {
+  color: var(--yellow);
+}
+
+.service-status-summary .summary-item.outage .summary-count {
+  color: var(--red);
+}
+
+.service-status-filters {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.status-filter-btn {
+  padding: 4px 8px;
+  font-size: 9px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.status-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.status-filter-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.service-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.service-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.service-status-item .status-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.service-status-item .status-name {
+  flex: 1;
+  color: var(--text);
+}
+
+.service-status-item .status-badge {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.service-status-item.operational .status-icon { color: var(--green); }
+.service-status-item.degraded .status-icon { color: var(--yellow); }
+.service-status-item.outage .status-icon { color: var(--red); }
+.service-status-item.unknown .status-icon { color: var(--text-dim); }
+
+.service-status-item .status-badge.operational {
+  background: rgba(0, 200, 83, 0.15);
+  color: var(--green);
+}
+
+.service-status-item .status-badge.degraded {
+  background: rgba(255, 170, 0, 0.15);
+  color: var(--yellow);
+}
+
+.service-status-item .status-badge.outage {
+  background: rgba(255, 82, 82, 0.15);
+  color: var(--red);
+}
+
+.service-status-item .status-badge.unknown {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+}
+
+.all-operational {
+  text-align: center;
+  padding: 12px;
+  font-size: 10px;
+  color: var(--green);
+  background: rgba(0, 200, 83, 0.1);
+  border-radius: 4px;
+  margin-top: 8px;
 }
