@@ -1,0 +1,119 @@
+import { Panel } from './Panel';
+import { getTechReadinessRankings, type TechReadinessScore } from '@/services/worldbank';
+import { escapeHtml } from '@/utils/sanitize';
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  'USA': '🇺🇸', 'CHN': '🇨🇳', 'JPN': '🇯🇵', 'DEU': '🇩🇪', 'KOR': '🇰🇷',
+  'GBR': '🇬🇧', 'IND': '🇮🇳', 'ISR': '🇮🇱', 'SGP': '🇸🇬', 'TWN': '🇹🇼',
+  'FRA': '🇫🇷', 'CAN': '🇨🇦', 'SWE': '🇸🇪', 'NLD': '🇳🇱', 'CHE': '🇨🇭',
+  'FIN': '🇫🇮', 'IRL': '🇮🇪', 'AUS': '🇦🇺', 'BRA': '🇧🇷', 'IDN': '🇮🇩',
+  'ESP': '🇪🇸', 'ITA': '🇮🇹', 'MEX': '🇲🇽', 'RUS': '🇷🇺', 'TUR': '🇹🇷',
+  'SAU': '🇸🇦', 'ARE': '🇦🇪', 'POL': '🇵🇱', 'THA': '🇹🇭', 'MYS': '🇲🇾',
+  'VNM': '🇻🇳', 'PHL': '🇵🇭', 'NZL': '🇳🇿', 'AUT': '🇦🇹', 'BEL': '🇧🇪',
+  'DNK': '🇩🇰', 'NOR': '🇳🇴', 'PRT': '🇵🇹', 'CZE': '🇨🇿', 'ZAF': '🇿🇦',
+  'NGA': '🇳🇬', 'KEN': '🇰🇪', 'EGY': '🇪🇬', 'ARG': '🇦🇷', 'CHL': '🇨🇱',
+  'COL': '🇨🇴', 'PAK': '🇵🇰', 'BGD': '🇧🇩', 'UKR': '🇺🇦', 'ROU': '🇷🇴',
+  'EST': '🇪🇪', 'LVA': '🇱🇻', 'LTU': '🇱🇹', 'HUN': '🇭🇺', 'GRC': '🇬🇷',
+};
+
+export class TechReadinessPanel extends Panel {
+  private rankings: TechReadinessScore[] = [];
+  private loading = false;
+  private lastFetch = 0;
+  private readonly REFRESH_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
+
+  constructor() {
+    super({
+      id: 'tech-readiness',
+      title: 'Tech Readiness Index',
+      showCount: true,
+      infoTooltip: `
+        <strong>Global Tech Readiness</strong><br>
+        Composite score based on World Bank indicators:<br><br>
+        • Internet users (% of population)<br>
+        • Mobile & broadband subscriptions<br>
+        • R&D expenditure (% of GDP)<br>
+        • Patent applications<br>
+        • High-tech exports (%)<br><br>
+        <em>Data source: World Bank Open Data</em>
+      `,
+    });
+  }
+
+  public async refresh(): Promise<void> {
+    if (this.loading) return;
+    if (Date.now() - this.lastFetch < this.REFRESH_INTERVAL && this.rankings.length > 0) {
+      return;
+    }
+
+    this.loading = true;
+    this.showLoading();
+
+    try {
+      this.rankings = await getTechReadinessRankings();
+      this.lastFetch = Date.now();
+      this.setCount(this.rankings.length);
+      this.render();
+    } catch (error) {
+      console.error('[TechReadinessPanel] Error fetching data:', error);
+      this.showError('Failed to load tech readiness data');
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private getFlag(countryCode: string): string {
+    return COUNTRY_FLAGS[countryCode] || '🌐';
+  }
+
+  private getScoreClass(score: number): string {
+    if (score >= 70) return 'high';
+    if (score >= 40) return 'medium';
+    return 'low';
+  }
+
+  private formatComponent(value: number | null): string {
+    if (value === null) return '—';
+    return Math.round(value).toString();
+  }
+
+  private render(): void {
+    if (this.rankings.length === 0) {
+      this.showError('No data available');
+      return;
+    }
+
+    // Show top 15 countries
+    const top = this.rankings.slice(0, 15);
+
+    const html = `
+      <div class="tech-readiness-list">
+        ${top.map(country => {
+          const scoreClass = this.getScoreClass(country.score);
+          return `
+            <div class="readiness-item ${scoreClass}" data-country="${escapeHtml(country.country)}">
+              <div class="readiness-rank">#${country.rank}</div>
+              <div class="readiness-flag">${this.getFlag(country.country)}</div>
+              <div class="readiness-info">
+                <div class="readiness-name">${escapeHtml(country.countryName)}</div>
+                <div class="readiness-components">
+                  <span title="Internet Users">🌐${this.formatComponent(country.components.internet)}</span>
+                  <span title="R&D Spending">🔬${this.formatComponent(country.components.rdSpend)}</span>
+                  <span title="Patents">📜${this.formatComponent(country.components.patents)}</span>
+                  <span title="High-Tech Exports">📦${this.formatComponent(country.components.highTechExports)}</span>
+                </div>
+              </div>
+              <div class="readiness-score ${scoreClass}">${country.score}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div class="readiness-footer">
+        <span class="readiness-source">Source: World Bank</span>
+        <span class="readiness-updated">Updated: ${new Date(this.lastFetch).toLocaleDateString()}</span>
+      </div>
+    `;
+
+    this.setContent(html);
+  }
+}
