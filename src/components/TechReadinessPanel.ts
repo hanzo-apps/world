@@ -86,8 +86,8 @@ export class TechReadinessPanel extends Panel {
       return;
     }
 
-    // Show top 15 countries
-    const top = this.rankings.slice(0, 15);
+    // Show top 25 countries
+    const top = this.rankings.slice(0, 25);
 
     const html = `
       <div class="tech-readiness-list">
