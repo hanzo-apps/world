@@ -1,6 +1,6 @@
 import { escapeHtml } from '@/utils/sanitize';
 
-export type SearchResultType = 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator';
+export type SearchResultType = 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -19,6 +19,11 @@ const RECENT_SEARCHES_KEY = 'worldmonitor_recent_searches';
 const MAX_RECENT = 8;
 const MAX_RESULTS = 12;
 
+interface SearchModalOptions {
+  placeholder?: string;
+  hint?: string;
+}
+
 export class SearchModal {
   private container: HTMLElement;
   private overlay: HTMLElement | null = null;
@@ -29,9 +34,13 @@ export class SearchModal {
   private selectedIndex = 0;
   private recentSearches: string[] = [];
   private onSelect?: (result: SearchResult) => void;
+  private placeholder: string;
+  private hint: string;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, options?: SearchModalOptions) {
     this.container = container;
+    this.placeholder = options?.placeholder || 'Search news, pipelines, bases, markets...';
+    this.hint = options?.hint || 'News • Pipelines • Bases • Cables • Datacenters • Markets';
     this.loadRecentSearches();
   }
 
@@ -77,7 +86,7 @@ export class SearchModal {
       <div class="search-modal">
         <div class="search-header">
           <span class="search-icon">⌘</span>
-          <input type="text" class="search-input" placeholder="Search news, pipelines, bases, markets..." autofocus />
+          <input type="text" class="search-input" placeholder="${this.placeholder}" autofocus />
           <kbd class="search-kbd">ESC</kbd>
         </div>
         <div class="search-results"></div>
@@ -186,7 +195,7 @@ export class SearchModal {
       <div class="search-empty">
         <div class="search-empty-icon">🔍</div>
         <div>Search across all data sources</div>
-        <div class="search-empty-hint">News • Pipelines • Bases • Cables • Datacenters • Markets</div>
+        <div class="search-empty-hint">${this.hint}</div>
       </div>
     `;
   }
@@ -218,6 +227,10 @@ export class SearchModal {
       outage: '📡',
       nuclear: '☢️',
       irradiator: '⚛️',
+      techcompany: '🏢',
+      ailab: '🧠',
+      startup: '🚀',
+      techevent: '📅',
     };
 
     this.resultsList.innerHTML = this.results.map((result, i) => `
