@@ -78,6 +78,91 @@ body.animations-paused *::after {
   gap: 16px;
 }
 
+/* Variant Switcher */
+.variant-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-right: 6px;
+}
+
+.variant-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-decoration: none;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.variant-option .variant-icon {
+  font-size: 11px;
+  filter: grayscale(80%);
+  transition: filter 0.25s ease;
+}
+
+.variant-option .variant-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.3s ease, opacity 0.2s ease;
+}
+
+.variant-option:hover .variant-label,
+.variant-option.active .variant-label {
+  max-width: 50px;
+  opacity: 1;
+}
+
+.variant-option:hover {
+  color: var(--text);
+}
+
+.variant-option:hover .variant-icon {
+  filter: grayscale(0%);
+}
+
+.variant-option.active {
+  color: var(--green);
+  background: rgba(68, 255, 136, 0.1);
+  pointer-events: none;
+}
+
+.variant-option.active .variant-icon {
+  filter: grayscale(0%) drop-shadow(0 0 4px var(--green));
+}
+
+.variant-option[data-variant="tech"].active {
+  color: #4a9eff;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.variant-option[data-variant="tech"].active .variant-icon {
+  filter: grayscale(0%) drop-shadow(0 0 4px #4a9eff);
+}
+
+.variant-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.variant-switcher:hover .variant-option .variant-label {
+  max-width: 50px;
+  opacity: 1;
+}
+
 .logo {
   font-weight: bold;
   font-size: 14px;
