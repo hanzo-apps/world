@@ -4,6 +4,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import type { Feature, Geometry } from 'geojson';
 import type { MapLayers, Hotspot, NewsItem, Earthquake, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent } from '@/types';
+import type { TechHubActivity } from '@/services/tech-activity';
 import { getNaturalEventIcon } from '@/services/eonet';
 import type { WeatherAlert } from '@/services/weather';
 import { getSeverityColor } from '@/services/weather';
@@ -119,7 +120,9 @@ export class MapComponent {
   private militaryVesselClusters: MilitaryVesselCluster[] = [];
   private naturalEvents: NaturalEvent[] = [];
   private techEvents: TechEventMarker[] = [];
+  private techActivities: TechHubActivity[] = [];
   private news: NewsItem[] = [];
+  private onTechHubClick?: (hub: TechHubActivity) => void;
   private popup: MapPopup;
   private onHotspotClick?: (hotspot: Hotspot) => void;
   private onTimeRangeChange?: (range: TimeRange) => void;
@@ -1902,6 +1905,48 @@ export class MapComponent {
       });
     }
 
+    // Tech Hub Activity Markers (shows activity heatmap for tech hubs with news activity)
+    if (SITE_VARIANT === 'tech' && this.techActivities.length > 0) {
+      this.techActivities.forEach((activity) => {
+        const pos = projection([activity.lon, activity.lat]);
+        if (!pos) return;
+
+        // Only show markers for hubs with actual activity
+        if (activity.newsCount === 0) return;
+
+        const div = document.createElement('div');
+        div.className = `tech-activity-marker ${activity.activityLevel}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+        div.style.zIndex = activity.activityLevel === 'high' ? '60' : activity.activityLevel === 'elevated' ? '50' : '40';
+        div.title = `${activity.city}: ${activity.newsCount} stories`;
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onTechHubClick?.(activity);
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'techActivity',
+            data: activity,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+
+        // Add label for high/elevated activity hubs at sufficient zoom
+        if ((activity.activityLevel === 'high' || (activity.activityLevel === 'elevated' && this.state.zoom >= 2)) && this.state.zoom >= 1.5) {
+          const label = document.createElement('div');
+          label.className = 'tech-activity-label';
+          label.textContent = activity.city;
+          label.style.left = `${pos[0]}px`;
+          label.style.top = `${pos[1] + 14}px`;
+          this.overlays.appendChild(label);
+        }
+      });
+    }
+
     // Protests / Social Unrest Events (severity colors + icons) - with clustering
     // Filter to show only significant events on map (all events still used for CII analysis)
     if (this.state.layers.protests) {
@@ -3136,6 +3181,15 @@ export class MapComponent {
   public setTechEvents(events: TechEventMarker[]): void {
     this.techEvents = events;
     this.render();
+  }
+
+  public setTechActivity(activities: TechHubActivity[]): void {
+    this.techActivities = activities;
+    this.render();
+  }
+
+  public setOnTechHubClick(handler: (hub: TechHubActivity) => void): void {
+    this.onTechHubClick = handler;
   }
 
   private getCableAdvisory(cableId: string): CableAdvisory | undefined {

@@ -27,3 +27,6 @@ export * from './cross-module-integration';
 export * from './data-freshness';
 export * from './usa-spending';
 export * from './oil-analytics';
+export * from './tech-hub-index';
+export * from './tech-activity';
+export * from './worldbank';
