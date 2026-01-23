@@ -8,7 +8,7 @@ import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticl
 import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster';
 
 interface TechEventPopupData {
   id: string;
@@ -23,9 +23,21 @@ interface TechEventPopupData {
   daysUntil: number;
 }
 
+interface TechHQClusterData {
+  items: TechHQ[];
+  city: string;
+  country: string;
+}
+
+interface TechEventClusterData {
+  items: TechEventPopupData[];
+  location: string;
+  country: string;
+}
+
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -201,6 +213,10 @@ export class MapPopup {
         return this.renderAcceleratorPopup(data.data as Accelerator);
       case 'techEvent':
         return this.renderTechEventPopup(data.data as TechEventPopupData);
+      case 'techHQCluster':
+        return this.renderTechHQClusterPopup(data.data as { items: TechHQ[]; city: string; country: string });
+      case 'techEventCluster':
+        return this.renderTechEventClusterPopup(data.data as { items: TechEventPopupData[]; location: string; country: string });
       default:
         return '';
     }
@@ -1357,6 +1373,59 @@ export class MapPopup {
           More Information →
         </a>
         ` : ''}
+      </div>
+    `;
+  }
+
+  private renderTechHQClusterPopup(data: { items: TechHQ[]; city: string; country: string }): string {
+    const unicorns = data.items.filter(h => h.type === 'unicorn');
+    const faangs = data.items.filter(h => h.type === 'faang');
+    const publics = data.items.filter(h => h.type === 'public');
+
+    const listItems = data.items.map(hq => {
+      const icon = hq.type === 'faang' ? '🏛️' : hq.type === 'unicorn' ? '🦄' : '🏢';
+      const marketCap = hq.marketCap ? ` (${hq.marketCap})` : '';
+      return `<li class="cluster-item ${hq.type}">${icon} ${escapeHtml(hq.company)}${marketCap}</li>`;
+    }).join('');
+
+    return `
+      <div class="popup-header tech-hq cluster">
+        <span class="popup-title">🏙️ ${escapeHtml(data.city)}</span>
+        <span class="popup-badge">${data.items.length} COMPANIES</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body cluster-popup">
+        <div class="popup-subtitle">📍 ${escapeHtml(data.city)}, ${escapeHtml(data.country)}</div>
+        <div class="cluster-summary">
+          ${faangs.length ? `<span class="summary-item faang">🏛️ ${faangs.length} Big Tech</span>` : ''}
+          ${unicorns.length ? `<span class="summary-item unicorn">🦄 ${unicorns.length} Unicorns</span>` : ''}
+          ${publics.length ? `<span class="summary-item public">🏢 ${publics.length} Public</span>` : ''}
+        </div>
+        <ul class="cluster-list">${listItems}</ul>
+      </div>
+    `;
+  }
+
+  private renderTechEventClusterPopup(data: { items: TechEventPopupData[]; location: string; country: string }): string {
+    const upcomingSoon = data.items.filter(e => e.daysUntil <= 14);
+
+    const listItems = data.items.map(event => {
+      const startDate = new Date(event.startDate);
+      const dateStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const urgencyClass = event.daysUntil <= 7 ? 'urgent' : event.daysUntil <= 30 ? 'soon' : '';
+      return `<li class="cluster-item ${urgencyClass}">📅 ${dateStr}: ${escapeHtml(event.title)}</li>`;
+    }).join('');
+
+    return `
+      <div class="popup-header tech-event cluster">
+        <span class="popup-title">📅 ${escapeHtml(data.location)}</span>
+        <span class="popup-badge">${data.items.length} EVENTS</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body cluster-popup">
+        <div class="popup-subtitle">📍 ${escapeHtml(data.location)}, ${escapeHtml(data.country)}</div>
+        ${upcomingSoon.length ? `<div class="cluster-summary"><span class="summary-item soon">⚡ ${upcomingSoon.length} upcoming within 2 weeks</span></div>` : ''}
+        <ul class="cluster-list">${listItems}</ul>
       </div>
     `;
   }
