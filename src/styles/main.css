@@ -8872,6 +8872,20 @@ body.playback-mode .status-dot {
 /* MapLibre GL overrides for dark theme */
 .maplibregl-map {
   font-family: inherit;
+  background: transparent !important;
+}
+
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  background: transparent !important;
+}
+
+/* Ensure deck.gl doesn't add any overlay */
+#deckgl-overlay,
+#deckgl-overlay > *,
+#deckgl-overlay canvas {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .maplibregl-popup-content {

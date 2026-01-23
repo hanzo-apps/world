@@ -182,18 +182,18 @@ export class DeckGLMap {
     const wrapper = document.createElement('div');
     wrapper.className = 'deckgl-map-wrapper';
     wrapper.id = 'deckglMapWrapper';
-    wrapper.style.cssText = 'position: relative; width: 100%; height: 100%;';
+    wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; overflow: hidden;';
 
-    // MapLibre container (base map)
+    // MapLibre container (base map) - z-index 1
     const mapContainer = document.createElement('div');
     mapContainer.id = 'deckgl-basemap';
-    mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
+    mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;';
     wrapper.appendChild(mapContainer);
 
-    // Deck.gl canvas container
+    // Deck.gl canvas container - z-index 2, on top of MapLibre
     const deckContainer = document.createElement('div');
     deckContainer.id = 'deckgl-overlay';
-    deckContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;';
+    deckContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; background: none;';
     wrapper.appendChild(deckContainer);
 
     this.container.appendChild(wrapper);
@@ -270,35 +270,8 @@ export class DeckGLMap {
     const deckContainer = document.getElementById('deckgl-overlay') as HTMLDivElement | null;
     if (!deckContainer) return;
 
-    // Create canvas with proper alpha support
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width: 100%; height: 100%; background: transparent;';
-    deckContainer.appendChild(canvas);
-
-    // Get WebGL context with alpha enabled
-    const gl = canvas.getContext('webgl2', {
-      alpha: true,
-      premultipliedAlpha: true,
-      antialias: true,
-      preserveDrawingBuffer: false,
-    }) || canvas.getContext('webgl', {
-      alpha: true,
-      premultipliedAlpha: true,
-      antialias: true,
-      preserveDrawingBuffer: false,
-    });
-
-    if (!gl) {
-      console.error('[DeckGLMap] WebGL not supported');
-      return;
-    }
-
-    // Set transparent clear color
-    gl.clearColor(0, 0, 0, 0);
-
     this.deck = new Deck({
-      canvas: canvas,
-      gl: gl as WebGL2RenderingContext,
+      parent: deckContainer,
       viewState: {
         longitude: preset.longitude,
         latitude: preset.latitude,
@@ -311,6 +284,22 @@ export class DeckGLMap {
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 5,
+      // Disable any default effects
+      effects: [],
+    });
+
+    // After deck initializes, ensure canvas transparency
+    requestAnimationFrame(() => {
+      const canvas = deckContainer.querySelector('canvas');
+      if (canvas) {
+        canvas.style.background = 'none';
+        canvas.style.backgroundColor = 'transparent';
+        // Get the WebGL context and set transparent clear color
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (gl) {
+          gl.clearColor(0, 0, 0, 0);
+        }
+      }
     });
   }
 
