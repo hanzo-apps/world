@@ -99,15 +99,34 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
       return cached?.items || [];
     }
 
-    const items = doc.querySelectorAll('item');
+    // Support both RSS (<item>) and Atom (<entry>) formats
+    let items = doc.querySelectorAll('item');
+    const isAtom = items.length === 0;
+    if (isAtom) {
+      items = doc.querySelectorAll('entry');
+    }
 
     const parsed = Array.from(items)
       .slice(0, 5)
       .map((item) => {
         const title = item.querySelector('title')?.textContent || '';
-        const link = item.querySelector('link')?.textContent || '';
-        const pubDateStr = item.querySelector('pubDate')?.textContent || '';
+
+        // Atom uses <link href="..."> while RSS uses <link>text</link>
+        let link = '';
+        if (isAtom) {
+          const linkEl = item.querySelector('link[href]');
+          link = linkEl?.getAttribute('href') || '';
+        } else {
+          link = item.querySelector('link')?.textContent || '';
+        }
+
+        // Atom uses <published> or <updated>, RSS uses <pubDate>
+        const pubDateStr = isAtom
+          ? (item.querySelector('published')?.textContent ||
+             item.querySelector('updated')?.textContent || '')
+          : (item.querySelector('pubDate')?.textContent || '');
         const pubDate = pubDateStr ? new Date(pubDateStr) : new Date();
+
         const isAlert = ALERT_KEYWORDS.some((kw) =>
           title.toLowerCase().includes(kw)
         );
