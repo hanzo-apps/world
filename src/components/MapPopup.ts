@@ -8,7 +8,7 @@ import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticl
 import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster';
 
 interface TechEventPopupData {
   id: string;
@@ -35,9 +35,14 @@ interface TechEventClusterData {
   country: string;
 }
 
+interface ProtestClusterData {
+  items: SocialUnrestEvent[];
+  country: string;
+}
+
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -185,6 +190,8 @@ export class MapPopup {
         return this.renderAisPopup(data.data as AisDisruptionEvent);
       case 'protest':
         return this.renderProtestPopup(data.data as SocialUnrestEvent);
+      case 'protestCluster':
+        return this.renderProtestClusterPopup(data.data as ProtestClusterData);
       case 'flight':
         return this.renderFlightPopup(data.data as AirportDelayAlert);
       case 'militaryFlight':
@@ -714,6 +721,50 @@ export class MapPopup {
         ${event.title ? `<p class="popup-description">${escapeHtml(event.title)}</p>` : ''}
         ${tagsSection}
         ${relatedHotspots}
+      </div>
+    `;
+  }
+
+  private renderProtestClusterPopup(data: ProtestClusterData): string {
+    const riots = data.items.filter(e => e.eventType === 'riot');
+    const highSeverity = data.items.filter(e => e.severity === 'high');
+    const verified = data.items.filter(e => e.validated);
+    const totalFatalities = data.items.reduce((sum, e) => sum + (e.fatalities || 0), 0);
+
+    const sortedItems = [...data.items].sort((a, b) => {
+      const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      const typeOrder: Record<string, number> = { riot: 0, civil_unrest: 1, strike: 2, demonstration: 3, protest: 4 };
+      const sevDiff = (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3);
+      if (sevDiff !== 0) return sevDiff;
+      return (typeOrder[a.eventType] ?? 5) - (typeOrder[b.eventType] ?? 5);
+    });
+
+    const listItems = sortedItems.slice(0, 10).map(event => {
+      const icon = event.eventType === 'riot' ? '🔥' : event.eventType === 'strike' ? '✊' : '📢';
+      const sevClass = event.severity;
+      const dateStr = event.time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const city = event.city ? escapeHtml(event.city) : '';
+      const title = event.title ? `: ${escapeHtml(event.title.slice(0, 40))}${event.title.length > 40 ? '...' : ''}` : '';
+      return `<li class="cluster-item ${sevClass}">${icon} ${dateStr}${city ? ` • ${city}` : ''}${title}</li>`;
+    }).join('');
+
+    const moreCount = data.items.length > 10 ? `<li class="cluster-more">+${data.items.length - 10} more events</li>` : '';
+    const headerClass = highSeverity.length > 0 ? 'high' : riots.length > 0 ? 'medium' : 'low';
+
+    return `
+      <div class="popup-header protest ${headerClass} cluster">
+        <span class="popup-title">📢 ${escapeHtml(data.country)}</span>
+        <span class="popup-badge">${data.items.length} EVENTS</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body cluster-popup">
+        <div class="cluster-summary">
+          ${riots.length ? `<span class="summary-item riot">🔥 ${riots.length} Riots</span>` : ''}
+          ${highSeverity.length ? `<span class="summary-item high">⚠️ ${highSeverity.length} High Severity</span>` : ''}
+          ${verified.length ? `<span class="summary-item verified">✓ ${verified.length} Verified</span>` : ''}
+          ${totalFatalities > 0 ? `<span class="summary-item fatalities">💀 ${totalFatalities} Fatalities</span>` : ''}
+        </div>
+        <ul class="cluster-list">${listItems}${moreCount}</ul>
       </div>
     `;
   }
