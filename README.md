@@ -2853,6 +2853,127 @@ The full [ROADMAP.md](ROADMAP.md) documents implementation details, API endpoint
 
 ---
 
+## System Architecture
+
+### Data Flow Overview
+
+```
+                                    ┌─────────────────────────────────┐
+                                    │     External Data Sources       │
+                                    │  RSS Feeds, APIs, WebSockets    │
+                                    └─────────────┬───────────────────┘
+                                                  │
+                         ┌────────────────────────┼────────────────────────┐
+                         │                        │                        │
+                         ▼                        ▼                        ▼
+               ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+               │   RSS Parser    │    │    API Client   │    │  WebSocket Hub  │
+               │  (News Feeds)   │    │ (USGS, FAA...)  │    │ (AIS, Markets)  │
+               └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+                        │                      │                      │
+                        └──────────────────────┼──────────────────────┘
+                                               │
+                                               ▼
+                             ┌─────────────────────────────────┐
+                             │      Circuit Breakers           │
+                             │  (Rate Limiting, Retry Logic)   │
+                             └─────────────┬───────────────────┘
+                                           │
+                         ┌─────────────────┼─────────────────┐
+                         │                 │                 │
+                         ▼                 ▼                 ▼
+               ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+               │  Data Freshness │ │  Search Index   │ │   Web Worker    │
+               │    Tracker      │ │  (Searchables)  │ │  (Clustering)   │
+               └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
+                        │                   │                   │
+                        └───────────────────┼───────────────────┘
+                                            │
+                                            ▼
+                             ┌─────────────────────────────────┐
+                             │         App State               │
+                             │  (Map, Panels, Intelligence)    │
+                             └─────────────┬───────────────────┘
+                                           │
+                                           ▼
+                             ┌─────────────────────────────────┐
+                             │      Rendering Pipeline         │
+                             │  D3.js Map + React-like Panels  │
+                             └─────────────────────────────────┘
+```
+
+### Update Cycles
+
+Different data types refresh at different intervals based on volatility and API limits:
+
+| Data Type | Refresh Interval | Rationale |
+|-----------|------------------|-----------|
+| **News Feeds** | 3 minutes | Balance between freshness and API politeness |
+| **Market Data** | 60 seconds | Real-time awareness with rate limit constraints |
+| **Military Tracking** | 30 seconds | High-priority for situational awareness |
+| **Weather Alerts** | 5 minutes | NWS update frequency |
+| **Earthquakes** | 5 minutes | USGS update cadence |
+| **Internet Outages** | 5 minutes | Cloudflare Radar update frequency |
+| **AIS Vessels** | Real-time | WebSocket streaming |
+
+### Error Handling Strategy
+
+The system implements defense-in-depth for external service failures:
+
+**Circuit Breakers**
+- Each external service has an independent circuit breaker
+- After 3 consecutive failures, the circuit opens for 60 seconds
+- Partial failures don't cascade to other services
+- Status panel shows exact failure states
+
+**Graceful Degradation**
+- Stale cached data displays during outages (with timestamp warning)
+- Failed services are automatically retried on next cycle
+- Critical data (news, markets) has backup sources
+
+**User Feedback**
+- Real-time status indicators in the header
+- Specific error messages in the status panel
+- No silent failures—every data source state is visible
+
+### Build-Time Optimization
+
+The project uses Vite for optimal production builds:
+
+**Code Splitting**
+- Web Worker code is bundled separately
+- Config files (tech-geo.ts, pipelines.ts) are tree-shaken
+- Lazy-loaded panels reduce initial bundle size
+
+**Variant Builds**
+- `npm run build` - Standard geopolitical dashboard
+- `npm run build:tech` - Tech sector variant with different defaults
+- Both share the same codebase, configured via environment variables
+
+**Asset Optimization**
+- TopoJSON geography data is pre-compressed
+- Static config data is inlined at build time
+- CSS is minified and autoprefixed
+
+### Security Considerations
+
+**Client-Side Security**
+- All user input is sanitized via `escapeHtml()` before rendering
+- URLs are validated via `sanitizeUrl()` before href assignment
+- No `innerHTML` with user-controllable content
+
+**API Security**
+- Sensitive API keys are stored server-side only
+- Proxy functions validate and sanitize parameters
+- Geographic coordinates are clamped to valid ranges
+
+**Privacy**
+- No user accounts or cloud storage
+- All preferences stored in localStorage
+- No telemetry beyond basic Vercel analytics (page views only)
+
+---
+
 ## Contributing
 
 Contributions are welcome! Whether you're fixing bugs, adding features, improving documentation, or suggesting ideas, your help makes this project better.
