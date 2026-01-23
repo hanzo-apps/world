@@ -8904,6 +8904,15 @@ body.playback-mode .status-dot {
   background-color: transparent !important;
 }
 
+/* Override deck.gl default grab cursor - use default pointer */
+#deckgl-overlay canvas {
+  cursor: default !important;
+}
+
+#deckgl-overlay canvas:active {
+  cursor: grabbing !important;
+}
+
 .maplibregl-popup-content {
   background: rgba(10, 15, 12, 0.95);
   color: var(--text);
