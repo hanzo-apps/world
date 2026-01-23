@@ -22,10 +22,10 @@ const TECH_FEEDS = new Set([
   'Tech', 'Ai', 'Startups', 'Vcblogs', 'RegionalStartups',
   'Unicorns', 'Accelerators', 'Security', 'Policy', 'Layoffs',
   'Finance', 'Hardware', 'Cloud', 'Dev', 'Tech Events', 'Crypto',
-  'Markets', 'Events', 'Producthunt', 'Funding'
+  'Markets', 'Events', 'Producthunt', 'Funding', 'Polymarket'
 ]);
 const TECH_APIS = new Set([
-  'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status'
+  'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status', 'Polymarket'
 ]);
 
 const WORLD_FEEDS = new Set([
