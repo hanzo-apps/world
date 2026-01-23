@@ -2,17 +2,17 @@
 // Keeps API key server-side
 export const config = { runtime: 'edge' };
 
-const ALLOWED_ORIGINS = [
-  'https://worldmonitor.app',
-  'https://www.worldmonitor.app',
-  'https://tech.worldmonitor.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
 function getCorsOrigin(req) {
   const origin = req.headers.get('origin') || '';
-  return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Allow *.worldmonitor.app and localhost
+  if (
+    origin.endsWith('.worldmonitor.app') ||
+    origin === 'https://worldmonitor.app' ||
+    origin.startsWith('http://localhost:')
+  ) {
+    return origin;
+  }
+  return 'https://worldmonitor.app';
 }
 
 export default async function handler(req) {
