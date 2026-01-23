@@ -5,7 +5,7 @@
  */
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
-import { GeoJsonLayer, ScatterplotLayer, PathLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, ScatterplotLayer, PathLayer, TextLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
 import type {
   MapLayers,
@@ -280,9 +280,9 @@ export class DeckGLMap {
       layers.push(this.createBasesLayer());
     }
 
-    // Nuclear facilities layer
+    // Nuclear facilities layer (returns array with icon layer)
     if (mapLayers.nuclear) {
-      layers.push(this.createNuclearLayer());
+      layers.push(...this.createNuclearLayer());
     }
 
     // Hotspots layer
@@ -290,9 +290,9 @@ export class DeckGLMap {
       layers.push(this.createHotspotsLayer());
     }
 
-    // Datacenters layer
+    // Datacenters layer (returns array with icon layer)
     if (mapLayers.datacenters) {
-      layers.push(this.createDatacentersLayer());
+      layers.push(...this.createDatacentersLayer());
     }
 
     // Earthquakes layer
@@ -455,24 +455,38 @@ export class DeckGLMap {
     });
   }
 
-  private createNuclearLayer(): ScatterplotLayer {
+  private createNuclearLayer(): Layer[] {
     const highlightedNuclear = this.highlightedAssets.nuclear;
+    const data = NUCLEAR_FACILITIES.filter(f => f.status !== 'decommissioned');
 
-    return new ScatterplotLayer({
-      id: 'nuclear-layer',
-      data: NUCLEAR_FACILITIES.filter(f => f.status !== 'decommissioned'),
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => highlightedNuclear.has(d.id) ? 12000 : 6000,
-      getFillColor: (d) => {
-        if (highlightedNuclear.has(d.id)) {
-          return [255, 100, 100, 255] as [number, number, number, number];
-        }
-        return COLORS.nuclear;
-      },
-      radiusMinPixels: 3,
-      radiusMaxPixels: 10,
-      pickable: true,
-    });
+    return [
+      new ScatterplotLayer({
+        id: 'nuclear-layer',
+        data,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: (d) => highlightedNuclear.has(d.id) ? 12000 : 6000,
+        getFillColor: (d) => {
+          if (highlightedNuclear.has(d.id)) {
+            return [255, 100, 100, 255] as [number, number, number, number];
+          }
+          return COLORS.nuclear;
+        },
+        radiusMinPixels: 5,
+        radiusMaxPixels: 12,
+        pickable: true,
+      }),
+      new TextLayer({
+        id: 'nuclear-icon-layer',
+        data,
+        getPosition: (d) => [d.lon, d.lat],
+        getText: () => '☢️',
+        getSize: 12,
+        getAngle: 0,
+        getTextAnchor: 'middle',
+        getAlignmentBaseline: 'center',
+        pickable: false,
+      }),
+    ];
   }
 
   private createHotspotsLayer(): ScatterplotLayer {
@@ -500,24 +514,38 @@ export class DeckGLMap {
     });
   }
 
-  private createDatacentersLayer(): ScatterplotLayer {
+  private createDatacentersLayer(): Layer[] {
     const highlightedDC = this.highlightedAssets.datacenter;
+    const data = AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned');
 
-    return new ScatterplotLayer({
-      id: 'datacenters-layer',
-      data: AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned'),
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => highlightedDC.has(d.id) ? 10000 : 5000,
-      getFillColor: (d) => {
-        if (highlightedDC.has(d.id)) {
-          return [255, 100, 100, 255] as [number, number, number, number];
-        }
-        return COLORS.datacenter;
-      },
-      radiusMinPixels: 3,
-      radiusMaxPixels: 8,
-      pickable: true,
-    });
+    return [
+      new ScatterplotLayer({
+        id: 'datacenters-layer',
+        data,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: (d) => highlightedDC.has(d.id) ? 10000 : 5000,
+        getFillColor: (d) => {
+          if (highlightedDC.has(d.id)) {
+            return [255, 100, 100, 255] as [number, number, number, number];
+          }
+          return COLORS.datacenter;
+        },
+        radiusMinPixels: 5,
+        radiusMaxPixels: 10,
+        pickable: true,
+      }),
+      new TextLayer({
+        id: 'datacenters-icon-layer',
+        data,
+        getPosition: (d) => [d.lon, d.lat],
+        getText: () => '🖥️',
+        getSize: 14,
+        getAngle: 0,
+        getTextAnchor: 'middle',
+        getAlignmentBaseline: 'center',
+        pickable: false,
+      }),
+    ];
   }
 
   private createEarthquakesLayer(): ScatterplotLayer {
