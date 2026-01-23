@@ -2,6 +2,87 @@ import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import pkg from './package.json';
 
+const VARIANT_META: Record<string, {
+  title: string;
+  description: string;
+  keywords: string;
+  url: string;
+  siteName: string;
+  features: string[];
+}> = {
+  world: {
+    title: 'World Monitor - Real-Time Global Intelligence Dashboard',
+    description: 'Real-time global intelligence dashboard with live news, markets, military tracking, infrastructure monitoring, and geopolitical data. OSINT in one view.',
+    keywords: 'global intelligence, geopolitical dashboard, world news, market data, military bases, nuclear facilities, undersea cables, conflict zones, real-time monitoring, situation awareness, OSINT, flight tracking, AIS ships, earthquake monitor, protest tracker, power outages, oil prices, government spending, polymarket predictions',
+    url: 'https://worldmonitor.app/',
+    siteName: 'World Monitor',
+    features: [
+      'Real-time news aggregation',
+      'Stock market tracking',
+      'Military flight monitoring',
+      'Ship AIS tracking',
+      'Earthquake alerts',
+      'Protest tracking',
+      'Power outage monitoring',
+      'Oil price analytics',
+      'Government spending data',
+      'Prediction markets',
+      'Infrastructure monitoring',
+      'Geopolitical intelligence',
+    ],
+  },
+  tech: {
+    title: 'Tech Monitor - Real-Time AI & Tech Industry Dashboard',
+    description: 'Real-time AI and tech industry dashboard tracking tech giants, AI labs, startup ecosystems, funding rounds, and tech events worldwide.',
+    keywords: 'tech dashboard, AI industry, startup ecosystem, tech companies, AI labs, venture capital, tech events, tech conferences, cloud infrastructure, datacenters, tech layoffs, funding rounds, unicorns, FAANG, tech HQ, accelerators, Y Combinator, tech news',
+    url: 'https://tech.worldmonitor.app/',
+    siteName: 'Tech Monitor',
+    features: [
+      'Tech news aggregation',
+      'AI lab tracking',
+      'Startup ecosystem mapping',
+      'Tech HQ locations',
+      'Conference & event calendar',
+      'Cloud infrastructure monitoring',
+      'Datacenter mapping',
+      'Tech layoff tracking',
+      'Funding round analytics',
+      'Tech stock tracking',
+      'Service status monitoring',
+    ],
+  },
+};
+
+function htmlVariantPlugin(): Plugin {
+  const variant = process.env.VITE_VARIANT || 'world';
+  const meta = VARIANT_META[variant] || VARIANT_META.world;
+
+  return {
+    name: 'html-variant',
+    transformIndexHtml(html) {
+      return html
+        .replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`)
+        .replace(/<meta name="title" content=".*?" \/>/, `<meta name="title" content="${meta.title}" />`)
+        .replace(/<meta name="description" content=".*?" \/>/, `<meta name="description" content="${meta.description}" />`)
+        .replace(/<meta name="keywords" content=".*?" \/>/, `<meta name="keywords" content="${meta.keywords}" />`)
+        .replace(/<link rel="canonical" href=".*?" \/>/, `<link rel="canonical" href="${meta.url}" />`)
+        .replace(/<meta name="application-name" content=".*?" \/>/, `<meta name="application-name" content="${meta.siteName}" />`)
+        .replace(/<meta property="og:url" content=".*?" \/>/, `<meta property="og:url" content="${meta.url}" />`)
+        .replace(/<meta property="og:title" content=".*?" \/>/, `<meta property="og:title" content="${meta.title}" />`)
+        .replace(/<meta property="og:description" content=".*?" \/>/, `<meta property="og:description" content="${meta.description}" />`)
+        .replace(/<meta property="og:site_name" content=".*?" \/>/, `<meta property="og:site_name" content="${meta.siteName}" />`)
+        .replace(/<meta name="twitter:url" content=".*?" \/>/, `<meta name="twitter:url" content="${meta.url}" />`)
+        .replace(/<meta name="twitter:title" content=".*?" \/>/, `<meta name="twitter:title" content="${meta.title}" />`)
+        .replace(/<meta name="twitter:description" content=".*?" \/>/, `<meta name="twitter:description" content="${meta.description}" />`)
+        .replace(/"name": "World Monitor"/, `"name": "${meta.siteName}"`)
+        .replace(/"alternateName": "WorldMonitor"/, `"alternateName": "${meta.siteName.replace(' ', '')}"`)
+        .replace(/"url": "https:\/\/worldmonitor\.app\/"/, `"url": "${meta.url}"`)
+        .replace(/"description": "Real-time global intelligence dashboard with live news, markets, military tracking, infrastructure monitoring, and geopolitical data."/, `"description": "${meta.description}"`)
+        .replace(/"featureList": \[[\s\S]*?\]/, `"featureList": ${JSON.stringify(meta.features, null, 8).replace(/\n/g, '\n      ')}`);
+    },
+  };
+}
+
 function youtubeLivePlugin(): Plugin {
   return {
     name: 'youtube-live',
@@ -42,7 +123,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
-  plugins: [youtubeLivePlugin()],
+  plugins: [htmlVariantPlugin(), youtubeLivePlugin()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
