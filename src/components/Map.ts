@@ -1979,16 +1979,6 @@ export class MapComponent {
         });
 
         this.overlays.appendChild(div);
-
-        // Add label for high/elevated activity hubs at sufficient zoom
-        if ((activity.activityLevel === 'high' || (activity.activityLevel === 'elevated' && this.state.zoom >= 2)) && this.state.zoom >= 1.5) {
-          const label = document.createElement('div');
-          label.className = 'geo-activity-label';
-          label.textContent = activity.name;
-          label.style.left = `${pos[0]}px`;
-          label.style.top = `${pos[1] + 14}px`;
-          this.overlays.appendChild(label);
-        }
       });
     }
 
