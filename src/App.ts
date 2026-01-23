@@ -12,7 +12,7 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, aggregateTechActivity } from '@/services';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal } from '@/services/military-surge';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
@@ -45,6 +45,8 @@ import {
   IntelligenceGapBadge,
   TechEventsPanel,
   ServiceStatusPanel,
+  TechHubsPanel,
+  TechReadinessPanel,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -77,6 +79,8 @@ export class App {
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
   private latestClusters: ClusteredEvent[] = [];
+  private techHubsPanel: TechHubsPanel | null = null;
+  private techReadinessPanel: TechReadinessPanel | null = null;
   private isPlaybackMode = false;
   private initialUrlState: ParsedMapUrlState | null = null;
   private inFlight: Set<string> = new Set();
@@ -1118,6 +1122,23 @@ export class App {
     const serviceStatusPanel = new ServiceStatusPanel();
     this.panels['service-status'] = serviceStatusPanel;
 
+    // Tech Hubs Panel - shows active tech hub activity (tech variant only)
+    if (SITE_VARIANT === 'tech') {
+      this.techHubsPanel = new TechHubsPanel();
+      this.panels['tech-hubs'] = this.techHubsPanel;
+
+      // Set up hub click handler to zoom map to hub location
+      this.techHubsPanel.setOnHubClick((hub) => {
+        this.map?.setCenter(hub.lat, hub.lon);
+        this.map?.flashLocation(hub.lat, hub.lon);
+      });
+
+      // Tech Readiness Panel - World Bank tech indicators
+      this.techReadinessPanel = new TechReadinessPanel();
+      this.panels['tech-readiness'] = this.techReadinessPanel;
+      this.techReadinessPanel.refresh();
+    }
+
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -1946,6 +1967,7 @@ export class App {
       { key: 'dev', feeds: FEEDS.dev },
       { key: 'github', feeds: FEEDS.github },
       { key: 'ipo', feeds: FEEDS.ipo },
+      { key: 'podcasts', feeds: FEEDS.podcasts },
     ];
     // Filter to only categories that have feeds defined
     const categories = allCategories.filter(c => c.feeds && c.feeds.length > 0);
@@ -2000,6 +2022,13 @@ export class App {
     // Update clusters for correlation analysis (off main thread via Web Worker)
     try {
       this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+
+      // Aggregate tech hub activity from news clusters (tech variant only)
+      if (SITE_VARIANT === 'tech' && this.latestClusters.length > 0) {
+        const techActivity = aggregateTechActivity(this.latestClusters);
+        this.map?.setTechActivity(techActivity);
+        this.techHubsPanel?.setActivities(techActivity);
+      }
     } catch (error) {
       console.error('[App] Worker clustering failed, clusters unchanged:', error);
     }
