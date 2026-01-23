@@ -998,6 +998,36 @@ export class App {
     this.newsPanels['startups'] = startupsPanel;
     this.panels['startups'] = startupsPanel;
 
+    const vcblogsPanel = new NewsPanel('vcblogs', 'VC Insights & Essays');
+    this.attachRelatedAssetHandlers(vcblogsPanel);
+    this.newsPanels['vcblogs'] = vcblogsPanel;
+    this.panels['vcblogs'] = vcblogsPanel;
+
+    const regionalStartupsPanel = new NewsPanel('regionalStartups', 'Global Startup News');
+    this.attachRelatedAssetHandlers(regionalStartupsPanel);
+    this.newsPanels['regionalStartups'] = regionalStartupsPanel;
+    this.panels['regionalStartups'] = regionalStartupsPanel;
+
+    const unicornsPanel = new NewsPanel('unicorns', 'Unicorn Tracker');
+    this.attachRelatedAssetHandlers(unicornsPanel);
+    this.newsPanels['unicorns'] = unicornsPanel;
+    this.panels['unicorns'] = unicornsPanel;
+
+    const acceleratorsPanel = new NewsPanel('accelerators', 'Accelerators & Demo Days');
+    this.attachRelatedAssetHandlers(acceleratorsPanel);
+    this.newsPanels['accelerators'] = acceleratorsPanel;
+    this.panels['accelerators'] = acceleratorsPanel;
+
+    const fundingPanel = new NewsPanel('funding', 'Funding & VC');
+    this.attachRelatedAssetHandlers(fundingPanel);
+    this.newsPanels['funding'] = fundingPanel;
+    this.panels['funding'] = fundingPanel;
+
+    const producthuntPanel = new NewsPanel('producthunt', 'Product Hunt');
+    this.attachRelatedAssetHandlers(producthuntPanel);
+    this.newsPanels['producthunt'] = producthuntPanel;
+    this.panels['producthunt'] = producthuntPanel;
+
     const securityPanel = new NewsPanel('security', 'Cybersecurity');
     this.attachRelatedAssetHandlers(securityPanel);
     this.newsPanels['security'] = securityPanel;
