@@ -8,7 +8,7 @@ const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
 const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
-  'tech-hubs': { name: 'Hot Tech Hubs', enabled: true, priority: 1 },
+  'geo-hubs': { name: 'Geopolitical Hotspots', enabled: true, priority: 1 },
   intel: { name: 'Intel Feed', enabled: true, priority: 1 },
   'gdelt-intel': { name: 'Live Intelligence', enabled: true, priority: 1 },
   cii: { name: 'Country Instability', enabled: true, priority: 1 },
