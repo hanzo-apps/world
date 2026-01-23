@@ -90,6 +90,33 @@ const ALLOWED_DOMAINS = [
   'www.engadget.com',
   'news.mit.edu',
   'dev.events',
+  // VC blogs
+  'www.ycombinator.com',
+  'a16z.com',
+  'review.firstround.com',
+  'www.sequoiacap.com',
+  'www.nfx.com',
+  'www.aaronsw.com',
+  'bothsidesofthetable.com',
+  'www.lennysnewsletter.com',
+  'stratechery.com',
+  // Regional startup news
+  'www.eu-startups.com',
+  'tech.eu',
+  'sifted.eu',
+  'www.techinasia.com',
+  'kr-asia.com',
+  'techcabal.com',
+  'disrupt-africa.com',
+  'lavca.org',
+  'contxto.com',
+  'inc42.com',
+  'yourstory.com',
+  // Funding & VC
+  'pitchbook.com',
+  'www.cbinsights.com',
+  // Accelerators
+  'www.techstars.com',
 ];
 
 export default async function handler(req) {
