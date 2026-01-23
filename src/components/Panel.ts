@@ -125,6 +125,7 @@ export class Panel {
   }
 
   public toggle(visible: boolean): void {
+    console.log(`[Panel.toggle] ${this.panelId} -> ${visible}`);
     if (visible) this.show();
     else this.hide();
   }
