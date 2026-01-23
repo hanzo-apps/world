@@ -44,6 +44,7 @@ import {
   StrategicRiskPanel,
   IntelligenceGapBadge,
   TechEventsPanel,
+  ServiceStatusPanel,
 } from '@/components';
 import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -940,6 +941,10 @@ export class App {
 
     // Tech Events Panel (tech variant only - but create for all to allow toggling)
     this.panels['events'] = new TechEventsPanel('events');
+
+    // Service Status Panel (primarily for tech variant)
+    const serviceStatusPanel = new ServiceStatusPanel();
+    this.panels['service-status'] = serviceStatusPanel;
 
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
