@@ -17,13 +17,40 @@ interface ApiStatus {
   latency?: number;
 }
 
+// Allowlists for each variant
+const TECH_FEEDS = new Set([
+  'Tech', 'Ai', 'Startups', 'Vcblogs', 'RegionalStartups',
+  'Unicorns', 'Accelerators', 'Security', 'Policy', 'Layoffs',
+  'Finance', 'Hardware', 'Cloud', 'Dev', 'Tech Events', 'Crypto',
+  'Markets', 'Events', 'Producthunt', 'Funding'
+]);
+const TECH_APIS = new Set([
+  'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status'
+]);
+
+const WORLD_FEEDS = new Set([
+  'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
+  'Gov', 'Intel', 'Layoffs', 'Thinktanks', 'Energy',
+  'Polymarket', 'Weather', 'NetBlocks', 'Shipping', 'Military'
+]);
+const WORLD_APIS = new Set([
+  'RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED',
+  'AISStream', 'GDELT Doc', 'EIA', 'USASpending', 'PizzINT'
+]);
+
 export class StatusPanel {
   private element: HTMLElement;
   private isOpen = false;
   private feeds: Map<string, FeedStatus> = new Map();
   private apis: Map<string, ApiStatus> = new Map();
+  private allowedFeeds: Set<string>;
+  private allowedApis: Set<string>;
 
   constructor() {
+    // Set allowlists based on variant
+    this.allowedFeeds = SITE_VARIANT === 'tech' ? TECH_FEEDS : WORLD_FEEDS;
+    this.allowedApis = SITE_VARIANT === 'tech' ? TECH_APIS : WORLD_APIS;
+
     this.element = document.createElement('div');
     this.element.className = 'status-panel-container';
     this.element.innerHTML = `
@@ -77,32 +104,21 @@ export class StatusPanel {
   }
 
   private initDefaultStatuses(): void {
-    // Names must match what App.ts sends: category.charAt(0).toUpperCase() + category.slice(1)
-    // Default to 'disabled' - only show status when layer is enabled and data is fetched
-    const feedNames = SITE_VARIANT === 'tech'
-      ? [
-          'Tech', 'Ai', 'Startups', 'Vcblogs', 'RegionalStartups',
-          'Unicorns', 'Accelerators', 'Security', 'Policy', 'Layoffs',
-          'Finance', 'Hardware', 'Cloud', 'Dev', 'Tech Events'
-        ]
-      : [
-          'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
-          'Gov', 'Intel', 'Layoffs', 'Thinktanks',
-          'Polymarket', 'Weather', 'NetBlocks', 'Shipping'
-        ];
-    feedNames.forEach(name => {
+    // Initialize all allowed feeds/APIs as disabled
+    // They get enabled when App.ts reports data
+    this.allowedFeeds.forEach(name => {
       this.feeds.set(name, { name, lastUpdate: null, status: 'disabled', itemCount: 0 });
     });
 
-    const apiNames = SITE_VARIANT === 'tech'
-      ? ['RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status']
-      : ['RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED', 'AISStream', 'GDELT Doc', 'EIA', 'USASpending'];
-    apiNames.forEach(name => {
+    this.allowedApis.forEach(name => {
       this.apis.set(name, { name, status: 'disabled' });
     });
   }
 
   public updateFeed(name: string, status: Partial<FeedStatus>): void {
+    // Only track feeds relevant to current variant
+    if (!this.allowedFeeds.has(name)) return;
+
     const existing = this.feeds.get(name) || { name, lastUpdate: null, status: 'ok' as const, itemCount: 0 };
     this.feeds.set(name, { ...existing, ...status, lastUpdate: new Date() });
     this.updateStatusIcon();
@@ -110,6 +126,9 @@ export class StatusPanel {
   }
 
   public updateApi(name: string, status: Partial<ApiStatus>): void {
+    // Only track APIs relevant to current variant
+    if (!this.allowedApis.has(name)) return;
+
     const existing = this.apis.get(name) || { name, status: 'ok' as const };
     this.apis.set(name, { ...existing, ...status });
     this.updateStatusIcon();
