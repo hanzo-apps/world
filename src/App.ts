@@ -805,7 +805,7 @@ export class App {
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
-              <span class="panel-title">Global Situation</span>
+              <span class="panel-title">${SITE_VARIANT === 'tech' ? 'Global Tech' : 'Global Situation'}</span>
             </div>
             <button class="map-pin-btn" id="mapPinBtn" title="Pin map to top">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
