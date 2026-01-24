@@ -1145,10 +1145,12 @@ export class App {
       });
     }
 
-    // Tech Readiness Panel - World Bank tech indicators (all variants)
-    this.techReadinessPanel = new TechReadinessPanel();
-    this.panels['tech-readiness'] = this.techReadinessPanel;
-    this.techReadinessPanel.refresh();
+    // Tech Readiness Panel - World Bank tech indicators (tech variant only)
+    if (SITE_VARIANT === 'tech') {
+      this.techReadinessPanel = new TechReadinessPanel();
+      this.panels['tech-readiness'] = this.techReadinessPanel;
+      this.techReadinessPanel.refresh();
+    }
 
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
