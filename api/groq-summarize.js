@@ -36,13 +36,16 @@ function getRedis() {
   return redis;
 }
 
+// Cache version - increment to bust old caches after breaking changes
+const CACHE_VERSION = 'v2';
+
 // Generate cache key from headlines, geoContext, and variant
 function getCacheKey(headlines, mode, geoContext = '', variant = 'full') {
   const sorted = headlines.slice(0, 8).sort().join('|');
   const geoHash = geoContext ? ':g' + hashString(geoContext).slice(0, 6) : '';
   const hash = hashString(`${mode}:${sorted}`);
-  // Include variant to prevent cross-site cache collisions
-  return `summary:${variant}:${hash}${geoHash}`;
+  // Include variant and version to prevent cross-site cache collisions
+  return `summary:${CACHE_VERSION}:${variant}:${hash}${geoHash}`;
 }
 
 // Simple hash function for cache keys
