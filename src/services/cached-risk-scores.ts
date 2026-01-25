@@ -5,6 +5,7 @@
  */
 
 import type { CountryScore, ComponentScores } from './country-instability';
+import { setHasCachedScores } from './country-instability';
 
 export interface CachedCIIScore {
   code: string;
@@ -67,6 +68,7 @@ export async function fetchCachedRiskScores(): Promise<CachedRiskScores | null> 
       const data = await response.json();
       cachedScores = data;
       lastFetchTime = now;
+      setHasCachedScores(true); // Bypass 15-min learning mode
       console.log('[CachedRiskScores] Loaded', data.cached ? '(from Redis)' : '(computed)');
       return cachedScores;
     } catch (error) {
