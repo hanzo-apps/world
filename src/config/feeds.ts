@@ -480,10 +480,10 @@ export const INTEL_SOURCES: Feed[] = [
 
 // Keywords that trigger alert status - must be specific to avoid false positives
 export const ALERT_KEYWORDS = [
-  'war', 'invasion', 'military action', 'nuclear', 'sanctions', 'missile',
-  'airstrike', 'troops deployed', 'armed conflict', 'bombing', 'casualties',
+  'war', 'invasion', 'military', 'nuclear', 'sanctions', 'missile',
+  'airstrike', 'drone strike', 'troops deployed', 'armed conflict', 'bombing', 'casualties',
   'ceasefire', 'peace treaty', 'nato', 'coup', 'martial law',
-  'assassination', 'terrorist', 'hostage', 'mass evacuation',
+  'assassination', 'terrorist', 'terror attack', 'cyber attack', 'hostage', 'evacuation order',
 ];
 
 // Patterns that indicate non-alert content (lifestyle, entertainment, etc.)
