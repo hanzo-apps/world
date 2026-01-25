@@ -118,6 +118,9 @@ export class MapPopup {
         top = topBuffer;
       }
 
+      // Ensure popup never goes above the top buffer (header area)
+      top = Math.max(topBuffer, top);
+
       this.popup.style.left = `${left}px`;
       this.popup.style.top = `${top}px`;
     }
