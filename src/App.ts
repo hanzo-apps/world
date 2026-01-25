@@ -2658,6 +2658,7 @@ export class App {
       economicPanel?.setErrorState(false);
       economicPanel?.update(data);
       this.statusPanel?.updateApi('FRED', { status: 'ok' });
+      dataFreshness.recordUpdate('economic', data.length);
     } catch {
       this.statusPanel?.updateApi('FRED', { status: 'error' });
       economicPanel?.setErrorState(true, 'Failed to load data');
