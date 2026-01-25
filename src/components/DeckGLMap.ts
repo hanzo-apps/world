@@ -207,9 +207,16 @@ export class DeckGLMap {
     this.setupDOM();
     this.popup = new MapPopup(container);
 
-    // Initialize deck.gl and MapLibre
+    // Initialize MapLibre first
     this.initMapLibre();
-    this.initDeck();
+
+    // Wait for map to fully load before initializing deck.gl overlay
+    // This prevents layer projection issues on initial render
+    this.maplibreMap?.on('load', () => {
+      this.initDeck();
+      // Initial render after deck is ready
+      this.render();
+    });
 
     // Setup resize handling to prevent canvas corruption during zoom/resize
     this.setupResizeObserver();
