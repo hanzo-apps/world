@@ -13,6 +13,8 @@ import {
   SITE_VARIANT,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
+import { mlWorker } from '@/services/ml-worker';
+import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal } from '@/services/military-surge';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
@@ -45,6 +47,7 @@ import {
   IntelligenceGapBadge,
   TechEventsPanel,
   ServiceStatusPanel,
+  InsightsPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
@@ -144,6 +147,9 @@ export class App {
 
   public async init(): Promise<void> {
     await initDB();
+
+    // Initialize ML worker (desktop only - automatically disabled on mobile)
+    await mlWorker.init();
 
     // Check AIS configuration before init
     if (!isAisConfigured()) {
@@ -1105,6 +1111,10 @@ export class App {
     const serviceStatusPanel = new ServiceStatusPanel();
     this.panels['service-status'] = serviceStatusPanel;
 
+    // AI Insights Panel (desktop only - hides itself on mobile)
+    const insightsPanel = new InsightsPanel();
+    this.panels['insights'] = insightsPanel;
+
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -1341,11 +1351,12 @@ export class App {
     // Map pin toggle
     this.setupMapPin();
 
-    // Pause animations when tab is hidden
+    // Pause animations when tab is hidden, unload ML models to free memory
     this.boundVisibilityHandler = () => {
       document.body.classList.toggle('animations-paused', document.hidden);
-      // Also reset idle timer when tab becomes visible
-      if (!document.hidden) {
+      if (document.hidden) {
+        mlWorker.unloadOptionalModels();
+      } else {
         this.resetIdleTimer();
       }
     };
@@ -1963,11 +1974,19 @@ export class App {
     // Update monitors
     this.updateMonitorResults();
 
-    // Update clusters for correlation analysis (off main thread via Web Worker)
+    // Update clusters for correlation analysis (hybrid: semantic + Jaccard when ML available)
     try {
-      this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+      this.latestClusters = mlWorker.isAvailable
+        ? await clusterNewsHybrid(this.allNews)
+        : await analysisWorker.clusterNews(this.allNews);
+
+      // Update AI Insights panel with new clusters (if ML available)
+      if (mlWorker.isAvailable && this.latestClusters.length > 0) {
+        const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+        insightsPanel?.updateInsights(this.latestClusters);
+      }
     } catch (error) {
-      console.error('[App] Worker clustering failed, clusters unchanged:', error);
+      console.error('[App] Clustering failed, clusters unchanged:', error);
     }
   }
 
@@ -2427,9 +2446,11 @@ export class App {
 
   private async runCorrelationAnalysis(): Promise<void> {
     try {
-      // Ensure we have clusters (compute via worker if needed)
+      // Ensure we have clusters (hybrid: semantic + Jaccard when ML available)
       if (this.latestClusters.length === 0 && this.allNews.length > 0) {
-        this.latestClusters = await analysisWorker.clusterNews(this.allNews);
+        this.latestClusters = mlWorker.isAvailable
+          ? await clusterNewsHybrid(this.allNews)
+          : await analysisWorker.clusterNews(this.allNews);
       }
 
       // Ingest news clusters for CII
