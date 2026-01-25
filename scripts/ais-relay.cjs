@@ -230,36 +230,58 @@ const server = http.createServer(async (req, res) => {
       console.log('[Relay] RSS request:', feedUrl);
 
       const https = require('https');
-      const request = https.get(feedUrl, {
-        headers: {
-          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        timeout: 15000
-      }, (response) => {
-        let data = '';
-        response.on('data', chunk => data += chunk);
-        response.on('end', () => {
-          res.writeHead(response.statusCode, {
-            'Content-Type': 'application/xml',
-            'Cache-Control': 'public, max-age=300'
+      const http = require('http');
+
+      // Helper to fetch with redirect following (max 3 redirects)
+      const fetchWithRedirects = (url, redirectCount = 0) => {
+        if (redirectCount > 3) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'Too many redirects' }));
+        }
+
+        const protocol = url.startsWith('https') ? https : http;
+        const request = protocol.get(url, {
+          headers: {
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          timeout: 15000
+        }, (response) => {
+          // Handle redirects
+          if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
+            const redirectUrl = response.headers.location.startsWith('http')
+              ? response.headers.location
+              : new URL(response.headers.location, url).href;
+            console.log(`[Relay] Following redirect to: ${redirectUrl}`);
+            return fetchWithRedirects(redirectUrl, redirectCount + 1);
+          }
+
+          let data = '';
+          response.on('data', chunk => data += chunk);
+          response.on('end', () => {
+            res.writeHead(response.statusCode, {
+              'Content-Type': 'application/xml',
+              'Cache-Control': 'public, max-age=300'
+            });
+            res.end(data);
           });
-          res.end(data);
         });
-      });
 
-      request.on('error', (err) => {
-        console.error('[Relay] RSS error:', err.message);
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      });
+        request.on('error', (err) => {
+          console.error('[Relay] RSS error:', err.message);
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        });
 
-      request.on('timeout', () => {
-        request.destroy();
-        res.writeHead(504, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Request timeout' }));
-      });
+        request.on('timeout', () => {
+          request.destroy();
+          res.writeHead(504, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Request timeout' }));
+        });
+      };
+
+      fetchWithRedirects(feedUrl);
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
