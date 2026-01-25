@@ -1,9 +1,10 @@
 import { Panel } from './Panel';
 import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
-import { formatTime } from '@/utils';
+import { formatTime, isMobileDevice } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { analysisWorker, enrichWithVelocity, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
+import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker } from '@/services';
+import { mlWorker } from '@/services/ml-worker';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 
 /** Threshold for enabling virtual scrolling */
@@ -30,12 +31,16 @@ export class NewsPanel extends Panel {
   private renderRequestId = 0;
   private boundScrollHandler: (() => void) | null = null;
   private boundClickHandler: (() => void) | null = null;
+  private clusters: ClusteredEvent[] = [];
+  private showMLFeatures: boolean;
 
   constructor(id: string, title: string) {
     super({ id, title, showCount: true, trackActivity: true });
+    this.showMLFeatures = !isMobileDevice() && mlWorker.isAvailable;
     this.createDeviationIndicator();
     this.setupActivityTracking();
     this.initWindowedList();
+    this.setupMLEventListeners();
   }
 
   private initWindowedList(): void {
@@ -132,7 +137,7 @@ export class NewsPanel extends Panel {
     try {
       const clusters = await analysisWorker.clusterNews(items);
       if (requestId !== this.renderRequestId) return;
-      const enriched = enrichWithVelocity(clusters);
+      const enriched = await enrichWithVelocityML(clusters);
       this.renderClusters(enriched);
     } catch (error) {
       if (requestId !== this.renderRequestId) return;
@@ -163,6 +168,8 @@ export class NewsPanel extends Panel {
   }
 
   private renderClusters(clusters: ClusteredEvent[]): void {
+    this.clusters = clusters;
+    this.showMLFeatures = !isMobileDevice() && mlWorker.isAvailable;
     const totalItems = clusters.reduce((sum, c) => sum + c.sourceCount, 0);
     this.setCount(totalItems);
     this.relatedAssetContext.clear();
@@ -310,6 +317,7 @@ export class NewsPanel extends Panel {
           ${cluster.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
         </div>
         <a class="item-title" href="${sanitizeUrl(cluster.primaryLink)}" target="_blank" rel="noopener">${escapeHtml(cluster.primaryTitle)}</a>
+        ${this.showMLFeatures ? `<div class="cluster-summary-container" data-cluster-id="${escapeHtml(cluster.id)}"><button class="cluster-summary-toggle" aria-label="Generate AI summary">✨</button></div>` : ''}
         <div class="cluster-meta">
           <span class="top-sources">${topSourcesHtml}</span>
           <span class="item-time">${formatTime(cluster.lastUpdated)}</span>
@@ -350,6 +358,30 @@ export class NewsPanel extends Panel {
           this.onRelatedAssetClick?.(asset);
         }
       });
+    });
+  }
+
+  private setupMLEventListeners(): void {
+    this.content.addEventListener('click', async (e) => {
+      const toggle = (e.target as Element).closest('.cluster-summary-toggle');
+      if (!toggle) return;
+
+      const container = toggle.closest('.cluster-summary-container') as HTMLElement;
+      const clusterId = container?.dataset.clusterId;
+      if (!clusterId || !mlWorker.isAvailable) return;
+
+      container.innerHTML = '<div class="cluster-summary loading"><span class="ml-loading-inline"></span> Summarizing...</div>';
+
+      const cluster = this.clusters.find(c => c.id === clusterId);
+      if (cluster) {
+        try {
+          const summaries = await mlWorker.summarize([cluster.primaryTitle]);
+          const summary = summaries[0] ?? 'Unable to generate summary';
+          container.innerHTML = `<div class="cluster-summary">${escapeHtml(summary)}</div>`;
+        } catch {
+          container.innerHTML = '<div class="cluster-summary error">Failed to generate summary</div>';
+        }
+      }
     });
   }
 
