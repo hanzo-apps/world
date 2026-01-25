@@ -115,12 +115,18 @@ export class CIIPanel extends Panel {
 
       // If no cached scores, learning complete, OR forced local → recalculate
       if (!this.usedCachedScores || !inLearning || forceLocal) {
+        if (forceLocal) {
+          console.log('[CIIPanel] Recalculating with focal point data...');
+        }
         const localScores = calculateCII();
-        // Merge: use local if better coverage, otherwise keep cached
-        if (localScores.filter(s => s.score > 0).length >= this.scores.filter(s => s.score > 0).length) {
+        const localWithData = localScores.filter(s => s.score > 0).length;
+        const cachedWithData = this.scores.filter(s => s.score > 0).length;
+
+        // Use local if better coverage, or if forced (focal points provide better intelligence)
+        if (localWithData >= cachedWithData || forceLocal) {
           this.scores = localScores;
           if (forceLocal) {
-            console.log('[CIIPanel] Recalculated with focal point data');
+            console.log(`[CIIPanel] Applied focal point boosts (${localWithData} countries with data)`);
           }
         }
       }
