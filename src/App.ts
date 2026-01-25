@@ -115,8 +115,10 @@ export class App {
     // Check if variant changed - reset all settings to variant defaults
     const storedVariant = localStorage.getItem('worldmonitor-variant');
     const currentVariant = SITE_VARIANT;
+    console.log(`[App] Variant check: stored="${storedVariant}", current="${currentVariant}"`);
     if (storedVariant !== currentVariant) {
       // Variant changed - use defaults for new variant, clear old settings
+      console.log('[App] Variant changed - resetting to defaults');
       localStorage.setItem('worldmonitor-variant', currentVariant);
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
       localStorage.removeItem(STORAGE_KEYS.panels);
@@ -129,6 +131,7 @@ export class App {
         STORAGE_KEYS.panels,
         DEFAULT_PANELS
       );
+      console.log('[App] Loaded panel settings from storage:', Object.entries(this.panelSettings).filter(([_, v]) => !v.enabled).map(([k]) => k));
 
       // One-time migration: reorder panels for existing users (v1.8 panel layout)
       // Puts live-news, insights, cii, strategic-risk at the top

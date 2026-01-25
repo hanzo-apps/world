@@ -28,6 +28,7 @@ import type {
   NaturalEvent,
 } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
+import { escapeHtml } from '@/utils/sanitize';
 import {
   INTEL_HOTSPOTS,
   CONFLICT_ZONES,
@@ -162,6 +163,7 @@ export class DeckGLMap {
   private naturalEvents: NaturalEvent[] = [];
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
+  private news: NewsItem[] = []; // Store news for related news lookup
 
   // Callbacks
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -401,6 +403,54 @@ export class DeckGLMap {
       const clusters = this.clusterMarkers(activeDCs, clusterRadius, dc => dc.country);
       this.renderDatacenterClusters(clusters);
     }
+
+    // Hotspot HTML overlays for high-activity hotspots (pulsating animation)
+    if (this.state.layers.hotspots) {
+      this.renderHotspotOverlays();
+    }
+  }
+
+  /** Render HTML overlays for high-activity hotspots with CSS pulsating animation */
+  private renderHotspotOverlays(): void {
+    if (!this.clusterOverlay || !this.maplibreMap) return;
+
+    // Only render HTML overlays for high-severity hotspots that need pulsating animation
+    const highActivityHotspots = this.hotspots.filter(h => h.level === 'high' || h.hasBreaking);
+
+    highActivityHotspots.forEach(hotspot => {
+      const pos = this.maplibreMap!.project([hotspot.lon, hotspot.lat]);
+      if (!pos) return;
+
+      const div = document.createElement('div');
+      div.className = 'hotspot';
+      div.style.cssText = `position: absolute; left: ${pos.x}px; top: ${pos.y}px; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; z-index: 100;`;
+
+      const breakingBadge = hotspot.hasBreaking
+        ? '<div class="hotspot-breaking">BREAKING</div>'
+        : '';
+
+      div.innerHTML = `
+        ${breakingBadge}
+        <div class="hotspot-marker ${escapeHtml(hotspot.level || 'low')}"></div>
+      `;
+
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const relatedNews = this.getRelatedNews(hotspot);
+        const rect = this.container.getBoundingClientRect();
+        this.popup.show({
+          type: 'hotspot',
+          data: hotspot,
+          relatedNews,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+        this.popup.loadHotspotGdeltContext(hotspot);
+        this.onHotspotClick?.(hotspot);
+      });
+
+      this.clusterOverlay!.appendChild(div);
+    });
   }
 
   private renderTechHQClusters(clusters: Array<{ items: typeof TECH_HQS; center: [number, number]; screenPos: [number, number] }>): void {
@@ -982,9 +1032,12 @@ export class DeckGLMap {
   }
 
   private createHotspotsLayer(): ScatterplotLayer {
+    // Filter out high-activity hotspots - they're rendered via HTML overlay for pulsating animation
+    const lowMediumHotspots = this.hotspots.filter(h => h.level !== 'high' && !h.hasBreaking);
+
     return new ScatterplotLayer({
       id: 'hotspots-layer',
-      data: this.hotspots,
+      data: lowMediumHotspots,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => {
         const score = d.escalationScore || 1;
@@ -1460,11 +1513,19 @@ export class DeckGLMap {
 
     const layerId = info.layer?.id || '';
 
-    // Hotspots have their own click handler - don't show popup
+    // Hotspots show popup with related news
     if (layerId === 'hotspots-layer') {
-      if (this.onHotspotClick) {
-        this.onHotspotClick(info.object as Hotspot);
-      }
+      const hotspot = info.object as Hotspot;
+      const relatedNews = this.getRelatedNews(hotspot);
+      this.popup.show({
+        type: 'hotspot',
+        data: hotspot,
+        relatedNews,
+        x: info.x,
+        y: info.y,
+      });
+      this.popup.loadHotspotGdeltContext(hotspot);
+      this.onHotspotClick?.(hotspot);
       return;
     }
 
@@ -1898,6 +1959,8 @@ export class DeckGLMap {
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
+    this.news = news; // Store for related news lookup
+
     // Update hotspot "breaking" indicators based on recent news
     const breakingKeywords = new Set<string>();
     const recentNews = news.filter(n =>
@@ -1927,6 +1990,43 @@ export class DeckGLMap {
     });
 
     this.updateLayers();
+  }
+
+  /** Get news items related to a hotspot by keyword matching */
+  private getRelatedNews(hotspot: Hotspot): NewsItem[] {
+    // High-priority conflict keywords that indicate the news is really about another topic
+    const conflictTopics = ['gaza', 'ukraine', 'russia', 'israel', 'iran', 'china', 'taiwan', 'korea', 'syria'];
+
+    return this.news
+      .map((item) => {
+        const titleLower = item.title.toLowerCase();
+        const matchedKeywords = hotspot.keywords.filter((kw) => titleLower.includes(kw.toLowerCase()));
+
+        if (matchedKeywords.length === 0) return null;
+
+        // Check if this news mentions other hotspot conflict topics
+        const conflictMatches = conflictTopics.filter(t =>
+          titleLower.includes(t) && !hotspot.keywords.some(k => k.toLowerCase().includes(t))
+        );
+
+        // If article mentions a major conflict topic that isn't this hotspot, deprioritize heavily
+        if (conflictMatches.length > 0) {
+          // Only include if it ALSO has a strong local keyword (city name, agency)
+          const strongLocalMatch = matchedKeywords.some(kw =>
+            kw.toLowerCase() === hotspot.name.toLowerCase() ||
+            hotspot.agencies?.some(a => titleLower.includes(a.toLowerCase()))
+          );
+          if (!strongLocalMatch) return null;
+        }
+
+        // Score: more keyword matches = more relevant
+        const score = matchedKeywords.length;
+        return { item, score };
+      })
+      .filter((x): x is { item: NewsItem; score: number } => x !== null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(x => x.item);
   }
 
   public updateMilitaryForEscalation(flights: MilitaryFlight[], vessels: MilitaryVessel[]): void {
@@ -2045,10 +2145,23 @@ export class DeckGLMap {
   // Trigger click methods - show popup at item location without moving the map
   public triggerHotspotClick(id: string): void {
     const hotspot = this.hotspots.find(h => h.id === id);
-    if (hotspot) {
-      // Don't pan - just trigger the callback (popup will show at screen position)
-      this.onHotspotClick?.(hotspot);
-    }
+    if (!hotspot) return;
+
+    // Get screen position for popup
+    const screenPos = this.projectToScreen(hotspot.lat, hotspot.lon);
+    const { x, y } = screenPos || this.getContainerCenter();
+
+    // Get related news and show popup
+    const relatedNews = this.getRelatedNews(hotspot);
+    this.popup.show({
+      type: 'hotspot',
+      data: hotspot,
+      relatedNews,
+      x,
+      y,
+    });
+    this.popup.loadHotspotGdeltContext(hotspot);
+    this.onHotspotClick?.(hotspot);
   }
 
   public triggerConflictClick(id: string): void {
