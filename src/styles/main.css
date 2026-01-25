@@ -6773,6 +6773,40 @@ body.playback-mode .status-dot {
   opacity: 0.6;
 }
 
+/* CII Awaiting focal points state */
+.cii-awaiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.cii-awaiting-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.cii-awaiting-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.cii-awaiting-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
 /* Cascade Panel Styles */
 .cascade-panel {
   display: flex;
