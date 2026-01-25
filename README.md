@@ -2745,57 +2745,81 @@ To prevent map clutter, natural events are filtered:
 
 ## Military Surge Detection
 
-The system detects unusual concentrations of military activity that may indicate developing situations.
+The system detects unusual concentrations of military activity using two complementary algorithms.
 
-### What Constitutes a "Surge"
+### Baseline-Based Surge Detection
 
-A military surge is detected when aircraft from multiple operators converge on the same region within a short time window:
+Surges are detected by comparing current aircraft counts to historical baselines within defined military theaters:
 
-| Condition | Threshold | Rationale |
-|-----------|-----------|-----------|
-| Distinct operators | ≥ 3 nations | Rules out routine national patrols |
-| Aircraft count | ≥ 4 total | Minimum significance threshold |
-| Time window | 2 hours | Recent convergence |
-| Geographic spread | 500km radius | Same operational theater |
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| Surge threshold | 2.0× baseline | Minimum multiplier to trigger alert |
+| Baseline window | 48 hours | Historical data used for comparison |
+| Minimum samples | 6 observations | Required data points for valid baseline |
+
+**Aircraft Categories Tracked**:
+
+| Category | Examples | Minimum Count |
+|----------|----------|---------------|
+| Transport/Airlift | C-17, C-130, KC-135, REACH flights | 5 aircraft |
+| Fighter | F-15, F-16, F-22, Typhoon | 4 aircraft |
+| Reconnaissance | RC-135, E-3 AWACS, U-2 | 3 aircraft |
 
 ### Surge Severity
 
-| Severity | Criteria |
-|----------|----------|
-| **Critical** | 5+ operators OR 8+ aircraft OR nuclear-capable aircraft detected |
-| **High** | 4 operators OR 6+ aircraft |
-| **Medium** | 3 operators OR 4+ aircraft |
+| Severity | Criteria | Meaning |
+|----------|----------|---------|
+| **Critical** | 4× baseline or higher | Major deployment |
+| **High** | 3× baseline | Significant increase |
+| **Medium** | 2× baseline | Elevated activity |
 
-### News Correlation
+### Military Theaters
 
-When a surge is detected, the system queries the Focal Point Detector for related news:
+Surge detection groups activity into strategic theaters:
 
-1. Identify countries involved in the surge (aircraft operators)
-2. Check focal points for those countries
-3. If news correlation exists, attach to surge alert
-
-**Example surge alert**:
-```
-MILITARY SURGE: Baltic Sea Region
-Operators: USAF (2), RAF (1), GAF (1), Polish AF (1)
-Aircraft: 5 total (KC-135, RC-135, Typhoon, F-16)
-Severity: HIGH
-
-NEWS CORRELATION:
-Russia: "NATO increases Baltic air patrols amid..."
-→ Russia appears in both news (8) and map signals (12)
-```
+| Theater | Center | Key Bases |
+|---------|--------|-----------|
+| Middle East | Persian Gulf | Al Udeid, Al Dhafra, Incirlik |
+| Eastern Europe | Poland | Ramstein, Spangdahlem, Łask |
+| Pacific | Guam/Japan | Andersen, Kadena, Yokota |
+| Horn of Africa | Djibouti | Camp Lemonnier |
 
 ### Foreign Presence Detection
 
-Beyond surges, the system monitors for foreign military presence in sensitive regions:
+A separate system monitors for military operators outside their normal operating areas:
 
-| Region | Home Operators (Excluded) | Alert Threshold |
-|--------|---------------------------|-----------------|
-| Taiwan Strait | Taiwan (ROC) | Any PLAAF presence |
-| Baltic Sea | Sweden, Finland, Baltic states | Any Russian VKS |
-| Persian Gulf | UAE, Saudi, Qatar | 3+ non-regional operators |
-| South China Sea | Philippines, Vietnam, Malaysia | Any PLAN vessels |
+| Operator | Home Regions | Alert When Found In |
+|----------|--------------|---------------------|
+| USAF/USN | Alaska ADIZ | Persian Gulf, Taiwan Strait |
+| Russian VKS | Kaliningrad, Arctic, Black Sea | Baltic Region, Alaska ADIZ |
+| PLAAF/PLAN | Taiwan Strait, South China Sea | (alerts when increased) |
+| Israeli IAF | Eastern Med | Iran border region |
+
+**Example alert**:
+```
+FOREIGN MILITARY PRESENCE: Persian Gulf
+USAF: 3 aircraft detected (KC-135, RC-135W, E-3)
+Severity: HIGH - Operator outside normal home regions
+```
+
+### News Correlation
+
+Both surge and foreign presence alerts query the Focal Point Detector for context:
+
+1. Identify countries involved (aircraft operators, region countries)
+2. Check focal points for those countries
+3. If news correlation exists, attach headlines and evidence
+
+**Example with correlation**:
+```
+MILITARY AIRLIFT SURGE: Middle East Theater
+Current: 8 transport aircraft (2.5× baseline)
+Aircraft: C-17 (3), KC-135 (3), C-130J (2)
+
+NEWS CORRELATION:
+Iran: "Iran protests continue amid military..."
+→ Iran appears in both news (12) and map signals (9)
+```
 
 ---
 
