@@ -243,6 +243,8 @@ export class InsightsPanel extends Panel {
       this.lastFocalPoints = focalSummary.focalPoints;
       if (focalSummary.focalPoints.length > 0) {
         focalPointDetector.logSummary();
+        // Signal CII to refresh now that focal points are available
+        window.dispatchEvent(new CustomEvent('focal-points-ready'));
       }
 
       if (importantClusters.length === 0) {
