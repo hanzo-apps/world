@@ -23,3 +23,4 @@ export * from './StrategicRiskPanel';
 export * from './IntelligenceGapBadge';
 export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
+export * from './InsightsPanel';
