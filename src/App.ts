@@ -779,19 +779,6 @@ export class App {
             <span>LIVE</span>
           </div>
         </div>
-        <div class="header-center">
-          <label class="focus-label">FOCUS</label>
-          <select class="focus-select" id="focusSelect">
-            <option value="global">GLOBAL</option>
-            <option value="america">AMERICA</option>
-            <option value="eu">EUROPE</option>
-            <option value="mena">MENA</option>
-            <option value="asia">ASIA</option>
-            <option value="africa">AFRICA</option>
-            <option value="latam">LAT AM</option>
-            <option value="oceania">OCEANIA</option>
-          </select>
-        </div>
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> Search</button>
           <button class="copy-link-btn" id="copyLinkBtn">Copy Link</button>
@@ -1160,11 +1147,6 @@ export class App {
     this.applyPanelSettings();
     this.applyInitialUrlState();
 
-    // Set correct view button state (especially for mobile defaults)
-    const currentView = this.map?.getState().view;
-    if (currentView) {
-      this.setActiveFocusRegion(currentView);
-    }
   }
 
   private applyInitialUrlState(): void {
@@ -1174,7 +1156,6 @@ export class App {
 
     if (view) {
       this.map.setView(view);
-      this.setActiveFocusRegion(view);
     }
 
     if (timeRange) {
@@ -1302,13 +1283,6 @@ export class App {
   }
 
   private setupEventListeners(): void {
-    // Focus region selector
-    const focusSelect = document.getElementById('focusSelect') as HTMLSelectElement;
-    focusSelect?.addEventListener('change', () => {
-      const view = focusSelect.value as MapView;
-      this.map?.setView(view);
-    });
-
     // Search button
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       this.updateSearchIndex();
@@ -1422,9 +1396,8 @@ export class App {
       history.replaceState(null, '', shareUrl);
     }, 250);
 
-    this.map.onStateChanged((state) => {
+    this.map.onStateChanged(() => {
       update();
-      this.setActiveFocusRegion(state.view);
     });
     update();
   }
@@ -1467,13 +1440,6 @@ export class App {
       button.textContent = originalText;
       button.classList.remove('copied');
     }, 1500);
-  }
-
-  private setActiveFocusRegion(view: MapView): void {
-    const focusSelect = document.getElementById('focusSelect') as HTMLSelectElement;
-    if (focusSelect) {
-      focusSelect.value = view;
-    }
   }
 
   private toggleFullscreen(): void {
