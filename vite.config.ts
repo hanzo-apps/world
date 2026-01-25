@@ -131,7 +131,6 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['@xenova/transformers'],
       output: {
         manualChunks: {
           'd3': ['d3'],
