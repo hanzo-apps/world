@@ -32,11 +32,31 @@ export class InsightsPanel extends Panel {
     }
   }
 
+  // High-impact geopolitical keywords that should boost importance
+  private static readonly CRITICAL_KEYWORDS = [
+    // Military/Conflict
+    'war', 'armada', 'military', 'attack', 'invasion', 'strike', 'troops', 'missile',
+    'nuclear', 'bomb', 'airstrike', 'artillery', 'combat', 'offensive', 'deployed',
+    // Crisis/Emergency
+    'crisis', 'emergency', 'catastrophe', 'disaster', 'collapse', 'martial law',
+    // Geopolitical flashpoints
+    'iran', 'russia', 'china', 'taiwan', 'ukraine', 'north korea', 'israel', 'gaza',
+    // Leadership/Diplomacy at high stakes
+    'summit', 'sanctions', 'ultimatum', 'threat', 'retaliation', 'escalation',
+  ];
+
   private getImportanceScore(cluster: ClusteredEvent): number {
     let score = 0;
+    const titleLower = cluster.primaryTitle.toLowerCase();
 
     // Source confirmation (most important signal)
     score += cluster.sourceCount * 15;
+
+    // Critical keyword boost (major geopolitical events)
+    const keywordMatches = InsightsPanel.CRITICAL_KEYWORDS.filter(kw => titleLower.includes(kw));
+    if (keywordMatches.length > 0) {
+      score += 40 + (keywordMatches.length * 10); // +40 base, +10 per additional keyword
+    }
 
     // Velocity multiplier
     const velMultiplier: Record<string, number> = {
