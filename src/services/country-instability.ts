@@ -49,10 +49,18 @@ export const TIER1_COUNTRIES: Record<string, string> = {
   VE: 'Venezuela',
 };
 
-// Learning Mode - warmup period for reliable data
+// Learning Mode - warmup period for reliable data (bypassed when cached scores exist)
 const LEARNING_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 let learningStartTime: number | null = null;
 let isLearningComplete = false;
+let hasCachedScoresAvailable = false;
+
+export function setHasCachedScores(hasScores: boolean): void {
+  hasCachedScoresAvailable = hasScores;
+  if (hasScores) {
+    isLearningComplete = true; // Skip learning when cached scores available
+  }
+}
 
 export function startLearning(): void {
   if (learningStartTime === null) {
@@ -61,6 +69,7 @@ export function startLearning(): void {
 }
 
 export function isInLearningMode(): boolean {
+  if (hasCachedScoresAvailable) return false; // Bypass if backend has cached scores
   if (isLearningComplete) return false;
   if (learningStartTime === null) return true;
 
@@ -73,7 +82,7 @@ export function isInLearningMode(): boolean {
 }
 
 export function getLearningProgress(): { inLearning: boolean; remainingMinutes: number; progress: number } {
-  if (isLearningComplete) {
+  if (hasCachedScoresAvailable || isLearningComplete) {
     return { inLearning: false, remainingMinutes: 0, progress: 100 };
   }
   if (learningStartTime === null) {
