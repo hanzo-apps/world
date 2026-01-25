@@ -1839,7 +1839,7 @@ export class DeckGLMap {
         const layer = (input as HTMLInputElement).closest('.layer-toggle')?.getAttribute('data-layer') as keyof MapLayers;
         if (layer) {
           this.state.layers[layer] = (input as HTMLInputElement).checked;
-          this.updateLayers();
+          this.render();
           this.onLayerChange?.(layer, (input as HTMLInputElement).checked);
         }
       });
@@ -2095,7 +2095,7 @@ export class DeckGLMap {
   public setTimeRange(range: TimeRange): void {
     this.state.timeRange = range;
     this.onTimeRangeChange?.(range);
-    this.updateLayers();
+    this.render(); // Debounced
   }
 
   public getTimeRange(): TimeRange {
@@ -2104,7 +2104,7 @@ export class DeckGLMap {
 
   public setLayers(layers: MapLayers): void {
     this.state.layers = layers;
-    this.updateLayers();
+    this.render(); // Debounced
 
     // Update toggle checkboxes
     Object.entries(layers).forEach(([key, value]) => {
@@ -2134,66 +2134,66 @@ export class DeckGLMap {
     this.setView('global');
   }
 
-  // Data setters
+  // Data setters - all use render() for debouncing
   public setEarthquakes(earthquakes: Earthquake[]): void {
     this.earthquakes = earthquakes;
-    this.updateLayers();
+    this.render();
   }
 
   public setWeatherAlerts(alerts: WeatherAlert[]): void {
     this.weatherAlerts = alerts;
     const withCentroid = alerts.filter(a => a.centroid && a.centroid.length === 2).length;
     console.log(`[DeckGLMap] Weather alerts: ${alerts.length} total, ${withCentroid} with coordinates`);
-    this.updateLayers();
+    this.render();
   }
 
   public setOutages(outages: InternetOutage[]): void {
     this.outages = outages;
-    this.updateLayers();
+    this.render();
   }
 
   public setAisData(disruptions: AisDisruptionEvent[], density: AisDensityZone[]): void {
     this.aisDisruptions = disruptions;
     this.aisDensity = density;
-    this.updateLayers();
+    this.render();
   }
 
   public setCableActivity(advisories: CableAdvisory[], repairShips: RepairShip[]): void {
     this.cableAdvisories = advisories;
     this.repairShips = repairShips;
-    this.updateLayers();
+    this.render();
   }
 
   public setProtests(events: SocialUnrestEvent[]): void {
     this.protests = events;
-    this.updateLayers();
+    this.render();
   }
 
   public setFlightDelays(delays: AirportDelayAlert[]): void {
     this.flightDelays = delays;
-    this.updateLayers();
+    this.render();
   }
 
   public setMilitaryFlights(flights: MilitaryFlight[], clusters: MilitaryFlightCluster[] = []): void {
     this.militaryFlights = flights;
     this.militaryFlightClusters = clusters;
-    this.updateLayers();
+    this.render();
   }
 
   public setMilitaryVessels(vessels: MilitaryVessel[], clusters: MilitaryVesselCluster[] = []): void {
     this.militaryVessels = vessels;
     this.militaryVesselClusters = clusters;
-    this.updateLayers();
+    this.render();
   }
 
   public setNaturalEvents(events: NaturalEvent[]): void {
     this.naturalEvents = events;
-    this.updateLayers();
+    this.render();
   }
 
   public setTechEvents(events: TechEventMarker[]): void {
     this.techEvents = events;
-    this.updateLayers();
+    this.render();
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
@@ -2227,7 +2227,7 @@ export class DeckGLMap {
       updateHotspotEscalation(h.id, matchCount, h.hasBreaking || false, velocity);
     });
 
-    this.updateLayers();
+    this.render(); // Debounced
   }
 
   /** Get news items related to a hotspot by keyword matching */
@@ -2295,7 +2295,7 @@ export class DeckGLMap {
       });
     }
 
-    this.updateLayers();
+    this.render(); // Debounced
   }
 
   public setOnHotspotClick(callback: (hotspot: Hotspot) => void): void {
@@ -2328,7 +2328,7 @@ export class DeckGLMap {
         h.level = levels[h.name] as 'low' | 'elevated' | 'high';
       }
     });
-    this.updateLayers();
+    this.render(); // Debounced
   }
 
   public initEscalationGetters(): void {
@@ -2363,11 +2363,11 @@ export class DeckGLMap {
   public flashAssets(assetType: AssetType, ids: string[]): void {
     // Temporarily highlight assets
     ids.forEach(id => this.highlightedAssets[assetType].add(id));
-    this.updateLayers();
+    this.render();
 
     setTimeout(() => {
       ids.forEach(id => this.highlightedAssets[assetType].delete(id));
-      this.updateLayers();
+      this.render();
     }, 3000);
   }
 
@@ -2377,7 +2377,7 @@ export class DeckGLMap {
       this.state.layers[layer] = true;
       const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement;
       if (toggle) toggle.checked = true;
-      this.updateLayers();
+      this.render();
       this.onLayerChange?.(layer, true);
     }
   }
@@ -2388,7 +2388,7 @@ export class DeckGLMap {
     this.state.layers[layer] = !this.state.layers[layer];
     const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement;
     if (toggle) toggle.checked = this.state.layers[layer];
-    this.updateLayers();
+    this.render();
     this.onLayerChange?.(layer, this.state.layers[layer]);
   }
 
