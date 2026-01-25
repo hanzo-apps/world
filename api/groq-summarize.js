@@ -17,12 +17,21 @@ const CACHE_TTL_SECONDS = 86400; // 24 hours
 
 // Initialize Redis (lazy - only if env vars present)
 let redis = null;
+let redisInitFailed = false;
 function getRedis() {
   if (redis) return redis;
+  if (redisInitFailed) return null;
+
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) {
-    redis = new Redis({ url, token });
+    try {
+      redis = new Redis({ url, token });
+    } catch (err) {
+      console.warn('[Groq] Redis init failed:', err.message);
+      redisInitFailed = true;
+      return null;
+    }
   }
   return redis;
 }
@@ -186,8 +195,12 @@ export default async function handler(request) {
     });
 
   } catch (error) {
-    console.error('[Groq] Error:', error);
-    return new Response(JSON.stringify({ error: error.message, fallback: true }), {
+    console.error('[Groq] Error:', error.name, error.message, error.stack?.split('\n')[1]);
+    return new Response(JSON.stringify({
+      error: error.message,
+      errorType: error.name,
+      fallback: true
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
