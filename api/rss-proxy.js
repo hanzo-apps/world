@@ -117,6 +117,22 @@ const ALLOWED_DOMAINS = [
   'www.cbinsights.com',
   // Accelerators
   'www.techstars.com',
+  // Middle East & Regional News
+  'english.alarabiya.net',
+  'www.arabnews.com',
+  'www.timesofisrael.com',
+  'www.scmp.com',
+  'kyivindependent.com',
+  'www.themoscowtimes.com',
+  'feeds.24.com',
+  // International Organizations
+  'news.un.org',
+  'www.iaea.org',
+  'www.who.int',
+  'www.cisa.gov',
+  'www.crisisgroup.org',
+  // Additional
+  'news.ycombinator.com',
 ];
 
 // CORS helper - allow worldmonitor.app and Vercel preview domains
