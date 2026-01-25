@@ -86,9 +86,17 @@ export class MapPopup {
       // Desktop: position near click with smart bounds checking
       this.popup.style.transform = '';
       const popupWidth = 380;
-      const popupHeight = 500; // Approximate max height for hotspot popups
       const bottomBuffer = 50; // Buffer from viewport bottom
       const topBuffer = 60; // Header height
+
+      // Temporarily append popup off-screen to measure actual height
+      this.popup.style.visibility = 'hidden';
+      this.popup.style.top = '0';
+      this.popup.style.left = '-9999px';
+      document.body.appendChild(this.popup);
+      const popupHeight = this.popup.offsetHeight;
+      document.body.removeChild(this.popup);
+      this.popup.style.visibility = '';
 
       // Convert container-relative coords to viewport coords
       const viewportX = containerRect.left + data.x;
@@ -114,11 +122,11 @@ export class MapPopup {
         // Not enough below, but enough above - position above click
         top = viewportY - popupHeight - 10;
       } else {
-        // Limited space both ways - position at top with max height
+        // Limited space both ways - position at top buffer
         top = topBuffer;
       }
 
-      // Ensure popup never goes above the top buffer (header area)
+      // CRITICAL: Ensure popup never goes above the top buffer (header area)
       top = Math.max(topBuffer, top);
 
       this.popup.style.left = `${left}px`;
