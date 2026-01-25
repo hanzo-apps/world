@@ -22,11 +22,39 @@ World Monitor runs two specialized variants from a single codebase, each optimiz
 
 A compact **variant switcher** in the header allows seamless navigation between variants while preserving your map position and panel configuration.
 
-### Tech Monitor Data Layers
+---
 
-The tech variant provides specialized layers for technology sector monitoring:
+## World Monitor (Geopolitical)
 
-**Tech Ecosystem**
+The primary variant focuses on geopolitical intelligence, military tracking, and infrastructure security monitoring.
+
+### Key Capabilities
+- **Conflict Monitoring** - Active war zones, hotspots, and crisis areas with real-time escalation tracking
+- **Military Intelligence** - 220+ military bases, flight tracking, naval vessel monitoring, surge detection
+- **Infrastructure Security** - Undersea cables, pipelines, datacenters, internet outages
+- **Economic Intelligence** - FRED indicators, oil analytics, government spending, sanctions tracking
+- **Natural Disasters** - Earthquakes, severe weather, NASA EONET events (wildfires, volcanoes, floods)
+- **AI-Powered Analysis** - Focal point detection, country instability scoring, infrastructure cascade analysis
+
+### Intelligence Panels
+| Panel | Purpose |
+|-------|---------|
+| **AI Insights** | LLM-synthesized world brief with focal point detection |
+| **Country Instability Index** | Real-time stability scores for 20 monitored countries |
+| **Strategic Risk Overview** | Composite risk score combining all intelligence modules |
+| **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
+| **Live Intelligence** | GDELT-powered topic feeds (Military, Cyber, Nuclear, Sanctions) |
+
+### News Coverage
+80+ curated sources across geopolitics, defense, energy, think tanks, and regional news (Middle East, Africa, Latin America, Asia-Pacific).
+
+---
+
+## Tech Monitor
+
+The tech variant ([tech.worldmonitor.app](https://tech.worldmonitor.app)) provides specialized layers for technology sector monitoring.
+
+### Tech Ecosystem Layers
 | Layer | Description |
 |-------|-------------|
 | **Tech HQs** | Headquarters of major tech companies (Big Tech, unicorns, public companies) |
@@ -35,14 +63,14 @@ The tech variant provides specialized layers for technology sector monitoring:
 | **Accelerators** | Y Combinator, Techstars, 500 Startups, and regional accelerator locations |
 | **Tech Events** | Upcoming conferences and tech events with countdown timers |
 
-**Tech Infrastructure**
+### Tech Infrastructure Layers
 | Layer | Description |
 |-------|-------------|
 | **AI Datacenters** | 111 major AI compute clusters (≥10,000 GPUs) |
 | **Undersea Cables** | Submarine fiber routes critical for cloud connectivity |
 | **Internet Outages** | Network disruptions affecting tech operations |
 
-**Tech News Categories**
+### Tech News Categories
 - **Startups & VC** - Funding rounds, acquisitions, startup news
 - **Cybersecurity** - Security vulnerabilities, breaches, threat intelligence
 - **Cloud & Infrastructure** - AWS, Azure, GCP announcements, outages
@@ -51,8 +79,6 @@ The tech variant provides specialized layers for technology sector monitoring:
 - **Tech Policy** - Regulation, antitrust, digital governance
 
 ### Regional Tech HQ Coverage
-
-Tech Monitor includes detailed coverage of global tech hubs with verified company data:
 
 | Region | Notable Companies |
 |--------|------------------|
@@ -66,6 +92,8 @@ Tech Monitor includes detailed coverage of global tech hubs with verified compan
 | **Singapore** | Grab, Razer, Sea Limited |
 | **Berlin** | Zalando, Delivery Hero, N26, Celonis |
 | **Tokyo** | Sony, Toyota, SoftBank, Rakuten |
+
+---
 
 ## Features
 
