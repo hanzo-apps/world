@@ -141,28 +141,27 @@ export default async function handler(request) {
     const intelSection = geoContext ? `\n\n${geoContext}` : '';
 
     if (mode === 'brief') {
-      systemPrompt = `You are a news anchor delivering a world brief. Write like you're opening the evening news.
+      systemPrompt = `Summarize the key development in 2-3 sentences.
 Rules:
-- Lead with the most significant development - start with WHAT happened, WHERE
-- CRITICAL FOCAL POINTS in the intelligence synthesis are the main actors - mention them by name
-- If a focal point shows news + signals convergence (military, outages, protests), lead with that
-- Vary your opening: use location, action, or impact - NEVER start with "The dominant narrative"
-- Write naturally: "Tensions escalated in Iran as...", "Markets reacted to...", "A major shift in..."
-- 2-3 punchy sentences, no bullet points`;
-      userPrompt = `What's the top story right now? Open strong:\n${headlineText}${intelSection}`;
+- Lead with WHAT happened and WHERE - be specific
+- NEVER start with "Breaking news", "Good evening", "Tonight", or TV-style openings
+- Start directly with the subject: "Iran's regime...", "The US Treasury...", "Protests in..."
+- CRITICAL FOCAL POINTS are the main actors - mention them by name
+- If focal points show news + signals convergence, that's the lead
+- No bullet points, no meta-commentary`;
+      userPrompt = `Summarize the top story:\n${headlineText}${intelSection}`;
     } else if (mode === 'analysis') {
-      systemPrompt = `Senior analyst giving a 30-second brief. Be direct and specific.
+      systemPrompt = `Provide analysis in 2-3 sentences. Be direct and specific.
 Rules:
-- Lead with the insight, not meta-commentary
+- Lead with the insight - what's significant and why
+- NEVER start with "Breaking news", "Tonight", "The key/dominant narrative is"
+- Start with substance: "Iran faces...", "The escalation in...", "Multiple signals suggest..."
 - CRITICAL FOCAL POINTS are your main actors - explain WHY they matter
-- If focal points show news-signal correlation (military + outages + protests), flag as escalation
-- Start with the actual finding: "China's...", "Iran's...", "A pattern of..."
-- NEVER start with "The dominant/key narrative is" or similar framing
-- Connect dots, be specific about implications
-- 2-3 sentences, confident tone`;
-      userPrompt = `What's the key pattern or risk here?\n${headlineText}${intelSection}`;
+- If focal points show news-signal correlation, flag as escalation
+- Connect dots, be specific about implications`;
+      userPrompt = `What's the key pattern or risk?\n${headlineText}${intelSection}`;
     } else {
-      systemPrompt = `Intel analyst synthesizing a feed. Lead with substance, not framing. 2 sentences max. Never start with "The dominant narrative" - just state the insight directly. CRITICAL focal points with news-signal convergence are significant.`;
+      systemPrompt = `Synthesize in 2 sentences max. Lead with substance. NEVER start with "Breaking news" or "Tonight" - just state the insight directly. CRITICAL focal points with news-signal convergence are significant.`;
       userPrompt = `Key takeaway:\n${headlineText}${intelSection}`;
     }
 
