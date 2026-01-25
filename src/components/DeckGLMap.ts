@@ -454,21 +454,21 @@ export class DeckGLMap {
   private createBasesLayer(): IconLayer {
     const highlightedBases = this.highlightedAssets.base;
 
-    // Base colors by operator type
+    // Base colors by operator type - semi-transparent for layering
     const getBaseColor = (type: string): [number, number, number, number] => {
       switch (type) {
-        case 'us-nato': return [68, 136, 255, 255];   // Blue
-        case 'russia': return [255, 68, 68, 255];     // Red
-        case 'china': return [255, 136, 68, 255];    // Orange
-        case 'uk': return [68, 170, 255, 255];       // Light blue
-        case 'france': return [0, 85, 164, 255];     // French blue
-        case 'india': return [255, 153, 51, 255];    // Saffron
-        case 'japan': return [188, 0, 45, 255];      // Rising sun red
-        default: return [136, 136, 136, 255];        // Gray
+        case 'us-nato': return [68, 136, 255, 160];   // Blue
+        case 'russia': return [255, 68, 68, 160];     // Red
+        case 'china': return [255, 136, 68, 160];    // Orange
+        case 'uk': return [68, 170, 255, 160];       // Light blue
+        case 'france': return [0, 85, 164, 160];     // French blue
+        case 'india': return [255, 153, 51, 160];    // Saffron
+        case 'japan': return [188, 0, 45, 160];      // Rising sun red
+        default: return [136, 136, 136, 160];        // Gray
       }
     };
 
-    // Military bases: TRIANGLE icons - color by operator
+    // Military bases: TRIANGLE icons - color by operator, semi-transparent
     return new IconLayer({
       id: 'bases-layer',
       data: MILITARY_BASES,
@@ -476,16 +476,16 @@ export class DeckGLMap {
       getIcon: () => 'triangleUp',
       iconAtlas: MARKER_ICONS.triangleUp,
       iconMapping: { triangleUp: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedBases.has(d.id) ? 20 : 12,
+      getSize: (d) => highlightedBases.has(d.id) ? 14 : 8,
       getColor: (d) => {
         if (highlightedBases.has(d.id)) {
-          return [255, 100, 100, 255] as [number, number, number, number];
+          return [255, 100, 100, 200] as [number, number, number, number];
         }
         return getBaseColor(d.type);
       },
       sizeScale: 1,
-      sizeMinPixels: 6,
-      sizeMaxPixels: 20,
+      sizeMinPixels: 4,
+      sizeMaxPixels: 14,
       pickable: true,
     });
   }
@@ -494,7 +494,7 @@ export class DeckGLMap {
     const highlightedNuclear = this.highlightedAssets.nuclear;
     const data = NUCLEAR_FACILITIES.filter(f => f.status !== 'decommissioned');
 
-    // Nuclear: HEXAGON icons - yellow/orange color
+    // Nuclear: HEXAGON icons - yellow/orange color, semi-transparent
     return new IconLayer({
       id: 'nuclear-layer',
       data,
@@ -502,19 +502,19 @@ export class DeckGLMap {
       getIcon: () => 'hexagon',
       iconAtlas: MARKER_ICONS.hexagon,
       iconMapping: { hexagon: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedNuclear.has(d.id) ? 22 : 14,
+      getSize: (d) => highlightedNuclear.has(d.id) ? 14 : 10,
       getColor: (d) => {
         if (highlightedNuclear.has(d.id)) {
-          return [255, 100, 100, 255] as [number, number, number, number];
+          return [255, 100, 100, 200] as [number, number, number, number];
         }
         if (d.status === 'contested') {
-          return [255, 50, 50, 255] as [number, number, number, number];
+          return [255, 50, 50, 180] as [number, number, number, number];
         }
-        return [255, 220, 0, 255] as [number, number, number, number];
+        return [255, 220, 0, 180] as [number, number, number, number]; // Semi-transparent yellow
       },
       sizeScale: 1,
-      sizeMinPixels: 8,
-      sizeMaxPixels: 22,
+      sizeMinPixels: 5,
+      sizeMaxPixels: 14,
       pickable: true,
     });
   }
@@ -548,7 +548,7 @@ export class DeckGLMap {
     const highlightedDC = this.highlightedAssets.datacenter;
     const data = AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned');
 
-    // Datacenters: SQUARE icons - purple color
+    // Datacenters: SQUARE icons - purple color, semi-transparent for layering
     return new IconLayer({
       id: 'datacenters-layer',
       data,
@@ -556,19 +556,19 @@ export class DeckGLMap {
       getIcon: () => 'square',
       iconAtlas: MARKER_ICONS.square,
       iconMapping: { square: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedDC.has(d.id) ? 24 : 16,
+      getSize: (d) => highlightedDC.has(d.id) ? 10 : 6,
       getColor: (d) => {
         if (highlightedDC.has(d.id)) {
-          return [255, 100, 100, 255] as [number, number, number, number];
+          return [255, 100, 100, 180] as [number, number, number, number];
         }
         if (d.status === 'planned') {
-          return [136, 68, 255, 150] as [number, number, number, number];
+          return [136, 68, 255, 50] as [number, number, number, number]; // Very transparent for planned
         }
-        return [136, 68, 255, 255] as [number, number, number, number];
+        return [136, 68, 255, 80] as [number, number, number, number]; // ~30% opacity
       },
       sizeScale: 1,
-      sizeMinPixels: 8,
-      sizeMaxPixels: 24,
+      sizeMinPixels: 4,
+      sizeMaxPixels: 10,
       pickable: true,
     });
   }
