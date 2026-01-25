@@ -34,9 +34,9 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   },
   {
     id: 'summarization',
-    name: 'T5-small',
-    hfModel: 'Xenova/t5-small',
-    size: 45_000_000,
+    name: 'Flan-T5-base',
+    hfModel: 'Xenova/flan-t5-base',
+    size: 250_000_000,
     priority: 3,
     required: false,
     task: 'text2text-generation',

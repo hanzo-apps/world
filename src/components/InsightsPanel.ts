@@ -6,6 +6,9 @@ import type { ClusteredEvent } from '@/types';
 
 export class InsightsPanel extends Panel {
   private isHidden = false;
+  private lastBriefUpdate = 0;
+  private cachedBrief: string | null = null;
+  private static readonly BRIEF_COOLDOWN_MS = 60000; // 1 min cooldown for brief generation
 
   constructor() {
     super({
@@ -15,7 +18,7 @@ export class InsightsPanel extends Panel {
       infoTooltip: `
         <strong>AI-Powered Analysis</strong><br>
         Uses local ML models for:<br>
-        • <strong>Breaking Stories</strong>: Multi-source confirmed<br>
+        • <strong>World Brief</strong>: AI summary of top stories<br>
         • <strong>Sentiment</strong>: News tone analysis<br>
         • <strong>Velocity</strong>: Fast-moving stories<br>
         <em>Desktop only • Models run in browser</em>
@@ -56,7 +59,7 @@ export class InsightsPanel extends Panel {
         return velB - velA;
       });
 
-      // Take top 8 for sentiment analysis
+      // Take top 8 for analysis
       const importantClusters = sortedClusters.slice(0, 8);
 
       if (importantClusters.length === 0) {
@@ -66,25 +69,66 @@ export class InsightsPanel extends Panel {
 
       const titles = importantClusters.map(c => c.primaryTitle);
 
-      // Only get sentiment - skip T5 summarization (too weak for real summaries)
+      // Get sentiment for all titles
       const sentiments = await mlWorker.classifySentiment(titles).catch(() => null);
 
-      this.renderInsights(importantClusters, sentiments);
+      // Generate World Brief (with cooldown to avoid excessive model calls)
+      let worldBrief = this.cachedBrief;
+      const now = Date.now();
+      if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
+        worldBrief = await this.generateWorldBrief(importantClusters);
+        if (worldBrief) {
+          this.cachedBrief = worldBrief;
+          this.lastBriefUpdate = now;
+        }
+      }
+
+      this.renderInsights(importantClusters, sentiments, worldBrief);
     } catch (error) {
       console.error('[InsightsPanel] Error:', error);
       this.setContent('<div class="insights-error">Analysis failed</div>');
     }
   }
 
+  private async generateWorldBrief(clusters: ClusteredEvent[]): Promise<string | null> {
+    if (clusters.length < 2) return null;
+
+    try {
+      // Combine top headlines into a single prompt for Flan-T5
+      // Format: "Summarize the key themes from these news headlines: ..."
+      const headlines = clusters
+        .slice(0, 6) // Take top 6 for brief
+        .map(c => c.primaryTitle.slice(0, 80)) // Truncate long titles
+        .join('. ');
+
+      const prompt = `Summarize the main themes from these news headlines in 2 sentences: ${headlines}`;
+
+      const [summary] = await mlWorker.summarize([prompt]);
+
+      // Clean up the summary - Flan-T5 may return empty or echo input
+      if (!summary || summary.length < 20 || summary.toLowerCase().includes('summarize')) {
+        return null;
+      }
+
+      return summary;
+    } catch (error) {
+      console.error('[InsightsPanel] Brief generation failed:', error);
+      return null;
+    }
+  }
+
   private renderInsights(
     clusters: ClusteredEvent[],
-    sentiments: Array<{ label: string; score: number }> | null
+    sentiments: Array<{ label: string; score: number }> | null,
+    worldBrief: string | null
   ): void {
+    const briefHtml = worldBrief ? this.renderWorldBrief(worldBrief) : '';
     const sentimentOverview = this.renderSentimentOverview(sentiments);
     const breakingHtml = this.renderBreakingStories(clusters, sentiments);
     const statsHtml = this.renderStats(clusters);
 
     this.setContent(`
+      ${briefHtml}
       ${sentimentOverview}
       ${statsHtml}
       <div class="insights-section">
@@ -92,6 +136,15 @@ export class InsightsPanel extends Panel {
         ${breakingHtml}
       </div>
     `);
+  }
+
+  private renderWorldBrief(brief: string): string {
+    return `
+      <div class="insights-brief">
+        <div class="insights-section-title">🌍 WORLD BRIEF</div>
+        <div class="insights-brief-text">${escapeHtml(brief)}</div>
+      </div>
+    `;
   }
 
   private renderBreakingStories(
