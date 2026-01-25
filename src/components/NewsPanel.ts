@@ -108,9 +108,6 @@ export class NewsPanel extends Panel {
   }
 
   private createSummarizeButton(): void {
-    const header = this.getElement().querySelector('.panel-header');
-    if (!header) return;
-
     // Create summary container (inserted between header and content)
     this.summaryContainer = document.createElement('div');
     this.summaryContainer.className = 'panel-summary';
@@ -124,12 +121,12 @@ export class NewsPanel extends Panel {
     this.summaryBtn.title = 'Summarize this panel';
     this.summaryBtn.addEventListener('click', () => this.handleSummarize());
 
-    // Insert before count element or at end of header
-    const countEl = header.querySelector('.panel-count');
+    // Insert before count element (use inherited this.header directly)
+    const countEl = this.header.querySelector('.panel-count');
     if (countEl) {
-      header.insertBefore(this.summaryBtn, countEl);
+      this.header.insertBefore(this.summaryBtn, countEl);
     } else {
-      header.appendChild(this.summaryBtn);
+      this.header.appendChild(this.summaryBtn);
     }
   }
 
