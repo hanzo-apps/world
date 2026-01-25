@@ -119,14 +119,41 @@ const ALLOWED_DOMAINS = [
   'www.techstars.com',
 ];
 
+// CORS helper - allow worldmonitor.app and Vercel preview domains
+function getCorsHeaders(req) {
+  const origin = req.headers.get('origin') || '*';
+  const allowedPatterns = [
+    /^https:\/\/.*\.worldmonitor\.app$/,
+    /^https:\/\/.*-elie-habib-projects\.vercel\.app$/,
+    /^https:\/\/worldmonitor.*\.vercel\.app$/,
+    /^http:\/\/localhost(:\d+)?$/,
+  ];
+
+  const isAllowed = origin === '*' || allowedPatterns.some(p => p.test(origin));
+
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://worldmonitor.app',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
 export default async function handler(req) {
+  const corsHeaders = getCorsHeaders(req);
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const requestUrl = new URL(req.url);
   const feedUrl = requestUrl.searchParams.get('url');
 
   if (!feedUrl) {
     return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
@@ -137,7 +164,7 @@ export default async function handler(req) {
     if (!ALLOWED_DOMAINS.includes(parsedUrl.hostname)) {
       return new Response(JSON.stringify({ error: 'Domain not allowed' }), {
         status: 403,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
@@ -158,8 +185,8 @@ export default async function handler(req) {
       status: response.status,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=300',
+        ...corsHeaders,
       },
     });
   } catch (error) {
@@ -171,7 +198,7 @@ export default async function handler(req) {
       url: feedUrl
     }), {
       status: isTimeout ? 504 : 502,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 }
