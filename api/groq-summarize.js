@@ -110,8 +110,8 @@ export default async function handler(request) {
     let systemPrompt, userPrompt;
 
     if (mode === 'brief') {
-      systemPrompt = 'You are a concise news analyst. Summarize the key themes from news headlines in 2-3 sentences. Focus on the most significant global developments. Be factual and neutral.';
-      userPrompt = `Summarize the main themes from these breaking news headlines:\n\n${headlineText}\n\nProvide a 2-3 sentence world brief:`;
+      systemPrompt = 'You are a concise news analyst. Summarize headlines in 2-3 varied sentences. Be factual. IMPORTANT: Start each summary differently - never start with "The headlines" or similar repetitive phrases. Vary your sentence structure.';
+      userPrompt = `News headlines:\n${headlineText}\n\nWrite a 2-3 sentence summary. Start directly with the key development or theme:`;
     } else if (mode === 'analysis') {
       systemPrompt = 'You are a geopolitical analyst. Analyze news headlines to identify patterns, risks, and implications. Be concise but insightful.';
       userPrompt = `Analyze these news headlines for key patterns and implications:\n\n${headlineText}\n\nProvide a brief analysis (3-4 sentences):`;
