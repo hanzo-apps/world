@@ -1456,6 +1456,8 @@ export class DeckGLMap {
           { key: 'conflicts', label: 'Conflict Zones', icon: '&#9876;' },
           { key: 'bases', label: 'Military Bases', icon: '&#127963;' },
           { key: 'nuclear', label: 'Nuclear Sites', icon: '&#9762;' },
+          { key: 'irradiators', label: 'Gamma Irradiators', icon: '&#9888;' },
+          { key: 'spaceports', label: 'Spaceports', icon: '&#128640;' },
           { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
           { key: 'pipelines', label: 'Pipelines', icon: '&#128738;' },
           { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
