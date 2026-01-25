@@ -11,7 +11,7 @@ import type {
   SocialUnrestEvent,
   AisDisruptionEvent,
 } from '@/types';
-import { TIER1_COUNTRIES } from './country-instability';
+import { TIER1_COUNTRIES } from '@/config/countries';
 
 export type SignalType =
   | 'internet_outage'
