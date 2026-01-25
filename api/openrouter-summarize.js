@@ -28,11 +28,12 @@ function getRedis() {
   return redis;
 }
 
-// Generate cache key from headlines (same as groq endpoint)
-function getCacheKey(headlines, mode) {
+// Generate cache key from headlines and geoContext (same as groq endpoint)
+function getCacheKey(headlines, mode, geoContext = '') {
   const sorted = headlines.slice(0, 8).sort().join('|');
+  const geoHash = geoContext ? ':g' + hashString(geoContext).slice(0, 6) : '';
   const hash = hashString(`${mode}:${sorted}`);
-  return `summary:${hash}`;
+  return `summary:${hash}${geoHash}`;
 }
 
 function hashString(str) {
@@ -97,7 +98,7 @@ export default async function handler(request) {
   }
 
   try {
-    const { headlines, mode = 'brief' } = await request.json();
+    const { headlines, mode = 'brief', geoContext = '' } = await request.json();
 
     if (!headlines || !Array.isArray(headlines) || headlines.length === 0) {
       return new Response(JSON.stringify({ error: 'Headlines array required' }), {
@@ -108,7 +109,7 @@ export default async function handler(request) {
 
     // Check Redis cache first (shared with Groq endpoint)
     const redisClient = getRedis();
-    const cacheKey = getCacheKey(headlines, mode);
+    const cacheKey = getCacheKey(headlines, mode, geoContext);
 
     if (redisClient) {
       try {
@@ -136,27 +137,33 @@ export default async function handler(request) {
 
     let systemPrompt, userPrompt;
 
+    // Include intelligence synthesis context in prompt if available
+    const intelSection = geoContext ? `\n\n${geoContext}` : '';
+
     if (mode === 'brief') {
       systemPrompt = `You are a news anchor delivering a world brief. Write like you're opening the evening news.
 Rules:
 - Lead with the most significant development - start with WHAT happened, WHERE
-- If stories connect, show the connection
+- CRITICAL FOCAL POINTS in the intelligence synthesis are the main actors - mention them by name
+- If a focal point shows news + signals convergence (military, outages, protests), lead with that
 - Vary your opening: use location, action, or impact - NEVER start with "The dominant narrative"
-- Write naturally: "Tensions escalated in...", "Markets reacted to...", "A major shift in..."
+- Write naturally: "Tensions escalated in Iran as...", "Markets reacted to...", "A major shift in..."
 - 2-3 punchy sentences, no bullet points`;
-      userPrompt = `What's the top story right now? Open strong:\n${headlineText}`;
+      userPrompt = `What's the top story right now? Open strong:\n${headlineText}${intelSection}`;
     } else if (mode === 'analysis') {
       systemPrompt = `Senior analyst giving a 30-second brief. Be direct and specific.
 Rules:
 - Lead with the insight, not meta-commentary
-- Start with the actual finding: "China's...", "The market...", "A pattern of..."
+- CRITICAL FOCAL POINTS are your main actors - explain WHY they matter
+- If focal points show news-signal correlation (military + outages + protests), flag as escalation
+- Start with the actual finding: "China's...", "Iran's...", "A pattern of..."
 - NEVER start with "The dominant/key narrative is" or similar framing
 - Connect dots, be specific about implications
 - 2-3 sentences, confident tone`;
-      userPrompt = `What's the key pattern or risk here?\n${headlineText}`;
+      userPrompt = `What's the key pattern or risk here?\n${headlineText}${intelSection}`;
     } else {
-      systemPrompt = `Intel analyst synthesizing a feed. Lead with substance, not framing. 2 sentences max. Never start with "The dominant narrative" - just state the insight directly.`;
-      userPrompt = `Key takeaway:\n${headlineText}`;
+      systemPrompt = `Intel analyst synthesizing a feed. Lead with substance, not framing. 2 sentences max. Never start with "The dominant narrative" - just state the insight directly. CRITICAL focal points with news-signal convergence are significant.`;
+      userPrompt = `Key takeaway:\n${headlineText}${intelSection}`;
     }
 
     const response = await fetch(OPENROUTER_API_URL, {
