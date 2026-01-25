@@ -83,6 +83,7 @@ type MLWorkerMessage =
 // Loaded pipelines (using unknown since pipeline types vary)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const loadedPipelines = new Map<string, any>();
+const loadingPromises = new Map<string, Promise<void>>();
 
 function getModelConfig(modelId: string): ModelConfig | undefined {
   return MODEL_CONFIGS.find(m => m.id === modelId);
@@ -91,26 +92,36 @@ function getModelConfig(modelId: string): ModelConfig | undefined {
 async function loadModel(modelId: string): Promise<void> {
   if (loadedPipelines.has(modelId)) return;
 
+  // Prevent concurrent loads - return existing promise if loading
+  const existing = loadingPromises.get(modelId);
+  if (existing) return existing;
+
   const config = getModelConfig(modelId);
   if (!config) throw new Error(`Unknown model: ${modelId}`);
 
   console.log(`[MLWorker] Loading model: ${config.hfModel}`);
   const startTime = Date.now();
 
-  const pipe = await pipeline(config.task, config.hfModel, {
-    progress_callback: (progress: { status: string; progress?: number }) => {
-      if (progress.status === 'progress' && progress.progress !== undefined) {
-        self.postMessage({
-          type: 'model-progress',
-          modelId,
-          progress: progress.progress,
-        });
-      }
-    },
-  });
+  const loadPromise = (async () => {
+    const pipe = await pipeline(config.task, config.hfModel, {
+      progress_callback: (progress: { status: string; progress?: number }) => {
+        if (progress.status === 'progress' && progress.progress !== undefined) {
+          self.postMessage({
+            type: 'model-progress',
+            modelId,
+            progress: progress.progress,
+          });
+        }
+      },
+    });
 
-  loadedPipelines.set(modelId, pipe);
-  console.log(`[MLWorker] Model loaded in ${Date.now() - startTime}ms: ${modelId}`);
+    loadedPipelines.set(modelId, pipe);
+    loadingPromises.delete(modelId);
+    console.log(`[MLWorker] Model loaded in ${Date.now() - startTime}ms: ${modelId}`);
+  })();
+
+  loadingPromises.set(modelId, loadPromise);
+  return loadPromise;
 }
 
 function unloadModel(modelId: string): void {
