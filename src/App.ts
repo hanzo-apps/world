@@ -46,7 +46,6 @@ import {
   TechEventsPanel,
   ServiceStatusPanel,
 } from '@/components';
-import type { MapView } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
 import { PIPELINES } from '@/config/pipelines';
