@@ -1790,10 +1790,13 @@ export class App {
       { name: 'fred', task: runGuarded('fred', () => this.loadFredData()) },
       { name: 'oil', task: runGuarded('oil', () => this.loadOilAnalytics()) },
       { name: 'spending', task: runGuarded('spending', () => this.loadGovernmentSpending()) },
-      // ALWAYS load intelligence signals for CII calculation (protests, military, outages)
-      // This ensures CII scores are accurate even when map layers are disabled
-      { name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) },
     ];
+
+    // Load intelligence signals for CII calculation (protests, military, outages)
+    // Only for geopolitical variant - tech variant doesn't need CII/focal points
+    if (SITE_VARIANT === 'full') {
+      tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
+    }
 
     // Conditionally load non-intelligence layers
     // NOTE: outages, protests, military are handled by loadIntelligenceSignals() above
@@ -2818,12 +2821,14 @@ export class App {
     this.scheduleRefresh('oil', () => this.loadOilAnalytics(), 30 * 60 * 1000);
     this.scheduleRefresh('spending', () => this.loadGovernmentSpending(), 60 * 60 * 1000);
 
-    // ALWAYS refresh intelligence signals for CII (no layer condition)
+    // Refresh intelligence signals for CII (geopolitical variant only)
     // This handles outages, protests, military - updates map when layers enabled
-    this.scheduleRefresh('intelligence', () => {
-      this.intelligenceCache = {}; // Clear cache to force fresh fetch
-      return this.loadIntelligenceSignals();
-    }, 5 * 60 * 1000);
+    if (SITE_VARIANT === 'full') {
+      this.scheduleRefresh('intelligence', () => {
+        this.intelligenceCache = {}; // Clear cache to force fresh fetch
+        return this.loadIntelligenceSignals();
+      }, 5 * 60 * 1000);
+    }
 
     // Non-intelligence layer refreshes only
     // NOTE: outages, protests, military are refreshed by intelligence schedule above
