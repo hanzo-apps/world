@@ -3547,6 +3547,19 @@ body.playback-mode .status-dot {
   gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(10, 10, 10, 0.98);
+}
+
+/* Solid backdrop for sticky header - ensures content doesn't show through */
+.popup-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.98);
+  z-index: -1;
 }
 
 .popup-header.conflict {
