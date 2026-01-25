@@ -5,7 +5,7 @@
  */
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
-import { GeoJsonLayer, ScatterplotLayer, PathLayer, TextLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, ScatterplotLayer, PathLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
 import type {
   MapLayers,
@@ -438,19 +438,33 @@ export class DeckGLMap {
   private createBasesLayer(): ScatterplotLayer {
     const highlightedBases = this.highlightedAssets.base;
 
+    // Base colors by operator type
+    const getBaseColor = (type: string): [number, number, number, number] => {
+      switch (type) {
+        case 'us-nato': return [68, 136, 255, 255];   // Blue
+        case 'russia': return [255, 68, 68, 255];     // Red
+        case 'china': return [255, 136, 68, 255];    // Orange
+        case 'uk': return [68, 170, 255, 255];       // Light blue
+        case 'france': return [0, 85, 164, 255];     // French blue
+        case 'india': return [255, 153, 51, 255];    // Saffron
+        case 'japan': return [188, 0, 45, 255];      // Rising sun red
+        default: return [136, 136, 136, 255];        // Gray
+      }
+    };
+
     return new ScatterplotLayer({
       id: 'bases-layer',
       data: MILITARY_BASES,
       getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => highlightedBases.has(d.id) ? 15000 : 8000,
+      getRadius: (d) => highlightedBases.has(d.id) ? 15000 : 6000,
       getFillColor: (d) => {
         if (highlightedBases.has(d.id)) {
           return [255, 100, 100, 255] as [number, number, number, number];
         }
-        return COLORS.base;
+        return getBaseColor(d.type);
       },
-      radiusMinPixels: 3,
-      radiusMaxPixels: 12,
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
       pickable: true,
     });
   }
@@ -459,31 +473,43 @@ export class DeckGLMap {
     const highlightedNuclear = this.highlightedAssets.nuclear;
     const data = NUCLEAR_FACILITIES.filter(f => f.status !== 'decommissioned');
 
+    // Nuclear: Yellow/orange RING (stroked hollow circle) - distinctive radiation-like look
     return [
       new ScatterplotLayer({
         id: 'nuclear-layer',
         data,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => highlightedNuclear.has(d.id) ? 12000 : 6000,
-        getFillColor: (d) => {
+        getRadius: (d) => highlightedNuclear.has(d.id) ? 12000 : 8000,
+        getFillColor: [0, 0, 0, 0] as [number, number, number, number], // Hollow
+        stroked: true,
+        getLineColor: (d) => {
           if (highlightedNuclear.has(d.id)) {
             return [255, 100, 100, 255] as [number, number, number, number];
           }
-          return COLORS.nuclear;
+          if (d.status === 'contested') {
+            return [255, 50, 50, 255] as [number, number, number, number];
+          }
+          return [255, 220, 0, 255] as [number, number, number, number]; // Bright yellow ring
         },
-        radiusMinPixels: 5,
-        radiusMaxPixels: 12,
+        lineWidthMinPixels: 3,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 14,
         pickable: true,
       }),
-      new TextLayer({
-        id: 'nuclear-icon-layer',
+      // Inner dot for nuclear
+      new ScatterplotLayer({
+        id: 'nuclear-inner-layer',
         data,
         getPosition: (d) => [d.lon, d.lat],
-        getText: () => '☢️',
-        getSize: 12,
-        getAngle: 0,
-        getTextAnchor: 'middle',
-        getAlignmentBaseline: 'center',
+        getRadius: 2000,
+        getFillColor: (d) => {
+          if (d.status === 'contested') {
+            return [255, 50, 50, 255] as [number, number, number, number];
+          }
+          return [255, 220, 0, 255] as [number, number, number, number];
+        },
+        radiusMinPixels: 2,
+        radiusMaxPixels: 4,
         pickable: false,
       }),
     ];
@@ -518,32 +544,31 @@ export class DeckGLMap {
     const highlightedDC = this.highlightedAssets.datacenter;
     const data = AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned');
 
+    // Datacenters: Purple filled circle with cyan/white border - distinctive tech look
     return [
       new ScatterplotLayer({
         id: 'datacenters-layer',
         data,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => highlightedDC.has(d.id) ? 10000 : 5000,
+        getRadius: (d) => highlightedDC.has(d.id) ? 10000 : 6000,
         getFillColor: (d) => {
           if (highlightedDC.has(d.id)) {
             return [255, 100, 100, 255] as [number, number, number, number];
           }
-          return COLORS.datacenter;
+          // Purple fill
+          return [136, 68, 255, 200] as [number, number, number, number];
         },
+        stroked: true,
+        getLineColor: (d) => {
+          if (d.status === 'planned') {
+            return [136, 68, 255, 150] as [number, number, number, number]; // Dashed effect via lighter color
+          }
+          return [200, 200, 255, 255] as [number, number, number, number]; // Light border
+        },
+        lineWidthMinPixels: 2,
         radiusMinPixels: 5,
-        radiusMaxPixels: 10,
+        radiusMaxPixels: 12,
         pickable: true,
-      }),
-      new TextLayer({
-        id: 'datacenters-icon-layer',
-        data,
-        getPosition: (d) => [d.lon, d.lat],
-        getText: () => '🖥️',
-        getSize: 14,
-        getAngle: 0,
-        getTextAnchor: 'middle',
-        getAlignmentBaseline: 'center',
-        pickable: false,
       }),
     ];
   }
