@@ -478,9 +478,18 @@ export const INTEL_SOURCES: Feed[] = [
   { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/'), type: 'cyber' },
 ];
 
+// Keywords that trigger alert status - must be specific to avoid false positives
 export const ALERT_KEYWORDS = [
-  'war', 'invasion', 'military', 'nuclear', 'sanctions', 'missile',
-  'attack', 'troops', 'conflict', 'strike', 'bomb', 'casualties',
-  'ceasefire', 'treaty', 'nato', 'coup', 'martial law', 'emergency',
-  'assassination', 'terrorist', 'hostage', 'evacuation', 'breaking',
+  'war', 'invasion', 'military action', 'nuclear', 'sanctions', 'missile',
+  'airstrike', 'troops deployed', 'armed conflict', 'bombing', 'casualties',
+  'ceasefire', 'peace treaty', 'nato', 'coup', 'martial law',
+  'assassination', 'terrorist', 'hostage', 'mass evacuation',
+];
+
+// Patterns that indicate non-alert content (lifestyle, entertainment, etc.)
+export const ALERT_EXCLUSIONS = [
+  'protein', 'couples', 'relationship', 'dating', 'diet', 'fitness',
+  'recipe', 'cooking', 'shopping', 'fashion', 'celebrity', 'movie',
+  'tv show', 'sports', 'game', 'concert', 'festival', 'wedding',
+  'vacation', 'travel tips', 'life hack', 'self-care', 'wellness',
 ];
