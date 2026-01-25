@@ -496,11 +496,20 @@ export function calculateCII(): CountryScore[] {
     // Hotspot proximity boost - events near strategic locations are more significant
     const hotspotBoost = getHotspotBoost(code);
 
-    // Blend baseline risk with detected events + hotspot boost
+    // News urgency boost - high information score means breaking news
+    // This prevents the score from being diluted when there's major news but no detected signals
+    // Example: "US sends armada to Iran" should elevate Iran even if no military tracked yet
+    const newsUrgencyBoost = components.information >= 70 ? 15
+      : components.information >= 50 ? 10
+      : components.information >= 30 ? 5
+      : 0;
+
+    // Blend baseline risk with detected events + hotspot boost + news urgency
     // - 40% baseline risk (geopolitical context always matters)
     // - 60% event-based (current detected activity)
     // - Hotspot boost adds up to 30 points for activity near strategic locations
-    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
+    // - News urgency boost ensures breaking news elevates score appropriately
+    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost;
 
     // Active conflict zones have a FLOOR score - they're inherently more unstable
     // than peaceful countries regardless of detected events
@@ -550,7 +559,11 @@ export function getCountryScore(code: string): number | null {
 
   const eventScore = components.unrest * 0.4 + components.security * 0.3 + components.information * 0.3;
   const hotspotBoost = getHotspotBoost(code);
-  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost;
+  const newsUrgencyBoost = components.information >= 70 ? 15
+    : components.information >= 50 ? 10
+    : components.information >= 30 ? 5
+    : 0;
+  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost;
 
   // Active conflict zones have floor scores
   const conflictFloor: Record<string, number> = {
