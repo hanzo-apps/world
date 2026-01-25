@@ -32,6 +32,66 @@ export class InsightsPanel extends Panel {
     }
   }
 
+  private getImportanceScore(cluster: ClusteredEvent): number {
+    let score = 0;
+
+    // Source confirmation (most important signal)
+    score += cluster.sourceCount * 15;
+
+    // Velocity multiplier
+    const velMultiplier: Record<string, number> = {
+      'viral': 3,
+      'spike': 2.5,
+      'elevated': 1.5,
+      'normal': 1
+    };
+    score *= velMultiplier[cluster.velocity?.level ?? 'normal'] ?? 1;
+
+    // Alert bonus
+    if (cluster.isAlert) score += 50;
+
+    // Recency bonus (decay over 12 hours)
+    const ageMs = Date.now() - cluster.firstSeen.getTime();
+    const ageHours = ageMs / 3600000;
+    const recencyMultiplier = Math.max(0.5, 1 - (ageHours / 12));
+    score *= recencyMultiplier;
+
+    return score;
+  }
+
+  private selectTopStories(clusters: ClusteredEvent[], maxCount: number): ClusteredEvent[] {
+    // Filter: require at least 2 sources OR alert OR elevated+ velocity
+    const candidates = clusters.filter(c =>
+      c.sourceCount >= 2 ||
+      c.isAlert ||
+      (c.velocity && c.velocity.level !== 'normal')
+    );
+
+    // Score and sort
+    const scored = candidates
+      .map(c => ({ cluster: c, score: this.getImportanceScore(c) }))
+      .sort((a, b) => b.score - a.score);
+
+    // Select with source diversity (max 3 from same primary source)
+    const selected: ClusteredEvent[] = [];
+    const sourceCount = new Map<string, number>();
+    const MAX_PER_SOURCE = 3;
+
+    for (const { cluster } of scored) {
+      const source = cluster.primarySource;
+      const count = sourceCount.get(source) || 0;
+
+      if (count < MAX_PER_SOURCE) {
+        selected.push(cluster);
+        sourceCount.set(source, count + 1);
+      }
+
+      if (selected.length >= maxCount) break;
+    }
+
+    return selected;
+  }
+
   private setProgress(step: number, total: number, message: string): void {
     const percent = Math.round((step / total) * 100);
     this.setContent(`
@@ -58,24 +118,10 @@ export class InsightsPanel extends Panel {
     const totalSteps = 3;
 
     try {
-      // Step 1: Filter and sort stories
-      this.setProgress(1, totalSteps, 'Filtering important stories...');
+      // Step 1: Filter and rank stories by composite importance score
+      this.setProgress(1, totalSteps, 'Ranking important stories...');
 
-      const importantStories = clusters.filter(c =>
-        c.sourceCount >= 2 ||
-        (c.velocity && c.velocity.level !== 'normal') ||
-        c.isAlert
-      );
-
-      const sortedClusters = importantStories.sort((a, b) => {
-        if (a.isAlert !== b.isAlert) return a.isAlert ? -1 : 1;
-        if (a.sourceCount !== b.sourceCount) return b.sourceCount - a.sourceCount;
-        const velA = a.velocity?.sourcesPerHour ?? 0;
-        const velB = b.velocity?.sourcesPerHour ?? 0;
-        return velB - velA;
-      });
-
-      const importantClusters = sortedClusters.slice(0, 8);
+      const importantClusters = this.selectTopStories(clusters, 8);
 
       if (importantClusters.length === 0) {
         this.setContent('<div class="insights-empty">No breaking or multi-source stories yet</div>');

@@ -1,9 +1,12 @@
 /**
- * OpenRouter API Summarization Endpoint
+ * OpenRouter API Summarization Endpoint with Redis Caching
  * Fallback when Groq is rate-limited
  * Uses Llama 3.3 70B free model
  * Free tier: 50 requests/day (20/min)
+ * Server-side Redis cache for cross-user deduplication
  */
+
+import { Redis } from '@upstash/redis';
 
 export const config = {
   runtime: 'edge',
@@ -11,6 +14,35 @@ export const config = {
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+const CACHE_TTL_SECONDS = 86400; // 24 hours
+
+// Initialize Redis (lazy - only if env vars present)
+let redis = null;
+function getRedis() {
+  if (redis) return redis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    redis = new Redis({ url, token });
+  }
+  return redis;
+}
+
+// Generate cache key from headlines (same as groq endpoint)
+function getCacheKey(headlines, mode) {
+  const sorted = headlines.slice(0, 8).sort().join('|');
+  const hash = hashString(`${mode}:${sorted}`);
+  return `summary:${hash}`;
+}
+
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
 
 export default async function handler(request) {
   // Only allow POST
@@ -37,6 +69,30 @@ export default async function handler(request) {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Check Redis cache first (shared with Groq endpoint)
+    const redisClient = getRedis();
+    const cacheKey = getCacheKey(headlines, mode);
+
+    if (redisClient) {
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached && typeof cached === 'object' && cached.summary) {
+          console.log('[OpenRouter] Cache hit:', cacheKey);
+          return new Response(JSON.stringify({
+            summary: cached.summary,
+            model: cached.model || MODEL,
+            provider: 'cache',
+            cached: true,
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (cacheError) {
+        console.warn('[OpenRouter] Cache read error:', cacheError.message);
+      }
     }
 
     // Build prompt based on mode
@@ -103,16 +159,31 @@ export default async function handler(request) {
       });
     }
 
+    // Store in Redis cache (shared with Groq endpoint)
+    if (redisClient) {
+      try {
+        await redisClient.set(cacheKey, {
+          summary,
+          model: MODEL,
+          timestamp: Date.now(),
+        }, { ex: CACHE_TTL_SECONDS });
+        console.log('[OpenRouter] Cached:', cacheKey);
+      } catch (cacheError) {
+        console.warn('[OpenRouter] Cache write error:', cacheError.message);
+      }
+    }
+
     return new Response(JSON.stringify({
       summary,
       model: MODEL,
       provider: 'openrouter',
+      cached: false,
       tokens: data.usage?.total_tokens || 0,
     }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=1800', // Cache for 30 min
+        'Cache-Control': 'public, max-age=1800',
       },
     });
 
