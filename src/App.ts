@@ -1,4 +1,4 @@
-import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset } from '@/types';
+import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetOutage, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster } from '@/types';
 import {
   FEEDS,
   INTEL_SOURCES,
@@ -1765,17 +1765,19 @@ export class App {
       { name: 'fred', task: runGuarded('fred', () => this.loadFredData()) },
       { name: 'oil', task: runGuarded('oil', () => this.loadOilAnalytics()) },
       { name: 'spending', task: runGuarded('spending', () => this.loadGovernmentSpending()) },
+      // ALWAYS load intelligence signals for CII calculation (protests, military, outages)
+      // This ensures CII scores are accurate even when map layers are disabled
+      { name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) },
     ];
 
-    // Conditionally load based on layer settings
+    // Conditionally load non-intelligence layers
+    // NOTE: outages, protests, military are handled by loadIntelligenceSignals() above
+    // They update the map when layers are enabled, so no duplicate tasks needed here
     if (this.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (this.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
-    if (this.mapLayers.outages) tasks.push({ name: 'outages', task: runGuarded('outages', () => this.loadOutages()) });
     if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
     if (this.mapLayers.cables) tasks.push({ name: 'cables', task: runGuarded('cables', () => this.loadCableActivity()) });
-    if (this.mapLayers.protests) tasks.push({ name: 'protests', task: runGuarded('protests', () => this.loadProtests()) });
     if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
-    if (this.mapLayers.military) tasks.push({ name: 'military', task: runGuarded('military', () => this.loadMilitary()) });
     if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
     // Use allSettled to ensure all tasks complete and search index always updates
@@ -2261,9 +2263,142 @@ export class App {
     }
   }
 
+  // Cache for intelligence data - allows CII to work even when layers are disabled
+  private intelligenceCache: {
+    outages?: InternetOutage[];
+    protests?: { events: SocialUnrestEvent[]; sources: { acled: number; gdelt: number } };
+    military?: { flights: MilitaryFlight[]; flightClusters: MilitaryFlightCluster[]; vessels: MilitaryVessel[]; vesselClusters: MilitaryVesselCluster[] };
+  } = {};
+
+  /**
+   * Load intelligence-critical signals for CII/focal point calculation
+   * This runs ALWAYS, regardless of layer visibility
+   * Map rendering is separate and still gated by layer visibility
+   */
+  private async loadIntelligenceSignals(): Promise<void> {
+    const tasks: Promise<void>[] = [];
+
+    // Always fetch outages for CII (internet blackouts = major instability signal)
+    tasks.push((async () => {
+      try {
+        const outages = await fetchInternetOutages();
+        this.intelligenceCache.outages = outages;
+        ingestOutagesForCII(outages);
+        signalAggregator.ingestOutages(outages);
+        dataFreshness.recordUpdate('outages', outages.length);
+        // Update map only if layer is visible
+        if (this.mapLayers.outages) {
+          this.map?.setOutages(outages);
+          this.map?.setLayerReady('outages', outages.length > 0);
+          this.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
+        }
+      } catch (error) {
+        console.error('[Intelligence] Outages fetch failed:', error);
+        dataFreshness.recordError('outages', String(error));
+      }
+    })());
+
+    // Always fetch protests for CII (unrest = core instability metric)
+    tasks.push((async () => {
+      try {
+        const protestData = await fetchProtestEvents();
+        this.intelligenceCache.protests = protestData;
+        ingestProtests(protestData.events);
+        ingestProtestsForCII(protestData.events);
+        signalAggregator.ingestProtests(protestData.events);
+        const protestCount = protestData.sources.acled + protestData.sources.gdelt;
+        if (protestCount > 0) dataFreshness.recordUpdate('acled', protestCount);
+        if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
+        // Update map only if layer is visible
+        if (this.mapLayers.protests) {
+          this.map?.setProtests(protestData.events);
+          this.map?.setLayerReady('protests', protestData.events.length > 0);
+          const status = getProtestStatus();
+          this.statusPanel?.updateFeed('Protests', {
+            status: 'ok',
+            itemCount: protestData.events.length,
+            errorMessage: status.acledConfigured === false ? 'ACLED not configured - using GDELT only' : undefined,
+          });
+        }
+      } catch (error) {
+        console.error('[Intelligence] Protests fetch failed:', error);
+        dataFreshness.recordError('acled', String(error));
+      }
+    })());
+
+    // Always fetch military for CII (security = core instability metric)
+    tasks.push((async () => {
+      try {
+        if (isMilitaryVesselTrackingConfigured()) {
+          initMilitaryVesselStream();
+        }
+        const [flightData, vesselData] = await Promise.all([
+          fetchMilitaryFlights(),
+          fetchMilitaryVessels(),
+        ]);
+        this.intelligenceCache.military = {
+          flights: flightData.flights,
+          flightClusters: flightData.clusters,
+          vessels: vesselData.vessels,
+          vesselClusters: vesselData.clusters,
+        };
+        ingestFlights(flightData.flights);
+        ingestVessels(vesselData.vessels);
+        ingestMilitaryForCII(flightData.flights, vesselData.vessels);
+        signalAggregator.ingestFlights(flightData.flights);
+        signalAggregator.ingestVessels(vesselData.vessels);
+        dataFreshness.recordUpdate('opensky', flightData.flights.length);
+        // Update map only if layer is visible
+        if (this.mapLayers.military) {
+          this.map?.setMilitaryFlights(flightData.flights, flightData.clusters);
+          this.map?.setMilitaryVessels(vesselData.vessels, vesselData.clusters);
+          this.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
+          const militaryCount = flightData.flights.length + vesselData.vessels.length;
+          this.statusPanel?.updateFeed('Military', {
+            status: militaryCount > 0 ? 'ok' : 'warning',
+            itemCount: militaryCount,
+          });
+        }
+        // Detect military airlift surges and foreign presence (suppress during learning mode)
+        if (!isInLearningMode()) {
+          const surgeAlerts = analyzeFlightsForSurge(flightData.flights);
+          if (surgeAlerts.length > 0) {
+            const surgeSignals = surgeAlerts.map(surgeAlertToSignal);
+            addToSignalHistory(surgeSignals);
+            this.signalModal?.show(surgeSignals);
+          }
+          const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
+          if (foreignAlerts.length > 0) {
+            const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
+            addToSignalHistory(foreignSignals);
+            this.signalModal?.show(foreignSignals);
+          }
+        }
+      } catch (error) {
+        console.error('[Intelligence] Military fetch failed:', error);
+        dataFreshness.recordError('opensky', String(error));
+      }
+    })());
+
+    await Promise.allSettled(tasks);
+
+    // Now trigger CII refresh with all intelligence data
+    (this.panels['cii'] as CIIPanel)?.refresh();
+    console.log('[Intelligence] All signals loaded for CII calculation');
+  }
+
   private async loadOutages(): Promise<void> {
+    // Use cached data if available
+    if (this.intelligenceCache.outages) {
+      const outages = this.intelligenceCache.outages;
+      this.map?.setOutages(outages);
+      this.map?.setLayerReady('outages', outages.length > 0);
+      this.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
+      return;
+    }
     try {
       const outages = await fetchInternetOutages();
+      this.intelligenceCache.outages = outages;
       this.map?.setOutages(outages);
       this.map?.setLayerReady('outages', outages.length > 0);
       ingestOutagesForCII(outages);
@@ -2351,33 +2486,43 @@ export class App {
   }
 
   private async loadProtests(): Promise<void> {
-    try {
-      const protestData = await fetchProtestEvents();
+    // Use cached data if available (from loadIntelligenceSignals)
+    if (this.intelligenceCache.protests) {
+      const protestData = this.intelligenceCache.protests;
       this.map?.setProtests(protestData.events);
       this.map?.setLayerReady('protests', protestData.events.length > 0);
-      ingestProtests(protestData.events);
-      ingestProtestsForCII(protestData.events);
-      signalAggregator.ingestProtests(protestData.events);
-
-      // Record data freshness AFTER CII ingestion to avoid race conditions
-      // For 'acled' source: count GDELT protests too since GDELT serves as fallback
-      const protestCount = protestData.sources.acled + protestData.sources.gdelt;
-      if (protestCount > 0) {
-        dataFreshness.recordUpdate('acled', protestCount);
-      }
-      if (protestData.sources.gdelt > 0) {
-        dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
-      }
-
-      (this.panels['cii'] as CIIPanel)?.refresh();
       const status = getProtestStatus();
-
       this.statusPanel?.updateFeed('Protests', {
         status: 'ok',
         itemCount: protestData.events.length,
         errorMessage: status.acledConfigured === false ? 'ACLED not configured - using GDELT only' : undefined,
       });
-
+      if (status.acledConfigured === true) {
+        this.statusPanel?.updateApi('ACLED', { status: 'ok' });
+      } else if (status.acledConfigured === null) {
+        this.statusPanel?.updateApi('ACLED', { status: 'warning' });
+      }
+      this.statusPanel?.updateApi('GDELT', { status: 'ok' });
+      return;
+    }
+    try {
+      const protestData = await fetchProtestEvents();
+      this.intelligenceCache.protests = protestData;
+      this.map?.setProtests(protestData.events);
+      this.map?.setLayerReady('protests', protestData.events.length > 0);
+      ingestProtests(protestData.events);
+      ingestProtestsForCII(protestData.events);
+      signalAggregator.ingestProtests(protestData.events);
+      const protestCount = protestData.sources.acled + protestData.sources.gdelt;
+      if (protestCount > 0) dataFreshness.recordUpdate('acled', protestCount);
+      if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
+      (this.panels['cii'] as CIIPanel)?.refresh();
+      const status = getProtestStatus();
+      this.statusPanel?.updateFeed('Protests', {
+        status: 'ok',
+        itemCount: protestData.events.length,
+        errorMessage: status.acledConfigured === false ? 'ACLED not configured - using GDELT only' : undefined,
+      });
       if (status.acledConfigured === true) {
         this.statusPanel?.updateApi('ACLED', { status: 'ok' });
       } else if (status.acledConfigured === null) {
@@ -2410,18 +2555,37 @@ export class App {
   }
 
   private async loadMilitary(): Promise<void> {
+    // Use cached data if available (from loadIntelligenceSignals)
+    if (this.intelligenceCache.military) {
+      const { flights, flightClusters, vessels, vesselClusters } = this.intelligenceCache.military;
+      this.map?.setMilitaryFlights(flights, flightClusters);
+      this.map?.setMilitaryVessels(vessels, vesselClusters);
+      this.map?.updateMilitaryForEscalation(flights, vessels);
+      const hasData = flights.length > 0 || vessels.length > 0;
+      this.map?.setLayerReady('military', hasData);
+      const militaryCount = flights.length + vessels.length;
+      this.statusPanel?.updateFeed('Military', {
+        status: militaryCount > 0 ? 'ok' : 'warning',
+        itemCount: militaryCount,
+        errorMessage: militaryCount === 0 ? 'No military activity in view' : undefined,
+      });
+      this.statusPanel?.updateApi('OpenSky', { status: 'ok' });
+      return;
+    }
     try {
-      // Initialize vessel stream if not already running
       if (isMilitaryVesselTrackingConfigured()) {
         initMilitaryVesselStream();
       }
-
-      // Load both flights and vessels in parallel
       const [flightData, vesselData] = await Promise.all([
         fetchMilitaryFlights(),
         fetchMilitaryVessels(),
       ]);
-
+      this.intelligenceCache.military = {
+        flights: flightData.flights,
+        flightClusters: flightData.clusters,
+        vessels: vesselData.vessels,
+        vesselClusters: vesselData.clusters,
+      };
       this.map?.setMilitaryFlights(flightData.flights, flightData.clusters);
       this.map?.setMilitaryVessels(vesselData.vessels, vesselData.clusters);
       ingestFlights(flightData.flights);
@@ -2431,8 +2595,6 @@ export class App {
       signalAggregator.ingestVessels(vesselData.vessels);
       this.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
       (this.panels['cii'] as CIIPanel)?.refresh();
-
-      // Detect military airlift surges and foreign presence (suppress during learning mode)
       if (!isInLearningMode()) {
         const surgeAlerts = analyzeFlightsForSurge(flightData.flights);
         if (surgeAlerts.length > 0) {
@@ -2440,8 +2602,6 @@ export class App {
           addToSignalHistory(surgeSignals);
           this.signalModal?.show(surgeSignals);
         }
-
-        // Detect foreign military concentration in sensitive regions (immediate, no baseline needed)
         const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
         if (foreignAlerts.length > 0) {
           const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
@@ -2449,17 +2609,15 @@ export class App {
           this.signalModal?.show(foreignSignals);
         }
       }
-
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
-
       const militaryCount = flightData.flights.length + vesselData.vessels.length;
       this.statusPanel?.updateFeed('Military', {
         status: militaryCount > 0 ? 'ok' : 'warning',
         itemCount: militaryCount,
         errorMessage: militaryCount === 0 ? 'No military activity in view' : undefined,
       });
-      this.statusPanel?.updateApi('OpenSky', { status: 'ok' }); // API worked, just no data in view
+      this.statusPanel?.updateApi('OpenSky', { status: 'ok' });
       dataFreshness.recordUpdate('opensky', flightData.flights.length);
     } catch (error) {
       this.map?.setLayerReady('military', false);
@@ -2633,11 +2791,18 @@ export class App {
     this.scheduleRefresh('fred', () => this.loadFredData(), 30 * 60 * 1000);
     this.scheduleRefresh('oil', () => this.loadOilAnalytics(), 30 * 60 * 1000);
     this.scheduleRefresh('spending', () => this.loadGovernmentSpending(), 60 * 60 * 1000);
-    this.scheduleRefresh('outages', () => this.loadOutages(), 60 * 60 * 1000, () => this.mapLayers.outages);
+
+    // ALWAYS refresh intelligence signals for CII (no layer condition)
+    // This handles outages, protests, military - updates map when layers enabled
+    this.scheduleRefresh('intelligence', () => {
+      this.intelligenceCache = {}; // Clear cache to force fresh fetch
+      return this.loadIntelligenceSignals();
+    }, 5 * 60 * 1000);
+
+    // Non-intelligence layer refreshes only
+    // NOTE: outages, protests, military are refreshed by intelligence schedule above
     this.scheduleRefresh('ais', () => this.loadAisSignals(), REFRESH_INTERVALS.ais, () => this.mapLayers.ais);
     this.scheduleRefresh('cables', () => this.loadCableActivity(), 30 * 60 * 1000, () => this.mapLayers.cables);
-    this.scheduleRefresh('protests', () => this.loadProtests(), 15 * 60 * 1000, () => this.mapLayers.protests);
     this.scheduleRefresh('flights', () => this.loadFlightDelays(), 10 * 60 * 1000, () => this.mapLayers.flights);
-    this.scheduleRefresh('military', () => this.loadMilitary(), 5 * 60 * 1000, () => this.mapLayers.military);
   }
 }
