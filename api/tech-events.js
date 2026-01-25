@@ -4,6 +4,71 @@ export const config = { runtime: 'edge' };
 const ICS_URL = 'https://www.techmeme.com/newsy_events.ics';
 const DEV_EVENTS_RSS = 'https://dev.events/rss.xml';
 
+// Curated major tech events that may fall off limited RSS feeds
+// These are manually maintained for important conferences
+const CURATED_EVENTS = [
+  {
+    id: 'step-dubai-2026',
+    title: 'STEP Dubai 2026',
+    type: 'conference',
+    location: 'Dubai Internet City, Dubai',
+    coords: { lat: 25.0956, lng: 55.1548, country: 'UAE', original: 'Dubai Internet City, Dubai' },
+    startDate: '2026-02-11',
+    endDate: '2026-02-12',
+    url: 'https://dubai.stepconference.com',
+    source: 'curated',
+    description: 'Intelligence Everywhere: The AI Economy - 8,000+ attendees, 400+ startups',
+  },
+  {
+    id: 'gitex-global-2026',
+    title: 'GITEX Global 2026',
+    type: 'conference',
+    location: 'Dubai World Trade Centre, Dubai',
+    coords: { lat: 25.2285, lng: 55.2867, country: 'UAE', original: 'Dubai World Trade Centre, Dubai' },
+    startDate: '2026-12-07',
+    endDate: '2026-12-11',
+    url: 'https://www.gitex.com',
+    source: 'curated',
+    description: 'World\'s largest tech & startup show',
+  },
+  {
+    id: 'token2049-dubai-2026',
+    title: 'TOKEN2049 Dubai 2026',
+    type: 'conference',
+    location: 'Dubai, UAE',
+    coords: { lat: 25.2048, lng: 55.2708, country: 'UAE', original: 'Dubai, UAE' },
+    startDate: '2026-04-29',
+    endDate: '2026-04-30',
+    url: 'https://www.token2049.com',
+    source: 'curated',
+    description: 'Premier crypto event in Dubai',
+  },
+  {
+    id: 'collision-2026',
+    title: 'Collision 2026',
+    type: 'conference',
+    location: 'Toronto, Canada',
+    coords: { lat: 43.6532, lng: -79.3832, country: 'Canada', original: 'Toronto, Canada' },
+    startDate: '2026-06-22',
+    endDate: '2026-06-25',
+    url: 'https://collisionconf.com',
+    source: 'curated',
+    description: 'North America\'s fastest growing tech conference',
+  },
+  {
+    id: 'web-summit-2026',
+    title: 'Web Summit 2026',
+    type: 'conference',
+    location: 'Lisbon, Portugal',
+    coords: { lat: 38.7223, lng: -9.1393, country: 'Portugal', original: 'Lisbon, Portugal' },
+    startDate: '2026-11-02',
+    endDate: '2026-11-05',
+    url: 'https://websummit.com',
+    source: 'curated',
+    description: 'The world\'s premier tech conference',
+  },
+];
+
 // Comprehensive city geocoding database (500+ cities worldwide)
 const CITY_COORDS = {
   // North America - USA
@@ -586,6 +651,16 @@ export default async function handler(req) {
       events.push(...devEvents);
     } else {
       console.warn('Failed to fetch dev.events RSS');
+    }
+
+    // Add curated events (major conferences that may fall off limited RSS feeds)
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    for (const curated of CURATED_EVENTS) {
+      const eventDate = new Date(curated.startDate);
+      if (eventDate >= now) {
+        events.push(curated);
+      }
     }
 
     // Deduplicate by title similarity (rough match)
