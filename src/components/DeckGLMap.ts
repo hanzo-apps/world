@@ -49,6 +49,7 @@ import {
   SPACEPORTS,
   APT_GROUPS,
   CRITICAL_MINERALS,
+  COUNTRY_LABELS,
 } from '@/config';
 import { MapPopup, type PopupType } from './MapPopup';
 import {
@@ -152,7 +153,10 @@ export class DeckGLMap {
   private earthquakes: Earthquake[] = [];
   private weatherAlerts: WeatherAlert[] = [];
   private outages: InternetOutage[] = [];
+  private aisDisruptions: AisDisruptionEvent[] = [];
   private aisDensity: AisDensityZone[] = [];
+  private cableAdvisories: CableAdvisory[] = [];
+  private repairShips: RepairShip[] = [];
   private protests: SocialUnrestEvent[] = [];
   private militaryFlights: MilitaryFlight[] = [];
   private militaryVessels: MilitaryVessel[] = [];
@@ -634,9 +638,29 @@ export class DeckGLMap {
       layers.push(this.createAisDensityLayer());
     }
 
+    // AIS disruptions layer (spoofing/jamming)
+    if (mapLayers.ais && this.aisDisruptions.length > 0) {
+      layers.push(this.createAisDisruptionsLayer());
+    }
+
     // Strategic ports layer (shown with AIS)
     if (mapLayers.ais) {
       layers.push(this.createPortsLayer());
+    }
+
+    // Cable advisories layer (shown with cables)
+    if (mapLayers.cables && this.cableAdvisories.length > 0) {
+      layers.push(this.createCableAdvisoriesLayer());
+    }
+
+    // Repair ships layer (shown with cables)
+    if (mapLayers.cables && this.repairShips.length > 0) {
+      layers.push(this.createRepairShipsLayer());
+    }
+
+    // Country labels layer
+    if (mapLayers.countries) {
+      layers.push(this.createCountryLabelsLayer());
     }
 
     // Flight delays layer
@@ -1027,6 +1051,82 @@ export class DeckGLMap {
     });
   }
 
+  private createAisDisruptionsLayer(): ScatterplotLayer {
+    // AIS spoofing/jamming events
+    return new ScatterplotLayer({
+      id: 'ais-disruptions-layer',
+      data: this.aisDisruptions,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 12000,
+      getFillColor: (d) => {
+        // Color by severity/type
+        if (d.severity === 'high' || d.type === 'spoofing') {
+          return [255, 50, 50, 220] as [number, number, number, number]; // Red
+        }
+        if (d.severity === 'medium') {
+          return [255, 150, 0, 200] as [number, number, number, number]; // Orange
+        }
+        return [255, 200, 100, 180] as [number, number, number, number]; // Yellow
+      },
+      radiusMinPixels: 6,
+      radiusMaxPixels: 14,
+      pickable: true,
+      stroked: true,
+      getLineColor: [255, 255, 255, 150] as [number, number, number, number],
+      lineWidthMinPixels: 1,
+    });
+  }
+
+  private createCableAdvisoriesLayer(): ScatterplotLayer {
+    // Cable fault/maintenance advisories
+    return new ScatterplotLayer({
+      id: 'cable-advisories-layer',
+      data: this.cableAdvisories,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 10000,
+      getFillColor: (d) => {
+        if (d.severity === 'fault') {
+          return [255, 50, 50, 220] as [number, number, number, number]; // Red for faults
+        }
+        return [255, 200, 0, 200] as [number, number, number, number]; // Yellow for maintenance
+      },
+      radiusMinPixels: 5,
+      radiusMaxPixels: 12,
+      pickable: true,
+      stroked: true,
+      getLineColor: [0, 200, 255, 200] as [number, number, number, number], // Cyan outline (cable color)
+      lineWidthMinPixels: 2,
+    });
+  }
+
+  private createRepairShipsLayer(): ScatterplotLayer {
+    // Cable repair ships
+    return new ScatterplotLayer({
+      id: 'repair-ships-layer',
+      data: this.repairShips,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 8000,
+      getFillColor: [0, 255, 200, 200] as [number, number, number, number], // Teal
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
+      pickable: true,
+    });
+  }
+
+  private createCountryLabelsLayer(): ScatterplotLayer {
+    // Country labels as small markers (text would require TextLayer)
+    return new ScatterplotLayer({
+      id: 'country-labels-layer',
+      data: COUNTRY_LABELS,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 3000,
+      getFillColor: [200, 200, 200, 100] as [number, number, number, number],
+      radiusMinPixels: 2,
+      radiusMaxPixels: 4,
+      pickable: true,
+    });
+  }
+
   // Note: Protests layer now rendered via HTML overlays in renderProtestClusters()
 
   private createMilitaryVesselsLayer(): ScatterplotLayer {
@@ -1287,6 +1387,23 @@ export class DeckGLMap {
       return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>${obj.mineral || ''} - ${obj.country || ''}<br/>${obj.operator || ''}</div>` };
     }
 
+    if (layerId === 'ais-disruptions-layer') {
+      return { html: `<div class="deckgl-tooltip"><strong>AIS ${obj.type || 'Disruption'}</strong><br/>${obj.severity || ''} severity<br/>${obj.description || ''}</div>` };
+    }
+
+    if (layerId === 'cable-advisories-layer') {
+      const cableName = UNDERSEA_CABLES.find(c => c.id === obj.cableId)?.name || obj.cableId;
+      return { html: `<div class="deckgl-tooltip"><strong>${cableName}</strong><br/>${obj.severity || 'Advisory'}<br/>${obj.description || ''}</div>` };
+    }
+
+    if (layerId === 'repair-ships-layer') {
+      return { html: `<div class="deckgl-tooltip"><strong>${obj.name || 'Repair Ship'}</strong><br/>${obj.status || ''}</div>` };
+    }
+
+    if (layerId === 'country-labels-layer') {
+      return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong></div>` };
+    }
+
     return null;
   }
 
@@ -1331,6 +1448,9 @@ export class DeckGLMap {
       'tech-events-layer': 'techEvent',
       'apt-groups-layer': 'apt',
       'minerals-layer': 'mineral',
+      'ais-disruptions-layer': 'ais',
+      'cable-advisories-layer': 'cable-advisory',
+      'repair-ships-layer': 'repair-ship',
     };
 
     const popupType = layerToPopupType[layerId];
@@ -1463,12 +1583,14 @@ export class DeckGLMap {
           { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
           { key: 'military', label: 'Military Activity', icon: '&#9992;' },
           { key: 'ais', label: 'Ship Traffic', icon: '&#128674;' },
+          { key: 'flights', label: 'Flight Delays', icon: '&#9992;' },
           { key: 'protests', label: 'Protests', icon: '&#128226;' },
           { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
           { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
           { key: 'economic', label: 'Economic Centers', icon: '&#128176;' },
+          { key: 'countries', label: 'Country Labels', icon: '&#127758;' },
           { key: 'minerals', label: 'Critical Minerals', icon: '&#128142;' },
         ];
 
@@ -1686,13 +1808,15 @@ export class DeckGLMap {
     this.updateLayers();
   }
 
-  public setAisData(_disruptions: AisDisruptionEvent[], density: AisDensityZone[]): void {
+  public setAisData(disruptions: AisDisruptionEvent[], density: AisDensityZone[]): void {
+    this.aisDisruptions = disruptions;
     this.aisDensity = density;
     this.updateLayers();
   }
 
-  public setCableActivity(_advisories: CableAdvisory[], _repairShips: RepairShip[]): void {
-    // Cable activity stored for reference
+  public setCableActivity(advisories: CableAdvisory[], repairShips: RepairShip[]): void {
+    this.cableAdvisories = advisories;
+    this.repairShips = repairShips;
     this.updateLayers();
   }
 
