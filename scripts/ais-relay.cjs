@@ -266,16 +266,29 @@ const server = http.createServer(async (req, res) => {
             return fetchWithRedirects(redirectUrl, redirectCount + 1);
           }
 
-          let data = '';
-          response.on('data', chunk => data += chunk);
-          response.on('end', () => {
+          // Handle gzip/deflate compressed responses from upstream
+          const encoding = response.headers['content-encoding'];
+          let stream = response;
+          if (encoding === 'gzip' || encoding === 'deflate') {
+            const zlib = require('zlib');
+            stream = encoding === 'gzip' ? response.pipe(zlib.createGunzip()) : response.pipe(zlib.createInflate());
+          }
+
+          const chunks = [];
+          stream.on('data', chunk => chunks.push(chunk));
+          stream.on('end', () => {
             if (responseHandled || res.headersSent) return;
             responseHandled = true;
+            const data = Buffer.concat(chunks);
             res.writeHead(response.statusCode, {
               'Content-Type': 'application/xml',
               'Cache-Control': 'public, max-age=300'
             });
             res.end(data);
+          });
+          stream.on('error', (err) => {
+            console.error('[Relay] Decompression error:', err.message);
+            sendError(502, 'Decompression failed: ' + err.message);
           });
         });
 
