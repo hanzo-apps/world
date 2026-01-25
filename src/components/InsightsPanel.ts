@@ -158,7 +158,7 @@ export class InsightsPanel extends Panel {
     const seen = new Set<string>();
 
     for (const entity of entities) {
-      if (entity.confidence < 0.7) continue;
+      if (!entity.type || !entity.text || entity.confidence < 0.7) continue;
       const key = `${entity.type}:${entity.text.toLowerCase()}`;
       if (seen.has(key)) continue;
       seen.add(key);
