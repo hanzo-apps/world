@@ -361,6 +361,32 @@ class FocalPointDetector {
   }
 
   /**
+   * Get urgency level for a specific country (for CII integration)
+   * Returns the focal point urgency if found, null otherwise
+   */
+  getCountryUrgency(countryCode: string): 'watch' | 'elevated' | 'critical' | null {
+    if (!this.lastSummary) return null;
+    const fp = this.lastSummary.focalPoints.find(
+      fp => fp.entityType === 'country' && fp.entityId === countryCode
+    );
+    return fp?.urgency || null;
+  }
+
+  /**
+   * Get all country urgencies as a map (for batch CII calculation)
+   */
+  getCountryUrgencyMap(): Map<string, 'watch' | 'elevated' | 'critical'> {
+    const map = new Map<string, 'watch' | 'elevated' | 'critical'>();
+    if (!this.lastSummary) return map;
+    for (const fp of this.lastSummary.focalPoints) {
+      if (fp.entityType === 'country') {
+        map.set(fp.entityId, fp.urgency);
+      }
+    }
+    return map;
+  }
+
+  /**
    * Log focal point summary to console for debugging
    */
   logSummary(): void {
