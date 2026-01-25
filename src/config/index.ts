@@ -30,6 +30,7 @@ export {
   getSourceType,
   getSourcePropagandaRisk,
   ALERT_KEYWORDS,
+  ALERT_EXCLUSIONS,
   type SourceRiskProfile,
   type SourceType,
 } from './feeds';
