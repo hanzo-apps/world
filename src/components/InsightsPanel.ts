@@ -503,7 +503,7 @@ export class InsightsPanel extends Panel {
 
     return `
       <div class="insights-section insights-missed">
-        <div class="insights-section-title">🎯 ML DETECTED (check console for details)</div>
+        <div class="insights-section-title">🎯 ML DETECTED</div>
         ${storiesHtml}
       </div>
     `;
