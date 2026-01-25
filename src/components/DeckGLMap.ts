@@ -1155,23 +1155,22 @@ export class DeckGLMap {
   }
 
   private createWeatherLayer(): ScatterplotLayer {
-    // Filter weather alerts that have coordinates
-    const alertsWithCoords = this.weatherAlerts.filter(a =>
-      'lat' in a && 'lon' in a && typeof (a as unknown as { lat: number }).lat === 'number'
-    );
+    // Filter weather alerts that have centroid coordinates
+    const alertsWithCoords = this.weatherAlerts.filter(a => a.centroid && a.centroid.length === 2);
 
     return new ScatterplotLayer({
       id: 'weather-layer',
       data: alertsWithCoords,
-      getPosition: (d) => [(d as unknown as { lon: number }).lon, (d as unknown as { lat: number }).lat],
-      getRadius: 15000,
+      getPosition: (d) => d.centroid as [number, number], // centroid is [lon, lat]
+      getRadius: 25000,
       getFillColor: (d) => {
-        if (d.severity === 'Extreme') return [255, 0, 0, 180] as [number, number, number, number];
+        if (d.severity === 'Extreme') return [255, 0, 0, 200] as [number, number, number, number];
         if (d.severity === 'Severe') return [255, 100, 0, 180] as [number, number, number, number];
+        if (d.severity === 'Moderate') return [255, 170, 0, 160] as [number, number, number, number];
         return COLORS.weather;
       },
-      radiusMinPixels: 5,
-      radiusMaxPixels: 15,
+      radiusMinPixels: 8,
+      radiusMaxPixels: 20,
       pickable: true,
     });
   }
@@ -1464,7 +1463,8 @@ export class DeckGLMap {
     }
 
     if (layerId === 'weather-layer') {
-      return { html: `<div class="deckgl-tooltip"><strong>${obj.event || 'Weather Alert'}</strong><br/>${obj.severity || ''}</div>` };
+      const area = obj.areaDesc ? `<br/><small>${obj.areaDesc.slice(0, 50)}${obj.areaDesc.length > 50 ? '...' : ''}</small>` : '';
+      return { html: `<div class="deckgl-tooltip"><strong>${obj.event || 'Weather Alert'}</strong><br/>${obj.severity || ''}${area}</div>` };
     }
 
     if (layerId === 'outages-layer') {
@@ -2065,6 +2065,8 @@ export class DeckGLMap {
 
   public setWeatherAlerts(alerts: WeatherAlert[]): void {
     this.weatherAlerts = alerts;
+    const withCentroid = alerts.filter(a => a.centroid && a.centroid.length === 2).length;
+    console.log(`[DeckGLMap] Weather alerts: ${alerts.length} total, ${withCentroid} with coordinates`);
     this.updateLayers();
   }
 
