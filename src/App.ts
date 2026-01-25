@@ -1262,6 +1262,17 @@ export class App {
     el.dataset.panel = key;
 
     el.addEventListener('dragstart', (e) => {
+      const target = e.target as HTMLElement;
+      // Don't start drag if panel is being resized
+      if (el.dataset.resizing === 'true') {
+        e.preventDefault();
+        return;
+      }
+      // Don't start drag if target is the resize handle
+      if (target.classList.contains('panel-resize-handle') || target.closest('.panel-resize-handle')) {
+        e.preventDefault();
+        return;
+      }
       el.classList.add('dragging');
       e.dataTransfer?.setData('text/plain', key);
     });

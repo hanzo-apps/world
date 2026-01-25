@@ -234,10 +234,18 @@ const server = http.createServer(async (req, res) => {
       const http = require('http');
 
       // Helper to fetch with redirect following (max 3 redirects)
+      let responseHandled = false;
+
+      const sendError = (statusCode, message) => {
+        if (responseHandled || res.headersSent) return;
+        responseHandled = true;
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: message }));
+      };
+
       const fetchWithRedirects = (url, redirectCount = 0) => {
         if (redirectCount > 3) {
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Too many redirects' }));
+          return sendError(502, 'Too many redirects');
         }
 
         const protocol = url.startsWith('https') ? https : http;
@@ -261,6 +269,8 @@ const server = http.createServer(async (req, res) => {
           let data = '';
           response.on('data', chunk => data += chunk);
           response.on('end', () => {
+            if (responseHandled || res.headersSent) return;
+            responseHandled = true;
             res.writeHead(response.statusCode, {
               'Content-Type': 'application/xml',
               'Cache-Control': 'public, max-age=300'
@@ -271,21 +281,21 @@ const server = http.createServer(async (req, res) => {
 
         request.on('error', (err) => {
           console.error('[Relay] RSS error:', err.message);
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: err.message }));
+          sendError(502, err.message);
         });
 
         request.on('timeout', () => {
           request.destroy();
-          res.writeHead(504, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Request timeout' }));
+          sendError(504, 'Request timeout');
         });
       };
 
       fetchWithRedirects(feedUrl);
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
     }
   } else if (req.url.startsWith('/opensky')) {
     // Proxy OpenSky API requests with OAuth2 authentication

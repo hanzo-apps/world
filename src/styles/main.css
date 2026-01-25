@@ -497,6 +497,58 @@ body.animations-paused *::after {
   min-height: 200px;
   cursor: grab;
   transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.panel.resized {
+  /* Custom height set - use grid-row span for height */
+}
+
+/* Row span classes for resizable panels */
+.panel.span-1 { grid-row: span 1 !important; min-height: 200px !important; }
+.panel.span-2 { grid-row: span 2 !important; min-height: 400px !important; }
+.panel.span-3 { grid-row: span 3 !important; min-height: 600px !important; }
+.panel.span-4 { grid-row: span 4 !important; min-height: 800px !important; }
+
+.panel-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  cursor: ns-resize;
+  background: linear-gradient(to top, rgba(68, 136, 255, 0.15), transparent);
+  z-index: 100;
+  transition: background 0.2s;
+  touch-action: none;
+  pointer-events: auto !important;
+  user-select: none;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle.active {
+  background: linear-gradient(to top, rgba(68, 136, 255, 0.5), transparent);
+}
+
+.panel-resize-handle::after {
+  content: '⋯';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  transition: color 0.2s;
+}
+
+.panel-resize-handle:hover::after {
+  color: var(--accent);
+}
+
+.panel.resizing {
+  cursor: ns-resize;
+  user-select: none;
 }
 
 .panel:active {
@@ -593,12 +645,14 @@ body.animations-paused *::after {
 
 /* Panel Summary Container */
 .panel-summary {
-  padding: 8px 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  margin: 8px;
+  padding: 10px;
+  background: linear-gradient(135deg, rgba(68, 136, 255, 0.08), rgba(136, 68, 255, 0.08));
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
   font-size: 11px;
   line-height: 1.5;
-  max-height: 80px;
+  max-height: 100px;
   overflow-y: auto;
   flex-shrink: 0;
 }
@@ -6259,9 +6313,10 @@ body.playback-mode .status-dot {
     max-height: 50vh !important;
   }
 
-  /* Hide pin button and resize handle on mobile */
+  /* Hide pin button and resize handles on mobile */
   .map-pin-btn,
-  .map-resize-handle {
+  .map-resize-handle,
+  .panel-resize-handle {
     display: none !important;
   }
 
