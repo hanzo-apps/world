@@ -137,27 +137,26 @@ export default async function handler(request) {
     let systemPrompt, userPrompt;
 
     if (mode === 'brief') {
-      systemPrompt = `You are a news intelligence analyst. Your job is to find the ONE dominant story or theme, not list everything.
+      systemPrompt = `You are a news anchor delivering a world brief. Write like you're opening the evening news.
 Rules:
-- Identify the single most significant development
-- If multiple stories are connected, explain HOW they connect
-- Ignore unrelated headlines - focus beats completeness
-- Write like a news anchor's lead: confident, direct, narrative
-- Never use bullet points, "Here are", or list multiple unrelated things
-- 2-3 sentences maximum`;
-      userPrompt = `What is THE story right now? Find the dominant narrative:\n${headlineText}`;
+- Lead with the most significant development - start with WHAT happened, WHERE
+- If stories connect, show the connection
+- Vary your opening: use location, action, or impact - NEVER start with "The dominant narrative"
+- Write naturally: "Tensions escalated in...", "Markets reacted to...", "A major shift in..."
+- 2-3 punchy sentences, no bullet points`;
+      userPrompt = `What's the top story right now? Open strong:\n${headlineText}`;
     } else if (mode === 'analysis') {
-      systemPrompt = `Senior geopolitical analyst writing a 30-second brief for executives.
+      systemPrompt = `Senior analyst giving a 30-second brief. Be direct and specific.
 Rules:
-- Identify ONE key pattern, trend, or emerging risk
-- Connect dots others might miss
-- Be specific about implications
-- No lists, no hedging, no "various" or "multiple"
-- Confident analysis in 2-3 sentences`;
-      userPrompt = `What's the pattern here? What should decision-makers know?\n${headlineText}`;
+- Lead with the insight, not meta-commentary
+- Start with the actual finding: "China's...", "The market...", "A pattern of..."
+- NEVER start with "The dominant/key narrative is" or similar framing
+- Connect dots, be specific about implications
+- 2-3 sentences, confident tone`;
+      userPrompt = `What's the key pattern or risk here?\n${headlineText}`;
     } else {
-      systemPrompt = `Intelligence analyst synthesizing a panel feed. Find the thread that ties these together, or highlight the ONE most significant item. No lists. 2 sentences max.`;
-      userPrompt = `Key takeaway from this feed:\n${headlineText}`;
+      systemPrompt = `Intel analyst synthesizing a feed. Lead with substance, not framing. 2 sentences max. Never start with "The dominant narrative" - just state the insight directly.`;
+      userPrompt = `Key takeaway:\n${headlineText}`;
     }
 
     const response = await fetch(OPENROUTER_API_URL, {
