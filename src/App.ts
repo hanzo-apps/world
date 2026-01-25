@@ -1403,6 +1403,11 @@ export class App {
     };
     document.addEventListener('visibilitychange', this.boundVisibilityHandler);
 
+    // Refresh CII when focal points are ready (ensures focal point urgency is factored in)
+    window.addEventListener('focal-points-ready', () => {
+      (this.panels['cii'] as CIIPanel)?.refresh();
+    });
+
     // Idle detection - pause animations after 2 minutes of inactivity
     this.setupIdleDetection();
   }
