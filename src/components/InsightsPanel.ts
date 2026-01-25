@@ -4,12 +4,6 @@ import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ClusteredEvent } from '@/types';
 
-interface NEREntity {
-  text: string;
-  type: string;
-  confidence: number;
-}
-
 export class InsightsPanel extends Panel {
   private isHidden = false;
 
@@ -21,9 +15,9 @@ export class InsightsPanel extends Panel {
       infoTooltip: `
         <strong>AI-Powered Analysis</strong><br>
         Uses local ML models for:<br>
-        • <strong>Themes</strong>: Top story clusters<br>
-        • <strong>Entities</strong>: People, orgs, locations<br>
+        • <strong>Breaking Stories</strong>: Multi-source confirmed<br>
         • <strong>Sentiment</strong>: News tone analysis<br>
+        • <strong>Velocity</strong>: Fast-moving stories<br>
         <em>Desktop only • Models run in browser</em>
       `,
     });
@@ -43,19 +37,39 @@ export class InsightsPanel extends Panel {
     this.showLoading();
 
     try {
-      const topClusters = clusters.slice(0, 5);
-      const titles = topClusters.map(c => c.primaryTitle);
+      // Filter to only important stories: multi-source OR fast-moving OR alerts
+      const importantStories = clusters.filter(c =>
+        c.sourceCount >= 2 ||
+        (c.velocity && c.velocity.level !== 'normal') ||
+        c.isAlert
+      );
 
-      const [summaries, sentiments] = await Promise.all([
-        mlWorker.summarize(titles).catch(() => null),
-        mlWorker.classifySentiment(titles).catch(() => null),
-      ]);
+      // Sort by importance: multi-source first, then velocity
+      const sortedClusters = importantStories.sort((a, b) => {
+        // Alerts first
+        if (a.isAlert !== b.isAlert) return a.isAlert ? -1 : 1;
+        // Then multi-source
+        if (a.sourceCount !== b.sourceCount) return b.sourceCount - a.sourceCount;
+        // Then by velocity
+        const velA = a.velocity?.sourcesPerHour ?? 0;
+        const velB = b.velocity?.sourcesPerHour ?? 0;
+        return velB - velA;
+      });
 
-      const allTitles = clusters.slice(0, 20).map(c => c.primaryTitle).join('. ');
-      const entitiesResult = await mlWorker.extractEntities([allTitles]).catch(() => null);
-      const entities = entitiesResult?.[0] ?? [];
+      // Take top 8 for sentiment analysis
+      const importantClusters = sortedClusters.slice(0, 8);
 
-      this.renderInsights(topClusters, summaries, sentiments, entities);
+      if (importantClusters.length === 0) {
+        this.setContent('<div class="insights-empty">No breaking or multi-source stories yet</div>');
+        return;
+      }
+
+      const titles = importantClusters.map(c => c.primaryTitle);
+
+      // Only get sentiment - skip T5 summarization (too weak for real summaries)
+      const sentiments = await mlWorker.classifySentiment(titles).catch(() => null);
+
+      this.renderInsights(importantClusters, sentiments);
     } catch (error) {
       console.error('[InsightsPanel] Error:', error);
       this.setContent('<div class="insights-error">Analysis failed</div>');
@@ -64,142 +78,127 @@ export class InsightsPanel extends Panel {
 
   private renderInsights(
     clusters: ClusteredEvent[],
-    summaries: string[] | null,
-    sentiments: Array<{ label: string; score: number }> | null,
-    entities: NEREntity[]
+    sentiments: Array<{ label: string; score: number }> | null
   ): void {
-    const themesHtml = this.renderThemes(clusters, summaries, sentiments);
-    const entitiesHtml = this.renderEntities(entities);
     const sentimentOverview = this.renderSentimentOverview(sentiments);
+    const breakingHtml = this.renderBreakingStories(clusters, sentiments);
+    const statsHtml = this.renderStats(clusters);
 
     this.setContent(`
       ${sentimentOverview}
+      ${statsHtml}
       <div class="insights-section">
-        <div class="insights-section-title">TOP THEMES</div>
-        ${themesHtml}
-      </div>
-      <div class="insights-section">
-        <div class="insights-section-title">KEY ENTITIES</div>
-        ${entitiesHtml}
+        <div class="insights-section-title">BREAKING & CONFIRMED</div>
+        ${breakingHtml}
       </div>
     `);
   }
 
-  private renderThemes(
+  private renderBreakingStories(
     clusters: ClusteredEvent[],
-    summaries: string[] | null,
     sentiments: Array<{ label: string; score: number }> | null
   ): string {
+    // Show multi-source and fast-moving stories
     return clusters.map((cluster, i) => {
-      const summary = summaries?.[i];
       const sentiment = sentiments?.[i];
       const sentimentClass = sentiment?.label === 'negative' ? 'negative' :
         sentiment?.label === 'positive' ? 'positive' : 'neutral';
 
+      const badges: string[] = [];
+
+      // Multi-source badge
+      if (cluster.sourceCount >= 3) {
+        badges.push(`<span class="insight-badge confirmed">✓ ${cluster.sourceCount} sources</span>`);
+      } else if (cluster.sourceCount >= 2) {
+        badges.push(`<span class="insight-badge multi">${cluster.sourceCount} sources</span>`);
+      }
+
+      // Velocity badge
+      if (cluster.velocity && cluster.velocity.level !== 'normal') {
+        const velIcon = cluster.velocity.trend === 'rising' ? '↑' : '';
+        badges.push(`<span class="insight-badge velocity ${cluster.velocity.level}">${velIcon}+${cluster.velocity.sourcesPerHour}/hr</span>`);
+      }
+
+      // Alert badge
+      if (cluster.isAlert) {
+        badges.push('<span class="insight-badge alert">⚠ ALERT</span>');
+      }
+
       return `
-        <div class="insight-theme">
-          <div class="insight-theme-title">
+        <div class="insight-story">
+          <div class="insight-story-header">
             <span class="insight-sentiment-dot ${sentimentClass}"></span>
-            ${escapeHtml(cluster.primaryTitle.slice(0, 80))}${cluster.primaryTitle.length > 80 ? '...' : ''}
+            <span class="insight-story-title">${escapeHtml(cluster.primaryTitle.slice(0, 100))}${cluster.primaryTitle.length > 100 ? '...' : ''}</span>
           </div>
-          ${summary ? `<div class="insight-summary">${escapeHtml(summary)}</div>` : ''}
-          <div class="insight-meta">${cluster.sourceCount} sources</div>
+          ${badges.length > 0 ? `<div class="insight-badges">${badges.join('')}</div>` : ''}
         </div>
       `;
     }).join('');
   }
 
-  private renderEntities(entities: NEREntity[]): string {
-    if (!entities.length) {
-      return '<div class="insights-empty">No entities detected</div>';
-    }
-
-    const grouped = this.groupEntities(entities);
-    const sections: string[] = [];
-
-    if (grouped.PER.length > 0) {
-      sections.push(`
-        <div class="entity-group">
-          <span class="entity-group-label">People:</span>
-          ${grouped.PER.slice(0, 5).map(e =>
-            `<span class="entity-pill person">${escapeHtml(e.text)}</span>`
-          ).join('')}
-        </div>
-      `);
-    }
-
-    if (grouped.ORG.length > 0) {
-      sections.push(`
-        <div class="entity-group">
-          <span class="entity-group-label">Organizations:</span>
-          ${grouped.ORG.slice(0, 5).map(e =>
-            `<span class="entity-pill organization">${escapeHtml(e.text)}</span>`
-          ).join('')}
-        </div>
-      `);
-    }
-
-    if (grouped.LOC.length > 0) {
-      sections.push(`
-        <div class="entity-group">
-          <span class="entity-group-label">Locations:</span>
-          ${grouped.LOC.slice(0, 5).map(e =>
-            `<span class="entity-pill location">${escapeHtml(e.text)}</span>`
-          ).join('')}
-        </div>
-      `);
-    }
-
-    return sections.join('') || '<div class="insights-empty">No entities detected</div>';
-  }
-
-  private groupEntities(entities: NEREntity[]): { PER: NEREntity[]; ORG: NEREntity[]; LOC: NEREntity[]; MISC: NEREntity[] } {
-    const grouped = { PER: [] as NEREntity[], ORG: [] as NEREntity[], LOC: [] as NEREntity[], MISC: [] as NEREntity[] };
-    const seen = new Set<string>();
-
-    for (const entity of entities) {
-      if (!entity.type || !entity.text || entity.confidence < 0.7) continue;
-      const key = `${entity.type}:${entity.text.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const type = entity.type.toUpperCase() as keyof typeof grouped;
-      if (type in grouped) {
-        grouped[type].push(entity);
-      } else {
-        grouped.MISC.push(entity);
-      }
-    }
-
-    return grouped;
-  }
-
   private renderSentimentOverview(sentiments: Array<{ label: string; score: number }> | null): string {
-    if (!sentiments?.length) return '';
-
-    const counts = { positive: 0, neutral: 0, negative: 0 };
-    for (const s of sentiments) {
-      if (s.label === 'positive') counts.positive++;
-      else if (s.label === 'negative') counts.negative++;
-      else counts.neutral++;
+    if (!sentiments || sentiments.length === 0) {
+      return '';
     }
+
+    const negative = sentiments.filter(s => s.label === 'negative').length;
+    const positive = sentiments.filter(s => s.label === 'positive').length;
+    const neutral = sentiments.length - negative - positive;
 
     const total = sentiments.length;
-    const dominant = counts.negative > counts.positive ? 'negative' :
-      counts.positive > counts.negative ? 'positive' : 'neutral';
+    const negPct = Math.round((negative / total) * 100);
+    const neuPct = Math.round((neutral / total) * 100);
+    const posPct = 100 - negPct - neuPct;
+
+    // Determine overall tone
+    let toneLabel = 'Mixed';
+    let toneClass = 'neutral';
+    if (negative > positive + neutral) {
+      toneLabel = 'Negative';
+      toneClass = 'negative';
+    } else if (positive > negative + neutral) {
+      toneLabel = 'Positive';
+      toneClass = 'positive';
+    }
 
     return `
-      <div class="insights-sentiment-overview ${dominant}">
-        <div class="sentiment-bar">
-          <div class="sentiment-segment negative" style="width: ${(counts.negative / total) * 100}%"></div>
-          <div class="sentiment-segment neutral" style="width: ${(counts.neutral / total) * 100}%"></div>
-          <div class="sentiment-segment positive" style="width: ${(counts.positive / total) * 100}%"></div>
+      <div class="insights-sentiment-bar">
+        <div class="sentiment-bar-track">
+          <div class="sentiment-bar-negative" style="width: ${negPct}%"></div>
+          <div class="sentiment-bar-neutral" style="width: ${neuPct}%"></div>
+          <div class="sentiment-bar-positive" style="width: ${posPct}%"></div>
         </div>
-        <div class="sentiment-labels">
-          <span class="negative">${counts.negative}</span>
-          <span class="neutral">${counts.neutral}</span>
-          <span class="positive">${counts.positive}</span>
+        <div class="sentiment-bar-labels">
+          <span class="sentiment-label negative">${negative}</span>
+          <span class="sentiment-label neutral">${neutral}</span>
+          <span class="sentiment-label positive">${positive}</span>
         </div>
+        <div class="sentiment-tone ${toneClass}">Overall: ${toneLabel}</div>
+      </div>
+    `;
+  }
+
+  private renderStats(clusters: ClusteredEvent[]): string {
+    const multiSource = clusters.filter(c => c.sourceCount >= 2).length;
+    const fastMoving = clusters.filter(c => c.velocity && c.velocity.level !== 'normal').length;
+    const alerts = clusters.filter(c => c.isAlert).length;
+
+    return `
+      <div class="insights-stats">
+        <div class="insight-stat">
+          <span class="insight-stat-value">${multiSource}</span>
+          <span class="insight-stat-label">Multi-source</span>
+        </div>
+        <div class="insight-stat">
+          <span class="insight-stat-value">${fastMoving}</span>
+          <span class="insight-stat-label">Fast-moving</span>
+        </div>
+        ${alerts > 0 ? `
+        <div class="insight-stat alert">
+          <span class="insight-stat-value">${alerts}</span>
+          <span class="insight-stat-label">Alerts</span>
+        </div>
+        ` : ''}
       </div>
     `;
   }
