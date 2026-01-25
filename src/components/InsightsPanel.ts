@@ -4,6 +4,7 @@ import { generateSummary, type SummarizationProvider } from '@/services/summariz
 import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-analysis';
 import { signalAggregator, logSignalSummary, type RegionalConvergence } from '@/services/signal-aggregator';
 import { focalPointDetector } from '@/services/focal-point-detector';
+import { ingestNewsForCII } from '@/services/country-instability';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ClusteredEvent, FocalPoint } from '@/types';
@@ -243,7 +244,9 @@ export class InsightsPanel extends Panel {
       this.lastFocalPoints = focalSummary.focalPoints;
       if (focalSummary.focalPoints.length > 0) {
         focalPointDetector.logSummary();
-        // Signal CII to refresh now that focal points are available
+        // Ingest news for CII BEFORE signaling (so CII has data when it calculates)
+        ingestNewsForCII(clusters);
+        // Signal CII to refresh now that focal points AND news data are available
         window.dispatchEvent(new CustomEvent('focal-points-ready'));
       }
 
