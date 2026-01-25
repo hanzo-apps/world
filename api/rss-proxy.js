@@ -125,6 +125,7 @@ const ALLOWED_DOMAINS = [
   'kyivindependent.com',
   'www.themoscowtimes.com',
   'feeds.24.com',
+  'feeds.capi24.com',  // News24 redirect destination
   // International Organizations
   'news.un.org',
   'www.iaea.org',
