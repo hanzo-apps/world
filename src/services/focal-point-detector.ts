@@ -387,6 +387,45 @@ class FocalPointDetector {
   }
 
   /**
+   * Get full focal point data for a country (for military surge integration)
+   * Returns focal point with news headlines and correlation evidence
+   */
+  getFocalPointForCountry(countryCode: string): FocalPoint | null {
+    if (!this.lastSummary) return null;
+    return this.lastSummary.focalPoints.find(
+      fp => fp.entityType === 'country' && fp.entityId === countryCode
+    ) || null;
+  }
+
+  /**
+   * Get news correlation context for multiple countries (for surge alerts)
+   * Returns formatted string describing news-signal correlations
+   */
+  getNewsCorrelationContext(countryCodes: string[]): string | null {
+    if (!this.lastSummary) return null;
+
+    const relevantFPs = this.lastSummary.focalPoints.filter(
+      fp => fp.entityType === 'country' && countryCodes.includes(fp.entityId) && fp.newsMentions > 0
+    );
+
+    if (relevantFPs.length === 0) return null;
+
+    const lines: string[] = [];
+    for (const fp of relevantFPs.slice(0, 3)) {
+      const headline = fp.topHeadlines[0];
+      if (headline) {
+        lines.push(`${fp.displayName}: "${headline.slice(0, 80)}..."`);
+      }
+      const evidence = fp.correlationEvidence[0];
+      if (evidence) {
+        lines.push(`  → ${evidence}`);
+      }
+    }
+
+    return lines.length > 0 ? lines.join('\n') : null;
+  }
+
+  /**
    * Log focal point summary to console for debugging
    */
   logSummary(): void {
