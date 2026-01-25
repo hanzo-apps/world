@@ -1115,30 +1115,34 @@ export class DeckGLMap {
     const legend = document.createElement('div');
     legend.className = 'map-legend deckgl-legend';
 
+    // SVG shapes for different marker types
+    const shapes = {
+      circle: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${color}"/></svg>`,
+      triangle: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,10 1,10" fill="${color}"/></svg>`,
+      square: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1" fill="${color}"/></svg>`,
+      hexagon: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 10.5,3.5 10.5,8.5 6,11 1.5,8.5 1.5,3.5" fill="${color}"/></svg>`,
+    };
+
     const legendItems = SITE_VARIANT === 'tech'
       ? [
-          { color: 'rgb(0, 255, 150)', label: 'Startup Hub' },
-          { color: 'rgb(100, 200, 255)', label: 'Tech HQ' },
-          { color: 'rgb(255, 200, 0)', label: 'Accelerator' },
-          { color: 'rgb(150, 100, 255)', label: 'Cloud Region' },
-          { color: 'rgb(0, 255, 200)', label: 'AI Datacenter' },
+          { shape: shapes.circle('rgb(0, 255, 150)'), label: 'Startup Hub' },
+          { shape: shapes.circle('rgb(100, 200, 255)'), label: 'Tech HQ' },
+          { shape: shapes.circle('rgb(255, 200, 0)'), label: 'Accelerator' },
+          { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud Region' },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
         ]
       : [
-          { color: 'rgb(255, 68, 68)', label: 'High Alert' },
-          { color: 'rgb(255, 165, 0)', label: 'Elevated' },
-          { color: 'rgb(255, 255, 0)', label: 'Monitoring' },
-          { color: 'rgb(0, 150, 255)', label: 'Military Base' },
-          { color: 'rgb(255, 215, 0)', label: 'Nuclear' },
+          { shape: shapes.circle('rgb(255, 68, 68)'), label: 'High Alert' },
+          { shape: shapes.circle('rgb(255, 165, 0)'), label: 'Elevated' },
+          { shape: shapes.circle('rgb(255, 255, 0)'), label: 'Monitoring' },
+          { shape: shapes.triangle('rgb(68, 136, 255)'), label: 'Base' },
+          { shape: shapes.hexagon('rgb(255, 220, 0)'), label: 'Nuclear' },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
         ];
 
     legend.innerHTML = `
-      <div class="legend-title">Legend</div>
-      ${legendItems.map(({ color, label }) => `
-        <div class="legend-item">
-          <span class="legend-color" style="background: ${color}"></span>
-          <span class="legend-label">${label}</span>
-        </div>
-      `).join('')}
+      <span class="legend-label-title">LEGEND</span>
+      ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${label}</span></span>`).join('')}
     `;
 
     this.container.appendChild(legend);
