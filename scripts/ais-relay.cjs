@@ -199,13 +199,27 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Missing url parameter' }));
       }
 
-      // Only allow specific blocked domains
+      // Allow domains that block Vercel IPs (must match feeds.ts railwayRss usage)
       const allowedDomains = [
+        // Original
         'rss.cnn.com',
         'www.defensenews.com',
         'layoffs.fyi',
+        // International Organizations
         'news.un.org',
         'www.cisa.gov',
+        'www.iaea.org',
+        'www.who.int',
+        'www.crisisgroup.org',
+        // Middle East & Regional News
+        'english.alarabiya.net',
+        'www.arabnews.com',
+        'www.timesofisrael.com',
+        'www.scmp.com',
+        'kyivindependent.com',
+        'www.themoscowtimes.com',
+        // Africa
+        'feeds.24.com',
       ];
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
