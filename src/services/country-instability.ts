@@ -1,5 +1,6 @@
 import type { SocialUnrestEvent, MilitaryFlight, MilitaryVessel, ClusteredEvent, InternetOutage } from '@/types';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, STRATEGIC_WATERWAYS } from '@/config/geo';
+import { TIER1_COUNTRIES } from '@/config/countries';
 import { focalPointDetector } from './focal-point-detector';
 
 export interface CountryScore {
@@ -27,28 +28,8 @@ interface CountryData {
   outages: InternetOutage[];
 }
 
-export const TIER1_COUNTRIES: Record<string, string> = {
-  US: 'United States',
-  RU: 'Russia',
-  CN: 'China',
-  UA: 'Ukraine',
-  IR: 'Iran',
-  IL: 'Israel',
-  TW: 'Taiwan',
-  KP: 'North Korea',
-  SA: 'Saudi Arabia',
-  TR: 'Turkey',
-  PL: 'Poland',
-  DE: 'Germany',
-  FR: 'France',
-  GB: 'United Kingdom',
-  IN: 'India',
-  PK: 'Pakistan',
-  SY: 'Syria',
-  YE: 'Yemen',
-  MM: 'Myanmar',
-  VE: 'Venezuela',
-};
+// Re-export for backwards compatibility
+export { TIER1_COUNTRIES } from '@/config/countries';
 
 // Learning Mode - warmup period for reliable data (bypassed when cached scores exist)
 const LEARNING_DURATION_MS = 15 * 60 * 1000; // 15 minutes
