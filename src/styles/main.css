@@ -7863,6 +7863,63 @@ body.playback-mode .status-dot {
   color: #66aaff;
 }
 
+/* --- Signal Modal: Focal Points & News Correlation --- */
+.signal-focal-points,
+.signal-news-correlation {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.signal-news-correlation {
+  background: rgba(68, 136, 255, 0.08);
+  border-color: rgba(68, 136, 255, 0.25);
+}
+
+.focal-points-header,
+.news-correlation-header {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b5cf6;
+  margin-bottom: 8px;
+}
+
+.news-correlation-header {
+  color: #4488ff;
+}
+
+.focal-point-item {
+  font-size: 11px;
+  color: var(--text);
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.focal-point-item:last-child {
+  border-bottom: none;
+}
+
+.news-correlation-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.signal-location {
+  margin: 8px 0;
+}
+
+.signal-item.military_surge {
+  border-left-color: #ff4444;
+}
+
 /* --- News Panel: Propaganda Risk Badges --- */
 .propaganda-badge {
   display: inline-flex;
