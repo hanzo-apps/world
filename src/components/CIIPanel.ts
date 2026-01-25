@@ -1,11 +1,10 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
-import { calculateCII, getLearningProgress, type CountryScore } from '@/services/country-instability';
-import { fetchCachedRiskScores, toCountryScore } from '@/services/cached-risk-scores';
+import { calculateCII, type CountryScore } from '@/services/country-instability';
 
 export class CIIPanel extends Panel {
   private scores: CountryScore[] = [];
-  private usedCachedScores = false;
+  private focalPointsReady = false;
 
   constructor() {
     super({
@@ -24,7 +23,14 @@ export class CIIPanel extends Panel {
         </ul>
         Event multipliers adjust for media coverage bias.`,
     });
-    this.refresh();
+    // Show loading state until focal points ready
+    this.content.innerHTML = `
+      <div class="cii-awaiting">
+        <div class="cii-awaiting-icon">📊</div>
+        <div class="cii-awaiting-text">Analyzing intelligence...</div>
+        <div class="cii-awaiting-sub">Correlating news with map signals</div>
+      </div>
+    `;
   }
 
   private getLevelColor(level: CountryScore['level']): string {
@@ -51,24 +57,6 @@ export class CIIPanel extends Panel {
     if (trend === 'rising') return `<span class="trend-up">↑${change > 0 ? change : ''}</span>`;
     if (trend === 'falling') return `<span class="trend-down">↓${Math.abs(change)}</span>`;
     return '<span class="trend-stable">→</span>';
-  }
-
-  private renderLearningBanner(): string {
-    const { inLearning, remainingMinutes, progress } = getLearningProgress();
-    if (!inLearning) return '';
-
-    return `
-      <div class="cii-learning-banner">
-        <div class="learning-icon">📊</div>
-        <div class="learning-text">
-          <div class="learning-title">Learning Mode</div>
-          <div class="learning-desc">Calibrating scores (~${remainingMinutes}m remaining)</div>
-        </div>
-        <div class="learning-progress">
-          <div class="learning-bar" style="width: ${progress}%"></div>
-        </div>
-      </div>
-    `;
   }
 
   private renderCountry(country: CountryScore): string {
@@ -98,54 +86,35 @@ export class CIIPanel extends Panel {
   }
 
   public async refresh(forceLocal = false): Promise<void> {
+    // Don't show scores until focal points are ready (avoids misleading preliminary data)
+    if (!this.focalPointsReady && !forceLocal) {
+      return; // Keep showing "Analyzing intelligence..." state
+    }
+
+    if (forceLocal) {
+      this.focalPointsReady = true;
+      console.log('[CIIPanel] Focal points ready, calculating scores...');
+    }
+
     this.showLoading();
 
     try {
-      // First, try to get cached scores from backend (eliminates learning mode)
-      const { inLearning } = getLearningProgress();
-
-      if (inLearning && !this.usedCachedScores && !forceLocal) {
-        const cached = await fetchCachedRiskScores();
-        if (cached && cached.cii.length > 0) {
-          this.scores = cached.cii.map(toCountryScore);
-          this.usedCachedScores = true;
-          console.log('[CIIPanel] Using cached scores from backend');
-        }
-      }
-
-      // If no cached scores, learning complete, OR forced local → recalculate
-      if (!this.usedCachedScores || !inLearning || forceLocal) {
-        if (forceLocal) {
-          console.log('[CIIPanel] Recalculating with focal point data...');
-        }
-        const localScores = calculateCII();
-        const localWithData = localScores.filter(s => s.score > 0).length;
-        const cachedWithData = this.scores.filter(s => s.score > 0).length;
-
-        // Use local if better coverage, or if forced (focal points provide better intelligence)
-        if (localWithData >= cachedWithData || forceLocal) {
-          this.scores = localScores;
-          if (forceLocal) {
-            console.log(`[CIIPanel] Applied focal point boosts (${localWithData} countries with data)`);
-          }
-        }
-      }
+      // Calculate with focal point data
+      const localScores = calculateCII();
+      const localWithData = localScores.filter(s => s.score > 0).length;
+      this.scores = localScores;
+      console.log(`[CIIPanel] Calculated ${localWithData} countries with focal point intelligence`);
 
       const withData = this.scores.filter(s => s.score > 0);
       this.setCount(withData.length);
 
-      // Only show learning banner if no cached scores AND still learning
-      const showLearning = inLearning && !this.usedCachedScores;
-      const learningBanner = showLearning ? this.renderLearningBanner() : '';
-      const learningClass = showLearning ? 'cii-learning' : '';
-
       if (withData.length === 0) {
-        this.content.innerHTML = learningBanner + '<div class="empty-state">Collecting data...</div>';
+        this.content.innerHTML = '<div class="empty-state">No instability signals detected</div>';
         return;
       }
 
       const html = withData.map(s => this.renderCountry(s)).join('');
-      this.content.innerHTML = learningBanner + `<div class="cii-list ${learningClass}">${html}</div>`;
+      this.content.innerHTML = `<div class="cii-list">${html}</div>`;
     } catch (error) {
       console.error('[CIIPanel] Refresh error:', error);
       this.showError('Failed to calculate CII');
