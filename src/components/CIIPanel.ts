@@ -97,14 +97,14 @@ export class CIIPanel extends Panel {
     `;
   }
 
-  public async refresh(): Promise<void> {
+  public async refresh(forceLocal = false): Promise<void> {
     this.showLoading();
 
     try {
       // First, try to get cached scores from backend (eliminates learning mode)
       const { inLearning } = getLearningProgress();
 
-      if (inLearning && !this.usedCachedScores) {
+      if (inLearning && !this.usedCachedScores && !forceLocal) {
         const cached = await fetchCachedRiskScores();
         if (cached && cached.cii.length > 0) {
           this.scores = cached.cii.map(toCountryScore);
@@ -113,12 +113,15 @@ export class CIIPanel extends Panel {
         }
       }
 
-      // If no cached scores or learning complete, use local calculation
-      if (!this.usedCachedScores || !inLearning) {
+      // If no cached scores, learning complete, OR forced local → recalculate
+      if (!this.usedCachedScores || !inLearning || forceLocal) {
         const localScores = calculateCII();
         // Merge: use local if better coverage, otherwise keep cached
         if (localScores.filter(s => s.score > 0).length >= this.scores.filter(s => s.score > 0).length) {
           this.scores = localScores;
+          if (forceLocal) {
+            console.log('[CIIPanel] Recalculated with focal point data');
+          }
         }
       }
 

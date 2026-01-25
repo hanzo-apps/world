@@ -1405,7 +1405,7 @@ export class App {
 
     // Refresh CII when focal points are ready (ensures focal point urgency is factored in)
     window.addEventListener('focal-points-ready', () => {
-      (this.panels['cii'] as CIIPanel)?.refresh();
+      (this.panels['cii'] as CIIPanel)?.refresh(true); // forceLocal to use focal point data
     });
 
     // Idle detection - pause animations after 2 minutes of inactivity
