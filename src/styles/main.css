@@ -9162,6 +9162,56 @@ body.playback-mode .status-dot {
   50% { opacity: 1; }
 }
 
+/* Insights Panel - Progress Bar */
+.insights-progress {
+  padding: 12px 8px;
+}
+
+.insights-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.insights-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #8844ff);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.insights-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.insights-progress-step {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.insights-progress-message {
+  color: var(--text-dim);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Insights Panel - Provider Badge */
+.insights-provider {
+  font-size: 8px;
+  padding: 2px 6px;
+  background: rgba(68, 136, 255, 0.15);
+  color: var(--accent);
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* Insights Panel - Stats */
 .insights-stats {
   display: flex;
