@@ -9574,3 +9574,32 @@ body.playback-mode .status-dot {
 .sentiment-tone.positive {
   color: var(--green);
 }
+
+/* ML-Detected Stories Section */
+.insights-missed {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.insights-missed .insights-section-title {
+  color: #6b8afd;
+}
+
+.insight-story.missed {
+  opacity: 0.85;
+  border-left: 2px solid #6b8afd;
+  padding-left: 8px;
+  margin-left: 0;
+}
+
+.insight-sentiment-dot.ml-flagged {
+  background: #6b8afd;
+  box-shadow: 0 0 6px rgba(107, 138, 253, 0.5);
+}
+
+.insight-badge.ml-detected {
+  background: rgba(107, 138, 253, 0.15);
+  color: #6b8afd;
+  border-color: rgba(107, 138, 253, 0.3);
+}
