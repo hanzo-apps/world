@@ -476,16 +476,16 @@ export class DeckGLMap {
       getIcon: () => 'triangleUp',
       iconAtlas: MARKER_ICONS.triangleUp,
       iconMapping: { triangleUp: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedBases.has(d.id) ? 14 : 8,
+      getSize: (d) => highlightedBases.has(d.id) ? 16 : 11,
       getColor: (d) => {
         if (highlightedBases.has(d.id)) {
-          return [255, 100, 100, 200] as [number, number, number, number];
+          return [255, 100, 100, 220] as [number, number, number, number];
         }
         return getBaseColor(d.type);
       },
       sizeScale: 1,
-      sizeMinPixels: 4,
-      sizeMaxPixels: 14,
+      sizeMinPixels: 6,
+      sizeMaxPixels: 16,
       pickable: true,
     });
   }
@@ -502,19 +502,19 @@ export class DeckGLMap {
       getIcon: () => 'hexagon',
       iconAtlas: MARKER_ICONS.hexagon,
       iconMapping: { hexagon: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedNuclear.has(d.id) ? 14 : 10,
+      getSize: (d) => highlightedNuclear.has(d.id) ? 15 : 11,
       getColor: (d) => {
         if (highlightedNuclear.has(d.id)) {
-          return [255, 100, 100, 200] as [number, number, number, number];
+          return [255, 100, 100, 220] as [number, number, number, number];
         }
         if (d.status === 'contested') {
-          return [255, 50, 50, 180] as [number, number, number, number];
+          return [255, 50, 50, 200] as [number, number, number, number];
         }
-        return [255, 220, 0, 180] as [number, number, number, number]; // Semi-transparent yellow
+        return [255, 220, 0, 200] as [number, number, number, number]; // Semi-transparent yellow
       },
       sizeScale: 1,
-      sizeMinPixels: 5,
-      sizeMaxPixels: 14,
+      sizeMinPixels: 6,
+      sizeMaxPixels: 15,
       pickable: true,
     });
   }
@@ -556,19 +556,19 @@ export class DeckGLMap {
       getIcon: () => 'square',
       iconAtlas: MARKER_ICONS.square,
       iconMapping: { square: { x: 0, y: 0, width: 32, height: 32, mask: true } },
-      getSize: (d) => highlightedDC.has(d.id) ? 10 : 6,
+      getSize: (d) => highlightedDC.has(d.id) ? 14 : 10,
       getColor: (d) => {
         if (highlightedDC.has(d.id)) {
-          return [255, 100, 100, 180] as [number, number, number, number];
+          return [255, 100, 100, 200] as [number, number, number, number];
         }
         if (d.status === 'planned') {
-          return [136, 68, 255, 50] as [number, number, number, number]; // Very transparent for planned
+          return [136, 68, 255, 100] as [number, number, number, number]; // Transparent for planned
         }
-        return [136, 68, 255, 80] as [number, number, number, number]; // ~30% opacity
+        return [136, 68, 255, 140] as [number, number, number, number]; // ~55% opacity
       },
       sizeScale: 1,
-      sizeMinPixels: 4,
-      sizeMaxPixels: 10,
+      sizeMinPixels: 6,
+      sizeMaxPixels: 14,
       pickable: true,
     });
   }
