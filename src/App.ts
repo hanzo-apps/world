@@ -1570,7 +1570,7 @@ export class App {
     document.addEventListener('mousemove', (e) => {
       if (!isResizing) return;
       const deltaY = e.clientY - startY;
-      const newHeight = Math.max(400, Math.min(startHeight + deltaY, window.innerHeight * 0.85));
+      const newHeight = Math.max(400, Math.min(startHeight + deltaY, window.innerHeight * 0.90));
       mapSection.style.height = `${newHeight}px`;
       this.map?.render();
     });
