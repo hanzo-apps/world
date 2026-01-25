@@ -9134,6 +9134,34 @@ body.playback-mode .status-dot {
   color: var(--red);
 }
 
+/* Insights Panel - Loading Status */
+.insights-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.insights-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.insights-status-text {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 /* Insights Panel - Stats */
 .insights-stats {
   display: flex;
