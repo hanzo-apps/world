@@ -1720,7 +1720,8 @@ body.playback-mode .status-dot {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  z-index: 100;
+  z-index: 500;
+  pointer-events: auto;
 }
 
 .map-control-btn {
@@ -8872,7 +8873,8 @@ body.playback-mode .status-dot {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 100;
+  z-index: 500;
+  pointer-events: auto;
 }
 
 .deckgl-controls .zoom-controls {
