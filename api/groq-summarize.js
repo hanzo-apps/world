@@ -149,8 +149,13 @@ export default async function handler(request) {
     // Include intelligence synthesis context in prompt if available
     const intelSection = geoContext ? `\n\n${geoContext}` : '';
 
+    // Current date context for LLM (models may have outdated knowledge)
+    const dateContext = `Current date: ${new Date().toISOString().split('T')[0]}. Donald Trump is the current US President (second term, inaugurated Jan 2025).`;
+
     if (mode === 'brief') {
-      systemPrompt = `Summarize the key development in 2-3 sentences.
+      systemPrompt = `${dateContext}
+
+Summarize the key development in 2-3 sentences.
 Rules:
 - Lead with WHAT happened and WHERE - be specific
 - NEVER start with "Breaking news", "Good evening", "Tonight", or TV-style openings
@@ -160,7 +165,9 @@ Rules:
 - No bullet points, no meta-commentary`;
       userPrompt = `Summarize the top story:\n${headlineText}${intelSection}`;
     } else if (mode === 'analysis') {
-      systemPrompt = `Provide analysis in 2-3 sentences. Be direct and specific.
+      systemPrompt = `${dateContext}
+
+Provide analysis in 2-3 sentences. Be direct and specific.
 Rules:
 - Lead with the insight - what's significant and why
 - NEVER start with "Breaking news", "Tonight", "The key/dominant narrative is"
@@ -170,7 +177,9 @@ Rules:
 - Connect dots, be specific about implications`;
       userPrompt = `What's the key pattern or risk?\n${headlineText}${intelSection}`;
     } else {
-      systemPrompt = `Synthesize in 2 sentences max. Lead with substance. NEVER start with "Breaking news" or "Tonight" - just state the insight directly. CRITICAL focal points with news-signal convergence are significant.`;
+      systemPrompt = `${dateContext}
+
+Synthesize in 2 sentences max. Lead with substance. NEVER start with "Breaking news" or "Tonight" - just state the insight directly. CRITICAL focal points with news-signal convergence are significant.`;
       userPrompt = `Key takeaway:\n${headlineText}${intelSection}`;
     }
 
