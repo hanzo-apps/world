@@ -123,7 +123,7 @@ const ALLOWED_DOMAINS = [
 function getCorsHeaders(req) {
   const origin = req.headers.get('origin') || '*';
   const allowedPatterns = [
-    /^https:\/\/.*\.worldmonitor\.app$/,
+    /^https:\/\/(.*\.)?worldmonitor\.app$/, // Matches worldmonitor.app and *.worldmonitor.app
     /^https:\/\/.*-elie-habib-projects\.vercel\.app$/,
     /^https:\/\/worldmonitor.*\.vercel\.app$/,
     /^http:\/\/localhost(:\d+)?$/,
