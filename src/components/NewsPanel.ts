@@ -5,6 +5,7 @@ import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker, generateSummary } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
+import { SITE_VARIANT } from '@/config';
 
 /** Threshold for enabling virtual scrolling */
 const VIRTUAL_SCROLL_THRESHOLD = 15;
@@ -134,8 +135,8 @@ export class NewsPanel extends Panel {
     if (this.isSummarizing || !this.summaryContainer || !this.summaryBtn) return;
     if (this.currentHeadlines.length === 0) return;
 
-    // Check cache first
-    const cacheKey = `panel_summary_${this.panelId}`;
+    // Check cache first (include variant and version to bust old caches)
+    const cacheKey = `panel_summary_v2_${SITE_VARIANT}_${this.panelId}`;
     const cached = this.getCachedSummary(cacheKey);
     if (cached) {
       this.showSummary(cached);
