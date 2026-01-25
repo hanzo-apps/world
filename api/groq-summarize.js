@@ -110,8 +110,8 @@ export default async function handler(request) {
     let systemPrompt, userPrompt;
 
     if (mode === 'brief') {
-      systemPrompt = 'You are a concise news analyst. Summarize headlines in 2-3 varied sentences. Be factual. IMPORTANT: Start each summary differently - never start with "The headlines" or similar repetitive phrases. Vary your sentence structure.';
-      userPrompt = `News headlines:\n${headlineText}\n\nWrite a 2-3 sentence summary. Start directly with the key development or theme:`;
+      systemPrompt = 'Ultra-concise news analyst. Max 2 sentences, 40 words total. No filler. Start with the key fact.';
+      userPrompt = `Headlines:\n${headlineText}\n\n2 sentences max, 40 words. Key developments only:`;
     } else if (mode === 'analysis') {
       systemPrompt = 'You are a geopolitical analyst. Analyze news headlines to identify patterns, risks, and implications. Be concise but insightful.';
       userPrompt = `Analyze these news headlines for key patterns and implications:\n\n${headlineText}\n\nProvide a brief analysis (3-4 sentences):`;
@@ -133,7 +133,7 @@ export default async function handler(request) {
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.3,
-        max_tokens: 200,
+        max_tokens: 80,
         top_p: 0.9,
       }),
     });
