@@ -39,16 +39,32 @@ export class InsightsPanel extends Panel {
     'carrier', 'navy', 'airforce', 'deployment', 'mobilization', 'attack',
   ];
 
+  // Violence/casualty keywords (huge boost - human cost stories)
+  private static readonly VIOLENCE_KEYWORDS = [
+    'killed', 'dead', 'death', 'shot', 'blood', 'massacre', 'slaughter',
+    'fatalities', 'casualties', 'wounded', 'injured', 'murdered', 'execution',
+    'crackdown', 'violent', 'clashes', 'gunfire', 'shooting',
+  ];
+
+  // Civil unrest keywords (high boost)
+  private static readonly UNREST_KEYWORDS = [
+    'protest', 'protests', 'uprising', 'revolt', 'revolution', 'riot', 'riots',
+    'demonstration', 'unrest', 'dissent', 'rebellion', 'insurgent', 'overthrow',
+    'coup', 'martial law', 'curfew', 'shutdown', 'blackout',
+  ];
+
   // Geopolitical flashpoints (major boost)
   private static readonly FLASHPOINT_KEYWORDS = [
-    'iran', 'russia', 'china', 'taiwan', 'ukraine', 'north korea', 'israel', 'gaza',
-    'syria', 'yemen', 'hezbollah', 'hamas', 'kremlin', 'pentagon', 'nato',
+    'iran', 'tehran', 'russia', 'moscow', 'china', 'beijing', 'taiwan', 'ukraine', 'kyiv',
+    'north korea', 'pyongyang', 'israel', 'gaza', 'west bank', 'syria', 'damascus',
+    'yemen', 'hezbollah', 'hamas', 'kremlin', 'pentagon', 'nato', 'wagner',
   ];
 
   // Crisis keywords (moderate boost)
   private static readonly CRISIS_KEYWORDS = [
-    'crisis', 'emergency', 'catastrophe', 'disaster', 'collapse', 'martial law',
+    'crisis', 'emergency', 'catastrophe', 'disaster', 'collapse', 'humanitarian',
     'sanctions', 'ultimatum', 'threat', 'retaliation', 'escalation', 'tensions',
+    'breaking', 'urgent', 'developing', 'exclusive',
   ];
 
   // Business/tech context that should REDUCE score (demote business news with military words)
@@ -64,16 +80,35 @@ export class InsightsPanel extends Panel {
     // Source confirmation (base signal)
     score += cluster.sourceCount * 10;
 
+    // Violence/casualty keywords: highest priority (+100 base, +25 per match)
+    // "Pools of blood" type stories should always surface
+    const violenceMatches = InsightsPanel.VIOLENCE_KEYWORDS.filter(kw => titleLower.includes(kw));
+    if (violenceMatches.length > 0) {
+      score += 100 + (violenceMatches.length * 25);
+    }
+
     // Military keywords: highest priority (+80 base, +20 per match)
     const militaryMatches = InsightsPanel.MILITARY_KEYWORDS.filter(kw => titleLower.includes(kw));
     if (militaryMatches.length > 0) {
       score += 80 + (militaryMatches.length * 20);
     }
 
+    // Civil unrest: high priority (+70 base, +18 per match)
+    const unrestMatches = InsightsPanel.UNREST_KEYWORDS.filter(kw => titleLower.includes(kw));
+    if (unrestMatches.length > 0) {
+      score += 70 + (unrestMatches.length * 18);
+    }
+
     // Flashpoint keywords: high priority (+60 base, +15 per match)
     const flashpointMatches = InsightsPanel.FLASHPOINT_KEYWORDS.filter(kw => titleLower.includes(kw));
     if (flashpointMatches.length > 0) {
       score += 60 + (flashpointMatches.length * 15);
+    }
+
+    // COMBO BONUS: Violence/unrest + flashpoint location = critical story
+    // e.g., "Iran protests" + "blood" = huge boost
+    if ((violenceMatches.length > 0 || unrestMatches.length > 0) && flashpointMatches.length > 0) {
+      score *= 1.5; // 50% bonus for flashpoint unrest
     }
 
     // Crisis keywords: moderate priority (+30 base, +10 per match)
@@ -110,17 +145,21 @@ export class InsightsPanel extends Panel {
   }
 
   private selectTopStories(clusters: ClusteredEvent[], maxCount: number): ClusteredEvent[] {
-    // Filter: require at least 2 sources OR alert OR elevated+ velocity
-    const candidates = clusters.filter(c =>
+    // Score ALL clusters first - high-scoring stories override source requirements
+    const allScored = clusters
+      .map(c => ({ cluster: c, score: this.getImportanceScore(c) }));
+
+    // Filter: require at least 2 sources OR alert OR elevated velocity OR high score
+    // High score (>100) means critical keywords were matched - don't require multi-source
+    const candidates = allScored.filter(({ cluster: c, score }) =>
       c.sourceCount >= 2 ||
       c.isAlert ||
-      (c.velocity && c.velocity.level !== 'normal')
+      (c.velocity && c.velocity.level !== 'normal') ||
+      score > 100  // Critical stories bypass source requirement
     );
 
-    // Score and sort
-    const scored = candidates
-      .map(c => ({ cluster: c, score: this.getImportanceScore(c) }))
-      .sort((a, b) => b.score - a.score);
+    // Sort by score
+    const scored = candidates.sort((a, b) => b.score - a.score);
 
     // Select with source diversity (max 3 from same primary source)
     const selected: ClusteredEvent[] = [];
