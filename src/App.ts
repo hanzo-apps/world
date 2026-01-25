@@ -25,6 +25,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import type { ParsedMapUrlState } from '@/utils';
 import {
   MapContainer,
+  type MapView,
   NewsPanel,
   MarketPanel,
   HeatmapPanel,
@@ -816,6 +817,18 @@ export class App {
             <span class="status-dot"></span>
             <span>LIVE</span>
           </div>
+          <div class="region-selector">
+            <select id="regionSelect" class="region-select">
+              <option value="global">Global</option>
+              <option value="america">Americas</option>
+              <option value="mena">MENA</option>
+              <option value="eu">Europe</option>
+              <option value="asia">Asia</option>
+              <option value="latam">Latin America</option>
+              <option value="africa">Africa</option>
+              <option value="oceania">Oceania</option>
+            </select>
+          </div>
         </div>
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> Search</button>
@@ -1223,6 +1236,13 @@ export class App {
         this.map.setCenter(lat, lon);
       }
     }
+
+    // Sync header region selector with initial view
+    const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
+    const currentView = this.map.getState().view;
+    if (regionSelect && currentView) {
+      regionSelect.value = currentView;
+    }
   }
 
   private getSavedPanelOrder(): string[] {
@@ -1383,6 +1403,12 @@ export class App {
     };
     document.addEventListener('fullscreenchange', this.boundFullscreenHandler);
 
+    // Region selector
+    const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
+    regionSelect?.addEventListener('change', () => {
+      this.map?.setView(regionSelect.value as MapView);
+    });
+
     // Window resize
     this.boundResizeHandler = () => {
       this.map?.render();
@@ -1457,6 +1483,14 @@ export class App {
 
     this.map.onStateChanged(() => {
       update();
+      // Sync header region selector with map view
+      const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
+      if (regionSelect && this.map) {
+        const state = this.map.getState();
+        if (regionSelect.value !== state.view) {
+          regionSelect.value = state.view;
+        }
+      }
     });
     update();
   }
