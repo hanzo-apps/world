@@ -102,6 +102,18 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
   oceania: { longitude: 135, latitude: -25, zoom: 3.5 },
 };
 
+// Zoom thresholds for layer visibility and labels (matches old Map.ts)
+// Used in renderClusterOverlays for zoom-dependent label visibility
+const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; showLabels?: number }>> = {
+  bases: { minZoom: 3, showLabels: 5 },
+  nuclear: { minZoom: 2 },
+  conflicts: { minZoom: 1, showLabels: 3 },
+  economic: { minZoom: 2 },
+  natural: { minZoom: 1, showLabels: 2 },
+};
+// Export for external use
+export { LAYER_ZOOM_THRESHOLDS };
+
 // Color constants matching the dark theme
 const COLORS = {
   hotspotHigh: [255, 68, 68, 200] as [number, number, number, number],
@@ -159,7 +171,9 @@ export class DeckGLMap {
   private repairShips: RepairShip[] = [];
   private protests: SocialUnrestEvent[] = [];
   private militaryFlights: MilitaryFlight[] = [];
+  private militaryFlightClusters: MilitaryFlightCluster[] = [];
   private militaryVessels: MilitaryVessel[] = [];
+  private militaryVesselClusters: MilitaryVesselCluster[] = [];
   private naturalEvents: NaturalEvent[] = [];
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
@@ -1705,6 +1719,7 @@ export class DeckGLMap {
     toggles.innerHTML = `
       <div class="toggle-header">
         <span>Layers</span>
+        <button class="layer-help-btn" title="Layer Guide">?</button>
         <button class="toggle-collapse">&#9660;</button>
       </div>
       <div class="toggle-list">
@@ -1732,6 +1747,10 @@ export class DeckGLMap {
       });
     });
 
+    // Help button
+    const helpBtn = toggles.querySelector('.layer-help-btn');
+    helpBtn?.addEventListener('click', () => this.showLayerHelp());
+
     // Collapse toggle
     const collapseBtn = toggles.querySelector('.toggle-collapse');
     const toggleList = toggles.querySelector('.toggle-list');
@@ -1739,6 +1758,123 @@ export class DeckGLMap {
       toggleList?.classList.toggle('collapsed');
       if (collapseBtn) collapseBtn.innerHTML = toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
     });
+  }
+
+  /** Show layer help popup explaining each layer */
+  private showLayerHelp(): void {
+    const existing = this.container.querySelector('.layer-help-popup');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    const popup = document.createElement('div');
+    popup.className = 'layer-help-popup';
+
+    const techHelpContent = `
+      <div class="layer-help-header">
+        <span>Map Layers Guide</span>
+        <button class="layer-help-close">×</button>
+      </div>
+      <div class="layer-help-content">
+        <div class="layer-help-section">
+          <div class="layer-help-title">Tech Ecosystem</div>
+          <div class="layer-help-item"><span>STARTUPHUBS</span> Major startup ecosystems (SF, NYC, London, etc.)</div>
+          <div class="layer-help-item"><span>CLOUDREGIONS</span> AWS, Azure, GCP data center regions</div>
+          <div class="layer-help-item"><span>TECHHQS</span> Headquarters of major tech companies</div>
+          <div class="layer-help-item"><span>ACCELERATORS</span> Y Combinator, Techstars, 500 Startups locations</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Infrastructure</div>
+          <div class="layer-help-item"><span>CABLES</span> Major undersea fiber optic cables (internet backbone)</div>
+          <div class="layer-help-item"><span>DATACENTERS</span> AI compute clusters ≥10,000 GPUs</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and service disruptions</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Natural & Economic</div>
+          <div class="layer-help-item"><span>NATURAL</span> Earthquakes, storms, fires (may affect data centers)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts</div>
+          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
+          <div class="layer-help-item"><span>COUNTRIES</span> Country name overlays</div>
+        </div>
+      </div>
+    `;
+
+    const fullHelpContent = `
+      <div class="layer-help-header">
+        <span>Map Layers Guide</span>
+        <button class="layer-help-close">×</button>
+      </div>
+      <div class="layer-help-content">
+        <div class="layer-help-section">
+          <div class="layer-help-title">Time Filter (top-right)</div>
+          <div class="layer-help-item"><span>1H/6H/24H</span> Filter time-based data to recent hours</div>
+          <div class="layer-help-item"><span>7D/30D/ALL</span> Show data from past week, month, or all time</div>
+          <div class="layer-help-note">Affects: Earthquakes, Weather, Protests, Outages</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Geopolitical</div>
+          <div class="layer-help-item"><span>CONFLICTS</span> Active war zones (Ukraine, Gaza, etc.) with boundaries</div>
+          <div class="layer-help-item"><span>HOTSPOTS</span> Tension regions - color-coded by news activity level</div>
+          <div class="layer-help-item"><span>SANCTIONS</span> Countries under US/EU/UN economic sanctions</div>
+          <div class="layer-help-item"><span>PROTESTS</span> Civil unrest, demonstrations (time-filtered)</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Military & Strategic</div>
+          <div class="layer-help-item"><span>BASES</span> US/NATO, China, Russia military installations (150+)</div>
+          <div class="layer-help-item"><span>NUCLEAR</span> Power plants, enrichment, weapons facilities</div>
+          <div class="layer-help-item"><span>IRRADIATORS</span> Industrial gamma irradiator facilities</div>
+          <div class="layer-help-item"><span>MILITARY</span> Live military aircraft and vessel tracking</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Infrastructure</div>
+          <div class="layer-help-item"><span>CABLES</span> Major undersea fiber optic cables (20 backbone routes)</div>
+          <div class="layer-help-item"><span>PIPELINES</span> Oil/gas pipelines (Nord Stream, TAPI, etc.)</div>
+          <div class="layer-help-item"><span>OUTAGES</span> Internet blackouts and disruptions</div>
+          <div class="layer-help-item"><span>DATACENTERS</span> AI compute clusters ≥10,000 GPUs only</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Transport</div>
+          <div class="layer-help-item"><span>SHIPPING</span> Vessels, chokepoints, 61 strategic ports</div>
+          <div class="layer-help-item"><span>DELAYS</span> Airport delays and ground stops (FAA)</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Natural & Economic</div>
+          <div class="layer-help-item"><span>NATURAL</span> Earthquakes (USGS) + storms, fires, volcanoes, floods (NASA EONET)</div>
+          <div class="layer-help-item"><span>WEATHER</span> Severe weather alerts</div>
+          <div class="layer-help-item"><span>ECONOMIC</span> Stock exchanges & central banks</div>
+        </div>
+        <div class="layer-help-section">
+          <div class="layer-help-title">Labels</div>
+          <div class="layer-help-item"><span>COUNTRIES</span> Country name overlays</div>
+          <div class="layer-help-item"><span>WATERWAYS</span> Strategic chokepoint labels</div>
+        </div>
+      </div>
+    `;
+
+    popup.innerHTML = SITE_VARIANT === 'tech' ? techHelpContent : fullHelpContent;
+
+    popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
+
+    // Prevent scroll events from propagating to map
+    const content = popup.querySelector('.layer-help-content');
+    if (content) {
+      content.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
+      content.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+    }
+
+    // Close on click outside
+    setTimeout(() => {
+      const closeHandler = (e: MouseEvent) => {
+        if (!popup.contains(e.target as Node)) {
+          popup.remove();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      document.addEventListener('click', closeHandler);
+    }, 100);
+
+    this.container.appendChild(popup);
   }
 
   private createLegend(): void {
@@ -1883,14 +2019,14 @@ export class DeckGLMap {
     return { ...this.state };
   }
 
-  // Zoom controls
-  private zoomIn(): void {
+  // Zoom controls - public for external access
+  public zoomIn(): void {
     if (this.maplibreMap) {
       this.maplibreMap.zoomIn();
     }
   }
 
-  private zoomOut(): void {
+  public zoomOut(): void {
     if (this.maplibreMap) {
       this.maplibreMap.zoomOut();
     }
@@ -1938,13 +2074,15 @@ export class DeckGLMap {
     this.updateLayers();
   }
 
-  public setMilitaryFlights(flights: MilitaryFlight[], _clusters: MilitaryFlightCluster[] = []): void {
+  public setMilitaryFlights(flights: MilitaryFlight[], clusters: MilitaryFlightCluster[] = []): void {
     this.militaryFlights = flights;
+    this.militaryFlightClusters = clusters;
     this.updateLayers();
   }
 
-  public setMilitaryVessels(vessels: MilitaryVessel[], _clusters: MilitaryVesselCluster[] = []): void {
+  public setMilitaryVessels(vessels: MilitaryVessel[], clusters: MilitaryVesselCluster[] = []): void {
     this.militaryVessels = vessels;
+    this.militaryVesselClusters = clusters;
     this.updateLayers();
   }
 
@@ -2037,6 +2175,16 @@ export class DeckGLMap {
     return getHotspotEscalation(hotspotId);
   }
 
+  /** Get military flight clusters for rendering/analysis */
+  public getMilitaryFlightClusters(): MilitaryFlightCluster[] {
+    return this.militaryFlightClusters;
+  }
+
+  /** Get military vessel clusters for rendering/analysis */
+  public getMilitaryVesselClusters(): MilitaryVesselCluster[] {
+    return this.militaryVesselClusters;
+  }
+
   public highlightAssets(assets: RelatedAsset[] | null): void {
     // Clear previous highlights
     Object.values(this.highlightedAssets).forEach(set => set.clear());
@@ -2127,6 +2275,16 @@ export class DeckGLMap {
       this.updateLayers();
       this.onLayerChange?.(layer, true);
     }
+  }
+
+  // Toggle layer on/off programmatically
+  public toggleLayer(layer: keyof MapLayers): void {
+    console.log(`[DeckGLMap.toggleLayer] ${layer}: ${this.state.layers[layer]} -> ${!this.state.layers[layer]}`);
+    this.state.layers[layer] = !this.state.layers[layer];
+    const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement;
+    if (toggle) toggle.checked = this.state.layers[layer];
+    this.updateLayers();
+    this.onLayerChange?.(layer, this.state.layers[layer]);
   }
 
   // Get center coordinates for programmatic popup positioning
