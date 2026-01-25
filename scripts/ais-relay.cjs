@@ -220,6 +220,7 @@ const server = http.createServer(async (req, res) => {
         'www.themoscowtimes.com',
         // Africa
         'feeds.24.com',
+        'feeds.capi24.com',  // News24 redirect destination
       ];
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
