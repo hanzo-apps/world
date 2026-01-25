@@ -1,9 +1,11 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { calculateCII, getLearningProgress, type CountryScore } from '@/services/country-instability';
+import { fetchCachedRiskScores, toCountryScore } from '@/services/cached-risk-scores';
 
 export class CIIPanel extends Panel {
   private scores: CountryScore[] = [];
+  private usedCachedScores = false;
 
   constructor() {
     super({
@@ -99,13 +101,34 @@ export class CIIPanel extends Panel {
     this.showLoading();
 
     try {
-      this.scores = calculateCII();
+      // First, try to get cached scores from backend (eliminates learning mode)
+      const { inLearning } = getLearningProgress();
+
+      if (inLearning && !this.usedCachedScores) {
+        const cached = await fetchCachedRiskScores();
+        if (cached && cached.cii.length > 0) {
+          this.scores = cached.cii.map(toCountryScore);
+          this.usedCachedScores = true;
+          console.log('[CIIPanel] Using cached scores from backend');
+        }
+      }
+
+      // If no cached scores or learning complete, use local calculation
+      if (!this.usedCachedScores || !inLearning) {
+        const localScores = calculateCII();
+        // Merge: use local if better coverage, otherwise keep cached
+        if (localScores.filter(s => s.score > 0).length >= this.scores.filter(s => s.score > 0).length) {
+          this.scores = localScores;
+        }
+      }
+
       const withData = this.scores.filter(s => s.score > 0);
       this.setCount(withData.length);
 
-      const { inLearning } = getLearningProgress();
-      const learningBanner = this.renderLearningBanner();
-      const learningClass = inLearning ? 'cii-learning' : '';
+      // Only show learning banner if no cached scores AND still learning
+      const showLearning = inLearning && !this.usedCachedScores;
+      const learningBanner = showLearning ? this.renderLearningBanner() : '';
+      const learningClass = showLearning ? 'cii-learning' : '';
 
       if (withData.length === 0) {
         this.content.innerHTML = learningBanner + '<div class="empty-state">Collecting data...</div>';
