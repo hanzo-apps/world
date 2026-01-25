@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { mlWorker } from '@/services/ml-worker';
 import { generateSummary, type SummarizationProvider } from '@/services/summarization';
+import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-analysis';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ClusteredEvent } from '@/types';
@@ -10,6 +11,7 @@ export class InsightsPanel extends Panel {
   private lastBriefUpdate = 0;
   private cachedBrief: string | null = null;
   private briefProvider: SummarizationProvider | null = null;
+  private lastMissedStories: AnalyzedHeadline[] = [];
   private static readonly BRIEF_COOLDOWN_MS = 120000; // 2 min cooldown (API has limits)
 
   constructor() {
@@ -204,13 +206,26 @@ export class InsightsPanel extends Panel {
       return;
     }
 
-    const totalSteps = 3;
+    const totalSteps = 4;
 
     try {
       // Step 1: Filter and rank stories by composite importance score
       this.setProgress(1, totalSteps, 'Ranking important stories...');
 
       const importantClusters = this.selectTopStories(clusters, 8);
+
+      // Run parallel multi-perspective analysis in background (logs to console)
+      // This analyzes ALL clusters, not just the keyword-filtered ones
+      const parallelPromise = parallelAnalysis.analyzeHeadlines(clusters).then(report => {
+        this.lastMissedStories = report.missedByKeywords;
+        const suggestions = parallelAnalysis.getSuggestedImprovements();
+        if (suggestions.length > 0) {
+          console.log('%c💡 Improvement Suggestions:', 'color: #f59e0b; font-weight: bold');
+          suggestions.forEach(s => console.log(`  • ${s}`));
+        }
+      }).catch(err => {
+        console.warn('[ParallelAnalysis] Error:', err);
+      });
 
       if (importantClusters.length === 0) {
         this.setContent('<div class="insights-empty">No breaking or multi-source stories yet</div>');
@@ -250,6 +265,10 @@ export class InsightsPanel extends Panel {
         this.setProgress(3, totalSteps, 'Using cached brief...');
       }
 
+      // Step 4: Wait for parallel analysis to complete
+      this.setProgress(4, totalSteps, 'Multi-perspective analysis...');
+      await parallelPromise;
+
       this.renderInsights(importantClusters, sentiments, worldBrief);
     } catch (error) {
       console.error('[InsightsPanel] Error:', error);
@@ -266,6 +285,7 @@ export class InsightsPanel extends Panel {
     const sentimentOverview = this.renderSentimentOverview(sentiments);
     const breakingHtml = this.renderBreakingStories(clusters, sentiments);
     const statsHtml = this.renderStats(clusters);
+    const missedHtml = this.renderMissedStories();
 
     this.setContent(`
       ${briefHtml}
@@ -275,6 +295,7 @@ export class InsightsPanel extends Panel {
         <div class="insights-section-title">BREAKING & CONFIRMED</div>
         ${breakingHtml}
       </div>
+      ${missedHtml}
     `);
   }
 
@@ -391,6 +412,40 @@ export class InsightsPanel extends Panel {
           <span class="insight-stat-label">Alerts</span>
         </div>
         ` : ''}
+      </div>
+    `;
+  }
+
+  private renderMissedStories(): string {
+    if (this.lastMissedStories.length === 0) {
+      return '';
+    }
+
+    const storiesHtml = this.lastMissedStories.slice(0, 3).map(story => {
+      const topPerspective = story.perspectives
+        .filter(p => p.name !== 'keywords')
+        .sort((a, b) => b.score - a.score)[0];
+
+      const perspectiveName = topPerspective?.name ?? 'ml';
+      const perspectiveScore = topPerspective?.score ?? 0;
+
+      return `
+        <div class="insight-story missed">
+          <div class="insight-story-header">
+            <span class="insight-sentiment-dot ml-flagged"></span>
+            <span class="insight-story-title">${escapeHtml(story.title.slice(0, 80))}${story.title.length > 80 ? '...' : ''}</span>
+          </div>
+          <div class="insight-badges">
+            <span class="insight-badge ml-detected">🔬 ${perspectiveName}: ${(perspectiveScore * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="insights-section insights-missed">
+        <div class="insights-section-title">🎯 ML DETECTED (check console for details)</div>
+        ${storiesHtml}
       </div>
     `;
   }
