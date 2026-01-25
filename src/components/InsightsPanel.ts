@@ -31,13 +31,28 @@ export class InsightsPanel extends Panel {
     }
   }
 
+  private setStatus(message: string, showSpinner = true): void {
+    const spinnerHtml = showSpinner ? '<span class="insights-spinner"></span>' : '';
+    this.setContent(`
+      <div class="insights-status">
+        ${spinnerHtml}
+        <span class="insights-status-text">${message}</span>
+      </div>
+    `);
+  }
+
   public async updateInsights(clusters: ClusteredEvent[]): Promise<void> {
-    if (this.isHidden || !mlWorker.isAvailable || clusters.length === 0) {
-      this.setContent('<div class="insights-unavailable">ML features unavailable</div>');
+    if (this.isHidden) return;
+
+    if (!mlWorker.isAvailable) {
+      this.setStatus('Initializing ML models...', true);
       return;
     }
 
-    this.showLoading();
+    if (clusters.length === 0) {
+      this.setContent('<div class="insights-empty">Waiting for news data...</div>');
+      return;
+    }
 
     try {
       // Filter to only important stories: multi-source OR fast-moving OR alerts
@@ -69,13 +84,15 @@ export class InsightsPanel extends Panel {
 
       const titles = importantClusters.map(c => c.primaryTitle);
 
-      // Get sentiment for all titles
+      // Show status: analyzing sentiment
+      this.setStatus('Analyzing sentiment...');
       const sentiments = await mlWorker.classifySentiment(titles).catch(() => null);
 
       // Generate World Brief (with cooldown to avoid excessive model calls)
       let worldBrief = this.cachedBrief;
       const now = Date.now();
       if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
+        this.setStatus('Generating world brief...');
         worldBrief = await this.generateWorldBrief(importantClusters);
         if (worldBrief) {
           this.cachedBrief = worldBrief;
@@ -86,7 +103,7 @@ export class InsightsPanel extends Panel {
       this.renderInsights(importantClusters, sentiments, worldBrief);
     } catch (error) {
       console.error('[InsightsPanel] Error:', error);
-      this.setContent('<div class="insights-error">Analysis failed</div>');
+      this.setContent('<div class="insights-error">Analysis failed - retrying...</div>');
     }
   }
 
