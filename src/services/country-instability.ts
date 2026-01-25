@@ -1,5 +1,6 @@
 import type { SocialUnrestEvent, MilitaryFlight, MilitaryVessel, ClusteredEvent, InternetOutage } from '@/types';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, STRATEGIC_WATERWAYS } from '@/config/geo';
+import { focalPointDetector } from './focal-point-detector';
 
 export interface CountryScore {
   code: string;
@@ -478,6 +479,7 @@ function getTrend(code: string, current: number): CountryScore['trend'] {
 
 export function calculateCII(): CountryScore[] {
   const scores: CountryScore[] = [];
+  const focalUrgencies = focalPointDetector.getCountryUrgencyMap();
 
   for (const [code, name] of Object.entries(TIER1_COUNTRIES)) {
     const data = countryDataMap.get(code) || initCountryData();
@@ -504,12 +506,20 @@ export function calculateCII(): CountryScore[] {
       : components.information >= 30 ? 5
       : 0;
 
-    // Blend baseline risk with detected events + hotspot boost + news urgency
+    // Focal point intelligence boost - FocalPointDetector correlates news entities with map signals
+    // If Iran is marked "critical" by focal analysis, boost CII score accordingly
+    const focalUrgency = focalUrgencies.get(code);
+    const focalBoost = focalUrgency === 'critical' ? 20
+      : focalUrgency === 'elevated' ? 10
+      : 0;
+
+    // Blend baseline risk with detected events + all boosts
     // - 40% baseline risk (geopolitical context always matters)
     // - 60% event-based (current detected activity)
     // - Hotspot boost adds up to 30 points for activity near strategic locations
-    // - News urgency boost ensures breaking news elevates score appropriately
-    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost;
+    // - News urgency boost ensures breaking news elevates score
+    // - Focal boost adds intelligence synthesis (news + signals correlation)
+    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost;
 
     // Active conflict zones have a FLOOR score - they're inherently more unstable
     // than peaceful countries regardless of detected events
