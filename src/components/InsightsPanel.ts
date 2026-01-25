@@ -7,6 +7,7 @@ import { focalPointDetector } from '@/services/focal-point-detector';
 import { ingestNewsForCII } from '@/services/country-instability';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
+import { SITE_VARIANT } from '@/config';
 import type { ClusteredEvent, FocalPoint } from '@/types';
 
 export class InsightsPanel extends Panel {
@@ -233,22 +234,47 @@ export class InsightsPanel extends Panel {
         console.warn('[ParallelAnalysis] Error:', err);
       });
 
-      // Get geographic signal correlations
-      const signalSummary = signalAggregator.getSummary();
-      this.lastConvergenceZones = signalSummary.convergenceZones;
-      if (signalSummary.totalSignals > 0) {
-        logSignalSummary();
-      }
+      // Get geographic signal correlations (geopolitical variant only)
+      // Tech variant focuses on tech news, not military/protest signals
+      let signalSummary: ReturnType<typeof signalAggregator.getSummary>;
+      let focalSummary: ReturnType<typeof focalPointDetector.analyze>;
 
-      // Run focal point detection (correlates news entities with map signals)
-      const focalSummary = focalPointDetector.analyze(clusters, signalSummary);
-      this.lastFocalPoints = focalSummary.focalPoints;
-      if (focalSummary.focalPoints.length > 0) {
-        focalPointDetector.logSummary();
-        // Ingest news for CII BEFORE signaling (so CII has data when it calculates)
-        ingestNewsForCII(clusters);
-        // Signal CII to refresh now that focal points AND news data are available
-        window.dispatchEvent(new CustomEvent('focal-points-ready'));
+      if (SITE_VARIANT === 'full') {
+        signalSummary = signalAggregator.getSummary();
+        this.lastConvergenceZones = signalSummary.convergenceZones;
+        if (signalSummary.totalSignals > 0) {
+          logSignalSummary();
+        }
+
+        // Run focal point detection (correlates news entities with map signals)
+        focalSummary = focalPointDetector.analyze(clusters, signalSummary);
+        this.lastFocalPoints = focalSummary.focalPoints;
+        if (focalSummary.focalPoints.length > 0) {
+          focalPointDetector.logSummary();
+          // Ingest news for CII BEFORE signaling (so CII has data when it calculates)
+          ingestNewsForCII(clusters);
+          // Signal CII to refresh now that focal points AND news data are available
+          window.dispatchEvent(new CustomEvent('focal-points-ready'));
+        }
+      } else {
+        // Tech variant: no geopolitical signals, just summarize tech news
+        signalSummary = {
+          timestamp: new Date(),
+          totalSignals: 0,
+          byType: {} as Record<string, number>,
+          convergenceZones: [],
+          topCountries: [],
+          aiContext: '',
+        };
+        focalSummary = {
+          focalPoints: [],
+          aiContext: '',
+          timestamp: new Date(),
+          topCountries: [],
+          topCompanies: [],
+        };
+        this.lastConvergenceZones = [];
+        this.lastFocalPoints = [];
       }
 
       if (importantClusters.length === 0) {
@@ -274,7 +300,10 @@ export class InsightsPanel extends Panel {
         this.setProgress(3, totalSteps, 'Generating world brief...');
 
         // Pass focal point context to AI for correlation-aware summarization
-        const geoContext = focalSummary.aiContext || signalSummary.aiContext;
+        // Tech variant: no geopolitical context, just tech news summarization
+        const geoContext = SITE_VARIANT === 'full'
+          ? (focalSummary.aiContext || signalSummary.aiContext)
+          : '';
         const result = await generateSummary(titles, (_step, _total, msg) => {
           // Show sub-progress for summarization
           this.setProgress(3, totalSteps, `Generating brief: ${msg}`);

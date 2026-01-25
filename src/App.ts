@@ -160,6 +160,31 @@ export class App {
         }
         localStorage.setItem(PANEL_ORDER_MIGRATION_KEY, 'done');
       }
+
+      // Tech variant migration: move insights to top (after live-news)
+      if (currentVariant === 'tech') {
+        const TECH_INSIGHTS_MIGRATION_KEY = 'worldmonitor-tech-insights-top-v1';
+        if (!localStorage.getItem(TECH_INSIGHTS_MIGRATION_KEY)) {
+          const savedOrder = localStorage.getItem('panel-order');
+          if (savedOrder) {
+            try {
+              const order: string[] = JSON.parse(savedOrder);
+              // Remove insights from current position
+              const filtered = order.filter(k => k !== 'insights' && k !== 'live-news');
+              // Build new order: live-news, insights, then rest
+              const newOrder: string[] = [];
+              if (order.includes('live-news')) newOrder.push('live-news');
+              if (order.includes('insights')) newOrder.push('insights');
+              newOrder.push(...filtered);
+              localStorage.setItem('panel-order', JSON.stringify(newOrder));
+              console.log('[App] Tech variant: Migrated insights panel to top');
+            } catch {
+              // Invalid saved order, will use defaults
+            }
+          }
+          localStorage.setItem(TECH_INSIGHTS_MIGRATION_KEY, 'done');
+        }
+      }
     }
 
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
