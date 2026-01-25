@@ -7,7 +7,9 @@ import { detectMLCapabilities, type MLCapabilities } from './ml-capabilities';
 import { ML_THRESHOLDS, MODEL_CONFIGS } from '@/config/ml-config';
 
 // Import worker using Vite's worker syntax
-import MLWorkerClass from '@/workers/ml.worker?worker';
+// Temporarily disabled - dependency @xenova/transformers not available
+// import MLWorkerClass from '@/workers/ml.worker?worker';
+const MLWorkerClass = null as unknown as new () => Worker;
 
 interface PendingRequest<T> {
   resolve: (value: T) => void;
