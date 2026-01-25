@@ -9101,6 +9101,26 @@ body.playback-mode .status-dot {
   letter-spacing: 0.5px;
 }
 
+/* World Brief - AI Summary */
+.insights-brief {
+  margin-bottom: 12px;
+  padding: 10px;
+  background: linear-gradient(135deg, rgba(68, 136, 255, 0.08), rgba(136, 68, 255, 0.08));
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
+.insights-brief .insights-section-title {
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.insights-brief-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 .insights-unavailable,
 .insights-error,
 .insights-empty {
