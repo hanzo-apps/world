@@ -2063,27 +2063,29 @@ export class App {
       }
     });
 
-    // Intel (uses different source) - run in parallel with category processing
-    const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
-    const intelPanel = this.newsPanels['intel'];
-    if (enabledIntelSources.length === 0) {
-      if (intelPanel) intelPanel.showError('All Intel sources disabled');
-      this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: 0 });
-    } else {
-      const intelResult = await Promise.allSettled([fetchCategoryFeeds(enabledIntelSources)]);
-      if (intelResult[0]?.status === 'fulfilled') {
-        const intel = intelResult[0].value;
-        if (intelPanel) {
-          intelPanel.renderNews(intel);
-          const baseline = await updateBaseline('news:intel', intel.length);
-          const deviation = calculateDeviation(intel.length, baseline);
-          intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
-        }
-        this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
-        collectedNews.push(...intel);
-        this.flashMapForNews(intel);
+    // Intel (uses different source) - full variant only (defense/military news)
+    if (SITE_VARIANT === 'full') {
+      const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
+      const intelPanel = this.newsPanels['intel'];
+      if (enabledIntelSources.length === 0) {
+        if (intelPanel) intelPanel.showError('All Intel sources disabled');
+        this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: 0 });
       } else {
-        console.error('[App] Intel feed failed:', intelResult[0]?.reason);
+        const intelResult = await Promise.allSettled([fetchCategoryFeeds(enabledIntelSources)]);
+        if (intelResult[0]?.status === 'fulfilled') {
+          const intel = intelResult[0].value;
+          if (intelPanel) {
+            intelPanel.renderNews(intel);
+            const baseline = await updateBaseline('news:intel', intel.length);
+            const deviation = calculateDeviation(intel.length, baseline);
+            intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+          }
+          this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
+          collectedNews.push(...intel);
+          this.flashMapForNews(intel);
+        } else {
+          console.error('[App] Intel feed failed:', intelResult[0]?.reason);
+        }
       }
     }
 
