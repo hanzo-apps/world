@@ -2,9 +2,11 @@ import { Panel } from './Panel';
 import { mlWorker } from '@/services/ml-worker';
 import { generateSummary, type SummarizationProvider } from '@/services/summarization';
 import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-analysis';
+import { signalAggregator, logSignalSummary, type RegionalConvergence } from '@/services/signal-aggregator';
+import { focalPointDetector } from '@/services/focal-point-detector';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
-import type { ClusteredEvent } from '@/types';
+import type { ClusteredEvent, FocalPoint } from '@/types';
 
 export class InsightsPanel extends Panel {
   private isHidden = false;
@@ -12,6 +14,8 @@ export class InsightsPanel extends Panel {
   private cachedBrief: string | null = null;
   private briefProvider: SummarizationProvider | null = null;
   private lastMissedStories: AnalyzedHeadline[] = [];
+  private lastConvergenceZones: RegionalConvergence[] = [];
+  private lastFocalPoints: FocalPoint[] = [];
   private static readonly BRIEF_COOLDOWN_MS = 120000; // 2 min cooldown (API has limits)
 
   constructor() {
@@ -227,6 +231,20 @@ export class InsightsPanel extends Panel {
         console.warn('[ParallelAnalysis] Error:', err);
       });
 
+      // Get geographic signal correlations
+      const signalSummary = signalAggregator.getSummary();
+      this.lastConvergenceZones = signalSummary.convergenceZones;
+      if (signalSummary.totalSignals > 0) {
+        logSignalSummary();
+      }
+
+      // Run focal point detection (correlates news entities with map signals)
+      const focalSummary = focalPointDetector.analyze(clusters, signalSummary);
+      this.lastFocalPoints = focalSummary.focalPoints;
+      if (focalSummary.focalPoints.length > 0) {
+        focalPointDetector.logSummary();
+      }
+
       if (importantClusters.length === 0) {
         this.setContent('<div class="insights-empty">No breaking or multi-source stories yet</div>');
         return;
@@ -249,17 +267,19 @@ export class InsightsPanel extends Panel {
       if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
         this.setProgress(3, totalSteps, 'Generating world brief...');
 
+        // Pass focal point context to AI for correlation-aware summarization
+        const geoContext = focalSummary.aiContext || signalSummary.aiContext;
         const result = await generateSummary(titles, (_step, _total, msg) => {
           // Show sub-progress for summarization
           this.setProgress(3, totalSteps, `Generating brief: ${msg}`);
-        });
+        }, geoContext);
 
         if (result) {
           worldBrief = result.summary;
           this.cachedBrief = worldBrief;
           this.briefProvider = result.provider;
           this.lastBriefUpdate = now;
-          console.log(`[InsightsPanel] Brief from ${result.provider}${result.cached ? ' (cached)' : ''}`);
+          console.log(`[InsightsPanel] Brief from ${result.provider}${result.cached ? ' (cached)' : ''}${geoContext ? ' (with geo context)' : ''}`);
         }
       } else {
         this.setProgress(3, totalSteps, 'Using cached brief...');
@@ -282,6 +302,8 @@ export class InsightsPanel extends Panel {
     worldBrief: string | null
   ): void {
     const briefHtml = worldBrief ? this.renderWorldBrief(worldBrief) : '';
+    const focalPointsHtml = this.renderFocalPoints();
+    const convergenceHtml = this.renderConvergenceZones();
     const sentimentOverview = this.renderSentimentOverview(sentiments);
     const breakingHtml = this.renderBreakingStories(clusters, sentiments);
     const statsHtml = this.renderStats(clusters);
@@ -289,6 +311,8 @@ export class InsightsPanel extends Panel {
 
     this.setContent(`
       ${briefHtml}
+      ${focalPointsHtml}
+      ${convergenceHtml}
       ${sentimentOverview}
       ${statsHtml}
       <div class="insights-section">
@@ -446,6 +470,85 @@ export class InsightsPanel extends Panel {
       <div class="insights-section insights-missed">
         <div class="insights-section-title">🎯 ML DETECTED (check console for details)</div>
         ${storiesHtml}
+      </div>
+    `;
+  }
+
+  private renderConvergenceZones(): string {
+    if (this.lastConvergenceZones.length === 0) {
+      return '';
+    }
+
+    const zonesHtml = this.lastConvergenceZones.slice(0, 3).map(zone => {
+      const signalIcons: Record<string, string> = {
+        internet_outage: '🌐',
+        military_flight: '✈️',
+        military_vessel: '🚢',
+        protest: '🪧',
+        ais_disruption: '⚓',
+      };
+
+      const icons = zone.signalTypes.map(t => signalIcons[t] || '📍').join('');
+
+      return `
+        <div class="convergence-zone">
+          <div class="convergence-region">${icons} ${escapeHtml(zone.region)}</div>
+          <div class="convergence-description">${escapeHtml(zone.description)}</div>
+          <div class="convergence-stats">${zone.signalTypes.length} signal types • ${zone.totalSignals} events</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="insights-section insights-convergence">
+        <div class="insights-section-title">📍 GEOGRAPHIC CONVERGENCE</div>
+        ${zonesHtml}
+      </div>
+    `;
+  }
+
+  private renderFocalPoints(): string {
+    // Only show focal points that have both news AND signals (true correlations)
+    const correlatedFPs = this.lastFocalPoints.filter(
+      fp => fp.newsMentions > 0 && fp.signalCount > 0
+    ).slice(0, 5);
+
+    if (correlatedFPs.length === 0) {
+      return '';
+    }
+
+    const signalIcons: Record<string, string> = {
+      internet_outage: '🌐',
+      military_flight: '✈️',
+      military_vessel: '⚓',
+      protest: '📢',
+      ais_disruption: '🚢',
+    };
+
+    const focalPointsHtml = correlatedFPs.map(fp => {
+      const urgencyClass = fp.urgency;
+      const icons = fp.signalTypes.map(t => signalIcons[t] || '').join(' ');
+      const headline = fp.topHeadlines[0]?.slice(0, 60) || '';
+
+      return `
+        <div class="focal-point ${urgencyClass}">
+          <div class="focal-point-header">
+            <span class="focal-point-name">${escapeHtml(fp.displayName)}</span>
+            <span class="focal-point-urgency ${urgencyClass}">${fp.urgency.toUpperCase()}</span>
+          </div>
+          <div class="focal-point-signals">${icons}</div>
+          <div class="focal-point-stats">
+            ${fp.newsMentions} news • ${fp.signalCount} signals
+          </div>
+          ${headline ? `<div class="focal-point-headline">"${escapeHtml(headline)}..."</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="insights-section insights-focal">
+        <div class="insights-section-title">🎯 FOCAL POINTS</div>
+        ${focalPointsHtml}
       </div>
     `;
   }
