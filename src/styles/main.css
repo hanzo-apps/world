@@ -598,6 +598,9 @@ body.animations-paused *::after {
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   line-height: 1.5;
+  max-height: 80px;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 .panel-summary-content {
   display: flex;
