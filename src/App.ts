@@ -16,6 +16,7 @@ import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions,
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
+import { signalAggregator } from '@/services/signal-aggregator';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal } from '@/services/military-surge';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
@@ -2197,6 +2198,7 @@ export class App {
       this.map?.setOutages(outages);
       this.map?.setLayerReady('outages', outages.length > 0);
       ingestOutagesForCII(outages);
+      signalAggregator.ingestOutages(outages);
       this.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
       dataFreshness.recordUpdate('outages', outages.length);
     } catch (error) {
@@ -2212,6 +2214,7 @@ export class App {
       const aisStatus = getAisStatus();
       console.log('[Ships] Events:', { disruptions: disruptions.length, density: density.length, vessels: aisStatus.vessels });
       this.map?.setAisData(disruptions, density);
+      signalAggregator.ingestAisDisruptions(disruptions);
 
       const hasData = disruptions.length > 0 || density.length > 0;
       this.map?.setLayerReady('ais', hasData);
@@ -2285,6 +2288,7 @@ export class App {
       this.map?.setLayerReady('protests', protestData.events.length > 0);
       ingestProtests(protestData.events);
       ingestProtestsForCII(protestData.events);
+      signalAggregator.ingestProtests(protestData.events);
 
       // Record data freshness AFTER CII ingestion to avoid race conditions
       // For 'acled' source: count GDELT protests too since GDELT serves as fallback
@@ -2354,6 +2358,8 @@ export class App {
       ingestFlights(flightData.flights);
       ingestVessels(vesselData.vessels);
       ingestMilitaryForCII(flightData.flights, vesselData.vessels);
+      signalAggregator.ingestFlights(flightData.flights);
+      signalAggregator.ingestVessels(vesselData.vessels);
       this.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
       (this.panels['cii'] as CIIPanel)?.refresh();
 

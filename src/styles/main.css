@@ -9603,3 +9603,130 @@ body.playback-mode .status-dot {
   color: #6b8afd;
   border-color: rgba(107, 138, 253, 0.3);
 }
+
+/* Geographic Convergence Section */
+.insights-convergence {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.insights-convergence .insights-section-title {
+  color: var(--orange);
+}
+
+.convergence-zone {
+  padding: 8px;
+  margin-bottom: 8px;
+  background: rgba(251, 146, 60, 0.05);
+  border-radius: 4px;
+  border-left: 2px solid var(--orange);
+}
+
+.convergence-region {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.convergence-description {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.convergence-stats {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Focal Points (Intelligence Synthesis) */
+.insights-focal {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.focal-point {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid var(--text-muted);
+}
+
+.focal-point.critical {
+  border-left-color: var(--red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.focal-point.elevated {
+  border-left-color: var(--orange);
+  background: rgba(251, 146, 60, 0.08);
+}
+
+.focal-point.watch {
+  border-left-color: var(--blue);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.focal-point-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.focal-point-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.focal-point-urgency {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.focal-point-urgency.critical {
+  background: var(--red);
+  color: white;
+}
+
+.focal-point-urgency.elevated {
+  background: var(--orange);
+  color: white;
+}
+
+.focal-point-urgency.watch {
+  background: var(--surface-elevated);
+  color: var(--text-dim);
+}
+
+.focal-point-signals {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.focal-point-stats {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.focal-point-headline {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

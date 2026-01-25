@@ -16,12 +16,12 @@ export interface SummarizationResult {
 
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
-async function tryGroq(headlines: string[]): Promise<SummarizationResult | null> {
+async function tryGroq(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
   try {
     const response = await fetch('/api/groq-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief' }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext }),
     });
 
     if (!response.ok) {
@@ -44,12 +44,12 @@ async function tryGroq(headlines: string[]): Promise<SummarizationResult | null>
   }
 }
 
-async function tryOpenRouter(headlines: string[]): Promise<SummarizationResult | null> {
+async function tryOpenRouter(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
   try {
     const response = await fetch('/api/openrouter-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief' }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext }),
     });
 
     if (!response.ok) {
@@ -103,10 +103,12 @@ async function tryBrowserT5(headlines: string[]): Promise<SummarizationResult | 
 /**
  * Generate a summary using the fallback chain: Groq -> OpenRouter -> Browser T5
  * Server-side Redis caching is handled by the API endpoints
+ * @param geoContext Optional geographic signal context to include in the prompt
  */
 export async function generateSummary(
   headlines: string[],
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  geoContext?: string
 ): Promise<SummarizationResult | null> {
   if (!headlines || headlines.length < 2) {
     return null;
@@ -116,14 +118,14 @@ export async function generateSummary(
 
   // Step 1: Try Groq (fast, 14.4K/day with 8b-instant + Redis cache)
   onProgress?.(1, totalSteps, 'Connecting to Groq AI...');
-  const groqResult = await tryGroq(headlines);
+  const groqResult = await tryGroq(headlines, geoContext);
   if (groqResult) {
     return groqResult;
   }
 
   // Step 2: Try OpenRouter (fallback, 50/day + Redis cache)
   onProgress?.(2, totalSteps, 'Trying OpenRouter...');
-  const openRouterResult = await tryOpenRouter(headlines);
+  const openRouterResult = await tryOpenRouter(headlines, geoContext);
   if (openRouterResult) {
     return openRouterResult;
   }
