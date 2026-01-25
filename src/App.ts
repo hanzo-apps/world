@@ -656,8 +656,8 @@ export class App {
   private updateSearchIndex(): void {
     if (!this.searchModal) return;
 
-    // Update news sources (use link as unique id)
-    this.searchModal.registerSource('news', this.allNews.slice(0, 200).map(n => ({
+    // Update news sources (use link as unique id) - index up to 500 items for better search coverage
+    this.searchModal.registerSource('news', this.allNews.slice(0, 500).map(n => ({
       id: n.link,
       title: n.title,
       subtitle: n.source,
