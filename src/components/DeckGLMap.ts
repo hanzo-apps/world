@@ -1145,11 +1145,15 @@ export class DeckGLMap {
     return new ScatterplotLayer({
       id: 'natural-events-layer',
       data: this.naturalEvents,
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: 8000,
-      getFillColor: [255, 150, 50, 200] as [number, number, number, number],
+      getPosition: (d: NaturalEvent) => [d.lon, d.lat],
+      getRadius: (d: NaturalEvent) => d.title.startsWith('🔴') ? 20000 : d.title.startsWith('🟠') ? 15000 : 8000,
+      getFillColor: (d: NaturalEvent) => {
+        if (d.title.startsWith('🔴')) return [255, 0, 0, 220] as [number, number, number, number];
+        if (d.title.startsWith('🟠')) return [255, 140, 0, 200] as [number, number, number, number];
+        return [255, 150, 50, 180] as [number, number, number, number];
+      },
       radiusMinPixels: 5,
-      radiusMaxPixels: 12,
+      radiusMaxPixels: 18,
       pickable: true,
     });
   }
