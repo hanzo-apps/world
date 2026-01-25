@@ -365,7 +365,7 @@ export class InsightsPanel extends Panel {
 
     return `
       <div class="insights-brief">
-        <div class="insights-section-title">🌍 WORLD BRIEF ${providerBadge}</div>
+        <div class="insights-section-title">${SITE_VARIANT === 'tech' ? '🚀 TECH BRIEF' : '🌍 WORLD BRIEF'} ${providerBadge}</div>
         <div class="insights-brief-text">${escapeHtml(brief)}</div>
       </div>
     `;
