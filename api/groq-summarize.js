@@ -146,14 +146,27 @@ export default async function handler(request) {
     let systemPrompt, userPrompt;
 
     if (mode === 'brief') {
-      systemPrompt = 'You synthesize news into a single flowing paragraph. Never use bullet points, numbered lists, or "Here are". Just write the summary directly. Combine related stories. Be extremely concise.';
-      userPrompt = `Synthesize these headlines into one paragraph (2-3 sentences max):\n${headlineText}`;
+      systemPrompt = `You are a news intelligence analyst. Your job is to find the ONE dominant story or theme, not list everything.
+Rules:
+- Identify the single most significant development
+- If multiple stories are connected, explain HOW they connect
+- Ignore unrelated headlines - focus beats completeness
+- Write like a news anchor's lead: confident, direct, narrative
+- Never use bullet points, "Here are", or list multiple unrelated things
+- 2-3 sentences maximum`;
+      userPrompt = `What is THE story right now? Find the dominant narrative:\n${headlineText}`;
     } else if (mode === 'analysis') {
-      systemPrompt = 'Geopolitical analyst. Write flowing prose, no bullets or lists. Identify the key pattern or risk.';
-      userPrompt = `Analyze the key pattern in these headlines (2-3 sentences):\n${headlineText}`;
+      systemPrompt = `Senior geopolitical analyst writing a 30-second brief for executives.
+Rules:
+- Identify ONE key pattern, trend, or emerging risk
+- Connect dots others might miss
+- Be specific about implications
+- No lists, no hedging, no "various" or "multiple"
+- Confident analysis in 2-3 sentences`;
+      userPrompt = `What's the pattern here? What should decision-makers know?\n${headlineText}`;
     } else {
-      systemPrompt = 'News synthesizer. Write one flowing paragraph, no bullets. Combine similar stories.';
-      userPrompt = `Synthesize into one paragraph:\n${headlineText}`;
+      systemPrompt = `Intelligence analyst synthesizing a panel feed. Find the thread that ties these together, or highlight the ONE most significant item. No lists. 2 sentences max.`;
+      userPrompt = `Key takeaway from this feed:\n${headlineText}`;
     }
 
     const response = await fetch(GROQ_API_URL, {
