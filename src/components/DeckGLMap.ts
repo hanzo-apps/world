@@ -5,7 +5,7 @@
  */
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
-import { GeoJsonLayer, ScatterplotLayer, PathLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
 import type {
   MapLayers,
@@ -118,6 +118,22 @@ const COLORS = {
   techHQ: [100, 200, 255, 200] as [number, number, number, number],
   accelerator: [255, 200, 0, 200] as [number, number, number, number],
   cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
+};
+
+// SVG icons as data URLs for different marker shapes
+const MARKER_ICONS = {
+  // Square - for datacenters
+  square: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="3" fill="white"/></svg>`),
+  // Diamond - for hotspots
+  diamond: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 30,16 16,30 2,16" fill="white"/></svg>`),
+  // Triangle up - for military bases
+  triangleUp: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 30,28 2,28" fill="white"/></svg>`),
+  // Hexagon - for nuclear
+  hexagon: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="white"/></svg>`),
+  // Circle - fallback
+  circle: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="white"/></svg>`),
+  // Star - for special markers
+  star: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 20,12 30,12 22,19 25,30 16,23 7,30 10,19 2,12 12,12" fill="white"/></svg>`),
 };
 
 export class DeckGLMap {
@@ -280,9 +296,9 @@ export class DeckGLMap {
       layers.push(this.createBasesLayer());
     }
 
-    // Nuclear facilities layer (returns array with icon layer)
+    // Nuclear facilities layer - HEXAGON icons
     if (mapLayers.nuclear) {
-      layers.push(...this.createNuclearLayer());
+      layers.push(this.createNuclearLayer());
     }
 
     // Hotspots layer
@@ -290,9 +306,9 @@ export class DeckGLMap {
       layers.push(this.createHotspotsLayer());
     }
 
-    // Datacenters layer (returns array with icon layer)
+    // Datacenters layer - SQUARE icons
     if (mapLayers.datacenters) {
-      layers.push(...this.createDatacentersLayer());
+      layers.push(this.createDatacentersLayer());
     }
 
     // Earthquakes layer
@@ -435,7 +451,7 @@ export class DeckGLMap {
     });
   }
 
-  private createBasesLayer(): ScatterplotLayer {
+  private createBasesLayer(): IconLayer {
     const highlightedBases = this.highlightedAssets.base;
 
     // Base colors by operator type
@@ -452,67 +468,55 @@ export class DeckGLMap {
       }
     };
 
-    return new ScatterplotLayer({
+    // Military bases: TRIANGLE icons - color by operator
+    return new IconLayer({
       id: 'bases-layer',
       data: MILITARY_BASES,
       getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => highlightedBases.has(d.id) ? 15000 : 6000,
-      getFillColor: (d) => {
+      getIcon: () => 'triangleUp',
+      iconAtlas: MARKER_ICONS.triangleUp,
+      iconMapping: { triangleUp: { x: 0, y: 0, width: 32, height: 32, mask: true } },
+      getSize: (d) => highlightedBases.has(d.id) ? 20 : 12,
+      getColor: (d) => {
         if (highlightedBases.has(d.id)) {
           return [255, 100, 100, 255] as [number, number, number, number];
         }
         return getBaseColor(d.type);
       },
-      radiusMinPixels: 4,
-      radiusMaxPixels: 10,
+      sizeScale: 1,
+      sizeMinPixels: 6,
+      sizeMaxPixels: 20,
       pickable: true,
     });
   }
 
-  private createNuclearLayer(): Layer[] {
+  private createNuclearLayer(): IconLayer {
     const highlightedNuclear = this.highlightedAssets.nuclear;
     const data = NUCLEAR_FACILITIES.filter(f => f.status !== 'decommissioned');
 
-    // Nuclear: Yellow/orange RING (stroked hollow circle) - distinctive radiation-like look
-    return [
-      new ScatterplotLayer({
-        id: 'nuclear-layer',
-        data,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => highlightedNuclear.has(d.id) ? 12000 : 8000,
-        getFillColor: [0, 0, 0, 0] as [number, number, number, number], // Hollow
-        stroked: true,
-        getLineColor: (d) => {
-          if (highlightedNuclear.has(d.id)) {
-            return [255, 100, 100, 255] as [number, number, number, number];
-          }
-          if (d.status === 'contested') {
-            return [255, 50, 50, 255] as [number, number, number, number];
-          }
-          return [255, 220, 0, 255] as [number, number, number, number]; // Bright yellow ring
-        },
-        lineWidthMinPixels: 3,
-        radiusMinPixels: 6,
-        radiusMaxPixels: 14,
-        pickable: true,
-      }),
-      // Inner dot for nuclear
-      new ScatterplotLayer({
-        id: 'nuclear-inner-layer',
-        data,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: 2000,
-        getFillColor: (d) => {
-          if (d.status === 'contested') {
-            return [255, 50, 50, 255] as [number, number, number, number];
-          }
-          return [255, 220, 0, 255] as [number, number, number, number];
-        },
-        radiusMinPixels: 2,
-        radiusMaxPixels: 4,
-        pickable: false,
-      }),
-    ];
+    // Nuclear: HEXAGON icons - yellow/orange color
+    return new IconLayer({
+      id: 'nuclear-layer',
+      data,
+      getPosition: (d) => [d.lon, d.lat],
+      getIcon: () => 'hexagon',
+      iconAtlas: MARKER_ICONS.hexagon,
+      iconMapping: { hexagon: { x: 0, y: 0, width: 32, height: 32, mask: true } },
+      getSize: (d) => highlightedNuclear.has(d.id) ? 22 : 14,
+      getColor: (d) => {
+        if (highlightedNuclear.has(d.id)) {
+          return [255, 100, 100, 255] as [number, number, number, number];
+        }
+        if (d.status === 'contested') {
+          return [255, 50, 50, 255] as [number, number, number, number];
+        }
+        return [255, 220, 0, 255] as [number, number, number, number];
+      },
+      sizeScale: 1,
+      sizeMinPixels: 8,
+      sizeMaxPixels: 22,
+      pickable: true,
+    });
   }
 
   private createHotspotsLayer(): ScatterplotLayer {
@@ -540,37 +544,33 @@ export class DeckGLMap {
     });
   }
 
-  private createDatacentersLayer(): Layer[] {
+  private createDatacentersLayer(): IconLayer {
     const highlightedDC = this.highlightedAssets.datacenter;
     const data = AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned');
 
-    // Datacenters: Purple filled circle with cyan/white border - distinctive tech look
-    return [
-      new ScatterplotLayer({
-        id: 'datacenters-layer',
-        data,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => highlightedDC.has(d.id) ? 10000 : 6000,
-        getFillColor: (d) => {
-          if (highlightedDC.has(d.id)) {
-            return [255, 100, 100, 255] as [number, number, number, number];
-          }
-          // Purple fill
-          return [136, 68, 255, 200] as [number, number, number, number];
-        },
-        stroked: true,
-        getLineColor: (d) => {
-          if (d.status === 'planned') {
-            return [136, 68, 255, 150] as [number, number, number, number]; // Dashed effect via lighter color
-          }
-          return [200, 200, 255, 255] as [number, number, number, number]; // Light border
-        },
-        lineWidthMinPixels: 2,
-        radiusMinPixels: 5,
-        radiusMaxPixels: 12,
-        pickable: true,
-      }),
-    ];
+    // Datacenters: SQUARE icons - purple color
+    return new IconLayer({
+      id: 'datacenters-layer',
+      data,
+      getPosition: (d) => [d.lon, d.lat],
+      getIcon: () => 'square',
+      iconAtlas: MARKER_ICONS.square,
+      iconMapping: { square: { x: 0, y: 0, width: 32, height: 32, mask: true } },
+      getSize: (d) => highlightedDC.has(d.id) ? 24 : 16,
+      getColor: (d) => {
+        if (highlightedDC.has(d.id)) {
+          return [255, 100, 100, 255] as [number, number, number, number];
+        }
+        if (d.status === 'planned') {
+          return [136, 68, 255, 150] as [number, number, number, number];
+        }
+        return [136, 68, 255, 255] as [number, number, number, number];
+      },
+      sizeScale: 1,
+      sizeMinPixels: 8,
+      sizeMaxPixels: 24,
+      pickable: true,
+    });
   }
 
   private createEarthquakesLayer(): ScatterplotLayer {
