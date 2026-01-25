@@ -573,7 +573,11 @@ export function getCountryScore(code: string): number | null {
     : components.information >= 50 ? 10
     : components.information >= 30 ? 5
     : 0;
-  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost;
+  const focalUrgency = focalPointDetector.getCountryUrgency(code);
+  const focalBoost = focalUrgency === 'critical' ? 20
+    : focalUrgency === 'elevated' ? 10
+    : 0;
+  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost;
 
   // Active conflict zones have floor scores
   const conflictFloor: Record<string, number> = {
