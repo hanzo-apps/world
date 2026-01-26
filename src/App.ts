@@ -1886,6 +1886,11 @@ export class App {
     if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
     if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
+    // Tech Readiness panel (tech variant only)
+    if (SITE_VARIANT === 'tech') {
+      tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
+    }
+
     // Use allSettled to ensure all tasks complete and search index always updates
     const results = await Promise.allSettled(tasks.map(t => t.task));
 
