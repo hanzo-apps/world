@@ -968,8 +968,13 @@ export class App {
 
     // Event handlers
     this.criticalBannerEl.querySelector('.banner-view')?.addEventListener('click', () => {
-      this.map?.setCenter(top.centerLat, top.centerLon);
-      this.map?.setZoom(4);
+      console.log('[Banner] View Region clicked:', top.theaterId, 'lat:', top.centerLat, 'lon:', top.centerLon);
+      if (top.centerLat && top.centerLon) {
+        this.map?.setCenter(top.centerLat, top.centerLon);
+        this.map?.setZoom(4);
+      } else {
+        console.error('[Banner] Missing coordinates for', top.theaterId);
+      }
     });
 
     this.criticalBannerEl.querySelector('.banner-dismiss')?.addEventListener('click', () => {
