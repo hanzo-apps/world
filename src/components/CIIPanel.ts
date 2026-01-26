@@ -27,9 +27,15 @@ export class CIIPanel extends Panel {
     // Show loading state until focal points ready
     this.content.innerHTML = `
       <div class="cii-awaiting">
-        <div class="cii-awaiting-icon">📊</div>
-        <div class="cii-awaiting-text">Analyzing intelligence...</div>
-        <div class="cii-awaiting-sub">Correlating news with map signals</div>
+        <div class="cii-scan-ring">
+          <div class="cii-scan-dot"></div>
+        </div>
+        <div class="cii-awaiting-text">Scanning intelligence feeds</div>
+        <div class="cii-awaiting-sources">
+          <span class="cii-source-chip">ACLED</span>
+          <span class="cii-source-chip">GDELT</span>
+          <span class="cii-source-chip">News</span>
+        </div>
       </div>
     `;
   }

@@ -318,40 +318,40 @@ export class StrategicPosturePanel extends Panel {
     const isExpanded = p.postureLevel !== 'normal';
 
     if (!isExpanded) {
-      const summary = p.totalVessels > 0
-        ? `${p.totalAircraft} aircraft, ${p.totalVessels} vessels`
-        : `${p.totalAircraft} aircraft`;
+      // Compact single-line view for normal theaters
+      const chips: string[] = [];
+      if (p.totalAircraft > 0) chips.push(`<span class="posture-chip air">✈ ${p.totalAircraft}</span>`);
+      if (p.totalVessels > 0) chips.push(`<span class="posture-chip naval">⚓ ${p.totalVessels}</span>`);
+
       return `
         <div class="posture-theater posture-compact" data-lat="${p.centerLat}" data-lon="${p.centerLon}">
-          <div class="posture-theater-header">
-            <span class="posture-name">${escapeHtml(p.shortName)}</span>
-            ${this.getPostureBadge(p.postureLevel)}
-          </div>
-          <div class="posture-summary-mini">${summary}</div>
+          <span class="posture-name">${escapeHtml(p.shortName)}</span>
+          <div class="posture-chips">${chips.join('')}</div>
+          ${this.getPostureBadge(p.postureLevel)}
         </div>
       `;
     }
 
-    // Build aircraft rows
-    const aircraftRows = [
-      p.fighters > 0 ? `<div class="posture-row"><span class="posture-icon">✈️</span><span class="posture-count">${p.fighters}</span><span class="posture-label">Fighters</span></div>` : '',
-      p.tankers > 0 ? `<div class="posture-row"><span class="posture-icon">⛽</span><span class="posture-count">${p.tankers}</span><span class="posture-label">Tankers</span></div>` : '',
-      p.awacs > 0 ? `<div class="posture-row"><span class="posture-icon">📡</span><span class="posture-count">${p.awacs}</span><span class="posture-label">AWACS</span></div>` : '',
-      p.reconnaissance > 0 ? `<div class="posture-row"><span class="posture-icon">🔍</span><span class="posture-count">${p.reconnaissance}</span><span class="posture-label">Recon</span></div>` : '',
-      p.transport > 0 ? `<div class="posture-row"><span class="posture-icon">📦</span><span class="posture-count">${p.transport}</span><span class="posture-label">Transport</span></div>` : '',
-      p.bombers > 0 ? `<div class="posture-row"><span class="posture-icon">💣</span><span class="posture-count">${p.bombers}</span><span class="posture-label">Bombers</span></div>` : '',
-      p.drones > 0 ? `<div class="posture-row"><span class="posture-icon">🛸</span><span class="posture-count">${p.drones}</span><span class="posture-label">Drones</span></div>` : '',
-    ].filter(Boolean).join('');
+    // Build compact stat chips for expanded view
+    const airChips: string[] = [];
+    if (p.fighters > 0) airChips.push(`<span class="posture-stat" title="Fighters">✈ ${p.fighters}</span>`);
+    if (p.tankers > 0) airChips.push(`<span class="posture-stat" title="Tankers">⛽ ${p.tankers}</span>`);
+    if (p.awacs > 0) airChips.push(`<span class="posture-stat" title="AWACS">📡 ${p.awacs}</span>`);
+    if (p.reconnaissance > 0) airChips.push(`<span class="posture-stat" title="Recon">🔍 ${p.reconnaissance}</span>`);
+    if (p.transport > 0) airChips.push(`<span class="posture-stat" title="Transport">📦 ${p.transport}</span>`);
+    if (p.bombers > 0) airChips.push(`<span class="posture-stat" title="Bombers">💣 ${p.bombers}</span>`);
+    if (p.drones > 0) airChips.push(`<span class="posture-stat" title="Drones">🛸 ${p.drones}</span>`);
 
-    // Build vessel rows
-    const vesselRows = [
-      p.carriers > 0 ? `<div class="posture-row"><span class="posture-icon">🚢</span><span class="posture-count">${p.carriers}</span><span class="posture-label">Carriers</span></div>` : '',
-      p.destroyers > 0 ? `<div class="posture-row"><span class="posture-icon">⚓</span><span class="posture-count">${p.destroyers}</span><span class="posture-label">Destroyers</span></div>` : '',
-      p.frigates > 0 ? `<div class="posture-row"><span class="posture-icon">🛥️</span><span class="posture-count">${p.frigates}</span><span class="posture-label">Frigates</span></div>` : '',
-      p.submarines > 0 ? `<div class="posture-row"><span class="posture-icon">🦈</span><span class="posture-count">${p.submarines}</span><span class="posture-label">Submarines</span></div>` : '',
-      p.patrol > 0 ? `<div class="posture-row"><span class="posture-icon">🚤</span><span class="posture-count">${p.patrol}</span><span class="posture-label">Patrol</span></div>` : '',
-      p.auxiliaryVessels > 0 ? `<div class="posture-row"><span class="posture-icon">⚓</span><span class="posture-count">${p.auxiliaryVessels}</span><span class="posture-label">Naval</span></div>` : '',
-    ].filter(Boolean).join('');
+    const navalChips: string[] = [];
+    if (p.carriers > 0) navalChips.push(`<span class="posture-stat carrier" title="Carriers">🚢 ${p.carriers}</span>`);
+    if (p.destroyers > 0) navalChips.push(`<span class="posture-stat" title="Destroyers">⚓ ${p.destroyers}</span>`);
+    if (p.frigates > 0) navalChips.push(`<span class="posture-stat" title="Frigates">🛥 ${p.frigates}</span>`);
+    if (p.submarines > 0) navalChips.push(`<span class="posture-stat" title="Submarines">🦈 ${p.submarines}</span>`);
+    if (p.patrol > 0) navalChips.push(`<span class="posture-stat" title="Patrol">🚤 ${p.patrol}</span>`);
+    if (p.auxiliaryVessels > 0) navalChips.push(`<span class="posture-stat" title="Auxiliary">⚓ ${p.auxiliaryVessels}</span>`);
+
+    const hasAir = airChips.length > 0;
+    const hasNaval = navalChips.length > 0;
 
     return `
       <div class="posture-theater posture-expanded ${p.postureLevel}" data-lat="${p.centerLat}" data-lon="${p.centerLon}">
@@ -360,22 +360,16 @@ export class StrategicPosturePanel extends Panel {
           ${this.getPostureBadge(p.postureLevel)}
         </div>
 
-        ${aircraftRows ? `
-        <div class="posture-section-label">AIR</div>
-        <div class="posture-breakdown">${aircraftRows}</div>
-        ` : ''}
-
-        ${vesselRows ? `
-        <div class="posture-section-label">NAVAL</div>
-        <div class="posture-breakdown">${vesselRows}</div>
-        ` : ''}
-
-        <div class="posture-meta">
-          ${p.strikeCapable ? '<span class="posture-strike">⚡ STRIKE CAPABLE</span>' : ''}
-          ${this.getTrendIcon(p.trend, p.changePercent)}
+        <div class="posture-forces">
+          ${hasAir ? `<div class="posture-force-row"><span class="posture-domain">AIR</span><div class="posture-stats">${airChips.join('')}</div></div>` : ''}
+          ${hasNaval ? `<div class="posture-force-row"><span class="posture-domain">SEA</span><div class="posture-stats">${navalChips.join('')}</div></div>` : ''}
         </div>
 
-        ${p.targetNation ? `<div class="posture-target">Focus: ${escapeHtml(p.targetNation)}</div>` : ''}
+        <div class="posture-footer">
+          ${p.strikeCapable ? '<span class="posture-strike">⚡ STRIKE</span>' : ''}
+          ${this.getTrendIcon(p.trend, p.changePercent)}
+          ${p.targetNation ? `<span class="posture-focus">→ ${escapeHtml(p.targetNation)}</span>` : ''}
+        </div>
       </div>
     `;
   }
