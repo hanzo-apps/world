@@ -665,3 +665,183 @@ export function surgeAlertToSignal(surge: SurgeAlert): {
     metadata,
   };
 }
+
+// ============ THEATER POSTURE AGGREGATION ============
+
+interface PostureTheater {
+  id: string;
+  name: string;
+  shortName: string;
+  targetNation: string | null;
+  regions: string[];
+  bounds: { north: number; south: number; east: number; west: number };
+  thresholds: { elevated: number; critical: number };
+  strikeIndicators: { minTankers: number; minAwacs: number; minFighters: number };
+}
+
+const POSTURE_THEATERS: PostureTheater[] = [
+  {
+    id: 'iran-theater',
+    name: 'Iran Theater',
+    shortName: 'IRAN',
+    targetNation: 'Iran',
+    regions: ['persian-gulf', 'strait-hormuz', 'iran-border'],
+    bounds: { north: 42, south: 20, east: 65, west: 30 },
+    thresholds: { elevated: 50, critical: 100 },
+    strikeIndicators: { minTankers: 10, minAwacs: 2, minFighters: 30 },
+  },
+  {
+    id: 'taiwan-theater',
+    name: 'Taiwan Strait',
+    shortName: 'TAIWAN',
+    targetNation: 'Taiwan',
+    regions: ['taiwan-strait', 'south-china-sea'],
+    bounds: { north: 30, south: 18, east: 130, west: 115 },
+    thresholds: { elevated: 30, critical: 60 },
+    strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
+  },
+  {
+    id: 'baltic-theater',
+    name: 'Baltic Theater',
+    shortName: 'BALTIC',
+    targetNation: null,
+    regions: ['baltics', 'poland-border', 'kaliningrad'],
+    bounds: { north: 65, south: 52, east: 32, west: 10 },
+    thresholds: { elevated: 20, critical: 40 },
+    strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
+  },
+  {
+    id: 'blacksea-theater',
+    name: 'Black Sea',
+    shortName: 'BLACK SEA',
+    targetNation: null,
+    regions: ['black-sea'],
+    bounds: { north: 48, south: 40, east: 42, west: 26 },
+    thresholds: { elevated: 15, critical: 30 },
+    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+  },
+];
+
+export interface TheaterPostureSummary {
+  theaterId: string;
+  theaterName: string;
+  shortName: string;
+  targetNation: string | null;
+  fighters: number;
+  tankers: number;
+  awacs: number;
+  reconnaissance: number;
+  transport: number;
+  bombers: number;
+  drones: number;
+  totalAircraft: number;
+  byOperator: Record<string, number>;
+  postureLevel: 'normal' | 'elevated' | 'critical';
+  strikeCapable: boolean;
+  trend: 'increasing' | 'stable' | 'decreasing';
+  changePercent: number;
+  summary: string;
+  headline: string;
+  centerLat: number;
+  centerLon: number;
+}
+
+export function getTheaterPostureSummaries(flights: MilitaryFlight[]): TheaterPostureSummary[] {
+  const summaries: TheaterPostureSummary[] = [];
+
+  for (const theater of POSTURE_THEATERS) {
+    const theaterFlights = flights.filter(
+      (f) =>
+        f.lat >= theater.bounds.south &&
+        f.lat <= theater.bounds.north &&
+        f.lon >= theater.bounds.west &&
+        f.lon <= theater.bounds.east
+    );
+
+    const byType = {
+      fighters: theaterFlights.filter((f) => f.aircraftType === 'fighter').length,
+      tankers: theaterFlights.filter((f) => f.aircraftType === 'tanker').length,
+      awacs: theaterFlights.filter((f) => f.aircraftType === 'awacs').length,
+      reconnaissance: theaterFlights.filter((f) => f.aircraftType === 'reconnaissance').length,
+      transport: theaterFlights.filter((f) => f.aircraftType === 'transport').length,
+      bombers: theaterFlights.filter((f) => f.aircraftType === 'bomber').length,
+      drones: theaterFlights.filter((f) => f.aircraftType === 'drone').length,
+    };
+
+    const total = Object.values(byType).reduce((a, b) => a + b, 0);
+
+    const byOperator: Record<string, number> = {};
+    for (const f of theaterFlights) {
+      byOperator[f.operator] = (byOperator[f.operator] || 0) + 1;
+    }
+
+    const postureLevel: 'normal' | 'elevated' | 'critical' =
+      total >= theater.thresholds.critical
+        ? 'critical'
+        : total >= theater.thresholds.elevated
+          ? 'elevated'
+          : 'normal';
+
+    const strikeCapable =
+      byType.tankers >= theater.strikeIndicators.minTankers &&
+      byType.awacs >= theater.strikeIndicators.minAwacs &&
+      byType.fighters >= theater.strikeIndicators.minFighters;
+
+    const history = activityHistory.get(theater.id) || [];
+    const recent = history.slice(-6);
+    const older = history.slice(-12, -6);
+    const recentAvg =
+      recent.length > 0 ? recent.reduce((a, b) => a + b.totalMilitary, 0) / recent.length : total;
+    const olderAvg =
+      older.length > 0 ? older.reduce((a, b) => a + b.totalMilitary, 0) / older.length : total;
+    const changePercent = olderAvg > 0 ? Math.round(((recentAvg - olderAvg) / olderAvg) * 100) : 0;
+    const trend: 'increasing' | 'stable' | 'decreasing' =
+      changePercent > 10 ? 'increasing' : changePercent < -10 ? 'decreasing' : 'stable';
+
+    const parts: string[] = [];
+    if (byType.fighters > 0) parts.push(`${byType.fighters} fighters`);
+    if (byType.tankers > 0) parts.push(`${byType.tankers} tankers`);
+    if (byType.awacs > 0) parts.push(`${byType.awacs} AWACS`);
+    if (byType.reconnaissance > 0) parts.push(`${byType.reconnaissance} recon`);
+    const summary = parts.join(', ') || 'No military aircraft';
+
+    const headline =
+      postureLevel === 'critical'
+        ? `Critical military buildup - ${theater.name}`
+        : postureLevel === 'elevated'
+          ? `Elevated military activity - ${theater.name}`
+          : `Normal activity - ${theater.name}`;
+
+    summaries.push({
+      theaterId: theater.id,
+      theaterName: theater.name,
+      shortName: theater.shortName,
+      targetNation: theater.targetNation,
+      fighters: byType.fighters,
+      tankers: byType.tankers,
+      awacs: byType.awacs,
+      reconnaissance: byType.reconnaissance,
+      transport: byType.transport,
+      bombers: byType.bombers,
+      drones: byType.drones,
+      totalAircraft: total,
+      byOperator,
+      postureLevel,
+      strikeCapable,
+      trend,
+      changePercent,
+      summary,
+      headline,
+      centerLat: (theater.bounds.north + theater.bounds.south) / 2,
+      centerLon: (theater.bounds.east + theater.bounds.west) / 2,
+    });
+  }
+
+  return summaries;
+}
+
+export function getCriticalPostures(flights: MilitaryFlight[]): TheaterPostureSummary[] {
+  return getTheaterPostureSummaries(flights).filter(
+    (p) => p.postureLevel === 'critical' || (p.postureLevel === 'elevated' && p.strikeCapable)
+  );
+}
