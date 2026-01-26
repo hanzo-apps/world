@@ -61,17 +61,24 @@ export function parseMapUrlState(
 
   const layersParam = params.get('layers');
   let layers: MapLayers | undefined;
-  if (layersParam) {
-    const requested = new Set(
-      layersParam
-        .split(',')
-        .map((layer) => layer.trim())
-        .filter(Boolean)
-    );
+  if (layersParam !== null) {
     layers = { ...fallbackLayers };
-    LAYER_KEYS.forEach((key) => {
-      layers![key] = requested.has(key);
-    });
+    const normalizedLayers = layersParam.trim();
+    if (normalizedLayers !== '' && normalizedLayers !== 'none') {
+      const requested = new Set(
+        normalizedLayers
+          .split(',')
+          .map((layer) => layer.trim())
+          .filter(Boolean)
+      );
+      LAYER_KEYS.forEach((key) => {
+        layers![key] = requested.has(key);
+      });
+    } else {
+      LAYER_KEYS.forEach((key) => {
+        layers![key] = false;
+      });
+    }
   }
 
   return {
@@ -107,9 +114,7 @@ export function buildMapUrl(
   params.set('timeRange', state.timeRange);
 
   const activeLayers = LAYER_KEYS.filter((layer) => state.layers[layer]);
-  if (activeLayers.length > 0) {
-    params.set('layers', activeLayers.join(','));
-  }
+  params.set('layers', activeLayers.length > 0 ? activeLayers.join(',') : 'none');
 
   url.search = params.toString();
   return url.toString();
