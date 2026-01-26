@@ -9858,6 +9858,7 @@ body.playback-mode .status-dot {
 }
 
 .focal-point-headline {
+  display: block;
   font-size: 10px;
   color: var(--text-muted);
   font-style: italic;
@@ -9865,6 +9866,14 @@ body.playback-mode .status-dot {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.focal-point-headline:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 /* ============ Critical Posture Banner ============ */
