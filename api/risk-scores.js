@@ -11,7 +11,9 @@ export const config = {
 };
 
 const CACHE_TTL_SECONDS = 600; // 10 minutes
-const CACHE_KEY = 'risk:scores:v1';
+const STALE_CACHE_TTL_SECONDS = 3600; // 1 hour - serve stale when API fails
+const CACHE_KEY = 'risk:scores:v2';
+const STALE_CACHE_KEY = 'risk:scores:stale:v2';
 
 // Tier 1 countries for CII
 const TIER1_COUNTRIES = {
@@ -93,21 +95,36 @@ async function fetchACLEDProtests() {
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
     const response = await fetch(
       `https://api.acleddata.com/acled/read?event_type=Protests&event_type=Riots&event_date=${startDate}|${endDate}&event_date_where=BETWEEN&limit=500`,
-      { headers: { 'Accept': 'application/json' } }
+      {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal,
+      }
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.warn('[RiskScores] ACLED fetch failed:', response.status);
-      return [];
+      throw new Error(`ACLED API error: ${response.status}`);
     }
 
     const data = await response.json();
+
+    // Check for API-level error in response
+    if (data.error || data.success === false) {
+      console.warn('[RiskScores] ACLED API returned error:', data.error || 'unknown');
+      throw new Error(data.error || 'ACLED API error');
+    }
+
     return data.data || [];
   } catch (error) {
     console.warn('[RiskScores] ACLED error:', error.message);
-    return [];
+    throw error; // Re-throw to trigger stale cache fallback
   }
 }
 
@@ -248,10 +265,13 @@ export default async function handler(request) {
       computedAt: new Date().toISOString(),
     };
 
-    // Cache in Redis
+    // Cache in Redis (both regular and stale backup)
     if (redisClient) {
       try {
-        await redisClient.set(CACHE_KEY, result, { ex: CACHE_TTL_SECONDS });
+        await Promise.all([
+          redisClient.set(CACHE_KEY, result, { ex: CACHE_TTL_SECONDS }),
+          redisClient.set(STALE_CACHE_KEY, result, { ex: STALE_CACHE_TTL_SECONDS }),
+        ]);
         console.log('[RiskScores] Cached scores');
       } catch (cacheError) {
         console.warn('[RiskScores] Cache write error:', cacheError.message);
@@ -271,6 +291,31 @@ export default async function handler(request) {
 
   } catch (error) {
     console.error('[RiskScores] Error:', error);
+
+    // Try to return stale cached data
+    if (redisClient) {
+      try {
+        const stale = await redisClient.get(STALE_CACHE_KEY);
+        if (stale && typeof stale === 'object') {
+          console.log('[RiskScores] Returning stale cache due to error');
+          return new Response(JSON.stringify({
+            ...stale,
+            cached: true,
+            stale: true,
+            error: 'Using cached data - ACLED temporarily unavailable',
+          }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=60',
+            },
+          });
+        }
+      } catch (cacheError) {
+        console.warn('[RiskScores] Stale cache read error:', cacheError.message);
+      }
+    }
+
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
