@@ -720,6 +720,36 @@ const POSTURE_THEATERS: PostureTheater[] = [
     thresholds: { elevated: 15, critical: 30 },
     strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
   },
+  {
+    id: 'korea-theater',
+    name: 'Korean Peninsula',
+    shortName: 'KOREA',
+    targetNation: 'North Korea',
+    regions: ['korean-dmz', 'sea-of-japan'],
+    bounds: { north: 43, south: 33, east: 132, west: 124 },
+    thresholds: { elevated: 20, critical: 50 },
+    strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
+  },
+  {
+    id: 'south-china-sea',
+    name: 'South China Sea',
+    shortName: 'SCS',
+    targetNation: null,
+    regions: ['south-china-sea', 'spratly-islands'],
+    bounds: { north: 25, south: 5, east: 121, west: 105 },
+    thresholds: { elevated: 25, critical: 50 },
+    strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
+  },
+  {
+    id: 'east-med-theater',
+    name: 'Eastern Mediterranean',
+    shortName: 'E.MED',
+    targetNation: null,
+    regions: ['eastern-med', 'levant'],
+    bounds: { north: 37, south: 30, east: 37, west: 25 },
+    thresholds: { elevated: 15, critical: 30 },
+    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+  },
 ];
 
 export interface TheaterPostureSummary {
