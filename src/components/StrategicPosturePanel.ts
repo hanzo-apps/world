@@ -1,16 +1,13 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
-import {
-  getTheaterPostureSummaries,
-  type TheaterPostureSummary,
-} from '@/services/military-surge';
-import type { MilitaryFlight } from '@/types';
+import { fetchCachedTheaterPosture, type CachedTheaterPosture } from '@/services/cached-theater-posture';
+import type { TheaterPostureSummary } from '@/services/military-surge';
 
 export class StrategicPosturePanel extends Panel {
   private postures: TheaterPostureSummary[] = [];
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private onLocationClick?: (lat: number, lon: number) => void;
-  private lastFlights: MilitaryFlight[] = [];
+  private lastTimestamp: string = '';
 
   constructor() {
     super({
@@ -31,27 +28,58 @@ export class StrategicPosturePanel extends Panel {
   }
 
   private init(): void {
-    this.showNoData();
+    this.showLoading();
+    this.fetchAndRender();
     this.startAutoRefresh();
   }
 
   private startAutoRefresh(): void {
-    this.refreshInterval = setInterval(() => this.refresh(), 5 * 60 * 1000);
+    this.refreshInterval = setInterval(() => this.fetchAndRender(), 5 * 60 * 1000);
   }
 
-  public updateFlights(flights: MilitaryFlight[]): void {
-    this.lastFlights = flights;
-    this.refresh();
+  public override showLoading(): void {
+    this.setContent(`
+      <div class="posture-panel">
+        <div class="posture-no-data">
+          <div class="posture-no-data-icon">⏳</div>
+          <div class="posture-no-data-title">Loading...</div>
+          <div class="posture-no-data-desc">
+            Fetching theater posture data.
+          </div>
+        </div>
+      </div>
+    `);
   }
 
-  public refresh(): void {
-    if (this.lastFlights.length === 0) {
+  private async fetchAndRender(): Promise<void> {
+    try {
+      const data = await fetchCachedTheaterPosture();
+      if (!data || data.postures.length === 0) {
+        this.showNoData();
+        return;
+      }
+      this.postures = data.postures;
+      this.lastTimestamp = data.timestamp;
+      this.updateBadges();
+      this.render();
+    } catch (error) {
+      console.error('[StrategicPosturePanel] Fetch error:', error);
+      this.showFetchError();
+    }
+  }
+
+  public updatePostures(data: CachedTheaterPosture): void {
+    if (!data || data.postures.length === 0) {
       this.showNoData();
       return;
     }
+    this.postures = data.postures;
+    this.lastTimestamp = data.timestamp;
+    this.updateBadges();
+    this.render();
+  }
 
-    this.postures = getTheaterPostureSummaries(this.lastFlights);
-
+  private updateBadges(): void {
     const hasCritical = this.postures.some((p) => p.postureLevel === 'critical');
     const hasElevated = this.postures.some((p) => p.postureLevel === 'elevated');
     if (hasCritical) {
@@ -61,8 +89,10 @@ export class StrategicPosturePanel extends Panel {
     } else {
       this.clearNewBadge();
     }
+  }
 
-    this.render();
+  public refresh(): void {
+    this.fetchAndRender();
   }
 
   private showNoData(): void {
@@ -70,9 +100,23 @@ export class StrategicPosturePanel extends Panel {
       <div class="posture-panel">
         <div class="posture-no-data">
           <div class="posture-no-data-icon">📡</div>
-          <div class="posture-no-data-title">Awaiting Data</div>
+          <div class="posture-no-data-title">No Data Available</div>
           <div class="posture-no-data-desc">
-            Enable military layer or wait for flight data to load.
+            Theater posture data is currently unavailable.
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  private showFetchError(): void {
+    this.setContent(`
+      <div class="posture-panel">
+        <div class="posture-no-data">
+          <div class="posture-no-data-icon">⚠️</div>
+          <div class="posture-no-data-title">Error Loading</div>
+          <div class="posture-no-data-desc">
+            Failed to fetch theater posture data. Will retry.
           </div>
         </div>
       </div>
@@ -148,12 +192,16 @@ export class StrategicPosturePanel extends Panel {
       return (order[a.postureLevel] ?? 2) - (order[b.postureLevel] ?? 2);
     });
 
+    const updatedTime = this.lastTimestamp
+      ? new Date(this.lastTimestamp).toLocaleTimeString()
+      : new Date().toLocaleTimeString();
+
     const html = `
       <div class="posture-panel">
         ${sorted.map((p) => this.renderTheater(p)).join('')}
 
         <div class="posture-footer">
-          <span class="posture-updated">Updated: ${new Date().toLocaleTimeString()}</span>
+          <span class="posture-updated">Updated: ${updatedTime}</span>
           <button class="posture-refresh-btn" title="Refresh">↻</button>
         </div>
       </div>
