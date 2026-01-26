@@ -67,6 +67,7 @@ import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
 export class App {
   private container: HTMLElement;
+  private readonly PANEL_ORDER_KEY = 'panel-order';
   private map: MapContainer | null = null;
   private panels: Record<string, Panel> = {};
   private newsPanels: Record<string, NewsPanel> = {};
@@ -127,7 +128,7 @@ export class App {
       localStorage.setItem('worldmonitor-variant', currentVariant);
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
       localStorage.removeItem(STORAGE_KEYS.panels);
-      localStorage.removeItem('worldmonitor-panel-order');
+      localStorage.removeItem(this.PANEL_ORDER_KEY);
       this.mapLayers = { ...defaultLayers };
       this.panelSettings = { ...DEFAULT_PANELS };
     } else {
@@ -142,7 +143,7 @@ export class App {
       // Puts live-news, insights, strategic-posture, cii, strategic-risk at the top
       const PANEL_ORDER_MIGRATION_KEY = 'worldmonitor-panel-order-v1.9';
       if (!localStorage.getItem(PANEL_ORDER_MIGRATION_KEY)) {
-        const savedOrder = localStorage.getItem('panel-order');
+        const savedOrder = localStorage.getItem(this.PANEL_ORDER_KEY);
         if (savedOrder) {
           try {
             const order: string[] = JSON.parse(savedOrder);
@@ -156,7 +157,7 @@ export class App {
             const newOrder = liveNewsIdx !== -1 ? ['live-news'] : [];
             newOrder.push(...priorityPanels.filter(p => order.includes(p)));
             newOrder.push(...filtered);
-            localStorage.setItem('panel-order', JSON.stringify(newOrder));
+            localStorage.setItem(this.PANEL_ORDER_KEY, JSON.stringify(newOrder));
             console.log('[App] Migrated panel order to v1.8 layout');
           } catch {
             // Invalid saved order, will use defaults
@@ -169,7 +170,7 @@ export class App {
       if (currentVariant === 'tech') {
         const TECH_INSIGHTS_MIGRATION_KEY = 'worldmonitor-tech-insights-top-v1';
         if (!localStorage.getItem(TECH_INSIGHTS_MIGRATION_KEY)) {
-          const savedOrder = localStorage.getItem('panel-order');
+          const savedOrder = localStorage.getItem(this.PANEL_ORDER_KEY);
           if (savedOrder) {
             try {
               const order: string[] = JSON.parse(savedOrder);
@@ -180,7 +181,7 @@ export class App {
               if (order.includes('live-news')) newOrder.push('live-news');
               if (order.includes('insights')) newOrder.push('insights');
               newOrder.push(...filtered);
-              localStorage.setItem('panel-order', JSON.stringify(newOrder));
+              localStorage.setItem(this.PANEL_ORDER_KEY, JSON.stringify(newOrder));
               console.log('[App] Tech variant: Migrated insights panel to top');
             } catch {
               // Invalid saved order, will use defaults
@@ -1355,7 +1356,7 @@ export class App {
 
   private getSavedPanelOrder(): string[] {
     try {
-      const saved = localStorage.getItem('panel-order');
+      const saved = localStorage.getItem(this.PANEL_ORDER_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -1368,7 +1369,7 @@ export class App {
     const order = Array.from(grid.children)
       .map((el) => (el as HTMLElement).dataset.panel)
       .filter((key): key is string => !!key);
-    localStorage.setItem('panel-order', JSON.stringify(order));
+    localStorage.setItem(this.PANEL_ORDER_KEY, JSON.stringify(order));
   }
 
   private attachRelatedAssetHandlers(panel: NewsPanel): void {
