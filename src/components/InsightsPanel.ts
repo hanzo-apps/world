@@ -1,6 +1,6 @@
 import { Panel } from './Panel';
 import { mlWorker } from '@/services/ml-worker';
-import { generateSummary, type SummarizationProvider } from '@/services/summarization';
+import { generateSummary } from '@/services/summarization';
 import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-analysis';
 import { signalAggregator, logSignalSummary, type RegionalConvergence } from '@/services/signal-aggregator';
 import { focalPointDetector } from '@/services/focal-point-detector';
@@ -15,7 +15,6 @@ export class InsightsPanel extends Panel {
   private isHidden = false;
   private lastBriefUpdate = 0;
   private cachedBrief: string | null = null;
-  private briefProvider: SummarizationProvider | null = null;
   private lastMissedStories: AnalyzedHeadline[] = [];
   private lastConvergenceZones: RegionalConvergence[] = [];
   private lastFocalPoints: FocalPoint[] = [];
@@ -346,9 +345,8 @@ export class InsightsPanel extends Panel {
         if (result) {
           worldBrief = result.summary;
           this.cachedBrief = worldBrief;
-          this.briefProvider = result.provider;
           this.lastBriefUpdate = now;
-          console.log(`[InsightsPanel] Brief from ${result.provider}${result.cached ? ' (cached)' : ''}${geoContext ? ' (with geo context)' : ''}`);
+          console.log(`[InsightsPanel] Brief generated${result.cached ? ' (cached)' : ''}${geoContext ? ' (with geo context)' : ''}`);
         }
       } else {
         this.setProgress(3, totalSteps, 'Using cached brief...');
@@ -393,13 +391,9 @@ export class InsightsPanel extends Panel {
   }
 
   private renderWorldBrief(brief: string): string {
-    const providerBadge = this.briefProvider && this.briefProvider !== 'cache'
-      ? `<span class="insights-provider">${this.briefProvider}</span>`
-      : '';
-
     return `
       <div class="insights-brief">
-        <div class="insights-section-title">${SITE_VARIANT === 'tech' ? '🚀 TECH BRIEF' : '🌍 WORLD BRIEF'} ${providerBadge}</div>
+        <div class="insights-section-title">${SITE_VARIANT === 'tech' ? '🚀 TECH BRIEF' : '🌍 WORLD BRIEF'}</div>
         <div class="insights-brief-text">${escapeHtml(brief)}</div>
       </div>
     `;
