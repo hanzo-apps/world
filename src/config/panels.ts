@@ -6,14 +6,14 @@ const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
 // FULL VARIANT (Geopolitical)
 // ============================================
 // Panel order matters! First panels appear at top of grid.
-// Desired order: live-news (video), insights (AI), cii, strategic-risk, then rest
+// Desired order: live-news, AI Insights, AI Strategic Posture, cii, strategic-risk, then rest
 const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
+  'strategic-posture': { name: 'AI Strategic Posture', enabled: true, priority: 1 },
   cii: { name: 'Country Instability', enabled: true, priority: 1 },
   'strategic-risk': { name: 'Strategic Risk Overview', enabled: true, priority: 1 },
-  'strategic-posture': { name: 'Strategic Posture', enabled: true, priority: 1 },
   intel: { name: 'Intel Feed', enabled: true, priority: 1 },
   'gdelt-intel': { name: 'Live Intelligence', enabled: true, priority: 1 },
   cascade: { name: 'Infrastructure Cascade', enabled: true, priority: 1 },
