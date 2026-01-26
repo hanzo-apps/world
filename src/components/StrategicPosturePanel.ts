@@ -33,10 +33,20 @@ export class StrategicPosturePanel extends Panel {
     this.showLoading();
     this.fetchAndRender();
     this.startAutoRefresh();
+    // Re-augment with vessels after stream has had time to populate (30s, 60s)
+    setTimeout(() => this.reaugmentVessels(), 30 * 1000);
+    setTimeout(() => this.reaugmentVessels(), 60 * 1000);
   }
 
   private startAutoRefresh(): void {
     this.refreshInterval = setInterval(() => this.fetchAndRender(), 5 * 60 * 1000);
+  }
+
+  private async reaugmentVessels(): Promise<void> {
+    if (this.postures.length === 0) return;
+    console.log('[StrategicPosturePanel] Re-augmenting with vessels...');
+    await this.augmentWithVessels();
+    this.render();
   }
 
   public override showLoading(): void {
