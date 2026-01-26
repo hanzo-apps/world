@@ -17,7 +17,8 @@ import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
-import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, getTheaterPostureSummaries, type TheaterPostureSummary } from '@/services/military-surge';
+import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
+import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
@@ -2668,11 +2669,8 @@ export class App {
       this.map?.setMilitaryFlights(flights, flightClusters);
       this.map?.setMilitaryVessels(vessels, vesselClusters);
       this.map?.updateMilitaryForEscalation(flights, vessels);
-      // Render critical posture banner and update panels from cached data
-      const postures = getTheaterPostureSummaries(flights);
-      this.renderCriticalBanner(postures);
-      const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
-      posturePanel?.updateFlights(flights);
+      // Fetch cached postures for banner (posture panel fetches its own data)
+      this.loadCachedPosturesForBanner();
       const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
       insightsPanel?.setMilitaryFlights(flights);
       const hasData = flights.length > 0 || vessels.length > 0;
@@ -2724,11 +2722,8 @@ export class App {
         }
       }
 
-      // Render critical posture banner and update panels
-      const postures = getTheaterPostureSummaries(flightData.flights);
-      this.renderCriticalBanner(postures);
-      const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
-      posturePanel?.updateFlights(flightData.flights);
+      // Fetch cached postures for banner (posture panel fetches its own data)
+      this.loadCachedPosturesForBanner();
       const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
       insightsPanel?.setMilitaryFlights(flightData.flights);
 
@@ -2747,6 +2742,24 @@ export class App {
       this.statusPanel?.updateFeed('Military', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('OpenSky', { status: 'error' });
       dataFreshness.recordError('opensky', String(error));
+    }
+  }
+
+  /**
+   * Load cached theater postures for banner display
+   * Uses server-side cached data to avoid redundant calculation per user
+   */
+  private async loadCachedPosturesForBanner(): Promise<void> {
+    try {
+      const data = await fetchCachedTheaterPosture();
+      if (data && data.postures.length > 0) {
+        this.renderCriticalBanner(data.postures);
+        // Also update posture panel with shared data (saves a duplicate fetch)
+        const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
+        posturePanel?.updatePostures(data);
+      }
+    } catch (error) {
+      console.warn('[App] Failed to load cached postures for banner:', error);
     }
   }
 
