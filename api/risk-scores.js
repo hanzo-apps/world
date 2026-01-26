@@ -209,10 +209,10 @@ function computeCIIScores(protests) {
 function computeStrategicRisk(ciiScores) {
   // Top 5 CII scores weighted average
   const top5 = ciiScores.slice(0, 5);
-  const ciiComponent = top5.reduce((sum, s, i) => {
-    const weight = 1 - (i * 0.15); // 1.0, 0.85, 0.70, 0.55, 0.40
-    return sum + s.score * weight;
-  }, 0) / top5.reduce((_, __, i) => 1 - (i * 0.15), 0);
+  const weights = top5.map((_, i) => 1 - (i * 0.15)); // [1.0, 0.85, 0.70, 0.55, 0.40]
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0); // 3.5
+  const weightedSum = top5.reduce((sum, s, i) => sum + s.score * weights[i], 0);
+  const ciiComponent = weightedSum / totalWeight;
 
   // Overall strategic risk
   const overallScore = Math.round(ciiComponent * 0.7 + 15); // 30% baseline
