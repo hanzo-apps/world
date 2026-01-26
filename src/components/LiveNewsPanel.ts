@@ -40,6 +40,7 @@ interface LiveChannel {
   fallbackVideoId?: string; // Fallback if no live stream detected
   videoId?: string; // Dynamically fetched live video ID
   isLive?: boolean;
+  useFallbackOnly?: boolean; // Skip auto-detection, always use fallback
 }
 
 const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
@@ -51,8 +52,8 @@ const FULL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'euronews', name: 'Euronews', handle: '@euabortnews', fallbackVideoId: 'pykpO5kQJ98' },
   { id: 'dw', name: 'DW', handle: '@DWNews', fallbackVideoId: 'LuKwFajn37U' },
   { id: 'france24', name: 'France24', handle: '@FRANCE24English', fallbackVideoId: 'Ap-UM1O9RBU' },
-  { id: 'alarabiya', name: 'AlArabiya', handle: '@AlArabiya', fallbackVideoId: 'n7eQejkXbnM' },
-  { id: 'aljazeera', name: 'AlJazeera', handle: '@AlJazeeraEnglish', fallbackVideoId: 'gCNeDWCI0vo' },
+  { id: 'alarabiya', name: 'AlArabiya', handle: '@AlArabiya', fallbackVideoId: 'n7eQejkXbnM', useFallbackOnly: true },
+  { id: 'aljazeera', name: 'AlJazeera', handle: '@AlJazeeraEnglish', fallbackVideoId: 'gCNeDWCI0vo', useFallbackOnly: true },
 ];
 
 // Tech variant: Tech & business channels
@@ -71,6 +72,11 @@ const liveVideoCache = new Map<string, { videoId: string | null; timestamp: numb
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function fetchLiveVideoId(channel: LiveChannel): Promise<string | null> {
+  // Skip auto-detection for channels that should use fallback only
+  if (channel.useFallbackOnly) {
+    return null;
+  }
+
   const cached = liveVideoCache.get(channel.handle);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.videoId;
