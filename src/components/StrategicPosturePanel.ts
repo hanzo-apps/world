@@ -138,6 +138,7 @@ export class StrategicPosturePanel extends Panel {
       byOperator: { ...p.byOperator },
     }));
     this.lastTimestamp = data.timestamp;
+    this.isStale = data.stale || false;
     this.augmentWithVessels().then(() => {
       this.updateBadges();
       this.render();
