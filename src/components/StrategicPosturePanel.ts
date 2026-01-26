@@ -88,6 +88,7 @@ export class StrategicPosturePanel extends Panel {
 
     try {
       const { vessels } = await fetchMilitaryVessels();
+      console.log(`[StrategicPosturePanel] Got ${vessels.length} total military vessels`);
       if (vessels.length === 0) return;
 
       // Merge vessel counts into each theater
@@ -110,9 +111,13 @@ export class StrategicPosturePanel extends Panel {
         posture.submarines = theaterVessels.filter((v) => v.vesselType === 'submarine').length;
         posture.patrol = theaterVessels.filter((v) => v.vesselType === 'patrol').length;
         posture.auxiliaryVessels = theaterVessels.filter(
-          (v) => v.vesselType === 'auxiliary' || v.vesselType === 'special' || v.vesselType === 'amphibious' || v.vesselType === 'icebreaker' || v.vesselType === 'research'
+          (v) => v.vesselType === 'auxiliary' || v.vesselType === 'special' || v.vesselType === 'amphibious' || v.vesselType === 'icebreaker' || v.vesselType === 'research' || v.vesselType === 'unknown'
         ).length;
         posture.totalVessels = theaterVessels.length;
+
+        if (theaterVessels.length > 0) {
+          console.log(`[StrategicPosturePanel] ${posture.shortName}: ${theaterVessels.length} vessels`, theaterVessels.map(v => v.vesselType));
+        }
 
         // Add vessel operators to byOperator
         for (const v of theaterVessels) {
@@ -253,7 +258,7 @@ export class StrategicPosturePanel extends Panel {
       p.frigates > 0 ? `<div class="posture-row"><span class="posture-icon">🛥️</span><span class="posture-count">${p.frigates}</span><span class="posture-label">Frigates</span></div>` : '',
       p.submarines > 0 ? `<div class="posture-row"><span class="posture-icon">🦈</span><span class="posture-count">${p.submarines}</span><span class="posture-label">Submarines</span></div>` : '',
       p.patrol > 0 ? `<div class="posture-row"><span class="posture-icon">🚤</span><span class="posture-count">${p.patrol}</span><span class="posture-label">Patrol</span></div>` : '',
-      p.auxiliaryVessels > 0 ? `<div class="posture-row"><span class="posture-icon">🔧</span><span class="posture-count">${p.auxiliaryVessels}</span><span class="posture-label">Auxiliary</span></div>` : '',
+      p.auxiliaryVessels > 0 ? `<div class="posture-row"><span class="posture-icon">⚓</span><span class="posture-count">${p.auxiliaryVessels}</span><span class="posture-label">Naval</span></div>` : '',
     ].filter(Boolean).join('');
 
     return `
