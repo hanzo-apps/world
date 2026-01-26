@@ -1745,10 +1745,13 @@ export class DeckGLMap {
 
     this.container.appendChild(controls);
 
-    // Bind events
-    controls.querySelector('.zoom-in')?.addEventListener('click', () => this.zoomIn());
-    controls.querySelector('.zoom-out')?.addEventListener('click', () => this.zoomOut());
-    controls.querySelector('.zoom-reset')?.addEventListener('click', () => this.resetView());
+    // Bind events - use event delegation for reliability
+    controls.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('zoom-in')) this.zoomIn();
+      else if (target.classList.contains('zoom-out')) this.zoomOut();
+      else if (target.classList.contains('zoom-reset')) this.resetView();
+    });
 
     const viewSelect = controls.querySelector('.view-select') as HTMLSelectElement;
     viewSelect.value = this.state.view;

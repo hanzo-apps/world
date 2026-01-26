@@ -9008,6 +9008,9 @@ body.playback-mode .status-dot {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .deckgl-controls .map-btn:hover {
