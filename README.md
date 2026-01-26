@@ -40,6 +40,7 @@ The primary variant focuses on geopolitical intelligence, military tracking, and
 | Panel | Purpose |
 |-------|---------|
 | **AI Insights** | LLM-synthesized world brief with focal point detection |
+| **AI Strategic Posture** | Theater-level military force aggregation with strike capability assessment |
 | **Country Instability Index** | Real-time stability scores for 20 monitored countries |
 | **Strategic Risk Overview** | Composite risk score combining all intelligence modules |
 | **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
@@ -179,6 +180,7 @@ Beyond raw data feeds, the dashboard provides synthesized intelligence panels:
 
 | Panel | Purpose |
 |-------|---------|
+| **AI Strategic Posture** | Theater-level military aggregation with strike capability analysis |
 | **Strategic Risk Overview** | Composite risk score combining all intelligence modules |
 | **Country Instability Index** | Real-time stability scores for 20 monitored countries |
 | **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
@@ -1000,9 +1002,41 @@ The CII tracks 24-hour changes to identify trajectory:
 - **Stable**: Change within ±5 points (steady state)
 - **Falling**: Score decreased by ≥5 points (de-escalation)
 
+### Contextual Score Boosts
+
+Beyond the base component scores, several contextual factors can boost a country's CII score (up to a combined maximum of 23 additional points):
+
+| Boost Type | Max Points | Condition | Purpose |
+|------------|------------|-----------|---------|
+| **Hotspot Activity** | 10 | Events near defined hotspots | Captures localized escalation |
+| **News Urgency** | 5 | Information component ≥50 | High media attention indicator |
+| **Focal Point** | 8 | AI focal point detection on country | Multi-source convergence indicator |
+
+**Hotspot Boost Calculation**:
+- Hotspot activity (0-100) scaled by 1.5× then capped at 10
+- Zero boost for countries with no associated hotspot activity
+
+**News Urgency Boost Tiers**:
+- Information ≥70: +5 points
+- Information ≥50: +3 points
+- Information <50: +0 points
+
+**Focal Point Boost Tiers**:
+- Critical urgency: +8 points
+- Elevated urgency: +4 points
+- Normal urgency: +0 points
+
+These boosts are designed to elevate scores only when corroborating evidence exists—a country must have both high base scores AND contextual signals to reach extreme levels.
+
+### Server-Side Pre-Computation
+
+To eliminate the "cold start" problem where new users would see blank data during the Learning Mode warmup, CII scores are **pre-computed server-side** via the `/api/risk-scores` endpoint. See the [Server-Side Risk Score API](#server-side-risk-score-api) section for details.
+
 ### Learning Mode (15-Minute Warmup)
 
 On dashboard startup, the CII system enters **Learning Mode**—a 15-minute calibration period where scores are calculated but alerts are suppressed. This prevents the flood of false-positive alerts that would otherwise occur as the system establishes baseline values.
+
+**Note**: Server-side pre-computation now provides immediate scores to new users—Learning Mode primarily affects client-side dynamic adjustments and alert generation rather than initial score display.
 
 **Why 15 minutes?** Real-world testing showed that CII scores stabilize after approximately 10-20 minutes of data collection. The 15-minute window provides sufficient time for:
 - Multiple refresh cycles across all data sources
@@ -1527,6 +1561,24 @@ Vessels are identified as military through multiple methods:
 | 412-414 | China | PLAN vessels |
 | 232-235 | UK | Royal Navy |
 | 226-228 | France | Marine Nationale |
+
+**Known Vessel Database**: A curated database of 50+ named vessels enables positive identification when AIS transmits vessel names:
+
+| Category | Tracked Vessels |
+|----------|-----------------|
+| **US Carriers** | All 11 Nimitz/Ford-class (CVN-68 through CVN-78) |
+| **UK Carriers** | HMS Queen Elizabeth (R08), HMS Prince of Wales (R09) |
+| **Chinese Carriers** | Liaoning (16), Shandong (17), Fujian (18) |
+| **Russian Carrier** | Admiral Kuznetsov |
+| **Notable Destroyers** | USS Zumwalt (DDG-1000), HMS Defender (D36), HMS Duncan (D37) |
+| **Research/Intel** | USNS Victorious (T-AGOS-19), USNS Impeccable (T-AGOS-23), Yuan Wang |
+
+**Vessel Classification Algorithm**:
+
+1. Check vessel name against known database (hull numbers and ship names)
+2. Fall back to AIS ship type code if name match fails
+3. Apply MMSI pattern matching for country/operator identification
+4. For naval-prefix vessels (USS, HMS, HMCS, HMAS, INS, JS, ROKS, TCG), infer military status
 
 **Callsign Patterns**: Known military callsign prefixes (NAVY, GUARD, etc.) provide secondary identification.
 
@@ -2851,6 +2903,159 @@ Iran: "Iran protests continue amid military..."
 
 ---
 
+## Strategic Posture Analysis
+
+The AI Strategic Posture panel aggregates military aircraft and naval vessels across defined theaters, providing at-a-glance situational awareness of global force concentrations.
+
+### Strategic Theaters
+
+Nine geographic theaters are monitored continuously, each with custom thresholds based on typical peacetime activity levels:
+
+| Theater | Bounds | Elevated Threshold | Critical Threshold |
+|---------|--------|--------------------|--------------------|
+| **Iran Theater** | Persian Gulf, Iraq, Syria (20°N–42°N, 30°E–65°E) | 50 aircraft | 100 aircraft |
+| **Taiwan Strait** | Taiwan, East China Sea (18°N–30°N, 115°E–130°E) | 30 aircraft | 60 aircraft |
+| **Korean Peninsula** | North/South Korea (33°N–43°N, 124°E–132°E) | 20 aircraft | 50 aircraft |
+| **Baltic Theater** | Baltics, Poland, Scandinavia (52°N–65°N, 10°E–32°E) | 20 aircraft | 40 aircraft |
+| **Black Sea** | Ukraine, Turkey, Romania (40°N–48°N, 26°E–42°E) | 15 aircraft | 30 aircraft |
+| **South China Sea** | Philippines, Vietnam (5°N–25°N, 105°E–121°E) | 25 aircraft | 50 aircraft |
+| **Eastern Mediterranean** | Syria, Cyprus, Lebanon (33°N–37°N, 25°E–37°E) | 15 aircraft | 30 aircraft |
+| **Israel/Gaza** | Israel, Gaza Strip (29°N–33°N, 33°E–36°E) | 10 aircraft | 25 aircraft |
+| **Yemen/Red Sea** | Bab el-Mandeb, Houthi areas (11°N–22°N, 32°E–54°E) | 15 aircraft | 30 aircraft |
+
+### Strike Capability Assessment
+
+Beyond raw counts, the system assesses whether forces in a theater constitute an **offensive strike package**—the combination of assets required for sustained combat operations.
+
+**Strike-Capable Criteria**:
+- Aerial refueling tankers (KC-135, KC-10, A330 MRTT)
+- Airborne command and control (E-3 AWACS, E-7 Wedgetail)
+- Combat aircraft (fighters, strike aircraft)
+
+Each theater has custom thresholds reflecting realistic strike package sizes:
+
+| Theater | Min Tankers | Min AWACS | Min Fighters |
+|---------|-------------|-----------|--------------|
+| Iran Theater | 10 | 2 | 30 |
+| Taiwan Strait | 5 | 1 | 20 |
+| Korean Peninsula | 4 | 1 | 15 |
+| Baltic/Black Sea | 3-4 | 1 | 10-15 |
+| Israel/Gaza | 2 | 1 | 8 |
+
+When all three criteria are met, the theater is flagged as **STRIKE CAPABLE**, indicating forces sufficient for sustained offensive operations.
+
+### Naval Vessel Integration
+
+The panel augments aircraft data with real-time naval vessel positions from AIS tracking. Vessels are classified into categories:
+
+| Category | Examples | Strategic Significance |
+|----------|----------|------------------------|
+| **Carriers** | CVN, CV, LHD | Power projection, air superiority |
+| **Destroyers** | DDG, DDH | Air defense, cruise missile strike |
+| **Frigates** | FFG, FF | Multi-role escort, ASW |
+| **Submarines** | SSN, SSK, SSBN | Deterrence, ISR, strike |
+| **Patrol** | PC, PG | Coastal defense |
+| **Auxiliary** | T-AO, AOR | Fleet support, logistics |
+
+**Data Accumulation Note**: AIS vessel data arrives via WebSocket stream and accumulates gradually. The panel automatically re-checks vessel counts at 30, 60, 90, and 120 seconds after initial load to capture late-arriving data.
+
+### Posture Levels
+
+| Level | Indicator | Criteria | Meaning |
+|-------|-----------|----------|---------|
+| **Normal** | 🟢 NORM | Below elevated threshold | Routine peacetime activity |
+| **Elevated** | 🟡 ELEV | At or above elevated threshold | Increased activity, possible exercises |
+| **Critical** | 🔴 CRIT | At or above critical threshold | Major deployment, potential crisis |
+
+**Elevated + Strike Capable** is treated as a higher alert state than regular elevated status.
+
+### Trend Detection
+
+Activity trends are computed from rolling historical data:
+
+- **Increasing** (↗): Current activity >10% higher than previous period
+- **Stable** (→): Activity within ±10% of previous period
+- **Decreasing** (↘): Current activity >10% lower than previous period
+
+### Server-Side Caching
+
+Theater posture computations run on edge servers with Redis caching:
+
+| Cache Type | TTL | Purpose |
+|------------|-----|---------|
+| **Active cache** | 5 minutes | Matches OpenSky refresh rate |
+| **Stale cache** | 1 hour | Fallback when upstream APIs fail |
+
+This ensures consistent data across all users and minimizes redundant API calls to OpenSky Network.
+
+---
+
+## Server-Side Risk Score API
+
+Strategic risk and Country Instability Index (CII) scores are pre-computed server-side rather than calculated in the browser. This eliminates the "cold start" problem where new users would see no data while the system accumulated enough information to generate scores.
+
+### How It Works
+
+The `/api/risk-scores` edge function:
+
+1. Fetches recent protest/riot data from ACLED (7-day window)
+2. Computes CII scores for 20 Tier 1 countries
+3. Derives strategic risk from weighted top-5 CII scores
+4. Caches results in Redis (10-minute TTL)
+
+### CII Score Calculation
+
+Each country's score combines:
+
+**Baseline Risk** (0–50 points): Static geopolitical risk based on historical instability, ongoing conflicts, and authoritarian governance.
+
+| Country | Baseline | Rationale |
+|---------|----------|-----------|
+| Syria, Ukraine, Yemen | 50 | Active conflict zones |
+| Myanmar, Venezuela, North Korea | 40-45 | Civil unrest, authoritarian |
+| Iran, Israel, Pakistan | 35-45 | Regional tensions |
+| Saudi Arabia, Turkey, India | 20-25 | Moderate instability |
+| Germany, UK, US | 5-10 | Stable democracies |
+
+**Unrest Component** (0–50 points): Recent protest and riot activity, weighted by event significance multiplier.
+
+**Information Component** (0–25 points): News coverage intensity (proxy for international attention).
+
+**Security Component** (0–25 points): Baseline plus riot contribution.
+
+### Event Significance Multipliers
+
+Events in some countries carry more global significance than others:
+
+| Multiplier | Countries | Rationale |
+|------------|-----------|-----------|
+| 3.0× | North Korea | Any visible unrest is highly unusual |
+| 2.0-2.5× | China, Russia, Iran, Saudi Arabia | Authoritarian states suppress protests |
+| 1.5-1.8× | Taiwan, Pakistan, Myanmar, Venezuela | Regional flashpoints |
+| 0.5-0.8× | US, UK, France, Germany | Protests are routine in democracies |
+
+### Strategic Risk Derivation
+
+The composite strategic risk score is computed as a weighted average of the top 5 CII scores:
+
+```
+Weights: [1.0, 0.85, 0.70, 0.55, 0.40] (total: 3.5)
+Strategic Risk = (Σ CII[i] × weight[i]) / 3.5 × 0.7 + 15
+```
+
+The top countries contribute most heavily, with diminishing influence for lower-ranked countries.
+
+### Fallback Behavior
+
+When ACLED data is unavailable (API errors, rate limits, expired auth):
+
+1. **Stale cache** (1-hour TTL): Return recent scores with `stale: true` flag
+2. **Baseline fallback**: Return scores using only static baseline values with `baseline: true` flag
+
+This ensures the dashboard always displays meaningful data even during upstream outages.
+
+---
+
 ## Service Status Monitoring
 
 The Service Status panel tracks the operational health of external services that WorldMonitor users may depend on.
@@ -3082,6 +3287,7 @@ src/
 │   ├── CIIPanel.ts           # Country Instability Index display
 │   ├── CascadePanel.ts       # Infrastructure cascade analysis
 │   ├── StrategicRiskPanel.ts # Strategic risk overview dashboard
+│   ├── StrategicPosturePanel.ts # AI strategic posture with theater analysis
 │   ├── ServiceStatusPanel.ts # External service health monitoring
 │   └── ...
 ├── config/
@@ -3102,6 +3308,7 @@ src/
 │   ├── military-vessels.ts   # Naval vessel identification and tracking
 │   ├── military-flights.ts   # Aircraft tracking via OpenSky relay
 │   ├── military-surge.ts     # Surge detection with news correlation
+│   ├── cached-theater-posture.ts # Theater posture API client with caching
 │   ├── wingbits.ts           # Aircraft enrichment (owner, operator, type)
 │   ├── pizzint.ts            # Pentagon Pizza Index + GDELT tensions
 │   ├── protests.ts           # ACLED + GDELT integration
@@ -3158,7 +3365,11 @@ api/                          # Vercel Edge serverless proxies
 ├── polymarket.js             # Prediction markets with validation
 ├── yahoo-finance.js          # Stock indices/commodities (backup)
 ├── opensky-relay.js          # Military aircraft tracking
-└── wingbits.js               # Aircraft enrichment proxy
+├── wingbits.js               # Aircraft enrichment proxy
+├── risk-scores.js            # Pre-computed CII and strategic risk (Redis cached)
+├── theater-posture.js        # Theater-level force aggregation (Redis cached)
+├── groq-summarize.js         # AI summarization with Groq API
+└── openrouter-summarize.js   # AI summarization fallback via OpenRouter
 ```
 
 ## Usage
@@ -3349,6 +3560,11 @@ See [ROADMAP.md](ROADMAP.md) for detailed planning. Recent intelligence enhancem
 - ✅ **CII Learning Mode** - 15-minute calibration period with visual progress indicator
 - ✅ **Regional Tech Coverage** - Verified tech HQ data for MENA, Europe, Asia-Pacific hubs
 - ✅ **Service Status Panel** - External service health monitoring (AI providers, cloud platforms)
+- ✅ **AI Strategic Posture Panel** - Theater-level force aggregation with strike capability assessment
+- ✅ **Server-Side Risk Score API** - Pre-computed CII and strategic risk scores with Redis caching
+- ✅ **Naval Vessel Classification** - Known vessel database with hull number matching and AIS type inference
+- ✅ **Strike Capability Detection** - Assessment of offensive force packages (tankers + AWACS + fighters)
+- ✅ **Theater Posture Thresholds** - Custom elevated/critical thresholds for each strategic theater
 
 ### Planned
 
