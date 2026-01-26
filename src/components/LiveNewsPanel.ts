@@ -62,7 +62,7 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'yahoo', name: 'Yahoo Finance', handle: '@YahooFinance', fallbackVideoId: 'KQp-e_XQnDE' },
   { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
   { id: 'tbpn', name: 'TBPN', handle: '@tbpnlive', fallbackVideoId: 'ksM7C7vLmRE' },
-  { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'nA9UZF-SZoQ' },
+  { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
 ];
 
 const LIVE_CHANNELS = SITE_VARIANT === 'tech' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
