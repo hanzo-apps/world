@@ -294,6 +294,7 @@ export class StrategicRiskPanel extends Panel {
     // Check for learning mode - skip if using cached scores
     const { inLearning, remainingMinutes, progress } = getLearningProgress();
     const showLearning = inLearning && !this.usedCachedScores;
+    // Only show status banner when there's something to report (learning mode)
     const statusBanner = showLearning
       ? `<div class="risk-status-banner risk-status-learning">
           <span class="risk-status-icon">📊</span>
@@ -302,10 +303,7 @@ export class StrategicRiskPanel extends Panel {
             <div class="learning-bar" style="width: ${progress}%"></div>
           </div>
         </div>`
-      : `<div class="risk-status-banner risk-status-ok">
-          <span class="risk-status-icon">✓</span>
-          <span class="risk-status-text">All data sources active</span>
-        </div>`;
+      : '';
 
     return `
       <div class="strategic-risk-panel">
