@@ -132,51 +132,64 @@ function getRedis() {
   return redis;
 }
 
-// Fetch military flights from OpenSky
+// Fetch military flights from OpenSky with timeout
 async function fetchMilitaryFlights() {
-  // Fetch global data (no bounding box for better coverage)
-  const response = await fetch('https://opensky-network.org/api/states/all', {
-    headers: {
-      'Accept': 'application/json',
-      'User-Agent': 'Mozilla/5.0 WorldMonitor/1.0',
-    },
-  });
+  // Fetch global data with 20s timeout (Edge has 25s limit)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-  if (!response.ok) {
-    throw new Error(`OpenSky API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (!data.states) return [];
-
-  // Filter and transform to military flights
-  const flights = [];
-  for (const state of data.states) {
-    const [icao24, callsign, , , , lon, lat, altitude, onGround, velocity, heading] = state;
-
-    // Skip if no position
-    if (lat == null || lon == null) continue;
-
-    // Skip if on ground
-    if (onGround) continue;
-
-    // Check if military
-    if (!isMilitaryCallsign(callsign)) continue;
-
-    flights.push({
-      id: icao24,
-      callsign: callsign?.trim() || '',
-      lat,
-      lon,
-      altitude: altitude || 0,
-      heading: heading || 0,
-      speed: velocity || 0,
-      aircraftType: detectAircraftType(callsign),
-      operator: 'unknown',
+  try {
+    const response = await fetch('https://opensky-network.org/api/states/all', {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 WorldMonitor/1.0',
+      },
+      signal: controller.signal,
     });
-  }
 
-  return flights;
+    if (!response.ok) {
+      throw new Error(`OpenSky API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.states) return [];
+
+    // Filter and transform to military flights
+    const flights = [];
+    for (const state of data.states) {
+      const [icao24, callsign, , , , lon, lat, altitude, onGround, velocity, heading] = state;
+
+      // Skip if no position
+      if (lat == null || lon == null) continue;
+
+      // Skip if on ground
+      if (onGround) continue;
+
+      // Check if military
+      if (!isMilitaryCallsign(callsign)) continue;
+
+      flights.push({
+        id: icao24,
+        callsign: callsign?.trim() || '',
+        lat,
+        lon,
+        altitude: altitude || 0,
+        heading: heading || 0,
+        speed: velocity || 0,
+        aircraftType: detectAircraftType(callsign),
+        operator: 'unknown',
+      });
+    }
+
+    return flights;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('OpenSky API timeout - try again');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // Calculate theater postures
