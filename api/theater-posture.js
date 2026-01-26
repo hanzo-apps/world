@@ -416,10 +416,10 @@ export default async function handler(req) {
     console.error('[TheaterPosture] Error:', error);
 
     // Try to return stale cached data when API fails
-    const redisClient = getRedis();
-    if (redisClient) {
+    const staleRedisClient = getRedis();
+    if (staleRedisClient) {
       try {
-        const stale = await redisClient.get(STALE_CACHE_KEY);
+        const stale = await staleRedisClient.get(STALE_CACHE_KEY);
         if (stale) {
           console.log('[TheaterPosture] Returning stale cached data due to API error');
           return Response.json({
