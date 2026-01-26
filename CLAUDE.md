@@ -2,12 +2,12 @@
 
 ## CRITICAL: Git Branch Rules
 
-**NEVER push to a different branch than the one you're working on without explicit user permission.**
+**NEVER merge or push to a different branch without explicit user permission.**
 
-- If on `beta`, only push to `beta`
-- If on `main`, only push to `main`
-- NEVER merge branches or push to `main` without asking first
-- NEVER assume deployment is wanted - always ask
+- If on `beta`, only push to `beta` - never merge to `main` without asking
+- If on `main`, stay on `main` - never switch branches and push without asking
+- NEVER merge branches without explicit request
+- Pushing to the CURRENT branch after commits is OK when continuing work
 
 ## Critical: RSS Proxy Allowlist
 
