@@ -88,7 +88,10 @@ function detectAircraftType(callsign) {
 
   // Reconnaissance
   if (/^(HOMER|OLIVE|JAKE|PSEUDO|GORDO)/.test(cs)) return 'reconnaissance';
-  if (/^(RC|RQ|MQ|U2|SR)/.test(cs)) return 'reconnaissance';
+  if (/^(RC|U2|SR)/.test(cs)) return 'reconnaissance';
+
+  // Drones/UAVs
+  if (/^(RQ|MQ|REAPER|PREDATOR|GLOBAL)/.test(cs)) return 'drone';
 
   // Bombers
   if (/^(DEATH|BONE|DOOM|REAPER)/.test(cs)) return 'bomber';
@@ -243,6 +246,13 @@ function calculatePostures(flights) {
       ? `Elevated military activity - ${theater.name}`
       : `Normal activity - ${theater.name}`;
 
+    // Build byOperator map for aircraft
+    const byOperator = {};
+    for (const f of theaterFlights) {
+      const op = f.operator || 'unknown';
+      byOperator[op] = (byOperator[op] || 0) + 1;
+    }
+
     summaries.push({
       theaterId: theater.id,
       theaterName: theater.name,
@@ -265,6 +275,8 @@ function calculatePostures(flights) {
       patrol: 0,
       auxiliaryVessels: 0,
       totalVessels: 0,
+      // By operator (aircraft + vessels added client-side)
+      byOperator,
       // Metadata
       postureLevel,
       strikeCapable,
