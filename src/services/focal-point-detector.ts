@@ -76,7 +76,7 @@ class FocalPointDetector {
           existing.avgConfidence = (existing.avgConfidence * (existing.mentionCount - 1) + entity.confidence) / existing.mentionCount;
           existing.clusterIds.push(clusterId);
           if (existing.topHeadlines.length < 3) {
-            existing.topHeadlines.push(cluster.primaryTitle);
+            existing.topHeadlines.push({ title: cluster.primaryTitle, url: cluster.primaryLink });
           }
         } else {
           mentions.set(entity.entityId, {
@@ -86,7 +86,7 @@ class FocalPointDetector {
             mentionCount: 1,
             avgConfidence: entity.confidence,
             clusterIds: [clusterId],
-            topHeadlines: [cluster.primaryTitle],
+            topHeadlines: [{ title: cluster.primaryTitle, url: cluster.primaryLink }],
           });
         }
       }
@@ -233,7 +233,7 @@ class FocalPointDetector {
     }
 
     if (signals && mention.topHeadlines.some(h => {
-      const lower = h.toLowerCase();
+      const lower = h.title.toLowerCase();
       return (signals.signalTypes.has('military_flight') && /military|troops|forces|army|air force/.test(lower)) ||
              (signals.signalTypes.has('military_vessel') && /navy|naval|ships|fleet|carrier/.test(lower)) ||
              (signals.signalTypes.has('protest') && /protest|demonstrat|unrest|riot/.test(lower)) ||
@@ -271,7 +271,7 @@ class FocalPointDetector {
     }
 
     if (mention.topHeadlines.length > 0 && mention.topHeadlines[0]) {
-      const headline = mention.topHeadlines[0].slice(0, 60);
+      const headline = mention.topHeadlines[0].title.slice(0, 60);
       parts.push(`"${headline}..."`);
     }
 
@@ -414,7 +414,7 @@ class FocalPointDetector {
     for (const fp of relevantFPs.slice(0, 3)) {
       const headline = fp.topHeadlines[0];
       if (headline) {
-        lines.push(`${fp.displayName}: "${headline.slice(0, 80)}..."`);
+        lines.push(`${fp.displayName}: "${headline.title.slice(0, 80)}..."`);
       }
       const evidence = fp.correlationEvidence[0];
       if (evidence) {
