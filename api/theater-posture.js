@@ -94,7 +94,7 @@ function detectAircraftType(callsign) {
   if (/^(RQ|MQ|REAPER|PREDATOR|GLOBAL)/.test(cs)) return 'drone';
 
   // Bombers
-  if (/^(DEATH|BONE|DOOM|REAPER)/.test(cs)) return 'bomber';
+  if (/^(DEATH|BONE|DOOM)/.test(cs)) return 'bomber';
   if (/^(B52|B1|B2)/.test(cs)) return 'bomber';
 
   // Default to fighter for other military
