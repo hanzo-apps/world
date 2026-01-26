@@ -403,7 +403,16 @@ function processAisPosition(data: AisPositionData): void {
     note: isDark ? 'Returned after AIS silence' : (nearChokepoint ? `Near ${nearChokepoint}` : undefined),
   };
 
+  const previousSize = trackedVessels.size;
   trackedVessels.set(mmsi, vessel);
+
+  // Clear stale caches when first vessels arrive or when we hit significant milestones
+  // This ensures cached empty results don't block fresh data
+  if (previousSize === 0 || (trackedVessels.size === 10 && previousSize < 10)) {
+    vesselCache = null;
+    breaker.clearCache();
+    console.log(`[Military Vessels] Cleared caches - first vessels arriving (count: ${trackedVessels.size})`);
+  }
 
   if (messageCount % 50 === 0) {
     console.log(`[Military Vessels] Tracking ${trackedVessels.size} military/gov vessels`);
@@ -495,6 +504,10 @@ export function initMilitaryVesselStream(): void {
 
   console.log('[Military Vessels] Initializing tracking via shared AIS stream...');
 
+  // Invalidate ALL caches when stream starts - fresh data should be read
+  vesselCache = null;
+  breaker.clearCache();  // Clear circuit breaker's 5-minute cache too!
+
   // Register callback with shared AIS stream
   registerAisCallback(processAisPosition);
   isTracking = true;
@@ -536,15 +549,20 @@ export async function fetchMilitaryVessels(): Promise<{
   vessels: MilitaryVessel[];
   clusters: MilitaryVesselCluster[];
 }> {
+  // Debug: check state before calling breaker
+  console.log(`[Military Vessels] fetchMilitaryVessels called - isTracking: ${isTracking}, isAisConfigured: ${isAisConfigured()}, trackedVessels.size: ${trackedVessels.size}`);
+
   return breaker.execute(async () => {
     // Check cache first
     if (vesselCache && Date.now() - vesselCache.timestamp < CACHE_TTL) {
+      console.log(`[Military Vessels] Returning cached: ${vesselCache.data.length} vessels`);
       const clusters = clusterVessels(vesselCache.data);
       return { vessels: vesselCache.data, clusters };
     }
 
     // Initialize stream if not running
     if (!isTracking && isAisConfigured()) {
+      console.log('[Military Vessels] Initializing stream from fetchMilitaryVessels...');
       initMilitaryVesselStream();
     }
 
@@ -553,9 +571,12 @@ export async function fetchMilitaryVessels(): Promise<{
 
     // Convert tracked vessels to array
     const vessels = Array.from(trackedVessels.values());
+    console.log(`[Military Vessels] After cleanup, returning ${vessels.length} vessels (trackedVessels.size: ${trackedVessels.size})`);
 
-    // Update cache
-    vesselCache = { data: vessels, timestamp: Date.now() };
+    // Only cache non-empty results - empty results due to timing shouldn't block future calls
+    if (vessels.length > 0) {
+      vesselCache = { data: vessels, timestamp: Date.now() };
+    }
 
     // Generate clusters
     const clusters = clusterVessels(vessels);

@@ -72,6 +72,10 @@ export class CircuitBreaker<T> {
     this.cache = { data, timestamp: Date.now() };
   }
 
+  clearCache(): void {
+    this.cache = null;
+  }
+
   recordFailure(error?: string): void {
     this.state.failures++;
     this.state.lastError = error;
