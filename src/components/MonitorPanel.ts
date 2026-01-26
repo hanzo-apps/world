@@ -107,33 +107,47 @@ export class MonitorPanel extends Panel {
 
     news.forEach((item) => {
       this.monitors.forEach((monitor) => {
-        const matched = monitor.keywords.some((kw) =>
-          item.title.toLowerCase().includes(kw)
-        );
+        // Search both title and description for better coverage
+        const searchText = `${item.title} ${(item as unknown as {description?: string}).description || ''}`.toLowerCase();
+        const matched = monitor.keywords.some((kw) => searchText.includes(kw));
         if (matched) {
           matchedItems.push({ ...item, monitorColor: monitor.color });
         }
       });
     });
 
-    if (matchedItems.length === 0) {
+    // Dedupe by link
+    const seen = new Set<string>();
+    const unique = matchedItems.filter(item => {
+      if (seen.has(item.link)) return false;
+      seen.add(item.link);
+      return true;
+    });
+
+    if (unique.length === 0) {
       results.innerHTML =
-        '<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">No matches found</div>';
+        `<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">No matches in ${news.length} articles</div>`;
       return;
     }
 
-    results.innerHTML = matchedItems
-      .slice(0, 10)
-      .map(
-        (item) => `
-      <div class="item" style="border-left: 2px solid ${escapeHtml(item.monitorColor || '')}; padding-left: 8px; margin-left: -8px;">
-        <div class="item-source">${escapeHtml(item.source)}</div>
-        <a class="item-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
-        <div class="item-time">${formatTime(item.pubDate)}</div>
-      </div>
-    `
-      )
-      .join('');
+    const countText = unique.length > 10
+      ? `Showing 10 of ${unique.length} matches`
+      : `${unique.length} match${unique.length === 1 ? '' : 'es'}`;
+
+    results.innerHTML = `
+      <div style="color: var(--text-dim); font-size: 10px; margin: 12px 0 8px;">${countText}</div>
+      ${unique
+        .slice(0, 10)
+        .map(
+          (item) => `
+        <div class="item" style="border-left: 2px solid ${escapeHtml(item.monitorColor || '')}; padding-left: 8px; margin-left: -8px;">
+          <div class="item-source">${escapeHtml(item.source)}</div>
+          <a class="item-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+          <div class="item-time">${formatTime(item.pubDate)}</div>
+        </div>
+      `
+        )
+        .join('')}`;
   }
 
   public onChanged(callback: (monitors: Monitor[]) => void): void {
