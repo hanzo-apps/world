@@ -28,3 +28,4 @@ export * from './data-freshness';
 export * from './usa-spending';
 export * from './oil-analytics';
 export { generateSummary } from './summarization';
+export * from './cached-theater-posture';
