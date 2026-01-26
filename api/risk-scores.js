@@ -98,10 +98,18 @@ async function fetchACLEDProtests() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
+    // ACLED API now requires authentication - new endpoint as of Jan 2026
+    const token = process.env.ACLED_ACCESS_TOKEN;
+    const headers = { 'Accept': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Updated endpoint: acleddata.com/api/ instead of api.acleddata.com
     const response = await fetch(
-      `https://api.acleddata.com/acled/read?event_type=Protests&event_type=Riots&event_date=${startDate}|${endDate}&event_date_where=BETWEEN&limit=500`,
+      `https://acleddata.com/api/acled/read?_format=json&event_type=Protests&event_type=Riots&event_date=${startDate}|${endDate}&event_date_where=BETWEEN&limit=500`,
       {
-        headers: { 'Accept': 'application/json' },
+        headers,
         signal: controller.signal,
       }
     );
@@ -109,13 +117,22 @@ async function fetchACLEDProtests() {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn('[RiskScores] ACLED fetch failed:', response.status);
+      const text = await response.text().catch(() => '');
+      console.warn('[RiskScores] ACLED fetch failed:', response.status, text.slice(0, 200));
+      // Check for auth errors specifically
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('ACLED API requires valid authentication token');
+      }
       throw new Error(`ACLED API error: ${response.status}`);
     }
 
     const data = await response.json();
 
     // Check for API-level error in response
+    if (data.message) {
+      console.warn('[RiskScores] ACLED API returned message:', data.message);
+      throw new Error(data.message);
+    }
     if (data.error || data.success === false) {
       console.warn('[RiskScores] ACLED API returned error:', data.error || 'unknown');
       throw new Error(data.error || 'ACLED API error');
@@ -316,9 +333,24 @@ export default async function handler(request) {
       }
     }
 
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
+    // Final fallback: return baseline scores without unrest data
+    console.log('[RiskScores] Returning baseline scores (no ACLED data)');
+    const baselineScores = computeCIIScores([]);  // Empty protests = baseline only
+    const baselineStrategic = computeStrategicRisk(baselineScores);
+
+    return new Response(JSON.stringify({
+      cii: baselineScores,
+      strategicRisk: baselineStrategic,
+      protestCount: 0,
+      computedAt: new Date().toISOString(),
+      baseline: true,
+      error: 'ACLED unavailable - showing baseline risk assessments',
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=60',
+      },
     });
   }
 }
