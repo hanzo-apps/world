@@ -61,8 +61,11 @@ export class StrategicPosturePanel extends Panel {
         return;
       }
 
-      // Start with aircraft-only postures
-      this.postures = data.postures;
+      // Deep clone to avoid mutating cached data
+      this.postures = data.postures.map((p) => ({
+        ...p,
+        byOperator: { ...p.byOperator },
+      }));
       this.lastTimestamp = data.timestamp;
 
       // Try to augment with vessel data (client-side)
@@ -127,7 +130,11 @@ export class StrategicPosturePanel extends Panel {
       this.showNoData();
       return;
     }
-    this.postures = data.postures;
+    // Deep clone to avoid mutating cached data
+    this.postures = data.postures.map((p) => ({
+      ...p,
+      byOperator: { ...p.byOperator },
+    }));
     this.lastTimestamp = data.timestamp;
     this.augmentWithVessels().then(() => {
       this.updateBadges();
