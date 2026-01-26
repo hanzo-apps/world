@@ -324,7 +324,7 @@ export class StrategicPosturePanel extends Panel {
       if (p.totalVessels > 0) chips.push(`<span class="posture-chip naval">⚓ ${p.totalVessels}</span>`);
 
       return `
-        <div class="posture-theater posture-compact" data-lat="${p.centerLat}" data-lon="${p.centerLon}">
+        <div class="posture-theater posture-compact" data-lat="${p.centerLat}" data-lon="${p.centerLon}" title="Click to view ${escapeHtml(p.theaterName)} on map">
           <span class="posture-name">${escapeHtml(p.shortName)}</span>
           <div class="posture-chips">${chips.join('')}</div>
           ${this.getPostureBadge(p.postureLevel)}
@@ -362,7 +362,7 @@ export class StrategicPosturePanel extends Panel {
     const hasNaval = navalChips.length > 0;
 
     return `
-      <div class="posture-theater posture-expanded ${p.postureLevel}" data-lat="${p.centerLat}" data-lon="${p.centerLon}">
+      <div class="posture-theater posture-expanded ${p.postureLevel}" data-lat="${p.centerLat}" data-lon="${p.centerLon}" title="Click to view on map">
         <div class="posture-theater-header">
           <span class="posture-name">${escapeHtml(p.theaterName)}</span>
           ${this.getPostureBadge(p.postureLevel)}
