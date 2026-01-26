@@ -969,7 +969,8 @@ export class App {
     // Event handlers
     this.criticalBannerEl.querySelector('.banner-view')?.addEventListener('click', () => {
       console.log('[Banner] View Region clicked:', top.theaterId, 'lat:', top.centerLat, 'lon:', top.centerLon);
-      if (top.centerLat && top.centerLon) {
+      // Use typeof check - truthy check would fail for coordinate 0
+      if (typeof top.centerLat === 'number' && typeof top.centerLon === 'number') {
         this.map?.setCenter(top.centerLat, top.centerLon);
         this.map?.setZoom(4);
       } else {
