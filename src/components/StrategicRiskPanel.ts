@@ -304,7 +304,7 @@ export class StrategicRiskPanel extends Panel {
         </div>`
       : `<div class="risk-status-banner risk-status-ok">
           <span class="risk-status-icon">✓</span>
-          <span class="risk-status-text">${this.usedCachedScores ? 'Using cached scores' : 'All data sources active'}</span>
+          <span class="risk-status-text">All data sources active</span>
         </div>`;
 
     return `
