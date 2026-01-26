@@ -11,7 +11,7 @@ export const config = {
 };
 
 const CACHE_TTL_SECONDS = 300; // 5 minutes
-const CACHE_KEY = 'theater-posture:v1';
+const CACHE_KEY = 'theater-posture:v2';
 
 // Theater definitions (matches client-side POSTURE_THEATERS)
 const POSTURE_THEATERS = [
@@ -48,6 +48,33 @@ const POSTURE_THEATERS = [
     shortName: 'BLACK SEA',
     targetNation: null,
     bounds: { north: 48, south: 40, east: 42, west: 26 },
+    thresholds: { elevated: 15, critical: 30 },
+    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+  },
+  {
+    id: 'korea-theater',
+    name: 'Korean Peninsula',
+    shortName: 'KOREA',
+    targetNation: 'North Korea',
+    bounds: { north: 43, south: 33, east: 132, west: 124 },
+    thresholds: { elevated: 20, critical: 50 },
+    strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
+  },
+  {
+    id: 'south-china-sea',
+    name: 'South China Sea',
+    shortName: 'SCS',
+    targetNation: null,
+    bounds: { north: 25, south: 5, east: 121, west: 105 },
+    thresholds: { elevated: 25, critical: 50 },
+    strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
+  },
+  {
+    id: 'east-med-theater',
+    name: 'Eastern Mediterranean',
+    shortName: 'E.MED',
+    targetNation: null,
+    bounds: { north: 37, south: 30, east: 37, west: 25 },
     thresholds: { elevated: 15, critical: 30 },
     strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
   },
