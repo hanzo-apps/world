@@ -320,7 +320,7 @@ export class StrategicPosturePanel extends Panel {
     if (!isExpanded) {
       // Compact single-line view for normal theaters
       const chips: string[] = [];
-      if (p.totalAircraft > 0) chips.push(`<span class="posture-chip air">✈ ${p.totalAircraft}</span>`);
+      if (p.totalAircraft > 0) chips.push(`<span class="posture-chip air">✈️ ${p.totalAircraft}</span>`);
       if (p.totalVessels > 0) chips.push(`<span class="posture-chip naval">⚓ ${p.totalVessels}</span>`);
 
       return `
@@ -334,21 +334,29 @@ export class StrategicPosturePanel extends Panel {
 
     // Build compact stat chips for expanded view
     const airChips: string[] = [];
-    if (p.fighters > 0) airChips.push(`<span class="posture-stat" title="Fighters">✈ ${p.fighters}</span>`);
+    if (p.fighters > 0) airChips.push(`<span class="posture-stat" title="Fighters">✈️ ${p.fighters}</span>`);
     if (p.tankers > 0) airChips.push(`<span class="posture-stat" title="Tankers">⛽ ${p.tankers}</span>`);
     if (p.awacs > 0) airChips.push(`<span class="posture-stat" title="AWACS">📡 ${p.awacs}</span>`);
     if (p.reconnaissance > 0) airChips.push(`<span class="posture-stat" title="Recon">🔍 ${p.reconnaissance}</span>`);
     if (p.transport > 0) airChips.push(`<span class="posture-stat" title="Transport">📦 ${p.transport}</span>`);
     if (p.bombers > 0) airChips.push(`<span class="posture-stat" title="Bombers">💣 ${p.bombers}</span>`);
     if (p.drones > 0) airChips.push(`<span class="posture-stat" title="Drones">🛸 ${p.drones}</span>`);
+    // Fallback: show total aircraft if no typed breakdown available
+    if (airChips.length === 0 && p.totalAircraft > 0) {
+      airChips.push(`<span class="posture-stat" title="Aircraft">✈️ ${p.totalAircraft}</span>`);
+    }
 
     const navalChips: string[] = [];
     if (p.carriers > 0) navalChips.push(`<span class="posture-stat carrier" title="Carriers">🚢 ${p.carriers}</span>`);
     if (p.destroyers > 0) navalChips.push(`<span class="posture-stat" title="Destroyers">⚓ ${p.destroyers}</span>`);
-    if (p.frigates > 0) navalChips.push(`<span class="posture-stat" title="Frigates">🛥 ${p.frigates}</span>`);
+    if (p.frigates > 0) navalChips.push(`<span class="posture-stat" title="Frigates">🛥️ ${p.frigates}</span>`);
     if (p.submarines > 0) navalChips.push(`<span class="posture-stat" title="Submarines">🦈 ${p.submarines}</span>`);
     if (p.patrol > 0) navalChips.push(`<span class="posture-stat" title="Patrol">🚤 ${p.patrol}</span>`);
     if (p.auxiliaryVessels > 0) navalChips.push(`<span class="posture-stat" title="Auxiliary">⚓ ${p.auxiliaryVessels}</span>`);
+    // Fallback: show total vessels if no typed breakdown available
+    if (navalChips.length === 0 && p.totalVessels > 0) {
+      navalChips.push(`<span class="posture-stat" title="Naval Vessels">⚓ ${p.totalVessels}</span>`);
+    }
 
     const hasAir = airChips.length > 0;
     const hasNaval = navalChips.length > 0;
