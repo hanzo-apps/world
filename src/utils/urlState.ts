@@ -7,6 +7,7 @@ const LAYER_KEYS: (keyof MapLayers)[] = [
   'cables',
   'pipelines',
   'hotspots',
+  'ais',
   'nuclear',
   'irradiators',
   'sanctions',
@@ -15,8 +16,17 @@ const LAYER_KEYS: (keyof MapLayers)[] = [
   'waterways',
   'outages',
   'datacenters',
+  'protests',
   'flights',
+  'military',
   'natural',
+  'spaceports',
+  'minerals',
+  'startupHubs',
+  'cloudRegions',
+  'accelerators',
+  'techHQs',
+  'techEvents',
 ];
 
 const TIME_RANGES: TimeRange[] = ['1h', '6h', '24h', '48h', '7d', 'all'];
