@@ -17,7 +17,7 @@ import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
-import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal } from '@/services/military-surge';
+import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, getTheaterPostureSummaries, type TheaterPostureSummary } from '@/services/military-surge';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
@@ -46,6 +46,7 @@ import {
   CIIPanel,
   CascadePanel,
   StrategicRiskPanel,
+  StrategicPosturePanel,
   IntelligenceGapBadge,
   TechEventsPanel,
   ServiceStatusPanel,
@@ -102,6 +103,7 @@ export class App {
   private disabledSources: Set<string> = new Set();
   private mapFlashCache: Map<string, number> = new Map();
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
+  private criticalBannerEl: HTMLElement | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -917,6 +919,66 @@ export class App {
   }
 
   /**
+   * Render critical military posture banner when buildup detected
+   */
+  private renderCriticalBanner(postures: TheaterPostureSummary[]): void {
+    // Check if banner was dismissed this session
+    const dismissedAt = sessionStorage.getItem('banner-dismissed');
+    if (dismissedAt && Date.now() - parseInt(dismissedAt, 10) < 30 * 60 * 1000) {
+      return; // Stay dismissed for 30 minutes
+    }
+
+    const critical = postures.filter(
+      (p) => p.postureLevel === 'critical' || (p.postureLevel === 'elevated' && p.strikeCapable)
+    );
+
+    if (critical.length === 0) {
+      if (this.criticalBannerEl) {
+        this.criticalBannerEl.remove();
+        this.criticalBannerEl = null;
+        document.body.classList.remove('has-critical-banner');
+      }
+      return;
+    }
+
+    const top = critical[0]!;
+    const isCritical = top.postureLevel === 'critical';
+
+    if (!this.criticalBannerEl) {
+      this.criticalBannerEl = document.createElement('div');
+      this.criticalBannerEl.className = 'critical-posture-banner';
+      const header = document.querySelector('.header');
+      if (header) header.insertAdjacentElement('afterend', this.criticalBannerEl);
+    }
+
+    // Always ensure body class is set when showing banner
+    document.body.classList.add('has-critical-banner');
+    this.criticalBannerEl.className = `critical-posture-banner ${isCritical ? 'severity-critical' : 'severity-elevated'}`;
+    this.criticalBannerEl.innerHTML = `
+      <div class="banner-content">
+        <span class="banner-icon">${isCritical ? '🚨' : '⚠️'}</span>
+        <span class="banner-headline">${top.headline}</span>
+        <span class="banner-stats">${top.totalAircraft} aircraft • ${top.summary}</span>
+        ${top.strikeCapable ? '<span class="banner-strike">STRIKE CAPABLE</span>' : ''}
+      </div>
+      <button class="banner-view" data-lat="${top.centerLat}" data-lon="${top.centerLon}">View Region</button>
+      <button class="banner-dismiss">×</button>
+    `;
+
+    // Event handlers
+    this.criticalBannerEl.querySelector('.banner-view')?.addEventListener('click', () => {
+      this.map?.setCenter(top.centerLat, top.centerLon);
+      this.map?.setZoom(4);
+    });
+
+    this.criticalBannerEl.querySelector('.banner-dismiss')?.addEventListener('click', () => {
+      this.criticalBannerEl?.classList.add('dismissed');
+      document.body.classList.remove('has-critical-banner');
+      sessionStorage.setItem('banner-dismissed', Date.now().toString());
+    });
+  }
+
+  /**
    * Clean up resources (for HMR/testing)
    */
   public destroy(): void {
@@ -1174,6 +1236,13 @@ export class App {
         this.map?.setZoom(4);
       });
       this.panels['strategic-risk'] = strategicRiskPanel;
+
+      const strategicPosturePanel = new StrategicPosturePanel();
+      strategicPosturePanel.setLocationClickHandler((lat, lon) => {
+        this.map?.setCenter(lat, lon);
+        this.map?.setZoom(4);
+      });
+      this.panels['strategic-posture'] = strategicPosturePanel;
     }
 
     const liveNewsPanel = new LiveNewsPanel();
@@ -2599,6 +2668,13 @@ export class App {
       this.map?.setMilitaryFlights(flights, flightClusters);
       this.map?.setMilitaryVessels(vessels, vesselClusters);
       this.map?.updateMilitaryForEscalation(flights, vessels);
+      // Render critical posture banner and update panels from cached data
+      const postures = getTheaterPostureSummaries(flights);
+      this.renderCriticalBanner(postures);
+      const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
+      posturePanel?.updateFlights(flights);
+      const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+      insightsPanel?.setMilitaryFlights(flights);
       const hasData = flights.length > 0 || vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
       const militaryCount = flights.length + vessels.length;
@@ -2647,6 +2723,15 @@ export class App {
           this.signalModal?.show(foreignSignals);
         }
       }
+
+      // Render critical posture banner and update panels
+      const postures = getTheaterPostureSummaries(flightData.flights);
+      this.renderCriticalBanner(postures);
+      const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
+      posturePanel?.updateFlights(flightData.flights);
+      const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+      insightsPanel?.setMilitaryFlights(flightData.flights);
+
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
       const militaryCount = flightData.flights.length + vesselData.vessels.length;

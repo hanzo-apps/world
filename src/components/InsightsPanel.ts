@@ -5,10 +5,11 @@ import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-ana
 import { signalAggregator, logSignalSummary, type RegionalConvergence } from '@/services/signal-aggregator';
 import { focalPointDetector } from '@/services/focal-point-detector';
 import { ingestNewsForCII } from '@/services/country-instability';
+import { getTheaterPostureSummaries } from '@/services/military-surge';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import { SITE_VARIANT } from '@/config';
-import type { ClusteredEvent, FocalPoint } from '@/types';
+import type { ClusteredEvent, FocalPoint, MilitaryFlight } from '@/types';
 
 export class InsightsPanel extends Panel {
   private isHidden = false;
@@ -18,6 +19,7 @@ export class InsightsPanel extends Panel {
   private lastMissedStories: AnalyzedHeadline[] = [];
   private lastConvergenceZones: RegionalConvergence[] = [];
   private lastFocalPoints: FocalPoint[] = [];
+  private lastMilitaryFlights: MilitaryFlight[] = [];
   private static readonly BRIEF_COOLDOWN_MS = 120000; // 2 min cooldown (API has limits)
 
   constructor() {
@@ -39,6 +41,37 @@ export class InsightsPanel extends Panel {
       this.hide();
       this.isHidden = true;
     }
+  }
+
+  public setMilitaryFlights(flights: MilitaryFlight[]): void {
+    this.lastMilitaryFlights = flights;
+  }
+
+  private getTheaterPostureContext(): string {
+    if (this.lastMilitaryFlights.length === 0) {
+      return '';
+    }
+
+    const postures = getTheaterPostureSummaries(this.lastMilitaryFlights);
+    const significant = postures.filter(
+      (p) => p.postureLevel === 'critical' || p.postureLevel === 'elevated' || p.strikeCapable
+    );
+
+    if (significant.length === 0) {
+      return '';
+    }
+
+    const lines = significant.map((p) => {
+      const parts: string[] = [];
+      parts.push(`${p.theaterName}: ${p.totalAircraft} aircraft`);
+      parts.push(`(${p.postureLevel.toUpperCase()})`);
+      if (p.strikeCapable) parts.push('STRIKE CAPABLE');
+      parts.push(`- ${p.summary}`);
+      if (p.targetNation) parts.push(`Focus: ${p.targetNation}`);
+      return parts.join(' ');
+    });
+
+    return `\n\nCRITICAL MILITARY POSTURE:\n${lines.join('\n')}`;
   }
 
   // High-priority military/conflict keywords (huge boost)
@@ -299,10 +332,11 @@ export class InsightsPanel extends Panel {
       if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
         this.setProgress(3, totalSteps, 'Generating world brief...');
 
-        // Pass focal point context to AI for correlation-aware summarization
+        // Pass focal point context + theater posture to AI for correlation-aware summarization
         // Tech variant: no geopolitical context, just tech news summarization
+        const theaterContext = SITE_VARIANT === 'full' ? this.getTheaterPostureContext() : '';
         const geoContext = SITE_VARIANT === 'full'
-          ? (focalSummary.aiContext || signalSummary.aiContext)
+          ? (focalSummary.aiContext || signalSummary.aiContext) + theaterContext
           : '';
         const result = await generateSummary(titles, (_step, _total, msg) => {
           // Show sub-progress for summarization
