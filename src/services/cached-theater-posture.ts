@@ -43,7 +43,7 @@ export async function fetchCachedTheaterPosture(): Promise<CachedTheaterPosture 
 
       const data = await response.json();
       cachedPosture = data;
-      lastFetchTime = now;
+      lastFetchTime = Date.now();
       console.log(
         '[CachedTheaterPosture] Loaded',
         data.cached ? '(from Redis)' : '(computed)',
