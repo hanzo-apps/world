@@ -11,7 +11,7 @@
 import type { ClusteredEvent, FocalPoint, FocalPointSummary, EntityMention } from '@/types';
 import type { SignalSummary, CountrySignalCluster, SignalType } from './signal-aggregator';
 import { extractEntitiesFromClusters, type NewsEntityContext } from './entity-extraction';
-import { getEntityIndex } from './entity-index';
+import { getEntityIndex, type EntityIndex } from './entity-index';
 
 const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
   internet_outage: 'internet outage',
@@ -31,6 +31,27 @@ const SIGNAL_TYPE_ICONS: Record<SignalType, string> = {
 
 class FocalPointDetector {
   private lastSummary: FocalPointSummary | null = null;
+
+  /**
+   * Check if entity name/alias appears in headline title (case-insensitive)
+   * This ensures we only show headlines that are actually ABOUT the entity
+   */
+  private entityAppearsInTitle(entityId: string, title: string, index: EntityIndex): boolean {
+    const entity = index.byId.get(entityId);
+    if (!entity) return false;
+
+    const titleLower = title.toLowerCase();
+
+    // Check entity name
+    if (titleLower.includes(entity.name.toLowerCase())) return true;
+
+    // Check aliases
+    for (const alias of entity.aliases) {
+      if (titleLower.includes(alias.toLowerCase())) return true;
+    }
+
+    return false;
+  }
 
   /**
    * Main analysis entry point - correlates news clusters with map signals
@@ -70,12 +91,16 @@ class FocalPointDetector {
         const entityEntry = index.byId.get(entity.entityId);
         if (!entityEntry) continue;
 
+        // Only add headline if entity appears in the title (not just mentioned in body)
+        const titleHasEntity = this.entityAppearsInTitle(entity.entityId, cluster.primaryTitle, index);
+
         const existing = mentions.get(entity.entityId);
         if (existing) {
           existing.mentionCount++;
           existing.avgConfidence = (existing.avgConfidence * (existing.mentionCount - 1) + entity.confidence) / existing.mentionCount;
           existing.clusterIds.push(clusterId);
-          if (existing.topHeadlines.length < 3) {
+          // Only add headlines where entity is prominent in title
+          if (existing.topHeadlines.length < 3 && titleHasEntity) {
             existing.topHeadlines.push({ title: cluster.primaryTitle, url: cluster.primaryLink });
           }
         } else {
@@ -86,7 +111,8 @@ class FocalPointDetector {
             mentionCount: 1,
             avgConfidence: entity.confidence,
             clusterIds: [clusterId],
-            topHeadlines: [{ title: cluster.primaryTitle, url: cluster.primaryLink }],
+            // Only include headline if entity appears in title
+            topHeadlines: titleHasEntity ? [{ title: cluster.primaryTitle, url: cluster.primaryLink }] : [],
           });
         }
       }

@@ -7,6 +7,9 @@ import type { TheaterPostureSummary } from '@/services/military-surge';
 export class StrategicPosturePanel extends Panel {
   private postures: TheaterPostureSummary[] = [];
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private vesselTimeouts: ReturnType<typeof setTimeout>[] = [];
+  private loadingElapsedInterval: ReturnType<typeof setInterval> | null = null;
+  private loadingStartTime: number = 0;
   private onLocationClick?: (lat: number, lon: number) => void;
   private lastTimestamp: string = '';
   private isStale: boolean = false;
@@ -33,9 +36,12 @@ export class StrategicPosturePanel extends Panel {
     this.showLoading();
     this.fetchAndRender();
     this.startAutoRefresh();
-    // Re-augment with vessels after stream has had time to populate (30s, 60s)
-    setTimeout(() => this.reaugmentVessels(), 30 * 1000);
-    setTimeout(() => this.reaugmentVessels(), 60 * 1000);
+    // Re-augment with vessels after stream has had time to populate
+    // AIS data accumulates gradually - check at 30s, 60s, 90s, 120s
+    this.vesselTimeouts.push(setTimeout(() => this.reaugmentVessels(), 30 * 1000));
+    this.vesselTimeouts.push(setTimeout(() => this.reaugmentVessels(), 60 * 1000));
+    this.vesselTimeouts.push(setTimeout(() => this.reaugmentVessels(), 90 * 1000));
+    this.vesselTimeouts.push(setTimeout(() => this.reaugmentVessels(), 120 * 1000));
   }
 
   private startAutoRefresh(): void {
@@ -50,22 +56,81 @@ export class StrategicPosturePanel extends Panel {
   }
 
   public override showLoading(): void {
+    this.loadingStartTime = Date.now();
     this.setContent(`
       <div class="posture-panel">
-        <div class="posture-no-data">
-          <div class="posture-no-data-icon">⏳</div>
-          <div class="posture-no-data-title">Loading...</div>
-          <div class="posture-no-data-desc">
-            Fetching theater posture data.
+        <div class="posture-loading">
+          <div class="posture-loading-radar">
+            <div class="posture-radar-sweep"></div>
+            <div class="posture-radar-dot"></div>
+          </div>
+          <div class="posture-loading-title">Scanning Theaters</div>
+          <div class="posture-loading-stages">
+            <div class="posture-stage active">
+              <span class="posture-stage-dot"></span>
+              <span>Aircraft positions</span>
+            </div>
+            <div class="posture-stage pending">
+              <span class="posture-stage-dot"></span>
+              <span>Naval vessels</span>
+            </div>
+            <div class="posture-stage pending">
+              <span class="posture-stage-dot"></span>
+              <span>Theater analysis</span>
+            </div>
+          </div>
+          <div class="posture-loading-tip">
+            Connecting to live ADS-B &amp; AIS streams...
+          </div>
+          <div class="posture-loading-elapsed">Elapsed: 0s</div>
+          <div class="posture-loading-note">
+            Initial load takes 30-60 seconds as tracking data accumulates
           </div>
         </div>
       </div>
     `);
+    this.startLoadingTimer();
+  }
+
+  private startLoadingTimer(): void {
+    if (this.loadingElapsedInterval) clearInterval(this.loadingElapsedInterval);
+    this.loadingElapsedInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - this.loadingStartTime) / 1000);
+      const elapsedEl = this.content.querySelector('.posture-loading-elapsed');
+      if (elapsedEl) {
+        elapsedEl.textContent = `Elapsed: ${elapsed}s`;
+      }
+    }, 1000);
+  }
+
+  private stopLoadingTimer(): void {
+    if (this.loadingElapsedInterval) {
+      clearInterval(this.loadingElapsedInterval);
+      this.loadingElapsedInterval = null;
+    }
+  }
+
+  private showLoadingStage(stage: 'aircraft' | 'vessels' | 'analysis'): void {
+    const stages = this.content.querySelectorAll('.posture-stage');
+    if (stages.length === 0) return;
+
+    stages.forEach((el, i) => {
+      el.classList.remove('active', 'complete');
+      if (stage === 'aircraft' && i === 0) el.classList.add('active');
+      else if (stage === 'vessels') {
+        if (i === 0) el.classList.add('complete');
+        else if (i === 1) el.classList.add('active');
+      } else if (stage === 'analysis') {
+        if (i <= 1) el.classList.add('complete');
+        else if (i === 2) el.classList.add('active');
+      }
+    });
   }
 
   private async fetchAndRender(): Promise<void> {
     try {
       // Fetch aircraft data from server
+      this.showLoadingStage('aircraft');
       const data = await fetchCachedTheaterPosture();
       if (!data || data.postures.length === 0) {
         this.showNoData();
@@ -81,8 +146,10 @@ export class StrategicPosturePanel extends Panel {
       this.isStale = data.stale || false;
 
       // Try to augment with vessel data (client-side)
+      this.showLoadingStage('vessels');
       await this.augmentWithVessels();
 
+      this.showLoadingStage('analysis');
       this.updateBadges();
       this.render();
     } catch (error) {
@@ -177,16 +244,27 @@ export class StrategicPosturePanel extends Panel {
   }
 
   private showNoData(): void {
+    this.stopLoadingTimer();
     this.setContent(`
       <div class="posture-panel">
         <div class="posture-no-data">
-          <div class="posture-no-data-icon">📡</div>
+          <div class="posture-no-data-icon pulse">📡</div>
           <div class="posture-no-data-title">Acquiring Data</div>
           <div class="posture-no-data-desc">
-            Military flight tracking uses public ADS-B transponder data.
-            Data may take a moment to load, or the feed may be temporarily rate-limited.
+            Connecting to ADS-B network for military flight data.
+            This may take 30-60 seconds on first load.
           </div>
-          <button class="posture-retry-btn">↻ Try Again</button>
+          <div class="posture-data-sources">
+            <div class="posture-source">
+              <span class="posture-source-icon connecting">✈️</span>
+              <span>OpenSky ADS-B</span>
+            </div>
+            <div class="posture-source">
+              <span class="posture-source-icon waiting">🚢</span>
+              <span>AIS Vessel Stream</span>
+            </div>
+          </div>
+          <button class="posture-retry-btn">↻ Retry Now</button>
         </div>
       </div>
     `);
@@ -194,14 +272,18 @@ export class StrategicPosturePanel extends Panel {
   }
 
   private showFetchError(): void {
+    this.stopLoadingTimer();
     this.setContent(`
       <div class="posture-panel">
         <div class="posture-no-data">
           <div class="posture-no-data-icon">⚠️</div>
-          <div class="posture-no-data-title">Feed Temporarily Unavailable</div>
+          <div class="posture-no-data-title">Feed Rate Limited</div>
           <div class="posture-no-data-desc">
-            The OpenSky flight feed is rate-limited or temporarily down.
-            This is normal during peak hours. Will retry automatically.
+            OpenSky API has request limits. The panel will automatically
+            retry in a few minutes, or you can try again now.
+          </div>
+          <div class="posture-error-hint">
+            <strong>Tip:</strong> Peak hours (UTC 12:00-20:00) often see higher limits.
           </div>
           <button class="posture-retry-btn">↻ Try Again</button>
         </div>
@@ -299,6 +381,7 @@ export class StrategicPosturePanel extends Panel {
   }
 
   private render(): void {
+    this.stopLoadingTimer();
     const sorted = [...this.postures].sort((a, b) => {
       const order: Record<string, number> = { critical: 0, elevated: 1, normal: 2 };
       return (order[a.postureLevel] ?? 2) - (order[b.postureLevel] ?? 2);
@@ -351,6 +434,9 @@ export class StrategicPosturePanel extends Panel {
 
   public destroy(): void {
     if (this.refreshInterval) clearInterval(this.refreshInterval);
+    this.stopLoadingTimer();
+    this.vesselTimeouts.forEach(t => clearTimeout(t));
+    this.vesselTimeouts = [];
     super.destroy();
   }
 }
