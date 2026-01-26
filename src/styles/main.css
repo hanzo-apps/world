@@ -6816,33 +6816,89 @@ body.playback-mode .status-dot {
   opacity: 0.6;
 }
 
-/* CII Awaiting focal points state */
+/* CII Awaiting focal points state - modern radar scan */
 .cii-awaiting {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 32px 20px;
   text-align: center;
-  color: var(--text-dim);
+  gap: 16px;
 }
 
-.cii-awaiting-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
-  animation: pulse 2s ease-in-out infinite;
+.cii-scan-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(100, 200, 255, 0.2);
+  position: relative;
+  animation: scan-pulse 2s ease-in-out infinite;
+}
+
+.cii-scan-ring::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(100, 200, 255, 0.8);
+  animation: scan-rotate 1.5s linear infinite;
+}
+
+.cii-scan-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: rgba(100, 200, 255, 0.8);
+  border-radius: 50%;
+  animation: scan-blink 1s ease-in-out infinite;
+}
+
+@keyframes scan-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scan-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes scan-blink {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 .cii-awaiting-text {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: 4px;
+  letter-spacing: 0.3px;
 }
 
-.cii-awaiting-sub {
-  font-size: 11px;
-  color: var(--text-dim);
+.cii-awaiting-sources {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cii-source-chip {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(100, 200, 255, 0.1);
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(100, 200, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 @keyframes pulse {
@@ -10050,6 +10106,116 @@ body.has-critical-banner .panels-grid {
   color: #44aa44;
 }
 
+/* Compact chip layout for posture panel */
+.posture-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.posture-compact:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.posture-compact .posture-name {
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 60px;
+}
+
+.posture-chips {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.posture-chip {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.posture-chip.air {
+  background: rgba(100, 180, 255, 0.15);
+  color: rgba(100, 180, 255, 0.9);
+}
+
+.posture-chip.naval {
+  background: rgba(100, 220, 180, 0.15);
+  color: rgba(100, 220, 180, 0.9);
+}
+
+/* Expanded theater with inline forces */
+.posture-forces {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.posture-force-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.posture-domain {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.posture-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.posture-stat {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.posture-stat.carrier {
+  background: rgba(255, 180, 100, 0.15);
+  color: rgba(255, 200, 130, 0.9);
+}
+
+.posture-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.posture-focus {
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: auto;
+}
+
+/* Legacy styles kept for compatibility */
 .posture-section-label {
   font-size: 10px;
   font-weight: 600;
@@ -10133,7 +10299,8 @@ body.has-critical-banner .panels-grid {
   color: rgba(255, 255, 255, 0.6);
 }
 
-.posture-footer {
+/* posture-footer already defined above with new compact layout */
+.posture-footer-old {
   display: flex;
   align-items: center;
   justify-content: space-between;
