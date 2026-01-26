@@ -14,7 +14,7 @@ export class StrategicPosturePanel extends Panel {
   constructor() {
     super({
       id: 'strategic-posture',
-      title: 'Strategic Posture',
+      title: 'AI Strategic Posture',
       showCount: false,
       trackActivity: true,
       infoTooltip: `<strong>Methodology</strong>
