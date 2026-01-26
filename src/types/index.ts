@@ -976,6 +976,11 @@ export interface StartupEcosystem {
 
 export type FocalPointUrgency = 'watch' | 'elevated' | 'critical';
 
+export interface HeadlineWithUrl {
+  title: string;
+  url: string;
+}
+
 export interface EntityMention {
   entityId: string;
   entityType: 'country' | 'company' | 'index' | 'commodity' | 'crypto' | 'sector';
@@ -983,7 +988,7 @@ export interface EntityMention {
   mentionCount: number;
   avgConfidence: number;
   clusterIds: string[];
-  topHeadlines: string[];
+  topHeadlines: HeadlineWithUrl[];
 }
 
 export interface FocalPoint {
@@ -995,7 +1000,7 @@ export interface FocalPoint {
   // News dimension
   newsMentions: number;
   newsVelocity: number;
-  topHeadlines: string[];
+  topHeadlines: HeadlineWithUrl[];
 
   // Signal dimension
   signalTypes: string[];
