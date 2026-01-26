@@ -144,8 +144,8 @@ function detectAircraftType(callsign) {
   if (/^(DEATH|BONE|DOOM)/.test(cs)) return 'bomber';
   if (/^(B52|B1|B2)/.test(cs)) return 'bomber';
 
-  // Default to fighter for other military
-  return 'fighter';
+  // Default to unknown for unrecognized military aircraft
+  return 'unknown';
 }
 
 // Check if callsign is military
@@ -270,6 +270,7 @@ function calculatePostures(flights) {
       transport: theaterFlights.filter(f => f.aircraftType === 'transport').length,
       bombers: theaterFlights.filter(f => f.aircraftType === 'bomber').length,
       drones: theaterFlights.filter(f => f.aircraftType === 'drone').length,
+      unknown: theaterFlights.filter(f => f.aircraftType === 'unknown').length,
     };
 
     const total = Object.values(byType).reduce((a, b) => a + b, 0);
@@ -290,6 +291,10 @@ function calculatePostures(flights) {
     if (byType.tankers > 0) parts.push(`${byType.tankers} tankers`);
     if (byType.awacs > 0) parts.push(`${byType.awacs} AWACS`);
     if (byType.reconnaissance > 0) parts.push(`${byType.reconnaissance} recon`);
+    if (byType.bombers > 0) parts.push(`${byType.bombers} bombers`);
+    if (byType.transport > 0) parts.push(`${byType.transport} transport`);
+    if (byType.drones > 0) parts.push(`${byType.drones} drones`);
+    if (byType.unknown > 0) parts.push(`${byType.unknown} other`);
     const summary = parts.join(', ') || 'No military aircraft';
 
     // Build headline
@@ -319,6 +324,7 @@ function calculatePostures(flights) {
       transport: byType.transport,
       bombers: byType.bombers,
       drones: byType.drones,
+      unknown: byType.unknown,
       totalAircraft: total,
       // Vessels (populated client-side)
       destroyers: 0,
