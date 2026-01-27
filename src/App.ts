@@ -404,8 +404,13 @@ export class App {
     this.countryIntelModal = new CountryIntelModal();
 
     this.map.onCountryClicked(async (lat, lon) => {
+      this.countryIntelModal!.showLoading();
+
       const geo = await reverseGeocode(lat, lon);
-      if (!geo) return;
+      if (!geo) {
+        this.countryIntelModal!.hide();
+        return;
+      }
 
       const scores = calculateCII();
       const score = scores.find((s) => s.code === geo.code) ?? null;
