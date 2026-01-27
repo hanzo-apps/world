@@ -103,41 +103,26 @@ const POSTURE_THEATERS = [
 ];
 
 // Military ICAO hex ranges by country (24-bit Mode S addresses)
-// These are CONFIRMED military-only blocks, not general country allocations
-// Source: Various OSINT databases, ADS-B Exchange, Planespotters
+// US military has dedicated AE/AF block; others mixed with commercial
 const MILITARY_HEX_RANGES = [
-  // United States Military (AE/AF block is dedicated military)
-  { start: 0xADF000, end: 0xAFFFFF, country: 'USA' },  // USAF, US Army, etc.
+  // United States Military (dedicated military block)
+  { start: 0xAE0000, end: 0xAFFFFF, country: 'USA' },
   // United Kingdom Military
-  { start: 0x43C000, end: 0x43CFFF, country: 'UK' },   // RAF
+  { start: 0x43C000, end: 0x43CFFF, country: 'UK' },
   // France Military
-  { start: 0x3E8000, end: 0x3EBFFF, country: 'France' }, // French AF
+  { start: 0x3E8000, end: 0x3EBFFF, country: 'France' },
   // Germany Military
-  { start: 0x3FC000, end: 0x3FCFFF, country: 'Germany' }, // Luftwaffe
-  // Italy Military
-  { start: 0x33F000, end: 0x33FFFF, country: 'Italy' },
-  // Netherlands Military
-  { start: 0x480000, end: 0x480FFF, country: 'Netherlands' },
-  // Belgium Military
-  { start: 0x44F000, end: 0x44FFFF, country: 'Belgium' },
-  // Israel Military (specific range)
-  { start: 0x738800, end: 0x738FFF, country: 'Israel' },
-  // Turkey Military (specific range)
-  { start: 0x4B7F00, end: 0x4B7FFF, country: 'Turkey' },
+  { start: 0x3F0000, end: 0x3FFFFF, country: 'Germany' },
+  // NATO international
+  { start: 0x0A0000, end: 0x0AFFFF, country: 'NATO' },
   // Russia Military
-  { start: 0x155000, end: 0x157FFF, country: 'Russia' },
-  // China Military (PLAAF specific)
-  { start: 0x781000, end: 0x782FFF, country: 'China' },
-  // Australia Military (RAAF)
+  { start: 0x150000, end: 0x15FFFF, country: 'Russia' },
+  // China Military
+  { start: 0x780000, end: 0x783FFF, country: 'China' },
+  // Australia Military
   { start: 0x7CF000, end: 0x7CFFFF, country: 'Australia' },
-  // Japan Military (JASDF)
-  { start: 0x870000, end: 0x871FFF, country: 'Japan' },
-  // South Korea Military (ROKAF)
-  { start: 0x71C000, end: 0x71CFFF, country: 'South Korea' },
-  // India Military (IAF)
-  { start: 0x800100, end: 0x8001FF, country: 'India' },
-  // Pakistan Military (PAF)
-  { start: 0x760100, end: 0x7601FF, country: 'Pakistan' },
+  // Japan Military
+  { start: 0x870000, end: 0x87FFFF, country: 'Japan' },
 ];
 
 // Check if ICAO hex is in military range
