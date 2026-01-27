@@ -676,6 +676,7 @@ interface PostureTheater {
   regions: string[];
   bounds: { north: number; south: number; east: number; west: number };
   thresholds: { elevated: number; critical: number };
+  navalThresholds: { elevated: number; critical: number };
   strikeIndicators: { minTankers: number; minAwacs: number; minFighters: number };
 }
 
@@ -688,6 +689,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['persian-gulf', 'strait-hormuz', 'iran-border'],
     bounds: { north: 42, south: 20, east: 65, west: 30 },
     thresholds: { elevated: 50, critical: 100 },
+    navalThresholds: { elevated: 20, critical: 40 },
     strikeIndicators: { minTankers: 10, minAwacs: 2, minFighters: 30 },
   },
   {
@@ -698,6 +700,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['taiwan-strait', 'south-china-sea'],
     bounds: { north: 30, south: 18, east: 130, west: 115 },
     thresholds: { elevated: 30, critical: 60 },
+    navalThresholds: { elevated: 15, critical: 30 },
     strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
   },
   {
@@ -708,6 +711,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['baltics', 'poland-border', 'kaliningrad'],
     bounds: { north: 65, south: 52, east: 32, west: 10 },
     thresholds: { elevated: 20, critical: 40 },
+    navalThresholds: { elevated: 10, critical: 20 },
     strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
   },
   {
@@ -718,6 +722,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['black-sea'],
     bounds: { north: 48, south: 40, east: 42, west: 26 },
     thresholds: { elevated: 15, critical: 30 },
+    navalThresholds: { elevated: 8, critical: 15 },
     strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
   },
   {
@@ -728,6 +733,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['korean-dmz', 'sea-of-japan'],
     bounds: { north: 43, south: 33, east: 132, west: 124 },
     thresholds: { elevated: 20, critical: 50 },
+    navalThresholds: { elevated: 10, critical: 25 },
     strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
   },
   {
@@ -738,6 +744,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['south-china-sea', 'spratly-islands'],
     bounds: { north: 25, south: 5, east: 121, west: 105 },
     thresholds: { elevated: 25, critical: 50 },
+    navalThresholds: { elevated: 15, critical: 30 },
     strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
   },
   {
@@ -748,6 +755,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['eastern-med', 'levant'],
     bounds: { north: 37, south: 33, east: 37, west: 25 },
     thresholds: { elevated: 15, critical: 30 },
+    navalThresholds: { elevated: 8, critical: 15 },
     strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
   },
   {
@@ -758,6 +766,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['israel', 'gaza', 'west-bank'],
     bounds: { north: 33, south: 29, east: 36, west: 33 },
     thresholds: { elevated: 10, critical: 25 },
+    navalThresholds: { elevated: 5, critical: 12 },
     strikeIndicators: { minTankers: 2, minAwacs: 1, minFighters: 8 },
   },
   {
@@ -768,6 +777,7 @@ const POSTURE_THEATERS: PostureTheater[] = [
     regions: ['yemen', 'red-sea', 'bab-el-mandeb'],
     bounds: { north: 22, south: 11, east: 54, west: 32 },
     thresholds: { elevated: 15, critical: 30 },
+    navalThresholds: { elevated: 10, critical: 20 },
     strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
   },
 ];
@@ -911,6 +921,41 @@ export function getTheaterPostureSummaries(flights: MilitaryFlight[]): TheaterPo
   }
 
   return summaries;
+}
+
+/**
+ * Recalculate posture level after vessels have been merged into summaries.
+ * Uses "either triggers" logic: if aircraft OR vessels exceed thresholds, level escalates.
+ */
+export function recalcPostureWithVessels(postures: TheaterPostureSummary[]): void {
+  for (const p of postures) {
+    const theater = POSTURE_THEATERS.find((t) => t.id === p.theaterId);
+    if (!theater) continue;
+
+    const airLevel: 0 | 1 | 2 =
+      p.totalAircraft >= theater.thresholds.critical ? 2
+        : p.totalAircraft >= theater.thresholds.elevated ? 1 : 0;
+
+    const navalLevel: 0 | 1 | 2 =
+      p.totalVessels >= theater.navalThresholds.critical ? 2
+        : p.totalVessels >= theater.navalThresholds.elevated ? 1 : 0;
+
+    const combined = Math.max(airLevel, navalLevel) as 0 | 1 | 2;
+    p.postureLevel = combined === 2 ? 'critical' : combined === 1 ? 'elevated' : 'normal';
+
+    // Rebuild headline with combined context
+    const parts: string[] = [];
+    if (p.totalAircraft > 0) parts.push(`${p.totalAircraft} aircraft`);
+    if (p.totalVessels > 0) parts.push(`${p.totalVessels} vessels`);
+    const assetSummary = parts.join(' + ') || 'No assets';
+
+    p.headline =
+      p.postureLevel === 'critical'
+        ? `Critical military buildup - ${p.theaterName} (${assetSummary})`
+        : p.postureLevel === 'elevated'
+          ? `Elevated military activity - ${p.theaterName} (${assetSummary})`
+          : `Normal activity - ${p.theaterName}`;
+  }
 }
 
 export function getCriticalPostures(flights: MilitaryFlight[]): TheaterPostureSummary[] {
