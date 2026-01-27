@@ -250,6 +250,91 @@ async function fetchMilitaryFlights() {
   }
 }
 
+// Fetch military flights from Wingbits (fallback when OpenSky fails)
+async function fetchMilitaryFlightsFromWingbits() {
+  const apiKey = process.env.WINGBITS_API_KEY;
+  if (!apiKey) {
+    console.log('[TheaterPosture] Wingbits not configured, skipping fallback');
+    return null;
+  }
+
+  console.log('[TheaterPosture] Trying Wingbits fallback...');
+
+  // Build batch request for all theaters
+  const areas = POSTURE_THEATERS.map(theater => ({
+    alias: theater.id,
+    by: 'box',
+    la: (theater.bounds.north + theater.bounds.south) / 2,
+    lo: (theater.bounds.east + theater.bounds.west) / 2,
+    w: Math.abs(theater.bounds.east - theater.bounds.west) * 60, // degrees to nm
+    h: Math.abs(theater.bounds.north - theater.bounds.south) * 60,
+    unit: 'nm',
+  }));
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch('https://customer-api.wingbits.com/v1/flights', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(areas),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn('[TheaterPosture] Wingbits API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[TheaterPosture] Wingbits returned', data.length, 'theater results');
+
+    // Transform Wingbits data to our format
+    const flights = [];
+    const seenIds = new Set();
+
+    for (const areaResult of data) {
+      const areaFlights = areaResult.flights || areaResult.data || [];
+      for (const f of areaFlights) {
+        // Skip duplicates (aircraft may appear in multiple theaters)
+        if (seenIds.has(f.icao24 || f.id)) continue;
+        seenIds.add(f.icao24 || f.id);
+
+        const callsign = f.callsign || f.flight || '';
+
+        // Skip if not military
+        if (!isMilitaryCallsign(callsign)) continue;
+
+        flights.push({
+          id: f.icao24 || f.id,
+          callsign: callsign.trim(),
+          lat: f.latitude || f.lat,
+          lon: f.longitude || f.lon || f.lng,
+          altitude: f.altitude || f.alt || 0,
+          heading: f.heading || f.track || 0,
+          speed: f.groundSpeed || f.speed || f.velocity || 0,
+          aircraftType: detectAircraftType(callsign),
+          operator: f.operator || 'unknown',
+          source: 'wingbits',
+        });
+      }
+    }
+
+    console.log('[TheaterPosture] Wingbits: found', flights.length, 'military flights');
+    return flights;
+  } catch (err) {
+    console.error('[TheaterPosture] Wingbits fetch error:', err.message);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // Calculate theater postures
 function calculatePostures(flights) {
   const summaries = [];
@@ -389,9 +474,27 @@ export default async function handler(req) {
       }
     }
 
-    // Fetch and calculate
+    // Fetch and calculate - try OpenSky first, then Wingbits fallback
     console.log('[TheaterPosture] Fetching fresh data...');
-    const flights = await fetchMilitaryFlights();
+    let flights;
+    let source = 'opensky';
+
+    try {
+      flights = await fetchMilitaryFlights();
+    } catch (openskyError) {
+      console.warn('[TheaterPosture] OpenSky failed:', openskyError.message);
+      console.log('[TheaterPosture] Trying Wingbits fallback...');
+
+      flights = await fetchMilitaryFlightsFromWingbits();
+      if (flights && flights.length > 0) {
+        source = 'wingbits';
+        console.log('[TheaterPosture] Wingbits fallback succeeded:', flights.length, 'flights');
+      } else {
+        // Both failed, re-throw OpenSky error to trigger cache fallback
+        throw openskyError;
+      }
+    }
+
     const postures = calculatePostures(flights);
 
     const result = {
@@ -399,6 +502,7 @@ export default async function handler(req) {
       totalFlights: flights.length,
       timestamp: new Date().toISOString(),
       cached: false,
+      source, // 'opensky' or 'wingbits'
     };
 
     // Cache the result (regular, stale, and long-term backup)
