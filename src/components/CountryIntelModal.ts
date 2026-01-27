@@ -13,6 +13,17 @@ interface CountryIntelData {
   error?: string;
 }
 
+export interface StockIndexData {
+  available: boolean;
+  code: string;
+  symbol: string;
+  indexName: string;
+  price: string;
+  weekChangePercent: string;
+  currency: string;
+  cached?: boolean;
+}
+
 interface ActiveSignals {
   protests: number;
   militaryFlights: number;
@@ -133,18 +144,16 @@ export class CountryIntelModal {
       `;
     }
 
+    const chips: string[] = [];
     if (signals) {
-      const chips: string[] = [];
       if (signals.protests > 0) chips.push(`<span class="signal-chip protest">📢 ${signals.protests} protests</span>`);
       if (signals.militaryFlights > 0) chips.push(`<span class="signal-chip military">✈️ ${signals.militaryFlights} mil. aircraft</span>`);
       if (signals.militaryVessels > 0) chips.push(`<span class="signal-chip military">⚓ ${signals.militaryVessels} mil. vessels</span>`);
       if (signals.outages > 0) chips.push(`<span class="signal-chip outage">🌐 ${signals.outages} outages</span>`);
       if (signals.earthquakes > 0) chips.push(`<span class="signal-chip quake">🌍 ${signals.earthquakes} earthquakes</span>`);
-
-      if (chips.length > 0) {
-        html += `<div class="active-signals">${chips.join('')}</div>`;
-      }
     }
+    chips.push(`<span class="signal-chip stock-loading">📈 Loading index...</span>`);
+    html += `<div class="active-signals">${chips.join('')}</div>`;
 
     html += `
       <div class="intel-brief-section">
@@ -183,6 +192,23 @@ export class CountryIntelModal {
         <span class="intel-timestamp">${data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : ''}</span>
       </div>
     `;
+  }
+
+  public updateStock(data: StockIndexData): void {
+    const el = this.contentEl.querySelector('.stock-loading');
+    if (!el) return;
+
+    if (!data.available) {
+      el.remove();
+      return;
+    }
+
+    const pct = parseFloat(data.weekChangePercent);
+    const sign = pct >= 0 ? '+' : '';
+    const cls = pct >= 0 ? 'stock-up' : 'stock-down';
+    const arrow = pct >= 0 ? '📈' : '📉';
+    el.className = `signal-chip stock ${cls}`;
+    el.innerHTML = `${arrow} ${escapeHtml(data.indexName)}: ${sign}${data.weekChangePercent}% (1W)`;
   }
 
   private formatBrief(text: string): string {
