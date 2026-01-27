@@ -462,6 +462,25 @@ export class MapContainer {
     }
   }
 
+  // Country click + highlight (deck.gl only)
+  public onCountryClicked(callback: (lat: number, lon: number) => void): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setOnCountryClick(callback);
+    }
+  }
+
+  public highlightCountry(code: string): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.highlightCountry(code);
+    }
+  }
+
+  public clearCountryHighlight(): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.clearCountryHighlight();
+    }
+  }
+
   // Utility methods
   public isDeckGLMode(): boolean {
     return this.useDeckGL;

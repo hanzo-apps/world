@@ -19,9 +19,11 @@ import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detect
 import { signalAggregator } from '@/services/signal-aggregator';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode, calculateCII } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
+import { reverseGeocode } from '@/utils/reverse-geocode';
+import { CountryIntelModal } from '@/components/CountryIntelModal';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ParsedMapUrlState } from '@/utils';
 import {
@@ -107,6 +109,7 @@ export class App {
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
   private initialLoadComplete = false;
   private criticalBannerEl: HTMLElement | null = null;
+  private countryIntelModal: CountryIntelModal | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -240,6 +243,7 @@ export class App {
     this.setupExportPanel();
     this.setupSearchModal();
     this.setupMapLayerHandlers();
+    this.setupCountryIntel();
     this.setupEventListeners();
     this.setupUrlStateSync();
     this.syncDataFreshnessWithLayers();
@@ -393,6 +397,79 @@ export class App {
         this.loadDataForLayer(layer);
       }
     });
+  }
+
+  private setupCountryIntel(): void {
+    if (!this.map) return;
+    this.countryIntelModal = new CountryIntelModal();
+
+    this.map.onCountryClicked(async (lat, lon) => {
+      const geo = await reverseGeocode(lat, lon);
+      if (!geo) return;
+
+      const scores = calculateCII();
+      const score = scores.find((s) => s.code === geo.code) ?? null;
+
+      const signals = this.getCountrySignals(geo.code, geo.country);
+      this.countryIntelModal!.show(geo.country, geo.code, score, signals);
+      this.map!.highlightCountry(geo.code);
+
+      try {
+        const context: Record<string, unknown> = {};
+        if (score) {
+          context.score = score.score;
+          context.level = score.level;
+          context.trend = score.trend;
+          context.components = score.components;
+        }
+        Object.assign(context, signals);
+
+        const headlines = this.allNews
+          .filter((n) => n.title.toLowerCase().includes(geo.country.toLowerCase()))
+          .slice(0, 10)
+          .map((n) => n.title);
+        if (headlines.length) context.headlines = headlines;
+
+        const res = await fetch('/api/country-intel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: geo.country, code: geo.code, context }),
+        });
+        const data = await res.json();
+        this.countryIntelModal!.updateBrief({ ...data, code: geo.code });
+      } catch (err) {
+        console.error('[CountryIntel] fetch error:', err);
+        this.countryIntelModal!.updateBrief({ brief: '', country: geo.country, code: geo.code, error: 'Failed to generate brief' });
+      }
+    });
+
+    this.countryIntelModal.onClose(() => {
+      this.map?.clearCountryHighlight();
+    });
+  }
+
+  private getCountrySignals(code: string, country: string): { protests: number; militaryFlights: number; militaryVessels: number; outages: number; earthquakes: number } {
+    const countryLower = country.toLowerCase();
+    const codeLower = code.toLowerCase();
+
+    let protests = 0;
+    if (this.intelligenceCache.protests?.events) {
+      protests = this.intelligenceCache.protests.events.filter((e) => e.country?.toLowerCase() === countryLower).length;
+    }
+
+    let militaryFlights = 0;
+    let militaryVessels = 0;
+    if (this.intelligenceCache.military) {
+      militaryFlights = this.intelligenceCache.military.flights.filter((f) => f.operatorCountry?.toLowerCase() === codeLower).length;
+      militaryVessels = this.intelligenceCache.military.vessels.filter((v) => v.operatorCountry?.toLowerCase() === codeLower).length;
+    }
+
+    let outages = 0;
+    if (this.intelligenceCache.outages) {
+      outages = this.intelligenceCache.outages.filter((o) => o.country?.toLowerCase() === countryLower).length;
+    }
+
+    return { protests, militaryFlights, militaryVessels, outages, earthquakes: 0 };
   }
 
   private setupSearchModal(): void {
