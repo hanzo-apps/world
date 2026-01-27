@@ -104,18 +104,27 @@ const POSTURE_THEATERS = [
 
 // Military callsign prefixes for identification
 const MILITARY_PREFIXES = [
-  // US
-  'RCH', 'REACH', 'MOOSE', 'EVAC', 'DUSTOFF', // Transport/medevac
-  'DUKE', 'HAVOC', 'KNIFE', 'WARHAWK', 'VIPER', // Fighters
-  'SHELL', 'TEXACO', 'ARCO', // Tankers
-  'SENTRY', 'AWACS', 'MAGIC', // AWACS
-  'COBRA', 'PYTHON', 'RAPTOR', // Various
+  // US Military
+  'RCH', 'REACH', 'MOOSE', 'EVAC', 'DUSTOFF', 'PEDRO', // Transport/medevac
+  'DUKE', 'HAVOC', 'KNIFE', 'WARHAWK', 'VIPER', 'RAGE', 'FURY', // Fighters
+  'SHELL', 'TEXACO', 'ARCO', 'ESSO', 'PETRO', // Tankers
+  'SENTRY', 'AWACS', 'MAGIC', 'DISCO', 'DARKSTAR', // AWACS/ISR
+  'COBRA', 'PYTHON', 'RAPTOR', 'EAGLE', 'HAWK', 'TALON', // Various
+  'BOXER', 'OMNI', 'TOPCAT', 'SKULL', 'REAPER', 'HUNTER', // More callsigns
+  'ARMY', 'NAVY', 'USAF', 'USMC', 'USCG', // Service prefixes
+  'AE', 'CNV', 'PAT', 'SAM', 'EXEC', // Special missions
+  'OPS', 'CTF', 'TF', // Operations/Task Force
   // NATO
-  'NATO', 'GAF', 'RRF', 'RAF', 'FAF', 'IAF',
+  'NATO', 'GAF', 'RRF', 'RAF', 'FAF', 'IAF', 'RNLAF', 'BAF', 'DAF', 'HAF', 'PAF',
+  'SWORD', 'LANCE', 'ARROW', 'SPARTAN', // NATO tactical
+  // Middle East
+  'RSAF', 'UAE', 'EMIRI', 'KAF', 'QAF', 'BAH', 'OMA', // Gulf states
+  'IAF', 'IRIAF', 'IRG', // Iran/Israel
+  'TAF', 'TUAF', // Turkey
   // Russia
-  'RSD', 'RF',
+  'RSD', 'RF', 'RFF', 'VKS',
   // China
-  'CCA', 'CHN',
+  'CCA', 'CHN', 'PLAAF', 'PLA',
 ];
 
 // Aircraft type detection from callsign patterns
@@ -160,9 +169,18 @@ function isMilitaryCallsign(callsign) {
     if (cs.startsWith(prefix)) return true;
   }
 
-  // Check patterns - only word-like callsigns (4+ letters followed by 1-3 digits)
-  // This catches DUKE01, VIPER12, MOOSE1 but NOT airline codes like PGT5873, IAW9011
+  // Check patterns - tactical callsigns (word + small number)
+  // DUKE01, VIPER12, RAGE1 but NOT airline codes like PGT5873, IAW9011
   if (/^[A-Z]{4,}\d{1,3}$/.test(cs)) return true;
+
+  // Short tactical: 3 letters + 1-2 digits (but exclude common airlines)
+  // This catches OPS4, CTF01, TF12 but blocks SVA12, QTR76, etc.
+  const AIRLINE_CODES = ['SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY',
+    'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'AWE', 'KNE', 'FAD', 'ADY'];
+  if (/^[A-Z]{3}\d{1,2}$/.test(cs)) {
+    const prefix = cs.slice(0, 3);
+    if (!AIRLINE_CODES.includes(prefix)) return true;
+  }
 
   return false;
 }
