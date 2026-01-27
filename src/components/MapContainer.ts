@@ -124,11 +124,12 @@ export class MapContainer {
     }
   }
 
-  public setCenter(lat: number, lon: number): void {
+  public setCenter(lat: number, lon: number, zoom?: number): void {
     if (this.useDeckGL) {
-      this.deckGLMap?.setCenter(lat, lon);
+      this.deckGLMap?.setCenter(lat, lon, zoom);
     } else {
       this.svgMap?.setCenter(lat, lon);
+      if (zoom != null) this.svgMap?.setZoom(zoom);
     }
   }
 
