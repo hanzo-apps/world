@@ -423,6 +423,13 @@ export class StrategicPosturePanel extends Panel {
       el.addEventListener('click', () => {
         const lat = parseFloat((el as HTMLElement).dataset.lat || '0');
         const lon = parseFloat((el as HTMLElement).dataset.lon || '0');
+        console.log('[StrategicPosturePanel] Theater clicked:', {
+          lat,
+          lon,
+          dataLat: (el as HTMLElement).dataset.lat,
+          dataLon: (el as HTMLElement).dataset.lon,
+          element: (el as HTMLElement).textContent?.slice(0, 30),
+        });
         if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
           this.onLocationClick(lat, lon);
         }

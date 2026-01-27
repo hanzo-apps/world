@@ -3109,10 +3109,12 @@ export class MapComponent {
   }
 
   public setCenter(lat: number, lon: number): void {
+    console.log('[Map] setCenter called:', { lat, lon });
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([lon, lat]);
+    console.log('[Map] projected pos:', pos, 'container:', { width, height }, 'zoom:', this.state.zoom);
     if (!pos) return;
     // Pan formula: after applyTransform() computes tx = centerOffset + pan*zoom,
     // and transform is translate(tx,ty) scale(zoom), to center on pos:
