@@ -105,6 +105,7 @@ export class App {
   private disabledSources: Set<string> = new Set();
   private mapFlashCache: Map<string, number> = new Map();
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
+  private initialLoadComplete = false;
   private criticalBannerEl: HTMLElement | null = null;
 
   constructor(containerId: string) {
@@ -1980,7 +1981,7 @@ export class App {
   }
 
   private flashMapForNews(items: NewsItem[]): void {
-    if (!this.map) return;
+    if (!this.map || !this.initialLoadComplete) return;
     const now = Date.now();
 
     for (const [key, timestamp] of this.mapFlashCache.entries()) {
@@ -2164,6 +2165,7 @@ export class App {
     }
 
     this.allNews = collectedNews;
+    this.initialLoadComplete = true;
 
     // Update map hotspots
     this.map?.updateHotspotActivity(this.allNews);
