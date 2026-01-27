@@ -135,13 +135,33 @@ const MILITARY_PREFIXES = [
   'SWORD', 'LANCE', 'ARROW', 'SPARTAN', // NATO tactical
   // Middle East (avoid UAE - conflicts with Emirates airline)
   'RSAF', 'EMIRI', 'UAEAF', 'KAF', 'QAF', 'BAHAF', 'OMAAF', // Gulf states
-  'IAF', 'IRIAF', 'IRG', 'IRGC', // Iran/Israel
+  'IRIAF', 'IRG', 'IRGC', // Iran (IAF already in NATO section covers Israel)
   'TAF', 'TUAF', // Turkey
   // Russia
   'RSD', 'RF', 'RFF', 'VKS',
-  // China
-  'CCA', 'CHN', 'PLAAF', 'PLA',
+  // China (NOTE: CCA is Air China airline, not military)
+  'CHN', 'PLAAF', 'PLA',
 ];
+
+// Airline ICAO codes to exclude from military detection (Set for O(1) lookup)
+const AIRLINE_CODES = new Set([
+  // Middle East
+  'SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY',
+  'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'FDB', 'KNE', 'FAD', 'ADY', 'OMA',
+  'ABQ', 'ABY', 'NIA', 'FJA', 'SWR', 'HZA', 'OMS', 'EGF', 'NOS', 'SXD',
+  // Europe
+  'BAW', 'AFR', 'DLH', 'KLM', 'AUA', 'SAS', 'FIN', 'LOT', 'AZA', 'TAP', 'IBE',
+  'VLG', 'RYR', 'EZY', 'WZZ', 'NOZ', 'BEL', 'AEE', 'ROT',
+  // Asia
+  'AIC', 'CPA', 'SIA', 'MAS', 'THA', 'VNM', 'JAL', 'ANA', 'KAL', 'AAR', 'EVA',
+  'CAL', 'CCA', 'CES', 'CSN', 'HDA', 'CHH', 'CXA', 'GIA', 'PAL', 'SLK',
+  // Americas
+  'AAL', 'DAL', 'UAL', 'SWA', 'JBU', 'FFT', 'ASA', 'NKS', 'WJA', 'ACA',
+  // Cargo
+  'FDX', 'UPS', 'GTI', 'ABW', 'CLX', 'MPH',
+  // Generic
+  'AIR', 'SKY', 'JET',
+]);
 
 // Aircraft type detection from callsign patterns
 function detectAircraftType(callsign) {
@@ -191,28 +211,9 @@ function isMilitaryCallsign(callsign) {
 
   // Short tactical: 3 letters + 1-2 digits (but exclude common airlines)
   // This catches OPS4, CTF01, TF12 but blocks SVA12, QTR76, etc.
-  // Common airline ICAO codes to exclude from military detection
-  const AIRLINE_CODES = [
-    // Middle East
-    'SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY', 'ELY',
-    'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'FDB', 'KNE', 'FAD', 'ADY', 'OMA',
-    'ABQ', 'ABY', 'NIA', 'FJA', 'SWR', 'HZA', 'OMS', 'EGF', 'NOS', 'SXD',
-    // Europe
-    'BAW', 'AFR', 'DLH', 'KLM', 'AUA', 'SAS', 'FIN', 'LOT', 'AZA', 'TAP', 'IBE',
-    'VLG', 'RYR', 'EZY', 'WZZ', 'NOZ', 'SWR', 'BEL', 'AEE', 'THY', 'ROT',
-    // Asia
-    'AIC', 'CPA', 'SIA', 'MAS', 'THA', 'VNM', 'JAL', 'ANA', 'KAL', 'AAR', 'EVA',
-    'CAL', 'CCA', 'CES', 'CSN', 'HDA', 'CHH', 'CXA', 'GIA', 'PAL', 'SLK',
-    // Americas
-    'AAL', 'DAL', 'UAL', 'SWA', 'JBU', 'FFT', 'ASA', 'NKS', 'WJA', 'ACA',
-    // Cargo
-    'FDX', 'UPS', 'GTI', 'ABW', 'CLX', 'MPH',
-    // Generic
-    'AIR', 'SKY', 'JET',
-  ];
   if (/^[A-Z]{3}\d{1,2}$/.test(cs)) {
     const prefix = cs.slice(0, 3);
-    if (!AIRLINE_CODES.includes(prefix)) return true;
+    if (!AIRLINE_CODES.has(prefix)) return true;
   }
 
   return false;
