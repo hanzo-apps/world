@@ -179,9 +179,13 @@ export class DeckGLMap {
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = []; // Store news for related news lookup
 
+  // Country highlight state
+  private countryGeoJsonLoaded = false;
+
   // Callbacks
   private onHotspotClick?: (hotspot: Hotspot) => void;
   private onTimeRangeChange?: (range: TimeRange) => void;
+  private onCountryClick?: (lat: number, lon: number) => void;
   private onLayerChange?: (layer: keyof MapLayers, enabled: boolean) => void;
   private onStateChange?: (state: DeckMapState) => void;
 
@@ -214,6 +218,7 @@ export class DeckGLMap {
     // This prevents layer projection issues on initial render
     this.maplibreMap?.on('load', () => {
       this.initDeck();
+      this.loadCountryBoundaries();
       // Initial render after deck is ready
       this.render();
     });
@@ -1626,7 +1631,14 @@ export class DeckGLMap {
   }
 
   private handleClick(info: PickingInfo): void {
-    if (!info.object) return;
+    if (!info.object) {
+      // Empty map click → country detection
+      if (info.coordinate && this.onCountryClick) {
+        const [lon, lat] = info.coordinate as [number, number];
+        this.onCountryClick(lat, lon);
+      }
+      return;
+    }
 
     const layerId = info.layer?.id || '';
 
@@ -2553,6 +2565,70 @@ export class DeckGLMap {
       wrapper.appendChild(flashMarker);
       setTimeout(() => flashMarker.remove(), durationMs);
     }
+  }
+
+  // --- Country click + highlight ---
+
+  public setOnCountryClick(cb: (lat: number, lon: number) => void): void {
+    this.onCountryClick = cb;
+  }
+
+  private loadCountryBoundaries(): void {
+    if (!this.maplibreMap || this.countryGeoJsonLoaded) return;
+    this.countryGeoJsonLoaded = true;
+
+    fetch('/data/countries.geojson')
+      .then((r) => r.json())
+      .then((geojson) => {
+        if (!this.maplibreMap) return;
+        this.maplibreMap.addSource('country-boundaries', {
+          type: 'geojson',
+          data: geojson,
+        });
+        this.maplibreMap.addLayer({
+          id: 'country-highlight-fill',
+          type: 'fill',
+          source: 'country-boundaries',
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.12,
+          },
+          filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
+        });
+        this.maplibreMap.addLayer({
+          id: 'country-highlight-border',
+          type: 'line',
+          source: 'country-boundaries',
+          paint: {
+            'line-color': '#3b82f6',
+            'line-width': 1.5,
+            'line-opacity': 0.5,
+          },
+          filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
+        });
+        console.log('[DeckGLMap] Country boundaries loaded');
+      })
+      .catch((err) => console.warn('[DeckGLMap] Failed to load country boundaries:', err));
+  }
+
+  public highlightCountry(code: string): void {
+    if (!this.maplibreMap || !this.countryGeoJsonLoaded) return;
+    // Update MapLibre filter to highlight this country
+    const filter: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], code];
+    try {
+      this.maplibreMap.setFilter('country-highlight-fill', filter);
+      this.maplibreMap.setFilter('country-highlight-border', filter);
+    } catch { /* layer not ready yet */ }
+  }
+
+  public clearCountryHighlight(): void {
+    if (!this.maplibreMap) return;
+    // Clear highlight filter
+    const noMatch: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], ''];
+    try {
+      this.maplibreMap.setFilter('country-highlight-fill', noMatch);
+      this.maplibreMap.setFilter('country-highlight-border', noMatch);
+    } catch { /* layer not ready */ }
   }
 
   public destroy(): void {
