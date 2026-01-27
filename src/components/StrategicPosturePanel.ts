@@ -429,15 +429,24 @@ export class StrategicPosturePanel extends Panel {
           dataLat: (el as HTMLElement).dataset.lat,
           dataLon: (el as HTMLElement).dataset.lon,
           element: (el as HTMLElement).textContent?.slice(0, 30),
+          hasHandler: !!this.onLocationClick,
         });
         if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
+          console.log('[StrategicPosturePanel] Calling onLocationClick with:', lat, lon);
           this.onLocationClick(lat, lon);
+        } else {
+          console.warn('[StrategicPosturePanel] No handler or invalid coords!', {
+            hasHandler: !!this.onLocationClick,
+            lat,
+            lon,
+          });
         }
       });
     });
   }
 
   public setLocationClickHandler(handler: (lat: number, lon: number) => void): void {
+    console.log('[StrategicPosturePanel] setLocationClickHandler called');
     this.onLocationClick = handler;
   }
 
