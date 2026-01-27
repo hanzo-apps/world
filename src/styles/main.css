@@ -1047,57 +1047,6 @@ body.animations-paused *::after {
   50% { opacity: 0.7; }
 }
 
-.threat-badge {
-  padding: 1px 4px;
-  font-size: 8px;
-  font-weight: bold;
-  color: #fff;
-  border-radius: 2px;
-  letter-spacing: 0.5px;
-}
-.threat-badge.threat-critical { animation: pulse-alert 1s infinite; }
-
-.threat-filter-bar {
-  display: flex;
-  gap: 3px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-  align-items: center;
-}
-.threat-filter-btn {
-  padding: 2px 6px;
-  font-size: 9px;
-  font-weight: bold;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.15s, background 0.15s;
-}
-.threat-filter-btn.active {
-  opacity: 1;
-  background: var(--threat-color);
-  color: #fff;
-  border-color: var(--threat-color);
-}
-.threat-sort-btn {
-  padding: 2px 6px;
-  font-size: 9px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  margin-left: auto;
-}
-.threat-sort-btn.active {
-  background: var(--accent, #6366f1);
-  color: #fff;
-  border-color: var(--accent, #6366f1);
-}
 
 .item-title {
   color: var(--text);
