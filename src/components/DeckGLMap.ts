@@ -2085,10 +2085,11 @@ export class DeckGLMap {
     }
   }
 
-  public setCenter(lat: number, lon: number): void {
+  public setCenter(lat: number, lon: number, zoom?: number): void {
     if (this.maplibreMap) {
       this.maplibreMap.flyTo({
         center: [lon, lat],
+        ...(zoom != null && { zoom }),
         duration: 500,
       });
     }
