@@ -1,6 +1,8 @@
 import { Panel } from './Panel';
 import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
+import type { ThreatLevel } from '@/services/threat-classifier';
+import { THREAT_COLORS, THREAT_LABELS, THREAT_PRIORITY } from '@/services/threat-classifier';
 import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker, generateSummary } from '@/services';
@@ -41,12 +43,100 @@ export class NewsPanel extends Panel {
   private currentHeadlines: string[] = [];
   private isSummarizing = false;
 
+  // Threat filter/sort
+  private threatFilters: Set<ThreatLevel> = new Set(['critical', 'high', 'medium', 'low', 'info']);
+  private sortByThreat = false;
+  private filterBar: HTMLElement | null = null;
+  private lastClusters: ClusteredEvent[] = [];
+
   constructor(id: string, title: string) {
     super({ id, title, showCount: true, trackActivity: true });
     this.createDeviationIndicator();
     this.createSummarizeButton();
+    this.createThreatFilterBar();
+    this.loadThreatPrefs();
     this.setupActivityTracking();
     this.initWindowedList();
+  }
+
+  private createThreatFilterBar(): void {
+    this.filterBar = document.createElement('div');
+    this.filterBar.className = 'threat-filter-bar';
+
+    const levels: ThreatLevel[] = ['critical', 'high', 'medium', 'low', 'info'];
+    for (const level of levels) {
+      const btn = document.createElement('button');
+      btn.className = `threat-filter-btn active`;
+      btn.dataset.level = level;
+      btn.textContent = THREAT_LABELS[level];
+      btn.style.setProperty('--threat-color', THREAT_COLORS[level]);
+      btn.addEventListener('click', () => this.toggleThreatFilter(level, btn));
+      this.filterBar.appendChild(btn);
+    }
+
+    const sortBtn = document.createElement('button');
+    sortBtn.className = 'threat-sort-btn';
+    sortBtn.textContent = '↕ Severity';
+    sortBtn.title = 'Sort by threat level';
+    sortBtn.addEventListener('click', () => {
+      this.sortByThreat = !this.sortByThreat;
+      sortBtn.classList.toggle('active', this.sortByThreat);
+      this.saveThreatPrefs();
+      this.reRenderClusters();
+    });
+    this.filterBar.appendChild(sortBtn);
+
+    this.element.insertBefore(this.filterBar, this.content);
+  }
+
+  private toggleThreatFilter(level: ThreatLevel, btn: HTMLButtonElement): void {
+    if (this.threatFilters.has(level)) {
+      this.threatFilters.delete(level);
+      btn.classList.remove('active');
+    } else {
+      this.threatFilters.add(level);
+      btn.classList.add('active');
+    }
+    this.saveThreatPrefs();
+    this.reRenderClusters();
+  }
+
+  private saveThreatPrefs(): void {
+    try {
+      localStorage.setItem('worldmonitor-threat-filters', JSON.stringify({
+        filters: Array.from(this.threatFilters),
+        sortByThreat: this.sortByThreat,
+      }));
+    } catch { /* ignore */ }
+  }
+
+  private loadThreatPrefs(): void {
+    try {
+      const raw = localStorage.getItem('worldmonitor-threat-filters');
+      if (!raw) return;
+      const prefs = JSON.parse(raw);
+      if (Array.isArray(prefs.filters)) {
+        this.threatFilters = new Set(prefs.filters);
+      }
+      if (typeof prefs.sortByThreat === 'boolean') {
+        this.sortByThreat = prefs.sortByThreat;
+      }
+      // Update button states
+      if (this.filterBar) {
+        this.filterBar.querySelectorAll<HTMLButtonElement>('.threat-filter-btn').forEach(btn => {
+          const level = btn.dataset.level as ThreatLevel;
+          btn.classList.toggle('active', this.threatFilters.has(level));
+        });
+        const sortBtn = this.filterBar.querySelector<HTMLButtonElement>('.threat-sort-btn');
+        sortBtn?.classList.toggle('active', this.sortByThreat);
+      }
+    } catch { /* ignore */ }
+  }
+
+  private reRenderClusters(): void {
+    if (this.lastClusters.length > 0) {
+      this.renderClusters(this.lastClusters);
+    }
   }
 
   private initWindowedList(): void {
@@ -276,15 +366,34 @@ export class NewsPanel extends Panel {
   }
 
   private renderClusters(clusters: ClusteredEvent[]): void {
-    const totalItems = clusters.reduce((sum, c) => sum + c.sourceCount, 0);
+    this.lastClusters = clusters;
+
+    // Apply threat filters
+    let filtered = clusters.filter(c => {
+      const level = c.threat?.level ?? 'info';
+      return this.threatFilters.has(level);
+    });
+
+    // Sort by threat priority if enabled
+    if (this.sortByThreat) {
+      filtered = [...filtered].sort((a, b) => {
+        const pa = THREAT_PRIORITY[a.threat?.level ?? 'info'];
+        const pb = THREAT_PRIORITY[b.threat?.level ?? 'info'];
+        if (pb !== pa) return pb - pa;
+        return b.lastUpdated.getTime() - a.lastUpdated.getTime();
+      });
+    }
+
+    const totalItems = filtered.reduce((sum, c) => sum + c.sourceCount, 0);
     this.setCount(totalItems);
     this.relatedAssetContext.clear();
 
     // Store headlines for summarization
-    this.currentHeadlines = clusters.slice(0, 10).map(c => c.primaryTitle);
+    this.currentHeadlines = filtered.slice(0, 10).map(c => c.primaryTitle);
 
-    // Track items with activity tracker (skip first render to avoid marking everything as "new")
-    const clusterIds = clusters.map(c => c.id);
+    // Track items with activity tracker using ALL clusters (not filtered)
+    // so toggling filters doesn't make items appear as "new"
+    const clusterIds = this.lastClusters.map(c => c.id);
     let newItemIds: Set<string>;
 
     if (this.isFirstRender) {
@@ -300,7 +409,7 @@ export class NewsPanel extends Panel {
     }
 
     // Prepare all clusters with their rendering data (defer HTML creation)
-    const prepared: PreparedCluster[] = clusters.map(cluster => {
+    const prepared: PreparedCluster[] = filtered.map(cluster => {
       const isNew = newItemIds.has(cluster.id);
       const shouldHighlight = activityTracker.shouldHighlight(this.panelId, cluster.id);
       const showNewTag = activityTracker.isNewItem(this.panelId, cluster.id) && isNew;
@@ -314,7 +423,7 @@ export class NewsPanel extends Panel {
     });
 
     // Use windowed rendering for large lists, direct render for small
-    if (this.useVirtualScroll && clusters.length > VIRTUAL_SCROLL_THRESHOLD && this.windowedList) {
+    if (this.useVirtualScroll && filtered.length > VIRTUAL_SCROLL_THRESHOLD && this.windowedList) {
       this.windowedList.setItems(prepared);
     } else {
       // Direct render for small lists
@@ -350,6 +459,11 @@ export class NewsPanel extends Panel {
       : '';
 
     const newTag = showNewTag ? '<span class="new-tag">NEW</span>' : '';
+
+    const threatLevel = cluster.threat?.level ?? 'info';
+    const threatBadge = threatLevel !== 'info'
+      ? `<span class="threat-badge threat-${threatLevel}" style="background:${THREAT_COLORS[threatLevel]}">${THREAT_LABELS[threatLevel]}</span>`
+      : '';
 
     // Propaganda risk indicator for primary source
     const primaryPropRisk = getSourcePropagandaRisk(cluster.primarySource);
@@ -424,6 +538,7 @@ export class NewsPanel extends Panel {
           ${velocityBadge}
           ${sentimentBadge}
           ${cluster.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
+          ${threatBadge}
         </div>
         <a class="item-title" href="${sanitizeUrl(cluster.primaryLink)}" target="_blank" rel="noopener">${escapeHtml(cluster.primaryTitle)}</a>
         <div class="cluster-meta">
