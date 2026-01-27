@@ -3114,10 +3114,14 @@ export class MapComponent {
     const projection = this.getProjection(width, height);
     const pos = projection([lon, lat]);
     if (!pos) return;
-    const zoom = this.state.zoom;
+    // Pan formula: after applyTransform() computes tx = centerOffset + pan*zoom,
+    // and transform is translate(tx,ty) scale(zoom), to center on pos:
+    // pos*zoom + tx = width/2 → tx = width/2 - pos*zoom
+    // Solving: (width/2)(1-zoom) + pan*zoom = width/2 - pos*zoom
+    // → pan = width/2 - pos (independent of zoom)
     this.state.pan = {
-      x: width / (2 * zoom) - pos[0],
-      y: height / (2 * zoom) - pos[1],
+      x: width / 2 - pos[0],
+      y: height / 2 - pos[1],
     };
     this.applyTransform();
     // Ensure base layer is intact after pan
