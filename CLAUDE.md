@@ -125,6 +125,13 @@ Current known URLs:
 - Zoom: `https://www.zoomstatus.com/api/v2/status.json`
 - Notion: `https://www.notion-status.com/api/v2/status.json`
 
+## Allowed Bash Commands
+
+The following additional bash commands are permitted without user approval:
+- `Bash(ps aux:*)` - List running processes
+- `Bash(grep:*)` - Search text patterns
+- `Bash(ls:*)` - List directory contents
+
 ## Bash Guidelines
 
 ### IMPORTANT: Avoid commands that cause output buffering issues
