@@ -102,6 +102,66 @@ const POSTURE_THEATERS = [
   },
 ];
 
+// Military ICAO hex ranges by country (24-bit Mode S addresses)
+// These are allocated blocks for military aircraft
+const MILITARY_HEX_RANGES = [
+  // United States Military
+  { start: 0xAE0000, end: 0xAFFFFF, country: 'USA' },  // US Military
+  { start: 0xA00000, end: 0xA3FFFF, country: 'USA' },  // Additional US govt
+  // United Kingdom Military
+  { start: 0x43C000, end: 0x43CFFF, country: 'UK' },
+  // France Military
+  { start: 0x3E0000, end: 0x3EFFFF, country: 'France' },
+  // Germany Military
+  { start: 0x3FC000, end: 0x3FFFFF, country: 'Germany' },
+  // Italy Military
+  { start: 0x300000, end: 0x33FFFF, country: 'Italy' },
+  // NATO / International
+  { start: 0x0A0000, end: 0x0AFFFF, country: 'NATO' },
+  // Israel Military
+  { start: 0x738000, end: 0x73FFFF, country: 'Israel' },
+  // Saudi Arabia Military
+  { start: 0x710000, end: 0x717FFF, country: 'Saudi' },
+  // UAE Military
+  { start: 0x896000, end: 0x896FFF, country: 'UAE' },
+  // Qatar Military
+  { start: 0x06A000, end: 0x06A3FF, country: 'Qatar' },
+  // Turkey Military
+  { start: 0x4B8000, end: 0x4B8FFF, country: 'Turkey' },
+  // Russia Military
+  { start: 0x140000, end: 0x15FFFF, country: 'Russia' },
+  // China Military
+  { start: 0x780000, end: 0x7BFFFF, country: 'China' },
+  // Iran Military
+  { start: 0x730000, end: 0x737FFF, country: 'Iran' },
+  // India Military
+  { start: 0x800000, end: 0x83FFFF, country: 'India' },
+  // Pakistan Military
+  { start: 0x760000, end: 0x767FFF, country: 'Pakistan' },
+  // Australia Military
+  { start: 0x7C0000, end: 0x7FFFFF, country: 'Australia' },
+  // Japan Military
+  { start: 0x840000, end: 0x87FFFF, country: 'Japan' },
+  // South Korea Military
+  { start: 0x718000, end: 0x71FFFF, country: 'South Korea' },
+];
+
+// Check if ICAO hex is in military range
+function isMilitaryHex(hexId) {
+  if (!hexId) return false;
+  // Handle both string and number, remove ~ prefix if present
+  const cleanHex = String(hexId).replace(/^~/, '').toLowerCase();
+  const num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return false;
+
+  for (const range of MILITARY_HEX_RANGES) {
+    if (num >= range.start && num <= range.end) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Military callsign prefixes for identification
 const MILITARY_PREFIXES = [
   // US Military
@@ -258,8 +318,9 @@ async function fetchMilitaryFlights() {
       // Skip if on ground
       if (onGround) continue;
 
-      // Check if military
-      if (!isMilitaryCallsign(callsign)) continue;
+      // Check if military (by callsign OR hex range)
+      const isMilitary = isMilitaryCallsign(callsign) || isMilitaryHex(icao24);
+      if (!isMilitary) continue;
 
       flights.push({
         id: icao24,
@@ -271,6 +332,7 @@ async function fetchMilitaryFlights() {
         speed: velocity || 0,
         aircraftType: detectAircraftType(callsign),
         operator: 'unknown',
+        militaryHex: isMilitaryHex(icao24),
       });
     }
 
@@ -351,8 +413,9 @@ async function fetchMilitaryFlightsFromWingbits() {
         // Get callsign - Wingbits uses 'f' for flight
         const callsign = f.f || f.callsign || f.flight || '';
 
-        // Skip if not military
-        if (!isMilitaryCallsign(callsign)) continue;
+        // Skip if not military (by callsign OR hex range)
+        const isMilitary = isMilitaryCallsign(callsign) || isMilitaryHex(icao24);
+        if (!isMilitary) continue;
 
         flights.push({
           id: icao24,
@@ -365,6 +428,7 @@ async function fetchMilitaryFlightsFromWingbits() {
           aircraftType: detectAircraftType(callsign),
           operator: f.operator || 'unknown',
           source: 'wingbits',
+          militaryHex: isMilitaryHex(icao24),
         });
       }
     }
