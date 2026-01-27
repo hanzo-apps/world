@@ -9,6 +9,8 @@ export interface Feed {
   stateAffiliated?: string;  // e.g., "Russia", "China", "Iran"
 }
 
+export type { ThreatClassification, ThreatLevel, EventCategory } from '@/services/threat-classifier';
+
 export interface NewsItem {
   source: string;
   title: string;
@@ -17,6 +19,7 @@ export interface NewsItem {
   isAlert: boolean;
   monitorColor?: string;
   tier?: number;
+  threat?: import('@/services/threat-classifier').ThreatClassification;
 }
 
 export type VelocityLevel = 'normal' | 'elevated' | 'spike';
@@ -44,6 +47,7 @@ export interface ClusteredEvent {
   isAlert: boolean;
   monitorColor?: string;
   velocity?: VelocityMetrics;
+  threat?: import('@/services/threat-classifier').ThreatClassification;
 }
 
 export type AssetType = 'pipeline' | 'cable' | 'datacenter' | 'base' | 'nuclear';
