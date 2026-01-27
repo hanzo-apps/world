@@ -10789,3 +10789,187 @@ body.has-critical-banner .panels-grid {
 .posture-error-hint strong {
   color: rgba(255, 255, 255, 0.7);
 }
+
+/* ── Country Intel Modal ── */
+.country-intel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.country-intel-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.country-intel-modal {
+  background: #1a1d23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  width: 480px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: translateY(20px);
+  transition: transform 0.2s ease;
+}
+.country-intel-overlay.active .country-intel-modal {
+  transform: translateY(0);
+}
+.country-intel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.country-intel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+.country-flag { font-size: 24px; }
+.country-intel-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.country-intel-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.country-intel-content {
+  padding: 16px 20px;
+}
+
+/* CII section */
+.cii-section { margin-bottom: 16px; }
+.cii-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+.cii-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.cii-score-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cii-score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.cii-score-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 48px;
+  text-align: right;
+}
+.cii-components {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+}
+.cii-trend { margin-left: auto; text-transform: capitalize; }
+.cii-trend.rising { color: #ff6644; }
+.cii-trend.falling { color: #44cc88; }
+.cii-trend.stable { color: rgba(255, 255, 255, 0.4); }
+
+/* Signal chips */
+.active-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.signal-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.signal-chip.protest { border-color: rgba(255, 170, 0, 0.3); color: #ffaa00; }
+.signal-chip.military { border-color: rgba(100, 180, 255, 0.3); color: #64b4ff; }
+.signal-chip.outage { border-color: rgba(255, 100, 100, 0.3); color: #ff6464; }
+.signal-chip.quake { border-color: rgba(180, 120, 255, 0.3); color: #b478ff; }
+
+/* Intel brief */
+.intel-brief-section { min-height: 100px; }
+.intel-brief-loading { padding: 8px 0; }
+.intel-skeleton {
+  height: 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+.intel-skeleton.short { width: 60%; }
+.intel-loading-text {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 12px;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.intel-brief {
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.8);
+}
+.intel-brief p { margin: 0 0 12px; }
+.intel-brief strong { color: #fff; }
+.intel-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+}
+.intel-cached { color: rgba(255, 255, 255, 0.4); }
+.intel-fresh { color: #44cc88; }
+.intel-error {
+  padding: 16px;
+  text-align: center;
+  color: rgba(255, 100, 100, 0.7);
+  font-size: 13px;
+}
