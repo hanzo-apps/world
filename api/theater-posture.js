@@ -117,9 +117,9 @@ const MILITARY_PREFIXES = [
   // NATO
   'NATO', 'GAF', 'RRF', 'RAF', 'FAF', 'IAF', 'RNLAF', 'BAF', 'DAF', 'HAF', 'PAF',
   'SWORD', 'LANCE', 'ARROW', 'SPARTAN', // NATO tactical
-  // Middle East
-  'RSAF', 'UAE', 'EMIRI', 'KAF', 'QAF', 'BAH', 'OMA', // Gulf states
-  'IAF', 'IRIAF', 'IRG', // Iran/Israel
+  // Middle East (avoid UAE - conflicts with Emirates airline)
+  'RSAF', 'EMIRI', 'UAEAF', 'KAF', 'QAF', 'BAHAF', 'OMAAF', // Gulf states
+  'IAF', 'IRIAF', 'IRG', 'IRGC', // Iran/Israel
   'TAF', 'TUAF', // Turkey
   // Russia
   'RSD', 'RF', 'RFF', 'VKS',
@@ -175,8 +175,25 @@ function isMilitaryCallsign(callsign) {
 
   // Short tactical: 3 letters + 1-2 digits (but exclude common airlines)
   // This catches OPS4, CTF01, TF12 but blocks SVA12, QTR76, etc.
-  const AIRLINE_CODES = ['SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY',
-    'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'AWE', 'KNE', 'FAD', 'ADY'];
+  // Common airline ICAO codes to exclude from military detection
+  const AIRLINE_CODES = [
+    // Middle East
+    'SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY', 'ELY',
+    'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'FDB', 'KNE', 'FAD', 'ADY', 'OMA',
+    'ABQ', 'ABY', 'NIA', 'FJA', 'SWR', 'HZA', 'OMS', 'EGF', 'NOS', 'SXD',
+    // Europe
+    'BAW', 'AFR', 'DLH', 'KLM', 'AUA', 'SAS', 'FIN', 'LOT', 'AZA', 'TAP', 'IBE',
+    'VLG', 'RYR', 'EZY', 'WZZ', 'NOZ', 'SWR', 'BEL', 'AEE', 'THY', 'ROT',
+    // Asia
+    'AIC', 'CPA', 'SIA', 'MAS', 'THA', 'VNM', 'JAL', 'ANA', 'KAL', 'AAR', 'EVA',
+    'CAL', 'CCA', 'CES', 'CSN', 'HDA', 'CHH', 'CXA', 'GIA', 'PAL', 'SLK',
+    // Americas
+    'AAL', 'DAL', 'UAL', 'SWA', 'JBU', 'FFT', 'ASA', 'NKS', 'WJA', 'ACA',
+    // Cargo
+    'FDX', 'UPS', 'GTI', 'ABW', 'CLX', 'MPH',
+    // Generic
+    'AIR', 'SKY', 'JET',
+  ];
   if (/^[A-Z]{3}\d{1,2}$/.test(cs)) {
     const prefix = cs.slice(0, 3);
     if (!AIRLINE_CODES.includes(prefix)) return true;
