@@ -642,6 +642,7 @@ export interface MilitaryFlight {
     manufacturer?: string;
     owner?: string;
     operatorName?: string;
+    typeCode?: string;
     builtYear?: string;
     confirmedMilitary?: boolean;
     militaryBranch?: string;
