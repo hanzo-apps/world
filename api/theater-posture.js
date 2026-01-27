@@ -160,9 +160,9 @@ function isMilitaryCallsign(callsign) {
     if (cs.startsWith(prefix)) return true;
   }
 
-  // Check patterns (military often use specific formats)
-  if (/^[A-Z]{3,4}\d{2,4}$/.test(cs)) return true; // e.g., DUKE01, VIPER123
-  if (/^[A-Z]{2,3}\d{3,4}$/.test(cs)) return true; // e.g., RCH123
+  // Check patterns - only word-like callsigns (4+ letters followed by 1-3 digits)
+  // This catches DUKE01, VIPER12, MOOSE1 but NOT airline codes like PGT5873, IAW9011
+  if (/^[A-Z]{4,}\d{1,3}$/.test(cs)) return true;
 
   return false;
 }
