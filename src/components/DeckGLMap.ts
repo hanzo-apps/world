@@ -2586,6 +2586,25 @@ export class DeckGLMap {
           data: geojson,
         });
         this.maplibreMap.addLayer({
+          id: 'country-interactive',
+          type: 'fill',
+          source: 'country-boundaries',
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0,
+          },
+        });
+        this.maplibreMap.addLayer({
+          id: 'country-hover-fill',
+          type: 'fill',
+          source: 'country-boundaries',
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.06,
+          },
+          filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
+        });
+        this.maplibreMap.addLayer({
           id: 'country-highlight-fill',
           type: 'fill',
           source: 'country-boundaries',
@@ -2606,9 +2625,41 @@ export class DeckGLMap {
           },
           filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
         });
+
+        this.setupCountryHover();
         console.log('[DeckGLMap] Country boundaries loaded');
       })
       .catch((err) => console.warn('[DeckGLMap] Failed to load country boundaries:', err));
+  }
+
+  private setupCountryHover(): void {
+    if (!this.maplibreMap) return;
+    const map = this.maplibreMap;
+    let hoveredCode: string | null = null;
+
+    map.on('mousemove', (e) => {
+      if (!this.onCountryClick) return;
+      const features = map.queryRenderedFeatures(e.point, { layers: ['country-interactive'] });
+      const code = features?.[0]?.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+
+      if (code && code !== hoveredCode) {
+        hoveredCode = code;
+        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], code]);
+        map.getCanvas().style.cursor = 'pointer';
+      } else if (!code && hoveredCode) {
+        hoveredCode = null;
+        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], '']);
+        map.getCanvas().style.cursor = '';
+      }
+    });
+
+    map.on('mouseout', () => {
+      if (hoveredCode) {
+        hoveredCode = null;
+        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], '']);
+        map.getCanvas().style.cursor = '';
+      }
+    });
   }
 
   public highlightCountry(code: string): void {

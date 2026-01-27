@@ -89,6 +89,24 @@ export class CountryIntelModal {
     `;
   }
 
+  public showLoading(): void {
+    this.currentCode = '__loading__';
+    this.headerEl.innerHTML = `
+      <span class="country-flag">🌍</span>
+      <span class="country-name">Identifying country...</span>
+    `;
+    this.contentEl.innerHTML = `
+      <div class="intel-brief-section">
+        <div class="intel-brief-loading">
+          <div class="intel-skeleton"></div>
+          <div class="intel-skeleton short"></div>
+          <span class="intel-loading-text">Locating region...</span>
+        </div>
+      </div>
+    `;
+    this.overlay.classList.add('active');
+  }
+
   public show(country: string, code: string, score: CountryScore | null, signals?: ActiveSignals): void {
     this.currentCode = code;
     const flag = this.countryFlag(code);
