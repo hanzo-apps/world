@@ -200,6 +200,8 @@ export class DeckGLMap {
 
   private timestampIntervalId: ReturnType<typeof setInterval> | null = null;
   private renderScheduled = false;
+  private renderPaused = false;
+  private renderPending = false;
   private resizeObserver: ResizeObserver | null = null;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
@@ -2055,6 +2057,10 @@ export class DeckGLMap {
 
   // Public API methods (matching MapComponent interface)
   public render(): void {
+    if (this.renderPaused) {
+      this.renderPending = true;
+      return;
+    }
     if (this.renderScheduled) return;
     this.renderScheduled = true;
 
@@ -2062,6 +2068,14 @@ export class DeckGLMap {
       this.renderScheduled = false;
       this.updateLayers();
     });
+  }
+
+  public setRenderPaused(paused: boolean): void {
+    this.renderPaused = paused;
+    if (!paused && this.renderPending) {
+      this.renderPending = false;
+      this.render();
+    }
   }
 
   private updateLayers(): void {
