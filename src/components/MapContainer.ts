@@ -481,6 +481,12 @@ export class MapContainer {
     }
   }
 
+  public setRenderPaused(paused: boolean): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setRenderPaused(paused);
+    }
+  }
+
   // Utility methods
   public isDeckGLMode(): boolean {
     return this.useDeckGL;
