@@ -2,6 +2,7 @@ import type { MilitaryFlight, MilitaryFlightCluster, MilitaryAircraftType, Milit
 import { createCircuitBreaker } from '@/utils';
 import {
   identifyByCallsign,
+  identifyByAircraftType,
   isKnownMilitaryHex,
   getNearbyHotspot,
   MILITARY_HOTSPOTS,
@@ -72,10 +73,11 @@ interface OpenSkyResponse {
 function determineAircraftInfo(
   callsign: string,
   icao24: string,
-  _typeCode?: string
+  originCountry?: string,
+  typeCode?: string
 ): { type: MilitaryAircraftType; operator: MilitaryOperator; country: string; confidence: 'high' | 'medium' | 'low' } {
   // Check callsign first (highest confidence)
-  const callsignMatch = identifyByCallsign(callsign);
+  const callsignMatch = identifyByCallsign(callsign, originCountry);
   if (callsignMatch) {
     return {
       type: callsignMatch.aircraftType || 'unknown',
@@ -94,6 +96,19 @@ function determineAircraftInfo(
       country: hexMatch.country,
       confidence: 'medium',
     };
+  }
+
+  // Check typecode as fallback
+  if (typeCode) {
+    const typeMatch = identifyByAircraftType(typeCode);
+    if (typeMatch) {
+      return {
+        type: typeMatch.type,
+        operator: 'other',
+        country: 'Unknown',
+        confidence: 'low',
+      };
+    }
   }
 
   // Default for unknown military
@@ -134,7 +149,7 @@ function isMilitaryFlight(state: OpenSkyStateArray): boolean {
   const originCountry = state[2];
 
   // Check for known military callsigns (covers all patterns from config)
-  if (callsign && identifyByCallsign(callsign)) {
+  if (callsign && identifyByCallsign(callsign, originCountry)) {
     return true;
   }
 
@@ -182,7 +197,7 @@ function parseOpenSkyResponse(data: OpenSkyResponse): MilitaryFlight[] {
 
     if (lat === null || lon === null) continue;
 
-    const info = determineAircraftInfo(callsign, icao24);
+    const info = determineAircraftInfo(callsign, icao24, state[2]);
 
     // Update flight history for trails
     const historyKey = icao24;
@@ -344,6 +359,7 @@ async function enrichFlightsWithWingbits(flights: MilitaryFlight[]): Promise<Mil
       manufacturer: analysis.manufacturer || undefined,
       owner: analysis.owner || undefined,
       operatorName: analysis.operator || undefined,
+      typeCode: analysis.typecode || undefined,
       builtYear: analysis.builtYear || undefined,
       confirmedMilitary: analysis.isMilitary,
       militaryBranch: analysis.militaryBranch || undefined,
@@ -357,6 +373,18 @@ async function enrichFlightsWithWingbits(flights: MilitaryFlight[]): Promise<Mil
     // Add model if available
     if (!enrichedFlight.aircraftModel && analysis.model) {
       enrichedFlight.aircraftModel = analysis.model;
+    }
+
+    // Use typecode to refine type if still unknown
+    const wingbitsTypeCode = analysis.typecode || details.typecode;
+    if (wingbitsTypeCode && enrichedFlight.aircraftType === 'unknown') {
+      const typeMatch = identifyByAircraftType(wingbitsTypeCode);
+      if (typeMatch) {
+        enrichedFlight.aircraftType = typeMatch.type;
+        if (enrichedFlight.confidence === 'low') {
+          enrichedFlight.confidence = 'medium';
+        }
+      }
     }
 
     // Upgrade confidence if Wingbits confirms military
