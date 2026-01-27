@@ -32,6 +32,7 @@ import {
   findNewsForMarketSymbol,
 } from './entity-extraction';
 import { getEntityIndex } from './entity-index';
+import { aggregateThreats } from './threat-classifier';
 
 // Re-export for convenience
 export {
@@ -54,6 +55,7 @@ export interface NewsItemCore {
   isAlert: boolean;
   monitorColor?: string;
   tier?: number;
+  threat?: import('./threat-classifier').ThreatClassification;
 }
 
 export type NewsItemWithTier = NewsItemCore & { tier: number };
@@ -71,6 +73,7 @@ export interface ClusteredEventCore {
   isAlert: boolean;
   monitorColor?: string;
   velocity?: { sourcesPerHour?: number };
+  threat?: import('./threat-classifier').ThreatClassification;
 }
 
 export interface PredictionMarketCore {
@@ -234,6 +237,8 @@ export function clusterNewsCore(
         url: item.link,
       }));
 
+    const threat = aggregateThreats(cluster);
+
     return {
       id: generateClusterId(cluster),
       primaryTitle: primary.title,
@@ -246,6 +251,7 @@ export function clusterNewsCore(
       lastUpdated: new Date(Math.max(...dates)),
       isAlert: cluster.some(i => i.isAlert),
       monitorColor: cluster.find(i => i.monitorColor)?.monitorColor,
+      threat,
     };
   }).sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
 }
