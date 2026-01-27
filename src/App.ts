@@ -231,9 +231,11 @@ export class App {
     });
     const findingsBadge = new IntelligenceGapBadge();
     findingsBadge.setOnSignalClick((signal) => {
+      if (this.countryIntelModal?.isVisible()) return;
       this.signalModal?.showSignal(signal);
     });
     findingsBadge.setOnAlertClick((alert) => {
+      if (this.countryIntelModal?.isVisible()) return;
       this.signalModal?.showAlert(alert);
     });
     this.setupMobileWarning();
@@ -405,10 +407,12 @@ export class App {
 
     this.map.onCountryClicked(async (lat, lon) => {
       this.countryIntelModal!.showLoading();
+      this.map!.setRenderPaused(true);
 
       const geo = await reverseGeocode(lat, lon);
       if (!geo) {
         this.countryIntelModal!.hide();
+        this.map!.setRenderPaused(false);
         return;
       }
 
@@ -418,6 +422,14 @@ export class App {
       const signals = this.getCountrySignals(geo.code, geo.country);
       this.countryIntelModal!.show(geo.country, geo.code, score, signals);
       this.map!.highlightCountry(geo.code);
+
+      // Fetch stock index (single request, used for both UI chip and AI context)
+      const stockPromise = fetch(`/api/stock-index?code=${encodeURIComponent(geo.code)}`)
+        .then((r) => r.json())
+        .catch(() => ({ available: false }));
+
+      // Update UI chip as soon as stock data arrives
+      stockPromise.then((stock) => this.countryIntelModal!.updateStock(stock));
 
       try {
         const context: Record<string, unknown> = {};
@@ -452,6 +464,13 @@ export class App {
           .map((n) => n.title);
         if (headlines.length) context.headlines = headlines;
 
+        // Reuse stock data for AI context
+        const stockData = await stockPromise;
+        if (stockData.available) {
+          const pct = parseFloat(stockData.weekChangePercent);
+          context.stockIndex = `${stockData.indexName}: ${stockData.price} (${pct >= 0 ? '+' : ''}${stockData.weekChangePercent}% week)`;
+        }
+
         const res = await fetch('/api/country-intel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -467,6 +486,7 @@ export class App {
 
     this.countryIntelModal.onClose(() => {
       this.map?.clearCountryHighlight();
+      this.map?.setRenderPaused(false);
     });
   }
 

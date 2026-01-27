@@ -10924,6 +10924,9 @@ body.has-critical-banner .panels-grid {
 .signal-chip.military { border-color: rgba(100, 180, 255, 0.3); color: #64b4ff; }
 .signal-chip.outage { border-color: rgba(255, 100, 100, 0.3); color: #ff6464; }
 .signal-chip.quake { border-color: rgba(180, 120, 255, 0.3); color: #b478ff; }
+.signal-chip.stock-loading { border-color: rgba(255, 255, 255, 0.15); color: #999; font-style: italic; }
+.signal-chip.stock.stock-up { border-color: rgba(68, 170, 68, 0.3); color: #44aa44; }
+.signal-chip.stock.stock-down { border-color: rgba(255, 68, 68, 0.3); color: #ff4444; }
 
 /* Intel brief */
 .intel-brief-section { min-height: 100px; }

@@ -103,6 +103,7 @@ export default async function handler(request) {
     if (context?.militaryVessels != null) dataLines.push(`Military vessels detected in/near country: ${context.militaryVessels}`);
     if (context?.outages != null) dataLines.push(`Internet outages: ${context.outages}`);
     if (context?.earthquakes != null) dataLines.push(`Recent earthquakes: ${context.earthquakes}`);
+    if (context?.stockIndex) dataLines.push(`Stock Market Index: ${context.stockIndex}`);
     if (context?.convergenceScore != null) {
       dataLines.push(`Signal convergence score: ${context.convergenceScore}/100 (multiple signal types detected: ${(context.signalTypes || []).join(', ')})`);
     }
