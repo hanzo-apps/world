@@ -223,8 +223,7 @@ export class App {
     this.renderLayout();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
-      this.map?.setCenter(lat, lon);
-      this.map?.setZoom(4);
+      this.map?.setCenter(lat, lon, 4);
     });
     const findingsBadge = new IntelligenceGapBadge();
     findingsBadge.setOnSignalClick((signal) => {
@@ -640,8 +639,7 @@ export class App {
         this.map?.enableLayer('techHQs');
         this.mapLayers.techHQs = true;
         setTimeout(() => {
-          this.map?.setCenter(company.lat, company.lon);
-          this.map?.setZoom(4);
+          this.map?.setCenter(company.lat, company.lon, 4);
         }, 300);
         break;
       }
@@ -649,8 +647,7 @@ export class App {
         const lab = result.data as typeof AI_RESEARCH_LABS[0];
         this.map?.setView('global');
         setTimeout(() => {
-          this.map?.setCenter(lab.lat, lab.lon);
-          this.map?.setZoom(4);
+          this.map?.setCenter(lab.lat, lab.lon, 4);
         }, 300);
         break;
       }
@@ -660,8 +657,7 @@ export class App {
         this.map?.enableLayer('startupHubs');
         this.mapLayers.startupHubs = true;
         setTimeout(() => {
-          this.map?.setCenter(ecosystem.lat, ecosystem.lon);
-          this.map?.setZoom(4);
+          this.map?.setCenter(ecosystem.lat, ecosystem.lon, 4);
         }, 300);
         break;
       }
@@ -676,8 +672,7 @@ export class App {
         this.map?.enableLayer('techHQs');
         this.mapLayers.techHQs = true;
         setTimeout(() => {
-          this.map?.setCenter(hq.lat, hq.lon);
-          this.map?.setZoom(4);
+          this.map?.setCenter(hq.lat, hq.lon, 4);
         }, 300);
         break;
       }
@@ -687,8 +682,7 @@ export class App {
         this.map?.enableLayer('accelerators');
         this.mapLayers.accelerators = true;
         setTimeout(() => {
-          this.map?.setCenter(acc.lat, acc.lon);
-          this.map?.setZoom(4);
+          this.map?.setCenter(acc.lat, acc.lon, 4);
         }, 300);
         break;
       }
@@ -972,8 +966,7 @@ export class App {
       console.log('[Banner] View Region clicked:', top.theaterId, 'lat:', top.centerLat, 'lon:', top.centerLon);
       // Use typeof check - truthy check would fail for coordinate 0
       if (typeof top.centerLat === 'number' && typeof top.centerLon === 'number') {
-        this.map?.setCenter(top.centerLat, top.centerLon);
-        this.map?.setZoom(4);
+        this.map?.setCenter(top.centerLat, top.centerLon, 4);
       } else {
         console.error('[Banner] Missing coordinates for', top.theaterId);
       }
@@ -1240,20 +1233,14 @@ export class App {
 
       const strategicRiskPanel = new StrategicRiskPanel();
       strategicRiskPanel.setLocationClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon);
-        this.map?.setZoom(4);
+        this.map?.setCenter(lat, lon, 4);
       });
       this.panels['strategic-risk'] = strategicRiskPanel;
 
       const strategicPosturePanel = new StrategicPosturePanel();
       strategicPosturePanel.setLocationClickHandler((lat, lon) => {
         console.log('[App] StrategicPosture handler called:', { lat, lon, hasMap: !!this.map });
-        if (this.map) {
-          this.map.setCenter(lat, lon);
-          this.map.setZoom(4);
-        } else {
-          console.error('[App] Map not available for navigation!');
-        }
+        this.map?.setCenter(lat, lon, 4);
       });
       this.panels['strategic-posture'] = strategicPosturePanel;
     }
