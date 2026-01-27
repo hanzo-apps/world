@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { fetchCachedTheaterPosture, type CachedTheaterPosture } from '@/services/cached-theater-posture';
 import { fetchMilitaryVessels, isMilitaryVesselTrackingConfigured } from '@/services/military-vessels';
-import type { TheaterPostureSummary } from '@/services/military-surge';
+import { recalcPostureWithVessels, type TheaterPostureSummary } from '@/services/military-surge';
 
 export class StrategicPosturePanel extends Panel {
   private postures: TheaterPostureSummary[] = [];
@@ -203,7 +203,9 @@ export class StrategicPosturePanel extends Panel {
         }
       }
 
-      console.log('[StrategicPosturePanel] Augmented with', vessels.length, 'vessels');
+      // Recalculate posture levels now that vessels are included
+      recalcPostureWithVessels(this.postures);
+      console.log('[StrategicPosturePanel] Augmented with', vessels.length, 'vessels, posture levels recalculated');
     } catch (error) {
       console.warn('[StrategicPosturePanel] Failed to fetch vessels:', error);
     }
