@@ -457,14 +457,24 @@ export const MILITARY_HOTSPOTS = [
 /**
  * Helper function to identify aircraft by callsign
  */
-export function identifyByCallsign(callsign: string): CallsignPattern | undefined {
+export function identifyByCallsign(callsign: string, originCountry?: string): CallsignPattern | undefined {
   const normalized = callsign.toUpperCase().trim();
+  const origin = originCountry?.toLowerCase().trim();
+
+  // Prefer country-specific operators to disambiguate (e.g. NAVY → USN vs RN)
+  const preferred: MilitaryOperator[] = [];
+  if (origin === 'united kingdom' || origin === 'uk') preferred.push('rn', 'raf');
+  if (origin === 'united states' || origin === 'usa') preferred.push('usn', 'usaf', 'usa', 'usmc');
+
+  if (preferred.length > 0) {
+    for (const pattern of ALL_MILITARY_CALLSIGNS) {
+      if (!preferred.includes(pattern.operator)) continue;
+      if (new RegExp(pattern.pattern, 'i').test(normalized)) return pattern;
+    }
+  }
 
   for (const pattern of ALL_MILITARY_CALLSIGNS) {
-    const regex = new RegExp(pattern.pattern, 'i');
-    if (regex.test(normalized)) {
-      return pattern;
-    }
+    if (new RegExp(pattern.pattern, 'i').test(normalized)) return pattern;
   }
 
   return undefined;
