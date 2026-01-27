@@ -169,7 +169,7 @@ function isMilitaryFlight(state: OpenSkyStateArray): boolean {
 
   if (militaryCountries.includes(originCountry)) {
     // Check for expanded military callsign patterns
-    const militaryPattern = /^(RCH|REACH|DUKE|KING|GOLD|NAVY|ARMY|MARINE|NATO|RAF|GAF|FAF|IAF|THK|TUR|SVA|RSAF|UAF|JPN|JASDF|ROKAF|KAF|RAAF|CANFORCE|CFC|AME|PLF|HAF|EGY|PAF|FORTE|HAWK|REAPER|COBRA|RIVET|OLIVE|SNTRY|DRAGN|BONE|DEATH|DOOM|TRIDENT|ASCOT|CNV|HMX|DUSTOFF|EVAC|MOOSE|HERKY)/i.test(callsign);
+    const militaryPattern = /^(RCH|REACH|DUKE|KING|GOLD|NAVY|ARMY|MARINE|NATO|RAF|GAF|FAF|IAF|THK|TUR|RSAF|UAF|JPN|JASDF|ROKAF|KAF|RAAF|CANFORCE|CFC|AME|PLF|HAF|EGY|PAF|FORTE|HAWK|REAPER|COBRA|RIVET|OLIVE|SNTRY|DRAGN|BONE|DEATH|DOOM|TRIDENT|ASCOT|CNV|HMX|DUSTOFF|EVAC|MOOSE|HERKY)/i.test(callsign);
     if (callsign && militaryPattern) {
       return true;
     }
