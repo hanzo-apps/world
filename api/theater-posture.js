@@ -11,9 +11,11 @@ export const config = {
 };
 
 const CACHE_TTL_SECONDS = 300; // 5 minutes
-const STALE_CACHE_TTL_SECONDS = 3600; // 1 hour - serve stale data when API is down
+const STALE_CACHE_TTL_SECONDS = 86400; // 24 hours - serve stale data when API is down
+const BACKUP_CACHE_TTL_SECONDS = 604800; // 7 days - last resort backup
 const CACHE_KEY = 'theater-posture:v4';
 const STALE_CACHE_KEY = 'theater-posture:stale:v4';
+const BACKUP_CACHE_KEY = 'theater-posture:backup:v4';
 
 // Theater definitions (matches client-side POSTURE_THEATERS)
 const POSTURE_THEATERS = [
@@ -399,14 +401,15 @@ export default async function handler(req) {
       cached: false,
     };
 
-    // Cache the result (both regular and stale backup)
+    // Cache the result (regular, stale, and long-term backup)
     if (redisClient) {
       try {
         await Promise.all([
           redisClient.set(CACHE_KEY, result, { ex: CACHE_TTL_SECONDS }),
           redisClient.set(STALE_CACHE_KEY, result, { ex: STALE_CACHE_TTL_SECONDS }),
+          redisClient.set(BACKUP_CACHE_KEY, result, { ex: BACKUP_CACHE_TTL_SECONDS }),
         ]);
-        console.log('[TheaterPosture] Cached result');
+        console.log('[TheaterPosture] Cached result (5min/24h/7d)');
       } catch (err) {
         console.warn('[TheaterPosture] Cache write error:', err.message);
       }
@@ -421,13 +424,14 @@ export default async function handler(req) {
   } catch (error) {
     console.error('[TheaterPosture] Error:', error);
 
-    // Try to return stale cached data when API fails
+    // Try to return cached data when API fails (stale first, then backup)
     const staleRedisClient = getRedis();
     if (staleRedisClient) {
+      // Try stale cache (24h TTL)
       try {
         const stale = await staleRedisClient.get(STALE_CACHE_KEY);
         if (stale) {
-          console.log('[TheaterPosture] Returning stale cached data due to API error');
+          console.log('[TheaterPosture] Returning stale cached data (24h) due to API error');
           return Response.json({
             ...stale,
             cached: true,
@@ -443,9 +447,30 @@ export default async function handler(req) {
       } catch (cacheErr) {
         console.warn('[TheaterPosture] Stale cache read error:', cacheErr.message);
       }
+
+      // Try backup cache (7d TTL) as last resort
+      try {
+        const backup = await staleRedisClient.get(BACKUP_CACHE_KEY);
+        if (backup) {
+          console.log('[TheaterPosture] Returning backup cached data (7d) due to API error');
+          return Response.json({
+            ...backup,
+            cached: true,
+            stale: true,
+            error: 'Using backup data - live feed temporarily unavailable',
+          }, {
+            headers: {
+              ...corsHeaders,
+              'Cache-Control': 'public, max-age=30',
+            },
+          });
+        }
+      } catch (cacheErr) {
+        console.warn('[TheaterPosture] Backup cache read error:', cacheErr.message);
+      }
     }
 
-    // No stale data available - return error
+    // No cached data available - return error
     return Response.json({
       error: error.message,
       postures: [],
