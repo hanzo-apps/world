@@ -13,7 +13,7 @@ export const config = {
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.1-8b-instant';
 const CACHE_TTL_SECONDS = 7200; // 2 hours
-const CACHE_VERSION = 'ci-v1';
+const CACHE_VERSION = 'ci-v2';
 
 let redis = null;
 let redisInitFailed = false;
@@ -91,42 +91,58 @@ export default async function handler(request) {
     // Build data context section
     const dataLines = [];
     if (context?.score != null) {
-      dataLines.push(`Instability Score: ${context.score}/100 (${context.level || 'unknown'}) — trend: ${context.trend || 'unknown'}`);
+      const changeStr = context.change24h ? ` (${context.change24h > 0 ? '+' : ''}${context.change24h} in 24h)` : '';
+      dataLines.push(`Instability Score: ${context.score}/100 (${context.level || 'unknown'}) — trend: ${context.trend || 'unknown'}${changeStr}`);
     }
     if (context?.components) {
       const c = context.components;
-      dataLines.push(`Score Components: Unrest ${c.unrest ?? '?'}, Security ${c.security ?? '?'}, Information ${c.information ?? '?'}`);
+      dataLines.push(`Score Components: Unrest ${c.unrest ?? '?'}/100, Security ${c.security ?? '?'}/100, Information ${c.information ?? '?'}/100`);
     }
-    if (context?.protests != null) dataLines.push(`Active protests (7d): ${context.protests}`);
-    if (context?.militaryFlights != null) dataLines.push(`Military aircraft in/near country: ${context.militaryFlights}`);
-    if (context?.militaryVessels != null) dataLines.push(`Military vessels in/near country: ${context.militaryVessels}`);
+    if (context?.protests != null) dataLines.push(`Active protests in/near country (7d): ${context.protests}`);
+    if (context?.militaryFlights != null) dataLines.push(`Military aircraft detected in/near country: ${context.militaryFlights}`);
+    if (context?.militaryVessels != null) dataLines.push(`Military vessels detected in/near country: ${context.militaryVessels}`);
     if (context?.outages != null) dataLines.push(`Internet outages: ${context.outages}`);
     if (context?.earthquakes != null) dataLines.push(`Recent earthquakes: ${context.earthquakes}`);
+    if (context?.convergenceScore != null) {
+      dataLines.push(`Signal convergence score: ${context.convergenceScore}/100 (multiple signal types detected: ${(context.signalTypes || []).join(', ')})`);
+    }
+    if (context?.regionalConvergence?.length > 0) {
+      dataLines.push(`\nRegional convergence alerts:`);
+      context.regionalConvergence.forEach(r => dataLines.push(`- ${r}`));
+    }
     if (context?.headlines?.length > 0) {
-      dataLines.push(`\nRecent headlines mentioning ${country}:`);
-      context.headlines.slice(0, 10).forEach((h, i) => dataLines.push(`${i + 1}. ${h}`));
+      dataLines.push(`\nRecent headlines mentioning ${country} (${context.headlines.length} found):`);
+      context.headlines.slice(0, 15).forEach((h, i) => dataLines.push(`${i + 1}. ${h}`));
     }
 
     const dataSection = dataLines.length > 0
-      ? `\nCURRENT DATA:\n${dataLines.join('\n')}`
-      : '\nNo real-time data available for this country.';
+      ? `\nCURRENT SENSOR DATA:\n${dataLines.join('\n')}`
+      : '\nNo real-time sensor data available for this country.';
 
     const dateStr = new Date().toISOString().split('T')[0];
 
-    const systemPrompt = `You are a senior intelligence analyst providing country situation briefs. Current date: ${dateStr}. Donald Trump is the current US President (second term, inaugurated Jan 2025).
+    const systemPrompt = `You are a senior intelligence analyst providing comprehensive country situation briefs. Current date: ${dateStr}. Donald Trump is the current US President (second term, inaugurated Jan 2025).
 
-Write a concise, data-driven intelligence brief for the requested country. Structure:
+Write a thorough, data-driven intelligence brief for the requested country. Structure:
 
-1. **Current Situation** — What is happening right now based on the data
-2. **Key Risk Factors** — What drives instability or stability
-3. **Outlook** — What to watch in the near term
+1. **Current Situation** — What is happening right now. Reference specific data: instability scores, protest counts, military presence, outages. Explain what the numbers mean in context.
+
+2. **Military & Security Posture** — Analyze military activity in/near the country. What forces are present? What does the positioning suggest? What are foreign nations doing in this theater?
+
+3. **Key Risk Factors** — What drives instability or stability. Connect the dots between different signals (protests + outages = potential crackdown? military buildup + diplomatic tensions = escalation risk?). Reference specific headlines.
+
+4. **Regional Context** — How does this country's situation affect or relate to its neighbors and the broader region? Reference any convergence alerts.
+
+5. **Outlook & Watch Items** — What to monitor in the near term. Be specific about indicators that would signal escalation or de-escalation.
 
 Rules:
-- Be specific. Reference the data provided (scores, counts, headlines).
+- Be specific and analytical. Reference the data provided (scores, counts, headlines, convergence).
 - If data shows low activity, say so — don't manufacture threats.
-- 3-4 paragraphs total, ~200 words.
+- Connect signals: explain what combinations of data points suggest.
+- 5-6 paragraphs, 300-400 words.
 - No speculation beyond what the data supports.
-- Use plain language, not jargon.`;
+- Use plain language, not jargon.
+- If military assets are 0, don't speculate about military presence — say monitoring shows no current military activity.`;
 
     const userPrompt = `Country: ${country} (${code})${dataSection}`;
 
@@ -143,7 +159,7 @@ Rules:
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.4,
-        max_tokens: 500,
+        max_tokens: 900,
       }),
     });
 
