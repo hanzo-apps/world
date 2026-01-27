@@ -257,8 +257,16 @@ export class Panel {
     return this.element;
   }
 
-  public showLoading(): void {
-    this.content.innerHTML = '<div class="loading">Loading</div>';
+  public showLoading(message = 'Loading'): void {
+    this.content.innerHTML = `
+      <div class="panel-loading">
+        <div class="panel-loading-radar">
+          <div class="panel-radar-sweep"></div>
+          <div class="panel-radar-dot"></div>
+        </div>
+        <div class="panel-loading-text">${message}</div>
+      </div>
+    `;
   }
 
   public showError(message = 'Failed to load data'): void {

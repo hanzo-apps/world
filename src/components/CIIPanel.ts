@@ -25,19 +25,7 @@ export class CIIPanel extends Panel {
         Focal Point Detection correlates news entities with map signals for accurate scoring.`,
     });
     // Show loading state until focal points ready
-    this.content.innerHTML = `
-      <div class="cii-awaiting">
-        <div class="cii-scan-ring">
-          <div class="cii-scan-dot"></div>
-        </div>
-        <div class="cii-awaiting-text">Scanning intelligence feeds</div>
-        <div class="cii-awaiting-sources">
-          <span class="cii-source-chip">ACLED</span>
-          <span class="cii-source-chip">GDELT</span>
-          <span class="cii-source-chip">News</span>
-        </div>
-      </div>
-    `;
+    this.showLoading('Scanning intelligence feeds');
   }
 
   private getLevelColor(level: CountryScore['level']): string {

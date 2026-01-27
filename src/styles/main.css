@@ -3303,6 +3303,60 @@ body.playback-mode .status-dot {
   to { transform: rotate(360deg); }
 }
 
+/* Unified Panel Loading - Radar Style */
+.panel-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  min-height: 120px;
+}
+
+.panel-loading-radar {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  position: relative;
+  border: 2px solid rgba(68, 255, 136, 0.3);
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.panel-radar-sweep {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #44ff88);
+  transform-origin: left center;
+  animation: panel-radar-sweep 2s linear infinite;
+}
+
+.panel-radar-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  background: #44ff88;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #44ff88;
+}
+
+@keyframes panel-radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.panel-loading-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5px;
+}
+
 /* Error */
 .error-message {
   color: var(--red);
