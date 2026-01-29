@@ -1136,13 +1136,31 @@ body.animations-paused *::after {
   background: #2a2a3e;
   color: #fff;
 }
-.story-download {
+.story-save {
   color: #3b82f6;
   border-color: #3b82f640;
 }
-.story-share {
-  color: #22c55e;
-  border-color: #22c55e40;
+.story-whatsapp {
+  color: #25d366;
+  border-color: #25d36640;
+}
+.story-instagram {
+  color: #e1306c;
+  border-color: #e1306c40;
+}
+.country-intel-share-btn {
+  background: none;
+  border: 1px solid #ff444440;
+  color: #ff4444;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: auto;
+  transition: background 0.2s;
+}
+.country-intel-share-btn:hover {
+  background: rgba(255, 68, 68, 0.15);
 }
 
 .category-tag {

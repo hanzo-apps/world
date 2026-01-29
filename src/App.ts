@@ -407,6 +407,9 @@ export class App {
   private setupCountryIntel(): void {
     if (!this.map) return;
     this.countryIntelModal = new CountryIntelModal();
+    this.countryIntelModal.setShareStoryHandler((code, name) => {
+      this.openCountryStory(code, name);
+    });
 
     this.map.onCountryClicked(async (lat, lon) => {
       this.countryIntelModal!.showLoading();
@@ -580,6 +583,21 @@ export class App {
     }
 
     return { protests, militaryFlights, militaryVessels, outages, earthquakes: 0 };
+  }
+
+  private openCountryStory(code: string, name: string): void {
+    const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
+    const postures = posturePanel?.getPostures() || [];
+    const signals = this.getCountrySignals(code, name);
+    const cluster = signalAggregator.getCountryClusters().find(c => c.country === code);
+    const regional = signalAggregator.getRegionalConvergence().filter(r => r.countries.includes(code));
+    const convergence = cluster ? {
+      score: cluster.convergenceScore,
+      signalTypes: [...cluster.signalTypes],
+      regionalDescriptions: regional.map(r => r.description),
+    } : null;
+    const data = collectStoryData(code, name, this.latestClusters, postures, this.latestPredictions, signals, convergence);
+    openStoryModal(data);
   }
 
   private setupSearchModal(): void {
@@ -1415,10 +1433,7 @@ export class App {
 
       const ciiPanel = new CIIPanel();
       ciiPanel.setShareStoryHandler((code, name) => {
-        const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
-        const postures = posturePanel?.getPostures() || [];
-        const data = collectStoryData(code, name, this.latestClusters, postures, this.latestPredictions);
-        openStoryModal(data);
+        this.openCountryStory(code, name);
       });
       this.panels['cii'] = ciiPanel;
 
