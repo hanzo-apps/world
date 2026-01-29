@@ -20,6 +20,9 @@ export interface NewsItem {
   monitorColor?: string;
   tier?: number;
   threat?: import('@/services/threat-classifier').ThreatClassification;
+  lat?: number;
+  lon?: number;
+  locationName?: string;
 }
 
 export type VelocityLevel = 'normal' | 'elevated' | 'spike';
@@ -48,6 +51,8 @@ export interface ClusteredEvent {
   monitorColor?: string;
   velocity?: VelocityMetrics;
   threat?: import('@/services/threat-classifier').ThreatClassification;
+  lat?: number;
+  lon?: number;
 }
 
 export type AssetType = 'pipeline' | 'cable' | 'datacenter' | 'base' | 'nuclear';

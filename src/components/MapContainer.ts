@@ -260,6 +260,14 @@ export class MapContainer {
     }
   }
 
+  public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string }>): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setNewsLocations(data);
+    } else {
+      this.svgMap?.setNewsLocations(data);
+    }
+  }
+
   public updateHotspotActivity(news: NewsItem[]): void {
     if (this.useDeckGL) {
       this.deckGLMap?.updateHotspotActivity(news);

@@ -2,6 +2,7 @@ import type { Feed, NewsItem } from '@/types';
 import { SITE_VARIANT } from '@/config';
 import { chunkArray, fetchWithProxy } from '@/utils';
 import { classifyByKeyword } from './threat-classifier';
+import { inferGeoHubsFromTitle } from './geo-hub-index';
 
 // Per-feed circuit breaker: track failures and cooldowns
 const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes after failure
@@ -134,6 +135,10 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
         // Derive isAlert from threat level (backward compat)
         const isAlert = threat.level === 'critical' || threat.level === 'high';
 
+        // Geo-locate via keyword matching
+        const geoMatches = inferGeoHubsFromTitle(title);
+        const topGeo = geoMatches[0];
+
         return {
           source: feed.name,
           title,
@@ -141,6 +146,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
           pubDate,
           isAlert,
           threat,
+          ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
         };
       });
 
