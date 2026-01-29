@@ -92,17 +92,25 @@ function shareWhatsApp(countryName: string): void {
   }
 
   const file = new File([currentBlob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
+  const msg = `${countryName} intelligence snapshot — worldmonitor.app`;
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    navigator.share({
-      text: `${countryName} intelligence snapshot — WorldMonitor`,
-      files: [file],
-    }).catch(() => {
-      window.open(`https://wa.me/?text=${encodeURIComponent(`${countryName} intelligence snapshot — worldmonitor.app`)}`, '_blank');
+    navigator.share({ text: msg, files: [file] }).catch(() => {
+      openWhatsApp(msg);
     });
   } else {
-    window.open(`https://wa.me/?text=${encodeURIComponent(`${countryName} intelligence snapshot — worldmonitor.app`)}`, '_blank');
+    downloadStory();
+    openWhatsApp(msg);
+    flashButton('.story-whatsapp', 'Image saved — attach in WhatsApp', 'WhatsApp');
   }
+}
+
+function openWhatsApp(text: string): void {
+  const encoded = encodeURIComponent(text);
+  window.open(`whatsapp://send?text=${encoded}`, '_self');
+  setTimeout(() => {
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  }, 500);
 }
 
 async function shareInstagram(countryName: string): Promise<void> {
