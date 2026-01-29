@@ -171,7 +171,12 @@ export class StrategicPosturePanel extends Panel {
     try {
       const { vessels } = await fetchMilitaryVessels();
       console.log(`[StrategicPosturePanel] Got ${vessels.length} total military vessels`);
-      if (vessels.length === 0) return;
+      if (vessels.length === 0) {
+        // AIS stream hasn't accumulated data yet — restore from cache
+        this.restoreVesselCounts();
+        recalcPostureWithVessels(this.postures);
+        return;
+      }
 
       // Merge vessel counts into each theater
       for (const posture of this.postures) {
@@ -208,12 +213,61 @@ export class StrategicPosturePanel extends Panel {
         }
       }
 
+      // Cache vessel counts per theater in localStorage for instant restore on refresh
+      this.cacheVesselCounts();
+
       // Recalculate posture levels now that vessels are included
       recalcPostureWithVessels(this.postures);
       console.log('[StrategicPosturePanel] Augmented with', vessels.length, 'vessels, posture levels recalculated');
     } catch (error) {
       console.warn('[StrategicPosturePanel] Failed to fetch vessels:', error);
+      // Restore cached vessel counts if live fetch failed
+      this.restoreVesselCounts();
+      recalcPostureWithVessels(this.postures);
     }
+  }
+
+  private cacheVesselCounts(): void {
+    try {
+      const counts: Record<string, { destroyers: number; frigates: number; carriers: number; submarines: number; patrol: number; auxiliaryVessels: number; totalVessels: number }> = {};
+      for (const p of this.postures) {
+        if (p.totalVessels > 0) {
+          counts[p.theaterId] = {
+            destroyers: p.destroyers || 0,
+            frigates: p.frigates || 0,
+            carriers: p.carriers || 0,
+            submarines: p.submarines || 0,
+            patrol: p.patrol || 0,
+            auxiliaryVessels: p.auxiliaryVessels || 0,
+            totalVessels: p.totalVessels || 0,
+          };
+        }
+      }
+      localStorage.setItem('wm:vesselPosture', JSON.stringify({ counts, ts: Date.now() }));
+    } catch { /* quota exceeded or private mode */ }
+  }
+
+  private restoreVesselCounts(): void {
+    try {
+      const raw = localStorage.getItem('wm:vesselPosture');
+      if (!raw) return;
+      const { counts, ts } = JSON.parse(raw);
+      // Only use cache if < 30 minutes old
+      if (Date.now() - ts > 30 * 60 * 1000) return;
+      for (const p of this.postures) {
+        const cached = counts[p.theaterId];
+        if (cached) {
+          p.destroyers = cached.destroyers;
+          p.frigates = cached.frigates;
+          p.carriers = cached.carriers;
+          p.submarines = cached.submarines;
+          p.patrol = cached.patrol;
+          p.auxiliaryVessels = cached.auxiliaryVessels;
+          p.totalVessels = cached.totalVessels;
+        }
+      }
+      console.log('[StrategicPosturePanel] Restored cached vessel counts');
+    } catch { /* parse error */ }
   }
 
   public updatePostures(data: CachedTheaterPosture): void {
