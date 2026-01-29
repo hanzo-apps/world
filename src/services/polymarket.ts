@@ -4,164 +4,161 @@ import { SITE_VARIANT } from '@/config';
 
 interface PolymarketMarket {
   question: string;
-  outcomes?: string[];
+  outcomes?: string;
   outcomePrices?: string;
   volume?: string;
   volumeNum?: number;
   closed?: boolean;
+  slug?: string;
+}
+
+interface PolymarketEvent {
+  id: string;
+  title: string;
+  slug: string;
+  volume?: number;
+  liquidity?: number;
+  markets?: PolymarketMarket[];
   tags?: Array<{ slug: string }>;
+  closed?: boolean;
 }
 
 const breaker = createCircuitBreaker<PredictionMarket[]>({ name: 'Polymarket' });
 
-// Tech/AI/Startup keywords for tech variant
-const TECH_KEYWORDS = [
-  // AI & ML
-  'ai', 'artificial intelligence', 'openai', 'chatgpt', 'gpt', 'claude', 'anthropic', 'google ai', 'gemini',
-  'machine learning', 'neural', 'llm', 'agi', 'deepmind', 'midjourney', 'stable diffusion', 'copilot',
-  // Tech Companies
-  'apple', 'google', 'microsoft', 'amazon', 'meta', 'facebook', 'nvidia', 'tesla', 'spacex',
-  'twitter', 'x.com', 'tiktok', 'bytedance', 'alibaba', 'tencent', 'samsung', 'intel', 'amd', 'tsmc',
-  // Startups & VC
-  'startup', 'ipo', 'unicorn', 'valuation', 'funding', 'series a', 'series b', 'y combinator', 'vc',
-  'venture capital', 'acquisition', 'merger', 'layoff', 'layoffs',
-  // Tech Topics
-  'crypto', 'bitcoin', 'ethereum', 'blockchain', 'web3', 'nft',
-  'autonomous', 'self-driving', 'robotics', 'drone', 'ev', 'electric vehicle',
-  'quantum', 'chip', 'semiconductor', 'gpu', 'processor',
-  'cybersecurity', 'hack', 'breach', 'ransomware',
-  'social media', 'app store', 'cloud', 'saas', 'software',
-  // Tech Regulation
-  'antitrust', 'ftc', 'eu commission', 'tech regulation', 'data privacy', 'gdpr',
-  // Tech Leaders
-  'elon musk', 'sam altman', 'mark zuckerberg', 'sundar pichai', 'satya nadella', 'tim cook', 'jensen huang',
+const GEOPOLITICAL_TAGS = [
+  'politics', 'geopolitics', 'elections', 'world',
+  'ukraine', 'china', 'middle-east', 'europe',
+  'economy', 'fed', 'inflation',
 ];
 
-// Geopolitical keywords for filtering relevant markets
-const GEOPOLITICAL_KEYWORDS = [
-  // Conflicts & Military
-  'war', 'military', 'invasion', 'attack', 'strike', 'troops', 'nato', 'nuclear',
-  'missile', 'drone', 'ceasefire', 'peace', 'conflict', 'terrorist', 'hamas', 'hezbollah',
-  // Countries & Leaders
-  'russia', 'ukraine', 'china', 'taiwan', 'iran', 'israel', 'gaza', 'palestine',
-  'north korea', 'syria', 'putin', 'zelensky', 'xi jinping', 'netanyahu', 'kim jong',
-  // Politics & Elections
-  'president', 'election', 'elections', 'congress', 'senate', 'parliament', 'government', 'minister',
-  'trump', 'biden', 'administration', 'democrat', 'republican', 'vote', 'impeach',
-  // Economics & Trade
-  'fed', 'interest rate', 'interest rates', 'inflation', 'recession', 'gdp', 'tariff', 'tariffs', 'sanction', 'sanctions',
-  'oil', 'opec', 'economy', 'trade war', 'currency', 'debt', 'default',
-  // Global Issues
-  'climate', 'pandemic', 'who', 'un ', 'united nations', 'eu ', 'european union',
-  'summit', 'treaty', 'alliance', 'coup', 'protest', 'protests', 'uprising', 'refugee', 'refugees',
+const TECH_TAGS = [
+  'ai', 'tech', 'crypto', 'science',
+  'elon-musk', 'business', 'economy',
 ];
 
-// Sports/Entertainment to exclude
 const EXCLUDE_KEYWORDS = [
   'nba', 'nfl', 'mlb', 'nhl', 'fifa', 'world cup', 'super bowl', 'championship',
   'playoffs', 'oscar', 'grammy', 'emmy', 'box office', 'movie', 'album', 'song',
-  'tiktok', 'youtube', 'streamer', 'influencer', 'celebrity', 'kardashian',
+  'streamer', 'influencer', 'celebrity', 'kardashian',
   'bachelor', 'reality tv', 'mvp', 'touchdown', 'home run', 'goal scorer',
-  // Awards / film / music / TV
-  'academy award', 'academy awards', 'oscars', 'bafta', 'golden globe', 'cannes', 'sundance', 'tony',
-  'documentary', 'feature film', 'film', 'filmmaker', 'tv', 'series', 'season', 'episode',
-  'actor', 'actress', 'director', 'album', 'song', 'soundtrack',
+  'academy award', 'bafta', 'golden globe', 'cannes', 'sundance',
+  'documentary', 'feature film', 'tv series', 'season finale',
 ];
 
-// Tag slugs from Polymarket that clearly indicate non-geopolitical categories
-const EXCLUDE_TAGS = [
-  'entertainment', 'sports', 'culture', 'film', 'movie', 'music', 'awards', 'tv', 'celebrity'
-];
-
-function normalizeText(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+function isExcluded(title: string): boolean {
+  const lower = title.toLowerCase();
+  return EXCLUDE_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-function escapeRegExp(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function parseMarketPrice(market: PolymarketMarket): number {
+  try {
+    const pricesStr = market.outcomePrices;
+    if (pricesStr) {
+      const prices: string[] = JSON.parse(pricesStr);
+      if (prices.length >= 1) {
+        const parsed = parseFloat(prices[0]!);
+        if (!isNaN(parsed)) return parsed * 100;
+      }
+    }
+  } catch { /* keep default */ }
+  return 50;
 }
 
-function containsKeyword(normalized: string, keyword: string): boolean {
-  const kw = normalizeText(keyword);
-  if (!kw) return false;
-  if (kw.includes(' ')) {
-    const padded = ` ${normalized} `;
-    const phrase = ` ${kw} `;
-    return padded.includes(phrase);
-  }
-  const re = new RegExp(`\\b${escapeRegExp(kw)}(s|es)?\\b`, 'i');
-  return re.test(normalized);
+function buildMarketUrl(eventSlug?: string, marketSlug?: string): string | undefined {
+  if (eventSlug) return `https://polymarket.com/event/${eventSlug}`;
+  if (marketSlug) return `https://polymarket.com/market/${marketSlug}`;
+  return undefined;
 }
 
-function tagsAreExcluded(tags: Array<{ slug: string }> | undefined): boolean {
-  if (!tags || tags.length === 0) return false;
-  return tags.some(tag => {
-    const tagNorm = normalizeText(tag.slug.replace(/-/g, ' '));
-    return EXCLUDE_TAGS.some(ex => containsKeyword(tagNorm, ex) || tagNorm.includes(normalizeText(ex)));
-  });
+async function fetchEventsByTag(tag: string, limit = 30): Promise<PolymarketEvent[]> {
+  const response = await fetch(
+    `/api/polymarket?endpoint=events&tag=${tag}&closed=false&order=volume&ascending=false&limit=${limit}`
+  );
+  if (!response.ok) return [];
+  return response.json();
 }
 
-function isRelevant(title: string, tags?: Array<{ slug: string }>): boolean {
-  const normalized = normalizeText(title);
-  if (!normalized) return false;
+async function fetchTopMarkets(): Promise<PredictionMarket[]> {
+  const response = await fetch('/api/polymarket?closed=false&order=volume&ascending=false&limit=100');
+  if (!response.ok) return [];
+  const data: PolymarketMarket[] = await response.json();
 
-  if (tagsAreExcluded(tags)) return false;
-
-  // Exclude sports/entertainment
-  if (EXCLUDE_KEYWORDS.some(kw => containsKeyword(normalized, kw))) {
-    return false;
-  }
-
-  // Use variant-specific keywords
-  const keywords = SITE_VARIANT === 'tech' ? TECH_KEYWORDS : GEOPOLITICAL_KEYWORDS;
-  return keywords.some(kw => containsKeyword(normalized, kw));
+  return data
+    .filter(m => m.question && !isExcluded(m.question))
+    .map(m => {
+      const yesPrice = parseMarketPrice(m);
+      const volume = m.volumeNum ?? (m.volume ? parseFloat(m.volume) : 0);
+      return {
+        title: m.question,
+        yesPrice,
+        volume,
+        url: buildMarketUrl(undefined, m.slug),
+      };
+    });
 }
 
 export async function fetchPredictions(): Promise<PredictionMarket[]> {
   return breaker.execute(async () => {
-    const response = await fetch('/api/polymarket?closed=false&order=volume&ascending=false&limit=100');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data: PolymarketMarket[] = await response.json();
+    const tags = SITE_VARIANT === 'tech' ? TECH_TAGS : GEOPOLITICAL_TAGS;
 
-    const parsed = data
-      .map((market) => {
-        let yesPrice = 50;
-        try {
-          const pricesStr = market.outcomePrices;
-          if (pricesStr) {
-            const prices: string[] = JSON.parse(pricesStr);
-            if (Array.isArray(prices) && prices.length >= 1 && prices[0]) {
-              const parsed = parseFloat(prices[0]);
-              if (!isNaN(parsed)) yesPrice = parsed * 100;
-            }
-          }
-        } catch { /* Keep default */ }
+    const eventResults = await Promise.all(tags.map(tag => fetchEventsByTag(tag, 20)));
 
-        const volume = market.volumeNum ?? (market.volume ? parseFloat(market.volume) : 0);
-        return {
-          title: market.question || '',
-          yesPrice,
-          volume,
-          tags: market.tags || [],
-        };
-      });
+    const seen = new Set<string>();
+    const markets: PredictionMarket[] = [];
 
-    return parsed
-      .filter((p) => {
-        if (!p.title || isNaN(p.yesPrice)) return false;
+    for (const events of eventResults) {
+      for (const event of events) {
+        if (event.closed || seen.has(event.id)) continue;
+        seen.add(event.id);
 
-        // Must be relevant to variant (tech or geopolitical)
-        if (!isRelevant(p.title, p.tags)) return false;
+        if (isExcluded(event.title)) continue;
 
-        // Must have meaningful signal (not 50/50) or high volume
-        const discrepancy = Math.abs(p.yesPrice - 50);
-        return discrepancy > 5 || (p.volume && p.volume > 50000);
+        const eventVolume = event.volume ?? 0;
+        if (eventVolume < 1000) continue;
+
+        if (event.markets && event.markets.length > 0) {
+          const topMarket = event.markets.reduce((best, m) => {
+            const vol = m.volumeNum ?? (m.volume ? parseFloat(m.volume) : 0);
+            const bestVol = best.volumeNum ?? (best.volume ? parseFloat(best.volume) : 0);
+            return vol > bestVol ? m : best;
+          });
+
+          const yesPrice = parseMarketPrice(topMarket);
+          markets.push({
+            title: topMarket.question || event.title,
+            yesPrice,
+            volume: eventVolume,
+            url: buildMarketUrl(event.slug),
+          });
+        } else {
+          markets.push({
+            title: event.title,
+            yesPrice: 50,
+            volume: eventVolume,
+            url: buildMarketUrl(event.slug),
+          });
+        }
+      }
+    }
+
+    // Fallback: only fetch top markets if tag queries didn't yield enough
+    if (markets.length < 15) {
+      const fallbackMarkets = await fetchTopMarkets();
+      for (const m of fallbackMarkets) {
+        if (markets.length >= 20) break;
+        if (!markets.some(existing => existing.title === m.title)) {
+          markets.push(m);
+        }
+      }
+    }
+
+    // Sort by volume descending, then filter for meaningful signal
+    return markets
+      .filter(m => {
+        const discrepancy = Math.abs(m.yesPrice - 50);
+        return discrepancy > 5 || (m.volume && m.volume > 50000);
       })
-      .map((p) => ({
-        title: p.title,
-        yesPrice: p.yesPrice,
-        volume: p.volume,
-      }))
+      .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
       .slice(0, 15);
   }, []);
 }

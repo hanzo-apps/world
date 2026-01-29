@@ -3173,6 +3173,17 @@ body.playback-mode .status-dot {
   line-height: 1.4;
 }
 
+a.prediction-link {
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+}
+
+a.prediction-link:hover {
+  color: var(--accent, #60a5fa);
+  text-decoration: underline;
+}
+
 .prediction-volume {
   font-size: 9px;
   color: var(--muted);
