@@ -152,6 +152,11 @@ export class StrategicPosturePanel extends Panel {
       this.showLoadingStage('analysis');
       this.updateBadges();
       this.render();
+
+      // If we rendered stale localStorage data, re-fetch fresh after a short delay
+      if (this.isStale) {
+        setTimeout(() => this.fetchAndRender(), 3000);
+      }
     } catch (error) {
       console.error('[StrategicPosturePanel] Fetch error:', error);
       this.showFetchError();
