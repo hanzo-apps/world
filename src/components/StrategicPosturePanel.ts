@@ -513,6 +513,10 @@ export class StrategicPosturePanel extends Panel {
     console.log('[StrategicPosturePanel] Handler stored, onLocationClick now:', typeof this.onLocationClick);
   }
 
+  public getPostures(): TheaterPostureSummary[] {
+    return this.postures;
+  }
+
   public destroy(): void {
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.stopLoadingTimer();
