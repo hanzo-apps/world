@@ -58,6 +58,8 @@ import {
   TechReadinessPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
+import { collectStoryData } from '@/services/story-data';
+import { openStoryModal } from '@/components/StoryModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
 import { PIPELINES } from '@/config/pipelines';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
@@ -1412,6 +1414,12 @@ export class App {
       this.panels['gdelt-intel'] = gdeltIntelPanel;
 
       const ciiPanel = new CIIPanel();
+      ciiPanel.setShareStoryHandler((code, name) => {
+        const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
+        const postures = posturePanel?.getPostures() || [];
+        const data = collectStoryData(code, name, this.latestClusters, postures, this.latestPredictions);
+        openStoryModal(data);
+      });
       this.panels['cii'] = ciiPanel;
 
       const cascadePanel = new CascadePanel();
