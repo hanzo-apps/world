@@ -19,8 +19,14 @@ function validateOrder(val) {
   return ALLOWED_ORDER.includes(val) ? val : 'volume';
 }
 
+function sanitizeTagSlug(val) {
+  if (!val) return null;
+  return val.replace(/[^a-z0-9-]/gi, '').slice(0, 100) || null;
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
+  const endpoint = url.searchParams.get('endpoint') || 'markets';
 
   const closed = validateBoolean(url.searchParams.get('closed'), 'false');
   const order = validateOrder(url.searchParams.get('order'));
@@ -28,11 +34,24 @@ export default async function handler(req) {
   const limit = validateLimit(url.searchParams.get('limit'));
 
   try {
-    const polyUrl = `https://gamma-api.polymarket.com/markets?closed=${closed}&order=${order}&ascending=${ascending}&limit=${limit}`;
+    let polyUrl;
+
+    if (endpoint === 'events') {
+      const tag = sanitizeTagSlug(url.searchParams.get('tag'));
+      const params = new URLSearchParams({
+        closed: closed,
+        order: order,
+        ascending: ascending,
+        limit: String(limit),
+      });
+      if (tag) params.set('tag_slug', tag);
+      polyUrl = `https://gamma-api.polymarket.com/events?${params}`;
+    } else {
+      polyUrl = `https://gamma-api.polymarket.com/markets?closed=${closed}&order=${order}&ascending=${ascending}&limit=${limit}`;
+    }
+
     const response = await fetch(polyUrl, {
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: { 'Accept': 'application/json' },
     });
 
     const data = await response.text();
