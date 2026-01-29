@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
-import { THREAT_PRIORITY } from '@/services/threat-classifier';
+import { THREAT_PRIORITY, THREAT_COLORS } from '@/services/threat-classifier';
 import { formatTime } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker, generateSummary } from '@/services';
@@ -412,6 +412,14 @@ export class NewsPanel extends Panel {
       `
       : '';
 
+    // Category tag from threat classification
+    const cat = cluster.threat?.category;
+    const catLabel = cat && cat !== 'general' ? cat.charAt(0).toUpperCase() + cat.slice(1) : '';
+    const catColor = cluster.threat ? THREAT_COLORS[cluster.threat.level] : '';
+    const categoryBadge = catLabel
+      ? `<span class="category-tag" style="color:${catColor};border-color:${catColor}40;background:${catColor}15">${catLabel}</span>`
+      : '';
+
     // Build class list for item
     const itemClasses = [
       'item',
@@ -432,6 +440,7 @@ export class NewsPanel extends Panel {
           ${velocityBadge}
           ${sentimentBadge}
           ${cluster.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
+          ${categoryBadge}
         </div>
         <a class="item-title" href="${sanitizeUrl(cluster.primaryLink)}" target="_blank" rel="noopener">${escapeHtml(cluster.primaryTitle)}</a>
         <div class="cluster-meta">
