@@ -33,6 +33,7 @@ export interface StoryData {
     level: CountryScore['level'];
     trend: CountryScore['trend'];
     components: CountryScore['components'];
+    change24h: number;
   } | null;
   news: Array<{
     title: string;
@@ -59,6 +60,17 @@ export interface StoryData {
     medium: number;
     categories: string[];
   };
+  signals: {
+    protests: number;
+    militaryFlights: number;
+    militaryVessels: number;
+    outages: number;
+  };
+  convergence: {
+    score: number;
+    signalTypes: string[];
+    regionalDescriptions: string[];
+  } | null;
 }
 
 export function collectStoryData(
@@ -67,6 +79,8 @@ export function collectStoryData(
   allNews: ClusteredEvent[],
   theaterPostures: Array<{ theaterId: string; theaterName: string; shortName: string; targetNation: string | null; postureLevel: string; totalAircraft: number; totalVessels: number; fighters: number; tankers: number; awacs: number; strikeCapable: boolean }>,
   predictionMarkets: Array<{ title: string; yesPrice: number }>,
+  signals?: { protests: number; militaryFlights: number; militaryVessels: number; outages: number },
+  convergence?: { score: number; signalTypes: string[]; regionalDescriptions: string[] } | null,
 ): StoryData {
   const scores = calculateCII();
   const countryScore = scores.find(s => s.code === countryCode) || null;
@@ -113,6 +127,7 @@ export function collectStoryData(
       level: countryScore.level,
       trend: countryScore.trend,
       components: countryScore.components,
+      change24h: countryScore.change24h,
     } : null,
     news: sortedNews.slice(0, 5).map(n => ({
       title: n.primaryTitle,
@@ -139,6 +154,8 @@ export function collectStoryData(
       medium: threatCounts.medium,
       categories: [...threatCounts.categories],
     },
+    signals: signals || { protests: 0, militaryFlights: 0, militaryVessels: 0, outages: 0 },
+    convergence: convergence || null,
   };
 }
 
