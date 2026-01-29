@@ -92,7 +92,7 @@ function shareWhatsApp(countryName: string): void {
   }
 
   const file = new File([currentBlob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
-  const msg = `${countryName} intelligence snapshot — worldmonitor.app`;
+  const msg = `${countryName} intelligence snapshot — https://worldmonitor.app`;
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     navigator.share({ text: msg, files: [file] }).catch(() => {
