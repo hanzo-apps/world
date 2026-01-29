@@ -25,8 +25,8 @@ const POSTURE_THEATERS = [
     shortName: 'IRAN',
     targetNation: 'Iran',
     bounds: { north: 42, south: 20, east: 65, west: 30 },
-    thresholds: { elevated: 50, critical: 100 },
-    strikeIndicators: { minTankers: 10, minAwacs: 2, minFighters: 30 },
+    thresholds: { elevated: 8, critical: 20 },
+    strikeIndicators: { minTankers: 2, minAwacs: 1, minFighters: 5 },
   },
   {
     id: 'taiwan-theater',
@@ -34,8 +34,8 @@ const POSTURE_THEATERS = [
     shortName: 'TAIWAN',
     targetNation: 'Taiwan',
     bounds: { north: 30, south: 18, east: 130, west: 115 },
-    thresholds: { elevated: 30, critical: 60 },
-    strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
+    thresholds: { elevated: 6, critical: 15 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 4 },
   },
   {
     id: 'baltic-theater',
@@ -43,8 +43,8 @@ const POSTURE_THEATERS = [
     shortName: 'BALTIC',
     targetNation: null,
     bounds: { north: 65, south: 52, east: 32, west: 10 },
-    thresholds: { elevated: 20, critical: 40 },
-    strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
+    thresholds: { elevated: 5, critical: 12 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
   {
     id: 'blacksea-theater',
@@ -52,8 +52,8 @@ const POSTURE_THEATERS = [
     shortName: 'BLACK SEA',
     targetNation: null,
     bounds: { north: 48, south: 40, east: 42, west: 26 },
-    thresholds: { elevated: 15, critical: 30 },
-    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+    thresholds: { elevated: 4, critical: 10 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
   {
     id: 'korea-theater',
@@ -61,8 +61,8 @@ const POSTURE_THEATERS = [
     shortName: 'KOREA',
     targetNation: 'North Korea',
     bounds: { north: 43, south: 33, east: 132, west: 124 },
-    thresholds: { elevated: 20, critical: 50 },
-    strikeIndicators: { minTankers: 4, minAwacs: 1, minFighters: 15 },
+    thresholds: { elevated: 5, critical: 12 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
   {
     id: 'south-china-sea',
@@ -70,8 +70,8 @@ const POSTURE_THEATERS = [
     shortName: 'SCS',
     targetNation: null,
     bounds: { north: 25, south: 5, east: 121, west: 105 },
-    thresholds: { elevated: 25, critical: 50 },
-    strikeIndicators: { minTankers: 5, minAwacs: 1, minFighters: 20 },
+    thresholds: { elevated: 6, critical: 15 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 4 },
   },
   {
     id: 'east-med-theater',
@@ -79,8 +79,8 @@ const POSTURE_THEATERS = [
     shortName: 'E.MED',
     targetNation: null,
     bounds: { north: 37, south: 33, east: 37, west: 25 },
-    thresholds: { elevated: 15, critical: 30 },
-    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+    thresholds: { elevated: 4, critical: 10 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
   {
     id: 'israel-gaza-theater',
@@ -88,8 +88,8 @@ const POSTURE_THEATERS = [
     shortName: 'GAZA',
     targetNation: 'Gaza',
     bounds: { north: 33, south: 29, east: 36, west: 33 },
-    thresholds: { elevated: 10, critical: 25 },
-    strikeIndicators: { minTankers: 2, minAwacs: 1, minFighters: 8 },
+    thresholds: { elevated: 3, critical: 8 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
   {
     id: 'yemen-redsea-theater',
@@ -97,8 +97,8 @@ const POSTURE_THEATERS = [
     shortName: 'RED SEA',
     targetNation: 'Yemen',
     bounds: { north: 22, south: 11, east: 54, west: 32 },
-    thresholds: { elevated: 15, critical: 30 },
-    strikeIndicators: { minTankers: 3, minAwacs: 1, minFighters: 10 },
+    thresholds: { elevated: 4, critical: 10 },
+    strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 },
   },
 ];
 
