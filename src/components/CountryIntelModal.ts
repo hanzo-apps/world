@@ -38,7 +38,9 @@ export class CountryIntelModal {
   private contentEl: HTMLElement;
   private headerEl: HTMLElement;
   private onCloseCallback?: () => void;
+  private onShareStory?: (code: string, name: string) => void;
   private currentCode: string | null = null;
+  private currentName: string | null = null;
 
   constructor() {
     this.overlay = document.createElement('div');
@@ -119,14 +121,25 @@ export class CountryIntelModal {
     this.overlay.classList.add('active');
   }
 
+  public setShareStoryHandler(handler: (code: string, name: string) => void): void {
+    this.onShareStory = handler;
+  }
+
   public show(country: string, code: string, score: CountryScore | null, signals?: ActiveSignals): void {
     this.currentCode = code;
+    this.currentName = country;
     const flag = this.countryFlag(code);
     this.headerEl.innerHTML = `
       <span class="country-flag">${flag}</span>
       <span class="country-name">${escapeHtml(country)}</span>
       ${score ? this.levelBadge(score.level) : ''}
+      <button class="country-intel-share-btn" title="Share story">⬡</button>
     `;
+    this.headerEl.querySelector('.country-intel-share-btn')?.addEventListener('click', () => {
+      if (this.onShareStory && this.currentCode && this.currentName) {
+        this.onShareStory(this.currentCode, this.currentName);
+      }
+    });
 
     // Show loading state + any immediate data
     let html = '';
