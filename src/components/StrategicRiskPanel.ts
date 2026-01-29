@@ -120,13 +120,6 @@ export class StrategicRiskPanel extends Panel {
     }
   }
 
-  private getActiveSourceNames(): string[] {
-    const sources = dataFreshness.getAllSources();
-    return sources
-      .filter(s => s.status === 'fresh' || s.status === 'stale')
-      .map(s => s.name.split(' ')[0]!)
-      .slice(0, 4);
-  }
 
   private getPriorityColor(priority: AlertPriority): string {
     switch (priority) {
@@ -202,83 +195,6 @@ export class StrategicRiskPanel extends Panel {
     `;
   }
 
-  /**
-   * Render when we have limited data - can assess but with caveats
-   */
-  private renderLimitedData(): string {
-    if (!this.overview || !this.freshnessSummary) return '';
-
-    const score = this.overview.compositeScore;
-    const color = this.getScoreColor(score);
-    const level = this.getScoreLevel(score);
-    const scoreDeg = Math.round((score / 100) * 270);
-    const sources = dataFreshness.getAllSources();
-
-    // Check for learning mode - skip if using cached scores
-    const { inLearning, remainingMinutes, progress } = getLearningProgress();
-    const showLearning = inLearning && !this.usedCachedScores;
-    const warningBanner = showLearning
-      ? `<div class="risk-warning-banner risk-status-learning">
-          <span class="risk-warning-icon">📊</span>
-          <span class="risk-warning-text">Learning Mode - ${remainingMinutes}m until reliable</span>
-          <div class="learning-progress-mini">
-            <div class="learning-bar" style="width: ${progress}%"></div>
-          </div>
-        </div>`
-      : `<div class="risk-warning-banner">
-          <span class="risk-warning-icon">⚠️</span>
-          <span class="risk-warning-text">Limited Data - ${this.getActiveSourceNames().join(', ') || 'waiting for sources'}</span>
-        </div>`;
-
-    return `
-      <div class="strategic-risk-panel">
-        ${warningBanner}
-
-        <div class="risk-gauge">
-          <div class="risk-score-container">
-            <div class="risk-score-ring" style="--score-color: ${color}; --score-deg: ${scoreDeg}deg;">
-              <div class="risk-score-inner">
-                <div class="risk-score" style="color: ${color}">${score}</div>
-                <div class="risk-level" style="color: ${color}">${level}</div>
-              </div>
-            </div>
-          </div>
-          <div class="risk-trend-container">
-            <span class="risk-trend-label">Trend</span>
-            <div class="risk-trend" style="color: ${this.getTrendColor(this.overview.trend)}">
-              ${this.getTrendEmoji(this.overview.trend)} ${this.overview.trend.charAt(0).toUpperCase() + this.overview.trend.slice(1)}
-            </div>
-          </div>
-        </div>
-
-        <div class="risk-section">
-          <div class="risk-section-title">Data Sources</div>
-          <div class="risk-sources-compact">
-            ${sources.filter(s => s.requiredForRisk).map(source => `
-              <div class="risk-source-chip" style="border-color: ${getStatusColor(source.status)}">
-                <span class="risk-source-dot" style="color: ${getStatusColor(source.status)}">${getStatusIcon(source.status)}</span>
-                <span class="risk-source-name">${source.name.split(' ')[0]}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        ${this.renderMetrics()}
-        ${this.renderTopRisks()}
-
-        <div class="risk-actions">
-          <button class="risk-action-btn" data-action="enable-all">
-            Enable More Feeds
-          </button>
-        </div>
-
-        <div class="risk-footer">
-          <span class="risk-updated">Updated: ${this.overview.timestamp.toLocaleTimeString()}</span>
-          <button class="risk-refresh-btn">Refresh</button>
-        </div>
-      </div>
-    `;
-  }
 
   /**
    * Render full data view - normal operation
@@ -475,19 +391,14 @@ export class StrategicRiskPanel extends Panel {
       return;
     }
 
-    // Choose render mode based on data availability
+    // Render full data view — partial data is handled gracefully by CII baselines
+    // Only show insufficient state if zero sources after 60s (true failure)
     let html: string;
-    switch (this.freshnessSummary.overallStatus) {
-      case 'insufficient':
-        html = this.renderInsufficientData();
-        break;
-      case 'limited':
-        html = this.renderLimitedData();
-        break;
-      case 'sufficient':
-      default:
-        html = this.renderFullData();
-        break;
+    const uptime = performance.now();
+    if (this.freshnessSummary.overallStatus === 'insufficient' && uptime > 60_000) {
+      html = this.renderInsufficientData();
+    } else {
+      html = this.renderFullData();
     }
 
     this.content.innerHTML = html;
