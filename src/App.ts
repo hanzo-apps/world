@@ -605,6 +605,7 @@ export class App {
   }
 
   private showToast(msg: string): void {
+    document.querySelector('.toast-notification')?.remove();
     const el = document.createElement('div');
     el.className = 'toast-notification';
     el.textContent = msg;
