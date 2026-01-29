@@ -268,13 +268,42 @@ export function classifyByKeyword(title: string, variant = 'full'): ThreatClassi
   return { level: 'info', category: 'general', confidence: 0.3, source: 'keyword' };
 }
 
-export async function classifyWithAI(
+// Rate-limited AI classification queue
+const AI_CONCURRENCY = 2;
+const AI_DELAY_MS = 300; // ms between requests
+let aiInFlight = 0;
+let aiPaused = false; // pause on 429
+const aiQueue: Array<{ title: string; variant: string; resolve: (v: ThreatClassification | null) => void }> = [];
+
+function drainAiQueue(): void {
+  if (aiPaused) return;
+  while (aiInFlight < AI_CONCURRENCY && aiQueue.length > 0) {
+    const job = aiQueue.shift()!;
+    aiInFlight++;
+    classifyWithAISingle(job.title, job.variant)
+      .then(job.resolve)
+      .finally(() => {
+        aiInFlight--;
+        setTimeout(drainAiQueue, AI_DELAY_MS);
+      });
+  }
+}
+
+async function classifyWithAISingle(
   title: string,
   variant: string
 ): Promise<ThreatClassification | null> {
   try {
     const params = new URLSearchParams({ title, variant });
     const resp = await fetch(`/api/classify-event?${params}`);
+    if (resp.status === 429) {
+      aiPaused = true;
+      console.warn('[Classify] Rate limited — pausing AI classification for 60s, flushing', aiQueue.length, 'queued jobs');
+      // Resolve all queued jobs with null so callers aren't left hanging
+      while (aiQueue.length > 0) aiQueue.shift()!.resolve(null);
+      setTimeout(() => { aiPaused = false; drainAiQueue(); }, 60_000);
+      return null;
+    }
     if (!resp.ok) return null;
     const data = await resp.json();
     if (data.fallback) return null;
@@ -287,6 +316,16 @@ export async function classifyWithAI(
   } catch {
     return null;
   }
+}
+
+export function classifyWithAI(
+  title: string,
+  variant: string
+): Promise<ThreatClassification | null> {
+  return new Promise((resolve) => {
+    aiQueue.push({ title, variant, resolve });
+    drainAiQueue();
+  });
 }
 
 export function aggregateThreats(
