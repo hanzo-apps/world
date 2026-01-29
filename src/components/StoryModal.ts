@@ -3,6 +3,7 @@ import { renderStoryToCanvas } from '@/services/story-renderer';
 
 let modalEl: HTMLElement | null = null;
 let currentDataUrl: string | null = null;
+let currentBlob: Blob | null = null;
 
 export function openStoryModal(data: StoryData): void {
   closeStoryModal();
@@ -18,8 +19,9 @@ export function openStoryModal(data: StoryData): void {
         </div>
       </div>
       <div class="story-actions" style="display:none">
-        <button class="story-btn story-download">Download PNG</button>
-        <button class="story-btn story-share">Share</button>
+        <button class="story-btn story-save">Save PNG</button>
+        <button class="story-btn story-whatsapp">WhatsApp</button>
+        <button class="story-btn story-instagram">Instagram</button>
         <button class="story-btn story-close">Close</button>
       </div>
     </div>
@@ -29,17 +31,22 @@ export function openStoryModal(data: StoryData): void {
     if (e.target === modalEl) closeStoryModal();
   });
   modalEl.querySelector('.story-close')?.addEventListener('click', closeStoryModal);
-  modalEl.querySelector('.story-download')?.addEventListener('click', downloadStory);
-  modalEl.querySelector('.story-share')?.addEventListener('click', () => shareStory(data.countryName));
+  modalEl.querySelector('.story-save')?.addEventListener('click', downloadStory);
+  modalEl.querySelector('.story-whatsapp')?.addEventListener('click', () => shareWhatsApp(data.countryName));
+  modalEl.querySelector('.story-instagram')?.addEventListener('click', () => shareInstagram(data.countryName));
 
   document.body.appendChild(modalEl);
 
-  // Render client-side on next frame
   requestAnimationFrame(() => {
     if (!modalEl) return;
     try {
       const canvas = renderStoryToCanvas(data);
       currentDataUrl = canvas.toDataURL('image/png');
+      // Create blob synchronously from data URL
+      const binStr = atob(currentDataUrl.split(',')[1] ?? '');
+      const bytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+      currentBlob = new Blob([bytes], { type: 'image/png' });
 
       const content = modalEl.querySelector('.story-modal-content');
       if (content) {
@@ -65,6 +72,7 @@ export function closeStoryModal(): void {
     modalEl.remove();
     modalEl = null;
     currentDataUrl = null;
+    currentBlob = null;
   }
 }
 
@@ -74,40 +82,64 @@ function downloadStory(): void {
   a.href = currentDataUrl;
   a.download = `worldmonitor-story-${Date.now()}.png`;
   a.click();
+  flashButton('.story-save', 'Saved!', 'Save PNG');
 }
 
-async function shareStory(countryName: string): Promise<void> {
-  if (!currentDataUrl) return;
+function shareWhatsApp(countryName: string): void {
+  if (!currentBlob) {
+    downloadStory();
+    return;
+  }
 
-  try {
-    const resp = await fetch(currentDataUrl);
-    const blob = await resp.blob();
-    const file = new File([blob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
+  const file = new File([currentBlob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
 
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    navigator.share({
+      text: `${countryName} intelligence snapshot — WorldMonitor`,
+      files: [file],
+    }).catch(() => {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${countryName} intelligence snapshot — worldmonitor.app`)}`, '_blank');
+    });
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${countryName} intelligence snapshot — worldmonitor.app`)}`, '_blank');
+  }
+}
+
+async function shareInstagram(countryName: string): Promise<void> {
+  if (!currentBlob) {
+    downloadStory();
+    return;
+  }
+
+  const file = new File([currentBlob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
       await navigator.share({
-        title: `${countryName} — WorldMonitor`,
-        text: `Current intelligence snapshot for ${countryName}`,
         files: [file],
       });
       return;
+    } catch {
+      // cancelled or failed
     }
-  } catch {
-    // Web Share API not available or cancelled
   }
 
+  // Fallback: copy to clipboard + instruct
   try {
-    const resp = await fetch(currentDataUrl);
-    const blob = await resp.blob();
     await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
+      new ClipboardItem({ 'image/png': currentBlob }),
     ]);
-    const btn = modalEl?.querySelector('.story-share');
-    if (btn) {
-      btn.textContent = 'Copied!';
-      setTimeout(() => { if (btn) btn.textContent = 'Share'; }, 2000);
-    }
+    flashButton('.story-instagram', 'Copied! Paste in IG', 'Instagram');
   } catch {
     downloadStory();
+    flashButton('.story-instagram', 'Saved! Upload to IG', 'Instagram');
+  }
+}
+
+function flashButton(selector: string, flashText: string, originalText: string): void {
+  const btn = modalEl?.querySelector(selector);
+  if (btn) {
+    btn.textContent = flashText;
+    setTimeout(() => { if (btn) btn.textContent = originalText; }, 2500);
   }
 }
