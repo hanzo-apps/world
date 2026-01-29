@@ -85,7 +85,7 @@ function downloadStory(): void {
   flashButton('.story-save', 'Saved!', 'Save PNG');
 }
 
-function shareWhatsApp(countryName: string): void {
+async function shareWhatsApp(countryName: string): Promise<void> {
   if (!currentBlob) {
     downloadStory();
     return;
@@ -94,26 +94,25 @@ function shareWhatsApp(countryName: string): void {
   const file = new File([currentBlob], `${countryName.toLowerCase()}-worldmonitor.png`, { type: 'image/png' });
   const msg = `${countryName} intelligence snapshot — https://worldmonitor.app`;
 
+  // Mobile: Web Share API sends image + text natively
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    navigator.share({ text: msg, files: [file] }).catch(() => {
-      openWhatsApp(msg);
-    });
-  } else {
-    downloadStory();
-    openWhatsApp(msg);
-    flashButton('.story-whatsapp', 'Image saved — attach in WhatsApp', 'WhatsApp');
+    try {
+      await navigator.share({ text: msg, files: [file] });
+      return;
+    } catch { /* user cancelled */ }
   }
-}
 
-function openWhatsApp(text: string): void {
-  const encoded = encodeURIComponent(text);
-  const t0 = Date.now();
-  window.location.href = `whatsapp://send?text=${encoded}`;
-  setTimeout(() => {
-    if (Date.now() - t0 < 1500 && !document.hidden) {
-      window.open(`https://wa.me/?text=${encoded}`, '_blank');
-    }
-  }, 1000);
+  // Desktop: copy image to clipboard, download as backup, then open WhatsApp
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'image/png': currentBlob }),
+    ]);
+    flashButton('.story-whatsapp', 'Image copied! Paste in WhatsApp', 'WhatsApp');
+  } catch {
+    downloadStory();
+    flashButton('.story-whatsapp', 'Image saved! Attach in WhatsApp', 'WhatsApp');
+  }
+  window.open(`https://web.whatsapp.com/`, '_blank');
 }
 
 async function shareInstagram(countryName: string): Promise<void> {
