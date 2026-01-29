@@ -106,10 +106,13 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 // Used in renderClusterOverlays for zoom-dependent label visibility
 const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; showLabels?: number }>> = {
   bases: { minZoom: 3, showLabels: 5 },
-  nuclear: { minZoom: 2 },
+  nuclear: { minZoom: 3 },
   conflicts: { minZoom: 1, showLabels: 3 },
-  economic: { minZoom: 2 },
+  economic: { minZoom: 3 },
   natural: { minZoom: 1, showLabels: 2 },
+  datacenters: { minZoom: 5 },
+  irradiators: { minZoom: 4 },
+  spaceports: { minZoom: 3 },
 };
 // Export for external use
 export { LAYER_ZOOM_THRESHOLDS };
@@ -327,10 +330,12 @@ export class DeckGLMap {
     this.maplibreMap.on('move', () => this.renderClusterOverlays());
     this.maplibreMap.on('zoom', () => this.renderClusterOverlays());
 
-    // Trigger resize after zoom to prevent canvas corruption
+    // Rebuild deck.gl layers on zoom change for progressive disclosure & opacity
     this.maplibreMap.on('zoomend', () => {
-      // Small delay to let the zoom animation complete
-      setTimeout(() => this.maplibreMap?.resize(), 50);
+      setTimeout(() => {
+        this.maplibreMap?.resize();
+        this.deckOverlay?.setProps({ layers: this.buildLayers() });
+      }, 50);
     });
   }
 
@@ -464,18 +469,49 @@ export class DeckGLMap {
   private renderHotspotOverlays(): void {
     if (!this.clusterOverlay || !this.maplibreMap) return;
 
-    // Only render HTML overlays for high-severity hotspots that need pulsating animation
+    const zoom = this.maplibreMap.getZoom();
     const highActivityHotspots = this.hotspots.filter(h => h.level === 'high' || h.hasBreaking);
 
-    highActivityHotspots.forEach(hotspot => {
+    // D: Label deconfliction — track occupied screen regions to prevent overlap
+    const occupiedRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+    const LABEL_W = 60;
+    const LABEL_H = 20;
+    const rectsOverlap = (a: typeof occupiedRects[0], b: typeof occupiedRects[0]) =>
+      a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+    // Sort by escalation score descending — highest priority gets label
+    const sorted = [...highActivityHotspots].sort(
+      (a, b) => (b.escalationScore || 0) - (a.escalationScore || 0)
+    );
+
+    // B: At low zoom, scale down hotspot markers
+    const markerScale = zoom < 2.5 ? 0.7 : zoom < 4 ? 0.85 : 1.0;
+
+    sorted.forEach(hotspot => {
       const pos = this.maplibreMap!.project([hotspot.lon, hotspot.lat]);
       if (!pos) return;
 
       const div = document.createElement('div');
       div.className = 'hotspot';
-      div.style.cssText = `position: absolute; left: ${pos.x}px; top: ${pos.y}px; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; z-index: 100;`;
+      div.style.cssText = `position: absolute; left: ${pos.x}px; top: ${pos.y}px; transform: translate(-50%, -50%) scale(${markerScale}); pointer-events: auto; cursor: pointer; z-index: 100;`;
 
-      const breakingBadge = hotspot.hasBreaking
+      // D: Only show BREAKING label if it doesn't overlap an existing one
+      let showBreaking = false;
+      if (hotspot.hasBreaking) {
+        const labelRect = {
+          x: pos.x - LABEL_W / 2,
+          y: pos.y - LABEL_H - 10,
+          w: LABEL_W,
+          h: LABEL_H,
+        };
+        const hasOverlap = occupiedRects.some(r => rectsOverlap(r, labelRect));
+        if (!hasOverlap) {
+          showBreaking = true;
+          occupiedRects.push(labelRect);
+        }
+      }
+
+      const breakingBadge = showBreaking
         ? '<div class="hotspot-breaking">BREAKING</div>'
         : '';
 
@@ -734,6 +770,13 @@ export class DeckGLMap {
     });
   }
 
+  private isLayerVisible(layerKey: keyof MapLayers): boolean {
+    const threshold = LAYER_ZOOM_THRESHOLDS[layerKey];
+    if (!threshold) return true;
+    const zoom = this.maplibreMap?.getZoom() || 2;
+    return zoom >= threshold.minZoom;
+  }
+
   private buildLayers(): LayersList {
     const layers: (Layer | null | false)[] = [];
     const { layers: mapLayers } = this.state;
@@ -753,23 +796,23 @@ export class DeckGLMap {
       layers.push(this.createConflictZonesLayer());
     }
 
-    // Military bases layer
-    if (mapLayers.bases) {
+    // Military bases layer — hidden at low zoom (E: progressive disclosure)
+    if (mapLayers.bases && this.isLayerVisible('bases')) {
       layers.push(this.createBasesLayer());
     }
 
-    // Nuclear facilities layer - HEXAGON icons
-    if (mapLayers.nuclear) {
+    // Nuclear facilities layer — hidden at low zoom
+    if (mapLayers.nuclear && this.isLayerVisible('nuclear')) {
       layers.push(this.createNuclearLayer());
     }
 
-    // Gamma irradiators layer
-    if (mapLayers.irradiators) {
+    // Gamma irradiators layer — hidden at low zoom
+    if (mapLayers.irradiators && this.isLayerVisible('irradiators')) {
       layers.push(this.createIrradiatorsLayer());
     }
 
-    // Spaceports layer
-    if (mapLayers.spaceports) {
+    // Spaceports layer — hidden at low zoom
+    if (mapLayers.spaceports && this.isLayerVisible('spaceports')) {
       layers.push(this.createSpaceportsLayer());
     }
 
@@ -861,8 +904,8 @@ export class DeckGLMap {
       layers.push(this.createWaterwaysLayer());
     }
 
-    // Economic centers layer
-    if (mapLayers.economic) {
+    // Economic centers layer — hidden at low zoom
+    if (mapLayers.economic && this.isLayerVisible('economic')) {
       layers.push(this.createEconomicCentersLayer());
     }
 
@@ -972,16 +1015,21 @@ export class DeckGLMap {
     const highlightedBases = this.highlightedAssets.base;
 
     // Base colors by operator type - semi-transparent for layering
+    // F: Fade in bases as you zoom — subtle at zoom 3, full at zoom 5+
+    const zoom = this.maplibreMap?.getZoom() || 3;
+    const alphaScale = Math.min(1, (zoom - 2.5) / 2.5); // 0.2 at zoom 3, 1.0 at zoom 5
+    const a = Math.round(160 * Math.max(0.3, alphaScale));
+
     const getBaseColor = (type: string): [number, number, number, number] => {
       switch (type) {
-        case 'us-nato': return [68, 136, 255, 160];   // Blue
-        case 'russia': return [255, 68, 68, 160];     // Red
-        case 'china': return [255, 136, 68, 160];    // Orange
-        case 'uk': return [68, 170, 255, 160];       // Light blue
-        case 'france': return [0, 85, 164, 160];     // French blue
-        case 'india': return [255, 153, 51, 160];    // Saffron
-        case 'japan': return [188, 0, 45, 160];      // Rising sun red
-        default: return [136, 136, 136, 160];        // Gray
+        case 'us-nato': return [68, 136, 255, a];
+        case 'russia': return [255, 68, 68, a];
+        case 'china': return [255, 136, 68, a];
+        case 'uk': return [68, 170, 255, a];
+        case 'france': return [0, 85, 164, a];
+        case 'india': return [255, 153, 51, a];
+        case 'japan': return [188, 0, 45, a];
+        default: return [136, 136, 136, a];
       }
     };
 
@@ -1108,8 +1156,13 @@ export class DeckGLMap {
   }
 
   private createHotspotsLayer(): ScatterplotLayer {
-    // Filter out high-activity hotspots - they're rendered via HTML overlay for pulsating animation
     const lowMediumHotspots = this.hotspots.filter(h => h.level !== 'high' && !h.hasBreaking);
+    const zoom = this.maplibreMap?.getZoom() || 2;
+    // B: Zoom-adaptive sizing — smaller at world view, full size zoomed in
+    const zoomScale = Math.min(1, (zoom - 1) / 3); // 0 at zoom 1, 1 at zoom 4
+    const maxPx = 6 + Math.round(14 * zoomScale); // 6px at world, 20px zoomed
+    // F: Opacity falloff at low zoom
+    const baseOpacity = zoom < 2.5 ? 0.5 : zoom < 4 ? 0.7 : 1.0;
 
     return new ScatterplotLayer({
       id: 'hotspots-layer',
@@ -1121,12 +1174,13 @@ export class DeckGLMap {
       },
       getFillColor: (d) => {
         const score = d.escalationScore || 1;
-        if (score >= 4) return COLORS.hotspotHigh;
-        if (score >= 2) return COLORS.hotspotElevated;
-        return COLORS.hotspotLow;
+        const a = Math.round((score >= 4 ? 200 : score >= 2 ? 200 : 180) * baseOpacity);
+        if (score >= 4) return [255, 68, 68, a] as [number, number, number, number];
+        if (score >= 2) return [255, 165, 0, a] as [number, number, number, number];
+        return [255, 255, 0, a] as [number, number, number, number];
       },
-      radiusMinPixels: 6,
-      radiusMaxPixels: 20,
+      radiusMinPixels: 4,
+      radiusMaxPixels: maxPx,
       pickable: true,
       stroked: true,
       getLineColor: (d) =>
@@ -1490,12 +1544,22 @@ export class DeckGLMap {
   }
 
   private createNewsLocationsLayer(): ScatterplotLayer {
-    const THREAT_RGB: Record<string, [number, number, number, number]> = {
-      critical: [239, 68, 68, 200],
-      high: [249, 115, 22, 180],
-      medium: [234, 179, 8, 160],
-      low: [34, 197, 94, 140],
-      info: [59, 130, 246, 120],
+    const zoom = this.maplibreMap?.getZoom() || 2;
+    // F: Fade low-severity dots at world zoom to reduce noise
+    const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
+    const THREAT_RGB: Record<string, [number, number, number]> = {
+      critical: [239, 68, 68],
+      high: [249, 115, 22],
+      medium: [234, 179, 8],
+      low: [34, 197, 94],
+      info: [59, 130, 246],
+    };
+    const THREAT_ALPHA: Record<string, number> = {
+      critical: 220,
+      high: 190,
+      medium: 160,
+      low: 120,
+      info: 80,
     };
 
     return new ScatterplotLayer({
@@ -1503,11 +1567,14 @@ export class DeckGLMap {
       data: this.newsLocations,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 18000,
-      getFillColor: (d) => THREAT_RGB[d.threatLevel] || [59, 130, 246, 120] as [number, number, number, number],
-      radiusMinPixels: 4,
-      radiusMaxPixels: 14,
+      getFillColor: (d) => {
+        const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
+        const a = Math.round((THREAT_ALPHA[d.threatLevel] || 120) * alphaScale);
+        return [...rgb, a] as [number, number, number, number];
+      },
+      radiusMinPixels: 3,
+      radiusMaxPixels: 12,
       pickable: true,
-      opacity: 0.8,
     });
   }
 

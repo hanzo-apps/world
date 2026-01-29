@@ -268,6 +268,27 @@ export function classifyByKeyword(title: string, variant = 'full'): ThreatClassi
   return { level: 'info', category: 'general', confidence: 0.3, source: 'keyword' };
 }
 
+export async function classifyWithAI(
+  title: string,
+  variant: string
+): Promise<ThreatClassification | null> {
+  try {
+    const params = new URLSearchParams({ title, variant });
+    const resp = await fetch(`/api/classify-event?${params}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data.fallback) return null;
+    return {
+      level: data.level as ThreatLevel,
+      category: data.category as EventCategory,
+      confidence: data.confidence ?? 0.9,
+      source: 'llm',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function aggregateThreats(
   items: Array<{ threat?: ThreatClassification; tier?: number }>
 ): ThreatClassification {

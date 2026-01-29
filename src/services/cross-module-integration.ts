@@ -274,10 +274,25 @@ function generateCompositeSummary(a: UnifiedAlert, b: UnifiedAlert): string {
     return `Instability index ${direction} from ${earliest.previousScore} to ${latest.currentScore} (${changeStr}). Driver: ${latest.driver}`;
   }
 
-  // Otherwise combine summaries
+  // Otherwise combine summaries — limit to avoid unbounded growth
+  // Extract unique bullet segments from both summaries (they may already contain ' • ' from prior merges)
+  const seen = new Set<string>();
   const parts: string[] = [];
-  if (a.summary) parts.push(a.summary);
-  if (b.summary && b.summary !== a.summary) parts.push(b.summary);
+  for (const s of [a.summary, b.summary]) {
+    if (!s) continue;
+    for (const seg of s.split(' • ')) {
+      const trimmed = seg.trim();
+      if (trimmed && !seen.has(trimmed)) {
+        seen.add(trimmed);
+        parts.push(trimmed);
+      }
+    }
+  }
+  // Cap at 3 evidence items to prevent wall-of-text
+  if (parts.length > 3) {
+    const extra = parts.length - 3;
+    return parts.slice(0, 3).join(' • ') + ` (+${extra} more)`;
+  }
   return parts.join(' • ');
 }
 
