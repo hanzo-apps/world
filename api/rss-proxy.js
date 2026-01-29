@@ -132,6 +132,26 @@ const ALLOWED_DOMAINS = [
   'www.who.int',
   'www.cisa.gov',
   'www.crisisgroup.org',
+  // Think Tanks & Research (Added 2026-01-29)
+  'rusi.org',
+  'www.chathamhouse.org',
+  'ecfr.eu',
+  'www.gmfus.org',
+  'www.wilsoncenter.org',
+  'www.lowyinstitute.org',
+  'www.mei.edu',
+  'www.stimson.org',
+  'www.cnas.org',
+  'carnegieendowment.org',
+  'www.rand.org',
+  'fas.org',
+  'www.armscontrol.org',
+  'www.nti.org',
+  'thebulletin.org',
+  // Economic & Food Security
+  'fpma.fao.org',
+  'worldbank.org',
+  'www.imf.org',
   // Additional
   'news.ycombinator.com',
 ];
