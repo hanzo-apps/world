@@ -37,9 +37,13 @@ export class PredictionPanel extends Panel {
         const noPercent = 100 - yesPercent;
         const volumeStr = this.formatVolume(p.volume);
 
+        const titleHtml = p.url
+          ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" class="prediction-question prediction-link">${escapeHtml(p.title)}</a>`
+          : `<div class="prediction-question">${escapeHtml(p.title)}</div>`;
+
         return `
       <div class="prediction-item">
-        <div class="prediction-question">${escapeHtml(p.title)}</div>
+        ${titleHtml}
         ${volumeStr ? `<div class="prediction-volume">Vol: ${volumeStr}</div>` : ''}
         <div class="prediction-bar">
           <div class="prediction-yes" style="width: ${yesPercent}%">
