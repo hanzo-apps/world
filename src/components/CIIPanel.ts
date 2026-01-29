@@ -5,6 +5,7 @@ import { calculateCII, type CountryScore } from '@/services/country-instability'
 export class CIIPanel extends Panel {
   private scores: CountryScore[] = [];
   private focalPointsReady = false;
+  private onShareStory?: (code: string, name: string) => void;
 
   constructor() {
     super({
@@ -24,8 +25,11 @@ export class CIIPanel extends Panel {
         <em>U:S:I values show component scores.</em>
         Focal Point Detection correlates news entities with map signals for accurate scoring.`,
     });
-    // Show loading state until focal points ready
     this.showLoading('Scanning intelligence feeds');
+  }
+
+  public setShareStoryHandler(handler: (code: string, name: string) => void): void {
+    this.onShareStory = handler;
   }
 
   private getLevelColor(level: CountryScore['level']): string {
@@ -67,6 +71,7 @@ export class CIIPanel extends Panel {
           <span class="cii-name">${escapeHtml(country.name)}</span>
           <span class="cii-score">${country.score}</span>
           ${trend}
+          <button class="cii-share-btn" data-code="${escapeHtml(country.code)}" data-name="${escapeHtml(country.name)}" title="Share story">⬡</button>
         </div>
         <div class="cii-bar-container">
           <div class="cii-bar" style="width: ${barWidth}%; background: ${color};"></div>
@@ -80,10 +85,22 @@ export class CIIPanel extends Panel {
     `;
   }
 
+  private bindShareButtons(): void {
+    if (!this.onShareStory) return;
+    this.content.querySelectorAll('.cii-share-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const el = e.currentTarget as HTMLElement;
+        const code = el.dataset.code || '';
+        const name = el.dataset.name || '';
+        if (code && name) this.onShareStory!(code, name);
+      });
+    });
+  }
+
   public async refresh(forceLocal = false): Promise<void> {
-    // Don't show scores until focal points are ready (avoids misleading preliminary data)
     if (!this.focalPointsReady && !forceLocal) {
-      return; // Keep showing "Analyzing intelligence..." state
+      return;
     }
 
     if (forceLocal) {
@@ -94,7 +111,6 @@ export class CIIPanel extends Panel {
     this.showLoading();
 
     try {
-      // Calculate with focal point data
       const localScores = calculateCII();
       const localWithData = localScores.filter(s => s.score > 0).length;
       this.scores = localScores;
@@ -110,6 +126,7 @@ export class CIIPanel extends Panel {
 
       const html = withData.map(s => this.renderCountry(s)).join('');
       this.content.innerHTML = `<div class="cii-list">${html}</div>`;
+      this.bindShareButtons();
     } catch (error) {
       console.error('[CIIPanel] Refresh error:', error);
       this.showError('Failed to calculate CII');
