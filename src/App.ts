@@ -268,6 +268,41 @@ export class App {
     this.setupRefreshIntervals();
     this.setupSnapshotSaving();
     cleanOldSnapshots();
+
+    // Handle deep links for story sharing
+    this.handleDeepLinks();
+  }
+
+  private handleDeepLinks(): void {
+    const url = new URL(window.location.href);
+    
+    // Check for story deep link: /story?c=UA&t=ciianalysis
+    if (url.pathname === '/story' || url.searchParams.has('c')) {
+      const countryCode = url.searchParams.get('c');
+      if (countryCode) {
+        const countryNames: Record<string, string> = {
+          UA: 'Ukraine', RU: 'Russia', CN: 'China', US: 'United States',
+          IR: 'Iran', IL: 'Israel', TW: 'Taiwan', KP: 'North Korea',
+          SA: 'Saudi Arabia', TR: 'Turkey', PL: 'Poland', DE: 'Germany',
+          FR: 'France', GB: 'United Kingdom', IN: 'India', PK: 'Pakistan',
+          SY: 'Syria', YE: 'Yemen', MM: 'Myanmar', VE: 'Venezuela',
+        };
+        const countryName = countryNames[countryCode.toUpperCase()] || countryCode;
+        
+        // Wait for data to load, then open story
+        const checkAndOpen = () => {
+          if (dataFreshness.hasSufficientData() && this.latestClusters.length > 0) {
+            this.openCountryStory(countryCode.toUpperCase(), countryName);
+          } else {
+            setTimeout(checkAndOpen, 500);
+          }
+        };
+        setTimeout(checkAndOpen, 2000);
+        
+        // Update URL without reload
+        history.replaceState(null, '', '/');
+      }
+    }
   }
 
   private setupMobileWarning(): void {
