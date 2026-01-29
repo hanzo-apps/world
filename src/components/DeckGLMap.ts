@@ -182,6 +182,8 @@ export class DeckGLMap {
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = []; // Store news for related news lookup
   private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string }> = [];
+  private newsLocationFirstSeen = new Map<string, number>(); // title → timestamp
+  private newsPulseTimer: ReturnType<typeof setInterval> | null = null;
 
   // Country highlight state
   private countryGeoJsonLoaded = false;
@@ -472,14 +474,6 @@ export class DeckGLMap {
     const zoom = this.maplibreMap.getZoom();
     const highActivityHotspots = this.hotspots.filter(h => h.level === 'high' || h.hasBreaking);
 
-    // D: Label deconfliction — track occupied screen regions to prevent overlap
-    const occupiedRects: Array<{ x: number; y: number; w: number; h: number }> = [];
-    const LABEL_W = 60;
-    const LABEL_H = 20;
-    const rectsOverlap = (a: typeof occupiedRects[0], b: typeof occupiedRects[0]) =>
-      a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-
-    // Sort by escalation score descending — highest priority gets label
     const sorted = [...highActivityHotspots].sort(
       (a, b) => (b.escalationScore || 0) - (a.escalationScore || 0)
     );
@@ -495,28 +489,7 @@ export class DeckGLMap {
       div.className = 'hotspot';
       div.style.cssText = `position: absolute; left: ${pos.x}px; top: ${pos.y}px; transform: translate(-50%, -50%) scale(${markerScale}); pointer-events: auto; cursor: pointer; z-index: 100;`;
 
-      // D: Only show BREAKING label if it doesn't overlap an existing one
-      let showBreaking = false;
-      if (hotspot.hasBreaking) {
-        const labelRect = {
-          x: pos.x - LABEL_W / 2,
-          y: pos.y - LABEL_H - 10,
-          w: LABEL_W,
-          h: LABEL_H,
-        };
-        const hasOverlap = occupiedRects.some(r => rectsOverlap(r, labelRect));
-        if (!hasOverlap) {
-          showBreaking = true;
-          occupiedRects.push(labelRect);
-        }
-      }
-
-      const breakingBadge = showBreaking
-        ? '<div class="hotspot-breaking">BREAKING</div>'
-        : '';
-
       div.innerHTML = `
-        ${breakingBadge}
         <div class="hotspot-marker ${escapeHtml(hotspot.level || 'low')}"></div>
       `;
 
@@ -937,7 +910,7 @@ export class DeckGLMap {
 
     // News geo-locations (always shown if data exists)
     if (this.newsLocations.length > 0) {
-      layers.push(this.createNewsLocationsLayer());
+      layers.push(...this.createNewsLocationsLayer());
     }
 
     return layers.filter(Boolean) as LayersList;
@@ -1543,9 +1516,8 @@ export class DeckGLMap {
     });
   }
 
-  private createNewsLocationsLayer(): ScatterplotLayer {
+  private createNewsLocationsLayer(): ScatterplotLayer[] {
     const zoom = this.maplibreMap?.getZoom() || 2;
-    // F: Fade low-severity dots at world zoom to reduce noise
     const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
     const THREAT_RGB: Record<string, [number, number, number]> = {
       critical: [239, 68, 68],
@@ -1562,20 +1534,60 @@ export class DeckGLMap {
       info: 80,
     };
 
-    return new ScatterplotLayer({
-      id: 'news-locations-layer',
-      data: this.newsLocations,
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: 18000,
-      getFillColor: (d) => {
-        const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
-        const a = Math.round((THREAT_ALPHA[d.threatLevel] || 120) * alphaScale);
-        return [...rgb, a] as [number, number, number, number];
-      },
-      radiusMinPixels: 3,
-      radiusMaxPixels: 12,
-      pickable: true,
+    const now = Date.now();
+    const PULSE_DURATION = 30_000;
+
+    const layers: ScatterplotLayer[] = [
+      new ScatterplotLayer({
+        id: 'news-locations-layer',
+        data: this.newsLocations,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: 18000,
+        getFillColor: (d) => {
+          const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
+          const a = Math.round((THREAT_ALPHA[d.threatLevel] || 120) * alphaScale);
+          return [...rgb, a] as [number, number, number, number];
+        },
+        radiusMinPixels: 3,
+        radiusMaxPixels: 12,
+        pickable: true,
+      }),
+    ];
+
+    // Pulse ring for recent news items (< 30s old)
+    const recentNews = this.newsLocations.filter(d => {
+      const firstSeen = this.newsLocationFirstSeen.get(d.title);
+      return firstSeen && (now - firstSeen) < PULSE_DURATION;
     });
+
+    if (recentNews.length > 0) {
+      // Oscillating pulse: cycles every 2s between 1.0x and 2.5x radius
+      const pulse = 1.0 + 1.5 * (0.5 + 0.5 * Math.sin(now / 318));
+
+      layers.push(new ScatterplotLayer({
+        id: 'news-pulse-layer',
+        data: recentNews,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: 18000,
+        radiusScale: pulse,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 30,
+        pickable: false,
+        stroked: true,
+        filled: false,
+        getLineColor: (d) => {
+          const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
+          const firstSeen = this.newsLocationFirstSeen.get(d.title) || now;
+          const age = now - firstSeen;
+          const fadeOut = Math.max(0, 1 - age / PULSE_DURATION);
+          const a = Math.round(150 * fadeOut * alphaScale);
+          return [...rgb, a] as [number, number, number, number];
+        },
+        lineWidthMinPixels: 1.5,
+      }));
+    }
+
+    return layers;
   }
 
   // Note: Tech Events layer now rendered via HTML overlays in renderTechEventClusters()
@@ -2333,8 +2345,33 @@ export class DeckGLMap {
   }
 
   public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string }>): void {
+    const now = Date.now();
+    // Track first-seen time for new items
+    for (const d of data) {
+      if (!this.newsLocationFirstSeen.has(d.title)) {
+        this.newsLocationFirstSeen.set(d.title, now);
+      }
+    }
+    // Prune old entries (> 60s)
+    for (const [key, ts] of this.newsLocationFirstSeen) {
+      if (now - ts > 60_000) this.newsLocationFirstSeen.delete(key);
+    }
     this.newsLocations = data;
     this.render();
+
+    // Start pulse timer if not running — rebuilds layers every 2s so pulse ring animates
+    if (!this.newsPulseTimer && this.newsLocationFirstSeen.size > 0) {
+      this.newsPulseTimer = setInterval(() => {
+        const hasRecent = [...this.newsLocationFirstSeen.values()].some(t => Date.now() - t < 30_000);
+        if (hasRecent) {
+          this.deckOverlay?.setProps({ layers: this.buildLayers() });
+        } else {
+          clearInterval(this.newsPulseTimer!);
+          this.newsPulseTimer = null;
+          this.deckOverlay?.setProps({ layers: this.buildLayers() });
+        }
+      }, 2000);
+    }
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
