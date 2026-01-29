@@ -1,7 +1,7 @@
 import type { Feed, NewsItem } from '@/types';
 import { SITE_VARIANT } from '@/config';
 import { chunkArray, fetchWithProxy } from '@/utils';
-import { classifyByKeyword } from './threat-classifier';
+import { classifyByKeyword, classifyWithAI } from './threat-classifier';
 import { inferGeoHubsFromTitle } from './geo-hub-index';
 
 // Per-feed circuit breaker: track failures and cooldowns
@@ -153,6 +153,19 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
     // Cache successful result
     feedCache.set(feed.name, { items: parsed, timestamp: Date.now() });
     recordFeedSuccess(feed.name);
+
+    // Fire AI classification in background for items that got keyword fallback
+    for (const item of parsed) {
+      if (item.threat.source === 'keyword') {
+        classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
+          if (aiResult && aiResult.confidence > item.threat.confidence) {
+            item.threat = aiResult;
+            item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
+          }
+        }).catch(() => {});
+      }
+    }
+
     return parsed;
   } catch (e) {
     console.error(`Failed to fetch ${feed.name}:`, e);
