@@ -56,6 +56,9 @@ export interface NewsItemCore {
   monitorColor?: string;
   tier?: number;
   threat?: import('./threat-classifier').ThreatClassification;
+  lat?: number;
+  lon?: number;
+  locationName?: string;
 }
 
 export type NewsItemWithTier = NewsItemCore & { tier: number };
@@ -74,6 +77,8 @@ export interface ClusteredEventCore {
   monitorColor?: string;
   velocity?: { sourcesPerHour?: number };
   threat?: import('./threat-classifier').ThreatClassification;
+  lat?: number;
+  lon?: number;
 }
 
 export interface PredictionMarketCore {
@@ -239,6 +244,23 @@ export function clusterNewsCore(
 
     const threat = aggregateThreats(cluster);
 
+    // Pick most common geo location across items
+    const locItems = cluster.filter((i): i is NewsItemWithTier & { lat: number; lon: number } => i.lat != null && i.lon != null);
+    let clusterLat: number | undefined;
+    let clusterLon: number | undefined;
+    if (locItems.length > 0) {
+      const locCounts = new Map<string, { lat: number; lon: number; count: number }>();
+      for (const li of locItems) {
+        const key = `${li.lat},${li.lon}`;
+        const entry = locCounts.get(key) || { lat: li.lat, lon: li.lon, count: 0 };
+        entry.count++;
+        locCounts.set(key, entry);
+      }
+      const best = Array.from(locCounts.values()).sort((a, b) => b.count - a.count)[0]!;
+      clusterLat = best.lat;
+      clusterLon = best.lon;
+    }
+
     return {
       id: generateClusterId(cluster),
       primaryTitle: primary.title,
@@ -252,6 +274,7 @@ export function clusterNewsCore(
       isAlert: cluster.some(i => i.isAlert),
       monitorColor: cluster.find(i => i.monitorColor)?.monitorColor,
       threat,
+      ...(clusterLat != null && { lat: clusterLat, lon: clusterLon }),
     };
   }).sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
 }

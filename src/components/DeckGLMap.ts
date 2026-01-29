@@ -178,6 +178,7 @@ export class DeckGLMap {
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = []; // Store news for related news lookup
+  private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string }> = [];
 
   // Country highlight state
   private countryGeoJsonLoaded = false;
@@ -891,6 +892,11 @@ export class DeckGLMap {
       // techEvents rendered via HTML overlays in renderClusterOverlays()
     }
 
+    // News geo-locations (always shown if data exists)
+    if (this.newsLocations.length > 0) {
+      layers.push(this.createNewsLocationsLayer());
+    }
+
     return layers.filter(Boolean) as LayersList;
   }
 
@@ -1483,6 +1489,28 @@ export class DeckGLMap {
     });
   }
 
+  private createNewsLocationsLayer(): ScatterplotLayer {
+    const THREAT_RGB: Record<string, [number, number, number, number]> = {
+      critical: [239, 68, 68, 200],
+      high: [249, 115, 22, 180],
+      medium: [234, 179, 8, 160],
+      low: [34, 197, 94, 140],
+      info: [59, 130, 246, 120],
+    };
+
+    return new ScatterplotLayer({
+      id: 'news-locations-layer',
+      data: this.newsLocations,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 18000,
+      getFillColor: (d) => THREAT_RGB[d.threatLevel] || [59, 130, 246, 120] as [number, number, number, number],
+      radiusMinPixels: 4,
+      radiusMaxPixels: 14,
+      pickable: true,
+      opacity: 0.8,
+    });
+  }
+
   // Note: Tech Events layer now rendered via HTML overlays in renderTechEventClusters()
 
   // Tooltip and click handlers
@@ -1589,6 +1617,10 @@ export class DeckGLMap {
 
     if (layerId === 'tech-events-layer') {
       return { html: `<div class="deckgl-tooltip"><strong>${obj.title || ''}</strong><br/>${obj.location || ''}</div>` };
+    }
+
+    if (layerId === 'news-locations-layer') {
+      return { html: `<div class="deckgl-tooltip"><strong>📰 News</strong><br/>${escapeHtml(obj.title?.slice(0, 80) || '')}</div>` };
     }
 
     if (layerId === 'irradiators-layer') {
@@ -2230,6 +2262,11 @@ export class DeckGLMap {
 
   public setTechEvents(events: TechEventMarker[]): void {
     this.techEvents = events;
+    this.render();
+  }
+
+  public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string }>): void {
+    this.newsLocations = data;
     this.render();
   }
 

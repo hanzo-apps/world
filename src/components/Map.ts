@@ -3201,6 +3201,11 @@ export class MapComponent {
     this.render();
   }
 
+  public setNewsLocations(_data: Array<{ lat: number; lon: number; title: string; threatLevel: string }>): void {
+    // SVG fallback: news locations rendered as simple circles
+    // For now, skip on SVG map to keep mobile lightweight
+  }
+
   public setTechActivity(activities: TechHubActivity[]): void {
     this.techActivities = activities;
     this.render();

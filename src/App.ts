@@ -13,6 +13,7 @@ import {
   SITE_VARIANT,
 } from '@/config';
 import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
+import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
@@ -430,6 +431,11 @@ export class App {
 
       // Update UI chip as soon as stock data arrives
       stockPromise.then((stock) => this.countryIntelModal!.updateStock(stock));
+
+      // Fetch country prediction markets
+      fetchCountryMarkets(geo.country)
+        .then((markets) => this.countryIntelModal!.updateMarkets(markets))
+        .catch(() => this.countryIntelModal!.updateMarkets([]));
 
       try {
         const context: Record<string, unknown> = {};
@@ -2362,6 +2368,19 @@ export class App {
       if (mlWorker.isAvailable && this.latestClusters.length > 0) {
         const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
         insightsPanel?.updateInsights(this.latestClusters);
+      }
+
+      // Push geo-located news clusters to map
+      const geoLocated = this.latestClusters
+        .filter((c): c is typeof c & { lat: number; lon: number } => c.lat != null && c.lon != null)
+        .map(c => ({
+          lat: c.lat,
+          lon: c.lon,
+          title: c.primaryTitle,
+          threatLevel: c.threat?.level ?? 'info',
+        }));
+      if (geoLocated.length > 0) {
+        this.map?.setNewsLocations(geoLocated);
       }
     } catch (error) {
       console.error('[App] Clustering failed, clusters unchanged:', error);
