@@ -1064,6 +1064,28 @@ body.animations-paused *::after {
   border-color: #3b82f6;
 }
 
+/* Toast */
+.toast-notification {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1a1a2e;
+  color: #ccc;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  font-size: 13px;
+  z-index: 10002;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+.toast-notification.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* Story Modal */
 .story-modal-overlay {
   position: fixed;

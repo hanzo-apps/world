@@ -586,6 +586,10 @@ export class App {
   }
 
   private openCountryStory(code: string, name: string): void {
+    if (!dataFreshness.hasSufficientData() || this.latestClusters.length === 0) {
+      this.showToast('Data still loading — try again in a moment');
+      return;
+    }
     const posturePanel = this.panels['strategic-posture'] as StrategicPosturePanel | undefined;
     const postures = posturePanel?.getPostures() || [];
     const signals = this.getCountrySignals(code, name);
@@ -598,6 +602,15 @@ export class App {
     } : null;
     const data = collectStoryData(code, name, this.latestClusters, postures, this.latestPredictions, signals, convergence);
     openStoryModal(data);
+  }
+
+  private showToast(msg: string): void {
+    const el = document.createElement('div');
+    el.className = 'toast-notification';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('visible'));
+    setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, 3000);
   }
 
   private setupSearchModal(): void {
