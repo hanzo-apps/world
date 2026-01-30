@@ -26,3 +26,4 @@ export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
 export * from './InsightsPanel';
 export * from './TechReadinessPanel';
+export * from './SatelliteFiresPanel';

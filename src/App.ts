@@ -18,6 +18,9 @@ import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
+import { updateAndCheck } from '@/services/temporal-baseline';
+import { fetchAllFires, flattenFires, computeRegionStats } from '@/services/firms-satellite';
+import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, startLearning, isInLearningMode, calculateCII } from '@/services/country-instability';
@@ -1490,6 +1493,9 @@ export class App {
       const cascadePanel = new CascadePanel();
       this.panels['cascade'] = cascadePanel;
 
+      const satelliteFiresPanel = new SatelliteFiresPanel();
+      this.panels['satellite-fires'] = satelliteFiresPanel;
+
       const strategicRiskPanel = new StrategicRiskPanel();
       strategicRiskPanel.setLocationClickHandler((lat, lon) => {
         this.map?.setCenter(lat, lon, 4);
@@ -2137,6 +2143,7 @@ export class App {
     // Conditionally load non-intelligence layers
     // NOTE: outages, protests, military are handled by loadIntelligenceSignals() above
     // They update the map when layers are enabled, so no duplicate tasks needed here
+    if (SITE_VARIANT === 'full') tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
     if (this.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (this.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
     if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
@@ -2171,6 +2178,9 @@ export class App {
       switch (layer) {
         case 'natural':
           await this.loadNatural();
+          break;
+        case 'fires':
+          await this.loadFirmsData();
           break;
         case 'weather':
           await this.loadWeatherAlerts();
@@ -2424,6 +2434,12 @@ export class App {
 
     this.allNews = collectedNews;
     this.initialLoadComplete = true;
+    // Temporal baseline: report news volume
+    updateAndCheck([
+      { type: 'news', region: 'global', count: collectedNews.length },
+    ]).then(anomalies => {
+      if (anomalies.length > 0) signalAggregator.ingestTemporalAnomalies(anomalies);
+    }).catch(() => {});
 
     // Update map hotspots
     this.map?.updateHotspotActivity(this.allNews);
@@ -2733,6 +2749,13 @@ export class App {
         signalAggregator.ingestFlights(flightData.flights);
         signalAggregator.ingestVessels(vesselData.vessels);
         dataFreshness.recordUpdate('opensky', flightData.flights.length);
+        // Temporal baseline: report counts and check for anomalies
+        updateAndCheck([
+          { type: 'military_flights', region: 'global', count: flightData.flights.length },
+          { type: 'vessels', region: 'global', count: vesselData.vessels.length },
+        ]).then(anomalies => {
+          if (anomalies.length > 0) signalAggregator.ingestTemporalAnomalies(anomalies);
+        }).catch(() => {});
         // Update map only if layer is visible
         if (this.mapLayers.military) {
           this.map?.setMilitaryFlights(flightData.flights, flightData.clusters);
@@ -2804,6 +2827,12 @@ export class App {
       console.log('[Ships] Events:', { disruptions: disruptions.length, density: density.length, vessels: aisStatus.vessels });
       this.map?.setAisData(disruptions, density);
       signalAggregator.ingestAisDisruptions(disruptions);
+      // Temporal baseline: report AIS gap counts
+      updateAndCheck([
+        { type: 'ais_gaps', region: 'global', count: disruptions.length },
+      ]).then(anomalies => {
+        if (anomalies.length > 0) signalAggregator.ingestTemporalAnomalies(anomalies);
+      }).catch(() => {});
 
       const hasData = disruptions.length > 0 || density.length > 0;
       this.map?.setLayerReady('ais', hasData);
@@ -2982,6 +3011,13 @@ export class App {
       ingestMilitaryForCII(flightData.flights, vesselData.vessels);
       signalAggregator.ingestFlights(flightData.flights);
       signalAggregator.ingestVessels(vesselData.vessels);
+      // Temporal baseline: report counts from standalone military load
+      updateAndCheck([
+        { type: 'military_flights', region: 'global', count: flightData.flights.length },
+        { type: 'vessels', region: 'global', count: vesselData.vessels.length },
+      ]).then(anomalies => {
+        if (anomalies.length > 0) signalAggregator.ingestTemporalAnomalies(anomalies);
+      }).catch(() => {});
       this.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
       (this.panels['cii'] as CIIPanel)?.refresh();
       if (!isInLearningMode()) {
@@ -3144,6 +3180,48 @@ export class App {
     }
   }
 
+  private async loadFirmsData(): Promise<void> {
+    try {
+      const { regions, totalCount } = await fetchAllFires(1);
+      if (totalCount > 0) {
+        const flat = flattenFires(regions);
+        const stats = computeRegionStats(regions);
+
+        // Feed signal aggregator
+        signalAggregator.ingestSatelliteFires(flat.map(f => ({
+          lat: f.lat,
+          lon: f.lon,
+          brightness: f.brightness,
+          frp: f.frp,
+          region: f.region,
+          acq_date: f.acq_date,
+        })));
+
+        // Feed map layer
+        this.map?.setFires(flat);
+
+        // Feed panel
+        (this.panels['satellite-fires'] as SatelliteFiresPanel)?.update(stats, totalCount);
+
+        dataFreshness.recordUpdate('firms', totalCount);
+
+        // Report to temporal baseline (fire-and-forget)
+        updateAndCheck([
+          { type: 'satellite_fires', region: 'global', count: totalCount },
+        ]).then(anomalies => {
+          if (anomalies.length > 0) {
+            signalAggregator.ingestTemporalAnomalies(anomalies);
+          }
+        }).catch(() => {});
+      }
+      this.statusPanel?.updateApi('FIRMS', { status: 'ok' });
+    } catch (e) {
+      console.warn('[App] FIRMS load failed:', e);
+      this.statusPanel?.updateApi('FIRMS', { status: 'error' });
+      dataFreshness.recordError('firms', String(e));
+    }
+  }
+
   private scheduleRefresh(
     name: string,
     fn: () => Promise<void>,
@@ -3217,6 +3295,7 @@ export class App {
 
     // Non-intelligence layer refreshes only
     // NOTE: outages, protests, military are refreshed by intelligence schedule above
+    this.scheduleRefresh('firms', () => this.loadFirmsData(), 30 * 60 * 1000);
     this.scheduleRefresh('ais', () => this.loadAisSignals(), REFRESH_INTERVALS.ais, () => this.mapLayers.ais);
     this.scheduleRefresh('cables', () => this.loadCableActivity(), 30 * 60 * 1000, () => this.mapLayers.cables);
     this.scheduleRefresh('flights', () => this.loadFlightDelays(), 10 * 60 * 1000, () => this.mapLayers.flights);

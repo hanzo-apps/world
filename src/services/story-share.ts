@@ -76,25 +76,6 @@ export const shareTexts = {
     `\n🔗 ${generateStoryDeepLink(data.countryCode)}`
 };
 
-// Story template types
-export type StoryTemplate = 
-  | 'ciianalysis'      // Full country analysis
-  | 'crisisalert'      // Crisis-focused
-  | 'dailybrief'       // Daily summary
-  | 'compare'          // Two-country comparison
-  | 'trend'            // Trend visualization
-  | 'marketfocus'      // Prediction market focus;
-
-// Template descriptions for UI
-export const templateDescriptions: Record<StoryTemplate, string> = {
-  ciianalysis: 'Complete country intelligence snapshot',
-  crisisalert: 'Focused on active threats and convergence',
-  dailybrief: 'AI-synthesized daily briefing',
-  compare: 'Side-by-side country comparison',
-  trend: '7-day instability trend chart',
-  marketfocus: 'Prediction market probabilities'
-};
-
 // Pre-generated share URLs
 export function getShareUrls(data: StoryData): Record<string, string> {
   const url = generateStoryDeepLink(data.countryCode);

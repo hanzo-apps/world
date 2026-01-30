@@ -178,6 +178,7 @@ export class DeckGLMap {
   private militaryVessels: MilitaryVessel[] = [];
   private militaryVesselClusters: MilitaryVesselCluster[] = [];
   private naturalEvents: NaturalEvent[] = [];
+  private firmsFireData: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }> = [];
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = []; // Store news for related news lookup
@@ -810,6 +811,11 @@ export class DeckGLMap {
       layers.push(this.createNaturalEventsLayer());
     }
 
+    // Satellite fires layer (NASA FIRMS)
+    if (mapLayers.fires && this.firmsFireData.length > 0) {
+      layers.push(this.createFiresLayer());
+    }
+
     // Weather alerts layer
     if (mapLayers.weather && this.weatherAlerts.length > 0) {
       layers.push(this.createWeatherLayer());
@@ -1222,6 +1228,23 @@ export class DeckGLMap {
       },
       radiusMinPixels: 5,
       radiusMaxPixels: 18,
+      pickable: true,
+    });
+  }
+
+  private createFiresLayer(): ScatterplotLayer {
+    return new ScatterplotLayer({
+      id: 'fires-layer',
+      data: this.firmsFireData,
+      getPosition: (d: (typeof this.firmsFireData)[0]) => [d.lon, d.lat],
+      getRadius: (d: (typeof this.firmsFireData)[0]) => Math.min(d.frp * 200, 30000) || 5000,
+      getFillColor: (d: (typeof this.firmsFireData)[0]) => {
+        if (d.brightness > 400) return [255, 30, 0, 220] as [number, number, number, number];
+        if (d.brightness > 350) return [255, 140, 0, 200] as [number, number, number, number];
+        return [255, 220, 50, 180] as [number, number, number, number];
+      },
+      radiusMinPixels: 3,
+      radiusMaxPixels: 12,
       pickable: true,
     });
   }
@@ -1926,6 +1949,7 @@ export class DeckGLMap {
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'techEvents', label: 'Tech Events', icon: '&#128197;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
+          { key: 'fires', label: 'Satellite Fires', icon: '&#128293;' },
         ]
       : [
           { key: 'hotspots', label: 'Intel Hotspots', icon: '&#127919;' },
@@ -1944,6 +1968,7 @@ export class DeckGLMap {
           { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
+          { key: 'fires', label: 'Satellite Fires', icon: '&#128293;' },
           { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
           { key: 'economic', label: 'Economic Centers', icon: '&#128176;' },
           { key: 'minerals', label: 'Critical Minerals', icon: '&#128142;' },
@@ -2336,6 +2361,11 @@ export class DeckGLMap {
 
   public setNaturalEvents(events: NaturalEvent[]): void {
     this.naturalEvents = events;
+    this.render();
+  }
+
+  public setFires(fires: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }>): void {
+    this.firmsFireData = fires;
     this.render();
   }
 

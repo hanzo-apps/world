@@ -17,7 +17,8 @@ export type DataSourceId =
   | 'weather'    // Weather alerts
   | 'economic'   // Economic indicators (FRED)
   | 'oil'        // EIA oil analytics
-  | 'spending';  // USASpending.gov
+  | 'spending'   // USASpending.gov
+  | 'firms';     // NASA FIRMS satellite fires
 
 export type FreshnessStatus = 'fresh' | 'stale' | 'very_stale' | 'no_data' | 'disabled' | 'error';
 
@@ -67,6 +68,7 @@ const SOURCE_METADATA: Record<DataSourceId, { name: string; requiredForRisk: boo
   economic: { name: 'Economic Data (FRED)', requiredForRisk: false, panelId: 'economic' },
   oil: { name: 'Oil Analytics (EIA)', requiredForRisk: false, panelId: 'economic' },
   spending: { name: 'Gov Spending', requiredForRisk: false, panelId: 'economic' },
+  firms: { name: 'FIRMS Satellite Fires', requiredForRisk: false, panelId: 'map' },
 };
 
 class DataFreshnessTracker {

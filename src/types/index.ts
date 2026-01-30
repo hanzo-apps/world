@@ -415,6 +415,7 @@ export interface MapLayers {
   natural: boolean;
   spaceports: boolean;
   minerals: boolean;
+  fires: boolean;
   // Tech variant layers
   startupHubs: boolean;
   cloudRegions: boolean;
