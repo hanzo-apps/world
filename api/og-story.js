@@ -36,75 +36,71 @@ export default function handler(req, res) {
   const levelColor = LEVEL_COLORS[level] || '#eab308';
   const scoreNum = score ? parseInt(score, 10) : null;
   const barWidth = scoreNum !== null ? Math.min(scoreNum, 100) * 4.6 : 0;
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#0a0a0a"/>
-
-  <!-- Grid pattern -->
-  <defs>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect width="1200" height="630" fill="#0c0c14"/>
 
   <!-- Top accent line -->
-  <rect x="0" y="0" width="1200" height="4" fill="${levelColor}"/>
+  <rect x="0" y="0" width="1200" height="5" fill="${levelColor}"/>
 
   <!-- WORLDMONITOR header -->
-  <text x="80" y="72" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#555" letter-spacing="6"
+  <text x="80" y="68" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#777" letter-spacing="6"
     >WORLDMONITOR</text>
-  <text x="1120" y="72" font-family="system-ui, sans-serif" font-size="20" fill="#444" text-anchor="end"
-    >${typeLabel.toUpperCase()}</text>
+  <text x="1120" y="68" font-family="system-ui, sans-serif" font-size="20" fill="#666" text-anchor="end"
+    >${escapeXml(typeLabel.toUpperCase())}</text>
 
   <!-- Separator -->
-  <line x1="80" y1="96" x2="1120" y2="96" stroke="#1a1a2e" stroke-width="1"/>
+  <line x1="80" y1="92" x2="1120" y2="92" stroke="#333" stroke-width="1"/>
 
   <!-- Country name -->
-  <text x="80" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="#ffffff"
+  <text x="80" y="190" font-family="system-ui, -apple-system, sans-serif" font-size="78" font-weight="800" fill="#ffffff"
     >${escapeXml(countryName.toUpperCase())}</text>
 
   <!-- Country code badge -->
-  <rect x="1040" y="168" width="80" height="40" rx="6" fill="rgba(255,255,255,0.08)"/>
-  <text x="1080" y="196" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#888" text-anchor="middle"
+  <rect x="1030" y="155" width="90" height="44" rx="8" fill="rgba(255,255,255,0.1)"/>
+  <text x="1075" y="185" font-family="system-ui, sans-serif" font-size="26" font-weight="700" fill="#aaa" text-anchor="middle"
     >${escapeXml(countryCode)}</text>
 
   ${scoreNum !== null ? `
   <!-- CII Score -->
-  <text x="80" y="300" font-family="system-ui, -apple-system, sans-serif" font-size="80" font-weight="800" fill="${levelColor}"
+  <text x="80" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="96" font-weight="800" fill="${levelColor}"
     >${scoreNum}</text>
-  <text x="${80 + String(scoreNum).length * 48}" y="300" font-family="system-ui, sans-serif" font-size="40" fill="#666"
+  <text x="${80 + String(scoreNum).length * 56}" y="310" font-family="system-ui, sans-serif" font-size="44" fill="#888"
     >/100</text>
 
   <!-- Level badge -->
-  <rect x="900" y="262" width="${level.length * 18 + 32}" height="40" rx="6" fill="${levelColor}"/>
-  <text x="${900 + (level.length * 18 + 32) / 2}" y="290" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#fff" text-anchor="middle"
+  <rect x="900" y="270" width="${level.length * 20 + 36}" height="44" rx="8" fill="${levelColor}"/>
+  <text x="${900 + (level.length * 20 + 36) / 2}" y="300" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#fff" text-anchor="middle"
     >${level.toUpperCase()}</text>
 
-  <!-- Score bar background -->
-  <rect x="80" y="330" width="460" height="14" rx="7" fill="#1a1a2e"/>
-  <!-- Score bar fill -->
-  <rect x="80" y="330" width="${barWidth}" height="14" rx="7" fill="${levelColor}"/>
+  <!-- Score bar -->
+  <rect x="80" y="340" width="500" height="16" rx="8" fill="#1a1a2e"/>
+  <rect x="80" y="340" width="${barWidth}" height="16" rx="8" fill="${levelColor}"/>
 
   <!-- Labels -->
-  <text x="80" y="390" font-family="system-ui, sans-serif" font-size="20" fill="#555" font-weight="600" letter-spacing="3"
-    >INSTABILITY INDEX</text>
+  <text x="80" y="400" font-family="system-ui, sans-serif" font-size="22" fill="#777" font-weight="600" letter-spacing="4"
+    >COUNTRY INSTABILITY INDEX</text>
   ` : `
-  <!-- No score available -->
-  <text x="80" y="300" font-family="system-ui, sans-serif" font-size="32" fill="#666"
+  <!-- No score — show descriptive text -->
+  <text x="80" y="290" font-family="system-ui, sans-serif" font-size="36" fill="#aaa" font-weight="600"
     >Real-time intelligence analysis</text>
+  <text x="80" y="340" font-family="system-ui, sans-serif" font-size="24" fill="#777"
+    >Country Instability Index · Military Posture · Prediction Markets</text>
+  <text x="80" y="380" font-family="system-ui, sans-serif" font-size="24" fill="#777"
+    >Signal Convergence · Threat Classification · Active Signals</text>
   `}
 
   <!-- Bottom separator -->
-  <line x1="80" y1="540" x2="1120" y2="540" stroke="#1a1a2e" stroke-width="1"/>
+  <line x1="80" y1="530" x2="1120" y2="530" stroke="#333" stroke-width="1"/>
 
   <!-- Footer -->
-  <text x="80" y="580" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#333" letter-spacing="2"
+  <text x="80" y="572" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#555" letter-spacing="2"
     >WORLDMONITOR.APP</text>
-  <text x="1120" y="580" font-family="system-ui, sans-serif" font-size="18" fill="#444" text-anchor="end"
+  <text x="1120" y="572" font-family="system-ui, sans-serif" font-size="20" fill="#666" text-anchor="end"
     >Real-time global intelligence monitoring</text>
-  <text x="1120" y="608" font-family="system-ui, sans-serif" font-size="16" fill="#333" text-anchor="end"
-    >Free &amp; open source</text>
+  <text x="1120" y="602" font-family="system-ui, sans-serif" font-size="18" fill="#555" text-anchor="end"
+    >${escapeXml(dateStr)} · Free &amp; open source</text>
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
