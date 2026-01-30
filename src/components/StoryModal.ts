@@ -58,10 +58,10 @@ export function openStoryModal(data: StoryData): void {
 
   document.body.appendChild(modalEl);
 
-  requestAnimationFrame(() => {
+  requestAnimationFrame(async () => {
     if (!modalEl) return;
     try {
-      renderAndDisplay(data);
+      await renderAndDisplay(data);
     } catch (err) {
       console.error('[StoryModal] Render error:', err);
       const content = modalEl?.querySelector('.story-modal-content');
@@ -70,8 +70,8 @@ export function openStoryModal(data: StoryData): void {
   });
 }
 
-function renderAndDisplay(data: StoryData): void {
-  const canvas = renderStoryToCanvas(data);
+async function renderAndDisplay(data: StoryData): Promise<void> {
+  const canvas = await renderStoryToCanvas(data);
   currentDataUrl = canvas.toDataURL('image/png');
   
   const binStr = atob(currentDataUrl.split(',')[1] ?? '');
