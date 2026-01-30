@@ -332,8 +332,9 @@ body.animations-paused *::after {
 }
 
 .fullscreen-btn.active {
-  background: var(--accent);
+  background: rgba(59, 130, 246, 0.12);
   border-color: var(--accent);
+  color: var(--accent);
 }
 
 .github-link {
