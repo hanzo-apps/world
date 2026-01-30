@@ -19,7 +19,7 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
   // Generate dynamic content
   const title = `${countryName} Intelligence Brief | World Monitor`;
   const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
-  const storyUrl = `${BASE_URL}/story?c=${countryCode}&t=${type}`;
+  const storyUrl = `${BASE_URL}/api/story?c=${countryCode}&t=${type}`;
   const imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
   
   // Update standard meta tags
