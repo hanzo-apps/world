@@ -1,7 +1,6 @@
 import type { StoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { generateStoryDeepLink, getShareUrls, shareTexts } from '@/services/story-share';
-import type { StoryTemplate } from '@/services/story-share';
 
 let modalEl: HTMLElement | null = null;
 let currentDataUrl: string | null = null;
@@ -18,15 +17,6 @@ export function openStoryModal(data: StoryData): void {
     <div class="story-modal">
       <div class="story-header">
         <h3>Share Intelligence Story</h3>
-        <div class="story-template-selector">
-          <label>Template:</label>
-          <select class="template-select">
-            <option value="ciianalysis">📊 Country Analysis</option>
-            <option value="crisisalert">🚨 Crisis Alert</option>
-            <option value="dailybrief">📰 Daily Brief</option>
-            <option value="marketfocus">🎯 Markets Focus</option>
-          </select>
-        </div>
       </div>
       <div class="story-modal-content">
         <div class="story-loading">
@@ -48,14 +38,6 @@ export function openStoryModal(data: StoryData): void {
       </div>
     </div>
   `;
-
-  // Template selector handler
-  const templateSelect = modalEl.querySelector('.template-select') as HTMLSelectElement;
-  templateSelect?.addEventListener('change', () => {
-    if (currentData) {
-      regenerateStory(currentData, templateSelect.value as StoryTemplate);
-    }
-  });
 
   modalEl.addEventListener('click', (e) => {
     if (e.target === modalEl) closeStoryModal();
@@ -88,8 +70,8 @@ export function openStoryModal(data: StoryData): void {
   });
 }
 
-function renderAndDisplay(data: StoryData, template?: StoryTemplate): void {
-  const canvas = renderStoryToCanvas(data, template);
+function renderAndDisplay(data: StoryData): void {
+  const canvas = renderStoryToCanvas(data);
   currentDataUrl = canvas.toDataURL('image/png');
   
   const binStr = atob(currentDataUrl.split(',')[1] ?? '');
@@ -116,27 +98,6 @@ function renderAndDisplay(data: StoryData, template?: StoryTemplate): void {
     const input = deepLinkSection.querySelector('.deep-link-input') as HTMLInputElement;
     if (input) input.value = generateStoryDeepLink(data.countryCode);
   }
-}
-
-function regenerateStory(data: StoryData, template: StoryTemplate): void {
-  if (!modalEl) return;
-  
-  const content = modalEl.querySelector('.story-modal-content');
-  if (content) {
-    content.innerHTML = `
-      <div class="story-loading">
-        <div class="story-spinner"></div>
-        <span>Regenerating...</span>
-      </div>
-    `;
-  }
-  
-  const actions = modalEl.querySelector('.story-actions') as HTMLElement;
-  if (actions) actions.style.display = 'none';
-  
-  requestAnimationFrame(() => {
-    renderAndDisplay(data, template);
-  });
 }
 
 export function closeStoryModal(): void {

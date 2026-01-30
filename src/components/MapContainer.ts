@@ -252,6 +252,14 @@ export class MapContainer {
     }
   }
 
+  public setFires(fires: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }>): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setFires(fires);
+    } else {
+      this.svgMap?.setFires(fires);
+    }
+  }
+
   public setTechEvents(events: TechEventMarker[]): void {
     if (this.useDeckGL) {
       this.deckGLMap?.setTechEvents(events);

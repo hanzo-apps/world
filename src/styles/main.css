@@ -2939,6 +2939,16 @@ body.playback-mode .status-dot {
 }
 
 /* Natural Event markers (NASA EONET) */
+.fire-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  opacity: 0.8;
+  z-index: 53;
+  pointer-events: none;
+  box-shadow: 0 0 4px currentColor;
+}
+
 .nat-event-marker {
   position: absolute;
   transform: translate(-50%, -50%) scale(var(--marker-scale, 1));

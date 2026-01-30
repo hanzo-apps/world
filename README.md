@@ -22,8 +22,8 @@
 
 | Problem | Solution |
 |---------|----------|
-| News scattered across 100+ sources | **Single unified dashboard** with 80+ curated feeds |
-| No geospatial context for events | **Interactive map** with 20+ toggleable data layers |
+| News scattered across 100+ sources | **Single unified dashboard** with 100+ curated feeds |
+| No geospatial context for events | **Interactive map** with 25 toggleable data layers |
 | Information overload | **AI-synthesized briefs** with focal point detection |
 | Expensive OSINT tools ($$$) | **100% free & open source** |
 | Static news feeds | **Real-time updates** with live video streams |
@@ -44,7 +44,7 @@ Both variants run from a single codebase — switch between them with one click.
 ## Key Features
 
 ### Interactive Global Map
-- **20+ data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, protests, disasters, datacenters, and more
+- **25 data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, and more
 - **Smart clustering** — markers intelligently group at low zoom, expand on zoom in
 - **Progressive disclosure** — detail layers (bases, nuclear, datacenters) appear only when zoomed in; zoom-adaptive opacity prevents clutter at world view
 - **Label deconfliction** — overlapping labels (e.g., multiple BREAKING badges) are automatically suppressed by priority, highest-severity first
@@ -67,6 +67,7 @@ Both variants run from a single codebase — switch between them with one click.
 - Intelligence hotspots with news correlation
 - Social unrest events (ACLED + GDELT)
 - Sanctions regimes
+- Weather alerts and severe conditions
 
 </details>
 
@@ -88,8 +89,9 @@ Both variants run from a single codebase — switch between them with one click.
 - Undersea cables with landing points
 - Oil & gas pipelines
 - AI datacenters (111 major clusters)
-- Internet outages
+- Internet outages (Cloudflare Radar)
 - Critical mineral deposits
+- NASA FIRMS satellite fire detection (VIIRS thermal hotspots)
 
 </details>
 
@@ -105,10 +107,21 @@ Both variants run from a single codebase — switch between them with one click.
 </details>
 
 ### Live News & Video
-- **80+ RSS feeds** across geopolitics, defense, energy, tech
+- **100+ RSS feeds** across geopolitics, defense, energy, tech
 - **Live video streams** — Bloomberg, Sky News, Al Jazeera, CNBC, and more
 - **Custom monitors** — Create keyword-based alerts for any topic
 - **Entity extraction** — Auto-links countries, leaders, organizations
+
+### Signal Aggregation & Anomaly Detection
+- **Multi-source signal fusion** — internet outages, military flights, naval vessels, protests, AIS disruptions, and satellite fires are aggregated into a unified intelligence picture with per-country and per-region clustering
+- **Temporal baseline anomaly detection** — Welford's online algorithm computes streaming mean/variance per event type, region, weekday, and month over a 90-day window. Z-score thresholds (1.5/2.0/3.0) flag deviations like "Military flights 3.2x normal for Thursday (January)" — stored in Redis via Upstash
+- **Regional convergence scoring** — when multiple signal types spike in the same geographic area, the system identifies convergence zones and escalates severity
+
+### Story Sharing & Social Export
+- **Shareable intelligence stories** — generate country-level intelligence briefs with CII scores, threat counts, theater posture, and related prediction markets
+- **Multi-platform export** — custom-formatted sharing for Twitter/X, LinkedIn, WhatsApp, Telegram, Reddit, and Facebook with platform-appropriate formatting
+- **Deep links** — every story generates a unique URL (`/story?c=<country>&t=<type>`) with dynamic Open Graph meta tags for rich social previews
+- **Canvas-based image generation** — stories render as PNG images for visual sharing, with QR codes linking back to the live dashboard
 
 ### Additional Capabilities
 - Signal intelligence with "Why It Matters" context
@@ -116,8 +129,10 @@ Both variants run from a single codebase — switch between them with one click.
 - Maritime & aviation tracking with surge detection
 - Prediction market integration (Polymarket) as leading indicators
 - Service status monitoring (cloud providers, AI services)
-- Snapshot system for sharing configurations
-- Data freshness monitoring with explicit intelligence gap reporting
+- Shareable map state via URL parameters (view, zoom, coordinates, time range, active layers)
+- Data freshness monitoring across 14 data sources with explicit intelligence gap reporting
+- Per-feed circuit breakers with 5-minute cooldowns to prevent cascading failures
+- Browser-side ML worker (Transformers.js) for NER and sentiment analysis without server dependency
 
 ---
 
@@ -178,9 +193,31 @@ When a news event is geo-located, the system automatically identifies critical i
 
 A 74-hub strategic location database infers geography from headlines via keyword matching. Hubs span capitals, conflict zones, strategic chokepoints (Strait of Hormuz, Suez Canal, Malacca Strait), and international organizations. Confidence scoring is boosted for critical-tier hubs and active conflict zones, enabling map-driven news placement without requiring explicit location metadata from RSS feeds.
 
+### Temporal Baseline Anomaly Detection
+
+Rather than relying on static thresholds, the system learns what "normal" looks like and flags deviations. Each event type (military flights, naval vessels, protests, news velocity, AIS gaps, satellite fires) is tracked per region with separate baselines for each weekday and month — because military activity patterns differ on Tuesdays vs. weekends, and January vs. July.
+
+The algorithm uses **Welford's online method** for numerically stable streaming computation of mean and variance, stored in Redis with a 90-day rolling window. When a new observation arrives, its z-score is computed against the learned baseline. Thresholds:
+
+| Z-Score | Severity | Example |
+|---------|----------|---------|
+| ≥ 1.5 | Low | Slightly elevated protest activity |
+| ≥ 2.0 | Medium | Unusual naval presence |
+| ≥ 3.0 | High/Critical | Military flights 3x above baseline |
+
+A minimum of 10 historical samples is required before anomalies are reported, preventing false positives during the learning phase. Anomalies are ingested back into the signal aggregator, where they compound with other signals for convergence detection.
+
+### Signal Aggregation
+
+All real-time data sources feed into a central signal aggregator that builds a unified geospatial intelligence picture. Signals are clustered by country and region, with each signal carrying a severity (low/medium/high), geographic coordinates, and metadata. The aggregator:
+
+1. **Clusters by country** — groups signals from diverse sources (flights, vessels, protests, fires, outages) into per-country profiles
+2. **Detects regional convergence** — identifies when multiple signal types spike in the same geographic corridor (e.g., military flights + protests + satellite fires in Eastern Mediterranean)
+3. **Feeds downstream analysis** — the CII, hotspot escalation, focal point detection, and AI insights modules all consume the aggregated signal picture rather than raw data
+
 ### Data Freshness & Intelligence Gaps
 
-A singleton tracker monitors 13+ data sources (GDELT, RSS, AIS, military flights, earthquakes, weather, outages) with status categorization: fresh (<15 min), stale (1h), very_stale (6h), no_data, error, disabled. It explicitly reports **intelligence gaps** — what analysts can't see — preventing false confidence when critical data sources are down or degraded.
+A singleton tracker monitors 14 data sources (GDELT, RSS, AIS, military flights, earthquakes, weather, outages, ACLED, Polymarket, economic indicators, NASA FIRMS, and more) with status categorization: fresh (<15 min), stale (1h), very_stale (6h), no_data, error, disabled. It explicitly reports **intelligence gaps** — what analysts can't see — preventing false confidence when critical data sources are down or degraded.
 
 ### Prediction Markets as Leading Indicators
 
@@ -198,6 +235,35 @@ Polymarket geopolitical markets are queried using tag-based filters (Ukraine, Ir
 | **Browser-first compute** | Analysis (clustering, instability scoring, surge detection) runs client-side — no backend compute dependency for core intelligence. |
 | **Multi-signal correlation** | No single data source is trusted alone. Focal points require convergence across news + military + markets + protests before escalating to critical. |
 | **Geopolitical grounding** | Hard-coded conflict zones, baseline country risk, and strategic chokepoints prevent statistical noise from generating false alerts in low-data regions. |
+
+---
+
+## Source Credibility & Feed Tiering
+
+Every RSS feed is assigned a source tier reflecting editorial reliability:
+
+| Tier | Description | Examples |
+|------|-------------|---------|
+| **Tier 1** | Wire services, official government sources | Reuters, AP, BBC, DOD |
+| **Tier 2** | Major established outlets | CNN, NYT, The Guardian, Al Jazeera |
+| **Tier 3** | Specialized/niche outlets | Defense One, Breaking Defense, The War Zone |
+| **Tier 4** | Aggregators and blogs | Google News, individual analyst blogs |
+
+Feeds also carry a **propaganda risk rating** and **state affiliation flag**. State-affiliated sources (RT, Xinhua, IRNA) are included for completeness but visually tagged so analysts can factor in editorial bias. Threat classification confidence is weighted by source tier — a Tier 1 breaking alert carries more weight than a Tier 4 blog post in the focal point detection algorithm.
+
+---
+
+## Edge Function Architecture
+
+World Monitor uses 30+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
+
+- **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers
+- **AI Pipeline** — Groq and OpenRouter edge functions with Redis deduplication, so identical headlines across concurrent users only trigger one LLM call
+- **Data Adapters** — GDELT, ACLED, OpenSky, USGS, NASA FIRMS, FRED, and others each have dedicated edge functions that normalize responses into consistent schemas
+- **Temporal Baseline** — Welford's algorithm state is persisted in Redis across requests, building statistical baselines without a traditional database
+- **Custom Scrapers** — sources without RSS feeds (FwdStart, GitHub Trending, tech events) are scraped and transformed into RSS-compatible formats
+
+All edge functions include circuit breaker logic and return cached stale data when upstream APIs are unavailable, ensuring the dashboard never shows blank panels.
 
 ---
 
@@ -231,6 +297,9 @@ OPENSKY_PASSWORD=xxx
 
 # Ship tracking
 VESSELFINDER_API_KEY=xxx
+
+# NASA FIRMS satellite fire detection
+NASA_FIRMS_API_KEY=xxx
 ```
 
 See [API Dependencies](./docs/DOCUMENTATION.md#api-dependencies) for the full list.
@@ -244,9 +313,9 @@ See [API Dependencies](./docs/DOCUMENTATION.md#api-dependencies) for the full li
 | **Frontend** | TypeScript, Vite, deck.gl (WebGL), MapLibre GL |
 | **AI/ML** | Groq (Llama 3.1 8B), TensorFlow.js (T5 fallback) |
 | **Caching** | Redis (Upstash) — cross-user deduplication for AI calls and classification |
-| **APIs** | OpenSky, GDELT, ACLED, USGS, NASA EONET, FRED, Polymarket |
+| **APIs** | OpenSky, GDELT, ACLED, USGS, NASA EONET, NASA FIRMS, FRED, Polymarket, EIA, Cloudflare Radar |
 | **Deployment** | Vercel Edge Functions |
-| **Data** | 80+ RSS feeds, ADS-B transponders, AIS maritime data |
+| **Data** | 100+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery |
 
 ---
 
@@ -282,10 +351,10 @@ npm run typecheck    # Type checking
 
 ## Roadmap
 
+- [x] API for programmatic access
 - [ ] Mobile-optimized views
 - [ ] Push notifications for critical alerts
 - [ ] Historical data playback
-- [ ] API for programmatic access
 - [ ] Self-hosted Docker image
 
 See [full roadmap](./docs/DOCUMENTATION.md#roadmap).
