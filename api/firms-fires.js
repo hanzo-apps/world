@@ -11,7 +11,7 @@ export const config = {
   runtime: 'edge',
 };
 
-const FIRMS_API_KEY = process.env.FIRMS_API_KEY || '';
+const FIRMS_API_KEY = process.env.NASA_FIRMS_API_KEY || process.env.FIRMS_API_KEY || '';
 const FIRMS_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const SOURCE = 'VIIRS_SNPP_NRT';
 
