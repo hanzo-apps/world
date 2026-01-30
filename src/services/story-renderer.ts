@@ -17,6 +17,12 @@ function humanizeSignalType(type: string): string {
     explained_market_move: 'Market Move Explained',
     sector_cascade: 'Sector Cascade',
     military_surge: 'Military Surge',
+    military_flight: 'Military Flights',
+    internet_outage: 'Internet Outages',
+    protest: 'Protests',
+    naval_vessel: 'Naval Vessels',
+    ais_gap: 'AIS Gaps',
+    satellite_fire: 'Satellite Fires',
   };
   return map[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -172,7 +178,7 @@ export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasEl
       roundRect(ctx, cx, y + 8, compBarW, 8, 4);
       ctx.fill();
       ctx.fillStyle = comp.color;
-      roundRect(ctx, cx, y + 8, compBarW * Math.min(comp.val, 40) / 40, 8, 4);
+      roundRect(ctx, cx, y + 8, compBarW * Math.min(comp.val, 100) / 100, 8, 4);
       ctx.fill();
     }
     y += 24;

@@ -36,7 +36,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   ai: { name: 'AI/ML', enabled: true, priority: 2 },
   layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
-  'satellite-fires': { name: 'Satellite Fires', enabled: true, priority: 2 },
+  'satellite-fires': { name: 'Fires', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
