@@ -18,7 +18,7 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
   
   // Generate dynamic content
   const title = `${countryName} Intelligence Brief | World Monitor`;
-  const description = generateDescription(ciiScore, ciiLevel, trend, type);
+  const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
   const storyUrl = `${BASE_URL}/story?c=${countryCode}&t=${type}`;
   const imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
   
@@ -66,10 +66,11 @@ export function resetMetaTags(): void {
 }
 
 function generateDescription(
-  score?: number, 
-  level?: string, 
-  trend?: string, 
-  type?: string
+  score?: number,
+  level?: string,
+  trend?: string,
+  type?: string,
+  countryName?: string
 ): string {
   const parts: string[] = [];
   
