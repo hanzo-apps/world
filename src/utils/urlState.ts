@@ -22,6 +22,7 @@ const LAYER_KEYS: (keyof MapLayers)[] = [
   'natural',
   'spaceports',
   'minerals',
+  'fires',
   'startupHubs',
   'cloudRegions',
   'accelerators',

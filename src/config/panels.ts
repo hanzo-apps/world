@@ -36,6 +36,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   ai: { name: 'AI/ML', enabled: true, priority: 2 },
   layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  'satellite-fires': { name: 'Satellite Fires', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -59,6 +60,7 @@ const FULL_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
@@ -88,6 +90,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
@@ -153,6 +156,7 @@ const TECH_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech layers (enabled in tech variant)
   startupHubs: true,
   cloudRegions: true,
@@ -182,6 +186,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech layers (limited on mobile)
   startupHubs: true,
   cloudRegions: false,
