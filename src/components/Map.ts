@@ -119,6 +119,7 @@ export class MapComponent {
   private militaryVessels: MilitaryVessel[] = [];
   private militaryVesselClusters: MilitaryVesselCluster[] = [];
   private naturalEvents: NaturalEvent[] = [];
+  private firmsFireData: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }> = [];
   private techEvents: TechEventMarker[] = [];
   private techActivities: TechHubActivity[] = [];
   private geoActivities: GeoHubActivity[] = [];
@@ -2330,6 +2331,28 @@ export class MapComponent {
         this.overlays.appendChild(div);
       });
     }
+
+    // Satellite Fires (NASA FIRMS) - separate fires layer
+    if (this.state.layers.fires) {
+      this.firmsFireData.forEach((fire) => {
+        const pos = projection([fire.lon, fire.lat]);
+        if (!pos) return;
+
+        const color = fire.brightness > 400 ? '#ff1e00' : fire.brightness > 350 ? '#ff8c00' : '#ffdc32';
+        const size = Math.max(4, Math.min(10, (fire.frp || 1) * 0.5));
+
+        const dot = document.createElement('div');
+        dot.className = 'fire-dot';
+        dot.style.left = `${pos[0]}px`;
+        dot.style.top = `${pos[1]}px`;
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.backgroundColor = color;
+        dot.title = `${fire.region} — ${Math.round(fire.brightness)}K, ${fire.frp}MW`;
+
+        this.overlays.appendChild(dot);
+      });
+    }
   }
 
   private renderWaterways(projection: d3.GeoProjection): void {
@@ -3193,6 +3216,11 @@ export class MapComponent {
 
   public setNaturalEvents(events: NaturalEvent[]): void {
     this.naturalEvents = events;
+    this.render();
+  }
+
+  public setFires(fires: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }>): void {
+    this.firmsFireData = fires;
     this.render();
   }
 
