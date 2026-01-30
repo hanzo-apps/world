@@ -1,5 +1,30 @@
 # WorldMonitor Development Notes
 
+## 🤖 Model Preferences (Jan 30, 2026)
+
+**For ALL coding tasks in WorldMonitor, ALWAYS use:**
+
+| Task | Model | Alias |
+|------|-------|-------|
+| **Coding** | `openrouter/anthropic/claude-sonnet-4-5` | `sonnet` |
+| **Coding** | `openai/gpt-5-2` | `codex` |
+
+**Never default to MiniMax for coding tasks.**
+
+**How to run with preferred model:**
+```bash
+# Sonnet for coding
+clawdbot --model openrouter/anthropic/claude-sonnet-4-5 "build me..."
+
+# Codex for coding  
+clawdbot --model openai/gpt-5-2 "build me..."
+```
+
+**Set as default:**
+```bash
+export CLAUDE_MODEL=openrouter/anthropic/claude-sonnet-4-5
+```
+
 ## CRITICAL: Git Branch Rules
 
 **NEVER merge or push to a different branch without explicit user permission.**
