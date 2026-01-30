@@ -1091,31 +1091,53 @@ body.animations-paused *::after {
   position: fixed;
   inset: 0;
   z-index: 10001;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.88);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
 }
 .story-modal {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   max-height: 95vh;
 }
+.story-close-x {
+  position: absolute;
+  top: -44px;
+  right: -4px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: #999;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  z-index: 1;
+}
+.story-close-x:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
 .story-modal-content {
-  max-height: 80vh;
+  max-height: 75vh;
   overflow: auto;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
 }
 .story-image {
   display: block;
-  max-height: 80vh;
+  max-height: 75vh;
   width: auto;
-  border-radius: 12px;
+  border-radius: 14px;
 }
 .story-loading, .story-error {
   display: flex;
@@ -1140,36 +1162,41 @@ body.animations-paused *::after {
 .story-error {
   color: #ef4444;
 }
-.story-actions {
+.story-share-bar {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  background: rgba(255,255,255,0.05);
+  padding: 8px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.06);
 }
-.story-btn {
-  background: #1a1a2e;
-  color: #ccc;
-  border: 1px solid #333;
-  padding: 8px 20px;
-  border-radius: 6px;
+.story-share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #999;
+  padding: 10px 16px;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 11px;
+  font-family: inherit;
   transition: background 0.2s, color 0.2s;
 }
-.story-btn:hover {
-  background: #2a2a3e;
+.story-share-btn:hover {
+  background: rgba(255,255,255,0.08);
   color: #fff;
 }
-.story-save {
-  color: #3b82f6;
-  border-color: #3b82f640;
+.story-share-btn svg {
+  flex-shrink: 0;
 }
-.story-whatsapp {
-  color: #25d366;
-  border-color: #25d36640;
-}
-.story-instagram {
-  color: #e1306c;
-  border-color: #e1306c40;
-}
+.story-share-btn.story-save:hover { color: #3b82f6; }
+.story-share-btn.story-whatsapp:hover { color: #25d366; }
+.story-share-btn.story-twitter:hover { color: #fff; }
+.story-share-btn.story-linkedin:hover { color: #0a66c2; }
+.story-share-btn.story-copy:hover { color: #eab308; }
 .country-intel-share-btn {
   background: none;
   border: 1px solid #ff444440;
