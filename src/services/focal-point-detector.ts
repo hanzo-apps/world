@@ -19,6 +19,8 @@ const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
   military_vessel: 'naval vessels',
   protest: 'protests',
   ais_disruption: 'shipping disruption',
+  satellite_fire: 'satellite fires',
+  temporal_anomaly: 'anomaly detection',
 };
 
 const SIGNAL_TYPE_ICONS: Record<SignalType, string> = {
@@ -27,6 +29,8 @@ const SIGNAL_TYPE_ICONS: Record<SignalType, string> = {
   military_vessel: '⚓',
   protest: '📢',
   ais_disruption: '🚢',
+  satellite_fire: '🔥',
+  temporal_anomaly: '📊',
 };
 
 class FocalPointDetector {

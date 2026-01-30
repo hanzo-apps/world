@@ -311,6 +311,7 @@ const INTELLIGENCE_GAP_MESSAGES: Record<DataSourceId, string> = {
   economic: 'Economic indicators stale—Fed/Treasury data not updating',
   oil: 'Oil market analytics unavailable—EIA data not updating',
   spending: 'Government spending data unavailable',
+  firms: 'Satellite fire detection unavailable—NASA FIRMS data not updating',
 };
 
 /**
