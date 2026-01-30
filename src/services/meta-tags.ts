@@ -20,7 +20,9 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
   const title = `${countryName} Intelligence Brief | World Monitor`;
   const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
   const storyUrl = `${BASE_URL}/api/story?c=${countryCode}&t=${type}`;
-  const imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
+  let imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
+  if (ciiScore !== undefined) imageUrl += `&s=${ciiScore}`;
+  if (ciiLevel) imageUrl += `&l=${ciiLevel}`;
   
   // Update standard meta tags
   setMetaTag('title', title);
