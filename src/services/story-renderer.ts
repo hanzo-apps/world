@@ -3,6 +3,24 @@ import type { StoryData } from './story-data';
 const W = 1080;
 const H = 1920;
 
+function humanizeSignalType(type: string): string {
+  const map: Record<string, string> = {
+    prediction_leads_news: 'Prediction Leading',
+    news_leads_markets: 'News Leading',
+    silent_divergence: 'Silent Divergence',
+    velocity_spike: 'Velocity Spike',
+    convergence: 'Convergence',
+    triangulation: 'Triangulation',
+    flow_drop: 'Flow Drop',
+    flow_price_divergence: 'Flow/Price Divergence',
+    geo_convergence: 'Geographic Convergence',
+    explained_market_move: 'Market Move Explained',
+    sector_cascade: 'Sector Cascade',
+    military_surge: 'Military Surge',
+  };
+  return map[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 const LEVEL_COLORS: Record<string, string> = {
   critical: '#ef4444', high: '#f97316', elevated: '#eab308', normal: '#22c55e', low: '#3b82f6',
 };
@@ -192,7 +210,7 @@ export function renderStoryToCanvas(data: StoryData): HTMLCanvasElement {
       y += 36;
       ctx.fillStyle = '#999';
       ctx.font = '400 22px Inter, system-ui, sans-serif';
-      ctx.fillText(data.convergence.signalTypes.join('  ·  '), PAD, y);
+      ctx.fillText(data.convergence.signalTypes.map(humanizeSignalType).join('  ·  '), PAD, y);
     }
 
     for (const desc of data.convergence.regionalDescriptions.slice(0, 2)) {
