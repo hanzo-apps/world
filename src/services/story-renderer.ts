@@ -28,11 +28,25 @@ const THREAT_COLORS: Record<string, string> = {
   critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e', info: '#3b82f6',
 };
 
-export function renderStoryToCanvas(data: StoryData): HTMLCanvasElement {
+const LOGO_URL = '/favico/worldmonitor-icon-1024.png';
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
+
+  let logoImg: HTMLImageElement | null = null;
+  try { logoImg = await loadImage(LOGO_URL); } catch { /* proceed without logo */ }
 
   // Background — slightly lighter for better contrast
   ctx.fillStyle = '#0c0c14';
@@ -41,13 +55,18 @@ export function renderStoryToCanvas(data: StoryData): HTMLCanvasElement {
   let y = 0;
   const PAD = 72;
   const RIGHT = W - PAD;
+  const LOGO_SIZE = 48;
 
   // ── HEADER ──
   y = 60;
+  if (logoImg) {
+    ctx.drawImage(logoImg, PAD, y - 4, LOGO_SIZE, LOGO_SIZE);
+  }
+  const textX = logoImg ? PAD + LOGO_SIZE + 14 : PAD;
   ctx.fillStyle = '#666';
   ctx.font = '700 30px Inter, system-ui, sans-serif';
   ctx.letterSpacing = '6px';
-  ctx.fillText('WORLDMONITOR', PAD, y + 26);
+  ctx.fillText('WORLDMONITOR', textX, y + 26);
   ctx.letterSpacing = '0px';
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   ctx.font = '400 24px Inter, system-ui, sans-serif';
@@ -401,19 +420,23 @@ export function renderStoryToCanvas(data: StoryData): HTMLCanvasElement {
   ctx.lineTo(RIGHT, H - 90);
   ctx.stroke();
 
+  const footerLogoSize = 40;
+  if (logoImg) {
+    ctx.drawImage(logoImg, PAD, H - 78, footerLogoSize, footerLogoSize);
+  }
+  const footerTextX = logoImg ? PAD + footerLogoSize + 12 : PAD;
   ctx.fillStyle = '#444';
   ctx.font = '600 24px Inter, system-ui, sans-serif';
   ctx.letterSpacing = '2px';
-  ctx.fillText('WORLDMONITOR.APP', PAD, H - 50);
+  ctx.fillText('WORLDMONITOR.APP', footerTextX, H - 55);
   ctx.letterSpacing = '0px';
+  ctx.font = '400 20px Inter, system-ui, sans-serif';
+  ctx.fillText('Real-time global intelligence monitoring', footerTextX, H - 30);
+
   ctx.font = '400 22px Inter, system-ui, sans-serif';
   ctx.fillStyle = '#555';
   const tw = ctx.measureText(timeStr).width;
-  ctx.fillText(timeStr, RIGHT - tw, H - 50);
-
-  ctx.fillStyle = '#444';
-  ctx.font = '400 20px Inter, system-ui, sans-serif';
-  ctx.fillText('Real-time global intelligence monitoring', PAD, H - 24);
+  ctx.fillText(timeStr, RIGHT - tw, H - 55);
 
   return canvas;
 }
