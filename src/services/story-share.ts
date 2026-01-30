@@ -1,13 +1,20 @@
 import type { StoryData } from './story-data';
 
 // Deep link generator for story sharing
-export function generateStoryDeepLink(countryCode: string, type: 'ciianalysis' | 'convergence' | 'brief' = 'ciianalysis'): string {
+export function generateStoryDeepLink(
+  countryCode: string,
+  type: 'ciianalysis' | 'convergence' | 'brief' = 'ciianalysis',
+  score?: number,
+  level?: string
+): string {
   const params = new URLSearchParams({
     c: countryCode,
     t: type,
     ts: Date.now().toString()
   });
-  return `https://worldmonitor.app/story?${params.toString()}`;
+  if (score !== undefined) params.set('s', String(score));
+  if (level) params.set('l', level);
+  return `https://worldmonitor.app/api/story?${params.toString()}`;
 }
 
 // Parse deep link parameters
@@ -65,7 +72,7 @@ export const shareTexts = {
     `*Trend:* ${data.cii?.trend || 'stable'}\n` +
     `${data.threats.critical > 0 ? `*⚠️ Critical:* ${data.threats.critical}\n` : ''}` +
     `${data.threats.high > 0 ? `*🔴 High:* ${data.threats.high}\n` : ''}` +
-    `\n📊 View full analysis: ${generateStoryDeepLink(data.countryCode)}`,
+    `\n📊 View full analysis: ${generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level)}`,
 
   linkedin: (data: StoryData) =>
     `Intelligence Update: ${data.countryName}\n\n` +
@@ -82,12 +89,12 @@ export const shareTexts = {
     `${data.cii?.change24h ? `📉 24h: *${data.cii.change24h > 0 ? '+' : ''}${data.cii.change24h}*\n` : ''}` +
     `${data.threats.critical > 0 ? `🚨 Critical: *${data.threats.critical}*\n` : ''}` +
     `${data.threats.high > 0 ? `🔴 High: *${data.threats.high}*\n` : ''}` +
-    `\n🔗 ${generateStoryDeepLink(data.countryCode)}`
+    `\n🔗 ${generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level)}`
 };
 
 // Pre-generated share URLs
 export function getShareUrls(data: StoryData): Record<string, string> {
-  const url = generateStoryDeepLink(data.countryCode);
+  const url = generateStoryDeepLink(data.countryCode, 'ciianalysis', data.cii?.score, data.cii?.level);
   const text = encodeURIComponent(shareTexts.twitter(data));
   
   return {
