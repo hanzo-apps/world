@@ -218,6 +218,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech-specific layers
   startupHubs: true,
   cloudRegions: true,
@@ -248,6 +249,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: false,
+  fires: false,
   // Tech-specific layers (limited on mobile)
   startupHubs: true,
   cloudRegions: false,
