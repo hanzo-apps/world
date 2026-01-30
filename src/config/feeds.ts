@@ -647,45 +647,34 @@ export const FEEDS = SITE_VARIANT === 'tech' ? TECH_FEEDS : FULL_FEEDS;
 
 export const INTEL_SOURCES: Feed[] = [
   // Defense & Security (Tier 1)
-  { name: 'RUSI', url: rss('https://rusi.org/rss.xml'), type: 'defense' },
   { name: 'Defense One', url: rss('https://www.defenseone.com/rss/all/'), type: 'defense' },
   { name: 'Breaking Defense', url: rss('https://breakingdefense.com/feed/'), type: 'defense' },
   { name: 'The War Zone', url: rss('https://www.thedrive.com/the-war-zone/rss'), type: 'defense' },
   { name: 'Defense News', url: rss('https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml'), type: 'defense' },
   { name: 'Janes', url: rss('https://news.google.com/rss/search?q=site:janes.com+when:3d&hl=en-US&gl=US&ceid=US:en'), type: 'defense' },
-  { name: 'Stimson Center', url: rss('https://stimson.org/feed/'), type: 'defense' },
-  { name: 'CNAS', url: rss('https://www.cnas.org/rss'), type: 'defense' },
   { name: 'CSIS', url: rss('https://www.csis.org/analysis?type=analysis'), type: 'defense' },
-  
+
   // International Relations (Tier 2)
   { name: 'Chatham House', url: rss('https://www.chathamhouse.org/rss.xml'), type: 'intl' },
-  { name: 'CFR', url: rss('https://www.cfr.org/rss'), type: 'intl' },
   { name: 'ECFR', url: rss('https://ecfr.eu/feed/'), type: 'intl' },
   { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/'), type: 'intl' },
   { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml'), type: 'intl' },
   { name: 'Atlantic Council', url: rss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
-  { name: 'GMFUS', url: rss('https://www.gmfus.org/feed'), type: 'intl' },
-  { name: 'Wilson Center', url: rss('https://www.wilsoncenter.org/rss.xml'), type: 'intl' },
-  { name: 'Lowy Institute', url: rss('https://www.lowyinstitute.org/feed'), type: 'intl' },
   { name: 'Middle East Institute', url: rss('https://www.mei.edu/rss.xml'), type: 'intl' },
-  
+
   // Think Tanks & Research (Tier 3)
   { name: 'RAND', url: rss('https://www.rand.org/rss/all.xml'), type: 'research' },
   { name: 'Brookings', url: rss('https://www.brookings.edu/feed/'), type: 'research' },
   { name: 'Carnegie', url: rss('https://carnegieendowment.org/rss/'), type: 'research' },
   { name: 'FAS', url: rss('https://fas.org/feed/'), type: 'research' },
-  { name: 'Arms Control Association', url: rss('https://www.armscontrol.org/rss/all'), type: 'research' },
   { name: 'NTI', url: rss('https://www.nti.org/rss/'), type: 'research' },
-  { name: 'Bulletin of Atomic Scientists', url: rss('https://thebulletin.org/feed/'), type: 'research' },
-  
+
   // OSINT & Monitoring (Tier 2)
   { name: 'Bellingcat', url: rss('https://www.bellingcat.com/feed/'), type: 'osint' },
   { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/'), type: 'cyber' },
-  
+
   // Economic & Food Security (Tier 2)
   { name: 'FAO Food Price Monitor', url: rss('https://fpma.fao.org/giews/fpmat4/rss.xml'), type: 'economic' },
-  { name: 'World Bank', url: rss('https://worldbank.org/rss.xml'), type: 'economic' },
-  { name: 'IMF', url: rss('https://www.imf.org/en/Rss.aspx'), type: 'economic' },
 ];
 
 // Keywords that trigger alert status - must be specific to avoid false positives
