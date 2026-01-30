@@ -1949,7 +1949,7 @@ export class DeckGLMap {
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'techEvents', label: 'Tech Events', icon: '&#128197;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
-          { key: 'fires', label: 'Satellite Fires', icon: '&#128293;' },
+          { key: 'fires', label: 'Fires', icon: '&#128293;' },
         ]
       : [
           { key: 'hotspots', label: 'Intel Hotspots', icon: '&#127919;' },
@@ -1968,7 +1968,7 @@ export class DeckGLMap {
           { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
-          { key: 'fires', label: 'Satellite Fires', icon: '&#128293;' },
+          { key: 'fires', label: 'Fires', icon: '&#128293;' },
           { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
           { key: 'economic', label: 'Economic Centers', icon: '&#128176;' },
           { key: 'minerals', label: 'Critical Minerals', icon: '&#128142;' },
