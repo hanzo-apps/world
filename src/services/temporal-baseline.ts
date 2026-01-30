@@ -37,7 +37,7 @@ const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
 
 function formatAnomalyMessage(
   type: TemporalEventType,
-  region: string,
+  _region: string,
   count: number,
   mean: number,
   multiplier: number,
