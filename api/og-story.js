@@ -128,10 +128,10 @@ export default function handler(req, res) {
 
   <!-- RIGHT COLUMN: Score arc gauge -->
   <!-- Arc background -->
-  <path d="${arcCx - arcRadius},${arcCy} A ${arcRadius} ${arcRadius} 0 1 1 ${arcCx + arcRadius},${arcCy}"
+  <path d="M ${arcCx - arcRadius},${arcCy} A ${arcRadius} ${arcRadius} 0 1 1 ${arcCx + arcRadius},${arcCy}"
     fill="none" stroke="#1a1a2e" stroke-width="16" stroke-linecap="round"/>
   <!-- Arc fill -->
-  ${scoreNum > 0 ? `<path d="${arcCx + arcRadius},${arcCy} A ${arcRadius} ${arcRadius} 0 ${largeArc} 0 ${arcEndX.toFixed(1)},${arcEndY.toFixed(1)}"
+  ${scoreNum > 0 ? `<path d="M ${arcCx + arcRadius},${arcCy} A ${arcRadius} ${arcRadius} 0 ${largeArc} 0 ${arcEndX.toFixed(1)},${arcEndY.toFixed(1)}"
     fill="none" stroke="${levelColor}" stroke-width="16" stroke-linecap="round"/>` : ''}
   <!-- Score in center of arc -->
   <text x="${arcCx}" y="${arcCy - 20}" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="${levelColor}" text-anchor="middle"
