@@ -296,12 +296,12 @@ async function classifyWithAISingle(
   try {
     const params = new URLSearchParams({ title, variant });
     const resp = await fetch(`/api/classify-event?${params}`);
-    if (resp.status === 429) {
+    if (resp.status === 429 || resp.status >= 500) {
       aiPaused = true;
-      console.warn('[Classify] Rate limited — pausing AI classification for 60s, flushing', aiQueue.length, 'queued jobs');
-      // Resolve all queued jobs with null so callers aren't left hanging
+      const delay = resp.status === 429 ? 60_000 : 30_000;
+      console.warn(`[Classify] ${resp.status} — pausing AI classification for ${delay / 1000}s, flushing`, aiQueue.length, 'queued jobs');
       while (aiQueue.length > 0) aiQueue.shift()!.resolve(null);
-      setTimeout(() => { aiPaused = false; drainAiQueue(); }, 60_000);
+      setTimeout(() => { aiPaused = false; drainAiQueue(); }, delay);
       return null;
     }
     if (!resp.ok) return null;
