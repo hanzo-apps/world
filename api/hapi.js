@@ -16,12 +16,12 @@ export default async function handler(req) {
   }
 
   try {
+    const appId = btoa('worldmonitor:monitor@worldmonitor.app');
     const response = await fetch(
-      'https://hapi.humdata.org/api/v2/coordination-context/conflict-event?output_format=json&limit=1000&offset=0',
+      `https://hapi.humdata.org/api/v2/coordination-context/conflict-events?output_format=json&limit=1000&offset=0&app_identifier=${appId}`,
       {
         headers: {
           'Accept': 'application/json',
-          'X-HDX-HAPI-APP-IDENTIFIER': 'worldmonitor-app',
         },
       }
     );
@@ -33,35 +33,33 @@ export default async function handler(req) {
     const rawData = await response.json();
     const records = rawData.data || [];
 
-    // Aggregate by country ISO3 code → most recent month's data
+    // Each record is (country, event_type, month) — aggregate across event types per country
+    // Keep only the most recent month per country
     const byCountry = {};
     for (const r of records) {
-      const iso3 = r.location_code || r.admin1_code?.substring(0, 3) || '';
+      const iso3 = r.location_code || '';
       if (!iso3) continue;
 
       const month = r.reference_period_start || '';
-      const existing = byCountry[iso3];
+      const eventType = (r.event_type || '').toLowerCase();
+      const events = r.events || 0;
+      const fatalities = r.fatalities || 0;
 
-      if (!existing || month > existing.month) {
-        byCountry[iso3] = {
-          iso3,
-          locationName: r.location_name || '',
-          month,
-          eventsTotal: r.events || 0,
-          eventsPoliticalViolence: r.events_political_violence || 0,
-          eventsCivilianTargeting: r.events_civilian_targeting || 0,
-          eventsDemonstrations: r.events_demonstrations || 0,
-          fatalitiesTotalPoliticalViolence: r.fatalities_political_violence || 0,
-          fatalitiesTotalCivilianTargeting: r.fatalities_civilian_targeting || 0,
-        };
-      } else if (month === existing.month) {
-        // Same month — accumulate admin-level data
-        existing.eventsTotal += r.events || 0;
-        existing.eventsPoliticalViolence += r.events_political_violence || 0;
-        existing.eventsCivilianTargeting += r.events_civilian_targeting || 0;
-        existing.eventsDemonstrations += r.events_demonstrations || 0;
-        existing.fatalitiesTotalPoliticalViolence += r.fatalities_political_violence || 0;
-        existing.fatalitiesTotalCivilianTargeting += r.fatalities_civilian_targeting || 0;
+      if (!byCountry[iso3]) {
+        byCountry[iso3] = { iso3, locationName: r.location_name || '', month, eventsTotal: 0, eventsPoliticalViolence: 0, eventsCivilianTargeting: 0, eventsDemonstrations: 0, fatalitiesTotalPoliticalViolence: 0, fatalitiesTotalCivilianTargeting: 0 };
+      }
+
+      const c = byCountry[iso3];
+      if (month > c.month) {
+        // Newer month — reset
+        c.month = month;
+        c.eventsTotal = 0; c.eventsPoliticalViolence = 0; c.eventsCivilianTargeting = 0; c.eventsDemonstrations = 0; c.fatalitiesTotalPoliticalViolence = 0; c.fatalitiesTotalCivilianTargeting = 0;
+      }
+      if (month === c.month) {
+        c.eventsTotal += events;
+        if (eventType.includes('political_violence')) { c.eventsPoliticalViolence += events; c.fatalitiesTotalPoliticalViolence += fatalities; }
+        if (eventType.includes('civilian_targeting')) { c.eventsCivilianTargeting += events; c.fatalitiesTotalCivilianTargeting += fatalities; }
+        if (eventType.includes('demonstration')) { c.eventsDemonstrations += events; }
       }
     }
 
