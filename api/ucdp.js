@@ -16,39 +16,46 @@ export default async function handler(req) {
   }
 
   try {
-    // Fetch active conflicts (latest version)
-    const response = await fetch('https://ucdpapi.pcr.uu.se/api/ucdpprioconflict/24.1?pagesize=100&page=0', {
-      headers: { 'Accept': 'application/json' },
-    });
+    // Fetch all pages of conflicts
+    let allConflicts = [];
+    let page = 0;
+    let totalPages = 1;
 
-    if (!response.ok) {
-      throw new Error(`UCDP API error: ${response.status}`);
+    while (page < totalPages) {
+      const response = await fetch(`https://ucdpapi.pcr.uu.se/api/ucdpprioconflict/24.1?pagesize=100&page=${page}`, {
+        headers: { 'Accept': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`UCDP API error: ${response.status}`);
+      }
+
+      const rawData = await response.json();
+      totalPages = rawData.TotalPages || 1;
+      const conflicts = rawData.Result || [];
+      allConflicts = allConflicts.concat(conflicts);
+      page++;
     }
 
-    const rawData = await response.json();
-    const conflicts = rawData.Result || [];
-
-    // Extract most recent year per country with intensity level
+    // Fields are snake_case: conflict_id, location, side_a, side_b, year, intensity_level, type_of_conflict
     const countryConflicts = {};
-    for (const c of conflicts) {
-      const locations = c.GWNoLoc || c.SideAID || '';
-      const name = c.Location || '';
-      const year = c.Year || 0;
-      const intensity = c.IntensityLevel || 0;
+    for (const c of allConflicts) {
+      const name = c.location || '';
+      const year = parseInt(c.year, 10) || 0;
+      const intensity = parseInt(c.intensity_level, 10) || 0;
 
-      // UCDP uses country names, map to entries
       const entry = {
-        conflictId: c.ConflictId,
-        conflictName: c.SideBID || c.SideB || '',
+        conflictId: parseInt(c.conflict_id, 10) || 0,
+        conflictName: c.side_b || '',
         location: name,
         year,
-        intensityLevel: intensity, // 1=Minor (25-999 deaths/yr), 2=War (1000+ deaths/yr)
-        typeOfConflict: c.TypeOfConflict, // 1=extrasystemic, 2=interstate, 3=intrastate, 4=internationalized intrastate
-        startDate: c.StartDate,
-        startDate2: c.StartDate2,
-        sideA: c.SideA,
-        sideB: c.SideB || c.SideBID,
-        region: c.Region,
+        intensityLevel: intensity,
+        typeOfConflict: parseInt(c.type_of_conflict, 10) || 0,
+        startDate: c.start_date,
+        startDate2: c.start_date2,
+        sideA: c.side_a,
+        sideB: c.side_b,
+        region: c.region,
       };
 
       // Keep most recent / highest intensity per location
@@ -72,7 +79,6 @@ export default async function handler(req) {
       headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600', 'X-Cache': 'MISS' },
     });
   } catch (error) {
-    // Return stale cache on error
     if (cache.data) {
       return Response.json(cache.data, {
         status: 200,
