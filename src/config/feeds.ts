@@ -327,8 +327,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'Al Jazeera', url: rss('https://www.aljazeera.com/xml/rss/all.xml') },
     // AlArabiya blocks cloud IPs (Cloudflare), use Google News fallback
     { name: 'Al Arabiya', url: rss('https://news.google.com/rss/search?q=site:english.alarabiya.net+when:2d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'Arab News', url: railwayRss('https://www.arabnews.com/cat/2/rss.xml') },
-    { name: 'Times of Israel', url: rss('https://www.timesofisrael.com/feed/') },
+    // Arab News and Times of Israel removed — 403 from cloud IPs
     { name: 'Guardian ME', url: rss('https://www.theguardian.com/world/middleeast/rss') },
     { name: 'CNN World', url: rss('http://rss.cnn.com/rss/cnn_world.rss') },
   ],
