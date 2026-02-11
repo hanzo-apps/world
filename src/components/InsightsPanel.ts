@@ -7,7 +7,7 @@ import { focalPointDetector } from '@/services/focal-point-detector';
 import { ingestNewsForCII } from '@/services/country-instability';
 import { getTheaterPostureSummaries } from '@/services/military-surge';
 import { isMobileDevice } from '@/utils';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { SITE_VARIANT } from '@/config';
 import type { ClusteredEvent, FocalPoint, MilitaryFlight } from '@/types';
 
@@ -593,7 +593,7 @@ export class InsightsPanel extends Panel {
       const icons = fp.signalTypes.map(t => signalIcons[t] || '').join(' ');
       const topHeadline = fp.topHeadlines[0];
       const headlineText = topHeadline?.title?.slice(0, 60) || '';
-      const headlineUrl = topHeadline?.url || '';
+      const headlineUrl = sanitizeUrl(topHeadline?.url || '');
 
       return `
         <div class="focal-point ${urgencyClass}">
@@ -605,7 +605,7 @@ export class InsightsPanel extends Panel {
           <div class="focal-point-stats">
             ${fp.newsMentions} news • ${fp.signalCount} signals
           </div>
-          ${headlineText ? `<a href="${escapeHtml(headlineUrl)}" target="_blank" rel="noopener" class="focal-point-headline">"${escapeHtml(headlineText)}..."</a>` : ''}
+          ${headlineText && headlineUrl ? `<a href="${headlineUrl}" target="_blank" rel="noopener" class="focal-point-headline">"${escapeHtml(headlineText)}..."</a>` : ''}
         </div>
       `;
     }).join('');

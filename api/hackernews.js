@@ -2,11 +2,23 @@ export const config = { runtime: 'edge' };
 
 // Fetch Hacker News front page stories
 // Uses official HackerNews Firebase API
+const ALLOWED_STORY_TYPES = new Set(['top', 'new', 'best', 'ask', 'show', 'job']);
+const DEFAULT_LIMIT = 30;
+const MAX_LIMIT = 60;
+const MAX_CONCURRENCY = 10;
+
+function parseLimit(rawLimit) {
+  const parsed = Number.parseInt(rawLimit || '', 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
+  return Math.max(1, Math.min(MAX_LIMIT, parsed));
+}
+
 export default async function handler(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const storyType = searchParams.get('type') || 'top'; // top, new, best, ask, show, job
-    const limit = parseInt(searchParams.get('limit') || '30', 10);
+    const requestedType = searchParams.get('type') || 'top';
+    const storyType = ALLOWED_STORY_TYPES.has(requestedType) ? requestedType : 'top';
+    const limit = parseLimit(searchParams.get('limit'));
 
     // HackerNews official Firebase API
     const storiesUrl = `https://hacker-news.firebaseio.com/v0/${storyType}stories.json`;
@@ -21,26 +33,33 @@ export default async function handler(request) {
     }
 
     const storyIds = await storiesResponse.json();
+    if (!Array.isArray(storyIds)) {
+      throw new Error('HackerNews API returned unexpected payload');
+    }
     const limitedIds = storyIds.slice(0, limit);
 
-    // Fetch story details in parallel (batch of 30)
-    const storyPromises = limitedIds.map(async (id) => {
-      const storyUrl = `https://hacker-news.firebaseio.com/v0/item/${id}.json`;
-      try {
-        const response = await fetch(storyUrl, {
-          signal: AbortSignal.timeout(5000),
-        });
-        if (response.ok) {
-          return await response.json();
+    // Fetch story details in bounded batches to avoid unbounded fan-out.
+    const stories = [];
+    for (let i = 0; i < limitedIds.length; i += MAX_CONCURRENCY) {
+      const batchIds = limitedIds.slice(i, i + MAX_CONCURRENCY);
+      const storyPromises = batchIds.map(async (id) => {
+        const storyUrl = `https://hacker-news.firebaseio.com/v0/item/${id}.json`;
+        try {
+          const response = await fetch(storyUrl, {
+            signal: AbortSignal.timeout(5000),
+          });
+          if (response.ok) {
+            return await response.json();
+          }
+          return null;
+        } catch (error) {
+          console.error(`Failed to fetch story ${id}:`, error);
+          return null;
         }
-        return null;
-      } catch (error) {
-        console.error(`Failed to fetch story ${id}:`, error);
-        return null;
-      }
-    });
-
-    const stories = (await Promise.all(storyPromises)).filter(story => story !== null);
+      });
+      const batchResults = await Promise.all(storyPromises);
+      stories.push(...batchResults.filter((story) => story !== null));
+    }
 
     return new Response(JSON.stringify({
       type: storyType,

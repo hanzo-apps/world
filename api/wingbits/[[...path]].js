@@ -1,10 +1,33 @@
 // Wingbits API proxy - keeps API key server-side
 // Note: Edge runtime is stateless - caching happens client-side and via HTTP Cache-Control
+import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
   const url = new URL(req.url);
   const path = url.pathname.replace('/api/wingbits', '');
+  const corsHeaders = getCorsHeaders(req, 'GET, POST, OPTIONS');
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) {
+      return new Response(null, {
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return Response.json({ error: 'Origin not allowed' }, {
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
 
   // Get API key from server-side env
   const apiKey = process.env.WINGBITS_API_KEY;
@@ -15,19 +38,7 @@ export default async function handler(req) {
       configured: false
     }, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
+      headers: corsHeaders,
     });
   }
 
@@ -50,7 +61,7 @@ export default async function handler(req) {
           icao24,
         }, {
           status: response.status,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -58,7 +69,7 @@ export default async function handler(req) {
 
       return Response.json(data, {
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           'Cache-Control': 'public, max-age=86400', // 24h - aircraft details rarely change
         },
       });
@@ -68,7 +79,7 @@ export default async function handler(req) {
         icao24,
       }, {
         status: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
   }
@@ -82,7 +93,7 @@ export default async function handler(req) {
       if (!Array.isArray(icao24List) || icao24List.length === 0) {
         return Response.json({ error: 'icao24s array required' }, {
           status: 400,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -124,7 +135,7 @@ export default async function handler(req) {
         requested: limitedList.length,
       }, {
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
         },
       });
     } catch (error) {
@@ -132,7 +143,7 @@ export default async function handler(req) {
         error: `Batch lookup failed: ${error.message}`,
       }, {
         status: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
   }
@@ -151,7 +162,7 @@ export default async function handler(req) {
       if (!la || !lo) {
         return Response.json({ error: 'lat (la) and lon (lo) required' }, {
           status: 400,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -173,7 +184,7 @@ export default async function handler(req) {
           details: errorText,
         }, {
           status: response.status,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -182,7 +193,7 @@ export default async function handler(req) {
 
       return Response.json(data, {
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           'Cache-Control': 'public, max-age=30', // 30 seconds - live data
         },
       });
@@ -192,7 +203,7 @@ export default async function handler(req) {
         error: `Fetch failed: ${error.message}`,
       }, {
         status: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
   }
@@ -206,7 +217,7 @@ export default async function handler(req) {
       if (!Array.isArray(areas) || areas.length === 0) {
         return Response.json({ error: 'areas array required' }, {
           status: 400,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -238,7 +249,7 @@ export default async function handler(req) {
           details: errorText,
         }, {
           status: response.status,
-          headers: { 'Access-Control-Allow-Origin': '*' },
+          headers: corsHeaders,
         });
       }
 
@@ -247,7 +258,7 @@ export default async function handler(req) {
 
       return Response.json(data, {
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           'Cache-Control': 'public, max-age=30',
         },
       });
@@ -257,7 +268,7 @@ export default async function handler(req) {
         error: `Fetch failed: ${error.message}`,
       }, {
         status: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
   }
@@ -273,7 +284,7 @@ export default async function handler(req) {
         ...data,
         configured: true,
       }, {
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     } catch (error) {
       return Response.json({
@@ -281,13 +292,13 @@ export default async function handler(req) {
         configured: true,
       }, {
         status: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
   }
 
   return Response.json({ error: 'Not found' }, {
     status: 404,
-    headers: { 'Access-Control-Allow-Origin': '*' },
+    headers: corsHeaders,
   });
 }

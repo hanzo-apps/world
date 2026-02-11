@@ -1,5 +1,5 @@
 import { Panel } from './Panel';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 interface TechEventCoords {
   lat: number;
@@ -198,8 +198,9 @@ export class TechEventsPanel extends Panel {
       ? `<span class="event-location">${escapeHtml(event.location)}</span>`
       : '';
 
-    const urlLink = event.url
-      ? `<a href="${event.url}" target="_blank" rel="noopener" class="event-url" title="More info">↗</a>`
+    const safeEventUrl = sanitizeUrl(event.url || '');
+    const urlLink = safeEventUrl
+      ? `<a href="${safeEventUrl}" target="_blank" rel="noopener" class="event-url" title="More info">↗</a>`
       : '';
 
     return `
