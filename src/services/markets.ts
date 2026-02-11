@@ -28,6 +28,9 @@ interface YahooFinanceResponse {
         chartPreviousClose?: number;
         previousClose?: number;
       };
+      indicators?: {
+        quote?: Array<{ close?: (number | null)[] }>;
+      };
     }>;
   };
 }
@@ -37,6 +40,13 @@ interface CoinGeckoResponse {
     usd: number;
     usd_24h_change: number;
   };
+}
+
+interface CoinGeckoMarketItem {
+  id: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  sparkline_in_7d?: { price: number[] };
 }
 
 // Symbols that need Yahoo Finance (indices and futures not supported by Finnhub free tier)
@@ -100,14 +110,18 @@ async function fetchFromYahoo(
     if (!response.ok) return null;
     const data: YahooFinanceResponse = await response.json();
 
-    const meta = data.chart.result[0]?.meta;
+    const result = data.chart.result[0];
+    const meta = result?.meta;
     if (!meta) return null;
 
     const price = meta.regularMarketPrice;
     const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     const change = ((price - prevClose) / prevClose) * 100;
 
-    return { symbol, name, display, price, change };
+    const closes = result.indicators?.quote?.[0]?.close;
+    const sparkline = closes?.filter((v): v is number => v != null);
+
+    return { symbol, name, display, price, change, sparkline };
   } catch {
     return null;
   }
@@ -165,17 +179,33 @@ export async function fetchStockQuote(
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
   try {
-    const response = await fetchWithProxy(API_URLS.coingecko);
+    const ids = Object.keys(CRYPTO_MAP).join(',');
+    const marketsUrl = `/api/coingecko?ids=${ids}&vs_currencies=usd&endpoint=markets`;
+    const response = await fetchWithProxy(marketsUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data: CoinGeckoResponse = await response.json();
+    const data: CoinGeckoMarketItem[] = await response.json();
 
+    if (!Array.isArray(data)) {
+      const fallback: CoinGeckoResponse = data;
+      return Object.entries(CRYPTO_MAP).map(([id, info]) => ({
+        name: info.name,
+        symbol: info.symbol,
+        price: fallback[id]?.usd ?? 0,
+        change: fallback[id]?.usd_24h_change ?? 0,
+      }));
+    }
+
+    const byId = new Map(data.map(c => [c.id, c]));
     return Object.entries(CRYPTO_MAP).map(([id, info]) => {
-      const coinData = data[id];
+      const coin = byId.get(id);
+      const prices = coin?.sparkline_in_7d?.price;
+      const sparkline = prices && prices.length > 24 ? prices.slice(-48) : prices;
       return {
         name: info.name,
         symbol: info.symbol,
-        price: coinData?.usd ?? 0,
-        change: coinData?.usd_24h_change ?? 0,
+        price: coin?.current_price ?? 0,
+        change: coin?.price_change_percentage_24h ?? 0,
+        sparkline,
       };
     });
   } catch (e) {
