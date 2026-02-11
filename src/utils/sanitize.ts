@@ -13,26 +13,34 @@ export function escapeHtml(str: string): string {
 
 export function sanitizeUrl(url: string): string {
   if (!url) return '';
-  const trimmed = url.trim();
+  const trimmed = String(url).trim();
+  if (!trimmed) return '';
+
+  const isAllowedProtocol = (protocol: string) => protocol === 'http:' || protocol === 'https:';
+
   try {
-    // Try as absolute URL first
     const parsed = new URL(trimmed);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return trimmed;
+    if (isAllowedProtocol(parsed.protocol)) {
+      return escapeAttr(parsed.toString());
     }
   } catch {
-    // Not absolute - try as relative URL
-    try {
-      const base = typeof window !== 'undefined' ? window.location.origin : 'https://example.com';
-      const resolved = new URL(trimmed, base);
-      if (resolved.protocol === 'http:' || resolved.protocol === 'https:') {
-        return trimmed; // Return original relative URL, browser will resolve it
-      }
-    } catch {
-      // Invalid URL
-    }
+    // Not an absolute URL, continue and validate as relative.
   }
-  return '';
+
+  if (!/^(\/|\.\/|\.\.\/|\?|#)/.test(trimmed)) {
+    return '';
+  }
+
+  try {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://example.com';
+    const resolved = new URL(trimmed, base);
+    if (!isAllowedProtocol(resolved.protocol)) {
+      return '';
+    }
+    return escapeAttr(trimmed);
+  } catch {
+    return '';
+  }
 }
 
 export function escapeAttr(str: string): string {

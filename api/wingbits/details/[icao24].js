@@ -1,19 +1,25 @@
 // Wingbits single aircraft details
+import { getCorsHeaders, isDisallowedOrigin } from '../../_cors.js';
 export const config = { runtime: 'edge' };
 
 export default async function handler(req, { params }) {
   const icao24 = params.icao24?.toLowerCase();
   const apiKey = process.env.WINGBITS_API_KEY;
-
-  // CORS headers
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
+  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
 
   if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) {
+      return new Response(null, { status: 403, headers: corsHeaders });
+    }
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== 'GET') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405, headers: corsHeaders });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return Response.json({ error: 'Origin not allowed' }, { status: 403, headers: corsHeaders });
   }
 
   if (!apiKey) {
