@@ -93,6 +93,7 @@ export interface MarketData {
   display: string;
   price: number | null;
   change: number | null;
+  sparkline?: number[];
 }
 
 export interface CryptoData {
@@ -100,6 +101,7 @@ export interface CryptoData {
   symbol: string;
   price: number;
   change: number;
+  sparkline?: number[];
 }
 
 export type EscalationTrend = 'escalating' | 'stable' | 'de-escalating';
