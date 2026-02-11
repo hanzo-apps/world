@@ -2889,7 +2889,7 @@ export class App {
       this.statusPanel?.updateFeed('Shipping', {
         status: shippingStatus,
         itemCount: shippingCount,
-        errorMessage: !aisStatus.connected && shippingCount === 0 ? 'WebSocket disconnected' : undefined,
+        errorMessage: !aisStatus.connected && shippingCount === 0 ? 'AIS snapshot unavailable' : undefined,
       });
       this.statusPanel?.updateApi('AISStream', {
         status: aisStatus.connected ? 'ok' : 'warning',
