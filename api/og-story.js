@@ -34,7 +34,10 @@ export default function handler(req, res) {
   const countryName = COUNTRY_NAMES[countryCode] || countryCode || 'Global';
   const levelColor = LEVEL_COLORS[level] || '#eab308';
   const levelLabel = LEVEL_LABELS[level] || 'MONITORING';
-  const scoreNum = score ? parseInt(score, 10) : null;
+  const parsedScore = score ? Number.parseInt(score, 10) : Number.NaN;
+  const scoreNum = Number.isFinite(parsedScore)
+    ? Math.max(0, Math.min(100, parsedScore))
+    : null;
   const dateStr = new Date().toISOString().slice(0, 10);
 
   // Score arc (semicircle gauge)

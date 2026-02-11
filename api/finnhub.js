@@ -1,3 +1,4 @@
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 const SYMBOL_PATTERN = /^[A-Za-z0-9.^]+$/;
@@ -49,12 +50,35 @@ async function fetchQuote(symbol, apiKey) {
 }
 
 export default async function handler(req) {
+  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) {
+      return new Response(null, { status: 403, headers: corsHeaders });
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== 'GET') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+
   const apiKey = process.env.FINNHUB_API_KEY;
 
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'Finnhub API key not configured' }), {
       status: 503,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
@@ -64,7 +88,7 @@ export default async function handler(req) {
   if (!symbols) {
     return new Response(JSON.stringify({ error: 'Invalid or missing symbols parameter' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
@@ -78,14 +102,14 @@ export default async function handler(req) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=30',
+        ...corsHeaders,
       },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 }

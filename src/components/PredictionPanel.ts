@@ -1,6 +1,6 @@
 import { Panel } from './Panel';
 import type { PredictionMarket } from '@/types';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 export class PredictionPanel extends Panel {
   constructor() {
@@ -37,8 +37,9 @@ export class PredictionPanel extends Panel {
         const noPercent = 100 - yesPercent;
         const volumeStr = this.formatVolume(p.volume);
 
-        const titleHtml = p.url
-          ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" class="prediction-question prediction-link">${escapeHtml(p.title)}</a>`
+        const safeUrl = sanitizeUrl(p.url || '');
+        const titleHtml = safeUrl
+          ? `<a href="${safeUrl}" target="_blank" rel="noopener" class="prediction-question prediction-link">${escapeHtml(p.title)}</a>`
           : `<div class="prediction-question">${escapeHtml(p.title)}</div>`;
 
         return `
