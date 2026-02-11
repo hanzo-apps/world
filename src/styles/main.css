@@ -3293,8 +3293,12 @@ body.playback-mode .status-dot {
 }
 
 .market-data {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-align: right;
 }
+.market-data .mini-sparkline { display: block; flex-shrink: 0; opacity: 0.8; }
 
 .market-price {
   font-size: 12px;
@@ -3341,6 +3345,7 @@ body.playback-mode .status-dot {
 
 .commodity-change.up { color: var(--green); }
 .commodity-change.down { color: var(--red); }
+.commodity-item .mini-sparkline { display: block; margin: 2px 0; opacity: 0.8; }
 
 /* Predictions */
 .prediction-item {
