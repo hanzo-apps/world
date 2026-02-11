@@ -43,6 +43,52 @@ const WINGBITS_PROXY_URL = '/api/wingbits';
 // Client-side cache for aircraft details
 const localCache = new Map<string, { data: WingbitsAircraftDetails; timestamp: number }>();
 const LOCAL_CACHE_TTL = 60 * 60 * 1000; // 1 hour client-side
+const MAX_LOCAL_CACHE_ENTRIES = 2000;
+const CACHE_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+let lastCacheSweep = 0;
+
+function sweepLocalCache(now = Date.now()): void {
+  if (now - lastCacheSweep < CACHE_SWEEP_INTERVAL_MS && localCache.size <= MAX_LOCAL_CACHE_ENTRIES) {
+    return;
+  }
+
+  lastCacheSweep = now;
+
+  for (const [key, value] of localCache.entries()) {
+    if (now - value.timestamp >= LOCAL_CACHE_TTL) {
+      localCache.delete(key);
+    }
+  }
+
+  if (localCache.size <= MAX_LOCAL_CACHE_ENTRIES) return;
+
+  const oldestFirst = Array.from(localCache.entries())
+    .sort((a, b) => a[1].timestamp - b[1].timestamp);
+  const toDelete = oldestFirst.slice(0, localCache.size - MAX_LOCAL_CACHE_ENTRIES);
+  for (const [key] of toDelete) {
+    localCache.delete(key);
+  }
+}
+
+function getFromLocalCache(key: string): WingbitsAircraftDetails | null {
+  const now = Date.now();
+  sweepLocalCache(now);
+  const cached = localCache.get(key);
+  if (!cached) return null;
+  if (now - cached.timestamp >= LOCAL_CACHE_TTL) {
+    localCache.delete(key);
+    return null;
+  }
+  return cached.data;
+}
+
+function setLocalCache(key: string, data: WingbitsAircraftDetails): void {
+  sweepLocalCache();
+  localCache.set(key, { data, timestamp: Date.now() });
+  if (localCache.size > MAX_LOCAL_CACHE_ENTRIES) {
+    sweepLocalCache();
+  }
+}
 
 // Track if Wingbits is configured
 let wingbitsConfigured: boolean | null = null;
@@ -110,10 +156,8 @@ export async function getAircraftDetails(icao24: string): Promise<WingbitsAircra
   const key = icao24.toLowerCase();
 
   // Check local cache first
-  const cached = localCache.get(key);
-  if (cached && Date.now() - cached.timestamp < LOCAL_CACHE_TTL) {
-    return cached.data;
-  }
+  const cached = getFromLocalCache(key);
+  if (cached) return cached;
 
   return breaker.execute(async () => {
     // Check if configured
@@ -125,7 +169,7 @@ export async function getAircraftDetails(icao24: string): Promise<WingbitsAircra
       if (!response.ok) {
         if (response.status === 404) {
           // Cache negative result
-          localCache.set(key, { data: { icao24: key } as WingbitsAircraftDetails, timestamp: Date.now() });
+          setLocalCache(key, { icao24: key } as WingbitsAircraftDetails);
           return null;
         }
         return null;
@@ -139,7 +183,7 @@ export async function getAircraftDetails(icao24: string): Promise<WingbitsAircra
       }
 
       // Cache the result
-      localCache.set(key, { data, timestamp: Date.now() });
+      setLocalCache(key, data);
       return data;
     } catch {
       return null;
@@ -157,10 +201,10 @@ export async function getAircraftDetailsBatch(icao24List: string[]): Promise<Map
   // Check local cache first
   for (const icao24 of icao24List) {
     const key = icao24.toLowerCase();
-    const cached = localCache.get(key);
-    if (cached && Date.now() - cached.timestamp < LOCAL_CACHE_TTL) {
-      if (cached.data.registration) { // Only include valid results
-        results.set(key, cached.data);
+    const cached = getFromLocalCache(key);
+    if (cached) {
+      if (cached.registration) { // Only include valid results
+        results.set(key, cached);
       }
     } else {
       toFetch.push(key);
@@ -191,7 +235,7 @@ export async function getAircraftDetailsBatch(icao24List: string[]): Promise<Map
     if (data.results) {
       for (const [icao24, details] of Object.entries(data.results)) {
         const typedDetails = details as WingbitsAircraftDetails;
-        localCache.set(icao24, { data: typedDetails, timestamp: Date.now() });
+        setLocalCache(icao24, typedDetails);
         if (typedDetails.registration) {
           results.set(icao24, typedDetails);
         }
@@ -318,4 +362,5 @@ export function getWingbitsStatus(): { configured: boolean | null; cacheSize: nu
  */
 export function clearWingbitsCache(): void {
   localCache.clear();
+  lastCacheSweep = 0;
 }

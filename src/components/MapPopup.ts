@@ -1063,10 +1063,18 @@ export class MapPopup {
     const statusLabel = advisory ? (advisory.severity === 'fault' ? 'FAULT' : 'DEGRADED') : 'ACTIVE';
     const statusBadge = advisory ? (advisory.severity === 'fault' ? 'high' : 'elevated') : 'low';
     const repairEta = repairShip?.eta || advisory?.repairEta;
+    const cableName = escapeHtml(cable.name.toUpperCase());
+    const safeStatusLabel = escapeHtml(statusLabel);
+    const safeRepairEta = repairEta ? escapeHtml(repairEta) : '';
+    const advisoryTitle = advisory ? escapeHtml(advisory.title) : '';
+    const advisoryImpact = advisory ? escapeHtml(advisory.impact) : '';
+    const advisoryDescription = advisory ? escapeHtml(advisory.description) : '';
+    const repairShipName = repairShip ? escapeHtml(repairShip.name) : '';
+    const repairShipNote = repairShip ? escapeHtml(repairShip.note || 'Repair vessel tracking indicates active deployment toward fault site.') : '';
 
     return `
       <div class="popup-header cable">
-        <span class="popup-title">🌐 ${cable.name.toUpperCase()}</span>
+        <span class="popup-title">🌐 ${cableName}</span>
         <span class="popup-badge ${statusBadge}">${cable.major ? 'MAJOR' : 'CABLE'}</span>
         <button class="popup-close">×</button>
       </div>
@@ -1083,12 +1091,12 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">STATUS</span>
-            <span class="stat-value">${statusLabel}</span>
+            <span class="stat-value">${safeStatusLabel}</span>
           </div>
           ${repairEta ? `
           <div class="popup-stat">
             <span class="stat-label">REPAIR ETA</span>
-            <span class="stat-value">${repairEta}</span>
+            <span class="stat-value">${safeRepairEta}</span>
           </div>
           ` : ''}
         </div>
@@ -1096,20 +1104,20 @@ export class MapPopup {
           <div class="popup-section">
             <span class="section-label">FAULT ADVISORY</span>
             <div class="popup-tags">
-              <span class="popup-tag">${advisory.title}</span>
-              <span class="popup-tag">${advisory.impact}</span>
+              <span class="popup-tag">${advisoryTitle}</span>
+              <span class="popup-tag">${advisoryImpact}</span>
             </div>
-            <p class="popup-description">${advisory.description}</p>
+            <p class="popup-description">${advisoryDescription}</p>
           </div>
         ` : ''}
         ${repairShip ? `
           <div class="popup-section">
             <span class="section-label">REPAIR DEPLOYMENT</span>
             <div class="popup-tags">
-              <span class="popup-tag">${repairShip.name}</span>
+              <span class="popup-tag">${repairShipName}</span>
               <span class="popup-tag">${repairShip.status === 'on-station' ? 'On Station' : 'En Route'}</span>
             </div>
-            <p class="popup-description">${repairShip.note || 'Repair vessel tracking indicates active deployment toward fault site.'}</p>
+            <p class="popup-description">${repairShipNote}</p>
           </div>
         ` : ''}
         <p class="popup-description">Undersea telecommunications cable carrying international internet traffic. These fiber optic cables form the backbone of global internet connectivity, transmitting over 95% of intercontinental data.</p>
@@ -1121,15 +1129,20 @@ export class MapPopup {
     const cable = UNDERSEA_CABLES.find((item) => item.id === advisory.cableId);
     const timeAgo = this.getTimeAgo(advisory.reported);
     const statusLabel = advisory.severity === 'fault' ? 'FAULT' : 'DEGRADED';
+    const cableName = escapeHtml(cable?.name.toUpperCase() || advisory.cableId.toUpperCase());
+    const advisoryTitle = escapeHtml(advisory.title);
+    const advisoryImpact = escapeHtml(advisory.impact);
+    const advisoryEta = advisory.repairEta ? escapeHtml(advisory.repairEta) : '';
+    const advisoryDescription = escapeHtml(advisory.description);
 
     return `
       <div class="popup-header cable">
-        <span class="popup-title">🚨 ${cable?.name.toUpperCase() || advisory.cableId.toUpperCase()}</span>
+        <span class="popup-title">🚨 ${cableName}</span>
         <span class="popup-badge ${advisory.severity === 'fault' ? 'high' : 'elevated'}">${statusLabel}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${advisory.title}</div>
+        <div class="popup-subtitle">${advisoryTitle}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">REPORTED</span>
@@ -1137,31 +1150,36 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">IMPACT</span>
-            <span class="stat-value">${advisory.impact}</span>
+            <span class="stat-value">${advisoryImpact}</span>
           </div>
           ${advisory.repairEta ? `
           <div class="popup-stat">
             <span class="stat-label">ETA</span>
-            <span class="stat-value">${advisory.repairEta}</span>
+            <span class="stat-value">${advisoryEta}</span>
           </div>
           ` : ''}
         </div>
-        <p class="popup-description">${advisory.description}</p>
+        <p class="popup-description">${advisoryDescription}</p>
       </div>
     `;
   }
 
   private renderRepairShipPopup(ship: RepairShip): string {
     const cable = UNDERSEA_CABLES.find((item) => item.id === ship.cableId);
+    const shipName = escapeHtml(ship.name.toUpperCase());
+    const cableLabel = escapeHtml(cable?.name || ship.cableId);
+    const shipEta = escapeHtml(ship.eta);
+    const shipOperator = ship.operator ? escapeHtml(ship.operator) : '';
+    const shipNote = escapeHtml(ship.note || 'Repair ship tracking indicates active deployment in support of undersea cable restoration.');
 
     return `
       <div class="popup-header cable">
-        <span class="popup-title">🚢 ${ship.name.toUpperCase()}</span>
+        <span class="popup-title">🚢 ${shipName}</span>
         <span class="popup-badge elevated">REPAIR SHIP</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${cable?.name || ship.cableId}</div>
+        <div class="popup-subtitle">${cableLabel}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">STATUS</span>
@@ -1169,16 +1187,16 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">ETA</span>
-            <span class="stat-value">${ship.eta}</span>
+            <span class="stat-value">${shipEta}</span>
           </div>
           ${ship.operator ? `
           <div class="popup-stat">
             <span class="stat-label">OPERATOR</span>
-            <span class="stat-value">${ship.operator}</span>
+            <span class="stat-value">${shipOperator}</span>
           </div>
           ` : ''}
         </div>
-        <p class="popup-description">${ship.note || 'Repair ship tracking indicates active deployment in support of undersea cable restoration.'}</p>
+        <p class="popup-description">${shipNote}</p>
       </div>
     `;
   }
@@ -1630,15 +1648,22 @@ export class MapPopup {
       medium: 'low',
       low: 'low',
     };
+    const callsign = escapeHtml(flight.callsign || 'Unknown');
+    const aircraftTypeBadge = escapeHtml(flight.aircraftType.toUpperCase());
+    const operatorLabel = escapeHtml(operatorLabels[flight.operator] || flight.operatorCountry || 'Unknown');
+    const hexCode = escapeHtml(flight.hexCode || '');
+    const aircraftType = escapeHtml(typeLabels[flight.aircraftType] || flight.aircraftType);
+    const squawk = flight.squawk ? escapeHtml(flight.squawk) : '';
+    const note = flight.note ? escapeHtml(flight.note) : '';
 
     return `
       <div class="popup-header military-flight ${flight.operator}">
-        <span class="popup-title">${flight.callsign}</span>
-        <span class="popup-badge ${confidenceColors[flight.confidence] || 'low'}">${flight.aircraftType.toUpperCase()}</span>
+        <span class="popup-title">${callsign}</span>
+        <span class="popup-badge ${confidenceColors[flight.confidence] || 'low'}">${aircraftTypeBadge}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${operatorLabels[flight.operator] || flight.operatorCountry}</div>
+        <div class="popup-subtitle">${operatorLabel}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">ALTITUDE</span>
@@ -1654,20 +1679,20 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">HEX CODE</span>
-            <span class="stat-value">${flight.hexCode}</span>
+            <span class="stat-value">${hexCode}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">TYPE</span>
-            <span class="stat-value">${typeLabels[flight.aircraftType] || flight.aircraftType}</span>
+            <span class="stat-value">${aircraftType}</span>
           </div>
           ${flight.squawk ? `
           <div class="popup-stat">
             <span class="stat-label">SQUAWK</span>
-            <span class="stat-value">${flight.squawk}</span>
+            <span class="stat-value">${squawk}</span>
           </div>
           ` : ''}
         </div>
-        ${flight.note ? `<p class="popup-description">${flight.note}</p>` : ''}
+        ${flight.note ? `<p class="popup-description">${note}</p>` : ''}
         <div class="popup-attribution">Source: OpenSky Network</div>
       </div>
     `;
@@ -1710,20 +1735,27 @@ export class MapPopup {
     const badgeType = vessel.vesselType === 'unknown' && vessel.aisShipType
       ? vessel.aisShipType.toUpperCase()
       : vessel.vesselType.toUpperCase();
+    const vesselName = escapeHtml(vessel.name || `Vessel ${vessel.mmsi}`);
+    const vesselOperator = escapeHtml(operatorLabels[vessel.operator] || vessel.operatorCountry || 'Unknown');
+    const vesselTypeLabel = escapeHtml(displayType);
+    const vesselBadgeType = escapeHtml(badgeType);
+    const vesselMmsi = escapeHtml(vessel.mmsi);
+    const vesselHull = vessel.hullNumber ? escapeHtml(vessel.hullNumber) : '';
+    const vesselNote = vessel.note ? escapeHtml(vessel.note) : '';
 
     return `
       <div class="popup-header military-vessel ${vessel.operator}">
-        <span class="popup-title">${vessel.name}</span>
+        <span class="popup-title">${vesselName}</span>
         ${darkWarning}
-        <span class="popup-badge elevated">${badgeType}</span>
+        <span class="popup-badge elevated">${vesselBadgeType}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${operatorLabels[vessel.operator] || vessel.operatorCountry}</div>
+        <div class="popup-subtitle">${vesselOperator}</div>
         <div class="popup-stats">
           <div class="popup-stat">
             <span class="stat-label">TYPE</span>
-            <span class="stat-value">${displayType}</span>
+            <span class="stat-value">${vesselTypeLabel}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">SPEED</span>
@@ -1735,16 +1767,16 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">MMSI</span>
-            <span class="stat-value">${vessel.mmsi}</span>
+            <span class="stat-value">${vesselMmsi}</span>
           </div>
           ${vessel.hullNumber ? `
           <div class="popup-stat">
             <span class="stat-label">HULL #</span>
-            <span class="stat-value">${vessel.hullNumber}</span>
+            <span class="stat-value">${vesselHull}</span>
           </div>
           ` : ''}
         </div>
-        ${vessel.note ? `<p class="popup-description">${vessel.note}</p>` : ''}
+        ${vessel.note ? `<p class="popup-description">${vesselNote}</p>` : ''}
         ${vessel.isDark ? '<p class="popup-description alert">⚠ Vessel has gone dark - AIS signal lost. May indicate sensitive operations.</p>' : ''}
       </div>
     `;
@@ -1765,9 +1797,12 @@ export class MapPopup {
     };
 
     const activityType = cluster.activityType || 'unknown';
+    const clusterName = escapeHtml(cluster.name);
+    const activityTypeLabel = escapeHtml(activityType.toUpperCase());
+    const dominantOperator = cluster.dominantOperator ? escapeHtml(cluster.dominantOperator.toUpperCase()) : '';
     const flightSummary = cluster.flights
       .slice(0, 5)
-      .map(f => `<div class="cluster-flight-item">${f.callsign} - ${f.aircraftType}</div>`)
+      .map(f => `<div class="cluster-flight-item">${escapeHtml(f.callsign)} - ${escapeHtml(f.aircraftType)}</div>`)
       .join('');
     const moreFlights = cluster.flightCount > 5
       ? `<div class="cluster-more">+${cluster.flightCount - 5} more aircraft</div>`
@@ -1775,7 +1810,7 @@ export class MapPopup {
 
     return `
       <div class="popup-header military-cluster">
-        <span class="popup-title">${cluster.name}</span>
+        <span class="popup-title">${clusterName}</span>
         <span class="popup-badge ${activityColors[activityType] || 'low'}">${cluster.flightCount} AIRCRAFT</span>
         <button class="popup-close">×</button>
       </div>
@@ -1788,12 +1823,12 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">ACTIVITY</span>
-            <span class="stat-value">${activityType.toUpperCase()}</span>
+            <span class="stat-value">${activityTypeLabel}</span>
           </div>
           ${cluster.dominantOperator ? `
           <div class="popup-stat">
             <span class="stat-label">PRIMARY</span>
-            <span class="stat-value">${cluster.dominantOperator.toUpperCase()}</span>
+            <span class="stat-value">${dominantOperator}</span>
           </div>
           ` : ''}
         </div>
@@ -1825,9 +1860,12 @@ export class MapPopup {
     };
 
     const activityType = cluster.activityType || 'unknown';
+    const clusterName = escapeHtml(cluster.name);
+    const activityTypeLabel = escapeHtml(activityType.toUpperCase());
+    const region = cluster.region ? escapeHtml(cluster.region) : '';
     const vesselSummary = cluster.vessels
       .slice(0, 5)
-      .map(v => `<div class="cluster-vessel-item">${v.name} - ${v.vesselType}</div>`)
+      .map(v => `<div class="cluster-vessel-item">${escapeHtml(v.name)} - ${escapeHtml(v.vesselType)}</div>`)
       .join('');
     const moreVessels = cluster.vesselCount > 5
       ? `<div class="cluster-more">+${cluster.vesselCount - 5} more vessels</div>`
@@ -1835,7 +1873,7 @@ export class MapPopup {
 
     return `
       <div class="popup-header military-cluster">
-        <span class="popup-title">${cluster.name}</span>
+        <span class="popup-title">${clusterName}</span>
         <span class="popup-badge ${activityColors[activityType] || 'low'}">${cluster.vesselCount} VESSELS</span>
         <button class="popup-close">×</button>
       </div>
@@ -1848,12 +1886,12 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">ACTIVITY</span>
-            <span class="stat-value">${activityType.toUpperCase()}</span>
+            <span class="stat-value">${activityTypeLabel}</span>
           </div>
           ${cluster.region ? `
           <div class="popup-stat">
             <span class="stat-label">REGION</span>
-            <span class="stat-value">${cluster.region}</span>
+            <span class="stat-value">${region}</span>
           </div>
           ` : ''}
         </div>
