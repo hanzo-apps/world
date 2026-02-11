@@ -23,8 +23,9 @@
 | Problem | Solution |
 |---------|----------|
 | News scattered across 100+ sources | **Single unified dashboard** with 100+ curated feeds |
-| No geospatial context for events | **Interactive map** with 25 toggleable data layers |
+| No geospatial context for events | **Interactive map** with 25+ toggleable data layers |
 | Information overload | **AI-synthesized briefs** with focal point detection |
+| Crypto/macro signal noise | **7-signal market radar** with composite BUY/CASH verdict |
 | Expensive OSINT tools ($$$) | **100% free & open source** |
 | Static news feeds | **Real-time updates** with live video streams |
 
@@ -44,7 +45,7 @@ Both variants run from a single codebase — switch between them with one click.
 ## Key Features
 
 ### Interactive Global Map
-- **25 data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, and more
+- **25+ data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, and more
 - **Smart clustering** — markers intelligently group at low zoom, expand on zoom in
 - **Progressive disclosure** — detail layers (bases, nuclear, datacenters) appear only when zoomed in; zoom-adaptive opacity prevents clutter at world view
 - **Label deconfliction** — overlapping labels (e.g., multiple BREAKING badges) are automatically suppressed by priority, highest-severity first
@@ -96,6 +97,19 @@ Both variants run from a single codebase — switch between them with one click.
 </details>
 
 <details>
+<summary><strong>Market & Crypto Intelligence</strong></summary>
+
+- 7-signal macro radar with composite BUY/CASH verdict
+- BTC spot ETF flow tracker (IBIT, FBTC, GBTC, and 7 more)
+- Stablecoin peg health monitor (USDT, USDC, DAI, FDUSD, USDe)
+- Fear & Greed Index with 30-day history
+- Bitcoin technical trend (SMA50, SMA200, VWAP, Mayer Multiple)
+- JPY liquidity signal, QQQ/XLP macro regime, BTC hash rate
+- Inline SVG sparklines and donut gauges for visual trends
+
+</details>
+
+<details>
 <summary><strong>Tech Ecosystem</strong> (Tech variant)</summary>
 
 - Tech company HQs (Big Tech, unicorns, public)
@@ -133,6 +147,11 @@ Both variants run from a single codebase — switch between them with one click.
 - Data freshness monitoring across 14 data sources with explicit intelligence gap reporting
 - Per-feed circuit breakers with 5-minute cooldowns to prevent cascading failures
 - Browser-side ML worker (Transformers.js) for NER and sentiment analysis without server dependency
+- **Cmd+K search** — fuzzy search across news headlines, countries, and entities
+- **Virtual scrolling** — news panels render only visible DOM elements, handling thousands of items without browser lag
+- **Mobile detection** — screens below 768px receive a warning modal since the dashboard is designed for multi-panel desktop use
+- **UCDP conflict classification** — countries with active wars (1,000+ battle deaths/year) receive automatic CII floor scores, preventing optimistic drift
+- **HAPI humanitarian data** — UN OCHA humanitarian access metrics feed into country-level instability scoring
 
 ---
 
@@ -175,6 +194,30 @@ The system blends static baseline risk (40%) with detected events (60%) and trac
 
 Events (protests, military flights, vessels, earthquakes) are binned into 1°×1° geographic cells within a 24-hour window. When 3+ distinct event types converge in one cell, a convergence alert fires. Scoring is based on type diversity (×25pts per unique type) plus event count bonuses (×2pts). Alerts are reverse-geocoded to human-readable names using conflict zones, waterways, and hotspot databases.
 
+### Strategic Theater Posture Assessment
+
+Nine operational theaters are continuously assessed for military posture escalation:
+
+| Theater | Key Trigger |
+|---------|-------------|
+| Iran / Persian Gulf | Carrier groups, tanker activity, AWACS |
+| Taiwan Strait | PLAAF sorties, USN carrier presence |
+| Baltic / Kaliningrad | Russian Western Military District flights |
+| Korean Peninsula | B-52/B-1 deployments, DPRK missile activity |
+| Eastern Mediterranean | Multi-national naval exercises |
+| Horn of Africa | Anti-piracy patrols, drone activity |
+| South China Sea | Freedom of navigation operations |
+| Arctic | Long-range aviation patrols |
+| Black Sea | ISR flights, naval movements |
+
+Posture levels escalate from NORMAL → ELEVATED → CRITICAL based on a composite of:
+- **Aircraft count** in theater (both resident and transient)
+- **Strike capability** — the presence of tankers + AWACS + fighters together indicates strike packaging, not routine training
+- **Naval presence** — carrier groups and combatant formations
+- **Country instability** — high CII scores for theater-adjacent countries amplify posture
+
+Each theater is linked to 38+ military bases, enabling automatic correlation between observed flights and known operating locations.
+
 ### Military Surge & Foreign Presence Detection
 
 The system monitors five operational theaters (Middle East, Eastern Europe, Western Europe, Western Pacific, Horn of Africa) with 38+ associated military bases. It classifies vessel clusters near hotspots by activity type:
@@ -184,6 +227,28 @@ The system monitors five operational theaters (Middle East, Eastern Europe, West
 - **Transit** — vessels passing through
 
 Foreign military presence is dual-credited: the operator's country is flagged for force projection, and the host location's country is flagged for foreign military threat. AIS gaps (dark ships) are flagged as potential signal discipline indicators.
+
+### Infrastructure Cascade Modeling
+
+Beyond proximity correlation, the system models how disruptions propagate through interconnected infrastructure. A dependency graph connects undersea cables, pipelines, ports, chokepoints, and countries with weighted edges representing capacity dependencies:
+
+```
+Disruption Event → Affected Node → Cascade Propagation (BFS, depth ≤ 3)
+                                          │
+                    ┌─────────────────────┤
+                    ▼                     ▼
+            Direct Impact         Indirect Impact
+         (e.g., cable cut)    (countries served by cable)
+```
+
+**Impact calculation**: `strength = edge_weight × disruption_level × (1 − redundancy)`
+
+Strategic chokepoint modeling captures real-world dependencies:
+- **Strait of Hormuz** — 80% of Japan's oil, 70% of South Korea's, 60% of India's, 40% of China's
+- **Suez Canal** — EU-Asia trade routes (Germany, Italy, UK, China)
+- **Malacca Strait** — 80% of China's oil transit
+
+Ports are weighted by type: oil/LNG terminals (0.9 — critical), container ports (0.7), naval bases (0.4 — geopolitical but less economic). This enables questions like "if the Strait of Hormuz closes, which countries face energy shortages within 30 days?"
 
 ### Related Assets & Proximity Correlation
 
@@ -207,6 +272,21 @@ The algorithm uses **Welford's online method** for numerically stable streaming 
 
 A minimum of 10 historical samples is required before anomalies are reported, preventing false positives during the learning phase. Anomalies are ingested back into the signal aggregator, where they compound with other signals for convergence detection.
 
+### Browser-Side ML Pipeline
+
+The dashboard runs a full ML pipeline in the browser via Transformers.js, with no server dependency for core intelligence. This is automatically disabled on mobile devices to conserve memory.
+
+| Capability | Model | Use |
+|-----------|-------|-----|
+| **Text embeddings** | sentence-similarity | Semantic clustering of news headlines |
+| **Sequence classification** | threat-classifier | Threat severity and category detection |
+| **Summarization** | T5-small | Fallback when Groq and OpenRouter are unavailable |
+| **Named Entity Recognition** | NER pipeline | Country, organization, and leader extraction |
+
+**Hybrid clustering** combines fast Jaccard similarity (n-gram overlap, threshold 0.4) with ML-refined semantic similarity (cosine similarity, threshold 0.78). Jaccard runs instantly on every refresh; semantic refinement runs when the ML worker is loaded and merges clusters that are textually different but semantically identical (e.g., "NATO expands missile shield" and "Alliance deploys new air defense systems").
+
+News velocity is tracked per cluster — when multiple Tier 1–2 sources converge on the same story within a short window, the cluster is flagged as a breaking alert with `sourcesPerHour` as the velocity metric.
+
 ### Signal Aggregation
 
 All real-time data sources feed into a central signal aggregator that builds a unified geospatial intelligence picture. Signals are clustered by country and region, with each signal carrying a severity (low/medium/high), geographic coordinates, and metadata. The aggregator:
@@ -223,6 +303,52 @@ A singleton tracker monitors 14 data sources (GDELT, RSS, AIS, military flights,
 
 Polymarket geopolitical markets are queried using tag-based filters (Ukraine, Iran, China, Taiwan, etc.) with 5-minute caching. Market probability shifts are correlated with news volume: if a prediction market moves significantly before matching news arrives, this is flagged as a potential early-warning signal.
 
+### Macro Signal Analysis (Market Radar)
+
+The Market Radar panel computes a composite BUY/CASH verdict from 7 independent signals sourced entirely from free APIs (Yahoo Finance, mempool.space, alternative.me):
+
+| Signal | Computation | Bullish When |
+|--------|------------|--------------|
+| **Liquidity** | JPY/USD 30-day rate of change | ROC > -2% (no yen squeeze) |
+| **Flow Structure** | BTC 5-day return vs QQQ 5-day return | Gap < 5% (aligned) |
+| **Macro Regime** | QQQ 20-day ROC vs XLP 20-day ROC | QQQ outperforming (risk-on) |
+| **Technical Trend** | BTC vs SMA50 + 30-day VWAP | Above both (bullish) |
+| **Hash Rate** | Bitcoin mining hashrate 30-day change | Growing > 3% |
+| **Mining Cost** | BTC price vs hashrate-implied cost | Price > $60K (profitable) |
+| **Fear & Greed** | alternative.me sentiment index | Value > 50 |
+
+The overall verdict requires ≥57% of known signals to be bullish (BUY), otherwise CASH. Signals with unknown data are excluded from the denominator.
+
+**VWAP Calculation** — Volume-Weighted Average Price is computed from aligned price/volume pairs over a 30-day window. Pairs where either price or volume is null are excluded together to prevent index misalignment:
+
+```
+VWAP = Σ(price × volume) / Σ(volume)    for last 30 trading days
+```
+
+The **Mayer Multiple** (BTC price / SMA200) provides a long-term valuation context — historically, values above 2.4 indicate overheating, while values below 0.8 suggest deep undervaluation.
+
+### Stablecoin Peg Monitoring
+
+Five major stablecoins (USDT, USDC, DAI, FDUSD, USDe) are monitored via the CoinGecko API with 2-minute caching. Each coin's deviation from the $1.00 peg determines its health status:
+
+| Deviation | Status | Indicator |
+|-----------|--------|-----------|
+| ≤ 0.5% | ON PEG | Green |
+| 0.5% – 1.0% | SLIGHT DEPEG | Yellow |
+| > 1.0% | DEPEGGED | Red |
+
+The panel aggregates total stablecoin market cap, 24h volume, and an overall health status (HEALTHY / CAUTION / WARNING). The `coins` query parameter accepts a comma-separated list of CoinGecko IDs, validated against a `[a-z0-9-]+` regex to prevent injection.
+
+### BTC ETF Flow Estimation
+
+Ten spot Bitcoin ETFs are tracked via Yahoo Finance's 5-day chart API (IBIT, FBTC, ARKB, BITB, GBTC, HODL, BRRR, EZBC, BTCO, BTCW). Since ETF flow data requires expensive terminal subscriptions, the system estimates flow direction from publicly available signals:
+
+- **Price change** — daily close vs. previous close determines direction
+- **Volume ratio** — current volume / trailing average volume measures conviction
+- **Flow magnitude** — `volume × price × direction × 0.1` provides a rough dollar estimate
+
+This is an approximation, not a substitute for official flow data, but it captures the direction and relative magnitude correctly. Results are cached for 15 minutes.
+
 ---
 
 ## Architecture Principles
@@ -230,11 +356,13 @@ Polymarket geopolitical markets are queried using tag-based filters (Ukraine, Ir
 | Principle | Implementation |
 |-----------|---------------|
 | **Speed over perfection** | Keyword classifier is instant; LLM refines asynchronously. Users never wait. |
-| **Assume failure** | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Groq → OpenRouter → browser-side T5. Redis cache failures degrade gracefully. |
+| **Assume failure** | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Groq → OpenRouter → browser-side T5. Redis cache failures degrade gracefully. Every edge function returns stale cached data when upstream APIs are down. |
 | **Show what you can't see** | Intelligence gap tracker explicitly reports data source outages rather than silently hiding them. |
 | **Browser-first compute** | Analysis (clustering, instability scoring, surge detection) runs client-side — no backend compute dependency for core intelligence. |
 | **Multi-signal correlation** | No single data source is trusted alone. Focal points require convergence across news + military + markets + protests before escalating to critical. |
 | **Geopolitical grounding** | Hard-coded conflict zones, baseline country risk, and strategic chokepoints prevent statistical noise from generating false alerts in low-data regions. |
+| **Defense in depth** | CORS origin allowlist, domain-allowlisted RSS proxy, server-side API key isolation, input sanitization with output encoding, IP rate limiting on AI endpoints. |
+| **Cache everything, trust nothing** | Three-tier caching (in-memory → Redis → upstream) with versioned cache keys and stale-on-error fallback. Every API response includes `X-Cache` header for debugging. |
 
 ---
 
@@ -255,15 +383,85 @@ Feeds also carry a **propaganda risk rating** and **state affiliation flag**. St
 
 ## Edge Function Architecture
 
-World Monitor uses 30+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
+World Monitor uses 45+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
 
-- **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers
-- **AI Pipeline** — Groq and OpenRouter edge functions with Redis deduplication, so identical headlines across concurrent users only trigger one LLM call
-- **Data Adapters** — GDELT, ACLED, OpenSky, USGS, NASA FIRMS, FRED, and others each have dedicated edge functions that normalize responses into consistent schemas
+- **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers. Feeds from domains that block Vercel IPs are automatically routed through the Railway relay.
+- **AI Pipeline** — Groq and OpenRouter edge functions with Redis deduplication, so identical headlines across concurrent users only trigger one LLM call. The classify-event endpoint pauses its queue on 500 errors to avoid wasting API quota.
+- **Data Adapters** — GDELT, ACLED, OpenSky, USGS, NASA FIRMS, FRED, Yahoo Finance, CoinGecko, mempool.space, and others each have dedicated edge functions that normalize responses into consistent schemas
+- **Market Intelligence** — macro signals, ETF flows, and stablecoin monitors compute derived analytics server-side (VWAP, SMA, peg deviation, flow estimates) and cache results in Redis
 - **Temporal Baseline** — Welford's algorithm state is persisted in Redis across requests, building statistical baselines without a traditional database
 - **Custom Scrapers** — sources without RSS feeds (FwdStart, GitHub Trending, tech events) are scraped and transformed into RSS-compatible formats
 
 All edge functions include circuit breaker logic and return cached stale data when upstream APIs are unavailable, ensuring the dashboard never shows blank panels.
+
+---
+
+## Dual-Deployment Architecture
+
+World Monitor runs on two platforms that work together:
+
+```
+┌─────────────────────────────────────┐
+│          Vercel (Edge)              │
+│  45+ edge functions · static SPA   │
+│  CORS allowlist · Redis cache       │
+│  AI pipeline · market analytics     │
+└──────────────┬──────────────────────┘
+               │ https:// (server-side)
+               │ wss://   (client-side)
+               ▼
+┌─────────────────────────────────────┐
+│       Railway (Relay Server)        │
+│  WebSocket relay · OpenSky OAuth2   │
+│  RSS proxy for blocked domains      │
+│  AIS vessel stream multiplexer      │
+└─────────────────────────────────────┘
+```
+
+**Why two platforms?** Several upstream APIs (OpenSky Network, CNN RSS, UN News, CISA, IAEA) actively block requests from Vercel's IP ranges. The Railway relay server acts as an alternate origin, handling:
+
+- **AIS vessel tracking** — maintains a persistent WebSocket connection to AISStream.io and multiplexes it to all connected browser clients, avoiding per-user connection limits
+- **OpenSky aircraft data** — authenticates via OAuth2 client credentials flow (Vercel IPs get 403'd by OpenSky without auth tokens)
+- **RSS feeds** — proxies feeds from domains that block Vercel IPs, with a separate domain allowlist for security
+
+The Vercel edge functions connect to Railway via `WS_RELAY_URL` (server-side, HTTPS) while browser clients connect via `VITE_WS_RELAY_URL` (client-side, WSS). This separation keeps the relay URL configurable per deployment without leaking server-side configuration to the browser.
+
+---
+
+## Caching Architecture
+
+Every external API call passes through a three-tier cache with stale-on-error fallback:
+
+```
+Request → [1] In-Memory Cache → [2] Redis (Upstash) → [3] Upstream API
+                                                              │
+            ◄──── stale data served on error ────────────────┘
+```
+
+| Tier | Scope | TTL | Purpose |
+|------|-------|-----|---------|
+| **In-memory** | Per edge function instance | Varies (60s–900s) | Eliminates Redis round-trips for hot paths |
+| **Redis (Upstash)** | Cross-user, cross-instance | Varies (120s–900s) | Deduplicates API calls across all visitors |
+| **Upstream** | Source of truth | N/A | External API (Yahoo Finance, CoinGecko, etc.) |
+
+Cache keys are versioned (`opensky:v2:lamin=...`, `macro-signals:v2:default`) so schema changes don't serve stale formats. Every response includes an `X-Cache` header (`HIT`, `REDIS-HIT`, `MISS`, `REDIS-STALE`, `REDIS-ERROR-FALLBACK`) for debugging.
+
+The AI summarization pipeline adds content-based deduplication: headlines are hashed and checked against Redis before calling Groq, so the same breaking news viewed by 1,000 concurrent users triggers exactly one LLM call.
+
+---
+
+## Security Model
+
+| Layer | Mechanism |
+|-------|-----------|
+| **CORS origin allowlist** | Only `worldmonitor.app`, `startups.worldmonitor.app`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
+| **RSS domain allowlist** | The RSS proxy only fetches from explicitly listed domains (~90+). Requests for unlisted domains are rejected with 403. |
+| **Railway domain allowlist** | The Railway relay has a separate, smaller domain allowlist for feeds that need the alternate origin. |
+| **API key isolation** | All API keys live server-side in Vercel environment variables. The browser never sees Groq, OpenRouter, ACLED, Finnhub, or other credentials. |
+| **Input sanitization** | User-facing content passes through `escapeHtml()` (prevents XSS) and `sanitizeUrl()` (blocks `javascript:` and `data:` URIs). URLs use `escapeAttr()` for attribute context encoding. |
+| **Query parameter validation** | API endpoints validate input formats (e.g., stablecoin coin IDs must match `[a-z0-9-]+`, bounding box params are numeric). |
+| **IP rate limiting** | AI endpoints use Upstash Redis-backed rate limiting to prevent abuse of Groq/OpenRouter quotas. |
+| **No debug endpoints** | The `api/debug-env.js` endpoint returns 404 in production — it exists only as a disabled placeholder. |
 
 ---
 
@@ -281,28 +479,24 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ### Environment Variables (Optional)
 
-For full functionality, add these to `.env.local`:
+The dashboard works without any API keys — panels for unconfigured services simply won't appear. For full functionality, copy the example file and fill in the keys you need:
 
-```env
-# AI Summarization & Classification (Groq)
-GROQ_API_KEY=gsk_xxx
-
-# Cross-user cache (Upstash Redis)
-UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=xxx
-
-# Live flight data
-OPENSKY_USERNAME=xxx
-OPENSKY_PASSWORD=xxx
-
-# Ship tracking
-VESSELFINDER_API_KEY=xxx
-
-# NASA FIRMS satellite fire detection
-NASA_FIRMS_API_KEY=xxx
+```bash
+cp .env.example .env.local
 ```
 
-See [API Dependencies](./docs/DOCUMENTATION.md#api-dependencies) for the full list.
+The `.env.example` file documents every variable with descriptions and registration links, organized by deployment target (Vercel vs Railway). Key groups:
+
+| Group | Variables | Free Tier |
+|-------|-----------|-----------|
+| **AI** | `GROQ_API_KEY`, `OPENROUTER_API_KEY` | 14,400 req/day (Groq), 50/day (OpenRouter) |
+| **Cache** | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | 10K commands/day |
+| **Markets** | `FINNHUB_API_KEY`, `FRED_API_KEY`, `EIA_API_KEY` | All free tier |
+| **Tracking** | `WINGBITS_API_KEY`, `AISSTREAM_API_KEY` | Free |
+| **Geopolitical** | `ACLED_ACCESS_TOKEN`, `CLOUDFLARE_API_TOKEN`, `NASA_FIRMS_API_KEY` | Free for researchers |
+| **Relay** | `WS_RELAY_URL`, `VITE_WS_RELAY_URL`, `OPENSKY_CLIENT_ID/SECRET` | Self-hosted |
+
+See [`.env.example`](./.env.example) for the complete list with registration links.
 
 ---
 
@@ -311,10 +505,12 @@ See [API Dependencies](./docs/DOCUMENTATION.md#api-dependencies) for the full li
 | Category | Technologies |
 |----------|--------------|
 | **Frontend** | TypeScript, Vite, deck.gl (WebGL), MapLibre GL |
-| **AI/ML** | Groq (Llama 3.1 8B), TensorFlow.js (T5 fallback) |
-| **Caching** | Redis (Upstash) — cross-user deduplication for AI calls and classification |
-| **APIs** | OpenSky, GDELT, ACLED, USGS, NASA EONET, NASA FIRMS, FRED, Polymarket, EIA, Cloudflare Radar |
-| **Deployment** | Vercel Edge Functions |
+| **AI/ML** | Groq (Llama 3.1 8B), OpenRouter (fallback), Transformers.js (browser-side T5, NER, embeddings) |
+| **Caching** | Redis (Upstash) — 3-tier cache with in-memory + Redis + upstream, cross-user AI deduplication |
+| **Geopolitical APIs** | OpenSky, GDELT, ACLED, UCDP, HAPI, USGS, NASA FIRMS, Polymarket, Cloudflare Radar |
+| **Market APIs** | Yahoo Finance (equities, forex, crypto), CoinGecko (stablecoins), mempool.space (BTC hashrate), alternative.me (Fear & Greed) |
+| **Economic APIs** | FRED (Federal Reserve), EIA (Energy), Finnhub (stock quotes) |
+| **Deployment** | Vercel Edge Functions (45+ endpoints) + Railway (WebSocket relay) |
 | **Data** | 100+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery |
 
 ---
@@ -341,17 +537,26 @@ Contributions welcome! See [CONTRIBUTING](./docs/DOCUMENTATION.md#contributing) 
 
 ```bash
 # Development
-npm run dev          # Start dev server
-npm run dev:tech     # Start tech variant
-npm run build        # Production build
-npm run typecheck    # Type checking
+npm run dev          # Full variant (worldmonitor.app)
+npm run dev:tech     # Tech variant (startups.worldmonitor.app)
+
+# Production builds
+npm run build:full   # Build full variant
+npm run build:tech   # Build tech variant
+
+# Quality
+npm run typecheck    # TypeScript type checking
 ```
 
 ---
 
 ## Roadmap
 
-- [x] API for programmatic access
+- [x] 45+ API edge functions for programmatic access
+- [x] Dual-site variant system (geopolitical + tech)
+- [x] Market intelligence (macro signals, ETF flows, stablecoin peg monitoring)
+- [x] Railway relay for WebSocket and blocked-domain proxying
+- [x] CORS origin allowlist and security hardening
 - [ ] Mobile-optimized views
 - [ ] Push notifications for critical alerts
 - [ ] Historical data playback
