@@ -1,7 +1,7 @@
 /**
  * CountryIntelModal - Shows AI-generated intelligence brief when user clicks a country
  */
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import type { CountryScore } from '@/services/country-instability';
 import type { PredictionMarket } from '@/types';
 
@@ -224,7 +224,8 @@ export class CountryIntelModal {
       const pct = Math.round(m.yesPrice);
       const noPct = 100 - pct;
       const vol = m.volume ? `$${(m.volume / 1000).toFixed(0)}k vol` : '';
-      const link = m.url ? ` <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener" class="market-link">↗</a>` : '';
+      const safeUrl = sanitizeUrl(m.url || '');
+      const link = safeUrl ? ` <a href="${safeUrl}" target="_blank" rel="noopener" class="market-link">↗</a>` : '';
       return `
         <div class="market-item">
           <div class="market-title">${escapeHtml(m.title.slice(0, 80))}${link}</div>

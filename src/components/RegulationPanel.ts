@@ -6,7 +6,7 @@ import {
   getUpcomingDeadlines,
   getRecentActions,
 } from '@/config';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 export class RegulationPanel extends Panel {
   private viewMode: 'timeline' | 'deadlines' | 'regulations' | 'countries' = 'timeline';
@@ -212,6 +212,7 @@ export class RegulationPanel extends Panel {
     const effectiveDate = regulation.effectiveDate
       ? new Date(regulation.effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
       : 'TBD';
+    const regulationLink = regulation.link ? sanitizeUrl(regulation.link) : '';
 
     return `
       <div class="regulation-card">
@@ -236,7 +237,7 @@ export class RegulationPanel extends Panel {
         <div class="regulation-scope">
           ${regulation.scope.map(s => `<span class="scope-tag">${escapeHtml(s)}</span>`).join('')}
         </div>
-        ${regulation.link ? `<a href="${regulation.link}" target="_blank" rel="noopener noreferrer" class="regulation-link">Learn More →</a>` : ''}
+        ${regulationLink ? `<a href="${regulationLink}" target="_blank" rel="noopener noreferrer" class="regulation-link">Learn More →</a>` : ''}
       </div>
     `;
   }

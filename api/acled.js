@@ -1,5 +1,6 @@
 // ACLED API proxy - keeps token server-side only
 // Token is stored in ACLED_ACCESS_TOKEN (no VITE_ prefix)
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 // In-memory cache (edge function instance)
@@ -29,6 +30,29 @@ function checkRateLimit(ip) {
 }
 
 export default async function handler(req) {
+  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) {
+      return new Response(null, { status: 403, headers: corsHeaders });
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== 'GET') {
+    return Response.json({ error: 'Method not allowed', data: [] }, {
+      status: 405,
+      headers: corsHeaders,
+    });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return Response.json({ error: 'Origin not allowed', data: [] }, {
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
+
   // Get client IP for rate limiting
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ||
              req.headers.get('x-real-ip') ||
@@ -39,7 +63,7 @@ export default async function handler(req) {
     return Response.json({ error: 'Rate limited', data: [] }, {
       status: 429,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Retry-After': '60',
       },
     });
@@ -55,7 +79,7 @@ export default async function handler(req) {
       configured: false
     }, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -65,7 +89,7 @@ export default async function handler(req) {
     return Response.json(cache.data, {
       status: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 'public, max-age=300',
         'X-Cache': 'HIT',
       },
@@ -100,7 +124,7 @@ export default async function handler(req) {
         data: [],
       }, {
         status: response.status,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
 
@@ -139,7 +163,7 @@ export default async function handler(req) {
     return Response.json(result, {
       status: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
         'Cache-Control': 'public, max-age=300',
         'X-Cache': 'MISS',
       },
@@ -150,7 +174,7 @@ export default async function handler(req) {
       data: [],
     }, {
       status: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 }
