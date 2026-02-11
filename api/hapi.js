@@ -3,15 +3,54 @@
 // Source: ACLED data aggregated monthly by HDX
 export const config = { runtime: 'edge' };
 
-let cache = { data: null, timestamp: 0 };
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+import { getCachedJson, setCachedJson } from './_upstash-cache.js';
+import { recordCacheTelemetry } from './_cache-telemetry.js';
+
+const CACHE_KEY = 'hapi:conflict-events:v2';
+const CACHE_TTL_SECONDS = 6 * 60 * 60; // 6 hours
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
+const RESPONSE_CACHE_CONTROL = 'public, max-age=1800';
+
+// In-memory fallback when Redis is unavailable.
+let fallbackCache = { data: null, timestamp: 0 };
+
+function isValidResult(data) {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    Array.isArray(data.countries)
+  );
+}
+
+function toErrorMessage(error) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'unknown error');
+}
 
 export default async function handler(req) {
   const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
-    return Response.json(cache.data, {
+  const cached = await getCachedJson(CACHE_KEY);
+  if (isValidResult(cached)) {
+    recordCacheTelemetry('/api/hapi', 'REDIS-HIT');
+    return Response.json(cached, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=1800', 'X-Cache': 'HIT' },
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': RESPONSE_CACHE_CONTROL,
+        'X-Cache': 'REDIS-HIT',
+      },
+    });
+  }
+
+  if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < CACHE_TTL_MS) {
+    recordCacheTelemetry('/api/hapi', 'MEMORY-HIT');
+    return Response.json(fallbackCache.data, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': RESPONSE_CACHE_CONTROL,
+        'X-Cache': 'MEMORY-HIT',
+      },
     });
   }
 
@@ -70,20 +109,33 @@ export default async function handler(req) {
       cached_at: new Date().toISOString(),
     };
 
-    cache = { data: result, timestamp: now };
+    fallbackCache = { data: result, timestamp: now };
+    void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
+    recordCacheTelemetry('/api/hapi', 'MISS');
 
     return Response.json(result, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=1800', 'X-Cache': 'MISS' },
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': RESPONSE_CACHE_CONTROL,
+        'X-Cache': 'MISS',
+      },
     });
   } catch (error) {
-    if (cache.data) {
-      return Response.json(cache.data, {
+    if (isValidResult(fallbackCache.data)) {
+      recordCacheTelemetry('/api/hapi', 'STALE');
+      return Response.json(fallbackCache.data, {
         status: 200,
-        headers: { 'Access-Control-Allow-Origin': '*', 'X-Cache': 'STALE' },
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=300',
+          'X-Cache': 'STALE',
+        },
       });
     }
-    return Response.json({ error: `Fetch failed: ${error.message}`, countries: [] }, {
+
+    recordCacheTelemetry('/api/hapi', 'ERROR');
+    return Response.json({ error: `Fetch failed: ${toErrorMessage(error)}`, countries: [] }, {
       status: 500,
       headers: { 'Access-Control-Allow-Origin': '*' },
     });

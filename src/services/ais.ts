@@ -1,56 +1,25 @@
 import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 import { dataFreshness } from './data-freshness';
 
-// WebSocket relay for live vessel tracking
-// Dev: local relay (node scripts/ais-relay.cjs)
-// Prod: configured via VITE_WS_RELAY_URL env var
-const AISSTREAM_URL = import.meta.env.VITE_WS_RELAY_URL || 'ws://localhost:3004';
+// Snapshot endpoint backed by server-side AIS aggregation.
+// This avoids a per-client WebSocket to Railway.
+const AIS_SNAPSHOT_API = '/api/ais-snapshot';
+const LOCAL_SNAPSHOT_FALLBACK = 'http://localhost:3004/ais/snapshot';
+const SNAPSHOT_POLL_INTERVAL_MS = 10 * 1000;
+const SNAPSHOT_STALE_MS = 20 * 1000;
+const CALLBACK_RETENTION_MS = 2 * 60 * 60 * 1000; // 2 hours
+const MAX_CALLBACK_TRACKED_VESSELS = 20000;
 
-// AIS is configured if VITE_WS_RELAY_URL is set OR we're on localhost (dev mode)
-const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const aisConfigured = Boolean(import.meta.env.VITE_WS_RELAY_URL) || isLocalhost;
+const isClientRuntime = typeof window !== 'undefined';
+const isLocalhost = isClientRuntime && window.location.hostname === 'localhost';
+// Snapshot polling no longer requires exposing relay URL to the browser.
+// Use VITE_ENABLE_AIS=false to disable the AIS feature client-side.
+const aisConfigured = isClientRuntime && import.meta.env.VITE_ENABLE_AIS !== 'false';
 
 export function isAisConfigured(): boolean {
   return aisConfigured;
 }
 
-// Grid cell size for density aggregation (degrees)
-const GRID_SIZE = 2;
-// Time window for density calculation (ms)
-const DENSITY_WINDOW = 30 * 60 * 1000; // 30 minutes
-// Gap threshold for disruption detection (ms)
-const GAP_THRESHOLD = 60 * 60 * 1000; // 1 hour without signal = potential dark ship
-
-interface VesselPosition {
-  mmsi: string;
-  name: string;
-  lat: number;
-  lon: number;
-  timestamp: number;
-  shipType?: number;
-}
-
-interface GridCell {
-  lat: number;
-  lon: number;
-  vessels: Set<string>;
-  lastUpdate: number;
-  previousCount: number;
-}
-
-// In-memory vessel tracking
-const vessels = new Map<string, VesselPosition>();
-const densityGrid = new Map<string, GridCell>();
-const vesselHistory = new Map<string, number[]>(); // MMSI -> last seen timestamps
-
-let socket: WebSocket | null = null;
-let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
-let isConnected = false;
-let isConnecting = false;
-let messageCount = 0;
-
-// Callback system for external listeners (e.g., military vessel tracking)
 export interface AisPositionData {
   mmsi: string;
   name: string;
@@ -61,73 +30,141 @@ export interface AisPositionData {
   speed?: number;
   course?: number;
 }
+
+interface SnapshotStatus {
+  connected: boolean;
+  vessels: number;
+  messages: number;
+}
+
+interface SnapshotCandidateReport extends AisPositionData {
+  timestamp: number;
+}
+
+interface AisSnapshotResponse {
+  sequence?: number;
+  timestamp?: string;
+  status?: {
+    connected?: boolean;
+    vessels?: number;
+    messages?: number;
+  };
+  disruptions?: AisDisruptionEvent[];
+  density?: AisDensityZone[];
+  candidateReports?: SnapshotCandidateReport[];
+}
+
 type AisCallback = (data: AisPositionData) => void;
 const positionCallbacks = new Set<AisCallback>();
+const lastCallbackTimestampByMmsi = new Map<string, number>();
 
-export function registerAisCallback(callback: AisCallback): void {
-  positionCallbacks.add(callback);
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+let inFlight = false;
+let isPolling = false;
+let lastPollAt = 0;
+let lastSequence = 0;
+
+let latestDisruptions: AisDisruptionEvent[] = [];
+let latestDensity: AisDensityZone[] = [];
+let latestStatus: SnapshotStatus = {
+  connected: false,
+  vessels: 0,
+  messages: 0,
+};
+
+function shouldIncludeCandidates(): boolean {
+  return positionCallbacks.size > 0;
 }
 
-export function unregisterAisCallback(callback: AisCallback): void {
-  positionCallbacks.delete(callback);
+function parseSnapshot(data: unknown): {
+  sequence: number;
+  status: SnapshotStatus;
+  disruptions: AisDisruptionEvent[];
+  density: AisDensityZone[];
+  candidateReports: SnapshotCandidateReport[];
+} | null {
+  if (!data || typeof data !== 'object') return null;
+  const raw = data as AisSnapshotResponse;
+
+  if (!Array.isArray(raw.disruptions) || !Array.isArray(raw.density)) return null;
+
+  const status = raw.status || {};
+  return {
+    sequence: Number.isFinite(raw.sequence as number) ? Number(raw.sequence) : 0,
+    status: {
+      connected: Boolean(status.connected),
+      vessels: Number.isFinite(status.vessels as number) ? Number(status.vessels) : 0,
+      messages: Number.isFinite(status.messages as number) ? Number(status.messages) : 0,
+    },
+    disruptions: raw.disruptions,
+    density: raw.density,
+    candidateReports: Array.isArray(raw.candidateReports) ? raw.candidateReports : [],
+  };
 }
 
-// Regions of interest for monitoring
-const CHOKEPOINTS = [
-  { name: 'Strait of Hormuz', lat: 26.5, lon: 56.5, radius: 2 },
-  { name: 'Suez Canal', lat: 30.0, lon: 32.5, radius: 1 },
-  { name: 'Strait of Malacca', lat: 2.5, lon: 101.5, radius: 2 },
-  { name: 'Bab el-Mandeb', lat: 12.5, lon: 43.5, radius: 1.5 },
-  { name: 'Panama Canal', lat: 9.0, lon: -79.5, radius: 1 },
-  { name: 'Taiwan Strait', lat: 24.5, lon: 119.5, radius: 2 },
-  { name: 'South China Sea', lat: 15.0, lon: 115.0, radius: 5 },
-  { name: 'Black Sea', lat: 43.5, lon: 34.0, radius: 3 },
-];
+async function fetchSnapshotPayload(includeCandidates: boolean): Promise<unknown> {
+  const query = `?candidates=${includeCandidates ? 'true' : 'false'}`;
+  const primary = await fetch(`${AIS_SNAPSHOT_API}${query}`, { headers: { Accept: 'application/json' } });
+  if (primary.ok) return primary.json();
 
-function getGridKey(lat: number, lon: number): string {
-  const gridLat = Math.floor(lat / GRID_SIZE) * GRID_SIZE;
-  const gridLon = Math.floor(lon / GRID_SIZE) * GRID_SIZE;
-  return `${gridLat},${gridLon}`;
+  // Local dev fallback when Vercel functions are not running.
+  if (isLocalhost) {
+    const local = await fetch(`${LOCAL_SNAPSHOT_FALLBACK}${query}`, { headers: { Accept: 'application/json' } });
+    if (local.ok) return local.json();
+  }
+
+  throw new Error(`AIS snapshot HTTP ${primary.status}`);
 }
 
-function processPositionReport(data: {
-  MetaData: { MMSI: number; ShipName: string; latitude: number; longitude: number; time_utc: string; ShipType?: number };
-  Message: { PositionReport?: { Latitude: number; Longitude: number; Cog?: number; Sog?: number; TrueHeading?: number } };
-}): void {
-  const meta = data.MetaData;
-  const pos = data.Message.PositionReport;
+function pruneCallbackTimestampIndex(now: number): void {
+  if (lastCallbackTimestampByMmsi.size <= MAX_CALLBACK_TRACKED_VESSELS) {
+    return;
+  }
 
-  if (!meta || !pos) return;
+  const threshold = now - CALLBACK_RETENTION_MS;
+  for (const [mmsi, ts] of lastCallbackTimestampByMmsi) {
+    if (ts < threshold) {
+      lastCallbackTimestampByMmsi.delete(mmsi);
+    }
+  }
 
-  const mmsi = String(meta.MMSI);
-  const lat = pos.Latitude ?? meta.latitude;
-  const lon = pos.Longitude ?? meta.longitude;
+  if (lastCallbackTimestampByMmsi.size <= MAX_CALLBACK_TRACKED_VESSELS) {
+    return;
+  }
+
+  const oldest = Array.from(lastCallbackTimestampByMmsi.entries())
+    .sort((a, b) => a[1] - b[1]);
+  const toDelete = lastCallbackTimestampByMmsi.size - MAX_CALLBACK_TRACKED_VESSELS;
+  for (let i = 0; i < toDelete; i++) {
+    const entry = oldest[i];
+    if (!entry) break;
+    lastCallbackTimestampByMmsi.delete(entry[0]);
+  }
+}
+
+function emitCandidateReports(reports: SnapshotCandidateReport[]): void {
+  if (positionCallbacks.size === 0 || reports.length === 0) return;
   const now = Date.now();
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  for (const report of reports) {
+    if (!report?.mmsi || !Number.isFinite(report.lat) || !Number.isFinite(report.lon)) continue;
 
-  // Update vessel position
-  vessels.set(mmsi, {
-    mmsi,
-    name: meta.ShipName || `Vessel ${mmsi}`,
-    lat,
-    lon,
-    timestamp: now,
-    shipType: meta.ShipType,
-  });
+    const reportTs = Number.isFinite(report.timestamp) ? Number(report.timestamp) : now;
+    const lastTs = lastCallbackTimestampByMmsi.get(report.mmsi) || 0;
+    if (reportTs <= lastTs) continue;
 
-  // Notify callbacks (for military vessel tracking, etc.)
-  if (positionCallbacks.size > 0) {
+    lastCallbackTimestampByMmsi.set(report.mmsi, reportTs);
     const callbackData: AisPositionData = {
-      mmsi,
-      name: meta.ShipName || '',
-      lat,
-      lon,
-      shipType: meta.ShipType,
-      heading: pos.TrueHeading,
-      speed: pos.Sog,
-      course: pos.Cog,
+      mmsi: report.mmsi,
+      name: report.name || '',
+      lat: report.lat,
+      lon: report.lon,
+      shipType: report.shipType,
+      heading: report.heading,
+      speed: report.speed,
+      course: report.course,
     };
+
     for (const callback of positionCallbacks) {
       try {
         callback(callbackData);
@@ -137,310 +174,105 @@ function processPositionReport(data: {
     }
   }
 
-  // Track vessel history for gap detection
-  const history = vesselHistory.get(mmsi) || [];
-  history.push(now);
-  if (history.length > 10) history.shift();
-  vesselHistory.set(mmsi, history);
-
-  // Update density grid
-  const gridKey = getGridKey(lat, lon);
-  let cell = densityGrid.get(gridKey);
-  if (!cell) {
-    cell = {
-      lat: Math.floor(lat / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2,
-      lon: Math.floor(lon / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2,
-      vessels: new Set(),
-      lastUpdate: now,
-      previousCount: 0,
-    };
-    densityGrid.set(gridKey, cell);
-  }
-  cell.vessels.add(mmsi);
-  cell.lastUpdate = now;
-
-  messageCount++;
+  pruneCallbackTimestampIndex(now);
 }
 
-function handleMessage(event: MessageEvent): void {
+async function pollSnapshot(force = false): Promise<void> {
+  if (!aisConfigured) return;
+  if (inFlight && !force) return;
+
+  inFlight = true;
   try {
-    const data = JSON.parse(event.data);
+    const includeCandidates = shouldIncludeCandidates();
+    const payload = await fetchSnapshotPayload(includeCandidates);
+    const snapshot = parseSnapshot(payload);
+    if (!snapshot) throw new Error('Invalid snapshot payload');
 
-    if (data.MessageType === 'PositionReport') {
-      processPositionReport(data);
-      if (messageCount % 100 === 0) {
-        console.log(`[Shipping] Received ${messageCount} position reports, tracking ${vessels.size} vessels`);
-        // Update data freshness every 100 messages
-        dataFreshness.recordUpdate('ais', vessels.size);
+    latestDisruptions = snapshot.disruptions;
+    latestDensity = snapshot.density;
+    latestStatus = snapshot.status;
+    lastPollAt = Date.now();
+
+    if (includeCandidates) {
+      if (snapshot.sequence > lastSequence) {
+        emitCandidateReports(snapshot.candidateReports);
+        lastSequence = snapshot.sequence;
+      } else if (lastSequence === 0) {
+        emitCandidateReports(snapshot.candidateReports);
+        lastSequence = snapshot.sequence;
       }
-    }
-  } catch (e) {
-    // Ignore parse errors
-  }
-}
-
-function connect(): void {
-  if (isConnecting || isConnected) return;
-  if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
-
-  isConnecting = true;
-  console.log('[Shipping] Opening WebSocket to:', AISSTREAM_URL);
-  try {
-    socket = new WebSocket(AISSTREAM_URL);
-
-    socket.onopen = () => {
-      console.log('[Shipping] Connected to relay');
-      isConnected = true;
-      isConnecting = false;
-      ensureCleanupInterval();
-    };
-
-    socket.onmessage = handleMessage;
-
-    socket.onclose = (event) => {
-      console.log('[Shipping] Disconnected:', event.code, event.reason || 'No reason');
-      isConnected = false;
-      isConnecting = false;
-      socket = null;
-      scheduleReconnect();
-    };
-
-    socket.onerror = (error) => {
-      console.error('[Shipping] WebSocket error:', error);
-      isConnected = false;
-      isConnecting = false;
-      if (socket) {
-        socket.close();
-        socket = null;
-      }
-    };
-  } catch (e) {
-    console.error('[Shipping] Failed to connect:', e);
-    isConnecting = false;
-    scheduleReconnect();
-  }
-}
-
-function ensureCleanupInterval(): void {
-  if (!cleanupInterval) {
-    cleanupInterval = setInterval(cleanupOldData, 60 * 1000);
-  }
-}
-
-function scheduleReconnect(): void {
-  if (reconnectTimeout) return;
-  reconnectTimeout = setTimeout(() => {
-    reconnectTimeout = null;
-    connect();
-  }, 30000); // Reconnect after 30s
-}
-
-function cleanupOldData(): void {
-  const now = Date.now();
-  const cutoff = now - DENSITY_WINDOW;
-
-  // Remove old vessel positions
-  for (const [mmsi, vessel] of vessels) {
-    if (vessel.timestamp < cutoff) {
-      vessels.delete(mmsi);
-    }
-  }
-
-  // Prune vesselHistory for removed vessels and old timestamps
-  for (const [mmsi, history] of vesselHistory) {
-    if (!vessels.has(mmsi)) {
-      vesselHistory.delete(mmsi);
     } else {
-      const filtered = history.filter(ts => ts >= cutoff);
-      if (filtered.length === 0) {
-        vesselHistory.delete(mmsi);
-      } else {
-        vesselHistory.set(mmsi, filtered);
-      }
-    }
-  }
-
-  // Update grid cells
-  for (const [key, cell] of densityGrid) {
-    cell.previousCount = cell.vessels.size;
-
-    // Remove vessels not seen recently from this cell
-    for (const mmsi of cell.vessels) {
-      const vessel = vessels.get(mmsi);
-      if (!vessel || vessel.timestamp < cutoff) {
-        cell.vessels.delete(mmsi);
-      }
+      lastSequence = snapshot.sequence;
     }
 
-    // Remove empty cells
-    if (cell.vessels.size === 0 && now - cell.lastUpdate > DENSITY_WINDOW * 2) {
-      densityGrid.delete(key);
+    const itemCount = latestDisruptions.length + latestDensity.length;
+    if (itemCount > 0 || latestStatus.vessels > 0) {
+      dataFreshness.recordUpdate('ais', itemCount > 0 ? itemCount : latestStatus.vessels);
     }
+  } catch {
+    latestStatus.connected = false;
+  } finally {
+    inFlight = false;
   }
 }
 
-function detectDisruptions(): AisDisruptionEvent[] {
-  const disruptions: AisDisruptionEvent[] = [];
-  const now = Date.now();
-
-  // Report on all chokepoints with vessel activity
-  for (const chokepoint of CHOKEPOINTS) {
-    let vesselCount = 0;
-
-    for (const vessel of vessels.values()) {
-      const distance = Math.sqrt(
-        Math.pow(vessel.lat - chokepoint.lat, 2) +
-        Math.pow(vessel.lon - chokepoint.lon, 2)
-      );
-      if (distance <= chokepoint.radius) {
-        vesselCount++;
-      }
-    }
-
-    // Show any chokepoint with vessels (lower threshold: 5+ vessels)
-    if (vesselCount >= 5) {
-      const normalTraffic = chokepoint.radius * 10; // Expected baseline
-      const severity = vesselCount > normalTraffic * 1.5 ? 'high' :
-                       vesselCount > normalTraffic ? 'elevated' : 'low';
-
-      disruptions.push({
-        id: `chokepoint-${chokepoint.name.toLowerCase().replace(/\s+/g, '-')}`,
-        name: chokepoint.name,
-        type: 'chokepoint_congestion',
-        lat: chokepoint.lat,
-        lon: chokepoint.lon,
-        severity,
-        changePct: normalTraffic > 0 ? Math.round((vesselCount / normalTraffic - 1) * 100) : 0,
-        windowHours: 1,
-        vesselCount,
-        region: chokepoint.name,
-        description: `${vesselCount} vessels in ${chokepoint.name}`,
-      });
-    }
-  }
-
-  // Check for AIS gap spikes (dark ships)
-  let darkShipCount = 0;
-  for (const [, history] of vesselHistory) {
-    if (history.length >= 2) {
-      const lastSeen = history[history.length - 1]!;
-      const secondLast = history[history.length - 2]!;
-
-      // If there was a long gap and vessel just reappeared
-      if (lastSeen - secondLast > GAP_THRESHOLD && now - lastSeen < 10 * 60 * 1000) {
-        darkShipCount++;
-      }
-    }
-  }
-
-  if (darkShipCount >= 1) {
-    disruptions.push({
-      id: 'global-gap-spike',
-      name: 'AIS Gap Spike Detected',
-      type: 'gap_spike',
-      lat: 0,
-      lon: 0,
-      severity: darkShipCount > 20 ? 'high' : darkShipCount > 10 ? 'elevated' : 'low',
-      changePct: darkShipCount * 10,
-      windowHours: 1,
-      darkShips: darkShipCount,
-      description: `${darkShipCount} vessels returned after extended AIS silence`,
-    });
-  }
-
-  return disruptions;
+function startPolling(): void {
+  if (isPolling || !aisConfigured) return;
+  isPolling = true;
+  void pollSnapshot(true);
+  pollInterval = setInterval(() => {
+    void pollSnapshot(false);
+  }, SNAPSHOT_POLL_INTERVAL_MS);
 }
 
-function calculateDensityZones(): AisDensityZone[] {
-  const zones: AisDensityZone[] = [];
-  const allCells = Array.from(densityGrid.values()).filter(c => c.vessels.size >= 2);
+export function registerAisCallback(callback: AisCallback): void {
+  positionCallbacks.add(callback);
+  startPolling();
+}
 
-  if (allCells.length === 0) return zones;
-
-  const vesselCounts = allCells.map(c => c.vessels.size);
-  const maxVessels = Math.max(...vesselCounts);
-  const minVessels = Math.min(...vesselCounts);
-
-  for (const [key, cell] of densityGrid) {
-    if (cell.vessels.size < 2) continue;
-
-    // Use logarithmic scaling to make smaller zones visible
-    // This ensures zones with fewer ships still appear on the map
-    const logMax = Math.log(maxVessels + 1);
-    const logMin = Math.log(minVessels + 1);
-    const logCurrent = Math.log(cell.vessels.size + 1);
-
-    // Normalize to 0.2-1.0 range (minimum 20% intensity for visibility)
-    const intensity = logMax > logMin
-      ? 0.2 + 0.8 * (logCurrent - logMin) / (logMax - logMin)
-      : 0.5;
-
-    const deltaPct = cell.previousCount > 0
-      ? Math.round(((cell.vessels.size - cell.previousCount) / cell.previousCount) * 100)
-      : 0;
-
-    zones.push({
-      id: `density-${key}`,
-      name: `Zone ${key}`,
-      lat: cell.lat,
-      lon: cell.lon,
-      intensity,
-      deltaPct,
-      shipsPerDay: cell.vessels.size * 48,
-      note: cell.vessels.size >= 10 ? 'High traffic area' : undefined,
-    });
+export function unregisterAisCallback(callback: AisCallback): void {
+  positionCallbacks.delete(callback);
+  if (positionCallbacks.size === 0) {
+    lastCallbackTimestampByMmsi.clear();
   }
-
-  // Return all qualifying zones (increased from 50 to 200 for global coverage)
-  const sorted = zones.sort((a, b) => b.intensity - a.intensity).slice(0, 200);
-
-
-  return sorted;
 }
 
 export function initAisStream(): void {
-  console.log('[Shipping] Initializing AIS stream...');
-  connect();
-  ensureCleanupInterval();
+  startPolling();
 }
 
 export function disconnectAisStream(): void {
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout);
-    reconnectTimeout = null;
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
   }
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
-  }
-  if (socket) {
-    socket.close();
-    socket = null;
-  }
-  isConnected = false;
-  isConnecting = false;
+  isPolling = false;
+  inFlight = false;
+  latestStatus.connected = false;
 }
 
 export function getAisStatus(): { connected: boolean; vessels: number; messages: number } {
+  const isFresh = Date.now() - lastPollAt <= SNAPSHOT_STALE_MS;
   return {
-    connected: isConnected,
-    vessels: vessels.size,
-    messages: messageCount,
+    connected: latestStatus.connected && isFresh,
+    vessels: latestStatus.vessels,
+    messages: latestStatus.messages,
   };
 }
 
 export async function fetchAisSignals(): Promise<{ disruptions: AisDisruptionEvent[]; density: AisDensityZone[] }> {
-  // Initialize stream if not already running
-  if (!socket && !isConnecting) {
-    connect();
+  if (!aisConfigured) {
+    return { disruptions: [], density: [] };
   }
-  ensureCleanupInterval();
 
-  // Return aggregated data from in-memory tracking
-  cleanupOldData();
+  startPolling();
+  const shouldRefresh = Date.now() - lastPollAt > SNAPSHOT_STALE_MS;
+  if (shouldRefresh) {
+    await pollSnapshot(true);
+  }
 
   return {
-    disruptions: detectDisruptions(),
-    density: calculateDensityZones(),
+    disruptions: latestDisruptions,
+    density: latestDensity,
   };
 }
