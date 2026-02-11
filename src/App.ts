@@ -2523,12 +2523,13 @@ export class App {
               display: c.display,
               price: c.price,
               change: c.change,
+              sparkline: c.sparkline,
             }))
           );
         },
       });
       (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-        commodities.map((c) => ({ display: c.display, price: c.price, change: c.change }))
+        commodities.map((c) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline }))
       );
     } catch {
       this.statusPanel?.updateApi('Finnhub', { status: 'error' });

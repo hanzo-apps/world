@@ -86,8 +86,15 @@ export default async function handler(req) {
     });
   }
 
+  const endpoint = url.searchParams.get('endpoint');
+
   try {
-    const geckoUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${vsCurrencies}&include_24hr_change=${include24hrChange}`;
+    let geckoUrl;
+    if (endpoint === 'markets') {
+      geckoUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vsCurrencies}&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+    } else {
+      geckoUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=${vsCurrencies}&include_24hr_change=${include24hrChange}`;
+    }
     const response = await fetch(geckoUrl, {
       headers: {
         'Accept': 'application/json',
