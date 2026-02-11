@@ -12,7 +12,7 @@ export default async function handler(request) {
     // ArXiv API search query
     // Search for papers in specified category, sorted by date
     const query = `cat:${category}`;
-    const apiUrl = `http://export.arxiv.org/api/query?search_query=${encodeURIComponent(query)}&start=0&max_results=${maxResults}&sortBy=${sortBy}&sortOrder=descending`;
+    const apiUrl = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(query)}&start=0&max_results=${maxResults}&sortBy=${sortBy}&sortOrder=descending`;
 
     const response = await fetch(apiUrl, {
       headers: {
