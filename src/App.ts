@@ -62,6 +62,9 @@ import {
   ServiceStatusPanel,
   InsightsPanel,
   TechReadinessPanel,
+  MacroSignalsPanel,
+  ETFFlowsPanel,
+  StablecoinPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { collectStoryData } from '@/services/story-data';
@@ -1526,6 +1529,11 @@ export class App {
     // Tech Readiness Panel (tech variant only - World Bank tech indicators)
     const techReadinessPanel = new TechReadinessPanel();
     this.panels['tech-readiness'] = techReadinessPanel;
+
+    // Crypto & Market Intelligence Panels
+    this.panels['macro-signals'] = new MacroSignalsPanel();
+    this.panels['etf-flows'] = new ETFFlowsPanel();
+    this.panels['stablecoins'] = new StablecoinPanel();
 
     // AI Insights Panel (desktop only - hides itself on mobile)
     const insightsPanel = new InsightsPanel();

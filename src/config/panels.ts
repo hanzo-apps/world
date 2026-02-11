@@ -37,6 +37,9 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
   'satellite-fires': { name: 'Fires', enabled: true, priority: 2 },
+  'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
+  'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
+  stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -132,6 +135,9 @@ const TECH_PANELS: Record<string, PanelConfig> = {
   'service-status': { name: 'Service Status', enabled: true, priority: 2 },
   economic: { name: 'Economic Indicators', enabled: true, priority: 2 },
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 1 },
+  'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
+  'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
+  stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
