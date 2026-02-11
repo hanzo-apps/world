@@ -1,34 +1,69 @@
 // ACLED Conflict Events API proxy - battles, explosions, violence against civilians
 // Separate from protest proxy to avoid mixing data flows
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+import { getCachedJson, setCachedJson } from './_upstash-cache.js';
+import { recordCacheTelemetry } from './_cache-telemetry.js';
+import { createIpRateLimiter } from './_ip-rate-limit.js';
+
 export const config = { runtime: 'edge' };
 
-let cache = { data: null, timestamp: 0 };
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_KEY = 'acled:conflict:v2';
+const CACHE_TTL_SECONDS = 10 * 60;
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
-const rateLimits = new Map();
+let fallbackCache = { data: null, timestamp: 0 };
+
 const RATE_LIMIT = 10;
-const RATE_WINDOW = 60 * 1000;
+const RATE_WINDOW_MS = 60 * 1000;
+const rateLimiter = createIpRateLimiter({
+  limit: RATE_LIMIT,
+  windowMs: RATE_WINDOW_MS,
+  maxEntries: 5000,
+});
 
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const record = rateLimits.get(ip);
-  if (!record || now - record.windowStart > RATE_WINDOW) {
-    rateLimits.set(ip, { count: 1, windowStart: now });
-    return true;
-  }
-  if (record.count >= RATE_LIMIT) return false;
-  record.count++;
-  return true;
+function getClientIp(req) {
+  return req.headers.get('x-forwarded-for')?.split(',')[0] ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+}
+
+function toErrorMessage(error) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'unknown error');
 }
 
 export default async function handler(req) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ||
-             req.headers.get('x-real-ip') || 'unknown';
+  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
 
-  if (!checkRateLimit(ip)) {
+  if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) {
+      return new Response(null, { status: 403, headers: corsHeaders });
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== 'GET') {
+    return Response.json({ error: 'Method not allowed', data: [] }, {
+      status: 405,
+      headers: corsHeaders,
+    });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return Response.json({ error: 'Origin not allowed', data: [] }, {
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
+
+  const ip = getClientIp(req);
+  if (!rateLimiter.check(ip)) {
     return Response.json({ error: 'Rate limited', data: [] }, {
       status: 429,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Retry-After': '60' },
+      headers: {
+        ...corsHeaders,
+        'Retry-After': '60',
+      },
     });
   }
 
@@ -36,22 +71,39 @@ export default async function handler(req) {
   if (!token) {
     return Response.json({ error: 'ACLED not configured', data: [], configured: false }, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
   const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
-    return Response.json(cache.data, {
+  const cached = await getCachedJson(CACHE_KEY);
+  if (cached && typeof cached === 'object' && Array.isArray(cached.data)) {
+    recordCacheTelemetry('/api/acled-conflict', 'REDIS-HIT');
+    return Response.json(cached, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300', 'X-Cache': 'HIT' },
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': 'public, max-age=300',
+        'X-Cache': 'REDIS-HIT',
+      },
+    });
+  }
+
+  if (fallbackCache.data && now - fallbackCache.timestamp < CACHE_TTL_MS) {
+    recordCacheTelemetry('/api/acled-conflict', 'MEMORY-HIT');
+    return Response.json(fallbackCache.data, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': 'public, max-age=300',
+        'X-Cache': 'MEMORY-HIT',
+      },
     });
   }
 
   try {
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
     const params = new URLSearchParams({
       event_type: 'Battles|Explosions/Remote violence|Violence against civilians',
       event_date: `${startDate}|${endDate}`,
@@ -61,21 +113,23 @@ export default async function handler(req) {
     });
 
     const response = await fetch(`https://acleddata.com/api/acled/read?${params}`, {
-      headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     if (!response.ok) {
       const text = await response.text();
       return Response.json({ error: `ACLED API error: ${response.status}`, details: text.substring(0, 200), data: [] }, {
         status: response.status,
-        headers: { 'Access-Control-Allow-Origin': '*' },
+        headers: corsHeaders,
       });
     }
 
     const rawData = await response.json();
-    const events = rawData.data || [];
-
-    const sanitizedEvents = events.map(e => ({
+    const events = Array.isArray(rawData?.data) ? rawData.data : [];
+    const sanitizedEvents = events.map((e) => ({
       event_id_cnty: e.event_id_cnty,
       event_date: e.event_date,
       event_type: e.event_type,
@@ -88,22 +142,47 @@ export default async function handler(req) {
       latitude: e.latitude,
       longitude: e.longitude,
       fatalities: e.fatalities,
-      notes: e.notes?.substring(0, 500),
+      notes: typeof e.notes === 'string' ? e.notes.substring(0, 500) : undefined,
       source: e.source,
       tags: e.tags,
     }));
 
-    const result = { success: true, count: sanitizedEvents.length, data: sanitizedEvents, cached_at: new Date().toISOString() };
-    cache = { data: result, timestamp: now };
+    const result = {
+      success: true,
+      count: sanitizedEvents.length,
+      data: sanitizedEvents,
+      cached_at: new Date().toISOString(),
+    };
+
+    fallbackCache = { data: result, timestamp: now };
+    void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
+    recordCacheTelemetry('/api/acled-conflict', 'MISS');
 
     return Response.json(result, {
       status: 200,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300', 'X-Cache': 'MISS' },
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': 'public, max-age=300',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (error) {
-    return Response.json({ error: `Fetch failed: ${error.message}`, data: [] }, {
+    if (fallbackCache.data) {
+      recordCacheTelemetry('/api/acled-conflict', 'STALE');
+      return Response.json(fallbackCache.data, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Cache-Control': 'public, max-age=60',
+          'X-Cache': 'STALE',
+        },
+      });
+    }
+
+    recordCacheTelemetry('/api/acled-conflict', 'ERROR');
+    return Response.json({ error: `Fetch failed: ${toErrorMessage(error)}`, data: [] }, {
       status: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 }

@@ -1,12 +1,19 @@
 export const config = { runtime: 'edge' };
 
+import { getCachedJson, hashString, setCachedJson } from './_upstash-cache.js';
+import { recordCacheTelemetry } from './_cache-telemetry.js';
+
 const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'btc', 'eth'];
 const MAX_COIN_IDS = 20;
 const COIN_ID_PATTERN = /^[a-z0-9-]+$/;
 
-// Simple in-memory cache for edge function (reset on cold start)
-let cache = { data: null, timestamp: 0 };
-const CACHE_TTL = 120 * 1000; // 2 minutes
+const CACHE_TTL_SECONDS = 120; // 2 minutes
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
+const RESPONSE_CACHE_CONTROL = 'public, max-age=120, stale-while-revalidate=60';
+const CACHE_VERSION = 'v2';
+
+// In-memory fallback cache for the current instance.
+let fallbackCache = { key: '', payload: null, timestamp: 0 };
 
 function validateCoinIds(idsParam) {
   if (!idsParam) return 'bitcoin,ethereum,solana';
@@ -29,6 +36,24 @@ function validateBoolean(val, defaultVal) {
   return defaultVal;
 }
 
+function getHeaders(xCache, cacheControl = RESPONSE_CACHE_CONTROL) {
+  return {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': cacheControl,
+    'X-Cache': xCache,
+  };
+}
+
+function isValidPayload(payload) {
+  return Boolean(
+    payload &&
+    typeof payload === 'object' &&
+    typeof payload.body === 'string' &&
+    Number.isFinite(payload.status)
+  );
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
 
@@ -36,17 +61,28 @@ export default async function handler(req) {
   const vsCurrencies = validateCurrency(url.searchParams.get('vs_currencies'));
   const include24hrChange = validateBoolean(url.searchParams.get('include_24hr_change'), 'true');
 
-  // Return cached data if fresh
+  const now = Date.now();
   const cacheKey = `${ids}:${vsCurrencies}:${include24hrChange}`;
-  if (cache.data && cache.key === cacheKey && Date.now() - cache.timestamp < CACHE_TTL) {
-    return new Response(cache.data, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=120, stale-while-revalidate=60',
-        'X-Cache': 'HIT',
-      },
+  const redisKey = `coingecko:${CACHE_VERSION}:${hashString(cacheKey)}`;
+
+  const redisCached = await getCachedJson(redisKey);
+  if (isValidPayload(redisCached)) {
+    recordCacheTelemetry('/api/coingecko', 'REDIS-HIT');
+    return new Response(redisCached.body, {
+      status: redisCached.status,
+      headers: getHeaders('REDIS-HIT'),
+    });
+  }
+
+  if (
+    isValidPayload(fallbackCache.payload) &&
+    fallbackCache.key === cacheKey &&
+    now - fallbackCache.timestamp < CACHE_TTL_MS
+  ) {
+    recordCacheTelemetry('/api/coingecko', 'MEMORY-HIT');
+    return new Response(fallbackCache.payload.body, {
+      status: fallbackCache.payload.status,
+      headers: getHeaders('MEMORY-HIT'),
     });
   }
 
@@ -59,15 +95,15 @@ export default async function handler(req) {
     });
 
     // If rate limited, return cached data if available
-    if (response.status === 429 && cache.data && cache.key === cacheKey) {
-      return new Response(cache.data, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=120, stale-while-revalidate=60',
-          'X-Cache': 'STALE',
-        },
+    if (
+      response.status === 429 &&
+      isValidPayload(fallbackCache.payload) &&
+      fallbackCache.key === cacheKey
+    ) {
+      recordCacheTelemetry('/api/coingecko', 'STALE');
+      return new Response(fallbackCache.payload.body, {
+        status: fallbackCache.payload.status,
+        headers: getHeaders('STALE'),
       });
     }
 
@@ -75,31 +111,29 @@ export default async function handler(req) {
 
     // Cache successful responses
     if (response.ok) {
-      cache = { data, key: cacheKey, timestamp: Date.now() };
+      const payload = { body: data, status: response.status };
+      fallbackCache = { key: cacheKey, payload, timestamp: Date.now() };
+      void setCachedJson(redisKey, payload, CACHE_TTL_SECONDS);
+      recordCacheTelemetry('/api/coingecko', 'MISS');
+    } else {
+      recordCacheTelemetry('/api/coingecko', 'UPSTREAM-ERROR');
     }
 
     return new Response(data, {
       status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=120, stale-while-revalidate=60',
-        'X-Cache': 'MISS',
-      },
+      headers: getHeaders('MISS'),
     });
   } catch (error) {
     // Return cached data on error if available
-    if (cache.data && cache.key === cacheKey) {
-      return new Response(cache.data, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=120',
-          'X-Cache': 'ERROR-FALLBACK',
-        },
+    if (isValidPayload(fallbackCache.payload) && fallbackCache.key === cacheKey) {
+      recordCacheTelemetry('/api/coingecko', 'ERROR-FALLBACK');
+      return new Response(fallbackCache.payload.body, {
+        status: fallbackCache.payload.status,
+        headers: getHeaders('ERROR-FALLBACK', 'public, max-age=120'),
       });
     }
+
+    recordCacheTelemetry('/api/coingecko', 'ERROR');
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
