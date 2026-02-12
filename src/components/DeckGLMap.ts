@@ -65,6 +65,7 @@ import { getAlertsNearLocation } from '@/services/geo-convergence';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+type MapInteractionMode = 'flat' | '3d';
 
 interface DeckMapState {
   zoom: number;
@@ -102,6 +103,9 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
   africa: { longitude: 20, latitude: 5, zoom: 3 },
   oceania: { longitude: 135, latitude: -25, zoom: 3.5 },
 };
+
+const MAP_INTERACTION_MODE: MapInteractionMode =
+  import.meta.env.VITE_MAP_INTERACTION_MODE === '3d' ? '3d' : 'flat';
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Used in renderClusterOverlays for zoom-dependent label visibility
@@ -217,8 +221,12 @@ export class DeckGLMap {
   private lastClusterState: Map<string, { x: number; y: number; count: number }> = new Map();
   private clusterResultCache: Map<string, Array<{ items: unknown[]; center: [number, number]; screenPos: [number, number] }>> = new Map();
   private lastClusterZoom = -1;
+  private techEventsVersion = 0;
+  private protestsVersion = 0;
   private newsPulseFrameId: number | null = null;
   private lastPulseUpdateTime = 0;
+  private lastCableHighlightSignature = '';
+  private lastPipelineHighlightSignature = '';
   private throttledRenderClusters: () => void;
   private debouncedRebuildLayers: () => void;
   private rafUpdateLayers: () => void;
@@ -323,10 +331,14 @@ export class DeckGLMap {
       zoom: preset.zoom,
       attributionControl: false,
       interactive: true,
-      maxPitch: 0,
-      pitchWithRotate: false,
-      dragRotate: false,
-      touchPitch: false,
+      ...(MAP_INTERACTION_MODE === 'flat'
+        ? {
+            maxPitch: 0,
+            pitchWithRotate: false,
+            dragRotate: false,
+            touchPitch: false,
+          }
+        : {}),
     });
   }
 
@@ -336,9 +348,10 @@ export class DeckGLMap {
     this.deckOverlay = new MapboxOverlay({
       interleaved: false,
       layers: this.buildLayers(),
+      getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 10,
-      useDevicePixels: false,
+      useDevicePixels: window.devicePixelRatio > 2 ? 2 : true,
     });
 
     this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
@@ -457,6 +470,17 @@ export class DeckGLMap {
     return `${type}-${center[0].toFixed(4)}-${center[1].toFixed(4)}-${count}`;
   }
 
+  private getSetSignature(set: Set<string>): string {
+    return [...set].sort().join('|');
+  }
+
+  private hasRecentNews(now = Date.now()): boolean {
+    for (const ts of this.newsLocationFirstSeen.values()) {
+      if (now - ts < 30_000) return true;
+    }
+    return false;
+  }
+
   private updateClusterElement(
     key: string,
     screenPos: [number, number],
@@ -486,6 +510,7 @@ export class DeckGLMap {
       if (!activeKeys.has(key)) {
         element.remove();
         this.clusterElementCache.delete(key);
+        this.lastClusterState.delete(key);
       }
     }
   }
@@ -524,7 +549,7 @@ export class DeckGLMap {
 
       if (this.state.layers.techEvents && this.techEvents.length > 0) {
         const clusterRadius = zoom >= 4 ? 15 : zoom >= 3 ? 25 : 40;
-        const cacheKey = `event-${clusterRadius}-${this.techEvents.length}`;
+        const cacheKey = `event-${this.techEventsVersion}-${clusterRadius}`;
         let clusters = this.clusterResultCache.get(cacheKey) as Array<{ items: Array<TechEventMarker & { lon: number }>; center: [number, number]; screenPos: [number, number] }> | undefined;
         if (!clusters || zoomChanged) {
           const eventsWithLon = this.techEvents.map(e => ({ ...e, lon: e.lng }));
@@ -544,7 +569,7 @@ export class DeckGLMap {
 
     if (this.state.layers.protests && this.protests.length > 0) {
       const clusterRadius = zoom >= 4 ? 12 : zoom >= 3 ? 20 : 35;
-      const cacheKey = `protest-${clusterRadius}-${this.protests.length}`;
+      const cacheKey = `protest-${this.protestsVersion}-${clusterRadius}`;
       let clusters = this.clusterResultCache.get(cacheKey) as Array<{ items: SocialUnrestEvent[]; center: [number, number]; screenPos: [number, number] }> | undefined;
       if (!clusters || zoomChanged) {
         const significantProtests = this.protests.filter(p => p.severity === 'high' || p.eventType === 'riot');
@@ -581,13 +606,13 @@ export class DeckGLMap {
     }
 
     if (this.state.layers.hotspots) {
-      this.renderHotspotOverlays();
+      this.renderHotspotOverlays(activeKeys);
     }
 
     this.pruneClusterCache(activeKeys);
 
     const elapsed = performance.now() - startTime;
-    if (elapsed > 16) {
+    if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] renderClusterOverlays took ${elapsed.toFixed(2)}ms (>16ms budget)`);
     }
   }
@@ -608,7 +633,7 @@ export class DeckGLMap {
   }
 
   /** Render HTML overlays for high-activity hotspots with CSS pulsating animation */
-  private renderHotspotOverlays(): void {
+  private renderHotspotOverlays(activeKeys: Set<string>): void {
     if (!this.clusterOverlay || !this.maplibreMap) return;
 
     const zoom = this.maplibreMap.getZoom();
@@ -625,6 +650,7 @@ export class DeckGLMap {
       if (!pos) return;
 
       const key = this.getClusterKey('hotspot', [hotspot.lon, hotspot.lat], 1);
+      activeKeys.add(key);
       const existing = this.clusterElementCache.get(key);
 
       if (existing) {
@@ -1051,7 +1077,7 @@ export class DeckGLMap {
 
     const result = layers.filter(Boolean) as LayersList;
     const elapsed = performance.now() - startTime;
-    if (elapsed > 16) {
+    if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] buildLayers took ${elapsed.toFixed(2)}ms (>16ms budget), ${result.length} layers`);
     }
     return result;
@@ -1062,11 +1088,8 @@ export class DeckGLMap {
     const highlightedCables = this.highlightedAssets.cable;
     const cacheKey = 'cables-layer';
     const cached = this.layerCache.get(cacheKey) as PathLayer | undefined;
-
-    const needsUpdate = !cached ||
-      (highlightedCables.size > 0) !== ((cached.props.updateTriggers as Record<string, unknown>)?.highlighted as boolean);
-
-    if (!needsUpdate) return cached!;
+    const highlightSignature = this.getSetSignature(highlightedCables);
+    if (cached && highlightSignature === this.lastCableHighlightSignature) return cached;
 
     const layer = new PathLayer({
       id: cacheKey,
@@ -1077,10 +1100,11 @@ export class DeckGLMap {
       getWidth: (d) => highlightedCables.has(d.id) ? 3 : 1,
       widthMinPixels: 1,
       widthMaxPixels: 5,
-      pickable: false,
-      updateTriggers: { highlighted: highlightedCables.size > 0 },
+      pickable: true,
+      updateTriggers: { highlighted: highlightSignature },
     });
 
+    this.lastCableHighlightSignature = highlightSignature;
     this.layerCache.set(cacheKey, layer);
     return layer;
   }
@@ -1089,11 +1113,8 @@ export class DeckGLMap {
     const highlightedPipelines = this.highlightedAssets.pipeline;
     const cacheKey = 'pipelines-layer';
     const cached = this.layerCache.get(cacheKey) as PathLayer | undefined;
-
-    const needsUpdate = !cached ||
-      (highlightedPipelines.size > 0) !== ((cached.props.updateTriggers as Record<string, unknown>)?.highlighted as boolean);
-
-    if (!needsUpdate) return cached!;
+    const highlightSignature = this.getSetSignature(highlightedPipelines);
+    if (cached && highlightSignature === this.lastPipelineHighlightSignature) return cached;
 
     const layer = new PathLayer({
       id: cacheKey,
@@ -1110,10 +1131,11 @@ export class DeckGLMap {
       getWidth: (d) => highlightedPipelines.has(d.id) ? 3 : 1.5,
       widthMinPixels: 1,
       widthMaxPixels: 4,
-      pickable: false,
-      updateTriggers: { highlighted: highlightedPipelines.size > 0 },
+      pickable: true,
+      updateTriggers: { highlighted: highlightSignature },
     });
 
+    this.lastPipelineHighlightSignature = highlightSignature;
     this.layerCache.set(cacheKey, layer);
     return layer;
   }
@@ -1121,6 +1143,7 @@ export class DeckGLMap {
   private createConflictZonesLayer(): GeoJsonLayer {
     const cacheKey = 'conflict-zones-layer';
     const cached = this.layerCache.get(cacheKey) as GeoJsonLayer | undefined;
+    // Conflict zones are static config data, so this layer is intentionally cached without dynamic invalidation.
     if (cached) return cached;
 
     const geojsonData = {
@@ -1144,7 +1167,7 @@ export class DeckGLMap {
       getLineColor: () => [255, 0, 0, 180] as [number, number, number, number],
       getLineWidth: 2,
       lineWidthMinPixels: 1,
-      pickable: false,
+      pickable: true,
     });
 
     this.layerCache.set(cacheKey, layer);
@@ -1704,16 +1727,26 @@ export class DeckGLMap {
 
   private startNewsPulseAnimation(): void {
     if (this.newsPulseFrameId !== null) return;
+    const PULSE_UPDATE_INTERVAL_MS = 250;
 
     const animate = (): void => {
       const now = Date.now();
-      if (now - this.lastPulseUpdateTime > 16) {
+      if (now - this.lastPulseUpdateTime >= PULSE_UPDATE_INTERVAL_MS) {
+        const hasRecent = this.hasRecentNews(now);
+        if (!hasRecent) {
+          this.pulseTime = now;
+          this.stopNewsPulseAnimation();
+          this.rafUpdateLayers();
+          return;
+        }
         this.pulseTime = now;
         this.lastPulseUpdateTime = now;
         this.rafUpdateLayers();
       }
       this.newsPulseFrameId = requestAnimationFrame(animate);
     };
+
+    this.lastPulseUpdateTime = 0;
     this.newsPulseFrameId = requestAnimationFrame(animate);
   }
 
@@ -1795,6 +1828,51 @@ export class DeckGLMap {
     }
 
     return layers;
+  }
+
+  private getTooltip(info: PickingInfo): { html: string } | null {
+    if (!info.object) return null;
+
+    const layerId = info.layer?.id || '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj = info.object as any;
+
+    switch (layerId) {
+      case 'hotspots-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>${obj.subtext || ''}</div>` };
+      case 'earthquakes-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>M${(obj.magnitude || 0).toFixed(1)} Earthquake</strong><br/>${obj.place || ''}</div>` };
+      case 'military-vessels-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>${obj.operatorCountry || ''}</div>` };
+      case 'military-flights-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.callsign || obj.registration || 'Military Aircraft'}</strong><br/>${obj.type || ''}</div>` };
+      case 'military-vessel-clusters-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || 'Vessel Cluster'}</strong><br/>${obj.vesselCount || 0} vessels</div>` };
+      case 'military-flight-clusters-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || 'Flight Cluster'}</strong><br/>${obj.flightCount || 0} aircraft</div>` };
+      case 'cables-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>Undersea Cable</div>` };
+      case 'pipelines-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>${obj.type || ''} Pipeline</div>` };
+      case 'conflict-zones-layer': {
+        const props = obj.properties || obj;
+        return { html: `<div class="deckgl-tooltip"><strong>${props.name || ''}</strong><br/>Conflict Zone</div>` };
+      }
+      case 'protests-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.title || ''}</strong><br/>${obj.country || ''}</div>` };
+      case 'datacenters-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.name || ''}</strong><br/>${obj.owner || ''}</div>` };
+      case 'weather-layer': {
+        const area = obj.areaDesc ? `<br/><small>${obj.areaDesc.slice(0, 50)}${obj.areaDesc.length > 50 ? '...' : ''}</small>` : '';
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.event || 'Weather Alert'}</strong><br/>${obj.severity || ''}${area}</div>` };
+      }
+      case 'outages-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.asn || 'Internet Outage'}</strong><br/>${obj.country || ''}</div>` };
+      case 'news-locations-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>📰 News</strong><br/>${escapeHtml(obj.title?.slice(0, 80) || '')}</div>` };
+      default:
+        return null;
+    }
   }
 
   private handleClick(info: PickingInfo): void {
@@ -2252,7 +2330,7 @@ export class DeckGLMap {
     }
     this.renderClusterOverlays();
     const elapsed = performance.now() - startTime;
-    if (elapsed > 16) {
+    if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
     }
   }
@@ -2374,6 +2452,8 @@ export class DeckGLMap {
 
   public setProtests(events: SocialUnrestEvent[]): void {
     this.protests = events;
+    this.protestsVersion += 1;
+    this.clusterResultCache.clear();
     this.render();
   }
 
@@ -2406,6 +2486,8 @@ export class DeckGLMap {
 
   public setTechEvents(events: TechEventMarker[]): void {
     this.techEvents = events;
+    this.techEventsVersion += 1;
+    this.clusterResultCache.clear();
     this.render();
   }
 
@@ -2422,7 +2504,7 @@ export class DeckGLMap {
     this.newsLocations = data;
     this.render();
 
-    const hasRecent = [...this.newsLocationFirstSeen.values()].some(t => Date.now() - t < 30_000);
+    const hasRecent = this.hasRecentNews(now);
     if (hasRecent && this.newsPulseFrameId === null) {
       this.startNewsPulseAnimation();
     } else if (!hasRecent) {
