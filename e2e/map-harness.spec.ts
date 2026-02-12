@@ -114,6 +114,21 @@ const waitForHarnessReady = async (
     .toBe(true);
 };
 
+const getMarkerCenter = async (
+  page: import('@playwright/test').Page,
+  selector: string
+): Promise<{ x: number; y: number } | null> => {
+  return await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }, selector);
+};
+
 const prepareVisualScenario = async (
   page: import('@playwright/test').Page,
   scenarioId: string
@@ -138,6 +153,18 @@ const prepareVisualScenario = async (
 };
 
 test.describe('DeckGL map harness', () => {
+  test('serves requested runtime variant for this test run', async ({ page }) => {
+    await waitForHarnessReady(page);
+
+    const runtimeVariant = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.variant ?? 'full';
+    });
+
+    const expectedVariant = process.env.VITE_VARIANT === 'tech' ? 'tech' : 'full';
+    expect(runtimeVariant).toBe(expectedVariant);
+  });
+
   test('boots without deck assertions or unhandled runtime errors', async ({
     page,
   }) => {
@@ -320,5 +347,39 @@ test.describe('DeckGL map harness', () => {
     await expect(page.locator('.map-popup .popup-description')).toContainText(
       'Scenario Beta Protest'
     );
+  });
+
+  test('reprojects protest overlay marker when panning at fixed zoom', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.seedAllDynamicData();
+      w.__mapHarness?.enableDeterministicVisualMode();
+    });
+
+    await prepareVisualScenario(page, 'protests-z5');
+
+    const markerSelector = '.protest-marker';
+    await expect(page.locator(markerSelector).first()).toBeVisible();
+
+    const before = await getMarkerCenter(page, markerSelector);
+    expect(before).not.toBeNull();
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setCamera({ lon: 2.2, lat: 20.1, zoom: 5.2 });
+    });
+
+    await page.waitForTimeout(750);
+
+    const after = await getMarkerCenter(page, markerSelector);
+    expect(after).not.toBeNull();
+
+    const dx = Math.abs((after?.x ?? 0) - (before?.x ?? 0));
+    const dy = Math.abs((after?.y ?? 0) - (before?.y ?? 0));
+    expect(Math.max(dx, dy)).toBeGreaterThan(10);
   });
 });
