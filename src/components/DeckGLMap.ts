@@ -512,6 +512,21 @@ export class DeckGLMap {
     }
   }
 
+  private invalidateClusterElementsByType(type: 'event' | 'protest'): void {
+    const prefix = `${type}-`;
+    for (const [key, element] of this.clusterElementCache) {
+      if (key.startsWith(prefix)) {
+        element.remove();
+        this.clusterElementCache.delete(key);
+      }
+    }
+    for (const key of this.lastClusterState.keys()) {
+      if (key.startsWith(prefix)) {
+        this.lastClusterState.delete(key);
+      }
+    }
+  }
+
   private renderClusterOverlays(): void {
     if (!this.clusterOverlay || !this.maplibreMap) return;
 
@@ -537,7 +552,7 @@ export class DeckGLMap {
         clusters.forEach((cluster) => {
           const key = this.getClusterKey('hq', cluster.center, cluster.items.length);
           activeKeys.add(key);
-          if (!this.lastClusterState.has(key) || this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
+          if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
             const element = this.updateClusterElement(key, cluster.screenPos, () => this.createTechHQClusterElement(cluster));
             if (!element.parentElement) this.clusterOverlay!.appendChild(element);
           }
@@ -556,7 +571,7 @@ export class DeckGLMap {
         clusters.forEach((cluster) => {
           const key = this.getClusterKey('event', cluster.center, cluster.items.length);
           activeKeys.add(key);
-          if (!this.lastClusterState.has(key) || this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
+          if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
             const element = this.updateClusterElement(key, cluster.screenPos, () => this.createTechEventClusterElement(cluster));
             if (!element.parentElement) this.clusterOverlay!.appendChild(element);
           }
@@ -576,7 +591,7 @@ export class DeckGLMap {
       clusters.forEach((cluster) => {
         const key = this.getClusterKey('protest', cluster.center, cluster.items.length);
         activeKeys.add(key);
-        if (!this.lastClusterState.has(key) || this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
+        if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
           const element = this.updateClusterElement(key, cluster.screenPos, () => this.createProtestClusterElement(cluster));
           if (!element.parentElement) this.clusterOverlay!.appendChild(element);
         }
@@ -595,7 +610,7 @@ export class DeckGLMap {
       clusters.forEach((cluster) => {
         const key = this.getClusterKey('dc', cluster.center, cluster.items.length);
         activeKeys.add(key);
-        if (!this.lastClusterState.has(key) || this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
+        if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
           const element = this.updateClusterElement(key, cluster.screenPos, () => this.createDatacenterClusterElement(cluster));
           if (!element.parentElement) this.clusterOverlay!.appendChild(element);
         }
@@ -2483,6 +2498,7 @@ export class DeckGLMap {
   public setProtests(events: SocialUnrestEvent[]): void {
     this.protests = events;
     this.clusterResultCache.clear();
+    this.invalidateClusterElementsByType('protest');
     this.render();
   }
 
@@ -2516,6 +2532,7 @@ export class DeckGLMap {
   public setTechEvents(events: TechEventMarker[]): void {
     this.techEvents = events;
     this.clusterResultCache.clear();
+    this.invalidateClusterElementsByType('event');
     this.render();
   }
 
