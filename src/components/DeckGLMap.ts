@@ -227,6 +227,9 @@ export class DeckGLMap {
   private throttledRenderClusters: () => void;
   private debouncedRebuildLayers: () => void;
   private rafUpdateLayers: () => void;
+  private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private hotspotSyncRafId: number | null = null;
+  private hotspotOverlayNeedsReconcile = false;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
@@ -353,26 +356,30 @@ export class DeckGLMap {
 
     this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
 
-    let moveTimeout: ReturnType<typeof setTimeout> | null = null;
     this.maplibreMap.on('movestart', () => {
-      if (moveTimeout) clearTimeout(moveTimeout);
+      if (this.moveTimeoutId) {
+        clearTimeout(this.moveTimeoutId);
+        this.moveTimeoutId = null;
+      }
       this.clusterOverlay!.style.opacity = '0.7';
     });
 
     this.maplibreMap.on('moveend', () => {
       this.clusterOverlay!.style.opacity = '1';
+      this.scheduleHotspotOverlaySync({ reconcile: true });
       this.throttledRenderClusters();
     });
 
     this.maplibreMap.on('move', () => {
-      this.updateHotspotPositions();
-      if (moveTimeout) clearTimeout(moveTimeout);
-      moveTimeout = setTimeout(() => this.throttledRenderClusters(), 100);
+      this.scheduleHotspotOverlaySync();
+      if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
+      this.moveTimeoutId = setTimeout(() => this.throttledRenderClusters(), 100);
     });
 
     this.maplibreMap.on('zoom', () => {
-      if (moveTimeout) clearTimeout(moveTimeout);
-      moveTimeout = setTimeout(() => this.throttledRenderClusters(), 100);
+      this.scheduleHotspotOverlaySync();
+      if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
+      this.moveTimeoutId = setTimeout(() => this.throttledRenderClusters(), 100);
     });
 
     this.maplibreMap.on('zoomend', () => {
@@ -716,22 +723,50 @@ export class DeckGLMap {
   }
 
   private updateHotspotPositions(): void {
-    if (!this.clusterOverlay || !this.maplibreMap) return;
+    if (!this.clusterOverlay || !this.maplibreMap || !this.state.layers.hotspots) return;
 
     const zoom = this.maplibreMap.getZoom();
     const markerScale = zoom < 2.5 ? 0.7 : zoom < 4 ? 0.85 : 1.0;
 
-    this.hotspots.forEach(hotspot => {
-      if (hotspot.level !== 'high' && !hotspot.hasBreaking) return;
+    for (const [key, existing] of this.clusterElementCache) {
+      if (!key.startsWith('hotspot-')) continue;
 
-      const key = this.getClusterKey('hotspot', [hotspot.lon, hotspot.lat], 1);
-      const existing = this.clusterElementCache.get(key);
-      if (!existing) return;
+      const match = /^hotspot-(-?\d+\.\d+)-(-?\d+\.\d+)-\d+$/.exec(key);
+      if (!match) continue;
+      const lon = Number(match[1]);
+      const lat = Number(match[2]);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
 
-      const pos = this.maplibreMap!.project([hotspot.lon, hotspot.lat]);
-      if (!pos) return;
+      const pos = this.maplibreMap.project([lon, lat]);
+      if (!pos) continue;
 
       existing.style.transform = `translate(${pos.x - 16}px, ${pos.y - 16}px) scale(${markerScale})`;
+    }
+  }
+
+  private scheduleHotspotOverlaySync(options?: { reconcile?: boolean }): void {
+    if (!this.state.layers.hotspots) return;
+
+    if (options?.reconcile) {
+      this.hotspotOverlayNeedsReconcile = true;
+    }
+
+    if (this.hotspotSyncRafId !== null) return;
+
+    this.hotspotSyncRafId = requestAnimationFrame(() => {
+      this.hotspotSyncRafId = null;
+
+      if (!this.clusterOverlay || !this.maplibreMap || !this.state.layers.hotspots) {
+        this.hotspotOverlayNeedsReconcile = false;
+        return;
+      }
+
+      this.updateHotspotPositions();
+
+      if (this.hotspotOverlayNeedsReconcile) {
+        this.hotspotOverlayNeedsReconcile = false;
+        this.throttledRenderClusters();
+      }
     });
   }
 
@@ -2623,17 +2658,7 @@ export class DeckGLMap {
       updateHotspotEscalation(h.id, matchCount, h.hasBreaking || false, velocity);
     });
 
-    if (import.meta.env.DEV) {
-      const shuffled = [...this.hotspots].sort(() => Math.random() - 0.5);
-      shuffled.slice(0, 3).forEach(h => {
-        h.hasBreaking = true;
-        h.level = 'high';
-        if (!h.escalationScore || h.escalationScore < 4) {
-          h.escalationScore = 5;
-        }
-      });
-    }
-
+    this.scheduleHotspotOverlaySync({ reconcile: true });
     this.render(); // Debounced
   }
 
@@ -3069,6 +3094,16 @@ export class DeckGLMap {
   public destroy(): void {
     if (this.timestampIntervalId) {
       clearInterval(this.timestampIntervalId);
+    }
+
+    if (this.moveTimeoutId) {
+      clearTimeout(this.moveTimeoutId);
+      this.moveTimeoutId = null;
+    }
+
+    if (this.hotspotSyncRafId !== null) {
+      cancelAnimationFrame(this.hotspotSyncRafId);
+      this.hotspotSyncRafId = null;
     }
 
     this.stopNewsPulseAnimation();
