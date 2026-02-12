@@ -478,6 +478,16 @@ export class DeckGLMap {
     return false;
   }
 
+  private projectClusterCenter(
+    center: [number, number],
+    fallback: [number, number]
+  ): [number, number] {
+    if (!this.maplibreMap) return fallback;
+    const projected = this.maplibreMap.project(center);
+    if (!projected) return fallback;
+    return [projected.x, projected.y];
+  }
+
   private updateClusterElement(
     key: string,
     screenPos: [number, number],
@@ -550,10 +560,11 @@ export class DeckGLMap {
           this.clusterResultCache.set(cacheKey, clusters);
         }
         clusters.forEach((cluster) => {
+          const screenPos = this.projectClusterCenter(cluster.center, cluster.screenPos);
           const key = this.getClusterKey('hq', cluster.center, cluster.items.length);
           activeKeys.add(key);
-          if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
-            const element = this.updateClusterElement(key, cluster.screenPos, () => this.createTechHQClusterElement(cluster));
+          if (this.hasClusterMoved(key, screenPos, cluster.items.length)) {
+            const element = this.updateClusterElement(key, screenPos, () => this.createTechHQClusterElement(cluster));
             if (!element.parentElement) this.clusterOverlay!.appendChild(element);
           }
         });
@@ -569,10 +580,11 @@ export class DeckGLMap {
           this.clusterResultCache.set(cacheKey, clusters);
         }
         clusters.forEach((cluster) => {
+          const screenPos = this.projectClusterCenter(cluster.center, cluster.screenPos);
           const key = this.getClusterKey('event', cluster.center, cluster.items.length);
           activeKeys.add(key);
-          if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
-            const element = this.updateClusterElement(key, cluster.screenPos, () => this.createTechEventClusterElement(cluster));
+          if (this.hasClusterMoved(key, screenPos, cluster.items.length)) {
+            const element = this.updateClusterElement(key, screenPos, () => this.createTechEventClusterElement(cluster));
             if (!element.parentElement) this.clusterOverlay!.appendChild(element);
           }
         });
@@ -589,10 +601,11 @@ export class DeckGLMap {
         this.clusterResultCache.set(cacheKey, clusters);
       }
       clusters.forEach((cluster) => {
+        const screenPos = this.projectClusterCenter(cluster.center, cluster.screenPos);
         const key = this.getClusterKey('protest', cluster.center, cluster.items.length);
         activeKeys.add(key);
-        if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
-          const element = this.updateClusterElement(key, cluster.screenPos, () => this.createProtestClusterElement(cluster));
+        if (this.hasClusterMoved(key, screenPos, cluster.items.length)) {
+          const element = this.updateClusterElement(key, screenPos, () => this.createProtestClusterElement(cluster));
           if (!element.parentElement) this.clusterOverlay!.appendChild(element);
         }
       });
@@ -608,10 +621,11 @@ export class DeckGLMap {
         this.clusterResultCache.set(cacheKey, clusters);
       }
       clusters.forEach((cluster) => {
+        const screenPos = this.projectClusterCenter(cluster.center, cluster.screenPos);
         const key = this.getClusterKey('dc', cluster.center, cluster.items.length);
         activeKeys.add(key);
-        if (this.hasClusterMoved(key, cluster.screenPos, cluster.items.length)) {
-          const element = this.updateClusterElement(key, cluster.screenPos, () => this.createDatacenterClusterElement(cluster));
+        if (this.hasClusterMoved(key, screenPos, cluster.items.length)) {
+          const element = this.updateClusterElement(key, screenPos, () => this.createDatacenterClusterElement(cluster));
           if (!element.parentElement) this.clusterOverlay!.appendChild(element);
         }
       });
