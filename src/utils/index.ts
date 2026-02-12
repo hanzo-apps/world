@@ -64,29 +64,6 @@ export function throttle<T extends (...args: unknown[]) => void>(
   };
 }
 
-export function throttleWithTrailing<T extends (...args: unknown[]) => void>(
-  fn: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle = false;
-  let trailingArgs: Parameters<T> | null = null;
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      fn(...args);
-      inThrottle = true;
-      setTimeout(() => {
-        inThrottle = false;
-        if (trailingArgs) {
-          fn(...trailingArgs);
-          trailingArgs = null;
-        }
-      }, limit);
-    } else {
-      trailingArgs = args;
-    }
-  };
-}
-
 export function rafSchedule<T extends (...args: unknown[]) => void>(fn: T): (...args: Parameters<T>) => void {
   let scheduled = false;
   let lastArgs: Parameters<T> | null = null;
