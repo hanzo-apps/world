@@ -1,21 +1,114 @@
 import { expect, test } from '@playwright/test';
 
+type LayerSnapshot = { id: string; dataCount: number };
+type OverlaySnapshot = {
+  protestMarkers: number;
+  datacenterMarkers: number;
+  techEventMarkers: number;
+  techHQMarkers: number;
+};
+
 type HarnessWindow = Window & {
   __mapHarness?: {
     ready: boolean;
+    variant: string;
+    seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
+    setZoom: (zoom: number) => void;
+    getDeckLayerSnapshot: () => LayerSnapshot[];
+    getOverlaySnapshot: () => OverlaySnapshot;
     getClusterStateSize: () => number;
   };
 };
 
+const EXPECTED_FULL_DECK_LAYERS = [
+  'cables-layer',
+  'pipelines-layer',
+  'conflict-zones-layer',
+  'bases-layer',
+  'nuclear-layer',
+  'irradiators-layer',
+  'spaceports-layer',
+  'hotspots-layer',
+  'datacenters-layer',
+  'earthquakes-layer',
+  'natural-events-layer',
+  'fires-layer',
+  'weather-layer',
+  'outages-layer',
+  'ais-density-layer',
+  'ais-disruptions-layer',
+  'ports-layer',
+  'cable-advisories-layer',
+  'repair-ships-layer',
+  'flight-delays-layer',
+  'military-vessels-layer',
+  'military-vessel-clusters-layer',
+  'military-flights-layer',
+  'military-flight-clusters-layer',
+  'waterways-layer',
+  'economic-centers-layer',
+  'minerals-layer',
+  'apt-groups-layer',
+  'news-locations-layer',
+];
+
+const EXPECTED_TECH_DECK_LAYERS = [
+  'cables-layer',
+  'pipelines-layer',
+  'conflict-zones-layer',
+  'bases-layer',
+  'nuclear-layer',
+  'irradiators-layer',
+  'spaceports-layer',
+  'hotspots-layer',
+  'datacenters-layer',
+  'earthquakes-layer',
+  'natural-events-layer',
+  'fires-layer',
+  'weather-layer',
+  'outages-layer',
+  'ais-density-layer',
+  'ais-disruptions-layer',
+  'ports-layer',
+  'cable-advisories-layer',
+  'repair-ships-layer',
+  'flight-delays-layer',
+  'military-vessels-layer',
+  'military-vessel-clusters-layer',
+  'military-flights-layer',
+  'military-flight-clusters-layer',
+  'waterways-layer',
+  'economic-centers-layer',
+  'minerals-layer',
+  'startup-hubs-layer',
+  'accelerators-layer',
+  'cloud-regions-layer',
+  'news-locations-layer',
+];
+
+const waitForHarnessReady = async (
+  page: import('@playwright/test').Page
+): Promise<void> => {
+  await page.goto('/map-harness.html');
+  await expect(page.locator('.deckgl-map-wrapper')).toBeVisible();
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        const w = window as HarnessWindow;
+        return Boolean(w.__mapHarness?.ready);
+      });
+    }, { timeout: 30000 })
+    .toBe(true);
+};
+
 test.describe('DeckGL map harness', () => {
-  test('boots without deck assertions or page crashes', async ({ page }) => {
+  test('boots without deck assertions or unhandled runtime errors', async ({
+    page,
+  }) => {
     const pageErrors: string[] = [];
     const deckAssertionErrors: string[] = [];
-    const ignorablePageErrorPatterns = [
-      /could not compile fragment shader/i,
-      /shader/i,
-    ];
+    const ignorablePageErrorPatterns = [/could not compile fragment shader/i];
 
     page.on('pageerror', (error) => {
       pageErrors.push(error.message);
@@ -29,17 +122,7 @@ test.describe('DeckGL map harness', () => {
       }
     });
 
-    await page.goto('/map-harness.html');
-    await expect(page.locator('.deckgl-map-wrapper')).toBeVisible();
-    await expect
-      .poll(async () => {
-        return await page.evaluate(() => {
-          const w = window as HarnessWindow;
-          return Boolean(w.__mapHarness?.ready);
-        });
-      })
-      .toBe(true);
-
+    await waitForHarnessReady(page);
     await page.waitForTimeout(1000);
 
     const unexpectedPageErrors = pageErrors.filter(
@@ -51,17 +134,88 @@ test.describe('DeckGL map harness', () => {
     expect(deckAssertionErrors).toEqual([]);
   });
 
-  test('updates protest marker click payload after data refresh', async ({ page }) => {
-    await page.goto('/map-harness.html');
-    await expect(page.locator('.deckgl-map-wrapper')).toBeVisible();
+  test('renders non-empty visual data for every renderable layer in current variant', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.seedAllDynamicData();
+      w.__mapHarness?.setZoom(5);
+    });
+
+    const variant = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.variant ?? 'full';
+    });
+
+    const expectedDeckLayers =
+      variant === 'tech'
+        ? EXPECTED_TECH_DECK_LAYERS
+        : EXPECTED_FULL_DECK_LAYERS;
+
+    await expect
+      .poll(async () => {
+        const snapshot = await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getDeckLayerSnapshot() ?? [];
+        });
+        const nonEmptyIds = new Set(
+          snapshot.filter((layer) => layer.dataCount > 0).map((layer) => layer.id)
+        );
+        return expectedDeckLayers.filter((id) => !nonEmptyIds.has(id)).length;
+      }, { timeout: 20000 })
+      .toBe(0);
+
     await expect
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return Boolean(w.__mapHarness?.ready);
+          return w.__mapHarness?.getOverlaySnapshot().protestMarkers ?? 0;
         });
-      })
-      .toBe(true);
+      }, { timeout: 20000 })
+      .toBeGreaterThan(0);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setZoom(3);
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getOverlaySnapshot().datacenterMarkers ?? 0;
+        });
+      }, { timeout: 20000 })
+      .toBeGreaterThan(0);
+
+    if (variant === 'tech') {
+      await expect
+        .poll(async () => {
+          return await page.evaluate(() => {
+            const w = window as HarnessWindow;
+            return w.__mapHarness?.getOverlaySnapshot().techHQMarkers ?? 0;
+          });
+        }, { timeout: 20000 })
+        .toBeGreaterThan(0);
+
+      await expect
+        .poll(async () => {
+          return await page.evaluate(() => {
+            const w = window as HarnessWindow;
+            return w.__mapHarness?.getOverlaySnapshot().techEventMarkers ?? 0;
+          });
+        }, { timeout: 20000 })
+        .toBeGreaterThan(0);
+    }
+  });
+
+  test('updates protest marker click payload after data refresh', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
 
     const protestMarker = page.locator('.protest-marker').first();
     await expect(protestMarker).toBeVisible({ timeout: 15000 });
@@ -83,7 +237,7 @@ test.describe('DeckGL map harness', () => {
           const w = window as HarnessWindow;
           return w.__mapHarness?.getClusterStateSize() ?? -1;
         });
-      })
+      }, { timeout: 20000 })
       .toBeGreaterThan(0);
 
     await expect(protestMarker).toBeVisible({ timeout: 15000 });
