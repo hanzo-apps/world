@@ -36,6 +36,7 @@ import type {
   MilitaryVessel,
   MilitaryVesselCluster,
   NaturalEvent,
+  NewsItem,
   RepairShip,
   SocialUnrestEvent,
 } from '../types';
@@ -84,6 +85,7 @@ type MapHarness = {
   variant: HarnessVariant;
   seedAllDynamicData: () => void;
   setProtestsScenario: (scenario: Scenario) => void;
+  setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
   setZoom: (zoom: number) => void;
   setLayersForSnapshot: (enabledLayers: HarnessLayerKey[]) => void;
   setCamera: (camera: CameraState) => void;
@@ -608,6 +610,22 @@ const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
   ];
 };
 
+const buildHotspotActivityNews = (
+  scenario: 'none' | 'breaking'
+): NewsItem[] => {
+  if (scenario === 'none') return [];
+
+  return [
+    {
+      source: 'e2e-harness',
+      title: 'Sahel alert: mali coup activity intensifies',
+      link: 'https://example.com/hotspot-breaking',
+      pubDate: new Date(),
+      isAlert: true,
+    },
+  ];
+};
+
 const seedAllDynamicData = (): void => {
   const earthquakes: Earthquake[] = [
     {
@@ -986,6 +1004,9 @@ window.__mapHarness = {
   seedAllDynamicData,
   setProtestsScenario: (scenario: Scenario): void => {
     map.setProtests(buildProtests(scenario));
+  },
+  setHotspotActivityScenario: (scenario: 'none' | 'breaking'): void => {
+    map.updateHotspotActivity(buildHotspotActivityNews(scenario));
   },
   setZoom: (zoom: number): void => {
     map.setZoom(zoom);
