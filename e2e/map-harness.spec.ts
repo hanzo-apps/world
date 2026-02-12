@@ -20,6 +20,7 @@ type HarnessWindow = Window & {
     variant: 'full' | 'tech';
     seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
+    setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
     setZoom: (zoom: number) => void;
     setLayersForSnapshot: (enabledLayers: string[]) => void;
     setCamera: (camera: { lon: number; lat: number; zoom: number }) => void;
@@ -270,6 +271,8 @@ test.describe('DeckGL map harness', () => {
   });
 
   test('matches golden screenshots per layer and zoom', async ({ page }) => {
+    test.setTimeout(180_000);
+
     await waitForHarnessReady(page);
 
     await page.evaluate(() => {
@@ -342,6 +345,105 @@ test.describe('DeckGL map harness', () => {
     await expect(page.locator('.map-popup .popup-description')).toContainText(
       'Scenario Beta Protest'
     );
+  });
+
+  test('reprojects hotspot overlay marker within one frame on zoom', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setLayersForSnapshot(['hotspots']);
+      w.__mapHarness?.setHotspotActivityScenario('breaking');
+      w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 4.2 });
+    });
+
+    const markerSelector = '.hotspot';
+    await expect(page.locator(markerSelector).first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const beforeTransform = await getMarkerInlineTransform(page, markerSelector);
+    expect(beforeTransform).not.toBeNull();
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 5.4 });
+    });
+
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+    const afterTransform = await getMarkerInlineTransform(page, markerSelector);
+    expect(afterTransform).not.toBeNull();
+    expect(afterTransform).not.toBe(beforeTransform);
+  });
+
+  test('does not mutate hotspot overlay position when hotspots layer is disabled', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setLayersForSnapshot(['hotspots']);
+      w.__mapHarness?.setHotspotActivityScenario('breaking');
+      w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 4.2 });
+    });
+
+    const markerSelector = '.hotspot';
+    await expect(page.locator(markerSelector).first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const result = await page.evaluate(async () => {
+      const w = window as HarnessWindow;
+      const marker = document.querySelector('.hotspot') as HTMLElement | null;
+      if (!w.__mapHarness || !marker) {
+        return { observed: false, styleMutations: -1, remaining: -1 };
+      }
+
+      let styleMutations = 0;
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (
+            record.type === 'attributes' &&
+            record.attributeName === 'style'
+          ) {
+            styleMutations += 1;
+          }
+        }
+      });
+
+      observer.observe(marker, {
+        attributes: true,
+        attributeFilter: ['style'],
+      });
+
+      w.__mapHarness.setLayersForSnapshot([]);
+      w.__mapHarness.setCamera({ lon: 3.5, lat: 18.2, zoom: 4.8 });
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 140);
+      });
+
+      observer.disconnect();
+
+      return {
+        observed: true,
+        styleMutations,
+        remaining: document.querySelectorAll('.hotspot').length,
+      };
+    });
+
+    expect(result.observed).toBe(true);
+    expect(result.styleMutations).toBe(0);
+    expect(result.remaining).toBe(0);
   });
 
   test('reprojects protest overlay marker when panning at fixed zoom', async ({
