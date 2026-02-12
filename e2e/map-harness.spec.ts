@@ -6,15 +6,27 @@ type OverlaySnapshot = {
   datacenterMarkers: number;
   techEventMarkers: number;
   techHQMarkers: number;
+  hotspotMarkers: number;
+};
+
+type VisualScenarioSummary = {
+  id: string;
+  variant: 'both' | 'full' | 'tech';
 };
 
 type HarnessWindow = Window & {
   __mapHarness?: {
     ready: boolean;
-    variant: string;
+    variant: 'full' | 'tech';
     seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
     setZoom: (zoom: number) => void;
+    setLayersForSnapshot: (enabledLayers: string[]) => void;
+    setCamera: (camera: { lon: number; lat: number; zoom: number }) => void;
+    enableDeterministicVisualMode: () => void;
+    getVisualScenarios: () => VisualScenarioSummary[];
+    prepareVisualScenario: (scenarioId: string) => boolean;
+    isVisualScenarioReady: (scenarioId: string) => boolean;
     getDeckLayerSnapshot: () => LayerSnapshot[];
     getOverlaySnapshot: () => OverlaySnapshot;
     getClusterStateSize: () => number;
@@ -100,6 +112,29 @@ const waitForHarnessReady = async (
       });
     }, { timeout: 30000 })
     .toBe(true);
+};
+
+const prepareVisualScenario = async (
+  page: import('@playwright/test').Page,
+  scenarioId: string
+): Promise<void> => {
+  const prepared = await page.evaluate((id) => {
+    const w = window as HarnessWindow;
+    return w.__mapHarness?.prepareVisualScenario(id) ?? false;
+  }, scenarioId);
+
+  expect(prepared).toBe(true);
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate((id) => {
+        const w = window as HarnessWindow;
+        return w.__mapHarness?.isVisualScenarioReady(id) ?? false;
+      }, scenarioId);
+    }, { timeout: 20000 })
+    .toBe(true);
+
+  await page.waitForTimeout(250);
 };
 
 test.describe('DeckGL map harness', () => {
@@ -209,6 +244,46 @@ test.describe('DeckGL map harness', () => {
           });
         }, { timeout: 20000 })
         .toBeGreaterThan(0);
+    }
+  });
+
+  test('matches golden screenshots per layer and zoom', async ({ page }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.seedAllDynamicData();
+      w.__mapHarness?.enableDeterministicVisualMode();
+    });
+
+    const variant = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.variant ?? 'full';
+    });
+
+    const scenarios = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getVisualScenarios() ?? [];
+    });
+
+    expect(scenarios.length).toBeGreaterThan(0);
+
+    const mapWrapper = page.locator('.deckgl-map-wrapper');
+    await expect(mapWrapper).toBeVisible();
+
+    for (const scenario of scenarios) {
+      await test.step(`visual baseline: ${scenario.id}`, async () => {
+        await prepareVisualScenario(page, scenario.id);
+        await expect(mapWrapper).toHaveScreenshot(
+          `layer-${variant}-${scenario.id}.png`,
+          {
+            animations: 'disabled',
+            caret: 'hide',
+            scale: 'css',
+            maxDiffPixelRatio: 0.02,
+          }
+        );
+      });
     }
   });
 

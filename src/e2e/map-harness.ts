@@ -1,7 +1,28 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../styles/main.css';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { DeckGLMap } from '../components/DeckGLMap';
-import { SITE_VARIANT } from '../config';
+import {
+  SITE_VARIANT,
+  INTEL_HOTSPOTS,
+  CONFLICT_ZONES,
+  MILITARY_BASES,
+  UNDERSEA_CABLES,
+  NUCLEAR_FACILITIES,
+  GAMMA_IRRADIATORS,
+  PIPELINES,
+  STRATEGIC_WATERWAYS,
+  ECONOMIC_CENTERS,
+  AI_DATA_CENTERS,
+  STARTUP_HUBS,
+  ACCELERATORS,
+  TECH_HQS,
+  CLOUD_REGIONS,
+  PORTS,
+  SPACEPORTS,
+  APT_GROUPS,
+  CRITICAL_MINERALS,
+} from '../config';
 import type {
   AisDensityZone,
   AisDisruptionEvent,
@@ -21,6 +42,8 @@ import type {
 import type { WeatherAlert } from '../services/weather';
 
 type Scenario = 'alpha' | 'beta';
+type HarnessVariant = 'full' | 'tech';
+type HarnessLayerKey = keyof MapLayers;
 
 type LayerSnapshot = {
   id: string;
@@ -32,14 +55,42 @@ type OverlaySnapshot = {
   datacenterMarkers: number;
   techEventMarkers: number;
   techHQMarkers: number;
+  hotspotMarkers: number;
+};
+
+type CameraState = {
+  lon: number;
+  lat: number;
+  zoom: number;
+};
+
+type VisualScenario = {
+  id: string;
+  variant: 'both' | HarnessVariant;
+  enabledLayers: HarnessLayerKey[];
+  camera: CameraState;
+  expectedDeckLayers: string[];
+  expectedSelectors: string[];
+  includeNewsLocation?: boolean;
+};
+
+type VisualScenarioSummary = {
+  id: string;
+  variant: 'both' | HarnessVariant;
 };
 
 type MapHarness = {
   ready: boolean;
-  variant: string;
+  variant: HarnessVariant;
   seedAllDynamicData: () => void;
   setProtestsScenario: (scenario: Scenario) => void;
   setZoom: (zoom: number) => void;
+  setLayersForSnapshot: (enabledLayers: HarnessLayerKey[]) => void;
+  setCamera: (camera: CameraState) => void;
+  enableDeterministicVisualMode: () => void;
+  getVisualScenarios: () => VisualScenarioSummary[];
+  prepareVisualScenario: (scenarioId: string) => boolean;
+  isVisualScenarioReady: (scenarioId: string) => boolean;
   getDeckLayerSnapshot: () => LayerSnapshot[];
   getOverlaySnapshot: () => OverlaySnapshot;
   getClusterStateSize: () => number;
@@ -57,9 +108,10 @@ if (!app) {
   throw new Error('Missing #app container for map harness');
 }
 
-app.style.width = '100vw';
-app.style.height = '100vh';
+app.style.width = '1280px';
+app.style.height = '720px';
 app.style.position = 'relative';
+app.style.margin = '0 auto';
 
 const allLayersEnabled: MapLayers = {
   conflicts: true,
@@ -90,6 +142,49 @@ const allLayersEnabled: MapLayers = {
   techEvents: true,
 };
 
+const allLayersDisabled: MapLayers = {
+  conflicts: false,
+  bases: false,
+  cables: false,
+  pipelines: false,
+  hotspots: false,
+  ais: false,
+  nuclear: false,
+  irradiators: false,
+  sanctions: false,
+  weather: false,
+  economic: false,
+  waterways: false,
+  outages: false,
+  datacenters: false,
+  protests: false,
+  flights: false,
+  military: false,
+  natural: false,
+  spaceports: false,
+  minerals: false,
+  fires: false,
+  startupHubs: false,
+  cloudRegions: false,
+  accelerators: false,
+  techHQs: false,
+  techEvents: false,
+};
+
+const SEEDED_NEWS_LOCATIONS: Array<{
+  lat: number;
+  lon: number;
+  title: string;
+  threatLevel: string;
+}> = [
+  {
+    lat: 48.85,
+    lon: 2.35,
+    title: 'Harness News Item',
+    threatLevel: 'high',
+  },
+];
+
 const map = new DeckGLMap(app, {
   zoom: 5,
   pan: { x: 0, y: 0 },
@@ -97,6 +192,387 @@ const map = new DeckGLMap(app, {
   layers: allLayersEnabled,
   timeRange: '24h',
 });
+
+const internals = map as unknown as {
+  buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
+  lastClusterState?: Map<string, unknown>;
+  maplibreMap?: MapLibreMap;
+  newsLocationFirstSeen?: Map<string, number>;
+  stopNewsPulseAnimation?: () => void;
+};
+
+const buildLayerState = (enabledLayers: HarnessLayerKey[]): MapLayers => {
+  const next: MapLayers = { ...allLayersDisabled };
+  for (const key of enabledLayers) {
+    next[key] = true;
+  }
+  return next;
+};
+
+const setLayersForSnapshot = (enabledLayers: HarnessLayerKey[]): void => {
+  map.setLayers(buildLayerState(enabledLayers));
+};
+
+const setCamera = (camera: CameraState): void => {
+  const maplibreMap = internals.maplibreMap;
+  if (!maplibreMap) return;
+  maplibreMap.jumpTo({
+    center: [camera.lon, camera.lat],
+    zoom: camera.zoom,
+  });
+  map.render();
+};
+
+const getDataCount = (data: unknown): number => {
+  if (Array.isArray(data)) return data.length;
+  if (
+    data &&
+    typeof data === 'object' &&
+    'type' in data &&
+    (data as { type?: string }).type === 'FeatureCollection' &&
+    'features' in data &&
+    Array.isArray((data as { features?: unknown[] }).features)
+  ) {
+    return (data as { features: unknown[] }).features.length;
+  }
+  if (
+    data &&
+    typeof data === 'object' &&
+    'length' in data &&
+    typeof (data as { length?: unknown }).length === 'number'
+  ) {
+    return Number((data as { length: number }).length);
+  }
+  return data ? 1 : 0;
+};
+
+const getDeckLayerSnapshot = (): LayerSnapshot[] => {
+  const layers = internals.buildLayers?.() ?? [];
+  return layers.map((layer) => ({
+    id: layer.id,
+    dataCount: getDataCount(layer.props?.data),
+  }));
+};
+
+const getOverlaySnapshot = (): OverlaySnapshot => ({
+  protestMarkers: document.querySelectorAll('.protest-marker').length,
+  datacenterMarkers: document.querySelectorAll('.datacenter-marker').length,
+  techEventMarkers: document.querySelectorAll('.tech-event-marker').length,
+  techHQMarkers: document.querySelectorAll('.tech-hq-marker').length,
+  hotspotMarkers: document.querySelectorAll('.hotspot').length,
+});
+
+const toCamera = (lon: number, lat: number, zoom: number): CameraState => ({
+  lon,
+  lat,
+  zoom,
+});
+
+const firstLatLon = <T extends { lat: number; lon: number }>(
+  items: T[],
+  fallback: [number, number]
+): [number, number] => {
+  const first = items[0];
+  if (!first) return fallback;
+  return [first.lon, first.lat];
+};
+
+const firstPathPoint = <T extends { points: [number, number][] }>(
+  items: T[],
+  fallback: [number, number]
+): [number, number] => {
+  const firstPoint = items[0]?.points?.[0];
+  if (!firstPoint || firstPoint.length < 2) return fallback;
+  return [firstPoint[0], firstPoint[1]];
+};
+
+const firstConflictPoint = (fallback: [number, number]): [number, number] => {
+  const coords = CONFLICT_ZONES[0]?.coords?.[0];
+  if (!coords || coords.length < 2) return fallback;
+  return [coords[0], coords[1]];
+};
+
+const seededCameras = {
+  ais: toCamera(55.0, 25.0, 5.2),
+  weather: toCamera(-80.2, 25.7, 5.2),
+  outages: toCamera(-0.1, 51.5, 5.2),
+  protests: toCamera(0.2, 20.1, 5.2),
+  flights: toCamera(-73.9, 40.4, 5.2),
+  military: toCamera(56.3, 26.1, 5.2),
+  natural: toCamera(-118.2, 34.1, 4.8),
+  fires: toCamera(-60.1, -5.4, 5.0),
+  techEvents: toCamera(-122.42, 37.77, 5.2),
+  news: toCamera(2.35, 48.85, 5.0),
+};
+
+const [conflictLon, conflictLat] = firstConflictPoint([36.0, 35.0]);
+const [baseLon, baseLat] = firstLatLon(MILITARY_BASES, [44.0, 33.0]);
+const [cableLon, cableLat] = firstPathPoint(UNDERSEA_CABLES, [38.0, 20.0]);
+const [pipelineLon, pipelineLat] = firstPathPoint(PIPELINES, [45.0, 30.0]);
+const [hotspotLon, hotspotLat] = firstLatLon(INTEL_HOTSPOTS, [0.0, 20.0]);
+const [nuclearLon, nuclearLat] = firstLatLon(NUCLEAR_FACILITIES, [14.0, 50.0]);
+const [irradiatorLon, irradiatorLat] = firstLatLon(GAMMA_IRRADIATORS, [12.0, 50.0]);
+const [waterwayLon, waterwayLat] = firstLatLon(STRATEGIC_WATERWAYS, [32.0, 30.0]);
+const [economicLon, economicLat] = firstLatLon(ECONOMIC_CENTERS, [-74.0, 40.7]);
+const [datacenterLon, datacenterLat] = firstLatLon(AI_DATA_CENTERS, [-121.9, 37.3]);
+const [spaceportLon, spaceportLat] = firstLatLon(SPACEPORTS, [-80.6, 28.6]);
+const [mineralLon, mineralLat] = firstLatLon(CRITICAL_MINERALS, [135.0, -27.0]);
+const [startupLon, startupLat] = firstLatLon(STARTUP_HUBS, [-122.08, 37.38]);
+const [acceleratorLon, acceleratorLat] = firstLatLon(ACCELERATORS, [-122.41, 37.77]);
+const [techHQLon, techHQLat] = firstLatLon(TECH_HQS, [-122.0, 37.3]);
+const [cloudRegionLon, cloudRegionLat] = firstLatLon(CLOUD_REGIONS, [-122.3, 37.6]);
+const [aptLon, aptLat] = firstLatLon(APT_GROUPS, [116.4, 39.9]);
+const [portLon, portLat] = firstLatLon(PORTS, [32.5, 29.9]);
+
+const VISUAL_SCENARIOS: VisualScenario[] = [
+  {
+    id: 'conflicts-z4',
+    variant: 'both',
+    enabledLayers: ['conflicts'],
+    camera: toCamera(conflictLon, conflictLat, 4.0),
+    expectedDeckLayers: ['conflict-zones-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'bases-z5',
+    variant: 'both',
+    enabledLayers: ['bases'],
+    camera: toCamera(baseLon, baseLat, 5.2),
+    expectedDeckLayers: ['bases-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'cables-z4',
+    variant: 'both',
+    enabledLayers: ['cables'],
+    camera: toCamera(cableLon, cableLat, 4.2),
+    expectedDeckLayers: ['cables-layer', 'cable-advisories-layer', 'repair-ships-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'pipelines-z4',
+    variant: 'both',
+    enabledLayers: ['pipelines'],
+    camera: toCamera(pipelineLon, pipelineLat, 4.2),
+    expectedDeckLayers: ['pipelines-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'hotspots-z4',
+    variant: 'both',
+    enabledLayers: ['hotspots'],
+    camera: toCamera(hotspotLon, hotspotLat, 4.2),
+    expectedDeckLayers: ['hotspots-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'ais-z5',
+    variant: 'both',
+    enabledLayers: ['ais'],
+    camera: seededCameras.ais,
+    expectedDeckLayers: ['ais-density-layer', 'ais-disruptions-layer', 'ports-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'ports-z5',
+    variant: 'both',
+    enabledLayers: ['ais'],
+    camera: toCamera(portLon, portLat, 5.2),
+    expectedDeckLayers: ['ports-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'nuclear-z5',
+    variant: 'both',
+    enabledLayers: ['nuclear'],
+    camera: toCamera(nuclearLon, nuclearLat, 5.2),
+    expectedDeckLayers: ['nuclear-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'irradiators-z5',
+    variant: 'both',
+    enabledLayers: ['irradiators'],
+    camera: toCamera(irradiatorLon, irradiatorLat, 5.2),
+    expectedDeckLayers: ['irradiators-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'weather-z5',
+    variant: 'both',
+    enabledLayers: ['weather'],
+    camera: seededCameras.weather,
+    expectedDeckLayers: ['weather-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'economic-z5',
+    variant: 'both',
+    enabledLayers: ['economic'],
+    camera: toCamera(economicLon, economicLat, 5.1),
+    expectedDeckLayers: ['economic-centers-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'waterways-z5',
+    variant: 'both',
+    enabledLayers: ['waterways'],
+    camera: toCamera(waterwayLon, waterwayLat, 5.1),
+    expectedDeckLayers: ['waterways-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'outages-z5',
+    variant: 'both',
+    enabledLayers: ['outages'],
+    camera: seededCameras.outages,
+    expectedDeckLayers: ['outages-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'datacenters-cluster-z3',
+    variant: 'both',
+    enabledLayers: ['datacenters'],
+    camera: toCamera(datacenterLon, datacenterLat, 3.0),
+    expectedDeckLayers: [],
+    expectedSelectors: ['.datacenter-marker'],
+  },
+  {
+    id: 'datacenters-icons-z6',
+    variant: 'both',
+    enabledLayers: ['datacenters'],
+    camera: toCamera(datacenterLon, datacenterLat, 6.0),
+    expectedDeckLayers: ['datacenters-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'protests-z5',
+    variant: 'both',
+    enabledLayers: ['protests'],
+    camera: seededCameras.protests,
+    expectedDeckLayers: [],
+    expectedSelectors: ['.protest-marker'],
+  },
+  {
+    id: 'flights-z5',
+    variant: 'both',
+    enabledLayers: ['flights'],
+    camera: seededCameras.flights,
+    expectedDeckLayers: ['flight-delays-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'military-z5',
+    variant: 'both',
+    enabledLayers: ['military'],
+    camera: seededCameras.military,
+    expectedDeckLayers: [
+      'military-vessels-layer',
+      'military-vessel-clusters-layer',
+      'military-flights-layer',
+      'military-flight-clusters-layer',
+    ],
+    expectedSelectors: [],
+  },
+  {
+    id: 'natural-z5',
+    variant: 'both',
+    enabledLayers: ['natural'],
+    camera: seededCameras.natural,
+    expectedDeckLayers: ['earthquakes-layer', 'natural-events-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'spaceports-z5',
+    variant: 'both',
+    enabledLayers: ['spaceports'],
+    camera: toCamera(spaceportLon, spaceportLat, 5.1),
+    expectedDeckLayers: ['spaceports-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'minerals-z5',
+    variant: 'both',
+    enabledLayers: ['minerals'],
+    camera: toCamera(mineralLon, mineralLat, 5.1),
+    expectedDeckLayers: ['minerals-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'fires-z5',
+    variant: 'both',
+    enabledLayers: ['fires'],
+    camera: seededCameras.fires,
+    expectedDeckLayers: ['fires-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'news-z5',
+    variant: 'both',
+    enabledLayers: [],
+    camera: seededCameras.news,
+    expectedDeckLayers: ['news-locations-layer'],
+    expectedSelectors: [],
+    includeNewsLocation: true,
+  },
+  {
+    id: 'apt-groups-z5',
+    variant: 'full',
+    enabledLayers: [],
+    camera: toCamera(aptLon, aptLat, 5.1),
+    expectedDeckLayers: ['apt-groups-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'startup-hubs-z5',
+    variant: 'tech',
+    enabledLayers: ['startupHubs'],
+    camera: toCamera(startupLon, startupLat, 5.2),
+    expectedDeckLayers: ['startup-hubs-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'accelerators-z5',
+    variant: 'tech',
+    enabledLayers: ['accelerators'],
+    camera: toCamera(acceleratorLon, acceleratorLat, 5.2),
+    expectedDeckLayers: ['accelerators-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'cloud-regions-z5',
+    variant: 'tech',
+    enabledLayers: ['cloudRegions'],
+    camera: toCamera(cloudRegionLon, cloudRegionLat, 5.2),
+    expectedDeckLayers: ['cloud-regions-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'tech-hqs-z5',
+    variant: 'tech',
+    enabledLayers: ['techHQs'],
+    camera: toCamera(techHQLon, techHQLat, 5.2),
+    expectedDeckLayers: [],
+    expectedSelectors: ['.tech-hq-marker'],
+  },
+  {
+    id: 'tech-events-z5',
+    variant: 'tech',
+    enabledLayers: ['techEvents'],
+    camera: seededCameras.techEvents,
+    expectedDeckLayers: [],
+    expectedSelectors: ['.tech-event-marker'],
+  },
+  // Note: `sanctions` has no map renderer in DeckGLMap today; excluded from visual scenarios.
+];
+
+const visualScenarioMap = new Map(VISUAL_SCENARIOS.map((scenario) => [scenario.id, scenario]));
+
+const filterScenariosForVariant = (variant: HarnessVariant): VisualScenario[] => {
+  return VISUAL_SCENARIOS.filter(
+    (scenario) => scenario.variant === 'both' || scenario.variant === variant
+  );
+};
 
 const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
   const title =
@@ -322,6 +798,7 @@ const seedAllDynamicData = (): void => {
     },
   ];
 
+  map.setRenderPaused(true);
   map.setLayers(allLayersEnabled);
   map.setZoom(5);
   map.setEarthquakes(earthquakes);
@@ -372,61 +849,131 @@ const seedAllDynamicData = (): void => {
       daysUntil: 42,
     },
   ]);
-  map.setNewsLocations([
-    {
-      lat: 48.85,
-      lon: 2.35,
-      title: 'Harness News Item',
-      threatLevel: 'high',
-    },
-  ]);
+  map.setNewsLocations(SEEDED_NEWS_LOCATIONS);
+  map.setRenderPaused(false);
+  map.render();
+};
+
+const makeNewsLocationsNonRecent = (): void => {
+  const now = Date.now();
+  if (internals.newsLocationFirstSeen) {
+    for (const key of internals.newsLocationFirstSeen.keys()) {
+      internals.newsLocationFirstSeen.set(key, now - 120_000);
+    }
+  }
+  internals.stopNewsPulseAnimation?.();
+};
+
+let deterministicVisualModeEnabled = false;
+const DETERMINISTIC_STYLE_ID = 'e2e-deterministic-style';
+
+const ensureDeterministicStyles = (): void => {
+  if (document.getElementById(DETERMINISTIC_STYLE_ID)) return;
+
+  const style = document.createElement('style');
+  style.id = DETERMINISTIC_STYLE_ID;
+  style.textContent = `
+    .deckgl-controls,
+    .deckgl-time-slider,
+    .deckgl-layer-toggles,
+    .deckgl-legend,
+    .deckgl-timestamp,
+    .maplibregl-ctrl-bottom-right,
+    .maplibregl-ctrl-bottom-left {
+      display: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
+const hideRasterBasemap = (): void => {
+  const maplibreMap = internals.maplibreMap;
+  if (!maplibreMap) return;
+
+  try {
+    if (maplibreMap.getLayer('carto-dark-layer')) {
+      maplibreMap.setPaintProperty('carto-dark-layer', 'raster-opacity', 0);
+    }
+  } catch {
+    // No-op for harness stability.
+  }
+};
+
+const enableDeterministicVisualMode = (): void => {
+  document.body.classList.add('animations-paused');
+  ensureDeterministicStyles();
+  hideRasterBasemap();
+  makeNewsLocationsNonRecent();
+  map.render();
+  deterministicVisualModeEnabled = true;
+};
+
+const prepareVisualScenario = (scenarioId: string): boolean => {
+  const scenario = visualScenarioMap.get(scenarioId);
+  if (!scenario) return false;
+
+  enableDeterministicVisualMode();
+
+  map.setRenderPaused(true);
+  setLayersForSnapshot(scenario.enabledLayers);
+  map.setNewsLocations(scenario.includeNewsLocation ? SEEDED_NEWS_LOCATIONS : []);
+  if (!scenario.includeNewsLocation) {
+    makeNewsLocationsNonRecent();
+  }
+  setCamera(scenario.camera);
+  map.setRenderPaused(false);
+  map.render();
+
+  return true;
+};
+
+const isVisualScenarioReady = (scenarioId: string): boolean => {
+  const scenario = visualScenarioMap.get(scenarioId);
+  if (!scenario) return false;
+
+  const layersById = new Map<string, number>(
+    getDeckLayerSnapshot().map((layer) => [layer.id, layer.dataCount])
+  );
+
+  for (const expectedLayerId of scenario.expectedDeckLayers) {
+    if ((layersById.get(expectedLayerId) ?? 0) <= 0) {
+      return false;
+    }
+  }
+
+  for (const selector of scenario.expectedSelectors) {
+    if (document.querySelectorAll(selector).length <= 0) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 seedAllDynamicData();
 
 let ready = false;
 const pollReady = (): void => {
-  if (document.querySelector('#deckgl-basemap canvas')) {
+  const hasCanvas = Boolean(document.querySelector('#deckgl-basemap canvas'));
+  const maplibreMap = internals.maplibreMap;
+
+  if (hasCanvas && maplibreMap?.isStyleLoaded()) {
+    if (!deterministicVisualModeEnabled) {
+      enableDeterministicVisualMode();
+    }
     ready = true;
     return;
   }
+
   requestAnimationFrame(pollReady);
 };
 pollReady();
-
-const internals = map as unknown as {
-  buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
-  lastClusterState?: Map<string, unknown>;
-};
-
-const getDataCount = (data: unknown): number => {
-  if (Array.isArray(data)) return data.length;
-  if (
-    data &&
-    typeof data === 'object' &&
-    'type' in data &&
-    (data as { type?: string }).type === 'FeatureCollection' &&
-    'features' in data &&
-    Array.isArray((data as { features?: unknown[] }).features)
-  ) {
-    return (data as { features: unknown[] }).features.length;
-  }
-  if (
-    data &&
-    typeof data === 'object' &&
-    'length' in data &&
-    typeof (data as { length?: unknown }).length === 'number'
-  ) {
-    return Number((data as { length: number }).length);
-  }
-  return data ? 1 : 0;
-};
 
 window.__mapHarness = {
   get ready() {
     return ready;
   },
-  variant: SITE_VARIANT,
+  variant: SITE_VARIANT === 'tech' ? 'tech' : 'full',
   seedAllDynamicData,
   setProtestsScenario: (scenario: Scenario): void => {
     map.setProtests(buildProtests(scenario));
@@ -435,19 +982,20 @@ window.__mapHarness = {
     map.setZoom(zoom);
     map.render();
   },
-  getDeckLayerSnapshot: (): LayerSnapshot[] => {
-    const layers = internals.buildLayers?.() ?? [];
-    return layers.map((layer) => ({
-      id: layer.id,
-      dataCount: getDataCount(layer.props?.data),
+  setLayersForSnapshot,
+  setCamera,
+  enableDeterministicVisualMode,
+  getVisualScenarios: (): VisualScenarioSummary[] => {
+    const variant = SITE_VARIANT === 'tech' ? 'tech' : 'full';
+    return filterScenariosForVariant(variant).map((scenario) => ({
+      id: scenario.id,
+      variant: scenario.variant,
     }));
   },
-  getOverlaySnapshot: (): OverlaySnapshot => ({
-    protestMarkers: document.querySelectorAll('.protest-marker').length,
-    datacenterMarkers: document.querySelectorAll('.datacenter-marker').length,
-    techEventMarkers: document.querySelectorAll('.tech-event-marker').length,
-    techHQMarkers: document.querySelectorAll('.tech-hq-marker').length,
-  }),
+  prepareVisualScenario,
+  isVisualScenarioReady,
+  getDeckLayerSnapshot,
+  getOverlaySnapshot,
   getClusterStateSize: (): number => {
     return internals.lastClusterState?.size ?? -1;
   },
