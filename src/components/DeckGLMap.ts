@@ -365,6 +365,7 @@ export class DeckGLMap {
     });
 
     this.maplibreMap.on('move', () => {
+      this.updateHotspotPositions();
       if (moveTimeout) clearTimeout(moveTimeout);
       moveTimeout = setTimeout(() => this.throttledRenderClusters(), 100);
     });
@@ -711,6 +712,26 @@ export class DeckGLMap {
 
       this.clusterElementCache.set(key, div);
       this.clusterOverlay!.appendChild(div);
+    });
+  }
+
+  private updateHotspotPositions(): void {
+    if (!this.clusterOverlay || !this.maplibreMap) return;
+
+    const zoom = this.maplibreMap.getZoom();
+    const markerScale = zoom < 2.5 ? 0.7 : zoom < 4 ? 0.85 : 1.0;
+
+    this.hotspots.forEach(hotspot => {
+      if (hotspot.level !== 'high' && !hotspot.hasBreaking) return;
+
+      const key = this.getClusterKey('hotspot', [hotspot.lon, hotspot.lat], 1);
+      const existing = this.clusterElementCache.get(key);
+      if (!existing) return;
+
+      const pos = this.maplibreMap!.project([hotspot.lon, hotspot.lat]);
+      if (!pos) return;
+
+      existing.style.transform = `translate(${pos.x - 16}px, ${pos.y - 16}px) scale(${markerScale})`;
     });
   }
 
@@ -2601,6 +2622,17 @@ export class DeckGLMap {
       const velocity = matchCount > 0 ? matchCount / 2 : 0; // 2 hour window
       updateHotspotEscalation(h.id, matchCount, h.hasBreaking || false, velocity);
     });
+
+    if (import.meta.env.DEV) {
+      const shuffled = [...this.hotspots].sort(() => Math.random() - 0.5);
+      shuffled.slice(0, 3).forEach(h => {
+        h.hasBreaking = true;
+        h.level = 'high';
+        if (!h.escalationScore || h.escalationScore < 4) {
+          h.escalationScore = 5;
+        }
+      });
+    }
 
     this.render(); // Debounced
   }
