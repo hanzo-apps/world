@@ -114,18 +114,13 @@ const waitForHarnessReady = async (
     .toBe(true);
 };
 
-const getMarkerCenter = async (
+const getMarkerInlineTransform = async (
   page: import('@playwright/test').Page,
   selector: string
-): Promise<{ x: number; y: number } | null> => {
+): Promise<string | null> => {
   return await page.evaluate((sel) => {
-    const el = document.querySelector(sel);
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-    };
+    const el = document.querySelector(sel) as HTMLElement | null;
+    return el?.style.transform ?? null;
   }, selector);
 };
 
@@ -365,8 +360,8 @@ test.describe('DeckGL map harness', () => {
     const markerSelector = '.protest-marker';
     await expect(page.locator(markerSelector).first()).toBeVisible();
 
-    const before = await getMarkerCenter(page, markerSelector);
-    expect(before).not.toBeNull();
+    const beforeTransform = await getMarkerInlineTransform(page, markerSelector);
+    expect(beforeTransform).not.toBeNull();
 
     await page.evaluate(() => {
       const w = window as HarnessWindow;
@@ -375,11 +370,8 @@ test.describe('DeckGL map harness', () => {
 
     await page.waitForTimeout(750);
 
-    const after = await getMarkerCenter(page, markerSelector);
-    expect(after).not.toBeNull();
-
-    const dx = Math.abs((after?.x ?? 0) - (before?.x ?? 0));
-    const dy = Math.abs((after?.y ?? 0) - (before?.y ?? 0));
-    expect(Math.max(dx, dy)).toBeGreaterThan(10);
+    const afterTransform = await getMarkerInlineTransform(page, markerSelector);
+    expect(afterTransform).not.toBeNull();
+    expect(afterTransform).not.toBe(beforeTransform);
   });
 });

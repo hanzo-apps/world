@@ -193,6 +193,8 @@ const map = new DeckGLMap(app, {
   timeRange: '24h',
 });
 
+const DETERMINISTIC_BODY_CLASS = 'e2e-deterministic';
+
 const internals = map as unknown as {
   buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
   lastClusterState?: Map<string, unknown>;
@@ -873,13 +875,20 @@ const ensureDeterministicStyles = (): void => {
   const style = document.createElement('style');
   style.id = DETERMINISTIC_STYLE_ID;
   style.textContent = `
-    .deckgl-controls,
-    .deckgl-time-slider,
-    .deckgl-layer-toggles,
-    .deckgl-legend,
-    .deckgl-timestamp,
-    .maplibregl-ctrl-bottom-right,
-    .maplibregl-ctrl-bottom-left {
+    body.${DETERMINISTIC_BODY_CLASS} *,
+    body.${DETERMINISTIC_BODY_CLASS} *::before,
+    body.${DETERMINISTIC_BODY_CLASS} *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-controls,
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-time-slider,
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-layer-toggles,
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-legend,
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-timestamp,
+    body.${DETERMINISTIC_BODY_CLASS} .maplibregl-ctrl-bottom-right,
+    body.${DETERMINISTIC_BODY_CLASS} .maplibregl-ctrl-bottom-left {
       display: none !important;
     }
   `;
@@ -900,7 +909,7 @@ const hideRasterBasemap = (): void => {
 };
 
 const enableDeterministicVisualMode = (): void => {
-  document.body.classList.add('animations-paused');
+  document.body.classList.add(DETERMINISTIC_BODY_CLASS);
   ensureDeterministicStyles();
   hideRasterBasemap();
   makeNewsLocationsNonRecent();
