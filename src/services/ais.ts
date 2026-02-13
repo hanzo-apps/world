@@ -1,5 +1,6 @@
 import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 import { dataFreshness } from './data-freshness';
+import { isFeatureAvailable } from './runtime-config';
 
 // Snapshot endpoint backed by server-side AIS aggregation.
 // This avoids a per-client WebSocket to Railway.
@@ -17,7 +18,7 @@ const isLocalhost = isClientRuntime && window.location.hostname === 'localhost';
 const aisConfigured = isClientRuntime && import.meta.env.VITE_ENABLE_AIS !== 'false';
 
 export function isAisConfigured(): boolean {
-  return aisConfigured;
+  return aisConfigured && isFeatureAvailable('aisRelay');
 }
 
 export interface AisPositionData {
@@ -178,7 +179,7 @@ function emitCandidateReports(reports: SnapshotCandidateReport[]): void {
 }
 
 async function pollSnapshot(force = false): Promise<void> {
-  if (!aisConfigured) return;
+  if (!isAisConfigured()) return;
   if (inFlight && !force) return;
 
   inFlight = true;
@@ -217,7 +218,7 @@ async function pollSnapshot(force = false): Promise<void> {
 }
 
 function startPolling(): void {
-  if (isPolling || !aisConfigured) return;
+  if (isPolling || !isAisConfigured()) return;
   isPolling = true;
   void pollSnapshot(true);
   pollInterval = setInterval(() => {
