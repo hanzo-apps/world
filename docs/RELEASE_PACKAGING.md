@@ -57,6 +57,51 @@ Bundler targets are pinned in both Tauri configs and enforced by packaging scrip
 - macOS: `app,dmg`
 - Windows: `nsis,msi`
 
+
+## Rust dependency modes (online vs restricted network)
+
+From `src-tauri/`, the project supports two packaging paths:
+
+### 1) Standard online build (default)
+
+Use normal Cargo behavior (crates.io):
+
+```bash
+cd src-tauri
+cargo generate-lockfile
+cargo tauri build --config tauri.conf.json
+```
+
+### 2) Restricted-network build (pre-vendored or internal mirror)
+
+An optional vendored source is defined in `src-tauri/.cargo/config.toml`. To use it, first prepare vendored crates on a machine that has registry access:
+
+```bash
+# from repository root
+cargo vendor --manifest-path src-tauri/Cargo.toml src-tauri/vendor
+```
+
+Then enable offline mode using either method:
+
+- One-off CLI override (no file changes):
+
+```bash
+cd src-tauri
+cargo generate-lockfile --offline --config 'source.crates-io.replace-with="vendored-sources"'
+cargo tauri build --offline --config 'source.crates-io.replace-with="vendored-sources"' --config tauri.conf.json
+```
+
+- Local override file (recommended for CI/repeatable offline jobs):
+
+```bash
+cp src-tauri/.cargo/config.local.toml.example src-tauri/.cargo/config.local.toml
+cd src-tauri
+cargo generate-lockfile --offline
+cargo tauri build --offline --config tauri.conf.json
+```
+
+For CI or internal mirrors, publish `src-tauri/vendor/` as an artifact and restore it before the restricted-network build. If your organization uses an internal crates mirror instead of vendoring, point `source.crates-io.replace-with` to that mirror in CI-specific Cargo config and run the same build commands.
+
 ## Optional signing/notarization hooks
 
 Unsigned packaging works by default.
