@@ -212,6 +212,100 @@ export interface ConflictZone {
   keyDevelopments?: string[];
 }
 
+// UCDP Georeferenced Events
+export type UcdpEventType = 'state-based' | 'non-state' | 'one-sided';
+
+export interface UcdpGeoEvent {
+  id: string;
+  date_start: string;
+  date_end: string;
+  latitude: number;
+  longitude: number;
+  country: string;
+  side_a: string;
+  side_b: string;
+  deaths_best: number;
+  deaths_low: number;
+  deaths_high: number;
+  type_of_violence: UcdpEventType;
+  source_original: string;
+}
+
+// UNHCR Displacement Data
+export interface DisplacementFlow {
+  originCode: string;
+  originName: string;
+  asylumCode: string;
+  asylumName: string;
+  refugees: number;
+  originLat?: number;
+  originLon?: number;
+  asylumLat?: number;
+  asylumLon?: number;
+}
+
+export interface CountryDisplacement {
+  code: string;
+  name: string;
+  // Origin-country displacement outflow metrics
+  refugees: number;
+  asylumSeekers: number;
+  idps: number;
+  stateless: number;
+  totalDisplaced: number;
+  // Host-country intake metrics
+  hostRefugees: number;
+  hostAsylumSeekers: number;
+  hostTotal: number;
+  lat?: number;
+  lon?: number;
+}
+
+export interface UnhcrSummary {
+  year: number;
+  globalTotals: {
+    refugees: number;
+    asylumSeekers: number;
+    idps: number;
+    stateless: number;
+    total: number;
+  };
+  countries: CountryDisplacement[];
+  topFlows: DisplacementFlow[];
+}
+
+// Climate Anomaly Data (Open-Meteo / ERA5)
+export type AnomalySeverity = 'normal' | 'moderate' | 'extreme';
+
+export interface ClimateAnomaly {
+  zone: string;
+  lat: number;
+  lon: number;
+  tempDelta: number;
+  precipDelta: number;
+  severity: AnomalySeverity;
+  type: 'warm' | 'cold' | 'wet' | 'dry' | 'mixed';
+  period: string;
+}
+
+// WorldPop Population Exposure
+export interface CountryPopulation {
+  code: string;
+  name: string;
+  population: number;
+  densityPerKm2: number;
+}
+
+export interface PopulationExposure {
+  eventId: string;
+  eventName: string;
+  eventType: string;
+  lat: number;
+  lon: number;
+  exposedPopulation: number;
+  exposureRadiusKm: number;
+}
+
 // Military base operator types
 export type MilitaryBaseType =
   | 'us-nato'      // United States and NATO allies
@@ -418,6 +512,10 @@ export interface MapLayers {
   spaceports: boolean;
   minerals: boolean;
   fires: boolean;
+  // Data source layers
+  ucdpEvents: boolean;
+  displacement: boolean;
+  climate: boolean;
   // Tech variant layers
   startupHubs: boolean;
   cloudRegions: boolean;

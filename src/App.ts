@@ -23,11 +23,15 @@ import { fetchAllFires, flattenFires, computeRegionStats } from '@/services/firm
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, startLearning, isInLearningMode, calculateCII } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, startLearning, isInLearningMode, calculateCII } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { fetchConflictEvents } from '@/services/conflicts';
 import { fetchUcdpClassifications } from '@/services/ucdp';
 import { fetchHapiSummary } from '@/services/hapi';
+import { fetchUcdpEvents, deduplicateAgainstAcled } from '@/services/ucdp-events';
+import { fetchUnhcrPopulation } from '@/services/unhcr';
+import { fetchClimateAnomalies } from '@/services/climate';
+import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import { reverseGeocode } from '@/utils/reverse-geocode';
 import { CountryIntelModal } from '@/components/CountryIntelModal';
@@ -65,6 +69,10 @@ import {
   MacroSignalsPanel,
   ETFFlowsPanel,
   StablecoinPanel,
+  UcdpEventsPanel,
+  DisplacementPanel,
+  ClimateAnomalyPanel,
+  PopulationExposurePanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { collectStoryData } from '@/services/story-data';
@@ -388,6 +396,9 @@ export class App {
       weather: ['weather'],
       outages: ['outages'],
       protests: ['acled'],
+      ucdpEvents: ['ucdp_events'],
+      displacement: ['unhcr'],
+      climate: ['climate'],
     };
 
     for (const [layer, sourceIds] of Object.entries(layerToSource)) {
@@ -421,6 +432,9 @@ export class App {
         weather: ['weather'],
         outages: ['outages'],
         protests: ['acled'],
+        ucdpEvents: ['ucdp_events'],
+        displacement: ['unhcr'],
+        climate: ['climate'],
       };
       const sourceIds = layerToSource[layer];
       if (sourceIds) {
@@ -1514,6 +1528,27 @@ export class App {
         this.map?.setCenter(lat, lon, 4);
       });
       this.panels['strategic-posture'] = strategicPosturePanel;
+
+      const ucdpEventsPanel = new UcdpEventsPanel();
+      ucdpEventsPanel.setEventClickHandler((lat, lon) => {
+        this.map?.setCenter(lat, lon, 5);
+      });
+      this.panels['ucdp-events'] = ucdpEventsPanel;
+
+      const displacementPanel = new DisplacementPanel();
+      displacementPanel.setCountryClickHandler((lat, lon) => {
+        this.map?.setCenter(lat, lon, 4);
+      });
+      this.panels['displacement'] = displacementPanel;
+
+      const climatePanel = new ClimateAnomalyPanel();
+      climatePanel.setZoneClickHandler((lat, lon) => {
+        this.map?.setCenter(lat, lon, 4);
+      });
+      this.panels['climate'] = climatePanel;
+
+      const populationExposurePanel = new PopulationExposurePanel();
+      this.panels['population-exposure'] = populationExposurePanel;
     }
 
     const liveNewsPanel = new LiveNewsPanel();
@@ -2219,6 +2254,11 @@ export class App {
           await this.loadTechEvents();
           console.log('[loadDataForLayer] techEvents loaded');
           break;
+        case 'ucdpEvents':
+        case 'displacement':
+        case 'climate':
+          await this.loadIntelligenceSignals();
+          break;
       }
     } finally {
       this.inFlight.delete(layer);
@@ -2712,7 +2752,8 @@ export class App {
     })());
 
     // Always fetch protests for CII (unrest = core instability metric)
-    tasks.push((async () => {
+    // This task is also used by UCDP deduplication, so keep it as a shared promise.
+    const protestsTask = (async (): Promise<SocialUnrestEvent[]> => {
       try {
         const protestData = await fetchProtestEvents();
         this.intelligenceCache.protests = protestData;
@@ -2733,11 +2774,14 @@ export class App {
             errorMessage: status.acledConfigured === false ? 'ACLED not configured - using GDELT only' : undefined,
           });
         }
+        return protestData.events;
       } catch (error) {
         console.error('[Intelligence] Protests fetch failed:', error);
         dataFreshness.recordError('acled', String(error));
+        return [];
       }
-    })());
+    })();
+    tasks.push(protestsTask.then(() => undefined));
 
     // Fetch armed conflict events (battles, explosions, violence) for CII
     tasks.push((async () => {
@@ -2836,7 +2880,97 @@ export class App {
       }
     })());
 
+    // Fetch UCDP georeferenced events (battles, one-sided violence, non-state conflict)
+    tasks.push((async () => {
+      try {
+        const [result, protestEvents] = await Promise.all([
+          fetchUcdpEvents(),
+          protestsTask,
+        ]);
+        if (!result.success) {
+          dataFreshness.recordError('ucdp_events', 'UCDP events unavailable (retaining prior event state)');
+          return;
+        }
+        const acledEvents = protestEvents.map(e => ({
+          latitude: e.lat, longitude: e.lon, event_date: e.time.toISOString(), fatalities: e.fatalities ?? 0,
+        }));
+        const events = deduplicateAgainstAcled(result.data, acledEvents);
+        (this.panels['ucdp-events'] as UcdpEventsPanel)?.setEvents(events);
+        if (this.mapLayers.ucdpEvents) {
+          this.map?.setUcdpEvents(events);
+        }
+        if (events.length > 0) dataFreshness.recordUpdate('ucdp_events', events.length);
+      } catch (error) {
+        console.error('[Intelligence] UCDP events fetch failed:', error);
+        dataFreshness.recordError('ucdp_events', String(error));
+      }
+    })());
+
+    // Fetch UNHCR displacement data (refugees, asylum seekers, IDPs)
+    tasks.push((async () => {
+      try {
+        const unhcrResult = await fetchUnhcrPopulation();
+        if (!unhcrResult.ok) {
+          dataFreshness.recordError('unhcr', 'UNHCR displacement unavailable (retaining prior displacement state)');
+          return;
+        }
+        const data = unhcrResult.data;
+        (this.panels['displacement'] as DisplacementPanel)?.setData(data);
+        ingestDisplacementForCII(data.countries);
+        if (this.mapLayers.displacement && data.topFlows) {
+          this.map?.setDisplacementFlows(data.topFlows);
+        }
+        if (data.countries.length > 0) dataFreshness.recordUpdate('unhcr', data.countries.length);
+      } catch (error) {
+        console.error('[Intelligence] UNHCR displacement fetch failed:', error);
+        dataFreshness.recordError('unhcr', String(error));
+      }
+    })());
+
+    // Fetch climate anomalies (temperature/precipitation deviations)
+    tasks.push((async () => {
+      try {
+        const climateResult = await fetchClimateAnomalies();
+        if (!climateResult.ok) {
+          dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
+          return;
+        }
+        const anomalies = climateResult.anomalies;
+        (this.panels['climate'] as ClimateAnomalyPanel)?.setAnomalies(anomalies);
+        ingestClimateForCII(anomalies);
+        if (this.mapLayers.climate) {
+          this.map?.setClimateAnomalies(anomalies);
+        }
+        if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
+      } catch (error) {
+        console.error('[Intelligence] Climate anomalies fetch failed:', error);
+        dataFreshness.recordError('climate', String(error));
+      }
+    })());
+
     await Promise.allSettled(tasks);
+
+    // Fetch population exposure estimates after upstream intelligence loads complete.
+    // This avoids race conditions where UCDP/protest data is still in-flight.
+    try {
+      const ucdpEvts = (this.panels['ucdp-events'] as UcdpEventsPanel)?.getEvents?.() || [];
+      const events = [
+        ...(this.intelligenceCache.protests?.events || []).slice(0, 10).map(e => ({
+          id: e.id, lat: e.lat, lon: e.lon, type: 'conflict' as const, name: e.title || 'Protest',
+        })),
+        ...ucdpEvts.slice(0, 10).map(e => ({
+          id: e.id, lat: e.latitude, lon: e.longitude, type: e.type_of_violence as string, name: `${e.side_a} vs ${e.side_b}`,
+        })),
+      ];
+      if (events.length > 0) {
+        const exposures = await enrichEventsWithExposure(events);
+        (this.panels['population-exposure'] as PopulationExposurePanel)?.setExposures(exposures);
+        if (exposures.length > 0) dataFreshness.recordUpdate('worldpop', exposures.length);
+      }
+    } catch (error) {
+      console.error('[Intelligence] Population exposure fetch failed:', error);
+      dataFreshness.recordError('worldpop', String(error));
+    }
 
     // Now trigger CII refresh with all intelligence data
     (this.panels['cii'] as CIIPanel)?.refresh();

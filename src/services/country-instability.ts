@@ -5,6 +5,7 @@ import { focalPointDetector } from './focal-point-detector';
 import type { ConflictEvent } from './conflicts';
 import type { UcdpConflictStatus } from './ucdp';
 import type { HapiConflictSummary } from './hapi';
+import type { CountryDisplacement, ClimateAnomaly } from '@/types';
 
 export interface CountryScore {
   code: string;
@@ -33,6 +34,8 @@ interface CountryData {
   militaryVessels: MilitaryVessel[];
   newsEvents: ClusteredEvent[];
   outages: InternetOutage[];
+  displacementOutflow: number;
+  climateStress: number;
 }
 
 // Re-export for backwards compatibility
@@ -167,7 +170,7 @@ const countryDataMap = new Map<string, CountryData>();
 const previousScores = new Map<string, number>();
 
 function initCountryData(): CountryData {
-  return { protests: [], conflicts: [], ucdpStatus: null, hapiSummary: null, militaryFlights: [], militaryVessels: [], newsEvents: [], outages: [] };
+  return { protests: [], conflicts: [], ucdpStatus: null, hapiSummary: null, militaryFlights: [], militaryVessels: [], newsEvents: [], outages: [], displacementOutflow: 0, climateStress: 0 };
 }
 
 export function clearCountryData(): void {
@@ -219,6 +222,61 @@ export function ingestHapiForCII(summaries: Map<string, HapiConflictSummary>): v
     if (!TIER1_COUNTRIES[code]) continue;
     if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
     countryDataMap.get(code)!.hapiSummary = summary;
+  }
+}
+
+const ISO3_TO_ISO2: Record<string, string> = {
+  AFG: 'AF', SYR: 'SY', UKR: 'UA', SDN: 'SD', SSD: 'SS', SOM: 'SO',
+  COD: 'CD', MMR: 'MM', YEM: 'YE', ETH: 'ET', VEN: 'VE', IRQ: 'IQ',
+  COL: 'CO', NGA: 'NG', PSE: 'PS', TUR: 'TR', PAK: 'PK', IRN: 'IR',
+  IND: 'IN', CHN: 'CN', RUS: 'RU', ISR: 'IL', SAU: 'SA', USA: 'US',
+  TWN: 'TW', PRK: 'KP', POL: 'PL', DEU: 'DE', FRA: 'FR', GBR: 'GB',
+};
+
+const COUNTRY_NAME_TO_ISO: Record<string, string> = {
+  'Afghanistan': 'AF', 'Syria': 'SY', 'Ukraine': 'UA', 'Sudan': 'SD',
+  'South Sudan': 'SS', 'Somalia': 'SO', 'DR Congo': 'CD', 'Myanmar': 'MM',
+  'Yemen': 'YE', 'Ethiopia': 'ET', 'Venezuela': 'VE', 'Iraq': 'IQ',
+  'Colombia': 'CO', 'Nigeria': 'NG', 'Palestine': 'PS', 'Turkey': 'TR',
+  'Pakistan': 'PK', 'Iran': 'IR', 'India': 'IN', 'China': 'CN',
+  'Russia': 'RU', 'Israel': 'IL', 'Saudi Arabia': 'SA',
+};
+
+export function ingestDisplacementForCII(countries: CountryDisplacement[]): void {
+  for (const data of countryDataMap.values()) {
+    data.displacementOutflow = 0;
+  }
+
+  for (const c of countries) {
+    const code = c.code?.length === 3
+      ? ISO3_TO_ISO2[c.code] || c.code.substring(0, 2)
+      : COUNTRY_NAME_TO_ISO[c.name] || c.code;
+    if (!code || !TIER1_COUNTRIES[code]) continue;
+    if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
+    const outflow = c.refugees + c.asylumSeekers;
+    countryDataMap.get(code)!.displacementOutflow = outflow;
+  }
+}
+
+const ZONE_COUNTRY_MAP: Record<string, string[]> = {
+  'Ukraine': ['UA'], 'Middle East': ['IR', 'IL', 'SA', 'SY', 'YE'],
+  'South Asia': ['PK', 'IN'], 'Myanmar': ['MM'],
+};
+
+export function ingestClimateForCII(anomalies: ClimateAnomaly[]): void {
+  for (const data of countryDataMap.values()) {
+    data.climateStress = 0;
+  }
+
+  for (const a of anomalies) {
+    if (a.severity === 'normal') continue;
+    const codes = ZONE_COUNTRY_MAP[a.zone] || [];
+    for (const code of codes) {
+      if (!TIER1_COUNTRIES[code]) continue;
+      if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
+      const stress = a.severity === 'extreme' ? 15 : 8;
+      countryDataMap.get(code)!.climateStress = Math.max(countryDataMap.get(code)!.climateStress, stress);
+    }
   }
 }
 
@@ -553,7 +611,12 @@ export function calculateCII(): CountryScore[] {
       : focalUrgency === 'elevated' ? 4
       : 0;
 
-    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost;
+    const displacementBoost = data.displacementOutflow >= 1_000_000 ? 8
+      : data.displacementOutflow >= 100_000 ? 4
+      : 0;
+    const climateBoost = data.climateStress;
+
+    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost;
 
     // UCDP-derived conflict floor replaces hardcoded floors
     // war (1000+ deaths/yr) → 70, minor (25-999) → 50, none → 0
@@ -604,7 +667,11 @@ export function getCountryScore(code: string): number | null {
   const focalBoost = focalUrgency === 'critical' ? 8
     : focalUrgency === 'elevated' ? 4
     : 0;
-  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost;
+  const displacementBoost = data.displacementOutflow >= 1_000_000 ? 8
+    : data.displacementOutflow >= 100_000 ? 4
+    : 0;
+  const climateBoost = data.climateStress;
+  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost;
 
   const floor = getUcdpFloor(data);
   return Math.round(Math.min(100, Math.max(floor, blendedScore)));
