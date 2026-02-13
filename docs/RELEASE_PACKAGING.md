@@ -26,6 +26,12 @@ npm ci
 
 ## Packaging commands
 
+To view script usage/help:
+
+```bash
+npm run desktop:package -- --help
+```
+
 ### macOS (`.app` + `.dmg`)
 
 ```bash
@@ -62,6 +68,8 @@ Set before packaging (Developer ID signature):
 ```bash
 export TAURI_BUNDLE_MACOS_SIGNING_IDENTITY="Developer ID Application: Your Company (TEAMID)"
 export TAURI_BUNDLE_MACOS_PROVIDER_SHORT_NAME="TEAMID"
+# optional alternate key accepted by Tauri tooling:
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Company (TEAMID)"
 ```
 
 For notarization, choose one auth method:
