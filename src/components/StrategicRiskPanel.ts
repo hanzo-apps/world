@@ -79,12 +79,21 @@ export class StrategicRiskPanel extends Panel {
 
     // Try to get cached scores during learning mode
     const { inLearning } = getLearningProgress();
-    if (inLearning && !this.usedCachedScores) {
+    this.usedCachedScores = false;
+    if (inLearning) {
       const cached = await fetchCachedRiskScores();
       if (cached && cached.strategicRisk) {
         this.usedCachedScores = true;
         console.log('[StrategicRiskPanel] Using cached scores from backend');
       }
+    }
+
+    if (!this.freshnessSummary || this.freshnessSummary.activeSources === 0) {
+      this.setDataBadge('unavailable');
+    } else if (this.usedCachedScores) {
+      this.setDataBadge('cached');
+    } else {
+      this.setDataBadge('live');
     }
 
     this.render();
