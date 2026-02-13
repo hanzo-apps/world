@@ -23,13 +23,12 @@ function getMemoryCachedSnapshot(cacheKey, allowStale = false) {
 
   const now = Date.now();
   const age = now - entry.timestamp;
-  if (allowStale) {
-    if (age > MEMORY_FALLBACK_MAX_AGE_MS) {
-      memoryCache.delete(cacheKey);
-      return null;
-    }
-  } else if (age > CACHE_TTL_MS) {
+  if (age > MEMORY_FALLBACK_MAX_AGE_MS) {
     memoryCache.delete(cacheKey);
+    return null;
+  }
+
+  if (!allowStale && age > CACHE_TTL_MS) {
     return null;
   }
 

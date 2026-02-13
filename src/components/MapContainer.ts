@@ -24,6 +24,9 @@ import type {
   MilitaryFlightCluster,
   MilitaryVesselCluster,
   NaturalEvent,
+  UcdpGeoEvent,
+  DisplacementFlow,
+  ClimateAnomaly,
 } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 
@@ -265,6 +268,24 @@ export class MapContainer {
       this.deckGLMap?.setTechEvents(events);
     } else {
       this.svgMap?.setTechEvents(events);
+    }
+  }
+
+  public setUcdpEvents(events: UcdpGeoEvent[]): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setUcdpEvents(events);
+    }
+  }
+
+  public setDisplacementFlows(flows: DisplacementFlow[]): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setDisplacementFlows(flows);
+    }
+  }
+
+  public setClimateAnomalies(anomalies: ClimateAnomaly[]): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setClimateAnomalies(anomalies);
     }
   }
 
