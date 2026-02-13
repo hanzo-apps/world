@@ -30,3 +30,7 @@ export * from './SatelliteFiresPanel';
 export * from './MacroSignalsPanel';
 export * from './ETFFlowsPanel';
 export * from './StablecoinPanel';
+export * from './UcdpEventsPanel';
+export * from './DisplacementPanel';
+export * from './ClimateAnomalyPanel';
+export * from './PopulationExposurePanel';

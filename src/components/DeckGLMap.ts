@@ -26,7 +26,12 @@ import type {
   MilitaryFlightCluster,
   MilitaryVesselCluster,
   NaturalEvent,
+  UcdpGeoEvent,
+  DisplacementFlow,
+  ClimateAnomaly,
 } from '@/types';
+import { ArcLayer } from '@deck.gl/layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { throttle, debounce, rafSchedule } from '@/utils/index';
@@ -143,6 +148,9 @@ const COLORS = {
   techHQ: [100, 200, 255, 200] as [number, number, number, number],
   accelerator: [255, 200, 0, 200] as [number, number, number, number],
   cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
+  ucdpStateBased: [255, 50, 50, 200] as [number, number, number, number],
+  ucdpNonState: [255, 165, 0, 200] as [number, number, number, number],
+  ucdpOneSided: [255, 255, 0, 200] as [number, number, number, number],
 };
 
 // SVG icons as data URLs for different marker shapes
@@ -189,6 +197,9 @@ export class DeckGLMap {
   private news: NewsItem[] = [];
   private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string }> = [];
   private newsLocationFirstSeen = new Map<string, number>();
+  private ucdpEvents: UcdpGeoEvent[] = [];
+  private displacementFlows: DisplacementFlow[] = [];
+  private climateAnomalies: ClimateAnomaly[] = [];
 
   // Country highlight state
   private countryGeoJsonLoaded = false;
@@ -1134,6 +1145,21 @@ export class DeckGLMap {
     // APT Groups layer (geopolitical variant only - always shown, no toggle)
     if (SITE_VARIANT !== 'tech') {
       layers.push(this.createAPTGroupsLayer());
+    }
+
+    // UCDP georeferenced events layer
+    if (mapLayers.ucdpEvents && this.ucdpEvents.length > 0) {
+      layers.push(this.createUcdpEventsLayer());
+    }
+
+    // Displacement flows arc layer
+    if (mapLayers.displacement && this.displacementFlows.length > 0) {
+      layers.push(this.createDisplacementArcsLayer());
+    }
+
+    // Climate anomalies heatmap layer
+    if (mapLayers.climate && this.climateAnomalies.length > 0) {
+      layers.push(this.createClimateHeatmapLayer());
     }
 
     // Tech variant layers
@@ -2189,6 +2215,9 @@ export class DeckGLMap {
           { key: 'ais', label: 'Ship Traffic', icon: '&#128674;' },
           { key: 'flights', label: 'Flight Delays', icon: '&#9992;' },
           { key: 'protests', label: 'Protests', icon: '&#128226;' },
+          { key: 'ucdpEvents', label: 'UCDP Events', icon: '&#9876;' },
+          { key: 'displacement', label: 'Displacement Flows', icon: '&#128101;' },
+          { key: 'climate', label: 'Climate Anomalies', icon: '&#127787;' },
           { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
@@ -2535,6 +2564,65 @@ export class DeckGLMap {
     this.setView('global');
   }
 
+  private createUcdpEventsLayer(): ScatterplotLayer<UcdpGeoEvent> {
+    return new ScatterplotLayer<UcdpGeoEvent>({
+      id: 'ucdp-events-layer',
+      data: this.ucdpEvents,
+      getPosition: (d) => [d.longitude, d.latitude],
+      getRadius: (d) => Math.max(4000, Math.sqrt(d.deaths_best || 1) * 3000),
+      getFillColor: (d) => {
+        switch (d.type_of_violence) {
+          case 'state-based': return COLORS.ucdpStateBased;
+          case 'non-state': return COLORS.ucdpNonState;
+          case 'one-sided': return COLORS.ucdpOneSided;
+          default: return COLORS.ucdpStateBased;
+        }
+      },
+      radiusMinPixels: 3,
+      radiusMaxPixels: 20,
+      pickable: false,
+    });
+  }
+
+  private createDisplacementArcsLayer(): ArcLayer<DisplacementFlow> {
+    const withCoords = this.displacementFlows.filter(f => f.originLat != null && f.asylumLat != null);
+    const top50 = withCoords.slice(0, 50);
+    const maxCount = Math.max(1, ...top50.map(f => f.refugees));
+    return new ArcLayer<DisplacementFlow>({
+      id: 'displacement-arcs-layer',
+      data: top50,
+      getSourcePosition: (d) => [d.originLon!, d.originLat!],
+      getTargetPosition: (d) => [d.asylumLon!, d.asylumLat!],
+      getSourceColor: [100, 150, 255, 180],
+      getTargetColor: [100, 255, 200, 180],
+      getWidth: (d) => Math.max(1, (d.refugees / maxCount) * 8),
+      widthMinPixels: 1,
+      widthMaxPixels: 8,
+      pickable: false,
+    });
+  }
+
+  private createClimateHeatmapLayer(): HeatmapLayer<ClimateAnomaly> {
+    return new HeatmapLayer<ClimateAnomaly>({
+      id: 'climate-heatmap-layer',
+      data: this.climateAnomalies,
+      getPosition: (d) => [d.lon, d.lat],
+      getWeight: (d) => Math.abs(d.tempDelta) + Math.abs(d.precipDelta) * 0.1,
+      radiusPixels: 80,
+      intensity: 1.5,
+      threshold: 0.1,
+      colorRange: [
+        [68, 136, 255],
+        [100, 200, 255],
+        [255, 255, 100],
+        [255, 200, 50],
+        [255, 100, 50],
+        [255, 50, 50],
+      ],
+      pickable: false,
+    });
+  }
+
   // Data setters - all use render() for debouncing
   public setEarthquakes(earthquakes: Earthquake[]): void {
     this.earthquakes = earthquakes;
@@ -2603,6 +2691,21 @@ export class DeckGLMap {
     this.techEvents = events;
     this.clusterResultCache.clear();
     this.invalidateClusterElementsByType('event');
+    this.render();
+  }
+
+  public setUcdpEvents(events: UcdpGeoEvent[]): void {
+    this.ucdpEvents = events;
+    this.render();
+  }
+
+  public setDisplacementFlows(flows: DisplacementFlow[]): void {
+    this.displacementFlows = flows;
+    this.render();
+  }
+
+  public setClimateAnomalies(anomalies: ClimateAnomaly[]): void {
+    this.climateAnomalies = anomalies;
     this.render();
   }
 

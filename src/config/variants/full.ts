@@ -71,6 +71,9 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
@@ -102,6 +105,9 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
