@@ -79,11 +79,25 @@ An optional vendored source is defined in `src-tauri/.cargo/config.toml`. To use
 ```bash
 # from repository root
 cargo vendor --manifest-path src-tauri/Cargo.toml src-tauri/vendor
+```
 
-# then (re)generate lockfile and build from src-tauri using vendored crates only
+Then enable offline mode using either method:
+
+- One-off CLI override (no file changes):
+
+```bash
 cd src-tauri
 cargo generate-lockfile --offline --config 'source.crates-io.replace-with="vendored-sources"'
 cargo tauri build --offline --config 'source.crates-io.replace-with="vendored-sources"' --config tauri.conf.json
+```
+
+- Local override file (recommended for CI/repeatable offline jobs):
+
+```bash
+cp src-tauri/.cargo/config.local.toml.example src-tauri/.cargo/config.local.toml
+cd src-tauri
+cargo generate-lockfile --offline
+cargo tauri build --offline --config tauri.conf.json
 ```
 
 For CI or internal mirrors, publish `src-tauri/vendor/` as an artifact and restore it before the restricted-network build. If your organization uses an internal crates mirror instead of vendoring, point `source.crates-io.replace-with` to that mirror in CI-specific Cargo config and run the same build commands.
