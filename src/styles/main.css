@@ -11433,3 +11433,94 @@ body.has-critical-banner .panels-grid {
 .change-positive { color: #4caf50; }
 .change-negative { color: #f44336; }
 .change-neutral { color: rgba(255,255,255,0.5); }
+
+.runtime-config-summary {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 10px;
+}
+
+.runtime-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.runtime-feature {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.runtime-feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.runtime-feature-header label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.runtime-feature-desc,
+.runtime-feature-fallback {
+  margin: 6px 0;
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+}
+
+.runtime-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.runtime-pill.ok,
+.runtime-secret-status.ok { color: #7de39d; }
+.runtime-pill.warn,
+.runtime-secret-status.warn,
+.runtime-feature-fallback.fallback { color: #ffd27c; }
+
+.runtime-secrets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.runtime-secret-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'key status'
+    'input input';
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.runtime-secret-row code {
+  grid-area: key;
+  font-size: 10px;
+}
+
+.runtime-secret-status {
+  grid-area: status;
+  font-size: 10px;
+}
+
+.runtime-secret-row input {
+  grid-area: input;
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 6px;
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 11px;
+}
