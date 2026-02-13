@@ -372,7 +372,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
   ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
-    { name: 'Atlantic Council', url: rss('https://www.atlanticcouncil.org/feed/') },
+    { name: 'Atlantic Council', url: railwayRss('https://www.atlanticcouncil.org/feed/') },
     { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml') },
     { name: 'CSIS', url: rss('https://news.google.com/rss/search?q=site:csis.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'RAND', url: rss('https://news.google.com/rss/search?q=site:rand.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
@@ -658,7 +658,7 @@ export const INTEL_SOURCES: Feed[] = [
   { name: 'ECFR', url: rss('https://ecfr.eu/feed/'), type: 'intl' },
   { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/'), type: 'intl' },
   { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml'), type: 'intl' },
-  { name: 'Atlantic Council', url: rss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
+  { name: 'Atlantic Council', url: railwayRss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
   { name: 'Middle East Institute', url: rss('https://www.mei.edu/rss.xml'), type: 'intl' },
 
   // Think Tanks & Research (Tier 3)
