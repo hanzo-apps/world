@@ -347,6 +347,37 @@ test.describe('DeckGL map harness', () => {
     );
   });
 
+  test('initializes cluster movement cache on first protest cluster render', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.seedAllDynamicData();
+      w.__mapHarness?.setLayersForSnapshot(['protests']);
+      w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 5.2 });
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getOverlaySnapshot().protestMarkers ?? 0;
+        });
+      }, { timeout: 20000 })
+      .toBeGreaterThan(0);
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getClusterStateSize() ?? -1;
+        });
+      }, { timeout: 20000 })
+      .toBeGreaterThan(0);
+  });
+
   test('reprojects hotspot overlay marker within one frame on zoom', async ({
     page,
   }) => {
