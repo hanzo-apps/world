@@ -25,8 +25,8 @@ Use these labels in future reports so outcomes are actionable:
    - Action: retry in a healthy network or fix credentials/proxy/mirror availability.
 
 2. **Expected failure: offline mode not provisioned**
-   - Symptoms: build is intentionally run without internet, but required offline inputs are missing (for Rust: no `vendor/` artifact or no internal mirror mapping configured; for JS: no prepared package cache).
-   - Action: provision offline artifacts/mirror config first, then rerun.
+   - Symptoms: build is intentionally run without internet, but required offline inputs are missing (for Rust: no `vendor/` artifact, no internal mirror mapping, or offline override not enabled; for JS: no prepared package cache).
+   - Action: provision offline artifacts/mirror config first, enable offline override (`config.local.toml` or CLI `--config`), then rerun.
 
 ## Next action to validate desktop end-to-end
 Choose one supported path:
