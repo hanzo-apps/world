@@ -79,7 +79,8 @@ export class StrategicRiskPanel extends Panel {
 
     // Try to get cached scores during learning mode
     const { inLearning } = getLearningProgress();
-    if (inLearning && !this.usedCachedScores) {
+    this.usedCachedScores = false;
+    if (inLearning) {
       const cached = await fetchCachedRiskScores();
       if (cached && cached.strategicRisk) {
         this.usedCachedScores = true;
