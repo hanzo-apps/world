@@ -67,6 +67,34 @@ function extractAlignedPriceVolume(chart) {
   }
 }
 
+function buildFallbackResult() {
+  return {
+    timestamp: new Date().toISOString(),
+    verdict: 'UNKNOWN',
+    bullishCount: 0,
+    totalCount: 0,
+    signals: {
+      liquidity: { status: 'UNKNOWN', value: null, sparkline: [] },
+      flowStructure: { status: 'UNKNOWN', btcReturn5: null, qqqReturn5: null },
+      macroRegime: { status: 'UNKNOWN', qqqRoc20: null, xlpRoc20: null },
+      technicalTrend: {
+        status: 'UNKNOWN',
+        btcPrice: null,
+        sma50: null,
+        sma200: null,
+        vwap30d: null,
+        mayerMultiple: null,
+        sparkline: [],
+      },
+      hashRate: { status: 'UNKNOWN', change30d: null },
+      miningCost: { status: 'UNKNOWN' },
+      fearGreed: { status: 'UNKNOWN', value: null, history: [] },
+    },
+    meta: { qqqSparkline: [] },
+    unavailable: true,
+  };
+}
+
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -245,9 +273,11 @@ export default async function handler(req) {
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': `public, s-maxage=${CACHE_TTL}, stale-while-revalidate=600` },
     });
   } catch (err) {
-    const fallback = cachedResponse || { error: 'Failed to compute signals', timestamp: new Date().toISOString() };
+    const fallback = cachedResponse || buildFallbackResult();
+    cachedResponse = fallback;
+    cacheTimestamp = now;
     return new Response(JSON.stringify(fallback), {
-      status: cachedResponse ? 200 : 500,
+      status: 200,
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, s-maxage=60' },
     });
   }

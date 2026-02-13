@@ -131,6 +131,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        settings: resolve(__dirname, 'settings.html'),
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {

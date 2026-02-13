@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
+import { isDesktopRuntime, toRuntimeUrl } from '@/services/runtime';
 
 // YouTube IFrame Player API types
 type YouTubePlayer = {
@@ -9,6 +10,7 @@ type YouTubePlayer = {
   pauseVideo(): void;
   loadVideoById(videoId: string): void;
   cueVideoById(videoId: string): void;
+  getIframe?(): HTMLIFrameElement;
   destroy(): void;
 };
 
@@ -16,9 +18,11 @@ type YouTubePlayerConstructor = new (
   elementId: string | HTMLElement,
   options: {
     videoId: string;
+    host?: string;
     playerVars: Record<string, number | string>;
     events: {
       onReady: () => void;
+      onError?: (event: { data: number }) => void;
     };
   },
 ) => YouTubePlayer;
@@ -89,9 +93,19 @@ export class LiveNewsPanel extends Panel {
   private playerElementId: string;
   private isPlayerReady = false;
   private currentVideoId: string | null = null;
+  private readonly youtubeOrigin: string | null;
+  private forceFallbackVideoForNextInit = false;
+
+  // Desktop fallback: embed via local HTTP bridge page to avoid YouTube 153
+  // on tauri:// initial launches where referer/origin can be missing.
+  private readonly useDesktopEmbedProxy = isDesktopRuntime();
+  private desktopEmbedIframe: HTMLIFrameElement | null = null;
+  private desktopEmbedStateKey: string | null = null;
+  private desktopEmbedRenderToken = 0;
 
   constructor() {
     super({ id: 'live-news', title: 'Live News', showCount: false, trackActivity: false });
+    this.youtubeOrigin = LiveNewsPanel.resolveYouTubeOrigin();
     this.playerElementId = `live-news-player-${Date.now()}`;
     this.element.classList.add('panel-wide');
     this.createLiveButton();
@@ -99,6 +113,30 @@ export class LiveNewsPanel extends Panel {
     this.createChannelSwitcher();
     this.renderPlayer();
     this.setupIdleDetection();
+  }
+
+  private static resolveYouTubeOrigin(): string | null {
+    const fallbackOrigin = SITE_VARIANT === 'tech'
+      ? 'https://worldmonitor.app'
+      : 'https://worldmonitor.app';
+
+    try {
+      const { protocol, origin, host } = window.location;
+      if (protocol === 'http:' || protocol === 'https:') {
+        // Desktop webviews commonly run from tauri.localhost which can trigger
+        // YouTube embed restrictions. Use canonical public origin instead.
+        if (host === 'tauri.localhost' || host.endsWith('.tauri.localhost')) {
+          return fallbackOrigin;
+        }
+        return origin;
+      }
+      if (protocol === 'tauri:' || protocol === 'asset:') {
+        return fallbackOrigin;
+      }
+    } catch {
+      // Ignore invalid location values.
+    }
+    return fallbackOrigin;
   }
 
   private setupIdleDetection(): void {
@@ -134,7 +172,6 @@ export class LiveNewsPanel extends Panel {
       this.isPlaying = false;
       this.updateLiveIndicator();
     }
-    // Destroy player completely to free memory (iframe consumes ~115 kB/s even when paused)
     this.destroyPlayer();
   }
 
@@ -143,15 +180,25 @@ export class LiveNewsPanel extends Panel {
       this.player.destroy();
       this.player = null;
     }
+
+    this.desktopEmbedIframe = null;
+    this.desktopEmbedStateKey = null;
+    this.desktopEmbedRenderToken += 1;
     this.isPlayerReady = false;
     this.currentVideoId = null;
-    // Clear the container to remove the iframe
+
+    // Clear the container to remove player/iframe
     if (this.playerContainer) {
       this.playerContainer.innerHTML = '';
-      // Recreate the player element for when we resume
-      this.playerElement = document.createElement('div');
-      this.playerElement.id = this.playerElementId;
-      this.playerContainer.appendChild(this.playerElement);
+
+      if (!this.useDesktopEmbedProxy) {
+        // Recreate player element for JS API mode
+        this.playerElement = document.createElement('div');
+        this.playerElement.id = this.playerElementId;
+        this.playerContainer.appendChild(this.playerElement);
+      } else {
+        this.playerElement = null;
+      }
     }
   }
 
@@ -159,7 +206,6 @@ export class LiveNewsPanel extends Panel {
     if (this.wasPlayingBeforeIdle && !this.isPlaying) {
       this.isPlaying = true;
       this.updateLiveIndicator();
-      // Reinitialize the player
       void this.initializePlayer();
     }
   }
@@ -188,7 +234,7 @@ export class LiveNewsPanel extends Panel {
 
   private togglePlayback(): void {
     this.isPlaying = !this.isPlaying;
-    this.wasPlayingBeforeIdle = this.isPlaying; // Track user intent
+    this.wasPlayingBeforeIdle = this.isPlaying;
     this.updateLiveIndicator();
     this.syncPlayerState();
   }
@@ -237,6 +283,14 @@ export class LiveNewsPanel extends Panel {
     this.element.insertBefore(this.channelSwitcher, this.content);
   }
 
+  private async resolveChannelVideo(channel: LiveChannel, forceFallback = false): Promise<void> {
+    const preferStableDesktopFallback = this.useDesktopEmbedProxy && !!channel.fallbackVideoId;
+    const useFallbackVideo = channel.useFallbackOnly || forceFallback || preferStableDesktopFallback;
+    const liveVideoId = useFallbackVideo ? null : await fetchLiveVideoId(channel.handle);
+    channel.videoId = liveVideoId || channel.fallbackVideoId;
+    channel.isLive = !!liveVideoId;
+  }
+
   private async switchChannel(channel: LiveChannel): Promise<void> {
     if (channel.id === this.activeChannel.id) return;
 
@@ -250,12 +304,8 @@ export class LiveNewsPanel extends Panel {
       }
     });
 
-    // Fetch live video ID dynamically
-    const liveVideoId = channel.useFallbackOnly ? null : await fetchLiveVideoId(channel.handle);
-    channel.videoId = liveVideoId || channel.fallbackVideoId;
-    channel.isLive = !!liveVideoId;
+    await this.resolveChannelVideo(channel);
 
-    // Update button state
     this.channelSwitcher?.querySelectorAll('.live-channel-btn').forEach(btn => {
       const btnEl = btn as HTMLElement;
       btnEl.classList.remove('loading');
@@ -266,6 +316,17 @@ export class LiveNewsPanel extends Panel {
 
     if (!channel.videoId) {
       this.showOfflineMessage(channel);
+      return;
+    }
+
+    if (this.useDesktopEmbedProxy) {
+      this.renderDesktopEmbed(true);
+      return;
+    }
+
+    if (!this.player) {
+      this.ensurePlayerContainer();
+      void this.initializePlayer();
       return;
     }
 
@@ -282,23 +343,141 @@ export class LiveNewsPanel extends Panel {
     `;
   }
 
+  private showEmbedError(channel: LiveChannel, errorCode: number): void {
+    const watchUrl = channel.videoId
+      ? `https://www.youtube.com/watch?v=${encodeURIComponent(channel.videoId)}`
+      : `https://www.youtube.com/${channel.handle}`;
+
+    this.content.innerHTML = `
+      <div class="live-offline">
+        <div class="offline-icon">!</div>
+        <div class="offline-text">${channel.name} cannot be embedded in this app (YouTube ${errorCode})</div>
+        <a class="offline-retry" href="${watchUrl}" target="_blank" rel="noopener noreferrer">Open on YouTube</a>
+      </div>
+    `;
+  }
+
   private renderPlayer(): void {
     this.ensurePlayerContainer();
     void this.initializePlayer();
   }
 
   private ensurePlayerContainer(): void {
-    if (this.playerContainer && this.playerElement) return;
-
     this.content.innerHTML = '';
     this.playerContainer = document.createElement('div');
     this.playerContainer.className = 'live-news-player';
 
-    this.playerElement = document.createElement('div');
-    this.playerElement.id = this.playerElementId;
-    this.playerContainer.appendChild(this.playerElement);
+    if (!this.useDesktopEmbedProxy) {
+      this.playerElement = document.createElement('div');
+      this.playerElement.id = this.playerElementId;
+      this.playerContainer.appendChild(this.playerElement);
+    } else {
+      this.playerElement = null;
+    }
 
     this.content.appendChild(this.playerContainer);
+  }
+
+  private buildDesktopEmbedPath(videoId: string): string {
+    const params = new URLSearchParams({
+      videoId,
+      autoplay: this.isPlaying ? '1' : '0',
+      mute: this.isMuted ? '1' : '0',
+    });
+    return `/api/youtube/embed?${params.toString()}`;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async ensureDesktopEmbedRouteReady(videoId: string): Promise<void> {
+    const path = toRuntimeUrl(this.buildDesktopEmbedPath(videoId));
+    const maxAttempts = 8;
+    let lastError = 'unknown';
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const response = await fetch(path, { cache: 'no-store' });
+        if (response.ok) {
+          return;
+        }
+        lastError = `HTTP ${response.status}`;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : 'network';
+      }
+
+      if (attempt < maxAttempts) {
+        await this.sleep(120 * attempt);
+      }
+    }
+
+    throw new Error(`Desktop embed route unavailable at ${path}: ${lastError}`);
+  }
+
+  private renderDesktopEmbed(force = false): void {
+    if (!this.useDesktopEmbedProxy) return;
+    void this.renderDesktopEmbedAsync(force);
+  }
+
+  private async renderDesktopEmbedAsync(force = false): Promise<void> {
+    const videoId = this.activeChannel.videoId;
+    if (!videoId) {
+      this.showOfflineMessage(this.activeChannel);
+      return;
+    }
+
+    const stateKey = `${videoId}|${this.isPlaying ? 1 : 0}|${this.isMuted ? 1 : 0}`;
+    if (!force && this.desktopEmbedStateKey === stateKey && this.desktopEmbedIframe) {
+      return;
+    }
+
+    const renderToken = ++this.desktopEmbedRenderToken;
+    this.desktopEmbedStateKey = stateKey;
+    this.currentVideoId = videoId;
+    this.isPlayerReady = true;
+
+    if (!this.playerContainer) {
+      this.ensurePlayerContainer();
+    }
+
+    if (!this.playerContainer) {
+      return;
+    }
+
+    this.playerContainer.innerHTML = '<div class="panel-loading-text">Loading live stream...</div>';
+
+    try {
+      const embedUrl = toRuntimeUrl(this.buildDesktopEmbedPath(videoId));
+      await this.ensureDesktopEmbedRouteReady(videoId);
+      if (renderToken !== this.desktopEmbedRenderToken || !this.playerContainer) {
+        return;
+      }
+
+      this.playerContainer.innerHTML = '';
+
+      const iframe = document.createElement('iframe');
+      iframe.className = 'live-news-embed-frame';
+      iframe.src = embedUrl;
+      iframe.title = `${this.activeChannel.name} live feed`;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      iframe.allowFullscreen = true;
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      iframe.setAttribute('loading', 'eager');
+
+      this.playerContainer.appendChild(iframe);
+      this.desktopEmbedIframe = iframe;
+    } catch (error) {
+      if (renderToken !== this.desktopEmbedRenderToken) {
+        return;
+      }
+
+      console.warn('[LiveNews] Desktop embed bridge failed', error);
+      this.showEmbedError(this.activeChannel, 153);
+    }
   }
 
   private static loadYouTubeApi(): Promise<void> {
@@ -345,15 +524,19 @@ export class LiveNewsPanel extends Panel {
   }
 
   private async initializePlayer(): Promise<void> {
-    if (this.player) return;
+    if (!this.useDesktopEmbedProxy && this.player) return;
 
-    // Fetch live video ID for initial channel
-    const liveVideoId = this.activeChannel.useFallbackOnly ? null : await fetchLiveVideoId(this.activeChannel.handle);
-    this.activeChannel.videoId = liveVideoId || this.activeChannel.fallbackVideoId;
-    this.activeChannel.isLive = !!liveVideoId;
+    const useFallbackVideo = this.activeChannel.useFallbackOnly || this.forceFallbackVideoForNextInit;
+    this.forceFallbackVideoForNextInit = false;
+    await this.resolveChannelVideo(this.activeChannel, useFallbackVideo);
 
     if (!this.activeChannel.videoId) {
       this.showOfflineMessage(this.activeChannel);
+      return;
+    }
+
+    if (this.useDesktopEmbedProxy) {
+      this.renderDesktopEmbed(true);
       return;
     }
 
@@ -361,26 +544,65 @@ export class LiveNewsPanel extends Panel {
     if (this.player || !this.playerElement) return;
 
     this.player = new window.YT!.Player(this.playerElement, {
+      host: 'https://www.youtube.com',
       videoId: this.activeChannel.videoId,
       playerVars: {
         autoplay: this.isPlaying ? 1 : 0,
         mute: this.isMuted ? 1 : 0,
         rel: 0,
         playsinline: 1,
-        origin: window.location.origin,
         enablejsapi: 1,
+        ...(this.youtubeOrigin
+          ? {
+              origin: this.youtubeOrigin,
+              widget_referrer: this.youtubeOrigin,
+            }
+          : {}),
       },
       events: {
         onReady: () => {
           this.isPlayerReady = true;
           this.currentVideoId = this.activeChannel.videoId || null;
+          const iframe = this.player?.getIframe?.();
+          if (iframe) iframe.referrerPolicy = 'strict-origin-when-cross-origin';
           this.syncPlayerState();
+        },
+        onError: (event) => {
+          const errorCode = Number(event?.data ?? 0);
+
+          // Retry once with known fallback stream.
+          if (
+            errorCode === 153 &&
+            this.activeChannel.fallbackVideoId &&
+            this.activeChannel.videoId !== this.activeChannel.fallbackVideoId
+          ) {
+            this.destroyPlayer();
+            this.forceFallbackVideoForNextInit = true;
+            this.ensurePlayerContainer();
+            void this.initializePlayer();
+            return;
+          }
+
+          // Desktop-specific last resort: use local HTTP embed proxy.
+          if (errorCode === 153 && isDesktopRuntime()) {
+            this.destroyPlayer();
+            this.renderDesktopEmbed(true);
+            return;
+          }
+
+          this.destroyPlayer();
+          this.showEmbedError(this.activeChannel, errorCode);
         },
       },
     });
   }
 
   private syncPlayerState(): void {
+    if (this.useDesktopEmbedProxy) {
+      this.renderDesktopEmbed();
+      return;
+    }
+
     if (!this.player || !this.isPlayerReady) return;
 
     const videoId = this.activeChannel.videoId;
@@ -389,7 +611,6 @@ export class LiveNewsPanel extends Panel {
     // Handle channel switch
     if (this.currentVideoId !== videoId) {
       this.currentVideoId = videoId;
-      // Re-render player container if it was showing offline message
       if (!this.playerElement || !document.getElementById(this.playerElementId)) {
         this.ensurePlayerContainer();
         void this.initializePlayer();
@@ -402,14 +623,12 @@ export class LiveNewsPanel extends Panel {
       }
     }
 
-    // Handle mute state
     if (this.isMuted) {
       this.player.mute();
     } else {
       this.player.unMute();
     }
 
-    // Handle play/pause state
     if (this.isPlaying) {
       this.player.playVideo();
     } else {
@@ -422,28 +641,26 @@ export class LiveNewsPanel extends Panel {
   }
 
   public destroy(): void {
-    // Clear idle timeout
     if (this.idleTimeout) {
       clearTimeout(this.idleTimeout);
       this.idleTimeout = null;
     }
 
-    // Remove global event listeners
     document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
     ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
       document.removeEventListener(event, this.boundIdleResetHandler);
     });
 
-    // Destroy YouTube player
     if (this.player) {
       this.player.destroy();
       this.player = null;
     }
+    this.desktopEmbedIframe = null;
+    this.desktopEmbedStateKey = null;
     this.isPlayerReady = false;
     this.playerContainer = null;
     this.playerElement = null;
 
-    // Call parent destroy
     super.destroy();
   }
 }
