@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -17,6 +18,98 @@ function json(data, status = 200, extraHeaders = {}) {
   });
 }
 
+function isBracketSegment(segment) {
+  return segment.startsWith('[') && segment.endsWith(']');
+}
+
+function splitRoutePath(routePath) {
+  return routePath.split('/').filter(Boolean);
+}
+
+function routePriority(routePath) {
+  const parts = splitRoutePath(routePath);
+  return parts.reduce((score, part) => {
+    if (part.startsWith('[[...') && part.endsWith(']]')) return score + 0;
+    if (part.startsWith('[...') && part.endsWith(']')) return score + 1;
+    if (isBracketSegment(part)) return score + 2;
+    return score + 10;
+  }, 0);
+}
+
+function matchRoute(routePath, pathname) {
+  const routeParts = splitRoutePath(routePath);
+  const pathParts = splitRoutePath(pathname.replace(/^\/api/, ''));
+
+  let i = 0;
+  let j = 0;
+
+  while (i < routeParts.length && j < pathParts.length) {
+    const routePart = routeParts[i];
+    const pathPart = pathParts[j];
+
+    if (routePart.startsWith('[[...') && routePart.endsWith(']]')) {
+      return true;
+    }
+
+    if (routePart.startsWith('[...') && routePart.endsWith(']')) {
+      return true;
+    }
+
+    if (isBracketSegment(routePart)) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    if (routePart !== pathPart) {
+      return false;
+    }
+
+    i += 1;
+    j += 1;
+  }
+
+  if (i === routeParts.length && j === pathParts.length) return true;
+
+  if (i === routeParts.length - 1) {
+    const tail = routeParts[i];
+    if (tail?.startsWith('[[...') && tail.endsWith(']]')) {
+      return true;
+    }
+    if (tail?.startsWith('[...') && tail.endsWith(']')) {
+      return j < pathParts.length;
+    }
+  }
+
+  return false;
+}
+
+async function buildRouteTable(root) {
+  const files = [];
+
+  async function walk(dir) {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolute);
+        continue;
+      }
+      if (!entry.name.endsWith('.js')) continue;
+      if (entry.name.startsWith('_')) continue;
+
+      const relative = path.relative(root, absolute).replace(/\\/g, '/');
+      const routePath = relative.replace(/\.js$/, '').replace(/\/index$/, '');
+      files.push({ routePath, modulePath: absolute });
+    }
+  }
+
+  await walk(root);
+
+  files.sort((a, b) => routePriority(b.routePath) - routePriority(a.routePath));
+  return files;
+}
+
 async function readBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -26,6 +119,7 @@ async function readBody(req) {
 function toHeaders(nodeHeaders) {
   const headers = new Headers();
   Object.entries(nodeHeaders).forEach(([key, value]) => {
+    if (key.toLowerCase() === 'host') return;
     if (Array.isArray(value)) {
       value.forEach(v => headers.append(key, v));
     } else if (typeof value === 'string') {
@@ -33,10 +127,6 @@ function toHeaders(nodeHeaders) {
     }
   });
   return headers;
-}
-
-function endpointFromPath(pathname) {
-  return pathname.replace(/^\/api\//, '').replace(/\/$/, '') || 'index';
 }
 
 async function handleServiceStatus() {
@@ -55,33 +145,54 @@ async function handleServiceStatus() {
 async function proxyToCloud(requestUrl, req) {
   const target = `${remoteBase}${requestUrl.pathname}${requestUrl.search}`;
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
-  const upstream = await fetch(target, {
+  return fetch(target, {
     method: req.method,
     headers: toHeaders(req.headers),
     body,
   });
-  return upstream;
 }
 
-async function dispatch(requestUrl, req) {
+function pickModule(pathname, routes) {
+  const apiPath = pathname.startsWith('/api') ? pathname.slice(4) || '/' : pathname;
+
+  for (const candidate of routes) {
+    if (matchRoute(candidate.routePath, apiPath)) {
+      return candidate.modulePath;
+    }
+  }
+
+  return null;
+}
+
+const moduleCache = new Map();
+
+async function importHandler(modulePath) {
+  const cacheKey = modulePath;
+  const cached = moduleCache.get(cacheKey);
+  if (cached) return cached;
+
+  const mod = await import(pathToFileURL(modulePath).href);
+  moduleCache.set(cacheKey, mod);
+  return mod;
+}
+
+async function dispatch(requestUrl, req, routes) {
   if (requestUrl.pathname === '/api/service-status') {
     return handleServiceStatus();
   }
   if (requestUrl.pathname === '/api/local-status') {
-    return json({ success: true, mode, port, apiDir, remoteBase });
+    return json({ success: true, mode, port, apiDir, remoteBase, routes: routes.length });
   }
 
-  const endpoint = endpointFromPath(requestUrl.pathname);
-  const modulePath = path.join(apiDir, `${endpoint}.js`);
-
-  if (!existsSync(modulePath)) {
+  const modulePath = pickModule(requestUrl.pathname, routes);
+  if (!modulePath || !existsSync(modulePath)) {
     return proxyToCloud(requestUrl, req);
   }
 
   try {
-    const mod = await import(`${pathToFileURL(modulePath).href}?v=${Date.now()}`);
+    const mod = await importHandler(modulePath);
     if (typeof mod.default !== 'function') {
-      return json({ error: `Invalid handler for ${endpoint}` }, 500);
+      return json({ error: `Invalid handler module: ${path.basename(modulePath)}` }, 500);
     }
 
     const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
@@ -91,9 +202,13 @@ async function dispatch(requestUrl, req) {
       body,
     });
 
-    return await mod.default(request);
+    const response = await mod.default(request);
+    if (!(response instanceof Response)) {
+      return json({ error: `Handler returned invalid response for ${requestUrl.pathname}` }, 500);
+    }
+    return response;
   } catch (error) {
-    console.error('[local-api] handler failed, using cloud fallback', endpoint, error);
+    console.error('[local-api] local handler failed, trying cloud fallback', requestUrl.pathname, error);
     try {
       return await proxyToCloud(requestUrl, req);
     } catch {
@@ -101,6 +216,8 @@ async function dispatch(requestUrl, req) {
     }
   }
 }
+
+const routes = await buildRouteTable(apiDir);
 
 createServer(async (req, res) => {
   const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${port}`);
@@ -112,7 +229,7 @@ createServer(async (req, res) => {
   }
 
   try {
-    const response = await dispatch(requestUrl, req);
+    const response = await dispatch(requestUrl, req, routes);
     const body = Buffer.from(await response.arrayBuffer());
     const headers = Object.fromEntries(response.headers.entries());
     res.writeHead(response.status, headers);
@@ -123,5 +240,5 @@ createServer(async (req, res) => {
     res.end(JSON.stringify({ error: 'Internal server error' }));
   }
 }).listen(port, '127.0.0.1', () => {
-  console.log(`[local-api] listening on http://127.0.0.1:${port} (apiDir=${apiDir})`);
+  console.log(`[local-api] listening on http://127.0.0.1:${port} (apiDir=${apiDir}, routes=${routes.length})`);
 });

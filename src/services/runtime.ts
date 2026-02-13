@@ -54,6 +54,29 @@ export function toRuntimeUrl(path: string): string {
   return `${baseUrl}${path}`;
 }
 
+function getApiTargetFromRequestInput(input: RequestInfo | URL): string | null {
+  if (typeof input === 'string') {
+    if (input.startsWith('/')) return input;
+    try {
+      const u = new URL(input);
+      return `${u.pathname}${u.search}`;
+    } catch {
+      return null;
+    }
+  }
+
+  if (input instanceof URL) {
+    return `${input.pathname}${input.search}`;
+  }
+
+  try {
+    const u = new URL(input.url);
+    return `${u.pathname}${u.search}`;
+  } catch {
+    return null;
+  }
+}
+
 export function installRuntimeFetchPatch(): void {
   if (!isDesktopRuntime() || typeof window === 'undefined' || (window as unknown as Record<string, unknown>).__wmFetchPatched) {
     return;
@@ -64,16 +87,19 @@ export function installRuntimeFetchPatch(): void {
   const remoteBase = getRemoteApiBaseUrl();
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    if (!url.startsWith('/api/')) {
+    const target = getApiTargetFromRequestInput(input);
+    if (!target?.startsWith('/api/')) {
       return nativeFetch(input, init);
     }
 
+    const localUrl = `${localBase}${target}`;
+    const remoteUrl = `${remoteBase}${target}`;
+
     try {
-      return await nativeFetch(`${localBase}${url}`, init);
+      return await nativeFetch(localUrl, init);
     } catch (error) {
-      console.warn(`[runtime] Local API fetch failed for ${url}, falling back to cloud`, error);
-      return nativeFetch(`${remoteBase}${url}`, init);
+      console.warn(`[runtime] Local API fetch failed for ${target}, falling back to cloud`, error);
+      return nativeFetch(remoteUrl, init);
     }
   };
 
