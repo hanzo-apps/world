@@ -24,6 +24,7 @@ export * from './StrategicPosturePanel';
 export * from './IntelligenceGapBadge';
 export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
+export * from './RuntimeConfigPanel';
 export * from './InsightsPanel';
 export * from './TechReadinessPanel';
 export * from './SatelliteFiresPanel';
