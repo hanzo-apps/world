@@ -162,6 +162,8 @@ function notifyConfigChanged(): void {
 }
 
 function seedSecretsFromEnvironment(): void {
+  if (isDesktopRuntime()) return;
+
   const keys = new Set<RuntimeSecretKey>(RUNTIME_FEATURES.flatMap(feature => feature.requiredSecrets));
   for (const key of keys) {
     const value = readEnvSecret(key);
@@ -196,8 +198,16 @@ export function getSecretState(key: RuntimeSecretKey): { present: boolean; valid
 }
 
 export function isFeatureAvailable(featureId: RuntimeFeatureId): boolean {
+  if (!isFeatureEnabled(featureId)) return false;
+
+  // Cloud/web deployments validate credentials server-side.
+  // Desktop runtime validates local secrets client-side for capability gating.
+  if (!isDesktopRuntime()) {
+    return true;
+  }
+
   const feature = RUNTIME_FEATURES.find(item => item.id === featureId);
-  if (!feature || !isFeatureEnabled(featureId)) return false;
+  if (!feature) return false;
   return feature.requiredSecrets.every(secretKey => getSecretState(secretKey).valid);
 }
 
@@ -208,19 +218,17 @@ export function setFeatureToggle(featureId: RuntimeFeatureId, enabled: boolean):
 }
 
 export async function setSecretValue(key: RuntimeSecretKey, value: string): Promise<void> {
-  const sanitized = value.trim();
-
-  if (isDesktopRuntime()) {
-    if (sanitized) {
-      await invokeTauri<void>('set_secret', { key, value: sanitized });
-    } else {
-      await invokeTauri<void>('delete_secret', { key });
-    }
+  if (!isDesktopRuntime()) {
+    console.warn('[runtime-config] Ignoring secret write outside desktop runtime');
+    return;
   }
 
+  const sanitized = value.trim();
   if (sanitized) {
-    runtimeConfig.secrets[key] = { value: sanitized, source: isDesktopRuntime() ? 'vault' : 'env' };
+    await invokeTauri<void>('set_secret', { key, value: sanitized });
+    runtimeConfig.secrets[key] = { value: sanitized, source: 'vault' };
   } else {
+    await invokeTauri<void>('delete_secret', { key });
     delete runtimeConfig.secrets[key];
   }
 
