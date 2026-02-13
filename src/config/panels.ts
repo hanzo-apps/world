@@ -40,6 +40,10 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
+  'ucdp-events': { name: 'UCDP Conflict Events', enabled: false, priority: 2 },
+  displacement: { name: 'UNHCR Displacement', enabled: false, priority: 2 },
+  climate: { name: 'Climate Anomalies', enabled: false, priority: 2 },
+  'population-exposure': { name: 'Population Exposure', enabled: false, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -64,6 +68,10 @@ const FULL_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Data source layers
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
@@ -94,6 +102,10 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Data source layers
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (disabled in full variant)
   startupHubs: false,
   cloudRegions: false,
@@ -163,6 +175,10 @@ const TECH_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Data source layers
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (enabled in tech variant)
   startupHubs: true,
   cloudRegions: true,
@@ -193,6 +209,10 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Data source layers
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
   // Tech layers (limited on mobile)
   startupHubs: true,
   cloudRegions: false,
