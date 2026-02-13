@@ -1,4 +1,5 @@
 import { isDesktopRuntime } from './runtime';
+import { invokeTauri } from './tauri-bridge';
 
 export type RuntimeSecretKey =
   | 'GROQ_API_KEY'
@@ -126,13 +127,6 @@ export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
 function readEnvSecret(key: RuntimeSecretKey): string {
   const envValue = (import.meta as { env?: Record<string, unknown> }).env?.[key];
   return typeof envValue === 'string' ? envValue.trim() : '';
-}
-
-async function invokeTauri<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
-  const tauriWindow = window as unknown as { __TAURI__?: { core?: { invoke?: <U>(cmd: string, args?: Record<string, unknown>) => Promise<U> } } };
-  const invoke = tauriWindow.__TAURI__?.core?.invoke;
-  if (!invoke) throw new Error('Tauri invoke bridge unavailable');
-  return invoke<T>(command, payload);
 }
 
 function readStoredToggles(): Record<RuntimeFeatureId, boolean> {

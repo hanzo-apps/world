@@ -24,6 +24,7 @@ interface ETFFlowsResult {
     outflowCount: number;
   };
   etfs: ETFData[];
+  unavailable?: boolean;
 }
 
 function formatVolume(v: number): string {
@@ -90,6 +91,11 @@ export class ETFFlowsPanel extends Panel {
     }
 
     const d = this.data;
+    if (!d.etfs.length) {
+      this.setContent('<div class="panel-loading-text">ETF data temporarily unavailable</div>');
+      return;
+    }
+
     const s = d.summary;
     const dirClass = s.netDirection.includes('INFLOW') ? 'flow-inflow' : s.netDirection.includes('OUTFLOW') ? 'flow-outflow' : 'flow-neutral';
 

@@ -37,7 +37,11 @@ if (!validVariants.has(variant)) {
 }
 
 const bundles = os === 'macos' ? 'app,dmg' : 'nsis,msi';
-const env = { ...process.env, VITE_VARIANT: variant };
+const env = {
+  ...process.env,
+  VITE_VARIANT: variant,
+  VITE_DESKTOP_RUNTIME: '1',
+};
 const cliArgs = ['build', '--bundles', bundles];
 const tauriBin = path.join('node_modules', '.bin', process.platform === 'win32' ? 'tauri.cmd' : 'tauri');
 

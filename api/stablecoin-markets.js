@@ -8,6 +8,21 @@ let cacheTimestamp = 0;
 
 const DEFAULT_COINS = 'tether,usd-coin,dai,first-digital-usd,ethena-usde';
 
+function buildFallbackResult() {
+  return {
+    timestamp: new Date().toISOString(),
+    summary: {
+      totalMarketCap: 0,
+      totalVolume24h: 0,
+      coinCount: 0,
+      depeggedCount: 0,
+      healthStatus: 'UNAVAILABLE',
+    },
+    stablecoins: [],
+    unavailable: true,
+  };
+}
+
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -104,9 +119,11 @@ export default async function handler(req) {
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': `public, s-maxage=${CACHE_TTL}, stale-while-revalidate=300` },
     });
   } catch (err) {
-    const fallback = cachedResponse || { error: 'Failed to fetch stablecoin data', timestamp: new Date().toISOString() };
+    const fallback = cachedResponse || buildFallbackResult();
+    cachedResponse = fallback;
+    cacheTimestamp = now;
     return new Response(JSON.stringify(fallback), {
-      status: cachedResponse ? 200 : 500,
+      status: 200,
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, s-maxage=60' },
     });
   }

@@ -86,6 +86,7 @@ import { TECH_COMPANIES } from '@/config/tech-companies';
 import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
+import { isDesktopRuntime } from '@/services/runtime';
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
 export class App {
@@ -131,6 +132,7 @@ export class App {
   private initialLoadComplete = false;
   private criticalBannerEl: HTMLElement | null = null;
   private countryIntelModal: CountryIntelModal | null = null;
+  private readonly isDesktopApp = isDesktopRuntime();
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -215,6 +217,18 @@ export class App {
           localStorage.setItem(TECH_INSIGHTS_MIGRATION_KEY, 'done');
         }
       }
+    }
+
+    // Desktop key management panel must always remain accessible in Tauri.
+    if (this.isDesktopApp) {
+      const runtimePanel = this.panelSettings['runtime-config'] ?? {
+        name: 'Desktop Configuration',
+        enabled: true,
+        priority: 2,
+      };
+      runtimePanel.enabled = true;
+      this.panelSettings['runtime-config'] = runtimePanel;
+      saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
     }
 
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
@@ -1093,18 +1107,18 @@ export class App {
       <div class="header">
         <div class="header-left">
           <div class="variant-switcher">
-            <a href="${SITE_VARIANT === 'tech' ? 'https://worldmonitor.app' : '#'}"
-               class="variant-option ${SITE_VARIANT !== 'tech' ? 'active' : ''}"
+            <a href="${this.isDesktopApp ? '#' : (SITE_VARIANT === 'tech' ? 'https://worldmonitor.app' : '#')}"
+               class="variant-option ${SITE_VARIANT !== 'tech' ? 'active' : ''} ${this.isDesktopApp ? 'desktop-locked' : ''}"
                data-variant="world"
-               title="Geopolitical Intelligence">
+               title="${this.isDesktopApp ? 'Desktop build runs a single bundled variant' : 'Geopolitical Intelligence'}">
               <span class="variant-icon">🌍</span>
               <span class="variant-label">WORLD</span>
             </a>
             <span class="variant-divider"></span>
-            <a href="${SITE_VARIANT === 'tech' ? '#' : 'https://tech.worldmonitor.app'}"
-               class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
+            <a href="${this.isDesktopApp ? '#' : (SITE_VARIANT === 'tech' ? '#' : 'https://tech.worldmonitor.app')}"
+               class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''} ${this.isDesktopApp ? 'desktop-locked' : ''}"
                data-variant="tech"
-               title="Tech & AI Intelligence">
+               title="${this.isDesktopApp ? 'Desktop build runs a single bundled variant' : 'Tech & AI Intelligence'}">
               <span class="variant-icon">💻</span>
               <span class="variant-label">TECH</span>
             </a>
@@ -1136,9 +1150,9 @@ export class App {
         </div>
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> Search</button>
-          <button class="copy-link-btn" id="copyLinkBtn">Copy Link</button>
+          ${this.isDesktopApp ? '' : '<button class="copy-link-btn" id="copyLinkBtn">Copy Link</button>'}
           <span class="time-display" id="timeDisplay">--:--:-- UTC</span>
-          <button class="fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
+          ${this.isDesktopApp ? '' : '<button class="fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>'}
           <button class="settings-btn" id="settingsBtn">⚙ PANELS</button>
           <button class="sources-btn" id="sourcesBtn">📡 SOURCES</button>
         </div>
@@ -1562,7 +1576,7 @@ export class App {
     const serviceStatusPanel = new ServiceStatusPanel();
     this.panels['service-status'] = serviceStatusPanel;
 
-    const runtimeConfigPanel = new RuntimeConfigPanel();
+    const runtimeConfigPanel = new RuntimeConfigPanel({ mode: this.isDesktopApp ? 'alert' : 'full' });
     this.panels['runtime-config'] = runtimeConfigPanel;
 
     // Tech Readiness Panel (tech variant only - World Bank tech indicators)
@@ -1605,6 +1619,17 @@ export class App {
     if (liveNewsIdx > 0) {
       panelOrder.splice(liveNewsIdx, 1);
       panelOrder.unshift('live-news');
+    }
+
+    // Desktop configuration should stay easy to reach in Tauri builds.
+    if (this.isDesktopApp) {
+      const runtimeIdx = panelOrder.indexOf('runtime-config');
+      if (runtimeIdx > 1) {
+        panelOrder.splice(runtimeIdx, 1);
+        panelOrder.splice(1, 0, 'runtime-config');
+      } else if (runtimeIdx === -1) {
+        panelOrder.splice(1, 0, 'runtime-config');
+      }
     }
 
     panelOrder.forEach((key: string) => {
@@ -1813,12 +1838,14 @@ export class App {
 
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenBtn');
-    fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
-    this.boundFullscreenHandler = () => {
-      fullscreenBtn!.textContent = document.fullscreenElement ? '⛶' : '⛶';
-      fullscreenBtn!.classList.toggle('active', !!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', this.boundFullscreenHandler);
+    if (!this.isDesktopApp && fullscreenBtn) {
+      fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+      this.boundFullscreenHandler = () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? '⛶' : '⛶';
+        fullscreenBtn.classList.toggle('active', !!document.fullscreenElement);
+      };
+      document.addEventListener('fullscreenchange', this.boundFullscreenHandler);
+    }
 
     // Region selector
     const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
