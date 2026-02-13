@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
@@ -39,6 +40,13 @@ const bundles = os === 'macos' ? 'app,dmg' : 'nsis,msi';
 const env = { ...process.env, VITE_VARIANT: variant };
 const cliArgs = ['build', '--bundles', bundles];
 const tauriBin = path.join('node_modules', '.bin', process.platform === 'win32' ? 'tauri.cmd' : 'tauri');
+
+if (!existsSync(tauriBin)) {
+  console.error(
+    `Local Tauri CLI not found at ${tauriBin}. Run \"npm ci\" to install dependencies before desktop packaging.`
+  );
+  process.exit(1);
+}
 
 if (variant === 'tech') {
   cliArgs.push('--config', 'src-tauri/tauri.tech.conf.json');
