@@ -31,6 +31,8 @@ npm ci
 ```bash
 npm run desktop:package:macos:full
 npm run desktop:package:macos:tech
+# or generic runner
+npm run desktop:package -- --os macos --variant full
 ```
 
 ### Windows (`.exe` + `.msi`)
@@ -38,9 +40,11 @@ npm run desktop:package:macos:tech
 ```bash
 npm run desktop:package:windows:full
 npm run desktop:package:windows:tech
+# or generic runner
+npm run desktop:package -- --os windows --variant tech
 ```
 
-These scripts lock bundler output to explicit targets:
+Bundler targets are pinned in both Tauri configs and enforced by packaging scripts:
 
 - macOS: `app,dmg`
 - Windows: `nsis,msi`
@@ -53,14 +57,25 @@ If signing credentials are present in environment variables, Tauri will sign/not
 
 ### macOS Apple Developer signing + notarization
 
-Set before packaging:
+Set before packaging (Developer ID signature):
 
 ```bash
 export TAURI_BUNDLE_MACOS_SIGNING_IDENTITY="Developer ID Application: Your Company (TEAMID)"
 export TAURI_BUNDLE_MACOS_PROVIDER_SHORT_NAME="TEAMID"
+```
+
+For notarization, choose one auth method:
+
+```bash
+# Apple ID + app-specific password
 export APPLE_ID="you@example.com"
 export APPLE_PASSWORD="app-specific-password"
 export APPLE_TEAM_ID="TEAMID"
+
+# OR App Store Connect API key
+export APPLE_API_KEY="ABC123DEFG"
+export APPLE_API_ISSUER="00000000-0000-0000-0000-000000000000"
+export APPLE_API_KEY_PATH="$HOME/.keys/AuthKey_ABC123DEFG.p8"
 ```
 
 Then run either standard or explicit sign script aliases:
@@ -78,6 +93,9 @@ Set before packaging (PowerShell):
 ```powershell
 $env:TAURI_BUNDLE_WINDOWS_CERTIFICATE_THUMBPRINT="<CERT_THUMBPRINT>"
 $env:TAURI_BUNDLE_WINDOWS_TIMESTAMP_URL="https://timestamp.digicert.com"
+# optional: if using cert file + password instead of cert store
+$env:TAURI_BUNDLE_WINDOWS_CERTIFICATE="C:\path\to\codesign.pfx"
+$env:TAURI_BUNDLE_WINDOWS_CERTIFICATE_PASSWORD="<PFX_PASSWORD>"
 ```
 
 Then run either standard or explicit sign script aliases:
@@ -93,9 +111,12 @@ npm run desktop:package:windows:full:sign
 - Full variant: `World Monitor` / `world-monitor`
 - Tech variant: `Tech Monitor` / `tech-monitor`
 
-Distinct names are already configured.
+Distinct names are configured in Tauri:
 
-If you also want variant-specific icons, set `bundle.icon` separately in each Tauri config file and point each variant to its own icon assets.
+- `src-tauri/tauri.conf.json` → `World Monitor` / `world-monitor`
+- `src-tauri/tauri.tech.conf.json` → `Tech Monitor` / `tech-monitor`
+
+If you want variant-specific icons, set `bundle.icon` separately in each config and point each variant to dedicated icon assets.
 
 ## Output locations
 

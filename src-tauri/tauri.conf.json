@@ -47,6 +47,9 @@
     "windows": {
       "digestAlgorithm": "sha256",
       "timestampUrl": "https://timestamp.digicert.com"
+    },
+    "macOS": {
+      "hardenedRuntime": true
     }
   }
 }
