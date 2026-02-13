@@ -790,6 +790,7 @@ const server = http.createServer(async (req, res) => {
         // Africa
         'feeds.24.com',
         'feeds.capi24.com',  // News24 redirect destination
+        'www.atlanticcouncil.org',
       ];
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
