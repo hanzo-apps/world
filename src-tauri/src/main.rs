@@ -4,13 +4,70 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
+use keyring::Entry;
 use tauri::{AppHandle, Manager, RunEvent};
 
 const LOCAL_API_PORT: &str = "46123";
+const KEYRING_SERVICE: &str = "world-monitor";
+const SUPPORTED_SECRET_KEYS: [&str; 13] = [
+    "GROQ_API_KEY",
+    "OPENROUTER_API_KEY",
+    "FRED_API_KEY",
+    "EIA_API_KEY",
+    "CLOUDFLARE_API_TOKEN",
+    "ACLED_ACCESS_TOKEN",
+    "WINGBITS_API_KEY",
+    "WS_RELAY_URL",
+    "VITE_OPENSKY_RELAY_URL",
+    "OPENSKY_CLIENT_ID",
+    "OPENSKY_CLIENT_SECRET",
+    "AISSTREAM_API_KEY",
+    "VITE_WS_RELAY_URL",
+];
 
 #[derive(Default)]
 struct LocalApiState {
     child: Mutex<Option<Child>>,
+}
+
+fn secret_entry(key: &str) -> Result<Entry, String> {
+    if !SUPPORTED_SECRET_KEYS.contains(&key) {
+        return Err(format!("Unsupported secret key: {key}"));
+    }
+    Entry::new(KEYRING_SERVICE, key).map_err(|e| format!("Keyring init failed: {e}"))
+}
+
+#[tauri::command]
+fn list_supported_secret_keys() -> Vec<String> {
+    SUPPORTED_SECRET_KEYS.iter().map(|key| (*key).to_string()).collect()
+}
+
+#[tauri::command]
+fn get_secret(key: String) -> Result<Option<String>, String> {
+    let entry = secret_entry(&key)?;
+    match entry.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(err) => Err(format!("Failed to read keyring secret: {err}")),
+    }
+}
+
+#[tauri::command]
+fn set_secret(key: String, value: String) -> Result<(), String> {
+    let entry = secret_entry(&key)?;
+    entry
+        .set_password(&value)
+        .map_err(|e| format!("Failed to write keyring secret: {e}"))
+}
+
+#[tauri::command]
+fn delete_secret(key: String) -> Result<(), String> {
+    let entry = secret_entry(&key)?;
+    match entry.delete_credential() {
+        Ok(_) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(err) => Err(format!("Failed to delete keyring secret: {err}")),
+    }
 }
 
 fn local_api_paths(app: &AppHandle) -> (PathBuf, PathBuf) {
@@ -83,6 +140,12 @@ fn stop_local_api(app: &AppHandle) {
 fn main() {
     tauri::Builder::default()
         .manage(LocalApiState::default())
+        .invoke_handler(tauri::generate_handler![
+            list_supported_secret_keys,
+            get_secret,
+            set_secret,
+            delete_secret
+        ])
         .setup(|app| {
             if let Err(err) = start_local_api(&app.handle()) {
                 eprintln!("[tauri] local API sidecar failed to start: {err}");
