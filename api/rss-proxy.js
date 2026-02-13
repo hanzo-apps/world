@@ -148,6 +148,7 @@ const ALLOWED_DOMAINS = [
   'www.armscontrol.org',
   'www.nti.org',
   'thebulletin.org',
+  'www.iss.europa.eu',
   // Economic & Food Security
   'www.fao.org',
   'worldbank.org',
