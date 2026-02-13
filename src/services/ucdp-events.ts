@@ -8,11 +8,16 @@ interface UcdpEventsResponse {
   cached_at: string;
 }
 
+const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
+const UCDP_BASE_URL = wsRelayUrl
+  ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ucdp-events'
+  : '/api/ucdp-events';
+
 const breaker = createCircuitBreaker<UcdpEventsResponse>({ name: 'UCDP Events' });
 
 export async function fetchUcdpEvents(): Promise<UcdpEventsResponse> {
   return breaker.execute(async () => {
-    const response = await fetch('/api/ucdp-events', {
+    const response = await fetch(UCDP_BASE_URL, {
       headers: { Accept: 'application/json' },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
