@@ -23,14 +23,15 @@
     "desktop:dev": "npx @tauri-apps/cli dev",
     "desktop:build:full": "VITE_VARIANT=full npx @tauri-apps/cli build",
     "desktop:build:tech": "VITE_VARIANT=tech npx @tauri-apps/cli build --config src-tauri/tauri.tech.conf.json",
-    "desktop:package:macos:full": "VITE_VARIANT=full npx @tauri-apps/cli build --bundles app,dmg",
-    "desktop:package:macos:tech": "VITE_VARIANT=tech npx @tauri-apps/cli build --config src-tauri/tauri.tech.conf.json --bundles app,dmg",
-    "desktop:package:windows:full": "VITE_VARIANT=full npx @tauri-apps/cli build --bundles nsis,msi",
-    "desktop:package:windows:tech": "VITE_VARIANT=tech npx @tauri-apps/cli build --config src-tauri/tauri.tech.conf.json --bundles nsis,msi",
-    "desktop:package:macos:full:sign": "VITE_VARIANT=full npx @tauri-apps/cli build --bundles app,dmg",
-    "desktop:package:macos:tech:sign": "VITE_VARIANT=tech npx @tauri-apps/cli build --config src-tauri/tauri.tech.conf.json --bundles app,dmg",
-    "desktop:package:windows:full:sign": "VITE_VARIANT=full npx @tauri-apps/cli build --bundles nsis,msi",
-    "desktop:package:windows:tech:sign": "VITE_VARIANT=tech npx @tauri-apps/cli build --config src-tauri/tauri.tech.conf.json --bundles nsis,msi"
+    "desktop:package:macos:full": "node scripts/desktop-package.mjs --os macos --variant full",
+    "desktop:package:macos:tech": "node scripts/desktop-package.mjs --os macos --variant tech",
+    "desktop:package:windows:full": "node scripts/desktop-package.mjs --os windows --variant full",
+    "desktop:package:windows:tech": "node scripts/desktop-package.mjs --os windows --variant tech",
+    "desktop:package:macos:full:sign": "node scripts/desktop-package.mjs --os macos --variant full --sign",
+    "desktop:package:macos:tech:sign": "node scripts/desktop-package.mjs --os macos --variant tech --sign",
+    "desktop:package:windows:full:sign": "node scripts/desktop-package.mjs --os windows --variant full --sign",
+    "desktop:package:windows:tech:sign": "node scripts/desktop-package.mjs --os windows --variant tech --sign",
+    "desktop:package": "node scripts/desktop-package.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
