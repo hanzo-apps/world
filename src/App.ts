@@ -64,6 +64,7 @@ import {
   IntelligenceGapBadge,
   TechEventsPanel,
   ServiceStatusPanel,
+  RuntimeConfigPanel,
   InsightsPanel,
   TechReadinessPanel,
   MacroSignalsPanel,
@@ -1560,6 +1561,9 @@ export class App {
     // Service Status Panel (primarily for tech variant)
     const serviceStatusPanel = new ServiceStatusPanel();
     this.panels['service-status'] = serviceStatusPanel;
+
+    const runtimeConfigPanel = new RuntimeConfigPanel();
+    this.panels['runtime-config'] = runtimeConfigPanel;
 
     // Tech Readiness Panel (tech variant only - World Bank tech indicators)
     const techReadinessPanel = new TechReadinessPanel();
