@@ -11,14 +11,21 @@ import {
   type RuntimeFeatureDefinition,
   type RuntimeSecretKey,
 } from '@/services/runtime-config';
+import { invokeTauri } from '@/services/tauri-bridge';
 import { escapeHtml } from '@/utils/sanitize';
 import { isDesktopRuntime } from '@/services/runtime';
 
+interface RuntimeConfigPanelOptions {
+  mode?: 'full' | 'alert';
+}
+
 export class RuntimeConfigPanel extends Panel {
   private unsubscribe: (() => void) | null = null;
+  private readonly mode: 'full' | 'alert';
 
-  constructor() {
+  constructor(options: RuntimeConfigPanelOptions = {}) {
     super({ id: 'runtime-config', title: 'Desktop Configuration', showCount: false });
+    this.mode = options.mode ?? (isDesktopRuntime() ? 'alert' : 'full');
     this.unsubscribe = subscribeRuntimeConfig(() => this.render());
     this.render();
   }
@@ -30,8 +37,44 @@ export class RuntimeConfigPanel extends Panel {
 
   protected render(): void {
     const snapshot = getRuntimeConfigSnapshot();
-
     const desktop = isDesktopRuntime();
+
+    if (desktop && this.mode === 'alert') {
+      const totalFeatures = RUNTIME_FEATURES.length;
+      const availableFeatures = RUNTIME_FEATURES.filter((feature) => isFeatureAvailable(feature.id)).length;
+      const missingFeatures = Math.max(0, totalFeatures - availableFeatures);
+      const missingSecrets = Array.from(
+        new Set(
+          RUNTIME_FEATURES
+            .flatMap((feature) => feature.requiredSecrets)
+            .filter((key) => !getSecretState(key).valid),
+        ),
+      );
+
+      const alertTitle = missingFeatures > 0 ? 'Settings not configured' : 'Desktop settings configured';
+      const alertClass = missingFeatures > 0 ? 'warn' : 'ok';
+      const missingPreview = missingSecrets.length > 0
+        ? missingSecrets.slice(0, 4).join(', ')
+        : 'None';
+      const missingTail = missingSecrets.length > 4 ? ` +${missingSecrets.length - 4} more` : '';
+
+      this.content.innerHTML = `
+        <section class="runtime-alert runtime-alert-${alertClass}">
+          <h3>${alertTitle}</h3>
+          <p>
+            ${availableFeatures}/${totalFeatures} features available · ${Object.keys(snapshot.secrets).length} local secrets configured.
+          </p>
+          <p class="runtime-alert-missing">
+            Missing keys: ${escapeHtml(`${missingPreview}${missingTail}`)}
+          </p>
+          <button type="button" class="runtime-open-settings-btn" data-open-settings>
+            Open Settings
+          </button>
+        </section>
+      `;
+      this.attachListeners();
+      return;
+    }
 
     this.content.innerHTML = `
       <div class="runtime-config-summary">
@@ -82,6 +125,15 @@ export class RuntimeConfigPanel extends Panel {
 
   private attachListeners(): void {
     if (!isDesktopRuntime()) return;
+
+    if (this.mode === 'alert') {
+      this.content.querySelector<HTMLButtonElement>('[data-open-settings]')?.addEventListener('click', () => {
+        void invokeTauri<void>('open_settings_window_command').catch((error) => {
+          console.warn('[runtime-config] Failed to open settings window', error);
+        });
+      });
+      return;
+    }
 
     this.content.querySelectorAll<HTMLInputElement>('input[data-toggle]').forEach((input) => {
       input.addEventListener('change', () => {

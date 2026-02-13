@@ -78,6 +78,22 @@ function parseChartData(chart, ticker, issuer) {
   }
 }
 
+function buildFallbackResult() {
+  return {
+    timestamp: new Date().toISOString(),
+    summary: {
+      etfCount: 0,
+      totalVolume: 0,
+      totalEstFlow: 0,
+      netDirection: 'UNAVAILABLE',
+      inflowCount: 0,
+      outflowCount: 0,
+    },
+    etfs: [],
+    unavailable: true,
+  };
+}
+
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -136,9 +152,11 @@ export default async function handler(req) {
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': `public, s-maxage=${CACHE_TTL}, stale-while-revalidate=1800` },
     });
   } catch (err) {
-    const fallback = cachedResponse || { error: 'Failed to fetch ETF data', timestamp: new Date().toISOString() };
+    const fallback = cachedResponse || buildFallbackResult();
+    cachedResponse = fallback;
+    cacheTimestamp = now;
     return new Response(JSON.stringify(fallback), {
-      status: cachedResponse ? 200 : 500,
+      status: 200,
       headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, s-maxage=60' },
     });
   }
