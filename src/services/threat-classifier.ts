@@ -268,53 +268,68 @@ export function classifyByKeyword(title: string, variant = 'full'): ThreatClassi
   return { level: 'info', category: 'general', confidence: 0.3, source: 'keyword' };
 }
 
-// Rate-limited AI classification queue
-const AI_CONCURRENCY = 2;
-const AI_DELAY_MS = 300; // ms between requests
-let aiInFlight = 0;
-let aiPaused = false; // pause on 429
-const aiQueue: Array<{ title: string; variant: string; resolve: (v: ThreatClassification | null) => void }> = [];
+// Batched AI classification — collects headlines then sends one API call
+const BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 500;
+let batchPaused = false;
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
+const batchQueue: Array<{ title: string; variant: string; resolve: (v: ThreatClassification | null) => void }> = [];
 
-function drainAiQueue(): void {
-  if (aiPaused) return;
-  while (aiInFlight < AI_CONCURRENCY && aiQueue.length > 0) {
-    const job = aiQueue.shift()!;
-    aiInFlight++;
-    classifyWithAISingle(job.title, job.variant)
-      .then(job.resolve)
-      .finally(() => {
-        aiInFlight--;
-        setTimeout(drainAiQueue, AI_DELAY_MS);
-      });
-  }
+function flushBatch(): void {
+  if (batchPaused || batchQueue.length === 0) return;
+  batchTimer = null;
+
+  const batch = batchQueue.splice(0, BATCH_SIZE);
+  if (batch.length === 0) return;
+  const variant = batch[0]!.variant;
+  const titles = batch.map(j => j.title);
+
+  fetch('/api/classify-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ titles, variant }),
+  })
+    .then(resp => {
+      if (resp.status === 429 || resp.status >= 500) {
+        batchPaused = true;
+        const delay = resp.status === 429 ? 60_000 : 30_000;
+        console.warn(`[Classify] ${resp.status} — pausing AI classification for ${delay / 1000}s`);
+        for (const job of batch) job.resolve(null);
+        while (batchQueue.length > 0) batchQueue.shift()!.resolve(null);
+        setTimeout(() => { batchPaused = false; scheduleBatch(); }, delay);
+        return null;
+      }
+      if (!resp.ok) { for (const job of batch) job.resolve(null); return null; }
+      return resp.json();
+    })
+    .then(data => {
+      if (!data) return;
+      const results: Array<{ level?: string; category?: string } | null> = data.results || [];
+      for (let i = 0; i < batch.length; i++) {
+        const r = results[i];
+        const job = batch[i]!;
+        if (r && r.level && r.category) {
+          job.resolve({
+            level: r.level as ThreatLevel,
+            category: r.category as EventCategory,
+            confidence: 0.9,
+            source: 'llm',
+          });
+        } else {
+          job.resolve(null);
+        }
+      }
+    })
+    .catch(() => { for (const job of batch) job.resolve(null); })
+    .finally(() => scheduleBatch());
 }
 
-async function classifyWithAISingle(
-  title: string,
-  variant: string
-): Promise<ThreatClassification | null> {
-  try {
-    const params = new URLSearchParams({ title, variant });
-    const resp = await fetch(`/api/classify-event?${params}`);
-    if (resp.status === 429 || resp.status >= 500) {
-      aiPaused = true;
-      const delay = resp.status === 429 ? 60_000 : 30_000;
-      console.warn(`[Classify] ${resp.status} — pausing AI classification for ${delay / 1000}s, flushing`, aiQueue.length, 'queued jobs');
-      while (aiQueue.length > 0) aiQueue.shift()!.resolve(null);
-      setTimeout(() => { aiPaused = false; drainAiQueue(); }, delay);
-      return null;
-    }
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    if (data.fallback) return null;
-    return {
-      level: data.level as ThreatLevel,
-      category: data.category as EventCategory,
-      confidence: data.confidence ?? 0.9,
-      source: 'llm',
-    };
-  } catch {
-    return null;
+function scheduleBatch(): void {
+  if (batchTimer || batchPaused || batchQueue.length === 0) return;
+  if (batchQueue.length >= BATCH_SIZE) {
+    flushBatch();
+  } else {
+    batchTimer = setTimeout(flushBatch, BATCH_DELAY_MS);
   }
 }
 
@@ -323,8 +338,8 @@ export function classifyWithAI(
   variant: string
 ): Promise<ThreatClassification | null> {
   return new Promise((resolve) => {
-    aiQueue.push({ title, variant, resolve });
-    drainAiQueue();
+    batchQueue.push({ title, variant, resolve });
+    scheduleBatch();
   });
 }
 
