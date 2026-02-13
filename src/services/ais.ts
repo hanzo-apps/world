@@ -2,9 +2,11 @@ import type { AisDisruptionEvent, AisDensityZone } from '@/types';
 import { dataFreshness } from './data-freshness';
 import { isFeatureAvailable } from './runtime-config';
 
-// Snapshot endpoint backed by server-side AIS aggregation.
-// This avoids a per-client WebSocket to Railway.
-const AIS_SNAPSHOT_API = '/api/ais-snapshot';
+const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
+const RAILWAY_SNAPSHOT_URL = wsRelayUrl
+  ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ais/snapshot'
+  : '';
+const VERCEL_SNAPSHOT_API = '/api/ais-snapshot';
 const LOCAL_SNAPSHOT_FALLBACK = 'http://localhost:3004/ais/snapshot';
 const SNAPSHOT_POLL_INTERVAL_MS = 10 * 1000;
 const SNAPSHOT_STALE_MS = 20 * 1000;
@@ -105,10 +107,17 @@ function parseSnapshot(data: unknown): {
 
 async function fetchSnapshotPayload(includeCandidates: boolean): Promise<unknown> {
   const query = `?candidates=${includeCandidates ? 'true' : 'false'}`;
-  const primary = await fetch(`${AIS_SNAPSHOT_API}${query}`, { headers: { Accept: 'application/json' } });
+
+  if (RAILWAY_SNAPSHOT_URL) {
+    try {
+      const railway = await fetch(`${RAILWAY_SNAPSHOT_URL}${query}`, { headers: { Accept: 'application/json' } });
+      if (railway.ok) return railway.json();
+    } catch { /* Railway unavailable — fall through */ }
+  }
+
+  const primary = await fetch(`${VERCEL_SNAPSHOT_API}${query}`, { headers: { Accept: 'application/json' } });
   if (primary.ok) return primary.json();
 
-  // Local dev fallback when Vercel functions are not running.
   if (isLocalhost) {
     const local = await fetch(`${LOCAL_SNAPSHOT_FALLBACK}${query}`, { headers: { Accept: 'application/json' } });
     if (local.ok) return local.json();
