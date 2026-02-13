@@ -145,6 +145,18 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Lowy Institute': 3,
   'China Tech Analysis': 3,
   'DigiChina': 2,
+  // Security/Defense Think Tanks
+  'RUSI': 2,
+  'Wilson Center': 3,
+  'GMF': 3,
+  'Stimson Center': 3,
+  'CNAS': 2,
+  // Nuclear & Arms Control
+  'Arms Control Assn': 2,
+  'Bulletin of Atomic Scientists': 2,
+  // Food Security
+  'FAO GIEWS': 2,
+  'EU ISS': 3,
 
   // Tier 3 - Policy Sources
   'Politico Tech': 2,
@@ -247,6 +259,13 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'AI Now Institute': 'intel', 'OECD Digital': 'intel', 'Bruegel (EU)': 'intel',
   'Chatham House Tech': 'intel', 'DigiChina': 'intel', 'Lowy Institute': 'intel',
   'EFF News': 'intel', 'Politico Tech': 'intel',
+  // Security/Defense Think Tanks
+  'RUSI': 'intel', 'Wilson Center': 'intel', 'GMF': 'intel',
+  'Stimson Center': 'intel', 'CNAS': 'intel',
+  // Nuclear & Arms Control
+  'Arms Control Assn': 'intel', 'Bulletin of Atomic Scientists': 'intel',
+  // Food Security & Regional
+  'FAO GIEWS': 'gov', 'EU ISS': 'intel',
 
   // Podcasts & Newsletters
   'Acquired Podcast': 'tech', 'All-In Podcast': 'tech', 'a16z Podcast': 'tech',
@@ -667,6 +686,16 @@ export const INTEL_SOURCES: Feed[] = [
   { name: 'Carnegie', url: rss('https://carnegieendowment.org/rss/'), type: 'research' },
   { name: 'FAS', url: rss('https://fas.org/feed/'), type: 'research' },
   { name: 'NTI', url: rss('https://www.nti.org/rss/'), type: 'research' },
+  { name: 'RUSI', url: rss('https://rusi.org/rss.xml'), type: 'research' },
+  { name: 'Wilson Center', url: rss('https://www.wilsoncenter.org/rss.xml'), type: 'research' },
+  { name: 'GMF', url: rss('https://www.gmfus.org/feed'), type: 'research' },
+  { name: 'Stimson Center', url: rss('https://www.stimson.org/feed/'), type: 'research' },
+  { name: 'CNAS', url: rss('https://www.cnas.org/rss'), type: 'research' },
+  { name: 'Lowy Institute', url: rss('https://www.lowyinstitute.org/feed'), type: 'research' },
+
+  // Nuclear & Arms Control (Tier 2)
+  { name: 'Arms Control Assn', url: rss('https://www.armscontrol.org/rss/all'), type: 'nuclear' },
+  { name: 'Bulletin of Atomic Scientists', url: rss('https://thebulletin.org/feed/'), type: 'nuclear' },
 
   // OSINT & Monitoring (Tier 2)
   { name: 'Bellingcat', url: rss('https://www.bellingcat.com/feed/'), type: 'osint' },
@@ -674,6 +703,8 @@ export const INTEL_SOURCES: Feed[] = [
 
   // Economic & Food Security (Tier 2)
   { name: 'FAO News', url: rss('https://www.fao.org/feeds/fao-newsroom-rss'), type: 'economic' },
+  { name: 'FAO GIEWS', url: rss('https://www.fao.org/giews/english/shortnews/rss.xml'), type: 'economic' },
+  { name: 'EU ISS', url: rss('https://www.iss.europa.eu/rss.xml'), type: 'intl' },
 ];
 
 // Keywords that trigger alert status - must be specific to avoid false positives
