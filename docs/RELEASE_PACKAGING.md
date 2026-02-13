@@ -26,6 +26,25 @@ npm ci
 
 All desktop scripts call the local `tauri` binary from `node_modules/.bin`; no runtime `npx` package download is required after `npm ci`.
 
+## Network preflight and remediation
+
+Before running desktop packaging in CI or managed networks, verify connectivity and proxy config:
+
+```bash
+npm ping
+curl -I https://index.crates.io/
+env | grep -E '^(HTTP_PROXY|HTTPS_PROXY|NO_PROXY)='
+```
+
+If these fail, use one of the supported remediations:
+
+- Internal npm mirror/proxy.
+- Internal Cargo sparse index/registry mirror.
+- Pre-vendored Rust crates (`src-tauri/vendor/`) + Cargo offline mode.
+- CI artifact/caching strategy that restores required package inputs before build.
+
+See `docs/TAURI_VALIDATION_REPORT.md` for failure classification labels and troubleshooting flow.
+
 ## Packaging commands
 
 To view script usage/help:
