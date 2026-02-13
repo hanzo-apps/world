@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Monitor Settings</title>
+  </head>
+  <body>
+    <div class="settings-shell">
+      <header class="settings-header">
+        <div>
+          <h1>Settings</h1>
+          <p>Desktop runtime configuration and local API keys.</p>
+        </div>
+        <div class="settings-actions">
+          <button id="openLogsBtn" type="button">Open Logs Folder</button>
+          <button id="openSidecarLogBtn" type="button">Open API Log</button>
+        </div>
+      </header>
+      <p id="settingsActionStatus" class="settings-action-status" aria-live="polite"></p>
+      <main id="settingsApp" class="settings-content"></main>
+    </div>
+
+    <script type="module" src="/src/settings-main.ts"></script>
+  </body>
+</html>

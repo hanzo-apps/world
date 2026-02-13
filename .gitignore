@@ -9,3 +9,8 @@ dist/
 .claude/
 .cursor/
 .env.vercel-backup
+.agent/
+.factory/
+.windsurf/
+skills/
+test-results/
