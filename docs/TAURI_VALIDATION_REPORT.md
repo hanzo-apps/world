@@ -3,6 +3,19 @@
 ## Scope
 Validated desktop build readiness for the World Monitor Tauri app by checking frontend compilation, TypeScript integrity, and Tauri/Rust build execution.
 
+## Preflight checks before desktop validation
+
+Run these checks first so failures are classified quickly:
+
+1. npm registry reachability
+   - `npm ping`
+2. crates.io sparse index reachability
+   - `curl -I https://index.crates.io/`
+3. proxy configuration present when required by your network
+   - `env | grep -E '^(HTTP_PROXY|HTTPS_PROXY|NO_PROXY)='`
+
+If any of these checks fail, treat downstream desktop build failures as environment-level until the network path is fixed.
+
 ## Commands run
 
 1. `npm ci` — failed because the environment blocks downloading the pinned `@tauri-apps/cli` package from npm (`403 Forbidden`).
@@ -40,3 +53,14 @@ Choose one supported path:
   - Run Cargo with `source.crates-io.replace-with` mapped to vendored/internal source and `--offline` where applicable.
 
 After `npm ci`, desktop build uses the local `tauri` binary and does not rely on runtime `npx` package retrieval.
+
+## Remediation options for restricted environments
+
+If preflight fails, use one of these approved remediations:
+
+- Configure an internal npm mirror/proxy for Node packages.
+- Configure an internal Cargo registry/sparse index mirror for Rust crates.
+- Pre-vendor Rust crates (`src-tauri/vendor/`) and run Cargo in offline mode.
+- Use CI runners that restore package/cache artifacts from a trusted internal store before builds.
+
+For release packaging details, see `docs/RELEASE_PACKAGING.md` (section: **Network preflight and remediation**).
