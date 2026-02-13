@@ -14,9 +14,15 @@ const hasFlag = (name) => args.includes(`--${name}`);
 const os = getArg('os');
 const variant = getArg('variant') ?? 'full';
 const sign = hasFlag('sign');
+const showHelp = hasFlag('help') || hasFlag('h');
 
 const validOs = new Set(['macos', 'windows']);
 const validVariants = new Set(['full', 'tech']);
+
+if (showHelp) {
+  console.log('Usage: npm run desktop:package -- --os <macos|windows> --variant <full|tech> [--sign]');
+  process.exit(0);
+}
 
 if (!validOs.has(os)) {
   console.error('Usage: npm run desktop:package -- --os <macos|windows> --variant <full|tech> [--sign]');
@@ -37,15 +43,26 @@ if (variant === 'tech') {
 }
 
 if (sign) {
-  const requiredVars =
-    os === 'macos'
-      ? ['TAURI_BUNDLE_MACOS_SIGNING_IDENTITY', 'TAURI_BUNDLE_MACOS_PROVIDER_SHORT_NAME']
-      : ['TAURI_BUNDLE_WINDOWS_CERTIFICATE_THUMBPRINT'];
+  if (os === 'macos') {
+    const hasIdentity = Boolean(env.TAURI_BUNDLE_MACOS_SIGNING_IDENTITY || env.APPLE_SIGNING_IDENTITY);
+    const hasProvider = Boolean(env.TAURI_BUNDLE_MACOS_PROVIDER_SHORT_NAME);
+    if (!hasIdentity || !hasProvider) {
+      console.error(
+        'Signing requested (--sign) but missing macOS signing env vars. Set TAURI_BUNDLE_MACOS_SIGNING_IDENTITY (or APPLE_SIGNING_IDENTITY) and TAURI_BUNDLE_MACOS_PROVIDER_SHORT_NAME.'
+      );
+      process.exit(1);
+    }
+  }
 
-  const missing = requiredVars.filter((name) => !env[name]);
-  if (missing.length > 0) {
-    console.error(`Signing requested (--sign) but missing env vars: ${missing.join(', ')}`);
-    process.exit(1);
+  if (os === 'windows') {
+    const hasThumbprint = Boolean(env.TAURI_BUNDLE_WINDOWS_CERTIFICATE_THUMBPRINT);
+    const hasPfx = Boolean(env.TAURI_BUNDLE_WINDOWS_CERTIFICATE && env.TAURI_BUNDLE_WINDOWS_CERTIFICATE_PASSWORD);
+    if (!hasThumbprint && !hasPfx) {
+      console.error(
+        'Signing requested (--sign) but missing Windows signing env vars. Set TAURI_BUNDLE_WINDOWS_CERTIFICATE_THUMBPRINT or TAURI_BUNDLE_WINDOWS_CERTIFICATE + TAURI_BUNDLE_WINDOWS_CERTIFICATE_PASSWORD.'
+      );
+      process.exit(1);
+    }
   }
 }
 
