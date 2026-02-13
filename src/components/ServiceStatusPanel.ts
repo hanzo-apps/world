@@ -1,6 +1,11 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { isDesktopRuntime } from '@/services/runtime';
+import {
+  getDesktopReadinessChecks,
+  getKeyBackedAvailabilitySummary,
+  getNonParityFeatures,
+} from '@/services/desktop-readiness';
 
 interface ServiceStatus {
   id: string;
@@ -122,12 +127,14 @@ export class ServiceStatusPanel extends Panel {
     const issues = filtered.filter(s => s.status !== 'operational');
 
     const backendHtml = this.renderBackendStatus();
+    const readinessHtml = this.renderDesktopReadiness();
     const summaryHtml = this.renderSummary(filtered);
     const filtersHtml = this.renderFilters();
     const servicesHtml = this.renderServices(filtered);
 
     this.content.innerHTML = `
       ${backendHtml}
+      ${readinessHtml}
       ${summaryHtml}
       ${filtersHtml}
       <div class="service-status-list">
@@ -180,6 +187,30 @@ export class ServiceStatusPanel extends Panel {
           <span class="summary-count">${outage}</span>
           <span class="summary-label">Outage</span>
         </div>
+      </div>
+    `;
+  }
+
+  private renderDesktopReadiness(): string {
+    if (!isDesktopRuntime()) return '';
+
+    const checks = getDesktopReadinessChecks(Boolean(this.localBackend?.enabled));
+    const keySummary = getKeyBackedAvailabilitySummary();
+    const nonParity = getNonParityFeatures();
+
+    return `
+      <div class="service-status-desktop-readiness">
+        <div class="service-status-desktop-title">Desktop readiness</div>
+        <div class="service-status-desktop-subtitle">Acceptance checks: ${checks.filter(check => check.ready).length}/${checks.length} ready · key-backed features ${keySummary.available}/${keySummary.total}</div>
+        <ul class="service-status-desktop-list">
+          ${checks.map(check => `<li>${check.ready ? '✅' : '⚠️'} ${escapeHtml(check.label)}</li>`).join('')}
+        </ul>
+        <details class="service-status-non-parity">
+          <summary>Non-parity fallbacks (${nonParity.length})</summary>
+          <ul>
+            ${nonParity.map(feature => `<li><strong>${escapeHtml(feature.panel)}</strong>: ${escapeHtml(feature.fallback)}</li>`).join('')}
+          </ul>
+        </details>
       </div>
     `;
   }
