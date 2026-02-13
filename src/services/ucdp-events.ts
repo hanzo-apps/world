@@ -9,19 +9,29 @@ interface UcdpEventsResponse {
 }
 
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const UCDP_BASE_URL = wsRelayUrl
+const RAILWAY_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ucdp-events'
-  : '/api/ucdp-events';
+  : '';
+const VERCEL_URL = '/api/ucdp-events';
 
 const breaker = createCircuitBreaker<UcdpEventsResponse>({ name: 'UCDP Events' });
 
+async function fetchFromUrl(url: string): Promise<UcdpEventsResponse> {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
 export async function fetchUcdpEvents(): Promise<UcdpEventsResponse> {
   return breaker.execute(async () => {
-    const response = await fetch(UCDP_BASE_URL, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
+    if (RAILWAY_URL) {
+      try {
+        return await fetchFromUrl(RAILWAY_URL);
+      } catch {
+        // Railway unavailable or route not deployed yet — fall back to Vercel
+      }
+    }
+    return fetchFromUrl(VERCEL_URL);
   }, { success: false, count: 0, data: [], cached_at: '' });
 }
 
