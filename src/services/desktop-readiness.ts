@@ -7,6 +7,7 @@ export interface DesktopParityFeature {
   panel: string;
   serviceFiles: string[];
   apiRoutes: string[];
+  apiHandlers: string[];
   locality: LocalityClass;
   fallback: string;
   priority: 1 | 2 | 3;
@@ -26,14 +27,17 @@ const keyBackedFeatures: RuntimeFeatureId[] = [
   'acledConflicts',
   'aisRelay',
   'openskyRelay',
+  'wingbitsEnrichment',
+  'energyEia',
 ];
 
 export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
   {
     id: 'live-news',
     panel: 'LiveNewsPanel',
-    serviceFiles: ['src/components/LiveNewsPanel.ts'],
+    serviceFiles: ['src/services/live-news.ts'],
     apiRoutes: ['/api/youtube/live'],
+    apiHandlers: ['api/youtube/live.js'],
     locality: 'fully-local',
     fallback: 'Channel fallback video IDs are used when live detection fails.',
     priority: 1,
@@ -41,8 +45,9 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
   {
     id: 'monitor',
     panel: 'MonitorPanel',
-    serviceFiles: ['src/components/MonitorPanel.ts'],
+    serviceFiles: [],
     apiRoutes: [],
+    apiHandlers: [],
     locality: 'fully-local',
     fallback: 'Keyword monitoring runs fully client-side on loaded news corpus.',
     priority: 1,
@@ -50,8 +55,9 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
   {
     id: 'strategic-risk',
     panel: 'StrategicRiskPanel',
-    serviceFiles: ['src/components/StrategicRiskPanel.ts', 'src/services/cached-risk-scores.ts'],
+    serviceFiles: ['src/services/cached-risk-scores.ts'],
     apiRoutes: ['/api/risk-scores'],
+    apiHandlers: ['api/risk-scores.js'],
     locality: 'api-key',
     fallback: 'Panel stays available with local aggregate scoring when cached backend scores are unavailable.',
     priority: 1,
@@ -61,6 +67,7 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
     panel: 'Map layers (conflicts/outages/ais/flights)',
     serviceFiles: ['src/services/conflicts.ts', 'src/services/outages.ts', 'src/services/ais.ts', 'src/services/military-flights.ts'],
     apiRoutes: ['/api/acled-conflict', '/api/cloudflare-outages', '/api/ais-snapshot', '/api/opensky'],
+    apiHandlers: ['api/acled-conflict.js', 'api/cloudflare-outages.js', 'api/ais-snapshot.js', 'api/opensky.js'],
     locality: 'api-key',
     fallback: 'Unavailable feeds are disabled while map rendering remains active for local/static layers.',
     priority: 1,
@@ -70,6 +77,7 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
     panel: 'Summaries',
     serviceFiles: ['src/services/summarization.ts'],
     apiRoutes: ['/api/groq-summarize', '/api/openrouter-summarize'],
+    apiHandlers: ['api/groq-summarize.js', 'api/openrouter-summarize.js'],
     locality: 'api-key',
     fallback: 'Browser summarizer executes when hosted LLM providers are unavailable.',
     priority: 2,
@@ -79,6 +87,7 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
     panel: 'MarketPanel',
     serviceFiles: ['src/services/markets.ts', 'src/services/polymarket.ts'],
     apiRoutes: ['/api/coingecko', '/api/polymarket', '/api/finnhub', '/api/yahoo-finance'],
+    apiHandlers: ['api/coingecko.js', 'api/polymarket.js', 'api/finnhub.js', 'api/yahoo-finance.js'],
     locality: 'fully-local',
     fallback: 'Multi-source market fetchers degrade to remaining providers and cached values.',
     priority: 2,
@@ -88,6 +97,7 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
     panel: 'Map layers (flight enrichment)',
     serviceFiles: ['src/services/wingbits.ts'],
     apiRoutes: ['/api/wingbits'],
+    apiHandlers: ['api/wingbits/[[...path]].js'],
     locality: 'api-key',
     fallback: 'Flight tracks continue with heuristic classification when Wingbits credentials are unavailable.',
     priority: 3,
@@ -97,6 +107,7 @@ export const DESKTOP_PARITY_FEATURES: DesktopParityFeature[] = [
     panel: 'Map layers (military flights relay)',
     serviceFiles: ['src/services/military-flights.ts'],
     apiRoutes: ['/api/opensky'],
+    apiHandlers: ['api/opensky.js'],
     locality: 'cloud-fallback',
     fallback: 'If relay is unreachable, service falls back to Vercel proxy path and then no-data mode.',
     priority: 3,
