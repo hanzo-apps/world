@@ -472,10 +472,12 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 git clone https://github.com/koala73/worldmonitor.git
 cd worldmonitor
 npm install
-npm run dev
+vercel dev       # Runs frontend + all 45+ API edge functions
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Open [http://localhost:3000](http://localhost:3000)
+
+> **Note**: `vercel dev` requires the [Vercel CLI](https://vercel.com/docs/cli) (`npm i -g vercel`). If you use `npm run dev` instead, only the frontend starts — news feeds and API-dependent panels won't load. See [Self-Hosting](#self-hosting) for details.
 
 ### Environment Variables (Optional)
 
@@ -498,6 +500,66 @@ The `.env.example` file documents every variable with descriptions and registrat
 | **UI** | `VITE_VARIANT`, `VITE_MAP_INTERACTION_MODE` (`flat` or `3d`, default `3d`) | N/A |
 
 See [`.env.example`](./.env.example) for the complete list with registration links.
+
+---
+
+## Self-Hosting
+
+World Monitor relies on **45+ Vercel Edge Functions** in the `api/` directory for RSS proxying, data caching, and API key isolation. Running `npm run dev` alone starts only the Vite frontend — the edge functions won't execute, and most panels (news feeds, markets, AI summaries) will be empty.
+
+### Option 1: Deploy to Vercel (Recommended)
+
+The simplest path — Vercel runs the edge functions natively on their free tier:
+
+```bash
+npm install -g vercel
+vercel          # Follow prompts to link/create project
+```
+
+Add your API keys in the Vercel dashboard under **Settings → Environment Variables**, then visit your deployment URL. The free Hobby plan supports all 45+ edge functions.
+
+### Option 2: Local Development with Vercel CLI
+
+To run everything locally (frontend + edge functions):
+
+```bash
+npm install -g vercel
+cp .env.example .env.local   # Add your API keys
+vercel dev                    # Starts on http://localhost:3000
+```
+
+> **Important**: Use `vercel dev` instead of `npm run dev`. The Vercel CLI emulates the edge runtime locally so all `api/` endpoints work. Plain `npm run dev` only starts Vite and the API layer won't be available.
+
+### Option 3: Static Frontend Only
+
+If you only want the map and client-side features (no news feeds, no AI, no market data):
+
+```bash
+npm run dev    # Vite dev server on http://localhost:5173
+```
+
+This runs the frontend without the API layer. Panels that require server-side proxying will show "No data available". The interactive map, static data layers (bases, cables, pipelines), and browser-side ML models still work.
+
+### Platform Notes
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Vercel** | Full support | Recommended deployment target |
+| **Linux x86_64** | Works with `vercel dev` | Full local development |
+| **macOS** | Works with `vercel dev` | Full local development |
+| **Raspberry Pi / ARM** | Partial | `vercel dev` edge runtime emulation may not work on ARM. Use Option 1 (deploy to Vercel) or Option 3 (static frontend) instead |
+| **Docker** | Planned | See [Roadmap](#roadmap) |
+
+### Railway Relay (Optional)
+
+For live AIS vessel tracking and OpenSky aircraft data, deploy the WebSocket relay on Railway:
+
+```bash
+# On Railway, deploy with:
+node scripts/ais-relay.cjs
+```
+
+Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WSS) in your environment. Without the relay, AIS and OpenSky layers won't show live data, but all other features work normally.
 
 ---
 
