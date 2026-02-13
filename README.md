@@ -155,6 +155,19 @@ Both variants run from a single codebase — switch between them with one click.
 
 ---
 
+## Regression Testing
+
+Map overlay behavior is validated in Playwright using the map harness (`/map-harness.html`).
+
+- Cluster-state cache initialization guard:
+  - `updates protest marker click payload after data refresh`
+  - `initializes cluster movement cache on first protest cluster render`
+- Run by variant:
+  - `npm run test:e2e:full -- -g "updates protest marker click payload after data refresh|initializes cluster movement cache on first protest cluster render"`
+  - `npm run test:e2e:tech -- -g "updates protest marker click payload after data refresh|initializes cluster movement cache on first protest cluster render"`
+
+---
+
 ## How It Works
 
 ### Threat Classification Pipeline
