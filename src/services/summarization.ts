@@ -6,6 +6,7 @@
 
 import { mlWorker } from './ml-worker';
 import { SITE_VARIANT } from '@/config';
+import { isFeatureAvailable } from './runtime-config';
 
 export type SummarizationProvider = 'groq' | 'openrouter' | 'browser' | 'cache';
 
@@ -18,6 +19,7 @@ export interface SummarizationResult {
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
 async function tryGroq(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
+  if (!isFeatureAvailable('aiGroq')) return null;
   try {
     const response = await fetch('/api/groq-summarize', {
       method: 'POST',
@@ -46,6 +48,7 @@ async function tryGroq(headlines: string[], geoContext?: string): Promise<Summar
 }
 
 async function tryOpenRouter(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
+  if (!isFeatureAvailable('aiOpenRouter')) return null;
   try {
     const response = await fetch('/api/openrouter-summarize', {
       method: 'POST',

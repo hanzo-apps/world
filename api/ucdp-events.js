@@ -69,14 +69,20 @@ function buildVersionCandidates() {
 }
 
 async function fetchGedPage(version, page) {
-  const response = await fetch(
-    `https://ucdpapi.pcr.uu.se/api/gedevents/${version}?pagesize=${UCDP_PAGE_SIZE}&page=${page}`,
-    { headers: { Accept: 'application/json' } }
-  );
-  if (!response.ok) {
-    throw new Error(`UCDP GED API error (${version}, page ${page}): ${response.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(
+      `https://ucdpapi.pcr.uu.se/api/gedevents/${version}?pagesize=${UCDP_PAGE_SIZE}&page=${page}`,
+      { headers: { Accept: 'application/json' }, signal: controller.signal }
+    );
+    if (!response.ok) {
+      throw new Error(`UCDP GED API error (${version}, page ${page}): ${response.status}`);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json();
 }
 
 async function discoverGedVersion() {
