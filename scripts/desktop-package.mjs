@@ -36,7 +36,7 @@ if (!validVariants.has(variant)) {
 
 const bundles = os === 'macos' ? 'app,dmg' : 'nsis,msi';
 const env = { ...process.env, VITE_VARIANT: variant };
-const cliArgs = ['@tauri-apps/cli', 'build', '--bundles', bundles];
+const cliArgs = ['build', '--bundles', bundles];
 
 if (variant === 'tech') {
   cliArgs.push('--config', 'src-tauri/tauri.tech.conf.json');
@@ -68,7 +68,7 @@ if (sign) {
 
 console.log(`[desktop-package] OS=${os} VARIANT=${variant} BUNDLES=${bundles} SIGN=${sign ? 'on' : 'off'}`);
 
-const result = spawnSync('npx', cliArgs, {
+const result = spawnSync('tauri', cliArgs, {
   env,
   stdio: 'inherit',
   shell: process.platform === 'win32'
