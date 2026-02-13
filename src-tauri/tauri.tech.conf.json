@@ -18,6 +18,13 @@
       "dmg",
       "nsis",
       "msi"
-    ]
+    ],
+    "macOS": {
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "https://timestamp.digicert.com"
+    }
   }
 }
