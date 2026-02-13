@@ -1,4 +1,5 @@
 import { isDesktopRuntime } from './runtime';
+import { invokeTauri } from './tauri-bridge';
 
 type CacheEnvelope<T> = {
   key: string;
@@ -7,13 +8,6 @@ type CacheEnvelope<T> = {
 };
 
 const CACHE_PREFIX = 'worldmonitor-persistent-cache:';
-
-async function invokeTauri<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
-  const tauriWindow = window as unknown as { __TAURI__?: { core?: { invoke?: <U>(cmd: string, args?: Record<string, unknown>) => Promise<U> } } };
-  const invoke = tauriWindow.__TAURI__?.core?.invoke;
-  if (!invoke) throw new Error('Tauri invoke bridge unavailable');
-  return invoke<T>(command, payload);
-}
 
 export async function getPersistentCache<T>(key: string): Promise<CacheEnvelope<T> | null> {
   if (isDesktopRuntime()) {

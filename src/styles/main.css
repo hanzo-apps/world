@@ -138,6 +138,11 @@ body.animations-paused *::after {
   pointer-events: none;
 }
 
+.variant-option.desktop-locked {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .variant-option.active .variant-icon {
   filter: grayscale(0%) drop-shadow(0 0 4px var(--green));
 }
@@ -11463,6 +11468,53 @@ body.has-critical-banner .panels-grid {
   font-size: 11px;
   color: rgba(255,255,255,0.7);
   margin-bottom: 10px;
+}
+
+.runtime-alert {
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.runtime-alert h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+
+.runtime-alert p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.78);
+}
+
+.runtime-alert.runtime-alert-warn {
+  border-color: rgba(255, 210, 124, 0.45);
+}
+
+.runtime-alert.runtime-alert-ok {
+  border-color: rgba(125, 227, 157, 0.45);
+}
+
+.runtime-alert-missing {
+  color: #ffd27c;
+  font-size: 12px;
+}
+
+.runtime-open-settings-btn {
+  border: 1px solid rgba(125, 227, 157, 0.45);
+  background: rgba(125, 227, 157, 0.08);
+  color: #d9ffe6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.runtime-open-settings-btn:hover {
+  background: rgba(125, 227, 157, 0.16);
 }
 
 .runtime-config-list {

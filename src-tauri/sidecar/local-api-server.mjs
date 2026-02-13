@@ -5,12 +5,6 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const port = Number(process.env.LOCAL_API_PORT || 46123);
-const remoteBase = (process.env.LOCAL_API_REMOTE_BASE || 'https://worldmonitor.app').replace(/\/$/, '');
-const resourceDir = process.env.LOCAL_API_RESOURCE_DIR || process.cwd();
-const apiDir = path.join(resourceDir, 'api');
-const mode = process.env.LOCAL_API_MODE || 'desktop-sidecar';
-
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -85,6 +79,8 @@ function matchRoute(routePath, pathname) {
 }
 
 async function buildRouteTable(root) {
+  if (!existsSync(root)) return [];
+
   const files = [];
 
   async function walk(dir) {
@@ -116,10 +112,15 @@ async function readBody(req) {
   return chunks.length ? Buffer.concat(chunks) : undefined;
 }
 
-function toHeaders(nodeHeaders) {
+function toHeaders(nodeHeaders, options = {}) {
+  const stripOrigin = options.stripOrigin === true;
   const headers = new Headers();
   Object.entries(nodeHeaders).forEach(([key, value]) => {
-    if (key.toLowerCase() === 'host') return;
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'host') return;
+    if (stripOrigin && (lowerKey === 'origin' || lowerKey === 'referer' || lowerKey.startsWith('sec-fetch-'))) {
+      return;
+    }
     if (Array.isArray(value)) {
       value.forEach(v => headers.append(key, v));
     } else if (typeof value === 'string') {
@@ -129,25 +130,13 @@ function toHeaders(nodeHeaders) {
   return headers;
 }
 
-async function handleServiceStatus() {
-  return json({
-    success: true,
-    timestamp: new Date().toISOString(),
-    summary: { operational: 2, degraded: 0, outage: 0, unknown: 0 },
-    services: [
-      { id: 'local-api', name: 'Local Desktop API', category: 'dev', status: 'operational', description: `Running on 127.0.0.1:${port}` },
-      { id: 'cloud-pass-through', name: 'Cloud pass-through', category: 'cloud', status: 'operational', description: `Fallback target ${remoteBase}` },
-    ],
-    local: { enabled: true, mode, port, remoteBase },
-  });
-}
-
-async function proxyToCloud(requestUrl, req) {
+async function proxyToCloud(requestUrl, req, remoteBase) {
   const target = `${remoteBase}${requestUrl.pathname}${requestUrl.search}`;
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
   return fetch(target, {
     method: req.method,
-    headers: toHeaders(req.headers),
+    // Strip browser-origin headers for server-to-server parity.
+    headers: toHeaders(req.headers, { stripOrigin: true }),
     body,
   });
 }
@@ -176,69 +165,184 @@ async function importHandler(modulePath) {
   return mod;
 }
 
-async function dispatch(requestUrl, req, routes) {
+function resolveConfig(options = {}) {
+  const port = Number(options.port ?? process.env.LOCAL_API_PORT ?? 46123);
+  const remoteBase = String(options.remoteBase ?? process.env.LOCAL_API_REMOTE_BASE ?? 'https://worldmonitor.app').replace(/\/$/, '');
+  const resourceDir = String(options.resourceDir ?? process.env.LOCAL_API_RESOURCE_DIR ?? process.cwd());
+  const apiDir = options.apiDir
+    ? String(options.apiDir)
+    : [
+      path.join(resourceDir, 'api'),
+      path.join(resourceDir, '_up_', 'api'),
+    ].find((candidate) => existsSync(candidate)) ?? path.join(resourceDir, 'api');
+  const mode = String(options.mode ?? process.env.LOCAL_API_MODE ?? 'desktop-sidecar');
+  const logger = options.logger ?? console;
+
+  return {
+    port,
+    remoteBase,
+    resourceDir,
+    apiDir,
+    mode,
+    logger,
+  };
+}
+
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  return pathToFileURL(process.argv[1]).href === import.meta.url;
+}
+
+async function handleLocalServiceStatus(context) {
+  return json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    summary: { operational: 2, degraded: 0, outage: 0, unknown: 0 },
+    services: [
+      { id: 'local-api', name: 'Local Desktop API', category: 'dev', status: 'operational', description: `Running on 127.0.0.1:${context.port}` },
+      { id: 'cloud-pass-through', name: 'Cloud pass-through', category: 'cloud', status: 'operational', description: `Fallback target ${context.remoteBase}` },
+    ],
+    local: { enabled: true, mode: context.mode, port: context.port, remoteBase: context.remoteBase },
+  });
+}
+
+async function tryCloudFallback(requestUrl, req, context, reason) {
+  if (reason) {
+    context.logger.warn('[local-api] local route fallback to cloud', requestUrl.pathname, reason);
+  }
+  try {
+    return await proxyToCloud(requestUrl, req, context.remoteBase);
+  } catch (error) {
+    context.logger.error('[local-api] cloud fallback failed', requestUrl.pathname, error);
+    return null;
+  }
+}
+
+async function dispatch(requestUrl, req, routes, context) {
   if (requestUrl.pathname === '/api/service-status') {
-    return handleServiceStatus();
+    return handleLocalServiceStatus(context);
   }
   if (requestUrl.pathname === '/api/local-status') {
-    return json({ success: true, mode, port, apiDir, remoteBase, routes: routes.length });
+    return json({
+      success: true,
+      mode: context.mode,
+      port: context.port,
+      apiDir: context.apiDir,
+      remoteBase: context.remoteBase,
+      routes: routes.length,
+    });
   }
 
   const modulePath = pickModule(requestUrl.pathname, routes);
   if (!modulePath || !existsSync(modulePath)) {
-    return proxyToCloud(requestUrl, req);
+    const cloudResponse = await tryCloudFallback(requestUrl, req, context, 'handler missing');
+    if (cloudResponse) return cloudResponse;
+    return json({ error: 'Local handler missing and cloud fallback unavailable' }, 502);
   }
 
   try {
     const mod = await importHandler(modulePath);
     if (typeof mod.default !== 'function') {
+      const cloudResponse = await tryCloudFallback(requestUrl, req, context, `invalid handler module ${path.basename(modulePath)}`);
+      if (cloudResponse) return cloudResponse;
       return json({ error: `Invalid handler module: ${path.basename(modulePath)}` }, 500);
     }
 
     const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
     const request = new Request(requestUrl.toString(), {
       method: req.method,
-      headers: toHeaders(req.headers),
+      // Local handler execution does not need browser-origin metadata.
+      headers: toHeaders(req.headers, { stripOrigin: true }),
       body,
     });
 
     const response = await mod.default(request);
     if (!(response instanceof Response)) {
+      const cloudResponse = await tryCloudFallback(requestUrl, req, context, 'handler returned non-Response');
+      if (cloudResponse) return cloudResponse;
       return json({ error: `Handler returned invalid response for ${requestUrl.pathname}` }, 500);
     }
+
+    // Local handlers can return 4xx/5xx when desktop keys are missing.
+    // Prefer cloud parity response when available.
+    if (!response.ok) {
+      const cloudResponse = await tryCloudFallback(requestUrl, req, context, `local status ${response.status}`);
+      if (cloudResponse) return cloudResponse;
+    }
+
     return response;
   } catch (error) {
-    console.error('[local-api] local handler failed, trying cloud fallback', requestUrl.pathname, error);
-    try {
-      return await proxyToCloud(requestUrl, req);
-    } catch {
-      return json({ error: 'Local handler failed and cloud fallback unavailable' }, 502);
-    }
+    const cloudResponse = await tryCloudFallback(requestUrl, req, context, error);
+    if (cloudResponse) return cloudResponse;
+    return json({ error: 'Local handler failed and cloud fallback unavailable' }, 502);
   }
 }
 
-const routes = await buildRouteTable(apiDir);
+export async function createLocalApiServer(options = {}) {
+  const context = resolveConfig(options);
+  const routes = await buildRouteTable(context.apiDir);
 
-createServer(async (req, res) => {
-  const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${port}`);
+  const server = createServer(async (req, res) => {
+    const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${context.port}`);
 
-  if (!requestUrl.pathname.startsWith('/api/')) {
-    res.writeHead(404, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not found' }));
-    return;
-  }
+    if (!requestUrl.pathname.startsWith('/api/')) {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+      return;
+    }
 
+    try {
+      const response = await dispatch(requestUrl, req, routes, context);
+      const body = Buffer.from(await response.arrayBuffer());
+      const headers = Object.fromEntries(response.headers.entries());
+      res.writeHead(response.status, headers);
+      res.end(body);
+    } catch (error) {
+      context.logger.error('[local-api] fatal', error);
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  });
+
+  return {
+    context,
+    routes,
+    server,
+    async start() {
+      await new Promise((resolve, reject) => {
+        const onListening = () => {
+          server.off('error', onError);
+          resolve();
+        };
+        const onError = (error) => {
+          server.off('listening', onListening);
+          reject(error);
+        };
+
+        server.once('listening', onListening);
+        server.once('error', onError);
+        server.listen(context.port, '127.0.0.1');
+      });
+
+      const address = server.address();
+      const boundPort = typeof address === 'object' && address?.port ? address.port : context.port;
+      context.logger.log(`[local-api] listening on http://127.0.0.1:${boundPort} (apiDir=${context.apiDir}, routes=${routes.length})`);
+      return { port: boundPort };
+    },
+    async close() {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    },
+  };
+}
+
+if (isMainModule()) {
   try {
-    const response = await dispatch(requestUrl, req, routes);
-    const body = Buffer.from(await response.arrayBuffer());
-    const headers = Object.fromEntries(response.headers.entries());
-    res.writeHead(response.status, headers);
-    res.end(body);
+    const app = await createLocalApiServer();
+    await app.start();
   } catch (error) {
-    console.error('[local-api] fatal', error);
-    res.writeHead(500, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error('[local-api] startup failed', error);
+    process.exit(1);
   }
-}).listen(port, '127.0.0.1', () => {
-  console.log(`[local-api] listening on http://127.0.0.1:${port} (apiDir=${apiDir}, routes=${routes.length})`);
-});
+}

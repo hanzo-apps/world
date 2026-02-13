@@ -25,6 +25,7 @@ interface StablecoinResult {
     healthStatus: string;
   };
   stablecoins: StablecoinData[];
+  unavailable?: boolean;
 }
 
 function formatLargeNum(v: number): string {
@@ -91,6 +92,11 @@ export class StablecoinPanel extends Panel {
     }
 
     const d = this.data;
+    if (!d.stablecoins.length) {
+      this.setContent('<div class="panel-loading-text">Stablecoin data temporarily unavailable</div>');
+      return;
+    }
+
     const s = d.summary;
 
     const pegRows = d.stablecoins.map(c => `
