@@ -5,6 +5,7 @@
  */
 
 import { dataFreshness } from './data-freshness';
+import { isFeatureAvailable } from './runtime-config';
 
 export interface OilDataPoint {
   date: string;
@@ -49,6 +50,7 @@ const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
  * Check if EIA API is configured
  */
 export async function checkEiaStatus(): Promise<boolean> {
+  if (!isFeatureAvailable('energyEia')) return false;
   try {
     const response = await fetch(`${EIA_PROXY_URL}/health`);
     const data = await response.json();
@@ -62,6 +64,9 @@ export async function checkEiaStatus(): Promise<boolean> {
  * Fetch oil analytics data
  */
 export async function fetchOilAnalytics(): Promise<OilAnalytics> {
+  if (!isFeatureAvailable('energyEia')) {
+    return { wtiPrice: null, brentPrice: null, usProduction: null, usInventory: null, fetchedAt: new Date() };
+  }
   // Return cached data if fresh
   if (cachedData && Date.now() - cacheTimestamp < CACHE_TTL) {
     return cachedData;

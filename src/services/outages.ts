@@ -1,5 +1,6 @@
 import type { InternetOutage } from '@/types';
 import { createCircuitBreaker } from '@/utils';
+import { isFeatureAvailable } from './runtime-config';
 
 const CLOUDFLARE_API_URL = '/api/cloudflare-outages';
 const breaker = createCircuitBreaker<InternetOutage[]>({ name: 'Cloudflare Outages' });
@@ -192,6 +193,11 @@ export function isOutagesConfigured(): boolean | null {
 }
 
 export async function fetchInternetOutages(): Promise<InternetOutage[]> {
+  if (!isFeatureAvailable('internetOutages')) {
+    outagesConfigured = false;
+    return [];
+  }
+
   return breaker.execute(async () => {
     const response = await fetch(`${CLOUDFLARE_API_URL}?dateRange=7d&limit=50`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
