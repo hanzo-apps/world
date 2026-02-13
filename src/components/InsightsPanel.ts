@@ -76,12 +76,13 @@ export class InsightsPanel extends Panel {
   }
 
 
-  private async loadBriefFromCache(): Promise<void> {
-    if (this.cachedBrief) return;
+  private async loadBriefFromCache(): Promise<boolean> {
+    if (this.cachedBrief) return false;
     const entry = await getPersistentCache<{ summary: string }>(InsightsPanel.BRIEF_CACHE_KEY);
-    if (!entry?.data?.summary) return;
+    if (!entry?.data?.summary) return false;
     this.cachedBrief = entry.data.summary;
     this.lastBriefUpdate = entry.updatedAt;
+    return true;
   }
   // High-priority military/conflict keywords (huge boost)
   private static readonly MILITARY_KEYWORDS = [
@@ -336,11 +337,11 @@ export class InsightsPanel extends Panel {
       }
 
       // Step 3: Generate World Brief (with cooldown)
-      await this.loadBriefFromCache();
+      const loadedFromPersistentCache = await this.loadBriefFromCache();
       let worldBrief = this.cachedBrief;
       const now = Date.now();
 
-      let usedCachedBrief = false;
+      let usedCachedBrief = loadedFromPersistentCache;
       if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
         this.setProgress(3, totalSteps, 'Generating world brief...');
 
@@ -359,6 +360,7 @@ export class InsightsPanel extends Panel {
           worldBrief = result.summary;
           this.cachedBrief = worldBrief;
           this.lastBriefUpdate = now;
+          usedCachedBrief = false;
           void setPersistentCache(InsightsPanel.BRIEF_CACHE_KEY, { summary: worldBrief });
           console.log(`[InsightsPanel] Brief generated${result.cached ? ' (cached)' : ''}${geoContext ? ' (with geo context)' : ''}`);
         }
