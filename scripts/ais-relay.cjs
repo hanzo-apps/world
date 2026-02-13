@@ -522,6 +522,12 @@ async function handleUcdpEventsRequest(req, res) {
   }
 }
 
+// ── Response caches (eliminates ~1.2TB/day OpenSky + ~30GB/day RSS egress) ──
+const openskyResponseCache = new Map(); // key: sorted query params → { data, timestamp }
+const OPENSKY_CACHE_TTL_MS = 30 * 1000; // 30s — OpenSky updates every ~10s but 58 clients hammer it
+const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp }
+const RSS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — RSS feeds rarely update faster
+
 // OpenSky OAuth2 token cache
 let openskyToken = null;
 let openskyTokenExpiry = 0;
@@ -603,6 +609,22 @@ async function handleOpenSkyRequest(req, res, PORT) {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     const params = url.searchParams;
 
+    // Build cache key from sorted bounding box params
+    const cacheKey = ['lamin', 'lomin', 'lamax', 'lomax']
+      .map(k => params.get(k) || '')
+      .join(',');
+
+    // Serve from cache if fresh (30s TTL)
+    const cached = openskyResponseCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < OPENSKY_CACHE_TTL_MS) {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=30',
+        'X-Cache': 'HIT',
+      });
+      return res.end(cached.data);
+    }
+
     const token = await getOpenSkyToken();
     if (!token) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
@@ -619,7 +641,7 @@ async function handleOpenSkyRequest(req, res, PORT) {
       openskyUrl += '?' + queryParams.join('&');
     }
 
-    console.log('[Relay] OpenSky request:', openskyUrl);
+    console.log('[Relay] OpenSky request (MISS):', openskyUrl);
 
     const https = require('https');
     const request = https.get(openskyUrl, {
@@ -633,15 +655,18 @@ async function handleOpenSkyRequest(req, res, PORT) {
       let data = '';
       response.on('data', chunk => data += chunk);
       response.on('end', () => {
-        // If 401, invalidate token cache
         if (response.statusCode === 401) {
-          console.log('[Relay] OpenSky 401, invalidating token cache');
           openskyToken = null;
           openskyTokenExpiry = 0;
         }
+        // Cache successful responses
+        if (response.statusCode === 200) {
+          openskyResponseCache.set(cacheKey, { data, timestamp: Date.now() });
+        }
         res.writeHead(response.statusCode, {
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=30'
+          'Cache-Control': 'public, max-age=30',
+          'X-Cache': 'MISS',
         });
         res.end(data);
       });
@@ -649,12 +674,21 @@ async function handleOpenSkyRequest(req, res, PORT) {
 
     request.on('error', (err) => {
       console.error('[Relay] OpenSky error:', err.message);
+      // Serve stale cache on error
+      if (cached) {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' });
+        return res.end(cached.data);
+      }
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
     });
 
     request.on('timeout', () => {
       request.destroy();
+      if (cached) {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' });
+        return res.end(cached.data);
+      }
       res.writeHead(504, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Request timeout', time: Date.now(), states: null }));
     });
@@ -664,7 +698,17 @@ async function handleOpenSkyRequest(req, res, PORT) {
   }
 }
 
-// HTTP server for health checks and OpenSky proxy
+// Periodic cache cleanup to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of openskyResponseCache) {
+    if (now - entry.timestamp > OPENSKY_CACHE_TTL_MS * 2) openskyResponseCache.delete(key);
+  }
+  for (const [key, entry] of rssResponseCache) {
+    if (now - entry.timestamp > RSS_CACHE_TTL_MS * 2) rssResponseCache.delete(key);
+  }
+}, 60 * 1000);
+
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -685,6 +729,11 @@ const server = http.createServer(async (req, res) => {
       connected: upstreamSocket?.readyState === WebSocket.OPEN,
       vessels: vessels.size,
       densityZones: Array.from(densityGrid.values()).filter(c => c.vessels.size >= 2).length,
+      cache: {
+        opensky: openskyResponseCache.size,
+        rss: rssResponseCache.size,
+        ucdp: ucdpCache.data ? 'warm' : 'cold',
+      },
     }));
   } else if (req.url.startsWith('/ais/snapshot')) {
     // Aggregated AIS snapshot for server-side fanout
@@ -741,12 +790,22 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
       }
 
-      console.log('[Relay] RSS request:', feedUrl);
+      // Serve from cache if fresh (5 min TTL)
+      const rssCached = rssResponseCache.get(feedUrl);
+      if (rssCached && Date.now() - rssCached.timestamp < RSS_CACHE_TTL_MS) {
+        res.writeHead(200, {
+          'Content-Type': rssCached.contentType || 'application/xml',
+          'Cache-Control': 'public, max-age=300',
+          'X-Cache': 'HIT',
+        });
+        return res.end(rssCached.data);
+      }
+
+      console.log('[Relay] RSS request (MISS):', feedUrl);
 
       const https = require('https');
       const http = require('http');
 
-      // Helper to fetch with redirect following (max 3 redirects)
       let responseHandled = false;
 
       const sendError = (statusCode, message) => {
@@ -770,7 +829,6 @@ const server = http.createServer(async (req, res) => {
           },
           timeout: 15000
         }, (response) => {
-          // Handle redirects
           if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
             const redirectUrl = response.headers.location.startsWith('http')
               ? response.headers.location
@@ -779,7 +837,6 @@ const server = http.createServer(async (req, res) => {
             return fetchWithRedirects(redirectUrl, redirectCount + 1);
           }
 
-          // Handle gzip/deflate compressed responses from upstream
           const encoding = response.headers['content-encoding'];
           let stream = response;
           if (encoding === 'gzip' || encoding === 'deflate') {
@@ -793,9 +850,14 @@ const server = http.createServer(async (req, res) => {
             if (responseHandled || res.headersSent) return;
             responseHandled = true;
             const data = Buffer.concat(chunks);
+            // Cache successful responses
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+              rssResponseCache.set(feedUrl, { data, contentType: 'application/xml', timestamp: Date.now() });
+            }
             res.writeHead(response.statusCode, {
               'Content-Type': 'application/xml',
-              'Cache-Control': 'public, max-age=300'
+              'Cache-Control': 'public, max-age=300',
+              'X-Cache': 'MISS',
             });
             res.end(data);
           });
@@ -807,11 +869,25 @@ const server = http.createServer(async (req, res) => {
 
         request.on('error', (err) => {
           console.error('[Relay] RSS error:', err.message);
+          // Serve stale on error
+          if (rssCached) {
+            if (!responseHandled && !res.headersSent) {
+              responseHandled = true;
+              res.writeHead(200, { 'Content-Type': 'application/xml', 'X-Cache': 'STALE' });
+              res.end(rssCached.data);
+            }
+            return;
+          }
           sendError(502, err.message);
         });
 
         request.on('timeout', () => {
           request.destroy();
+          if (rssCached && !responseHandled && !res.headersSent) {
+            responseHandled = true;
+            res.writeHead(200, { 'Content-Type': 'application/xml', 'X-Cache': 'STALE' });
+            return res.end(rssCached.data);
+          }
           sendError(504, 'Request timeout');
         });
       };
@@ -858,10 +934,10 @@ function connectUpstream() {
   });
 
   socket.on('message', (data) => {
-    if (upstreamSocket !== socket) return; // Stale socket
+    if (upstreamSocket !== socket) return;
     messageCount++;
     if (messageCount % 1000 === 0) {
-      console.log(`[Relay] ${messageCount} messages, ${clients.size} clients`);
+      console.log(`[Relay] ${messageCount} messages, ${clients.size} clients, cache: opensky=${openskyResponseCache.size} rss=${rssResponseCache.size}`);
     }
     const message = data.toString();
     try {
@@ -873,9 +949,13 @@ function connectUpstream() {
       // Ignore malformed upstream payloads
     }
 
-    for (const client of clients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+    // Throttled fanout: only forward every 10th message to WS clients
+    // The app uses HTTP snapshot polling, not WS — this is mostly for external consumers
+    if (clients.size > 0 && messageCount % 10 === 0) {
+      for (const client of clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
       }
     }
   });
