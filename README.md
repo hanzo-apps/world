@@ -629,7 +629,10 @@ npm run desktop:package:macos:tech     # .app + .dmg (Tech Monitor)
 npm run desktop:package:windows:full   # .exe + .msi (World Monitor)
 npm run desktop:package:windows:tech   # .exe + .msi (Tech Monitor)
 
-# Signed packaging (same commands, expects signing env vars to be set)
+# Generic packaging runner
+npm run desktop:package -- --os macos --variant full
+
+# Signed packaging (same targets, requires signing env vars)
 npm run desktop:package:macos:full:sign
 npm run desktop:package:windows:full:sign
 ```
