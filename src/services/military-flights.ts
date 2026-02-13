@@ -12,6 +12,7 @@ import {
   analyzeAircraftDetails,
   checkWingbitsStatus,
 } from './wingbits';
+import { isFeatureAvailable } from './runtime-config';
 
 // OpenSky Network API - use Railway relay (Vercel is blocked by OpenSky)
 // Convert WebSocket URL to HTTP URL for the same Railway server
@@ -495,6 +496,10 @@ export async function fetchMilitaryFlights(): Promise<{
   flights: MilitaryFlight[];
   clusters: MilitaryFlightCluster[];
 }> {
+  if (!isFeatureAvailable('openskyRelay')) {
+    return { flights: [], clusters: [] };
+  }
+
   return breaker.execute(async () => {
     // Check cache
     if (flightCache && Date.now() - flightCache.timestamp < CACHE_TTL) {
