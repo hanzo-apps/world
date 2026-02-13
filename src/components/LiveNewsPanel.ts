@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { fetchLiveVideoId } from '@/services/live-news';
 
 // YouTube IFrame Player API types
 type YouTubePlayer = {
@@ -66,34 +67,6 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
 ];
 
 const LIVE_CHANNELS = SITE_VARIANT === 'tech' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
-
-// Cache for live video IDs
-const liveVideoCache = new Map<string, { videoId: string | null; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-async function fetchLiveVideoId(channel: LiveChannel): Promise<string | null> {
-  // Skip auto-detection for channels that should use fallback only
-  if (channel.useFallbackOnly) {
-    return null;
-  }
-
-  const cached = liveVideoCache.get(channel.handle);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.videoId;
-  }
-
-  try {
-    const res = await fetch(`/api/youtube/live?channel=${encodeURIComponent(channel.handle)}`);
-    if (!res.ok) throw new Error('API error');
-    const data = await res.json();
-    const videoId = data.videoId || null;
-    liveVideoCache.set(channel.handle, { videoId, timestamp: Date.now() });
-    return videoId;
-  } catch (error) {
-    console.warn(`[LiveNews] Failed to fetch live ID for ${channel.name}:`, error);
-    return null;
-  }
-}
 
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
@@ -278,7 +251,7 @@ export class LiveNewsPanel extends Panel {
     });
 
     // Fetch live video ID dynamically
-    const liveVideoId = await fetchLiveVideoId(channel);
+    const liveVideoId = channel.useFallbackOnly ? null : await fetchLiveVideoId(channel.handle);
     channel.videoId = liveVideoId || channel.fallbackVideoId;
     channel.isLive = !!liveVideoId;
 
@@ -375,7 +348,7 @@ export class LiveNewsPanel extends Panel {
     if (this.player) return;
 
     // Fetch live video ID for initial channel
-    const liveVideoId = await fetchLiveVideoId(this.activeChannel);
+    const liveVideoId = this.activeChannel.useFallbackOnly ? null : await fetchLiveVideoId(this.activeChannel.handle);
     this.activeChannel.videoId = liveVideoId || this.activeChannel.fallbackVideoId;
     this.activeChannel.isLive = !!liveVideoId;
 
