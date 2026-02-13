@@ -1,15 +1,25 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::path::PathBuf;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::env;
 
 use keyring::Entry;
 use serde_json::{Map, Value};
-use tauri::{AppHandle, Manager, RunEvent};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 const LOCAL_API_PORT: &str = "46123";
 const KEYRING_SERVICE: &str = "world-monitor";
+const LOCAL_API_LOG_FILE: &str = "local-api.log";
+const DESKTOP_LOG_FILE: &str = "desktop.log";
+const MENU_FILE_SETTINGS_ID: &str = "file.settings";
+const MENU_DEBUG_OPEN_LOGS_ID: &str = "debug.open_logs";
+const MENU_DEBUG_OPEN_SIDECAR_LOG_ID: &str = "debug.open_sidecar_log";
 const SUPPORTED_SECRET_KEYS: [&str; 13] = [
     "GROQ_API_KEY",
     "OPENROUTER_API_KEY",
@@ -123,6 +133,180 @@ fn write_cache_entry(app: AppHandle, key: String, value: String) -> Result<(), S
         .map_err(|e| format!("Failed to write cache store {}: {e}", path.display()))
 }
 
+fn logs_dir_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to resolve app log dir: {e}"))?;
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create app log dir {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
+fn sidecar_log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(logs_dir_path(app)?.join(LOCAL_API_LOG_FILE))
+}
+
+fn desktop_log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(logs_dir_path(app)?.join(DESKTOP_LOG_FILE))
+}
+
+fn append_desktop_log(app: &AppHandle, level: &str, message: &str) {
+    let Ok(path) = desktop_log_path(app) else {
+        return;
+    };
+
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let _ = writeln!(file, "[{timestamp}][{level}] {message}");
+}
+
+fn open_path_in_shell(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut cmd = Command::new("open");
+        cmd.arg(path);
+        cmd
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut cmd = Command::new("explorer");
+        cmd.arg(path);
+        cmd
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut cmd = Command::new("xdg-open");
+        cmd.arg(path);
+        cmd
+    };
+
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Failed to open {}: {e}", path.display()))
+}
+
+fn open_logs_folder_impl(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = logs_dir_path(app)?;
+    open_path_in_shell(&dir)?;
+    Ok(dir)
+}
+
+fn open_sidecar_log_impl(app: &AppHandle) -> Result<PathBuf, String> {
+    let log_path = sidecar_log_path(app)?;
+    if !log_path.exists() {
+        File::create(&log_path)
+            .map_err(|e| format!("Failed to create sidecar log {}: {e}", log_path.display()))?;
+    }
+    open_path_in_shell(&log_path)?;
+    Ok(log_path)
+}
+
+#[tauri::command]
+fn open_logs_folder(app: AppHandle) -> Result<String, String> {
+    open_logs_folder_impl(&app).map(|path| path.display().to_string())
+}
+
+#[tauri::command]
+fn open_sidecar_log_file(app: AppHandle) -> Result<String, String> {
+    open_sidecar_log_impl(&app).map(|path| path.display().to_string())
+}
+
+#[tauri::command]
+fn open_settings_window_command(app: AppHandle) -> Result<(), String> {
+    open_settings_window(&app)
+}
+
+fn open_settings_window(app: &AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.show();
+        window
+            .set_focus()
+            .map_err(|e| format!("Failed to focus settings window: {e}"))?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+        .title("World Monitor Settings")
+        .inner_size(980.0, 760.0)
+        .min_inner_size(820.0, 620.0)
+        .resizable(true)
+        .build()
+        .map_err(|e| format!("Failed to create settings window: {e}"))?;
+
+    Ok(())
+}
+
+fn build_app_menu(handle: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let settings_item = MenuItem::with_id(
+        handle,
+        MENU_FILE_SETTINGS_ID,
+        "Settings...",
+        true,
+        Some("CmdOrCtrl+,"),
+    )?;
+    let separator = PredefinedMenuItem::separator(handle)?;
+    let quit_item = PredefinedMenuItem::quit(handle, Some("Quit"))?;
+    let file_menu =
+        Submenu::with_items(handle, "File", true, &[&settings_item, &separator, &quit_item])?;
+
+    let open_logs_item = MenuItem::with_id(
+        handle,
+        MENU_DEBUG_OPEN_LOGS_ID,
+        "Open Logs Folder",
+        true,
+        None::<&str>,
+    )?;
+    let open_sidecar_log_item = MenuItem::with_id(
+        handle,
+        MENU_DEBUG_OPEN_SIDECAR_LOG_ID,
+        "Open Local API Log",
+        true,
+        None::<&str>,
+    )?;
+    let debug_menu = Submenu::with_items(
+        handle,
+        "Debug",
+        true,
+        &[&open_logs_item, &open_sidecar_log_item],
+    )?;
+
+    Menu::with_items(handle, &[&file_menu, &debug_menu])
+}
+
+fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
+    match event.id().as_ref() {
+        MENU_FILE_SETTINGS_ID => {
+            if let Err(err) = open_settings_window(app) {
+                append_desktop_log(app, "ERROR", &format!("settings menu failed: {err}"));
+                eprintln!("[tauri] settings menu failed: {err}");
+            }
+        }
+        MENU_DEBUG_OPEN_LOGS_ID => {
+            if let Err(err) = open_logs_folder_impl(app) {
+                append_desktop_log(app, "ERROR", &format!("open logs folder failed: {err}"));
+                eprintln!("[tauri] open logs folder failed: {err}");
+            }
+        }
+        MENU_DEBUG_OPEN_SIDECAR_LOG_ID => {
+            if let Err(err) = open_sidecar_log_impl(app) {
+                append_desktop_log(app, "ERROR", &format!("open sidecar log failed: {err}"));
+                eprintln!("[tauri] open sidecar log failed: {err}");
+            }
+        }
+        _ => {}
+    }
+}
+
 fn local_api_paths(app: &AppHandle) -> (PathBuf, PathBuf) {
     let resource_dir = app
         .path()
@@ -141,10 +325,54 @@ fn local_api_paths(app: &AppHandle) -> (PathBuf, PathBuf) {
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."))
     } else {
-        resource_dir
+        let direct_api = resource_dir.join("api");
+        let lifted_root = resource_dir.join("_up_");
+        let lifted_api = lifted_root.join("api");
+        if direct_api.exists() {
+            resource_dir
+        } else if lifted_api.exists() {
+            lifted_root
+        } else {
+            resource_dir
+        }
     };
 
     (sidecar_script, api_dir_root)
+}
+
+fn resolve_node_binary() -> Option<PathBuf> {
+    if let Ok(explicit) = env::var("LOCAL_API_NODE_BIN") {
+        let explicit_path = PathBuf::from(explicit);
+        if explicit_path.exists() {
+            return Some(explicit_path);
+        }
+    }
+
+    let node_name = if cfg!(windows) { "node.exe" } else { "node" };
+    if let Some(path_var) = env::var_os("PATH") {
+        for dir in env::split_paths(&path_var) {
+            let candidate = dir.join(node_name);
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    let common_locations = if cfg!(windows) {
+        vec![
+            PathBuf::from(r"C:\Program Files\nodejs\node.exe"),
+            PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"),
+        ]
+    } else {
+        vec![
+            PathBuf::from("/opt/homebrew/bin/node"),
+            PathBuf::from("/usr/local/bin/node"),
+            PathBuf::from("/usr/bin/node"),
+            PathBuf::from("/opt/local/bin/node"),
+        ]
+    };
+
+    common_locations.into_iter().find(|path| path.exists())
 }
 
 fn start_local_api(app: &AppHandle) -> Result<(), String> {
@@ -164,18 +392,44 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
             script.display()
         ));
     }
+    let node_binary = resolve_node_binary().ok_or_else(|| {
+        "Node.js executable not found. Install Node 18+ or set LOCAL_API_NODE_BIN".to_string()
+    })?;
 
-    let mut cmd = Command::new("node");
+    let log_path = sidecar_log_path(app)?;
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .map_err(|e| format!("Failed to open local API log {}: {e}", log_path.display()))?;
+    let log_file_err = log_file
+        .try_clone()
+        .map_err(|e| format!("Failed to clone local API log handle: {e}"))?;
+
+    append_desktop_log(
+        app,
+        "INFO",
+        &format!(
+            "starting local API sidecar script={} resource_root={} log={}",
+            script.display(),
+            resource_root.display(),
+            log_path.display()
+        ),
+    );
+    append_desktop_log(app, "INFO", &format!("resolved node binary={}", node_binary.display()));
+
+    let mut cmd = Command::new(&node_binary);
     cmd.arg(&script)
         .env("LOCAL_API_PORT", LOCAL_API_PORT)
         .env("LOCAL_API_RESOURCE_DIR", resource_root)
         .env("LOCAL_API_MODE", "tauri-sidecar")
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
+        .stdout(Stdio::from(log_file))
+        .stderr(Stdio::from(log_file_err));
 
     let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to launch local API: {e}"))?;
+    append_desktop_log(app, "INFO", &format!("local API sidecar started pid={}", child.id()));
     *slot = Some(child);
     Ok(())
 }
@@ -185,6 +439,7 @@ fn stop_local_api(app: &AppHandle) {
         if let Ok(mut slot) = state.child.lock() {
             if let Some(mut child) = slot.take() {
                 let _ = child.kill();
+                append_desktop_log(app, "INFO", "local API sidecar stopped");
             }
         }
     }
@@ -192,6 +447,8 @@ fn stop_local_api(app: &AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        .menu(build_app_menu)
+        .on_menu_event(handle_menu_event)
         .manage(LocalApiState::default())
         .invoke_handler(tauri::generate_handler![
             list_supported_secret_keys,
@@ -199,10 +456,18 @@ fn main() {
             set_secret,
             delete_secret,
             read_cache_entry,
-            write_cache_entry
+            write_cache_entry,
+            open_logs_folder,
+            open_sidecar_log_file,
+            open_settings_window_command
         ])
         .setup(|app| {
             if let Err(err) = start_local_api(&app.handle()) {
+                append_desktop_log(
+                    &app.handle(),
+                    "ERROR",
+                    &format!("local API sidecar failed to start: {err}"),
+                );
                 eprintln!("[tauri] local API sidecar failed to start: {err}");
             }
             Ok(())
