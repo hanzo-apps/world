@@ -19,7 +19,10 @@
     "test:e2e:visual": "npm run test:e2e:visual:full && npm run test:e2e:visual:tech",
     "test:e2e:visual:update:full": "VITE_VARIANT=full playwright test -g \"matches golden screenshots per layer and zoom\" --update-snapshots",
     "test:e2e:visual:update:tech": "VITE_VARIANT=tech playwright test -g \"matches golden screenshots per layer and zoom\" --update-snapshots",
-    "test:e2e:visual:update": "npm run test:e2e:visual:update:full && npm run test:e2e:visual:update:tech"
+    "test:e2e:visual:update": "npm run test:e2e:visual:update:full && npm run test:e2e:visual:update:tech",
+    "desktop:dev": "npx @tauri-apps/cli dev",
+    "desktop:build:full": "VITE_VARIANT=full npx @tauri-apps/cli build",
+    "desktop:build:tech": "VITE_VARIANT=tech npx @tauri-apps/cli build"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
