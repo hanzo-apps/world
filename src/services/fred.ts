@@ -1,4 +1,5 @@
 import { createCircuitBreaker } from '@/utils';
+import { isFeatureAvailable } from './runtime-config';
 
 export interface FredSeries {
   id: string;
@@ -68,6 +69,8 @@ async function fetchSeriesData(seriesId: string): Promise<{ date: string; value:
 }
 
 export async function fetchFredData(): Promise<FredSeries[]> {
+  if (!isFeatureAvailable('economicFred')) return [];
+
   return breaker.execute(async () => {
     const fetchPromises = FRED_SERIES.map(async (config): Promise<FredSeries | null> => {
       const data = await fetchSeriesData(config.id);

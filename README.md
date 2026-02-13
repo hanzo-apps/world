@@ -622,7 +622,23 @@ npm run build:tech   # Build tech variant
 
 # Quality
 npm run typecheck    # TypeScript type checking
+
+# Desktop packaging
+npm run desktop:package:macos:full     # .app + .dmg (World Monitor)
+npm run desktop:package:macos:tech     # .app + .dmg (Tech Monitor)
+npm run desktop:package:windows:full   # .exe + .msi (World Monitor)
+npm run desktop:package:windows:tech   # .exe + .msi (Tech Monitor)
+
+# Generic packaging runner
+npm run desktop:package -- --os macos --variant full
+
+# Signed packaging (same targets, requires signing env vars)
+npm run desktop:package:macos:full:sign
+npm run desktop:package:windows:full:sign
 ```
+
+Desktop release details, signing hooks, variant outputs, and clean-machine validation checklist:
+- [docs/RELEASE_PACKAGING.md](./docs/RELEASE_PACKAGING.md)
 
 ---
 
