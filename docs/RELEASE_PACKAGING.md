@@ -25,6 +25,7 @@ npm ci
 ```
 
 All desktop scripts call the local `tauri` binary from `node_modules/.bin`; no runtime `npx` package download is required after `npm ci`.
+If the local CLI is missing, `scripts/desktop-package.mjs` now fails fast with an explicit `npm ci` remediation message.
 
 ## Network preflight and remediation
 
