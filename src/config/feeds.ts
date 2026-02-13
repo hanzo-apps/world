@@ -673,7 +673,7 @@ export const INTEL_SOURCES: Feed[] = [
   { name: 'Krebs Security', url: rss('https://krebsonsecurity.com/feed/'), type: 'cyber' },
 
   // Economic & Food Security (Tier 2)
-  { name: 'FAO News', url: rss('https://www.fao.org/rss/home/en/'), type: 'economic' },
+  { name: 'FAO News', url: rss('https://www.fao.org/feeds/fao-newsroom-rss'), type: 'economic' },
 ];
 
 // Keywords that trigger alert status - must be specific to avoid false positives
