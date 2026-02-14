@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
+          - platform: 'macos-14'
             args: '--target aarch64-apple-darwin'
             label: 'macOS-ARM64'
           - platform: 'macos-latest'
@@ -60,7 +60,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ contains(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -73,7 +73,7 @@ jobs:
 
       # ── Detect whether Apple signing secrets are configured ──
       - name: Check Apple signing secrets
-        if: matrix.platform == 'macos-latest'
+        if: contains(matrix.platform, 'macos')
         id: apple-signing
         shell: bash
         run: |
@@ -87,7 +87,7 @@ jobs:
 
       # ── macOS Code Signing (only when secrets are valid) ──
       - name: Import Apple Developer Certificate
-        if: matrix.platform == 'macos-latest' && steps.apple-signing.outputs.available == 'true'
+        if: contains(matrix.platform, 'macos') && steps.apple-signing.outputs.available == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
