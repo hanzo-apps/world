@@ -640,7 +640,7 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 
 | Layer | Mechanism |
 |-------|-----------|
-| **CORS origin allowlist** | Only `worldmonitor.app`, `startups.worldmonitor.app`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
+| **CORS origin allowlist** | Only `worldmonitor.app`, `tech.worldmonitor.app`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
 | **RSS domain allowlist** | The RSS proxy only fetches from explicitly listed domains (~90+). Requests for unlisted domains are rejected with 403. |
 | **Railway domain allowlist** | The Railway relay has a separate, smaller domain allowlist for feeds that need the alternate origin. |
 | **API key isolation** | All API keys live server-side in Vercel environment variables. The browser never sees Groq, OpenRouter, ACLED, Finnhub, or other credentials. |
@@ -790,7 +790,7 @@ Contributions welcome! See [CONTRIBUTING](./docs/DOCUMENTATION.md#contributing) 
 ```bash
 # Development
 npm run dev          # Full variant (worldmonitor.app)
-npm run dev:tech     # Tech variant (startups.worldmonitor.app)
+npm run dev:tech     # Tech variant (tech.worldmonitor.app)
 
 # Production builds
 npm run build:full   # Build full variant
