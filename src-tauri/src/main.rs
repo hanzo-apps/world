@@ -19,6 +19,7 @@ const LOCAL_API_LOG_FILE: &str = "local-api.log";
 const DESKTOP_LOG_FILE: &str = "desktop.log";
 const MENU_FILE_SETTINGS_ID: &str = "file.settings";
 const MENU_HELP_GITHUB_ID: &str = "help.github";
+const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
 const SUPPORTED_SECRET_KEYS: [&str; 15] = [
     "GROQ_API_KEY",
     "OPENROUTER_API_KEY",
@@ -350,12 +351,19 @@ fn build_app_menu(handle: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
+    let devtools_item = MenuItem::with_id(
+        handle,
+        MENU_HELP_DEVTOOLS_ID,
+        "Toggle Developer Tools",
+        true,
+        Some("CmdOrCtrl+Alt+I"),
+    )?;
     let help_separator = PredefinedMenuItem::separator(handle)?;
     let help_menu = Submenu::with_items(
         handle,
         "Help",
         true,
-        &[&about_item, &help_separator, &github_item],
+        &[&about_item, &help_separator, &github_item, &devtools_item],
     )?;
 
     Menu::with_items(handle, &[&file_menu, &help_menu])
@@ -371,6 +379,15 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         }
         MENU_HELP_GITHUB_ID => {
             let _ = open_in_shell("https://github.com/koala73/worldmonitor");
+        }
+        MENU_HELP_DEVTOOLS_ID => {
+            if let Some(window) = app.get_webview_window("main") {
+                if window.is_devtools_open() {
+                    window.close_devtools();
+                } else {
+                    window.open_devtools();
+                }
+            }
         }
         _ => {}
     }
@@ -566,6 +583,7 @@ fn main() {
                 );
                 eprintln!("[tauri] local API sidecar failed to start: {err}");
             }
+
             Ok(())
         })
         .build(tauri::generate_context!())
