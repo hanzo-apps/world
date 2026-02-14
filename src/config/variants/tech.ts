@@ -1,4 +1,4 @@
-// Tech/AI variant - startups.worldmonitor.app
+// Tech/AI variant - tech.worldmonitor.app
 import type { PanelConfig, MapLayers } from '@/types';
 import type { VariantConfig } from './base';
 

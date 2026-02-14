@@ -68,7 +68,7 @@ If a panel shows "No news available":
 Two variants controlled by `VITE_VARIANT` environment variable:
 
 - `full` (default): Geopolitical focus - worldmonitor.app
-- `tech`: Tech/startup focus - startups.worldmonitor.app
+- `tech`: Tech/startup focus - tech.worldmonitor.app
 
 ### Running Locally
 ```bash
@@ -79,7 +79,7 @@ npm run dev:tech   # Tech variant
 ### Building
 ```bash
 npm run build:full  # Production build for worldmonitor.app
-npm run build:tech  # Production build for startups.worldmonitor.app
+npm run build:tech  # Production build for tech.worldmonitor.app
 ```
 
 ## Custom Feed Scrapers
