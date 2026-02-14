@@ -430,9 +430,10 @@ export class DeckGLMap {
       if (assigned.has(i)) continue;
 
       const item = items[i]!;
-      const itemLon = item.lon ?? item.lng ?? 0;
-      const pos = this.maplibreMap.project([itemLon, item.lat]);
-      if (!pos) continue;
+      const itemLon = item.lon ?? item.lng;
+      if (!Number.isFinite(item.lat) || !Number.isFinite(itemLon)) continue;
+      const pos = this.maplibreMap.project([itemLon!, item.lat]);
+      if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) continue;
 
       const cluster: T[] = [item];
       assigned.add(i);
@@ -448,9 +449,10 @@ export class DeckGLMap {
         // Skip if group keys don't match
         if (itemKey !== undefined && otherKey !== undefined && itemKey !== otherKey) continue;
 
-        const otherLon = other.lon ?? other.lng ?? 0;
-        const otherPos = this.maplibreMap.project([otherLon, other.lat]);
-        if (!otherPos) continue;
+        const otherLon = other.lon ?? other.lng;
+        if (!Number.isFinite(other.lat) || !Number.isFinite(otherLon)) continue;
+        const otherPos = this.maplibreMap.project([otherLon!, other.lat]);
+        if (!Number.isFinite(otherPos.x) || !Number.isFinite(otherPos.y)) continue;
 
         const dist = Math.sqrt(
           Math.pow(pos.x - otherPos.x, 2) + Math.pow(pos.y - otherPos.y, 2)
@@ -466,16 +468,17 @@ export class DeckGLMap {
       let sumLat = 0, sumLon = 0;
       for (const c of cluster) {
         sumLat += c.lat;
-        sumLon += c.lon ?? c.lng ?? 0;
+        sumLon += c.lon ?? c.lng ?? 0;  // safe: items already validated
       }
       const centerLat = sumLat / cluster.length;
       const centerLon = sumLon / cluster.length;
       const centerPos = this.maplibreMap.project([centerLon, centerLat]);
+      const validCenter = centerPos && Number.isFinite(centerPos.x) && Number.isFinite(centerPos.y);
 
       clusters.push({
         items: cluster,
         center: [centerLon, centerLat],
-        screenPos: centerPos ? [centerPos.x, centerPos.y] : [pos.x, pos.y],
+        screenPos: validCenter ? [centerPos.x, centerPos.y] : [pos.x, pos.y],
       });
     }
 
@@ -502,8 +505,9 @@ export class DeckGLMap {
     fallback: [number, number]
   ): [number, number] {
     if (!this.maplibreMap) return fallback;
+    if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) return fallback;
     const projected = this.maplibreMap.project(center);
-    if (!projected) return fallback;
+    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return fallback;
     return [projected.x, projected.y];
   }
 
@@ -517,15 +521,15 @@ export class DeckGLMap {
     const y = Math.round(screenPos[1]);
 
     if (existing) {
-      existing.style.transform = `translate(${x - 16}px, ${y - 16}px)`;
+      existing.style.left = `${x}px`;
+      existing.style.top = `${y}px`;
       return existing;
     }
 
     const element = renderFn();
     element.style.position = 'absolute';
-    element.style.left = '0';
-    element.style.top = '0';
-    element.style.transform = `translate(${x - 16}px, ${y - 16}px)`;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
     element.dataset.clusterKey = key;
     this.clusterElementCache.set(key, element);
     return element;
