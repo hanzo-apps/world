@@ -96,9 +96,9 @@ export class LiveNewsPanel extends Panel {
   private readonly youtubeOrigin: string | null;
   private forceFallbackVideoForNextInit = false;
 
-  // Desktop fallback: embed via local HTTP bridge page to avoid YouTube 153
-  // on tauri:// initial launches where referer/origin can be missing.
-  private readonly useDesktopEmbedProxy = isDesktopRuntime();
+  // Desktop fallback: embed via cloud bridge page to avoid YouTube 153.
+  // Starts false — try native JS API first; switches to true on Error 153.
+  private useDesktopEmbedProxy = false;
   private desktopEmbedIframe: HTMLIFrameElement | null = null;
   private desktopEmbedRenderToken = 0;
   private boundMessageHandler!: (e: MessageEvent) => void;
@@ -581,9 +581,11 @@ export class LiveNewsPanel extends Panel {
             return;
           }
 
-          // Desktop-specific last resort: use local HTTP embed proxy.
+          // Desktop-specific last resort: switch to cloud bridge embed.
           if (errorCode === 153 && isDesktopRuntime()) {
+            this.useDesktopEmbedProxy = true;
             this.destroyPlayer();
+            this.ensurePlayerContainer();
             this.renderDesktopEmbed(true);
             return;
           }
@@ -612,7 +614,8 @@ export class LiveNewsPanel extends Panel {
     if (!videoId) return;
 
     // Handle channel switch
-    if (this.currentVideoId !== videoId) {
+    const isNewVideo = this.currentVideoId !== videoId;
+    if (isNewVideo) {
       this.currentVideoId = videoId;
       if (!this.playerElement || !document.getElementById(this.playerElementId)) {
         this.ensurePlayerContainer();
@@ -633,7 +636,23 @@ export class LiveNewsPanel extends Panel {
     }
 
     if (this.isPlaying) {
-      this.player.playVideo();
+      if (isNewVideo) {
+        // WKWebView loses user gesture context after await.
+        // Pause then play after a delay — mimics the manual workaround.
+        this.player.pauseVideo();
+        setTimeout(() => {
+          if (this.player && this.isPlaying) {
+            this.player.mute();
+            this.player.playVideo();
+            // Restore mute state after play starts
+            if (!this.isMuted) {
+              setTimeout(() => { if (this.player) this.player.unMute(); }, 500);
+            }
+          }
+        }, 800);
+      } else {
+        this.player.playVideo();
+      }
     } else {
       this.player.pauseVideo();
     }
