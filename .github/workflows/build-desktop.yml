@@ -47,6 +47,7 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     name: Build (${{ matrix.label }})
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v4
