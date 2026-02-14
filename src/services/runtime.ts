@@ -81,8 +81,8 @@ export function getRemoteApiBaseUrl(): string {
     return normalizeBaseUrl(configuredRemoteBase);
   }
 
-  const variant = import.meta.env.VITE_VARIANT || 'world';
-  return DEFAULT_REMOTE_HOSTS[variant] ?? DEFAULT_REMOTE_HOSTS.world ?? 'https://worldmonitor.app';
+  const variant = import.meta.env.VITE_VARIANT || 'full';
+  return DEFAULT_REMOTE_HOSTS[variant] ?? DEFAULT_REMOTE_HOSTS.full ?? 'https://worldmonitor.app';
 }
 
 export function toRuntimeUrl(path: string): string {
@@ -102,7 +102,6 @@ const APP_HOSTS = new Set([
   'worldmonitor.app',
   'www.worldmonitor.app',
   'tech.worldmonitor.app',
-  'startups.worldmonitor.app',
   'localhost',
   '127.0.0.1',
 ]);
