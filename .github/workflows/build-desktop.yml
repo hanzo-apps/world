@@ -71,21 +71,46 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # ── macOS Code Signing (only when secrets are configured) ──
+      # ── Detect whether Apple signing secrets are configured ──
+      - name: Check Apple signing secrets
+        if: matrix.platform == 'macos-latest'
+        id: apple-signing
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "Apple signing secrets detected"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "No Apple signing secrets — building unsigned"
+          fi
+
+      # ── macOS Code Signing (only when secrets are valid) ──
       - name: Import Apple Developer Certificate
-        if: matrix.platform == 'macos-latest' && env.APPLE_CERTIFICATE != ''
+        if: matrix.platform == 'macos-latest' && steps.apple-signing.outputs.available == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          CERT_SIZE=$(wc -c < certificate.p12 | tr -d ' ')
+          if [ "$CERT_SIZE" -lt 100 ]; then
+            echo "::warning::Certificate file too small ($CERT_SIZE bytes) — likely invalid. Skipping signing."
+            echo "SKIP_SIGNING=true" >> $GITHUB_ENV
+            exit 0
+          fi
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
           security import certificate.p12 -k build.keychain \
-            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign || {
+            echo "::warning::Certificate import failed — building unsigned"
+            echo "SKIP_SIGNING=true" >> $GITHUB_ENV
+            exit 0
+          }
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -96,7 +121,8 @@ jobs:
             echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_ENV
             echo "Certificate imported: $CERT_ID"
           else
-            echo "No Developer ID certificate found"
+            echo "::warning::No Developer ID certificate found in keychain — building unsigned"
+            echo "SKIP_SIGNING=true" >> $GITHUB_ENV
           fi
 
       # ── Determine variant ──
@@ -110,8 +136,12 @@ jobs:
           fi
 
       # ── Build with tauri-action ──
-      - name: Build Tauri app (full variant)
-        if: env.BUILD_VARIANT == 'full'
+      # Signed builds: only when Apple signing secrets are valid and imported
+      # Unsigned builds: fallback when no signing (Windows always uses this path)
+
+      # ── Build: Full variant (signed) ──
+      - name: Build Tauri app (full, signed)
+        if: env.BUILD_VARIANT == 'full' && steps.apple-signing.outputs.available == 'true' && env.SKIP_SIGNING != 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,8 +162,26 @@ jobs:
           args: ${{ matrix.args }}
           retryAttempts: 1
 
-      - name: Build Tauri app (tech variant)
-        if: env.BUILD_VARIANT == 'tech'
+      # ── Build: Full variant (unsigned — no Apple certs) ──
+      - name: Build Tauri app (full, unsigned)
+        if: env.BUILD_VARIANT == 'full' && (steps.apple-signing.outputs.available != 'true' || env.SKIP_SIGNING == 'true')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_VARIANT: full
+          VITE_DESKTOP_RUNTIME: '1'
+        with:
+          tagName: v__VERSION__
+          releaseName: 'World Monitor v__VERSION__'
+          releaseBody: 'Download the installer for your platform below.'
+          releaseDraft: ${{ github.event.inputs.draft || true }}
+          prerelease: false
+          args: ${{ matrix.args }}
+          retryAttempts: 1
+
+      # ── Build: Tech variant (signed) ──
+      - name: Build Tauri app (tech, signed)
+        if: env.BUILD_VARIANT == 'tech' && steps.apple-signing.outputs.available == 'true' && env.SKIP_SIGNING != 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -145,6 +193,24 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: v__VERSION__-tech
+          releaseName: 'Tech Monitor v__VERSION__'
+          releaseBody: 'Download the installer for your platform below.'
+          releaseDraft: ${{ github.event.inputs.draft || true }}
+          prerelease: false
+          tauriScript: npx tauri
+          args: --config src-tauri/tauri.tech.conf.json ${{ matrix.args }}
+          retryAttempts: 1
+
+      # ── Build: Tech variant (unsigned — no Apple certs) ──
+      - name: Build Tauri app (tech, unsigned)
+        if: env.BUILD_VARIANT == 'tech' && (steps.apple-signing.outputs.available != 'true' || env.SKIP_SIGNING == 'true')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_VARIANT: tech
+          VITE_DESKTOP_RUNTIME: '1'
         with:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
