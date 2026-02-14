@@ -7,6 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Last commit](https://img.shields.io/github/last-commit/koala73/worldmonitor)](https://github.com/koala73/worldmonitor/commits/main)
+[![Latest release](https://img.shields.io/github/v/release/koala73/worldmonitor?style=flat)](https://github.com/koala73/worldmonitor/releases/latest)
 
 <p align="center">
   <a href="https://worldmonitor.app"><strong>Live Demo</strong></a> &nbsp;·&nbsp;
@@ -28,6 +29,8 @@
 | Crypto/macro signal noise | **7-signal market radar** with composite BUY/CASH verdict |
 | Expensive OSINT tools ($$$) | **100% free & open source** |
 | Static news feeds | **Real-time updates** with live video streams |
+| Web-only dashboards | **Native desktop app** (Tauri) + installable PWA with offline map support |
+| Flat 2D maps | **3D WebGL globe** with deck.gl rendering and 29+ toggleable data layers |
 
 ---
 
@@ -44,13 +47,15 @@ Both variants run from a single codebase — switch between them with one click.
 
 ## Key Features
 
-### Interactive Global Map
-- **25+ data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, and more
-- **Smart clustering** — markers intelligently group at low zoom, expand on zoom in
-- **Progressive disclosure** — detail layers (bases, nuclear, datacenters) appear only when zoomed in; zoom-adaptive opacity prevents clutter at world view
+### Interactive 3D Globe
+- **WebGL-accelerated rendering** — deck.gl + MapLibre GL JS for smooth 60fps performance with thousands of concurrent markers. Switchable between **3D globe** (with pitch/rotation) and **flat map** mode via `VITE_MAP_INTERACTION_MODE`
+- **29+ data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, displacement flows, climate anomalies, and more
+- **Smart clustering** — Supercluster groups markers at low zoom, expands on zoom in. Cluster thresholds adapt to zoom level
+- **Progressive disclosure** — detail layers (bases, nuclear, datacenters) appear only when zoomed in; zoom-adaptive opacity fades markers from 0.2 at world view to 1.0 at street level
 - **Label deconfliction** — overlapping labels (e.g., multiple BREAKING badges) are automatically suppressed by priority, highest-severity first
 - **8 regional presets** — Global, Americas, Europe, MENA, Asia, Africa, Oceania, Latin America
 - **Time filtering** — 1h, 6h, 24h, 48h, 7d event windows
+- **URL state sharing** — map center, zoom, active layers, and time range are encoded in the URL for shareable views (`?view=mena&zoom=4&layers=conflicts,bases`)
 
 ### AI-Powered Intelligence
 - **World Brief** — LLM-synthesized summary of top global developments (Groq Llama 3.1, Redis-cached)
@@ -64,9 +69,10 @@ Both variants run from a single codebase — switch between them with one click.
 <details>
 <summary><strong>Geopolitical</strong></summary>
 
-- Active conflict zones with escalation tracking
+- Active conflict zones with escalation tracking (UCDP + ACLED)
 - Intelligence hotspots with news correlation
-- Social unrest events (ACLED + GDELT)
+- Social unrest events (dual-source: ACLED protests + GDELT geo-events, Haversine-deduplicated)
+- Natural disasters from 3 sources (USGS earthquakes M4.5+, GDACS alerts, NASA EONET events)
 - Sanctions regimes
 - Weather alerts and severe conditions
 
@@ -121,10 +127,13 @@ Both variants run from a single codebase — switch between them with one click.
 </details>
 
 ### Live News & Video
-- **100+ RSS feeds** across geopolitics, defense, energy, tech
-- **Live video streams** — Bloomberg, Sky News, Al Jazeera, CNBC, and more
-- **Custom monitors** — Create keyword-based alerts for any topic
+- **100+ RSS feeds** across geopolitics, defense, energy, tech — domain-allowlisted proxy prevents CORS issues
+- **8 live video streams** — Bloomberg, Sky News, Al Jazeera, Euronews, DW, France24, CNBC, Al Arabiya — with automatic live detection that scrapes YouTube channel pages every 5 minutes to find active streams
+- **Desktop embed bridge** — YouTube's IFrame API restricts playback in native webviews (error 153). The dashboard detects this and transparently routes through a cloud-hosted embed proxy with bidirectional message passing (play/pause/mute/unmute/loadVideo)
+- **Idle-aware playback** — video players pause and are removed from the DOM after 5 minutes of inactivity, resuming when the user returns. Tab visibility changes also suspend/resume streams
+- **Custom monitors** — Create keyword-based alerts for any topic, color-coded with persistent storage
 - **Entity extraction** — Auto-links countries, leaders, organizations
+- **Virtual scrolling** — news panels render only visible DOM elements, handling thousands of items without browser lag
 
 ### Signal Aggregation & Anomaly Detection
 - **Multi-source signal fusion** — internet outages, military flights, naval vessels, protests, AIS disruptions, and satellite fires are aggregated into a unified intelligence picture with per-country and per-region clustering
@@ -137,21 +146,38 @@ Both variants run from a single codebase — switch between them with one click.
 - **Deep links** — every story generates a unique URL (`/story?c=<country>&t=<type>`) with dynamic Open Graph meta tags for rich social previews
 - **Canvas-based image generation** — stories render as PNG images for visual sharing, with QR codes linking back to the live dashboard
 
+### Desktop Application (Tauri)
+- **Native desktop app** for macOS and Windows — packages the full dashboard with a local Node.js sidecar that runs all 45+ API handlers locally
+- **OS keychain integration** — API keys stored in the system credential manager (macOS Keychain, Windows Credential Manager), never in plaintext files
+- **Token-authenticated sidecar** — a unique session token prevents other local processes from accessing the sidecar on localhost. Generated per launch using randomized hashing
+- **Cloud fallback** — when a local API handler fails or is missing, requests transparently fall through to the cloud deployment (worldmonitor.app) with origin headers stripped
+- **Settings window** — dedicated configuration UI (Cmd+,) for managing 15 API keys with validation, signup links, and feature-availability indicators
+- **Verbose debug mode** — toggle traffic logging with persistent state across restarts. View the last 200 requests with timing, status codes, and error details
+- **DevTools toggle** — Cmd+Alt+I opens the embedded web inspector for debugging
+
+### Progressive Web App
+- **Installable** — the dashboard can be installed to the home screen on mobile or as a standalone desktop app via Chrome's install prompt. Full-screen `standalone` display mode with custom theme color
+- **Offline map support** — MapTiler tiles are cached using a CacheFirst strategy (up to 500 tiles, 30-day TTL), enabling map browsing without a network connection
+- **Smart caching strategies** — APIs and RSS feeds use NetworkOnly (real-time data must always be fresh), while fonts (1-year TTL), images (7-day StaleWhileRevalidate), and static assets (1-year immutable) are aggressively cached
+- **Auto-updating service worker** — checks for new versions every 60 minutes. Tauri desktop builds skip service worker registration entirely (uses native APIs instead)
+- **Offline fallback** — a branded fallback page with retry button is served when the network is unavailable
+
 ### Additional Capabilities
 - Signal intelligence with "Why It Matters" context
 - Infrastructure cascade analysis with proximity correlation
 - Maritime & aviation tracking with surge detection
-- Prediction market integration (Polymarket) as leading indicators
+- Prediction market integration (Polymarket) with 3-tier JA3 bypass (browser-direct → Tauri native TLS → cloud proxy)
 - Service status monitoring (cloud providers, AI services)
 - Shareable map state via URL parameters (view, zoom, coordinates, time range, active layers)
 - Data freshness monitoring across 14 data sources with explicit intelligence gap reporting
 - Per-feed circuit breakers with 5-minute cooldowns to prevent cascading failures
 - Browser-side ML worker (Transformers.js) for NER and sentiment analysis without server dependency
-- **Cmd+K search** — fuzzy search across news headlines, countries, and entities
-- **Virtual scrolling** — news panels render only visible DOM elements, handling thousands of items without browser lag
+- **Cmd+K search** — fuzzy search across 20+ result types: news headlines, countries, hotspots, markets, military bases, cables, pipelines, datacenters, nuclear facilities, tech companies, and more
+- **Historical playback** — dashboard snapshots are stored in IndexedDB. A time slider allows rewinding to any saved state, with live updates paused during playback
 - **Mobile detection** — screens below 768px receive a warning modal since the dashboard is designed for multi-panel desktop use
 - **UCDP conflict classification** — countries with active wars (1,000+ battle deaths/year) receive automatic CII floor scores, preventing optimistic drift
 - **HAPI humanitarian data** — UN OCHA humanitarian access metrics feed into country-level instability scoring
+- **Idle-aware resource management** — animations pause after 2 minutes of inactivity and when the tab is hidden, preventing battery drain. Video streams are destroyed from the DOM and recreated on return
 
 ---
 
@@ -285,6 +311,34 @@ The algorithm uses **Welford's online method** for numerically stable streaming 
 
 A minimum of 10 historical samples is required before anomalies are reported, preventing false positives during the learning phase. Anomalies are ingested back into the signal aggregator, where they compound with other signals for convergence detection.
 
+### Natural Disaster Monitoring
+
+Three independent sources are merged into a unified disaster picture, then deduplicated on a 0.1° geographic grid:
+
+| Source | Coverage | Types | Update Frequency |
+|--------|----------|-------|------------------|
+| **USGS** | Global earthquakes M4.5+ | Earthquakes | 5 minutes |
+| **GDACS** | UN-coordinated disaster alerts | Earthquakes, floods, cyclones, volcanoes, wildfires, droughts | Real-time |
+| **NASA EONET** | Earth observation events | 13 natural event categories (30-day open events) | Real-time |
+
+GDACS events carry color-coded alert levels (Red = critical, Orange = high) and are filtered to exclude low-severity Green alerts. EONET wildfires are filtered to events within 48 hours to prevent stale data. Earthquakes from EONET are excluded since USGS provides higher-quality seismological data.
+
+The merged output feeds into the signal aggregator for geographic convergence detection — e.g., an earthquake near a pipeline triggers an infrastructure cascade alert.
+
+### Dual-Source Protest Tracking
+
+Protest data is sourced from two independent providers to reduce single-source bias:
+
+1. **ACLED** (Armed Conflict Location & Event Data) — 30-day window, tokenized API with Redis caching (10-minute TTL). Covers protests, riots, strikes, and demonstrations with actor attribution and fatality counts.
+2. **GDELT** (Global Database of Events, Language, and Tone) — 7-day geospatial event feed filtered to protest keywords. Events with mention count ≥5 are included; those above 30 are marked as `validated`.
+
+Events from both sources are **Haversine-deduplicated** on a 0.5° grid (~50km) with same-day matching. ACLED events take priority due to higher editorial confidence. Severity is classified as:
+- **High** — fatalities present or riot/clash keywords
+- **Medium** — standard protest/demonstration
+- **Low** — default
+
+Protest scoring is regime-aware: democratic countries use logarithmic scaling (routine protests don't trigger instability), while authoritarian states use linear scoring (every protest is significant). Fatalities and concurrent internet outages apply severity boosts.
+
 ### Browser-Side ML Pipeline
 
 The dashboard runs a full ML pipeline in the browser via Transformers.js, with no server dependency for core intelligence. This is automatically disabled on mobile devices to conserve memory.
@@ -315,6 +369,18 @@ A singleton tracker monitors 14 data sources (GDELT, RSS, AIS, military flights,
 ### Prediction Markets as Leading Indicators
 
 Polymarket geopolitical markets are queried using tag-based filters (Ukraine, Iran, China, Taiwan, etc.) with 5-minute caching. Market probability shifts are correlated with news volume: if a prediction market moves significantly before matching news arrives, this is flagged as a potential early-warning signal.
+
+**Cloudflare JA3 bypass** — Polymarket's API is protected by Cloudflare TLS fingerprinting (JA3) that blocks all server-side requests. The system uses a 3-tier fallback:
+
+| Tier | Method | When It Works |
+|------|--------|---------------|
+| **1** | Browser-direct fetch | Always (browser TLS passes Cloudflare) |
+| **2** | Tauri native TLS (reqwest) | Desktop app (Rust TLS fingerprint differs from Node.js) |
+| **3** | Vercel edge proxy | Rarely (edge runtime sometimes passes) |
+
+Once browser-direct succeeds, the system caches this state and skips fallback tiers on subsequent requests. Country-specific markets are fetched by mapping countries to Polymarket tags with name-variant matching (e.g., "Russia" matches titles containing "Russian", "Moscow", "Kremlin", "Putin").
+
+Markets are filtered to exclude sports and entertainment (100+ exclusion keywords), require meaningful price divergence from 50% or volume above $50K, and are ranked by trading volume. Each variant gets different tag sets — geopolitical focus queries politics/world/ukraine/middle-east tags, while tech focus queries ai/crypto/business tags.
 
 ### Macro Signal Analysis (Market Radar)
 
@@ -374,8 +440,10 @@ This is an approximation, not a substitute for official flow data, but it captur
 | **Browser-first compute** | Analysis (clustering, instability scoring, surge detection) runs client-side — no backend compute dependency for core intelligence. |
 | **Multi-signal correlation** | No single data source is trusted alone. Focal points require convergence across news + military + markets + protests before escalating to critical. |
 | **Geopolitical grounding** | Hard-coded conflict zones, baseline country risk, and strategic chokepoints prevent statistical noise from generating false alerts in low-data regions. |
-| **Defense in depth** | CORS origin allowlist, domain-allowlisted RSS proxy, server-side API key isolation, input sanitization with output encoding, IP rate limiting on AI endpoints. |
-| **Cache everything, trust nothing** | Three-tier caching (in-memory → Redis → upstream) with versioned cache keys and stale-on-error fallback. Every API response includes `X-Cache` header for debugging. |
+| **Defense in depth** | CORS origin allowlist, domain-allowlisted RSS proxy, server-side API key isolation, token-authenticated desktop sidecar, input sanitization with output encoding, IP rate limiting on AI endpoints. |
+| **Cache everything, trust nothing** | Three-tier caching (in-memory → Redis → upstream) with versioned cache keys and stale-on-error fallback. Every API response includes `X-Cache` header for debugging. CDN layer (`s-maxage`) absorbs repeated requests before they reach edge functions. |
+| **Bandwidth efficiency** | Gzip compression on all relay responses (80% reduction). Content-hash static assets with 1-year immutable cache. Staggered polling intervals prevent synchronized API storms. Animations and polling pause on hidden tabs. |
+| **Run anywhere** | Same codebase deploys to Vercel (web), Railway (relay), Tauri (desktop), and PWA (installable). Desktop sidecar mirrors all cloud API handlers locally. Service worker caches map tiles for offline use while keeping intelligence data always-fresh (NetworkOnly). |
 
 ---
 
@@ -409,9 +477,9 @@ All edge functions include circuit breaker logic and return cached stale data wh
 
 ---
 
-## Dual-Deployment Architecture
+## Multi-Platform Architecture
 
-World Monitor runs on two platforms that work together:
+World Monitor runs on three platforms that work together:
 
 ```
 ┌─────────────────────────────────────┐
@@ -419,15 +487,25 @@ World Monitor runs on two platforms that work together:
 │  45+ edge functions · static SPA   │
 │  CORS allowlist · Redis cache       │
 │  AI pipeline · market analytics     │
-└──────────────┬──────────────────────┘
-               │ https:// (server-side)
-               │ wss://   (client-side)
-               ▼
+│  CDN caching (s-maxage) · PWA host  │
+└──────────┬─────────────┬────────────┘
+           │             │ fallback
+           │             ▼
+           │  ┌───────────────────────────────────┐
+           │  │     Tauri Desktop (Rust + Node)    │
+           │  │  OS keychain · Token-auth sidecar  │
+           │  │  45+ local API handlers · gzip     │
+           │  │  Cloud fallback · Traffic logging   │
+           │  └───────────────────────────────────┘
+           │
+           │ https:// (server-side)
+           │ wss://   (client-side)
+           ▼
 ┌─────────────────────────────────────┐
 │       Railway (Relay Server)        │
 │  WebSocket relay · OpenSky OAuth2   │
 │  RSS proxy for blocked domains      │
-│  AIS vessel stream multiplexer      │
+│  AIS vessel stream · gzip all resp  │
 └─────────────────────────────────────┘
 ```
 
@@ -438,6 +516,101 @@ World Monitor runs on two platforms that work together:
 - **RSS feeds** — proxies feeds from domains that block Vercel IPs, with a separate domain allowlist for security
 
 The Vercel edge functions connect to Railway via `WS_RELAY_URL` (server-side, HTTPS) while browser clients connect via `VITE_WS_RELAY_URL` (client-side, WSS). This separation keeps the relay URL configurable per deployment without leaking server-side configuration to the browser.
+
+All Railway relay responses are gzip-compressed (zlib `gzipSync`) when the client accepts it and the payload exceeds 1KB, reducing egress by ~80% for JSON and XML responses.
+
+---
+
+## Desktop Application Architecture
+
+The Tauri desktop app wraps the dashboard in a native window with a local Node.js sidecar that runs all API handlers without cloud dependency:
+
+```
+┌─────────────────────────────────────────────────┐
+│              Tauri (Rust)                        │
+│  Window management · OS keychain · Menu bar      │
+│  Token generation · Log management               │
+│  Polymarket native TLS bridge                    │
+└─────────────────────┬───────────────────────────┘
+                      │ spawn + env vars
+                      ▼
+┌─────────────────────────────────────────────────┐
+│         Node.js Sidecar (port 46123)            │
+│  45+ API handlers · Gzip compression            │
+│  Cloud fallback · Traffic logging                │
+│  Verbose debug mode · Circuit breakers           │
+└─────────────────────┬───────────────────────────┘
+                      │ fetch (on local failure)
+                      ▼
+┌─────────────────────────────────────────────────┐
+│         Cloud (worldmonitor.app)                 │
+│  Transparent fallback when local handlers fail   │
+└─────────────────────────────────────────────────┘
+```
+
+### Secret Management
+
+API keys are stored in the operating system's credential manager (macOS Keychain, Windows Credential Manager) — never in plaintext config files. At sidecar launch, all 15 supported secrets are read from the keyring, trimmed, and injected as environment variables. Empty or whitespace-only values are skipped.
+
+Secrets can also be updated at runtime without restarting the sidecar: saving a key in the Settings window triggers a `POST /api/local-env-update` call that hot-patches `process.env` and clears the module cache so handlers pick up the new value immediately.
+
+### Sidecar Authentication
+
+A unique 32-character hex token is generated per app launch using randomized hash state (`RandomState` from Rust's standard library). The token is:
+1. Injected into the sidecar as `LOCAL_API_TOKEN`
+2. Retrieved by the frontend via the `get_local_api_token` Tauri command (lazy-loaded on first API request)
+3. Attached as `Authorization: Bearer <token>` to every local request
+
+The `/api/service-status` health check endpoint is exempt from token validation to support monitoring tools.
+
+### Cloud Fallback
+
+When a local API handler is missing, throws an error, or returns a 5xx status, the sidecar transparently proxies the request to the cloud deployment. Endpoints that fail are marked as `cloudPreferred` — subsequent requests skip the local handler and go directly to the cloud until the sidecar is restarted. Origin and Referer headers are stripped before proxying to maintain server-to-server parity.
+
+### Observability
+
+- **Traffic log** — a ring buffer of the last 200 requests with method, path, status, and duration (ms), accessible via `GET /api/local-traffic-log`
+- **Verbose mode** — togglable via `POST /api/local-debug-toggle`, persists across sidecar restarts in `verbose-mode.json`
+- **Dual log files** — `desktop.log` captures Rust-side events (startup, secret injection counts, menu actions), while `local-api.log` captures Node.js stdout/stderr
+- **DevTools** — `Cmd+Alt+I` toggles the embedded web inspector
+
+---
+
+## Bandwidth Optimization
+
+The system minimizes egress costs through layered caching and compression across all three deployment targets:
+
+### Vercel CDN Headers
+
+Every API edge function includes `Cache-Control` headers that enable Vercel's CDN to serve cached responses without hitting the origin:
+
+| Data Type | `s-maxage` | `stale-while-revalidate` | Rationale |
+|-----------|-----------|--------------------------|-----------|
+| Classification results | 3600s (1h) | 600s (10min) | Headlines don't reclassify often |
+| Country intelligence | 3600s (1h) | 600s (10min) | Briefs change slowly |
+| Risk scores | 300s (5min) | 60s (1min) | Near real-time, low latency |
+| Market data | 3600s (1h) | 600s (10min) | Intraday granularity sufficient |
+| Fire detection | 600s (10min) | 120s (2min) | VIIRS updates every ~12 hours |
+| Economic indicators | 3600s (1h) | 600s (10min) | Monthly/quarterly releases |
+
+Static assets use content-hash filenames with 1-year immutable cache headers. The service worker file (`sw.js`) is never cached (`max-age=0, must-revalidate`) to ensure update detection.
+
+### Railway Relay Compression
+
+All relay server responses pass through `gzipSync` when the client accepts gzip and the payload exceeds 1KB. This applies to OpenSky aircraft JSON, RSS XML feeds, UCDP event data, AIS snapshots, and health checks — reducing wire size by approximately 80%.
+
+### Frontend Polling Intervals
+
+Panels refresh at staggered intervals to avoid synchronized API storms:
+
+| Panel | Interval | Rationale |
+|-------|----------|-----------|
+| AIS maritime snapshot | 10s | Real-time vessel positions |
+| Service status | 60s | Health check cadence |
+| Market signals / ETF / Stablecoins | 180s (3min) | Market hours granularity |
+| Risk scores / Theater posture | 300s (5min) | Composite scores change slowly |
+
+All animations and polling pause when the tab is hidden or after 2 minutes of inactivity, preventing wasted requests from background tabs.
 
 ---
 
@@ -474,6 +647,8 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 | **Input sanitization** | User-facing content passes through `escapeHtml()` (prevents XSS) and `sanitizeUrl()` (blocks `javascript:` and `data:` URIs). URLs use `escapeAttr()` for attribute context encoding. |
 | **Query parameter validation** | API endpoints validate input formats (e.g., stablecoin coin IDs must match `[a-z0-9-]+`, bounding box params are numeric). |
 | **IP rate limiting** | AI endpoints use Upstash Redis-backed rate limiting to prevent abuse of Groq/OpenRouter quotas. |
+| **Desktop sidecar auth** | The local API sidecar requires a per-session `Bearer` token generated at launch. The token is stored in Rust state and injected into the sidecar environment — only the Tauri frontend can retrieve it via IPC. Health check endpoints are exempt. |
+| **OS keychain storage** | Desktop API keys are stored in the operating system's credential manager (macOS Keychain, Windows Credential Manager), never in plaintext files or environment variables on disk. |
 | **No debug endpoints** | The `api/debug-env.js` endpoint returns 404 in production — it exists only as a disabled placeholder. |
 
 ---
@@ -580,14 +755,15 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 
 | Category | Technologies |
 |----------|--------------|
-| **Frontend** | TypeScript, Vite, deck.gl (WebGL), MapLibre GL |
+| **Frontend** | TypeScript, Vite, deck.gl (WebGL 3D globe), MapLibre GL, vite-plugin-pwa (service worker + manifest) |
+| **Desktop** | Tauri 2 (Rust) with Node.js sidecar, OS keychain integration (keyring crate), native TLS (reqwest) |
 | **AI/ML** | Groq (Llama 3.1 8B), OpenRouter (fallback), Transformers.js (browser-side T5, NER, embeddings) |
-| **Caching** | Redis (Upstash) — 3-tier cache with in-memory + Redis + upstream, cross-user AI deduplication |
-| **Geopolitical APIs** | OpenSky, GDELT, ACLED, UCDP, HAPI, USGS, NASA FIRMS, Polymarket, Cloudflare Radar |
+| **Caching** | Redis (Upstash) — 3-tier cache with in-memory + Redis + upstream, cross-user AI deduplication. Vercel CDN (s-maxage). Service worker (Workbox) |
+| **Geopolitical APIs** | OpenSky, GDELT, ACLED, UCDP, HAPI, USGS, GDACS, NASA EONET, NASA FIRMS, Polymarket, Cloudflare Radar |
 | **Market APIs** | Yahoo Finance (equities, forex, crypto), CoinGecko (stablecoins), mempool.space (BTC hashrate), alternative.me (Fear & Greed) |
 | **Economic APIs** | FRED (Federal Reserve), EIA (Energy), Finnhub (stock quotes) |
-| **Deployment** | Vercel Edge Functions (45+ endpoints) + Railway (WebSocket relay) |
-| **Data** | 100+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery |
+| **Deployment** | Vercel Edge Functions (45+ endpoints) + Railway (WebSocket relay) + Tauri (desktop) + PWA (installable) |
+| **Data** | 100+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery, 8 live YouTube streams |
 
 ---
 
@@ -649,9 +825,15 @@ Desktop release details, signing hooks, variant outputs, and clean-machine valid
 - [x] Market intelligence (macro signals, ETF flows, stablecoin peg monitoring)
 - [x] Railway relay for WebSocket and blocked-domain proxying
 - [x] CORS origin allowlist and security hardening
+- [x] Native desktop application (Tauri) with OS keychain + authenticated sidecar
+- [x] Progressive Web App with offline map support and installability
+- [x] Bandwidth optimization (CDN caching, gzip relay, staggered polling)
+- [x] 3D WebGL globe visualization (deck.gl)
+- [x] Natural disaster monitoring (USGS + GDACS + NASA EONET)
+- [x] Historical playback via IndexedDB snapshots
+- [x] Live YouTube stream detection with desktop embed bridge
 - [ ] Mobile-optimized views
 - [ ] Push notifications for critical alerts
-- [ ] Historical data playback
 - [ ] Self-hosted Docker image
 
 See [full roadmap](./docs/DOCUMENTATION.md#roadmap).
