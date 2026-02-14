@@ -3114,7 +3114,7 @@ export class DeckGLMap {
             'fill-color': '#3b82f6',
             'fill-opacity': 0.06,
           },
-          filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
+          filter: ['==', ['get', 'name'], ''],
         });
         this.maplibreMap.addLayer({
           id: 'country-highlight-fill',
@@ -3147,28 +3147,28 @@ export class DeckGLMap {
   private setupCountryHover(): void {
     if (!this.maplibreMap) return;
     const map = this.maplibreMap;
-    let hoveredCode: string | null = null;
+    let hoveredName: string | null = null;
 
     map.on('mousemove', (e) => {
       if (!this.onCountryClick) return;
       const features = map.queryRenderedFeatures(e.point, { layers: ['country-interactive'] });
-      const code = features?.[0]?.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+      const name = features?.[0]?.properties?.name as string | undefined;
 
-      if (code && code !== hoveredCode) {
-        hoveredCode = code;
-        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], code]);
+      if (name && name !== hoveredName) {
+        hoveredName = name;
+        map.setFilter('country-hover-fill', ['==', ['get', 'name'], name]);
         map.getCanvas().style.cursor = 'pointer';
-      } else if (!code && hoveredCode) {
-        hoveredCode = null;
-        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], '']);
+      } else if (!name && hoveredName) {
+        hoveredName = null;
+        map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
         map.getCanvas().style.cursor = '';
       }
     });
 
     map.on('mouseout', () => {
-      if (hoveredCode) {
-        hoveredCode = null;
-        map.setFilter('country-hover-fill', ['==', ['get', 'ISO3166-1-Alpha-2'], '']);
+      if (hoveredName) {
+        hoveredName = null;
+        map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
         map.getCanvas().style.cursor = '';
       }
     });
