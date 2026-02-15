@@ -116,8 +116,15 @@ export class LiveNewsPanel extends Panel {
     this.setupIdleDetection();
   }
 
+  private get embedOrigin(): string {
+    try { return new URL(getRemoteApiBaseUrl()).origin; } catch { return 'https://worldmonitor.app'; }
+  }
+
   private setupBridgeMessageListener(): void {
     this.boundMessageHandler = (e: MessageEvent) => {
+      if (e.source !== this.desktopEmbedIframe?.contentWindow) return;
+      const expected = this.embedOrigin;
+      if (e.origin !== expected && e.origin !== 'http://127.0.0.1:46123') return;
       const msg = e.data;
       if (!msg || typeof msg !== 'object' || !msg.type) return;
       if (msg.type === 'yt-ready') {
@@ -412,7 +419,7 @@ export class LiveNewsPanel extends Panel {
 
   private postToEmbed(msg: Record<string, unknown>): void {
     if (!this.desktopEmbedIframe?.contentWindow) return;
-    this.desktopEmbedIframe.contentWindow.postMessage(msg, '*');
+    this.desktopEmbedIframe.contentWindow.postMessage(msg, this.embedOrigin);
   }
 
   private syncDesktopEmbedState(): void {
@@ -472,6 +479,7 @@ export class LiveNewsPanel extends Panel {
     iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
     iframe.setAttribute('loading', 'eager');
 
     this.playerContainer.appendChild(iframe);
