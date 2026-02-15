@@ -301,6 +301,7 @@ export class IntelligenceFindingsBadge {
       hotspot_escalation: '⚠️',
       news_leads_markets: '📰',
       velocity_spike: '📈',
+      keyword_spike: '📊',
       convergence: '🔀',
       triangulation: '🔺',
       flow_drop: '⬇️',
