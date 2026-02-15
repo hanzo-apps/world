@@ -76,6 +76,17 @@ export class RuntimeConfigPanel extends Panel {
     this.validationMessages.clear();
   }
 
+  public async commitVerifiedSecrets(): Promise<void> {
+    for (const [key, value] of this.pendingSecrets) {
+      if (this.validatedKeys.get(key) !== false) {
+        await setSecretValue(key, value);
+        this.pendingSecrets.delete(key);
+        this.validatedKeys.delete(key);
+        this.validationMessages.delete(key);
+      }
+    }
+  }
+
   public hasPendingChanges(): boolean {
     return this.pendingSecrets.size > 0;
   }
@@ -124,7 +135,24 @@ export class RuntimeConfigPanel extends Panel {
     this.unsubscribe = null;
   }
 
+  private captureUnsavedInputs(): void {
+    if (!this.buffered) return;
+    this.content.querySelectorAll<HTMLInputElement>('input[data-secret]').forEach((input) => {
+      const key = input.dataset.secret as RuntimeSecretKey | undefined;
+      if (!key) return;
+      const raw = input.value.trim();
+      if (!raw || raw === MASKED_SENTINEL) return;
+      this.pendingSecrets.set(key, raw);
+      const result = validateSecret(key, raw);
+      if (!result.valid) {
+        this.validatedKeys.set(key, false);
+        this.validationMessages.set(key, result.hint || 'Invalid format');
+      }
+    });
+  }
+
   protected render(): void {
+    this.captureUnsavedInputs();
     const snapshot = getRuntimeConfigSnapshot();
     const desktop = isDesktopRuntime();
 
