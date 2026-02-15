@@ -256,6 +256,7 @@ export class DeckGLMap {
   private lastSCBoundsKey = '';
   private lastSCMask = '';
   private newsPulseIntervalId: ReturnType<typeof setInterval> | null = null;
+  private readonly startupTime = Date.now();
   private lastCableHighlightSignature = '';
   private lastPipelineHighlightSignature = '';
   private debouncedRebuildLayers: () => void;
@@ -271,10 +272,12 @@ export class DeckGLMap {
     this.rebuildDatacenterSupercluster();
 
     this.debouncedRebuildLayers = debounce(() => {
+      if (this.renderPaused) return;
       this.maplibreMap?.resize();
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     }, 150);
     this.rafUpdateLayers = rafSchedule(() => {
+      if (this.renderPaused) return;
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     });
 
@@ -618,6 +621,11 @@ export class DeckGLMap {
           const verifiedCount = Number(props.verifiedCount ?? 0);
           const totalFatalities = Number(props.totalFatalities ?? 0);
           const clusterCount = Number(f.properties.point_count ?? items.length);
+          const latestRiotEventTimeMs = items.reduce((max, it) => {
+            if (it.eventType !== 'riot' || it.sourceType === 'gdelt') return max;
+            const ts = it.time.getTime();
+            return Number.isFinite(ts) ? Math.max(max, ts) : max;
+          }, 0);
           return {
             id: `pc-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
@@ -626,6 +634,7 @@ export class DeckGLMap {
             country: String(props.country ?? items[0]?.country ?? ''),
             maxSeverity: maxSev as 'low' | 'medium' | 'high',
             hasRiot: riotCount > 0,
+            latestRiotEventTimeMs: latestRiotEventTimeMs || undefined,
             totalFatalities,
             riotCount,
             highSeverityCount,
@@ -638,6 +647,10 @@ export class DeckGLMap {
           id: `pp-${f.properties.index}`, lat: item.lat, lon: item.lon,
           count: 1, items: [item], country: item.country,
           maxSeverity: item.severity, hasRiot: item.eventType === 'riot',
+          latestRiotEventTimeMs:
+            item.eventType === 'riot' && item.sourceType !== 'gdelt' && Number.isFinite(item.time.getTime())
+              ? item.time.getTime()
+              : undefined,
           totalFatalities: item.fatalities ?? 0,
           riotCount: item.eventType === 'riot' ? 1 : 0,
           highSeverityCount: item.severity === 'high' ? 1 : 0,
@@ -1877,19 +1890,50 @@ export class DeckGLMap {
 
   private pulseTime = 0;
 
-  private needsPulseAnimation(): boolean {
-    return this.hasRecentNews(Date.now())
-      || this.protestClusters.some(c => c.maxSeverity === 'high' || c.hasRiot)
-      || this.hotspots.some(h => h.level === 'high' || h.hasBreaking);
+  private canPulse(now = Date.now()): boolean {
+    return now - this.startupTime > 60_000;
+  }
+
+  private hasRecentRiot(now = Date.now(), windowMs = 2 * 60 * 60 * 1000): boolean {
+    const hasRecentClusterRiot = this.protestClusters.some(c =>
+      c.hasRiot && c.latestRiotEventTimeMs != null && (now - c.latestRiotEventTimeMs) < windowMs
+    );
+    if (hasRecentClusterRiot) return true;
+
+    // Fallback to raw protests because syncPulseAnimation can run before cluster data refreshes.
+    return this.protests.some((p) => {
+      if (p.eventType !== 'riot' || p.sourceType === 'gdelt') return false;
+      const ts = p.time.getTime();
+      return Number.isFinite(ts) && (now - ts) < windowMs;
+    });
+  }
+
+  private needsPulseAnimation(now = Date.now()): boolean {
+    return this.hasRecentNews(now)
+      || this.hasRecentRiot(now)
+      || this.hotspots.some(h => h.hasBreaking);
+  }
+
+  private syncPulseAnimation(now = Date.now()): void {
+    if (this.renderPaused) {
+      if (this.newsPulseIntervalId !== null) this.stopPulseAnimation();
+      return;
+    }
+    const shouldPulse = this.canPulse(now) && this.needsPulseAnimation(now);
+    if (shouldPulse && this.newsPulseIntervalId === null) {
+      this.startPulseAnimation();
+    } else if (!shouldPulse && this.newsPulseIntervalId !== null) {
+      this.stopPulseAnimation();
+    }
   }
 
   private startPulseAnimation(): void {
     if (this.newsPulseIntervalId !== null) return;
-    const PULSE_UPDATE_INTERVAL_MS = 250;
+    const PULSE_UPDATE_INTERVAL_MS = 500;
 
     this.newsPulseIntervalId = setInterval(() => {
       const now = Date.now();
-      if (!this.needsPulseAnimation()) {
+      if (!this.needsPulseAnimation(now)) {
         this.pulseTime = now;
         this.stopPulseAnimation();
         this.rafUpdateLayers();
@@ -2649,7 +2693,14 @@ export class DeckGLMap {
   }
 
   public setRenderPaused(paused: boolean): void {
+    if (this.renderPaused === paused) return;
     this.renderPaused = paused;
+    if (paused) {
+      this.stopPulseAnimation();
+      return;
+    }
+
+    this.syncPulseAnimation();
     if (!paused && this.renderPending) {
       this.renderPending = false;
       this.render();
@@ -2657,6 +2708,7 @@ export class DeckGLMap {
   }
 
   private updateLayers(): void {
+    if (this.renderPaused) return;
     const startTime = performance.now();
     if (this.deckOverlay) {
       this.deckOverlay.setProps({ layers: this.buildLayers() });
@@ -2846,9 +2898,7 @@ export class DeckGLMap {
     this.protests = events;
     this.rebuildProtestSupercluster();
     this.render();
-    if (this.needsPulseAnimation() && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    }
+    this.syncPulseAnimation();
   }
 
   public setFlightDelays(delays: AirportDelayAlert[]): void {
@@ -2912,12 +2962,7 @@ export class DeckGLMap {
     this.newsLocations = data;
     this.render();
 
-    const hasRecent = this.hasRecentNews(now);
-    if (hasRecent && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    } else if (!hasRecent) {
-      this.stopPulseAnimation();
-    }
+    this.syncPulseAnimation(now);
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
@@ -2952,9 +2997,7 @@ export class DeckGLMap {
     });
 
     this.render();
-    if (this.needsPulseAnimation() && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    }
+    this.syncPulseAnimation();
   }
 
   /** Get news items related to a hotspot by keyword matching */
