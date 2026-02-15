@@ -11627,11 +11627,12 @@ body.has-critical-banner .panels-grid {
 
 .runtime-secret-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   grid-template-areas:
-    'key status'
-    'meta status'
-    'input input';
+    'key status check'
+    'meta meta meta'
+    'input input input'
+    'hint hint hint';
   gap: 4px 8px;
   align-items: center;
 }
@@ -11660,6 +11661,14 @@ body.has-critical-banner .panels-grid {
   color: #fff;
   padding: 6px 8px;
   font-size: 11px;
+}
+
+.runtime-secret-check {
+  grid-area: check;
+}
+
+.runtime-secret-hint {
+  grid-area: hint;
 }
 
 /* ============================================
