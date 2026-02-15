@@ -3,6 +3,9 @@ export const config = { runtime: 'edge' };
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   try {
     const response = await fetch('https://www.pizzint.watch/api/dashboard-data', {
       headers: {

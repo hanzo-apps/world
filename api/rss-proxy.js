@@ -1,3 +1,5 @@
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+
 export const config = { runtime: 'edge' };
 
 // Fetch with timeout
@@ -157,28 +159,8 @@ const ALLOWED_DOMAINS = [
   'news.ycombinator.com',
 ];
 
-// CORS helper - allow worldmonitor.app and Vercel preview domains
-function getCorsHeaders(req) {
-  const origin = req.headers.get('origin') || '*';
-  const allowedPatterns = [
-    /^https:\/\/(.*\.)?worldmonitor\.app$/, // Matches worldmonitor.app and *.worldmonitor.app
-    /^https:\/\/.*-elie-habib-projects\.vercel\.app$/,
-    /^https:\/\/worldmonitor.*\.vercel\.app$/,
-    /^http:\/\/localhost(:\d+)?$/,
-  ];
-
-  const isAllowed = origin === '*' || allowedPatterns.some(p => p.test(origin));
-
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://worldmonitor.app',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
-  };
-}
-
 export default async function handler(req) {
-  const corsHeaders = getCorsHeaders(req);
+  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -216,7 +198,44 @@ export default async function handler(req) {
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',
         'Accept-Language': 'en-US,en;q=0.9',
       },
+      redirect: 'manual',
     }, timeout);
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (location) {
+        try {
+          const redirectUrl = new URL(location, feedUrl);
+          if (!ALLOWED_DOMAINS.includes(redirectUrl.hostname)) {
+            return new Response(JSON.stringify({ error: 'Redirect to disallowed domain' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+          const redirectResponse = await fetchWithTimeout(redirectUrl.href, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          }, timeout);
+          const data = await redirectResponse.text();
+          return new Response(data, {
+            status: redirectResponse.status,
+            headers: {
+              'Content-Type': 'application/xml',
+              'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
+              ...corsHeaders,
+            },
+          });
+        } catch {
+          return new Response(JSON.stringify({ error: 'Invalid redirect' }), {
+            status: 502,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+      }
+    }
 
     const data = await response.text();
     return new Response(data, {
