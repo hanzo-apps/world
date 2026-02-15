@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('keyword spike modal/badge flow', () => {
   test('injects synthetic headlines and renders keyword_spike end-to-end', async ({ page }) => {
-    await page.goto('/runtime-harness.html');
+    await page.goto('/tests/runtime-harness.html');
 
     const setup = await page.evaluate(async () => {
       const { SignalModal } = await import('/src/components/SignalModal.ts');

@@ -117,7 +117,7 @@ const EXPECTED_TECH_DECK_LAYERS = [
 const waitForHarnessReady = async (
   page: import('@playwright/test').Page
 ): Promise<void> => {
-  await page.goto('/map-harness.html');
+  await page.goto('/tests/map-harness.html');
   await expect(page.locator('.deckgl-map-wrapper')).toBeVisible();
   await expect
     .poll(async () => {
