@@ -81,7 +81,7 @@ export function includesKeyword(text: string, keywords: string[]): boolean {
   return keywords.some(keyword => text.includes(keyword));
 }
 
-function escapeRegex(value: string): string {
+export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
