@@ -73,10 +73,18 @@ import {
 } from '@/services/hotspot-escalation';
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
+import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 type MapInteractionMode = 'flat' | '3d';
+
+export interface CountryClickPayload {
+  lat: number;
+  lon: number;
+  code?: string;
+  name?: string;
+}
 
 interface DeckMapState {
   zoom: number;
@@ -215,7 +223,7 @@ export class DeckGLMap {
   // Callbacks
   private onHotspotClick?: (hotspot: Hotspot) => void;
   private onTimeRangeChange?: (range: TimeRange) => void;
-  private onCountryClick?: (lat: number, lon: number) => void;
+  private onCountryClick?: (country: CountryClickPayload) => void;
   private onLayerChange?: (layer: keyof MapLayers, enabled: boolean) => void;
   private onStateChange?: (state: DeckMapState) => void;
 
@@ -2093,7 +2101,12 @@ export class DeckGLMap {
       // Empty map click → country detection
       if (info.coordinate && this.onCountryClick) {
         const [lon, lat] = info.coordinate as [number, number];
-        this.onCountryClick(lat, lon);
+        const country = this.resolveCountryFromCoordinate(lon, lat);
+        this.onCountryClick({
+          lat,
+          lon,
+          ...(country ? { code: country.code, name: country.name } : {}),
+        });
       }
       return;
     }
@@ -3260,18 +3273,38 @@ export class DeckGLMap {
 
   // --- Country click + highlight ---
 
-  public setOnCountryClick(cb: (lat: number, lon: number) => void): void {
+  public setOnCountryClick(cb: (country: CountryClickPayload) => void): void {
     this.onCountryClick = cb;
+  }
+
+  private resolveCountryFromCoordinate(lon: number, lat: number): { code: string; name: string } | null {
+    const fromGeometry = getCountryAtCoordinates(lat, lon);
+    if (fromGeometry) return fromGeometry;
+    if (!this.maplibreMap || !this.countryGeoJsonLoaded) return null;
+    try {
+      const point = this.maplibreMap.project([lon, lat]);
+      const features = this.maplibreMap.queryRenderedFeatures(point, { layers: ['country-interactive'] });
+      const properties = (features?.[0]?.properties ?? {}) as Record<string, unknown>;
+      const code = typeof properties['ISO3166-1-Alpha-2'] === 'string'
+        ? properties['ISO3166-1-Alpha-2'].trim().toUpperCase()
+        : '';
+      const name = typeof properties.name === 'string'
+        ? properties.name.trim()
+        : '';
+      if (!code || !name) return null;
+      return { code, name };
+    } catch {
+      return null;
+    }
   }
 
   private loadCountryBoundaries(): void {
     if (!this.maplibreMap || this.countryGeoJsonLoaded) return;
     this.countryGeoJsonLoaded = true;
 
-    fetch('/data/countries.geojson')
-      .then((r) => r.json())
+    getCountriesGeoJson()
       .then((geojson) => {
-        if (!this.maplibreMap) return;
+        if (!this.maplibreMap || !geojson) return;
         this.maplibreMap.addSource('country-boundaries', {
           type: 'geojson',
           data: geojson,
