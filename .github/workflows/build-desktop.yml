@@ -38,15 +38,15 @@ jobs:
           - platform: 'macos-14'
             args: '--target aarch64-apple-darwin'
             label: 'macOS-ARM64'
-            timeout: 360
+            timeout: 180
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
             label: 'macOS-x64'
-            timeout: 360
+            timeout: 180
           - platform: 'windows-latest'
             args: ''
             label: 'Windows-x64'
-            timeout: 360
+            timeout: 120
 
     runs-on: ${{ matrix.platform }}
     name: Build (${{ matrix.label }})
@@ -54,6 +54,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Start job timer
+        shell: bash
+        run: echo "JOB_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -232,3 +236,17 @@ jobs:
         run: |
           rm -f certificate.p12
           security delete-keychain build.keychain || true
+
+      - name: Report build duration
+        if: always()
+        shell: bash
+        run: |
+          if [ -z "${JOB_START_EPOCH:-}" ]; then
+            echo "::warning::JOB_START_EPOCH missing; duration unavailable."
+            exit 0
+          fi
+          END_EPOCH=$(date +%s)
+          ELAPSED=$((END_EPOCH - JOB_START_EPOCH))
+          MINUTES=$((ELAPSED / 60))
+          SECONDS=$((ELAPSED % 60))
+          echo "Build duration for ${{ matrix.label }}: ${MINUTES}m ${SECONDS}s"

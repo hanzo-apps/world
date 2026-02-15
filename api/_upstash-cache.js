@@ -4,7 +4,10 @@ const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
 const mem = new Map();
 let persistPath = null;
 let persistTimer = null;
+let persistInFlight = false;
+let persistQueued = false;
 let loaded = false;
+const MAX_PERSIST_ENTRIES = Math.max(100, Number(process.env.LOCAL_API_CACHE_PERSIST_MAX || 5000));
 
 async function ensureDesktopCache() {
   if (loaded) return;
@@ -31,18 +34,52 @@ async function ensureDesktopCache() {
   }, 60_000).unref?.();
 }
 
+function buildPersistSnapshot() {
+  const now = Date.now();
+  const payload = Object.create(null);
+  let kept = 0;
+
+  for (const [key, entry] of mem) {
+    if (!entry || entry.expiresAt <= now) continue;
+    payload[key] = entry;
+    kept += 1;
+    if (kept >= MAX_PERSIST_ENTRIES) break;
+  }
+
+  return payload;
+}
+
+async function persistToDisk() {
+  if (!persistPath) return;
+  if (persistInFlight) {
+    persistQueued = true;
+    return;
+  }
+
+  persistInFlight = true;
+  try {
+    const snapshot = buildPersistSnapshot();
+    const json = JSON.stringify(snapshot);
+    const { writeFile, rename } = await import('node:fs/promises');
+    const tmp = persistPath + '.tmp';
+    await writeFile(tmp, json, 'utf8');
+    await rename(tmp, persistPath);
+  } catch (err) {
+    console.warn('[Cache] Persist error:', err.message);
+  } finally {
+    persistInFlight = false;
+    if (persistQueued) {
+      persistQueued = false;
+      void persistToDisk();
+    }
+  }
+}
+
 function debouncedPersist() {
   if (!persistPath) return;
   clearTimeout(persistTimer);
-  persistTimer = setTimeout(async () => {
-    try {
-      const { writeFileSync, renameSync } = await import('node:fs');
-      const tmp = persistPath + '.tmp';
-      writeFileSync(tmp, JSON.stringify(Object.fromEntries(mem)));
-      renameSync(tmp, persistPath);
-    } catch (err) {
-      console.warn('[Cache] Persist error:', err.message);
-    }
+  persistTimer = setTimeout(() => {
+    void persistToDisk();
   }, 2000);
   if (persistTimer?.unref) persistTimer.unref();
 }
