@@ -1007,7 +1007,7 @@ export class App {
         }
       : {
           placeholder: 'Search news, pipelines, bases, markets...',
-          hint: 'News • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
+          hint: 'News • Countries • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
         };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
@@ -1121,6 +1121,9 @@ export class App {
         data: g,
       })));
     }
+
+    // Register countries for both variants
+    this.searchModal.registerSource('country', this.buildCountrySearchItems());
 
     // Handle result selection
     this.searchModal.setOnSelect((result) => this.handleSearchResult(result));
@@ -1291,6 +1294,11 @@ export class App {
         }, 300);
         break;
       }
+      case 'country': {
+        const { code, name } = result.data as { code: string; name: string };
+        this.openCountryBriefByCode(code, name);
+        break;
+      }
     }
   }
 
@@ -1316,6 +1324,9 @@ export class App {
 
   private updateSearchIndex(): void {
     if (!this.searchModal) return;
+
+    // Keep country CII labels fresh with latest ingested signals.
+    this.searchModal.registerSource('country', this.buildCountrySearchItems());
 
     // Update news sources (use link as unique id) - index up to 500 items for better search coverage
     const newsItems = this.allNews.slice(0, 500).map(n => ({
@@ -1346,6 +1357,30 @@ export class App {
         data: m,
       })));
     }
+  }
+
+  private buildCountrySearchItems(): { id: string; title: string; subtitle: string; data: { code: string; name: string } }[] {
+    const panelScores = (this.panels['cii'] as CIIPanel | undefined)?.getScores() ?? [];
+    const scores = panelScores.length > 0 ? panelScores : calculateCII();
+    const ciiByCode = new Map(scores.map((score) => [score.code, score]));
+    return Object.entries(TIER1_COUNTRIES).map(([code, name]) => {
+      const score = ciiByCode.get(code);
+      return {
+        id: code,
+        title: `${App.toFlagEmoji(code)} ${name}`,
+        subtitle: score ? `CII: ${score.score}/100 • ${score.level}` : 'Country Brief',
+        data: { code, name },
+      };
+    });
+  }
+
+  private static toFlagEmoji(code: string): string {
+    const upperCode = code.toUpperCase();
+    if (!/^[A-Z]{2}$/.test(upperCode)) return '🏳️';
+    return upperCode
+      .split('')
+      .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+      .join('');
   }
 
   private setupPlaybackControl(): void {
