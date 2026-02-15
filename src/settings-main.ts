@@ -78,9 +78,15 @@ async function initSettingsWindow(): Promise<void> {
   document.getElementById('okBtn')?.addEventListener('click', () => {
     void (async () => {
       try {
+        if (!panel.hasPendingChanges()) {
+          closeSettingsWindow();
+          return;
+        }
         setActionStatus('Validating API keys...', 'ok');
         const errors = await panel.verifyPendingSecrets();
+        console.log('[settings] verify done, errors:', errors.length, errors);
         await panel.commitVerifiedSecrets();
+        console.log('[settings] commit done, remaining pending:', panel.hasPendingChanges());
         if (errors.length > 0) {
           setActionStatus(`Saved verified keys. Failed: ${errors.join(', ')}`, 'error');
         } else {
@@ -88,6 +94,7 @@ async function initSettingsWindow(): Promise<void> {
           closeSettingsWindow();
         }
       } catch (err) {
+        console.error('[settings] save error:', err);
         setActionStatus(`Save failed: ${err}`, 'error');
       }
     })();

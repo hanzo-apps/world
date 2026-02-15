@@ -11532,15 +11532,15 @@ body.has-critical-banner .panels-grid {
 }
 
 .runtime-alert h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 0 0 6px;
+  font-size: 12px;
   letter-spacing: 0.5px;
 }
 
 .runtime-alert p {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.78);
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
 }
 
 .runtime-alert.runtime-alert-warn {
@@ -11560,10 +11560,10 @@ body.has-critical-banner .panels-grid {
   border: 1px solid rgba(125, 227, 157, 0.45);
   background: rgba(125, 227, 157, 0.08);
   color: #d9ffe6;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  padding: 5px 10px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 
