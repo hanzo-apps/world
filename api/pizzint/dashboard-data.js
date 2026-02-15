@@ -1,6 +1,8 @@
+import { getCorsHeaders } from '../_cors.js';
 export const config = { runtime: 'edge' };
 
-export default async function handler() {
+export default async function handler(request) {
+  const cors = getCorsHeaders(request);
   try {
     const response = await fetch('https://www.pizzint.watch/api/dashboard-data', {
       headers: {
@@ -18,14 +20,14 @@ export default async function handler() {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30',
       },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: 'Failed to fetch PizzINT data', details: error.message }), {
       status: 502,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...cors },
     });
   }
 }
