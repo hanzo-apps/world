@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('desktop runtime routing guardrails', () => {
   test('detectDesktopRuntime covers packaged tauri hosts', async ({ page }) => {
-    await page.goto('/runtime-harness.html');
+    await page.goto('/tests/runtime-harness.html');
 
     const result = await page.evaluate(async () => {
       const runtime = await import('/src/services/runtime.ts');
@@ -69,7 +69,7 @@ test.describe('desktop runtime routing guardrails', () => {
   });
 
   test('runtime fetch patch falls back to cloud for local failures', async ({ page }) => {
-    await page.goto('/runtime-harness.html');
+    await page.goto('/tests/runtime-harness.html');
 
     const result = await page.evaluate(async () => {
       const runtime = await import('/src/services/runtime.ts');
