@@ -1,9 +1,10 @@
 {
   "name": "world-monitor",
   "private": true,
-  "version": "2.3.2",
+  "version": "2.3.3",
   "type": "module",
   "scripts": {
+    "lint:md": "markdownlint-cli2 '**/*.md'",
     "dev": "vite",
     "dev:tech": "VITE_VARIANT=tech vite",
     "build": "tsc && vite build",
@@ -44,6 +45,7 @@
     "@types/maplibre-gl": "^1.13.2",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
+    "markdownlint-cli2": "^0.20.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "vite-plugin-pwa": "^1.2.0",

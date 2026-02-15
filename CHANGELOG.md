@@ -2,9 +2,20 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.3.3] - 2026-02-16
+
+### Fixed
+
+- **Keychain persistence**: Enable `apple-native` (macOS) and `windows-native` (Windows) features for the `keyring` crate — v3 ships with no default platform backends, so API keys were stored in-memory only and lost on restart
+- **Settings key verification**: Soft-pass network errors during API key verification so transient sidecar failures don't block saving
+- **Resilient keychain reads**: Use `Promise.allSettled` in `loadDesktopSecrets` so a single key failure doesn't discard all loaded secrets
+- **Settings window capabilities**: Add `"settings"` to Tauri capabilities window list for core plugin permissions
+- **Input preservation**: Capture unsaved input values before DOM re-render in settings panel
+
 ## [2.3.0] - 2026-02-15
 
 ### Security
+
 - **CORS hardening**: Tighten Vercel preview deployment regex to block origin spoofing (`worldmonitorEVIL.vercel.app`)
 - **Sidecar auth bypass**: Move `/api/local-env-update` behind `LOCAL_API_TOKEN` auth check
 - **Env key allowlist**: Restrict sidecar env mutations to 18 known secret keys (matching `SUPPORTED_SECRET_KEYS`)
@@ -19,43 +30,51 @@ All notable changes to World Monitor are documented here.
 - **Meta tag validation**: Validate URL query params with regex allowlist in `parseStoryParams()`
 
 ### Fixed
+
 - **Service worker stale assets**: Add `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches` to workbox config — fixes `NS_ERROR_CORRUPTED_CONTENT` / MIME type errors when users have a cached SW serving old HTML after redeployment
 
 ## [2.2.6] - 2026-02-14
 
 ### Fixed
+
 - Filter trending noise and fix sidecar auth
 - Restore tech variant panels
 - Remove Market Radar and Economic Data panels from tech variant
 
 ### Docs
+
 - Add developer X/Twitter link to Support section
 - Add cyber threat API keys to `.env.example`
 
 ## [2.2.5] - 2026-02-13
 
 ### Security
+
 - Migrate all Vercel edge functions to CORS allowlist
 - Restrict Railway relay CORS to allowed origins only
 
 ### Fixed
+
 - Hide desktop config panel on web
 - Route World Bank & Polymarket via Railway relay
 
 ## [2.2.3] - 2026-02-12
 
 ### Added
+
 - Cyber threat intelligence map layer (Feodo Tracker, URLhaus, C2IntelFeeds, OTX, AbuseIPDB)
 - Trending keyword spike detection with end-to-end flow
 - Download desktop app slide-in banner for web visitors
 - Country briefs in Cmd+K search
 
 ### Changed
+
 - Redesign 4 panels with table layouts and scoped styles
 - Redesign population exposure panel and reorder UCDP columns
 - Dramatically increase cyber threat map density
 
 ### Fixed
+
 - Resolve z-index conflict between pinned map and panels grid
 - Cap geo enrichment at 12s timeout, prevent duplicate download banners
 - Replace ipwho.is/ipapi.co with ipinfo.io/freeipapi.com for geo enrichment
@@ -65,10 +84,12 @@ All notable changes to World Monitor are documented here.
 ## [2.2.2] - 2026-02-10
 
 ### Added
+
 - Full-page Country Brief Page replacing modal overlay
 - Download redirect API for platform-specific installers
 
 ### Fixed
+
 - Normalize country name from GeoJSON to canonical TIER1 name
 - Tighten headline relevance, add Top News section, compact markets
 - Hide desktop config panel on web, fix irrelevant prediction markets
@@ -76,12 +97,14 @@ All notable changes to World Monitor are documented here.
 - macOS: hide window on close instead of quitting
 
 ### Performance
+
 - Reduce idle CPU from pulse animation loop
 - Harden regression guardrails in CI, cache, and map clustering
 
 ## [2.2.1] - 2026-02-08
 
 ### Fixed
+
 - Consolidate variant naming and fix PWA tile caching
 - Windows settings window: async command, no menu bar, no white flash
 - Constrain layers menu height in DeckGLMap
