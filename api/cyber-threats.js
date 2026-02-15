@@ -21,6 +21,9 @@ const GEO_CACHE_TTL_MS = GEO_CACHE_TTL_SECONDS * 1000;
 
 const FEODO_URL = 'https://feodotracker.abuse.ch/downloads/ipblocklist.json';
 const URLHAUS_RECENT_URL = (limit) => `https://urlhaus-api.abuse.ch/v1/urls/recent/limit/${limit}/`;
+const C2INTEL_URL = 'https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv';
+const OTX_INDICATORS_URL = 'https://otx.alienvault.com/api/v1/indicators/export?type=IPv4&modified_since=';
+const ABUSEIPDB_BLACKLIST_URL = 'https://api.abuseipdb.com/api/v2/blacklist';
 
 const UPSTREAM_TIMEOUT_MS = 8000;
 const GEO_MAX_UNRESOLVED_PER_RUN = 100;
@@ -35,7 +38,7 @@ const rateLimiter = createIpRateLimiter({
 });
 
 const ALLOWED_TYPES = new Set(['c2_server', 'malware_host', 'phishing', 'malicious_url']);
-const ALLOWED_SOURCES = new Set(['feodo', 'urlhaus']);
+const ALLOWED_SOURCES = new Set(['feodo', 'urlhaus', 'c2intel', 'otx', 'abuseipdb']);
 const ALLOWED_SEVERITIES = new Set(['low', 'medium', 'high', 'critical']);
 const ALLOWED_INDICATOR_TYPES = new Set(['ip', 'domain', 'url']);
 
@@ -232,7 +235,8 @@ function parseFeodoRecord(record, cutoffMs) {
   if (!isIpAddress(ip)) return null;
 
   const statusRaw = cleanString(record?.status || record?.c2_status || '', 30).toLowerCase();
-  if (statusRaw !== 'online') return null;
+  // Accept both online and recently-offline (still threat-relevant)
+  if (statusRaw && statusRaw !== 'online' && statusRaw !== 'offline') return null;
 
   const firstSeen = toIsoDate(record?.first_seen || record?.first_seen_utc || record?.dateadded);
   const lastSeen = toIsoDate(record?.last_online || record?.last_seen || record?.last_seen_utc || record?.first_seen || record?.first_seen_utc);
@@ -255,7 +259,7 @@ function parseFeodoRecord(record, cutoffMs) {
     lat: toFiniteNumber(record?.latitude ?? record?.lat),
     lon: toFiniteNumber(record?.longitude ?? record?.lon),
     country: record?.country || record?.country_code,
-    severity: inferFeodoSeverity(record, malwareFamily),
+    severity: statusRaw === 'online' ? inferFeodoSeverity(record, malwareFamily) : 'medium',
     malwareFamily,
     tags: ['botnet', 'c2', ...tags],
     firstSeen,
@@ -318,6 +322,46 @@ function parseUrlhausRecord(record, cutoffMs) {
     tags,
     firstSeen,
     lastSeen,
+  });
+}
+
+function parseC2IntelCsvLine(line) {
+  if (!line || line.startsWith('#')) return null;
+  const commaIdx = line.indexOf(',');
+  if (commaIdx < 0) return null;
+
+  const ip = cleanString(line.slice(0, commaIdx), 80).toLowerCase();
+  if (!isIpAddress(ip)) return null;
+
+  const description = cleanString(line.slice(commaIdx + 1), 200);
+  const malwareFamily = description
+    .replace(/^Possible\s+/i, '')
+    .replace(/\s+C2\s+IP$/i, '')
+    .trim() || 'Unknown';
+
+  const tags = ['c2'];
+  const descLower = description.toLowerCase();
+  if (descLower.includes('cobaltstrike') || descLower.includes('cobalt strike')) tags.push('cobaltstrike');
+  if (descLower.includes('metasploit')) tags.push('metasploit');
+  if (descLower.includes('sliver')) tags.push('sliver');
+  if (descLower.includes('brute ratel') || descLower.includes('bruteratel')) tags.push('bruteratel');
+
+  const severity = /cobaltstrike|cobalt.strike|brute.?ratel/i.test(description) ? 'high' : 'medium';
+
+  return sanitizeThreat({
+    id: `c2intel:${ip}`,
+    type: 'c2_server',
+    source: 'c2intel',
+    indicator: ip,
+    indicatorType: 'ip',
+    lat: null,
+    lon: null,
+    country: undefined,
+    severity,
+    malwareFamily,
+    tags: normalizeTags(tags),
+    firstSeen: undefined,
+    lastSeen: undefined,
   });
 }
 
@@ -640,6 +684,153 @@ async function fetchUrlhausSource(limit, cutoffMs) {
   }
 }
 
+async function fetchOtxSource(limit, days) {
+  const apiKey = cleanString(process.env.OTX_API_KEY || '', 200);
+  if (!apiKey) {
+    return { ok: false, threats: [], reason: 'missing_api_key', enabled: false };
+  }
+
+  try {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const response = await fetchJsonWithTimeout(
+      `${OTX_INDICATORS_URL}${encodeURIComponent(since)}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'X-OTX-API-KEY': apiKey,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return { ok: false, threats: [], reason: `otx_http_${response.status}`, enabled: true };
+    }
+
+    const payload = await response.json();
+    const results = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
+
+    const parsed = [];
+    for (const record of results) {
+      const ip = cleanString(record?.indicator || record?.ip || '', 80).toLowerCase();
+      if (!isIpAddress(ip)) continue;
+
+      const title = cleanString(record?.title || record?.description || '', 200);
+      const tags = normalizeTags(record?.tags || []);
+
+      const severity = tags.some((t) => /ransomware|apt|c2|botnet/.test(t)) ? 'high' : 'medium';
+
+      const sanitized = sanitizeThreat({
+        id: `otx:${ip}`,
+        type: tags.some((t) => /c2|botnet/.test(t)) ? 'c2_server' : 'malware_host',
+        source: 'otx',
+        indicator: ip,
+        indicatorType: 'ip',
+        lat: null,
+        lon: null,
+        country: undefined,
+        severity,
+        malwareFamily: title || undefined,
+        tags,
+        firstSeen: toIsoDate(record?.created),
+        lastSeen: toIsoDate(record?.modified || record?.created),
+      });
+      if (sanitized) parsed.push(sanitized);
+      if (parsed.length >= limit) break;
+    }
+
+    return { ok: true, threats: parsed, enabled: true };
+  } catch (error) {
+    return { ok: false, threats: [], reason: `otx_error:${cleanString(toErrorMessage(error), 120)}`, enabled: true };
+  }
+}
+
+async function fetchAbuseIpDbSource(limit) {
+  const apiKey = cleanString(process.env.ABUSEIPDB_API_KEY || '', 200);
+  if (!apiKey) {
+    return { ok: false, threats: [], reason: 'missing_api_key', enabled: false };
+  }
+
+  try {
+    const url = `${ABUSEIPDB_BLACKLIST_URL}?confidenceMinimum=90&limit=${Math.min(limit, 500)}`;
+    const response = await fetchJsonWithTimeout(url, {
+      headers: {
+        Accept: 'application/json',
+        Key: apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      return { ok: false, threats: [], reason: `abuseipdb_http_${response.status}`, enabled: true };
+    }
+
+    const payload = await response.json();
+    const records = Array.isArray(payload?.data) ? payload.data : [];
+
+    const parsed = [];
+    for (const record of records) {
+      const ip = cleanString(record?.ipAddress || record?.ip || '', 80).toLowerCase();
+      if (!isIpAddress(ip)) continue;
+
+      const score = toFiniteNumber(record?.abuseConfidenceScore) ?? 0;
+      const severity = score >= 95 ? 'critical' : (score >= 80 ? 'high' : 'medium');
+
+      const sanitized = sanitizeThreat({
+        id: `abuseipdb:${ip}`,
+        type: 'malware_host',
+        source: 'abuseipdb',
+        indicator: ip,
+        indicatorType: 'ip',
+        lat: toFiniteNumber(record?.latitude ?? record?.lat),
+        lon: toFiniteNumber(record?.longitude ?? record?.lon),
+        country: record?.countryCode || record?.country,
+        severity,
+        malwareFamily: undefined,
+        tags: normalizeTags([`score:${score}`]),
+        firstSeen: undefined,
+        lastSeen: toIsoDate(record?.lastReportedAt),
+      });
+      if (sanitized) parsed.push(sanitized);
+      if (parsed.length >= limit) break;
+    }
+
+    return { ok: true, threats: parsed, enabled: true };
+  } catch (error) {
+    return { ok: false, threats: [], reason: `abuseipdb_error:${cleanString(toErrorMessage(error), 120)}`, enabled: true };
+  }
+}
+
+async function fetchC2IntelSource(limit) {
+  try {
+    const response = await fetchJsonWithTimeout(C2INTEL_URL, {
+      headers: { Accept: 'text/plain' },
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        threats: [],
+        reason: `c2intel_http_${response.status}`,
+      };
+    }
+
+    const text = await response.text();
+    const lines = text.split('\n');
+
+    const parsed = lines
+      .map((line) => parseC2IntelCsvLine(line))
+      .filter(Boolean)
+      .slice(0, limit);
+
+    return { ok: true, threats: parsed };
+  } catch (error) {
+    return {
+      ok: false,
+      threats: [],
+      reason: `c2intel_error:${cleanString(toErrorMessage(error), 120)}`,
+    };
+  }
+}
+
 export function __resetCyberThreatsState() {
   responseMemoryCache.clear();
   staleFallbackCache.clear();
@@ -716,18 +907,25 @@ export default async function handler(req) {
   }
 
   try {
-    const [feodo, urlhaus] = await Promise.all([
+    const [feodo, urlhaus, c2intel, otx, abuseipdb] = await Promise.all([
       fetchFeodoSource(limit, cutoffMs),
       fetchUrlhausSource(limit, cutoffMs),
+      fetchC2IntelSource(limit),
+      fetchOtxSource(limit, days),
+      fetchAbuseIpDbSource(limit),
     ]);
 
-    if (!feodo.ok && !urlhaus.ok) {
+    const anySuceeded = feodo.ok || urlhaus.ok || c2intel.ok || otx.ok || abuseipdb.ok;
+    if (!anySuceeded) {
       throw new Error('all_sources_failed');
     }
 
     const combined = __testDedupeThreats([
       ...feodo.threats,
       ...urlhaus.threats,
+      ...c2intel.threats,
+      ...otx.threats,
+      ...abuseipdb.threats,
     ]);
 
     const withGeo = await hydrateThreatCoordinates(combined);
@@ -748,23 +946,26 @@ export default async function handler(req) {
       })
       .slice(0, limit);
 
-    const partial = !feodo.ok || (urlhaus.enabled === true && !urlhaus.ok);
+    const enabledButFailed = (src) => src.enabled !== false && !src.ok;
+    const partial = !feodo.ok || enabledButFailed(urlhaus) || !c2intel.ok
+      || enabledButFailed(otx) || enabledButFailed(abuseipdb);
+
+    const sourceStatus = (src) => ({
+      ok: src.ok,
+      count: src.threats.length,
+      ...(src.reason ? { reason: src.reason } : {}),
+    });
 
     const result = {
       success: true,
       count: mapData.length,
       partial,
       sources: {
-        feodo: {
-          ok: feodo.ok,
-          count: feodo.threats.length,
-          ...(feodo.reason ? { reason: feodo.reason } : {}),
-        },
-        urlhaus: {
-          ok: urlhaus.ok,
-          count: urlhaus.threats.length,
-          ...(urlhaus.reason ? { reason: urlhaus.reason } : {}),
-        },
+        feodo: sourceStatus(feodo),
+        urlhaus: sourceStatus(urlhaus),
+        c2intel: sourceStatus(c2intel),
+        otx: sourceStatus(otx),
+        abuseipdb: sourceStatus(abuseipdb),
       },
       data: mapData,
       cachedAt: new Date().toISOString(),
