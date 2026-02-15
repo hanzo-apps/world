@@ -48,11 +48,14 @@ export class UcdpEventsPanel extends Panel {
       { key: 'one-sided', label: 'One-Sided' },
     ];
 
-    const tabCounts = {
-      'state-based': this.events.filter(e => e.type_of_violence === 'state-based').length,
-      'non-state': this.events.filter(e => e.type_of_violence === 'non-state').length,
-      'one-sided': this.events.filter(e => e.type_of_violence === 'one-sided').length,
+    const tabCounts: Record<UcdpEventType, number> = {
+      'state-based': 0,
+      'non-state': 0,
+      'one-sided': 0,
     };
+    for (const event of this.events) {
+      tabCounts[event.type_of_violence] += 1;
+    }
 
     const totalDeaths = filtered.reduce((sum, e) => sum + e.deaths_best, 0);
 

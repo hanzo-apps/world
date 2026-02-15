@@ -38,6 +38,7 @@ import { aggregateThreats } from './threat-classifier';
 
 const TOPIC_BASELINE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const TOPIC_BASELINE_SPIKE_MULTIPLIER = 3;
+const TOPIC_HISTORY_MAX_POINTS = 1000;
 
 interface TopicVelocityPoint {
   timestamp: number;
@@ -492,6 +493,9 @@ export function analyzeCorrelationsCore(
   for (const topic of topicUniverse) {
     const prior = pruneVelocityHistory(previousHistory.get(topic) ?? [], now);
     const updated = [...prior, { timestamp: now, velocity: newsTopics.get(topic) ?? 0 }];
+    if (updated.length > TOPIC_HISTORY_MAX_POINTS) {
+      updated.splice(0, updated.length - TOPIC_HISTORY_MAX_POINTS);
+    }
     currentHistory.set(topic, updated);
   }
 
