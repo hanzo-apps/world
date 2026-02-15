@@ -1146,6 +1146,7 @@ export interface MapProtestCluster {
   country: string;
   maxSeverity: 'low' | 'medium' | 'high';
   hasRiot: boolean;
+  latestRiotEventTimeMs?: number;
   totalFatalities: number;
   riotCount?: number;
   highSeverityCount?: number;
