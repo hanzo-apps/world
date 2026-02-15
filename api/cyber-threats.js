@@ -26,9 +26,10 @@ const OTX_INDICATORS_URL = 'https://otx.alienvault.com/api/v1/indicators/export?
 const ABUSEIPDB_BLACKLIST_URL = 'https://api.abuseipdb.com/api/v2/blacklist';
 
 const UPSTREAM_TIMEOUT_MS = 8000;
-const GEO_MAX_UNRESOLVED_PER_RUN = 100;
-const GEO_CONCURRENCY = 8;
-const GEO_OVERALL_TIMEOUT_MS = 12_000;
+const GEO_MAX_UNRESOLVED_PER_RUN = 250;
+const GEO_CONCURRENCY = 16;
+const GEO_OVERALL_TIMEOUT_MS = 15_000;
+const GEO_PER_IP_TIMEOUT_MS = 3000;
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60 * 1000;
@@ -126,6 +127,37 @@ function normalizeCountry(value) {
   if (!raw) return undefined;
   if (/^[a-z]{2}$/i.test(raw)) return raw.toUpperCase();
   return raw;
+}
+
+const COUNTRY_CENTROIDS = {
+  US:[39.8,-98.6],CA:[56.1,-106.3],MX:[23.6,-102.6],BR:[-14.2,-51.9],AR:[-38.4,-63.6],
+  GB:[55.4,-3.4],DE:[51.2,10.5],FR:[46.2,2.2],IT:[41.9,12.6],ES:[40.5,-3.7],
+  NL:[52.1,5.3],BE:[50.5,4.5],SE:[60.1,18.6],NO:[60.5,8.5],FI:[61.9,25.7],
+  DK:[56.3,9.5],PL:[51.9,19.1],CZ:[49.8,15.5],AT:[47.5,14.6],CH:[46.8,8.2],
+  PT:[39.4,-8.2],IE:[53.1,-8.2],RO:[45.9,25.0],HU:[47.2,19.5],BG:[42.7,25.5],
+  HR:[45.1,15.2],SK:[48.7,19.7],UA:[48.4,31.2],RU:[61.5,105.3],BY:[53.7,28.0],
+  TR:[39.0,35.2],GR:[39.1,21.8],RS:[44.0,21.0],CN:[35.9,104.2],JP:[36.2,138.3],
+  KR:[35.9,127.8],IN:[20.6,79.0],PK:[30.4,69.3],BD:[23.7,90.4],ID:[-0.8,113.9],
+  TH:[15.9,101.0],VN:[14.1,108.3],PH:[12.9,121.8],MY:[4.2,101.9],SG:[1.4,103.8],
+  TW:[23.7,121.0],HK:[22.4,114.1],AU:[-25.3,133.8],NZ:[-40.9,174.9],
+  ZA:[-30.6,22.9],NG:[9.1,8.7],EG:[26.8,30.8],KE:[-0.02,37.9],ET:[9.1,40.5],
+  MA:[31.8,-7.1],DZ:[28.0,1.7],TN:[33.9,9.5],GH:[7.9,-1.0],
+  SA:[23.9,45.1],AE:[23.4,53.8],IL:[31.0,34.9],IR:[32.4,53.7],IQ:[33.2,43.7],
+  KW:[29.3,47.5],QA:[25.4,51.2],BH:[26.0,50.6],JO:[30.6,36.2],LB:[33.9,35.9],
+  CL:[-35.7,-71.5],CO:[4.6,-74.3],PE:[-9.2,-75.0],VE:[6.4,-66.6],
+  KZ:[48.0,68.0],UZ:[41.4,64.6],GE:[42.3,43.4],AZ:[40.1,47.6],AM:[40.1,45.0],
+  LT:[55.2,23.9],LV:[56.9,24.1],EE:[58.6,25.0],
+  HN:[15.2,-86.2],GT:[15.8,-90.2],PA:[8.5,-80.8],CR:[9.7,-84.0],
+  SN:[14.5,-14.5],CM:[7.4,12.4],CI:[7.5,-5.5],TZ:[-6.4,34.9],UG:[1.4,32.3],
+};
+
+function getCountryCentroid(countryCode) {
+  if (!countryCode) return null;
+  const code = countryCode.toUpperCase();
+  const coords = COUNTRY_CENTROIDS[code];
+  if (!coords) return null;
+  const jitter = () => (Math.random() - 0.5) * 2;
+  return { lat: coords[0] + jitter(), lon: coords[1] + jitter() };
 }
 
 function normalizeTags(input, maxTags = 8) {
@@ -497,7 +529,7 @@ async function setGeoCache(ip, geo) {
 async function fetchGeoIp(ip) {
   // Primary: ipinfo.io (HTTPS, works from Edge runtime & Node.js, 50K/mo free)
   try {
-    const primary = await fetchJsonWithTimeout(`https://ipinfo.io/${encodeURIComponent(ip)}/json`);
+    const primary = await fetchJsonWithTimeout(`https://ipinfo.io/${encodeURIComponent(ip)}/json`, {}, GEO_PER_IP_TIMEOUT_MS);
     if (primary.ok) {
       const data = await primary.json();
       const locParts = (data?.loc || '').split(',');
@@ -515,7 +547,7 @@ async function fetchGeoIp(ip) {
 
   // Fallback: freeipapi.com (HTTPS, works from Edge runtime, 60/min)
   try {
-    const fallback = await fetchJsonWithTimeout(`https://freeipapi.com/api/json/${encodeURIComponent(ip)}`);
+    const fallback = await fetchJsonWithTimeout(`https://freeipapi.com/api/json/${encodeURIComponent(ip)}`, {}, GEO_PER_IP_TIMEOUT_MS);
     if (!fallback.ok) return null;
 
     const data = await fallback.json();
@@ -588,14 +620,21 @@ async function hydrateThreatCoordinates(threats) {
     if (hasCoords || threat.indicatorType !== 'ip') return threat;
 
     const lookup = resolvedByIp.get(cleanString(threat.indicator, 80).toLowerCase());
-    if (!lookup) return threat;
+    if (lookup) {
+      return {
+        ...threat,
+        lat: lookup.lat,
+        lon: lookup.lon,
+        country: threat.country || lookup.country,
+      };
+    }
 
-    return {
-      ...threat,
-      lat: lookup.lat,
-      lon: lookup.lon,
-      country: threat.country || lookup.country,
-    };
+    const centroid = getCountryCentroid(threat.country);
+    if (centroid) {
+      return { ...threat, lat: centroid.lat, lon: centroid.lon };
+    }
+
+    return threat;
   });
 }
 
