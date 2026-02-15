@@ -11,7 +11,7 @@ use std::env;
 use keyring::Entry;
 use serde_json::{Map, Value};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent, WebviewUrl, WebviewWindowBuilder};
 
 const LOCAL_API_PORT: &str = "46123";
 const KEYRING_SERVICE: &str = "world-monitor";
@@ -595,8 +595,31 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while running world-monitor tauri application")
         .run(|app, event| {
-            if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
-                stop_local_api(&app);
+            match &event {
+                // macOS: hide window on close instead of quitting (standard behavior)
+                #[cfg(target_os = "macos")]
+                RunEvent::WindowEvent {
+                    label,
+                    event: WindowEvent::CloseRequested { api, .. },
+                    ..
+                } if label == "main" => {
+                    api.prevent_close();
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.hide();
+                    }
+                }
+                // macOS: reshow window when dock icon is clicked
+                #[cfg(target_os = "macos")]
+                RunEvent::Reopen { .. } => {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                }
+                RunEvent::ExitRequested { .. } | RunEvent::Exit => {
+                    stop_local_api(app);
+                }
+                _ => {}
             }
         });
 }
