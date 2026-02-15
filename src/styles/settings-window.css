@@ -68,6 +68,9 @@
   line-height: 20px;
   font-size: 11px;
   color: var(--settings-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-action-status.ok { color: var(--settings-green); }
@@ -208,6 +211,31 @@
 
 .settings-runtime-panel input[type="checkbox"] {
   accent-color: var(--settings-accent);
+}
+
+/* Validation feedback */
+.runtime-secret-check {
+  color: var(--settings-green);
+  font-size: 14px;
+  margin-left: 6px;
+  display: none;
+}
+
+.runtime-secret-check.visible {
+  display: inline;
+}
+
+.runtime-secret-hint {
+  color: var(--settings-red);
+  font-size: 11px;
+}
+
+.settings-runtime-panel .runtime-secret-row input.valid-staged {
+  border-color: rgba(48, 209, 88, 0.5);
+}
+
+.settings-runtime-panel .runtime-secret-row input.invalid {
+  border-color: var(--settings-red);
 }
 
 /* Signup link icon */
