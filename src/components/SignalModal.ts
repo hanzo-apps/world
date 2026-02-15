@@ -1,5 +1,6 @@
 import type { CorrelationSignal } from '@/services/correlation';
 import type { UnifiedAlert } from '@/services/cross-module-integration';
+import { suppressTrendingTerm } from '@/services/trending-keywords';
 import { escapeHtml } from '@/utils/sanitize';
 import { getSignalContext, type SignalType } from '@/utils/analysis-constants';
 
@@ -70,6 +71,18 @@ export class SignalModal {
           this.onLocationClick(lat, lon);
           this.hide();
         }
+        return;
+      }
+
+      if (target.classList.contains('suppress-keyword-btn')) {
+        const term = (target.dataset.term || '').trim();
+        if (!term) return;
+        suppressTrendingTerm(term);
+        this.currentSignals = this.currentSignals.filter(signal => {
+          const signalTerm = (signal.data as Record<string, unknown>).term;
+          return typeof signalTerm !== 'string' || signalTerm.toLowerCase() !== term.toLowerCase();
+        });
+        this.renderSignals();
       }
     });
   }
@@ -219,6 +232,7 @@ export class SignalModal {
       'news_leads_markets': '📰 News Leading',
       'silent_divergence': '🔇 Silent Divergence',
       'velocity_spike': '🔥 Velocity Spike',
+      'keyword_spike': '📊 Keyword Spike',
       'convergence': '◉ Convergence',
       'triangulation': '△ Triangulation',
       'flow_drop': '🛢️ Flow Drop',
@@ -285,6 +299,11 @@ export class SignalModal {
           ${signal.data.relatedTopics?.length ? `
             <div class="signal-topics">
               ${signal.data.relatedTopics.map(t => `<span class="signal-topic">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          ` : ''}
+          ${signal.type === 'keyword_spike' && typeof data?.term === 'string' ? `
+            <div class="signal-actions">
+              <button class="suppress-keyword-btn" data-term="${escapeHtml(data.term)}">Suppress this term</button>
             </div>
           ` : ''}
         </div>
