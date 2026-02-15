@@ -178,6 +178,17 @@ export function clearCountryData(): void {
   hotspotActivityMap.clear();
 }
 
+export function getCountryData(code: string): CountryData | undefined {
+  return countryDataMap.get(code);
+}
+
+export function getPreviousScores(): Map<string, number> {
+  return previousScores;
+}
+
+export { COUNTRY_BOUNDS };
+export type { CountryData };
+
 function normalizeCountryName(name: string): string | null {
   const lower = name.toLowerCase();
   for (const [code, keywords] of Object.entries(COUNTRY_KEYWORDS)) {
