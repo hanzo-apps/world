@@ -2,6 +2,14 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.3.4] - 2026-02-16
+
+### Fixed
+
+- **Windows sidecar crash**: Strip `\\?\` UNC extended-length prefix from paths before passing to Node.js — Tauri `resource_dir()` on Windows returns UNC-prefixed paths that cause `EISDIR: lstat 'C:'` in Node.js module resolution
+- **Windows sidecar CWD**: Set explicit `current_dir` on the Node.js Command to prevent bare drive-letter working directory issues from NSIS shortcut launcher
+- **Sidecar package scope**: Add `package.json` with `"type": "module"` to sidecar directory, preventing Node.js from walking up the entire directory tree during ESM scope resolution
+
 ## [2.3.3] - 2026-02-16
 
 ### Fixed

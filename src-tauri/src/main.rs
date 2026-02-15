@@ -420,6 +420,18 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     }
 }
 
+/// Strip the `\\?\` extended-length path prefix that Windows `canonicalize()` adds.
+/// Node.js module resolution cannot handle UNC-prefixed paths and walks up to a
+/// bare drive letter like `C:` which then fails with `EISDIR: lstat 'C:'`.
+fn sanitize_path_for_node(p: &Path) -> String {
+    let s = p.to_string_lossy();
+    if s.starts_with("\\\\?\\") {
+        s[4..].to_string()
+    } else {
+        s.into_owned()
+    }
+}
+
 fn local_api_paths(app: &AppHandle) -> (PathBuf, PathBuf) {
     let resource_dir = app
         .path()
@@ -540,13 +552,22 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
     drop(token_slot);
 
     let mut cmd = Command::new(&node_binary);
-    cmd.arg(&script)
+    // Sanitize paths for Node.js on Windows: strip \\?\ UNC prefix and set
+    // explicit working directory to avoid bare drive-letter CWD issues that
+    // cause EISDIR errors in Node.js module resolution.
+    let script_for_node = sanitize_path_for_node(&script);
+    let resource_for_node = sanitize_path_for_node(&resource_root);
+    append_desktop_log(app, "INFO", &format!("node args: script={script_for_node} resource_dir={resource_for_node}"));
+    cmd.arg(&script_for_node)
         .env("LOCAL_API_PORT", LOCAL_API_PORT)
-        .env("LOCAL_API_RESOURCE_DIR", resource_root)
+        .env("LOCAL_API_RESOURCE_DIR", &resource_for_node)
         .env("LOCAL_API_MODE", "tauri-sidecar")
         .env("LOCAL_API_TOKEN", &local_api_token)
         .stdout(Stdio::from(log_file))
         .stderr(Stdio::from(log_file_err));
+    if let Some(parent) = script.parent() {
+        cmd.current_dir(parent);
+    }
 
     // Pass keychain secrets to sidecar as env vars
     let mut secret_count = 0u32;

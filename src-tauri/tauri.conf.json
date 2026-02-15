@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "World Monitor",
   "mainBinaryName": "world-monitor",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "identifier": "app.worldmonitor.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -47,6 +47,7 @@
     "resources": [
       "../api",
       "sidecar/local-api-server.mjs",
+      "sidecar/package.json",
       "../data",
       "../src/config"
     ],
