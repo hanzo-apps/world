@@ -35,6 +35,7 @@ import type {
   MapTechHQCluster,
   MapTechEventCluster,
   MapDatacenterCluster,
+  CyberThreat,
 } from '@/types';
 import { ArcLayer } from '@deck.gl/layers';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
@@ -197,6 +198,7 @@ export class DeckGLMap {
   private earthquakes: Earthquake[] = [];
   private weatherAlerts: WeatherAlert[] = [];
   private outages: InternetOutage[] = [];
+  private cyberThreats: CyberThreat[] = [];
   private aisDisruptions: AisDisruptionEvent[] = [];
   private aisDensity: AisDensityZone[] = [];
   private cableAdvisories: CableAdvisory[] = [];
@@ -256,6 +258,7 @@ export class DeckGLMap {
   private lastSCBoundsKey = '';
   private lastSCMask = '';
   private newsPulseIntervalId: ReturnType<typeof setInterval> | null = null;
+  private readonly startupTime = Date.now();
   private lastCableHighlightSignature = '';
   private lastPipelineHighlightSignature = '';
   private debouncedRebuildLayers: () => void;
@@ -271,10 +274,12 @@ export class DeckGLMap {
     this.rebuildDatacenterSupercluster();
 
     this.debouncedRebuildLayers = debounce(() => {
+      if (this.renderPaused) return;
       this.maplibreMap?.resize();
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     }, 150);
     this.rafUpdateLayers = rafSchedule(() => {
+      if (this.renderPaused) return;
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     });
 
@@ -618,6 +623,11 @@ export class DeckGLMap {
           const verifiedCount = Number(props.verifiedCount ?? 0);
           const totalFatalities = Number(props.totalFatalities ?? 0);
           const clusterCount = Number(f.properties.point_count ?? items.length);
+          const latestRiotEventTimeMs = items.reduce((max, it) => {
+            if (it.eventType !== 'riot' || it.sourceType === 'gdelt') return max;
+            const ts = it.time.getTime();
+            return Number.isFinite(ts) ? Math.max(max, ts) : max;
+          }, 0);
           return {
             id: `pc-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
@@ -626,6 +636,7 @@ export class DeckGLMap {
             country: String(props.country ?? items[0]?.country ?? ''),
             maxSeverity: maxSev as 'low' | 'medium' | 'high',
             hasRiot: riotCount > 0,
+            latestRiotEventTimeMs: latestRiotEventTimeMs || undefined,
             totalFatalities,
             riotCount,
             highSeverityCount,
@@ -638,6 +649,10 @@ export class DeckGLMap {
           id: `pp-${f.properties.index}`, lat: item.lat, lon: item.lon,
           count: 1, items: [item], country: item.country,
           maxSeverity: item.severity, hasRiot: item.eventType === 'riot',
+          latestRiotEventTimeMs:
+            item.eventType === 'riot' && item.sourceType !== 'gdelt' && Number.isFinite(item.time.getTime())
+              ? item.time.getTime()
+              : undefined,
           totalFatalities: item.fatalities ?? 0,
           riotCount: item.eventType === 'riot' ? 1 : 0,
           highSeverityCount: item.severity === 'high' ? 1 : 0,
@@ -865,6 +880,12 @@ export class DeckGLMap {
     if (mapLayers.outages && this.outages.length > 0) {
       layers.push(this.createOutagesLayer());
       layers.push(this.createGhostLayer('outages-layer', this.outages, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
+    }
+
+    // Cyber threat IOC layer
+    if (mapLayers.cyberThreats && this.cyberThreats.length > 0) {
+      layers.push(this.createCyberThreatsLayer());
+      layers.push(this.createGhostLayer('cyber-threats-layer', this.cyberThreats, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
     }
 
     // AIS density layer
@@ -1344,6 +1365,36 @@ export class DeckGLMap {
       radiusMinPixels: 6,
       radiusMaxPixels: 18,
       pickable: true,
+    });
+  }
+
+  private createCyberThreatsLayer(): ScatterplotLayer<CyberThreat> {
+    return new ScatterplotLayer<CyberThreat>({
+      id: 'cyber-threats-layer',
+      data: this.cyberThreats,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => {
+        switch (d.severity) {
+          case 'critical': return 22000;
+          case 'high': return 17000;
+          case 'medium': return 13000;
+          default: return 9000;
+        }
+      },
+      getFillColor: (d) => {
+        switch (d.severity) {
+          case 'critical': return [255, 61, 0, 225] as [number, number, number, number];
+          case 'high': return [255, 102, 0, 205] as [number, number, number, number];
+          case 'medium': return [255, 176, 0, 185] as [number, number, number, number];
+          default: return [255, 235, 59, 170] as [number, number, number, number];
+        }
+      },
+      radiusMinPixels: 6,
+      radiusMaxPixels: 18,
+      pickable: true,
+      stroked: true,
+      getLineColor: [255, 255, 255, 160] as [number, number, number, number],
+      lineWidthMinPixels: 1,
     });
   }
 
@@ -1877,19 +1928,50 @@ export class DeckGLMap {
 
   private pulseTime = 0;
 
-  private needsPulseAnimation(): boolean {
-    return this.hasRecentNews(Date.now())
-      || this.protestClusters.some(c => c.maxSeverity === 'high' || c.hasRiot)
-      || this.hotspots.some(h => h.level === 'high' || h.hasBreaking);
+  private canPulse(now = Date.now()): boolean {
+    return now - this.startupTime > 60_000;
+  }
+
+  private hasRecentRiot(now = Date.now(), windowMs = 2 * 60 * 60 * 1000): boolean {
+    const hasRecentClusterRiot = this.protestClusters.some(c =>
+      c.hasRiot && c.latestRiotEventTimeMs != null && (now - c.latestRiotEventTimeMs) < windowMs
+    );
+    if (hasRecentClusterRiot) return true;
+
+    // Fallback to raw protests because syncPulseAnimation can run before cluster data refreshes.
+    return this.protests.some((p) => {
+      if (p.eventType !== 'riot' || p.sourceType === 'gdelt') return false;
+      const ts = p.time.getTime();
+      return Number.isFinite(ts) && (now - ts) < windowMs;
+    });
+  }
+
+  private needsPulseAnimation(now = Date.now()): boolean {
+    return this.hasRecentNews(now)
+      || this.hasRecentRiot(now)
+      || this.hotspots.some(h => h.hasBreaking);
+  }
+
+  private syncPulseAnimation(now = Date.now()): void {
+    if (this.renderPaused) {
+      if (this.newsPulseIntervalId !== null) this.stopPulseAnimation();
+      return;
+    }
+    const shouldPulse = this.canPulse(now) && this.needsPulseAnimation(now);
+    if (shouldPulse && this.newsPulseIntervalId === null) {
+      this.startPulseAnimation();
+    } else if (!shouldPulse && this.newsPulseIntervalId !== null) {
+      this.stopPulseAnimation();
+    }
   }
 
   private startPulseAnimation(): void {
     if (this.newsPulseIntervalId !== null) return;
-    const PULSE_UPDATE_INTERVAL_MS = 250;
+    const PULSE_UPDATE_INTERVAL_MS = 500;
 
     this.newsPulseIntervalId = setInterval(() => {
       const now = Date.now();
-      if (!this.needsPulseAnimation()) {
+      if (!this.needsPulseAnimation(now)) {
         this.pulseTime = now;
         this.stopPulseAnimation();
         this.rafUpdateLayers();
@@ -2089,6 +2171,8 @@ export class DeckGLMap {
       }
       case 'outages-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.asn || 'Internet Outage')}</strong><br/>${text(obj.country)}</div>` };
+      case 'cyber-threats-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>Cyber Threat</strong><br/>${text(obj.severity || 'medium')} · ${text(obj.country || 'Unknown')}</div>` };
       case 'news-locations-layer':
         return { html: `<div class="deckgl-tooltip"><strong>📰 News</strong><br/>${text(obj.title?.slice(0, 80) || '')}</div>` };
       default:
@@ -2235,6 +2319,7 @@ export class DeckGLMap {
       'earthquakes-layer': 'earthquake',
       'weather-layer': 'weather',
       'outages-layer': 'outage',
+      'cyber-threats-layer': 'cyberThreat',
       'protests-layer': 'protest',
       'military-flights-layer': 'militaryFlight',
       'military-vessels-layer': 'militaryVessel',
@@ -2376,6 +2461,7 @@ export class DeckGLMap {
           { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
           { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
+          { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
           { key: 'techEvents', label: 'Tech Events', icon: '&#128197;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
           { key: 'fires', label: 'Fires', icon: '&#128293;' },
@@ -2399,6 +2485,7 @@ export class DeckGLMap {
           { key: 'climate', label: 'Climate Anomalies', icon: '&#127787;' },
           { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
+          { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
           { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
           { key: 'fires', label: 'Fires', icon: '&#128293;' },
           { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
@@ -2649,7 +2736,14 @@ export class DeckGLMap {
   }
 
   public setRenderPaused(paused: boolean): void {
+    if (this.renderPaused === paused) return;
     this.renderPaused = paused;
+    if (paused) {
+      this.stopPulseAnimation();
+      return;
+    }
+
+    this.syncPulseAnimation();
     if (!paused && this.renderPending) {
       this.renderPending = false;
       this.render();
@@ -2657,6 +2751,7 @@ export class DeckGLMap {
   }
 
   private updateLayers(): void {
+    if (this.renderPaused) return;
     const startTime = performance.now();
     if (this.deckOverlay) {
       this.deckOverlay.setProps({ layers: this.buildLayers() });
@@ -2830,6 +2925,11 @@ export class DeckGLMap {
     this.render();
   }
 
+  public setCyberThreats(threats: CyberThreat[]): void {
+    this.cyberThreats = threats;
+    this.render();
+  }
+
   public setAisData(disruptions: AisDisruptionEvent[], density: AisDensityZone[]): void {
     this.aisDisruptions = disruptions;
     this.aisDensity = density;
@@ -2846,9 +2946,7 @@ export class DeckGLMap {
     this.protests = events;
     this.rebuildProtestSupercluster();
     this.render();
-    if (this.needsPulseAnimation() && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    }
+    this.syncPulseAnimation();
   }
 
   public setFlightDelays(delays: AirportDelayAlert[]): void {
@@ -2912,12 +3010,7 @@ export class DeckGLMap {
     this.newsLocations = data;
     this.render();
 
-    const hasRecent = this.hasRecentNews(now);
-    if (hasRecent && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    } else if (!hasRecent) {
-      this.stopPulseAnimation();
-    }
+    this.syncPulseAnimation(now);
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
@@ -2952,9 +3045,7 @@ export class DeckGLMap {
     });
 
     this.render();
-    if (this.needsPulseAnimation() && this.newsPulseIntervalId === null) {
-      this.startPulseAnimation();
-    }
+    this.syncPulseAnimation();
   }
 
   /** Get news items related to a hotspot by keyword matching */
