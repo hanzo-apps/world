@@ -305,8 +305,13 @@ export async function setSecretValue(key: RuntimeSecretKey, value: string): Prom
     delete runtimeConfig.secrets[key];
   }
 
-  // Push to sidecar so handlers pick it up immediately
-  await pushSecretToSidecar(key, sanitized || '');
+  // Push to sidecar so handlers pick it up immediately.
+  // This is best-effort: keyring persistence is the source of truth.
+  try {
+    await pushSecretToSidecar(key, sanitized || '');
+  } catch (error) {
+    console.warn(`[runtime-config] Failed to sync ${key} to sidecar`, error);
+  }
 
   notifyConfigChanged();
 }
