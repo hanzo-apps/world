@@ -1147,6 +1147,10 @@ export interface MapProtestCluster {
   maxSeverity: 'low' | 'medium' | 'high';
   hasRiot: boolean;
   totalFatalities: number;
+  riotCount?: number;
+  highSeverityCount?: number;
+  verifiedCount?: number;
+  sampled?: boolean;
 }
 
 export interface MapTechHQCluster {
@@ -1158,6 +1162,10 @@ export interface MapTechHQCluster {
   city: string;
   country: string;
   primaryType: 'faang' | 'unicorn' | 'public';
+  faangCount?: number;
+  unicornCount?: number;
+  publicCount?: number;
+  sampled?: boolean;
 }
 
 export interface MapTechEventCluster {
@@ -1169,6 +1177,8 @@ export interface MapTechEventCluster {
   location: string;
   country: string;
   soonestDaysUntil: number;
+  soonCount?: number;
+  sampled?: boolean;
 }
 
 export interface MapDatacenterCluster {
@@ -1182,4 +1192,7 @@ export interface MapDatacenterCluster {
   totalChips: number;
   totalPowerMW: number;
   majorityExisting: boolean;
+  existingCount?: number;
+  plannedCount?: number;
+  sampled?: boolean;
 }
