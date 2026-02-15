@@ -101,6 +101,7 @@ export class RuntimeConfigPanel extends Panel {
   }
 
   public async verifyPendingSecrets(): Promise<string[]> {
+    this.captureUnsavedInputs();
     const errors: string[] = [];
     const context = Object.fromEntries(this.pendingSecrets.entries()) as Partial<Record<RuntimeSecretKey, string>>;
 
