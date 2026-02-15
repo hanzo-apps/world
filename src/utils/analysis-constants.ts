@@ -42,6 +42,11 @@ export const TOPIC_KEYWORDS = [
   'ai', 'tech', 'layoff', 'trump', 'biden', 'election',
 ];
 
+export const SUPPRESSED_TRENDING_TERMS = new Set<string>([
+  'ai', 'app', 'api', 'new', 'top', 'big', 'ceo', 'cto',
+  'update', 'report', 'latest', 'breaking', 'analysis',
+]);
+
 export const TOPIC_MAPPINGS: Record<string, string[]> = {
   'iran': ['iran', 'israel', 'oil', 'sanctions'],
   'israel': ['israel', 'iran', 'war', 'gaza'],
@@ -76,12 +81,23 @@ export function includesKeyword(text: string, keywords: string[]): boolean {
   return keywords.some(keyword => text.includes(keyword));
 }
 
+export function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function containsTopicKeyword(text: string, keyword: string): boolean {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  if (!normalizedKeyword) return false;
+  const pattern = new RegExp(`\\b${escapeRegex(normalizedKeyword)}\\b`, 'i');
+  return pattern.test(text);
+}
+
 export function findRelatedTopics(prediction: string): string[] {
   const title = prediction.toLowerCase();
   const related: string[] = [];
 
   for (const [key, topics] of Object.entries(TOPIC_MAPPINGS)) {
-    if (title.includes(key)) {
+    if (containsTopicKeyword(title, key)) {
       related.push(...topics);
     }
   }
@@ -111,6 +127,7 @@ export type SignalType =
   | 'news_leads_markets'
   | 'silent_divergence'
   | 'velocity_spike'
+  | 'keyword_spike'
   | 'convergence'
   | 'triangulation'
   | 'flow_drop'
@@ -147,6 +164,11 @@ export const SIGNAL_CONTEXT: Record<SignalType, SignalContext> = {
     whyItMatters: 'A story is accelerating across multiple news sources—indicates growing significance and potential for market/policy impact.',
     actionableInsight: 'This topic warrants immediate attention; expect official statements or market reactions.',
     confidenceNote: 'Higher confidence with more sources; check if Tier 1 sources are among them.',
+  },
+  keyword_spike: {
+    whyItMatters: 'A term is appearing at significantly higher frequency than its baseline across multiple sources, indicating a developing story.',
+    actionableInsight: 'Review related headlines and AI summary, then correlate with country instability and market moves.',
+    confidenceNote: 'Confidence increases with stronger baseline multiplier and broader source diversity.',
   },
   convergence: {
     whyItMatters: 'Multiple independent source types confirming same event—cross-validation increases likelihood of accuracy.',

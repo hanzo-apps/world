@@ -1,4 +1,4 @@
-import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetOutage, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster } from '@/types';
+import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetOutage, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, CyberThreat } from '@/types';
 import {
   FEEDS,
   INTEL_SOURCES,
@@ -12,7 +12,7 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics } from '@/services';
+import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
@@ -35,6 +35,7 @@ import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice } from '@/utils';
 import { reverseGeocode } from '@/utils/reverse-geocode';
 import { CountryBriefPage } from '@/components/CountryBriefPage';
+import { maybeShowDownloadBanner } from '@/components/DownloadBanner';
 import { CountryTimeline, type TimelineEvent } from '@/components/CountryTimeline';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ParsedMapUrlState } from '@/utils';
@@ -97,6 +98,8 @@ type IntlDisplayNamesCtor = new (
   locales: string | string[],
   options: { type: 'region' }
 ) => { of: (code: string) => string | undefined };
+
+const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
 
 export interface CountryBriefSignals {
   protests: number;
@@ -267,6 +270,9 @@ export class App {
       }
       this.mapLayers = this.initialUrlState.layers;
     }
+    if (!CYBER_LAYER_ENABLED) {
+      this.mapLayers.cyberThreats = false;
+    }
     this.disabledSources = new Set(loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []));
   }
 
@@ -323,6 +329,9 @@ export class App {
     }
     if (isOutagesConfigured() === false) {
       this.map?.hideLayerToggle('outages');
+    }
+    if (!CYBER_LAYER_ENABLED) {
+      this.map?.hideLayerToggle('cyberThreats');
     }
 
     this.setupRefreshIntervals();
@@ -454,6 +463,7 @@ export class App {
       natural: ['usgs'],
       weather: ['weather'],
       outages: ['outages'],
+      cyberThreats: ['cyber_threats'],
       protests: ['acled'],
       ucdpEvents: ['ucdp_events'],
       displacement: ['unhcr'],
@@ -490,6 +500,7 @@ export class App {
         natural: ['usgs'],
         weather: ['weather'],
         outages: ['outages'],
+        cyberThreats: ['cyber_threats'],
         protests: ['acled'],
         ucdpEvents: ['ucdp_events'],
         displacement: ['unhcr'],
@@ -598,6 +609,7 @@ export class App {
 
   public async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
+    this.map?.setRenderPaused(true);
 
     // Normalize to canonical name (GeoJSON may use "United States of America" etc.)
     const canonicalName = TIER1_COUNTRIES[code] || App.resolveCountryName(code);
@@ -1007,7 +1019,7 @@ export class App {
         }
       : {
           placeholder: 'Search news, pipelines, bases, markets...',
-          hint: 'News • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
+          hint: 'News • Countries • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
         };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
@@ -1121,6 +1133,9 @@ export class App {
         data: g,
       })));
     }
+
+    // Register countries for both variants
+    this.searchModal.registerSource('country', this.buildCountrySearchItems());
 
     // Handle result selection
     this.searchModal.setOnSelect((result) => this.handleSearchResult(result));
@@ -1291,6 +1306,11 @@ export class App {
         }, 300);
         break;
       }
+      case 'country': {
+        const { code, name } = result.data as { code: string; name: string };
+        this.openCountryBriefByCode(code, name);
+        break;
+      }
     }
   }
 
@@ -1316,6 +1336,9 @@ export class App {
 
   private updateSearchIndex(): void {
     if (!this.searchModal) return;
+
+    // Keep country CII labels fresh with latest ingested signals.
+    this.searchModal.registerSource('country', this.buildCountrySearchItems());
 
     // Update news sources (use link as unique id) - index up to 500 items for better search coverage
     const newsItems = this.allNews.slice(0, 500).map(n => ({
@@ -1346,6 +1369,30 @@ export class App {
         data: m,
       })));
     }
+  }
+
+  private buildCountrySearchItems(): { id: string; title: string; subtitle: string; data: { code: string; name: string } }[] {
+    const panelScores = (this.panels['cii'] as CIIPanel | undefined)?.getScores() ?? [];
+    const scores = panelScores.length > 0 ? panelScores : calculateCII();
+    const ciiByCode = new Map(scores.map((score) => [score.code, score]));
+    return Object.entries(TIER1_COUNTRIES).map(([code, name]) => {
+      const score = ciiByCode.get(code);
+      return {
+        id: code,
+        title: `${App.toFlagEmoji(code)} ${name}`,
+        subtitle: score ? `CII: ${score.score}/100 • ${score.level}` : 'Country Brief',
+        data: { code, name },
+      };
+    });
+  }
+
+  private static toFlagEmoji(code: string): string {
+    const upperCode = code.toUpperCase();
+    if (!/^[A-Z]{2}$/.test(upperCode)) return '🏳️';
+    return upperCode
+      .split('')
+      .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+      .join('');
   }
 
   private setupPlaybackControl(): void {
@@ -2556,6 +2603,7 @@ export class App {
     if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
     if (this.mapLayers.cables) tasks.push({ name: 'cables', task: runGuarded('cables', () => this.loadCableActivity()) });
     if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
+    if (CYBER_LAYER_ENABLED && this.mapLayers.cyberThreats) tasks.push({ name: 'cyberThreats', task: runGuarded('cyberThreats', () => this.loadCyberThreats()) });
     if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
     // Tech Readiness panel (tech variant only)
@@ -2594,6 +2642,9 @@ export class App {
           break;
         case 'outages':
           await this.loadOutages();
+          break;
+        case 'cyberThreats':
+          await this.loadCyberThreats();
           break;
         case 'ais':
           await this.loadAisSignals();
@@ -2846,6 +2897,7 @@ export class App {
 
     this.allNews = collectedNews;
     this.initialLoadComplete = true;
+    maybeShowDownloadBanner();
     // Temporal baseline: report news volume
     updateAndCheck([
       { type: 'news', region: 'global', count: collectedNews.length },
@@ -3086,6 +3138,7 @@ export class App {
     military?: { flights: MilitaryFlight[]; flightClusters: MilitaryFlightCluster[]; vessels: MilitaryVessel[]; vesselClusters: MilitaryVesselCluster[] };
     earthquakes?: import('@/types').Earthquake[];
   } = {};
+  private cyberThreatsCache: CyberThreat[] | null = null;
 
   /**
    * Load intelligence-critical signals for CII/focal point calculation
@@ -3363,6 +3416,34 @@ export class App {
       this.map?.setLayerReady('outages', false);
       this.statusPanel?.updateFeed('NetBlocks', { status: 'error' });
       dataFreshness.recordError('outages', String(error));
+    }
+  }
+
+  private async loadCyberThreats(): Promise<void> {
+    if (!CYBER_LAYER_ENABLED) {
+      this.mapLayers.cyberThreats = false;
+      this.map?.setLayerReady('cyberThreats', false);
+      return;
+    }
+
+    if (this.cyberThreatsCache) {
+      this.map?.setCyberThreats(this.cyberThreatsCache);
+      this.map?.setLayerReady('cyberThreats', this.cyberThreatsCache.length > 0);
+      this.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: this.cyberThreatsCache.length });
+      return;
+    }
+
+    try {
+      const threats = await fetchCyberThreats({ limit: 500, days: 14 });
+      this.cyberThreatsCache = threats;
+      this.map?.setCyberThreats(threats);
+      this.map?.setLayerReady('cyberThreats', threats.length > 0);
+      this.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: threats.length });
+      dataFreshness.recordUpdate('cyber_threats', threats.length);
+    } catch (error) {
+      this.map?.setLayerReady('cyberThreats', false);
+      this.statusPanel?.updateFeed('Cyber Threats', { status: 'error', errorMessage: String(error) });
+      dataFreshness.recordError('cyber_threats', String(error));
     }
   }
 
@@ -3716,7 +3797,8 @@ export class App {
         geoSignals = geoAlerts.map(geoConvergenceToSignal);
       }
 
-      const allSignals = [...signals, ...geoSignals];
+      const keywordSpikeSignals = drainTrendingSignals();
+      const allSignals = [...signals, ...geoSignals, ...keywordSpikeSignals];
       if (allSignals.length > 0) {
         addToSignalHistory(allSignals);
         this.signalModal?.show(allSignals);
@@ -3849,5 +3931,9 @@ export class App {
     this.scheduleRefresh('ais', () => this.loadAisSignals(), REFRESH_INTERVALS.ais, () => this.mapLayers.ais);
     this.scheduleRefresh('cables', () => this.loadCableActivity(), 30 * 60 * 1000, () => this.mapLayers.cables);
     this.scheduleRefresh('flights', () => this.loadFlightDelays(), 10 * 60 * 1000, () => this.mapLayers.flights);
+    this.scheduleRefresh('cyberThreats', () => {
+      this.cyberThreatsCache = null;
+      return this.loadCyberThreats();
+    }, 10 * 60 * 1000, () => CYBER_LAYER_ENABLED && this.mapLayers.cyberThreats);
   }
 }
