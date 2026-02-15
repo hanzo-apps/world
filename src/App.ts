@@ -89,6 +89,7 @@ import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { isDesktopRuntime } from '@/services/runtime';
+import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
@@ -310,6 +311,7 @@ export class App {
     this.pendingDeepLinkCountry = initState.country ?? null;
     this.setupUrlStateSync();
     this.syncDataFreshnessWithLayers();
+    await preloadCountryGeometry();
     await this.loadAllData();
 
     // Start CII learning mode after first data load
@@ -550,8 +552,12 @@ export class App {
       }
     });
 
-    this.map.onCountryClicked(async (lat, lon) => {
-      this.openCountryBrief(lat, lon);
+    this.map.onCountryClicked(async (countryClick) => {
+      if (countryClick.code && countryClick.name) {
+        this.openCountryBriefByCode(countryClick.code, countryClick.name);
+      } else {
+        this.openCountryBrief(countryClick.lat, countryClick.lon);
+      }
     });
 
     this.countryBriefPage.onClose(() => {
@@ -571,6 +577,13 @@ export class App {
     const token = ++this.briefRequestToken;
     this.countryBriefPage.showLoading();
     this.map?.setRenderPaused(true);
+
+    const localGeo = getCountryAtCoordinates(lat, lon);
+    if (localGeo) {
+      if (token !== this.briefRequestToken) return; // superseded by newer click
+      this.openCountryBriefByCode(localGeo.code, localGeo.name);
+      return;
+    }
 
     const geo = await reverseGeocode(lat, lon);
     if (token !== this.briefRequestToken) return; // superseded by newer click
@@ -729,8 +742,8 @@ export class App {
 
     const events: TimelineEvent[] = [];
     const countryLower = country.toLowerCase();
-    const hasBbox = !!App.COUNTRY_BOUNDS[code];
-    const inCountry = (lat: number, lon: number) => hasBbox && this.isInCountry(lat, lon, code);
+    const hasGeoShape = hasCountryGeometry(code) || !!App.COUNTRY_BOUNDS[code];
+    const inCountry = (lat: number, lon: number) => hasGeoShape && this.isInCountry(lat, lon, code);
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
     if (this.intelligenceCache.protests?.events) {
@@ -761,7 +774,7 @@ export class App {
 
     if (this.intelligenceCache.military) {
       for (const f of this.intelligenceCache.military.flights) {
-        if (hasBbox ? this.isInCountry(f.lat, f.lon, code) : f.operatorCountry?.toUpperCase() === code) {
+        if (hasGeoShape ? this.isInCountry(f.lat, f.lon, code) : f.operatorCountry?.toUpperCase() === code) {
           events.push({
             timestamp: new Date(f.lastSeen).getTime(),
             lane: 'military',
@@ -771,7 +784,7 @@ export class App {
         }
       }
       for (const v of this.intelligenceCache.military.vessels) {
-        if (hasBbox ? this.isInCountry(v.lat, v.lon, code) : v.operatorCountry?.toUpperCase() === code) {
+        if (hasGeoShape ? this.isInCountry(v.lat, v.lon, code) : v.operatorCountry?.toUpperCase() === code) {
           events.push({
             timestamp: new Date(v.lastAisUpdate).getTime(),
             lane: 'military',
@@ -894,6 +907,8 @@ export class App {
   }
 
   private isInCountry(lat: number, lon: number, code: string): boolean {
+    const precise = isCoordinateInCountry(lat, lon, code);
+    if (precise != null) return precise;
     const b = App.COUNTRY_BOUNDS[code];
     if (!b) return false;
     return lat >= b.s && lat <= b.n && lon >= b.w && lon <= b.e;
@@ -901,12 +916,12 @@ export class App {
 
   private getCountrySignals(code: string, country: string): CountryBriefSignals {
     const countryLower = country.toLowerCase();
-    const hasBbox = !!App.COUNTRY_BOUNDS[code];
+    const hasGeoShape = hasCountryGeometry(code) || !!App.COUNTRY_BOUNDS[code];
 
     let protests = 0;
     if (this.intelligenceCache.protests?.events) {
       protests = this.intelligenceCache.protests.events.filter((e) =>
-        e.country?.toLowerCase() === countryLower || (hasBbox && this.isInCountry(e.lat, e.lon, code))
+        e.country?.toLowerCase() === countryLower || (hasGeoShape && this.isInCountry(e.lat, e.lon, code))
       ).length;
     }
 
@@ -914,24 +929,24 @@ export class App {
     let militaryVessels = 0;
     if (this.intelligenceCache.military) {
       militaryFlights = this.intelligenceCache.military.flights.filter((f) =>
-        hasBbox ? this.isInCountry(f.lat, f.lon, code) : f.operatorCountry?.toUpperCase() === code
+        hasGeoShape ? this.isInCountry(f.lat, f.lon, code) : f.operatorCountry?.toUpperCase() === code
       ).length;
       militaryVessels = this.intelligenceCache.military.vessels.filter((v) =>
-        hasBbox ? this.isInCountry(v.lat, v.lon, code) : v.operatorCountry?.toUpperCase() === code
+        hasGeoShape ? this.isInCountry(v.lat, v.lon, code) : v.operatorCountry?.toUpperCase() === code
       ).length;
     }
 
     let outages = 0;
     if (this.intelligenceCache.outages) {
       outages = this.intelligenceCache.outages.filter((o) =>
-        o.country?.toLowerCase() === countryLower || (hasBbox && this.isInCountry(o.lat, o.lon, code))
+        o.country?.toLowerCase() === countryLower || (hasGeoShape && this.isInCountry(o.lat, o.lon, code))
       ).length;
     }
 
     let earthquakes = 0;
     if (this.intelligenceCache.earthquakes) {
       earthquakes = this.intelligenceCache.earthquakes.filter((eq) => {
-        if (hasBbox) return this.isInCountry(eq.lat, eq.lon, code);
+        if (hasGeoShape) return this.isInCountry(eq.lat, eq.lon, code);
         return eq.place?.toLowerCase().includes(countryLower);
       }).length;
     }
