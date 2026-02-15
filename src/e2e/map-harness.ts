@@ -28,6 +28,7 @@ import type {
   AisDisruptionEvent,
   AirportDelayAlert,
   CableAdvisory,
+  CyberThreat,
   Earthquake,
   InternetOutage,
   MapLayers,
@@ -45,6 +46,12 @@ import type { WeatherAlert } from '../services/weather';
 type Scenario = 'alpha' | 'beta';
 type HarnessVariant = 'full' | 'tech';
 type HarnessLayerKey = keyof MapLayers;
+type PulseProtestScenario =
+  | 'none'
+  | 'recent-acled-riot'
+  | 'recent-gdelt-riot'
+  | 'recent-protest';
+type NewsPulseScenario = 'none' | 'recent' | 'stale';
 
 type LayerSnapshot = {
   id: string;
@@ -85,7 +92,12 @@ type MapHarness = {
   variant: HarnessVariant;
   seedAllDynamicData: () => void;
   setProtestsScenario: (scenario: Scenario) => void;
+  setPulseProtestsScenario: (scenario: PulseProtestScenario) => void;
+  setNewsPulseScenario: (scenario: NewsPulseScenario) => void;
   setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
+  forcePulseStartupElapsed: () => void;
+  resetPulseStartupTime: () => void;
+  isPulseAnimationRunning: () => boolean;
   setZoom: (zoom: number) => void;
   setLayersForSnapshot: (enabledLayers: HarnessLayerKey[]) => void;
   setCamera: (camera: CameraState) => void;
@@ -95,6 +107,7 @@ type MapHarness = {
   isVisualScenarioReady: (scenarioId: string) => boolean;
   getDeckLayerSnapshot: () => LayerSnapshot[];
   getOverlaySnapshot: () => OverlaySnapshot;
+  getCyberTooltipHtml: (indicator: string) => string;
   getClusterStateSize: () => number;
   destroy: () => void;
 };
@@ -129,6 +142,7 @@ const allLayersEnabled: MapLayers = {
   economic: true,
   waterways: true,
   outages: true,
+  cyberThreats: true,
   datacenters: true,
   protests: true,
   flights: true,
@@ -161,6 +175,7 @@ const allLayersDisabled: MapLayers = {
   economic: false,
   waterways: false,
   outages: false,
+  cyberThreats: false,
   datacenters: false,
   protests: false,
   flights: false,
@@ -207,8 +222,11 @@ const internals = map as unknown as {
   buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
   lastClusterState?: Map<string, unknown>;
   maplibreMap?: MapLibreMap;
+  getTooltip?: (info: { object?: unknown; layer?: { id?: string } }) => { html?: string } | null;
   newsLocationFirstSeen?: Map<string, number>;
-  stopNewsPulseAnimation?: () => void;
+  newsPulseIntervalId?: ReturnType<typeof setInterval> | null;
+  startupTime?: number;
+  stopPulseAnimation?: () => void;
 };
 
 const buildLayerState = (enabledLayers: HarnessLayerKey[]): MapLayers => {
@@ -306,6 +324,7 @@ const seededCameras = {
   ais: toCamera(55.0, 25.0, 5.2),
   weather: toCamera(-80.2, 25.7, 5.2),
   outages: toCamera(-0.1, 51.5, 5.2),
+  cyber: toCamera(-0.12, 51.5, 5.2),
   protests: toCamera(0.2, 20.1, 5.2),
   flights: toCamera(-73.9, 40.4, 5.2),
   military: toCamera(56.3, 26.1, 5.2),
@@ -437,6 +456,14 @@ const VISUAL_SCENARIOS: VisualScenario[] = [
     enabledLayers: ['outages'],
     camera: seededCameras.outages,
     expectedDeckLayers: ['outages-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'cyber-z5',
+    variant: 'both',
+    enabledLayers: ['cyberThreats'],
+    camera: seededCameras.cyber,
+    expectedDeckLayers: ['cyber-threats-layer'],
     expectedSelectors: [],
   },
   {
@@ -616,6 +643,37 @@ const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
   ];
 };
 
+const buildPulseProtests = (scenario: PulseProtestScenario): SocialUnrestEvent[] => {
+  if (scenario === 'none') return [];
+
+  const now = new Date();
+  const isRiot = scenario !== 'recent-protest';
+  const sourceType = scenario === 'recent-gdelt-riot' ? 'gdelt' : 'acled';
+
+  return [
+    {
+      id: `e2e-pulse-protest-${scenario}`,
+      title: `Pulse Protest ${scenario}`,
+      summary: `Pulse protest fixture: ${scenario}`,
+      eventType: isRiot ? 'riot' : 'protest',
+      city: 'Harness City',
+      country: 'Harnessland',
+      lat: 20.1,
+      lon: 0.2,
+      time: now,
+      severity: isRiot ? 'high' : 'medium',
+      fatalities: isRiot ? 1 : 0,
+      sources: ['e2e'],
+      sourceType,
+      tags: ['e2e', 'pulse'],
+      actors: ['Harness Group'],
+      relatedHotspots: [],
+      confidence: 'high',
+      validated: true,
+    },
+  ];
+};
+
 const buildHotspotActivityNews = (
   scenario: 'none' | 'breaking'
 ): NewsItem[] => {
@@ -673,6 +731,24 @@ const seedAllDynamicData = (): void => {
       lon: -0.1,
       severity: 'major',
       categories: ['connectivity'],
+    },
+  ];
+
+  const cyberThreats: CyberThreat[] = [
+    {
+      id: 'e2e-cyber-1',
+      type: 'c2_server',
+      source: 'feodo',
+      indicator: '1.2.3.4',
+      indicatorType: 'ip',
+      lat: 51.5,
+      lon: -0.12,
+      country: 'GB',
+      severity: 'high',
+      malwareFamily: 'QakBot',
+      tags: ['botnet', 'c2'],
+      firstSeen: '2026-02-01T09:00:00.000Z',
+      lastSeen: '2026-02-01T10:00:00.000Z',
     },
   ];
 
@@ -830,6 +906,7 @@ const seedAllDynamicData = (): void => {
   map.setEarthquakes(earthquakes);
   map.setWeatherAlerts(weather);
   map.setOutages(outages);
+  map.setCyberThreats(cyberThreats);
   map.setAisData(aisDisruptions, aisDensity);
   map.setCableActivity(cableAdvisories, repairShips);
   map.setProtests(buildProtests('alpha'));
@@ -887,7 +964,30 @@ const makeNewsLocationsNonRecent = (): void => {
       internals.newsLocationFirstSeen.set(key, now - 120_000);
     }
   }
-  internals.stopNewsPulseAnimation?.();
+  internals.stopPulseAnimation?.();
+};
+
+const setNewsPulseScenario = (scenario: NewsPulseScenario): void => {
+  if (scenario === 'none') {
+    internals.newsLocationFirstSeen?.clear();
+    map.setNewsLocations([]);
+    return;
+  }
+
+  if (scenario === 'recent') {
+    map.setNewsLocations([
+      {
+        lat: 48.85,
+        lon: 2.35,
+        title: `Harness Pulse News ${Date.now()}`,
+        threatLevel: 'high',
+      },
+    ]);
+    return;
+  }
+
+  map.setNewsLocations(SEEDED_NEWS_LOCATIONS);
+  makeNewsLocationsNonRecent();
 };
 
 let deterministicVisualModeEnabled = false;
@@ -983,6 +1083,18 @@ const isVisualScenarioReady = (scenarioId: string): boolean => {
   return true;
 };
 
+const getCyberTooltipHtml = (indicator: string): string => {
+  const tooltip = internals.getTooltip?.({
+    object: {
+      indicator,
+      severity: 'high',
+      source: 'feodo',
+    },
+    layer: { id: 'cyber-threats-layer' },
+  });
+  return typeof tooltip?.html === 'string' ? tooltip.html : '';
+};
+
 seedAllDynamicData();
 
 let ready = false;
@@ -1011,8 +1123,21 @@ window.__mapHarness = {
   setProtestsScenario: (scenario: Scenario): void => {
     map.setProtests(buildProtests(scenario));
   },
+  setPulseProtestsScenario: (scenario: PulseProtestScenario): void => {
+    map.setProtests(buildPulseProtests(scenario));
+  },
+  setNewsPulseScenario,
   setHotspotActivityScenario: (scenario: 'none' | 'breaking'): void => {
     map.updateHotspotActivity(buildHotspotActivityNews(scenario));
+  },
+  forcePulseStartupElapsed: (): void => {
+    internals.startupTime = Date.now() - 61_000;
+  },
+  resetPulseStartupTime: (): void => {
+    internals.startupTime = Date.now();
+  },
+  isPulseAnimationRunning: (): boolean => {
+    return internals.newsPulseIntervalId != null;
   },
   setZoom: (zoom: number): void => {
     map.setZoom(zoom);
@@ -1032,6 +1157,7 @@ window.__mapHarness = {
   isVisualScenarioReady,
   getDeckLayerSnapshot,
   getOverlaySnapshot,
+  getCyberTooltipHtml,
   getClusterStateSize: (): number => {
     return internals.lastClusterState?.size ?? -1;
   },

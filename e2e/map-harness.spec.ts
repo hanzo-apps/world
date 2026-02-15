@@ -20,7 +20,18 @@ type HarnessWindow = Window & {
     variant: 'full' | 'tech';
     seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
+    setPulseProtestsScenario: (
+      scenario:
+        | 'none'
+        | 'recent-acled-riot'
+        | 'recent-gdelt-riot'
+        | 'recent-protest'
+    ) => void;
+    setNewsPulseScenario: (scenario: 'none' | 'recent' | 'stale') => void;
     setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
+    forcePulseStartupElapsed: () => void;
+    resetPulseStartupTime: () => void;
+    isPulseAnimationRunning: () => boolean;
     setZoom: (zoom: number) => void;
     setLayersForSnapshot: (enabledLayers: string[]) => void;
     setCamera: (camera: { lon: number; lat: number; zoom: number }) => void;
@@ -30,6 +41,7 @@ type HarnessWindow = Window & {
     isVisualScenarioReady: (scenarioId: string) => boolean;
     getDeckLayerSnapshot: () => LayerSnapshot[];
     getOverlaySnapshot: () => OverlaySnapshot;
+    getCyberTooltipHtml: (indicator: string) => string;
     getClusterStateSize: () => number;
   };
 };
@@ -49,6 +61,7 @@ const EXPECTED_FULL_DECK_LAYERS = [
   'fires-layer',
   'weather-layer',
   'outages-layer',
+  'cyber-threats-layer',
   'ais-density-layer',
   'ais-disruptions-layer',
   'ports-layer',
@@ -81,6 +94,7 @@ const EXPECTED_TECH_DECK_LAYERS = [
   'fires-layer',
   'weather-layer',
   'outages-layer',
+  'cyber-threats-layer',
   'ais-density-layer',
   'ais-disruptions-layer',
   'ports-layer',
@@ -230,7 +244,8 @@ test.describe('DeckGL map harness', () => {
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return w.__mapHarness?.getOverlaySnapshot().protestMarkers ?? 0;
+          const layers = w.__mapHarness?.getDeckLayerSnapshot() ?? [];
+          return layers.find((layer) => layer.id === 'protest-clusters-layer')?.dataCount ?? 0;
         });
       }, { timeout: 20000 })
       .toBeGreaterThan(0);
@@ -244,17 +259,24 @@ test.describe('DeckGL map harness', () => {
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return w.__mapHarness?.getOverlaySnapshot().datacenterMarkers ?? 0;
+          const layers = w.__mapHarness?.getDeckLayerSnapshot() ?? [];
+          return layers.find((layer) => layer.id === 'datacenter-clusters-layer')?.dataCount ?? 0;
         });
       }, { timeout: 20000 })
       .toBeGreaterThan(0);
 
     if (variant === 'tech') {
+      await page.evaluate(() => {
+        const w = window as HarnessWindow;
+        w.__mapHarness?.setCamera({ lon: -122.42, lat: 37.77, zoom: 5.2 });
+      });
+
       await expect
         .poll(async () => {
           return await page.evaluate(() => {
             const w = window as HarnessWindow;
-            return w.__mapHarness?.getOverlaySnapshot().techHQMarkers ?? 0;
+            const layers = w.__mapHarness?.getDeckLayerSnapshot() ?? [];
+            return layers.find((layer) => layer.id === 'tech-hq-clusters-layer')?.dataCount ?? 0;
           });
         }, { timeout: 20000 })
         .toBeGreaterThan(0);
@@ -263,11 +285,114 @@ test.describe('DeckGL map harness', () => {
         .poll(async () => {
           return await page.evaluate(() => {
             const w = window as HarnessWindow;
-            return w.__mapHarness?.getOverlaySnapshot().techEventMarkers ?? 0;
+            const layers = w.__mapHarness?.getDeckLayerSnapshot() ?? [];
+            return layers.find((layer) => layer.id === 'tech-event-clusters-layer')?.dataCount ?? 0;
           });
         }, { timeout: 20000 })
         .toBeGreaterThan(0);
     }
+  });
+
+  test('sanitizes cyber threat tooltip content', async ({ page }) => {
+    await waitForHarnessReady(page);
+
+    const html = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getCyberTooltipHtml('<script>alert(1)</script>') ?? '';
+    });
+
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
+  });
+
+  test('suppresses pulse animation during startup cooldown even with recent signals', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+      w.__mapHarness?.setNewsPulseScenario('none');
+      w.__mapHarness?.resetPulseStartupTime();
+      w.__mapHarness?.setNewsPulseScenario('recent');
+    });
+
+    await page.waitForTimeout(800);
+
+    const isRunning = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+    });
+
+    expect(isRunning).toBe(false);
+  });
+
+  test('starts and stops pulse on dynamic signals and ignores gdelt-only riot recency', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+      w.__mapHarness?.setNewsPulseScenario('none');
+      w.__mapHarness?.forcePulseStartupElapsed();
+      w.__mapHarness?.setNewsPulseScenario('recent');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(true);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setNewsPulseScenario('stale');
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(false);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setPulseProtestsScenario('recent-gdelt-riot');
+    });
+
+    await page.waitForTimeout(800);
+    const gdeltPulseRunning = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+    });
+    expect(gdeltPulseRunning).toBe(false);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setPulseProtestsScenario('recent-acled-riot');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(true);
   });
 
   test('matches golden screenshots per layer and zoom', async ({ page }) => {

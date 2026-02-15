@@ -1,6 +1,6 @@
 import { escapeHtml } from '@/utils/sanitize';
 
-export type SearchResultType = 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator';
+export type SearchResultType = 'country' | 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -147,7 +147,7 @@ export class SearchModal {
     // Prioritize: news first, then other dynamic data, then static infrastructure
     const priority: SearchResultType[] = [
       'news', 'prediction', 'market', 'earthquake', 'outage',  // Dynamic/timely
-      'conflict', 'hotspot',  // Current events
+      'conflict', 'hotspot', 'country',  // Current events + countries
       'base', 'pipeline', 'cable', 'datacenter', 'nuclear', 'irradiator',  // Infrastructure
       'techcompany', 'ailab', 'startup', 'techevent', 'techhq', 'accelerator'  // Tech
     ];
@@ -157,7 +157,7 @@ export class SearchModal {
     for (const type of priority) {
       const matches = byType.get(type) || [];
       matches.sort((a, b) => b._score - a._score);
-      const limit = type === 'news' ? 6 : 3;  // News gets 6 slots, others get 3
+      const limit = type === 'news' ? 6 : type === 'country' ? 4 : 3;
       this.results.push(...matches.slice(0, limit));
       if (this.results.length >= MAX_RESULTS) break;
     }
@@ -233,6 +233,7 @@ export class SearchModal {
     }
 
     const icons: Record<SearchResultType, string> = {
+      country: '🏳️',
       news: '📰',
       hotspot: '📍',
       market: '📈',
