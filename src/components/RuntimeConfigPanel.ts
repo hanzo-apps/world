@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import {
   RUNTIME_FEATURES,
+  getEffectiveSecrets,
   getRuntimeConfigSnapshot,
   getSecretState,
   isFeatureAvailable,
@@ -167,18 +168,24 @@ export class RuntimeConfigPanel extends Panel {
   private renderFeature(feature: RuntimeFeatureDefinition): string {
     const enabled = isFeatureEnabled(feature.id);
     const available = isFeatureAvailable(feature.id);
-    const secrets = feature.requiredSecrets.map((key) => this.renderSecretRow(key)).join('');
+    const effectiveSecrets = getEffectiveSecrets(feature);
+    const allStaged = !available && effectiveSecrets.every(
+      (k) => getSecretState(k).valid || (this.pendingSecrets.has(k) && this.validatedKeys.get(k) !== false)
+    );
+    const pillClass = available ? 'ok' : allStaged ? 'staged' : 'warn';
+    const pillLabel = available ? 'Ready' : allStaged ? 'Staged' : 'Needs Keys';
+    const secrets = effectiveSecrets.map((key) => this.renderSecretRow(key)).join('');
     const desktop = isDesktopRuntime();
-    const fallbackHtml = available ? '' : `<p class="runtime-feature-fallback fallback">${escapeHtml(feature.fallback)}</p>`;
+    const fallbackHtml = available || allStaged ? '' : `<p class="runtime-feature-fallback fallback">${escapeHtml(feature.fallback)}</p>`;
 
     return `
-      <section class="runtime-feature ${available ? 'available' : 'degraded'}">
+      <section class="runtime-feature ${available ? 'available' : allStaged ? 'staged' : 'degraded'}">
         <header class="runtime-feature-header">
           <label>
             <input type="checkbox" data-toggle="${feature.id}" ${enabled ? 'checked' : ''} ${desktop ? '' : 'disabled'}>
             <span>${escapeHtml(feature.name)}</span>
           </label>
-          <span class="runtime-pill ${available ? 'ok' : 'warn'}">${available ? 'Ready' : 'Needs Keys'}</span>
+          <span class="runtime-pill ${pillClass}">${pillLabel}</span>
         </header>
         <div class="runtime-secrets">${secrets}</div>
         ${fallbackHtml}
@@ -188,13 +195,19 @@ export class RuntimeConfigPanel extends Panel {
 
   private renderSecretRow(key: RuntimeSecretKey): string {
     const state = getSecretState(key);
-    const status = !state.present ? 'Missing' : state.valid ? `Valid (${state.source})` : 'Looks invalid';
+    const pending = this.pendingSecrets.has(key);
+    const pendingValid = pending ? this.validatedKeys.get(key) : undefined;
+    const status = pending
+      ? (pendingValid === false ? 'Invalid' : 'Staged')
+      : !state.present ? 'Missing' : state.valid ? `Valid (${state.source})` : 'Looks invalid';
+    const statusClass = pending
+      ? (pendingValid === false ? 'warn' : 'staged')
+      : state.valid ? 'ok' : 'warn';
     const signupUrl = SIGNUP_URLS[key];
     const helpText = SECRET_HELP_TEXT[key];
     const linkHtml = signupUrl
       ? ` <a href="#" data-signup-url="${signupUrl}" class="runtime-secret-link" title="Get API key">&#x2197;</a>`
       : '';
-    const pending = this.pendingSecrets.has(key);
     const validated = this.validatedKeys.get(key);
     const inputClass = pending ? (validated === false ? 'invalid' : 'valid-staged') : '';
     const checkClass = validated === true ? 'visible' : '';
@@ -205,7 +218,7 @@ export class RuntimeConfigPanel extends Panel {
     return `
       <div class="runtime-secret-row">
         <div class="runtime-secret-key"><code>${escapeHtml(key)}</code>${linkHtml}</div>
-        <span class="runtime-secret-status ${state.valid ? 'ok' : 'warn'}">${escapeHtml(status)}</span>
+        <span class="runtime-secret-status ${statusClass}">${escapeHtml(status)}</span>
         <span class="runtime-secret-check ${checkClass}">&#x2713;</span>
         ${helpText ? `<div class="runtime-secret-meta">${escapeHtml(helpText)}</div>` : ''}
         <input type="password" data-secret="${key}" placeholder="${pending ? 'Staged (save with OK)' : 'Set secret'}" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} class="${inputClass}" ${pending ? `value="${MASKED_SENTINEL}"` : ''}>

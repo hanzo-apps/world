@@ -41,6 +41,7 @@ export interface RuntimeFeatureDefinition {
   name: string;
   description: string;
   requiredSecrets: RuntimeSecretKey[];
+  desktopRequiredSecrets?: RuntimeSecretKey[];
   fallback: string;
 }
 
@@ -148,16 +149,18 @@ export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
   },
   {
     id: 'aisRelay',
-    name: 'AIS vessel relay',
-    description: 'Live vessel ingestion via relay endpoint and AIS key.',
+    name: 'AIS vessel tracking',
+    description: 'Live vessel ingestion via AISStream WebSocket.',
     requiredSecrets: ['WS_RELAY_URL', 'AISSTREAM_API_KEY'],
+    desktopRequiredSecrets: ['AISSTREAM_API_KEY'],
     fallback: 'AIS layer is disabled.',
   },
   {
     id: 'openskyRelay',
-    name: 'OpenSky military flights relay',
-    description: 'Relay credentials for OpenSky OAuth client credentials flow.',
+    name: 'OpenSky military flights',
+    description: 'OpenSky OAuth credentials for military flight data.',
     requiredSecrets: ['VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'],
+    desktopRequiredSecrets: ['OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'],
     fallback: 'Military flights fall back to limited/no data.',
   },
   {
@@ -248,6 +251,22 @@ function seedSecretsFromEnvironment(): void {
 
 seedSecretsFromEnvironment();
 
+// Listen for cross-window state updates (settings ↔ main).
+// When one window saves secrets or toggles features, the `storage` event fires in other same-origin windows.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'wm-secrets-updated') {
+      void loadDesktopSecrets();
+    } else if (e.key === TOGGLES_STORAGE_KEY && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue) as Partial<Record<RuntimeFeatureId, boolean>>;
+        Object.assign(runtimeConfig.featureToggles, parsed);
+        notifyConfigChanged();
+      } catch { /* ignore malformed JSON */ }
+    }
+  });
+}
+
 export function subscribeRuntimeConfig(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -281,7 +300,12 @@ export function isFeatureAvailable(featureId: RuntimeFeatureId): boolean {
 
   const feature = RUNTIME_FEATURES.find(item => item.id === featureId);
   if (!feature) return false;
-  return feature.requiredSecrets.every(secretKey => getSecretState(secretKey).valid);
+  const secrets = feature.desktopRequiredSecrets ?? feature.requiredSecrets;
+  return secrets.every(secretKey => getSecretState(secretKey).valid);
+}
+
+export function getEffectiveSecrets(feature: RuntimeFeatureDefinition): RuntimeSecretKey[] {
+  return (isDesktopRuntime() && feature.desktopRequiredSecrets) ? feature.desktopRequiredSecrets : feature.requiredSecrets;
 }
 
 export function setFeatureToggle(featureId: RuntimeFeatureId, enabled: boolean): void {
@@ -312,6 +336,12 @@ export async function setSecretValue(key: RuntimeSecretKey, value: string): Prom
   } catch (error) {
     console.warn(`[runtime-config] Failed to sync ${key} to sidecar`, error);
   }
+
+  // Signal other windows (main ↔ settings) to reload secrets from keychain.
+  // The `storage` event fires in all same-origin windows except the one that wrote.
+  try {
+    localStorage.setItem('wm-secrets-updated', String(Date.now()));
+  } catch { /* localStorage may be unavailable */ }
 
   notifyConfigChanged();
 }

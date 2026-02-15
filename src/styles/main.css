@@ -11618,6 +11618,8 @@ body.has-critical-banner .panels-grid {
 .runtime-pill.warn,
 .runtime-secret-status.warn,
 .runtime-feature-fallback.fallback { color: #ffd27c; }
+.runtime-pill.staged,
+.runtime-secret-status.staged { color: #7de39d; opacity: 0.7; }
 
 .runtime-secrets {
   display: flex;
