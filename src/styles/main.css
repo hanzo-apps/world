@@ -11533,14 +11533,15 @@ body.has-critical-banner .panels-grid {
 
 .runtime-alert h3 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: normal;
   letter-spacing: 0.5px;
 }
 
 .runtime-alert p {
   margin: 0 0 6px;
-  font-size: 11px;
-  color: rgba(255,255,255,0.7);
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
 }
 
 .runtime-alert.runtime-alert-warn {
