@@ -163,4 +163,12 @@ export function getAssetLabel(type: AssetType): string {
   return ASSET_LABELS[type];
 }
 
+export function getNearbyInfrastructure(
+  lat: number, lon: number, types: AssetType[]
+): RelatedAsset[] {
+  return findNearbyAssets({ lat, lon, label: 'country-centroid' }, types);
+}
+
+export { haversineDistanceKm };
+
 export { MAX_DISTANCE_KM };
