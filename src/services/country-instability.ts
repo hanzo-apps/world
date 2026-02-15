@@ -113,6 +113,8 @@ const COUNTRY_KEYWORDS: Record<string, string[]> = {
   YE: ['yemen', 'sanaa', 'houthi'],
   MM: ['myanmar', 'burma', 'rangoon'],
   VE: ['venezuela', 'caracas', 'maduro'],
+  BR: ['brazil', 'brasilia', 'lula', 'bolsonaro'],
+  AE: ['uae', 'emirates', 'dubai', 'abu dhabi'],
 };
 
 // Geopolitical baseline risk scores (0-50)
@@ -138,6 +140,8 @@ const BASELINE_RISK: Record<string, number> = {
   YE: 50,   // Active civil war
   MM: 45,   // Military coup, civil conflict
   VE: 40,   // Economic collapse, authoritarian
+  BR: 15,   // Large democracy, social tensions, Amazon deforestation
+  AE: 10,   // Stable, regional hub, low internal unrest
 };
 
 // Event significance multipliers
@@ -164,6 +168,8 @@ const EVENT_MULTIPLIER: Record<string, number> = {
   YE: 0.7,  // War zone, events expected
   MM: 1.8,  // Military suppression
   VE: 1.8,  // Suppressed
+  BR: 0.6,  // Large democracy, many events
+  AE: 1.5,  // Events rare, significant when occur
 };
 
 const countryDataMap = new Map<string, CountryData>();

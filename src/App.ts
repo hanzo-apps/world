@@ -92,6 +92,11 @@ import { isDesktopRuntime } from '@/services/runtime';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
+type IntlDisplayNamesCtor = new (
+  locales: string | string[],
+  options: { type: 'region' }
+) => { of: (code: string) => string | undefined };
+
 export interface CountryBriefSignals {
   protests: number;
   militaryFlights: number;
@@ -362,7 +367,7 @@ export class App {
     const deepLinkCountry = this.pendingDeepLinkCountry;
     this.pendingDeepLinkCountry = null;
     if (deepLinkCountry) {
-      const cName = TIER1_COUNTRIES[deepLinkCountry] || deepLinkCountry;
+      const cName = App.resolveCountryName(deepLinkCountry);
       const checkAndOpenBrief = () => {
         if (dataFreshness.hasSufficientData()) {
           this.openCountryBriefByCode(deepLinkCountry, cName);
@@ -756,7 +761,7 @@ export class App {
 
     if (this.intelligenceCache.military) {
       for (const f of this.intelligenceCache.military.flights) {
-        if (inCountry(f.lat, f.lon) || f.operatorCountry?.toUpperCase() === code) {
+        if (hasBbox ? this.isInCountry(f.lat, f.lon, code) : f.operatorCountry?.toUpperCase() === code) {
           events.push({
             timestamp: new Date(f.lastSeen).getTime(),
             lane: 'military',
@@ -766,7 +771,7 @@ export class App {
         }
       }
       for (const v of this.intelligenceCache.military.vessels) {
-        if (inCountry(v.lat, v.lon) || v.operatorCountry?.toUpperCase() === code) {
+        if (hasBbox ? this.isInCountry(v.lat, v.lon, code) : v.operatorCountry?.toUpperCase() === code) {
           events.push({
             timestamp: new Date(v.lastAisUpdate).getTime(),
             lane: 'military',
@@ -808,6 +813,7 @@ export class App {
     SD: { n: 22, s: 8.7, e: 38.6, w: 21.8 }, US: { n: 49, s: 24.5, e: -66.9, w: -125 },
     GB: { n: 58.7, s: 49.9, e: 1.8, w: -8.2 }, DE: { n: 55.1, s: 47.3, e: 15.0, w: 5.9 },
     FR: { n: 51.1, s: 41.3, e: 9.6, w: -5.1 }, TR: { n: 42.1, s: 36, e: 44.8, w: 26 },
+    BR: { n: 5.3, s: -33.8, e: -34.8, w: -73.9 },
   };
 
   private static COUNTRY_ALIASES: Record<string, string[]> = {
@@ -831,6 +837,8 @@ export class App {
     TR: ['turkey', 'turkish', 'ankara', 'erdogan', 'türkiye'],
     US: ['united states', 'american', 'washington', 'pentagon', 'white house'],
     GB: ['united kingdom', 'british', 'london', 'uk '],
+    BR: ['brazil', 'brazilian', 'brasilia', 'lula', 'bolsonaro'],
+    AE: ['united arab emirates', 'uae', 'emirati', 'dubai', 'abu dhabi'],
   };
 
   private static otherCountryTermsCache: Map<string, string[]> = new Map();
@@ -862,9 +870,26 @@ export class App {
     return terms;
   }
 
+  private static resolveCountryName(code: string): string {
+    if (TIER1_COUNTRIES[code]) return TIER1_COUNTRIES[code];
+
+    try {
+      const displayNamesCtor = (Intl as unknown as { DisplayNames?: IntlDisplayNamesCtor }).DisplayNames;
+      if (!displayNamesCtor) return code;
+      const displayNames = new displayNamesCtor(['en'], { type: 'region' });
+      const resolved = displayNames.of(code);
+      if (resolved && resolved.toUpperCase() !== code) return resolved;
+    } catch {
+      // Intl.DisplayNames unavailable in older runtimes.
+    }
+
+    return code;
+  }
+
   private static getCountrySearchTerms(country: string, code: string): string[] {
     const aliases = App.COUNTRY_ALIASES[code];
     if (aliases) return aliases;
+    if (/^[A-Z]{2}$/i.test(country.trim())) return [];
     return [country.toLowerCase()];
   }
 
