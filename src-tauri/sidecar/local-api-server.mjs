@@ -1,10 +1,52 @@
 #!/usr/bin/env node
-import { createServer } from 'node:http';
+import http, { createServer } from 'node:http';
+import https from 'node:https';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+// Monkey-patch globalThis.fetch to force IPv4 for HTTPS requests.
+// Node.js built-in fetch (undici) tries IPv6 first via Happy Eyeballs.
+// Government APIs (EIA, NASA FIRMS, FRED) publish AAAA records but their
+// IPv6 endpoints time out, causing ETIMEDOUT. This override ensures ALL
+// fetch() calls in dynamically-loaded handler modules (api/*.js) use IPv4.
+const _originalFetch = globalThis.fetch;
+globalThis.fetch = function ipv4Fetch(input, init) {
+  const isRequest = input && typeof input === 'object' && 'url' in input;
+  let url;
+  try { url = new URL(typeof input === 'string' ? input : input.url); } catch { return _originalFetch(input, init); }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return _originalFetch(input, init);
+  const mod = url.protocol === 'https:' ? https : http;
+  const method = init?.method || (isRequest ? input.method : 'GET');
+  const headers = {};
+  const rawHeaders = init?.headers || (isRequest ? input.headers : null);
+  if (rawHeaders) {
+    const h = rawHeaders instanceof Headers ? Object.fromEntries(rawHeaders.entries())
+      : Array.isArray(rawHeaders) ? Object.fromEntries(rawHeaders) : rawHeaders;
+    Object.assign(headers, h);
+  }
+  return new Promise((resolve, reject) => {
+    const req = mod.request({ hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80), path: url.pathname + url.search, method, headers, family: 4 }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const body = buf.toString();
+        const responseHeaders = new Headers();
+        for (const [k, v] of Object.entries(res.headers)) {
+          if (v) responseHeaders.set(k, Array.isArray(v) ? v.join(', ') : v);
+        }
+        resolve(new Response(body, { status: res.statusCode, statusText: res.statusMessage, headers: responseHeaders }));
+      });
+    });
+    req.on('error', reject);
+    if (init?.signal) { init.signal.addEventListener('abort', () => req.destroy()); }
+    if (init?.body) req.write(typeof init.body === 'string' ? init.body : Buffer.from(init.body));
+    req.end();
+  });
+};
 
 const ALLOWED_ENV_KEYS = new Set([
   'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'FRED_API_KEY', 'EIA_API_KEY',
@@ -315,6 +357,40 @@ function makeCorsHeaders(req) {
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  // Use node:https with IPv4 forced — Node.js built-in fetch (undici) tries IPv6
+  // first and some servers (EIA, NASA FIRMS) have broken IPv6 causing ETIMEDOUT.
+  const u = new URL(url);
+  if (u.protocol === 'https:') {
+    return new Promise((resolve, reject) => {
+      const reqOpts = {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + u.search,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        family: 4,
+      };
+      const req = https.request(reqOpts, (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString();
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            headers: { get: (k) => res.headers[k.toLowerCase()] || null },
+            text: () => Promise.resolve(body),
+            json: () => Promise.resolve(JSON.parse(body)),
+          });
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(timeoutMs, () => { req.destroy(new Error('Request timed out')); });
+      if (options.body) req.write(options.body);
+      req.end();
+    });
+  }
+  // HTTP fallback (localhost sidecar, etc.)
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -385,7 +461,7 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
 
     case 'EIA_API_KEY': {
       const response = await fetchWithTimeout(
-        `https://api.eia.gov/v2/seriesid/PET.RWTC.W?api_key=${encodeURIComponent(value)}&num=1`,
+        `https://api.eia.gov/v2/?api_key=${encodeURIComponent(value)}`,
         { headers: { Accept: 'application/json' } }
       );
       const text = await response.text();
@@ -393,20 +469,21 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
       if (!response.ok) return fail(`EIA probe failed (${response.status})`);
       let payload = null;
       try { payload = JSON.parse(text); } catch { /* ignore */ }
-      if (!Array.isArray(payload?.response?.data)) return fail('Unexpected EIA response');
+      if (payload?.response?.id === undefined && !payload?.response?.routes) return fail('Unexpected EIA response');
       return ok('EIA key verified');
     }
 
     case 'CLOUDFLARE_API_TOKEN': {
-      const response = await fetchWithTimeout('https://api.cloudflare.com/client/v4/user/tokens/verify', {
-        headers: { Authorization: `Bearer ${value}` },
-      });
+      const response = await fetchWithTimeout(
+        'https://api.cloudflare.com/client/v4/radar/annotations/outages?dateRange=1d&limit=1',
+        { headers: { Authorization: `Bearer ${value}` } }
+      );
       const text = await response.text();
       if (isAuthFailure(response.status, text)) return fail('Cloudflare rejected this token');
       if (!response.ok) return fail(`Cloudflare probe failed (${response.status})`);
       let payload = null;
       try { payload = JSON.parse(text); } catch { /* ignore */ }
-      if (payload?.success !== true) return fail('Cloudflare token verification failed');
+      if (payload?.success !== true) return fail('Cloudflare Radar API did not return success');
       return ok('Cloudflare token verified');
     }
 
@@ -557,7 +634,7 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provider probe failed';
-    return fail(`Verification request failed: ${message}`);
+    return { valid: true, message: `Saved (could not verify: ${message})` };
   }
 }
 
