@@ -165,7 +165,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'World Monitor v__VERSION__'
-          releaseBody: 'Download the installer for your platform below.'
+          releaseBody: 'See changelog below.'
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.draft) }}
           prerelease: false
           args: ${{ matrix.args }}
@@ -182,7 +182,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'World Monitor v__VERSION__'
-          releaseBody: 'Download the installer for your platform below.'
+          releaseBody: 'See changelog below.'
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.draft) }}
           prerelease: false
           args: ${{ matrix.args }}
@@ -205,7 +205,7 @@ jobs:
         with:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
-          releaseBody: 'Download the installer for your platform below.'
+          releaseBody: 'See changelog below.'
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.draft) }}
           prerelease: false
           tauriScript: npx tauri
@@ -223,7 +223,7 @@ jobs:
         with:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
-          releaseBody: 'Download the installer for your platform below.'
+          releaseBody: 'See changelog below.'
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.draft) }}
           prerelease: false
           tauriScript: npx tauri
@@ -250,3 +250,42 @@ jobs:
           MINUTES=$((ELAPSED / 60))
           SECONDS=$((ELAPSED % 60))
           echo "Build duration for ${{ matrix.label }}: ${MINUTES}m ${SECONDS}s"
+
+  # ── Update release notes with changelog after all builds complete ──
+  update-release-notes:
+    needs: build-tauri
+    if: always() && contains(needs.build-tauri.result, 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Generate and update release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          TAG="v${VERSION}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS="Initial release"
+          else
+            COMMITS=$(git log "${PREV_TAG}..${TAG}" --oneline --no-merges | sed 's/^[a-f0-9]*//' | sed 's/^ /- /')
+          fi
+
+          BODY=$(cat <<NOTES
+          ## What's Changed
+
+          ${COMMITS}
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...${TAG}
+          NOTES
+          )
+
+          gh release edit "$TAG" --notes "$BODY"
+          echo "Updated release notes for $TAG"
