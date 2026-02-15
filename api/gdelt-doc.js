@@ -1,9 +1,11 @@
+import { getCorsHeaders } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 const MAX_RECORDS = 20;
 const DEFAULT_RECORDS = 10;
 
 export default async function handler(req) {
+  const cors = getCorsHeaders(req);
   const url = new URL(req.url);
   const query = url.searchParams.get('query');
   const maxrecords = Math.min(
@@ -50,7 +52,7 @@ export default async function handler(req) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
       },
     });
