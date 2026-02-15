@@ -2783,9 +2783,10 @@ export class DeckGLMap {
       data: this.climateAnomalies,
       getPosition: (d) => [d.lon, d.lat],
       getWeight: (d) => Math.abs(d.tempDelta) + Math.abs(d.precipDelta) * 0.1,
-      radiusPixels: 80,
-      intensity: 1.5,
-      threshold: 0.1,
+      radiusPixels: 40,
+      intensity: 0.6,
+      threshold: 0.15,
+      opacity: 0.45,
       colorRange: [
         [68, 136, 255],
         [100, 200, 255],
