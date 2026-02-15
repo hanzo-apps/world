@@ -298,15 +298,7 @@ async function dispatch(requestUrl, req, routes, context) {
     return handleLocalServiceStatus(context);
   }
 
-  const expectedToken = process.env.LOCAL_API_TOKEN;
-  if (expectedToken) {
-    const authHeader = req.headers.authorization || '';
-    if (authHeader !== `Bearer ${expectedToken}`) {
-      context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
-      return json({ error: 'Unauthorized' }, 401);
-    }
-  }
-
+  // Localhost-only diagnostics — no token required
   if (requestUrl.pathname === '/api/local-status') {
     return json({
       success: true,
@@ -358,6 +350,15 @@ async function dispatch(requestUrl, req, routes, context) {
       return json({ error: 'expected { key, value }' }, 400);
     }
     return json({ error: 'POST required' }, 405);
+  }
+
+  const expectedToken = process.env.LOCAL_API_TOKEN;
+  if (expectedToken) {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader !== `Bearer ${expectedToken}`) {
+      context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
+      return json({ error: 'Unauthorized' }, 401);
+    }
   }
 
   if (context.cloudFallback && cloudPreferred.has(requestUrl.pathname)) {
