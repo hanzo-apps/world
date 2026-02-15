@@ -50,21 +50,22 @@ jobs:
     timeout-minutes: 40
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: lts/*
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7
         with:
+          toolchain: stable
           targets: ${{ contains(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@ad397744b0d591a723ab90405b7247fac0e6b8db
         with:
           workspaces: './src-tauri -> target'
           cache-on-failure: true
@@ -78,7 +79,7 @@ jobs:
         id: apple-signing
         shell: bash
         run: |
-          if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ]; then
+          if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ] && [ -n "${{ secrets.KEYCHAIN_PASSWORD }}" ]; then
             echo "available=true" >> $GITHUB_OUTPUT
             echo "Apple signing secrets detected"
           else
@@ -94,7 +95,7 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
           CERT_SIZE=$(wc -c < certificate.p12 | tr -d ' ')
           if [ "$CERT_SIZE" -lt 100 ]; then
             echo "::warning::Certificate file too small ($CERT_SIZE bytes) — likely invalid. Skipping signing."
@@ -143,7 +144,7 @@ jobs:
       # ── Build: Full variant (signed) ──
       - name: Build Tauri app (full, signed)
         if: env.BUILD_VARIANT == 'full' && steps.apple-signing.outputs.available == 'true' && env.SKIP_SIGNING != 'true'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@79c624843491f12ae9d63592534ed49df3bc4adb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: full
@@ -158,7 +159,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'World Monitor v__VERSION__'
           releaseBody: 'Download the installer for your platform below.'
-          releaseDraft: ${{ github.event.inputs.draft || true }}
+          releaseDraft: ${{ github.event_name != 'workflow_dispatch' || fromJSON(github.event.inputs.draft) }}
           prerelease: false
           args: ${{ matrix.args }}
           retryAttempts: 1
@@ -166,7 +167,7 @@ jobs:
       # ── Build: Full variant (unsigned — no Apple certs) ──
       - name: Build Tauri app (full, unsigned)
         if: env.BUILD_VARIANT == 'full' && (steps.apple-signing.outputs.available != 'true' || env.SKIP_SIGNING == 'true')
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@79c624843491f12ae9d63592534ed49df3bc4adb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: full
@@ -175,7 +176,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'World Monitor v__VERSION__'
           releaseBody: 'Download the installer for your platform below.'
-          releaseDraft: ${{ github.event.inputs.draft || true }}
+          releaseDraft: ${{ github.event_name != 'workflow_dispatch' || fromJSON(github.event.inputs.draft) }}
           prerelease: false
           args: ${{ matrix.args }}
           retryAttempts: 1
@@ -183,7 +184,7 @@ jobs:
       # ── Build: Tech variant (signed) ──
       - name: Build Tauri app (tech, signed)
         if: env.BUILD_VARIANT == 'tech' && steps.apple-signing.outputs.available == 'true' && env.SKIP_SIGNING != 'true'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@79c624843491f12ae9d63592534ed49df3bc4adb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: tech
@@ -198,7 +199,7 @@ jobs:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
           releaseBody: 'Download the installer for your platform below.'
-          releaseDraft: ${{ github.event.inputs.draft || true }}
+          releaseDraft: ${{ github.event_name != 'workflow_dispatch' || fromJSON(github.event.inputs.draft) }}
           prerelease: false
           tauriScript: npx tauri
           args: --config src-tauri/tauri.tech.conf.json ${{ matrix.args }}
@@ -207,7 +208,7 @@ jobs:
       # ── Build: Tech variant (unsigned — no Apple certs) ──
       - name: Build Tauri app (tech, unsigned)
         if: env.BUILD_VARIANT == 'tech' && (steps.apple-signing.outputs.available != 'true' || env.SKIP_SIGNING == 'true')
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@79c624843491f12ae9d63592534ed49df3bc4adb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: tech
@@ -216,8 +217,15 @@ jobs:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
           releaseBody: 'Download the installer for your platform below.'
-          releaseDraft: ${{ github.event.inputs.draft || true }}
+          releaseDraft: ${{ github.event_name != 'workflow_dispatch' || fromJSON(github.event.inputs.draft) }}
           prerelease: false
           tauriScript: npx tauri
           args: --config src-tauri/tauri.tech.conf.json ${{ matrix.args }}
           retryAttempts: 1
+
+      - name: Cleanup Apple signing materials
+        if: always() && contains(matrix.platform, 'macos')
+        shell: bash
+        run: |
+          rm -f certificate.p12
+          security delete-keychain build.keychain || true
