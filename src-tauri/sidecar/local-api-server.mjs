@@ -13,6 +13,32 @@ import { pathToFileURL } from 'node:url';
 // IPv6 endpoints time out, causing ETIMEDOUT. This override ensures ALL
 // fetch() calls in dynamically-loaded handler modules (api/*.js) use IPv4.
 const _originalFetch = globalThis.fetch;
+
+function normalizeRequestBody(body) {
+  if (body == null) return null;
+  if (typeof body === 'string' || Buffer.isBuffer(body) || body instanceof Uint8Array) return body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (ArrayBuffer.isView(body)) return Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+  if (body instanceof ArrayBuffer) return Buffer.from(body);
+  return body;
+}
+
+function buildSafeResponse(statusCode, statusText, headers, bodyBuffer) {
+  const status = Number.isInteger(statusCode) ? statusCode : 500;
+  const body = (status === 204 || status === 205 || status === 304) ? null : bodyBuffer;
+  return new Response(body, { status, statusText, headers });
+}
+
+function isTransientVerificationError(error) {
+  if (!(error instanceof Error)) return false;
+  const code = typeof error.code === 'string' ? error.code : '';
+  if (code && ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN', 'ENOTFOUND', 'UND_ERR_CONNECT_TIMEOUT'].includes(code)) {
+    return true;
+  }
+  if (error.name === 'AbortError') return true;
+  return /timed out|timeout|network|fetch failed|failed to fetch|socket hang up/i.test(error.message);
+}
+
 globalThis.fetch = function ipv4Fetch(input, init) {
   const isRequest = input && typeof input === 'object' && 'url' in input;
   let url;
@@ -33,17 +59,23 @@ globalThis.fetch = function ipv4Fetch(input, init) {
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const buf = Buffer.concat(chunks);
-        const body = buf.toString();
         const responseHeaders = new Headers();
         for (const [k, v] of Object.entries(res.headers)) {
           if (v) responseHeaders.set(k, Array.isArray(v) ? v.join(', ') : v);
         }
-        resolve(new Response(body, { status: res.statusCode, statusText: res.statusMessage, headers: responseHeaders }));
+        try {
+          resolve(buildSafeResponse(res.statusCode, res.statusMessage, responseHeaders, buf));
+        } catch (error) {
+          reject(error);
+        }
       });
     });
     req.on('error', reject);
     if (init?.signal) { init.signal.addEventListener('abort', () => req.destroy()); }
-    if (init?.body) req.write(typeof init.body === 'string' ? init.body : Buffer.from(init.body));
+    if (init?.body) {
+      const body = normalizeRequestBody(init.body);
+      if (body != null) req.write(body);
+    }
     req.end();
   });
 };
@@ -386,7 +418,10 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
       });
       req.on('error', reject);
       req.setTimeout(timeoutMs, () => { req.destroy(new Error('Request timed out')); });
-      if (options.body) req.write(options.body);
+      if (options.body) {
+        const body = normalizeRequestBody(options.body);
+        if (body != null) req.write(body);
+      }
       req.end();
     });
   }
@@ -634,7 +669,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provider probe failed';
-    return { valid: true, message: `Saved (could not verify: ${message})` };
+    if (isTransientVerificationError(error)) {
+      return { valid: true, message: `Saved (could not verify: ${message})` };
+    }
+    return fail(`Verification request failed: ${message}`);
   }
 }
 
