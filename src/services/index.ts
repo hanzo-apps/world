@@ -1,4 +1,5 @@
 export * from './rss';
+export * from './trending-keywords';
 export * from './markets';
 export * from './polymarket';
 export * from './earthquakes';
@@ -10,6 +11,7 @@ export * from './correlation';
 export * from './weather';
 export * from './fred';
 export * from './outages';
+export * from './cyber-threats';
 export * from './ais';
 export * from './cable-activity';
 export * from './protests';

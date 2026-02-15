@@ -1,4 +1,4 @@
-import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, Port, Spaceport, CriticalMineralProject } from '@/types';
+import type { ConflictZone, Hotspot, Earthquake, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, AirportDelayAlert, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, Port, Spaceport, CriticalMineralProject, CyberThreat } from '@/types';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 import type { StartupHub, Accelerator, TechHQ, CloudRegion } from '@/config/tech-geo';
@@ -10,7 +10,7 @@ import { fetchHotspotContext, formatArticleDate, extractDomain, type GdeltArticl
 import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity';
 
 interface TechEventPopupData {
   id: string;
@@ -70,7 +70,7 @@ interface DatacenterClusterData {
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -207,6 +207,8 @@ export class MapPopup {
         return this.renderWaterwayPopup(data.data as StrategicWaterway);
       case 'apt':
         return this.renderAPTPopup(data.data as APTGroup);
+      case 'cyberThreat':
+        return this.renderCyberThreatPopup(data.data as CyberThreat);
       case 'nuclear':
         return this.renderNuclearPopup(data.data as NuclearFacility);
       case 'economic':
@@ -902,6 +904,57 @@ export class MapPopup {
           </div>
         </div>
         <p class="popup-description">Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors.</p>
+      </div>
+    `;
+  }
+
+  private renderCyberThreatPopup(threat: CyberThreat): string {
+    const severityClass = escapeHtml(threat.severity);
+    const sourceLabels: Record<string, string> = {
+      feodo: 'Feodo Tracker',
+      urlhaus: 'URLhaus',
+      c2intel: 'C2 Intel Feeds',
+      otx: 'AlienVault OTX',
+      abuseipdb: 'AbuseIPDB',
+    };
+    const sourceLabel = sourceLabels[threat.source] || threat.source;
+    const typeLabel = threat.type.replace(/_/g, ' ').toUpperCase();
+    const tags = (threat.tags || []).slice(0, 6);
+
+    return `
+      <div class="popup-header apt ${severityClass}">
+        <span class="popup-title">Cyber Threat</span>
+        <span class="popup-badge ${severityClass}">${escapeHtml(threat.severity.toUpperCase())}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(typeLabel)}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">${escapeHtml(threat.indicatorType.toUpperCase())}</span>
+            <span class="stat-value">${escapeHtml(threat.indicator)}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">COUNTRY</span>
+            <span class="stat-value">${escapeHtml(threat.country || 'Unknown')}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">SOURCE</span>
+            <span class="stat-value">${escapeHtml(sourceLabel)}</span>
+          </div>
+          ${threat.malwareFamily ? `<div class="popup-stat">
+            <span class="stat-label">MALWARE</span>
+            <span class="stat-value">${escapeHtml(threat.malwareFamily)}</span>
+          </div>` : ''}
+          <div class="popup-stat">
+            <span class="stat-label">LAST SEEN</span>
+            <span class="stat-value">${escapeHtml(threat.lastSeen ? new Date(threat.lastSeen).toLocaleString() : 'Unknown')}</span>
+          </div>
+        </div>
+        ${tags.length > 0 ? `
+        <div class="popup-tags">
+          ${tags.map((tag) => `<span class="popup-tag">${escapeHtml(tag)}</span>`).join('')}
+        </div>` : ''}
       </div>
     `;
   }
