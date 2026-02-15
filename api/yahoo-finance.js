@@ -1,5 +1,7 @@
 export const config = { runtime: 'edge' };
 
+import { getCorsHeaders } from './_cors.js';
+
 const SYMBOL_PATTERN = /^[A-Za-z0-9.^=\-]+$/;
 const MAX_SYMBOL_LENGTH = 20;
 
@@ -12,13 +14,14 @@ function validateSymbol(symbol) {
 }
 
 export default async function handler(req) {
+  const cors = getCorsHeaders(req);
   const url = new URL(req.url);
   const symbol = validateSymbol(url.searchParams.get('symbol'));
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: 'Invalid or missing symbol parameter' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...cors },
     });
   }
 
@@ -35,14 +38,14 @@ export default async function handler(req) {
       status: response.status,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30',
       },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...cors },
     });
   }
 }

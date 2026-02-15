@@ -1,8 +1,10 @@
+import { getCorsHeaders } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 // Fetch AI/ML papers from ArXiv
 // Categories: cs.AI, cs.LG (Machine Learning), cs.CL (Computation and Language)
 export default async function handler(request) {
+  const cors = getCorsHeaders(request);
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category') || 'cs.AI'; // cs.AI, cs.LG, cs.CL
@@ -32,7 +34,7 @@ export default async function handler(request) {
       status: 200,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', // 1 hour cache
       },
     });
@@ -46,7 +48,7 @@ export default async function handler(request) {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          ...cors
         },
       }
     );

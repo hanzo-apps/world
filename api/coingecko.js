@@ -2,6 +2,7 @@ export const config = { runtime: 'edge' };
 
 import { getCachedJson, hashString, setCachedJson } from './_upstash-cache.js';
 import { recordCacheTelemetry } from './_cache-telemetry.js';
+import { getCorsHeaders } from './_cors.js';
 
 const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'btc', 'eth'];
 const MAX_COIN_IDS = 20;
@@ -36,10 +37,10 @@ function validateBoolean(val, defaultVal) {
   return defaultVal;
 }
 
-function getHeaders(xCache, cacheControl = RESPONSE_CACHE_CONTROL) {
+function getHeaders(cors, xCache, cacheControl = RESPONSE_CACHE_CONTROL) {
   return {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    ...cors,
     'Cache-Control': cacheControl,
     'X-Cache': xCache,
   };
@@ -55,6 +56,7 @@ function isValidPayload(payload) {
 }
 
 export default async function handler(req) {
+  const cors = getCorsHeaders(req);
   const url = new URL(req.url);
 
   const ids = validateCoinIds(url.searchParams.get('ids'));
@@ -70,7 +72,7 @@ export default async function handler(req) {
     recordCacheTelemetry('/api/coingecko', 'REDIS-HIT');
     return new Response(redisCached.body, {
       status: redisCached.status,
-      headers: getHeaders('REDIS-HIT'),
+      headers: getHeaders(cors, 'REDIS-HIT'),
     });
   }
 
@@ -82,7 +84,7 @@ export default async function handler(req) {
     recordCacheTelemetry('/api/coingecko', 'MEMORY-HIT');
     return new Response(fallbackCache.payload.body, {
       status: fallbackCache.payload.status,
-      headers: getHeaders('MEMORY-HIT'),
+      headers: getHeaders(cors, 'MEMORY-HIT'),
     });
   }
 
@@ -110,7 +112,7 @@ export default async function handler(req) {
       recordCacheTelemetry('/api/coingecko', 'STALE');
       return new Response(fallbackCache.payload.body, {
         status: fallbackCache.payload.status,
-        headers: getHeaders('STALE'),
+        headers: getHeaders(cors, 'STALE'),
       });
     }
 
@@ -128,7 +130,7 @@ export default async function handler(req) {
 
     return new Response(data, {
       status: response.status,
-      headers: getHeaders('MISS'),
+      headers: getHeaders(cors, 'MISS'),
     });
   } catch (error) {
     // Return cached data on error if available
@@ -136,14 +138,14 @@ export default async function handler(req) {
       recordCacheTelemetry('/api/coingecko', 'ERROR-FALLBACK');
       return new Response(fallbackCache.payload.body, {
         status: fallbackCache.payload.status,
-        headers: getHeaders('ERROR-FALLBACK', 'public, max-age=120'),
+        headers: getHeaders(cors, 'ERROR-FALLBACK', 'public, max-age=120'),
       });
     }
 
     recordCacheTelemetry('/api/coingecko', 'ERROR');
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...cors },
     });
   }
 }
