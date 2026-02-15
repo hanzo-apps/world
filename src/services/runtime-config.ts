@@ -435,8 +435,10 @@ export async function verifySecretWithApi(
     const message = String((payload as Record<string, unknown>).message || (valid ? 'Verified' : 'Verification failed'));
     return { valid, message };
   } catch (error) {
+    // Network errors reaching the sidecar should NOT block saving.
+    // Only explicit 401/403 from the provider means the key is invalid.
     const message = error instanceof Error ? error.message : 'Secret validation failed';
-    return { valid: false, message };
+    return { valid: true, message: `Saved (could not verify – ${message})` };
   }
 }
 
@@ -446,7 +448,7 @@ export async function loadDesktopSecrets(): Promise<void> {
   try {
     const keys = await invokeTauri<RuntimeSecretKey[]>('list_supported_secret_keys');
 
-    await Promise.all(keys.map(async (key) => {
+    const results = await Promise.allSettled(keys.map(async (key) => {
       const value = await invokeTauri<string | null>('get_secret', { key });
       if (value && value.trim()) {
         runtimeConfig.secrets[key] = { value: value.trim(), source: 'vault' };
@@ -457,6 +459,11 @@ export async function loadDesktopSecrets(): Promise<void> {
         }
       }
     }));
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    if (failures.length > 0) {
+      console.warn(`[runtime-config] ${failures.length} key(s) failed to load from vault`);
+    }
 
     notifyConfigChanged();
   } catch (error) {
