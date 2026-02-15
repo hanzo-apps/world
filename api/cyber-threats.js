@@ -28,6 +28,7 @@ const ABUSEIPDB_BLACKLIST_URL = 'https://api.abuseipdb.com/api/v2/blacklist';
 const UPSTREAM_TIMEOUT_MS = 8000;
 const GEO_MAX_UNRESOLVED_PER_RUN = 100;
 const GEO_CONCURRENCY = 8;
+const GEO_OVERALL_TIMEOUT_MS = 12_000;
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60 * 1000;
@@ -577,7 +578,10 @@ async function hydrateThreatCoordinates(threats) {
     }
   });
 
-  await Promise.all(workers);
+  await Promise.race([
+    Promise.all(workers),
+    new Promise((resolve) => setTimeout(resolve, GEO_OVERALL_TIMEOUT_MS)),
+  ]);
 
   return threats.map((threat) => {
     const hasCoords = hasValidCoordinates(threat.lat, threat.lon);
