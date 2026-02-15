@@ -16,7 +16,9 @@ export type RuntimeSecretKey =
   | 'VITE_OPENSKY_RELAY_URL'
   | 'OPENSKY_CLIENT_ID'
   | 'OPENSKY_CLIENT_SECRET'
-  | 'AISSTREAM_API_KEY';
+  | 'AISSTREAM_API_KEY'
+  | 'FINNHUB_API_KEY'
+  | 'NASA_FIRMS_API_KEY';
 
 export type RuntimeFeatureId =
   | 'aiGroq'
@@ -30,7 +32,9 @@ export type RuntimeFeatureId =
   | 'abuseIpdbThreatIntel'
   | 'wingbitsEnrichment'
   | 'aisRelay'
-  | 'openskyRelay';
+  | 'openskyRelay'
+  | 'finnhubMarkets'
+  | 'nasaFirms';
 
 export interface RuntimeFeatureDefinition {
   id: RuntimeFeatureId;
@@ -51,6 +55,8 @@ export interface RuntimeConfig {
 }
 
 const TOGGLES_STORAGE_KEY = 'worldmonitor-runtime-feature-toggles';
+const SIDECAR_ENV_UPDATE_URL = 'http://127.0.0.1:46123/api/local-env-update';
+const SIDECAR_SECRET_VALIDATE_URL = 'http://127.0.0.1:46123/api/local-validate-secret';
 
 const defaultToggles: Record<RuntimeFeatureId, boolean> = {
   aiGroq: true,
@@ -65,6 +71,8 @@ const defaultToggles: Record<RuntimeFeatureId, boolean> = {
   wingbitsEnrichment: true,
   aisRelay: true,
   openskyRelay: true,
+  finnhubMarkets: true,
+  nasaFirms: true,
 };
 
 export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
@@ -152,6 +160,20 @@ export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
     requiredSecrets: ['VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'],
     fallback: 'Military flights fall back to limited/no data.',
   },
+  {
+    id: 'finnhubMarkets',
+    name: 'Finnhub market data',
+    description: 'Real-time stock quotes and market data from Finnhub.',
+    requiredSecrets: ['FINNHUB_API_KEY'],
+    fallback: 'Stock ticker uses limited free data.',
+  },
+  {
+    id: 'nasaFirms',
+    name: 'NASA FIRMS fire data',
+    description: 'Fire Information for Resource Management System satellite data.',
+    requiredSecrets: ['NASA_FIRMS_API_KEY'],
+    fallback: 'FIRMS fire layer uses public VIIRS feed.',
+  },
 ];
 
 function readEnvSecret(key: RuntimeSecretKey): string {
@@ -170,8 +192,33 @@ function readStoredToggles(): Record<RuntimeFeatureId, boolean> {
   }
 }
 
-function validateSecretValue(value: string): boolean {
-  return value.trim().length >= 8;
+const URL_SECRET_KEYS = new Set<RuntimeSecretKey>([
+  'WS_RELAY_URL',
+  'VITE_OPENSKY_RELAY_URL',
+]);
+
+export interface SecretVerificationResult {
+  valid: boolean;
+  message: string;
+}
+
+export function validateSecret(key: RuntimeSecretKey, value: string): { valid: boolean; hint?: string } {
+  const trimmed = value.trim();
+  if (!trimmed) return { valid: false, hint: 'Value is required' };
+
+  if (URL_SECRET_KEYS.has(key)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) {
+        return { valid: false, hint: 'Must be an http(s) or ws(s) URL' };
+      }
+      return { valid: true };
+    } catch {
+      return { valid: false, hint: 'Must be a valid URL' };
+    }
+  }
+
+  return { valid: true };
 }
 
 const listeners = new Set<() => void>();
@@ -180,6 +227,8 @@ const runtimeConfig: RuntimeConfig = {
   featureToggles: readStoredToggles(),
   secrets: {},
 };
+
+let localApiTokenPromise: Promise<string | null> | null = null;
 
 function notifyConfigChanged(): void {
   for (const listener of listeners) listener();
@@ -218,7 +267,7 @@ export function isFeatureEnabled(featureId: RuntimeFeatureId): boolean {
 export function getSecretState(key: RuntimeSecretKey): { present: boolean; valid: boolean; source: 'env' | 'vault' | 'missing' } {
   const state = runtimeConfig.secrets[key];
   if (!state) return { present: false, valid: false, source: 'missing' };
-  return { present: true, valid: validateSecretValue(state.value), source: state.source };
+  return { present: true, valid: validateSecret(key, state.value).valid, source: state.source };
 }
 
 export function isFeatureAvailable(featureId: RuntimeFeatureId): boolean {
@@ -257,17 +306,103 @@ export async function setSecretValue(key: RuntimeSecretKey, value: string): Prom
   }
 
   // Push to sidecar so handlers pick it up immediately
-  pushSecretToSidecar(key, sanitized || '');
+  await pushSecretToSidecar(key, sanitized || '');
 
   notifyConfigChanged();
 }
 
-function pushSecretToSidecar(key: string, value: string): void {
-  fetch('http://127.0.0.1:46123/api/local-env-update', {
+async function getLocalApiToken(): Promise<string | null> {
+  if (!localApiTokenPromise) {
+    localApiTokenPromise = invokeTauri<string>('get_local_api_token')
+      .then((token) => token.trim() || null)
+      .catch((error) => {
+        // Allow retries on subsequent calls if bridge/token is temporarily unavailable.
+        localApiTokenPromise = null;
+        throw error;
+      });
+  }
+  return localApiTokenPromise;
+}
+
+async function pushSecretToSidecar(key: string, value: string): Promise<void> {
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  const token = await getLocalApiToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(SIDECAR_ENV_UPDATE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ key, value: value || null }),
-  }).catch(() => { /* sidecar not running */ });
+  });
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      detail = await response.text();
+    } catch { /* ignore non-readable body */ }
+    throw new Error(`Sidecar secret sync failed (${response.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+  }
+}
+
+async function callSidecarWithAuth(url: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers ?? {});
+  const token = await getLocalApiToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(url, { ...init, headers });
+}
+
+export async function verifySecretWithApi(
+  key: RuntimeSecretKey,
+  value: string,
+  context: Partial<Record<RuntimeSecretKey, string>> = {},
+): Promise<SecretVerificationResult> {
+  const localValidation = validateSecret(key, value);
+  if (!localValidation.valid) {
+    return { valid: false, message: localValidation.hint || 'Invalid value' };
+  }
+
+  if (!isDesktopRuntime()) {
+    return { valid: true, message: 'Saved' };
+  }
+
+  try {
+    const response = await callSidecarWithAuth(SIDECAR_SECRET_VALIDATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: value.trim(), context }),
+    });
+
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch { /* non-JSON response */ }
+
+    if (!response.ok) {
+      const message = payload && typeof payload === 'object'
+        ? String(
+            (payload as Record<string, unknown>).message
+            || (payload as Record<string, unknown>).error
+            || 'Secret validation failed'
+          )
+        : `Secret validation failed (${response.status})`;
+      return { valid: false, message };
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      return { valid: false, message: 'Secret validation returned an invalid response' };
+    }
+
+    const valid = Boolean((payload as Record<string, unknown>).valid);
+    const message = String((payload as Record<string, unknown>).message || (valid ? 'Verified' : 'Verification failed'));
+    return { valid, message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Secret validation failed';
+    return { valid: false, message };
+  }
 }
 
 export async function loadDesktopSecrets(): Promise<void> {
@@ -280,7 +415,11 @@ export async function loadDesktopSecrets(): Promise<void> {
       const value = await invokeTauri<string | null>('get_secret', { key });
       if (value && value.trim()) {
         runtimeConfig.secrets[key] = { value: value.trim(), source: 'vault' };
-        pushSecretToSidecar(key, value.trim());
+        try {
+          await pushSecretToSidecar(key, value.trim());
+        } catch (error) {
+          console.warn(`[runtime-config] Failed to sync ${key} to sidecar`, error);
+        }
       }
     }));
 
