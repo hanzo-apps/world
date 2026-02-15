@@ -172,6 +172,12 @@
   border-color: rgba(255, 214, 10, 0.3);
 }
 
+.settings-runtime-panel .runtime-pill.staged {
+  color: var(--settings-green);
+  border-color: rgba(48, 209, 88, 0.3);
+  opacity: 0.7;
+}
+
 .settings-runtime-panel .runtime-secret-row input {
   background: var(--settings-surface-inset);
   border: 1px solid var(--settings-border-strong);
@@ -203,6 +209,11 @@
 
 .settings-runtime-panel .runtime-secret-status.warn {
   color: var(--settings-yellow);
+}
+
+.settings-runtime-panel .runtime-secret-status.staged {
+  color: var(--settings-green);
+  opacity: 0.7;
 }
 
 .settings-runtime-panel .runtime-feature-fallback.fallback {

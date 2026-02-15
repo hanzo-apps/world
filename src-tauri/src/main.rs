@@ -382,7 +382,18 @@ fn build_app_menu(handle: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[&about_item, &help_separator, &github_item, &devtools_item],
     )?;
 
-    Menu::with_items(handle, &[&file_menu, &help_menu])
+    let edit_menu = {
+        let undo = PredefinedMenuItem::undo(handle, None)?;
+        let redo = PredefinedMenuItem::redo(handle, None)?;
+        let sep1 = PredefinedMenuItem::separator(handle)?;
+        let cut = PredefinedMenuItem::cut(handle, None)?;
+        let copy = PredefinedMenuItem::copy(handle, None)?;
+        let paste = PredefinedMenuItem::paste(handle, None)?;
+        let select_all = PredefinedMenuItem::select_all(handle, None)?;
+        Submenu::with_items(handle, "Edit", true, &[&undo, &redo, &sep1, &cut, &copy, &paste, &select_all])?
+    };
+
+    Menu::with_items(handle, &[&file_menu, &edit_menu, &help_menu])
 }
 
 fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
@@ -624,6 +635,17 @@ fn main() {
                     if let Some(w) = app.get_webview_window("main") {
                         let _ = w.show();
                         let _ = w.set_focus();
+                    }
+                }
+                // Raise settings window when main window gains focus so it doesn't hide behind
+                RunEvent::WindowEvent {
+                    label,
+                    event: WindowEvent::Focused(true),
+                    ..
+                } if label == "main" => {
+                    if let Some(sw) = app.get_webview_window("settings") {
+                        let _ = sw.show();
+                        let _ = sw.set_focus();
                     }
                 }
                 RunEvent::ExitRequested { .. } | RunEvent::Exit => {
