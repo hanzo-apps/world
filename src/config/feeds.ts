@@ -415,7 +415,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     // RUSI - Royal United Services Institute (UK defense & security)
     { name: 'RUSI', url: rss('https://www.rusi.org/rss/latest-commentary.xml') },
     // FPRI - Foreign Policy Research Institute (US foreign policy)
-    { name: 'FPRI', url: rss('https://www.fpri.org/feed') },
+    { name: 'FPRI', url: rss('https://www.fpri.org/feed/') },
     // Jamestown Foundation - Eurasia/China/Terrorism analysis
     { name: 'Jamestown', url: rss('https://jamestown.org/feed/') },
   ],
