@@ -322,15 +322,15 @@ async function isSignificantTerm(term: string, headlines: StoredHeadline[]): Pro
 async function handleSpike(spike: TrendingSpike, config: TrendingConfig): Promise<void> {
   const termKey = toTermKey(spike.term);
   if (activeSpikeTerms.has(termKey)) return;
-
-  const significant = await isSignificantTerm(spike.term, spike.headlines);
-  if (!significant) {
-    console.log(`[TrendingKeywords] Suppressed non-entity term: "${spike.term}"`);
-    return;
-  }
-
   activeSpikeTerms.add(termKey);
+
   try {
+    const significant = await isSignificantTerm(spike.term, spike.headlines);
+    if (!significant) {
+      console.log(`[TrendingKeywords] Suppressed non-entity term: "${spike.term}"`);
+      return;
+    }
+
     const windowHours = Math.round((spike.windowMs / HOUR_MS) * 10) / 10;
     const headlines = spike.headlines.slice(0, 6).map(h => h.title);
     const multiplierText = spike.baseline > 0 ? `${spike.multiplier.toFixed(1)}x baseline` : 'cold-start threshold';
