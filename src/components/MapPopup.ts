@@ -29,23 +29,43 @@ interface TechHQClusterData {
   items: TechHQ[];
   city: string;
   country: string;
+  count?: number;
+  faangCount?: number;
+  unicornCount?: number;
+  publicCount?: number;
+  sampled?: boolean;
 }
 
 interface TechEventClusterData {
   items: TechEventPopupData[];
   location: string;
   country: string;
+  count?: number;
+  soonCount?: number;
+  sampled?: boolean;
 }
 
 interface ProtestClusterData {
   items: SocialUnrestEvent[];
   country: string;
+  count?: number;
+  riotCount?: number;
+  highSeverityCount?: number;
+  verifiedCount?: number;
+  totalFatalities?: number;
+  sampled?: boolean;
 }
 
 interface DatacenterClusterData {
   items: AIDataCenter[];
   region: string;
   country: string;
+  count?: number;
+  totalChips?: number;
+  totalPowerMW?: number;
+  existingCount?: number;
+  plannedCount?: number;
+  sampled?: boolean;
 }
 
 interface PopupData {
@@ -242,9 +262,9 @@ export class MapPopup {
       case 'techEvent':
         return this.renderTechEventPopup(data.data as TechEventPopupData);
       case 'techHQCluster':
-        return this.renderTechHQClusterPopup(data.data as { items: TechHQ[]; city: string; country: string });
+        return this.renderTechHQClusterPopup(data.data as TechHQClusterData);
       case 'techEventCluster':
-        return this.renderTechEventClusterPopup(data.data as { items: TechEventPopupData[]; location: string; country: string });
+        return this.renderTechEventClusterPopup(data.data as TechEventClusterData);
       default:
         return '';
     }
@@ -747,10 +767,11 @@ export class MapPopup {
   }
 
   private renderProtestClusterPopup(data: ProtestClusterData): string {
-    const riots = data.items.filter(e => e.eventType === 'riot');
-    const highSeverity = data.items.filter(e => e.severity === 'high');
-    const verified = data.items.filter(e => e.validated);
-    const totalFatalities = data.items.reduce((sum, e) => sum + (e.fatalities || 0), 0);
+    const totalCount = data.count ?? data.items.length;
+    const riots = data.riotCount ?? data.items.filter(e => e.eventType === 'riot').length;
+    const highSeverity = data.highSeverityCount ?? data.items.filter(e => e.severity === 'high').length;
+    const verified = data.verifiedCount ?? data.items.filter(e => e.validated).length;
+    const totalFatalities = data.totalFatalities ?? data.items.reduce((sum, e) => sum + (e.fatalities || 0), 0);
 
     const sortedItems = [...data.items].sort((a, b) => {
       const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -769,23 +790,26 @@ export class MapPopup {
       return `<li class="cluster-item ${sevClass}">${icon} ${dateStr}${city ? ` • ${city}` : ''}${title}</li>`;
     }).join('');
 
-    const moreCount = data.items.length > 10 ? `<li class="cluster-more">+${data.items.length - 10} more events</li>` : '';
-    const headerClass = highSeverity.length > 0 ? 'high' : riots.length > 0 ? 'medium' : 'low';
+    const renderedCount = Math.min(10, data.items.length);
+    const remainingCount = Math.max(0, totalCount - renderedCount);
+    const moreCount = remainingCount > 0 ? `<li class="cluster-more">+${remainingCount} more events</li>` : '';
+    const headerClass = highSeverity > 0 ? 'high' : riots > 0 ? 'medium' : 'low';
 
     return `
       <div class="popup-header protest ${headerClass} cluster">
         <span class="popup-title">📢 ${escapeHtml(data.country)}</span>
-        <span class="popup-badge">${data.items.length} EVENTS</span>
+        <span class="popup-badge">${totalCount} EVENTS</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body cluster-popup">
         <div class="cluster-summary">
-          ${riots.length ? `<span class="summary-item riot">🔥 ${riots.length} Riots</span>` : ''}
-          ${highSeverity.length ? `<span class="summary-item high">⚠️ ${highSeverity.length} High Severity</span>` : ''}
-          ${verified.length ? `<span class="summary-item verified">✓ ${verified.length} Verified</span>` : ''}
+          ${riots ? `<span class="summary-item riot">🔥 ${riots} Riots</span>` : ''}
+          ${highSeverity ? `<span class="summary-item high">⚠️ ${highSeverity} High Severity</span>` : ''}
+          ${verified ? `<span class="summary-item verified">✓ ${verified} Verified</span>` : ''}
           ${totalFatalities > 0 ? `<span class="summary-item fatalities">💀 ${totalFatalities} Fatalities</span>` : ''}
         </div>
         <ul class="cluster-list">${listItems}${moreCount}</ul>
+        ${data.sampled ? `<p class="popup-more">Showing a sampled list of ${data.items.length} events.</p>` : ''}
       </div>
     `;
   }
@@ -1321,10 +1345,11 @@ export class MapPopup {
   }
 
   private renderDatacenterClusterPopup(data: DatacenterClusterData): string {
-    const totalChips = data.items.reduce((sum, dc) => sum + dc.chipCount, 0);
-    const totalPower = data.items.reduce((sum, dc) => sum + (dc.powerMW || 0), 0);
-    const existingCount = data.items.filter(dc => dc.status === 'existing').length;
-    const plannedCount = data.items.filter(dc => dc.status === 'planned').length;
+    const totalCount = data.count ?? data.items.length;
+    const totalChips = data.totalChips ?? data.items.reduce((sum, dc) => sum + dc.chipCount, 0);
+    const totalPower = data.totalPowerMW ?? data.items.reduce((sum, dc) => sum + (dc.powerMW || 0), 0);
+    const existingCount = data.existingCount ?? data.items.filter(dc => dc.status === 'existing').length;
+    const plannedCount = data.plannedCount ?? data.items.filter(dc => dc.status === 'planned').length;
 
     const formatNumber = (n: number) => {
       if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -1344,7 +1369,7 @@ export class MapPopup {
 
     return `
       <div class="popup-header datacenter cluster">
-        <span class="popup-title">🖥️ ${data.items.length} Data Centers</span>
+        <span class="popup-title">🖥️ ${totalCount} Data Centers</span>
         <span class="popup-badge elevated">${escapeHtml(data.region)}</span>
         <button class="popup-close">×</button>
       </div>
@@ -1373,7 +1398,8 @@ export class MapPopup {
         <div class="cluster-list">
           ${dcListHtml}
         </div>
-        ${data.items.length > 8 ? `<p class="popup-more">+ ${data.items.length - 8} more data centers</p>` : ''}
+        ${totalCount > 8 ? `<p class="popup-more">+ ${Math.max(0, totalCount - 8)} more data centers</p>` : ''}
+        ${data.sampled ? `<p class="popup-more">Showing a sampled list of ${data.items.length} sites.</p>` : ''}
         <div class="popup-attribution">Data: Epoch AI GPU Clusters</div>
       </div>
     `;
@@ -1526,10 +1552,11 @@ export class MapPopup {
     `;
   }
 
-  private renderTechHQClusterPopup(data: { items: TechHQ[]; city: string; country: string }): string {
-    const unicorns = data.items.filter(h => h.type === 'unicorn');
-    const faangs = data.items.filter(h => h.type === 'faang');
-    const publics = data.items.filter(h => h.type === 'public');
+  private renderTechHQClusterPopup(data: TechHQClusterData): string {
+    const totalCount = data.count ?? data.items.length;
+    const unicornCount = data.unicornCount ?? data.items.filter(h => h.type === 'unicorn').length;
+    const faangCount = data.faangCount ?? data.items.filter(h => h.type === 'faang').length;
+    const publicCount = data.publicCount ?? data.items.filter(h => h.type === 'public').length;
 
     const sortedItems = [...data.items].sort((a, b) => {
       const typeOrder = { faang: 0, unicorn: 1, public: 2 };
@@ -1545,23 +1572,25 @@ export class MapPopup {
     return `
       <div class="popup-header tech-hq cluster">
         <span class="popup-title">🏙️ ${escapeHtml(data.city)}</span>
-        <span class="popup-badge">${data.items.length} COMPANIES</span>
+        <span class="popup-badge">${totalCount} COMPANIES</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body cluster-popup">
         <div class="popup-subtitle">📍 ${escapeHtml(data.city)}, ${escapeHtml(data.country)}</div>
         <div class="cluster-summary">
-          ${faangs.length ? `<span class="summary-item faang">🏛️ ${faangs.length} Big Tech</span>` : ''}
-          ${unicorns.length ? `<span class="summary-item unicorn">🦄 ${unicorns.length} Unicorns</span>` : ''}
-          ${publics.length ? `<span class="summary-item public">🏢 ${publics.length} Public</span>` : ''}
+          ${faangCount ? `<span class="summary-item faang">🏛️ ${faangCount} Big Tech</span>` : ''}
+          ${unicornCount ? `<span class="summary-item unicorn">🦄 ${unicornCount} Unicorns</span>` : ''}
+          ${publicCount ? `<span class="summary-item public">🏢 ${publicCount} Public</span>` : ''}
         </div>
         <ul class="cluster-list">${listItems}</ul>
+        ${data.sampled ? `<p class="popup-more">Showing a sampled list of ${data.items.length} companies.</p>` : ''}
       </div>
     `;
   }
 
-  private renderTechEventClusterPopup(data: { items: TechEventPopupData[]; location: string; country: string }): string {
-    const upcomingSoon = data.items.filter(e => e.daysUntil <= 14);
+  private renderTechEventClusterPopup(data: TechEventClusterData): string {
+    const totalCount = data.count ?? data.items.length;
+    const upcomingSoon = data.soonCount ?? data.items.filter(e => e.daysUntil <= 14).length;
     const sortedItems = [...data.items].sort((a, b) => a.daysUntil - b.daysUntil);
 
     const listItems = sortedItems.map(event => {
@@ -1574,13 +1603,14 @@ export class MapPopup {
     return `
       <div class="popup-header tech-event cluster">
         <span class="popup-title">📅 ${escapeHtml(data.location)}</span>
-        <span class="popup-badge">${data.items.length} EVENTS</span>
+        <span class="popup-badge">${totalCount} EVENTS</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body cluster-popup">
         <div class="popup-subtitle">📍 ${escapeHtml(data.location)}, ${escapeHtml(data.country)}</div>
-        ${upcomingSoon.length ? `<div class="cluster-summary"><span class="summary-item soon">⚡ ${upcomingSoon.length} upcoming within 2 weeks</span></div>` : ''}
+        ${upcomingSoon ? `<div class="cluster-summary"><span class="summary-item soon">⚡ ${upcomingSoon} upcoming within 2 weeks</span></div>` : ''}
         <ul class="cluster-list">${listItems}</ul>
+        ${data.sampled ? `<p class="popup-more">Showing a sampled list of ${data.items.length} events.</p>` : ''}
       </div>
     `;
   }

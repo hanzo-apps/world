@@ -176,6 +176,8 @@ const MARKER_ICONS = {
 };
 
 export class DeckGLMap {
+  private static readonly MAX_CLUSTER_LEAVES = 200;
+
   private container: HTMLElement;
   private deckOverlay: MapboxOverlay | null = null;
   private maplibreMap: maplibregl.Map | null = null;
@@ -243,6 +245,8 @@ export class DeckGLMap {
   private techEventClusters: MapTechEventCluster[] = [];
   private datacenterClusters: MapDatacenterCluster[] = [];
   private lastSCZoom = -1;
+  private lastSCBoundsKey = '';
+  private lastSCMask = '';
   private newsPulseIntervalId: ReturnType<typeof setInterval> | null = null;
   private lastCableHighlightSignature = '';
   private lastPipelineHighlightSignature = '';
@@ -431,9 +435,36 @@ export class DeckGLMap {
     const points = this.protests.map((p, i) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] as [number, number] },
-      properties: { index: i },
+      properties: {
+        index: i,
+        country: p.country,
+        severity: p.severity,
+        eventType: p.eventType,
+        validated: Boolean(p.validated),
+        fatalities: Number.isFinite(p.fatalities) ? Number(p.fatalities) : 0,
+      },
     }));
-    this.protestSC = new Supercluster({ radius: 60, maxZoom: 14 });
+    this.protestSC = new Supercluster({
+      radius: 60,
+      maxZoom: 14,
+      map: (props: Record<string, unknown>) => ({
+        index: Number(props.index ?? 0),
+        country: String(props.country ?? ''),
+        maxSeverityRank: props.severity === 'high' ? 2 : props.severity === 'medium' ? 1 : 0,
+        riotCount: props.eventType === 'riot' ? 1 : 0,
+        highSeverityCount: props.severity === 'high' ? 1 : 0,
+        verifiedCount: props.validated ? 1 : 0,
+        totalFatalities: Number(props.fatalities ?? 0) || 0,
+      }),
+      reduce: (acc: Record<string, unknown>, props: Record<string, unknown>) => {
+        acc.maxSeverityRank = Math.max(Number(acc.maxSeverityRank ?? 0), Number(props.maxSeverityRank ?? 0));
+        acc.riotCount = Number(acc.riotCount ?? 0) + Number(props.riotCount ?? 0);
+        acc.highSeverityCount = Number(acc.highSeverityCount ?? 0) + Number(props.highSeverityCount ?? 0);
+        acc.verifiedCount = Number(acc.verifiedCount ?? 0) + Number(props.verifiedCount ?? 0);
+        acc.totalFatalities = Number(acc.totalFatalities ?? 0) + Number(props.totalFatalities ?? 0);
+        if (!acc.country && props.country) acc.country = props.country;
+      },
+    });
     this.protestSC.load(points);
     this.lastSCZoom = -1;
   }
@@ -442,9 +473,32 @@ export class DeckGLMap {
     const points = TECH_HQS.map((h, i) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [h.lon, h.lat] as [number, number] },
-      properties: { index: i },
+      properties: {
+        index: i,
+        city: h.city,
+        country: h.country,
+        type: h.type,
+      },
     }));
-    this.techHQSC = new Supercluster({ radius: 50, maxZoom: 14 });
+    this.techHQSC = new Supercluster({
+      radius: 50,
+      maxZoom: 14,
+      map: (props: Record<string, unknown>) => ({
+        index: Number(props.index ?? 0),
+        city: String(props.city ?? ''),
+        country: String(props.country ?? ''),
+        faangCount: props.type === 'faang' ? 1 : 0,
+        unicornCount: props.type === 'unicorn' ? 1 : 0,
+        publicCount: props.type === 'public' ? 1 : 0,
+      }),
+      reduce: (acc: Record<string, unknown>, props: Record<string, unknown>) => {
+        acc.faangCount = Number(acc.faangCount ?? 0) + Number(props.faangCount ?? 0);
+        acc.unicornCount = Number(acc.unicornCount ?? 0) + Number(props.unicornCount ?? 0);
+        acc.publicCount = Number(acc.publicCount ?? 0) + Number(props.publicCount ?? 0);
+        if (!acc.city && props.city) acc.city = props.city;
+        if (!acc.country && props.country) acc.country = props.country;
+      },
+    });
     this.techHQSC.load(points);
     this.lastSCZoom = -1;
   }
@@ -453,9 +507,36 @@ export class DeckGLMap {
     const points = this.techEvents.map((e, i) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] as [number, number] },
-      properties: { index: i },
+      properties: {
+        index: i,
+        location: e.location,
+        country: e.country,
+        daysUntil: e.daysUntil,
+      },
     }));
-    this.techEventSC = new Supercluster({ radius: 50, maxZoom: 14 });
+    this.techEventSC = new Supercluster({
+      radius: 50,
+      maxZoom: 14,
+      map: (props: Record<string, unknown>) => {
+        const daysUntil = Number(props.daysUntil ?? Number.MAX_SAFE_INTEGER);
+        return {
+          index: Number(props.index ?? 0),
+          location: String(props.location ?? ''),
+          country: String(props.country ?? ''),
+          soonestDaysUntil: Number.isFinite(daysUntil) ? daysUntil : Number.MAX_SAFE_INTEGER,
+          soonCount: Number.isFinite(daysUntil) && daysUntil <= 14 ? 1 : 0,
+        };
+      },
+      reduce: (acc: Record<string, unknown>, props: Record<string, unknown>) => {
+        acc.soonestDaysUntil = Math.min(
+          Number(acc.soonestDaysUntil ?? Number.MAX_SAFE_INTEGER),
+          Number(props.soonestDaysUntil ?? Number.MAX_SAFE_INTEGER),
+        );
+        acc.soonCount = Number(acc.soonCount ?? 0) + Number(props.soonCount ?? 0);
+        if (!acc.location && props.location) acc.location = props.location;
+        if (!acc.country && props.country) acc.country = props.country;
+      },
+    });
     this.techEventSC.load(points);
     this.lastSCZoom = -1;
   }
@@ -465,39 +546,83 @@ export class DeckGLMap {
     const points = activeDCs.map((dc, i) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [dc.lon, dc.lat] as [number, number] },
-      properties: { index: i },
+      properties: {
+        index: i,
+        country: dc.country,
+        chipCount: dc.chipCount,
+        powerMW: dc.powerMW ?? 0,
+        status: dc.status,
+      },
     }));
-    this.datacenterSC = new Supercluster({ radius: 70, maxZoom: 14 });
+    this.datacenterSC = new Supercluster({
+      radius: 70,
+      maxZoom: 14,
+      map: (props: Record<string, unknown>) => ({
+        index: Number(props.index ?? 0),
+        country: String(props.country ?? ''),
+        totalChips: Number(props.chipCount ?? 0) || 0,
+        totalPowerMW: Number(props.powerMW ?? 0) || 0,
+        existingCount: props.status === 'existing' ? 1 : 0,
+        plannedCount: props.status === 'planned' ? 1 : 0,
+      }),
+      reduce: (acc: Record<string, unknown>, props: Record<string, unknown>) => {
+        acc.totalChips = Number(acc.totalChips ?? 0) + Number(props.totalChips ?? 0);
+        acc.totalPowerMW = Number(acc.totalPowerMW ?? 0) + Number(props.totalPowerMW ?? 0);
+        acc.existingCount = Number(acc.existingCount ?? 0) + Number(props.existingCount ?? 0);
+        acc.plannedCount = Number(acc.plannedCount ?? 0) + Number(props.plannedCount ?? 0);
+        if (!acc.country && props.country) acc.country = props.country;
+      },
+    });
     this.datacenterSC.load(points);
     this.lastSCZoom = -1;
   }
 
   private updateClusterData(): void {
     const zoom = Math.floor(this.maplibreMap?.getZoom() ?? 2);
-    if (zoom === this.lastSCZoom) return;
-    this.lastSCZoom = zoom;
-
     const bounds = this.maplibreMap?.getBounds();
     if (!bounds) return;
     const bbox: [number, number, number, number] = [
       bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(),
     ];
+    const boundsKey = `${bbox[0].toFixed(4)}:${bbox[1].toFixed(4)}:${bbox[2].toFixed(4)}:${bbox[3].toFixed(4)}`;
+    const layers = this.state.layers;
+    const useProtests = layers.protests && this.protests.length > 0;
+    const useTechHQ = SITE_VARIANT === 'tech' && layers.techHQs;
+    const useTechEvents = SITE_VARIANT === 'tech' && layers.techEvents && this.techEvents.length > 0;
+    const useDatacenterClusters = layers.datacenters && zoom < 5;
+    const layerMask = `${Number(useProtests)}${Number(useTechHQ)}${Number(useTechEvents)}${Number(useDatacenterClusters)}`;
+    if (zoom === this.lastSCZoom && boundsKey === this.lastSCBoundsKey && layerMask === this.lastSCMask) return;
+    this.lastSCZoom = zoom;
+    this.lastSCBoundsKey = boundsKey;
+    this.lastSCMask = layerMask;
 
-    if (this.protestSC) {
+    if (useProtests && this.protestSC) {
       this.protestClusters = this.protestSC.getClusters(bbox, zoom).map(f => {
         const coords = f.geometry.coordinates as [number, number];
         if (f.properties.cluster) {
-          const leaves = this.protestSC!.getLeaves(f.properties.cluster_id!, Infinity);
+          const props = f.properties as Record<string, unknown>;
+          const leaves = this.protestSC!.getLeaves(f.properties.cluster_id!, DeckGLMap.MAX_CLUSTER_LEAVES);
           const items = leaves.map(l => this.protests[l.properties.index]).filter((x): x is SocialUnrestEvent => !!x);
-          const maxSev = items.some(i => i.severity === 'high') ? 'high' : items.some(i => i.severity === 'medium') ? 'medium' : 'low';
+          const maxSeverityRank = Number(props.maxSeverityRank ?? 0);
+          const maxSev = maxSeverityRank >= 2 ? 'high' : maxSeverityRank === 1 ? 'medium' : 'low';
+          const riotCount = Number(props.riotCount ?? 0);
+          const highSeverityCount = Number(props.highSeverityCount ?? 0);
+          const verifiedCount = Number(props.verifiedCount ?? 0);
+          const totalFatalities = Number(props.totalFatalities ?? 0);
+          const clusterCount = Number(f.properties.point_count ?? items.length);
           return {
             id: `pc-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
-            count: f.properties.point_count!,
-            items, country: items[0]?.country ?? '',
+            count: clusterCount,
+            items,
+            country: String(props.country ?? items[0]?.country ?? ''),
             maxSeverity: maxSev as 'low' | 'medium' | 'high',
-            hasRiot: items.some(i => i.eventType === 'riot'),
-            totalFatalities: items.reduce((s, i) => s + (i.fatalities ?? 0), 0),
+            hasRiot: riotCount > 0,
+            totalFatalities,
+            riotCount,
+            highSeverityCount,
+            verifiedCount,
+            sampled: items.length < clusterCount,
           };
         }
         const item = this.protests[f.properties.index]!;
@@ -506,22 +631,44 @@ export class DeckGLMap {
           count: 1, items: [item], country: item.country,
           maxSeverity: item.severity, hasRiot: item.eventType === 'riot',
           totalFatalities: item.fatalities ?? 0,
+          riotCount: item.eventType === 'riot' ? 1 : 0,
+          highSeverityCount: item.severity === 'high' ? 1 : 0,
+          verifiedCount: item.validated ? 1 : 0,
+          sampled: false,
         };
       });
+    } else {
+      this.protestClusters = [];
     }
 
-    if (this.techHQSC) {
+    if (useTechHQ && this.techHQSC) {
       this.techHQClusters = this.techHQSC.getClusters(bbox, zoom).map(f => {
         const coords = f.geometry.coordinates as [number, number];
         if (f.properties.cluster) {
-          const leaves = this.techHQSC!.getLeaves(f.properties.cluster_id!, Infinity);
+          const props = f.properties as Record<string, unknown>;
+          const leaves = this.techHQSC!.getLeaves(f.properties.cluster_id!, DeckGLMap.MAX_CLUSTER_LEAVES);
           const items = leaves.map(l => TECH_HQS[l.properties.index]).filter(Boolean) as typeof TECH_HQS;
+          const faangCount = Number(props.faangCount ?? 0);
+          const unicornCount = Number(props.unicornCount ?? 0);
+          const publicCount = Number(props.publicCount ?? 0);
+          const clusterCount = Number(f.properties.point_count ?? items.length);
+          const primaryType = faangCount >= unicornCount && faangCount >= publicCount
+            ? 'faang'
+            : unicornCount >= publicCount
+              ? 'unicorn'
+              : 'public';
           return {
             id: `hc-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
-            count: f.properties.point_count!,
-            items, city: items[0]?.city ?? '', country: items[0]?.country ?? '',
-            primaryType: items[0]?.type ?? 'public',
+            count: clusterCount,
+            items,
+            city: String(props.city ?? items[0]?.city ?? ''),
+            country: String(props.country ?? items[0]?.country ?? ''),
+            primaryType,
+            faangCount,
+            unicornCount,
+            publicCount,
+            sampled: items.length < clusterCount,
           };
         }
         const item = TECH_HQS[f.properties.index]!;
@@ -529,22 +676,36 @@ export class DeckGLMap {
           id: `hp-${f.properties.index}`, lat: item.lat, lon: item.lon,
           count: 1, items: [item], city: item.city, country: item.country,
           primaryType: item.type,
+          faangCount: item.type === 'faang' ? 1 : 0,
+          unicornCount: item.type === 'unicorn' ? 1 : 0,
+          publicCount: item.type === 'public' ? 1 : 0,
+          sampled: false,
         };
       });
+    } else {
+      this.techHQClusters = [];
     }
 
-    if (this.techEventSC) {
+    if (useTechEvents && this.techEventSC) {
       this.techEventClusters = this.techEventSC.getClusters(bbox, zoom).map(f => {
         const coords = f.geometry.coordinates as [number, number];
         if (f.properties.cluster) {
-          const leaves = this.techEventSC!.getLeaves(f.properties.cluster_id!, Infinity);
+          const props = f.properties as Record<string, unknown>;
+          const leaves = this.techEventSC!.getLeaves(f.properties.cluster_id!, DeckGLMap.MAX_CLUSTER_LEAVES);
           const items = leaves.map(l => this.techEvents[l.properties.index]).filter((x): x is TechEventMarker => !!x);
+          const clusterCount = Number(f.properties.point_count ?? items.length);
+          const soonestDaysUntil = Number(props.soonestDaysUntil ?? Number.MAX_SAFE_INTEGER);
+          const soonCount = Number(props.soonCount ?? 0);
           return {
             id: `ec-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
-            count: f.properties.point_count!,
-            items, location: items[0]?.location ?? '', country: items[0]?.country ?? '',
-            soonestDaysUntil: Math.min(...items.map(i => i.daysUntil)),
+            count: clusterCount,
+            items,
+            location: String(props.location ?? items[0]?.location ?? ''),
+            country: String(props.country ?? items[0]?.country ?? ''),
+            soonestDaysUntil: Number.isFinite(soonestDaysUntil) ? soonestDaysUntil : Number.MAX_SAFE_INTEGER,
+            soonCount,
+            sampled: items.length < clusterCount,
           };
         }
         const item = this.techEvents[f.properties.index]!;
@@ -552,26 +713,40 @@ export class DeckGLMap {
           id: `ep-${f.properties.index}`, lat: item.lat, lon: item.lng,
           count: 1, items: [item], location: item.location, country: item.country,
           soonestDaysUntil: item.daysUntil,
+          soonCount: item.daysUntil <= 14 ? 1 : 0,
+          sampled: false,
         };
       });
+    } else {
+      this.techEventClusters = [];
     }
 
-    if (this.datacenterSC) {
+    if (useDatacenterClusters && this.datacenterSC) {
       const activeDCs = AI_DATA_CENTERS.filter(dc => dc.status !== 'decommissioned');
       this.datacenterClusters = this.datacenterSC.getClusters(bbox, zoom).map(f => {
         const coords = f.geometry.coordinates as [number, number];
         if (f.properties.cluster) {
-          const leaves = this.datacenterSC!.getLeaves(f.properties.cluster_id!, Infinity);
+          const props = f.properties as Record<string, unknown>;
+          const leaves = this.datacenterSC!.getLeaves(f.properties.cluster_id!, DeckGLMap.MAX_CLUSTER_LEAVES);
           const items = leaves.map(l => activeDCs[l.properties.index]).filter((x): x is AIDataCenter => !!x);
-          const existingCount = items.filter(i => i.status === 'existing').length;
+          const clusterCount = Number(f.properties.point_count ?? items.length);
+          const existingCount = Number(props.existingCount ?? 0);
+          const plannedCount = Number(props.plannedCount ?? 0);
+          const totalChips = Number(props.totalChips ?? 0);
+          const totalPowerMW = Number(props.totalPowerMW ?? 0);
           return {
             id: `dc-${f.properties.cluster_id}`,
             lat: coords[1], lon: coords[0],
-            count: f.properties.point_count!,
-            items, region: items[0]?.country ?? '', country: items[0]?.country ?? '',
-            totalChips: items.reduce((s, i) => s + i.chipCount, 0),
-            totalPowerMW: items.reduce((s, i) => s + (i.powerMW ?? 0), 0),
-            majorityExisting: existingCount >= items.length / 2,
+            count: clusterCount,
+            items,
+            region: String(props.country ?? items[0]?.country ?? ''),
+            country: String(props.country ?? items[0]?.country ?? ''),
+            totalChips,
+            totalPowerMW,
+            majorityExisting: existingCount >= Math.max(1, clusterCount / 2),
+            existingCount,
+            plannedCount,
+            sampled: items.length < clusterCount,
           };
         }
         const item = activeDCs[f.properties.index]!;
@@ -580,8 +755,13 @@ export class DeckGLMap {
           count: 1, items: [item], region: item.country, country: item.country,
           totalChips: item.chipCount, totalPowerMW: item.powerMW ?? 0,
           majorityExisting: item.status === 'existing',
+          existingCount: item.status === 'existing' ? 1 : 0,
+          plannedCount: item.status === 'planned' ? 1 : 0,
+          sampled: false,
         };
       });
+    } else {
+      this.datacenterClusters = [];
     }
   }
 
@@ -1943,7 +2123,21 @@ export class DeckGLMap {
       if (cluster.count === 1 && cluster.items[0]) {
         this.popup.show({ type: 'protest', data: cluster.items[0], x: info.x, y: info.y });
       } else {
-        this.popup.show({ type: 'protestCluster', data: { items: cluster.items, country: cluster.country }, x: info.x, y: info.y });
+        this.popup.show({
+          type: 'protestCluster',
+          data: {
+            items: cluster.items,
+            country: cluster.country,
+            count: cluster.count,
+            riotCount: cluster.riotCount,
+            highSeverityCount: cluster.highSeverityCount,
+            verifiedCount: cluster.verifiedCount,
+            totalFatalities: cluster.totalFatalities,
+            sampled: cluster.sampled,
+          },
+          x: info.x,
+          y: info.y,
+        });
       }
       return;
     }
@@ -1952,7 +2146,21 @@ export class DeckGLMap {
       if (cluster.count === 1 && cluster.items[0]) {
         this.popup.show({ type: 'techHQ', data: cluster.items[0], x: info.x, y: info.y });
       } else {
-        this.popup.show({ type: 'techHQCluster', data: { items: cluster.items, city: cluster.city, country: cluster.country }, x: info.x, y: info.y });
+        this.popup.show({
+          type: 'techHQCluster',
+          data: {
+            items: cluster.items,
+            city: cluster.city,
+            country: cluster.country,
+            count: cluster.count,
+            faangCount: cluster.faangCount,
+            unicornCount: cluster.unicornCount,
+            publicCount: cluster.publicCount,
+            sampled: cluster.sampled,
+          },
+          x: info.x,
+          y: info.y,
+        });
       }
       return;
     }
@@ -1961,7 +2169,19 @@ export class DeckGLMap {
       if (cluster.count === 1 && cluster.items[0]) {
         this.popup.show({ type: 'techEvent', data: cluster.items[0], x: info.x, y: info.y });
       } else {
-        this.popup.show({ type: 'techEventCluster', data: { items: cluster.items, location: cluster.location, country: cluster.country }, x: info.x, y: info.y });
+        this.popup.show({
+          type: 'techEventCluster',
+          data: {
+            items: cluster.items,
+            location: cluster.location,
+            country: cluster.country,
+            count: cluster.count,
+            soonCount: cluster.soonCount,
+            sampled: cluster.sampled,
+          },
+          x: info.x,
+          y: info.y,
+        });
       }
       return;
     }
@@ -1970,7 +2190,22 @@ export class DeckGLMap {
       if (cluster.count === 1 && cluster.items[0]) {
         this.popup.show({ type: 'datacenter', data: cluster.items[0], x: info.x, y: info.y });
       } else {
-        this.popup.show({ type: 'datacenterCluster', data: { items: cluster.items, region: cluster.country, country: cluster.country }, x: info.x, y: info.y });
+        this.popup.show({
+          type: 'datacenterCluster',
+          data: {
+            items: cluster.items,
+            region: cluster.region || cluster.country,
+            country: cluster.country,
+            count: cluster.count,
+            totalChips: cluster.totalChips,
+            totalPowerMW: cluster.totalPowerMW,
+            existingCount: cluster.existingCount,
+            plannedCount: cluster.plannedCount,
+            sampled: cluster.sampled,
+          },
+          x: info.x,
+          y: info.y,
+        });
       }
       return;
     }
