@@ -80,13 +80,13 @@ async function initSettingsWindow(): Promise<void> {
       try {
         setActionStatus('Validating API keys...', 'ok');
         const errors = await panel.verifyPendingSecrets();
+        await panel.commitVerifiedSecrets();
         if (errors.length > 0) {
-          setActionStatus(`Invalid keys: ${errors.join(', ')}`, 'error');
-          return;
+          setActionStatus(`Saved verified keys. Failed: ${errors.join(', ')}`, 'error');
+        } else {
+          setActionStatus('Settings saved', 'ok');
+          closeSettingsWindow();
         }
-        await panel.commitPendingSecrets();
-        setActionStatus('Settings saved', 'ok');
-        closeSettingsWindow();
       } catch (err) {
         setActionStatus(`Save failed: ${err}`, 'error');
       }
