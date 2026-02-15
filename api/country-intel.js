@@ -109,7 +109,8 @@ Rules:
 - 5-6 paragraphs, 300-400 words.
 - No speculation beyond what the data supports.
 - Use plain language, not jargon.
-- If military assets are 0, don't speculate about military presence — say monitoring shows no current military activity.`;
+- If military assets are 0, don't speculate about military presence — say monitoring shows no current military activity.
+- When referencing a specific headline from the numbered list, cite it as [N] where N is the headline number (e.g. "tensions escalated [3]"). Only cite headlines you directly reference.`;
 
     const userPrompt = `Country: ${country} (${code})${dataSection}`;
 
