@@ -1,4 +1,5 @@
 export * from './rss';
+export * from './trending-keywords';
 export * from './markets';
 export * from './polymarket';
 export * from './earthquakes';

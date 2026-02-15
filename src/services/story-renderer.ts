@@ -9,6 +9,7 @@ function humanizeSignalType(type: string): string {
     news_leads_markets: 'News Leading',
     silent_divergence: 'Silent Divergence',
     velocity_spike: 'Velocity Spike',
+    keyword_spike: 'Keyword Spike',
     convergence: 'Convergence',
     triangulation: 'Triangulation',
     flow_drop: 'Flow Drop',
