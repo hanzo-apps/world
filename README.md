@@ -58,6 +58,7 @@ Both variants run from a single codebase — switch between them with one click.
 ## Key Features
 
 ### Interactive 3D Globe
+
 - **WebGL-accelerated rendering** — deck.gl + MapLibre GL JS for smooth 60fps performance with thousands of concurrent markers. Switchable between **3D globe** (with pitch/rotation) and **flat map** mode via `VITE_MAP_INTERACTION_MODE`
 - **30+ data layers** — conflicts, military bases, nuclear facilities, undersea cables, pipelines, satellite fire detection, protests, natural disasters, datacenters, displacement flows, climate anomalies, cyber threat IOCs, and more
 - **Smart clustering** — Supercluster groups markers at low zoom, expands on zoom in. Cluster thresholds adapt to zoom level
@@ -68,6 +69,7 @@ Both variants run from a single codebase — switch between them with one click.
 - **URL state sharing** — map center, zoom, active layers, and time range are encoded in the URL for shareable views (`?view=mena&zoom=4&layers=conflicts,bases`)
 
 ### AI-Powered Intelligence
+
 - **World Brief** — LLM-synthesized summary of top global developments (Groq Llama 3.1, Redis-cached)
 - **Hybrid Threat Classification** — instant keyword classifier with async LLM override for higher-confidence results
 - **Focal Point Detection** — correlates entities across news, military activity, protests, outages, and markets to identify convergence
@@ -141,6 +143,7 @@ Both variants run from a single codebase — switch between them with one click.
 </details>
 
 ### Live News & Video
+
 - **100+ RSS feeds** across geopolitics, defense, energy, tech — domain-allowlisted proxy prevents CORS issues
 - **8 live video streams** — Bloomberg, Sky News, Al Jazeera, Euronews, DW, France24, CNBC, Al Arabiya — with automatic live detection that scrapes YouTube channel pages every 5 minutes to find active streams
 - **Desktop embed bridge** — YouTube's IFrame API restricts playback in native webviews (error 153). The dashboard detects this and transparently routes through a cloud-hosted embed proxy with bidirectional message passing (play/pause/mute/unmute/loadVideo)
@@ -150,17 +153,20 @@ Both variants run from a single codebase — switch between them with one click.
 - **Virtual scrolling** — news panels render only visible DOM elements, handling thousands of items without browser lag
 
 ### Signal Aggregation & Anomaly Detection
+
 - **Multi-source signal fusion** — internet outages, military flights, naval vessels, protests, AIS disruptions, satellite fires, and keyword spikes are aggregated into a unified intelligence picture with per-country and per-region clustering
 - **Temporal baseline anomaly detection** — Welford's online algorithm computes streaming mean/variance per event type, region, weekday, and month over a 90-day window. Z-score thresholds (1.5/2.0/3.0) flag deviations like "Military flights 3.2x normal for Thursday (January)" — stored in Redis via Upstash
 - **Regional convergence scoring** — when multiple signal types spike in the same geographic area, the system identifies convergence zones and escalates severity
 
 ### Story Sharing & Social Export
+
 - **Shareable intelligence stories** — generate country-level intelligence briefs with CII scores, threat counts, theater posture, and related prediction markets
 - **Multi-platform export** — custom-formatted sharing for Twitter/X, LinkedIn, WhatsApp, Telegram, Reddit, and Facebook with platform-appropriate formatting
 - **Deep links** — every story generates a unique URL (`/story?c=<country>&t=<type>`) with dynamic Open Graph meta tags for rich social previews
 - **Canvas-based image generation** — stories render as PNG images for visual sharing, with QR codes linking back to the live dashboard
 
 ### Desktop Application (Tauri)
+
 - **Native desktop app** for macOS and Windows — packages the full dashboard with a local Node.js sidecar that runs all 45+ API handlers locally
 - **OS keychain integration** — API keys stored in the system credential manager (macOS Keychain, Windows Credential Manager), never in plaintext files
 - **Token-authenticated sidecar** — a unique session token prevents other local processes from accessing the sidecar on localhost. Generated per launch using randomized hashing
@@ -170,6 +176,7 @@ Both variants run from a single codebase — switch between them with one click.
 - **DevTools toggle** — Cmd+Alt+I opens the embedded web inspector for debugging
 
 ### Progressive Web App
+
 - **Installable** — the dashboard can be installed to the home screen on mobile or as a standalone desktop app via Chrome's install prompt. Full-screen `standalone` display mode with custom theme color
 - **Offline map support** — MapTiler tiles are cached using a CacheFirst strategy (up to 500 tiles, 30-day TTL), enabling map browsing without a network connection
 - **Smart caching strategies** — APIs and RSS feeds use NetworkOnly (real-time data must always be fresh), while fonts (1-year TTL), images (7-day StaleWhileRevalidate), and static assets (1-year immutable) are aggressively cached
@@ -177,6 +184,7 @@ Both variants run from a single codebase — switch between them with one click.
 - **Offline fallback** — a branded fallback page with retry button is served when the network is unavailable
 
 ### Additional Capabilities
+
 - Signal intelligence with "Why It Matters" context
 - Infrastructure cascade analysis with proximity correlation
 - Maritime & aviation tracking with surge detection
@@ -225,11 +233,13 @@ Map overlay behavior is validated in Playwright using the map harness (`/tests/m
 Clicking any country on the map opens a full-page intelligence dossier — a single-screen synthesis of all intelligence modules for that country. The brief is organized into a two-column layout:
 
 **Left column**:
+
 - **Instability Index** — animated SVG score ring (0–100) with four component breakdown bars (Unrest, Conflict, Security, Information), severity badge, and trend indicator
 - **Intelligence Brief** — AI-generated analysis (Groq Llama 3.1) with inline citation anchors `[1]`–`[8]` that scroll to the corresponding news source when clicked
 - **Top News** — 8 most relevant headlines for the country, threat-level color-coded, with source and time-ago metadata
 
 **Right column**:
+
 - **Active Signals** — real-time chip indicators for protests, military aircraft, naval vessels, internet outages, earthquakes, displacement flows, climate stress, conflict events, and the country's stock market index (1-week change)
 - **7-Day Timeline** — D3.js-rendered event chart with 4 severity-coded lanes (protest, conflict, natural, military), interactive tooltips, and responsive resizing
 - **Prediction Markets** — top 3 Polymarket contracts by volume with probability bars and external links
@@ -303,6 +313,7 @@ Nine operational theaters are continuously assessed for military posture escalat
 | Black Sea | ISR flights, naval movements |
 
 Posture levels escalate from NORMAL → ELEVATED → CRITICAL based on a composite of:
+
 - **Aircraft count** in theater (both resident and transient)
 - **Strike capability** — the presence of tankers + AWACS + fighters together indicates strike packaging, not routine training
 - **Naval presence** — carrier groups and combatant formations
@@ -336,6 +347,7 @@ Disruption Event → Affected Node → Cascade Propagation (BFS, depth ≤ 3)
 **Impact calculation**: `strength = edge_weight × disruption_level × (1 − redundancy)`
 
 Strategic chokepoint modeling captures real-world dependencies:
+
 - **Strait of Hormuz** — 80% of Japan's oil, 70% of South Korea's, 60% of India's, 40% of China's
 - **Suez Canal** — EU-Asia trade routes (Germany, Italy, UK, China)
 - **Malacca Strait** — 80% of China's oil transit
@@ -431,6 +443,7 @@ Protest data is sourced from two independent providers to reduce single-source b
 2. **GDELT** (Global Database of Events, Language, and Tone) — 7-day geospatial event feed filtered to protest keywords. Events with mention count ≥5 are included; those above 30 are marked as `validated`.
 
 Events from both sources are **Haversine-deduplicated** on a 0.5° grid (~50km) with same-day matching. ACLED events take priority due to higher editorial confidence. Severity is classified as:
+
 - **High** — fatalities present or riot/clash keywords
 - **Medium** — standard protest/demonstration
 - **Low** — default
@@ -719,6 +732,7 @@ Secrets can also be updated at runtime without restarting the sidecar: saving a 
 ### Sidecar Authentication
 
 A unique 32-character hex token is generated per app launch using randomized hash state (`RandomState` from Rust's standard library). The token is:
+
 1. Injected into the sidecar as `LOCAL_API_TOKEN`
 2. Retrieved by the frontend via the `get_local_api_token` Tauri command (lazy-loaded on first API request)
 3. Attached as `Authorization: Bearer <token>` to every local request
@@ -963,6 +977,7 @@ npm run desktop:package:windows:full:sign
 ```
 
 Desktop release details, signing hooks, variant outputs, and clean-machine validation checklist:
+
 - [docs/RELEASE_PACKAGING.md](./docs/RELEASE_PACKAGING.md)
 
 ---
@@ -1027,7 +1042,6 @@ MIT License — see [LICENSE](LICENSE) for details.
   <a href="https://worldmonitor.app">worldmonitor.app</a> &nbsp;·&nbsp;
   <a href="https://tech.worldmonitor.app">tech.worldmonitor.app</a>
 </p>
-
 
 ## Star History
 
