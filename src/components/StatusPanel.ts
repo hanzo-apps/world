@@ -22,20 +22,24 @@ const TECH_FEEDS = new Set([
   'Tech', 'Ai', 'Startups', 'Vcblogs', 'RegionalStartups',
   'Unicorns', 'Accelerators', 'Security', 'Policy', 'Layoffs',
   'Finance', 'Hardware', 'Cloud', 'Dev', 'Tech Events', 'Crypto',
-  'Markets', 'Events', 'Producthunt', 'Funding', 'Polymarket'
+  'Markets', 'Events', 'Producthunt', 'Funding', 'Polymarket',
+  'Cyber Threats'
 ]);
 const TECH_APIS = new Set([
-  'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status', 'Polymarket'
+  'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status', 'Polymarket',
+  'Cyber Threats API'
 ]);
 
 const WORLD_FEEDS = new Set([
   'Politics', 'Middleeast', 'Tech', 'Ai', 'Finance',
   'Gov', 'Intel', 'Layoffs', 'Thinktanks', 'Energy',
-  'Polymarket', 'Weather', 'NetBlocks', 'Shipping', 'Military'
+  'Polymarket', 'Weather', 'NetBlocks', 'Shipping', 'Military',
+  'Cyber Threats'
 ]);
 const WORLD_APIS = new Set([
   'RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED',
-  'AISStream', 'GDELT Doc', 'EIA', 'USASpending', 'PizzINT', 'FIRMS'
+  'AISStream', 'GDELT Doc', 'EIA', 'USASpending', 'PizzINT', 'FIRMS',
+  'Cyber Threats API'
 ]);
 
 export class StatusPanel {
