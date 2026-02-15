@@ -1,5 +1,5 @@
 // World Bank API proxy (Web API handler for Edge + sidecar compatibility)
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
@@ -36,6 +36,9 @@ const TECH_COUNTRIES = [
 
 export default async function handler(request) {
   const CORS = getCorsHeaders(request);
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: CORS });
+  }
 
   function json(data, status = 200, extra = {}) {
     return new Response(JSON.stringify(data), {

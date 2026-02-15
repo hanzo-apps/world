@@ -1,5 +1,5 @@
 // Tech Events API - Parses Techmeme ICS feed and dev.events RSS, returns structured events
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 const ICS_URL = 'https://www.techmeme.com/newsy_events.ics';
@@ -619,6 +619,9 @@ function parseDevEventsRSS(rssText) {
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
   const type = url.searchParams.get('type'); // 'all', 'conferences', 'earnings', 'ipo'
   const mappable = url.searchParams.get('mappable') === 'true'; // Only return events with coords

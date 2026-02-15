@@ -5,6 +5,7 @@
  */
 
 import { getCachedJson, setCachedJson } from './_upstash-cache.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
@@ -220,10 +221,22 @@ function computeStrategicRisk(ciiScores) {
 }
 
 export default async function handler(request) {
-  // Allow GET only
+  const corsHeaders = getCorsHeaders(request, 'GET, OPTIONS');
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (request.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
