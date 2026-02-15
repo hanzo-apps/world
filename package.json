@@ -10,6 +10,7 @@
     "build:full": "VITE_VARIANT=full tsc && VITE_VARIANT=full vite build",
     "build:tech": "VITE_VARIANT=tech tsc && VITE_VARIANT=tech vite build",
     "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
     "preview": "vite preview",
     "test:e2e:full": "VITE_VARIANT=full playwright test",
     "test:e2e:tech": "VITE_VARIANT=tech playwright test",
