@@ -207,7 +207,7 @@ Both variants run from a single codebase — switch between them with one click.
 
 ## Regression Testing
 
-Map overlay behavior is validated in Playwright using the map harness (`/map-harness.html`).
+Map overlay behavior is validated in Playwright using the map harness (`/tests/map-harness.html`).
 
 - Cluster-state cache initialization guard:
   - `updates protest marker click payload after data refresh`
