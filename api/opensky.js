@@ -1,11 +1,14 @@
 // OpenSky Network API proxy - v3
 // Note: OpenSky seems to block some cloud provider IPs
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
 
   // Build OpenSky API URL with bounding box params

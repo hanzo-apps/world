@@ -5,7 +5,7 @@ export const config = { runtime: 'edge' };
 
 import { getCachedJson, setCachedJson } from './_upstash-cache.js';
 import { recordCacheTelemetry } from './_cache-telemetry.js';
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 const CACHE_KEY = 'ucdp:country-conflicts:v2';
 const CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 hours (annual data)
@@ -30,6 +30,9 @@ function toErrorMessage(error) {
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {

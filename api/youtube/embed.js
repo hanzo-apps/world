@@ -10,6 +10,28 @@ function sanitizeVideoId(value) {
   return /^[A-Za-z0-9_-]{11}$/.test(value) ? value : null;
 }
 
+const ALLOWED_ORIGINS = [
+  /^https:\/\/(.*\.)?worldmonitor\.app$/,
+  /^https:\/\/worldmonitor-[a-z0-9]+-elie-habib-projects\.vercel\.app$/,
+  /^https:\/\/worldmonitor-[a-z0-9]+\.vercel\.app$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /^tauri:\/\/localhost$/,
+];
+
+function sanitizeOrigin(raw) {
+  if (!raw) return 'https://worldmonitor.app';
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'tauri:') {
+      return 'https://worldmonitor.app';
+    }
+    const origin = parsed.origin !== 'null' ? parsed.origin : raw;
+    if (ALLOWED_ORIGINS.some(p => p.test(origin))) return origin;
+  } catch { /* invalid URL */ }
+  return 'https://worldmonitor.app';
+}
+
 export default async function handler(request) {
   const url = new URL(request.url);
   const videoId = sanitizeVideoId(url.searchParams.get('videoId'));
@@ -24,7 +46,7 @@ export default async function handler(request) {
   const autoplay = parseFlag(url.searchParams.get('autoplay'), '1');
   const mute = parseFlag(url.searchParams.get('mute'), '1');
 
-  const origin = url.searchParams.get('origin') || 'https://worldmonitor.app';
+  const origin = sanitizeOrigin(url.searchParams.get('origin'));
 
   const embedSrc = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
   embedSrc.searchParams.set('autoplay', autoplay);
@@ -63,7 +85,7 @@ export default async function handler(request) {
       player=new YT.Player('player',{
         videoId:'${videoId}',
         host:'https://www.youtube-nocookie.com',
-        playerVars:{autoplay:${autoplay},mute:${mute},playsinline:1,rel:0,controls:1,modestbranding:1,enablejsapi:1,origin:'${origin}',widget_referrer:'${origin}'},
+        playerVars:{autoplay:${autoplay},mute:${mute},playsinline:1,rel:0,controls:1,modestbranding:1,enablejsapi:1,origin:${JSON.stringify(origin)},widget_referrer:${JSON.stringify(origin)}},
         events:{
           onReady:function(){
             window.parent.postMessage({type:'yt-ready'},'*');

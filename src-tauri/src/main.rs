@@ -233,10 +233,13 @@ fn open_path_in_shell(path: &Path) -> Result<(), String> {
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Only http/https URLs are allowed".to_string());
+    if url.starts_with("https://") {
+        return open_in_shell(&url);
     }
-    open_in_shell(&url)
+    if url.starts_with("http://localhost") || url.starts_with("http://127.0.0.1") {
+        return open_in_shell(&url);
+    }
+    Err("Only https:// URLs are allowed (http:// only for localhost)".to_string())
 }
 
 fn open_logs_folder_impl(app: &AppHandle) -> Result<PathBuf, String> {
