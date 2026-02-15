@@ -38,16 +38,19 @@ jobs:
           - platform: 'macos-14'
             args: '--target aarch64-apple-darwin'
             label: 'macOS-ARM64'
+            timeout: 360
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
             label: 'macOS-x64'
+            timeout: 360
           - platform: 'windows-latest'
             args: ''
             label: 'Windows-x64'
+            timeout: 360
 
     runs-on: ${{ matrix.platform }}
     name: Build (${{ matrix.label }})
-    timeout-minutes: 40
+    timeout-minutes: ${{ matrix.timeout }}
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
