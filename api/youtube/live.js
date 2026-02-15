@@ -1,11 +1,18 @@
 // YouTube Live Stream Detection API
 // Uses YouTube's oembed endpoint to check for live streams
 
+import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
+
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(request) {
+  const cors = getCorsHeaders(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(request.url);
   const channel = url.searchParams.get('channel');
 

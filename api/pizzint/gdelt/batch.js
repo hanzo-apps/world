@@ -3,6 +3,9 @@ export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
   const pairs = url.searchParams.get('pairs') || 'usa_russia,russia_ukraine,usa_china,china_taiwan,usa_iran,usa_venezuela';
   const dateStart = url.searchParams.get('dateStart');

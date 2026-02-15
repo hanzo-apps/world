@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' };
 
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 const SYMBOL_PATTERN = /^[A-Za-z0-9.^=\-]+$/;
 const MAX_SYMBOL_LENGTH = 20;
@@ -15,6 +15,9 @@ function validateSymbol(symbol) {
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
   const symbol = validateSymbol(url.searchParams.get('symbol'));
 

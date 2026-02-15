@@ -6,6 +6,14 @@ import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const ALLOWED_ENV_KEYS = new Set([
+  'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'FRED_API_KEY', 'EIA_API_KEY',
+  'CLOUDFLARE_API_TOKEN', 'ACLED_ACCESS_TOKEN', 'URLHAUS_AUTH_KEY',
+  'OTX_API_KEY', 'ABUSEIPDB_API_KEY', 'WINGBITS_API_KEY', 'WS_RELAY_URL',
+  'VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET',
+  'AISSTREAM_API_KEY', 'VITE_WS_RELAY_URL', 'FINNHUB_API_KEY', 'NASA_FIRMS_API_KEY',
+]);
+
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -282,16 +290,33 @@ async function tryCloudFallback(requestUrl, req, context, reason) {
   }
 }
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+const SIDECAR_ALLOWED_ORIGINS = [
+  /^tauri:\/\/localhost$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /^https:\/\/tauri\.localhost(:\d+)?$/,
+  /^https:\/\/(.*\.)?worldmonitor\.app$/,
+];
+
+function getSidecarCorsOrigin(req) {
+  const origin = req.headers?.origin || req.headers?.get?.('origin') || '';
+  if (origin && SIDECAR_ALLOWED_ORIGINS.some(p => p.test(origin))) return origin;
+  return 'tauri://localhost';
+}
+
+function makeCorsHeaders(req) {
+  return {
+    'Access-Control-Allow-Origin': getSidecarCorsOrigin(req),
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
 
 async function dispatch(requestUrl, req, routes, context) {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: makeCorsHeaders(req) });
   }
 
   if (requestUrl.pathname === '/api/service-status') {
@@ -325,33 +350,7 @@ async function dispatch(requestUrl, req, routes, context) {
     }
     return json({ verboseMode });
   }
-  if (requestUrl.pathname === '/api/local-env-update') {
-    if (req.method === 'POST') {
-      const body = await readBody(req);
-      if (body) {
-        try {
-          const { key, value } = JSON.parse(body.toString());
-          if (typeof key === 'string' && key.length > 0 && key.length < 100) {
-            if (value == null || value === '') {
-              delete process.env[key];
-              context.logger.log(`[local-api] env unset: ${key}`);
-            } else {
-              process.env[key] = String(value);
-              context.logger.log(`[local-api] env set: ${key}`);
-            }
-            // Clear cached handler modules so they pick up new env on next call
-            moduleCache.clear();
-            failedImports.clear();
-            cloudPreferred.clear();
-            return json({ ok: true, key });
-          }
-        } catch { /* bad JSON */ }
-      }
-      return json({ error: 'expected { key, value }' }, 400);
-    }
-    return json({ error: 'POST required' }, 405);
-  }
-
+  // Token auth — required for env mutations and all API handlers
   const expectedToken = process.env.LOCAL_API_TOKEN;
   if (expectedToken) {
     const authHeader = req.headers.authorization || '';
@@ -359,6 +358,33 @@ async function dispatch(requestUrl, req, routes, context) {
       context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
       return json({ error: 'Unauthorized' }, 401);
     }
+  }
+
+  if (requestUrl.pathname === '/api/local-env-update') {
+    if (req.method === 'POST') {
+      const body = await readBody(req);
+      if (body) {
+        try {
+          const { key, value } = JSON.parse(body.toString());
+          if (typeof key === 'string' && key.length > 0 && ALLOWED_ENV_KEYS.has(key)) {
+            if (value == null || value === '') {
+              delete process.env[key];
+              context.logger.log(`[local-api] env unset: ${key}`);
+            } else {
+              process.env[key] = String(value);
+              context.logger.log(`[local-api] env set: ${key}`);
+            }
+            moduleCache.clear();
+            failedImports.clear();
+            cloudPreferred.clear();
+            return json({ ok: true, key });
+          }
+          return json({ error: 'key not in allowlist' }, 403);
+        } catch { /* bad JSON */ }
+      }
+      return json({ error: 'expected { key, value }' }, 400);
+    }
+    return json({ error: 'POST required' }, 405);
   }
 
   if (context.cloudFallback && cloudPreferred.has(requestUrl.pathname)) {
@@ -430,7 +456,7 @@ export async function createLocalApiServer(options = {}) {
     const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${context.port}`);
 
     if (!requestUrl.pathname.startsWith('/api/')) {
-      res.writeHead(404, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
+      res.writeHead(404, { 'content-type': 'application/json', ...makeCorsHeaders(req) });
       res.end(JSON.stringify({ error: 'Not found' }));
       return;
     }
@@ -443,7 +469,9 @@ export async function createLocalApiServer(options = {}) {
       const durationMs = Date.now() - start;
       let body = Buffer.from(await response.arrayBuffer());
       const headers = Object.fromEntries(response.headers.entries());
-      headers['access-control-allow-origin'] = '*';
+      const corsOrigin = getSidecarCorsOrigin(req);
+      headers['access-control-allow-origin'] = corsOrigin;
+      headers['vary'] = headers['vary'] ? headers['vary'] + ', Origin' : 'Origin';
 
       if (!skipRecord) {
         recordTraffic({
@@ -479,7 +507,7 @@ export async function createLocalApiServer(options = {}) {
         });
       }
 
-      res.writeHead(500, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
+      res.writeHead(500, { 'content-type': 'application/json', ...makeCorsHeaders(req) });
       res.end(JSON.stringify({ error: 'Internal server error' }));
     }
   });

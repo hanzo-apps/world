@@ -6,6 +6,7 @@
  */
 
 import { getCachedJson, setCachedJson, hashString } from './_upstash-cache.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
@@ -60,10 +61,22 @@ function deduplicateHeadlines(headlines) {
 }
 
 export default async function handler(request) {
-  // Only allow POST
+  const corsHeaders = getCorsHeaders(request, 'POST, OPTIONS');
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -73,6 +86,14 @@ export default async function handler(request) {
     return new Response(JSON.stringify({ summary: null, fallback: true, skipped: true, reason: 'GROQ_API_KEY not configured' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+  if (contentLength > 51200) {
+    return new Response(JSON.stringify({ error: 'Payload too large' }), {
+      status: 413,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -235,6 +256,7 @@ Rules:
     }), {
       status: 200,
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=300',
       },

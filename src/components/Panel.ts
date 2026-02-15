@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils/sanitize';
+
 export interface PanelOptions {
   id: string;
   title: string;
@@ -283,13 +285,13 @@ export class Panel {
           <div class="panel-radar-sweep"></div>
           <div class="panel-radar-dot"></div>
         </div>
-        <div class="panel-loading-text">${message}</div>
+        <div class="panel-loading-text">${escapeHtml(message)}</div>
       </div>
     `;
   }
 
   public showError(message = 'Failed to load data'): void {
-    this.content.innerHTML = `<div class="error-message">${message}</div>`;
+    this.content.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
   }
 
   public setCount(count: number): void {

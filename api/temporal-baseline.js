@@ -8,6 +8,7 @@
  */
 
 import { getCachedJson, setCachedJson, mget } from './_upstash-cache.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
@@ -33,6 +34,19 @@ function getSeverity(zScore) {
 }
 
 export default async function handler(request) {
+  const corsHeaders = getCorsHeaders(request, 'GET, POST, OPTIONS');
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     if (request.method === 'GET') {
       return await handleGet(request);
@@ -41,7 +55,7 @@ export default async function handler(request) {
     }
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     console.error('[TemporalBaseline] Error:', err);
@@ -102,6 +116,11 @@ async function handleGet(request) {
 }
 
 async function handlePost(request) {
+  const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+  if (contentLength > 51200) {
+    return json({ error: 'Payload too large' }, 413);
+  }
+
   const body = await request.json();
   const updates = body?.updates;
 

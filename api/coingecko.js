@@ -2,7 +2,7 @@ export const config = { runtime: 'edge' };
 
 import { getCachedJson, hashString, setCachedJson } from './_upstash-cache.js';
 import { recordCacheTelemetry } from './_cache-telemetry.js';
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'cny', 'btc', 'eth'];
 const MAX_COIN_IDS = 20;
@@ -57,6 +57,9 @@ function isValidPayload(payload) {
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
 
   const ids = validateCoinIds(url.searchParams.get('ids'));

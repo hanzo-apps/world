@@ -1,4 +1,4 @@
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 const MAX_RECORDS = 20;
@@ -6,6 +6,9 @@ const DEFAULT_RECORDS = 10;
 
 export default async function handler(req) {
   const cors = getCorsHeaders(req);
+  if (isDisallowedOrigin(req)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   const url = new URL(req.url);
   const query = url.searchParams.get('query');
   const maxrecords = Math.min(

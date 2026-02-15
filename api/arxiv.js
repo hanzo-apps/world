@@ -1,10 +1,13 @@
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 // Fetch AI/ML papers from ArXiv
 // Categories: cs.AI, cs.LG (Machine Learning), cs.CL (Computation and Language)
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category') || 'cs.AI'; // cs.AI, cs.LG, cs.CL
