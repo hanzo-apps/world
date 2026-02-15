@@ -910,34 +910,45 @@ export class MapPopup {
 
   private renderCyberThreatPopup(threat: CyberThreat): string {
     const severityClass = escapeHtml(threat.severity);
-    const sourceLabel = threat.source === 'urlhaus' ? 'URLhaus' : 'Feodo';
+    const sourceLabels: Record<string, string> = {
+      feodo: 'Feodo Tracker',
+      urlhaus: 'URLhaus',
+      c2intel: 'C2 Intel Feeds',
+      otx: 'AlienVault OTX',
+      abuseipdb: 'AbuseIPDB',
+    };
+    const sourceLabel = sourceLabels[threat.source] || threat.source;
     const typeLabel = threat.type.replace(/_/g, ' ').toUpperCase();
     const tags = (threat.tags || []).slice(0, 6);
 
     return `
       <div class="popup-header apt ${severityClass}">
-        <span class="popup-title">${escapeHtml(threat.indicator)}</span>
+        <span class="popup-title">Cyber Threat</span>
         <span class="popup-badge ${severityClass}">${escapeHtml(threat.severity.toUpperCase())}</span>
         <button class="popup-close">×</button>
       </div>
       <div class="popup-body">
-        <div class="popup-subtitle">${escapeHtml(typeLabel)} · ${escapeHtml(sourceLabel)}</div>
+        <div class="popup-subtitle">${escapeHtml(typeLabel)}</div>
         <div class="popup-stats">
           <div class="popup-stat">
-            <span class="stat-label">INDICATOR</span>
-            <span class="stat-value">${escapeHtml(threat.indicatorType.toUpperCase())}</span>
+            <span class="stat-label">${escapeHtml(threat.indicatorType.toUpperCase())}</span>
+            <span class="stat-value">${escapeHtml(threat.indicator)}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">COUNTRY</span>
             <span class="stat-value">${escapeHtml(threat.country || 'Unknown')}</span>
           </div>
           <div class="popup-stat">
+            <span class="stat-label">SOURCE</span>
+            <span class="stat-value">${escapeHtml(sourceLabel)}</span>
+          </div>
+          ${threat.malwareFamily ? `<div class="popup-stat">
+            <span class="stat-label">MALWARE</span>
+            <span class="stat-value">${escapeHtml(threat.malwareFamily)}</span>
+          </div>` : ''}
+          <div class="popup-stat">
             <span class="stat-label">LAST SEEN</span>
             <span class="stat-value">${escapeHtml(threat.lastSeen ? new Date(threat.lastSeen).toLocaleString() : 'Unknown')}</span>
-          </div>
-          <div class="popup-stat">
-            <span class="stat-label">COORDINATES</span>
-            <span class="stat-value">${threat.lat.toFixed(2)}°, ${threat.lon.toFixed(2)}°</span>
           </div>
         </div>
         ${tags.length > 0 ? `

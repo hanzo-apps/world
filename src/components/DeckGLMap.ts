@@ -1389,11 +1389,11 @@ export class DeckGLMap {
           default: return [255, 235, 59, 170] as [number, number, number, number];
         }
       },
-      radiusMinPixels: 4,
-      radiusMaxPixels: 16,
+      radiusMinPixels: 6,
+      radiusMaxPixels: 18,
       pickable: true,
       stroked: true,
-      getLineColor: [255, 255, 255, 140] as [number, number, number, number],
+      getLineColor: [255, 255, 255, 160] as [number, number, number, number],
       lineWidthMinPixels: 1,
     });
   }
@@ -2172,7 +2172,7 @@ export class DeckGLMap {
       case 'outages-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.asn || 'Internet Outage')}</strong><br/>${text(obj.country)}</div>` };
       case 'cyber-threats-layer':
-        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.indicator || 'Threat IOC')}</strong><br/>${text(obj.severity || 'medium')} · ${text(obj.source || 'unknown')}</div>` };
+        return { html: `<div class="deckgl-tooltip"><strong>Cyber Threat</strong><br/>${text(obj.severity || 'medium')} · ${text(obj.country || 'Unknown')}</div>` };
       case 'news-locations-layer':
         return { html: `<div class="deckgl-tooltip"><strong>📰 News</strong><br/>${text(obj.title?.slice(0, 80) || '')}</div>` };
       default:
