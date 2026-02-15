@@ -1,6 +1,6 @@
 import type { CorrelationSignal } from './correlation';
 import { generateSummary } from './summarization';
-import { SUPPRESSED_TRENDING_TERMS, generateSignalId, tokenize } from '@/utils/analysis-constants';
+import { SUPPRESSED_TRENDING_TERMS, escapeRegex, generateSignalId, tokenize } from '@/utils/analysis-constants';
 
 export interface TrendingHeadlineInput {
   title: string;
@@ -70,6 +70,10 @@ const LEADER_NAMES = [
   'putin', 'zelensky', 'xi jinping', 'biden', 'trump', 'netanyahu',
   'khamenei', 'erdogan', 'modi', 'macron', 'scholz', 'starmer',
 ];
+const LEADER_PATTERNS = LEADER_NAMES.map(name => ({
+  name,
+  pattern: new RegExp(`\\b${escapeRegex(name)}\\b`, 'i'),
+}));
 
 const termFrequency = new Map<string, TermRecord>();
 const seenHeadlines = new Map<string, number>();
@@ -149,15 +153,6 @@ function getBlockedTermSet(config: TrendingConfig): Set<string> {
   ]);
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function containsPhrase(text: string, phrase: string): boolean {
-  const pattern = new RegExp(`\\b${escapeRegex(phrase)}\\b`, 'i');
-  return pattern.test(text);
-}
-
 export function extractEntities(text: string): string[] {
   const entities: string[] = [];
   const lower = text.toLowerCase();
@@ -171,8 +166,8 @@ export function extractEntities(text: string): string[] {
   for (const match of text.matchAll(FIN_PATTERN)) {
     entities.push(match[0].toUpperCase());
   }
-  for (const name of LEADER_NAMES) {
-    if (containsPhrase(lower, name)) {
+  for (const { name, pattern } of LEADER_PATTERNS) {
+    if (pattern.test(lower)) {
       entities.push(name);
     }
   }
@@ -412,7 +407,7 @@ export function ingestHeadlines(headlines: TrendingHeadlineInput[]): void {
 
   const spikes = checkForSpikes(now, config, blockedTerms);
   for (const spike of spikes) {
-    void handleSpike(spike, config);
+    void handleSpike(spike, config).catch(() => {});
   }
 }
 
