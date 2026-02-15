@@ -6,6 +6,7 @@ import type { ConflictEvent } from './conflicts';
 import type { UcdpConflictStatus } from './ucdp';
 import type { HapiConflictSummary } from './hapi';
 import type { CountryDisplacement, ClimateAnomaly } from '@/types';
+import { getCountryAtCoordinates } from './country-geometry';
 
 export interface CountryScore {
   code: string;
@@ -113,6 +114,8 @@ const COUNTRY_KEYWORDS: Record<string, string[]> = {
   YE: ['yemen', 'sanaa', 'houthi'],
   MM: ['myanmar', 'burma', 'rangoon'],
   VE: ['venezuela', 'caracas', 'maduro'],
+  BR: ['brazil', 'brasilia', 'lula', 'bolsonaro'],
+  AE: ['uae', 'emirates', 'dubai', 'abu dhabi'],
 };
 
 // Geopolitical baseline risk scores (0-50)
@@ -138,6 +141,8 @@ const BASELINE_RISK: Record<string, number> = {
   YE: 50,   // Active civil war
   MM: 45,   // Military coup, civil conflict
   VE: 40,   // Economic collapse, authoritarian
+  BR: 15,   // Large democracy, social tensions, Amazon deforestation
+  AE: 10,   // Stable, regional hub, low internal unrest
 };
 
 // Event significance multipliers
@@ -164,6 +169,8 @@ const EVENT_MULTIPLIER: Record<string, number> = {
   YE: 0.7,  // War zone, events expected
   MM: 1.8,  // Military suppression
   VE: 1.8,  // Suppressed
+  BR: 0.6,  // Large democracy, many events
+  AE: 1.5,  // Events rare, significant when occur
 };
 
 const countryDataMap = new Map<string, CountryData>();
@@ -177,6 +184,17 @@ export function clearCountryData(): void {
   countryDataMap.clear();
   hotspotActivityMap.clear();
 }
+
+export function getCountryData(code: string): CountryData | undefined {
+  return countryDataMap.get(code);
+}
+
+export function getPreviousScores(): Map<string, number> {
+  return previousScores;
+}
+
+export { COUNTRY_BOUNDS };
+export type { CountryData };
 
 function normalizeCountryName(name: string): string | null {
   const lower = name.toLowerCase();
@@ -296,8 +314,14 @@ const COUNTRY_BOUNDS: Record<string, [number, number, number, number]> = {
   CN: [18, 54, 73, 135],     // China
   RU: [41, 82, 19, 180],     // Russia (simplified)
 };
+const LOCATION_COUNTRY_CANDIDATES = Object.keys(TIER1_COUNTRIES);
 
 function getCountryFromLocation(lat: number, lon: number): string | null {
+  const precise = getCountryAtCoordinates(lat, lon, LOCATION_COUNTRY_CANDIDATES);
+  if (precise && TIER1_COUNTRIES[precise.code]) {
+    return precise.code;
+  }
+
   for (const [code, [minLat, maxLat, minLon, maxLon]] of Object.entries(COUNTRY_BOUNDS)) {
     if (lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon) {
       return code;
