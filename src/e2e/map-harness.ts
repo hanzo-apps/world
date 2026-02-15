@@ -45,6 +45,12 @@ import type { WeatherAlert } from '../services/weather';
 type Scenario = 'alpha' | 'beta';
 type HarnessVariant = 'full' | 'tech';
 type HarnessLayerKey = keyof MapLayers;
+type PulseProtestScenario =
+  | 'none'
+  | 'recent-acled-riot'
+  | 'recent-gdelt-riot'
+  | 'recent-protest';
+type NewsPulseScenario = 'none' | 'recent' | 'stale';
 
 type LayerSnapshot = {
   id: string;
@@ -85,7 +91,12 @@ type MapHarness = {
   variant: HarnessVariant;
   seedAllDynamicData: () => void;
   setProtestsScenario: (scenario: Scenario) => void;
+  setPulseProtestsScenario: (scenario: PulseProtestScenario) => void;
+  setNewsPulseScenario: (scenario: NewsPulseScenario) => void;
   setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
+  forcePulseStartupElapsed: () => void;
+  resetPulseStartupTime: () => void;
+  isPulseAnimationRunning: () => boolean;
   setZoom: (zoom: number) => void;
   setLayersForSnapshot: (enabledLayers: HarnessLayerKey[]) => void;
   setCamera: (camera: CameraState) => void;
@@ -208,7 +219,9 @@ const internals = map as unknown as {
   lastClusterState?: Map<string, unknown>;
   maplibreMap?: MapLibreMap;
   newsLocationFirstSeen?: Map<string, number>;
-  stopNewsPulseAnimation?: () => void;
+  newsPulseIntervalId?: ReturnType<typeof setInterval> | null;
+  startupTime?: number;
+  stopPulseAnimation?: () => void;
 };
 
 const buildLayerState = (enabledLayers: HarnessLayerKey[]): MapLayers => {
@@ -616,6 +629,37 @@ const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
   ];
 };
 
+const buildPulseProtests = (scenario: PulseProtestScenario): SocialUnrestEvent[] => {
+  if (scenario === 'none') return [];
+
+  const now = new Date();
+  const isRiot = scenario !== 'recent-protest';
+  const sourceType = scenario === 'recent-gdelt-riot' ? 'gdelt' : 'acled';
+
+  return [
+    {
+      id: `e2e-pulse-protest-${scenario}`,
+      title: `Pulse Protest ${scenario}`,
+      summary: `Pulse protest fixture: ${scenario}`,
+      eventType: isRiot ? 'riot' : 'protest',
+      city: 'Harness City',
+      country: 'Harnessland',
+      lat: 20.1,
+      lon: 0.2,
+      time: now,
+      severity: isRiot ? 'high' : 'medium',
+      fatalities: isRiot ? 1 : 0,
+      sources: ['e2e'],
+      sourceType,
+      tags: ['e2e', 'pulse'],
+      actors: ['Harness Group'],
+      relatedHotspots: [],
+      confidence: 'high',
+      validated: true,
+    },
+  ];
+};
+
 const buildHotspotActivityNews = (
   scenario: 'none' | 'breaking'
 ): NewsItem[] => {
@@ -887,7 +931,30 @@ const makeNewsLocationsNonRecent = (): void => {
       internals.newsLocationFirstSeen.set(key, now - 120_000);
     }
   }
-  internals.stopNewsPulseAnimation?.();
+  internals.stopPulseAnimation?.();
+};
+
+const setNewsPulseScenario = (scenario: NewsPulseScenario): void => {
+  if (scenario === 'none') {
+    internals.newsLocationFirstSeen?.clear();
+    map.setNewsLocations([]);
+    return;
+  }
+
+  if (scenario === 'recent') {
+    map.setNewsLocations([
+      {
+        lat: 48.85,
+        lon: 2.35,
+        title: `Harness Pulse News ${Date.now()}`,
+        threatLevel: 'high',
+      },
+    ]);
+    return;
+  }
+
+  map.setNewsLocations(SEEDED_NEWS_LOCATIONS);
+  makeNewsLocationsNonRecent();
 };
 
 let deterministicVisualModeEnabled = false;
@@ -1011,8 +1078,21 @@ window.__mapHarness = {
   setProtestsScenario: (scenario: Scenario): void => {
     map.setProtests(buildProtests(scenario));
   },
+  setPulseProtestsScenario: (scenario: PulseProtestScenario): void => {
+    map.setProtests(buildPulseProtests(scenario));
+  },
+  setNewsPulseScenario,
   setHotspotActivityScenario: (scenario: 'none' | 'breaking'): void => {
     map.updateHotspotActivity(buildHotspotActivityNews(scenario));
+  },
+  forcePulseStartupElapsed: (): void => {
+    internals.startupTime = Date.now() - 61_000;
+  },
+  resetPulseStartupTime: (): void => {
+    internals.startupTime = Date.now();
+  },
+  isPulseAnimationRunning: (): boolean => {
+    return internals.newsPulseIntervalId != null;
   },
   setZoom: (zoom: number): void => {
     map.setZoom(zoom);
