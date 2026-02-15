@@ -18,6 +18,9 @@ export interface CyberThreatsMeta {
   sources: {
     feodo: CyberThreatSourceStatus;
     urlhaus: CyberThreatSourceStatus;
+    c2intel: CyberThreatSourceStatus;
+    otx: CyberThreatSourceStatus;
+    abuseipdb: CyberThreatSourceStatus;
   };
   cachedAt?: string;
 }
@@ -29,6 +32,9 @@ let lastMeta: CyberThreatsMeta = {
   sources: {
     feodo: { ok: false, count: 0 },
     urlhaus: { ok: false, count: 0 },
+    c2intel: { ok: false, count: 0 },
+    otx: { ok: false, count: 0 },
+    abuseipdb: { ok: false, count: 0 },
   },
 };
 
@@ -62,7 +68,11 @@ function asIndicatorType(value: unknown): CyberThreatIndicatorType {
 
 function asSource(value: unknown): CyberThreatSource {
   const normalized = String(value ?? '').toLowerCase();
-  return normalized === 'urlhaus' ? 'urlhaus' : 'feodo';
+  if (normalized === 'urlhaus') return 'urlhaus';
+  if (normalized === 'c2intel') return 'c2intel';
+  if (normalized === 'otx') return 'otx';
+  if (normalized === 'abuseipdb') return 'abuseipdb';
+  return 'feodo';
 }
 
 function hasValidCoordinates(lat: number, lon: number): boolean {
@@ -139,7 +149,7 @@ export async function fetchCyberThreats(options: { limit?: number; days?: number
       success?: boolean;
       partial?: boolean;
       data?: unknown[];
-      sources?: { feodo?: unknown; urlhaus?: unknown };
+      sources?: { feodo?: unknown; urlhaus?: unknown; c2intel?: unknown; otx?: unknown; abuseipdb?: unknown };
       cachedAt?: string;
     };
 
@@ -156,6 +166,9 @@ export async function fetchCyberThreats(options: { limit?: number; days?: number
       sources: {
         feodo: sanitizeSourceStatus(payload.sources?.feodo),
         urlhaus: sanitizeSourceStatus(payload.sources?.urlhaus),
+        c2intel: sanitizeSourceStatus(payload.sources?.c2intel),
+        otx: sanitizeSourceStatus(payload.sources?.otx),
+        abuseipdb: sanitizeSourceStatus(payload.sources?.abuseipdb),
       },
       cachedAt: payload.cachedAt,
     };
@@ -170,6 +183,9 @@ export function getCyberThreatsMeta(): CyberThreatsMeta {
     sources: {
       feodo: { ...lastMeta.sources.feodo },
       urlhaus: { ...lastMeta.sources.urlhaus },
+      c2intel: { ...lastMeta.sources.c2intel },
+      otx: { ...lastMeta.sources.otx },
+      abuseipdb: { ...lastMeta.sources.abuseipdb },
     },
     cachedAt: lastMeta.cachedAt,
   };
