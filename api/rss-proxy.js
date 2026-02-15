@@ -136,6 +136,11 @@ const ALLOWED_DOMAINS = [
   'www.crisisgroup.org',
   // Think Tanks & Research (Added 2026-01-29)
   'rusi.org',
+  'warontherocks.com',
+  'www.aei.org',
+  'responsiblestatecraft.org',
+  'www.fpri.org',
+  'jamestown.org',
   'www.chathamhouse.org',
   'ecfr.eu',
   'www.gmfus.org',
