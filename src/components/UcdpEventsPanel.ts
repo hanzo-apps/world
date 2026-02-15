@@ -80,8 +80,8 @@ export class UcdpEventsPanel extends Panel {
 
         return `<tr class="ucdp-row" data-lat="${e.latitude}" data-lon="${e.longitude}">
           <td class="ucdp-country">${escapeHtml(e.country)}</td>
-          <td class="ucdp-date">${e.date_start}</td>
           <td class="ucdp-deaths">${deathsHtml}</td>
+          <td class="ucdp-date">${e.date_start}</td>
           <td class="ucdp-actors">${actors}</td>
         </tr>`;
       }).join('');
@@ -91,8 +91,8 @@ export class UcdpEventsPanel extends Panel {
           <thead>
             <tr>
               <th>Country</th>
-              <th>Date</th>
               <th>Deaths</th>
+              <th>Date</th>
               <th>Actors</th>
             </tr>
           </thead>
@@ -124,7 +124,7 @@ export class UcdpEventsPanel extends Panel {
         .ucdp-total-deaths { color: #ef4444; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
         .ucdp-table { width: 100%; border-collapse: collapse; }
         .ucdp-table th { text-align: left; color: #666; font-weight: 600; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid #222; }
-        .ucdp-table th:nth-child(3) { text-align: right; }
+        .ucdp-table th:nth-child(2) { text-align: right; }
         .ucdp-table td { padding: 5px 8px; border-bottom: 1px solid #1a1a1a; color: #ccc; }
         .ucdp-row { cursor: pointer; }
         .ucdp-row:hover { background: #1a1a1a; }

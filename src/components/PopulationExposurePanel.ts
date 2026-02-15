@@ -39,15 +39,16 @@ export class PopulationExposurePanel extends Panel {
 
     const totalAffected = this.exposures.reduce((sum, e) => sum + e.exposedPopulation, 0);
 
-    const rows = this.exposures.slice(0, 30).map(e => {
+    const cards = this.exposures.slice(0, 30).map(e => {
       const typeIcon = this.getTypeIcon(e.eventType);
-      const popClass = e.exposedPopulation >= 1_000_000 ? ' popexp-large' : '';
-      return `<tr class="popexp-row">
-        <td class="popexp-type">${typeIcon}</td>
-        <td class="popexp-name">${escapeHtml(e.eventName)}</td>
-        <td class="popexp-pop${popClass}">${formatPopulation(e.exposedPopulation)}</td>
-        <td class="popexp-radius">${e.exposureRadiusKm}km</td>
-      </tr>`;
+      const popClass = e.exposedPopulation >= 1_000_000 ? ' popexp-pop-large' : '';
+      return `<div class="popexp-card">
+        <div class="popexp-card-name">${typeIcon} ${escapeHtml(e.eventName)}</div>
+        <div class="popexp-card-meta">
+          <span class="popexp-card-pop${popClass}">${formatPopulation(e.exposedPopulation)} affected</span>
+          <span class="popexp-card-radius">${e.exposureRadiusKm}km radius</span>
+        </div>
+      </div>`;
     }).join('');
 
     this.setContent(`
@@ -56,34 +57,21 @@ export class PopulationExposurePanel extends Panel {
           <span class="popexp-label">Total Affected</span>
           <span class="popexp-total">${formatPopulation(totalAffected)}</span>
         </div>
-        <table class="popexp-table">
-          <thead>
-            <tr>
-              <th class="popexp-th-type"></th>
-              <th>Event</th>
-              <th>Population</th>
-              <th>Radius</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        <div class="popexp-list">${cards}</div>
       </div>
       <style>
         .popexp-panel-content { font-size: 12px; }
         .popexp-summary { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: rgba(239, 68, 68, 0.08); border-radius: 4px; border-left: 3px solid #ef4444; }
         .popexp-label { color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
         .popexp-total { color: #fff; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .popexp-table { width: 100%; border-collapse: collapse; }
-        .popexp-table th { text-align: left; color: #666; font-weight: 600; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid #222; }
-        .popexp-table th:nth-child(3), .popexp-table th:nth-child(4) { text-align: right; }
-        .popexp-table td { padding: 5px 8px; border-bottom: 1px solid #1a1a1a; color: #ccc; }
-        .popexp-row:hover { background: #1a1a1a; }
-        .popexp-th-type { width: 28px; }
-        .popexp-type { width: 28px; text-align: center; }
-        .popexp-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .popexp-pop { text-align: right; font-variant-numeric: tabular-nums; }
-        .popexp-large { color: #fff; font-weight: 600; }
-        .popexp-radius { text-align: right; font-variant-numeric: tabular-nums; color: #666; }
+        .popexp-list { display: flex; flex-direction: column; }
+        .popexp-card { padding: 6px 10px; border-bottom: 1px solid #1a1a1a; }
+        .popexp-card:hover { background: #1a1a1a; }
+        .popexp-card-name { color: #ddd; font-size: 12px; line-height: 1.4; margin-bottom: 3px; word-break: break-word; }
+        .popexp-card-meta { display: flex; justify-content: space-between; align-items: center; }
+        .popexp-card-pop { color: #ef4444; font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 500; }
+        .popexp-pop-large { color: #fff; font-weight: 700; }
+        .popexp-card-radius { color: #666; font-size: 11px; font-variant-numeric: tabular-nums; }
       </style>
     `);
   }
