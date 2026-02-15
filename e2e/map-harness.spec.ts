@@ -20,7 +20,18 @@ type HarnessWindow = Window & {
     variant: 'full' | 'tech';
     seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
+    setPulseProtestsScenario: (
+      scenario:
+        | 'none'
+        | 'recent-acled-riot'
+        | 'recent-gdelt-riot'
+        | 'recent-protest'
+    ) => void;
+    setNewsPulseScenario: (scenario: 'none' | 'recent' | 'stale') => void;
     setHotspotActivityScenario: (scenario: 'none' | 'breaking') => void;
+    forcePulseStartupElapsed: () => void;
+    resetPulseStartupTime: () => void;
+    isPulseAnimationRunning: () => boolean;
     setZoom: (zoom: number) => void;
     setLayersForSnapshot: (enabledLayers: string[]) => void;
     setCamera: (camera: { lon: number; lat: number; zoom: number }) => void;
@@ -268,6 +279,96 @@ test.describe('DeckGL map harness', () => {
         }, { timeout: 20000 })
         .toBeGreaterThan(0);
     }
+  });
+
+  test('suppresses pulse animation during startup cooldown even with recent signals', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+      w.__mapHarness?.setNewsPulseScenario('none');
+      w.__mapHarness?.resetPulseStartupTime();
+      w.__mapHarness?.setNewsPulseScenario('recent');
+    });
+
+    await page.waitForTimeout(800);
+
+    const isRunning = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+    });
+
+    expect(isRunning).toBe(false);
+  });
+
+  test('starts and stops pulse on dynamic signals and ignores gdelt-only riot recency', async ({
+    page,
+  }) => {
+    await waitForHarnessReady(page);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+      w.__mapHarness?.setNewsPulseScenario('none');
+      w.__mapHarness?.forcePulseStartupElapsed();
+      w.__mapHarness?.setNewsPulseScenario('recent');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(true);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setNewsPulseScenario('stale');
+      w.__mapHarness?.setHotspotActivityScenario('none');
+      w.__mapHarness?.setPulseProtestsScenario('none');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(false);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setPulseProtestsScenario('recent-gdelt-riot');
+    });
+
+    await page.waitForTimeout(800);
+    const gdeltPulseRunning = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+    });
+    expect(gdeltPulseRunning).toBe(false);
+
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setPulseProtestsScenario('recent-acled-riot');
+    });
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.isPulseAnimationRunning() ?? false;
+        });
+      }, { timeout: 10000 })
+      .toBe(true);
   });
 
   test('matches golden screenshots per layer and zoom', async ({ page }) => {
