@@ -2,11 +2,14 @@ import { isDesktopRuntime } from '@/services/runtime';
 
 const STORAGE_KEY = 'wm-download-banner-dismissed';
 const SHOW_DELAY_MS = 12_000;
+let bannerScheduled = false;
 
 export function maybeShowDownloadBanner(): void {
+  if (bannerScheduled) return;
   if (isDesktopRuntime()) return;
   if (localStorage.getItem(STORAGE_KEY)) return;
 
+  bannerScheduled = true;
   setTimeout(() => {
     if (localStorage.getItem(STORAGE_KEY)) return;
     const panel = buildPanel();
