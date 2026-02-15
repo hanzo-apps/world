@@ -9,6 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::env;
 
 use keyring::Entry;
+use reqwest::Url;
 use serde_json::{Map, Value};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent, WebviewUrl, WebviewWindowBuilder};
@@ -233,13 +234,16 @@ fn open_path_in_shell(path: &Path) -> Result<(), String> {
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    if url.starts_with("https://") {
-        return open_in_shell(&url);
+    let parsed = Url::parse(&url).map_err(|_| "Invalid URL".to_string())?;
+
+    match parsed.scheme() {
+        "https" => open_in_shell(parsed.as_str()),
+        "http" => match parsed.host_str() {
+            Some("localhost") | Some("127.0.0.1") => open_in_shell(parsed.as_str()),
+            _ => Err("Only https:// URLs are allowed (http:// only for localhost)".to_string()),
+        },
+        _ => Err("Only https:// URLs are allowed (http:// only for localhost)".to_string()),
     }
-    if url.starts_with("http://localhost") || url.starts_with("http://127.0.0.1") {
-        return open_in_shell(&url);
-    }
-    Err("Only https:// URLs are allowed (http:// only for localhost)".to_string())
 }
 
 fn open_logs_folder_impl(app: &AppHandle) -> Result<PathBuf, String> {
