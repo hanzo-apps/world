@@ -24,12 +24,12 @@ test('returns embeddable html for valid video id', async () => {
   assert.equal(html.includes("host:'https://www.youtube-nocookie.com'"), true);
   assert.equal(html.includes('autoplay:0'), true);
   assert.equal(html.includes('mute:1'), true);
-  assert.equal(html.includes("origin:'https://worldmonitor.app'"), true);
+  assert.equal(html.includes('origin:"https://worldmonitor.app"'), true);
   assert.equal(html.includes('postMessage'), true);
 });
 
 test('accepts custom origin parameter', async () => {
   const response = await handler(makeRequest('?videoId=iEpJwprxDdk&origin=http://127.0.0.1:46123'));
   const html = await response.text();
-  assert.equal(html.includes("origin:'http://127.0.0.1:46123'"), true);
+  assert.equal(html.includes('origin:"http://127.0.0.1:46123"'), true);
 });
