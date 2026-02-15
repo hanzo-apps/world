@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
+    "@tauri-apps/cli": "^2.10.0",
     "@types/d3": "^7.4.3",
     "@types/maplibre-gl": "^1.13.2",
     "@types/topojson-client": "^3.1.5",
