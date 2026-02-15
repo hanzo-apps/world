@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' };
 
-import { getCorsHeaders } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 // Fetch Hacker News front page stories
 // Uses official HackerNews Firebase API
@@ -17,6 +17,9 @@ function parseLimit(rawLimit) {
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const requestedType = searchParams.get('type') || 'top';

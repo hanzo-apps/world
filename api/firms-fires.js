@@ -7,6 +7,8 @@
  * GET ?days=1                 — fires for all monitored regions
  */
 
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+
 export const config = {
   runtime: 'edge',
 };
@@ -70,6 +72,11 @@ function parseCSV(csv) {
 }
 
 export default async function handler(request) {
+  const cors = getCorsHeaders(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   if (!FIRMS_API_KEY) {
     return json({ regions: {}, totalCount: 0, skipped: true, reason: 'NASA_FIRMS_API_KEY not configured', source: SOURCE, days: 0, timestamp: new Date().toISOString() });
   }

@@ -4,6 +4,7 @@
  * Redis cached (1h TTL)
  */
 
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { getCachedJson, setCachedJson } from './_upstash-cache.js';
 
 export const config = {
@@ -62,6 +63,11 @@ const COUNTRY_INDEX = {
 };
 
 export default async function handler(request) {
+  const cors = getCorsHeaders(request);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (isDisallowedOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  }
   if (request.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
