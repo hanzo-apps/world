@@ -8,6 +8,8 @@ import {
   setFeatureToggle,
   setSecretValue,
   subscribeRuntimeConfig,
+  validateSecret,
+  verifySecretWithApi,
   type RuntimeFeatureDefinition,
   type RuntimeSecretKey,
 } from '@/services/runtime-config';
@@ -29,12 +31,18 @@ const SIGNUP_URLS: Partial<Record<RuntimeSecretKey, string>> = {
   AISSTREAM_API_KEY: 'https://aisstream.io/authenticate',
   OPENSKY_CLIENT_ID: 'https://opensky-network.org/login?view=registration',
   OPENSKY_CLIENT_SECRET: 'https://opensky-network.org/login?view=registration',
+  FINNHUB_API_KEY: 'https://finnhub.io/register',
+  NASA_FIRMS_API_KEY: 'https://firms.modaps.eosdis.nasa.gov/api/area/',
 };
+
+const MASKED_SENTINEL = '__WM_MASKED__';
 
 const SECRET_HELP_TEXT: Partial<Record<RuntimeSecretKey, string>> = {
   URLHAUS_AUTH_KEY: 'Used for both URLhaus and ThreatFox APIs.',
   OTX_API_KEY: 'Optional enrichment source for the cyber threat layer.',
   ABUSEIPDB_API_KEY: 'Optional enrichment source for malicious IP reputation.',
+  FINNHUB_API_KEY: 'Real-time stock quotes and market data.',
+  NASA_FIRMS_API_KEY: 'Fire Information for Resource Management System.',
 };
 
 interface RuntimeConfigPanelOptions {
@@ -47,6 +55,8 @@ export class RuntimeConfigPanel extends Panel {
   private readonly mode: 'full' | 'alert';
   private readonly buffered: boolean;
   private pendingSecrets = new Map<RuntimeSecretKey, string>();
+  private validatedKeys = new Map<RuntimeSecretKey, boolean>();
+  private validationMessages = new Map<RuntimeSecretKey, string>();
 
   constructor(options: RuntimeConfigPanelOptions = {}) {
     super({ id: 'runtime-config', title: 'Desktop Configuration', showCount: false });
@@ -61,10 +71,51 @@ export class RuntimeConfigPanel extends Panel {
       await setSecretValue(key, value);
     }
     this.pendingSecrets.clear();
+    this.validatedKeys.clear();
+    this.validationMessages.clear();
   }
 
   public hasPendingChanges(): boolean {
     return this.pendingSecrets.size > 0;
+  }
+
+  public getValidationErrors(): string[] {
+    const errors: string[] = [];
+    for (const [key, value] of this.pendingSecrets) {
+      const result = validateSecret(key, value);
+      if (!result.valid) errors.push(`${key}: ${result.hint || 'Invalid format'}`);
+    }
+    return errors;
+  }
+
+  public async verifyPendingSecrets(): Promise<string[]> {
+    const errors: string[] = [];
+    const context = Object.fromEntries(this.pendingSecrets.entries()) as Partial<Record<RuntimeSecretKey, string>>;
+
+    for (const [key, value] of this.pendingSecrets) {
+      const localResult = validateSecret(key, value);
+      if (!localResult.valid) {
+        this.validatedKeys.set(key, false);
+        this.validationMessages.set(key, localResult.hint || 'Invalid format');
+        errors.push(`${key}: ${localResult.hint || 'Invalid format'}`);
+        continue;
+      }
+
+      const verifyResult = await verifySecretWithApi(key, value, context);
+      this.validatedKeys.set(key, verifyResult.valid);
+      if (!verifyResult.valid) {
+        this.validationMessages.set(key, verifyResult.message || 'Verification failed');
+        errors.push(`${key}: ${verifyResult.message || 'Verification failed'}`);
+      } else {
+        this.validationMessages.delete(key);
+      }
+    }
+
+    if (this.pendingSecrets.size > 0) {
+      this.render();
+    }
+
+    return errors;
   }
 
   public destroy(): void {
@@ -143,12 +194,22 @@ export class RuntimeConfigPanel extends Panel {
     const linkHtml = signupUrl
       ? ` <a href="#" data-signup-url="${signupUrl}" class="runtime-secret-link" title="Get API key">&#x2197;</a>`
       : '';
+    const pending = this.pendingSecrets.has(key);
+    const validated = this.validatedKeys.get(key);
+    const inputClass = pending ? (validated === false ? 'invalid' : 'valid-staged') : '';
+    const checkClass = validated === true ? 'visible' : '';
+    const hintText = pending && validated === false
+      ? (this.validationMessages.get(key) || validateSecret(key, this.pendingSecrets.get(key) || '').hint || 'Invalid value')
+      : null;
+
     return `
       <div class="runtime-secret-row">
         <div class="runtime-secret-key"><code>${escapeHtml(key)}</code>${linkHtml}</div>
         <span class="runtime-secret-status ${state.valid ? 'ok' : 'warn'}">${escapeHtml(status)}</span>
+        <span class="runtime-secret-check ${checkClass}">&#x2713;</span>
         ${helpText ? `<div class="runtime-secret-meta">${escapeHtml(helpText)}</div>` : ''}
-        <input type="password" data-secret="${key}" placeholder="Set secret" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'}>
+        <input type="password" data-secret="${key}" placeholder="${pending ? 'Staged (save with OK)' : 'Set secret'}" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} class="${inputClass}" ${pending ? `value="${MASKED_SENTINEL}"` : ''}>
+        ${hintText ? `<span class="runtime-secret-hint">${escapeHtml(hintText)}</span>` : ''}
       </div>
     `;
   }
@@ -187,15 +248,68 @@ export class RuntimeConfigPanel extends Panel {
     });
 
     this.content.querySelectorAll<HTMLInputElement>('input[data-secret]').forEach((input) => {
-      input.addEventListener('change', () => {
+      input.addEventListener('input', () => {
         const key = input.dataset.secret as RuntimeSecretKey | undefined;
-        if (!key || !input.value) return;
+        if (!key) return;
+        if (this.buffered && this.pendingSecrets.has(key) && input.value.startsWith(MASKED_SENTINEL)) {
+          input.value = input.value.slice(MASKED_SENTINEL.length);
+        }
+        this.validatedKeys.delete(key);
+        this.validationMessages.delete(key);
+        const check = input.closest('.runtime-secret-row')?.querySelector('.runtime-secret-check');
+        check?.classList.remove('visible');
+        input.classList.remove('valid-staged', 'invalid');
+        const hint = input.closest('.runtime-secret-row')?.querySelector('.runtime-secret-hint');
+        if (hint) hint.remove();
+      });
+
+      input.addEventListener('blur', () => {
+        const key = input.dataset.secret as RuntimeSecretKey | undefined;
+        if (!key) return;
+        const raw = input.value.trim();
+        if (!raw) {
+          if (this.buffered && this.pendingSecrets.has(key)) {
+            this.pendingSecrets.delete(key);
+            this.validatedKeys.delete(key);
+            this.validationMessages.delete(key);
+            this.render();
+          }
+          return;
+        }
+        if (raw === MASKED_SENTINEL) return;
         if (this.buffered) {
-          this.pendingSecrets.set(key, input.value);
-          input.value = '';
-          input.placeholder = 'Pending (save with OK)';
+          this.pendingSecrets.set(key, raw);
+          const result = validateSecret(key, raw);
+          if (result.valid) {
+            this.validatedKeys.delete(key);
+            this.validationMessages.delete(key);
+          } else {
+            this.validatedKeys.set(key, false);
+            this.validationMessages.set(key, result.hint || 'Invalid format');
+          }
+          input.type = 'password';
+          input.value = MASKED_SENTINEL;
+          input.placeholder = 'Staged (save with OK)';
+          const row = input.closest('.runtime-secret-row');
+          const check = row?.querySelector('.runtime-secret-check');
+          input.classList.remove('valid-staged', 'invalid');
+          if (result.valid) {
+            check?.classList.remove('visible');
+            input.classList.add('valid-staged');
+          } else {
+            check?.classList.remove('visible');
+            input.classList.add('invalid');
+            const existingHint = row?.querySelector('.runtime-secret-hint');
+            if (existingHint) existingHint.remove();
+            if (result.hint) {
+              const hint = document.createElement('span');
+              hint.className = 'runtime-secret-hint';
+              hint.textContent = result.hint;
+              row?.appendChild(hint);
+            }
+          }
         } else {
-          void setSecretValue(key, input.value);
+          void setSecretValue(key, raw);
           input.value = '';
         }
       });
