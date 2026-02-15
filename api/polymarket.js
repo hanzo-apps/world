@@ -1,3 +1,5 @@
+import { getCorsHeaders } from './_cors.js';
+
 export const config = { runtime: 'edge' };
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com';
@@ -53,6 +55,7 @@ function buildUrl(base, endpoint, params) {
 }
 
 export default async function handler(req) {
+  const cors = getCorsHeaders(req);
   const url = new URL(req.url);
   const endpoint = url.searchParams.get('endpoint') || 'markets';
 
@@ -82,7 +85,7 @@ export default async function handler(req) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
         'X-Polymarket-Source': 'gamma',
       },
@@ -93,7 +96,7 @@ export default async function handler(req) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'X-Polymarket-Error': err.message,
         'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
       },

@@ -1,6 +1,9 @@
+import { getCorsHeaders } from './_cors.js';
+
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
+  const cors = getCorsHeaders(req);
   try {
     const response = await fetch('https://nasstatus.faa.gov/api/airport-status-information', {
       headers: { 'Accept': 'application/xml' },
@@ -10,7 +13,7 @@ export default async function handler(req) {
       status: response.status,
       headers: {
         'Content-Type': 'application/xml',
-        'Access-Control-Allow-Origin': '*',
+        ...cors,
         'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30',
       },
     });
