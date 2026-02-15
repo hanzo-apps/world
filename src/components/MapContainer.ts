@@ -4,7 +4,7 @@
  */
 import { isMobileDevice } from '@/utils';
 import { MapComponent } from './Map';
-import { DeckGLMap, type DeckMapView } from './DeckGLMap';
+import { DeckGLMap, type DeckMapView, type CountryClickPayload } from './DeckGLMap';
 import type {
   MapLayers,
   Hotspot,
@@ -500,7 +500,7 @@ export class MapContainer {
   }
 
   // Country click + highlight (deck.gl only)
-  public onCountryClicked(callback: (lat: number, lon: number) => void): void {
+  public onCountryClicked(callback: (country: CountryClickPayload) => void): void {
     if (this.useDeckGL) {
       this.deckGLMap?.setOnCountryClick(callback);
     }

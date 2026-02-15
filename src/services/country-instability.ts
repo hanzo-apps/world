@@ -6,6 +6,7 @@ import type { ConflictEvent } from './conflicts';
 import type { UcdpConflictStatus } from './ucdp';
 import type { HapiConflictSummary } from './hapi';
 import type { CountryDisplacement, ClimateAnomaly } from '@/types';
+import { getCountryAtCoordinates } from './country-geometry';
 
 export interface CountryScore {
   code: string;
@@ -313,8 +314,14 @@ const COUNTRY_BOUNDS: Record<string, [number, number, number, number]> = {
   CN: [18, 54, 73, 135],     // China
   RU: [41, 82, 19, 180],     // Russia (simplified)
 };
+const LOCATION_COUNTRY_CANDIDATES = Object.keys(TIER1_COUNTRIES);
 
 function getCountryFromLocation(lat: number, lon: number): string | null {
+  const precise = getCountryAtCoordinates(lat, lon, LOCATION_COUNTRY_CANDIDATES);
+  if (precise && TIER1_COUNTRIES[precise.code]) {
+    return precise.code;
+  }
+
   for (const [code, [minLat, maxLat, minLon, maxLon]] of Object.entries(COUNTRY_BOUNDS)) {
     if (lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon) {
       return code;
