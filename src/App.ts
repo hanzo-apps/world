@@ -599,6 +599,10 @@ export class App {
   public async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
 
+    // Normalize to canonical name (GeoJSON may use "United States of America" etc.)
+    const canonicalName = TIER1_COUNTRIES[code] || App.resolveCountryName(code);
+    if (canonicalName !== code) country = canonicalName;
+
     const scores = calculateCII();
     const score = scores.find((s) => s.code === code) ?? null;
     const signals = this.getCountrySignals(code, country);
