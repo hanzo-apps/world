@@ -930,20 +930,6 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 
 ---
 
-## Documentation
-
-Full documentation including algorithms, data sources, and system architecture:
-
-**[docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md)**
-
-Key sections:
-- [Signal Intelligence](./docs/DOCUMENTATION.md#signal-intelligence)
-- [Country Instability Index](./docs/DOCUMENTATION.md#country-instability-index-cii)
-- [Military Tracking](./docs/DOCUMENTATION.md#military-tracking)
-- [Infrastructure Analysis](./docs/DOCUMENTATION.md#infrastructure-cascade-analysis)
-- [API Dependencies](./docs/DOCUMENTATION.md#api-dependencies)
-- [System Architecture](./docs/DOCUMENTATION.md#system-architecture)
-
 ---
 
 ## Contributing
@@ -1022,7 +1008,6 @@ If you find World Monitor useful:
 - **Share** with colleagues interested in OSINT
 - **Contribute** code, data sources, or documentation
 - **Report issues** to help improve the platform
-- **Follow the developer** on [X/Twitter](https://x.com/eliehabib)
 
 ---
 
