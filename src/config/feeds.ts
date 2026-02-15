@@ -156,6 +156,12 @@ export const SOURCE_TIERS: Record<string, number> = {
   // Food Security
   'FAO GIEWS': 2,
   'EU ISS': 3,
+  // New verified think tanks
+  'War on the Rocks': 2,
+  'AEI': 3,
+  'Responsible Statecraft': 3,
+  'FPRI': 3,
+  'Jamestown': 3,
 
   // Tier 3 - Policy Sources
   'Politico Tech': 2,
@@ -265,6 +271,9 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'Arms Control Assn': 'intel', 'Bulletin of Atomic Scientists': 'intel',
   // Food Security & Regional
   'FAO GIEWS': 'gov', 'EU ISS': 'intel',
+  // New verified think tanks
+  'War on the Rocks': 'intel', 'AEI': 'intel', 'Responsible Statecraft': 'intel',
+  'FPRI': 'intel', 'Jamestown': 'intel',
 
   // Podcasts & Newsletters
   'Acquired Podcast': 'tech', 'All-In Podcast': 'tech', 'a16z Podcast': 'tech',
@@ -396,6 +405,19 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'RAND', url: rss('https://news.google.com/rss/search?q=site:rand.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Brookings', url: rss('https://news.google.com/rss/search?q=site:brookings.edu+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Carnegie', url: rss('https://news.google.com/rss/search?q=site:carnegieendowment.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // New verified think tank feeds
+    // War on the Rocks - Defense and national security analysis
+    { name: 'War on the Rocks', url: rss('https://warontherocks.com/feed') },
+    // AEI - American Enterprise Institute (US conservative think tank)
+    { name: 'AEI', url: rss('https://www.aei.org/feed/') },
+    // Responsible Statecraft - Foreign policy analysis (Quincy Institute)
+    { name: 'Responsible Statecraft', url: rss('https://responsiblestatecraft.org/feed/') },
+    // RUSI - Royal United Services Institute (UK defense & security)
+    { name: 'RUSI', url: rss('https://www.rusi.org/rss/latest-commentary.xml') },
+    // FPRI - Foreign Policy Research Institute (US foreign policy)
+    { name: 'FPRI', url: rss('https://www.fpri.org/feed/') },
+    // Jamestown Foundation - Eurasia/China/Terrorism analysis
+    { name: 'Jamestown', url: rss('https://jamestown.org/feed/') },
   ],
   crisis: [
     { name: 'CrisisWatch', url: rss('https://www.crisisgroup.org/rss') },
