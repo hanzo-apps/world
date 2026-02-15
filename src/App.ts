@@ -598,6 +598,7 @@ export class App {
 
   public async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
+    this.map?.setRenderPaused(true);
 
     // Normalize to canonical name (GeoJSON may use "United States of America" etc.)
     const canonicalName = TIER1_COUNTRIES[code] || App.resolveCountryName(code);
