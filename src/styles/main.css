@@ -1579,6 +1579,10 @@ body.animations-paused *::after {
   border-left-color: var(--red);
 }
 
+.signal-item.keyword_spike {
+  border-left-color: #ff8c42;
+}
+
 .signal-item.prediction_leads_news {
   border-left-color: var(--yellow);
 }
@@ -1622,6 +1626,24 @@ body.animations-paused *::after {
   color: var(--text);
   line-height: 1.4;
   margin-bottom: 8px;
+}
+
+.signal-actions {
+  margin-top: 8px;
+}
+
+.suppress-keyword-btn {
+  border: 1px solid rgba(255, 140, 66, 0.5);
+  background: rgba(255, 140, 66, 0.12);
+  color: #ffae6f;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.suppress-keyword-btn:hover {
+  background: rgba(255, 140, 66, 0.2);
 }
 
 .signal-meta {
