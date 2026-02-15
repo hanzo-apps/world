@@ -75,10 +75,15 @@ async function initSettingsWindow(): Promise<void> {
 
   window.addEventListener('beforeunload', () => panel.destroy());
 
-  // OK: commit pending secrets, then close
   document.getElementById('okBtn')?.addEventListener('click', () => {
     void (async () => {
       try {
+        setActionStatus('Validating API keys...', 'ok');
+        const errors = await panel.verifyPendingSecrets();
+        if (errors.length > 0) {
+          setActionStatus(`Invalid keys: ${errors.join(', ')}`, 'error');
+          return;
+        }
         await panel.commitPendingSecrets();
         setActionStatus('Settings saved', 'ok');
         closeSettingsWindow();
