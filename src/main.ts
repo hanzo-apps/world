@@ -21,6 +21,11 @@ void loadDesktopSecrets();
 // Apply stored theme preference before app initialization (safety net for inline script)
 applyStoredTheme();
 
+// Remove no-transition class after first paint to enable smooth theme transitions
+requestAnimationFrame(() => {
+  document.documentElement.classList.remove('no-transition');
+});
+
 const app = new App('app');
 app.init().catch(console.error);
 
