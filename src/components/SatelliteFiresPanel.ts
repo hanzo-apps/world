@@ -34,7 +34,7 @@ export class SatelliteFiresPanel extends Panel {
 
   private render(): void {
     if (this.stats.length === 0) {
-      this.setContent('<div class="panel-empty">No fire data available</div>');
+      this.setContent(`<div class="panel-empty">${t('common.noDataAvailable')}</div>`);
       return;
     }
 
