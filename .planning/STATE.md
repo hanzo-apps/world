@@ -1,0 +1,71 @@
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-02-16)
+
+**Core value:** Users who prefer light mode get a first-class experience — every panel, the map, and all chrome look intentionally designed for light backgrounds, not like an afterthought inversion.
+**Current focus:** Phase 1 - CSS Foundation & Color Centralization
+
+## Current Position
+
+Phase: 1 of 4 (CSS Foundation & Color Centralization)
+Plan: 4 of 5
+Status: Executing
+Last activity: 2026-02-16 — Completed 01-03-PLAN.md (settings window + embedded style block color conversion)
+
+Progress: [██████░░░░] 60%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 3
+- Average duration: 5 min
+- Total execution time: 0.25 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 01-css-foundation | 3/5 | 15min | 5min |
+
+**Recent Trend:**
+- Last 5 plans: 01-01 (5min), 01-02 (5min), 01-03 (5min)
+- Trend: consistent
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- Settings-only toggle to avoid cluttering dense dashboard UI
+- Keep accent colors unchanged (reds, greens, yellows work on both backgrounds)
+- CSS custom properties approach enables instant theme switching without reload
+- (01-01) Split :root into two blocks: theme colors vs semantic colors, preventing accidental light-mode override of semantic values
+- (01-01) getCSSColor uses Map cache with auto-invalidation on data-theme attribute change
+- (01-03) color-mix(in srgb, var(--x) N%, transparent) pattern for alpha-transparent tints from CSS variables
+- (01-03) Settings window --settings-* variables alias global theme variables for cascade isolation
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+**From Research:**
+- 124+ hardcoded color instances found via grep - must be systematically converted in Phase 1
+- Map basemap URL is hardcoded in DeckGLMap.ts - needs parameterization in Phase 3
+- D3 charts have hardcoded color scales - require theme subscriptions in Phase 3
+- Unknown if Carto light basemap ocean colors will require Deck.GL overlay adjustments
+
+**Mitigation strategies identified in research for all blockers**
+
+## Session Continuity
+
+Last session: 2026-02-16 (plan execution)
+Stopped at: Completed 01-03-PLAN.md
+Resume file: None
