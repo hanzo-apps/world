@@ -198,7 +198,7 @@ export class CountryBriefPage {
             <span class="cb-country-name">${t('modals.countryBrief.identifying')}</span>
           </div>
           <div class="cb-header-right">
-            <button class="cb-close" aria-label="Close">×</button>
+            <button class="cb-close" aria-label="${t('components.newsPanel.close')}">×</button>
           </div>
         </div>
         <div class="cb-body">
@@ -249,12 +249,12 @@ export class CountryBriefPage {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </button>
               <div class="cb-export-menu hidden">
-                <button class="cb-export-option" data-format="image">Export Image</button>
-                <button class="cb-export-option" data-format="json">Export JSON</button>
-                <button class="cb-export-option" data-format="csv">Export CSV</button>
+                <button class="cb-export-option" data-format="image">${t('common.exportImage')}</button>
+                <button class="cb-export-option" data-format="json">${t('common.exportJson')}</button>
+                <button class="cb-export-option" data-format="csv">${t('common.exportCsv')}</button>
               </div>
             </div>
-            <button class="cb-close" aria-label="Close">×</button>
+            <button class="cb-close" aria-label="${t('components.newsPanel.close')}">×</button>
           </div>
         </div>
         <div class="cb-body">
