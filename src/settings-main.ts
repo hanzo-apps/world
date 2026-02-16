@@ -4,6 +4,7 @@ import { RuntimeConfigPanel } from '@/components/RuntimeConfigPanel';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { tryInvokeTauri } from '@/services/tauri-bridge';
 import { escapeHtml } from '@/utils/sanitize';
+import { initI18n, t } from '@/services/i18n';
 
 let diagnosticsInitialized = false;
 
@@ -23,7 +24,7 @@ async function invokeDesktopAction(command: string, successLabel: string): Promi
     return;
   }
 
-  setActionStatus(`Failed to run ${command}. Check desktop log.`, 'error');
+  setActionStatus(t('modals.settingsWindow.invokeFail', { command }), 'error');
 }
 
 function initTabs(): void {
@@ -58,10 +59,11 @@ function initTabs(): void {
 }
 
 function closeSettingsWindow(): void {
-  void tryInvokeTauri<void>('close_settings_window').then(() => {}, () => window.close());
+  void tryInvokeTauri<void>('close_settings_window').then(() => { }, () => window.close());
 }
 
 async function initSettingsWindow(): Promise<void> {
+  await initI18n(); // Initialize i18n first
   await loadDesktopSecrets();
 
   const mount = document.getElementById('settingsApp');
@@ -82,20 +84,20 @@ async function initSettingsWindow(): Promise<void> {
           closeSettingsWindow();
           return;
         }
-        setActionStatus('Validating API keys...', 'ok');
+        setActionStatus(t('modals.settingsWindow.validating'), 'ok');
         const errors = await panel.verifyPendingSecrets();
         console.log('[settings] verify done, errors:', errors.length, errors);
         await panel.commitVerifiedSecrets();
         console.log('[settings] commit done, remaining pending:', panel.hasPendingChanges());
         if (errors.length > 0) {
-          setActionStatus(`Saved verified keys. Failed: ${errors.join(', ')}`, 'error');
+          setActionStatus(t('modals.settingsWindow.verifyFailed', { errors: errors.join(', ') }), 'error');
         } else {
-          setActionStatus('Settings saved', 'ok');
+          setActionStatus(t('modals.settingsWindow.saved'), 'ok');
           closeSettingsWindow();
         }
       } catch (err) {
         console.error('[settings] save error:', err);
-        setActionStatus(`Save failed: ${err}`, 'error');
+        setActionStatus(t('modals.settingsWindow.failed', { error: String(err) }), 'error');
       }
     })();
   });
@@ -107,12 +109,12 @@ async function initSettingsWindow(): Promise<void> {
 
   const openLogsBtn = document.getElementById('openLogsBtn');
   openLogsBtn?.addEventListener('click', () => {
-    void invokeDesktopAction('open_logs_folder', 'Opened logs folder');
+    void invokeDesktopAction('open_logs_folder', t('modals.settingsWindow.openLogs'));
   });
 
   const openSidecarLogBtn = document.getElementById('openSidecarLogBtn');
   openSidecarLogBtn?.addEventListener('click', () => {
-    void invokeDesktopAction('open_sidecar_log_file', 'Opened API log');
+    void invokeDesktopAction('open_sidecar_log_file', t('modals.settingsWindow.openApiLog'));
   });
 
   initTabs();
@@ -150,9 +152,9 @@ function initDiagnostics(): void {
       const res = await fetch(`${SIDECAR_BASE}/api/local-debug-toggle`, { method: 'POST' });
       const data = await res.json();
       if (verboseToggle) verboseToggle.checked = data.verboseMode;
-      setActionStatus(data.verboseMode ? 'Verbose sidecar logging ON (saved)' : 'Verbose sidecar logging OFF (saved)', 'ok');
+      setActionStatus(data.verboseMode ? t('modals.settingsWindow.verboseOn') : t('modals.settingsWindow.verboseOff'), 'ok');
     } catch {
-      setActionStatus('Could not reach sidecar to toggle verbose mode', 'error');
+      setActionStatus(t('modals.settingsWindow.sidecarError'), 'error');
     }
   });
 
@@ -167,7 +169,7 @@ function initDiagnostics(): void {
       if (trafficCount) trafficCount.textContent = `(${entries.length})`;
 
       if (entries.length === 0) {
-        trafficLogEl.innerHTML = '<p class="diag-empty">No traffic recorded yet.</p>';
+        trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.noTraffic')}</p>`;
         return;
       }
 
@@ -177,9 +179,9 @@ function initDiagnostics(): void {
         return `<tr class="diag-${cls}"><td>${escapeHtml(ts)}</td><td>${e.method}</td><td title="${escapeHtml(e.path)}">${escapeHtml(e.path)}</td><td>${e.status}</td><td>${e.durationMs}ms</td></tr>`;
       }).join('');
 
-      trafficLogEl.innerHTML = `<table class="diag-table"><thead><tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th></tr></thead><tbody>${rows}</tbody></table>`;
+      trafficLogEl.innerHTML = `<table class="diag-table"><thead><tr><th>${t('modals.settingsWindow.table.time')}</th><th>${t('modals.settingsWindow.table.method')}</th><th>${t('modals.settingsWindow.table.path')}</th><th>${t('modals.settingsWindow.table.status')}</th><th>${t('modals.settingsWindow.table.duration')}</th></tr></thead><tbody>${rows}</tbody></table>`;
     } catch {
-      trafficLogEl.innerHTML = '<p class="diag-empty">Sidecar not reachable.</p>';
+      trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.sidecarUnreachable')}</p>`;
     }
   }
 
@@ -189,7 +191,7 @@ function initDiagnostics(): void {
     try {
       await fetch(`${SIDECAR_BASE}/api/local-traffic-log`, { method: 'DELETE' });
     } catch { /* ignore */ }
-    if (trafficLogEl) trafficLogEl.innerHTML = '<p class="diag-empty">Log cleared.</p>';
+    if (trafficLogEl) trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.logCleared')}</p>`;
     if (trafficCount) trafficCount.textContent = '(0)';
   });
 
