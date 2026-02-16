@@ -135,9 +135,9 @@ export class TechReadinessPanel extends Panel {
               <div class="readiness-info">
                 <div class="readiness-name">${escapeHtml(country.countryName)}</div>
                 <div class="readiness-components">
-                  <span title="Internet Users">🌐${this.formatComponent(country.components.internet)}</span>
-                  <span title="Mobile Subscriptions">📱${this.formatComponent(country.components.mobile)}</span>
-                  <span title="R&D Spending">🔬${this.formatComponent(country.components.rdSpend)}</span>
+                  <span title="${t('components.techReadiness.internetUsers')}">🌐${this.formatComponent(country.components.internet)}</span>
+                  <span title="${t('components.techReadiness.mobileSubscriptions')}">📱${this.formatComponent(country.components.mobile)}</span>
+                  <span title="${t('components.techReadiness.rdSpending')}">🔬${this.formatComponent(country.components.rdSpend)}</span>
                 </div>
               </div>
               <div class="readiness-score ${scoreClass}">${country.score}</div>
