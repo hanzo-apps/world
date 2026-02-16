@@ -2,6 +2,7 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import type { UnhcrSummary, CountryDisplacement } from '@/types';
 import { formatPopulation } from '@/services/unhcr';
+import { t } from '@/services/i18n';
 
 type DisplacementTab = 'origins' | 'hosts';
 
@@ -25,7 +26,7 @@ export class DisplacementPanel extends Panel {
         </ul>
         Data updates yearly. CC BY 4.0 license.`,
     });
-    this.showLoading('Loading displacement data');
+    this.showLoading(t('common.loadingDisplacement'));
   }
 
   public setCountryClickHandler(handler: (lat: number, lon: number) => void): void {
@@ -79,7 +80,7 @@ export class DisplacementPanel extends Panel {
     let tableHtml: string;
 
     if (displayed.length === 0) {
-      tableHtml = '<div class="panel-empty">No data</div>';
+      tableHtml = `<div class="panel-empty">${t('common.noDataShort')}</div>`;
     } else {
       const rows = displayed.map(c => {
         const hostTotal = c.hostTotal || 0;
@@ -87,12 +88,12 @@ export class DisplacementPanel extends Panel {
         const total = this.activeTab === 'origins' ? c.totalDisplaced : hostTotal;
         const badgeCls = total >= 1_000_000 ? 'disp-crisis'
           : total >= 500_000 ? 'disp-high'
-          : total >= 100_000 ? 'disp-elevated'
-          : '';
+            : total >= 100_000 ? 'disp-elevated'
+              : '';
         const badgeLabel = total >= 1_000_000 ? 'CRISIS'
           : total >= 500_000 ? 'HIGH'
-          : total >= 100_000 ? 'ELEVATED'
-          : '';
+            : total >= 100_000 ? 'ELEVATED'
+              : '';
         const badgeHtml = badgeLabel
           ? `<span class="disp-badge ${badgeCls}">${badgeLabel}</span>`
           : '';

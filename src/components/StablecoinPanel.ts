@@ -87,17 +87,17 @@ export class StablecoinPanel extends Panel {
 
   private renderPanel(): void {
     if (this.loading) {
-      this.showLoading('Loading stablecoins...');
+      this.showLoading(t('common.loadingStablecoins'));
       return;
     }
 
     if (this.error || !this.data) {
-      this.showError(this.error || 'No data');
+      this.showError(this.error || t('common.noDataShort'));
       return;
     }
 
     if (this.isUpstreamUnavailable()) {
-      this.showError('Upstream API unavailable — will retry automatically');
+      this.showError(t('common.upstreamUnavailable'));
       return;
     }
 

@@ -59,7 +59,7 @@ export class TechReadinessPanel extends Panel {
       this.render();
     } catch (error) {
       console.error('[TechReadinessPanel] Error fetching data:', error);
-      this.showError('Failed to load tech readiness data');
+      this.showError(t('common.failedTechReadiness'));
     } finally {
       this.loading = false;
     }
@@ -117,7 +117,7 @@ export class TechReadinessPanel extends Panel {
 
   private render(): void {
     if (this.rankings.length === 0) {
-      this.showError('No data available');
+      this.showError(t('common.noDataAvailable'));
       return;
     }
 

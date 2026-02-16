@@ -24,7 +24,7 @@ export class UcdpEventsPanel extends Panel {
         Deaths shown as best estimate (low-high range).
         ACLED duplicates are filtered out automatically.`,
     });
-    this.showLoading('Loading UCDP events');
+    this.showLoading(t('common.loadingUcdpEvents'));
   }
 
   public setEventClickHandler(handler: (lat: number, lon: number) => void): void {
