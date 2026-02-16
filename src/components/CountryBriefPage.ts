@@ -1,4 +1,5 @@
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 import type { CountryScore } from '@/services/country-instability';
 import type { PredictionMarket, NewsItem } from '@/types';
 import type { AssetType } from '@/types';
@@ -52,12 +53,12 @@ export class CountryBriefPage {
   };
 
   private static INFRA_LABELS: Record<BriefAssetType, string> = {
-    pipeline: 'Pipelines',
-    cable: 'Undersea Cables',
-    datacenter: 'Data Centers',
-    base: 'Military Bases',
-    nuclear: 'Nuclear Facilities',
-    port: 'Ports',
+    pipeline: 'pipeline',
+    cable: 'cable',
+    datacenter: 'datacenter',
+    base: 'base',
+    nuclear: 'nuclear',
+    port: 'port',
   };
 
   private overlay: HTMLElement;
@@ -142,10 +143,10 @@ export class CountryBriefPage {
 
   private componentBars(components: CountryScore['components']): string {
     const items = [
-      { label: 'Unrest', value: components.unrest, icon: '📢' },
-      { label: 'Conflict', value: components.conflict, icon: '⚔' },
-      { label: 'Security', value: components.security, icon: '🛡️' },
-      { label: 'Information', value: components.information, icon: '📡' },
+      { label: t('modals.countryBrief.components.unrest'), value: components.unrest, icon: '📢' },
+      { label: t('modals.countryBrief.components.conflict'), value: components.conflict, icon: '⚔' },
+      { label: t('modals.countryBrief.components.security'), value: components.security, icon: '🛡️' },
+      { label: t('modals.countryBrief.components.information'), value: components.information, icon: '📡' },
     ];
     return items.map(({ label, value, icon }) => {
       const pct = Math.min(100, Math.max(0, value));
@@ -162,20 +163,20 @@ export class CountryBriefPage {
 
   private signalChips(signals: CountryBriefSignals): string {
     const chips: string[] = [];
-    if (signals.protests > 0) chips.push(`<span class="signal-chip protest">📢 ${signals.protests} protests</span>`);
-    if (signals.militaryFlights > 0) chips.push(`<span class="signal-chip military">✈️ ${signals.militaryFlights} mil. aircraft</span>`);
-    if (signals.militaryVessels > 0) chips.push(`<span class="signal-chip military">⚓ ${signals.militaryVessels} mil. vessels</span>`);
-    if (signals.outages > 0) chips.push(`<span class="signal-chip outage">🌐 ${signals.outages} outages</span>`);
-    if (signals.earthquakes > 0) chips.push(`<span class="signal-chip quake">🌍 ${signals.earthquakes} earthquakes</span>`);
+    if (signals.protests > 0) chips.push(`<span class="signal-chip protest">📢 ${signals.protests} ${t('modals.countryBrief.signals.protests')}</span>`);
+    if (signals.militaryFlights > 0) chips.push(`<span class="signal-chip military">✈️ ${signals.militaryFlights} ${t('modals.countryBrief.signals.militaryAir')}</span>`);
+    if (signals.militaryVessels > 0) chips.push(`<span class="signal-chip military">⚓ ${signals.militaryVessels} ${t('modals.countryBrief.signals.militarySea')}</span>`);
+    if (signals.outages > 0) chips.push(`<span class="signal-chip outage">🌐 ${signals.outages} ${t('modals.countryBrief.signals.outages')}</span>`);
+    if (signals.earthquakes > 0) chips.push(`<span class="signal-chip quake">🌍 ${signals.earthquakes} ${t('modals.countryBrief.signals.earthquakes')}</span>`);
     if (signals.displacementOutflow > 0) {
       const fmt = signals.displacementOutflow >= 1_000_000
         ? `${(signals.displacementOutflow / 1_000_000).toFixed(1)}M`
         : `${(signals.displacementOutflow / 1000).toFixed(0)}K`;
-      chips.push(`<span class="signal-chip displacement">🌊 ${fmt} displaced</span>`);
+      chips.push(`<span class="signal-chip displacement">🌊 ${fmt} ${t('modals.countryBrief.signals.displaced')}</span>`);
     }
-    if (signals.climateStress > 0) chips.push(`<span class="signal-chip climate">🌡️ Climate stress</span>`);
-    if (signals.conflictEvents > 0) chips.push(`<span class="signal-chip conflict">⚔️ ${signals.conflictEvents} conflict events</span>`);
-    chips.push(`<span class="signal-chip stock-loading">📈 Loading index...</span>`);
+    if (signals.climateStress > 0) chips.push(`<span class="signal-chip climate">🌡️ ${t('modals.countryBrief.signals.climate')}</span>`);
+    if (signals.conflictEvents > 0) chips.push(`<span class="signal-chip conflict">⚔️ ${signals.conflictEvents} ${t('modals.countryBrief.signals.conflictEvents')}</span>`);
+    chips.push(`<span class="signal-chip stock-loading">📈 ${t('modals.countryBrief.loadingIndex')}</span>`);
     return chips.join('');
   }
 
@@ -194,7 +195,7 @@ export class CountryBriefPage {
         <div class="cb-header">
           <div class="cb-header-left">
             <span class="cb-flag">🌍</span>
-            <span class="cb-country-name">Identifying country...</span>
+            <span class="cb-country-name">${t('modals.countryBrief.identifying')}</span>
           </div>
           <div class="cb-header-right">
             <button class="cb-close" aria-label="Close">×</button>
@@ -204,7 +205,7 @@ export class CountryBriefPage {
           <div class="cb-loading-state">
             <div class="intel-skeleton"></div>
             <div class="intel-skeleton short"></div>
-            <span class="intel-loading-text">Locating region...</span>
+            <span class="intel-loading-text">${t('modals.countryBrief.locating')}</span>
           </div>
         </div>
       </div>`;
@@ -223,7 +224,7 @@ export class CountryBriefPage {
     const flag = this.countryFlag(code);
 
     const tierBadge = !signals.isTier1
-      ? '<span class="cb-tier-badge">Limited coverage</span>'
+      ? `<span class="cb-tier-badge">${t('modals.countryBrief.limitedCoverage')}</span>`
       : '';
 
     this.overlay.innerHTML = `
@@ -261,7 +262,7 @@ export class CountryBriefPage {
             <div class="cb-col-left">
               ${score ? `
                 <section class="cb-section cb-risk-section">
-                  <h3 class="cb-section-title">Instability Index</h3>
+                  <h3 class="cb-section-title">${t('modals.countryBrief.instabilityIndex')}</h3>
                   <div class="cb-risk-content">
                     ${this.scoreRing(score.score, score.level)}
                     <div class="cb-components">
@@ -270,54 +271,54 @@ export class CountryBriefPage {
                   </div>
                 </section>` : signals.isTier1 ? '' : `
                 <section class="cb-section cb-risk-section">
-                  <h3 class="cb-section-title">Instability Index</h3>
+                  <h3 class="cb-section-title">${t('modals.countryBrief.instabilityIndex')}</h3>
                   <div class="cb-not-tracked">
                     <span class="cb-not-tracked-icon">📊</span>
-                    <span>Not tracked — ${escapeHtml(country)} is not in the CII tier-1 list</span>
+                    <span>${t('modals.countryBrief.notTracked', { country: escapeHtml(country) })}</span>
                   </div>
                 </section>`}
 
               <section class="cb-section cb-brief-section">
-                <h3 class="cb-section-title">Intelligence Brief</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.intelBrief')}</h3>
                 <div class="cb-brief-content">
                   <div class="intel-brief-loading">
                     <div class="intel-skeleton"></div>
                     <div class="intel-skeleton short"></div>
                     <div class="intel-skeleton"></div>
                     <div class="intel-skeleton short"></div>
-                    <span class="intel-loading-text">Generating intelligence brief...</span>
+                    <span class="intel-loading-text">${t('modals.countryBrief.generatingBrief')}</span>
                   </div>
                 </div>
               </section>
 
               <section class="cb-section cb-news-section" style="display:none">
-                <h3 class="cb-section-title">Top News</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.topNews')}</h3>
                 <div class="cb-news-content"></div>
               </section>
             </div>
 
             <div class="cb-col-right">
               <section class="cb-section cb-signals-section">
-                <h3 class="cb-section-title">Active Signals</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.activeSignals')}</h3>
                 <div class="cb-signals-grid">
                   ${this.signalChips(signals)}
                 </div>
               </section>
 
               <section class="cb-section cb-timeline-section">
-                <h3 class="cb-section-title">7-Day Timeline</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.timeline')}</h3>
                 <div class="cb-timeline-mount"></div>
               </section>
 
               <section class="cb-section cb-markets-section">
-                <h3 class="cb-section-title">Prediction Markets</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.predictionMarkets')}</h3>
                 <div class="cb-markets-content">
-                  <span class="intel-loading-text">Loading prediction markets...</span>
+                  <span class="intel-loading-text">${t('modals.countryBrief.loadingMarkets')}</span>
                 </div>
               </section>
 
               <section class="cb-section cb-infra-section" style="display:none">
-                <h3 class="cb-section-title">Infrastructure Exposure</h3>
+                <h3 class="cb-section-title">${t('modals.countryBrief.infrastructure')}</h3>
                 <div class="cb-infra-content"></div>
               </section>
 
@@ -386,7 +387,7 @@ export class CountryBriefPage {
     if (!section) return;
 
     if (data.error || data.skipped || !data.brief) {
-      const msg = data.error || data.reason || 'AI brief unavailable — configure GROQ_API_KEY in Settings.';
+      const msg = data.error || data.reason || t('modals.countryBrief.briefUnavailable');
       section.innerHTML = `<div class="intel-error">${escapeHtml(msg)}</div>`;
       return;
     }
@@ -396,7 +397,7 @@ export class CountryBriefPage {
     section.innerHTML = `
       <div class="cb-brief-text">${formatted}</div>
       <div class="cb-brief-footer">
-        ${data.cached ? '<span class="intel-cached">📋 Cached</span>' : '<span class="intel-fresh">✨ Fresh</span>'}
+        ${data.cached ? `<span class="intel-cached">📋 ${t('modals.countryBrief.cached')}</span>` : `<span class="intel-fresh">✨ ${t('modals.countryBrief.fresh')}</span>`}
         <span class="intel-timestamp">${data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : ''}</span>
       </div>`;
   }
@@ -406,7 +407,7 @@ export class CountryBriefPage {
     if (!section) return;
 
     if (markets.length === 0) {
-      section.innerHTML = '<span class="cb-empty">No prediction markets found</span>';
+      section.innerHTML = `<span class="cb-empty">${t('modals.countryBrief.noMarkets')}</span>`;
       return;
     }
 
@@ -459,8 +460,8 @@ export class CountryBriefPage {
       const safeUrl = sanitizeUrl(item.link);
       const threatColor = item.threat?.level === 'critical' ? '#ff4444'
         : item.threat?.level === 'high' ? '#ff8800'
-        : item.threat?.level === 'medium' ? '#ffaa00'
-        : '#64b4ff';
+          : item.threat?.level === 'medium' ? '#ffaa00'
+            : '#64b4ff';
       const timeAgo = this.timeAgo(item.pubDate);
       const cardBody = `
         <span class="cb-news-threat" style="background:${threatColor}"></span>
@@ -513,7 +514,8 @@ export class CountryBriefPage {
       const items = grouped.get(type);
       if (!items || items.length === 0) continue;
       const icon = CountryBriefPage.INFRA_ICONS[type];
-      const label = CountryBriefPage.INFRA_LABELS[type];
+      const key = CountryBriefPage.INFRA_LABELS[type];
+      const label = t(`modals.countryBrief.infra.${key}`);
       html += `<div class="cb-infra-group">`;
       html += `<div class="cb-infra-type">${icon} ${label}</div>`;
       for (const item of items) {
@@ -541,9 +543,9 @@ export class CountryBriefPage {
   private timeAgo(date: Date): string {
     const ms = Date.now() - new Date(date).getTime();
     const hours = Math.floor(ms / 3600000);
-    if (hours < 1) return `${Math.floor(ms / 60000)}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
+    if (hours < 1) return t('modals.countryBrief.timeAgo.m', { count: Math.floor(ms / 60000) });
+    if (hours < 24) return t('modals.countryBrief.timeAgo.h', { count: hours });
+    return t('modals.countryBrief.timeAgo.d', { count: Math.floor(hours / 24) });
   }
 
   private formatBrief(text: string, headlineCount = 0): string {

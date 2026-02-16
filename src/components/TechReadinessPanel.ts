@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { t } from '@/services/i18n';
 import { getTechReadinessRankings, type TechReadinessScore } from '@/services/worldbank';
 import { escapeHtml } from '@/utils/sanitize';
 
@@ -26,7 +27,7 @@ export class TechReadinessPanel extends Panel {
   constructor() {
     super({
       id: 'tech-readiness',
-      title: 'Tech Readiness Index',
+      title: t('panels.techReadiness'),
       showCount: true,
       infoTooltip: `
         <strong>Global Tech Readiness</strong><br>
@@ -126,8 +127,8 @@ export class TechReadinessPanel extends Panel {
     const html = `
       <div class="tech-readiness-list">
         ${top.map(country => {
-          const scoreClass = this.getScoreClass(country.score);
-          return `
+      const scoreClass = this.getScoreClass(country.score);
+      return `
             <div class="readiness-item ${scoreClass}" data-country="${escapeHtml(country.country)}">
               <div class="readiness-rank">#${country.rank}</div>
               <div class="readiness-flag">${this.getFlag(country.country)}</div>
@@ -142,7 +143,7 @@ export class TechReadinessPanel extends Panel {
               <div class="readiness-score ${scoreClass}">${country.score}</div>
             </div>
           `;
-        }).join('')}
+    }).join('')}
       </div>
       <div class="readiness-footer">
         <span class="readiness-source">Source: World Bank</span>
