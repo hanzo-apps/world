@@ -726,6 +726,12 @@
         "failedClusterNews": "Échec du regroupement des actualités",
         "noNewsAvailable": "Aucune actualité disponible",
         "noActiveTechHubs": "Aucun pôle tech actif",
-        "noActiveGeoHubs": "Aucun pôle géopolitique actif"
+        "noActiveGeoHubs": "Aucun pôle géopolitique actif",
+        "allSourcesDisabled": "Toutes les sources désactivées",
+        "allIntelSourcesDisabled": "Toutes les sources Intel désactivées",
+        "noEventsInCategory": "Aucun événement dans cette catégorie",
+        "exportCsv": "Exporter CSV",
+        "exportJson": "Exporter JSON",
+        "exportData": "Exporter les données"
     }
 }

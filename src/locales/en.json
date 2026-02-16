@@ -726,6 +726,12 @@
     "failedClusterNews": "Failed to cluster news",
     "noNewsAvailable": "No news available",
     "noActiveTechHubs": "No active tech hubs",
-    "noActiveGeoHubs": "No active geopolitical hubs"
+    "noActiveGeoHubs": "No active geopolitical hubs",
+    "allSourcesDisabled": "All sources disabled",
+    "allIntelSourcesDisabled": "All Intel sources disabled",
+    "noEventsInCategory": "No events in this category",
+    "exportCsv": "Export CSV",
+    "exportJson": "Export JSON",
+    "exportData": "Export Data"
   }
 }
