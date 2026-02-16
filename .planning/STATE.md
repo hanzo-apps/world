@@ -5,33 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Users who prefer light mode get a first-class experience — every panel, the map, and all chrome look intentionally designed for light backgrounds, not like an afterthought inversion.
-**Current focus:** Phase 1 - CSS Foundation & Color Centralization
+**Current focus:** Phase 2 - Theme Core, Settings Toggle
 
 ## Current Position
 
-Phase: 1 of 4 (CSS Foundation & Color Centralization)
-Plan: 5 of 5 (COMPLETE)
-Status: Phase Complete
-Last activity: 2026-02-16 — 01-05 audit and verification complete
+Phase: 2 of 4 (Theme Core, Settings Toggle)
+Plan: 1 of 2 (COMPLETE)
+Status: In Progress
+Last activity: 2026-02-16 — 02-01 ThemeManager module and FOUC prevention complete
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 9 min
-- Total execution time: 0.73 hours
+- Total plans completed: 6
+- Average duration: 8 min
+- Total execution time: 0.77 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-css-foundation | 5/5 | 44min | 9min |
+| 02-theme-core-settings-toggle | 1/2 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5min), 01-02 (5min), 01-03 (5min), 01-04 (17min), 01-05 (12min)
-- Trend: consistent (larger plans 01-04, 01-05 have higher complexity)
+- Last 5 plans: 01-02 (5min), 01-03 (5min), 01-04 (17min), 01-05 (12min), 02-01 (2min)
+- Trend: consistent (02-01 fast due to small focused scope)
 
 *Updated after each plan completion*
 
@@ -58,6 +59,9 @@ Recent decisions affecting current work:
 - (01-05) 15 minor gaps in 3 files (VerificationChecklist, PizzIntIndicator, MacroSignalsPanel) accepted as low-priority fallback colors
 - (01-05) Map staying dark in light mode confirmed as expected — DeckGL basemap swap is Phase 3 scope
 - (01-05) Phase 1 success criteria validated: all 124+ colors converted, themes separated, 20+ panels work in both themes, WCAG AA contrast met
+- (02-01) Dark mode is default — FOUC script only sets data-theme when stored value is explicitly 'light'
+- (02-01) applyStoredTheme() is lightweight pre-mount call: skips event dispatch and cache invalidation
+- (02-01) CSP updated with unsafe-inline for script-src to allow FOUC prevention inline scripts
 
 ### Pending Todos
 
@@ -80,7 +84,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16 (plan execution)
-Stopped at: Phase 1 complete — 01-05 audit and verification finished successfully
+Stopped at: Completed 02-01-PLAN.md — ThemeManager module and FOUC prevention
 Resume file: None
 
 ## Phase 1 Summary
