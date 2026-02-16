@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import type { FireRegionStats } from '@/services/firms-satellite';
+import { t } from '@/services/i18n';
 
 export class SatelliteFiresPanel extends Panel {
   private stats: FireRegionStats[] = [];
@@ -14,7 +15,7 @@ export class SatelliteFiresPanel extends Panel {
       trackActivity: true,
       infoTooltip: 'NASA FIRMS VIIRS satellite thermal detections across monitored conflict regions. High-intensity = brightness &gt;360K &amp; confidence &gt;80%.',
     });
-    this.showLoading('Scanning thermal data');
+    this.showLoading(t('common.scanningThermalData'));
   }
 
   public update(stats: FireRegionStats[], totalCount: number): void {

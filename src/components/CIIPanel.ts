@@ -128,7 +128,7 @@ export class CIIPanel extends Panel {
       this.bindShareButtons();
     } catch (error) {
       console.error('[CIIPanel] Refresh error:', error);
-      this.showError('Failed to calculate CII');
+      this.showError(t('common.failedCII'));
     }
   }
 

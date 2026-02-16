@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 import {
   calculateStrategicRiskOverview,
   getRecentAlerts,
@@ -63,7 +64,7 @@ export class StrategicRiskPanel extends Panel {
       this.startAutoRefresh();
     } catch (error) {
       console.error('[StrategicRiskPanel] Init error:', error);
-      this.showError('Failed to calculate risk overview');
+      this.showError(t('common.failedRiskOverview'));
     }
   }
 
@@ -321,24 +322,24 @@ export class StrategicRiskPanel extends Panel {
         <div class="risk-section-title">Top Risks</div>
         <div class="risk-list">
           ${this.overview.topRisks.map((risk, i) => {
-            // First risk is convergence - make it clickable if we have location
-            const isConvergence = i === 0 && risk.startsWith('Convergence:') && topZone;
-            if (isConvergence) {
-              return `
+      // First risk is convergence - make it clickable if we have location
+      const isConvergence = i === 0 && risk.startsWith('Convergence:') && topZone;
+      if (isConvergence) {
+        return `
                 <div class="risk-item risk-item-clickable" data-lat="${topZone.lat}" data-lon="${topZone.lon}">
                   <span class="risk-rank">${i + 1}.</span>
                   <span class="risk-text">${escapeHtml(risk)}</span>
                   <span class="risk-location-icon">↗</span>
                 </div>
               `;
-            }
-            return `
+      }
+      return `
               <div class="risk-item">
                 <span class="risk-rank">${i + 1}.</span>
                 <span class="risk-text">${escapeHtml(risk)}</span>
               </div>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
     `;
@@ -356,13 +357,13 @@ export class StrategicRiskPanel extends Panel {
         <div class="risk-section-title">Recent Alerts (${this.alerts.length})</div>
         <div class="risk-alerts">
           ${displayAlerts.map(alert => {
-            const hasLocation = alert.location && alert.location.lat && alert.location.lon;
-            const clickableClass = hasLocation ? 'risk-alert-clickable' : '';
-            const locationAttrs = hasLocation
-              ? `data-lat="${alert.location!.lat}" data-lon="${alert.location!.lon}"`
-              : '';
+      const hasLocation = alert.location && alert.location.lat && alert.location.lon;
+      const clickableClass = hasLocation ? 'risk-alert-clickable' : '';
+      const locationAttrs = hasLocation
+        ? `data-lat="${alert.location!.lat}" data-lon="${alert.location!.lon}"`
+        : '';
 
-            return `
+      return `
               <div class="risk-alert ${clickableClass}" style="border-left: 3px solid ${this.getPriorityColor(alert.priority)}" ${locationAttrs}>
                 <div class="risk-alert-header">
                   <span class="risk-alert-type">${this.getTypeEmoji(alert.type)}</span>
@@ -374,7 +375,7 @@ export class StrategicRiskPanel extends Panel {
                 <div class="risk-alert-time">${this.formatTime(alert.timestamp)}</div>
               </div>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
     `;

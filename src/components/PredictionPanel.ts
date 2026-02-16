@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import type { PredictionMarket } from '@/types';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 
 export class PredictionPanel extends Panel {
   constructor() {
@@ -27,7 +28,7 @@ export class PredictionPanel extends Panel {
 
   public renderPredictions(data: PredictionMarket[]): void {
     if (data.length === 0) {
-      this.showError('Failed to load predictions');
+      this.showError(t('common.failedPredictions'));
       return;
     }
 
