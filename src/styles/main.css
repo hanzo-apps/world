@@ -342,6 +342,44 @@ canvas,
   vertical-align: middle;
 }
 
+.update-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #0a0a0a;
+  background: var(--green);
+  border-radius: 8px;
+  text-decoration: none;
+  vertical-align: middle;
+  animation: update-pulse 2s ease-in-out 3;
+}
+
+.update-badge:hover {
+  filter: brightness(1.15);
+}
+
+.update-badge-dismiss {
+  margin-left: 2px;
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.update-badge-dismiss:hover {
+  opacity: 1;
+}
+
+@keyframes update-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .credit-link {
   font-size: 9px;
   color: var(--muted);

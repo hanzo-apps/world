@@ -91,6 +91,7 @@ import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { isDesktopRuntime } from '@/services/runtime';
+import { invokeTauri } from '@/services/tauri-bridge';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
@@ -99,6 +100,11 @@ type IntlDisplayNamesCtor = new (
   locales: string | string[],
   options: { type: 'region' }
 ) => { of: (code: string) => string | undefined };
+
+interface DesktopRuntimeInfo {
+  os: string;
+  arch: string;
+}
 
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
 
@@ -341,6 +347,10 @@ export class App {
 
     // Handle deep links for story sharing
     this.handleDeepLinks();
+
+    if (this.isDesktopApp) {
+      setTimeout(() => this.checkForUpdate(), 5000);
+    }
   }
 
   private handleDeepLinks(): void {
@@ -389,6 +399,98 @@ export class App {
       };
       setTimeout(checkAndOpenBrief, 2000);
     }
+  }
+
+  private async checkForUpdate(): Promise<void> {
+    try {
+      const res = await fetch('https://worldmonitor.app/api/version');
+      if (!res.ok) return;
+      const data = await res.json();
+      const remote = data.version as string;
+      if (!remote) return;
+
+      const current = __APP_VERSION__;
+      if (!this.isNewerVersion(remote, current)) return;
+
+      const dismissKey = `wm-update-dismissed-${remote}`;
+      if (localStorage.getItem(dismissKey)) return;
+
+      const releaseUrl = typeof data.url === 'string' && data.url
+        ? data.url
+        : 'https://github.com/koala73/worldmonitor/releases/latest';
+      await this.showUpdateBadge(remote, releaseUrl);
+    } catch { /* silent */ }
+  }
+
+  private isNewerVersion(remote: string, current: string): boolean {
+    const r = remote.split('.').map(Number);
+    const c = current.split('.').map(Number);
+    for (let i = 0; i < Math.max(r.length, c.length); i++) {
+      const rv = r[i] ?? 0;
+      const cv = c[i] ?? 0;
+      if (rv > cv) return true;
+      if (rv < cv) return false;
+    }
+    return false;
+  }
+
+  private mapDesktopDownloadPlatform(os: string, arch: string): string | null {
+    const normalizedOs = os.toLowerCase();
+    const normalizedArch = arch.toLowerCase()
+      .replace('amd64', 'x86_64')
+      .replace('x64', 'x86_64')
+      .replace('arm64', 'aarch64');
+
+    if (normalizedOs === 'windows') {
+      return normalizedArch === 'x86_64' ? 'windows-exe' : null;
+    }
+
+    if (normalizedOs === 'macos' || normalizedOs === 'darwin') {
+      if (normalizedArch === 'aarch64') return 'macos-arm64';
+      if (normalizedArch === 'x86_64') return 'macos-x64';
+      return null;
+    }
+
+    return null;
+  }
+
+  private async resolveUpdateDownloadUrl(releaseUrl: string): Promise<string> {
+    try {
+      const runtimeInfo = await invokeTauri<DesktopRuntimeInfo>('get_desktop_runtime_info');
+      const platform = this.mapDesktopDownloadPlatform(runtimeInfo.os, runtimeInfo.arch);
+      if (platform) {
+        return `https://worldmonitor.app/api/download?platform=${platform}`;
+      }
+    } catch {
+      // Silent fallback to release page when desktop runtime info is unavailable.
+    }
+    return releaseUrl;
+  }
+
+  private async showUpdateBadge(version: string, releaseUrl: string): Promise<void> {
+    const versionSpan = this.container.querySelector('.version');
+    if (!versionSpan) return;
+    const href = await this.resolveUpdateDownloadUrl(releaseUrl);
+
+    const badge = document.createElement('a');
+    badge.className = 'update-badge';
+    badge.href = href;
+    badge.target = '_blank';
+    badge.rel = 'noopener';
+    badge.textContent = `UPDATE v${version}`;
+
+    const dismiss = document.createElement('span');
+    dismiss.className = 'update-badge-dismiss';
+    dismiss.textContent = '\u00d7';
+    dismiss.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      localStorage.setItem(`wm-update-dismissed-${version}`, '1');
+      badge.remove();
+    });
+
+    badge.appendChild(dismiss);
+    versionSpan.insertAdjacentElement('afterend', badge);
   }
 
   private setupMobileWarning(): void {

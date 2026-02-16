@@ -152,6 +152,65 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.calls.some((url) => url.includes('worldmonitor.app/api/stablecoin-markets'))).toBe(true);
   });
 
+  test('update badge picks architecture-correct desktop download url', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const { App } = await import('/src/App.ts');
+      const globalWindow = window as unknown as {
+        __TAURI__?: { core?: { invoke?: (command: string) => Promise<unknown> } };
+      };
+      const previousTauri = globalWindow.__TAURI__;
+      const releaseUrl = 'https://github.com/koala73/worldmonitor/releases/latest';
+
+      const appProto = App.prototype as unknown as {
+        resolveUpdateDownloadUrl: (releaseUrl: string) => Promise<string>;
+        mapDesktopDownloadPlatform: (os: string, arch: string) => string | null;
+      };
+      const fakeApp = {
+        mapDesktopDownloadPlatform: appProto.mapDesktopDownloadPlatform,
+      };
+
+      try {
+        globalWindow.__TAURI__ = {
+          core: {
+            invoke: async (command: string) => {
+              if (command !== 'get_desktop_runtime_info') throw new Error(`Unexpected command: ${command}`);
+              return { os: 'macos', arch: 'aarch64' };
+            },
+          },
+        };
+        const macArm = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
+
+        globalWindow.__TAURI__ = {
+          core: {
+            invoke: async () => ({ os: 'windows', arch: 'amd64' }),
+          },
+        };
+        const windowsX64 = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
+
+        globalWindow.__TAURI__ = {
+          core: {
+            invoke: async () => ({ os: 'linux', arch: 'x86_64' }),
+          },
+        };
+        const linuxFallback = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
+
+        return { macArm, windowsX64, linuxFallback };
+      } finally {
+        if (previousTauri === undefined) {
+          delete globalWindow.__TAURI__;
+        } else {
+          globalWindow.__TAURI__ = previousTauri;
+        }
+      }
+    });
+
+    expect(result.macArm).toBe('https://worldmonitor.app/api/download?platform=macos-arm64');
+    expect(result.windowsX64).toBe('https://worldmonitor.app/api/download?platform=windows-exe');
+    expect(result.linuxFallback).toBe('https://github.com/koala73/worldmonitor/releases/latest');
+  });
+
   test('loadMarkets keeps Yahoo-backed data when Finnhub is skipped', async ({ page }) => {
     await page.goto('/tests/runtime-harness.html');
 
