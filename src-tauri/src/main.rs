@@ -114,6 +114,21 @@ fn get_secret(key: String) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+fn get_all_secrets() -> std::collections::HashMap<String, String> {
+    let mut result = std::collections::HashMap::new();
+    for key in SUPPORTED_SECRET_KEYS.iter() {
+        if let Ok(entry) = Entry::new(KEYRING_SERVICE, key) {
+            if let Ok(value) = entry.get_password() {
+                if !value.trim().is_empty() {
+                    result.insert((*key).to_string(), value.trim().to_string());
+                }
+            }
+        }
+    }
+    result
+}
+
+#[tauri::command]
 fn set_secret(key: String, value: String) -> Result<(), String> {
     let entry = secret_entry(&key)?;
     entry
@@ -682,6 +697,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_supported_secret_keys,
             get_secret,
+            get_all_secrets,
             set_secret,
             delete_secret,
             get_local_api_token,
