@@ -2,6 +2,7 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import type { ClimateAnomaly } from '@/types';
 import { getSeverityIcon, formatDelta } from '@/services/climate';
+import { t } from '@/services/i18n';
 
 export class ClimateAnomalyPanel extends Panel {
   private anomalies: ClimateAnomaly[] = [];
@@ -22,7 +23,7 @@ export class ClimateAnomalyPanel extends Panel {
         </ul>
         Monitors 15 conflict/disaster-prone zones.`,
     });
-    this.showLoading('Loading climate data');
+    this.showLoading(t('common.loadingClimateData'));
   }
 
   public setZoneClickHandler(handler: (lat: number, lon: number) => void): void {

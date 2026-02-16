@@ -1,6 +1,7 @@
 import { escapeHtml } from '../utils/sanitize';
 import { isDesktopRuntime } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
+import { t } from '../services/i18n';
 
 export interface PanelOptions {
   id: string;
@@ -186,8 +187,8 @@ export class Panel {
       document.removeEventListener('mouseup', onMouseUp);
 
       const currentSpan = this.element.classList.contains('span-4') ? 4 :
-                          this.element.classList.contains('span-3') ? 3 :
-                          this.element.classList.contains('span-2') ? 2 : 1;
+        this.element.classList.contains('span-3') ? 3 :
+          this.element.classList.contains('span-2') ? 2 : 1;
       savePanelSpan(this.panelId, currentSpan);
     };
 
@@ -247,8 +248,8 @@ export class Panel {
       delete this.element.dataset.resizing;
       this.resizeHandle?.classList.remove('active');
       const currentSpan = this.element.classList.contains('span-4') ? 4 :
-                          this.element.classList.contains('span-3') ? 3 :
-                          this.element.classList.contains('span-2') ? 2 : 1;
+        this.element.classList.contains('span-3') ? 3 :
+          this.element.classList.contains('span-2') ? 2 : 1;
       savePanelSpan(this.panelId, currentSpan);
     };
 
@@ -280,7 +281,7 @@ export class Panel {
     return this.element;
   }
 
-  public showLoading(message = 'Loading'): void {
+  public showLoading(message = t('common.loading')): void {
     this.content.innerHTML = `
       <div class="panel-loading">
         <div class="panel-loading-radar">
@@ -292,7 +293,7 @@ export class Panel {
     `;
   }
 
-  public showError(message = 'Failed to load data'): void {
+  public showError(message = t('common.failedToLoad')): void {
     this.content.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
   }
 
@@ -303,7 +304,7 @@ export class Panel {
     this.content.innerHTML = `<div class="config-error-message">${escapeHtml(message)}${settingsBtn}</div>`;
     if (isDesktopRuntime()) {
       this.content.querySelector('.config-error-settings-btn')?.addEventListener('click', () => {
-        void invokeTauri<void>('open_settings_window_command').catch(() => {});
+        void invokeTauri<void>('open_settings_window_command').catch(() => { });
       });
     }
   }

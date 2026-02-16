@@ -2,6 +2,7 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import type { PopulationExposure } from '@/types';
 import { formatPopulation } from '@/services/population-exposure';
+import { t } from '@/services/i18n';
 
 export class PopulationExposurePanel extends Panel {
   private exposures: PopulationExposure[] = [];
@@ -22,7 +23,7 @@ export class PopulationExposurePanel extends Panel {
           <li>Wildfire: 30km radius</li>
         </ul>`,
     });
-    this.showLoading('Calculating exposure');
+    this.showLoading(t('common.calculatingExposure'));
   }
 
   public setExposures(exposures: PopulationExposure[]): void {

@@ -99,17 +99,17 @@ export class MacroSignalsPanel extends Panel {
 
   private renderPanel(): void {
     if (this.loading) {
-      this.showLoading('Computing signals...');
+      this.showLoading(t('common.computingSignals'));
       return;
     }
 
     if (this.error || !this.data) {
-      this.showError(this.error || 'No data');
+      this.showError(this.error || t('common.noDataShort'));
       return;
     }
 
     if (this.data.unavailable) {
-      this.showError('Upstream API unavailable — will retry automatically');
+      this.showError(t('common.upstreamUnavailable'));
       return;
     }
 
