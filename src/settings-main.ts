@@ -64,6 +64,12 @@ function closeSettingsWindow(): void {
 
 async function initSettingsWindow(): Promise<void> {
   applyStoredTheme();
+
+  // Remove no-transition class after first paint to enable smooth theme transitions
+  requestAnimationFrame(() => {
+    document.documentElement.classList.remove('no-transition');
+  });
+
   await loadDesktopSecrets();
 
   const mount = document.getElementById('settingsApp');
