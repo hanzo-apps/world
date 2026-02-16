@@ -116,7 +116,7 @@ interface DatacenterClusterData {
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity | StockExchangePopupData | FinancialCenterPopupData | CentralBankPopupData | CommodityHubPopupData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -314,13 +314,13 @@ export class MapPopup {
       case 'techEventCluster':
         return this.renderTechEventClusterPopup(data.data as TechEventClusterData);
       case 'stockExchange':
-        return this.renderStockExchangePopup(data.data as unknown as StockExchangePopupData);
+        return this.renderStockExchangePopup(data.data as StockExchangePopupData);
       case 'financialCenter':
-        return this.renderFinancialCenterPopup(data.data as unknown as FinancialCenterPopupData);
+        return this.renderFinancialCenterPopup(data.data as FinancialCenterPopupData);
       case 'centralBank':
-        return this.renderCentralBankPopup(data.data as unknown as CentralBankPopupData);
+        return this.renderCentralBankPopup(data.data as CentralBankPopupData);
       case 'commodityHub':
-        return this.renderCommodityHubPopup(data.data as unknown as CommodityHubPopupData);
+        return this.renderCommodityHubPopup(data.data as CommodityHubPopupData);
       default:
         return '';
     }
