@@ -7,6 +7,7 @@ import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, getAssetLabel, MAX_DISTANCE_KM, activityTracker, generateSummary } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 import { SITE_VARIANT } from '@/config';
+import { t } from '@/services/i18n';
 
 /** Threshold for enabling virtual scrolling */
 const VIRTUAL_SCROLL_THRESHOLD = 15;
@@ -230,7 +231,7 @@ export class NewsPanel extends Panel {
   public renderNews(items: NewsItem[]): void {
     if (items.length === 0) {
       this.setDataBadge('unavailable');
-      this.showError('No news available');
+      this.showError(t('common.noNewsAvailable'));
       return;
     }
 
@@ -254,7 +255,7 @@ export class NewsPanel extends Panel {
     } catch (error) {
       if (requestId !== this.renderRequestId) return;
       console.error('[NewsPanel] Failed to cluster news:', error);
-      this.showError('Failed to cluster news');
+      this.showError(t('common.failedClusterNews'));
     }
   }
 
@@ -380,14 +381,14 @@ export class NewsPanel extends Panel {
     const otherSources = cluster.topSources.filter(s => s.name !== cluster.primarySource);
     const topSourcesHtml = otherSources.length > 0
       ? `<span class="also-reported">Also:</span>` + otherSources
-          .map(s => {
-            const propRisk = getSourcePropagandaRisk(s.name);
-            const propBadge = propRisk.risk !== 'low'
-              ? `<span class="propaganda-badge ${propRisk.risk}" title="${escapeHtml(propRisk.note || `State-affiliated: ${propRisk.stateAffiliated || 'Unknown'}`)}">${propRisk.risk === 'high' ? '⚠' : '!'}</span>`
-              : '';
-            return `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}${propBadge}</span>`;
-          })
-          .join('')
+        .map(s => {
+          const propRisk = getSourcePropagandaRisk(s.name);
+          const propBadge = propRisk.risk !== 'low'
+            ? `<span class="propaganda-badge ${propRisk.risk}" title="${escapeHtml(propRisk.note || `State-affiliated: ${propRisk.stateAffiliated || 'Unknown'}`)}">${propRisk.risk === 'high' ? '⚠' : '!'}</span>`
+            : '';
+          return `<span class="top-source tier-${s.tier}">${escapeHtml(s.name)}${propBadge}</span>`;
+        })
+        .join('')
       : '';
 
     const assetContext = getClusterAssetContext(cluster);
