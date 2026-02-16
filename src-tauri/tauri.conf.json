@@ -33,8 +33,7 @@
       "dmg",
       "nsis",
       "msi",
-      "appimage",
-      "deb"
+      "appimage"
     ],
     "category": "Productivity",
     "shortDescription": "World Monitor desktop app (supports World and Tech variants)",
