@@ -1643,23 +1643,9 @@ export class App {
       <div class="modal-overlay" id="settingsModal">
         <div class="modal">
           <div class="modal-header">
-            <span class="modal-title">Settings</span>
+            <span class="modal-title">Panels</span>
             <button class="modal-close" id="modalClose">×</button>
           </div>
-          <div class="theme-toggle-section">
-            <span class="section-label">APPEARANCE</span>
-            <div class="theme-toggle-group" id="themeToggle">
-              <label class="theme-option ${getCurrentTheme() === 'dark' ? 'active' : ''}">
-                <input type="radio" name="theme" value="dark" ${getCurrentTheme() === 'dark' ? 'checked' : ''}>
-                <span>Dark</span>
-              </label>
-              <label class="theme-option ${getCurrentTheme() === 'light' ? 'active' : ''}">
-                <input type="radio" name="theme" value="light" ${getCurrentTheme() === 'light' ? 'checked' : ''}>
-                <span>Light</span>
-              </label>
-            </div>
-          </div>
-          <div class="section-label">PANELS</div>
           <div class="panel-toggle-grid" id="panelToggles"></div>
         </div>
       </div>
@@ -2307,30 +2293,12 @@ export class App {
       }
     });
 
-    // Theme toggle (settings modal)
-    const themeToggle = document.getElementById('themeToggle');
-    themeToggle?.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.type === 'radio' && target.name === 'theme') {
-        setTheme(target.value as Theme);
-        themeToggle.querySelectorAll('.theme-option').forEach(label => {
-          label.classList.toggle('active', (label.querySelector('input') as HTMLInputElement)?.checked);
-        });
-        this.updateHeaderThemeIcon();
-      }
-    });
 
     // Header theme toggle button
     document.getElementById('headerThemeToggle')?.addEventListener('click', () => {
       const next = getCurrentTheme() === 'dark' ? 'light' : 'dark';
       setTheme(next);
       this.updateHeaderThemeIcon();
-      // Sync settings modal radios if open
-      const radios = document.querySelectorAll<HTMLInputElement>('#themeToggle input[name="theme"]');
-      radios.forEach(r => {
-        r.checked = r.value === next;
-        r.closest('.theme-option')?.classList.toggle('active', r.checked);
-      });
     });
 
     // Sources modal
