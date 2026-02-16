@@ -12,6 +12,7 @@ use std::os::windows::process::CommandExt;
 
 use keyring::Entry;
 use reqwest::Url;
+use serde::Serialize;
 use serde_json::{Map, Value};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent, WebviewUrl, WebviewWindowBuilder};
@@ -50,6 +51,12 @@ struct LocalApiState {
     token: Mutex<Option<String>>,
 }
 
+#[derive(Serialize)]
+struct DesktopRuntimeInfo {
+    os: String,
+    arch: String,
+}
+
 fn secret_entry(key: &str) -> Result<Entry, String> {
     if !SUPPORTED_SECRET_KEYS.contains(&key) {
         return Err(format!("Unsupported secret key: {key}"));
@@ -81,6 +88,14 @@ fn get_local_api_token(state: tauri::State<'_, LocalApiState>) -> Result<String,
         .lock()
         .map_err(|_| "Failed to lock local API token".to_string())?;
     token.clone().ok_or_else(|| "Token not generated".to_string())
+}
+
+#[tauri::command]
+fn get_desktop_runtime_info() -> DesktopRuntimeInfo {
+    DesktopRuntimeInfo {
+        os: env::consts::OS.to_string(),
+        arch: env::consts::ARCH.to_string(),
+    }
 }
 
 #[tauri::command]
@@ -652,6 +667,7 @@ fn main() {
             set_secret,
             delete_secret,
             get_local_api_token,
+            get_desktop_runtime_info,
             read_cache_entry,
             write_cache_entry,
             open_logs_folder,
