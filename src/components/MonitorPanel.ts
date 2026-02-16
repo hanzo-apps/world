@@ -21,7 +21,7 @@ export class MonitorPanel extends Panel {
     inputContainer.className = 'monitor-input-container';
     inputContainer.innerHTML = `
       <input type="text" class="monitor-input" id="monitorKeywords" placeholder="${t('components.monitor.placeholder')}">
-      <button class="monitor-add-btn" id="addMonitorBtn">+ Add Monitor</button>
+      <button class="monitor-add-btn" id="addMonitorBtn">${t('components.monitor.add')}</button>
     `;
 
     this.content.appendChild(inputContainer);
