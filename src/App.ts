@@ -145,7 +145,6 @@ export class App {
   private inFlight: Set<string> = new Set();
   private isMobile: boolean;
   private seenGeoAlerts: Set<string> = new Set();
-  private timeIntervalId: ReturnType<typeof setInterval> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private refreshTimeoutIds: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private isDestroyed = false;
@@ -1614,7 +1613,11 @@ export class App {
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> Search</button>
           ${this.isDesktopApp ? '' : '<button class="copy-link-btn" id="copyLinkBtn">Copy Link</button>'}
-          <span class="time-display" id="timeDisplay">--:--:-- UTC</span>
+          <button class="theme-toggle-btn" id="headerThemeToggle" title="Toggle dark/light mode">
+            ${getCurrentTheme() === 'dark'
+              ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+              : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
+          </button>
           ${this.isDesktopApp ? '' : '<button class="fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>'}
           <button class="settings-btn" id="settingsBtn">⚙ PANELS</button>
           <button class="sources-btn" id="sourcesBtn">📡 SOURCES</button>
@@ -1681,8 +1684,6 @@ export class App {
 
     this.createPanels();
     this.renderPanelToggles();
-    this.updateTime();
-    this.timeIntervalId = setInterval(() => this.updateTime(), 1000);
   }
 
   /**
@@ -1755,12 +1756,6 @@ export class App {
    */
   public destroy(): void {
     this.isDestroyed = true;
-
-    // Clear time display interval
-    if (this.timeIntervalId) {
-      clearInterval(this.timeIntervalId);
-      this.timeIntervalId = null;
-    }
 
     // Clear snapshot saving interval
     if (this.snapshotIntervalId) {
@@ -2312,17 +2307,30 @@ export class App {
       }
     });
 
-    // Theme toggle
+    // Theme toggle (settings modal)
     const themeToggle = document.getElementById('themeToggle');
     themeToggle?.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
       if (target.type === 'radio' && target.name === 'theme') {
         setTheme(target.value as Theme);
-        // Update active class on labels
         themeToggle.querySelectorAll('.theme-option').forEach(label => {
           label.classList.toggle('active', (label.querySelector('input') as HTMLInputElement)?.checked);
         });
+        this.updateHeaderThemeIcon();
       }
+    });
+
+    // Header theme toggle button
+    document.getElementById('headerThemeToggle')?.addEventListener('click', () => {
+      const next = getCurrentTheme() === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+      this.updateHeaderThemeIcon();
+      // Sync settings modal radios if open
+      const radios = document.querySelectorAll<HTMLInputElement>('#themeToggle input[name="theme"]');
+      radios.forEach(r => {
+        r.checked = r.value === next;
+        r.closest('.theme-option')?.classList.toggle('active', r.checked);
+      });
     });
 
     // Sources modal
@@ -2390,6 +2398,7 @@ export class App {
     // Re-render components with baked getCSSColor() values on theme change
     window.addEventListener('theme-changed', () => {
       this.map?.render();
+      this.updateHeaderThemeIcon();
     });
 
     // Idle detection - pause animations after 2 minutes of inactivity
@@ -2695,12 +2704,13 @@ export class App {
     });
   }
 
-  private updateTime(): void {
-    const now = new Date();
-    const el = document.getElementById('timeDisplay');
-    if (el) {
-      el.textContent = now.toUTCString().split(' ')[4] + ' UTC';
-    }
+  private updateHeaderThemeIcon(): void {
+    const btn = document.getElementById('headerThemeToggle');
+    if (!btn) return;
+    const isDark = getCurrentTheme() === 'dark';
+    btn.innerHTML = isDark
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
   }
 
   private async loadAllData(): Promise<void> {
