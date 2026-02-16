@@ -141,10 +141,10 @@ export class CountryIntelModal {
         <div class="cii-section">
           <div class="cii-label">${t('modals.countryIntel.instabilityIndex')} ${this.scoreBar(score.score)}</div>
           <div class="cii-components">
-            <span title="Unrest">📢 ${score.components.unrest.toFixed(0)}</span>
-            <span title="Conflict">⚔ ${score.components.conflict.toFixed(0)}</span>
-            <span title="Security">🛡️ ${score.components.security.toFixed(0)}</span>
-            <span title="Information">📡 ${score.components.information.toFixed(0)}</span>
+            <span title="${t('common.unrest')}">📢 ${score.components.unrest.toFixed(0)}</span>
+            <span title="${t('common.conflict')}">⚔ ${score.components.conflict.toFixed(0)}</span>
+            <span title="${t('common.security')}">🛡️ ${score.components.security.toFixed(0)}</span>
+            <span title="${t('common.information')}">📡 ${score.components.information.toFixed(0)}</span>
             <span class="cii-trend ${score.trend}">${score.trend === 'rising' ? '↗' : score.trend === 'falling' ? '↘' : '→'} ${score.trend}</span>
           </div>
         </div>
