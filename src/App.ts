@@ -2983,15 +2983,17 @@ export class App {
         },
       });
 
+      const finnhubConfigMsg = 'FINNHUB_API_KEY not configured — add in Settings';
+      this.latestMarkets = stocksResult.data;
+      (this.panels['markets'] as MarketPanel).renderMarkets(stocksResult.data);
+
       if (stocksResult.skipped) {
-        const msg = 'FINNHUB_API_KEY not configured — add in Settings';
-        this.panels['markets']?.showConfigError(msg);
-        this.panels['heatmap']?.showConfigError(msg);
-        this.panels['commodities']?.showConfigError(msg);
         this.statusPanel?.updateApi('Finnhub', { status: 'error' });
+        if (stocksResult.data.length === 0) {
+          this.panels['markets']?.showConfigError(finnhubConfigMsg);
+        }
+        this.panels['heatmap']?.showConfigError(finnhubConfigMsg);
       } else {
-        this.latestMarkets = stocksResult.data;
-        (this.panels['markets'] as MarketPanel).renderMarkets(stocksResult.data);
         this.statusPanel?.updateApi('Finnhub', { status: 'ok' });
 
         const sectorsResult = await fetchMultipleStocks(
@@ -3007,23 +3009,23 @@ export class App {
         (this.panels['heatmap'] as HeatmapPanel).renderHeatmap(
           sectorsResult.data.map((s) => ({ name: s.name, change: s.change }))
         );
-
-        const commoditiesResult = await fetchMultipleStocks(COMMODITIES, {
-          onBatch: (partialCommodities) => {
-            (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-              partialCommodities.map((c) => ({
-                display: c.display,
-                price: c.price,
-                change: c.change,
-                sparkline: c.sparkline,
-              }))
-            );
-          },
-        });
-        (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-          commoditiesResult.data.map((c) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline }))
-        );
       }
+
+      const commoditiesResult = await fetchMultipleStocks(COMMODITIES, {
+        onBatch: (partialCommodities) => {
+          (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
+            partialCommodities.map((c) => ({
+              display: c.display,
+              price: c.price,
+              change: c.change,
+              sparkline: c.sparkline,
+            }))
+          );
+        },
+      });
+      (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
+        commoditiesResult.data.map((c) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline }))
+      );
     } catch {
       this.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }
