@@ -20,7 +20,7 @@ export class MonitorPanel extends Panel {
     const inputContainer = document.createElement('div');
     inputContainer.className = 'monitor-input-container';
     inputContainer.innerHTML = `
-      <input type="text" class="monitor-input" id="monitorKeywords" placeholder="Keywords (comma separated)">
+      <input type="text" class="monitor-input" id="monitorKeywords" placeholder="${t('components.monitor.placeholder')}">
       <button class="monitor-add-btn" id="addMonitorBtn">+ Add Monitor</button>
     `;
 
@@ -132,7 +132,7 @@ export class MonitorPanel extends Panel {
 
     if (unique.length === 0) {
       results.innerHTML =
-        `<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">No matches in ${news.length} articles</div>`;
+        `<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">${t('components.monitor.noMatches', { count: String(news.length) })}</div>`;
       return;
     }
 

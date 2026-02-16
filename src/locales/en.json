@@ -60,7 +60,11 @@
     "settings": "PANELS",
     "sources": "SOURCES",
     "copyLink": "Copy Link",
-    "fullscreen": "Fullscreen"
+    "fullscreen": "Fullscreen",
+    "pinMap": "Pin map to top",
+    "viewOnGitHub": "View on GitHub",
+    "filterSources": "Filter sources...",
+    "sourcesEnabled": "{{enabled}}/{{total}} enabled"
   },
   "panels": {
     "liveNews": "Live News",
@@ -337,6 +341,104 @@
       "yes": "Yes",
       "no": "No",
       "vol": "Vol"
+    },
+    "status": {
+      "systemStatus": "System Status",
+      "updatedJustNow": "Updated just now",
+      "updatedAt": "Updated {{time}}",
+      "storageUnavailable": "Storage info unavailable"
+    },
+    "playback": {
+      "toggleMode": "Toggle Playback Mode",
+      "live": "LIVE"
+    },
+    "pizzint": {
+      "title": "Pentagon Pizza Index",
+      "defcon": "DEFCON {{level}}",
+      "updated": "Updated {{timeAgo}}"
+    },
+    "strategicPosture": {
+      "elapsed": "Elapsed: {{elapsed}} s",
+      "clickToView": "Click to view {{name}} on map",
+      "clickToViewMap": "Click to view on map",
+      "refresh": "Refresh",
+      "units": {
+        "fighters": "Fighters",
+        "tankers": "Tankers",
+        "awacs": "AWACS",
+        "recon": "Recon",
+        "transport": "Transport",
+        "bombers": "Bombers",
+        "drones": "Drones",
+        "aircraft": "Aircraft",
+        "carriers": "Carriers",
+        "destroyers": "Destroyers",
+        "frigates": "Frigates",
+        "submarines": "Submarines",
+        "patrol": "Patrol",
+        "auxiliary": "Auxiliary",
+        "navalVessels": "Naval Vessels"
+      }
+    },
+    "countryBrief": {
+      "shareStory": "Share story",
+      "printPdf": "Print / PDF",
+      "exportData": "Export data",
+      "sourceRef": "Source [{{n}}]"
+    },
+    "deckgl": {
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "resetView": "Reset View",
+      "layerGuide": "Layer Guide"
+    },
+    "cii": {
+      "shareStory": "Share story",
+      "noSignals": "No instability signals detected"
+    },
+    "insights": {
+      "noStories": "No breaking or multi-source stories yet"
+    },
+    "cascade": {
+      "noImpacts": "No country impacts detected"
+    },
+    "strategicRisk": {
+      "noRisks": "No significant risks detected"
+    },
+    "techEvents": {
+      "loading": "Loading tech events...",
+      "noEvents": "No events to display",
+      "showOnMap": "Show on map",
+      "moreInfo": "More info"
+    },
+    "techReadiness": {
+      "internetUsers": "Internet Users",
+      "mobileSubscriptions": "Mobile Subscriptions",
+      "rdSpending": "R&D Spending"
+    },
+    "populationExposure": {
+      "noData": "No exposure data available"
+    },
+    "satelliteFires": {
+      "noData": "No fire data available"
+    },
+    "ucdpEvents": {
+      "noEvents": "No events in this category"
+    },
+    "displacement": {
+      "noData": "No data"
+    },
+    "climate": {
+      "noAnomalies": "No significant anomalies detected"
+    },
+    "newsPanel": {
+      "close": "Close"
+    },
+    "export": {
+      "exportData": "Export Data"
+    },
+    "runtimeConfig": {
+      "getApiKey": "Get API key"
     }
   },
   "popups": {

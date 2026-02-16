@@ -60,7 +60,11 @@
         "settings": "PANNEAUX",
         "sources": "SOURCES",
         "copyLink": "Copier le lien",
-        "fullscreen": "Plein écran"
+        "fullscreen": "Plein écran",
+        "pinMap": "Épingler la carte en haut",
+        "viewOnGitHub": "Voir sur GitHub",
+        "filterSources": "Filtrer les sources...",
+        "sourcesEnabled": "{{enabled}}/{{total}} activées"
     },
     "panels": {
         "liveNews": "Actualités en direct",
@@ -336,6 +340,104 @@
             "yes": "Oui",
             "no": "Non",
             "vol": "Vol"
+        },
+        "status": {
+            "systemStatus": "État du système",
+            "updatedJustNow": "Mis à jour à l'instant",
+            "updatedAt": "Mis à jour {{time}}",
+            "storageUnavailable": "Infos stockage indisponibles"
+        },
+        "playback": {
+            "toggleMode": "Basculer le mode lecture",
+            "live": "LIVE"
+        },
+        "pizzint": {
+            "title": "Pentagon Pizza Index",
+            "defcon": "DEFCON {{level}}",
+            "updated": "Mis à jour {{timeAgo}}"
+        },
+        "strategicPosture": {
+            "elapsed": "Écoulé : {{elapsed}} s",
+            "clickToView": "Cliquer pour voir {{name}} sur la carte",
+            "clickToViewMap": "Cliquer pour voir sur la carte",
+            "refresh": "Actualiser",
+            "units": {
+                "fighters": "Chasseurs",
+                "tankers": "Ravitailleurs",
+                "awacs": "AWACS",
+                "recon": "Reconnaissance",
+                "transport": "Transport",
+                "bombers": "Bombardiers",
+                "drones": "Drones",
+                "aircraft": "Aéronefs",
+                "carriers": "Porte-avions",
+                "destroyers": "Destroyers",
+                "frigates": "Frégates",
+                "submarines": "Sous-marins",
+                "patrol": "Patrouilleurs",
+                "auxiliary": "Auxiliaires",
+                "navalVessels": "Navires de guerre"
+            }
+        },
+        "countryBrief": {
+            "shareStory": "Partager l'article",
+            "printPdf": "Imprimer / PDF",
+            "exportData": "Exporter les données",
+            "sourceRef": "Source [{{n}}]"
+        },
+        "deckgl": {
+            "zoomIn": "Zoom avant",
+            "zoomOut": "Zoom arrière",
+            "resetView": "Réinitialiser la vue",
+            "layerGuide": "Guide des couches"
+        },
+        "cii": {
+            "shareStory": "Partager l'article",
+            "noSignals": "Aucun signal d'instabilité détecté"
+        },
+        "insights": {
+            "noStories": "Aucune info de dernière minute pour l'instant"
+        },
+        "cascade": {
+            "noImpacts": "Aucun impact pays détecté"
+        },
+        "strategicRisk": {
+            "noRisks": "Aucun risque significatif détecté"
+        },
+        "techEvents": {
+            "loading": "Chargement des événements tech...",
+            "noEvents": "Aucun événement à afficher",
+            "showOnMap": "Voir sur la carte",
+            "moreInfo": "Plus d'infos"
+        },
+        "techReadiness": {
+            "internetUsers": "Utilisateurs Internet",
+            "mobileSubscriptions": "Abonnements mobiles",
+            "rdSpending": "Dépenses R&D"
+        },
+        "populationExposure": {
+            "noData": "Aucune donnée d'exposition disponible"
+        },
+        "satelliteFires": {
+            "noData": "Aucune donnée d'incendie disponible"
+        },
+        "ucdpEvents": {
+            "noEvents": "Aucun événement dans cette catégorie"
+        },
+        "displacement": {
+            "noData": "Aucune donnée"
+        },
+        "climate": {
+            "noAnomalies": "Aucune anomalie significative détectée"
+        },
+        "newsPanel": {
+            "close": "Fermer"
+        },
+        "export": {
+            "exportData": "Exporter les données"
+        },
+        "runtimeConfig": {
+            "getApiKey": "Obtenir une clé API"
         }
     },
     "popups": {

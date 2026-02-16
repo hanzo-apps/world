@@ -1,5 +1,6 @@
 import type { PizzIntStatus, GdeltTensionPair } from '@/types';
 import { escapeHtml } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 
 const DEFCON_COLORS: Record<number, string> = {
   1: '#ff0040',
@@ -19,7 +20,7 @@ export class PizzIntIndicator {
     this.element = document.createElement('div');
     this.element.className = 'pizzint-indicator';
     this.element.innerHTML = `
-      <button class="pizzint-toggle" title="Pentagon Pizza Index">
+      <button class="pizzint-toggle" title="${t('components.pizzint.title')}">
         <span class="pizzint-icon">🍕</span>
         <span class="pizzint-defcon">--</span>
         <span class="pizzint-score">--%</span>
@@ -249,7 +250,7 @@ export class PizzIntIndicator {
     const updatedEl = this.element.querySelector('.pizzint-updated') as HTMLElement;
 
     const color = DEFCON_COLORS[this.status.defconLevel] || '#888';
-    defconEl.textContent = `DEFCON ${this.status.defconLevel}`;
+    defconEl.textContent = t('components.pizzint.defcon', { level: String(this.status.defconLevel) });
     defconEl.style.background = color;
     defconEl.style.color = this.status.defconLevel <= 3 ? '#000' : '#fff';
 
@@ -269,7 +270,7 @@ export class PizzIntIndicator {
     }).join('');
 
     const timeAgo = this.formatTimeAgo(this.status.lastUpdate);
-    updatedEl.textContent = `Updated ${timeAgo}`;
+    updatedEl.textContent = t('components.pizzint.updated', { timeAgo });
   }
 
   private renderTensions(): void {
