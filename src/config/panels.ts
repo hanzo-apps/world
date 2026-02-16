@@ -39,10 +39,10 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
-  'ucdp-events': { name: 'UCDP Conflict Events', enabled: false, priority: 2 },
-  displacement: { name: 'UNHCR Displacement', enabled: false, priority: 2 },
-  climate: { name: 'Climate Anomalies', enabled: false, priority: 2 },
-  'population-exposure': { name: 'Population Exposure', enabled: false, priority: 2 },
+  'ucdp-events': { name: 'UCDP Conflict Events', enabled: true, priority: 2 },
+  displacement: { name: 'UNHCR Displacement', enabled: true, priority: 2 },
+  climate: { name: 'Climate Anomalies', enabled: true, priority: 2 },
+  'population-exposure': { name: 'Population Exposure', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
