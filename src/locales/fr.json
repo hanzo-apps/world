@@ -732,6 +732,11 @@
         "noEventsInCategory": "Aucun événement dans cette catégorie",
         "exportCsv": "Exporter CSV",
         "exportJson": "Exporter JSON",
-        "exportData": "Exporter les données"
+        "exportData": "Exporter les données",
+        "unrest": "Troubles",
+        "conflict": "Conflit",
+        "security": "Sécurité",
+        "information": "Information",
+        "shareStory": "Partager le sujet"
     }
 }
