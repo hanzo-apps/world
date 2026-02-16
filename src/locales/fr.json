@@ -737,6 +737,7 @@
         "conflict": "Conflit",
         "security": "Sécurité",
         "information": "Information",
-        "shareStory": "Partager le sujet"
+        "shareStory": "Partager le sujet",
+        "exportImage": "Exporter l'image"
     }
 }
