@@ -349,12 +349,24 @@
         },
         "playback": {
             "toggleMode": "Basculer le mode lecture",
-            "live": "LIVE"
+            "live": "LIVE",
+            "historicalPlayback": "Lecture historique"
         },
         "pizzint": {
             "title": "Pentagon Pizza Index",
             "defcon": "DEFCON {{level}}",
-            "updated": "Mis à jour {{timeAgo}}"
+            "updated": "Mis à jour {{timeAgo}}",
+            "tensionsTitle": "Tensions géopolitiques",
+            "source": "Source :",
+            "statusClosed": "FERMÉ",
+            "statusSpike": "PIC",
+            "statusHigh": "ÉLEVÉ",
+            "statusElevated": "MODÉRÉ",
+            "statusNominal": "NOMINAL",
+            "statusQuiet": "CALME",
+            "justNow": "à l'instant",
+            "minutesAgo": "il y a {{m}}min",
+            "hoursAgo": "il y a {{h}}h"
         },
         "strategicPosture": {
             "elapsed": "Écoulé : {{elapsed}} s",
@@ -389,7 +401,50 @@
             "zoomIn": "Zoom avant",
             "zoomOut": "Zoom arrière",
             "resetView": "Réinitialiser la vue",
-            "layerGuide": "Guide des couches"
+            "layerGuide": "Guide des couches",
+            "layersTitle": "Couches",
+            "timeAll": "Tout",
+            "views": {
+                "global": "Mondial",
+                "americas": "Amériques",
+                "mena": "MENA",
+                "europe": "Europe",
+                "asia": "Asie",
+                "latam": "Amérique latine",
+                "africa": "Afrique",
+                "oceania": "Océanie"
+            },
+            "layers": {
+                "startupHubs": "Pôles startups",
+                "techHQs": "Sièges tech",
+                "accelerators": "Accélérateurs",
+                "cloudRegions": "Régions cloud",
+                "aiDataCenters": "Centres de données IA",
+                "underseaCables": "Câbles sous-marins",
+                "internetOutages": "Pannes Internet",
+                "cyberThreats": "Menaces cyber",
+                "techEvents": "Événements tech",
+                "naturalEvents": "Événements naturels",
+                "fires": "Incendies",
+                "intelHotspots": "Points chauds renseignement",
+                "conflictZones": "Zones de conflit",
+                "militaryBases": "Bases militaires",
+                "nuclearSites": "Sites nucléaires",
+                "gammaIrradiators": "Irradiateurs gamma",
+                "spaceports": "Cosmodromes",
+                "pipelines": "Pipelines",
+                "militaryActivity": "Activité militaire",
+                "shipTraffic": "Trafic maritime",
+                "flightDelays": "Retards de vols",
+                "protests": "Manifestations",
+                "ucdpEvents": "Événements UCDP",
+                "displacementFlows": "Flux de déplacement",
+                "climateAnomalies": "Anomalies climatiques",
+                "weatherAlerts": "Alertes météo",
+                "strategicWaterways": "Voies navigables stratégiques",
+                "economicCenters": "Centres économiques",
+                "criticalMinerals": "Minéraux critiques"
+            }
         },
         "cii": {
             "shareStory": "Partager l'article",
