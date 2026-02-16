@@ -422,15 +422,50 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     }
 }
 
-/// Strip the `\\?\` extended-length path prefix that Windows `canonicalize()` adds.
-/// Node.js module resolution cannot handle UNC-prefixed paths and walks up to a
-/// bare drive letter like `C:` which then fails with `EISDIR: lstat 'C:'`.
+/// Strip Windows extended-length path prefixes that `canonicalize()` adds.
+/// Preserve UNC semantics: `\\?\UNC\server\share\...` must become
+/// `\\server\share\...` (not `UNC\server\share\...`).
 fn sanitize_path_for_node(p: &Path) -> String {
     let s = p.to_string_lossy();
-    if s.starts_with("\\\\?\\") {
-        s[4..].to_string()
+    if let Some(stripped_unc) = s.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{stripped_unc}")
+    } else if let Some(stripped) = s.strip_prefix("\\\\?\\") {
+        stripped.to_string()
     } else {
         s.into_owned()
+    }
+}
+
+#[cfg(test)]
+mod sanitize_path_tests {
+    use super::sanitize_path_for_node;
+    use std::path::Path;
+
+    #[test]
+    fn strips_extended_drive_prefix() {
+        let raw = Path::new(r"\\?\C:\Program Files\nodejs\node.exe");
+        assert_eq!(
+            sanitize_path_for_node(raw),
+            r"C:\Program Files\nodejs\node.exe".to_string()
+        );
+    }
+
+    #[test]
+    fn strips_extended_unc_prefix_and_preserves_unc_root() {
+        let raw = Path::new(r"\\?\UNC\server\share\sidecar\local-api-server.mjs");
+        assert_eq!(
+            sanitize_path_for_node(raw),
+            r"\\server\share\sidecar\local-api-server.mjs".to_string()
+        );
+    }
+
+    #[test]
+    fn leaves_standard_paths_unchanged() {
+        let raw = Path::new(r"C:\Users\alice\sidecar\local-api-server.mjs");
+        assert_eq!(
+            sanitize_path_for_node(raw),
+            r"C:\Users\alice\sidecar\local-api-server.mjs".to_string()
+        );
     }
 }
 
