@@ -48,6 +48,7 @@
       "../api",
       "sidecar/local-api-server.mjs",
       "sidecar/package.json",
+      "sidecar/node",
       "../data",
       "../src/config"
     ],
