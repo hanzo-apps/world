@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { t } from '@/services/i18n';
 import type { Monitor, NewsItem } from '@/types';
 import { MONITOR_COLORS } from '@/config';
 import { generateId, formatTime } from '@/utils';
@@ -9,7 +10,7 @@ export class MonitorPanel extends Panel {
   private onMonitorsChange?: (monitors: Monitor[]) => void;
 
   constructor(initialMonitors: Monitor[] = []) {
-    super({ id: 'monitors', title: 'My Monitors' });
+    super({ id: 'monitors', title: t('panels.monitors') });
     this.monitors = initialMonitors;
     this.renderInput();
   }
@@ -108,7 +109,7 @@ export class MonitorPanel extends Panel {
     news.forEach((item) => {
       this.monitors.forEach((monitor) => {
         // Search both title and description for better coverage
-        const searchText = `${item.title} ${(item as unknown as {description?: string}).description || ''}`.toLowerCase();
+        const searchText = `${item.title} ${(item as unknown as { description?: string }).description || ''}`.toLowerCase();
         const matched = monitor.keywords.some((kw) => {
           // Use word boundary matching to avoid false positives like "ai" in "train"
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
