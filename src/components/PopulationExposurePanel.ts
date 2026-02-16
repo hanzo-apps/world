@@ -34,7 +34,7 @@ export class PopulationExposurePanel extends Panel {
 
   private renderContent(): void {
     if (this.exposures.length === 0) {
-      this.setContent('<div class="panel-empty">No exposure data available</div>');
+      this.setContent(`<div class="panel-empty">${t('common.noDataAvailable')}</div>`);
       return;
     }
 
