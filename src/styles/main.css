@@ -123,9 +123,9 @@
 
   /* Map */
   --map-bg: #e8f0f8;
-  --map-grid: #c0d8e8;
-  --map-country: #d8e8d8;
-  --map-stroke: #90b8a0;
+  --map-grid: #b0c8d8;
+  --map-country: #f0e8d8;
+  --map-stroke: #c8b8a8;
 }
 
 * {
