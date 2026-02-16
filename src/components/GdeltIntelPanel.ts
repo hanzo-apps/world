@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 import {
   INTEL_TOPICS,
   fetchTopicIntelligence,
@@ -79,7 +80,7 @@ export class GdeltIntelPanel extends Panel {
       this.setCount(data.articles.length);
     } catch (error) {
       console.error('[GdeltIntelPanel] Load error:', error);
-      this.showError('Failed to load intelligence feed');
+      this.showError(t('common.failedIntelFeed'));
     }
   }
 
