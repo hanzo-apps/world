@@ -135,3 +135,4 @@ export type { ParsedMapUrlState } from './urlState';
 export { CircuitBreaker, createCircuitBreaker, getCircuitBreakerStatus, getCircuitBreakerCooldownInfo } from './circuit-breaker';
 export type { CircuitBreakerOptions } from './circuit-breaker';
 export * from './analysis-constants';
+export { getCSSColor, invalidateColorCache } from './theme-colors';
