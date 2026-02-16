@@ -156,31 +156,43 @@ const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; 
 // Export for external use
 export { LAYER_ZOOM_THRESHOLDS };
 
-// Color constants matching the dark theme
-const COLORS = {
-  hotspotHigh: [255, 68, 68, 200] as [number, number, number, number],
-  hotspotElevated: [255, 165, 0, 200] as [number, number, number, number],
-  hotspotLow: [255, 255, 0, 180] as [number, number, number, number],
-  conflict: [255, 0, 0, 100] as [number, number, number, number],
-  base: [0, 150, 255, 200] as [number, number, number, number],
-  nuclear: [255, 215, 0, 200] as [number, number, number, number],
-  datacenter: [0, 255, 200, 180] as [number, number, number, number],
-  cable: [0, 200, 255, 150] as [number, number, number, number],
-  cableHighlight: [255, 100, 100, 200] as [number, number, number, number],
-  earthquake: [255, 100, 50, 200] as [number, number, number, number],
-  vesselMilitary: [255, 100, 100, 220] as [number, number, number, number],
-  flightMilitary: [255, 50, 50, 220] as [number, number, number, number],
-  protest: [255, 150, 0, 200] as [number, number, number, number],
-  outage: [255, 50, 50, 180] as [number, number, number, number],
-  weather: [100, 150, 255, 180] as [number, number, number, number],
-  startupHub: [0, 255, 150, 200] as [number, number, number, number],
-  techHQ: [100, 200, 255, 200] as [number, number, number, number],
-  accelerator: [255, 200, 0, 200] as [number, number, number, number],
-  cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
-  ucdpStateBased: [255, 50, 50, 200] as [number, number, number, number],
-  ucdpNonState: [255, 165, 0, 200] as [number, number, number, number],
-  ucdpOneSided: [255, 255, 0, 200] as [number, number, number, number],
-};
+// Theme-aware overlay color function — refreshed each buildLayers() call
+function getOverlayColors() {
+  const isLight = getCurrentTheme() === 'light';
+  return {
+    // Threat dots: IDENTICAL in both modes (user locked decision)
+    hotspotHigh: [255, 68, 68, 200] as [number, number, number, number],
+    hotspotElevated: [255, 165, 0, 200] as [number, number, number, number],
+    hotspotLow: [255, 255, 0, 180] as [number, number, number, number],
+
+    // Conflict zone fills: more transparent in light mode
+    conflict: isLight
+      ? [255, 0, 0, 60] as [number, number, number, number]
+      : [255, 0, 0, 100] as [number, number, number, number],
+
+    // Infrastructure/category markers: same in both modes (semantic, not theme-dependent)
+    base: [0, 150, 255, 200] as [number, number, number, number],
+    nuclear: [255, 215, 0, 200] as [number, number, number, number],
+    datacenter: [0, 255, 200, 180] as [number, number, number, number],
+    cable: [0, 200, 255, 150] as [number, number, number, number],
+    cableHighlight: [255, 100, 100, 200] as [number, number, number, number],
+    earthquake: [255, 100, 50, 200] as [number, number, number, number],
+    vesselMilitary: [255, 100, 100, 220] as [number, number, number, number],
+    flightMilitary: [255, 50, 50, 220] as [number, number, number, number],
+    protest: [255, 150, 0, 200] as [number, number, number, number],
+    outage: [255, 50, 50, 180] as [number, number, number, number],
+    weather: [100, 150, 255, 180] as [number, number, number, number],
+    startupHub: [0, 255, 150, 200] as [number, number, number, number],
+    techHQ: [100, 200, 255, 200] as [number, number, number, number],
+    accelerator: [255, 200, 0, 200] as [number, number, number, number],
+    cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
+    ucdpStateBased: [255, 50, 50, 200] as [number, number, number, number],
+    ucdpNonState: [255, 165, 0, 200] as [number, number, number, number],
+    ucdpOneSided: [255, 255, 0, 200] as [number, number, number, number],
+  };
+}
+// Initialize and refresh on every buildLayers() call
+let COLORS = getOverlayColors();
 
 // SVG icons as data URLs for different marker shapes
 const MARKER_ICONS = {
@@ -822,6 +834,8 @@ export class DeckGLMap {
 
   private buildLayers(): LayersList {
     const startTime = performance.now();
+    // Refresh theme-aware overlay colors on each rebuild
+    COLORS = getOverlayColors();
     const layers: (Layer | null | false)[] = [];
     const { layers: mapLayers } = this.state;
 
@@ -1110,7 +1124,9 @@ export class DeckGLMap {
       filled: true,
       stroked: true,
       getFillColor: () => COLORS.conflict,
-      getLineColor: () => [255, 0, 0, 180] as [number, number, number, number],
+      getLineColor: () => getCurrentTheme() === 'light'
+        ? [255, 0, 0, 120] as [number, number, number, number]
+        : [255, 0, 0, 180] as [number, number, number, number],
       getLineWidth: 2,
       lineWidthMinPixels: 1,
       pickable: true,
@@ -2898,8 +2914,8 @@ export class DeckGLMap {
       data: top50,
       getSourcePosition: (d) => [d.originLon!, d.originLat!],
       getTargetPosition: (d) => [d.asylumLon!, d.asylumLat!],
-      getSourceColor: [100, 150, 255, 180],
-      getTargetColor: [100, 255, 200, 180],
+      getSourceColor: getCurrentTheme() === 'light' ? [50, 80, 180, 220] : [100, 150, 255, 180],
+      getTargetColor: getCurrentTheme() === 'light' ? [20, 150, 100, 220] : [100, 255, 200, 180],
       getWidth: (d) => Math.max(1, (d.refugees / maxCount) * 8),
       widthMinPixels: 1,
       widthMaxPixels: 8,
