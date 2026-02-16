@@ -2764,7 +2764,7 @@ export class App {
       // Filter out disabled sources
       const enabledFeeds = (feeds ?? []).filter(f => !this.disabledSources.has(f.name));
       if (enabledFeeds.length === 0) {
-        if (panel) panel.showError('All sources disabled');
+        if (panel) panel.showError(t('common.allSourcesDisabled'));
         this.statusPanel?.updateFeed(category.charAt(0).toUpperCase() + category.slice(1), {
           status: 'ok',
           itemCount: 0,
@@ -2891,7 +2891,7 @@ export class App {
       const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
       const intelPanel = this.newsPanels['intel'];
       if (enabledIntelSources.length === 0) {
-        if (intelPanel) intelPanel.showError('All Intel sources disabled');
+        if (intelPanel) intelPanel.showError(t('common.allIntelSourcesDisabled'));
         this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: 0 });
       } else {
         const intelResult = await Promise.allSettled([fetchCategoryFeeds(enabledIntelSources)]);

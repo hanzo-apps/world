@@ -38,7 +38,7 @@ export class ClimateAnomalyPanel extends Panel {
 
   private renderContent(): void {
     if (this.anomalies.length === 0) {
-      this.setContent('<div class="panel-empty">No significant anomalies detected</div>');
+      this.setContent(`<div class="panel-empty">${t('components.climate.noAnomalies')}</div>`);
       return;
     }
 
