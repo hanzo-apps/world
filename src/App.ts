@@ -90,6 +90,7 @@ import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { isDesktopRuntime } from '@/services/runtime';
+import { isFeatureAvailable } from '@/services/runtime-config';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
 
@@ -3847,7 +3848,10 @@ export class App {
       }
 
       if (data.length === 0) {
-        economicPanel?.setErrorState(true, 'Failed to load economic data');
+        const reason = isFeatureAvailable('economicFred')
+          ? 'FRED data temporarily unavailable — will retry'
+          : 'FRED_API_KEY not configured — add in Settings';
+        economicPanel?.setErrorState(true, reason);
         this.statusPanel?.updateApi('FRED', { status: 'error' });
         return;
       }
@@ -3858,7 +3862,7 @@ export class App {
       dataFreshness.recordUpdate('economic', data.length);
     } catch {
       this.statusPanel?.updateApi('FRED', { status: 'error' });
-      economicPanel?.setErrorState(true, 'Failed to load data');
+      economicPanel?.setErrorState(true, 'FRED data temporarily unavailable — will retry');
       economicPanel?.setLoading(false);
     }
   }
