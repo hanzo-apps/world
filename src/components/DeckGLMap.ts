@@ -41,6 +41,7 @@ import { ArcLayer } from '@deck.gl/layers';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 import { debounce, rafSchedule } from '@/utils/index';
 import {
   INTEL_HOTSPOTS,
@@ -362,11 +363,11 @@ export class DeckGLMap {
       interactive: true,
       ...(MAP_INTERACTION_MODE === 'flat'
         ? {
-            maxPitch: 0,
-            pitchWithRotate: false,
-            dragRotate: false,
-            touchPitch: false,
-          }
+          maxPitch: 0,
+          pitchWithRotate: false,
+          dragRotate: false,
+          touchPitch: false,
+        }
         : {}),
     });
   }
@@ -2387,9 +2388,9 @@ export class DeckGLMap {
     controls.className = 'map-controls deckgl-controls';
     controls.innerHTML = `
       <div class="zoom-controls">
-        <button class="map-btn zoom-in" title="Zoom In">+</button>
-        <button class="map-btn zoom-out" title="Zoom Out">-</button>
-        <button class="map-btn zoom-reset" title="Reset View">&#8962;</button>
+        <button class="map-btn zoom-in" title="${t('components.deckgl.zoomIn')}">+</button>
+        <button class="map-btn zoom-out" title="${t('components.deckgl.zoomOut')}">-</button>
+        <button class="map-btn zoom-reset" title="${t('components.deckgl.resetView')}">&#8962;</button>
       </div>
       <div class="view-selector">
         <select class="view-select">
@@ -2454,49 +2455,49 @@ export class DeckGLMap {
 
     const layerConfig = SITE_VARIANT === 'tech'
       ? [
-          { key: 'startupHubs', label: 'Startup Hubs', icon: '&#128640;' },
-          { key: 'techHQs', label: 'Tech HQs', icon: '&#127970;' },
-          { key: 'accelerators', label: 'Accelerators', icon: '&#9889;' },
-          { key: 'cloudRegions', label: 'Cloud Regions', icon: '&#9729;' },
-          { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
-          { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
-          { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
-          { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
-          { key: 'techEvents', label: 'Tech Events', icon: '&#128197;' },
-          { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
-          { key: 'fires', label: 'Fires', icon: '&#128293;' },
-        ]
+        { key: 'startupHubs', label: 'Startup Hubs', icon: '&#128640;' },
+        { key: 'techHQs', label: 'Tech HQs', icon: '&#127970;' },
+        { key: 'accelerators', label: 'Accelerators', icon: '&#9889;' },
+        { key: 'cloudRegions', label: 'Cloud Regions', icon: '&#9729;' },
+        { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
+        { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
+        { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
+        { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
+        { key: 'techEvents', label: 'Tech Events', icon: '&#128197;' },
+        { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
+        { key: 'fires', label: 'Fires', icon: '&#128293;' },
+      ]
       : [
-          { key: 'hotspots', label: 'Intel Hotspots', icon: '&#127919;' },
-          { key: 'conflicts', label: 'Conflict Zones', icon: '&#9876;' },
-          { key: 'bases', label: 'Military Bases', icon: '&#127963;' },
-          { key: 'nuclear', label: 'Nuclear Sites', icon: '&#9762;' },
-          { key: 'irradiators', label: 'Gamma Irradiators', icon: '&#9888;' },
-          { key: 'spaceports', label: 'Spaceports', icon: '&#128640;' },
-          { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
-          { key: 'pipelines', label: 'Pipelines', icon: '&#128738;' },
-          { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
-          { key: 'military', label: 'Military Activity', icon: '&#9992;' },
-          { key: 'ais', label: 'Ship Traffic', icon: '&#128674;' },
-          { key: 'flights', label: 'Flight Delays', icon: '&#9992;' },
-          { key: 'protests', label: 'Protests', icon: '&#128226;' },
-          { key: 'ucdpEvents', label: 'UCDP Events', icon: '&#9876;' },
-          { key: 'displacement', label: 'Displacement Flows', icon: '&#128101;' },
-          { key: 'climate', label: 'Climate Anomalies', icon: '&#127787;' },
-          { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
-          { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
-          { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
-          { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
-          { key: 'fires', label: 'Fires', icon: '&#128293;' },
-          { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
-          { key: 'economic', label: 'Economic Centers', icon: '&#128176;' },
-          { key: 'minerals', label: 'Critical Minerals', icon: '&#128142;' },
-        ];
+        { key: 'hotspots', label: 'Intel Hotspots', icon: '&#127919;' },
+        { key: 'conflicts', label: 'Conflict Zones', icon: '&#9876;' },
+        { key: 'bases', label: 'Military Bases', icon: '&#127963;' },
+        { key: 'nuclear', label: 'Nuclear Sites', icon: '&#9762;' },
+        { key: 'irradiators', label: 'Gamma Irradiators', icon: '&#9888;' },
+        { key: 'spaceports', label: 'Spaceports', icon: '&#128640;' },
+        { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
+        { key: 'pipelines', label: 'Pipelines', icon: '&#128738;' },
+        { key: 'datacenters', label: 'AI Data Centers', icon: '&#128421;' },
+        { key: 'military', label: 'Military Activity', icon: '&#9992;' },
+        { key: 'ais', label: 'Ship Traffic', icon: '&#128674;' },
+        { key: 'flights', label: 'Flight Delays', icon: '&#9992;' },
+        { key: 'protests', label: 'Protests', icon: '&#128226;' },
+        { key: 'ucdpEvents', label: 'UCDP Events', icon: '&#9876;' },
+        { key: 'displacement', label: 'Displacement Flows', icon: '&#128101;' },
+        { key: 'climate', label: 'Climate Anomalies', icon: '&#127787;' },
+        { key: 'weather', label: 'Weather Alerts', icon: '&#9928;' },
+        { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
+        { key: 'cyberThreats', label: 'Cyber Threats', icon: '&#128737;' },
+        { key: 'natural', label: 'Natural Events', icon: '&#127755;' },
+        { key: 'fires', label: 'Fires', icon: '&#128293;' },
+        { key: 'waterways', label: 'Strategic Waterways', icon: '&#9875;' },
+        { key: 'economic', label: 'Economic Centers', icon: '&#128176;' },
+        { key: 'minerals', label: 'Critical Minerals', icon: '&#128142;' },
+      ];
 
     toggles.innerHTML = `
       <div class="toggle-header">
         <span>Layers</span>
-        <button class="layer-help-btn" title="Layer Guide">?</button>
+        <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
         <button class="toggle-collapse">&#9660;</button>
       </div>
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
@@ -2678,20 +2679,20 @@ export class DeckGLMap {
 
     const legendItems = SITE_VARIANT === 'tech'
       ? [
-          { shape: shapes.circle('rgb(0, 255, 150)'), label: 'Startup Hub' },
-          { shape: shapes.circle('rgb(100, 200, 255)'), label: 'Tech HQ' },
-          { shape: shapes.circle('rgb(255, 200, 0)'), label: 'Accelerator' },
-          { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud Region' },
-          { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
-        ]
+        { shape: shapes.circle('rgb(0, 255, 150)'), label: 'Startup Hub' },
+        { shape: shapes.circle('rgb(100, 200, 255)'), label: 'Tech HQ' },
+        { shape: shapes.circle('rgb(255, 200, 0)'), label: 'Accelerator' },
+        { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud Region' },
+        { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
+      ]
       : [
-          { shape: shapes.circle('rgb(255, 68, 68)'), label: 'High Alert' },
-          { shape: shapes.circle('rgb(255, 165, 0)'), label: 'Elevated' },
-          { shape: shapes.circle('rgb(255, 255, 0)'), label: 'Monitoring' },
-          { shape: shapes.triangle('rgb(68, 136, 255)'), label: 'Base' },
-          { shape: shapes.hexagon('rgb(255, 220, 0)'), label: 'Nuclear' },
-          { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
-        ];
+        { shape: shapes.circle('rgb(255, 68, 68)'), label: 'High Alert' },
+        { shape: shapes.circle('rgb(255, 165, 0)'), label: 'Elevated' },
+        { shape: shapes.circle('rgb(255, 255, 0)'), label: 'Monitoring' },
+        { shape: shapes.triangle('rgb(68, 136, 255)'), label: 'Base' },
+        { shape: shapes.hexagon('rgb(255, 220, 0)'), label: 'Nuclear' },
+        { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
+      ];
 
     legend.innerHTML = `
       <span class="legend-label-title">LEGEND</span>
