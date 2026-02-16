@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import type { FredSeries } from '@/services/fred';
+import { t } from '@/services/i18n';
 import type { OilAnalytics } from '@/services/oil-analytics';
 import type { SpendingSummary } from '@/services/usa-spending';
 import { getChangeClass, formatChange } from '@/services/fred';
@@ -17,7 +18,7 @@ export class EconomicPanel extends Panel {
   private activeTab: TabId = 'indicators';
 
   constructor() {
-    super({ id: 'economic', title: 'Economic Data' });
+    super({ id: 'economic', title: t('panels.economic') });
   }
 
   public update(data: FredSeries[]): void {
@@ -121,13 +122,13 @@ export class EconomicPanel extends Panel {
     return `
       <div class="economic-indicators">
         ${this.fredData.map(series => {
-          const changeClass = getChangeClass(series.change);
-          const changeStr = formatChange(series.change, series.unit);
-          const arrow = series.change !== null
-            ? (series.change > 0 ? '▲' : series.change < 0 ? '▼' : '–')
-            : '';
+      const changeClass = getChangeClass(series.change);
+      const changeStr = formatChange(series.change, series.unit);
+      const arrow = series.change !== null
+        ? (series.change > 0 ? '▲' : series.change < 0 ? '▼' : '–')
+        : '';
 
-          return `
+      return `
             <div class="economic-indicator" data-series="${escapeHtml(series.id)}">
               <div class="indicator-header">
                 <span class="indicator-name">${escapeHtml(series.name)}</span>
@@ -140,7 +141,7 @@ export class EconomicPanel extends Panel {
               <div class="indicator-date">${escapeHtml(series.date)}</div>
             </div>
           `;
-        }).join('')}
+    }).join('')}
       </div>
     `;
   }
@@ -164,11 +165,11 @@ export class EconomicPanel extends Panel {
     return `
       <div class="economic-indicators oil-metrics">
         ${metrics.map(metric => {
-          if (!metric) return '';
-          const trendIcon = getTrendIndicator(metric.trend);
-          const trendColor = getTrendColor(metric.trend, metric.name.includes('Production'));
+      if (!metric) return '';
+      const trendIcon = getTrendIndicator(metric.trend);
+      const trendColor = getTrendColor(metric.trend, metric.name.includes('Production'));
 
-          return `
+      return `
             <div class="economic-indicator oil-metric">
               <div class="indicator-header">
                 <span class="indicator-name">${escapeHtml(metric.name)}</span>
@@ -182,7 +183,7 @@ export class EconomicPanel extends Panel {
               <div class="indicator-date">vs previous week</div>
             </div>
           `;
-        }).join('')}
+    }).join('')}
       </div>
     `;
   }

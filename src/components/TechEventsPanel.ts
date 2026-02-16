@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { t } from '@/services/i18n';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 interface TechEventCoords {
@@ -39,7 +40,7 @@ export class TechEventsPanel extends Panel {
   private error: string | null = null;
 
   constructor(id: string) {
-    super({ id, title: 'Tech Events', showCount: true });
+    super({ id, title: t('panels.events'), showCount: true });
     this.element.classList.add('panel-tall');
     void this.fetchEvents();
   }
@@ -108,9 +109,9 @@ export class TechEventsPanel extends Panel {
         </div>
         <div class="tech-events-list">
           ${filteredEvents.length > 0
-            ? filteredEvents.map(e => this.renderEvent(e)).join('')
-            : '<div class="empty-state">No events to display</div>'
-          }
+        ? filteredEvents.map(e => this.renderEvent(e)).join('')
+        : '<div class="empty-state">No events to display</div>'
+      }
         </div>
       </div>
     `;

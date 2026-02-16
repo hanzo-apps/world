@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
 
 interface StablecoinData {
@@ -54,7 +55,7 @@ export class StablecoinPanel extends Panel {
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    super({ id: 'stablecoins', title: 'Stablecoins', showCount: false });
+    super({ id: 'stablecoins', title: t('panels.stablecoins'), showCount: false });
     void this.fetchData();
     this.refreshInterval = setInterval(() => this.fetchData(), 3 * 60000);
   }

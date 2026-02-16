@@ -1,4 +1,5 @@
 import { isDesktopRuntime } from '@/services/runtime';
+import { t } from '@/services/i18n';
 
 const STORAGE_KEY = 'wm-download-banner-dismissed';
 const SHOW_DELAY_MS = 12_000;
@@ -81,14 +82,14 @@ function buildPanel(): HTMLElement {
       .wm-dl-btn.win:hover { background: rgba(6, 182, 212, 0.15); }
     </style>
     <div class="wm-dl-head">
-      <div class="wm-dl-title">\u{1F5A5} Desktop Available</div>
-      <button class="wm-dl-close" aria-label="Dismiss">\u00D7</button>
+      <div class="wm-dl-title">\u{1F5A5} ${t('modals.downloadBanner.title')}</div>
+      <button class="wm-dl-close" aria-label="${t('modals.downloadBanner.dismiss')}">\u00D7</button>
     </div>
-    <div class="wm-dl-body">Native performance, secure local key storage, offline map tiles.</div>
+    <div class="wm-dl-body">${t('modals.downloadBanner.description')}</div>
     <div class="wm-dl-btns">
-      <a class="wm-dl-btn mac" href="/api/download?platform=macos-arm64">\uF8FF macOS (Apple Silicon)</a>
-      <a class="wm-dl-btn mac" href="/api/download?platform=macos-x64">\uF8FF macOS (Intel)</a>
-      <a class="wm-dl-btn win" href="/api/download?platform=windows-exe">\u229E Windows (.exe)</a>
+      <a class="wm-dl-btn mac" href="/api/download?platform=macos-arm64">\uF8FF ${t('modals.downloadBanner.macSilicon')}</a>
+      <a class="wm-dl-btn mac" href="/api/download?platform=macos-x64">\uF8FF ${t('modals.downloadBanner.macIntel')}</a>
+      <a class="wm-dl-btn win" href="/api/download?platform=windows-exe">\u229E ${t('modals.downloadBanner.windows')}</a>
     </div>
   `;
 
