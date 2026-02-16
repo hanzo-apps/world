@@ -136,3 +136,5 @@ export { CircuitBreaker, createCircuitBreaker, getCircuitBreakerStatus, getCircu
 export type { CircuitBreakerOptions } from './circuit-breaker';
 export * from './analysis-constants';
 export { getCSSColor, invalidateColorCache } from './theme-colors';
+export { getStoredTheme, getCurrentTheme, setTheme, applyStoredTheme } from './theme-manager';
+export type { Theme } from './theme-manager';
