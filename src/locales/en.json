@@ -350,12 +350,24 @@
     },
     "playback": {
       "toggleMode": "Toggle Playback Mode",
-      "live": "LIVE"
+      "live": "LIVE",
+      "historicalPlayback": "Historical Playback"
     },
     "pizzint": {
       "title": "Pentagon Pizza Index",
       "defcon": "DEFCON {{level}}",
-      "updated": "Updated {{timeAgo}}"
+      "updated": "Updated {{timeAgo}}",
+      "tensionsTitle": "Geopolitical Tensions",
+      "source": "Source:",
+      "statusClosed": "CLOSED",
+      "statusSpike": "SPIKE",
+      "statusHigh": "HIGH",
+      "statusElevated": "ELEVATED",
+      "statusNominal": "NOMINAL",
+      "statusQuiet": "QUIET",
+      "justNow": "just now",
+      "minutesAgo": "{{m}}m ago",
+      "hoursAgo": "{{h}}h ago"
     },
     "strategicPosture": {
       "elapsed": "Elapsed: {{elapsed}} s",
@@ -390,7 +402,50 @@
       "zoomIn": "Zoom In",
       "zoomOut": "Zoom Out",
       "resetView": "Reset View",
-      "layerGuide": "Layer Guide"
+      "layerGuide": "Layer Guide",
+      "layersTitle": "Layers",
+      "timeAll": "All",
+      "views": {
+        "global": "Global",
+        "americas": "Americas",
+        "mena": "MENA",
+        "europe": "Europe",
+        "asia": "Asia",
+        "latam": "Latin America",
+        "africa": "Africa",
+        "oceania": "Oceania"
+      },
+      "layers": {
+        "startupHubs": "Startup Hubs",
+        "techHQs": "Tech HQs",
+        "accelerators": "Accelerators",
+        "cloudRegions": "Cloud Regions",
+        "aiDataCenters": "AI Data Centers",
+        "underseaCables": "Undersea Cables",
+        "internetOutages": "Internet Outages",
+        "cyberThreats": "Cyber Threats",
+        "techEvents": "Tech Events",
+        "naturalEvents": "Natural Events",
+        "fires": "Fires",
+        "intelHotspots": "Intel Hotspots",
+        "conflictZones": "Conflict Zones",
+        "militaryBases": "Military Bases",
+        "nuclearSites": "Nuclear Sites",
+        "gammaIrradiators": "Gamma Irradiators",
+        "spaceports": "Spaceports",
+        "pipelines": "Pipelines",
+        "militaryActivity": "Military Activity",
+        "shipTraffic": "Ship Traffic",
+        "flightDelays": "Flight Delays",
+        "protests": "Protests",
+        "ucdpEvents": "UCDP Events",
+        "displacementFlows": "Displacement Flows",
+        "climateAnomalies": "Climate Anomalies",
+        "weatherAlerts": "Weather Alerts",
+        "strategicWaterways": "Strategic Waterways",
+        "economicCenters": "Economic Centers",
+        "criticalMinerals": "Critical Minerals"
+      }
     },
     "cii": {
       "shareStory": "Share story",
