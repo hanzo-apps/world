@@ -2908,38 +2908,10 @@ export class App {
   }
 
   private async loadNews(): Promise<void> {
-    // Build categories dynamically based on what feeds exist
-    const allCategories = [
-      { key: 'politics', feeds: FEEDS.politics },
-      { key: 'tech', feeds: FEEDS.tech },
-      { key: 'finance', feeds: FEEDS.finance },
-      { key: 'gov', feeds: FEEDS.gov },
-      { key: 'middleeast', feeds: FEEDS.middleeast },
-      { key: 'africa', feeds: FEEDS.africa },
-      { key: 'latam', feeds: FEEDS.latam },
-      { key: 'asia', feeds: FEEDS.asia },
-      { key: 'energy', feeds: FEEDS.energy },
-      { key: 'layoffs', feeds: FEEDS.layoffs },
-      { key: 'ai', feeds: FEEDS.ai },
-      { key: 'thinktanks', feeds: FEEDS.thinktanks },
-      // Tech variant categories
-      { key: 'startups', feeds: FEEDS.startups },
-      { key: 'vcblogs', feeds: FEEDS.vcblogs },
-      { key: 'regionalStartups', feeds: FEEDS.regionalStartups },
-      { key: 'unicorns', feeds: FEEDS.unicorns },
-      { key: 'accelerators', feeds: FEEDS.accelerators },
-      { key: 'funding', feeds: FEEDS.funding },
-      { key: 'producthunt', feeds: FEEDS.producthunt },
-      { key: 'security', feeds: FEEDS.security },
-      { key: 'policy', feeds: FEEDS.policy },
-      { key: 'hardware', feeds: FEEDS.hardware },
-      { key: 'cloud', feeds: FEEDS.cloud },
-      { key: 'dev', feeds: FEEDS.dev },
-      { key: 'github', feeds: FEEDS.github },
-      { key: 'ipo', feeds: FEEDS.ipo },
-    ];
-    // Filter to only categories that have feeds defined
-    const categories = allCategories.filter(c => c.feeds && c.feeds.length > 0);
+    // Build categories dynamically from whatever feeds the current variant exports
+    const categories = Object.entries(FEEDS)
+      .filter((entry): entry is [string, typeof FEEDS[keyof typeof FEEDS]] => Array.isArray(entry[1]) && entry[1].length > 0)
+      .map(([key, feeds]) => ({ key, feeds }));
 
     // Fetch all categories in parallel
     const categoryResults = await Promise.allSettled(
