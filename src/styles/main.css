@@ -1,17 +1,131 @@
+/* ============================================================
+   Theme Colors — overridden by [data-theme="light"] below
+   ============================================================ */
 :root {
+  /* Backgrounds */
   --bg: #0a0a0a;
+  --bg-secondary: #111;
   --surface: #141414;
+  --surface-hover: #1e1e1e;
+  --surface-active: #1a1a2e;
+
+  /* Borders */
   --border: #2a2a2a;
+  --border-strong: #444;
+  --border-subtle: #1a1a1a;
+
+  /* Text */
   --text: #e8e8e8;
+  --text-secondary: #ccc;
   --text-dim: #888;
+  --text-muted: #666;
+  --text-faint: #555;
+  --text-ghost: #444;
   --accent: #fff;
-  --red: #ff4444;
-  --green: #44ff88;
-  --yellow: #ffaa00;
+
+  /* Overlays & shadows */
+  --overlay-subtle: rgba(255, 255, 255, 0.03);
+  --overlay-light: rgba(255, 255, 255, 0.05);
+  --overlay-medium: rgba(255, 255, 255, 0.1);
+  --overlay-heavy: rgba(255, 255, 255, 0.2);
+  --shadow-color: rgba(0, 0, 0, 0.5);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #333;
+  --scrollbar-thumb-hover: #555;
+
+  /* Input */
+  --input-bg: #1a1a1a;
+
+  /* Map */
   --map-bg: #020a08;
   --map-grid: #0a2a20;
   --map-country: #0a2018;
   --map-stroke: #0f5040;
+}
+
+/* ============================================================
+   Semantic Colors — identical in both themes, NEVER overridden
+   ============================================================ */
+:root {
+  /* Severity levels */
+  --semantic-critical: #ff4444;
+  --semantic-high: #ff8800;
+  --semantic-elevated: #ffaa00;
+  --semantic-normal: #44aa44;
+  --semantic-low: #3388ff;
+  --semantic-info: #3b82f6;
+
+  /* Threat levels */
+  --threat-critical: #ef4444;
+  --threat-high: #f97316;
+  --threat-medium: #eab308;
+  --threat-low: #22c55e;
+  --threat-info: #3b82f6;
+
+  /* DEFCON levels */
+  --defcon-1: #ff0040;
+  --defcon-2: #ff4400;
+  --defcon-3: #ffaa00;
+  --defcon-4: #00aaff;
+  --defcon-5: #2d8a6e;
+
+  /* Status indicators */
+  --status-live: #44ff88;
+  --status-cached: #ffaa00;
+  --status-unavailable: #ff4444;
+
+  /* Legacy color aliases (used by existing var() references) */
+  --red: #ff4444;
+  --green: #44ff88;
+  --yellow: #ffaa00;
+}
+
+/* ============================================================
+   Light Theme — overrides theme colors only
+   Semantic colors intentionally NOT redefined — identical in both themes
+   ============================================================ */
+[data-theme="light"] {
+  /* Backgrounds */
+  --bg: #f8f9fa;
+  --bg-secondary: #f0f1f3;
+  --surface: #ffffff;
+  --surface-hover: #f0f0f0;
+  --surface-active: #e8e8f0;
+
+  /* Borders */
+  --border: #d4d4d4;
+  --border-strong: #b0b0b0;
+  --border-subtle: #e8e8e8;
+
+  /* Text */
+  --text: #1a1a1a;
+  --text-secondary: #333;
+  --text-dim: #6b6b6b;
+  --text-muted: #8a8a8a;
+  --text-faint: #aaa;
+  --text-ghost: #bbb;
+  --accent: #111111;
+
+  /* Overlays & shadows */
+  --overlay-subtle: rgba(0, 0, 0, 0.02);
+  --overlay-light: rgba(0, 0, 0, 0.04);
+  --overlay-medium: rgba(0, 0, 0, 0.08);
+  --overlay-heavy: rgba(0, 0, 0, 0.12);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #c0c0c0;
+  --scrollbar-thumb-hover: #999;
+
+  /* Input */
+  --input-bg: #f0f0f0;
+
+  /* Map */
+  --map-bg: #e8f0f8;
+  --map-grid: #c0d8e8;
+  --map-country: #d8e8d8;
+  --map-stroke: #90b8a0;
 }
 
 * {
