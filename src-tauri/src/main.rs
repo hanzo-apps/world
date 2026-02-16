@@ -517,11 +517,29 @@ fn local_api_paths(app: &AppHandle) -> (PathBuf, PathBuf) {
     (sidecar_script, api_dir_root)
 }
 
-fn resolve_node_binary() -> Option<PathBuf> {
+fn resolve_node_binary(app: &AppHandle) -> Option<PathBuf> {
     if let Ok(explicit) = env::var("LOCAL_API_NODE_BIN") {
         let explicit_path = PathBuf::from(explicit);
-        if explicit_path.exists() {
+        if explicit_path.is_file() {
             return Some(explicit_path);
+        }
+        append_desktop_log(
+            app,
+            "WARN",
+            &format!(
+                "LOCAL_API_NODE_BIN is set but not a valid file: {}",
+                explicit_path.display()
+            ),
+        );
+    }
+
+    if !cfg!(debug_assertions) {
+        let node_name = if cfg!(windows) { "node.exe" } else { "node" };
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let bundled = resource_dir.join("sidecar").join("node").join(node_name);
+            if bundled.is_file() {
+                return Some(bundled);
+            }
         }
     }
 
@@ -529,7 +547,7 @@ fn resolve_node_binary() -> Option<PathBuf> {
     if let Some(path_var) = env::var_os("PATH") {
         for dir in env::split_paths(&path_var) {
             let candidate = dir.join(node_name);
-            if candidate.exists() {
+            if candidate.is_file() {
                 return Some(candidate);
             }
         }
@@ -549,7 +567,7 @@ fn resolve_node_binary() -> Option<PathBuf> {
         ]
     };
 
-    common_locations.into_iter().find(|path| path.exists())
+    common_locations.into_iter().find(|path| path.is_file())
 }
 
 fn start_local_api(app: &AppHandle) -> Result<(), String> {
@@ -569,7 +587,7 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
             script.display()
         ));
     }
-    let node_binary = resolve_node_binary().ok_or_else(|| {
+    let node_binary = resolve_node_binary(app).ok_or_else(|| {
         "Node.js executable not found. Install Node 18+ or set LOCAL_API_NODE_BIN".to_string()
     })?;
 
