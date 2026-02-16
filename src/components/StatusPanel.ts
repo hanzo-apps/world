@@ -42,15 +42,23 @@ const WORLD_APIS = new Set([
   'Cyber Threats API'
 ]);
 
-export class StatusPanel {
-  private element: HTMLElement;
+import { t } from '../services/i18n';
+import { Panel } from './Panel';
+
+export class StatusPanel extends Panel {
   private isOpen = false;
   private feeds: Map<string, FeedStatus> = new Map();
   private apis: Map<string, ApiStatus> = new Map();
-  private allowedFeeds: Set<string>;
-  private allowedApis: Set<string>;
+  private allowedFeeds!: Set<string>;
+  private allowedApis!: Set<string>;
 
   constructor() {
+    super({ id: 'status', title: t('panels.status') });
+    // Title is hidden in CSS, we use custom header
+    this.init();
+  }
+
+  private init(): void {
     // Set allowlists based on variant
     this.allowedFeeds = SITE_VARIANT === 'tech' ? TECH_FEEDS : WORLD_FEEDS;
     this.allowedApis = SITE_VARIANT === 'tech' ? TECH_APIS : WORLD_APIS;
@@ -63,7 +71,7 @@ export class StatusPanel {
       </button>
       <div class="status-panel hidden">
         <div class="status-panel-header">
-          <span>System Health</span>
+          <span>${t('panels.status')}</span>
           <button class="status-panel-close">×</button>
         </div>
         <div class="status-panel-content">
@@ -164,9 +172,9 @@ export class StatusPanel {
     const enabledApis = [...this.apis.values()].filter(a => a.status !== 'disabled');
 
     const hasError = enabledFeeds.some(f => f.status === 'error') ||
-                     enabledApis.some(a => a.status === 'error');
+      enabledApis.some(a => a.status === 'error');
     const hasWarning = enabledFeeds.some(f => f.status === 'warning') ||
-                       enabledApis.some(a => a.status === 'warning');
+      enabledApis.some(a => a.status === 'warning');
 
     icon.className = 'status-icon';
     if (hasError) {

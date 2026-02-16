@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { t } from '@/services/i18n';
 import type { TechHubActivity } from '@/services/tech-activity';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
@@ -64,7 +65,7 @@ export class TechHubsPanel extends Panel {
   constructor() {
     super({
       id: 'tech-hubs',
-      title: 'Hot Tech Hubs',
+      title: t('panels.techHubs'),
       showCount: true,
       infoTooltip: `
         <strong>Tech Hub Activity</strong><br>

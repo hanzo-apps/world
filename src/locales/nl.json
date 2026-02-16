@@ -1,0 +1,291 @@
+{
+    "modals": {
+        "search": {
+            "placeholder": "Search news, pipelines, bases, markets...",
+            "hint": "News • Pipelines • Bases • Cables • Datacenters • Markets",
+            "recent": "Recent Searches",
+            "empty": "Search across all data sources",
+            "noResults": "No results found",
+            "navigate": "navigate",
+            "select": "select",
+            "close": "close",
+            "types": {
+                "country": "Land",
+                "news": "Nieuws",
+                "hotspot": "Hotspot",
+                "market": "Markt",
+                "prediction": "Voorspelling",
+                "conflict": "Conflict",
+                "base": "Militaire basis",
+                "pipeline": "Pijpleiding",
+                "cable": "Onderzeese kabel",
+                "datacenter": "Datacenter",
+                "earthquake": "Aardbeving",
+                "outage": "Storing",
+                "nuclear": "Nucleaire site",
+                "irradiator": "Bestraler",
+                "techcompany": "Techbedrijf",
+                "ailab": "AI-lab",
+                "startup": "Startup",
+                "techevent": "Tech-evenement",
+                "techhq": "Tech-hoofdkantoor",
+                "accelerator": "Accelerator"
+            }
+        },
+        "signal": {
+            "share": "Share",
+            "source": "Source",
+            "confidence": "Confidence",
+            "related": "Related Events"
+        },
+        "settings": {
+            "title": "Settings",
+            "general": "General",
+            "appearance": "Appearance",
+            "data": "Data Sources",
+            "about": "About"
+        },
+        "mobileWarning": {
+            "title": "Desktop Experience Recommended",
+            "message": "WorldMonitor is optimized for large screens. Some features may be limited on mobile devices.",
+            "continue": "Continue Anyway"
+        },
+        "downloadBanner": {
+            "title": "Desktop Available",
+            "description": "Native performance, secure local key storage, offline map tiles.",
+            "macSilicon": "macOS (Apple Silicon)",
+            "macIntel": "macOS (Intel)",
+            "windows": "Windows (.exe)",
+            "dismiss": "Dismiss"
+        },
+        "runtimeConfig": {
+            "title": "Desktop Configuration",
+            "alertTitle": {
+                "configured": "Desktop settings configured",
+                "needsKeys": "Configure API keys to unlock features",
+                "some": "Some features need API keys"
+            },
+            "openSettings": "Open Settings",
+            "summary": {
+                "desktop": "Desktop mode",
+                "web": "Web mode (read-only, server-managed credentials)",
+                "secrets": "local secrets configured",
+                "available": "features available"
+            },
+            "status": {
+                "ready": "Ready",
+                "staged": "Staged",
+                "needsKeys": "Needs Keys",
+                "invalid": "Invalid",
+                "missing": "Missing",
+                "valid": "Valid",
+                "looksInvalid": "Looks invalid"
+            },
+            "placeholder": {
+                "setSecret": "Set secret",
+                "staged": "Staged (save with OK)"
+            }
+        },
+        "countryIntel": {
+            "title": "Country Intelligence",
+            "description": "Access detailed country profiles and geopolitical analysis."
+        }
+    },
+    "panels": {
+        "liveNews": "Live News",
+        "markets": "Markets",
+        "heatmap": "Sector Heatmap",
+        "crypto": "Crypto",
+        "strategicPosture": "Strategic Posture",
+        "cii": "Country Instability Index",
+        "status": "System Status",
+        "news": "Global News",
+        "insights": "AI Insights",
+        "signals": "Macro Signals",
+        "hazards": "Natural Hazards",
+        "map": "Interactive Map"
+    },
+    "components": {
+        "monitor": {
+            "placeholder": "Keywords (comma separated)",
+            "add": "+ Add Monitor",
+            "addKeywords": "Add keywords to monitor news",
+            "noMatches": "No matches in {{count}} articles",
+            "showingMatches": "Showing {{count}} of {{total}} matches",
+            "match": "match",
+            "matches": "matches"
+        },
+        "timeline": {
+            "title": "Timeline",
+            "today": "Today",
+            "yesterday": "Yesterday"
+        },
+        "playback": {
+            "play": "Play",
+            "pause": "Pause",
+            "speed": "Speed",
+            "live": "Live"
+        }
+    },
+    "popups": {
+        "startDate": "START DATE",
+        "endDate": "END DATE",
+        "magnitude": "Magnitude",
+        "intensity": "Intensity",
+        "status": "Status",
+        "keyEntities": "KEY ENTITIES",
+        "relatedHeadlines": "RELATED HEADLINES",
+        "liveIntel": "Live Intelligence",
+        "loadingNews": "Loading global news...",
+        "noCoverage": "No recent global coverage",
+        "depth": "Depth",
+        "time": "Time",
+        "area": "Area",
+        "expires": "Expires",
+        "type": "TYPE",
+        "aisGapSpike": "AIS GAP SPIKE",
+        "chokepointCongestion": "CHOKEPOINT CONGESTION",
+        "darkening": "DARKENING",
+        "density": "DENSITY",
+        "darkShips": "DARK SHIPS",
+        "vesselCount": "VESSEL COUNT",
+        "window": "WINDOW",
+        "region": "REGION",
+        "fatalities": "FATALITIES",
+        "actors": "ACTORS",
+        "near": "Near",
+        "moreEvents": "more events",
+        "monitoring": "Monitoring",
+        "viewUSGS": "View on USGS",
+        "expired": "Expired",
+        "timeAgo": {
+            "s": "s ago",
+            "m": "m ago",
+            "h": "h ago",
+            "d": "d ago"
+        }
+    },
+    "earthquake": {
+        "levels": {
+            "major": "MAJOR",
+            "moderate": "MODERATE",
+            "minor": "MINOR"
+        }
+    },
+    "base": {
+        "types": {
+            "us-nato": "US/NATO",
+            "china": "CHINA",
+            "russia": "RUSSIA"
+        }
+    },
+    "protest": {
+        "acledVerified": "ACLED (verified)",
+        "gdelt": "GDELT",
+        "riots": "Riots",
+        "highSeverity": "High Severity"
+    },
+    "flight": {
+        "groundStop": "GROUND STOP",
+        "groundDelay": "GROUND DELAY PROGRAM",
+        "departureDelay": "DEPARTURE DELAYS",
+        "arrivalDelay": "ARRIVAL DELAYS",
+        "delaysReported": "DELAYS REPORTED",
+        "delays": "DELAYS",
+        "avgDelay": "AVG DELAY",
+        "cancelled": "CANCELLED"
+    },
+    "capacity": "CAPACITY",
+    "apt": {
+        "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."
+    },
+    "cyberThreat": {
+        "title": "CYBER THREAT"
+    },
+    "nuclear": {
+        "types": {
+            "plant": "POWER PLANT",
+            "enrichment": "ENRICHMENT",
+            "weapons": "WEAPONS COMPLEX",
+            "research": "RESEARCH"
+        },
+        "description": "Nuclear facility under monitoring. Strategic importance for regional security and non-proliferation concerns."
+    },
+    "economic": {
+        "types": {
+            "exchange": "STOCK EXCHANGE",
+            "centralBank": "CENTRAL BANK",
+            "financialHub": "FINANCIAL HUB"
+        }
+    },
+    "irradiator": {
+        "subtitle": "Industrial Gamma Irradiator Facility",
+        "description": "Industrial irradiation facility using Cobalt-60 or Cesium-137 sources for medical device sterilization, food preservation, or material processing. Source: IAEA DIIF Database."
+    },
+    "pipeline": {
+        "title": "PIPELINE",
+        "types": {
+            "oil": "OIL PIPELINE",
+            "gas": "GAS PIPELINE",
+            "products": "PRODUCTS PIPELINE"
+        },
+        "status": {
+            "operating": "OPERATING",
+            "construction": "UNDER CONSTRUCTION"
+        },
+        "description": "Major {{type}} pipeline infrastructure. {{status}}"
+    },
+    "pipelineStatusDesc": {
+        "operating": "Currently operational and transporting resources.",
+        "construction": "Currently under construction."
+    },
+    "cable": {
+        "fault": "FAULT",
+        "degraded": "DEGRADED",
+        "active": "ACTIVE",
+        "major": "MAJOR",
+        "cable": "CABLE",
+        "subtitle": "Undersea Fiber Optic Cable",
+        "type": "SUBMARINE CABLE",
+        "advisory": "FAULT ADVISORY",
+        "repairDeployment": "REPAIR DEPLOYMENT"
+    },
+    "repairShip": {
+        "note": "Repair vessel tracking indicates active deployment toward fault site."
+    },
+    "strategic": "STRATEGIC",
+    "verified": "VERIFIED",
+    "sampledList": "Showing a sampled list of {{count}} events.",
+    "reason": "REASON",
+    "threat": "THREAT",
+    "aka": "Also known as",
+    "sponsor": "SPONSOR",
+    "origin": "ORIGIN",
+    "country": "COUNTRY",
+    "malware": "MALWARE",
+    "lastSeen": "LAST SEEN",
+    "open": "OPEN",
+    "tradingHours": "TRADING HOURS",
+    "gamma": "GAMMA",
+    "city": "CITY",
+    "length": "LENGTH",
+    "operator": "OPERATOR",
+    "countries": "COUNTRIES",
+    "waypoints": "WAYPOINTS",
+    "repairEta": "REPAIR ETA",
+    "timeUnits": {
+        "m": "m",
+        "h": "h",
+        "d": "d"
+    },
+    "common": {
+        "loading": "Loading...",
+        "error": "An error occurred",
+        "retry": "Retry",
+        "close": "Close",
+        "cancel": "Cancel",
+        "confirm": "Confirm",
+        "unknown": "Unknown",
+        "updated": "Updated: {{time}}"
+    }
+}
