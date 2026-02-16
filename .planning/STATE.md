@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - CSS custom properties approach enables instant theme switching without reload
 - (01-01) Split :root into two blocks: theme colors vs semantic colors, preventing accidental light-mode override of semantic values
 - (01-01) getCSSColor uses Map cache with auto-invalidation on data-theme attribute change
+- (01-02) Semantic-colored rgba tints kept hardcoded: CSS cannot parametrize rgba() individual channels with var()
+- (01-02) Overlay vars for backgrounds/borders only; shadow var for box-shadow contexts only; text hierarchy vars for text color
+- (01-02) High-opacity dark rgba (>0.6) maps to var(--bg), low-opacity (<0.35) maps to var(--overlay-heavy)
 - (01-03) color-mix(in srgb, var(--x) N%, transparent) pattern for alpha-transparent tints from CSS variables
 - (01-03) Settings window --settings-* variables alias global theme variables for cascade isolation
 
@@ -57,7 +60,7 @@ None yet.
 ### Blockers/Concerns
 
 **From Research:**
-- 124+ hardcoded color instances found via grep - must be systematically converted in Phase 1
+- ~~124+ hardcoded color instances found via grep - must be systematically converted in Phase 1~~ (resolved: 889 colors converted in 01-02)
 - Map basemap URL is hardcoded in DeckGLMap.ts - needs parameterization in Phase 3
 - D3 charts have hardcoded color scales - require theme subscriptions in Phase 3
 - Unknown if Carto light basemap ocean colors will require Deck.GL overlay adjustments
