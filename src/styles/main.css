@@ -497,9 +497,24 @@ canvas,
   gap: 12px;
 }
 
-.time-display {
-  font-size: 11px;
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
   color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-dim);
 }
 
 .settings-btn {
@@ -7077,8 +7092,7 @@ a.prediction-link:hover {
   }
 
   /* Hide non-essential header items */
-  .copy-link-btn,
-  .time-display {
+  .copy-link-btn {
     display: none;
   }
 }
