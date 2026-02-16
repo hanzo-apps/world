@@ -1,4 +1,5 @@
 import { getSnapshotTimestamps, getSnapshotAt, type DashboardSnapshot } from '@/services/storage';
+import { t } from '@/services/i18n';
 
 export class PlaybackControl {
   private element: HTMLElement;
@@ -11,7 +12,7 @@ export class PlaybackControl {
     this.element = document.createElement('div');
     this.element.className = 'playback-control';
     this.element.innerHTML = `
-      <button class="playback-toggle" title="Toggle Playback Mode">
+      <button class="playback-toggle" title="${t('components.playback.toggleMode')}">
         <span class="playback-icon">⏪</span>
       </button>
       <div class="playback-panel hidden">
@@ -144,7 +145,7 @@ export class PlaybackControl {
     const display = this.element.querySelector('.playback-time')!;
 
     if (!this.isPlaybackMode || this.timestamps.length === 0) {
-      display.textContent = 'LIVE';
+      display.textContent = t('components.playback.live');
       display.classList.remove('historical');
       return;
     }

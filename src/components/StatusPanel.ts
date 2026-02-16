@@ -66,7 +66,7 @@ export class StatusPanel extends Panel {
     this.element = document.createElement('div');
     this.element.className = 'status-panel-container';
     this.element.innerHTML = `
-      <button class="status-panel-toggle" title="System Status">
+      <button class="status-panel-toggle" title="${t('components.status.systemStatus')}">
         <span class="status-icon">◉</span>
       </button>
       <div class="status-panel hidden">
@@ -89,7 +89,7 @@ export class StatusPanel extends Panel {
           </div>
         </div>
         <div class="status-panel-footer">
-          <span class="last-check">Updated just now</span>
+          <span class="last-check">${t('components.status.updatedJustNow')}</span>
         </div>
       </div>
     `;
@@ -213,7 +213,7 @@ export class StatusPanel extends Panel {
     `).join('');
 
     this.updateStorageInfo(storageInfo);
-    lastCheck.textContent = `Updated ${this.formatTime(new Date())}`;
+    lastCheck.textContent = t('components.status.updatedAt', { time: this.formatTime(new Date()) });
   }
 
   private async updateStorageInfo(container: Element): Promise<void> {
@@ -229,10 +229,10 @@ export class StatusPanel extends Panel {
           </div>
         `;
       } else {
-        container.innerHTML = `<div class="status-row">Storage info unavailable</div>`;
+        container.innerHTML = `<div class="status-row">${t('components.status.storageUnavailable')}</div>`;
       }
     } catch {
-      container.innerHTML = `<div class="status-row">Storage info unavailable</div>`;
+      container.innerHTML = `<div class="status-row">${t('components.status.storageUnavailable')}</div>`;
     }
   }
 
