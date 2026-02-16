@@ -45,7 +45,7 @@
 }
 
 /* ============================================================
-   Semantic Colors — identical in both themes, NEVER overridden
+   Semantic Colors — dark-mode defaults, light overrides below
    ============================================================ */
 :root {
   /* Severity levels */
@@ -82,10 +82,24 @@
 }
 
 /* ============================================================
-   Light Theme — overrides theme colors only
-   Semantic colors intentionally NOT redefined — identical in both themes
+   Light Theme — overrides theme colors AND semantic colors
+   Bright/neon dark-mode colors need darker variants for light backgrounds
    ============================================================ */
 [data-theme="light"] {
+  /* Semantic color overrides — darker variants for light backgrounds */
+  --semantic-high: #ea580c;      /* Tailwind orange-600 (was #ff8800, 2.27:1) */
+  --semantic-elevated: #d97706;  /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  --semantic-normal: #15803d;    /* Tailwind green-700 (was #44aa44, 2.81:1) */
+  --threat-high: #c2410c;        /* Tailwind orange-700 (was #f97316, 2.66:1) */
+  --threat-medium: #ca8a04;      /* Tailwind yellow-600 (was #eab308, 1.82:1) */
+  --threat-low: #15803d;         /* Tailwind green-700 (was #22c55e, 2.16:1) */
+  --defcon-3: #d97706;           /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  --defcon-4: #0284c7;           /* Tailwind sky-600 (was #00aaff, 2.43:1) */
+  --status-live: #16a34a;        /* Tailwind green-600 (was #44ff88, 1.25:1) */
+  --status-cached: #d97706;      /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  --green: #16a34a;              /* Tailwind green-600 (was #44ff88) */
+  --yellow: #d97706;             /* Tailwind amber-600 (was #ffaa00) */
+
   /* Backgrounds */
   --bg: #f8f9fa;
   --bg-secondary: #f0f1f3;

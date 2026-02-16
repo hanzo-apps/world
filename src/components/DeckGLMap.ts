@@ -170,10 +170,14 @@ function getOverlayColors() {
       ? [255, 0, 0, 60] as [number, number, number, number]
       : [255, 0, 0, 100] as [number, number, number, number],
 
-    // Infrastructure/category markers: same in both modes (semantic, not theme-dependent)
+    // Infrastructure/category markers: darker variants in light mode for map readability
     base: [0, 150, 255, 200] as [number, number, number, number],
-    nuclear: [255, 215, 0, 200] as [number, number, number, number],
-    datacenter: [0, 255, 200, 180] as [number, number, number, number],
+    nuclear: isLight
+      ? [180, 120, 0, 220] as [number, number, number, number]
+      : [255, 215, 0, 200] as [number, number, number, number],
+    datacenter: isLight
+      ? [13, 148, 136, 200] as [number, number, number, number]
+      : [0, 255, 200, 180] as [number, number, number, number],
     cable: [0, 200, 255, 150] as [number, number, number, number],
     cableHighlight: [255, 100, 100, 200] as [number, number, number, number],
     earthquake: [255, 100, 50, 200] as [number, number, number, number],
@@ -182,9 +186,13 @@ function getOverlayColors() {
     protest: [255, 150, 0, 200] as [number, number, number, number],
     outage: [255, 50, 50, 180] as [number, number, number, number],
     weather: [100, 150, 255, 180] as [number, number, number, number],
-    startupHub: [0, 255, 150, 200] as [number, number, number, number],
+    startupHub: isLight
+      ? [22, 163, 74, 220] as [number, number, number, number]
+      : [0, 255, 150, 200] as [number, number, number, number],
     techHQ: [100, 200, 255, 200] as [number, number, number, number],
-    accelerator: [255, 200, 0, 200] as [number, number, number, number],
+    accelerator: isLight
+      ? [180, 120, 0, 220] as [number, number, number, number]
+      : [255, 200, 0, 200] as [number, number, number, number],
     cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
     ucdpStateBased: [255, 50, 50, 200] as [number, number, number, number],
     ucdpNonState: [255, 165, 0, 200] as [number, number, number, number],
@@ -2714,20 +2722,21 @@ export class DeckGLMap {
       hexagon: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 10.5,3.5 10.5,8.5 6,11 1.5,8.5 1.5,3.5" fill="${color}"/></svg>`,
     };
 
+    const isLight = getCurrentTheme() === 'light';
     const legendItems = SITE_VARIANT === 'tech'
       ? [
-          { shape: shapes.circle('rgb(0, 255, 150)'), label: 'Startup Hub' },
+          { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: 'Startup Hub' },
           { shape: shapes.circle('rgb(100, 200, 255)'), label: 'Tech HQ' },
-          { shape: shapes.circle('rgb(255, 200, 0)'), label: 'Accelerator' },
+          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: 'Accelerator' },
           { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud Region' },
           { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
         ]
       : [
           { shape: shapes.circle('rgb(255, 68, 68)'), label: 'High Alert' },
           { shape: shapes.circle('rgb(255, 165, 0)'), label: 'Elevated' },
-          { shape: shapes.circle('rgb(255, 255, 0)'), label: 'Monitoring' },
+          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 255, 0)'), label: 'Monitoring' },
           { shape: shapes.triangle('rgb(68, 136, 255)'), label: 'Base' },
-          { shape: shapes.hexagon('rgb(255, 220, 0)'), label: 'Nuclear' },
+          { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: 'Nuclear' },
           { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter' },
         ];
 
