@@ -3807,6 +3807,58 @@ a.prediction-link:hover {
   cursor: pointer;
 }
 
+.theme-toggle-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal .section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: block;
+  padding: 0 16px;
+}
+
+.theme-toggle-section .section-label {
+  padding: 0;
+}
+
+.theme-toggle-group {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.theme-option:hover {
+  border-color: var(--text-dim);
+}
+
+.theme-option.active,
+.theme-option:has(input:checked) {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.theme-option input[type="radio"] {
+  display: none;
+}
+
 .panel-toggle-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
