@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Users who prefer light mode get a first-class experience — every panel, the map, and all chrome look intentionally designed for light backgrounds, not like an afterthought inversion.
-**Current focus:** Phase 2 - Theme Core, Settings Toggle (COMPLETE)
+**Current focus:** Phase 3 - Map Visualization Theming (COMPLETE)
 
 ## Current Position
 
-Phase: 2 of 4 (Theme Core, Settings Toggle) - COMPLETE
+Phase: 3 of 4 (Map Visualization Theming)
 Plan: 2 of 2 (COMPLETE)
 Status: Phase Complete
-Last activity: 2026-02-16 — 02-02 Settings toggle UI and theme-changed event wiring complete
+Last activity: 2026-02-16 — 03-02 D3 chart & map theme-awareness complete
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 7 min
-- Total execution time: 0.80 hours
+- Total plans completed: 9
+- Average duration: 6 min
+- Total execution time: 0.92 hours
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01-css-foundation | 5/5 | 44min | 9min |
 | 02-theme-core-settings-toggle | 2/2 | 4min | 2min |
+| 03-map-visualization-theming | 2/2 | 7min | 3.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (5min), 01-04 (17min), 01-05 (12min), 02-01 (2min), 02-02 (2min)
-- Trend: consistent (Phase 2 plans fast due to focused scope)
+- Last 5 plans: 01-05 (12min), 02-01 (2min), 02-02 (2min), 03-01 (4min), 03-02 (3min)
+- Trend: fast execution with focused map/overlay scope
 
 *Updated after each plan completion*
 
@@ -64,6 +65,12 @@ Recent decisions affecting current work:
 - (02-01) CSP updated with unsafe-inline for script-src to allow FOUC prevention inline scripts
 - (02-02) Scoped .section-label to .modal context to avoid leaking styles to existing popup .section-label
 - (02-02) Used :has(input:checked) CSS pseudo-class alongside JS .active class for redundant active state
+- (03-01) Used let COLORS + getOverlayColors() refresh pattern to minimize diff across 14+ color references
+- (03-01) Conflict fills alpha 60 in light mode (vs 100 dark) for subtler overlay on cream background
+- (03-01) Displacement arc colors deeper/saturated in light mode for visibility on blue ocean/cream land
+- (03-02) Semantic lane colors (protest/conflict/natural/military) remain hardcoded hex in both themes
+- (03-02) Map light theme uses warm cream (#f0e8d8) land instead of greenish (#d8e8d8) for Voyager aesthetic
+- (03-02) Map.ts theme listener resets baseRendered flag to force full base layer rebuild
 
 ### Pending Todos
 
@@ -73,8 +80,8 @@ None yet.
 
 **From Research:**
 - ~~124+ hardcoded color instances found via grep - must be systematically converted in Phase 1~~ (resolved: 889 colors converted in 01-02, audit completed in 01-05)
-- Map basemap URL is hardcoded in DeckGLMap.ts - needs parameterization in Phase 3
-- D3 charts have hardcoded color scales - require theme subscriptions in Phase 3
+- ~~Map basemap URL is hardcoded in DeckGLMap.ts - needs parameterization in Phase 3~~ (resolved: theme-aware DARK_TILES/LIGHT_TILES constants + switchBasemap() in 03-01)
+- ~~D3 charts have hardcoded color scales - require theme subscriptions in Phase 3~~ (resolved: CountryTimeline converted to getCSSColor() in 03-02)
 - Unknown if Carto light basemap ocean colors will require Deck.GL overlay adjustments
 
 **Phase 1 Complete:**
@@ -86,7 +93,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16 (plan execution)
-Stopped at: Completed 02-02-PLAN.md — Settings toggle UI and theme-changed event wiring (Phase 2 COMPLETE)
+Stopped at: Completed 03-01-PLAN.md — DeckGL basemap and overlay theming (Phase 3 COMPLETE)
 Resume file: None
 
 ## Phase 1 Summary
@@ -139,3 +146,30 @@ Resume file: None
 6. Page loads with correct theme applied before first paint (no FOUC)
 
 **Next:** Phase 3 - Map & Chart Theme Subscriptions
+
+## Phase 3 Summary
+
+**Status:** COMPLETE
+
+**Completed Plans:**
+1. 03-01: DeckGL map basemap and overlay theming (4min)
+2. 03-02: D3 chart and map theme-awareness (3min)
+
+**Total Duration:** 7 minutes
+
+**Deliverables:**
+- Theme-aware basemap tile swap (CARTO dark to Voyager) via MapLibre setTiles() with no flash
+- getOverlayColors() per-render color refresh for Deck.GL overlay layers
+- Conflict fills more transparent in light mode, displacement arcs deeper for visibility
+- Country hover/highlight opacity auto-adjusts for theme
+- CountryTimeline D3 chart colors converted to getCSSColor() with theme-changed listener
+
+**Phase 3 Success Criteria Met:**
+1. Map basemap automatically switches between dark CARTO and light Voyager tiles
+2. No blank/gray flash during basemap transition
+3. Deck.GL overlay layers readable on both dark and light backgrounds
+4. Country fill overlays slightly more transparent in light mode
+5. Displacement arc colors visible on cream land and blue ocean
+6. D3 chart colors theme-aware via getCSSColor()
+
+**Next:** Phase 4 - Final Polish & Edge Cases
