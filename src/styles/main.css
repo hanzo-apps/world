@@ -102,7 +102,7 @@
   --text: #1a1a1a;
   --text-secondary: #333;
   --text-dim: #6b6b6b;
-  --text-muted: #8a8a8a;
+  --text-muted: #767676;  /* WCAG AA: 4.54:1 vs #f8f9fa */
   --text-faint: #aaa;
   --text-ghost: #bbb;
   --accent: #111111;
@@ -158,6 +158,33 @@ body.animations-paused *,
 body.animations-paused *::before,
 body.animations-paused *::after {
   animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* ============================================================
+   Theme Transition — smooth 200ms animation for theme switches
+   ============================================================ */
+*,
+*::before,
+*::after {
+  transition: background-color 0.2s ease,
+              color 0.2s ease,
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+/* Suppress transitions during initial page load (FOUC prevention) */
+.no-transition *,
+.no-transition *::before,
+.no-transition *::after {
+  transition: none !important;
+}
+
+/* Map and canvas elements manage their own rendering */
+canvas,
+.maplibregl-map,
+.maplibregl-canvas,
+.deck-canvas {
   transition: none !important;
 }
 
