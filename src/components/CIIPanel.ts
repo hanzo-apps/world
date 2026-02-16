@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { calculateCII, type CountryScore } from '@/services/country-instability';
+import { t } from '../services/i18n';
 
 export class CIIPanel extends Panel {
   private scores: CountryScore[] = [];
@@ -10,22 +11,19 @@ export class CIIPanel extends Panel {
   constructor() {
     super({
       id: 'cii',
-      title: 'Country Instability Index',
-      showCount: true,
-      trackActivity: true,
-      infoTooltip: `<strong>CII Methodology</strong>
-        Score (0-100) per country based on:
+      title: t('panels.cii'),
+      infoTooltip: `<strong>Methodology</strong>
         <ul>
-          <li>40% baseline geopolitical risk</li>
-          <li><strong>U</strong>nrest: protests, fatalities, internet outages</li>
+          <li><strong>U</strong>nrest: civil disorder & protests</li>
+          <li><strong>C</strong>onflict: armed conflict intensity</li>
           <li><strong>S</strong>ecurity: military flights/vessels over territory</li>
           <li><strong>I</strong>nformation: news velocity and focal point correlation</li>
           <li>Hotspot proximity boost (strategic locations)</li>
         </ul>
-        <em>U:S:I values show component scores.</em>
+        <em>U:C:S:I values show component scores.</em>
         Focal Point Detection correlates news entities with map signals for accurate scoring.`,
     });
-    this.showLoading('Scanning intelligence feeds');
+    this.showLoading(t('common.loading'));
   }
 
   public setShareStoryHandler(handler: (code: string, name: string) => void): void {
@@ -53,7 +51,7 @@ export class CIIPanel extends Panel {
   }
 
   private getTrendArrow(trend: CountryScore['trend'], change: number): string {
-    if (trend === 'rising') return `<span class="trend-up">↑${change > 0 ? change : ''}</span>`;
+    if (trend === 'rising') return `< span class= "trend-up" >↑${change > 0 ? change : ''} </span>`;
     if (trend === 'falling') return `<span class="trend-down">↓${Math.abs(change)}</span>`;
     return '<span class="trend-stable">→</span>';
   }

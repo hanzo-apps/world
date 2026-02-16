@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import type { UcdpGeoEvent, UcdpEventType } from '@/types';
+import { t } from '@/services/i18n';
 
 export class UcdpEventsPanel extends Panel {
   private events: UcdpGeoEvent[] = [];
@@ -10,7 +11,7 @@ export class UcdpEventsPanel extends Panel {
   constructor() {
     super({
       id: 'ucdp-events',
-      title: 'UCDP Conflict Events',
+      title: t('panels.ucdpEvents'),
       showCount: true,
       trackActivity: true,
       infoTooltip: `<strong>UCDP Georeferenced Events</strong>
@@ -72,7 +73,7 @@ export class UcdpEventsPanel extends Panel {
       const rows = displayed.map(e => {
         const deathsClass = e.type_of_violence === 'state-based' ? 'ucdp-deaths-state'
           : e.type_of_violence === 'non-state' ? 'ucdp-deaths-nonstate'
-          : 'ucdp-deaths-onesided';
+            : 'ucdp-deaths-onesided';
         const deathsHtml = e.deaths_best > 0
           ? `<span class="${deathsClass}">${e.deaths_best}</span> <small class="ucdp-range">(${e.deaths_low}-${e.deaths_high})</small>`
           : '<span class="ucdp-deaths-zero">0</span>';
