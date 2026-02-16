@@ -17,7 +17,7 @@ export class PlaybackControl {
       </button>
       <div class="playback-panel hidden">
         <div class="playback-header">
-          <span>Historical Playback</span>
+          <span>${t('components.playback.historicalPlayback')}</span>
           <button class="playback-close">×</button>
         </div>
         <div class="playback-slider-container">
@@ -27,7 +27,7 @@ export class PlaybackControl {
         <div class="playback-controls">
           <button class="playback-btn" data-action="start">⏮</button>
           <button class="playback-btn" data-action="prev">◀</button>
-          <button class="playback-btn playback-live" data-action="live">LIVE</button>
+          <button class="playback-btn playback-live" data-action="live">${t('components.playback.live')}</button>
           <button class="playback-btn" data-action="next">▶</button>
           <button class="playback-btn" data-action="end">⏭</button>
         </div>
