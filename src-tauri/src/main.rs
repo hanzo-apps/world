@@ -7,6 +7,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::env;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 use keyring::Entry;
 use reqwest::Url;
@@ -552,6 +554,8 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
     drop(token_slot);
 
     let mut cmd = Command::new(&node_binary);
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW — hide the node.exe console
     // Sanitize paths for Node.js on Windows: strip \\?\ UNC prefix and set
     // explicit working directory to avoid bare drive-letter CWD issues that
     // cause EISDIR errors in Node.js module resolution.
