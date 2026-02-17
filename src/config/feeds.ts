@@ -685,7 +685,8 @@ const TECH_FEEDS: Record<string, Feed[]> = {
 const FINANCE_FEEDS: Record<string, Feed[]> = {
   markets: [
     { name: 'CNBC', url: rss('https://www.cnbc.com/id/100003114/device/rss/rss.html') },
-    { name: 'MarketWatch', url: rss('https://feeds.marketwatch.com/marketwatch/topstories') },
+    // Direct MarketWatch RSS returns frequent 403s from cloud IPs; use Google News fallback.
+    { name: 'MarketWatch', url: rss('https://news.google.com/rss/search?q=site:marketwatch.com+markets+when:1d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Yahoo Finance', url: rss('https://finance.yahoo.com/rss/topstories') },
     { name: 'Seeking Alpha', url: rss('https://seekingalpha.com/market_currents.xml') },
     { name: 'Reuters Markets', url: rss('https://news.google.com/rss/search?q=site:reuters.com+markets+stocks+when:1d&hl=en-US&gl=US&ceid=US:en') },

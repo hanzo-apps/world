@@ -2929,10 +2929,16 @@ export class App {
       .filter((entry): entry is [string, typeof FEEDS[keyof typeof FEEDS]] => Array.isArray(entry[1]) && entry[1].length > 0)
       .map(([key, feeds]) => ({ key, feeds }));
 
-    // Fetch all categories in parallel
-    const categoryResults = await Promise.allSettled(
-      categories.map(({ key, feeds }) => this.loadNewsCategory(key, feeds))
-    );
+    // Finance variant has a much larger feed surface; stage category fetches to avoid startup bursts.
+    const categoryConcurrency = SITE_VARIANT === 'finance' ? 3 : Math.max(1, categories.length);
+    const categoryResults: PromiseSettledResult<NewsItem[]>[] = [];
+    for (let i = 0; i < categories.length; i += categoryConcurrency) {
+      const chunk = categories.slice(i, i + categoryConcurrency);
+      const chunkResults = await Promise.allSettled(
+        chunk.map(({ key, feeds }) => this.loadNewsCategory(key, feeds))
+      );
+      categoryResults.push(...chunkResults);
+    }
 
     // Collect successful results
     const collectedNews: NewsItem[] = [];
