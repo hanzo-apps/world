@@ -1,4 +1,18 @@
 {
+    "panels": {
+        "liveNews": "Live News",
+        "markets": "Markets",
+        "heatmap": "Sector Heatmap",
+        "crypto": "Crypto",
+        "strategicPosture": "Strategic Posture",
+        "cii": "Country Instability Index",
+        "status": "System Status",
+        "news": "Global News",
+        "insights": "AI Insights",
+        "signals": "Macro Signals",
+        "hazards": "Natural Hazards",
+        "map": "Interactive Map"
+    },
     "modals": {
         "search": {
             "placeholder": "Search news, pipelines, bases, markets...",
@@ -91,20 +105,6 @@
             "description": "Access detailed country profiles and geopolitical analysis."
         }
     },
-    "panels": {
-        "liveNews": "Live News",
-        "markets": "Markets",
-        "heatmap": "Sector Heatmap",
-        "crypto": "Crypto",
-        "strategicPosture": "Strategic Posture",
-        "cii": "Country Instability Index",
-        "status": "System Status",
-        "news": "Global News",
-        "insights": "AI Insights",
-        "signals": "Macro Signals",
-        "hazards": "Natural Hazards",
-        "map": "Interactive Map"
-    },
     "components": {
         "monitor": {
             "placeholder": "Keywords (comma separated)",
@@ -128,155 +128,204 @@
         }
     },
     "popups": {
-        "startDate": "START DATE",
-        "endDate": "END DATE",
+        "startDate": "STARTDATUM",
+        "endDate": "EINDDATUM",
         "magnitude": "Magnitude",
-        "intensity": "Intensity",
-        "status": "Status",
-        "keyEntities": "KEY ENTITIES",
-        "relatedHeadlines": "RELATED HEADLINES",
-        "liveIntel": "Live Intelligence",
-        "loadingNews": "Loading global news...",
-        "noCoverage": "No recent global coverage",
-        "depth": "Depth",
-        "time": "Time",
-        "area": "Area",
-        "expires": "Expires",
+        "depth": "Diepte",
+        "intensity": "Intensiteit",
         "type": "TYPE",
-        "aisGapSpike": "AIS GAP SPIKE",
-        "chokepointCongestion": "CHOKEPOINT CONGESTION",
-        "darkening": "DARKENING",
-        "density": "DENSITY",
-        "darkShips": "DARK SHIPS",
-        "vesselCount": "VESSEL COUNT",
-        "window": "WINDOW",
-        "region": "REGION",
-        "fatalities": "FATALITIES",
-        "actors": "ACTORS",
-        "near": "Near",
-        "moreEvents": "more events",
+        "status": "STATUS",
+        "severity": "Ernst",
+        "location": "LOCATIE",
+        "coordinates": "COÖRDINATEN",
+        "casualties": "SLACHTOFFERS",
+        "displaced": "ONTHEEMDEN",
+        "belligerents": "STRIJDENDE PARTIJEN",
+        "keyDevelopments": "BELANGRIJKE ONTWIKKELINGEN",
+        "unknown": "Onbekend",
+        "source": "Bron",
+        "target": "Doelwit",
+        "events": "Gebeurtenissen",
+        "impact": "Impact",
+        "capacity": "Capaciteit",
+        "alerts": "Actieve waarschuwingen",
+        "common": {
+            "start": "START",
+            "end": "EINDE",
+            "updated": "BIJGEWERKT"
+        },
+        "conflict": {
+            "title": "CONFLICTZONE"
+        },
+        "earthquake": {
+            "levels": {
+                "major": "ZWAAR",
+                "moderate": "MATIG",
+                "minor": "LICHT"
+            }
+        },
+        "base": {
+            "types": {
+                "us-nato": "VS/NAVO",
+                "china": "CHINA",
+                "russia": "RUSLAND"
+            }
+        },
+        "protest": {
+            "acledVerified": "ACLED (geverifieerd)",
+            "gdelt": "GDELT",
+            "riots": "Rellen",
+            "highSeverity": "Hoge ernst"
+        },
+        "flight": {
+            "groundStop": "GRONDSTOP",
+            "groundDelay": "GRONDVERTRAGING",
+            "departureDelay": "VERTREKVERTRAGINGEN",
+            "arrivalDelay": "AANKOMSTVERTRAGINGEN",
+            "delaysReported": "VERTRAGINGEN GEMELD",
+            "delays": "VERTRAGINGEN",
+            "avgDelay": "GEM. VERTRAGING",
+            "cancelled": "GEANNULEERD"
+        },
+        "apt": {
+            "description": "Geavanceerde persistente dreigingsgroep met capaciteiten op staatsniveau. Bekend om geavanceerde cyberoperaties gericht op kritieke infrastructuur, overheid en defensiesectoren."
+        },
+        "cyberThreat": {
+            "title": "CYBERDREIGING"
+        },
+        "nuclear": {
+            "types": {
+                "plant": "KERNCENTRALE",
+                "enrichment": "VERRIJKING",
+                "weapons": "WAPENCOMPLEX",
+                "research": "ONDERZOEK"
+            },
+            "description": "Nucleaire faciliteit onder toezicht. Strategisch belang voor regionale veiligheid en non-proliferatie."
+        },
+        "economic": {
+            "types": {
+                "exchange": "EFFECTENBEURS",
+                "centralBank": "CENTRALE BANK",
+                "financialHub": "FINANCIEEL CENTRUM"
+            }
+        },
+        "irradiator": {
+            "subtitle": "Industriële gammabestralingsfaciliteit",
+            "description": "Industriële bestralingsfaciliteit met Cobalt-60 of Cesium-137 voor sterilisatie van medische apparatuur, voedselconservering of materiaalverwerking. Bron: IAEA DIIF-database."
+        },
+        "pipeline": {
+            "title": "PIJPLEIDING",
+            "types": {
+                "oil": "OLIEPIJPLEIDING",
+                "gas": "GASPIJPLEIDING",
+                "products": "PRODUCTPIJPLEIDING"
+            },
+            "status": {
+                "operating": "IN BEDRIJF",
+                "construction": "IN AANBOUW"
+            },
+            "description": "Belangrijke {{type}}-pijpleidinginfrastructuur. {{status}}"
+        },
+        "pipelineStatusDesc": {
+            "operating": "Momenteel operationeel en transporteert grondstoffen.",
+            "construction": "Momenteel in aanbouw."
+        },
+        "cable": {
+            "fault": "STORING",
+            "degraded": "VERSLECHTERD",
+            "active": "ACTIEF",
+            "major": "ERNSTIG",
+            "cable": "KABEL",
+            "subtitle": "Onderzeese glasvezelkabel",
+            "type": "ZEEKABEL",
+            "advisory": "STORINGSADVIES",
+            "repairDeployment": "REPARATIE-INZET"
+        },
+        "repairShip": {
+            "note": "Tracking van reparatieschip wijst op actieve inzet richting storingslocatie."
+        },
+        "strategic": "STRATEGISCH",
+        "verified": "GEVERIFIEERD",
+        "sampledList": "Steekproef van {{count}} gebeurtenissen weergegeven.",
+        "reason": "REDEN",
+        "threat": "DREIGING",
+        "aka": "Ook bekend als",
+        "sponsor": "SPONSOR",
+        "origin": "HERKOMST",
+        "country": "LAND",
+        "malware": "MALWARE",
+        "lastSeen": "LAATST GEZIEN",
+        "open": "OPEN",
+        "tradingHours": "HANDELSUREN",
+        "gamma": "GAMMA",
+        "city": "STAD",
+        "length": "LENGTE",
+        "operator": "OPERATOR",
+        "countries": "LANDEN",
+        "waypoints": "WAYPOINTS",
+        "repairEta": "REPARATIE-ETA",
+        "timeUnits": {
+            "m": "m",
+            "h": "u",
+            "d": "d"
+        },
+        "hotspot": {
+            "escalation": "ESCALATIEBEOORDELING",
+            "baseline": "Basislijn",
+            "score": "Score",
+            "trend": "Trend",
+            "components": {
+                "news": "Nieuws",
+                "cii": "CII",
+                "geo": "Geo",
+                "military": "Militair"
+            },
+            "levels": {
+                "stable": "STABIEL",
+                "watch": "BEWAKING",
+                "elevated": "VERHOOGD",
+                "high": "HOOG",
+                "critical": "KRITIEK"
+            }
+        },
+        "buttons": {
+            "track": "Probleem volgen",
+            "details": "Details bekijken"
+        },
+        "historicalContext": "HISTORISCHE CONTEXT",
+        "lastMajorEvent": "Laatste grote gebeurtenis",
+        "precedents": "Precedenten",
+        "cyclicalPattern": "Cyclisch patroon",
+        "whyItMatters": "WAAROM HET ERTOE DOET",
+        "keyEntities": "SLEUTELENTITEITEN",
+        "relatedHeadlines": "GERELATEERDE KOPPEN",
+        "liveIntel": "Live Intelligence",
+        "loadingNews": "Wereldnieuws laden...",
+        "noCoverage": "Geen recente wereldwijde dekking",
+        "time": "Tijd",
+        "area": "Gebied",
+        "expires": "Verloopt",
+        "aisGapSpike": "AIS-LACUNE PIEK",
+        "chokepointCongestion": "KNELPUNT CONGESTIE",
+        "darkening": "VERDUISTERING",
+        "density": "DICHTHEID",
+        "darkShips": "DONKERE SCHEPEN",
+        "vesselCount": "SCHEEPSTELLING",
+        "window": "VENSTER",
+        "region": "REGIO",
+        "fatalities": "DODELIJKE SLACHTOFFERS",
+        "actors": "ACTOREN",
+        "near": "Nabij",
+        "moreEvents": "meer gebeurtenissen",
         "monitoring": "Monitoring",
-        "viewUSGS": "View on USGS",
-        "expired": "Expired",
+        "viewUSGS": "Bekijk op USGS",
+        "expired": "Verlopen",
         "timeAgo": {
-            "s": "s ago",
-            "m": "m ago",
-            "h": "h ago",
-            "d": "d ago"
+            "s": "s geleden",
+            "m": "m geleden",
+            "h": "u geleden",
+            "d": "d geleden"
         }
-    },
-    "earthquake": {
-        "levels": {
-            "major": "MAJOR",
-            "moderate": "MODERATE",
-            "minor": "MINOR"
-        }
-    },
-    "base": {
-        "types": {
-            "us-nato": "US/NATO",
-            "china": "CHINA",
-            "russia": "RUSSIA"
-        }
-    },
-    "protest": {
-        "acledVerified": "ACLED (verified)",
-        "gdelt": "GDELT",
-        "riots": "Riots",
-        "highSeverity": "High Severity"
-    },
-    "flight": {
-        "groundStop": "GROUND STOP",
-        "groundDelay": "GROUND DELAY PROGRAM",
-        "departureDelay": "DEPARTURE DELAYS",
-        "arrivalDelay": "ARRIVAL DELAYS",
-        "delaysReported": "DELAYS REPORTED",
-        "delays": "DELAYS",
-        "avgDelay": "AVG DELAY",
-        "cancelled": "CANCELLED"
-    },
-    "capacity": "CAPACITY",
-    "apt": {
-        "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."
-    },
-    "cyberThreat": {
-        "title": "CYBER THREAT"
-    },
-    "nuclear": {
-        "types": {
-            "plant": "POWER PLANT",
-            "enrichment": "ENRICHMENT",
-            "weapons": "WEAPONS COMPLEX",
-            "research": "RESEARCH"
-        },
-        "description": "Nuclear facility under monitoring. Strategic importance for regional security and non-proliferation concerns."
-    },
-    "economic": {
-        "types": {
-            "exchange": "STOCK EXCHANGE",
-            "centralBank": "CENTRAL BANK",
-            "financialHub": "FINANCIAL HUB"
-        }
-    },
-    "irradiator": {
-        "subtitle": "Industrial Gamma Irradiator Facility",
-        "description": "Industrial irradiation facility using Cobalt-60 or Cesium-137 sources for medical device sterilization, food preservation, or material processing. Source: IAEA DIIF Database."
-    },
-    "pipeline": {
-        "title": "PIPELINE",
-        "types": {
-            "oil": "OIL PIPELINE",
-            "gas": "GAS PIPELINE",
-            "products": "PRODUCTS PIPELINE"
-        },
-        "status": {
-            "operating": "OPERATING",
-            "construction": "UNDER CONSTRUCTION"
-        },
-        "description": "Major {{type}} pipeline infrastructure. {{status}}"
-    },
-    "pipelineStatusDesc": {
-        "operating": "Currently operational and transporting resources.",
-        "construction": "Currently under construction."
-    },
-    "cable": {
-        "fault": "FAULT",
-        "degraded": "DEGRADED",
-        "active": "ACTIVE",
-        "major": "MAJOR",
-        "cable": "CABLE",
-        "subtitle": "Undersea Fiber Optic Cable",
-        "type": "SUBMARINE CABLE",
-        "advisory": "FAULT ADVISORY",
-        "repairDeployment": "REPAIR DEPLOYMENT"
-    },
-    "repairShip": {
-        "note": "Repair vessel tracking indicates active deployment toward fault site."
-    },
-    "strategic": "STRATEGIC",
-    "verified": "VERIFIED",
-    "sampledList": "Showing a sampled list of {{count}} events.",
-    "reason": "REASON",
-    "threat": "THREAT",
-    "aka": "Also known as",
-    "sponsor": "SPONSOR",
-    "origin": "ORIGIN",
-    "country": "COUNTRY",
-    "malware": "MALWARE",
-    "lastSeen": "LAST SEEN",
-    "open": "OPEN",
-    "tradingHours": "TRADING HOURS",
-    "gamma": "GAMMA",
-    "city": "CITY",
-    "length": "LENGTH",
-    "operator": "OPERATOR",
-    "countries": "COUNTRIES",
-    "waypoints": "WAYPOINTS",
-    "repairEta": "REPAIR ETA",
-    "timeUnits": {
-        "m": "m",
-        "h": "h",
-        "d": "d"
     },
     "common": {
         "loading": "Laden...",
