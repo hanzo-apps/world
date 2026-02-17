@@ -10,6 +10,8 @@ import pt from '../locales/pt.json';
 import nl from '../locales/nl.json';
 import sv from '../locales/sv.json';
 import ru from '../locales/ru.json';
+import ar from '../locales/ar.json';
+import zh from '../locales/zh.json';
 
 const resources = {
   en: { translation: en },
@@ -22,7 +24,20 @@ const resources = {
   nl: { translation: nl },
   sv: { translation: sv },
   ru: { translation: ru },
+  ar: { translation: ar },
+  zh: { translation: zh },
 };
+
+const RTL_LANGUAGES = new Set(['ar']);
+
+function applyDocumentDirection(lang: string): void {
+  document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
+  if (RTL_LANGUAGES.has(lang)) {
+    document.documentElement.setAttribute('dir', 'rtl');
+  } else {
+    document.documentElement.removeAttribute('dir');
+  }
+}
 
 // Initialize i18n
 export async function initI18n(): Promise<void> {
@@ -40,6 +55,7 @@ export async function initI18n(): Promise<void> {
         caches: ['localStorage'],
       },
     });
+  applyDocumentDirection(i18next.language || 'en');
 }
 
 // Helper to translate
@@ -50,6 +66,7 @@ export function t(key: string, options?: Record<string, unknown>): string {
 // Helper to change language
 export async function changeLanguage(lng: string): Promise<void> {
   await i18next.changeLanguage(lng);
+  applyDocumentDirection(lng);
   window.location.reload(); // Simple reload to update all components for now
 }
 
@@ -58,8 +75,20 @@ export function getCurrentLanguage(): string {
   return i18next.language || 'en';
 }
 
+export function isRTL(): boolean {
+  return RTL_LANGUAGES.has(getCurrentLanguage());
+}
+
+export function getLocale(): string {
+  const lang = getCurrentLanguage();
+  const map: Record<string, string> = { en: 'en-US', zh: 'zh-CN', pt: 'pt-BR' };
+  return map[lang] || lang;
+}
+
 export const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
   { code: 'fr', label: 'Français', flag: '🇫🇷' },
   { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
   { code: 'es', label: 'Español', flag: '🇪🇸' },
