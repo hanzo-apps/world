@@ -194,8 +194,12 @@ export class MapPopup {
         top = topBuffer;
       }
 
-      // CRITICAL: Ensure popup never goes above the top buffer (header area)
+      // CRITICAL: Ensure popup stays within viewport vertically
       top = Math.max(topBuffer, top);
+      const maxTop = window.innerHeight - popupHeight - bottomBuffer;
+      if (maxTop > topBuffer) {
+        top = Math.min(top, maxTop);
+      }
 
       this.popup.style.left = `${left}px`;
       this.popup.style.top = `${top}px`;
