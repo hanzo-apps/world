@@ -29,17 +29,7 @@ export class TechReadinessPanel extends Panel {
       id: 'tech-readiness',
       title: t('panels.techReadiness'),
       showCount: true,
-      infoTooltip: `
-        <strong>Global Tech Readiness</strong><br>
-        Composite score (0-100) based on World Bank data:<br><br>
-        <strong>Metrics shown:</strong><br>
-        🌐 Internet Users (% of population)<br>
-        📱 Mobile Subscriptions (per 100 people)<br>
-        🔬 R&D Expenditure (% of GDP)<br><br>
-        <strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br>
-        <em>— = No recent data available</em><br>
-        <em>Source: World Bank Open Data (2019-2024)</em>
-      `,
+      infoTooltip: t('components.techReadiness.infoTooltip'),
     });
   }
 

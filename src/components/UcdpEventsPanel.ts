@@ -14,15 +14,7 @@ export class UcdpEventsPanel extends Panel {
       title: t('panels.ucdpEvents'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>UCDP Georeferenced Events</strong>
-        Event-level conflict data from Uppsala University.
-        <ul>
-          <li><strong>State-Based</strong>: Government vs rebel group</li>
-          <li><strong>Non-State</strong>: Armed group vs armed group</li>
-          <li><strong>One-Sided</strong>: Violence against civilians</li>
-        </ul>
-        Deaths shown as best estimate (low-high range).
-        ACLED duplicates are filtered out automatically.`,
+      infoTooltip: t('components.ucdpEvents.infoTooltip'),
     });
     this.showLoading(t('common.loadingUcdpEvents'));
   }

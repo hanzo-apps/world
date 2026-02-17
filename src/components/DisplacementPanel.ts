@@ -17,14 +17,7 @@ export class DisplacementPanel extends Panel {
       title: t('panels.displacement'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>UNHCR Displacement Data</strong>
-        Global refugee, asylum seeker, and IDP counts from UNHCR.
-        <ul>
-          <li><strong>Origins</strong>: Countries people flee FROM</li>
-          <li><strong>Hosts</strong>: Countries hosting refugees</li>
-          <li>Crisis badges: >1M | High: >500K displaced</li>
-        </ul>
-        Data updates yearly. CC BY 4.0 license.`,
+      infoTooltip: t('components.displacement.infoTooltip'),
     });
     this.showLoading(t('common.loadingDisplacement'));
   }

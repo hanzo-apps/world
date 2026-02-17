@@ -8,14 +8,7 @@ export class PredictionPanel extends Panel {
     super({
       id: 'polymarket',
       title: t('panels.polymarket'),
-      infoTooltip: `<strong>Prediction Markets</strong>
-        Real-money forecasting markets:
-        <ul>
-          <li>Prices reflect crowd probability estimates</li>
-          <li>Higher volume = more reliable signal</li>
-          <li>Geopolitical and current events focus</li>
-        </ul>
-        Source: Polymarket (polymarket.com)`,
+      infoTooltip: t('components.prediction.infoTooltip'),
     });
   }
 

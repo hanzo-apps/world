@@ -71,7 +71,7 @@ export class InvestmentsPanel extends Panel {
       id: 'gcc-investments',
       title: t('panels.gccInvestments'),
       showCount: true,
-      infoTooltip: 'Database of Saudi Arabia and UAE foreign direct investments in global critical infrastructure. Click a row to fly to the investment on the map.',
+      infoTooltip: t('components.investments.infoTooltip'),
     });
     this.onInvestmentClick = onInvestmentClick;
     this.render();
