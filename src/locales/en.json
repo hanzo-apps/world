@@ -129,6 +129,10 @@
     "search": {
       "placeholder": "Search news, pipelines, bases, markets...",
       "hint": "News • Pipelines • Bases • Cables • Datacenters • Markets",
+      "placeholderTech": "Search companies, AI labs, startups, events...",
+      "hintTech": "HQs • Companies • AI Labs • Startups • Accelerators • Events",
+      "placeholderFinance": "Search exchanges, markets, central banks...",
+      "hintFinance": "Exchanges • Financial Centers • Central Banks • Commodities",
       "recent": "Recent Searches",
       "empty": "Search across all data sources",
       "noResults": "No results",
@@ -163,6 +167,20 @@
       "soundAlerts": "Sound alerts",
       "dismiss": "Dismiss",
       "confidence": "Confidence",
+      "country": "Country:",
+      "scoreChange": "Score Change:",
+      "instabilityLevel": "Instability Level:",
+      "primaryDriver": "Primary Driver:",
+      "location": "Location:",
+      "eventTypes": "Event Types:",
+      "eventCount": "Event Count:",
+      "eventCountValue": "{{count}} events in 24h",
+      "source": "Source:",
+      "countriesAffected": "Countries Affected:",
+      "impactLevel": "Impact Level:",
+      "focalPoints": "CORRELATED FOCAL POINTS",
+      "newsCorrelation": "NEWS CORRELATION",
+      "viewOnMap": "View on map",
       "whyItMatters": "Why it matters:",
       "action": "Action:",
       "note": "Note:",
@@ -184,6 +202,8 @@
     },
     "story": {
       "generating": "Generating story...",
+      "close": "Close",
+      "shareTitle": "Share story",
       "save": "Save",
       "whatsapp": "WhatsApp",
       "twitter": "X",
@@ -207,6 +227,8 @@
       "macSilicon": "macOS (Apple Silicon)",
       "macIntel": "macOS (Intel)",
       "windows": "Windows (.exe)",
+      "showAllPlatforms": "Show all platforms",
+      "showLess": "Show less",
       "dismiss": "Dismiss"
     },
     "runtimeConfig": {
@@ -281,7 +303,57 @@
       "cached": "Cached",
       "fresh": "Fresh",
       "noMarkets": "No prediction markets found",
-      "predictionMarkets": "Prediction Markets"
+      "predictionMarkets": "Prediction Markets",
+      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings."
+    },
+    "countryBrief": {
+      "identifying": "Identifying country...",
+      "locating": "Locating region...",
+      "limitedCoverage": "Limited coverage",
+      "instabilityIndex": "Instability Index",
+      "notTracked": "Not tracked — {{country}} is not in the CII tier-1 list",
+      "intelBrief": "Intelligence Brief",
+      "generatingBrief": "Generating intelligence brief...",
+      "topNews": "Top News",
+      "activeSignals": "Active Signals",
+      "timeline": "7-Day Timeline",
+      "predictionMarkets": "Prediction Markets",
+      "loadingMarkets": "Loading prediction markets...",
+      "infrastructure": "Infrastructure Exposure",
+      "briefUnavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+      "cached": "Cached",
+      "fresh": "Fresh",
+      "noMarkets": "No prediction markets found",
+      "loadingIndex": "Loading index...",
+      "components": {
+        "unrest": "Unrest",
+        "conflict": "Conflict",
+        "security": "Security",
+        "information": "Information"
+      },
+      "signals": {
+        "protests": "protests",
+        "militaryAir": "mil. aircraft",
+        "militarySea": "mil. vessels",
+        "outages": "outages",
+        "earthquakes": "earthquakes",
+        "displaced": "displaced",
+        "climate": "Climate stress",
+        "conflictEvents": "conflict events"
+      },
+      "timeAgo": {
+        "m": "m ago",
+        "h": "h ago",
+        "d": "d ago"
+      },
+      "infra": {
+        "pipeline": "Pipelines",
+        "cable": "Undersea Cables",
+        "datacenter": "Data Centers",
+        "base": "Military Bases",
+        "nuclear": "Nuclear Facilities",
+        "port": "Ports"
+      }
     }
   },
   "components": {
@@ -518,6 +590,7 @@
     "impact": "Impact",
     "capacity": "Capacity",
     "alerts": "Active Alerts",
+    "updated": "Updated",
     "common": {
       "start": "START",
       "end": "END",
@@ -700,6 +773,7 @@
     "loading": "Loading...",
     "error": "Error",
     "noData": "No data available",
+    "noDataAvailable": "No data available",
     "updated": "Updated just now",
     "ago": "{{time}} ago",
     "failedToLoad": "Failed to load data",
@@ -733,6 +807,8 @@
     "exportCsv": "Export CSV",
     "exportJson": "Export JSON",
     "exportData": "Export Data",
+    "selectAll": "Select All",
+    "selectNone": "Select None",
     "unrest": "Unrest",
     "conflict": "Conflict",
     "security": "Security",
