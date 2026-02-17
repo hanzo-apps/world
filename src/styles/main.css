@@ -820,6 +820,7 @@ canvas,
   background: var(--overlay-subtle);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  position: relative;
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -835,6 +836,18 @@ canvas,
 .panel-header-error .panel-count {
   background: rgba(255, 80, 80, 0.3);
   color: var(--semantic-critical);
+}
+
+.header-clock {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  text-transform: uppercase;
 }
 
 .panel-header-left {
