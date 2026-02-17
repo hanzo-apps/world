@@ -42,6 +42,7 @@ import type { ParsedMapUrlState } from '@/utils';
 import {
   MapContainer,
   type MapView,
+  type TimeRange,
   NewsPanel,
   MarketPanel,
   HeatmapPanel,
@@ -127,6 +128,8 @@ export class App {
   private panels: Record<string, Panel> = {};
   private newsPanels: Record<string, NewsPanel> = {};
   private allNews: NewsItem[] = [];
+  private newsByCategory: Record<string, NewsItem[]> = {};
+  private currentTimeRange: TimeRange = '7d';
   private monitors: Monitor[];
   private panelSettings: Record<string, PanelConfig>;
   private mapLayers: MapLayers;
@@ -140,6 +143,9 @@ export class App {
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
   private latestClusters: ClusteredEvent[] = [];
+  private readonly applyTimeRangeFilterToNewsPanelsDebounced = debounce(() => {
+    this.applyTimeRangeFilterToNewsPanels();
+  }, 120);
   private isPlaybackMode = false;
   private initialUrlState: ParsedMapUrlState | null = null;
   private inFlight: Set<string> = new Set();
@@ -1807,6 +1813,7 @@ export class App {
 
     // Initialize escalation service with data getters
     this.map.initEscalationGetters();
+    this.currentTimeRange = this.map.getTimeRange();
 
     // Create all panels
     const politicsPanel = new NewsPanel('politics', 'World / Geopolitical');
@@ -2099,6 +2106,11 @@ export class App {
         this.makeDraggable(el, key);
         panelsGrid.appendChild(el);
       }
+    });
+
+    this.map.onTimeRangeChanged((range) => {
+      this.currentTimeRange = range;
+      this.applyTimeRangeFilterToNewsPanelsDebounced();
     });
 
     this.applyPanelSettings();
@@ -2850,6 +2862,57 @@ export class App {
     }
   }
 
+  private getTimeRangeWindowMs(range: TimeRange): number {
+    const ranges: Record<TimeRange, number> = {
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '48h': 48 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      'all': Infinity,
+    };
+    return ranges[range];
+  }
+
+  private filterItemsByTimeRange(items: NewsItem[], range: TimeRange = this.currentTimeRange): NewsItem[] {
+    if (range === 'all') return items;
+    const cutoff = Date.now() - this.getTimeRangeWindowMs(range);
+    return items.filter((item) => {
+      const ts = item.pubDate instanceof Date ? item.pubDate.getTime() : new Date(item.pubDate).getTime();
+      return Number.isFinite(ts) ? ts >= cutoff : true;
+    });
+  }
+
+  private getTimeRangeLabel(range: TimeRange = this.currentTimeRange): string {
+    const labels: Record<TimeRange, string> = {
+      '1h': 'the last hour',
+      '6h': 'the last 6 hours',
+      '24h': 'the last 24 hours',
+      '48h': 'the last 48 hours',
+      '7d': 'the last 7 days',
+      'all': 'all time',
+    };
+    return labels[range];
+  }
+
+  private renderNewsForCategory(category: string, items: NewsItem[]): void {
+    this.newsByCategory[category] = items;
+    const panel = this.newsPanels[category];
+    if (!panel) return;
+    const filteredItems = this.filterItemsByTimeRange(items);
+    if (filteredItems.length === 0 && items.length > 0) {
+      panel.renderFilteredEmpty(`No items in ${this.getTimeRangeLabel()}`);
+      return;
+    }
+    panel.renderNews(filteredItems);
+  }
+
+  private applyTimeRangeFilterToNewsPanels(): void {
+    Object.entries(this.newsByCategory).forEach(([category, items]) => {
+      this.renderNewsForCategory(category, items);
+    });
+  }
+
   private async loadNewsCategory(category: string, feeds: typeof FEEDS.politics): Promise<NewsItem[]> {
     try {
       const panel = this.newsPanels[category];
@@ -2861,6 +2924,7 @@ export class App {
       // Filter out disabled sources
       const enabledFeeds = (feeds ?? []).filter(f => !this.disabledSources.has(f.name));
       if (enabledFeeds.length === 0) {
+        delete this.newsByCategory[category];
         if (panel) panel.showError('All sources disabled');
         this.statusPanel?.updateFeed(category.charAt(0).toUpperCase() + category.slice(1), {
           status: 'ok',
@@ -2870,8 +2934,8 @@ export class App {
       }
 
       const flushPendingRender = () => {
-        if (!panel || !pendingItems) return;
-        panel.renderNews(pendingItems);
+        if (!pendingItems) return;
+        this.renderNewsForCategory(category, pendingItems);
         pendingItems = null;
         lastRenderTime = Date.now();
       };
@@ -2904,13 +2968,13 @@ export class App {
         },
       });
 
+      this.renderNewsForCategory(category, items);
       if (panel) {
         if (renderTimeout) {
           clearTimeout(renderTimeout);
           renderTimeout = null;
           pendingItems = null;
         }
-        panel.renderNews(items);
 
         const baseline = await updateBaseline(`news:${category}`, items.length);
         const deviation = calculateDeviation(items.length, baseline);
@@ -2930,6 +2994,7 @@ export class App {
         errorMessage: String(error),
       });
       this.statusPanel?.updateApi('RSS2JSON', { status: 'error' });
+      delete this.newsByCategory[category];
       return [];
     }
   }
@@ -2988,14 +3053,15 @@ export class App {
       const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
       const intelPanel = this.newsPanels['intel'];
       if (enabledIntelSources.length === 0) {
+        delete this.newsByCategory['intel'];
         if (intelPanel) intelPanel.showError('All Intel sources disabled');
         this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: 0 });
       } else {
         const intelResult = await Promise.allSettled([fetchCategoryFeeds(enabledIntelSources)]);
         if (intelResult[0]?.status === 'fulfilled') {
           const intel = intelResult[0].value;
+          this.renderNewsForCategory('intel', intel);
           if (intelPanel) {
-            intelPanel.renderNews(intel);
             const baseline = await updateBaseline('news:intel', intel.length);
             const deviation = calculateDeviation(intel.length, baseline);
             intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
@@ -3004,6 +3070,7 @@ export class App {
           collectedNews.push(...intel);
           this.flashMapForNews(intel);
         } else {
+          delete this.newsByCategory['intel'];
           console.error('[App] Intel feed failed:', intelResult[0]?.reason);
         }
       }
@@ -3045,6 +3112,7 @@ export class App {
           lon: c.lon,
           title: c.primaryTitle,
           threatLevel: c.threat?.level ?? 'info',
+          timestamp: c.lastUpdated,
         }));
       if (geoLocated.length > 0) {
         this.map?.setNewsLocations(geoLocated);
