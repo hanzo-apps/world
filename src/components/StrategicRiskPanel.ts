@@ -37,14 +37,7 @@ export class StrategicRiskPanel extends Panel {
       title: t('panels.strategicRisk'),
       showCount: false,
       trackActivity: true,
-      infoTooltip: `<strong>Methodology</strong>
-        Composite score (0-100) blending:
-        <ul>
-          <li>50% Country Instability (top 5 weighted)</li>
-          <li>30% Geographic convergence zones</li>
-          <li>20% Infrastructure incidents</li>
-        </ul>
-        Auto-refreshes every 5 minutes.`,
+      infoTooltip: t('components.strategicRisk.infoTooltip'),
     });
     this.init();
   }

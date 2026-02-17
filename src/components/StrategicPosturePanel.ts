@@ -21,14 +21,7 @@ export class StrategicPosturePanel extends Panel {
       title: t('panels.strategicPosture'),
       showCount: false,
       trackActivity: true,
-      infoTooltip: `<strong>Methodology</strong>
-        <p>Aggregates military aircraft and naval vessels by theater.</p>
-        <ul>
-          <li><strong>Normal:</strong> Baseline activity</li>
-          <li><strong>Elevated:</strong> Above threshold (50+ aircraft)</li>
-          <li><strong>Critical:</strong> High concentration (100+ aircraft)</li>
-        </ul>
-        <p><strong>Strike Capable:</strong> Tankers + AWACS + Fighters present in sufficient numbers for sustained operations.</p>`,
+      infoTooltip: t('components.strategicPosture.infoTooltip'),
     });
     this.init();
   }

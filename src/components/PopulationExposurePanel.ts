@@ -13,15 +13,7 @@ export class PopulationExposurePanel extends Panel {
       title: t('panels.populationExposure'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>Population Exposure Estimates</strong>
-        Estimated population within event impact radius.
-        Based on WorldPop country density data.
-        <ul>
-          <li>Conflict: 50km radius</li>
-          <li>Earthquake: 100km radius</li>
-          <li>Flood: 100km radius</li>
-          <li>Wildfire: 30km radius</li>
-        </ul>`,
+      infoTooltip: t('components.populationExposure.infoTooltip'),
     });
     this.showLoading(t('common.calculatingExposure'));
   }

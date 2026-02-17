@@ -22,14 +22,7 @@ export class GdeltIntelPanel extends Panel {
       title: t('panels.gdeltIntel'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>GDELT Intelligence</strong>
-        Real-time global news monitoring:
-        <ul>
-          <li>Curated topic categories (conflicts, cyber, etc.)</li>
-          <li>Articles from 100+ languages translated</li>
-          <li>Updates every 15 minutes</li>
-        </ul>
-        Source: GDELT Project (gdeltproject.org)`,
+      infoTooltip: t('components.gdeltIntel.infoTooltip'),
     });
     this.createTabs();
     this.loadActiveTopic();

@@ -37,20 +37,11 @@ export class GeoHubsPanel extends Panel {
       id: 'geo-hubs',
       title: t('panels.geoHubs'),
       showCount: true,
-      infoTooltip: `
-        <strong>Geopolitical Activity Hubs</strong><br>
-        Shows regions with the most news activity.<br><br>
-        <em>Hub types:</em><br>
-        • 🏛️ Capitals — World capitals and government centers<br>
-        • ⚔️ Conflict Zones — Active conflict areas<br>
-        • ⚓ Strategic — Chokepoints and key regions<br>
-        • 🏢 Organizations — UN, NATO, IAEA, etc.<br><br>
-        <em>Activity levels:</em><br>
-        • <span style="color: ${getCSSColor('--semantic-critical')}">High</span> — Breaking news or 70+ score<br>
-        • <span style="color: ${getCSSColor('--semantic-high')}">Elevated</span> — Score 40-69<br>
-        • <span style="color: ${getCSSColor('--text-dim')}">Low</span> — Score below 40<br><br>
-        Click a hub to zoom to its location.
-      `,
+      infoTooltip: t('components.geoHubs.infoTooltip', {
+        highColor: getCSSColor('--semantic-critical'),
+        elevatedColor: getCSSColor('--semantic-high'),
+        lowColor: getCSSColor('--text-dim'),
+      }),
     });
   }
 
