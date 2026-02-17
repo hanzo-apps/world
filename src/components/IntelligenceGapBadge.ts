@@ -40,7 +40,7 @@ export class IntelligenceFindingsBadge {
   private contextMenu: HTMLElement | null = null;
 
   constructor() {
-    this.enabled = localStorage.getItem(STORAGE_KEY) !== 'hidden';
+    this.enabled = IntelligenceFindingsBadge.getStoredEnabledState();
 
     this.badge = document.createElement('button');
     this.badge.className = 'intel-findings-badge';
@@ -89,9 +89,8 @@ export class IntelligenceFindingsBadge {
       this.closeDropdown();
     });
 
-    document.addEventListener('click', this.boundCloseDropdown);
-
     if (this.enabled) {
+      document.addEventListener('click', this.boundCloseDropdown);
       this.mount();
       this.initAudio();
       this.update();
@@ -119,6 +118,10 @@ export class IntelligenceFindingsBadge {
     this.onAlertClick = handler;
   }
 
+  public static getStoredEnabledState(): boolean {
+    return localStorage.getItem(STORAGE_KEY) !== 'hidden';
+  }
+
   public isEnabled(): boolean {
     return this.enabled;
   }
@@ -129,17 +132,20 @@ export class IntelligenceFindingsBadge {
 
     if (enabled) {
       localStorage.removeItem(STORAGE_KEY);
+      document.addEventListener('click', this.boundCloseDropdown);
       this.mount();
       this.initAudio();
       this.update();
       this.startRefresh();
     } else {
       localStorage.setItem(STORAGE_KEY, 'hidden');
+      document.removeEventListener('click', this.boundCloseDropdown);
       if (this.refreshInterval) {
         clearInterval(this.refreshInterval);
         this.refreshInterval = null;
       }
       this.closeDropdown();
+      this.dismissContextMenu();
       this.badge.remove();
     }
   }
