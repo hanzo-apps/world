@@ -3,6 +3,55 @@
     "title": "World Monitor",
     "description": "Sytuacja globalna z analizami AI"
   },
+  "countryBrief": {
+    "identifying": "Identyfikacja kraju...",
+    "locating": "Lokalizowanie regionu...",
+    "limitedCoverage": "Ograniczony zasięg",
+    "instabilityIndex": "Indeks niestabilności",
+    "notTracked": "Nie monitorowane — {{country}} nie znajduje się na liście CII poziomu 1",
+    "intelBrief": "Raport wywiadowczy",
+    "generatingBrief": "Generowanie raportu wywiadowczego...",
+    "topNews": "Najważniejsze wiadomości",
+    "activeSignals": "Aktywne sygnały",
+    "timeline": "Oś czasu 7 dni",
+    "predictionMarkets": "Rynki prognostyczne",
+    "loadingMarkets": "Ładowanie rynków prognostycznych...",
+    "infrastructure": "Ekspozycja infrastruktury",
+    "briefUnavailable": "Raport AI niedostępny — skonfiguruj GROQ_API_KEY w Ustawieniach.",
+    "cached": "Z pamięci podręcznej",
+    "fresh": "Aktualne",
+    "noMarkets": "Nie znaleziono rynków prognostycznych",
+    "loadingIndex": "Ładowanie indeksu...",
+    "components": {
+      "unrest": "Niepokoje",
+      "conflict": "Konflikt",
+      "security": "Bezpieczeństwo",
+      "information": "Informacja"
+    },
+    "signals": {
+      "protests": "protesty",
+      "militaryAir": "sam. wojsk.",
+      "militarySea": "okręty wojsk.",
+      "outages": "awarie",
+      "earthquakes": "trzęsienia ziemi",
+      "displaced": "przesiedleni",
+      "climate": "Stres klimatyczny",
+      "conflictEvents": "wydarzenia konfliktowe"
+    },
+    "timeAgo": {
+      "m": "m temu",
+      "h": "h temu",
+      "d": "d temu"
+    },
+    "infra": {
+      "pipeline": "Rurociągi",
+      "cable": "Kable podmorskie",
+      "datacenter": "Centra danych",
+      "base": "Bazy wojskowe",
+      "nuclear": "Obiekty jądrowe",
+      "port": "Porty"
+    }
+  },
   "header": {
     "world": "ŚWIAT",
     "tech": "TECH",
@@ -126,6 +175,7 @@
       "action": "Działanie:",
       "note": "Notatka:",
       "suppress": "Pomiń to określenie",
+      "suppressed": "Pominięte",
       "predictionLeading": "Wiodące prognozy",
       "newsLeading": "Wiadomości wiodące",
       "silentDivergence": "Cicha rozbieżność",
@@ -211,6 +261,13 @@
       "placeholder": {
         "setSecret": "Ustal tajemnicę",
         "staged": "Inscenizacja (zapisz za pomocą OK)"
+      },
+      "help": {
+        "URLHAUS_AUTH_KEY": "Używany zarówno dla API URLhaus, jak i ThreatFox.",
+        "OTX_API_KEY": "Opcjonalne źródło wzbogacania warstwy zagrożeń cybernetycznych.",
+        "ABUSEIPDB_API_KEY": "Opcjonalne źródło wzbogacania reputacji złośliwych adresów IP.",
+        "FINNHUB_API_KEY": "Notowania giełdowe w czasie rzeczywistym i dane rynkowe.",
+        "NASA_FIRMS_API_KEY": "System informacji o pożarach do zarządzania zasobami."
       }
     },
     "countryIntel": {
@@ -270,6 +327,14 @@
         "m": "{{count}}m temu",
         "h": "{{count}}h temu",
         "d": "{{count}}d temu"
+      },
+      "infra": {
+        "pipeline": "Rurociągi",
+        "cable": "Kable podmorskie",
+        "datacenter": "Centra danych",
+        "base": "Bazy wojskowe",
+        "nuclear": "Obiekty jądrowe",
+        "port": "Porty"
       }
     },
     "settingsWindow": {
@@ -604,6 +669,7 @@
       "infoTooltip": "<strong>Globalna gotowość technologiczna</strong><br>Wynik złożony (0-100) na podstawie danych Banku Światowego:<br><br><strong>Pokazane dane:</strong><br>🌐 Użytkownicy Internetu (% populacji)<br>📱 Subskrypcje mobilne (na 100 osób)<br>🔬 Badania i rozwój Wydatki (% PKB)<br><br><strong>Wagi:</strong> Badania i rozwój (35%), Internet (30%), Internet szerokopasmowy (20%), Telefonia komórkowa (15%)<br><br><em>— = Brak dostępnych najnowszych danych</em><br><em>Źródło: Otwarte dane Banku Światowego (2019-2024)</em>"
     },
     "cascade": {
+      "noImpacts": "Nie wykryto wpływu na kraje",
       "filters": {
         "cables": "Kable",
         "pipelines": "Rurociągi",
@@ -668,6 +734,7 @@
       }
     },
     "satelliteFires": {
+      "noData": "Brak danych o pożarach",
       "region": "Region",
       "fires": "Pożary",
       "high": "Wysoki",
@@ -681,6 +748,7 @@
       "infoTooltip": "NASA FIRMS VIIRS satelitarne wykrywanie temperatury w monitorowanych regionach konfliktu. Wysoka intensywność = jasność > 360 K i pewność > 80%."
     },
     "displacement": {
+      "noData": "Brak danych",
       "refugees": "Uchodźcy",
       "asylumSeekers": "Osoby ubiegające się o azyl",
       "idps": "IDP",
@@ -698,6 +766,7 @@
       "infoTooltip": "<strong>Dane UNHCR dotyczące przesiedleń</strong> Globalna liczba uchodźców, osób ubiegających się o azyl i osób wewnętrznie przesiedlonych z UNHCR.<ul><li><strong>Początki</strong>: Kraje, z których uciekają ludzie FROM</li><li><strong>Goście</strong>: Kraje przyjmujące uchodźców</li><li>Odznaki kryzysowe: >1M | Wysoki: >500 tys. wysiedlonych</li></ul>Dane są aktualizowane co roku. Licencja CC BY 4.0."
     },
     "populationExposure": {
+      "noData": "Brak danych o narażeniu",
       "totalAffected": "Całkowita liczba dotkniętych",
       "affectedCount": "Dotyczy {{count}}",
       "radiusKm": "Promień {{km}}km",
@@ -708,6 +777,8 @@
       "noEventsIn7Days": "Brak wydarzeń w ciągu 7 dni"
     },
     "cii": {
+      "shareStory": "Udostępnij historię",
+      "noSignals": "Nie wykryto sygnałów niestabilności",
       "infoTooltip": "<strong>Metodologia</strong><ul><li><strong>U</strong>nrest: zamieszki społeczne i protesty</li><li><strong>C</strong>konflikt: intensywność konfliktu zbrojnego</li><li><strong>S</strong>bezpieczeństwo: loty/statki wojskowe terytorium</li><li><strong>I</strong>informacje: prędkość wiadomości i korelacja punktów ogniskowych</li><li>Wzmocnienie bliskości hotspotów (lokalizacje strategiczne)</li></ul><em>U:C:S:I wartości pokazują wyniki komponentów.</em> Funkcja wykrywania punktów ogniskowych koreluje jednostki wiadomości z sygnałami mapy w celu uzyskania dokładnej punktacji."
     },
     "gdeltIntel": {
@@ -720,13 +791,22 @@
       "infoTooltip": "<strong>Rynki prognostyczne</strong> Rynki prognostyczne realnych pieniędzy:<ul><li>Ceny odzwierciedlają szacunki prawdopodobieństwa tłumu</li><li>Większy wolumen = bardziej niezawodny sygnał</li><li>Nacisk na wydarzenia geopolityczne i bieżące</li></ul>Źródło: Polymarket (polymarket.com)"
     },
     "ucdpEvents": {
+      "noEvents": "Brak zdarzeń w tej kategorii",
       "infoTooltip": "<strong>UCDP Zdarzenia z georeferencją</strong> Dane dotyczące konfliktów na poziomie zdarzenia z Uniwersytetu w Uppsali.<ul><li><strong>Oparte na państwie</strong>: Rząd kontra grupa rebeliantów</li><li><strong>Niepaństwowe</strong>: Grupa zbrojna kontra grupa zbrojna grupa</li><li><strong>Jednostronna</strong>: Przemoc wobec ludności cywilnej</li></ul>Śmiertelność pokazana jako najlepsze szacunki (od niskiego do wysokiego zakresu). Duplikaty ACLED są odfiltrowywane automatycznie."
     },
     "strategicRisk": {
+      "noRisks": "Nie wykryto istotnych zagrożeń",
       "infoTooltip": "<strong>Metodologia</strong> Łączny wynik (0-100) mieszanie:<ul><li>50% Niestabilność kraju (5 pierwszych ważonych)</li><li>30% Strefy konwergencji geograficznej</li><li>20% Incydenty w infrastrukturze</li></ul>Automatyczne odświeżanie co 5 minut."
     },
     "insights": {
+      "noStories": "Brak pilnych lub wieloźródłowych wiadomości",
       "infoTooltip": "<strong>Analiza oparta na sztucznej inteligencji</strong><br>• <strong>World Brief</strong>: Podsumowanie sztucznej inteligencji (Groq/OpenRouter)<br>• <strong>Nastroje</strong>: Analiza tonu wiadomości<br>• <strong>Velocity</strong>: Szybkie historie<br>• <strong>Focal Punkty</strong>: Koreluje wiadomości z sygnałami z mapy (wojsko, protesty, awarie)<br><em>Tylko komputer stacjonarny • Obsługiwane przez Lamę 3.3 + wykrywanie punktów ogniskowych</em>"
+    },
+    "export": {
+      "exportData": "Eksportuj dane"
+    },
+    "runtimeConfig": {
+      "getApiKey": "Pobierz klucz API"
     }
   },
   "popups": {
