@@ -92,7 +92,7 @@ export const SUPPRESSED_TRENDING_TERMS = new Set<string>([
   'state', 'states', 'department', 'officials', 'official',
   'country', 'countries', 'people', 'group', 'groups',
   'plan', 'deal', 'talks', 'move', 'order', 'case',
-  'house', 'court', 'secretary', 'board', 'control',
+  'house', 'court', 'secretary', 'board', 'control', 'bank',
   'power', 'leader', 'leaders', 'government', 'minister',
   'president', 'agency', 'market', 'markets', 'company',
   'companies', 'world', 'white', 'head', 'side', 'point',
@@ -121,6 +121,17 @@ export const SUPPRESSED_TRENDING_TERMS = new Set<string>([
   'develop', 'break', 'happen', 'create', 'live',
   // Numbers and misc
   '000', '100', '200', '500', 'per', 'than',
+  // Finance / trading generic terms
+  'trading', 'stock', 'earnings', 'finance', 'defi',
+  'ipo', 'tradingview', 'currency', 'dollar',
+  'usd', 'investing', 'equity', 'valuation', 'ecb',
+  'regulation', 'outlook', 'forecast', 'financial',
+  // Web / tech generic terms
+  'com', 'platform', 'block',
+  // Generic news nouns (additional)
+  'focus', 'today', 'chief', 'basel',
+  // Date fragments
+  '2025', '2026', '2027',
 ]);
 
 

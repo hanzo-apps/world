@@ -12,6 +12,7 @@ dist/
 .cursor/
 CLAUDE.md
 .env.vercel-backup
+.env.vercel-export
 .agent/
 .factory/
 .windsurf/
