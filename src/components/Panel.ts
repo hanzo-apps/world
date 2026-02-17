@@ -267,7 +267,11 @@ export class Panel {
 
   protected setDataBadge(state: 'live' | 'cached' | 'unavailable', detail?: string): void {
     if (!this.statusBadgeEl) return;
-    const labels = { live: 'LIVE', cached: 'CACHED', unavailable: 'UNAVAILABLE' } as const;
+    const labels = {
+      live: t('common.live'),
+      cached: t('common.cached'),
+      unavailable: t('common.unavailable'),
+    } as const;
     this.statusBadgeEl.textContent = detail ? `${labels[state]} · ${detail}` : labels[state];
     this.statusBadgeEl.className = `panel-data-badge ${state}`;
     this.statusBadgeEl.style.display = 'inline-flex';
@@ -356,7 +360,7 @@ export class Panel {
       return;
     }
 
-    this.newBadgeEl.textContent = count > 99 ? '99+' : `${count} new`;
+    this.newBadgeEl.textContent = count > 99 ? '99+' : `${count} ${t('common.new')}`;
     this.newBadgeEl.style.display = 'inline-flex';
     this.element.classList.add('has-new');
 

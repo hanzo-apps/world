@@ -13,16 +13,7 @@ export class CIIPanel extends Panel {
     super({
       id: 'cii',
       title: t('panels.cii'),
-      infoTooltip: `<strong>Methodology</strong>
-        <ul>
-          <li><strong>U</strong>nrest: civil disorder & protests</li>
-          <li><strong>C</strong>onflict: armed conflict intensity</li>
-          <li><strong>S</strong>ecurity: military flights/vessels over territory</li>
-          <li><strong>I</strong>nformation: news velocity and focal point correlation</li>
-          <li>Hotspot proximity boost (strategic locations)</li>
-        </ul>
-        <em>U:C:S:I values show component scores.</em>
-        Focal Point Detection correlates news entities with map signals for accurate scoring.`,
+      infoTooltip: t('components.cii.infoTooltip'),
     });
     this.showLoading(t('common.loading'));
   }

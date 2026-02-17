@@ -14,14 +14,7 @@ export class ClimateAnomalyPanel extends Panel {
       title: t('panels.climate'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>Climate Anomaly Monitor</strong>
-        Temperature and precipitation deviations from 30-day baseline.
-        Data from Open-Meteo (ERA5 reanalysis).
-        <ul>
-          <li><strong>Extreme</strong>: >5°C or >80mm/day deviation</li>
-          <li><strong>Moderate</strong>: >3°C or >40mm/day deviation</li>
-        </ul>
-        Monitors 15 conflict/disaster-prone zones.`,
+      infoTooltip: t('components.climate.infoTooltip'),
     });
     this.showLoading(t('common.loadingClimateData'));
   }

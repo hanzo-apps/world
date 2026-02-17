@@ -29,14 +29,7 @@ export class InsightsPanel extends Panel {
       id: 'insights',
       title: t('panels.insights'),
       showCount: false,
-      infoTooltip: `
-        <strong>AI-Powered Analysis</strong><br>
-        • <strong>World Brief</strong>: AI summary (Groq/OpenRouter)<br>
-        • <strong>Sentiment</strong>: News tone analysis<br>
-        • <strong>Velocity</strong>: Fast-moving stories<br>
-        • <strong>Focal Points</strong>: Correlates news entities with map signals (military, protests, outages)<br>
-        <em>Desktop only • Powered by Llama 3.3 + Focal Point Detection</em>
-      `,
+      infoTooltip: t('components.insights.infoTooltip'),
     });
 
     if (isMobileDevice()) {
