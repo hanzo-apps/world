@@ -1,4 +1,5 @@
 import type { StoryData } from './story-data';
+import { getLocale } from './i18n';
 
 const W = 1080;
 const H = 1920;
@@ -75,7 +76,7 @@ export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasEl
   ctx.letterSpacing = '6px';
   ctx.fillText('WORLDMONITOR', textX, y + 26);
   ctx.letterSpacing = '0px';
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   ctx.font = '400 24px Inter, system-ui, sans-serif';
   ctx.fillStyle = '#555';
   const dateW = ctx.measureText(dateStr).width;
