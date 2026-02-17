@@ -130,8 +130,19 @@ export const SUPPRESSED_TRENDING_TERMS = new Set<string>([
   'com', 'platform', 'block',
   // Generic news nouns (additional)
   'focus', 'today', 'chief', 'basel',
+  // Generic adjectives / adverbs (additional)
+  'ongoing', 'higher', 'poised', 'track',
+  // URL / source fragments
+  'wall', 'street', 'financialcontent',
+  // Media / URL fragments
+  'ray', 'msn', 'aol',
   // Date fragments
   '2025', '2026', '2027',
+  // Month names
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+  // Company name fragments (too generic standalone)
+  'goldman', 'sachs', 'off',
 ]);
 
 
