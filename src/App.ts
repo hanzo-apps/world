@@ -3042,8 +3042,9 @@ export class App {
       .filter((entry): entry is [string, typeof FEEDS[keyof typeof FEEDS]] => Array.isArray(entry[1]) && entry[1].length > 0)
       .map(([key, feeds]) => ({ key, feeds }));
 
-    // Finance variant has a much larger feed surface; stage category fetches to avoid startup bursts.
-    const categoryConcurrency = SITE_VARIANT === 'finance' ? 3 : Math.max(1, categories.length);
+    // Stage category fetches to avoid startup bursts and API pressure in all variants.
+    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 3 : SITE_VARIANT === 'tech' ? 4 : 5;
+    const categoryConcurrency = Math.max(1, Math.min(maxCategoryConcurrency, categories.length));
     const categoryResults: PromiseSettledResult<NewsItem[]>[] = [];
     for (let i = 0; i < categories.length; i += categoryConcurrency) {
       const chunk = categories.slice(i, i + categoryConcurrency);
