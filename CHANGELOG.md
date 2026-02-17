@@ -2,6 +2,27 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.3.8] - 2026-02-17
+
+### Added
+
+- **Finance variant**: Added a dedicated market-first variant (`finance.worldmonitor.app`) with finance/trading-focused feeds, panels, and map defaults
+- **Finance desktop profile**: Added finance-specific desktop config and build profile for Tauri packaging
+
+### Changed
+
+- **Variant feed loading**: `loadNews` now enumerates categories dynamically and stages category fetches with bounded concurrency across variants
+- **Feed resilience**: Replaced direct MarketWatch RSS usage in finance/full/tech paths with Google News-backed fallback queries
+- **Classification pressure controls**: Tightened AI classification budgets for tech/full and tuned per-feed caps to reduce startup burst pressure
+
+### Fixed
+
+- **Finance panel parity**: Kept data-rich panels while adding news panels for finance instead of removing core data surfaces
+- **Desktop finance map parity**: Finance variant now runs first-class Deck.GL map/layer behavior on desktop runtime
+- **Polymarket fallback**: Added one-time direct connectivity probe and memoized fallback to prevent repeated `ERR_CONNECTION_RESET` storms
+- **FRED fallback behavior**: Missing `FRED_API_KEY` now returns graceful empty payloads instead of repeated hard 500s
+- **Preview CSP tooling**: Allowed `https://vercel.live` script in CSP so Vercel preview feedback injection is not blocked
+
 ## [2.3.7] - 2026-02-16
 
 ### Added
