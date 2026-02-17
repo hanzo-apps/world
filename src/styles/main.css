@@ -12431,13 +12431,13 @@ body.has-critical-banner .panels-grid {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: hsl(229, 48%, 55%);
+  background: hsl(142, 70%, 50%);
   flex-shrink: 0;
   animation: cw-pulse 2s ease-in-out infinite;
 }
 @keyframes cw-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 hsla(229, 48%, 55%, 0.5); }
-  50% { opacity: 0.6; box-shadow: 0 0 0 4px hsla(229, 48%, 55%, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 hsla(142, 70%, 50%, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 10px 3px hsla(142, 70%, 50%, 0.35); }
 }
 .cw-text {
   font-size: 13px;
@@ -12447,7 +12447,7 @@ body.has-critical-banner .panels-grid {
 }
 .cw-cta {
   padding: 6px 14px;
-  background: hsl(229, 48%, 55%);
+  background: hsl(142, 70%, 40%);
   border: none;
   border-radius: 20px;
   color: #fff;
@@ -12458,7 +12458,7 @@ body.has-critical-banner .panels-grid {
   white-space: nowrap;
   transition: background 0.2s;
 }
-.cw-cta:hover { background: hsl(229, 48%, 62%); }
+.cw-cta:hover { background: hsl(142, 70%, 48%); }
 .cw-close {
   background: none;
   border: none;
