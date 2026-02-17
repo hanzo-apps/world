@@ -56,19 +56,22 @@ function detectPlatform(): Platform {
 
 interface DlButton { cls: string; href: string; label: string }
 
-const ALL_BUTTONS: DlButton[] = [
-  { cls: 'mac', href: '/api/download?platform=macos-arm64', label: '\uF8FF macOS (Apple Silicon)' },
-  { cls: 'mac', href: '/api/download?platform=macos-x64',   label: '\uF8FF macOS (Intel)' },
-  { cls: 'win', href: '/api/download?platform=windows-exe',  label: '\u229E Windows (.exe)' },
-];
+function allButtons(): DlButton[] {
+  return [
+    { cls: 'mac', href: '/api/download?platform=macos-arm64', label: `\uF8FF ${t('modals.downloadBanner.macSilicon')}` },
+    { cls: 'mac', href: '/api/download?platform=macos-x64', label: `\uF8FF ${t('modals.downloadBanner.macIntel')}` },
+    { cls: 'win', href: '/api/download?platform=windows-exe', label: `\u229E ${t('modals.downloadBanner.windows')}` },
+  ];
+}
 
 function buttonsForPlatform(p: Platform): DlButton[] {
+  const buttons = allButtons();
   switch (p) {
-    case 'macos-arm64': return ALL_BUTTONS.filter(b => b.href.includes('macos-arm64'));
-    case 'macos-x64':   return ALL_BUTTONS.filter(b => b.href.includes('macos-x64'));
-    case 'macos':       return ALL_BUTTONS.filter(b => b.cls === 'mac');
-    case 'windows':     return ALL_BUTTONS.filter(b => b.cls === 'win');
-    default:            return ALL_BUTTONS;
+    case 'macos-arm64': return buttons.filter(b => b.href.includes('macos-arm64'));
+    case 'macos-x64': return buttons.filter(b => b.href.includes('macos-x64'));
+    case 'macos': return buttons.filter(b => b.cls === 'mac');
+    case 'windows': return buttons.filter(b => b.cls === 'win');
+    default: return buttons;
   }
 }
 
@@ -84,7 +87,8 @@ function renderButtons(container: HTMLElement, buttons: DlButton[], panel: HTMLE
 function buildPanel(): HTMLElement {
   const platform = detectPlatform();
   const primaryButtons = buttonsForPlatform(platform);
-  const showToggle = platform !== 'unknown' && primaryButtons.length < ALL_BUTTONS.length;
+  const buttons = allButtons();
+  const showToggle = platform !== 'unknown' && primaryButtons.length < buttons.length;
 
   const el = document.createElement('div');
   el.className = 'wm-dl-panel';
@@ -150,9 +154,8 @@ function buildPanel(): HTMLElement {
       <button class="wm-dl-close" aria-label="${t('modals.downloadBanner.dismiss')}">\u00D7</button>
     </div>
     <div class="wm-dl-body">${t('modals.downloadBanner.description')}</div>
-    <div class="wm-dl-body">${t('modals.downloadBanner.description')}</div>
     <div class="wm-dl-btns"></div>
-    ${showToggle ? '<button class="wm-dl-toggle">Show all platforms</button>' : ''}
+    ${showToggle ? `<button class="wm-dl-toggle">${t('modals.downloadBanner.showAllPlatforms')}</button>` : ''}
   `;
 
   const btnsContainer = el.querySelector('.wm-dl-btns') as HTMLElement;
@@ -165,8 +168,10 @@ function buildPanel(): HTMLElement {
     let showingAll = false;
     toggle.addEventListener('click', () => {
       showingAll = !showingAll;
-      renderButtons(btnsContainer, showingAll ? ALL_BUTTONS : primaryButtons, el);
-      toggle.textContent = showingAll ? 'Show less' : 'Show all platforms';
+      renderButtons(btnsContainer, showingAll ? buttons : primaryButtons, el);
+      toggle.textContent = showingAll
+        ? t('modals.downloadBanner.showLess')
+        : t('modals.downloadBanner.showAllPlatforms');
     });
   }
 

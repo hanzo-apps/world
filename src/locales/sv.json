@@ -1,378 +1,690 @@
 {
-    "panels": {
-        "liveNews": "Live News",
-        "markets": "Markets",
-        "heatmap": "Sector Heatmap",
-        "crypto": "Crypto",
-        "strategicPosture": "Strategic Posture",
-        "cii": "Country Instability Index",
-        "status": "System Status",
-        "news": "Global News",
-        "insights": "AI Insights",
-        "signals": "Macro Signals",
-        "hazards": "Natural Hazards",
-        "map": "Interactive Map"
-    },
-    "modals": {
-        "search": {
-            "placeholder": "Search news, pipelines, bases, markets...",
-            "hint": "News • Pipelines • Bases • Cables • Datacenters • Markets",
-            "recent": "Recent Searches",
-            "empty": "Search across all data sources",
-            "noResults": "No results found",
-            "navigate": "navigate",
-            "select": "select",
-            "close": "close",
-            "types": {
-                "country": "Land",
-                "news": "Nyheter",
-                "hotspot": "Hotspot",
-                "market": "Marknad",
-                "prediction": "Prognos",
-                "conflict": "Konflikt",
-                "base": "Militärbas",
-                "pipeline": "Rörledning",
-                "cable": "Undervattenskabel",
-                "datacenter": "Datacenter",
-                "earthquake": "Jordbävning",
-                "outage": "Avbrott",
-                "nuclear": "Kärnteknisk anläggning",
-                "irradiator": "Strålkälla",
-                "techcompany": "Teknikföretag",
-                "ailab": "AI-labb",
-                "startup": "Startup",
-                "techevent": "Teknikevenemang",
-                "techhq": "Teknikhuvudkontor",
-                "accelerator": "Accelerator"
-            }
-        },
-        "signal": {
-            "share": "Share",
-            "source": "Source",
-            "confidence": "Confidence",
-            "related": "Related Events"
-        },
-        "settings": {
-            "title": "Settings",
-            "general": "General",
-            "appearance": "Appearance",
-            "data": "Data Sources",
-            "about": "About"
-        },
-        "mobileWarning": {
-            "title": "Desktop Experience Recommended",
-            "message": "WorldMonitor is optimized for large screens. Some features may be limited on mobile devices.",
-            "continue": "Continue Anyway"
-        },
-        "downloadBanner": {
-            "title": "Desktop Available",
-            "description": "Native performance, secure local key storage, offline map tiles.",
-            "macSilicon": "macOS (Apple Silicon)",
-            "macIntel": "macOS (Intel)",
-            "windows": "Windows (.exe)",
-            "dismiss": "Dismiss"
-        },
-        "runtimeConfig": {
-            "title": "Desktop Configuration",
-            "alertTitle": {
-                "configured": "Desktop settings configured",
-                "needsKeys": "Configure API keys to unlock features",
-                "some": "Some features need API keys"
-            },
-            "openSettings": "Open Settings",
-            "summary": {
-                "desktop": "Desktop mode",
-                "web": "Web mode (read-only, server-managed credentials)",
-                "secrets": "local secrets configured",
-                "available": "features available"
-            },
-            "status": {
-                "ready": "Ready",
-                "staged": "Staged",
-                "needsKeys": "Needs Keys",
-                "invalid": "Invalid",
-                "missing": "Missing",
-                "valid": "Valid",
-                "looksInvalid": "Looks invalid"
-            },
-            "placeholder": {
-                "setSecret": "Set secret",
-                "staged": "Staged (save with OK)"
-            }
-        },
-        "countryIntel": {
-            "title": "Country Intelligence",
-            "description": "Detailed insights and data for specific countries."
-        }
-    },
-    "components": {
-        "monitor": {
-            "placeholder": "Keywords (comma separated)",
-            "add": "+ Add Monitor",
-            "addKeywords": "Add keywords to monitor news",
-            "noMatches": "No matches in {{count}} articles",
-            "showingMatches": "Showing {{count}} of {{total}} matches",
-            "match": "match",
-            "matches": "matches"
-        },
-        "timeline": {
-            "title": "Timeline",
-            "today": "Today",
-            "yesterday": "Yesterday"
-        },
-        "playback": {
-            "play": "Play",
-            "pause": "Pause",
-            "speed": "Speed",
-            "live": "Live"
-        }
-    },
-    "popups": {
-        "startDate": "STARTDATUM",
-        "endDate": "SLUTDATUM",
-        "magnitude": "Magnitud",
-        "depth": "Djup",
-        "intensity": "Intensitet",
-        "type": "TYP",
-        "status": "STATUS",
-        "severity": "Allvarlighet",
-        "location": "PLATS",
-        "coordinates": "KOORDINATER",
-        "casualties": "OFFER",
-        "displaced": "FÖRDRIVNA",
-        "belligerents": "STRIDANDE PARTER",
-        "keyDevelopments": "VIKTIGA UTVECKLINGAR",
-        "unknown": "Okänd",
-        "source": "Källa",
-        "target": "Mål",
-        "events": "Händelser",
-        "impact": "Påverkan",
-        "capacity": "Kapacitet",
-        "alerts": "Aktiva varningar",
-        "common": {
-            "start": "START",
-            "end": "SLUT",
-            "updated": "UPPDATERAD"
-        },
-        "conflict": {
-            "title": "KONFLIKTZON"
-        },
-        "earthquake": {
-            "levels": {
-                "major": "STOR",
-                "moderate": "MÅTTLIG",
-                "minor": "MINDRE"
-            }
-        },
-        "base": {
-            "types": {
-                "us-nato": "US/NATO",
-                "china": "KINA",
-                "russia": "RYSSLAND"
-            }
-        },
-        "protest": {
-            "acledVerified": "ACLED (verifierad)",
-            "gdelt": "GDELT",
-            "riots": "Upplopp",
-            "highSeverity": "Hög allvarlighet"
-        },
-        "flight": {
-            "groundStop": "MARKSTOPP",
-            "groundDelay": "MARKFÖRDRÖJNING",
-            "departureDelay": "AVGÅNGSFÖRDRÖJNINGAR",
-            "arrivalDelay": "ANKOMSTFÖRDRÖJNINGAR",
-            "delaysReported": "FÖRSENINGAR RAPPORTERADE",
-            "delays": "FÖRSENINGAR",
-            "avgDelay": "SNITT FÖRSENING",
-            "cancelled": "INSTÄLLD"
-        },
-        "apt": {
-            "description": "Avancerad ihållande hotgrupp med statliga förmågor. Känd för sofistikerade cyberoperationer riktade mot kritisk infrastruktur, regering och försvarssektorer."
-        },
-        "cyberThreat": {
-            "title": "CYBERHOT"
-        },
-        "nuclear": {
-            "types": {
-                "plant": "KRAFTVERK",
-                "enrichment": "ANRIKNING",
-                "weapons": "VAPENKOMPLEX",
-                "research": "FORSKNING"
-            },
-            "description": "Kärnteknisk anläggning under övervakning. Strategisk betydelse för regional säkerhet och icke-spridning."
-        },
-        "economic": {
-            "types": {
-                "exchange": "BÖRS",
-                "centralBank": "CENTRALBANK",
-                "financialHub": "FINANSCENTRUM"
-            }
-        },
-        "irradiator": {
-            "subtitle": "Industriell gammabestrålningsanläggning",
-            "description": "Industriell bestrålningsanläggning med Kobolt-60 eller Cesium-137 för sterilisering av medicintekniska produkter, livsmedelskonservering eller materialbearbetning. Källa: IAEA DIIF-databas."
-        },
-        "pipeline": {
-            "title": "RÖRLEDNING",
-            "types": {
-                "oil": "OLJERÖRLEDNING",
-                "gas": "GASLEDNING",
-                "products": "PRODUKTLEDNING"
-            },
-            "status": {
-                "operating": "I DRIFT",
-                "construction": "UNDER KONSTRUKTION"
-            },
-            "description": "Viktig {{type}}-rörledningsinfrastruktur. {{status}}"
-        },
-        "pipelineStatusDesc": {
-            "operating": "I drift och transporterar resurser.",
-            "construction": "Under konstruktion."
-        },
-        "cable": {
-            "fault": "FEL",
-            "degraded": "FÖRSÄMRAD",
-            "active": "AKTIV",
-            "major": "ALLVARLIG",
-            "cable": "KABEL",
-            "subtitle": "Undervattens fiberoptisk kabel",
-            "type": "UNDERVATTENSKABEL",
-            "advisory": "FELVARNING",
-            "repairDeployment": "REPARATIONSINSATS"
-        },
-        "repairShip": {
-            "note": "Reparationsfartygets spårning indikerar aktiv utplacering mot felplatsen."
-        },
-        "strategic": "STRATEGISK",
-        "verified": "VERIFIERAD",
-        "sampledList": "Visar ett stickprov av {{count}} händelser.",
-        "reason": "ORSAK",
-        "threat": "HOT",
-        "aka": "Även känd som",
-        "sponsor": "SPONSOR",
-        "origin": "URSPRUNG",
-        "country": "LAND",
-        "malware": "MALWARE",
-        "lastSeen": "SENAST SEDD",
-        "open": "ÖPPEN",
-        "tradingHours": "HANDELSTIDER",
-        "gamma": "GAMMA",
-        "city": "STAD",
-        "length": "LÄNGD",
-        "operator": "OPERATÖR",
-        "countries": "LÄNDER",
-        "waypoints": "VÄGPUNKTER",
-        "repairEta": "REPARATIONS-ETA",
-        "timeUnits": {
-            "m": "m",
-            "h": "h",
-            "d": "d"
-        },
-        "hotspot": {
-            "escalation": "ESKALERINGSBEDÖMNING",
-            "baseline": "Baslinje",
-            "score": "Poäng",
-            "trend": "Trend",
-            "components": {
-                "news": "Nyheter",
-                "cii": "CII",
-                "geo": "Geo",
-                "military": "Militär"
-            },
-            "levels": {
-                "stable": "STABIL",
-                "watch": "BEVAKNING",
-                "elevated": "FÖRHÖJD",
-                "high": "HÖG",
-                "critical": "KRITISK"
-            }
-        },
-        "buttons": {
-            "track": "Spåra problem",
-            "details": "Visa detaljer"
-        },
-        "historicalContext": "HISTORISK KONTEXT",
-        "lastMajorEvent": "Senaste stora händelse",
-        "precedents": "Prejudikat",
-        "cyclicalPattern": "Cykliskt mönster",
-        "whyItMatters": "VARFÖR DET SPELAR ROLL",
-        "keyEntities": "NYCKELENTITETER",
-        "relatedHeadlines": "RELATERADE RUBRIKER",
-        "liveIntel": "Live Intelligence",
-        "loadingNews": "Laddar globala nyheter...",
-        "noCoverage": "Ingen aktuell global bevakning",
-        "time": "Tid",
-        "area": "Område",
-        "expires": "Utgår",
-        "aisGapSpike": "AIS-LUCKTOPP",
-        "chokepointCongestion": "FLASKHALS TRÄNGSEL",
-        "darkening": "MÖRKLÄGGNING",
-        "density": "TÄTHET",
-        "darkShips": "MÖRKA FARTYG",
-        "vesselCount": "FARTYGSANTAL",
-        "window": "FÖNSTER",
-        "region": "REGION",
-        "fatalities": "DÖDSFALL",
-        "actors": "AKTÖRER",
-        "near": "Nära",
-        "moreEvents": "fler händelser",
-        "monitoring": "Övervakning",
-        "viewUSGS": "Visa på USGS",
-        "expired": "Utgången",
-        "timeAgo": {
-            "s": "s sedan",
-            "m": "m sedan",
-            "h": "h sedan",
-            "d": "d sedan"
-        }
-    },
-    "common": {
-        "loading": "Laddar...",
-        "error": "Ett fel inträffade",
-        "retry": "Försök igen",
-        "close": "Stäng",
-        "cancel": "Avbryt",
-        "confirm": "Bekräfta",
-        "unknown": "Okänt",
-        "updated": "Uppdaterad: {{time}}",
-        "failedToLoad": "Kunde inte ladda data",
-        "noDataShort": "Inga data",
-        "noDataAvailable": "Inga data tillgängliga",
-        "upstreamUnavailable": "Uppströms-API ej tillgängligt — automatiskt nytt försök",
-        "loadingUcdpEvents": "Laddar UCDP-händelser",
-        "loadingStablecoins": "Laddar stablecoins...",
-        "scanningThermalData": "Skannar termiska data",
-        "calculatingExposure": "Beräknar exponering",
-        "computingSignals": "Beräknar signaler...",
-        "loadingEtfData": "Laddar ETF-data...",
-        "loadingDisplacement": "Laddar förflyttningsdata",
-        "loadingClimateData": "Laddar klimatdata",
-        "failedTechReadiness": "Kunde inte ladda teknologisk beredskap",
-        "failedRiskOverview": "Kunde inte beräkna risköversikt",
-        "failedPredictions": "Kunde inte ladda prognoser",
-        "failedCII": "Kunde inte beräkna CII",
-        "failedDependencyGraph": "Kunde inte bygga beroendegrafen",
-        "failedIntelFeed": "Kunde inte ladda underrättelseflöde",
-        "failedMarketData": "Kunde inte ladda marknadsdata",
-        "failedSectorData": "Kunde inte ladda sektorsdata",
-        "failedCommodities": "Kunde inte ladda råvaror",
-        "failedCryptoData": "Kunde inte ladda kryptodata",
-        "failedClusterNews": "Kunde inte gruppera nyheter",
-        "noNewsAvailable": "Inga nyheter tillgängliga",
-        "noActiveTechHubs": "Inga aktiva teknikhubbar",
-        "noActiveGeoHubs": "Inga aktiva geopolitiska hubbar",
-        "allSourcesDisabled": "Alla källor inaktiverade",
-        "allIntelSourcesDisabled": "Alla Intel-källor inaktiverade",
-        "noEventsInCategory": "Inga händelser i denna kategori",
-        "exportCsv": "Exportera CSV",
-        "exportJson": "Exportera JSON",
-        "exportData": "Exportera data",
-        "exportImage": "Exportera bild",
-        "unrest": "Oroligheter",
+  "panels": {
+    "liveNews": "Live News",
+    "markets": "Markets",
+    "heatmap": "Sector Heatmap",
+    "crypto": "Crypto",
+    "strategicPosture": "Strategic Posture",
+    "cii": "Country Instability Index",
+    "status": "System Status",
+    "news": "Global News",
+    "insights": "AI Insights",
+    "signals": "Macro Signals",
+    "hazards": "Natural Hazards",
+    "map": "Interactive Map",
+    "techMap": "Global Tech",
+    "politics": "World News",
+    "tech": "Technology",
+    "finance": "Financial",
+    "gov": "Government",
+    "intel": "Intel Feed",
+    "middleeast": "Middle East",
+    "layoffs": "Layoffs Tracker",
+    "ai": "AI/ML",
+    "startups": "Startups & VC",
+    "vcblogs": "VC Insights & Essays",
+    "regionalStartups": "Global Startup News",
+    "unicorns": "Unicorn Tracker",
+    "accelerators": "Accelerators & Demo Days",
+    "funding": "Funding & VC",
+    "producthunt": "Product Hunt",
+    "security": "Cybersecurity",
+    "policy": "AI Policy & Regulation",
+    "hardware": "Semiconductors & Hardware",
+    "cloud": "Cloud & Infrastructure",
+    "dev": "Developer Community",
+    "github": "GitHub Trending",
+    "ipo": "IPO & SPAC",
+    "thinktanks": "Think Tanks",
+    "africa": "Africa",
+    "latam": "Latin America",
+    "asia": "Asia-Pacific",
+    "energy": "Energy & Resources",
+    "etfFlows": "BTC ETF Tracker",
+    "economic": "Economic Indicators",
+    "macroSignals": "Market Radar",
+    "commodities": "Commodities",
+    "monitors": "My Monitors",
+    "regulation": "AI Regulation Dashboard",
+    "serviceStatus": "Service Status",
+    "stablecoins": "Stablecoins",
+    "events": "Tech Events",
+    "techHubs": "Hot Tech Hubs",
+    "techReadiness": "Tech Readiness Index",
+    "ucdpEvents": "UCDP Conflict Events"
+  },
+  "modals": {
+    "search": {
+      "placeholder": "Search news, pipelines, bases, markets...",
+      "hint": "News • Pipelines • Bases • Cables • Datacenters • Markets",
+      "recent": "Recent Searches",
+      "empty": "Search across all data sources",
+      "noResults": "No results found",
+      "navigate": "navigate",
+      "select": "select",
+      "close": "close",
+      "types": {
+        "country": "Land",
+        "news": "Nyheter",
+        "hotspot": "Hotspot",
+        "market": "Marknad",
+        "prediction": "Prognos",
         "conflict": "Konflikt",
-        "security": "Säkerhet",
-        "information": "Information",
-        "shareStory": "Dela historia"
+        "base": "Militärbas",
+        "pipeline": "Rörledning",
+        "cable": "Undervattenskabel",
+        "datacenter": "Datacenter",
+        "earthquake": "Jordbävning",
+        "outage": "Avbrott",
+        "nuclear": "Kärnteknisk anläggning",
+        "irradiator": "Strålkälla",
+        "techcompany": "Teknikföretag",
+        "ailab": "AI-labb",
+        "startup": "Startup",
+        "techevent": "Teknikevenemang",
+        "techhq": "Teknikhuvudkontor",
+        "accelerator": "Accelerator"
+      },
+      "placeholderTech": "Search companies, AI labs, startups, events...",
+      "hintTech": "HQs • Companies • AI Labs • Startups • Accelerators • Events",
+      "placeholderFinance": "Search exchanges, markets, central banks...",
+      "hintFinance": "Exchanges • Financial Centers • Central Banks • Commodities"
+    },
+    "signal": {
+      "share": "Share",
+      "source": "Source",
+      "confidence": "Confidence",
+      "related": "Related Events",
+      "title": "INTELLIGENCE FINDING",
+      "soundAlerts": "Sound alerts",
+      "dismiss": "Dismiss",
+      "country": "Country:",
+      "scoreChange": "Score Change:",
+      "instabilityLevel": "Instability Level:",
+      "primaryDriver": "Primary Driver:",
+      "location": "Location:",
+      "eventTypes": "Event Types:",
+      "eventCount": "Event Count:",
+      "eventCountValue": "{{count}} events in 24h",
+      "countriesAffected": "Countries Affected:",
+      "impactLevel": "Impact Level:",
+      "predictionLeading": "Prediction Leading",
+      "newsLeading": "News Leading",
+      "silentDivergence": "Silent Divergence",
+      "velocitySpike": "Velocity Spike",
+      "keywordSpike": "Keyword Spike",
+      "convergence": "Convergence",
+      "triangulation": "Triangulation",
+      "flowDrop": "Flow Drop",
+      "flowPriceDivergence": "Flow/Price Divergence",
+      "geoConvergence": "Geographic Convergence",
+      "marketMove": "Market Move Explained",
+      "sectorCascade": "Sector Cascade",
+      "militarySurge": "Military Surge",
+      "focalPoints": "CORRELATED FOCAL POINTS",
+      "newsCorrelation": "NEWS CORRELATION",
+      "viewOnMap": "View on map",
+      "whyItMatters": "Why it matters:",
+      "action": "Action:",
+      "note": "Note:",
+      "suppress": "Suppress this term"
+    },
+    "settings": {
+      "title": "Settings",
+      "general": "General",
+      "appearance": "Appearance",
+      "data": "Data Sources",
+      "about": "About"
+    },
+    "mobileWarning": {
+      "title": "Desktop Experience Recommended",
+      "message": "WorldMonitor is optimized for large screens. Some features may be limited on mobile devices.",
+      "continue": "Continue Anyway",
+      "description": "You're viewing a simplified mobile version focused on MENA region with essential layers enabled.",
+      "tip": "Tip: Use the view buttons (GLOBAL/US/MENA) to switch regions. Tap markers to see details.",
+      "dontShowAgain": "Don't show again",
+      "gotIt": "Got it"
+    },
+    "downloadBanner": {
+      "title": "Desktop Available",
+      "description": "Native performance, secure local key storage, offline map tiles.",
+      "macSilicon": "macOS (Apple Silicon)",
+      "macIntel": "macOS (Intel)",
+      "windows": "Windows (.exe)",
+      "dismiss": "Dismiss",
+      "showAllPlatforms": "Show all platforms",
+      "showLess": "Show less"
+    },
+    "runtimeConfig": {
+      "title": "Desktop Configuration",
+      "alertTitle": {
+        "configured": "Desktop settings configured",
+        "needsKeys": "Configure API keys to unlock features",
+        "some": "Some features need API keys"
+      },
+      "openSettings": "Open Settings",
+      "summary": {
+        "desktop": "Desktop mode",
+        "web": "Web mode (read-only, server-managed credentials)",
+        "secrets": "local secrets configured",
+        "available": "features available"
+      },
+      "status": {
+        "ready": "Ready",
+        "staged": "Staged",
+        "needsKeys": "Needs Keys",
+        "invalid": "Invalid",
+        "missing": "Missing",
+        "valid": "Valid",
+        "looksInvalid": "Looks invalid"
+      },
+      "placeholder": {
+        "setSecret": "Set secret",
+        "staged": "Staged (save with OK)"
+      }
+    },
+    "countryIntel": {
+      "title": "Country Intelligence",
+      "description": "Detailed insights and data for specific countries.",
+      "identifying": "Identifying country...",
+      "locating": "Locating region...",
+      "instabilityIndex": "Instability Index",
+      "protests": "protests",
+      "militaryAircraft": "mil. aircraft",
+      "militaryVessels": "mil. vessels",
+      "outages": "outages",
+      "earthquakes": "earthquakes",
+      "loadingIndex": "Loading index...",
+      "loadingMarkets": "Loading prediction markets...",
+      "generatingBrief": "Generating intelligence brief...",
+      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+      "cached": "Cached",
+      "fresh": "Fresh",
+      "noMarkets": "No prediction markets found",
+      "predictionMarkets": "Prediction Markets"
+    },
+    "countryBrief": {
+      "components": {
+        "unrest": "Unrest",
+        "conflict": "Conflict",
+        "security": "Security",
+        "information": "Information"
+      },
+      "signals": {
+        "protests": "protests",
+        "militaryAir": "mil. aircraft",
+        "militarySea": "mil. vessels",
+        "outages": "outages",
+        "earthquakes": "earthquakes",
+        "displaced": "displaced",
+        "climate": "Climate stress",
+        "conflictEvents": "conflict events"
+      },
+      "loadingIndex": "Loading index...",
+      "identifying": "Identifying country...",
+      "locating": "Locating region...",
+      "limitedCoverage": "Limited coverage",
+      "instabilityIndex": "Instability Index",
+      "notTracked": "Not tracked — {{country}} is not in the CII tier-1 list",
+      "intelBrief": "Intelligence Brief",
+      "generatingBrief": "Generating intelligence brief...",
+      "topNews": "Top News",
+      "activeSignals": "Active Signals",
+      "timeline": "7-Day Timeline",
+      "predictionMarkets": "Prediction Markets",
+      "loadingMarkets": "Loading prediction markets...",
+      "infrastructure": "Infrastructure Exposure",
+      "briefUnavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+      "cached": "Cached",
+      "fresh": "Fresh",
+      "noMarkets": "No prediction markets found",
+      "timeAgo": {
+        "m": "m ago",
+        "h": "h ago",
+        "d": "d ago"
+      }
+    },
+    "story": {
+      "shareTitle": "Share story",
+      "close": "Close",
+      "generating": "Generating story...",
+      "save": "Save",
+      "whatsapp": "WhatsApp",
+      "twitter": "X",
+      "linkedin": "LinkedIn",
+      "copyLink": "Link",
+      "error": "Failed to generate story.",
+      "saved": "Saved!",
+      "copied": "Copied!",
+      "opening": "Opening..."
+    },
+    "settingsWindow": {
+      "invokeFail": "Failed to run {{command}}. Check desktop log.",
+      "validating": "Validating API keys...",
+      "verifyFailed": "Saved verified keys. Failed: {{errors}}",
+      "saved": "Settings saved",
+      "failed": "Save failed: {{error}}",
+      "openLogs": "Opened logs folder",
+      "openApiLog": "Opened API log",
+      "verboseOn": "Verbose sidecar logging ON (saved)",
+      "verboseOff": "Verbose sidecar logging OFF (saved)",
+      "sidecarError": "Could not reach sidecar to toggle verbose mode",
+      "noTraffic": "No traffic recorded yet.",
+      "table": {
+        "time": "Time",
+        "method": "Method",
+        "path": "Path",
+        "status": "Status",
+        "duration": "Duration"
+      },
+      "sidecarUnreachable": "Sidecar not reachable.",
+      "logCleared": "Log cleared."
     }
+  },
+  "components": {
+    "monitor": {
+      "placeholder": "Keywords (comma separated)",
+      "add": "+ Add Monitor",
+      "addKeywords": "Add keywords to monitor news",
+      "noMatches": "No matches in {{count}} articles",
+      "showingMatches": "Showing {{count}} of {{total}} matches",
+      "match": "match",
+      "matches": "matches"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "playback": {
+      "play": "Play",
+      "pause": "Pause",
+      "speed": "Speed",
+      "live": "Live",
+      "toggleMode": "Toggle Playback Mode",
+      "historicalPlayback": "Historical Playback"
+    },
+    "deckgl": {
+      "views": {
+        "global": "Global",
+        "americas": "Americas",
+        "europe": "Europe",
+        "latam": "Latin America",
+        "mena": "MENA",
+        "asia": "Asia",
+        "africa": "Africa",
+        "oceania": "Oceania"
+      },
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "resetView": "Reset View",
+      "timeAll": "All",
+      "layers": {
+        "startupHubs": "Startup Hubs",
+        "techHQs": "Tech HQs",
+        "accelerators": "Accelerators",
+        "cloudRegions": "Cloud Regions",
+        "aiDataCenters": "AI Data Centers",
+        "underseaCables": "Undersea Cables",
+        "internetOutages": "Internet Outages",
+        "cyberThreats": "Cyber Threats",
+        "techEvents": "Tech Events",
+        "naturalEvents": "Natural Events",
+        "fires": "Fires",
+        "intelHotspots": "Intel Hotspots",
+        "conflictZones": "Conflict Zones",
+        "militaryBases": "Military Bases",
+        "nuclearSites": "Nuclear Sites",
+        "gammaIrradiators": "Gamma Irradiators",
+        "spaceports": "Spaceports",
+        "pipelines": "Pipelines",
+        "militaryActivity": "Military Activity",
+        "shipTraffic": "Ship Traffic",
+        "flightDelays": "Flight Delays",
+        "protests": "Protests",
+        "ucdpEvents": "UCDP Events",
+        "displacementFlows": "Displacement Flows",
+        "climateAnomalies": "Climate Anomalies",
+        "weatherAlerts": "Weather Alerts",
+        "strategicWaterways": "Strategic Waterways",
+        "economicCenters": "Economic Centers",
+        "criticalMinerals": "Critical Minerals"
+      },
+      "layersTitle": "Layers",
+      "layerGuide": "Layer Guide"
+    },
+    "climate": {
+      "noAnomalies": "No significant anomalies detected"
+    },
+    "newsPanel": {
+      "close": "Close"
+    },
+    "countryBrief": {
+      "shareStory": "Share story",
+      "printPdf": "Print / PDF",
+      "exportData": "Export data",
+      "sourceRef": "Source [{{n}}]"
+    },
+    "pizzint": {
+      "title": "Pentagon Pizza Index",
+      "tensionsTitle": "Geopolitical Tensions",
+      "source": "Source:",
+      "defcon": "DEFCON {{level}}",
+      "updated": "Updated {{timeAgo}}",
+      "statusClosed": "CLOSED",
+      "statusSpike": "SPIKE",
+      "statusHigh": "HIGH",
+      "statusElevated": "ELEVATED",
+      "statusNominal": "NOMINAL",
+      "statusQuiet": "QUIET",
+      "justNow": "just now",
+      "minutesAgo": "{{m}}m ago",
+      "hoursAgo": "{{h}}h ago"
+    },
+    "status": {
+      "systemStatus": "System Status",
+      "updatedJustNow": "Updated just now",
+      "updatedAt": "Updated {{time}}",
+      "storageUnavailable": "Storage info unavailable"
+    },
+    "strategicPosture": {
+      "elapsed": "Elapsed: {{elapsed}} s",
+      "clickToView": "Click to view {{name}} on map",
+      "units": {
+        "fighters": "Fighters",
+        "tankers": "Tankers",
+        "awacs": "AWACS",
+        "recon": "Recon",
+        "transport": "Transport",
+        "bombers": "Bombers",
+        "drones": "Drones",
+        "aircraft": "Aircraft",
+        "carriers": "Carriers",
+        "destroyers": "Destroyers",
+        "frigates": "Frigates",
+        "submarines": "Submarines",
+        "patrol": "Patrol",
+        "auxiliary": "Auxiliary",
+        "navalVessels": "Naval Vessels"
+      },
+      "clickToViewMap": "Click to view on map",
+      "refresh": "Refresh"
+    },
+    "techEvents": {
+      "loading": "Loading tech events...",
+      "noEvents": "No events to display",
+      "showOnMap": "Show on map",
+      "moreInfo": "More info"
+    },
+    "techReadiness": {
+      "internetUsers": "Internet Users",
+      "mobileSubscriptions": "Mobile Subscriptions",
+      "rdSpending": "R&D Spending"
+    }
+  },
+  "popups": {
+    "startDate": "STARTDATUM",
+    "endDate": "SLUTDATUM",
+    "magnitude": "Magnitud",
+    "depth": "Djup",
+    "intensity": "Intensitet",
+    "type": "TYP",
+    "status": "STATUS",
+    "severity": "Allvarlighet",
+    "location": "PLATS",
+    "coordinates": "KOORDINATER",
+    "casualties": "OFFER",
+    "displaced": "FÖRDRIVNA",
+    "belligerents": "STRIDANDE PARTER",
+    "keyDevelopments": "VIKTIGA UTVECKLINGAR",
+    "unknown": "Okänd",
+    "source": "Källa",
+    "target": "Mål",
+    "events": "Händelser",
+    "impact": "Påverkan",
+    "capacity": "Kapacitet",
+    "alerts": "Aktiva varningar",
+    "common": {
+      "start": "START",
+      "end": "SLUT",
+      "updated": "UPPDATERAD"
+    },
+    "conflict": {
+      "title": "KONFLIKTZON"
+    },
+    "earthquake": {
+      "levels": {
+        "major": "STOR",
+        "moderate": "MÅTTLIG",
+        "minor": "MINDRE"
+      }
+    },
+    "base": {
+      "types": {
+        "us-nato": "US/NATO",
+        "china": "KINA",
+        "russia": "RYSSLAND"
+      }
+    },
+    "protest": {
+      "acledVerified": "ACLED (verifierad)",
+      "gdelt": "GDELT",
+      "riots": "Upplopp",
+      "highSeverity": "Hög allvarlighet"
+    },
+    "flight": {
+      "groundStop": "MARKSTOPP",
+      "groundDelay": "MARKFÖRDRÖJNING",
+      "departureDelay": "AVGÅNGSFÖRDRÖJNINGAR",
+      "arrivalDelay": "ANKOMSTFÖRDRÖJNINGAR",
+      "delaysReported": "FÖRSENINGAR RAPPORTERADE",
+      "delays": "FÖRSENINGAR",
+      "avgDelay": "SNITT FÖRSENING",
+      "cancelled": "INSTÄLLD"
+    },
+    "apt": {
+      "description": "Avancerad ihållande hotgrupp med statliga förmågor. Känd för sofistikerade cyberoperationer riktade mot kritisk infrastruktur, regering och försvarssektorer."
+    },
+    "cyberThreat": {
+      "title": "CYBERHOT"
+    },
+    "nuclear": {
+      "types": {
+        "plant": "KRAFTVERK",
+        "enrichment": "ANRIKNING",
+        "weapons": "VAPENKOMPLEX",
+        "research": "FORSKNING"
+      },
+      "description": "Kärnteknisk anläggning under övervakning. Strategisk betydelse för regional säkerhet och icke-spridning."
+    },
+    "economic": {
+      "types": {
+        "exchange": "BÖRS",
+        "centralBank": "CENTRALBANK",
+        "financialHub": "FINANSCENTRUM"
+      }
+    },
+    "irradiator": {
+      "subtitle": "Industriell gammabestrålningsanläggning",
+      "description": "Industriell bestrålningsanläggning med Kobolt-60 eller Cesium-137 för sterilisering av medicintekniska produkter, livsmedelskonservering eller materialbearbetning. Källa: IAEA DIIF-databas."
+    },
+    "pipeline": {
+      "title": "RÖRLEDNING",
+      "types": {
+        "oil": "OLJERÖRLEDNING",
+        "gas": "GASLEDNING",
+        "products": "PRODUKTLEDNING"
+      },
+      "status": {
+        "operating": "I DRIFT",
+        "construction": "UNDER KONSTRUKTION"
+      },
+      "description": "Viktig {{type}}-rörledningsinfrastruktur. {{status}}"
+    },
+    "pipelineStatusDesc": {
+      "operating": "I drift och transporterar resurser.",
+      "construction": "Under konstruktion."
+    },
+    "cable": {
+      "fault": "FEL",
+      "degraded": "FÖRSÄMRAD",
+      "active": "AKTIV",
+      "major": "ALLVARLIG",
+      "cable": "KABEL",
+      "subtitle": "Undervattens fiberoptisk kabel",
+      "type": "UNDERVATTENSKABEL",
+      "advisory": "FELVARNING",
+      "repairDeployment": "REPARATIONSINSATS"
+    },
+    "repairShip": {
+      "note": "Reparationsfartygets spårning indikerar aktiv utplacering mot felplatsen."
+    },
+    "strategic": "STRATEGISK",
+    "verified": "VERIFIERAD",
+    "sampledList": "Visar ett stickprov av {{count}} händelser.",
+    "reason": "ORSAK",
+    "threat": "HOT",
+    "aka": "Även känd som",
+    "sponsor": "SPONSOR",
+    "origin": "URSPRUNG",
+    "country": "LAND",
+    "malware": "MALWARE",
+    "lastSeen": "SENAST SEDD",
+    "open": "ÖPPEN",
+    "tradingHours": "HANDELSTIDER",
+    "gamma": "GAMMA",
+    "city": "STAD",
+    "length": "LÄNGD",
+    "operator": "OPERATÖR",
+    "countries": "LÄNDER",
+    "waypoints": "VÄGPUNKTER",
+    "repairEta": "REPARATIONS-ETA",
+    "timeUnits": {
+      "m": "m",
+      "h": "h",
+      "d": "d"
+    },
+    "hotspot": {
+      "escalation": "ESKALERINGSBEDÖMNING",
+      "baseline": "Baslinje",
+      "score": "Poäng",
+      "trend": "Trend",
+      "components": {
+        "news": "Nyheter",
+        "cii": "CII",
+        "geo": "Geo",
+        "military": "Militär"
+      },
+      "levels": {
+        "stable": "STABIL",
+        "watch": "BEVAKNING",
+        "elevated": "FÖRHÖJD",
+        "high": "HÖG",
+        "critical": "KRITISK"
+      }
+    },
+    "buttons": {
+      "track": "Spåra problem",
+      "details": "Visa detaljer"
+    },
+    "historicalContext": "HISTORISK KONTEXT",
+    "lastMajorEvent": "Senaste stora händelse",
+    "precedents": "Prejudikat",
+    "cyclicalPattern": "Cykliskt mönster",
+    "whyItMatters": "VARFÖR DET SPELAR ROLL",
+    "keyEntities": "NYCKELENTITETER",
+    "relatedHeadlines": "RELATERADE RUBRIKER",
+    "liveIntel": "Live Intelligence",
+    "loadingNews": "Laddar globala nyheter...",
+    "noCoverage": "Ingen aktuell global bevakning",
+    "time": "Tid",
+    "area": "Område",
+    "expires": "Utgår",
+    "aisGapSpike": "AIS-LUCKTOPP",
+    "chokepointCongestion": "FLASKHALS TRÄNGSEL",
+    "darkening": "MÖRKLÄGGNING",
+    "density": "TÄTHET",
+    "darkShips": "MÖRKA FARTYG",
+    "vesselCount": "FARTYGSANTAL",
+    "window": "FÖNSTER",
+    "region": "REGION",
+    "fatalities": "DÖDSFALL",
+    "actors": "AKTÖRER",
+    "near": "Nära",
+    "moreEvents": "fler händelser",
+    "monitoring": "Övervakning",
+    "viewUSGS": "Visa på USGS",
+    "expired": "Utgången",
+    "timeAgo": {
+      "s": "s sedan",
+      "m": "m sedan",
+      "h": "h sedan",
+      "d": "d sedan"
+    },
+    "updated": "Updated"
+  },
+  "common": {
+    "loading": "Laddar...",
+    "error": "Ett fel inträffade",
+    "retry": "Försök igen",
+    "close": "Stäng",
+    "cancel": "Avbryt",
+    "confirm": "Bekräfta",
+    "unknown": "Okänt",
+    "updated": "Uppdaterad: {{time}}",
+    "failedToLoad": "Kunde inte ladda data",
+    "noDataShort": "Inga data",
+    "noDataAvailable": "Inga data tillgängliga",
+    "upstreamUnavailable": "Uppströms-API ej tillgängligt — automatiskt nytt försök",
+    "loadingUcdpEvents": "Laddar UCDP-händelser",
+    "loadingStablecoins": "Laddar stablecoins...",
+    "scanningThermalData": "Skannar termiska data",
+    "calculatingExposure": "Beräknar exponering",
+    "computingSignals": "Beräknar signaler...",
+    "loadingEtfData": "Laddar ETF-data...",
+    "loadingDisplacement": "Laddar förflyttningsdata",
+    "loadingClimateData": "Laddar klimatdata",
+    "failedTechReadiness": "Kunde inte ladda teknologisk beredskap",
+    "failedRiskOverview": "Kunde inte beräkna risköversikt",
+    "failedPredictions": "Kunde inte ladda prognoser",
+    "failedCII": "Kunde inte beräkna CII",
+    "failedDependencyGraph": "Kunde inte bygga beroendegrafen",
+    "failedIntelFeed": "Kunde inte ladda underrättelseflöde",
+    "failedMarketData": "Kunde inte ladda marknadsdata",
+    "failedSectorData": "Kunde inte ladda sektorsdata",
+    "failedCommodities": "Kunde inte ladda råvaror",
+    "failedCryptoData": "Kunde inte ladda kryptodata",
+    "failedClusterNews": "Kunde inte gruppera nyheter",
+    "noNewsAvailable": "Inga nyheter tillgängliga",
+    "noActiveTechHubs": "Inga aktiva teknikhubbar",
+    "noActiveGeoHubs": "Inga aktiva geopolitiska hubbar",
+    "allSourcesDisabled": "Alla källor inaktiverade",
+    "allIntelSourcesDisabled": "Alla Intel-källor inaktiverade",
+    "noEventsInCategory": "Inga händelser i denna kategori",
+    "exportCsv": "Exportera CSV",
+    "exportJson": "Exportera JSON",
+    "exportData": "Exportera data",
+    "exportImage": "Exportera bild",
+    "unrest": "Oroligheter",
+    "conflict": "Konflikt",
+    "security": "Säkerhet",
+    "information": "Information",
+    "shareStory": "Dela historia",
+    "selectAll": "Select All",
+    "selectNone": "Select None"
+  },
+  "header": {
+    "world": "WORLD",
+    "tech": "TECH",
+    "viewOnGitHub": "View on GitHub",
+    "live": "LIVE",
+    "search": "Search",
+    "copyLink": "Copy Link",
+    "fullscreen": "Fullscreen",
+    "settings": "PANELS",
+    "sources": "SOURCES",
+    "pinMap": "Pin map to top",
+    "filterSources": "Filter sources...",
+    "sourcesEnabled": "{{enabled}}/{{total}} enabled"
+  }
 }
