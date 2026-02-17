@@ -40,6 +40,10 @@
   /* Input */
   --input-bg: #1a1a1a;
 
+  /* Panels */
+  --panel-bg: #141414;
+  --panel-border: #2a2a2a;
+
   /* Map */
   --map-bg: #020a08;
   --map-grid: #0a2a20;
@@ -140,6 +144,10 @@
 
   /* Input */
   --input-bg: #f0f0f0;
+
+  /* Panels */
+  --panel-bg: #ffffff;
+  --panel-border: #d4d4d4;
 
   /* Map */
   --map-bg: #e8f0f8;
