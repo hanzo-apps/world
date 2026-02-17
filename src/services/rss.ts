@@ -161,7 +161,8 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
         const pubDateStr = isAtom
           ? (item.querySelector('published')?.textContent || item.querySelector('updated')?.textContent || '')
           : (item.querySelector('pubDate')?.textContent || '');
-        const pubDate = pubDateStr ? new Date(pubDateStr) : new Date();
+        const parsedDate = pubDateStr ? new Date(pubDateStr) : new Date();
+        const pubDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
         const threat = classifyByKeyword(title, SITE_VARIANT);
         const isAlert = threat.level === 'critical' || threat.level === 'high';
         const geoMatches = inferGeoHubsFromTitle(title);
