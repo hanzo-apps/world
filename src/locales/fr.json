@@ -349,6 +349,14 @@
         "m": "m ago",
         "h": "h ago",
         "d": "d ago"
+      },
+      "infra": {
+        "pipeline": "Pipelines",
+        "cable": "Câbles sous-marins",
+        "datacenter": "Centres de données",
+        "base": "Bases militaires",
+        "nuclear": "Installations nucléaires",
+        "port": "Ports"
       }
     }
   },
@@ -990,7 +998,6 @@
       "track": "Suivre",
       "details": "Détails"
     },
-    "critical": "CRITIQUE",
     "historicalContext": "CONTEXTE HISTORIQUE",
     "lastMajorEvent": "Dernier Événement Majeur",
     "precedents": "Précédents",
