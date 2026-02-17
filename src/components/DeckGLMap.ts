@@ -133,19 +133,9 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 const MAP_INTERACTION_MODE: MapInteractionMode =
   import.meta.env.VITE_MAP_INTERACTION_MODE === 'flat' ? 'flat' : '3d';
 
-// Theme-aware basemap tile URLs
-const DARK_TILES = [
-  'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-  'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-  'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-];
-const LIGHT_TILES = [
-  'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-  'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-  'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-];
-const DARK_BG = '#0a0f0c';
-const LIGHT_BG = '#e8f0f8';
+// Theme-aware basemap vector style URLs (English labels, no local scripts)
+const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
@@ -276,6 +266,8 @@ export class DeckGLMap {
 
   // Country highlight state
   private countryGeoJsonLoaded = false;
+  private countryHoverSetup = false;
+  private highlightedCountryCode: string | null = null;
 
   // Callbacks
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -383,43 +375,13 @@ export class DeckGLMap {
   private initMapLibre(): void {
     const preset = VIEW_PRESETS[this.state.view];
     const initialTheme = getCurrentTheme();
-    const initialTiles = initialTheme === 'light' ? LIGHT_TILES : DARK_TILES;
-    const initialBg = initialTheme === 'light' ? LIGHT_BG : DARK_BG;
-    const styleName = initialTheme === 'light' ? 'Light' : 'Dark';
 
     this.maplibreMap = new maplibregl.Map({
       container: 'deckgl-basemap',
-      style: {
-        version: 8,
-        name: styleName,
-        sources: {
-          'carto-dark': {
-            type: 'raster',
-            tiles: initialTiles,
-            tileSize: 256,
-            attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-          },
-        },
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': initialBg,
-            },
-          },
-          {
-            id: 'carto-dark-layer',
-            type: 'raster',
-            source: 'carto-dark',
-            minzoom: 0,
-            maxzoom: 22,
-          },
-        ],
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      },
+      style: initialTheme === 'light' ? LIGHT_STYLE : DARK_STYLE,
       center: [preset.longitude, preset.latitude],
       zoom: preset.zoom,
+      renderWorldCopies: false,
       attributionControl: false,
       interactive: true,
       ...(MAP_INTERACTION_MODE === 'flat'
@@ -437,7 +399,7 @@ export class DeckGLMap {
     if (!this.maplibreMap) return;
 
     this.deckOverlay = new MapboxOverlay({
-      interleaved: false,
+      interleaved: true,
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
@@ -3769,14 +3731,17 @@ export class DeckGLMap {
           filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
         });
 
-        this.setupCountryHover();
+        if (!this.countryHoverSetup) this.setupCountryHover();
+        this.updateCountryLayerPaint(getCurrentTheme());
+        if (this.highlightedCountryCode) this.highlightCountry(this.highlightedCountryCode);
         console.log('[DeckGLMap] Country boundaries loaded');
       })
       .catch((err) => console.warn('[DeckGLMap] Failed to load country boundaries:', err));
   }
 
   private setupCountryHover(): void {
-    if (!this.maplibreMap) return;
+    if (!this.maplibreMap || this.countryHoverSetup) return;
+    this.countryHoverSetup = true;
     const map = this.maplibreMap;
     let hoveredName: string | null = null;
 
@@ -3806,8 +3771,8 @@ export class DeckGLMap {
   }
 
   public highlightCountry(code: string): void {
+    this.highlightedCountryCode = code;
     if (!this.maplibreMap || !this.countryGeoJsonLoaded) return;
-    // Update MapLibre filter to highlight this country
     const filter: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], code];
     try {
       this.maplibreMap.setFilter('country-highlight-fill', filter);
@@ -3816,8 +3781,8 @@ export class DeckGLMap {
   }
 
   public clearCountryHighlight(): void {
+    this.highlightedCountryCode = null;
     if (!this.maplibreMap) return;
-    // Clear highlight filter
     const noMatch: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], ''];
     try {
       this.maplibreMap.setFilter('country-highlight-fill', noMatch);
@@ -3827,14 +3792,12 @@ export class DeckGLMap {
 
   private switchBasemap(theme: 'dark' | 'light'): void {
     if (!this.maplibreMap) return;
-    const source = this.maplibreMap.getSource('carto-dark') as maplibregl.RasterTileSource;
-    if (!source) return;
-    source.setTiles(theme === 'light' ? LIGHT_TILES : DARK_TILES);
-    try {
-      this.maplibreMap.setPaintProperty('background', 'background-color',
-        theme === 'light' ? LIGHT_BG : DARK_BG);
-    } catch { /* background layer may not exist */ }
-    this.updateCountryLayerPaint(theme);
+    this.maplibreMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
+    // setStyle() replaces all sources/layers — reset guard so country layers are re-added
+    this.countryGeoJsonLoaded = false;
+    this.maplibreMap.once('style.load', () => {
+      this.loadCountryBoundaries();
+    });
   }
 
   private updateCountryLayerPaint(theme: 'dark' | 'light'): void {
