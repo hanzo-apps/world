@@ -288,7 +288,6 @@ export class DeckGLMap {
     nuclear: new Set(),
   };
 
-  private timestampIntervalId: ReturnType<typeof setInterval> | null = null;
   private renderScheduled = false;
   private renderPaused = false;
   private renderPending = false;
@@ -359,7 +358,6 @@ export class DeckGLMap {
     this.createTimeSlider();
     this.createLayerToggles();
     this.createLegend();
-    this.createTimestamp();
   }
 
   private setupDOM(): void {
@@ -2998,25 +2996,6 @@ export class DeckGLMap {
     this.container.appendChild(legend);
   }
 
-  private createTimestamp(): void {
-    const timestamp = document.createElement('div');
-    // Only use deckgl-timestamp class - map-timestamp has conflicting positioning
-    timestamp.className = 'deckgl-timestamp';
-    timestamp.id = 'deckglTimestamp';
-    this.container.appendChild(timestamp);
-
-    this.updateTimestamp();
-    this.timestampIntervalId = setInterval(() => this.updateTimestamp(), 1000);
-  }
-
-  private updateTimestamp(): void {
-    const el = document.getElementById('deckglTimestamp');
-    if (el) {
-      const now = new Date();
-      el.textContent = `${now.toUTCString().replace('GMT', 'UTC')}`;
-    }
-  }
-
   // Public API methods (matching MapComponent interface)
   public render(): void {
     if (this.renderPaused) {
@@ -3819,10 +3798,6 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
-    if (this.timestampIntervalId) {
-      clearInterval(this.timestampIntervalId);
-    }
-
     if (this.moveTimeoutId) {
       clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = null;
