@@ -266,6 +266,7 @@ export class DeckGLMap {
 
   // Country highlight state
   private countryGeoJsonLoaded = false;
+  private countryHoverSetup = false;
 
   // Callbacks
   private onHotspotClick?: (hotspot: Hotspot) => void;
@@ -3729,14 +3730,16 @@ export class DeckGLMap {
           filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
         });
 
-        this.setupCountryHover();
+        if (!this.countryHoverSetup) this.setupCountryHover();
+        this.updateCountryLayerPaint(getCurrentTheme());
         console.log('[DeckGLMap] Country boundaries loaded');
       })
       .catch((err) => console.warn('[DeckGLMap] Failed to load country boundaries:', err));
   }
 
   private setupCountryHover(): void {
-    if (!this.maplibreMap) return;
+    if (!this.maplibreMap || this.countryHoverSetup) return;
+    this.countryHoverSetup = true;
     const map = this.maplibreMap;
     let hoveredName: string | null = null;
 
@@ -3788,7 +3791,11 @@ export class DeckGLMap {
   private switchBasemap(theme: 'dark' | 'light'): void {
     if (!this.maplibreMap) return;
     this.maplibreMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
-    this.updateCountryLayerPaint(theme);
+    // setStyle() replaces all sources/layers — reset guard so country layers are re-added
+    this.countryGeoJsonLoaded = false;
+    this.maplibreMap.once('style.load', () => {
+      this.loadCountryBoundaries();
+    });
   }
 
   private updateCountryLayerPaint(theme: 'dark' | 'light'): void {
