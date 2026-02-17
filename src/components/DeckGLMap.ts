@@ -2758,6 +2758,7 @@ export class DeckGLMap {
           { key: 'financialCenters', label: 'Financial Centers', icon: '&#128176;' },
           { key: 'centralBanks', label: 'Central Banks', icon: '&#127974;' },
           { key: 'commodityHubs', label: 'Commodity Hubs', icon: '&#128230;' },
+          { key: 'gulfInvestments', label: 'GCC Investments', icon: '&#127760;' },
           { key: 'cables', label: 'Undersea Cables', icon: '&#128268;' },
           { key: 'pipelines', label: 'Pipelines', icon: '&#128738;' },
           { key: 'outages', label: 'Internet Outages', icon: '&#128225;' },
