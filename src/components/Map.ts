@@ -149,7 +149,6 @@ export class MapComponent {
   private renderScheduled = false;
   private lastRenderTime = 0;
   private readonly MIN_RENDER_INTERVAL_MS = 100;
-  private timestampIntervalId: ReturnType<typeof setInterval> | null = null;
   private healthCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(container: HTMLElement, initialState: MapState) {
@@ -181,7 +180,7 @@ export class MapComponent {
     container.appendChild(this.createTimeSlider());
     container.appendChild(this.createLayerToggles());
     container.appendChild(this.createLegend());
-    container.appendChild(this.createTimestamp());
+    this.healthCheckIntervalId = setInterval(() => this.runHealthCheck(), 30000);
 
     this.svg = d3.select(svgElement);
     this.baseLayerGroup = this.svg.append('g').attr('class', 'map-base');
@@ -225,10 +224,6 @@ export class MapComponent {
 
   public destroy(): void {
     document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
-    if (this.timestampIntervalId) {
-      clearInterval(this.timestampIntervalId);
-      this.timestampIntervalId = null;
-    }
     if (this.healthCheckIntervalId) {
       clearInterval(this.healthCheckIntervalId);
       this.healthCheckIntervalId = null;
@@ -543,17 +538,6 @@ export class MapComponent {
     return legend;
   }
 
-  private createTimestamp(): HTMLElement {
-    const timestamp = document.createElement('div');
-    timestamp.className = 'map-timestamp';
-    timestamp.id = 'mapTimestamp';
-    this.updateTimestamp(timestamp);
-    this.timestampIntervalId = setInterval(() => this.updateTimestamp(timestamp), 60000);
-    // Health check every 30 seconds to detect and recover from base layer issues
-    this.healthCheckIntervalId = setInterval(() => this.runHealthCheck(), 30000);
-    return timestamp;
-  }
-
   private runHealthCheck(): void {
     // Skip if page is hidden (no need to check while user isn't looking)
     if (document.hidden) return;
@@ -575,11 +559,6 @@ export class MapComponent {
       }
       this.render();
     }
-  }
-
-  private updateTimestamp(el: HTMLElement): void {
-    const now = new Date();
-    el.innerHTML = `LAST UPDATE: ${now.toUTCString().replace('GMT', 'UTC')}`;
   }
 
   private setupZoomHandlers(): void {
