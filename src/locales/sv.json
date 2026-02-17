@@ -1,4 +1,18 @@
 {
+    "panels": {
+        "liveNews": "Live News",
+        "markets": "Markets",
+        "heatmap": "Sector Heatmap",
+        "crypto": "Crypto",
+        "strategicPosture": "Strategic Posture",
+        "cii": "Country Instability Index",
+        "status": "System Status",
+        "news": "Global News",
+        "insights": "AI Insights",
+        "signals": "Macro Signals",
+        "hazards": "Natural Hazards",
+        "map": "Interactive Map"
+    },
     "modals": {
         "search": {
             "placeholder": "Search news, pipelines, bases, markets...",
@@ -91,20 +105,6 @@
             "description": "Detailed insights and data for specific countries."
         }
     },
-    "panels": {
-        "liveNews": "Live News",
-        "markets": "Markets",
-        "heatmap": "Sector Heatmap",
-        "crypto": "Crypto",
-        "strategicPosture": "Strategic Posture",
-        "cii": "Country Instability Index",
-        "status": "System Status",
-        "news": "Global News",
-        "insights": "AI Insights",
-        "signals": "Macro Signals",
-        "hazards": "Natural Hazards",
-        "map": "Interactive Map"
-    },
     "components": {
         "monitor": {
             "placeholder": "Keywords (comma separated)",
@@ -128,155 +128,204 @@
         }
     },
     "popups": {
-        "startDate": "START DATE",
-        "endDate": "END DATE",
-        "magnitude": "Magnitude",
-        "intensity": "Intensity",
-        "status": "Status",
-        "keyEntities": "KEY ENTITIES",
-        "relatedHeadlines": "RELATED HEADLINES",
+        "startDate": "STARTDATUM",
+        "endDate": "SLUTDATUM",
+        "magnitude": "Magnitud",
+        "depth": "Djup",
+        "intensity": "Intensitet",
+        "type": "TYP",
+        "status": "STATUS",
+        "severity": "Allvarlighet",
+        "location": "PLATS",
+        "coordinates": "KOORDINATER",
+        "casualties": "OFFER",
+        "displaced": "FÖRDRIVNA",
+        "belligerents": "STRIDANDE PARTER",
+        "keyDevelopments": "VIKTIGA UTVECKLINGAR",
+        "unknown": "Okänd",
+        "source": "Källa",
+        "target": "Mål",
+        "events": "Händelser",
+        "impact": "Påverkan",
+        "capacity": "Kapacitet",
+        "alerts": "Aktiva varningar",
+        "common": {
+            "start": "START",
+            "end": "SLUT",
+            "updated": "UPPDATERAD"
+        },
+        "conflict": {
+            "title": "KONFLIKTZON"
+        },
+        "earthquake": {
+            "levels": {
+                "major": "STOR",
+                "moderate": "MÅTTLIG",
+                "minor": "MINDRE"
+            }
+        },
+        "base": {
+            "types": {
+                "us-nato": "US/NATO",
+                "china": "KINA",
+                "russia": "RYSSLAND"
+            }
+        },
+        "protest": {
+            "acledVerified": "ACLED (verifierad)",
+            "gdelt": "GDELT",
+            "riots": "Upplopp",
+            "highSeverity": "Hög allvarlighet"
+        },
+        "flight": {
+            "groundStop": "MARKSTOPP",
+            "groundDelay": "MARKFÖRDRÖJNING",
+            "departureDelay": "AVGÅNGSFÖRDRÖJNINGAR",
+            "arrivalDelay": "ANKOMSTFÖRDRÖJNINGAR",
+            "delaysReported": "FÖRSENINGAR RAPPORTERADE",
+            "delays": "FÖRSENINGAR",
+            "avgDelay": "SNITT FÖRSENING",
+            "cancelled": "INSTÄLLD"
+        },
+        "apt": {
+            "description": "Avancerad ihållande hotgrupp med statliga förmågor. Känd för sofistikerade cyberoperationer riktade mot kritisk infrastruktur, regering och försvarssektorer."
+        },
+        "cyberThreat": {
+            "title": "CYBERHOT"
+        },
+        "nuclear": {
+            "types": {
+                "plant": "KRAFTVERK",
+                "enrichment": "ANRIKNING",
+                "weapons": "VAPENKOMPLEX",
+                "research": "FORSKNING"
+            },
+            "description": "Kärnteknisk anläggning under övervakning. Strategisk betydelse för regional säkerhet och icke-spridning."
+        },
+        "economic": {
+            "types": {
+                "exchange": "BÖRS",
+                "centralBank": "CENTRALBANK",
+                "financialHub": "FINANSCENTRUM"
+            }
+        },
+        "irradiator": {
+            "subtitle": "Industriell gammabestrålningsanläggning",
+            "description": "Industriell bestrålningsanläggning med Kobolt-60 eller Cesium-137 för sterilisering av medicintekniska produkter, livsmedelskonservering eller materialbearbetning. Källa: IAEA DIIF-databas."
+        },
+        "pipeline": {
+            "title": "RÖRLEDNING",
+            "types": {
+                "oil": "OLJERÖRLEDNING",
+                "gas": "GASLEDNING",
+                "products": "PRODUKTLEDNING"
+            },
+            "status": {
+                "operating": "I DRIFT",
+                "construction": "UNDER KONSTRUKTION"
+            },
+            "description": "Viktig {{type}}-rörledningsinfrastruktur. {{status}}"
+        },
+        "pipelineStatusDesc": {
+            "operating": "I drift och transporterar resurser.",
+            "construction": "Under konstruktion."
+        },
+        "cable": {
+            "fault": "FEL",
+            "degraded": "FÖRSÄMRAD",
+            "active": "AKTIV",
+            "major": "ALLVARLIG",
+            "cable": "KABEL",
+            "subtitle": "Undervattens fiberoptisk kabel",
+            "type": "UNDERVATTENSKABEL",
+            "advisory": "FELVARNING",
+            "repairDeployment": "REPARATIONSINSATS"
+        },
+        "repairShip": {
+            "note": "Reparationsfartygets spårning indikerar aktiv utplacering mot felplatsen."
+        },
+        "strategic": "STRATEGISK",
+        "verified": "VERIFIERAD",
+        "sampledList": "Visar ett stickprov av {{count}} händelser.",
+        "reason": "ORSAK",
+        "threat": "HOT",
+        "aka": "Även känd som",
+        "sponsor": "SPONSOR",
+        "origin": "URSPRUNG",
+        "country": "LAND",
+        "malware": "MALWARE",
+        "lastSeen": "SENAST SEDD",
+        "open": "ÖPPEN",
+        "tradingHours": "HANDELSTIDER",
+        "gamma": "GAMMA",
+        "city": "STAD",
+        "length": "LÄNGD",
+        "operator": "OPERATÖR",
+        "countries": "LÄNDER",
+        "waypoints": "VÄGPUNKTER",
+        "repairEta": "REPARATIONS-ETA",
+        "timeUnits": {
+            "m": "m",
+            "h": "h",
+            "d": "d"
+        },
+        "hotspot": {
+            "escalation": "ESKALERINGSBEDÖMNING",
+            "baseline": "Baslinje",
+            "score": "Poäng",
+            "trend": "Trend",
+            "components": {
+                "news": "Nyheter",
+                "cii": "CII",
+                "geo": "Geo",
+                "military": "Militär"
+            },
+            "levels": {
+                "stable": "STABIL",
+                "watch": "BEVAKNING",
+                "elevated": "FÖRHÖJD",
+                "high": "HÖG",
+                "critical": "KRITISK"
+            }
+        },
+        "buttons": {
+            "track": "Spåra problem",
+            "details": "Visa detaljer"
+        },
+        "historicalContext": "HISTORISK KONTEXT",
+        "lastMajorEvent": "Senaste stora händelse",
+        "precedents": "Prejudikat",
+        "cyclicalPattern": "Cykliskt mönster",
+        "whyItMatters": "VARFÖR DET SPELAR ROLL",
+        "keyEntities": "NYCKELENTITETER",
+        "relatedHeadlines": "RELATERADE RUBRIKER",
         "liveIntel": "Live Intelligence",
-        "loadingNews": "Loading global news...",
-        "noCoverage": "No recent global coverage",
-        "depth": "Depth",
-        "time": "Time",
-        "area": "Area",
-        "expires": "Expires",
-        "type": "TYPE",
-        "aisGapSpike": "AIS GAP SPIKE",
-        "chokepointCongestion": "CHOKEPOINT CONGESTION",
-        "darkening": "DARKENING",
-        "density": "DENSITY",
-        "darkShips": "DARK SHIPS",
-        "vesselCount": "VESSEL COUNT",
-        "window": "WINDOW",
+        "loadingNews": "Laddar globala nyheter...",
+        "noCoverage": "Ingen aktuell global bevakning",
+        "time": "Tid",
+        "area": "Område",
+        "expires": "Utgår",
+        "aisGapSpike": "AIS-LUCKTOPP",
+        "chokepointCongestion": "FLASKHALS TRÄNGSEL",
+        "darkening": "MÖRKLÄGGNING",
+        "density": "TÄTHET",
+        "darkShips": "MÖRKA FARTYG",
+        "vesselCount": "FARTYGSANTAL",
+        "window": "FÖNSTER",
         "region": "REGION",
-        "fatalities": "FATALITIES",
-        "actors": "ACTORS",
-        "near": "Near",
-        "moreEvents": "more events",
-        "monitoring": "Monitoring",
-        "viewUSGS": "View on USGS",
-        "expired": "Expired",
+        "fatalities": "DÖDSFALL",
+        "actors": "AKTÖRER",
+        "near": "Nära",
+        "moreEvents": "fler händelser",
+        "monitoring": "Övervakning",
+        "viewUSGS": "Visa på USGS",
+        "expired": "Utgången",
         "timeAgo": {
-            "s": "s ago",
-            "m": "m ago",
-            "h": "h ago",
-            "d": "d ago"
+            "s": "s sedan",
+            "m": "m sedan",
+            "h": "h sedan",
+            "d": "d sedan"
         }
-    },
-    "earthquake": {
-        "levels": {
-            "major": "MAJOR",
-            "moderate": "MODERATE",
-            "minor": "MINOR"
-        }
-    },
-    "base": {
-        "types": {
-            "us-nato": "US/NATO",
-            "china": "CHINA",
-            "russia": "RUSSIA"
-        }
-    },
-    "protest": {
-        "acledVerified": "ACLED (verified)",
-        "gdelt": "GDELT",
-        "riots": "Riots",
-        "highSeverity": "High Severity"
-    },
-    "flight": {
-        "groundStop": "GROUND STOP",
-        "groundDelay": "GROUND DELAY PROGRAM",
-        "departureDelay": "DEPARTURE DELAYS",
-        "arrivalDelay": "ARRIVAL DELAYS",
-        "delaysReported": "DELAYS REPORTED",
-        "delays": "DELAYS",
-        "avgDelay": "AVG DELAY",
-        "cancelled": "CANCELLED"
-    },
-    "capacity": "CAPACITY",
-    "apt": {
-        "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."
-    },
-    "cyberThreat": {
-        "title": "CYBER THREAT"
-    },
-    "nuclear": {
-        "types": {
-            "plant": "POWER PLANT",
-            "enrichment": "ENRICHMENT",
-            "weapons": "WEAPONS COMPLEX",
-            "research": "RESEARCH"
-        },
-        "description": "Nuclear facility under monitoring. Strategic importance for regional security and non-proliferation concerns."
-    },
-    "economic": {
-        "types": {
-            "exchange": "STOCK EXCHANGE",
-            "centralBank": "CENTRAL BANK",
-            "financialHub": "FINANCIAL HUB"
-        }
-    },
-    "irradiator": {
-        "subtitle": "Industrial Gamma Irradiator Facility",
-        "description": "Industrial irradiation facility using Cobalt-60 or Cesium-137 sources for medical device sterilization, food preservation, or material processing. Source: IAEA DIIF Database."
-    },
-    "pipeline": {
-        "title": "PIPELINE",
-        "types": {
-            "oil": "OIL PIPELINE",
-            "gas": "GAS PIPELINE",
-            "products": "PRODUCTS PIPELINE"
-        },
-        "status": {
-            "operating": "OPERATING",
-            "construction": "UNDER CONSTRUCTION"
-        },
-        "description": "Major {{type}} pipeline infrastructure. {{status}}"
-    },
-    "pipelineStatusDesc": {
-        "operating": "Currently operational and transporting resources.",
-        "construction": "Currently under construction."
-    },
-    "cable": {
-        "fault": "FAULT",
-        "degraded": "DEGRADED",
-        "active": "ACTIVE",
-        "major": "MAJOR",
-        "cable": "CABLE",
-        "subtitle": "Undersea Fiber Optic Cable",
-        "type": "SUBMARINE CABLE",
-        "advisory": "FAULT ADVISORY",
-        "repairDeployment": "REPAIR DEPLOYMENT"
-    },
-    "repairShip": {
-        "note": "Repair vessel tracking indicates active deployment toward fault site."
-    },
-    "strategic": "STRATEGIC",
-    "verified": "VERIFIED",
-    "sampledList": "Showing a sampled list of {{count}} events.",
-    "reason": "REASON",
-    "threat": "THREAT",
-    "aka": "Also known as",
-    "sponsor": "SPONSOR",
-    "origin": "ORIGIN",
-    "country": "COUNTRY",
-    "malware": "MALWARE",
-    "lastSeen": "LAST SEEN",
-    "open": "OPEN",
-    "tradingHours": "TRADING HOURS",
-    "gamma": "GAMMA",
-    "city": "CITY",
-    "length": "LENGTH",
-    "operator": "OPERATOR",
-    "countries": "COUNTRIES",
-    "waypoints": "WAYPOINTS",
-    "repairEta": "REPAIR ETA",
-    "timeUnits": {
-        "m": "m",
-        "h": "h",
-        "d": "d"
     },
     "common": {
         "loading": "Laddar...",

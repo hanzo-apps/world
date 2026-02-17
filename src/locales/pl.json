@@ -260,170 +260,204 @@
         }
     },
     "popups": {
-        "startDate": "START DATE",
-        "casualties": "CASUALTIES",
-        "displaced": "DISPLACED",
-        "location": "LOCATION",
-        "belligerents": "BELLIGERENTS",
-        "keyDevelopments": "KEY DEVELOPMENTS",
-        "escalationAssessment": "ESCALATION ASSESSMENT",
-        "stable": "STABLE",
-        "watch": "WATCH",
-        "elevated": "ELEVATED",
-        "high": "HIGH",
-        "critical": "CRITIQUE",
-        "baseline": "Baseline",
-        "historicalContext": "HISTORICAL CONTEXT",
-        "lastMajorEvent": "Last Major Event",
-        "precedents": "Precedents",
-        "cyclicalPattern": "Cyclical Pattern",
-        "whyItMatters": "WHY IT MATTERS",
-        "coordinates": "COORDINATES",
+        "startDate": "DATA POCZĄTKOWA",
+        "endDate": "DATA KOŃCOWA",
+        "magnitude": "Siła",
+        "depth": "Głębokość",
+        "intensity": "Intensywność",
+        "type": "TYP",
         "status": "STATUS",
-        "keyEntities": "KEY ENTITIES",
-        "relatedHeadlines": "RELATED HEADLINES",
-        "liveIntel": "Live Intelligence",
-        "loadingNews": "Loading global news...",
-        "noCoverage": "No recent global coverage",
-        "depth": "Depth",
-        "time": "Time",
-        "area": "Area",
-        "expires": "Expires",
-        "type": "TYPE",
-        "aisGapSpike": "AIS GAP SPIKE",
-        "chokepointCongestion": "CHOKEPOINT CONGESTION",
-        "darkening": "DARKENING",
-        "density": "DENSITY",
-        "darkShips": "DARK SHIPS",
-        "vesselCount": "VESSEL COUNT",
-        "window": "WINDOW",
+        "severity": "Dotkliwość",
+        "location": "LOKALIZACJA",
+        "coordinates": "WSPÓŁRZĘDNE",
+        "casualties": "OFIARY",
+        "displaced": "PRZESIEDLENI",
+        "belligerents": "STRONY KONFLIKTU",
+        "keyDevelopments": "KLUCZOWE WYDARZENIA",
+        "unknown": "Nieznany",
+        "source": "Źródło",
+        "target": "Cel",
+        "events": "Zdarzenia",
+        "impact": "Wpływ",
+        "capacity": "Pojemność",
+        "alerts": "Aktywne alerty",
+        "common": {
+            "start": "POCZĄTEK",
+            "end": "KONIEC",
+            "updated": "ZAKTUALIZOWANO"
+        },
+        "conflict": {
+            "title": "STREFA KONFLIKTU"
+        },
+        "earthquake": {
+            "levels": {
+                "major": "SILNE",
+                "moderate": "UMIARKOWANE",
+                "minor": "SŁABE"
+            }
+        },
+        "base": {
+            "types": {
+                "us-nato": "US/NATO",
+                "china": "CHINY",
+                "russia": "ROSJA"
+            }
+        },
+        "protest": {
+            "acledVerified": "ACLED (zweryfikowany)",
+            "gdelt": "GDELT",
+            "riots": "Zamieszki",
+            "highSeverity": "Wysoka dotkliwość"
+        },
+        "flight": {
+            "groundStop": "WSTRZYMANIE NA ZIEMI",
+            "groundDelay": "OPÓŹNIENIE NAZIEMNE",
+            "departureDelay": "OPÓŹNIENIA ODLOTÓW",
+            "arrivalDelay": "OPÓŹNIENIA PRZYLOTÓW",
+            "delaysReported": "ZGŁOSZONE OPÓŹNIENIA",
+            "delays": "OPÓŹNIENIA",
+            "avgDelay": "ŚR. OPÓŹNIENIE",
+            "cancelled": "ODWOŁANY"
+        },
+        "apt": {
+            "description": "Grupa zaawansowanego trwałego zagrożenia z możliwościami na poziomie państwowym. Znana z wyrafinowanych operacji cybernetycznych wymierzonych w infrastrukturę krytyczną, rząd i sektory obronne."
+        },
+        "cyberThreat": {
+            "title": "CYBERZAGROŻENIE"
+        },
+        "nuclear": {
+            "types": {
+                "plant": "ELEKTROWNIA",
+                "enrichment": "WZBOGACANIE",
+                "weapons": "KOMPLEKS BRONI",
+                "research": "BADANIA"
+            },
+            "description": "Obiekt nuklearny pod nadzorem. Znaczenie strategiczne dla bezpieczeństwa regionalnego i nieproliferacji."
+        },
+        "economic": {
+            "types": {
+                "exchange": "GIEŁDA",
+                "centralBank": "BANK CENTRALNY",
+                "financialHub": "CENTRUM FINANSOWE"
+            }
+        },
+        "irradiator": {
+            "subtitle": "Przemysłowa instalacja napromieniania gamma",
+            "description": "Przemysłowa instalacja napromieniania z użyciem Kobaltu-60 lub Cezu-137 do sterylizacji urządzeń medycznych, konserwacji żywności lub przetwarzania materiałów. Źródło: Baza danych IAEA DIIF."
+        },
+        "pipeline": {
+            "title": "RUROCIĄG",
+            "types": {
+                "oil": "ROPOCIĄG",
+                "gas": "GAZOCIĄG",
+                "products": "RUROCIĄG PRODUKTOWY"
+            },
+            "status": {
+                "operating": "W EKSPLOATACJI",
+                "construction": "W BUDOWIE"
+            },
+            "description": "Ważna infrastruktura rurociągu {{type}}. {{status}}"
+        },
+        "pipelineStatusDesc": {
+            "operating": "Aktualnie w eksploatacji i transportujący zasoby.",
+            "construction": "Aktualnie w budowie."
+        },
+        "cable": {
+            "fault": "AWARIA",
+            "degraded": "ZDEGRADOWANY",
+            "active": "AKTYWNY",
+            "major": "POWAŻNA",
+            "cable": "KABEL",
+            "subtitle": "Podmorski kabel światłowodowy",
+            "type": "KABEL PODMORSKI",
+            "advisory": "OSTRZEŻENIE O AWARII",
+            "repairDeployment": "WYSŁANIE NAPRAWY"
+        },
+        "repairShip": {
+            "note": "Śledzenie statku naprawczego wskazuje na aktywne rozmieszczenie w kierunku miejsca awarii."
+        },
+        "strategic": "STRATEGICZNY",
+        "verified": "ZWERYFIKOWANY",
+        "sampledList": "Wyświetlanie próbkowanej listy {{count}} zdarzeń.",
+        "reason": "POWÓD",
+        "threat": "ZAGROŻENIE",
+        "aka": "Znany również jako",
+        "sponsor": "SPONSOR",
+        "origin": "POCHODZENIE",
+        "country": "KRAJ",
+        "malware": "MALWARE",
+        "lastSeen": "OSTATNIO WIDZIANY",
+        "open": "OTWARTY",
+        "tradingHours": "GODZINY HANDLU",
+        "gamma": "GAMMA",
+        "city": "MIASTO",
+        "length": "DŁUGOŚĆ",
+        "operator": "OPERATOR",
+        "countries": "KRAJE",
+        "waypoints": "PUNKTY TRASY",
+        "repairEta": "ETA NAPRAWY",
+        "timeUnits": {
+            "m": "m",
+            "h": "h",
+            "d": "d"
+        },
+        "hotspot": {
+            "escalation": "OCENA ESKALACJI",
+            "baseline": "Linia bazowa",
+            "score": "Wynik",
+            "trend": "Trend",
+            "components": {
+                "news": "Wiadomości",
+                "cii": "CII",
+                "geo": "Geo",
+                "military": "Wojsko"
+            },
+            "levels": {
+                "stable": "STABILNY",
+                "watch": "OBSERWACJA",
+                "elevated": "PODWYŻSZONY",
+                "high": "WYSOKI",
+                "critical": "KRYTYCZNY"
+            }
+        },
+        "buttons": {
+            "track": "Śledź problem",
+            "details": "Zobacz szczegóły"
+        },
+        "historicalContext": "KONTEKST HISTORYCZNY",
+        "lastMajorEvent": "Ostatnie ważne wydarzenie",
+        "precedents": "Precedensy",
+        "cyclicalPattern": "Wzorzec cykliczny",
+        "whyItMatters": "DLACZEGO TO WAŻNE",
+        "keyEntities": "KLUCZOWE PODMIOTY",
+        "relatedHeadlines": "POWIĄZANE NAGŁÓWKI",
+        "liveIntel": "Intelligence na żywo",
+        "loadingNews": "Ładowanie globalnych wiadomości...",
+        "noCoverage": "Brak aktualnych globalnych relacji",
+        "time": "Czas",
+        "area": "Obszar",
+        "expires": "Wygasa",
+        "aisGapSpike": "SKOK LUKI AIS",
+        "chokepointCongestion": "ZATOR PRZEJŚCIA STRATEGICZNEGO",
+        "darkening": "ZACIEMNIENIE",
+        "density": "GĘSTOŚĆ",
+        "darkShips": "CIEMNE STATKI",
+        "vesselCount": "LICZBA STATKÓW",
+        "window": "OKNO",
         "region": "REGION",
-        "fatalities": "FATALITIES",
-        "actors": "ACTORS",
-        "near": "Near",
-        "moreEvents": "more events",
+        "fatalities": "OFIARY ŚMIERTELNE",
+        "actors": "AKTORZY",
+        "near": "W pobliżu",
+        "moreEvents": "więcej zdarzeń",
         "monitoring": "Monitoring",
-        "viewUSGS": "View on USGS",
-        "expired": "Expired",
+        "viewUSGS": "Zobacz na USGS",
+        "expired": "Wygasły",
         "timeAgo": {
-            "s": "s ago",
-            "m": "m ago",
-            "h": "h ago",
-            "d": "d ago"
+            "s": "s temu",
+            "m": "m temu",
+            "h": "h temu",
+            "d": "d temu"
         }
-    },
-    "earthquake": {
-        "levels": {
-            "major": "MAJOR",
-            "moderate": "MODERATE",
-            "minor": "MINOR"
-        }
-    },
-    "base": {
-        "types": {
-            "us-nato": "US/NATO",
-            "china": "CHINA",
-            "russia": "RUSSIA"
-        }
-    },
-    "protest": {
-        "acledVerified": "ACLED (verified)",
-        "gdelt": "GDELT",
-        "riots": "Riots",
-        "highSeverity": "High Severity"
-    },
-    "flight": {
-        "groundStop": "GROUND STOP",
-        "groundDelay": "GROUND DELAY PROGRAM",
-        "departureDelay": "DEPARTURE DELAYS",
-        "arrivalDelay": "ARRIVAL DELAYS",
-        "delaysReported": "DELAYS REPORTED",
-        "delays": "DELAYS",
-        "avgDelay": "AVG DELAY",
-        "cancelled": "CANCELLED"
-    },
-    "capacity": "CAPACITY",
-    "apt": {
-        "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."
-    },
-    "cyberThreat": {
-        "title": "CYBER THREAT"
-    },
-    "nuclear": {
-        "types": {
-            "plant": "POWER PLANT",
-            "enrichment": "ENRICHMENT",
-            "weapons": "WEAPONS COMPLEX",
-            "research": "RESEARCH"
-        },
-        "description": "Nuclear facility under monitoring. Strategic importance for regional security and non-proliferation concerns."
-    },
-    "economic": {
-        "types": {
-            "exchange": "STOCK EXCHANGE",
-            "centralBank": "CENTRAL BANK",
-            "financialHub": "FINANCIAL HUB"
-        }
-    },
-    "irradiator": {
-        "subtitle": "Industrial Gamma Irradiator Facility",
-        "description": "Industrial irradiation facility using Cobalt-60 or Cesium-137 sources for medical device sterilization, food preservation, or material processing. Source: IAEA DIIF Database."
-    },
-    "pipeline": {
-        "title": "PIPELINE",
-        "types": {
-            "oil": "OIL PIPELINE",
-            "gas": "GAS PIPELINE",
-            "products": "PRODUCTS PIPELINE"
-        },
-        "status": {
-            "operating": "OPERATING",
-            "construction": "UNDER CONSTRUCTION"
-        },
-        "description": "Major {{type}} pipeline infrastructure. {{status}}"
-    },
-    "pipelineStatusDesc": {
-        "operating": "Currently operational and transporting resources.",
-        "construction": "Currently under construction."
-    },
-    "cable": {
-        "fault": "FAULT",
-        "degraded": "DEGRADED",
-        "active": "ACTIVE",
-        "major": "MAJOR",
-        "cable": "CABLE",
-        "subtitle": "Undersea Fiber Optic Cable",
-        "type": "SUBMARINE CABLE",
-        "advisory": "FAULT ADVISORY",
-        "repairDeployment": "REPAIR DEPLOYMENT"
-    },
-    "repairShip": {
-        "note": "Repair vessel tracking indicates active deployment toward fault site."
-    },
-    "strategic": "STRATEGIC",
-    "verified": "VERIFIED",
-    "sampledList": "Showing a sampled list of {{count}} events.",
-    "reason": "REASON",
-    "threat": "THREAT",
-    "aka": "Also known as",
-    "sponsor": "SPONSOR",
-    "origin": "ORIGIN",
-    "country": "COUNTRY",
-    "malware": "MALWARE",
-    "lastSeen": "LAST SEEN",
-    "open": "OPEN",
-    "tradingHours": "TRADING HOURS",
-    "gamma": "GAMMA",
-    "city": "CITY",
-    "length": "LENGTH",
-    "operator": "OPERATOR",
-    "countries": "COUNTRIES",
-    "waypoints": "WAYPOINTS",
-    "repairEta": "REPAIR ETA",
-    "timeUnits": {
-        "m": "m",
-        "h": "h",
-        "d": "d"
     },
     "common": {
         "loading": "Ładowanie...",
