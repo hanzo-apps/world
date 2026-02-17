@@ -15,8 +15,10 @@ const feedCache = new Map<string, { items: NewsItem[]; timestamp: number }>();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const AI_CLASSIFY_DEDUP_MS = 30 * 60 * 1000;
 const AI_CLASSIFY_WINDOW_MS = 60 * 1000;
-const AI_CLASSIFY_MAX_PER_WINDOW = SITE_VARIANT === 'finance' ? 40 : 120;
-const AI_CLASSIFY_MAX_PER_FEED = SITE_VARIANT === 'finance' ? 2 : 4;
+const AI_CLASSIFY_MAX_PER_WINDOW =
+  SITE_VARIANT === 'finance' ? 40 : SITE_VARIANT === 'tech' ? 60 : 80;
+const AI_CLASSIFY_MAX_PER_FEED =
+  SITE_VARIANT === 'finance' ? 2 : SITE_VARIANT === 'tech' ? 2 : 3;
 const aiRecentlyQueued = new Map<string, number>();
 const aiDispatches: number[] = [];
 
