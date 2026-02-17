@@ -448,6 +448,25 @@ function pushSignal(signal: CorrelationSignal): void {
   }
 }
 
+function isLikelyProperNoun(term: string, headlines: StoredHeadline[]): boolean {
+  if (term.includes(' ') && term.length > 5) return true;
+  if (/^\d/.test(term) || /[A-Z]{2,}/.test(term)) return true;
+
+  const titles = headlines.slice(0, 8).map(h => h.title);
+  const termRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'gi');
+  let capitalizedCount = 0;
+  let totalCount = 0;
+  for (const title of titles) {
+    const matches = title.matchAll(termRe);
+    for (const m of matches) {
+      totalCount++;
+      const idx = m.index ?? 0;
+      if (idx > 0 && /[A-Z]/.test(title[idx]!)) capitalizedCount++;
+    }
+  }
+  return totalCount > 0 && capitalizedCount / totalCount >= 0.5;
+}
+
 async function isSignificantTerm(term: string, headlines: StoredHeadline[]): Promise<boolean> {
   const lower = term.toLowerCase();
 
@@ -456,7 +475,9 @@ async function isSignificantTerm(term: string, headlines: StoredHeadline[]): Pro
     if (pattern.test(term)) return true;
   }
 
-  if (!mlWorker.isAvailable) return true;
+  if (!mlWorker.isAvailable) {
+    return isLikelyProperNoun(term, headlines);
+  }
 
   try {
     const titles = headlines.slice(0, 6).map(h => h.title);
@@ -472,7 +493,7 @@ async function isSignificantTerm(term: string, headlines: StoredHeadline[]): Pro
 
     return false;
   } catch {
-    return true;
+    return isLikelyProperNoun(term, headlines);
   }
 }
 
