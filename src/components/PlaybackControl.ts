@@ -22,7 +22,7 @@ export class PlaybackControl {
         </div>
         <div class="playback-slider-container">
           <input type="range" class="playback-slider" min="0" max="100" value="100">
-          <div class="playback-time">LIVE</div>
+          <div class="playback-time">${t('components.playback.live')}</div>
         </div>
         <div class="playback-controls">
           <button class="playback-btn" data-action="start">⏮</button>
