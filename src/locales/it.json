@@ -260,170 +260,204 @@
         }
     },
     "popups": {
-        "startDate": "START DATE",
-        "casualties": "CASUALTIES",
-        "displaced": "DISPLACED",
-        "location": "LOCATION",
-        "belligerents": "BELLIGERENTS",
-        "keyDevelopments": "KEY DEVELOPMENTS",
-        "escalationAssessment": "ESCALATION ASSESSMENT",
-        "stable": "STABLE",
-        "watch": "WATCH",
-        "elevated": "ELEVATED",
-        "high": "HIGH",
-        "critical": "CRITICAL",
-        "baseline": "Baseline",
-        "historicalContext": "HISTORICAL CONTEXT",
-        "lastMajorEvent": "Last Major Event",
-        "precedents": "Precedents",
-        "cyclicalPattern": "Cyclical Pattern",
-        "whyItMatters": "WHY IT MATTERS",
-        "coordinates": "COORDINATES",
-        "status": "STATUS",
-        "keyEntities": "KEY ENTITIES",
-        "relatedHeadlines": "RELATED HEADLINES",
-        "liveIntel": "Live Intelligence",
-        "loadingNews": "Loading global news...",
-        "noCoverage": "No recent global coverage",
-        "depth": "Depth",
-        "time": "Time",
+        "startDate": "DATA DI INIZIO",
+        "endDate": "DATA DI FINE",
+        "magnitude": "Magnitudo",
+        "depth": "Profondità",
+        "intensity": "Intensità",
+        "type": "TIPO",
+        "status": "STATO",
+        "severity": "Gravità",
+        "location": "POSIZIONE",
+        "coordinates": "COORDINATE",
+        "casualties": "VITTIME",
+        "displaced": "SFOLLATI",
+        "belligerents": "BELLIGERANTI",
+        "keyDevelopments": "SVILUPPI CHIAVE",
+        "unknown": "Sconosciuto",
+        "source": "Fonte",
+        "target": "Obiettivo",
+        "events": "Eventi",
+        "impact": "Impatto",
+        "capacity": "Capacità",
+        "alerts": "Allarmi Attivi",
+        "common": {
+            "start": "INIZIO",
+            "end": "FINE",
+            "updated": "AGGIORNATO"
+        },
+        "conflict": {
+            "title": "ZONA DI CONFLITTO"
+        },
+        "earthquake": {
+            "levels": {
+                "major": "MAGGIORE",
+                "moderate": "MODERATO",
+                "minor": "MINORE"
+            }
+        },
+        "base": {
+            "types": {
+                "us-nato": "US/NATO",
+                "china": "CINA",
+                "russia": "RUSSIA"
+            }
+        },
+        "protest": {
+            "acledVerified": "ACLED (verificato)",
+            "gdelt": "GDELT",
+            "riots": "Sommosse",
+            "highSeverity": "Alta Gravità"
+        },
+        "flight": {
+            "groundStop": "BLOCCO A TERRA",
+            "groundDelay": "RITARDO A TERRA",
+            "departureDelay": "RITARDI IN PARTENZA",
+            "arrivalDelay": "RITARDI IN ARRIVO",
+            "delaysReported": "RITARDI SEGNALATI",
+            "delays": "RITARDI",
+            "avgDelay": "RITARDO MEDIO",
+            "cancelled": "CANCELLATO"
+        },
+        "apt": {
+            "description": "Gruppo di minaccia persistente avanzata con capacità a livello statale. Noto per operazioni informatiche sofisticate contro infrastrutture critiche, governo e settori della difesa."
+        },
+        "cyberThreat": {
+            "title": "MINACCIA INFORMATICA"
+        },
+        "nuclear": {
+            "types": {
+                "plant": "CENTRALE ELETTRICA",
+                "enrichment": "ARRICCHIMENTO",
+                "weapons": "COMPLESSO ARMI",
+                "research": "RICERCA"
+            },
+            "description": "Impianto nucleare sotto monitoraggio. Importanza strategica per la sicurezza regionale e la non proliferazione."
+        },
+        "economic": {
+            "types": {
+                "exchange": "BORSA VALORI",
+                "centralBank": "BANCA CENTRALE",
+                "financialHub": "CENTRO FINANZIARIO"
+            }
+        },
+        "irradiator": {
+            "subtitle": "Impianto Industriale di Irradiazione Gamma",
+            "description": "Impianto di irradiazione industriale con Cobalto-60 o Cesio-137 per sterilizzazione dispositivi medici, conservazione alimentare o trattamento materiali. Fonte: Database IAEA DIIF."
+        },
+        "pipeline": {
+            "title": "GASDOTTO",
+            "types": {
+                "oil": "OLEODOTTO",
+                "gas": "GASDOTTO",
+                "products": "CONDOTTA PRODOTTI"
+            },
+            "status": {
+                "operating": "IN FUNZIONE",
+                "construction": "IN COSTRUZIONE"
+            },
+            "description": "Importante infrastruttura {{type}}. {{status}}"
+        },
+        "pipelineStatusDesc": {
+            "operating": "Attualmente operativo e in trasporto risorse.",
+            "construction": "Attualmente in costruzione."
+        },
+        "cable": {
+            "fault": "GUASTO",
+            "degraded": "DEGRADATO",
+            "active": "ATTIVO",
+            "major": "MAGGIORE",
+            "cable": "CAVO",
+            "subtitle": "Cavo Sottomarino in Fibra Ottica",
+            "type": "CAVO SOTTOMARINO",
+            "advisory": "AVVISO DI GUASTO",
+            "repairDeployment": "DISPIEGAMENTO RIPARAZIONE"
+        },
+        "repairShip": {
+            "note": "Il tracciamento della nave riparatrice indica un dispiegamento attivo verso il sito del guasto."
+        },
+        "strategic": "STRATEGICO",
+        "verified": "VERIFICATO",
+        "sampledList": "Visualizzazione di un campione di {{count}} eventi.",
+        "reason": "MOTIVO",
+        "threat": "MINACCIA",
+        "aka": "Conosciuto anche come",
+        "sponsor": "SPONSOR",
+        "origin": "ORIGINE",
+        "country": "PAESE",
+        "malware": "MALWARE",
+        "lastSeen": "ULTIMA RILEVAZIONE",
+        "open": "APERTO",
+        "tradingHours": "ORARI DI NEGOZIAZIONE",
+        "gamma": "GAMMA",
+        "city": "CITTÀ",
+        "length": "LUNGHEZZA",
+        "operator": "OPERATORE",
+        "countries": "PAESI",
+        "waypoints": "PUNTI DI PASSAGGIO",
+        "repairEta": "ETA RIPARAZIONE",
+        "timeUnits": {
+            "m": "m",
+            "h": "h",
+            "d": "d"
+        },
+        "hotspot": {
+            "escalation": "VALUTAZIONE ESCALATION",
+            "baseline": "Linea di base",
+            "score": "Punteggio",
+            "trend": "Tendenza",
+            "components": {
+                "news": "Notizie",
+                "cii": "CII",
+                "geo": "Geo",
+                "military": "Militare"
+            },
+            "levels": {
+                "stable": "STABILE",
+                "watch": "SORVEGLIANZA",
+                "elevated": "ELEVATO",
+                "high": "ALTO",
+                "critical": "CRITICO"
+            }
+        },
+        "buttons": {
+            "track": "Segui problema",
+            "details": "Visualizza dettagli"
+        },
+        "historicalContext": "CONTESTO STORICO",
+        "lastMajorEvent": "Ultimo evento importante",
+        "precedents": "Precedenti",
+        "cyclicalPattern": "Schema ciclico",
+        "whyItMatters": "PERCHÉ È IMPORTANTE",
+        "keyEntities": "ENTITÀ CHIAVE",
+        "relatedHeadlines": "TITOLI CORRELATI",
+        "liveIntel": "Intelligence in tempo reale",
+        "loadingNews": "Caricamento notizie globali...",
+        "noCoverage": "Nessuna copertura globale recente",
+        "time": "Ora",
         "area": "Area",
-        "expires": "Expires",
-        "type": "TYPE",
-        "aisGapSpike": "AIS GAP SPIKE",
-        "chokepointCongestion": "CHOKEPOINT CONGESTION",
-        "darkening": "DARKENING",
-        "density": "DENSITY",
-        "darkShips": "DARK SHIPS",
-        "vesselCount": "VESSEL COUNT",
-        "window": "WINDOW",
-        "region": "REGION",
-        "fatalities": "FATALITIES",
-        "actors": "ACTORS",
-        "near": "Near",
-        "moreEvents": "more events",
-        "monitoring": "Monitoring",
-        "viewUSGS": "View on USGS",
-        "expired": "Expired",
+        "expires": "Scade",
+        "aisGapSpike": "PICCO LACUNA AIS",
+        "chokepointCongestion": "CONGESTIONE PUNTO STRATEGICO",
+        "darkening": "OSCURAMENTO",
+        "density": "DENSITÀ",
+        "darkShips": "NAVI OSCURE",
+        "vesselCount": "CONTEGGIO NAVI",
+        "window": "FINESTRA",
+        "region": "REGIONE",
+        "fatalities": "VITTIME",
+        "actors": "ATTORI",
+        "near": "Vicino a",
+        "moreEvents": "altri eventi",
+        "monitoring": "Monitoraggio",
+        "viewUSGS": "Visualizza su USGS",
+        "expired": "Scaduto",
         "timeAgo": {
-            "s": "s ago",
-            "m": "m ago",
-            "h": "h ago",
-            "d": "d ago"
+            "s": "s fa",
+            "m": "m fa",
+            "h": "h fa",
+            "d": "d fa"
         }
-    },
-    "earthquake": {
-        "levels": {
-            "major": "MAJOR",
-            "moderate": "MODERATE",
-            "minor": "MINOR"
-        }
-    },
-    "base": {
-        "types": {
-            "us-nato": "US/NATO",
-            "china": "CHINA",
-            "russia": "RUSSIA"
-        }
-    },
-    "protest": {
-        "acledVerified": "ACLED (verified)",
-        "gdelt": "GDELT",
-        "riots": "Riots",
-        "highSeverity": "High Severity"
-    },
-    "flight": {
-        "groundStop": "GROUND STOP",
-        "groundDelay": "GROUND DELAY PROGRAM",
-        "departureDelay": "DEPARTURE DELAYS",
-        "arrivalDelay": "ARRIVAL DELAYS",
-        "delaysReported": "DELAYS REPORTED",
-        "delays": "DELAYS",
-        "avgDelay": "AVG DELAY",
-        "cancelled": "CANCELLED"
-    },
-    "capacity": "CAPACITY",
-    "apt": {
-        "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."
-    },
-    "cyberThreat": {
-        "title": "CYBER THREAT"
-    },
-    "nuclear": {
-        "types": {
-            "plant": "POWER PLANT",
-            "enrichment": "ENRICHMENT",
-            "weapons": "WEAPONS COMPLEX",
-            "research": "RESEARCH"
-        },
-        "description": "Nuclear facility under monitoring. Strategic importance for regional security and non-proliferation concerns."
-    },
-    "economic": {
-        "types": {
-            "exchange": "STOCK EXCHANGE",
-            "centralBank": "CENTRAL BANK",
-            "financialHub": "FINANCIAL HUB"
-        }
-    },
-    "irradiator": {
-        "subtitle": "Industrial Gamma Irradiator Facility",
-        "description": "Industrial irradiation facility using Cobalt-60 or Cesium-137 sources for medical device sterilization, food preservation, or material processing. Source: IAEA DIIF Database."
-    },
-    "pipeline": {
-        "title": "PIPELINE",
-        "types": {
-            "oil": "OIL PIPELINE",
-            "gas": "GAS PIPELINE",
-            "products": "PRODUCTS PIPELINE"
-        },
-        "status": {
-            "operating": "OPERATING",
-            "construction": "UNDER CONSTRUCTION"
-        },
-        "description": "Major {{type}} pipeline infrastructure. {{status}}"
-    },
-    "pipelineStatusDesc": {
-        "operating": "Currently operational and transporting resources.",
-        "construction": "Currently under construction."
-    },
-    "cable": {
-        "fault": "FAULT",
-        "degraded": "DEGRADED",
-        "active": "ACTIVE",
-        "major": "MAJOR",
-        "cable": "CABLE",
-        "subtitle": "Undersea Fiber Optic Cable",
-        "type": "SUBMARINE CABLE",
-        "advisory": "FAULT ADVISORY",
-        "repairDeployment": "REPAIR DEPLOYMENT"
-    },
-    "repairShip": {
-        "note": "Repair vessel tracking indicates active deployment toward fault site."
-    },
-    "strategic": "STRATEGIC",
-    "verified": "VERIFIED",
-    "sampledList": "Showing a sampled list of {{count}} events.",
-    "reason": "REASON",
-    "threat": "THREAT",
-    "aka": "Also known as",
-    "sponsor": "SPONSOR",
-    "origin": "ORIGIN",
-    "country": "COUNTRY",
-    "malware": "MALWARE",
-    "lastSeen": "LAST SEEN",
-    "open": "OPEN",
-    "tradingHours": "TRADING HOURS",
-    "gamma": "GAMMA",
-    "city": "CITY",
-    "length": "LENGTH",
-    "operator": "OPERATOR",
-    "countries": "COUNTRIES",
-    "waypoints": "WAYPOINTS",
-    "repairEta": "REPAIR ETA",
-    "timeUnits": {
-        "m": "m",
-        "h": "h",
-        "d": "d"
     },
     "common": {
         "loading": "Caricamento...",
