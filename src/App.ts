@@ -1138,17 +1138,17 @@ export class App {
   private setupSearchModal(): void {
     const searchOptions = SITE_VARIANT === 'tech'
       ? {
-        placeholder: 'Search companies, AI labs, startups, events...',
-        hint: 'HQs • Companies • AI Labs • Startups • Accelerators • Events',
+        placeholder: t('modals.search.placeholderTech'),
+        hint: t('modals.search.hintTech'),
       }
       : SITE_VARIANT === 'finance'
       ? {
-          placeholder: 'Search exchanges, markets, central banks...',
-          hint: 'Exchanges • Financial Centers • Central Banks • Commodities',
+          placeholder: t('modals.search.placeholderFinance'),
+          hint: t('modals.search.hintFinance'),
         }
       : {
-        placeholder: 'Search news, pipelines, bases, markets...',
-        hint: 'News • Countries • Hotspots • Conflicts • Bases • Pipelines • Cables • Datacenters',
+        placeholder: t('modals.search.placeholder'),
+        hint: t('modals.search.hint'),
       };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
@@ -1711,12 +1711,12 @@ export class App {
           </div>
           <div class="region-selector">
             <select id="regionSelect" class="region-select">
-              <option value="global">Global</option>
-              <option value="america">Americas</option>
+              <option value="global">${t('components.deckgl.views.global')}</option>
+              <option value="america">${t('components.deckgl.views.americas')}</option>
               <option value="mena">MENA</option>
-              <option value="eu">Europe</option>
+              <option value="eu">${t('components.deckgl.views.europe')}</option>
               <option value="asia">Asia</option>
-              <option value="latam">Latin America</option>
+              <option value="latam">${t('components.deckgl.views.latam')}</option>
               <option value="africa">Africa</option>
               <option value="oceania">Oceania</option>
             </select>
@@ -1760,7 +1760,7 @@ export class App {
       <div class="modal-overlay" id="settingsModal">
         <div class="modal">
           <div class="modal-header">
-            <span class="modal-title">Panels</span>
+            <span class="modal-title">${t('header.settings')}</span>
             <button class="modal-close" id="modalClose">×</button>
           </div>
           <div class="panel-toggle-grid" id="panelToggles"></div>
@@ -1769,7 +1769,7 @@ export class App {
       <div class="modal-overlay" id="sourcesModal">
         <div class="modal sources-modal">
           <div class="modal-header">
-            <span class="modal-title">News Sources</span>
+            <span class="modal-title">${t('header.sources')}</span>
             <span class="sources-counter" id="sourcesCounter"></span>
             <button class="modal-close" id="sourcesModalClose">×</button>
           </div>
@@ -1778,8 +1778,8 @@ export class App {
           </div>
           <div class="sources-toggle-grid" id="sourceToggles"></div>
           <div class="sources-footer">
-            <button class="sources-select-all" id="sourcesSelectAll">Select All</button>
-            <button class="sources-select-none" id="sourcesSelectNone">Select None</button>
+            <button class="sources-select-all" id="sourcesSelectAll">${t('common.selectAll')}</button>
+            <button class="sources-select-none" id="sourcesSelectNone">${t('common.selectNone')}</button>
           </div>
         </div>
       </div>
