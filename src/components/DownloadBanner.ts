@@ -28,7 +28,7 @@ function dismiss(panel: HTMLElement): void {
   panel.addEventListener('transitionend', () => panel.remove(), { once: true });
 }
 
-type Platform = 'macos-arm64' | 'macos-x64' | 'windows' | 'unknown';
+type Platform = 'macos-arm64' | 'macos-x64' | 'macos' | 'windows' | 'unknown';
 
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
@@ -48,7 +48,7 @@ function detectPlatform(): Platform {
       }
     } catch { /* ignore */ }
     // Can't determine architecture — show both Mac options
-    return 'unknown';
+    return 'macos';
   }
   return 'unknown';
 }
@@ -65,6 +65,7 @@ function buttonsForPlatform(p: Platform): DlButton[] {
   switch (p) {
     case 'macos-arm64': return ALL_BUTTONS.filter(b => b.href.includes('macos-arm64'));
     case 'macos-x64':   return ALL_BUTTONS.filter(b => b.href.includes('macos-x64'));
+    case 'macos':       return ALL_BUTTONS.filter(b => b.cls === 'mac');
     case 'windows':     return ALL_BUTTONS.filter(b => b.cls === 'win');
     default:            return ALL_BUTTONS;
   }
