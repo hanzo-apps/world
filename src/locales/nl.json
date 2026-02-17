@@ -7,10 +7,7 @@
     "strategicPosture": "Strategic Posture",
     "cii": "Country Instability Index",
     "status": "Systeemstatus",
-    "news": "Global News",
     "insights": "AI-inzichten",
-    "signals": "Macro Signals",
-    "hazards": "Natural Hazards",
     "map": "Interactive Map",
     "techMap": "Mondiale technologie",
     "politics": "Wereldnieuws",
@@ -101,10 +98,8 @@
       "hintFinance": "Beurzen • Financiële centra • Centrale banken • Grondstoffen"
     },
     "signal": {
-      "share": "Share",
       "source": "Source",
       "confidence": "Vertrouwen",
-      "related": "Related Events",
       "title": "INTELLIGENTIE VINDEN",
       "soundAlerts": "Geluidswaarschuwingen",
       "dismiss": "Afwijzen",
@@ -137,19 +132,11 @@
       "whyItMatters": "Waarom het belangrijk is:",
       "action": "Actie:",
       "note": "Opmerking:",
-      "suppress": "Onderdruk deze term"
-    },
-    "settings": {
-      "title": "Settings",
-      "general": "General",
-      "appearance": "Appearance",
-      "data": "Data Sources",
-      "about": "About"
+      "suppress": "Onderdruk deze term",
+      "suppressed": "Onderdrukt"
     },
     "mobileWarning": {
       "title": "Desktop Experience Recommended",
-      "message": "WorldMonitor is optimized for large screens. Some features may be limited on mobile devices.",
-      "continue": "Continue Anyway",
       "description": "Je bekijkt een vereenvoudigde mobiele versie gericht op de MENA-regio met essentiële lagen ingeschakeld.",
       "tip": "Tip: Gebruik de weergaveknoppen (GLOBAL/US/MENA) om van regio te wisselen. Tik op markeringen om details te zien.",
       "dontShowAgain": "Niet meer laten zien",
@@ -191,11 +178,16 @@
       "placeholder": {
         "setSecret": "Geheim instellen",
         "staged": "Geënsceneerd (opslaan met OK)"
+      },
+      "help": {
+        "URLHAUS_AUTH_KEY": "Gebruikt voor de URLhaus- en ThreatFox-API's.",
+        "OTX_API_KEY": "Optionele verrijkingsbron voor de cyberdreigingslaag.",
+        "ABUSEIPDB_API_KEY": "Optionele verrijkingsbron voor reputatie van kwaadaardige IP-adressen.",
+        "FINNHUB_API_KEY": "Realtime aandelenkoersen en marktgegevens.",
+        "NASA_FIRMS_API_KEY": "Brandinformatiesysteem voor Resourcebeheer."
       }
     },
     "countryIntel": {
-      "title": "Country Intelligence",
-      "description": "Access detailed country profiles and geopolitical analysis.",
       "identifying": "Land identificeren...",
       "locating": "Regio lokaliseren...",
       "instabilityIndex": "Instabiliteitsindex",
@@ -252,6 +244,14 @@
         "m": "{{count}}m geleden",
         "h": "{{count}}u geleden",
         "d": "{{count}}d geleden"
+      },
+      "infra": {
+        "pipeline": "Pijpleidingen",
+        "cable": "Onderzeese kabels",
+        "datacenter": "Datacenters",
+        "base": "Militaire bases",
+        "nuclear": "Nucleaire faciliteiten",
+        "port": "Havens"
       }
     },
     "story": {
@@ -301,15 +301,7 @@
       "match": "overeenkomst",
       "matches": "wedstrijden"
     },
-    "timeline": {
-      "title": "Timeline",
-      "today": "Today",
-      "yesterday": "Yesterday"
-    },
     "playback": {
-      "play": "Play",
-      "pause": "Pause",
-      "speed": "Speed",
       "live": "Live",
       "toggleMode": "Schakel de afspeelmodus in",
       "historicalPlayback": "Historisch afspelen"
@@ -581,7 +573,8 @@
       "countriesAffected": "Betrokken landen ({{count}})",
       "links": "koppelingen",
       "selectInfrastructureHint": "Selecteer infrastructuur om de cascade-impact te analyseren",
-      "infoTooltip": "<strong>Cascadeanalyse</strong> Modelleert afhankelijkheden van de infrastructuur:<ul><li>Onderzeese kabels, pijpleidingen, havens, knelpunten</li><li>Selecteer infrastructuur om storingen te simuleren</li><li>Toont getroffen landen en capaciteitsverlies</li><li>Identificeert overtollige routes</li></ul>Gegevens uit TeleGeography en industriële bronnen."
+      "infoTooltip": "<strong>Cascadeanalyse</strong> Modelleert afhankelijkheden van de infrastructuur:<ul><li>Onderzeese kabels, pijpleidingen, havens, knelpunten</li><li>Selecteer infrastructuur om storingen te simuleren</li><li>Toont getroffen landen en capaciteitsverlies</li><li>Identificeert overtollige routes</li></ul>Gegevens uit TeleGeography en industriële bronnen.",
+      "noImpacts": "Geen landeneffecten gedetecteerd"
     },
     "intelligenceFindings": {
       "badgeTitle": "Bevindingen van inlichtingen",
@@ -627,7 +620,9 @@
       "gov": "Regering",
       "noOilMetrics": "Geen oliestatistieken beschikbaar. Voeg EIA_API_KEY toe om in te schakelen.",
       "noSpending": "Geen recente overheidsprijzen",
-      "awards": "onderscheidingen"
+      "awards": "onderscheidingen",
+      "noData": "Geen economische gegevens beschikbaar",
+      "noOilData": "Oliegegevens niet beschikbaar"
     },
     "satelliteFires": {
       "region": "Regio",
@@ -640,7 +635,8 @@
         "minutesAgo": "{{count}}m geleden",
         "hoursAgo": "{{count}}u geleden"
       },
-      "infoTooltip": "NASA FIRMS VIIRS thermische satellietdetectie in bewaakte conflictgebieden. Hoge intensiteit = helderheid >360K en betrouwbaarheid >80%."
+      "infoTooltip": "NASA FIRMS VIIRS thermische satellietdetectie in bewaakte conflictgebieden. Hoge intensiteit = helderheid >360K en betrouwbaarheid >80%.",
+      "noData": "Geen brandgegevens beschikbaar"
     },
     "displacement": {
       "refugees": "Vluchtelingen",
@@ -657,20 +653,24 @@
       "country": "Land",
       "status": "Status",
       "count": "Graaf",
-      "infoTooltip": "<strong>UNHCR-ontheemdingsgegevens</strong> Wereldwijde aantallen vluchtelingen, asielzoekers en IDP's van UNHCR.<ul><li><strong>Herkomst</strong>: landen waar mensen vluchten VANUIT</li><li><strong>Hosts</strong>: gastlanden voor vluchtelingen</li><li>Crisisbadges: >1 miljoen | Hoog: >500.000 ontheemden</li></ul>Gegevens worden jaarlijks bijgewerkt. CC BY 4.0-licentie."
+      "infoTooltip": "<strong>UNHCR-ontheemdingsgegevens</strong> Wereldwijde aantallen vluchtelingen, asielzoekers en IDP's van UNHCR.<ul><li><strong>Herkomst</strong>: landen waar mensen vluchten VANUIT</li><li><strong>Hosts</strong>: gastlanden voor vluchtelingen</li><li>Crisisbadges: >1 miljoen | Hoog: >500.000 ontheemden</li></ul>Gegevens worden jaarlijks bijgewerkt. CC BY 4.0-licentie.",
+      "noData": "Geen gegevens"
     },
     "populationExposure": {
       "totalAffected": "Totaal getroffen",
       "affectedCount": "{{count}} getroffen",
       "radiusKm": "straal van {{km}}km",
-      "infoTooltip": "<strong>Blootstellingsschattingen van de bevolking</strong> Geschatte populatie binnen de impactradius van de gebeurtenis. Gebaseerd op gegevens over de landdichtheid van WorldPop.<ul><li>Conflict: straal van 50 km</li><li>Aardbeving: straal van 100 km</li><li>Overstroming: straal van 100 km</li><li>Natuurbrand: straal van 30 km</li></ul>"
+      "infoTooltip": "<strong>Blootstellingsschattingen van de bevolking</strong> Geschatte populatie binnen de impactradius van de gebeurtenis. Gebaseerd op gegevens over de landdichtheid van WorldPop.<ul><li>Conflict: straal van 50 km</li><li>Aardbeving: straal van 100 km</li><li>Overstroming: straal van 100 km</li><li>Natuurbrand: straal van 30 km</li></ul>",
+      "noData": "Geen blootstellingsgegevens beschikbaar"
     },
     "countryTimeline": {
       "now": "nu",
       "noEventsIn7Days": "Geen evenementen in 7 dagen"
     },
     "cii": {
-      "infoTooltip": "<strong>Methodologie</strong><ul><li><strong>U</strong>nrest: burgerlijke onrust en protesten</li><li><strong>C</strong>aanval: intensiteit van gewapende conflicten</li><li><strong>S</strong>veiligheid: militaire vluchten/schepen voorbij territorium</li><li><strong>I</strong>nformatie: nieuwssnelheid en correlatie van focuspunten</li><li>Hotspot-nabijheidsboost (strategische locaties)</li></ul><em>U:C:S:I-waarden tonen componentscores.</em> Focal Point Detection correleert nieuwsentiteiten met kaartsignalen voor nauwkeurige scores."
+      "infoTooltip": "<strong>Methodologie</strong><ul><li><strong>U</strong>nrest: burgerlijke onrust en protesten</li><li><strong>C</strong>aanval: intensiteit van gewapende conflicten</li><li><strong>S</strong>veiligheid: militaire vluchten/schepen voorbij territorium</li><li><strong>I</strong>nformatie: nieuwssnelheid en correlatie van focuspunten</li><li>Hotspot-nabijheidsboost (strategische locaties)</li></ul><em>U:C:S:I-waarden tonen componentscores.</em> Focal Point Detection correleert nieuwsentiteiten met kaartsignalen voor nauwkeurige scores.",
+      "shareStory": "Verhaal delen",
+      "noSignals": "Geen instabiliteitssignalen gedetecteerd"
     },
     "gdeltIntel": {
       "infoTooltip": "<strong>GDELT Intelligence</strong> Realtime monitoring van mondiaal nieuws:<ul><li>Samengestelde onderwerpcategorieën (conflicten, cyber, etc.)</li><li>Artikelen uit meer dan 100 talen vertaald</li><li>Updates elke 15 minuten</li></ul>Bron: GDELT Project (gdeltproject.org)"
@@ -682,29 +682,62 @@
       "infoTooltip": "<strong>Voorspellingsmarkten</strong> Voorspellingsmarkten voor echt geld:<ul><li>Prijzen weerspiegelen schattingen van de waarschijnlijkheid van het publiek</li><li>Hoger volume = betrouwbaarder signaal</li><li>Focus op geopolitieke en actuele gebeurtenissen</li></ul>Bron: Polymarket (polymarket.com)"
     },
     "ucdpEvents": {
-      "infoTooltip": "<strong>UCDP-gegeorefereerde gebeurtenissen</strong> Conflictgegevens op gebeurtenisniveau van de universiteit van Uppsala.<ul><li><strong>State-based</strong>: regering versus rebellengroep</li><li><strong>Niet-statelijke </strong>: gewapende groep versus gewapende groep groep</li><li><strong>Eenzijdig</strong>: Geweld tegen burgers</li></ul>Doden weergegeven als beste schatting (laag-hoog bereik). ACLED-duplicaten worden automatisch uitgefilterd."
+      "infoTooltip": "<strong>UCDP-gegeorefereerde gebeurtenissen</strong> Conflictgegevens op gebeurtenisniveau van de universiteit van Uppsala.<ul><li><strong>State-based</strong>: regering versus rebellengroep</li><li><strong>Niet-statelijke </strong>: gewapende groep versus gewapende groep groep</li><li><strong>Eenzijdig</strong>: Geweld tegen burgers</li></ul>Doden weergegeven als beste schatting (laag-hoog bereik). ACLED-duplicaten worden automatisch uitgefilterd.",
+      "noEvents": "Geen gebeurtenissen in deze categorie"
     },
     "strategicRisk": {
-      "infoTooltip": "<strong>Methodologie</strong> Samengestelde score (0-100) menging:<ul><li>50% Landinstabiliteit (top 5 gewogen)</li><li>30% Geografische convergentiezones</li><li>20% Infrastructuurincidenten</li></ul>Wordt elke 5 minuten automatisch vernieuwd."
+      "infoTooltip": "<strong>Methodologie</strong> Samengestelde score (0-100) menging:<ul><li>50% Landinstabiliteit (top 5 gewogen)</li><li>30% Geografische convergentiezones</li><li>20% Infrastructuurincidenten</li></ul>Wordt elke 5 minuten automatisch vernieuwd.",
+      "noRisks": "Geen significante risico's gedetecteerd"
     },
     "insights": {
-      "infoTooltip": "<strong>AI-aangedreven analyse</strong><br>• <strong>World Brief</strong>: AI-samenvatting (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: analyse van nieuwstoon<br>• <strong>Velocity</strong>: snel bewegende verhalen<br>• <strong>Focal Punten</strong>: correleert nieuwsentiteiten met kaartsignalen (militair, protesten, storingen)<br><em>Alleen desktop • Mogelijk gemaakt door Llama 3.3 + Focal Point-detectie</em>"
+      "infoTooltip": "<strong>AI-aangedreven analyse</strong><br>• <strong>World Brief</strong>: AI-samenvatting (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: analyse van nieuwstoon<br>• <strong>Velocity</strong>: snel bewegende verhalen<br>• <strong>Focal Punten</strong>: correleert nieuwsentiteiten met kaartsignalen (militair, protesten, storingen)<br><em>Alleen desktop • Mogelijk gemaakt door Llama 3.3 + Focal Point-detectie</em>",
+      "noStories": "Nog geen breaking of multi-source verhalen"
     },
     "techHubs": {
-      "infoTooltip": "<strong>Tech Hub-activiteit</strong><br>Toont tech-hubs met de meeste nieuwsactiviteit.<br><br><em>Activiteitsniveaus:</em><br>• <span style=\"color: {{highColor}}\">Hoog</span> — Breaking news of 50+ score<br>• <span style=\"color: {{elevatedColor}}\">Verhoogd</span> — Score 20-49<br>• <span style=\"color: {{lowColor}}\">Laag</span> — Score lager dan 20<br><br>Klik op een hub om naar de locatie ervan te zoomen."
+      "infoTooltip": "<strong>Tech Hub-activiteit</strong><br>Toont tech-hubs met de meeste nieuwsactiviteit.<br><br><em>Activiteitsniveaus:</em><br>• <span style=\"color: {{highColor}}\">Hoog</span> — Breaking news of 50+ score<br>• <span style=\"color: {{elevatedColor}}\">Verhoogd</span> — Score 20-49<br>• <span style=\"color: {{lowColor}}\">Laag</span> — Score lager dan 20<br><br>Klik op een hub om naar de locatie ervan te zoomen.",
+      "tooltip": "<strong>Tech Hub-activiteit</strong><br>Toont tech-hubs met de meeste nieuwsactiviteit.<br><br><em>Niveaus:</em><br>• <span style=\"color: #00ff88\">Hoog</span> — Actueel nieuws of score 50+<br>• <span style=\"color: #ffc800\">Verhoogd</span> — Score 20-49<br>• <span style=\"color: #888\">Laag</span> — Score onder 20<br><br>Klik op een hub om naar de locatie te zoomen.",
+      "noActive": "Geen actieve tech-hubs"
     },
     "geoHubs": {
       "infoTooltip": "<strong>Geopolitieke activiteitenhubs</strong><br>Toont regio's met de meeste nieuwsactiviteit.<br><br><em>Hubtypes:</em><br>• 🏛️ Hoofdsteden — Hoofdsteden van de wereld en regeringscentra<br>• ⚔️ Conflictzones — Actieve conflictgebieden<br>• ⚓ Strategisch — Knelpunten en belangrijke regio's<br>• 🏢 Organisaties — VN, NAVO, IAEA, etc.<br><br><em>Activiteitsniveaus:</em><br>• <span style=\"color: {{highColor}}\">Hoog</span> — Actueel nieuws of score van 70+<br>• <span style=\"color: {{elevatedColor}}\">Verhoogd</span> — Score 40-69<br>• <span style=\"color: {{lowColor}}\">Laag</span> — Score lager dan 40<br><br>Klik op een hub om naar de locatie ervan te zoomen.",
       "story": "verhaal",
-      "stories": "verhalen"
+      "stories": "verhalen",
+      "tooltip": "<strong>Geopolitieke activiteitenhubs</strong><br>Toont regio's met de meeste nieuwsactiviteit.<br><br><em>Typen:</em><br>• 🏛️ Hoofdsteden — Hoofdsteden en regeringscentra<br>• ⚔️ Conflictzones — Actieve conflictgebieden<br>• ⚓ Strategisch — Knelpunten en belangrijke regio's<br>• 🏢 Organisaties — VN, NAVO, IAEA, etc.<br><br><em>Niveaus:</em><br>• <span style=\"color: #ff4444\">Hoog</span> — Actueel nieuws of score 70+<br>• <span style=\"color: #ff8844\">Verhoogd</span> — Score 40-69<br>• <span style=\"color: #888\">Laag</span> — Score onder 40<br><br>Klik op een hub om naar de locatie te zoomen.",
+      "noActive": "Geen actieve geopolitieke hubs"
     },
     "predictions": {
       "vol": "Vol",
       "yes": "Ja",
-      "no": "Nee"
+      "no": "Nee",
+      "tooltip": "<strong>Voorspellingsmarkten</strong><br>Markten met echt geld:<br><ul><li>Prijzen weerspiegelen waarschijnlijkheidsschattingen</li><li>Hoger volume = betrouwbaarder signaal</li><li>Geopolitieke en actuele evenementen</li></ul>Bron: Polymarket (polymarket.com)",
+      "error": "Voorspellingen laden mislukt"
     },
     "gdelt": {
       "empty": "Geen recente artikelen voor dit onderwerp"
+    },
+    "regulation": {
+      "timeline": "Tijdlijn",
+      "deadlines": "Deadlines",
+      "regulations": "Regelgevingen",
+      "countries": "Landen",
+      "recentActions": "Recente regelgevende acties (laatste 12 maanden)",
+      "upcomingDeadlines": "Aankomende nalevingsdeadlines",
+      "activeRegulations": "Actieve regelgevingen",
+      "proposedRegulations": "Voorgestelde regelgevingen",
+      "globalLandscape": "Mondiaal regelgevingslandschap",
+      "emptyActions": "Geen recente regelgevende acties",
+      "emptyDeadlines": "Geen aankomende nalevingsdeadlines in de komende 12 maanden",
+      "keyProvisions": "Kernbepalingen",
+      "learnMore": "Meer informatie",
+      "active": "Actief",
+      "proposed": "Voorgesteld",
+      "updated": "Bijgewerkt"
+    },
+    "export": {
+      "exportData": "Gegevens exporteren"
+    },
+    "runtimeConfig": {
+      "getApiKey": "API-sleutel ophalen"
     }
   },
   "popups": {
@@ -1160,11 +1193,6 @@
   "common": {
     "loading": "Laden...",
     "error": "Er is een fout opgetreden",
-    "retry": "Opnieuw proberen",
-    "close": "Sluiten",
-    "cancel": "Annuleren",
-    "confirm": "Bevestigen",
-    "unknown": "Onbekend",
     "updated": "Bijgewerkt: {{time}}",
     "failedToLoad": "Laden van gegevens mislukt",
     "noDataShort": "Geen gegevens",
@@ -1209,7 +1237,9 @@
     "new": "NIEUW",
     "live": "RECHTSTREEKS",
     "cached": "IN CACHE",
-    "unavailable": "NIET BESCHIKBAAR"
+    "unavailable": "NIET BESCHIKBAAR",
+    "noData": "Geen gegevens beschikbaar",
+    "ago": "{{time}} geleden"
   },
   "header": {
     "world": "WORLD",
@@ -1226,5 +1256,58 @@
     "sourcesEnabled": "{{enabled}}/{{total}} ingeschakeld",
     "finance": "FINANCE",
     "toggleTheme": "Schakel tussen de donkere/lichte modus"
+  },
+  "app": {
+    "title": "World Monitor",
+    "description": "Mondiale situatie met AI-inzichten"
+  },
+  "countryBrief": {
+    "identifying": "Land identificeren...",
+    "locating": "Regio lokaliseren...",
+    "limitedCoverage": "Beperkte dekking",
+    "instabilityIndex": "Instabiliteitsindex",
+    "notTracked": "Niet bijgehouden — {{country}} staat niet in de CII tier-1-lijst",
+    "intelBrief": "Inlichtingenoverzicht",
+    "generatingBrief": "Inlichtingenoverzicht genereren...",
+    "topNews": "Topnieuws",
+    "activeSignals": "Actieve signalen",
+    "timeline": "7-daagse tijdlijn",
+    "predictionMarkets": "Voorspellingsmarkten",
+    "loadingMarkets": "Voorspellingsmarkten laden...",
+    "infrastructure": "Blootstelling aan infrastructuur",
+    "briefUnavailable": "AI-overzicht niet beschikbaar — configureer GROQ_API_KEY in Instellingen.",
+    "cached": "In cache",
+    "fresh": "Vers",
+    "noMarkets": "Geen voorspellingsmarkten gevonden",
+    "loadingIndex": "Index laden...",
+    "components": {
+      "unrest": "Onrust",
+      "conflict": "Conflict",
+      "security": "Beveiliging",
+      "information": "Informatie"
+    },
+    "signals": {
+      "protests": "protesten",
+      "militaryAir": "mil. vliegtuigen",
+      "militarySea": "mil. schepen",
+      "outages": "storingen",
+      "earthquakes": "aardbevingen",
+      "displaced": "ontheemden",
+      "climate": "Klimaatstress",
+      "conflictEvents": "conflictgebeurtenissen"
+    },
+    "timeAgo": {
+      "m": "{{count}}m geleden",
+      "h": "{{count}}u geleden",
+      "d": "{{count}}d geleden"
+    },
+    "infra": {
+      "pipeline": "Pijpleidingen",
+      "cable": "Onderzeese kabels",
+      "datacenter": "Datacenters",
+      "base": "Militaire bases",
+      "nuclear": "Nucleaire faciliteiten",
+      "port": "Havens"
+    }
   }
 }

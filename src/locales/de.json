@@ -3,6 +3,55 @@
     "title": "World Monitor",
     "description": "Globale Lage mit KI-Erkenntnissen"
   },
+  "countryBrief": {
+    "identifying": "Land wird identifiziert...",
+    "locating": "Region wird gesucht...",
+    "limitedCoverage": "Begrenzte Abdeckung",
+    "instabilityIndex": "Instabilitätsindex",
+    "notTracked": "Nicht verfolgt – {{country}} ist nicht in der CII-Tier-1-Liste",
+    "intelBrief": "Nachrichtendienstliche Lagebeurteilung",
+    "generatingBrief": "Nachrichtendienstliche Lagebeurteilung wird erstellt...",
+    "topNews": "Top-Nachrichten",
+    "activeSignals": "Aktive Signale",
+    "timeline": "7-Tage-Zeitleiste",
+    "predictionMarkets": "Prognosemärkte",
+    "loadingMarkets": "Prognosemärkte werden geladen...",
+    "infrastructure": "Infrastrukturexposition",
+    "briefUnavailable": "KI-Brief nicht verfügbar – konfigurieren Sie GROQ_API_KEY in den Einstellungen.",
+    "cached": "Zwischengespeichert",
+    "fresh": "Aktuell",
+    "noMarkets": "Keine Prognosemärkte gefunden",
+    "loadingIndex": "Index wird geladen...",
+    "components": {
+      "unrest": "Unruhen",
+      "conflict": "Konflikt",
+      "security": "Sicherheit",
+      "information": "Information"
+    },
+    "signals": {
+      "protests": "Proteste",
+      "militaryAir": "Mil. Flugzeuge",
+      "militarySea": "Mil. Schiffe",
+      "outages": "Ausfälle",
+      "earthquakes": "Erdbeben",
+      "displaced": "Vertriebene",
+      "climate": "Klimastress",
+      "conflictEvents": "Konfliktereignisse"
+    },
+    "timeAgo": {
+      "m": "vor m",
+      "h": "vor h",
+      "d": "vor d"
+    },
+    "infra": {
+      "pipeline": "Pipelines",
+      "cable": "Unterseekabel",
+      "datacenter": "Rechenzentren",
+      "base": "Militärstützpunkte",
+      "nuclear": "Nuklearanlagen",
+      "port": "Häfen"
+    }
+  },
   "header": {
     "world": "WELT",
     "tech": "TECH",
@@ -126,6 +175,7 @@
       "action": "Aktion:",
       "note": "Notiz:",
       "suppress": "Unterdrücken Sie diesen Begriff",
+      "suppressed": "Unterdrückt",
       "predictionLeading": "Vorhersage führend",
       "newsLeading": "Nachrichten führend",
       "silentDivergence": "Stille Divergenz",
@@ -211,6 +261,13 @@
       "placeholder": {
         "setSecret": "Geheimnis festlegen",
         "staged": "Gestaffelt (mit OK speichern)"
+      },
+      "help": {
+        "URLHAUS_AUTH_KEY": "Wird für URLhaus- und ThreatFox-APIs verwendet.",
+        "OTX_API_KEY": "Optionale Anreicherungsquelle für die Cyberbedrohungsebene.",
+        "ABUSEIPDB_API_KEY": "Optionale Anreicherungsquelle für die Reputation bösartiger IPs.",
+        "FINNHUB_API_KEY": "Echtzeit-Aktienkurse und Marktdaten.",
+        "NASA_FIRMS_API_KEY": "Branderkennungssystem für Ressourcenmanagement."
       }
     },
     "countryIntel": {
@@ -270,6 +327,14 @@
         "m": "Vor {{count}}m",
         "h": "Vor {{count}}h",
         "d": "Vor {{count}}d"
+      },
+      "infra": {
+        "pipeline": "Pipelines",
+        "cable": "Unterseekabel",
+        "datacenter": "Rechenzentren",
+        "base": "Militärstützpunkte",
+        "nuclear": "Nuklearanlagen",
+        "port": "Häfen"
       }
     },
     "settingsWindow": {
@@ -604,6 +669,7 @@
       "infoTooltip": "<strong>Globale Technologiebereitschaft</strong><br>Zusammengesetzter Wert (0-100) basierend auf Daten der Weltbank:<br><br><strong>Angezeigte Metriken:</strong><br>🌐 Internetnutzer (% der Bevölkerung)<br>📱 Mobilfunkabonnements (pro 100 Personen)<br>🔬 F&E-Ausgaben (% von BIP)<br><br><strong>Gewichte:</strong> F&E (35 %), Internet (30 %), Breitband (20 %), Mobilfunk (15 %)<br><br><em> – = Keine aktuellen Daten verfügbar</em><br><em>Quelle: World Bank Open Data (2019–2024)</em>"
     },
     "cascade": {
+      "noImpacts": "Keine Länderauswirkungen festgestellt",
       "filters": {
         "cables": "Kabel",
         "pipelines": "Pipelines",
@@ -668,6 +734,7 @@
       }
     },
     "satelliteFires": {
+      "noData": "Keine Branddaten verfügbar",
       "region": "Region",
       "fires": "Brände",
       "high": "Hoch",
@@ -681,6 +748,7 @@
       "infoTooltip": "Die NASA FIRST die thermischen Erkennungen von VIIRS-Satelliten in überwachten Konfliktregionen. Hohe Intensität = Helligkeit >360K und Zuverlässigkeit >80 %."
     },
     "displacement": {
+      "noData": "Keine Daten",
       "refugees": "Flüchtlinge",
       "asylumSeekers": "Asylbewerber",
       "idps": "Binnenvertriebene",
@@ -698,6 +766,7 @@
       "infoTooltip": "<strong>UNHCR-Vertreibungsdaten</strong> Weltweite Flüchtlings-, Asylbewerber- und Binnenvertriebenenzahlen vom UNHCR.<ul><li><strong>Ursprünge</strong>: Länder, aus denen Menschen fliehen</li><li><strong>Gastgeber</strong>: Länder, die Flüchtlinge aufnehmen</li><li>Krisenabzeichen: >1 Mio. | Höchstwert: >500.000 Vertriebene</li></ul>Datenaktualisierungen jährlich. CC BY 4.0-Lizenz."
     },
     "populationExposure": {
+      "noData": "Keine Expositionsdaten verfügbar",
       "totalAffected": "Insgesamt betroffen",
       "affectedCount": "{{count}} betroffen",
       "radiusKm": "{{km}}km Radius",
@@ -708,6 +777,8 @@
       "noEventsIn7Days": "Keine Ereignisse in 7 Tagen"
     },
     "cii": {
+      "shareStory": "Geschichte teilen",
+      "noSignals": "Keine Instabilitätssignale erkannt",
       "infoTooltip": "<strong>Methodik</strong><ul><li><strong>U</strong>nrest: zivile Unruhen und Proteste</li><li><strong>C</strong>Konflikt: bewaffnete Konfliktintensität</li><li><strong>S</strong>Sicherheit: Militärflüge/-schiffe über Gebiet</li><li><strong>I</strong>Informationen: Nachrichtengeschwindigkeit und Fokuspunktkorrelation</li><li>Hotspot-Näherungsschub (strategische Standorte)</li></ul><em>U:C:S:I-Werte zeigen Komponentenbewertungen.</em> Die Fokuspunkterkennung korreliert Nachrichtenentitäten mit Kartensignalen für eine genaue Bewertung."
     },
     "gdeltIntel": {
@@ -720,13 +791,22 @@
       "infoTooltip": "<strong>Prognosemärkte</strong> Echtgeld-Prognosemärkte:<ul><li>Preise spiegeln Schätzungen der Massenwahrscheinlichkeit wider</li><li>Höheres Volumen = zuverlässigeres Signal</li><li>Geopolitische und aktuelle Ereignisse im Fokus</li></ul>Quelle: Polymarket (polymarket.com)"
     },
     "ucdpEvents": {
+      "noEvents": "Keine Ereignisse in dieser Kategorie",
       "infoTooltip": "<strong>UCDP Georeferenzierte Ereignisse</strong> Konfliktdaten auf Ereignisebene von der Universität Uppsala.<ul><li><strong>Staatlich</strong>: Regierung vs. Rebellengruppe</li><li><strong>Nichtstaatlich</strong>: Bewaffnete Gruppe vs. bewaffnete Gruppe</li><li><strong>Einseitig</strong>: Gewalt gegen Zivilisten</li></ul>Todesfälle als beste Schätzung (niedriger bis hoher Bereich) angegeben. ACLED-Duplikate werden automatisch herausgefiltert."
     },
     "strategicRisk": {
+      "noRisks": "Keine signifikanten Risiken erkannt",
       "infoTooltip": "<strong>Methodik</strong> Zusammengesetzte Bewertung (0–100), Mischung:<ul><li>50 % Länderinstabilität (Top 5 gewichtet)</li><li>30 % Geografische Konvergenzzonen</li><li>20 % Infrastrukturvorfälle</li></ul>Automatische Aktualisierung alle 5 Minuten."
     },
     "insights": {
+      "noStories": "Noch keine aktuellen oder quellenübergreifenden Meldungen",
       "infoTooltip": "<strong>AI-gestützte Analyse</strong><br>• <strong>World Brief</strong>: KI-Zusammenfassung (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: Nachrichtentonanalyse<br>• <strong>Velocity</strong>: Schnelllebige Geschichten<br>• <strong>Focal Points</strong>: Korreliert Nachrichtenentitäten mit Kartensignale (Militär, Proteste, Ausfälle)<br><em>Nur Desktop • Unterstützt von Llama 3.3 + Focal Point Detection</em>"
+    },
+    "export": {
+      "exportData": "Daten exportieren"
+    },
+    "runtimeConfig": {
+      "getApiKey": "API-Schlüssel anfordern"
     }
   },
   "popups": {
