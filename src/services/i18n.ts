@@ -9,6 +9,7 @@ import pl from '../locales/pl.json';
 import pt from '../locales/pt.json';
 import nl from '../locales/nl.json';
 import sv from '../locales/sv.json';
+import ru from '../locales/ru.json';
 
 const resources = {
   en: { translation: en },
@@ -20,6 +21,7 @@ const resources = {
   pt: { translation: pt },
   nl: { translation: nl },
   sv: { translation: sv },
+  ru: { translation: ru },
 };
 
 // Initialize i18n
@@ -66,4 +68,5 @@ export const LANGUAGES = [
   { code: 'pt', label: 'Português', flag: '🇵🇹' },
   { code: 'nl', label: 'Nederlands', flag: '🇳🇱' },
   { code: 'sv', label: 'Svenska', flag: '🇸🇪' },
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
 ];
