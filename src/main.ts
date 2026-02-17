@@ -8,6 +8,15 @@ import { installRuntimeFetchPatch } from '@/services/runtime';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 
+// Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures)
+window.addEventListener('vite:preloadError', (_e) => {
+  const reloadKey = 'wm-chunk-reload';
+  if (!sessionStorage.getItem(reloadKey)) {
+    sessionStorage.setItem(reloadKey, '1');
+    window.location.reload();
+  }
+});
+
 // Initialize Vercel Analytics
 inject();
 

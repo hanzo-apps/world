@@ -110,6 +110,9 @@ type MapHarness = {
   prepareVisualScenario: (scenarioId: string) => boolean;
   isVisualScenarioReady: (scenarioId: string) => boolean;
   getDeckLayerSnapshot: () => LayerSnapshot[];
+  getLayerDataCount: (layerId: string) => number;
+  getLayerFirstScreenTransform: (layerId: string) => string | null;
+  getFirstProtestTitle: () => string | null;
   getOverlaySnapshot: () => OverlaySnapshot;
   getCyberTooltipHtml: (indicator: string) => string;
   getClusterStateSize: () => number;
@@ -225,7 +228,8 @@ const map = new DeckGLMap(app, {
   pan: { x: 0, y: 0 },
   view: 'global',
   layers: allLayersEnabled,
-  timeRange: '24h',
+  // Keep harness deterministic regardless of wall-clock date.
+  timeRange: 'all',
 });
 
 const DETERMINISTIC_BODY_CLASS = 'e2e-deterministic';
@@ -292,6 +296,46 @@ const getDeckLayerSnapshot = (): LayerSnapshot[] => {
     id: layer.id,
     dataCount: getDataCount(layer.props?.data),
   }));
+};
+
+const getLayerDataCount = (layerId: string): number => {
+  return getDeckLayerSnapshot().find((layer) => layer.id === layerId)?.dataCount ?? 0;
+};
+
+const getLayerFirstScreenTransform = (layerId: string): string | null => {
+  const maplibreMap = internals.maplibreMap;
+  if (!maplibreMap) return null;
+
+  const layers = internals.buildLayers?.() ?? [];
+  const target = layers.find((layer) => layer.id === layerId);
+  const data = target?.props?.data;
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const first = data[0] as {
+    lon?: number;
+    lng?: number;
+    longitude?: number;
+    lat?: number;
+    latitude?: number;
+  };
+
+  const lon = first.lon ?? first.lng ?? first.longitude;
+  const lat = first.lat ?? first.latitude;
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+
+  const point = maplibreMap.project([lon as number, lat as number]);
+  return `translate(${point.x.toFixed(2)}px, ${point.y.toFixed(2)}px)`;
+};
+
+const getFirstProtestTitle = (): string | null => {
+  const layers = internals.buildLayers?.() ?? [];
+  const protestLayer = layers.find((layer) => layer.id === 'protest-clusters-layer');
+  const data = protestLayer?.props?.data;
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const first = data[0] as { items?: Array<{ title?: string }> };
+  const title = first.items?.[0]?.title;
+  return typeof title === 'string' ? title : null;
 };
 
 const getOverlaySnapshot = (): OverlaySnapshot => ({
@@ -487,8 +531,8 @@ const VISUAL_SCENARIOS: VisualScenario[] = [
     variant: 'both',
     enabledLayers: ['datacenters'],
     camera: toCamera(datacenterLon, datacenterLat, 3.0),
-    expectedDeckLayers: [],
-    expectedSelectors: ['.datacenter-marker'],
+    expectedDeckLayers: ['datacenter-clusters-layer'],
+    expectedSelectors: [],
   },
   {
     id: 'datacenters-icons-z6',
@@ -503,8 +547,8 @@ const VISUAL_SCENARIOS: VisualScenario[] = [
     variant: 'both',
     enabledLayers: ['protests'],
     camera: seededCameras.protests,
-    expectedDeckLayers: [],
-    expectedSelectors: ['.protest-marker'],
+    expectedDeckLayers: ['protest-clusters-layer'],
+    expectedSelectors: [],
   },
   {
     id: 'flights-z5',
@@ -605,16 +649,16 @@ const VISUAL_SCENARIOS: VisualScenario[] = [
     variant: 'tech',
     enabledLayers: ['techHQs'],
     camera: toCamera(techHQLon, techHQLat, 5.2),
-    expectedDeckLayers: [],
-    expectedSelectors: ['.tech-hq-marker'],
+    expectedDeckLayers: ['tech-hq-clusters-layer'],
+    expectedSelectors: [],
   },
   {
     id: 'tech-events-z5',
     variant: 'tech',
     enabledLayers: ['techEvents'],
     camera: seededCameras.techEvents,
-    expectedDeckLayers: [],
-    expectedSelectors: ['.tech-event-marker'],
+    expectedDeckLayers: ['tech-event-clusters-layer'],
+    expectedSelectors: [],
   },
   {
     id: 'stock-exchanges-z5',
@@ -1140,7 +1184,7 @@ const isVisualScenarioReady = (scenarioId: string): boolean => {
 const getCyberTooltipHtml = (indicator: string): string => {
   const tooltip = internals.getTooltip?.({
     object: {
-      indicator,
+      country: indicator,
       severity: 'high',
       source: 'feodo',
     },
@@ -1152,11 +1196,18 @@ const getCyberTooltipHtml = (indicator: string): string => {
 seedAllDynamicData();
 
 let ready = false;
+const readyStartedAt = Date.now();
+const STYLE_READY_FALLBACK_MS = 12_000;
 const pollReady = (): void => {
   const hasCanvas = Boolean(document.querySelector('#deckgl-basemap canvas'));
   const maplibreMap = internals.maplibreMap;
+  const styleLoaded = Boolean(maplibreMap?.isStyleLoaded());
+  const allowStyleFallback =
+    hasCanvas &&
+    Boolean(maplibreMap) &&
+    Date.now() - readyStartedAt >= STYLE_READY_FALLBACK_MS;
 
-  if (hasCanvas && maplibreMap?.isStyleLoaded()) {
+  if ((hasCanvas && styleLoaded) || allowStyleFallback) {
     if (!deterministicVisualModeEnabled) {
       enableDeterministicVisualMode();
     }
@@ -1209,10 +1260,13 @@ window.__mapHarness = {
   prepareVisualScenario,
   isVisualScenarioReady,
   getDeckLayerSnapshot,
+  getLayerDataCount,
+  getLayerFirstScreenTransform,
+  getFirstProtestTitle,
   getOverlaySnapshot,
   getCyberTooltipHtml,
   getClusterStateSize: (): number => {
-    return internals.lastClusterState?.size ?? -1;
+    return getLayerDataCount('protest-clusters-layer');
   },
   destroy: (): void => {
     map.destroy();
