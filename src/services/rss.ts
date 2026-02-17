@@ -13,6 +13,12 @@ const MAX_CACHE_ENTRIES = 100; // Prevent unbounded growth
 const feedFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const feedCache = new Map<string, { items: NewsItem[]; timestamp: number }>();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const AI_CLASSIFY_DEDUP_MS = 30 * 60 * 1000;
+const AI_CLASSIFY_WINDOW_MS = 60 * 1000;
+const AI_CLASSIFY_MAX_PER_WINDOW = SITE_VARIANT === 'finance' ? 40 : 120;
+const AI_CLASSIFY_MAX_PER_FEED = SITE_VARIANT === 'finance' ? 2 : 4;
+const aiRecentlyQueued = new Map<string, number>();
+const aiDispatches: number[] = [];
 
 function toSerializable(items: NewsItem[]): Array<Omit<NewsItem, 'pubDate'> & { pubDate: string }> {
   return items.map(item => ({ ...item, pubDate: item.pubDate.toISOString() }));
@@ -74,6 +80,35 @@ function recordFeedFailure(feedName: string): void {
 
 function recordFeedSuccess(feedName: string): void {
   feedFailures.delete(feedName);
+}
+
+function toAiKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function canQueueAiClassification(title: string): boolean {
+  const now = Date.now();
+  while (aiDispatches.length > 0 && now - aiDispatches[0]! > AI_CLASSIFY_WINDOW_MS) {
+    aiDispatches.shift();
+  }
+  for (const [key, queuedAt] of aiRecentlyQueued) {
+    if (now - queuedAt > AI_CLASSIFY_DEDUP_MS) {
+      aiRecentlyQueued.delete(key);
+    }
+  }
+  if (aiDispatches.length >= AI_CLASSIFY_MAX_PER_WINDOW) {
+    return false;
+  }
+
+  const key = toAiKey(title);
+  const lastQueued = aiRecentlyQueued.get(key);
+  if (lastQueued && now - lastQueued < AI_CLASSIFY_DEDUP_MS) {
+    return false;
+  }
+
+  aiDispatches.push(now);
+  aiRecentlyQueued.set(key, now);
+  return true;
 }
 
 export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
@@ -151,15 +186,19 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
       link: item.link,
     })));
 
-    for (const item of parsed) {
-      if (item.threat.source === 'keyword') {
-        classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
-          if (aiResult && aiResult.confidence > item.threat.confidence) {
-            item.threat = aiResult;
-            item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
-          }
-        }).catch(() => {});
-      }
+    const aiCandidates = parsed
+      .filter(item => item.threat.source === 'keyword')
+      .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
+      .slice(0, AI_CLASSIFY_MAX_PER_FEED);
+
+    for (const item of aiCandidates) {
+      if (!canQueueAiClassification(item.title)) continue;
+      classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
+        if (aiResult && aiResult.confidence > item.threat.confidence) {
+          item.threat = aiResult;
+          item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
+        }
+      }).catch(() => {});
     }
 
     return parsed;
