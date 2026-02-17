@@ -40,6 +40,9 @@ type HarnessWindow = Window & {
     prepareVisualScenario: (scenarioId: string) => boolean;
     isVisualScenarioReady: (scenarioId: string) => boolean;
     getDeckLayerSnapshot: () => LayerSnapshot[];
+    getLayerDataCount: (layerId: string) => number;
+    getLayerFirstScreenTransform: (layerId: string) => string | null;
+    getFirstProtestTitle: () => string | null;
     getOverlaySnapshot: () => OverlaySnapshot;
     getCyberTooltipHtml: (indicator: string) => string;
     getClusterStateSize: () => number;
@@ -135,16 +138,6 @@ const waitForHarnessReady = async (
       });
     }, { timeout: 30000 })
     .toBe(true);
-};
-
-const getMarkerInlineTransform = async (
-  page: import('@playwright/test').Page,
-  selector: string
-): Promise<string | null> => {
-  return await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    return el?.style.transform ?? null;
-  }, selector);
 };
 
 const prepareVisualScenario = async (
@@ -455,14 +448,14 @@ test.describe('DeckGL map harness', () => {
   }) => {
     await waitForHarnessReady(page);
 
-    const protestMarker = page.locator('.protest-marker').first();
-    await expect(protestMarker).toBeVisible({ timeout: 15000 });
-
-    await protestMarker.click({ force: true });
-    await expect(page.locator('.map-popup .popup-description')).toContainText(
-      'Scenario Alpha Protest'
-    );
-    await page.locator('.map-popup .popup-close').click();
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getFirstProtestTitle() ?? '';
+        });
+      }, { timeout: 15000 })
+      .toContain('Scenario Alpha Protest');
 
     await page.evaluate(() => {
       const w = window as HarnessWindow;
@@ -478,11 +471,14 @@ test.describe('DeckGL map harness', () => {
       }, { timeout: 20000 })
       .toBeGreaterThan(0);
 
-    await expect(protestMarker).toBeVisible({ timeout: 15000 });
-    await protestMarker.click({ force: true });
-    await expect(page.locator('.map-popup .popup-description')).toContainText(
-      'Scenario Beta Protest'
-    );
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getFirstProtestTitle() ?? '';
+        });
+      }, { timeout: 15000 })
+      .toContain('Scenario Beta Protest');
   });
 
   test('initializes cluster movement cache on first protest cluster render', async ({
@@ -501,7 +497,7 @@ test.describe('DeckGL map harness', () => {
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return w.__mapHarness?.getOverlaySnapshot().protestMarkers ?? 0;
+          return w.__mapHarness?.getLayerDataCount('protest-clusters-layer') ?? 0;
         });
       }, { timeout: 20000 })
       .toBeGreaterThan(0);
@@ -528,12 +524,19 @@ test.describe('DeckGL map harness', () => {
       w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 4.2 });
     });
 
-    const markerSelector = '.hotspot';
-    await expect(page.locator(markerSelector).first()).toBeVisible({
-      timeout: 15000,
-    });
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getLayerDataCount('hotspots-layer') ?? 0;
+        });
+      }, { timeout: 15000 })
+      .toBeGreaterThan(0);
 
-    const beforeTransform = await getMarkerInlineTransform(page, markerSelector);
+    const beforeTransform = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getLayerFirstScreenTransform('hotspots-layer') ?? null;
+    });
     expect(beforeTransform).not.toBeNull();
 
     await page.evaluate(() => {
@@ -548,7 +551,10 @@ test.describe('DeckGL map harness', () => {
         })
     );
 
-    const afterTransform = await getMarkerInlineTransform(page, markerSelector);
+    const afterTransform = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getLayerFirstScreenTransform('hotspots-layer') ?? null;
+    });
     expect(afterTransform).not.toBeNull();
     expect(afterTransform).not.toBe(beforeTransform);
   });
@@ -565,54 +571,41 @@ test.describe('DeckGL map harness', () => {
       w.__mapHarness?.setCamera({ lon: 0.2, lat: 15.2, zoom: 4.2 });
     });
 
-    const markerSelector = '.hotspot';
-    await expect(page.locator(markerSelector).first()).toBeVisible({
-      timeout: 15000,
-    });
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getLayerDataCount('hotspots-layer') ?? 0;
+        });
+      }, { timeout: 15000 })
+      .toBeGreaterThan(0);
 
-    const result = await page.evaluate(async () => {
+    const beforeTransform = await page.evaluate(() => {
       const w = window as HarnessWindow;
-      const marker = document.querySelector('.hotspot') as HTMLElement | null;
-      if (!w.__mapHarness || !marker) {
-        return { observed: false, styleMutations: -1, remaining: -1 };
-      }
+      return w.__mapHarness?.getLayerFirstScreenTransform('hotspots-layer') ?? null;
+    });
+    expect(beforeTransform).not.toBeNull();
 
-      let styleMutations = 0;
-      const observer = new MutationObserver((records) => {
-        for (const record of records) {
-          if (
-            record.type === 'attributes' &&
-            record.attributeName === 'style'
-          ) {
-            styleMutations += 1;
-          }
-        }
-      });
-
-      observer.observe(marker, {
-        attributes: true,
-        attributeFilter: ['style'],
-      });
-
-      w.__mapHarness.setLayersForSnapshot([]);
-      w.__mapHarness.setCamera({ lon: 3.5, lat: 18.2, zoom: 4.8 });
-
-      await new Promise((resolve) => {
-        setTimeout(resolve, 140);
-      });
-
-      observer.disconnect();
-
-      return {
-        observed: true,
-        styleMutations,
-        remaining: document.querySelectorAll('.hotspot').length,
-      };
+    await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      w.__mapHarness?.setLayersForSnapshot([]);
+      w.__mapHarness?.setCamera({ lon: 3.5, lat: 18.2, zoom: 4.8 });
     });
 
-    expect(result.observed).toBe(true);
-    expect(result.styleMutations).toBe(0);
-    expect(result.remaining).toBe(0);
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getLayerDataCount('hotspots-layer') ?? -1;
+        });
+      }, { timeout: 10000 })
+      .toBe(0);
+
+    const afterTransform = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getLayerFirstScreenTransform('hotspots-layer') ?? null;
+    });
+    expect(afterTransform).toBeNull();
   });
 
   test('reprojects protest overlay marker when panning at fixed zoom', async ({
@@ -628,10 +621,19 @@ test.describe('DeckGL map harness', () => {
 
     await prepareVisualScenario(page, 'protests-z5');
 
-    const markerSelector = '.protest-marker';
-    await expect(page.locator(markerSelector).first()).toBeVisible();
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const w = window as HarnessWindow;
+          return w.__mapHarness?.getLayerDataCount('protest-clusters-layer') ?? 0;
+        });
+      }, { timeout: 15000 })
+      .toBeGreaterThan(0);
 
-    const beforeTransform = await getMarkerInlineTransform(page, markerSelector);
+    const beforeTransform = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getLayerFirstScreenTransform('protest-clusters-layer') ?? null;
+    });
     expect(beforeTransform).not.toBeNull();
 
     await page.evaluate(() => {
@@ -641,7 +643,10 @@ test.describe('DeckGL map harness', () => {
 
     await page.waitForTimeout(750);
 
-    const afterTransform = await getMarkerInlineTransform(page, markerSelector);
+    const afterTransform = await page.evaluate(() => {
+      const w = window as HarnessWindow;
+      return w.__mapHarness?.getLayerFirstScreenTransform('protest-clusters-layer') ?? null;
+    });
     expect(afterTransform).not.toBeNull();
     expect(afterTransform).not.toBe(beforeTransform);
   });
