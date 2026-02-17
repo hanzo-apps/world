@@ -229,6 +229,7 @@ export class NewsPanel extends Panel {
 
   public renderNews(items: NewsItem[]): void {
     if (items.length === 0) {
+      this.renderRequestId += 1; // Cancel in-flight clustering from previous renders.
       this.setDataBadge('unavailable');
       this.showError('No news available');
       return;
@@ -241,6 +242,15 @@ export class NewsPanel extends Panel {
     } else {
       this.renderFlat(items);
     }
+  }
+
+  public renderFilteredEmpty(message: string): void {
+    this.renderRequestId += 1; // Cancel in-flight clustering from previous renders.
+    this.setDataBadge('live');
+    this.setCount(0);
+    this.relatedAssetContext.clear();
+    this.currentHeadlines = [];
+    this.setContent(`<div class="panel-empty">${escapeHtml(message)}</div>`);
   }
 
   private async renderClustersAsync(items: NewsItem[]): Promise<void> {
