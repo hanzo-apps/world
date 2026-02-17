@@ -68,15 +68,11 @@ export class TechHubsPanel extends Panel {
       id: 'tech-hubs',
       title: t('panels.techHubs'),
       showCount: true,
-      infoTooltip: `
-        <strong>Tech Hub Activity</strong><br>
-        Shows tech hubs with the most news activity.<br><br>
-        <em>Activity levels:</em><br>
-        • <span style="color: ${getCSSColor('--semantic-normal')}">High</span> — Breaking news or 50+ score<br>
-        • <span style="color: ${getCSSColor('--semantic-elevated')}">Elevated</span> — Score 20-49<br>
-        • <span style="color: ${getCSSColor('--text-dim')}">Low</span> — Score below 20<br><br>
-        Click a hub to zoom to its location.
-      `,
+      infoTooltip: t('components.techHubs.infoTooltip', {
+        highColor: getCSSColor('--semantic-normal'),
+        elevatedColor: getCSSColor('--semantic-elevated'),
+        lowColor: getCSSColor('--text-dim'),
+      }),
     });
   }
 

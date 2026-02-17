@@ -26,15 +26,7 @@ export class CascadePanel extends Panel {
       title: t('panels.cascade'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: `<strong>Cascade Analysis</strong>
-        Models infrastructure dependencies:
-        <ul>
-          <li>Subsea cables, pipelines, ports, chokepoints</li>
-          <li>Select infrastructure to simulate failure</li>
-          <li>Shows affected countries and capacity loss</li>
-          <li>Identifies redundant routes</li>
-        </ul>
-        Data from TeleGeography and industry sources.`,
+      infoTooltip: t('components.cascade.infoTooltip'),
     });
     this.init();
   }

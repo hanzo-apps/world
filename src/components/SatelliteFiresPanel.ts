@@ -13,7 +13,7 @@ export class SatelliteFiresPanel extends Panel {
       title: t('panels.satelliteFires'),
       showCount: true,
       trackActivity: true,
-      infoTooltip: 'NASA FIRMS VIIRS satellite thermal detections across monitored conflict regions. High-intensity = brightness &gt;360K &amp; confidence &gt;80%.',
+      infoTooltip: t('components.satelliteFires.infoTooltip'),
     });
     this.showLoading(t('common.scanningThermalData'));
   }
