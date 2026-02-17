@@ -2149,6 +2149,8 @@ export class App {
     // GCC Investments Panel (finance variant)
     if (SITE_VARIANT === 'finance') {
       const investmentsPanel = new InvestmentsPanel((inv) => {
+        this.map?.enableLayer('gulfInvestments');
+        this.mapLayers.gulfInvestments = true;
         this.map?.setCenter(inv.lat, inv.lon, 6);
       });
       this.panels['gcc-investments'] = investmentsPanel;
