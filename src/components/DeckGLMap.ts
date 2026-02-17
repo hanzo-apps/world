@@ -247,7 +247,7 @@ export class DeckGLMap {
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = [];
-  private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string }> = [];
+  private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }> = [];
   private newsLocationFirstSeen = new Map<string, number>();
   private ucdpEvents: UcdpGeoEvent[] = [];
   private displacementFlows: DisplacementFlow[] = [];
@@ -291,6 +291,7 @@ export class DeckGLMap {
   private lastSCZoom = -1;
   private lastSCBoundsKey = '';
   private lastSCMask = '';
+  private protestSuperclusterSource: SocialUnrestEvent[] = [];
   private newsPulseIntervalId: ReturnType<typeof setInterval> | null = null;
   private readonly startupTime = Date.now();
   private lastCableHighlightSignature = '';
@@ -486,8 +487,71 @@ export class DeckGLMap {
     return false;
   }
 
-  private rebuildProtestSupercluster(): void {
-    const points = this.protests.map((p, i) => ({
+  private getTimeRangeMs(range: TimeRange = this.state.timeRange): number {
+    const ranges: Record<TimeRange, number> = {
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '48h': 48 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      'all': Infinity,
+    };
+    return ranges[range];
+  }
+
+  private parseTime(value: Date | string | number | undefined | null): number | null {
+    if (value == null) return null;
+    const ts = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    return Number.isFinite(ts) ? ts : null;
+  }
+
+  private filterByTime<T>(
+    items: T[],
+    getTime: (item: T) => Date | string | number | undefined | null
+  ): T[] {
+    if (this.state.timeRange === 'all') return items;
+    const cutoff = Date.now() - this.getTimeRangeMs();
+    return items.filter((item) => {
+      const ts = this.parseTime(getTime(item));
+      return ts == null ? true : ts >= cutoff;
+    });
+  }
+
+  private getFilteredProtests(): SocialUnrestEvent[] {
+    return this.filterByTime(this.protests, (event) => event.time);
+  }
+
+  private filterMilitaryFlightClustersByTime(clusters: MilitaryFlightCluster[]): MilitaryFlightCluster[] {
+    return clusters
+      .map((cluster) => {
+        const flights = this.filterByTime(cluster.flights ?? [], (flight) => flight.lastSeen);
+        if (flights.length === 0) return null;
+        return {
+          ...cluster,
+          flights,
+          flightCount: flights.length,
+        };
+      })
+      .filter((cluster): cluster is MilitaryFlightCluster => cluster !== null);
+  }
+
+  private filterMilitaryVesselClustersByTime(clusters: MilitaryVesselCluster[]): MilitaryVesselCluster[] {
+    return clusters
+      .map((cluster) => {
+        const vessels = this.filterByTime(cluster.vessels ?? [], (vessel) => vessel.lastAisUpdate);
+        if (vessels.length === 0) return null;
+        return {
+          ...cluster,
+          vessels,
+          vesselCount: vessels.length,
+        };
+      })
+      .filter((cluster): cluster is MilitaryVesselCluster => cluster !== null);
+  }
+
+  private rebuildProtestSupercluster(source: SocialUnrestEvent[] = this.getFilteredProtests()): void {
+    this.protestSuperclusterSource = source;
+    const points = source.map((p, i) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] as [number, number] },
       properties: {
@@ -641,7 +705,7 @@ export class DeckGLMap {
     ];
     const boundsKey = `${bbox[0].toFixed(4)}:${bbox[1].toFixed(4)}:${bbox[2].toFixed(4)}:${bbox[3].toFixed(4)}`;
     const layers = this.state.layers;
-    const useProtests = layers.protests && this.protests.length > 0;
+    const useProtests = layers.protests && this.protestSuperclusterSource.length > 0;
     const useTechHQ = SITE_VARIANT === 'tech' && layers.techHQs;
     const useTechEvents = SITE_VARIANT === 'tech' && layers.techEvents && this.techEvents.length > 0;
     const useDatacenterClusters = layers.datacenters && zoom < 5;
@@ -657,7 +721,7 @@ export class DeckGLMap {
         if (f.properties.cluster) {
           const props = f.properties as Record<string, unknown>;
           const leaves = this.protestSC!.getLeaves(f.properties.cluster_id!, DeckGLMap.MAX_CLUSTER_LEAVES);
-          const items = leaves.map(l => this.protests[l.properties.index]).filter((x): x is SocialUnrestEvent => !!x);
+          const items = leaves.map(l => this.protestSuperclusterSource[l.properties.index]).filter((x): x is SocialUnrestEvent => !!x);
           const maxSeverityRank = Number(props.maxSeverityRank ?? 0);
           const maxSev = maxSeverityRank >= 2 ? 'high' : maxSeverityRank === 1 ? 'medium' : 'low';
           const riotCount = Number(props.riotCount ?? 0);
@@ -686,7 +750,7 @@ export class DeckGLMap {
             sampled: items.length < clusterCount,
           };
         }
-        const item = this.protests[f.properties.index]!;
+        const item = this.protestSuperclusterSource[f.properties.index]!;
         return {
           id: `pp-${f.properties.index}`, lat: item.lat, lon: item.lon,
           count: 1, items: [item], country: item.country,
@@ -846,6 +910,17 @@ export class DeckGLMap {
     COLORS = getOverlayColors();
     const layers: (Layer | null | false)[] = [];
     const { layers: mapLayers } = this.state;
+    const filteredEarthquakes = this.filterByTime(this.earthquakes, (eq) => eq.time);
+    const filteredNaturalEvents = this.filterByTime(this.naturalEvents, (event) => event.date);
+    const filteredWeatherAlerts = this.filterByTime(this.weatherAlerts, (alert) => alert.onset);
+    const filteredOutages = this.filterByTime(this.outages, (outage) => outage.pubDate);
+    const filteredCableAdvisories = this.filterByTime(this.cableAdvisories, (advisory) => advisory.reported);
+    const filteredFlightDelays = this.filterByTime(this.flightDelays, (delay) => delay.updatedAt);
+    const filteredMilitaryFlights = this.filterByTime(this.militaryFlights, (flight) => flight.lastSeen);
+    const filteredMilitaryVessels = this.filterByTime(this.militaryVessels, (vessel) => vessel.lastAisUpdate);
+    const filteredMilitaryFlightClusters = this.filterMilitaryFlightClustersByTime(this.militaryFlightClusters);
+    const filteredMilitaryVesselClusters = this.filterMilitaryVesselClustersByTime(this.militaryVesselClusters);
+    const filteredUcdpEvents = this.filterByTime(this.ucdpEvents, (event) => event.date_start);
 
     // Undersea cables layer
     if (mapLayers.cables) {
@@ -900,14 +975,14 @@ export class DeckGLMap {
     }
 
     // Earthquakes layer + ghost for easier picking
-    if (mapLayers.natural && this.earthquakes.length > 0) {
-      layers.push(this.createEarthquakesLayer());
-      layers.push(this.createGhostLayer('earthquakes-layer', this.earthquakes, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
+    if (mapLayers.natural && filteredEarthquakes.length > 0) {
+      layers.push(this.createEarthquakesLayer(filteredEarthquakes));
+      layers.push(this.createGhostLayer('earthquakes-layer', filteredEarthquakes, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
     }
 
     // Natural events layer
-    if (mapLayers.natural && this.naturalEvents.length > 0) {
-      layers.push(this.createNaturalEventsLayer());
+    if (mapLayers.natural && filteredNaturalEvents.length > 0) {
+      layers.push(this.createNaturalEventsLayer(filteredNaturalEvents));
     }
 
     // Satellite fires layer (NASA FIRMS)
@@ -916,14 +991,14 @@ export class DeckGLMap {
     }
 
     // Weather alerts layer
-    if (mapLayers.weather && this.weatherAlerts.length > 0) {
-      layers.push(this.createWeatherLayer());
+    if (mapLayers.weather && filteredWeatherAlerts.length > 0) {
+      layers.push(this.createWeatherLayer(filteredWeatherAlerts));
     }
 
     // Internet outages layer + ghost for easier picking
-    if (mapLayers.outages && this.outages.length > 0) {
-      layers.push(this.createOutagesLayer());
-      layers.push(this.createGhostLayer('outages-layer', this.outages, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
+    if (mapLayers.outages && filteredOutages.length > 0) {
+      layers.push(this.createOutagesLayer(filteredOutages));
+      layers.push(this.createGhostLayer('outages-layer', filteredOutages, d => [d.lon, d.lat], { radiusMinPixels: 12 }));
     }
 
     // Cyber threat IOC layer
@@ -948,8 +1023,8 @@ export class DeckGLMap {
     }
 
     // Cable advisories layer (shown with cables)
-    if (mapLayers.cables && this.cableAdvisories.length > 0) {
-      layers.push(this.createCableAdvisoriesLayer());
+    if (mapLayers.cables && filteredCableAdvisories.length > 0) {
+      layers.push(this.createCableAdvisoriesLayer(filteredCableAdvisories));
     }
 
     // Repair ships layer (shown with cables)
@@ -958,8 +1033,8 @@ export class DeckGLMap {
     }
 
     // Flight delays layer
-    if (mapLayers.flights && this.flightDelays.length > 0) {
-      layers.push(this.createFlightDelaysLayer());
+    if (mapLayers.flights && filteredFlightDelays.length > 0) {
+      layers.push(this.createFlightDelaysLayer(filteredFlightDelays));
     }
 
     // Protests layer (Supercluster-based deck.gl layers)
@@ -968,23 +1043,23 @@ export class DeckGLMap {
     }
 
     // Military vessels layer
-    if (mapLayers.military && this.militaryVessels.length > 0) {
-      layers.push(this.createMilitaryVesselsLayer());
+    if (mapLayers.military && filteredMilitaryVessels.length > 0) {
+      layers.push(this.createMilitaryVesselsLayer(filteredMilitaryVessels));
     }
 
     // Military vessel clusters layer
-    if (mapLayers.military && this.militaryVesselClusters.length > 0) {
-      layers.push(this.createMilitaryVesselClustersLayer());
+    if (mapLayers.military && filteredMilitaryVesselClusters.length > 0) {
+      layers.push(this.createMilitaryVesselClustersLayer(filteredMilitaryVesselClusters));
     }
 
     // Military flights layer
-    if (mapLayers.military && this.militaryFlights.length > 0) {
-      layers.push(this.createMilitaryFlightsLayer());
+    if (mapLayers.military && filteredMilitaryFlights.length > 0) {
+      layers.push(this.createMilitaryFlightsLayer(filteredMilitaryFlights));
     }
 
     // Military flight clusters layer
-    if (mapLayers.military && this.militaryFlightClusters.length > 0) {
-      layers.push(this.createMilitaryFlightClustersLayer());
+    if (mapLayers.military && filteredMilitaryFlightClusters.length > 0) {
+      layers.push(this.createMilitaryFlightClustersLayer(filteredMilitaryFlightClusters));
     }
 
     // Strategic waterways layer
@@ -1008,8 +1083,8 @@ export class DeckGLMap {
     }
 
     // UCDP georeferenced events layer
-    if (mapLayers.ucdpEvents && this.ucdpEvents.length > 0) {
-      layers.push(this.createUcdpEventsLayer());
+    if (mapLayers.ucdpEvents && filteredUcdpEvents.length > 0) {
+      layers.push(this.createUcdpEventsLayer(filteredUcdpEvents));
     }
 
     // Displacement flows arc layer
@@ -1265,10 +1340,10 @@ export class DeckGLMap {
     });
   }
 
-  private createFlightDelaysLayer(): ScatterplotLayer {
+  private createFlightDelaysLayer(delays: AirportDelayAlert[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'flight-delays-layer',
-      data: this.flightDelays,
+      data: delays,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => {
         if (d.severity === 'GDP') return 15000; // Ground Delay Program
@@ -1328,10 +1403,10 @@ export class DeckGLMap {
     });
   }
 
-  private createEarthquakesLayer(): ScatterplotLayer {
+  private createEarthquakesLayer(earthquakes: Earthquake[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'earthquakes-layer',
-      data: this.earthquakes,
+      data: earthquakes,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => Math.pow(2, d.magnitude) * 1000,
       getFillColor: (d) => {
@@ -1346,10 +1421,10 @@ export class DeckGLMap {
     });
   }
 
-  private createNaturalEventsLayer(): ScatterplotLayer {
+  private createNaturalEventsLayer(events: NaturalEvent[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'natural-events-layer',
-      data: this.naturalEvents,
+      data: events,
       getPosition: (d: NaturalEvent) => [d.lon, d.lat],
       getRadius: (d: NaturalEvent) => d.title.startsWith('🔴') ? 20000 : d.title.startsWith('🟠') ? 15000 : 8000,
       getFillColor: (d: NaturalEvent) => {
@@ -1380,9 +1455,9 @@ export class DeckGLMap {
     });
   }
 
-  private createWeatherLayer(): ScatterplotLayer {
+  private createWeatherLayer(alerts: WeatherAlert[]): ScatterplotLayer {
     // Filter weather alerts that have centroid coordinates
-    const alertsWithCoords = this.weatherAlerts.filter(a => a.centroid && a.centroid.length === 2);
+    const alertsWithCoords = alerts.filter(a => a.centroid && a.centroid.length === 2);
 
     return new ScatterplotLayer({
       id: 'weather-layer',
@@ -1401,10 +1476,10 @@ export class DeckGLMap {
     });
   }
 
-  private createOutagesLayer(): ScatterplotLayer {
+  private createOutagesLayer(outages: InternetOutage[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'outages-layer',
-      data: this.outages,
+      data: outages,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 20000,
       getFillColor: COLORS.outage,
@@ -1492,11 +1567,11 @@ export class DeckGLMap {
     });
   }
 
-  private createCableAdvisoriesLayer(): ScatterplotLayer {
+  private createCableAdvisoriesLayer(advisories: CableAdvisory[]): ScatterplotLayer {
     // Cable fault/maintenance advisories
     return new ScatterplotLayer({
       id: 'cable-advisories-layer',
-      data: this.cableAdvisories,
+      data: advisories,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 10000,
       getFillColor: (d) => {
@@ -1528,10 +1603,10 @@ export class DeckGLMap {
     });
   }
 
-  private createMilitaryVesselsLayer(): ScatterplotLayer {
+  private createMilitaryVesselsLayer(vessels: MilitaryVessel[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'military-vessels-layer',
-      data: this.militaryVessels,
+      data: vessels,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 6000,
       getFillColor: COLORS.vesselMilitary,
@@ -1541,10 +1616,10 @@ export class DeckGLMap {
     });
   }
 
-  private createMilitaryVesselClustersLayer(): ScatterplotLayer {
+  private createMilitaryVesselClustersLayer(clusters: MilitaryVesselCluster[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'military-vessel-clusters-layer',
-      data: this.militaryVesselClusters,
+      data: clusters,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => 15000 + (d.vesselCount || 1) * 3000,
       getFillColor: (d) => {
@@ -1560,10 +1635,10 @@ export class DeckGLMap {
     });
   }
 
-  private createMilitaryFlightsLayer(): ScatterplotLayer {
+  private createMilitaryFlightsLayer(flights: MilitaryFlight[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'military-flights-layer',
-      data: this.militaryFlights,
+      data: flights,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 8000,
       getFillColor: COLORS.flightMilitary,
@@ -1573,10 +1648,10 @@ export class DeckGLMap {
     });
   }
 
-  private createMilitaryFlightClustersLayer(): ScatterplotLayer {
+  private createMilitaryFlightClustersLayer(clusters: MilitaryFlightCluster[]): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'military-flight-clusters-layer',
-      data: this.militaryFlightClusters,
+      data: clusters,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => 15000 + (d.flightCount || 1) * 3000,
       getFillColor: (d) => {
@@ -2038,6 +2113,7 @@ export class DeckGLMap {
   private createNewsLocationsLayer(): ScatterplotLayer[] {
     const zoom = this.maplibreMap?.getZoom() || 2;
     const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
+    const filteredNewsLocations = this.filterByTime(this.newsLocations, (location) => location.timestamp);
     const THREAT_RGB: Record<string, [number, number, number]> = {
       critical: [239, 68, 68],
       high: [249, 115, 22],
@@ -2059,7 +2135,7 @@ export class DeckGLMap {
     const layers: ScatterplotLayer[] = [
       new ScatterplotLayer({
         id: 'news-locations-layer',
-        data: this.newsLocations,
+        data: filteredNewsLocations,
         getPosition: (d) => [d.lon, d.lat],
         getRadius: 18000,
         getFillColor: (d) => {
@@ -2073,7 +2149,7 @@ export class DeckGLMap {
       }),
     ];
 
-    const recentNews = this.newsLocations.filter(d => {
+    const recentNews = filteredNewsLocations.filter(d => {
       const firstSeen = this.newsLocationFirstSeen.get(d.title);
       return firstSeen && (now - firstSeen) < PULSE_DURATION;
     });
@@ -2488,9 +2564,16 @@ export class DeckGLMap {
       btn.addEventListener('click', () => {
         const range = (btn as HTMLElement).dataset.range as TimeRange;
         this.setTimeRange(range);
-        slider.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
       });
+    });
+  }
+
+  private updateTimeSliderButtons(): void {
+    const slider = this.container.querySelector('.deckgl-time-slider');
+    if (!slider) return;
+    slider.querySelectorAll('.time-btn').forEach((btn) => {
+      const range = (btn as HTMLElement).dataset.range as TimeRange | undefined;
+      btn.classList.toggle('active', range === this.state.timeRange);
     });
   }
 
@@ -2854,7 +2937,9 @@ export class DeckGLMap {
 
   public setTimeRange(range: TimeRange): void {
     this.state.timeRange = range;
+    this.rebuildProtestSupercluster();
     this.onTimeRangeChange?.(range);
+    this.updateTimeSliderButtons();
     this.render(); // Debounced
   }
 
@@ -2894,10 +2979,10 @@ export class DeckGLMap {
     this.setView('global');
   }
 
-  private createUcdpEventsLayer(): ScatterplotLayer<UcdpGeoEvent> {
+  private createUcdpEventsLayer(events: UcdpGeoEvent[]): ScatterplotLayer<UcdpGeoEvent> {
     return new ScatterplotLayer<UcdpGeoEvent>({
       id: 'ucdp-events-layer',
-      data: this.ucdpEvents,
+      data: events,
       getPosition: (d) => [d.longitude, d.latitude],
       getRadius: (d) => Math.max(4000, Math.sqrt(d.deaths_best || 1) * 3000),
       getFillColor: (d) => {
@@ -3044,7 +3129,7 @@ export class DeckGLMap {
     this.render();
   }
 
-  public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string }>): void {
+  public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }>): void {
     const now = Date.now();
     for (const d of data) {
       if (!this.newsLocationFirstSeen.has(d.title)) {
