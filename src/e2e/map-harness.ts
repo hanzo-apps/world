@@ -113,9 +113,9 @@ type MapHarness = {
   getLayerDataCount: (layerId: string) => number;
   getLayerFirstScreenTransform: (layerId: string) => string | null;
   getFirstProtestTitle: () => string | null;
+  getProtestClusterCount: () => number;
   getOverlaySnapshot: () => OverlaySnapshot;
   getCyberTooltipHtml: (indicator: string) => string;
-  getClusterStateSize: () => number;
   destroy: () => void;
 };
 
@@ -236,7 +236,6 @@ const DETERMINISTIC_BODY_CLASS = 'e2e-deterministic';
 
 const internals = map as unknown as {
   buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
-  lastClusterState?: Map<string, unknown>;
   maplibreMap?: MapLibreMap;
   getTooltip?: (info: { object?: unknown; layer?: { id?: string } }) => { html?: string } | null;
   newsLocationFirstSeen?: Map<string, number>;
@@ -336,6 +335,10 @@ const getFirstProtestTitle = (): string | null => {
   const first = data[0] as { items?: Array<{ title?: string }> };
   const title = first.items?.[0]?.title;
   return typeof title === 'string' ? title : null;
+};
+
+const getProtestClusterCount = (): number => {
+  return getLayerDataCount('protest-clusters-layer');
 };
 
 const getOverlaySnapshot = (): OverlaySnapshot => ({
@@ -1263,11 +1266,9 @@ window.__mapHarness = {
   getLayerDataCount,
   getLayerFirstScreenTransform,
   getFirstProtestTitle,
+  getProtestClusterCount,
   getOverlaySnapshot,
   getCyberTooltipHtml,
-  getClusterStateSize: (): number => {
-    return getLayerDataCount('protest-clusters-layer');
-  },
   destroy: (): void => {
     map.destroy();
   },
