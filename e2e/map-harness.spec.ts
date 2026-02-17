@@ -43,9 +43,9 @@ type HarnessWindow = Window & {
     getLayerDataCount: (layerId: string) => number;
     getLayerFirstScreenTransform: (layerId: string) => string | null;
     getFirstProtestTitle: () => string | null;
+    getProtestClusterCount: () => number;
     getOverlaySnapshot: () => OverlaySnapshot;
     getCyberTooltipHtml: (indicator: string) => string;
-    getClusterStateSize: () => number;
   };
 };
 
@@ -466,7 +466,7 @@ test.describe('DeckGL map harness', () => {
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return w.__mapHarness?.getClusterStateSize() ?? -1;
+          return w.__mapHarness?.getProtestClusterCount() ?? 0;
         });
       }, { timeout: 20000 })
       .toBeGreaterThan(0);
@@ -481,7 +481,7 @@ test.describe('DeckGL map harness', () => {
       .toContain('Scenario Beta Protest');
   });
 
-  test('initializes cluster movement cache on first protest cluster render', async ({
+  test('populates protest clusters on first protest cluster render', async ({
     page,
   }) => {
     await waitForHarnessReady(page);
@@ -506,7 +506,7 @@ test.describe('DeckGL map harness', () => {
       .poll(async () => {
         return await page.evaluate(() => {
           const w = window as HarnessWindow;
-          return w.__mapHarness?.getClusterStateSize() ?? -1;
+          return w.__mapHarness?.getProtestClusterCount() ?? 0;
         });
       }, { timeout: 20000 })
       .toBeGreaterThan(0);

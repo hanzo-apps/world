@@ -8,11 +8,12 @@ import { installRuntimeFetchPatch } from '@/services/runtime';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 
+const chunkReloadStorageKey = `wm-chunk-reload:${__APP_VERSION__}`;
+
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures)
-window.addEventListener('vite:preloadError', (_e) => {
-  const reloadKey = 'wm-chunk-reload';
-  if (!sessionStorage.getItem(reloadKey)) {
-    sessionStorage.setItem(reloadKey, '1');
+window.addEventListener('vite:preloadError', () => {
+  if (!sessionStorage.getItem(chunkReloadStorageKey)) {
+    sessionStorage.setItem(chunkReloadStorageKey, '1');
     window.location.reload();
   }
 });
@@ -36,7 +37,13 @@ requestAnimationFrame(() => {
 });
 
 const app = new App('app');
-app.init().catch(console.error);
+app
+  .init()
+  .then(() => {
+    // Clear the one-shot guard after a successful boot so future stale-chunk incidents can recover.
+    sessionStorage.removeItem(chunkReloadStorageKey);
+  })
+  .catch(console.error);
 
 // Debug helpers for geo-convergence testing (remove in production)
 (window as unknown as Record<string, unknown>).geoDebug = {
