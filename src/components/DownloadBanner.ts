@@ -34,7 +34,7 @@ function detectPlatform(): Platform {
   const ua = navigator.userAgent;
   if (/Windows/i.test(ua)) return 'windows';
   if (/Mac/i.test(ua)) {
-    // WebGL renderer can reveal Apple Silicon GPU on some browsers
+    // WebGL renderer can reveal Apple Silicon vs Intel GPU
     try {
       const c = document.createElement('canvas');
       const gl = c.getContext('webgl') as WebGLRenderingContext | null;
@@ -43,11 +43,12 @@ function detectPlatform(): Platform {
         if (dbg) {
           const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
           if (/Apple M/i.test(renderer)) return 'macos-arm64';
+          if (/Intel/i.test(renderer)) return 'macos-x64';
         }
       }
     } catch { /* ignore */ }
-    // Fallback: assume Apple Silicon for modern macOS visitors
-    return 'macos-arm64';
+    // Can't determine architecture — show both Mac options
+    return 'unknown';
   }
   return 'unknown';
 }
