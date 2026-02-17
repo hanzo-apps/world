@@ -2690,7 +2690,7 @@ export class App {
       )
       .join('');
 
-    const findingsEnabled = this.findingsBadge?.isEnabled() ?? true;
+    const findingsEnabled = this.findingsBadge?.isEnabled() ?? IntelligenceGapBadge.getStoredEnabledState();
     const findingsHtml = `
       <div class="panel-toggle-item ${findingsEnabled ? 'active' : ''}" data-panel="intel-findings">
         <div class="panel-toggle-checkbox">${findingsEnabled ? '✓' : ''}</div>
