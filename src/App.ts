@@ -2253,6 +2253,14 @@ export class App {
       panelOrder.unshift('live-news');
     }
 
+    // live-webcams MUST follow live-news (one-time migration for existing users)
+    const webcamsIdx = panelOrder.indexOf('live-webcams');
+    if (webcamsIdx !== -1 && webcamsIdx !== panelOrder.indexOf('live-news') + 1) {
+      panelOrder.splice(webcamsIdx, 1);
+      const afterNews = panelOrder.indexOf('live-news') + 1;
+      panelOrder.splice(afterNews, 0, 'live-webcams');
+    }
+
     // Desktop configuration should stay easy to reach in Tauri builds.
     if (this.isDesktopApp) {
       const runtimeIdx = panelOrder.indexOf('runtime-config');
