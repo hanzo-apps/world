@@ -2,6 +2,34 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.3.9] - 2026-02-18
+
+### Added
+
+- **Full internationalization (14 locales)**: English, French, German, Spanish, Italian, Polish, Portuguese, Dutch, Swedish, Russian, Arabic, Chinese Simplified, Japanese — each with 1100+ translated keys
+- **RTL support**: Arabic locale with `dir="rtl"`, dedicated RTL CSS overrides, regional language code normalization (e.g. `ar-SA` correctly triggers RTL)
+- **Language switcher**: in-app locale picker with flag icons, persists to localStorage
+- **i18n infrastructure**: i18next with browser language detection and English fallback
+- **Community discussion widget**: floating pill linking to GitHub Discussions with delayed appearance and permanent dismiss
+- **Linux AppImage**: added `ubuntu-22.04` to CI build matrix with webkit2gtk/appindicator dependencies
+- **NHK World and Nikkei Asia**: added RSS feeds for Japan news coverage
+- **Intelligence Findings badge toggle**: option to disable the findings badge in the UI
+
+### Changed
+
+- **Zero hardcoded English**: all UI text routed through `t()` — panels, modals, tooltips, popups, map legends, alert templates, signal descriptions
+- **Trending proper-noun detection**: improved mid-sentence capitalization heuristic with all-caps fallback when ML classifier is unavailable
+- **Stopword suppression**: added missing English stopwords to trending keyword filter
+
+### Fixed
+
+- **Dead UTC clock**: removed `#timeDisplay` element that permanently displayed `--:--:-- UTC`
+- **Community widget duplicates**: added DOM idempotency guard preventing duplicate widgets on repeated news refresh cycles
+- **Settings help text**: suppressed raw i18n key paths rendering when translation is missing
+- **Intelligence Findings badge**: fixed toggle state and listener lifecycle
+- **Context menu styles**: restored intel-findings context menu styles
+- **CSS theme variables**: defined missing `--panel-bg` and `--panel-border` variables
+
 ## [2.3.8] - 2026-02-17
 
 ### Added
