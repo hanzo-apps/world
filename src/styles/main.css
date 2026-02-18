@@ -392,6 +392,20 @@ canvas,
   opacity: 1;
 }
 
+.beta-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #0a0a0a;
+  background: #f59e0b;
+  border-radius: 8px;
+  vertical-align: middle;
+}
+
 @keyframes update-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
