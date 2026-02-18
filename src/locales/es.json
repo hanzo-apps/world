@@ -1487,6 +1487,8 @@
     "new": "NUEVO",
     "live": "EN VIVO",
     "cached": "EN CACHE",
-    "unavailable": "NO DISPONIBLE"
+    "unavailable": "NO DISPONIBLE",
+    "close": "Cerrar",
+    "currentVariant": "(actual)"
   }
 }
