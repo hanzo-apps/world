@@ -1487,6 +1487,8 @@
     "new": "NEU",
     "live": "AKTUELL",
     "cached": "ZWISCHENGESPEICHERT",
-    "unavailable": "NICHT VERFUEGBAR"
+    "unavailable": "NICHT VERFUEGBAR",
+    "close": "Schließen",
+    "currentVariant": "(aktuell)"
   }
 }
