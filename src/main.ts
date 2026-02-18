@@ -1,7 +1,65 @@
 import './styles/main.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import * as Sentry from '@sentry/browser';
 import { inject } from '@vercel/analytics';
 import { App } from './App';
+
+// Initialize Sentry error tracking (early as possible)
+Sentry.init({
+  dsn: 'https://afc9a1c85c6ba49f8464a43f8de74ccd@o4509927897890816.ingest.us.sentry.io/4510906342113280',
+  release: `worldmonitor@${__APP_VERSION__}`,
+  environment: location.hostname === 'worldmonitor.app' ? 'production'
+    : location.hostname.includes('vercel.app') ? 'preview'
+    : 'development',
+  enabled: !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
+  sendDefaultPii: true,
+  tracesSampleRate: 0.1,
+  ignoreErrors: [
+    'Invalid WebGL2RenderingContext',
+    'WebGL context lost',
+    /reading 'imageManager'/,
+    /ResizeObserver loop/,
+    /NotAllowedError/,
+    /InvalidAccessError/,
+    /importScripts/,
+    /^TypeError: Load failed$/,
+    /^TypeError: Failed to fetch( \(.*\))?$/,
+    /^TypeError: cancelled$/,
+    /^TypeError: NetworkError/,
+    /runtime\.sendMessage\(\)/,
+    /Java object is gone/,
+    /^Object captured as promise rejection with keys:/,
+    /Unable to load image/,
+    /Non-Error promise rejection captured with value:/,
+    /Connection to Indexed Database server lost/,
+    /webkit\.messageHandlers/,
+    /unsafe-eval.*Content Security Policy/,
+    /Fullscreen request denied/,
+    /requestFullscreen/,
+    /vc_text_indicators_context/,
+    /Program failed to link: null/,
+  ],
+  beforeSend(event) {
+    const msg = event.exception?.values?.[0]?.value ?? '';
+    if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
+    const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
+    // Suppress module-import failures only when originating from browser extensions
+    if (/Importing a module script failed/.test(msg)) {
+      if (frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''))) return null;
+    }
+    // Suppress maplibre internal null-access crashes (light, placement) only when stack is in map chunk
+    if (/this\.light is null|can't access property "type", \w+ is undefined/.test(msg)) {
+      if (frames.some(f => /\/map-[A-Za-z0-9]+\.js/.test(f.filename ?? ''))) return null;
+    }
+    return event;
+  },
+});
+// Suppress NotAllowedError from YouTube IFrame API's internal play() — browser autoplay policy,
+// not actionable. The YT IFrame API doesn't expose the play() promise so it leaks as unhandled.
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason?.name === 'NotAllowedError') e.preventDefault();
+});
+
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
