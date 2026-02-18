@@ -38,6 +38,8 @@ Sentry.init({
     /requestFullscreen/,
     /vc_text_indicators_context/,
     /Program failed to link/,
+    /this\.light is null/,
+    /can't access property "type", \w+ is undefined/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
