@@ -247,7 +247,12 @@ class MLWorkerManager {
    */
   async unloadModel(modelId: string): Promise<boolean> {
     if (!this.isReady || !this.loadedModels.has(modelId)) return false;
-    return this.request<boolean>('unload-model', { modelId });
+    try {
+      return await this.request<boolean>('unload-model', { modelId });
+    } catch {
+      this.loadedModels.delete(modelId);
+      return false;
+    }
   }
 
   /**
