@@ -44,7 +44,7 @@
       "d": "il y a {{count}}j"
     },
     "infra": {
-      "pipeline": "Pipelines",
+      "pipeline": "Oléoducs",
       "cable": "Câbles sous-marins",
       "datacenter": "Centres de données",
       "base": "Bases militaires",
@@ -55,7 +55,7 @@
   "header": {
     "world": "MONDE",
     "tech": "TECH",
-    "live": "LIVE",
+    "live": "EN DIRECT",
     "search": "Recherche",
     "settings": "PANNEAUX",
     "sources": "SOURCES",
@@ -88,7 +88,7 @@
     "asia": "Asie-Pacifique",
     "energy": "Énergie & Ressources",
     "gov": "Gouvernement",
-    "thinktanks": "Think Tanks",
+    "thinktanks": "Groupes de Réflexion",
     "polymarket": "Prédictions",
     "commodities": "Matières premières",
     "economic": "Indicateurs économiques",
@@ -107,7 +107,7 @@
     "displacement": "Déplacements HCR",
     "climate": "Anomalies climatiques",
     "populationExposure": "Exposition de la population",
-    "startups": "Startups & VC",
+    "startups": "Startups & Capital-risque",
     "vcblogs": "Insights VC & Essais",
     "regionalStartups": "Actualités startups mondiales",
     "unicorns": "Suivi des licornes",
@@ -125,7 +125,7 @@
     "events": "Événements Tech",
     "serviceStatus": "État des services",
     "techReadiness": "Indice de maturité technologique",
-    "techHubs": "Hot Tech Hubs",
+    "techHubs": "Pôles Technologiques",
     "gccInvestments": "Investissements du CCG",
     "geoHubs": "Centres géopolitiques"
   },
@@ -147,7 +147,7 @@
         "prediction": "Prédiction",
         "conflict": "Conflit",
         "base": "Base militaire",
-        "pipeline": "Pipeline",
+        "pipeline": "Oléoduc",
         "cable": "Câble sous-marin",
         "datacenter": "Centre de données",
         "earthquake": "Séisme",
@@ -189,20 +189,20 @@
       "marketMove": "Mouvement de marché expliqué",
       "sectorCascade": "Cascade sectorielle",
       "militarySurge": "Montée militaire",
-      "country": "Country:",
-      "scoreChange": "Score Change:",
-      "instabilityLevel": "Instability Level:",
-      "primaryDriver": "Primary Driver:",
-      "location": "Location:",
-      "eventTypes": "Event Types:",
-      "eventCount": "Event Count:",
-      "eventCountValue": "{{count}} events in 24h",
-      "source": "Source:",
-      "countriesAffected": "Countries Affected:",
-      "impactLevel": "Impact Level:",
-      "focalPoints": "CORRELATED FOCAL POINTS",
-      "newsCorrelation": "NEWS CORRELATION",
-      "viewOnMap": "View on map"
+      "country": "Pays :",
+      "scoreChange": "Évolution du score :",
+      "instabilityLevel": "Niveau d'instabilité :",
+      "primaryDriver": "Facteur principal :",
+      "location": "Localisation :",
+      "eventTypes": "Types d'événements :",
+      "eventCount": "Nombre d'événements :",
+      "eventCountValue": "{{count}} événements en 24h",
+      "source": "Source :",
+      "countriesAffected": "Pays affectés :",
+      "impactLevel": "Niveau d'impact :",
+      "focalPoints": "POINTS FOCAUX CORRÉLÉS",
+      "newsCorrelation": "CORRÉLATION D'ACTUALITÉS",
+      "viewOnMap": "Voir sur la carte"
     },
     "story": {
       "generating": "Génération de l'histoire...",
@@ -215,8 +215,8 @@
       "copied": "Copié !",
       "opening": "Ouverture...",
       "error": "Échec de la génération.",
-      "shareTitle": "Share story",
-      "close": "Close"
+      "shareTitle": "Partager l'histoire",
+      "close": "Fermer"
     },
     "mobileWarning": {
       "title": "Vue Mobile",
@@ -232,8 +232,8 @@
       "macIntel": "macOS (Intel)",
       "windows": "Windows (.exe)",
       "dismiss": "Ignorer",
-      "showAllPlatforms": "Show all platforms",
-      "showLess": "Show less"
+      "showAllPlatforms": "Afficher toutes les plateformes",
+      "showLess": "Afficher moins"
     },
     "runtimeConfig": {
       "title": "Configuration Bureau",
@@ -308,7 +308,7 @@
       "fresh": "Frais",
       "noMarkets": "Aucun marché de prédiction trouvé",
       "predictionMarkets": "Marchés de Prédiction",
-      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings."
+      "unavailable": "Briefing IA indisponible — configurez GROQ_API_KEY dans les Paramètres."
     },
     "countryBrief": {
       "components": {
@@ -343,15 +343,15 @@
       "infrastructure": "Exposition aux infrastructures",
       "briefUnavailable": "Brief AI indisponible – configurez GROQ_API_KEY dans Paramètres.",
       "cached": "En cache",
-      "fresh": "Fresh",
+      "fresh": "Récent",
       "noMarkets": "Aucun marché de prédiction trouvé",
       "timeAgo": {
-        "m": "m ago",
-        "h": "h ago",
-        "d": "d ago"
+        "m": "il y a {{count}}m",
+        "h": "il y a {{count}}h",
+        "d": "il y a {{count}}j"
       },
       "infra": {
-        "pipeline": "Pipelines",
+        "pipeline": "Oléoducs",
         "cable": "Câbles sous-marins",
         "datacenter": "Centres de données",
         "base": "Bases militaires",
@@ -384,7 +384,7 @@
       "emptyDeadlines": "Aucune échéance à venir dans les 12 prochains mois",
       "keyProvisions": "Dispositions Clés",
       "learnMore": "En savoir plus",
-      "active": "Active",
+      "active": "Actif",
       "proposed": "Proposée",
       "updated": "Mis à jour"
     },
@@ -444,7 +444,7 @@
     },
     "playback": {
       "toggleMode": "Basculer le mode lecture",
-      "live": "LIVE",
+      "live": "EN DIRECT",
       "historicalPlayback": "Lecture historique"
     },
     "pizzint": {
@@ -501,11 +501,16 @@
       "sourceRef": "Source [{{n}}]"
     },
     "relatedAssets": {
-      "pipeline": "Pipeline",
+      "pipeline": "Oléoduc",
       "cable": "Câble",
-      "datacenter": "Datacenter",
+      "datacenter": "Centre de données",
       "base": "Base",
       "nuclear": "Nucléaire"
+    },
+    "community": {
+      "joinDiscussion": "Rejoindre la discussion",
+      "openDiscussion": "Ouvrir la discussion",
+      "dontShowAgain": "Ne plus afficher"
     },
     "threatLabels": {
       "critical": "CRIT",
@@ -524,7 +529,7 @@
         "techHQ": "Siège Tech",
         "accelerator": "Accélérateur",
         "cloudRegion": "Région Cloud",
-        "datacenter": "Datacenter",
+        "datacenter": "Centre de données",
         "stockExchange": "Bourse",
         "financialCenter": "Centre financier",
         "centralBank": "Banque centrale",
@@ -598,7 +603,7 @@
         "techEventsCount": "{{count}} événements techniques",
         "dataCentersCount": "{{count}} centres de données",
         "underseaCable": "Câble sous-marin",
-        "pipeline": "Pipeline",
+        "pipeline": "Oléoduc",
         "conflictZone": "Zone de conflit",
         "naturalEvent": "Événement naturel",
         "financialCenter": "place financière",
@@ -693,13 +698,13 @@
       "noImpacts": "Aucun impact pays détecté",
       "filters": {
         "cables": "Câbles",
-        "pipelines": "Pipelines",
+        "pipelines": "Oléoducs",
         "ports": "Ports",
         "chokepoints": "Points d'étranglement"
       },
       "filterType": {
         "cable": "câble",
-        "pipeline": "pipeline",
+        "pipeline": "oléoduc",
         "port": "port",
         "chokepoint": "point d'étranglement",
         "country": "pays"
@@ -708,15 +713,15 @@
       "analyzeImpact": "Analyser l'impact",
       "impactLevels": {
         "critical": "critique",
-        "high": "high",
-        "medium": "medium",
+        "high": "élevé",
+        "medium": "moyen",
         "low": "faible"
       },
       "capacityPercent": "Capacité {{percent}}%",
       "noCountryImpacts": "Aucun impact pays détecté",
       "alternativeRoutes": "Itinéraires alternatifs",
       "countriesAffected": "Pays concernés ({{count}})",
-      "links": "links",
+      "links": "liens",
       "selectInfrastructureHint": "Sélectionnez l’infrastructure pour analyser l’impact en cascade",
       "infoTooltip": "<strong>Analyse en cascade</strong> Modélise les dépendances de l'infrastructure :<ul><li>Câbles sous-marins, pipelines, ports, points d'étranglement</li><li>Sélectionner l'infrastructure pour simuler une panne</li><li>Affiche les pays touchés et la perte de capacité</li><li>Identifie les itinéraires redondants</li></ul>Données provenant de sources TeleGeography et industrielles."
     },
@@ -772,7 +777,7 @@
     },
     "displacement": {
       "noData": "Aucune donnée",
-      "refugees": "Refugees",
+      "refugees": "Réfugiés",
       "asylumSeekers": "Demandeurs d'asile",
       "idps": "personnes déplacées",
       "total": "Total",
@@ -796,7 +801,7 @@
       "severityLabel": "Gravité",
       "severity": {
         "extreme": "EXTRÊME",
-        "moderate": "MODERATE",
+        "moderate": "MODÉRÉ",
         "normal": "NORMALE"
       },
       "infoTooltip": "<strong>Moniteur des anomalies climatiques</strong> Écarts de température et de précipitations par rapport à la référence de 30 jours. Données d'Open-Meteo (réanalyse ERA5).<ul><li><strong>Extrême</strong> : >5 °C ou >80 mm/jour d'écart</li><li><strong>Modéré</strong> : >3 °C ou >40 mm/jour déviation</li></ul>Surveille 15 zones sujettes aux conflits/catastrophes."
@@ -830,7 +835,7 @@
       "priority": {
         "critical": "CRITIQUE",
         "high": "HAUT",
-        "medium": "MEDIUM",
+        "medium": "MOYEN",
         "low": "FAIBLE"
       },
       "insights": {
@@ -1085,7 +1090,7 @@
       "h": "il y a {{count}}h",
       "d": "il y a {{count}}j"
     },
-    "updated": "Updated",
+    "updated": "Mis à jour",
     "cableAdvisory": {
       "reported": "RAPPORTÉ",
       "impact": "IMPACT",
@@ -1478,7 +1483,7 @@
     "exportImage": "Exporter l'image",
     "selectAll": "Sélectionner tout",
     "selectNone": "Sélectionnez Aucun",
-    "noDataAvailable": "No data available",
+    "noDataAvailable": "Aucune donnée disponible",
     "new": "NOUVEAU",
     "live": "EN DIRECT",
     "cached": "EN CACHE",

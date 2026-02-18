@@ -39,9 +39,9 @@
       "conflictEvents": "конфликтные события"
     },
     "timeAgo": {
-      "m": "м назад",
-      "h": "ч назад",
-      "d": "д назад"
+      "m": "{{count}}м назад",
+      "h": "{{count}}ч назад",
+      "d": "{{count}}д назад"
     },
     "infra": {
       "pipeline": "Трубопроводы",
@@ -55,7 +55,7 @@
   "header": {
     "world": "МИР",
     "tech": "ТЕХНО",
-    "live": "LIVE",
+    "live": "ПРЯМОЙ ЭФИР",
     "search": "Поиск",
     "settings": "ПАНЕЛИ",
     "sources": "ИСТОЧНИКИ",
@@ -346,9 +346,9 @@
         "conflictEvents": "конфликтные события"
       },
       "timeAgo": {
-        "m": "м назад",
-        "h": "ч назад",
-        "d": "д назад"
+        "m": "{{count}}м назад",
+        "h": "{{count}}ч назад",
+        "d": "{{count}}д назад"
       },
       "infra": {
         "pipeline": "Трубопроводы",
@@ -444,7 +444,7 @@
     },
     "playback": {
       "toggleMode": "Переключить режим воспроизведения",
-      "live": "LIVE",
+      "live": "ПРЯМОЙ ЭФИР",
       "historicalPlayback": "Историческое воспроизведение"
     },
     "pizzint": {
@@ -506,6 +506,11 @@
       "datacenter": "Дата-центр",
       "base": "База",
       "nuclear": "Ядерный"
+    },
+    "community": {
+      "joinDiscussion": "Присоединиться к обсуждению",
+      "openDiscussion": "Открыть обсуждение",
+      "dontShowAgain": "Больше не показывать"
     },
     "threatLabels": {
       "critical": "КРИТ",
@@ -1081,10 +1086,10 @@
     "viewUSGS": "Смотреть на USGS",
     "expired": "Истёк",
     "timeAgo": {
-      "s": "с назад",
-      "m": "м назад",
-      "h": "ч назад",
-      "d": "д назад"
+      "s": "{{count}}с назад",
+      "m": "{{count}}м назад",
+      "h": "{{count}}ч назад",
+      "d": "{{count}}д назад"
     },
     "cableAdvisory": {
       "reported": "ЗАФИКСИРОВАНО",
@@ -1197,7 +1202,7 @@
       "speed": "СКОРОСТЬ",
       "heading": "КУРС",
       "hexCode": "HEX-КОД",
-      "squawk": "SQUAWK",
+      "squawk": "СКВОК",
       "attribution": "Источник: OpenSky Network"
     },
     "militaryVessel": {
@@ -1480,7 +1485,7 @@
     "shareStory": "Поделиться сюжетом",
     "exportImage": "Экспорт изображения",
     "new": "НОВОЕ",
-    "live": "LIVE",
+    "live": "ПРЯМОЙ ЭФИР",
     "cached": "КЭШ",
     "unavailable": "НЕДОСТУПНО"
   }

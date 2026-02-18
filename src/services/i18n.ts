@@ -45,6 +45,8 @@ export async function initI18n(): Promise<void> {
     .use(LanguageDetector)
     .init({
       resources,
+      supportedLngs: ['en', 'fr', 'de', 'es', 'it', 'pl', 'pt', 'nl', 'sv', 'ru', 'ar', 'zh'],
+      nonExplicitSupportedLngs: true,
       fallbackLng: 'en',
       debug: import.meta.env.DEV,
       interpolation: {
@@ -70,9 +72,10 @@ export async function changeLanguage(lng: string): Promise<void> {
   window.location.reload(); // Simple reload to update all components for now
 }
 
-// Helper to get current language
+// Helper to get current language (normalized to short code)
 export function getCurrentLanguage(): string {
-  return i18next.language || 'en';
+  const lang = i18next.language || 'en';
+  return lang.split('-')[0]!;
 }
 
 export function isRTL(): boolean {

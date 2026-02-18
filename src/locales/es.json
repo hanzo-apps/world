@@ -39,9 +39,9 @@
       "conflictEvents": "eventos de conflicto"
     },
     "timeAgo": {
-      "m": "hace m",
-      "h": "hace h",
-      "d": "hace d"
+      "m": "{{count}}hace m",
+      "h": "{{count}}hace h",
+      "d": "{{count}}hace d"
     },
     "infra": {
       "pipeline": "Oleoductos",
@@ -88,7 +88,7 @@
     "asia": "Asia-Pacífico",
     "energy": "Energía y Recursos",
     "gov": "Gobierno",
-    "thinktanks": "Think Tanks",
+    "thinktanks": "Centros de Estudio",
     "polymarket": "Predicciones",
     "commodities": "Materias primas",
     "economic": "Indicadores económicos",
@@ -444,7 +444,7 @@
         "techHQ": "Sede Tech",
         "accelerator": "Aceleradora",
         "cloudRegion": "Región Cloud",
-        "datacenter": "Datacenter",
+        "datacenter": "Centro de datos",
         "stockExchange": "Bolsa de valores",
         "financialCenter": "Centro financiero",
         "centralBank": "Banco central",
@@ -597,8 +597,8 @@
       "precip": "Precipicio",
       "severityLabel": "Gravedad",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
+        "extreme": "EXTREMO",
+        "moderate": "MODERADO",
         "normal": "NORMAL"
       },
       "infoTooltip": "<strong>Monitor de anomalías climáticas</strong> Desviaciones de temperatura y precipitación con respecto a la línea base de 30 días. Datos de Open-Meteo (reanálisis ERA5).<ul><li><strong>Extremo</strong>: >5°C o >80mm/día de desviación</li><li><strong>Moderado</strong>: >3°C o >40mm/día de desviación</li></ul>Monitorea 15 zonas propensas a conflictos/desastres."
@@ -619,9 +619,14 @@
     "relatedAssets": {
       "pipeline": "Ducto",
       "cable": "Cable",
-      "datacenter": "Datacenter",
+      "datacenter": "Centro de datos",
       "base": "Base",
       "nuclear": "Nuclear"
+    },
+    "community": {
+      "joinDiscussion": "Únete a la discusión",
+      "openDiscussion": "Abrir discusión",
+      "dontShowAgain": "No mostrar de nuevo"
     },
     "threatLabels": {
       "critical": "CRÍT",
@@ -636,12 +641,12 @@
       "source": "Fuente:",
       "defcon": "DEFCON {{level}}",
       "updated": "Actualizado {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
+      "statusClosed": "CERRADO",
+      "statusSpike": "PICO",
+      "statusHigh": "ALTO",
+      "statusElevated": "ELEVADO",
       "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusQuiet": "TRANQUILO",
       "justNow": "En este momento",
       "minutesAgo": "Hace {{m}}m",
       "hoursAgo": "Hace {{h}}h",
@@ -656,7 +661,7 @@
     "playback": {
       "toggleMode": "Alternar modo de reproducción",
       "historicalPlayback": "Reproducción histórica",
-      "live": "LIVE"
+      "live": "EN VIVO"
     },
     "stablecoins": {
       "pegHealth": "Salud del anclaje",
@@ -757,10 +762,10 @@
       "more": "+{{count}} más hallazgos",
       "all": "Todos los hallazgos de inteligencia ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "CRÍTICO",
+        "high": "ALTO",
+        "medium": "MEDIO",
+        "low": "BAJO"
       },
       "insights": {
         "criticalDestabilization": "Desestabilización crítica: atención inmediata",
@@ -801,8 +806,8 @@
       "hosts": "Anfitriones",
       "badges": {
         "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "high": "ALTO",
+        "elevated": "ELEVADO"
       },
       "country": "País",
       "status": "Estado",
@@ -1080,10 +1085,10 @@
     "viewUSGS": "Ver en USGS",
     "expired": "Expirado",
     "timeAgo": {
-      "s": "s atrás",
-      "m": "m atrás",
-      "h": "h atrás",
-      "d": "d atrás"
+      "s": "{{count}}s atrás",
+      "m": "{{count}}m atrás",
+      "h": "{{count}}h atrás",
+      "d": "{{count}}d atrás"
     },
     "updated": "Actualizado",
     "cableAdvisory": {

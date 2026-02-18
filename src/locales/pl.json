@@ -39,9 +39,9 @@
       "conflictEvents": "wydarzenia konfliktowe"
     },
     "timeAgo": {
-      "m": "m temu",
-      "h": "h temu",
-      "d": "d temu"
+      "m": "{{count}}m temu",
+      "h": "{{count}}h temu",
+      "d": "{{count}}d temu"
     },
     "infra": {
       "pipeline": "Rurociągi",
@@ -593,13 +593,13 @@
     "climate": {
       "noAnomalies": "Nie wykryto żadnych znaczących anomalii",
       "zone": "Strefa",
-      "temp": "Temp",
+      "temp": "Temp.",
       "precip": "Opad",
       "severityLabel": "Powaga",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
-        "normal": "NORMAL"
+        "extreme": "EKSTREMALNY",
+        "moderate": "UMIARKOWANY",
+        "normal": "NORMALNY"
       },
       "infoTooltip": "<strong>Monitor anomalii klimatycznych</strong> Odchylenia temperatury i opadów od 30-dniowej wartości bazowej. Dane z Open-Meteo (ponowna analiza ERA5).<ul><li><strong>Ekstremalne</strong>: >5°C lub >80mm/dzień odchylenie</li><li><strong>Umiarkowane</strong>: >3°C lub >40mm/dzień odchylenie</li></ul>Monitoruje 15 stref konfliktów/podatnych na katastrofy."
     },
@@ -623,6 +623,11 @@
       "base": "Baza",
       "nuclear": "Obiekt jądrowy"
     },
+    "community": {
+      "joinDiscussion": "Dołącz do dyskusji",
+      "openDiscussion": "Otwórz dyskusję",
+      "dontShowAgain": "Nie pokazuj ponownie"
+    },
     "threatLabels": {
       "critical": "KRYT",
       "high": "WYS",
@@ -636,12 +641,12 @@
       "source": "Źródło:",
       "defcon": "DEFCON {{level}}",
       "updated": "Zaktualizowano {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
-      "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusClosed": "ZAMKNIĘTE",
+      "statusSpike": "SKOK",
+      "statusHigh": "WYSOKI",
+      "statusElevated": "PODWYŻSZONY",
+      "statusNominal": "NOMINALNY",
+      "statusQuiet": "SPOKOJNY",
       "justNow": "właśnie",
       "minutesAgo": "{{m}}m temu",
       "hoursAgo": "{{h}}h temu",
@@ -656,7 +661,7 @@
     "playback": {
       "toggleMode": "Przełącz tryb odtwarzania",
       "historicalPlayback": "Odtwarzanie historyczne",
-      "live": "LIVE"
+      "live": "NA ŻYWO"
     },
     "stablecoins": {
       "pegHealth": "Stabilność powiązania",
@@ -757,10 +762,10 @@
       "more": "+{{count}} więcej ustaleń",
       "all": "Wszystkie ustalenia wywiadowcze ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "KRYTYCZNY",
+        "high": "WYSOKI",
+        "medium": "ŚREDNI",
+        "low": "NISKI"
       },
       "insights": {
         "criticalDestabilization": "Krytyczna destabilizacja – natychmiastowa uwaga",
@@ -800,9 +805,9 @@
       "origins": "Początki",
       "hosts": "Zastępy niebieskie",
       "badges": {
-        "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "crisis": "KRYZYS",
+        "high": "WYSOKI",
+        "elevated": "PODWYŻSZONY"
       },
       "country": "Kraj",
       "status": "Status",
@@ -1080,10 +1085,10 @@
     "viewUSGS": "Zobacz na USGS",
     "expired": "Wygasły",
     "timeAgo": {
-      "s": "s temu",
-      "m": "m temu",
-      "h": "h temu",
-      "d": "d temu"
+      "s": "{{count}}s temu",
+      "m": "{{count}}m temu",
+      "h": "{{count}}h temu",
+      "d": "{{count}}d temu"
     },
     "updated": "Zaktualizowano",
     "cableAdvisory": {
@@ -1400,7 +1405,7 @@
     "cascadeAlert": "Alert kaskady infrastruktury",
     "infraAlert": "Alert infrastruktury: {{name}}",
     "countriesAffected": "{{count}} krajów dotkniętych, największy wpływ: {{impact}}",
-    "alert": "Alert: {{location}}",
+    "alert": "Alarm: {{location}}",
     "multipleRegions": "Wiele regionów",
     "trending": "\"{{term}}\" w trendach — {{count}} wzmianek w {{hours}}h",
     "eventsDetected": "{{count}} zdarzeń wykrytych w regionie ({{lat}}°, {{lon}}°)"

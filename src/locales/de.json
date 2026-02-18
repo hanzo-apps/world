@@ -39,9 +39,9 @@
       "conflictEvents": "Konfliktereignisse"
     },
     "timeAgo": {
-      "m": "vor m",
-      "h": "vor h",
-      "d": "vor d"
+      "m": "{{count}}vor m",
+      "h": "{{count}}vor h",
+      "d": "{{count}}vor d"
     },
     "infra": {
       "pipeline": "Pipelines",
@@ -107,7 +107,7 @@
     "displacement": "UNHCR Vertreibung",
     "climate": "Klima-Anomalien",
     "populationExposure": "Bevölkerungsexposition",
-    "startups": "Startups & VC",
+    "startups": "Startups & Risikokapital",
     "vcblogs": "VC-Einblicke und Essays",
     "regionalStartups": "Globale Startup-Nachrichten",
     "unicorns": "Einhorn-Tracker",
@@ -597,8 +597,8 @@
       "precip": "Niederschlag",
       "severityLabel": "Schwere",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
+        "extreme": "EXTREM",
+        "moderate": "MÄSSIG",
         "normal": "NORMAL"
       },
       "infoTooltip": "<strong>Klimanomalie-Monitor</strong> Temperatur- und Niederschlagsabweichungen von der 30-Tage-Basislinie. Daten von Open-Meteo (ERA5-Reanalyse).<ul><li><strong>Extrem</strong>: >5°C oder >80mm/Tag Abweichung</li><li><strong>Moderat</strong>: >3°C oder >40mm/Tag Abweichung</li></ul>Überwacht 15 konflikt-/katastrophengefährdete Zonen."
@@ -623,6 +623,11 @@
       "base": "Basis",
       "nuclear": "Nuklear"
     },
+    "community": {
+      "joinDiscussion": "An der Diskussion teilnehmen",
+      "openDiscussion": "Diskussion öffnen",
+      "dontShowAgain": "Nicht mehr anzeigen"
+    },
     "threatLabels": {
       "critical": "KRIT",
       "high": "HOCH",
@@ -631,17 +636,17 @@
       "info": "INFO"
     },
     "pizzint": {
-      "title": "Pentagon Pizza Index",
+      "title": "Pentagon-Pizza-Index",
       "tensionsTitle": "Geopolitische Spannungen",
       "source": "Quelle:",
       "defcon": "DEFCON {{level}}",
       "updated": "Aktualisiert {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
-      "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusClosed": "GESCHLOSSEN",
+      "statusSpike": "ANSTIEG",
+      "statusHigh": "HOCH",
+      "statusElevated": "ERHÖHT",
+      "statusNominal": "NORMAL",
+      "statusQuiet": "RUHIG",
       "justNow": "soeben",
       "minutesAgo": "Vor {{m}}m",
       "hoursAgo": "Vor {{h}}h",
@@ -757,10 +762,10 @@
       "more": "+{{count}} weitere Erkenntnisse",
       "all": "Alle Geheimdienstergebnisse ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "KRITISCH",
+        "high": "HOCH",
+        "medium": "MITTEL",
+        "low": "NIEDRIG"
       },
       "insights": {
         "criticalDestabilization": "Kritische Destabilisierung – sofortige Aufmerksamkeit",
@@ -800,9 +805,9 @@
       "origins": "Ursprünge",
       "hosts": "Gastgeber",
       "badges": {
-        "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "crisis": "KRISE",
+        "high": "HOCH",
+        "elevated": "ERHÖHT"
       },
       "country": "Land",
       "status": "Status",
@@ -955,7 +960,7 @@
         "centralBank": "ZENTRALBANK",
         "financialHub": "FINANZZENTRUM"
       },
-      "closed": "CLOSED"
+      "closed": "GESCHLOSSEN"
     },
     "irradiator": {
       "subtitle": "Industrielle Gamma-Bestrahlungsanlage",
@@ -1080,15 +1085,15 @@
     "viewUSGS": "Auf USGS ansehen",
     "expired": "Abgelaufen",
     "timeAgo": {
-      "s": "s her",
-      "m": "m her",
-      "h": "h her",
-      "d": "d her"
+      "s": "{{count}}s her",
+      "m": "{{count}}m her",
+      "h": "{{count}}h her",
+      "d": "{{count}}d her"
     },
     "updated": "Aktualisiert",
     "cableAdvisory": {
-      "reported": "REPORTED",
-      "impact": "IMPACT",
+      "reported": "GEMELDET",
+      "impact": "AUSWIRKUNG",
       "eta": "ETA"
     },
     "outage": {
@@ -1098,21 +1103,21 @@
         "partial": "TEILWEISE STÖRUNG",
         "disruption": "STÖRUNG"
       },
-      "reported": "REPORTED",
+      "reported": "GEMELDET",
       "categories": "KATEGORIEN",
       "readReport": "Vollständigen Bericht lesen"
     },
     "datacenter": {
       "status": {
         "existing": "BETRIEBSFÄHIG",
-        "planned": "PLANNED",
+        "planned": "GEPLANT",
         "decommissioned": "STILLGESTELLT",
-        "unknown": "UNKNOWN"
+        "unknown": "UNBEKANNT"
       },
       "gpuChipCount": "GPU-/CHIP-ANZAHL",
       "chipType": "CHIP-TYP",
-      "power": "POWER",
-      "sector": "SECTOR",
+      "power": "LEISTUNG",
+      "sector": "SEKTOR",
       "attribution": "Daten: Epoch AI GPU-Cluster",
       "chips": "Chips",
       "cluster": {
@@ -1120,7 +1125,7 @@
         "totalChips": "GESAMT-CHIPS",
         "totalPower": "GESAMTKRAFT",
         "operational": "BETRIEBSFÄHIG",
-        "planned": "PLANNED",
+        "planned": "GEPLANT",
         "moreDataCenters": "+ {{count}} mehr Rechenzentren",
         "sampledSites": "Zeigt eine Beispielliste von {{count}}-Sites."
       }
@@ -1129,20 +1134,20 @@
       "tiers": {
         "mega": "MEGA-HUB",
         "major": "WICHTIGER HUB",
-        "emerging": "EMERGING",
+        "emerging": "AUFSTREBEND",
         "hub": "HUB"
       },
-      "unicorns": "UNICORNS"
+      "unicorns": "EINHÖRNER"
     },
     "cloudRegion": {
-      "provider": "PROVIDER",
+      "provider": "ANBIETER",
       "availabilityZones": "VERFÜGBARKEITSZONEN"
     },
     "techHQ": {
       "types": {
         "faang": "GROSSE TECHNIK",
-        "unicorn": "UNICORN",
-        "public": "PUBLIC",
+        "unicorn": "EINHORN",
+        "public": "BÖRSENNOTIERT",
         "tech": "TECH"
       },
       "marketCap": "MARKTKAP",
@@ -1154,16 +1159,16 @@
         "incubator": "INKUBATOR",
         "studio": "STARTUP-STUDIO"
       },
-      "founded": "FOUNDED",
+      "founded": "GEGRÜNDET",
       "notableAlumni": "BEMERKENSWERTE ALUMNI"
     },
     "techEvent": {
       "days": {
-        "today": "TODAY",
-        "tomorrow": "TOMORROW",
+        "today": "HEUTE",
+        "tomorrow": "MORGEN",
         "inDays": "IN {{count}} TAGEN"
       },
-      "date": "DATE",
+      "date": "DATUM",
       "moreInformation": "Weitere Informationen"
     },
     "techHQCluster": {
@@ -1192,10 +1197,10 @@
         "specialOps": "Spezialoperationen",
         "vip": "VIP-Transport"
       },
-      "altitude": "ALTITUDE",
+      "altitude": "HÖHE",
       "ground": "Boden",
-      "speed": "SPEED",
-      "heading": "HEADING",
+      "speed": "GESCHW.",
+      "heading": "KURS",
       "hexCode": "HEX-CODE",
       "squawk": "SQUAWK",
       "attribution": "Quelle: OpenSky Network"
@@ -1203,8 +1208,8 @@
     "militaryVessel": {
       "aisDark": "AIS DUNKEL",
       "vessel": "Schiff",
-      "speed": "SPEED",
-      "heading": "HEADING",
+      "speed": "GESCHW.",
+      "heading": "KURS",
       "mmsi": "MMSI",
       "hull": "RUMPF #",
       "darkDescription": "⚠ Das Schiff ist dunkel geworden – AIS-Signal verloren. Kann auf sensible Vorgänge hinweisen."
@@ -1218,9 +1223,9 @@
       },
       "moreAircraft": "+{{count}} mehr Flugzeuge",
       "aircraftCount": "{{count}} FLUGZEUG",
-      "aircraft": "AIRCRAFT",
-      "activity": "ACTIVITY",
-      "primary": "PRIMARY",
+      "aircraft": "FLUGZEUGE",
+      "activity": "AKTIVITÄT",
+      "primary": "PRIMÄR",
       "trackedAircraft": "KETTENFLUGZEUG",
       "vesselActivity": {
         "exercise": "Marineübung",
@@ -1231,13 +1236,13 @@
       },
       "moreVessels": "+{{count}} weitere Schiffe",
       "vesselsCount": "{{count}} SCHIFFE",
-      "vessels": "VESSELS",
+      "vessels": "SCHIFFE",
       "trackedVessels": "RAUPENSCHIFFE"
     },
     "naturalEvent": {
-      "closed": "CLOSED",
-      "active": "ACTIVE",
-      "reported": "REPORTED",
+      "closed": "GESCHLOSSEN",
+      "active": "AKTIV",
+      "reported": "GEMELDET",
       "viewOnSource": "Auf {{source}} ansehen",
       "attribution": "Daten: NASA EONET"
     },
@@ -1247,16 +1252,16 @@
         "oil": "ÖLTERMINAL",
         "lng": "LNG-TERMINAL",
         "naval": "MARINEHAFEN",
-        "mixed": "MIXED",
-        "bulk": "BULK"
+        "mixed": "GEMISCHT",
+        "bulk": "MASSENGUT"
       },
       "worldRank": "WELTRANG"
     },
     "spaceport": {
       "status": {
-        "active": "ACTIVE",
+        "active": "AKTIV",
         "construction": "KONSTRUKTION",
-        "inactive": "INACTIVE"
+        "inactive": "INAKTIV"
       },
       "launchActivity": "AKTIVITÄT STARTEN",
       "description": "Strategische Weltraumstartanlage. Startfrequenz und Orbit-Zugangsmöglichkeiten sind wichtige geopolitische Indikatoren."
@@ -1277,7 +1282,7 @@
       "specialties": "SPEZIALITÄTEN"
     },
     "centralBank": {
-      "currency": "CURRENCY"
+      "currency": "WÄHRUNG"
     },
     "commodityHub": {
       "commodities": "WAREN"

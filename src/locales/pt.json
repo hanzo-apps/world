@@ -479,8 +479,8 @@
       "precip": "Precipício",
       "severityLabel": "Gravidade",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
+        "extreme": "EXTREMO",
+        "moderate": "MODERADO",
         "normal": "NORMAL"
       },
       "infoTooltip": "<strong>Climate Anomaly Monitor</strong> Temperature and precipitation deviations from 30-day baseline. Dados do Open-Meteo (reanálise ERA5).<ul><li><strong>Extremo</strong>: >5°C ou >80mm/dia ​​de desvio</li><li><strong>Moderado</strong>: >3°C ou >40mm/dia ​​de desvio</li></ul>Monitora 15 zonas propensas a conflitos/desastres."
@@ -505,6 +505,11 @@
       "base": "Base",
       "nuclear": "Nuclear"
     },
+    "community": {
+      "joinDiscussion": "Junte-se à discussão",
+      "openDiscussion": "Abrir discussão",
+      "dontShowAgain": "Não mostrar novamente"
+    },
     "threatLabels": {
       "critical": "CRÍT",
       "high": "ALTO",
@@ -518,12 +523,12 @@
       "source": "Fonte:",
       "defcon": "DEFCON{{level}}",
       "updated": "Atualizado {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
+      "statusClosed": "FECHADO",
+      "statusSpike": "PICO",
+      "statusHigh": "ALTO",
+      "statusElevated": "ELEVADO",
       "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusQuiet": "CALMO",
       "justNow": "agora mesmo",
       "minutesAgo": "{{m}}m atrás",
       "hoursAgo": "{{h}}h atrás",
@@ -634,10 +639,10 @@
       "more": "+{{count}} mais descobertas",
       "all": "Todas as descobertas de inteligência ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "CRÍTICO",
+        "high": "ALTO",
+        "medium": "MÉDIO",
+        "low": "BAIXO"
       },
       "insights": {
         "criticalDestabilization": "Desestabilização crítica – atenção imediata",
@@ -690,9 +695,9 @@
       "origins": "Origens",
       "hosts": "Anfitriões",
       "badges": {
-        "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "crisis": "CRISE",
+        "high": "ALTO",
+        "elevated": "ELEVADO"
       },
       "country": "País",
       "status": "Status",
@@ -1011,14 +1016,14 @@
     "viewUSGS": "Ver no USGS",
     "expired": "Expirado",
     "timeAgo": {
-      "s": "s atrás",
-      "m": "m atrás",
-      "h": "h atrás",
-      "d": "d atrás"
+      "s": "{{count}}s atrás",
+      "m": "{{count}}m atrás",
+      "h": "{{count}}h atrás",
+      "d": "{{count}}d atrás"
     },
     "updated": "Atualizado",
     "cableAdvisory": {
-      "reported": "REPORTED",
+      "reported": "REPORTADO",
       "impact": "IMPACTO",
       "eta": "HEC"
     },
@@ -1060,7 +1065,7 @@
       "tiers": {
         "mega": "MEGA CENTRO",
         "major": "CENTRO PRINCIPAL",
-        "emerging": "EMERGING",
+        "emerging": "EMERGENTE",
         "hub": "EIXO"
       },
       "unicorns": "UNICÓRNIOS"
@@ -1416,15 +1421,15 @@
     "ago": "{{time}} atrás"
   },
   "header": {
-    "world": "WORLD",
+    "world": "MUNDO",
     "tech": "TECH",
     "viewOnGitHub": "Ver no GitHub",
-    "live": "LIVE",
+    "live": "AO VIVO",
     "search": "Procurar",
     "copyLink": "Copiar link",
     "fullscreen": "Tela cheia",
-    "settings": "PANELS",
-    "sources": "SOURCES",
+    "settings": "PAINÉIS",
+    "sources": "FONTES",
     "pinMap": "Fixar mapa no topo",
     "filterSources": "Filtrar fontes...",
     "sourcesEnabled": "{{enabled}}/{{total}} ativado",
