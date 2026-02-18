@@ -31,8 +31,9 @@ const resources = {
 const RTL_LANGUAGES = new Set(['ar']);
 
 function applyDocumentDirection(lang: string): void {
-  document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
-  if (RTL_LANGUAGES.has(lang)) {
+  const base = lang.split('-')[0] || lang;
+  document.documentElement.setAttribute('lang', base === 'zh' ? 'zh-CN' : base);
+  if (RTL_LANGUAGES.has(base)) {
     document.documentElement.setAttribute('dir', 'rtl');
   } else {
     document.documentElement.removeAttribute('dir');
