@@ -18,13 +18,13 @@ export interface SummarizationResult {
 
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
-async function tryGroq(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
+async function tryGroq(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
   if (!isFeatureAvailable('aiGroq')) return null;
   try {
     const response = await fetch('/api/groq-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
     });
 
     if (!response.ok) {
@@ -47,13 +47,13 @@ async function tryGroq(headlines: string[], geoContext?: string): Promise<Summar
   }
 }
 
-async function tryOpenRouter(headlines: string[], geoContext?: string): Promise<SummarizationResult | null> {
+async function tryOpenRouter(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
   if (!isFeatureAvailable('aiOpenRouter')) return null;
   try {
     const response = await fetch('/api/openrouter-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
     });
 
     if (!response.ok) {
@@ -112,7 +112,8 @@ async function tryBrowserT5(headlines: string[]): Promise<SummarizationResult | 
 export async function generateSummary(
   headlines: string[],
   onProgress?: ProgressCallback,
-  geoContext?: string
+  geoContext?: string,
+  lang: string = 'en'
 ): Promise<SummarizationResult | null> {
   if (!headlines || headlines.length < 2) {
     return null;
@@ -122,14 +123,14 @@ export async function generateSummary(
 
   // Step 1: Try Groq (fast, 14.4K/day with 8b-instant + Redis cache)
   onProgress?.(1, totalSteps, 'Connecting to Groq AI...');
-  const groqResult = await tryGroq(headlines, geoContext);
+  const groqResult = await tryGroq(headlines, geoContext, lang);
   if (groqResult) {
     return groqResult;
   }
 
   // Step 2: Try OpenRouter (fallback, 50/day + Redis cache)
   onProgress?.(2, totalSteps, 'Trying OpenRouter...');
-  const openRouterResult = await tryOpenRouter(headlines, geoContext);
+  const openRouterResult = await tryOpenRouter(headlines, geoContext, lang);
   if (openRouterResult) {
     return openRouterResult;
   }
@@ -145,3 +146,64 @@ export async function generateSummary(
   return null;
 }
 
+
+/**
+ * Translate text using the fallback chain
+ * @param text Text to translate
+ * @param targetLang Target language code (e.g., 'fr', 'es')
+ */
+export async function translateText(
+  text: string,
+  targetLang: string,
+  onProgress?: ProgressCallback
+): Promise<string | null> {
+  if (!text) return null;
+
+  // Step 1: Try Groq
+  if (isFeatureAvailable('aiGroq')) {
+    onProgress?.(1, 2, 'Translating with Groq...');
+    try {
+      const response = await fetch('/api/groq-summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headlines: [text],
+          mode: 'translate',
+          variant: targetLang
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.summary;
+      }
+    } catch (e) {
+      console.warn('Groq translation failed', e);
+    }
+  }
+
+  // Step 2: Try OpenRouter
+  if (isFeatureAvailable('aiOpenRouter')) {
+    onProgress?.(2, 2, 'Translating with OpenRouter...');
+    try {
+      const response = await fetch('/api/openrouter-summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headlines: [text],
+          mode: 'translate',
+          variant: targetLang
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.summary;
+      }
+    } catch (e) {
+      console.warn('OpenRouter translation failed', e);
+    }
+  }
+
+  return null;
+}
