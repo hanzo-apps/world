@@ -23,9 +23,15 @@ function getCacheKey(headlines, mode, geoContext = '', variant = 'full', lang = 
   const sorted = headlines.slice(0, 8).sort().join('|');
   const geoHash = geoContext ? ':g' + hashString(geoContext).slice(0, 6) : '';
   const hash = hashString(`${mode}:${sorted}`);
-  const targetLangHash = (mode === 'translate' && variant) ? `:${variant}` : '';
-  const langHash = (mode !== 'translate' && lang && lang !== 'en') ? `:${lang}` : '';
-  return `summary:${CACHE_VERSION}:${hash}${targetLangHash}${langHash}${geoHash}`;
+  const normalizedVariant = typeof variant === 'string' && variant ? variant.toLowerCase() : 'full';
+  const normalizedLang = typeof lang === 'string' && lang ? lang.toLowerCase() : 'en';
+
+  if (mode === 'translate') {
+    const targetLang = normalizedVariant || normalizedLang;
+    return `summary:${CACHE_VERSION}:${mode}:${targetLang}:${hash}${geoHash}`;
+  }
+
+  return `summary:${CACHE_VERSION}:${mode}:${normalizedVariant}:${normalizedLang}:${hash}${geoHash}`;
 }
 
 // Deduplicate similar headlines (same story from different sources)
