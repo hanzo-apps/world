@@ -71,19 +71,13 @@ export class LiveWebcamsPanel extends Panel {
     return WEBCAM_FEEDS.filter(f => f.region === this.regionFilter);
   }
 
+  private static readonly ALL_GRID_IDS = ['jerusalem', 'tehran', 'kyiv', 'washington'];
+
   private get gridFeeds(): WebcamFeed[] {
     if (this.regionFilter === 'all') {
-      // Pick first feed from each region for a diverse grid
-      const seen = new Set<WebcamRegion>();
-      const picks: WebcamFeed[] = [];
-      for (const feed of WEBCAM_FEEDS) {
-        if (!seen.has(feed.region)) {
-          seen.add(feed.region);
-          picks.push(feed);
-          if (picks.length >= MAX_GRID_CELLS) break;
-        }
-      }
-      return picks;
+      return LiveWebcamsPanel.ALL_GRID_IDS
+        .map(id => WEBCAM_FEEDS.find(f => f.id === id)!)
+        .filter(Boolean);
     }
     return this.filteredFeeds.slice(0, MAX_GRID_CELLS);
   }
