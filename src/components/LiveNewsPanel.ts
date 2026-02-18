@@ -644,9 +644,9 @@ export class LiveNewsPanel extends Panel {
     }
 
     if (this.isMuted) {
-      this.player.mute();
+      this.player.mute?.();
     } else {
-      this.player.unMute();
+      this.player.unMute?.();
     }
 
     if (this.isPlaying) {
@@ -656,11 +656,11 @@ export class LiveNewsPanel extends Panel {
         this.player.pauseVideo();
         setTimeout(() => {
           if (this.player && this.isPlaying) {
-            this.player.mute();
+            this.player.mute?.();
             this.player.playVideo();
             // Restore mute state after play starts
             if (!this.isMuted) {
-              setTimeout(() => { if (this.player) this.player.unMute(); }, 500);
+              setTimeout(() => { this.player?.unMute?.(); }, 500);
             }
           }
         }, 800);

@@ -37,6 +37,7 @@ Sentry.init({
     /Fullscreen request denied/,
     /requestFullscreen/,
     /vc_text_indicators_context/,
+    /Program failed to link/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
