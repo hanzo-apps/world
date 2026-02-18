@@ -1548,7 +1548,7 @@ canvas,
   align-items: center;
   gap: 4px;
   border-color: var(--text-dim);
-  margin-right: 4px;
+  margin-inline-end: 4px;
 }
 
 .webcam-placeholder {
