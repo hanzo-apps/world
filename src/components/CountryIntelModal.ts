@@ -135,7 +135,7 @@ export class CountryIntelModal {
       <span class="country-flag">${flag}</span>
       <span class="country-name">${escapeHtml(country)}</span>
       ${score ? this.levelBadge(score.level) : ''}
-      <button class="country-intel-share-btn" title="${t('modals.story.shareTitle') || 'Share story'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+      <button class="country-intel-share-btn" title="${t('modals.story.shareTitle')}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
     `;
 
     if (score) {
@@ -196,7 +196,7 @@ export class CountryIntelModal {
     if (!this.isVisible()) return;
 
     if (data.error || data.skipped || !data.brief) {
-      const msg = data.error || data.reason || t('modals.countryIntel.unavailable') || 'AI brief unavailable — configure GROQ_API_KEY in Settings.';
+      const msg = data.error || data.reason || t('modals.countryIntel.unavailable');
       const briefSection = this.contentEl.querySelector('.intel-brief-section');
       if (briefSection) {
         briefSection.innerHTML = `<div class="intel-error">${escapeHtml(msg)}</div>`;
