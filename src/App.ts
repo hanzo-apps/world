@@ -356,7 +356,7 @@ export class App {
 
     this.setupRefreshIntervals();
     this.setupSnapshotSaving();
-    cleanOldSnapshots();
+    cleanOldSnapshots().catch(() => {});
 
     // Handle deep links for story sharing
     this.handleDeepLinks();
