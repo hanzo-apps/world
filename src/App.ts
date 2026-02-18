@@ -12,7 +12,7 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
-import { fetchCategoryFeeds, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
+import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
@@ -80,6 +80,7 @@ import {
   ClimateAnomalyPanel,
   PopulationExposurePanel,
   InvestmentsPanel,
+  LanguageSelector,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { collectStoryData } from '@/services/story-data';
@@ -98,7 +99,7 @@ import { isDesktopRuntime } from '@/services/runtime';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
-import { initI18n, t, changeLanguage, getCurrentLanguage, LANGUAGES } from '@/services/i18n';
+import { initI18n, t, changeLanguage } from '@/services/i18n';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
@@ -142,6 +143,7 @@ export class App {
   private playbackControl: PlaybackControl | null = null;
   private statusPanel: StatusPanel | null = null;
   private exportPanel: ExportPanel | null = null;
+  private languageSelector: LanguageSelector | null = null;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
@@ -328,6 +330,7 @@ export class App {
     this.setupStatusPanel();
     this.setupPizzIntIndicator();
     this.setupExportPanel();
+    this.setupLanguageSelector();
     this.setupSearchModal();
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
@@ -578,6 +581,19 @@ export class App {
     const headerRight = this.container.querySelector('.header-right');
     if (headerRight) {
       headerRight.insertBefore(this.exportPanel.getElement(), headerRight.firstChild);
+    }
+  }
+
+  private setupLanguageSelector(): void {
+    this.languageSelector = new LanguageSelector();
+    const headerRight = this.container.querySelector('.header-right');
+    const searchBtn = this.container.querySelector('#searchBtn');
+
+    if (headerRight && searchBtn) {
+      // Insert before search button or at the beginning if search button not found
+      headerRight.insertBefore(this.languageSelector.getElement(), searchBtn);
+    } else if (headerRight) {
+      headerRight.insertBefore(this.languageSelector.getElement(), headerRight.firstChild);
     }
   }
 
@@ -1144,14 +1160,14 @@ export class App {
         hint: t('modals.search.hintTech'),
       }
       : SITE_VARIANT === 'finance'
-      ? {
+        ? {
           placeholder: t('modals.search.placeholderFinance'),
           hint: t('modals.search.hintFinance'),
         }
-      : {
-        placeholder: t('modals.search.placeholder'),
-        hint: t('modals.search.hint'),
-      };
+        : {
+          placeholder: t('modals.search.placeholder'),
+          hint: t('modals.search.hint'),
+        };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
     if (SITE_VARIANT === 'tech') {
@@ -1663,11 +1679,6 @@ export class App {
   }
 
   private renderLayout(): void {
-    const currentLang = getCurrentLanguage();
-    const langOptions = LANGUAGES.map(l =>
-      `<option value="${l.code}" ${l.code === currentLang ? 'selected' : ''}>${l.flag} ${l.code.toUpperCase()}</option>`
-    ).join('');
-
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
@@ -1725,15 +1736,12 @@ export class App {
           </div>
         </div>
         <div class="header-right">
-          <select id="langSelect" class="lang-select">
-            ${langOptions}
-          </select>
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           <button class="theme-toggle-btn" id="headerThemeToggle" title="${t('header.toggleTheme')}">
             ${getCurrentTheme() === 'dark'
-              ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
-              : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
           </button>
           ${this.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
           <button class="settings-btn" id="settingsBtn">⚙ ${t('header.settings')}</button>
@@ -3143,6 +3151,15 @@ export class App {
           clearTimeout(renderTimeout);
           renderTimeout = null;
           pendingItems = null;
+        }
+
+        if (items.length === 0) {
+          const failures = getFeedFailures();
+          const failedFeeds = enabledFeeds.filter(f => failures.has(f.name));
+          if (failedFeeds.length > 0) {
+            const names = failedFeeds.map(f => f.name).join(', ');
+            panel.showError(`${t('common.noNewsAvailable')} (${names} failed)`);
+          }
         }
 
         const baseline = await updateBaseline(`news:${category}`, items.length);
