@@ -411,7 +411,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     {
       name: 'Le Monde',
       url: {
-        en: rss('https://www.lemonde.fr/en/rss/full.xml'),
+        en: rss('https://www.lemonde.fr/en/rss/une.xml'),
         fr: rss('https://www.lemonde.fr/rss/une.xml')
       }
     },
