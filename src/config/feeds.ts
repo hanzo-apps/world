@@ -125,6 +125,7 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Taiwan Tech News': 3,
   'GloNewswire (Taiwan)': 4,
   // LATAM
+  'La Silla Vacía': 3,
   'LATAM Tech News': 3,
   'Startups.co (LATAM)': 3,
   'Contxto (LATAM)': 3,
@@ -453,6 +454,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'BBC Latin America', url: rss('https://feeds.bbci.co.uk/news/world/latin_america/rss.xml') },
     { name: 'Reuters LatAm', url: rss('https://news.google.com/rss/search?q=site:reuters.com+(Brazil+OR+Mexico+OR+Argentina)+when:3d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Guardian Americas', url: rss('https://www.theguardian.com/world/americas/rss') },
+    { name: 'La Silla Vacía', url: rss('https://www.lasillavacia.com/rss') },
   ],
   asia: [
     { name: 'Asia News', url: rss('https://news.google.com/rss/search?q=(China+OR+Japan+OR+Korea+OR+India+OR+ASEAN)+when:2d&hl=en-US&gl=US&ceid=US:en') },
