@@ -490,7 +490,7 @@ export class LiveNewsPanel extends Panel {
   private static loadYouTubeApi(): Promise<void> {
     if (LiveNewsPanel.apiPromise) return LiveNewsPanel.apiPromise;
 
-    LiveNewsPanel.apiPromise = new Promise((resolve, reject) => {
+    LiveNewsPanel.apiPromise = new Promise((resolve) => {
       if (window.YT?.Player) {
         resolve();
         return;
@@ -523,7 +523,10 @@ export class LiveNewsPanel extends Panel {
       script.src = 'https://www.youtube.com/iframe_api';
       script.async = true;
       script.dataset.youtubeIframeApi = 'true';
-      script.onerror = () => reject(new Error('Failed to load YouTube IFrame API'));
+      script.onerror = () => {
+        console.warn('[LiveNews] YouTube IFrame API failed to load (ad blocker or network issue)');
+        resolve();
+      };
       document.head.appendChild(script);
     });
 
@@ -548,7 +551,7 @@ export class LiveNewsPanel extends Panel {
     }
 
     await LiveNewsPanel.loadYouTubeApi();
-    if (this.player || !this.playerElement) return;
+    if (this.player || !this.playerElement || !window.YT?.Player) return;
 
     this.player = new window.YT!.Player(this.playerElement, {
       host: 'https://www.youtube-nocookie.com',
