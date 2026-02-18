@@ -1,7 +1,20 @@
 import './styles/main.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import * as Sentry from '@sentry/browser';
 import { inject } from '@vercel/analytics';
 import { App } from './App';
+
+// Initialize Sentry error tracking (early as possible)
+Sentry.init({
+  dsn: 'https://afc9a1c85c6ba49f8464a43f8de74ccd@o4509927897890816.ingest.us.sentry.io/4510906342113280',
+  release: `worldmonitor@${__APP_VERSION__}`,
+  environment: location.hostname === 'worldmonitor.app' ? 'production'
+    : location.hostname.includes('vercel.app') ? 'preview'
+    : 'development',
+  enabled: !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
+  sendDefaultPii: true,
+  tracesSampleRate: 0.1,
+});
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
