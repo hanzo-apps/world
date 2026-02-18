@@ -49,7 +49,7 @@ Sentry.init({
       if (frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''))) return null;
     }
     // Suppress maplibre internal null-access crashes (light, placement) only when stack is in map chunk
-    if (/this\.light is null|can't access property "type", \w+ is undefined|Cannot read properties of null \(reading '(id|type)'\)/.test(msg)) {
+    if (/this\.style\._layers|this\.light is null|can't access property "type", \w+ is undefined|Cannot read properties of null \(reading '(id|type)'\)/.test(msg)) {
       if (frames.some(f => /\/map-[A-Za-z0-9]+\.js/.test(f.filename ?? ''))) return null;
     }
     return event;
