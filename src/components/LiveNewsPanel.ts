@@ -657,7 +657,7 @@ export class LiveNewsPanel extends Panel {
         setTimeout(() => {
           if (this.player && this.isPlaying) {
             this.player.mute?.();
-            this.player.playVideo();
+            this.player.playVideo?.();
             // Restore mute state after play starts
             if (!this.isMuted) {
               setTimeout(() => { this.player?.unMute?.(); }, 500);
@@ -665,10 +665,10 @@ export class LiveNewsPanel extends Panel {
           }
         }, 800);
       } else {
-        this.player.playVideo();
+        this.player.playVideo?.();
       }
     } else {
-      this.player.pauseVideo();
+      this.player.pauseVideo?.();
     }
   }
 
