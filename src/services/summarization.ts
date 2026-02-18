@@ -6,6 +6,7 @@
 
 import { mlWorker } from './ml-worker';
 import { SITE_VARIANT } from '@/config';
+import { BETA_MODE } from '@/config/beta';
 import { isFeatureAvailable } from './runtime-config';
 
 export type SummarizationProvider = 'groq' | 'openrouter' | 'browser' | 'cache';
@@ -76,7 +77,7 @@ async function tryOpenRouter(headlines: string[], geoContext?: string): Promise<
   }
 }
 
-async function tryBrowserT5(headlines: string[]): Promise<SummarizationResult | null> {
+async function tryBrowserT5(headlines: string[], modelId?: string): Promise<SummarizationResult | null> {
   try {
     if (!mlWorker.isAvailable) {
       console.log('[Summarization] Browser ML not available');
@@ -86,7 +87,7 @@ async function tryBrowserT5(headlines: string[]): Promise<SummarizationResult | 
     const combinedText = headlines.slice(0, 6).map(h => h.slice(0, 80)).join('. ');
     const prompt = `Summarize the main themes from these news headlines in 2 sentences: ${combinedText}`;
 
-    const [summary] = await mlWorker.summarize([prompt]);
+    const [summary] = await mlWorker.summarize([prompt], modelId);
 
     if (!summary || summary.length < 20 || summary.toLowerCase().includes('summarize')) {
       return null;
@@ -115,6 +116,38 @@ export async function generateSummary(
   geoContext?: string
 ): Promise<SummarizationResult | null> {
   if (!headlines || headlines.length < 2) {
+    return null;
+  }
+
+  if (BETA_MODE) {
+    const totalSteps = 3;
+
+    // Beta: Browser T5-small first
+    onProgress?.(1, totalSteps, 'Loading local AI model (beta)...');
+    const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
+    if (browserResult) {
+      console.log('[BETA] Browser T5-small:', browserResult.summary);
+      // Fire-and-forget Groq for comparison logging
+      tryGroq(headlines, geoContext).then(r => {
+        if (r) console.log('[BETA] Groq:', r.summary);
+      }).catch(() => {});
+      return browserResult;
+    }
+
+    // Fallback to Groq if browser fails
+    onProgress?.(2, totalSteps, 'Falling back to Groq AI...');
+    const groqResult = await tryGroq(headlines, geoContext);
+    if (groqResult) {
+      console.log('[BETA] Groq (fallback):', groqResult.summary);
+      return groqResult;
+    }
+
+    // Fallback to OpenRouter if Groq also fails
+    onProgress?.(3, totalSteps, 'Trying OpenRouter...');
+    const openRouterResult = await tryOpenRouter(headlines, geoContext);
+    if (openRouterResult) return openRouterResult;
+
+    console.warn('[BETA] All providers failed');
     return null;
   }
 
