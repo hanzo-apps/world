@@ -6837,8 +6837,8 @@ a.prediction-link:hover {
    Mobile Touch Optimization
    ========================================================================== */
 
-/* Touch device detection - applies to both small screens and touch devices */
-@media (pointer: coarse), (max-width: 768px) {
+/* Narrow viewport only - touch-capable desktops (e.g. touch notebooks) keep desktop layout. Keep 768 in sync with MOBILE_BREAKPOINT_PX in src/utils/index.ts */
+@media (max-width: 768px) {
   /* Expand touch targets for all map markers using ::before pseudo-element */
   /* This creates an invisible touch area around small markers */
 
