@@ -14,6 +14,11 @@ Sentry.init({
   enabled: !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
   sendDefaultPii: true,
   tracesSampleRate: 0.1,
+  ignoreErrors: [
+    'Invalid WebGL2RenderingContext',
+    'WebGL context lost',
+    /ResizeObserver loop/,
+  ],
 });
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
