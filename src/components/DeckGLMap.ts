@@ -394,6 +394,16 @@ export class DeckGLMap {
         }
         : {}),
     });
+
+    const canvas = this.maplibreMap.getCanvas();
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('[DeckGLMap] WebGL context lost — will restore when browser recovers');
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.info('[DeckGLMap] WebGL context restored');
+      this.maplibreMap?.triggerRepaint();
+    });
   }
 
   private initDeck(): void {
