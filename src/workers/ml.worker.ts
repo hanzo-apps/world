@@ -104,6 +104,11 @@ async function loadModel(modelId: string): Promise<void> {
   const startTime = Date.now();
 
   const loadPromise = (async () => {
+    // Suppress verbose ONNX Runtime warnings (CleanUnusedInitializersAndNodeArgs)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ort = (globalThis as any).ort;
+    if (ort?.env) { try { ort.env.logLevel = 'error'; } catch { /* ignore */ } }
+
     const pipe = await pipeline(config.task, config.hfModel, {
       progress_callback: (progress: { status: string; progress?: number }) => {
         if (progress.status === 'progress' && progress.progress !== undefined) {
@@ -119,6 +124,9 @@ async function loadModel(modelId: string): Promise<void> {
     loadedPipelines.set(modelId, pipe);
     loadingPromises.delete(modelId);
     console.log(`[MLWorker] Model loaded in ${Date.now() - startTime}ms: ${modelId}`);
+
+    // Notify manager that model is now available (no id = unsolicited notification)
+    self.postMessage({ type: 'model-loaded', modelId });
   })();
 
   loadingPromises.set(modelId, loadPromise);

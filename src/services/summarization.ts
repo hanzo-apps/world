@@ -121,32 +121,58 @@ export async function generateSummary(
   }
 
   if (BETA_MODE) {
-    const totalSteps = 3;
+    const modelReady = mlWorker.isAvailable && mlWorker.isModelLoaded('summarization-beta');
 
-    // Beta: Browser T5-small first
-    onProgress?.(1, totalSteps, 'Loading local AI model (beta)...');
-    const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
-    if (browserResult) {
-      console.log('[BETA] Browser T5-small:', browserResult.summary);
-      // Fire-and-forget Groq for comparison logging
-      tryGroq(headlines, geoContext).then(r => {
-        if (r) console.log('[BETA] Groq:', r.summary);
-      }).catch(() => {});
-      return browserResult;
+    if (modelReady) {
+      const totalSteps = 3;
+      // Model already loaded — use browser T5-small first
+      onProgress?.(1, totalSteps, 'Running local AI model (beta)...');
+      const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
+      if (browserResult) {
+        console.log('[BETA] Browser T5-small:', browserResult.summary);
+        tryGroq(headlines, geoContext).then(r => {
+          if (r) console.log('[BETA] Groq comparison:', r.summary);
+        }).catch(() => {});
+        return browserResult;
+      }
+
+      // Warm model failed inference — cloud fallback
+      onProgress?.(2, totalSteps, 'Connecting to Groq AI...');
+      const groqResult = await tryGroq(headlines, geoContext);
+      if (groqResult) return groqResult;
+
+      onProgress?.(3, totalSteps, 'Trying OpenRouter...');
+      const openRouterResult = await tryOpenRouter(headlines, geoContext);
+      if (openRouterResult) return openRouterResult;
+    } else {
+      const totalSteps = 4;
+      console.log('[BETA] T5-small not loaded yet, using cloud providers first');
+      // Kick off model load in background for next time
+      if (mlWorker.isAvailable) {
+        mlWorker.loadModel('summarization-beta').catch(() => {});
+      }
+
+      // Cloud providers while model loads
+      onProgress?.(1, totalSteps, 'Connecting to Groq AI...');
+      const groqResult = await tryGroq(headlines, geoContext);
+      if (groqResult) {
+        console.log('[BETA] Groq:', groqResult.summary);
+        return groqResult;
+      }
+
+      onProgress?.(2, totalSteps, 'Trying OpenRouter...');
+      const openRouterResult = await tryOpenRouter(headlines, geoContext);
+      if (openRouterResult) return openRouterResult;
+
+      // Last resort: try browser T5 (may have finished loading by now)
+      if (mlWorker.isAvailable) {
+        onProgress?.(3, totalSteps, 'Waiting for local AI model...');
+        const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
+        if (browserResult) return browserResult;
+      }
+
+      onProgress?.(4, totalSteps, 'No providers available');
     }
-
-    // Fallback to Groq if browser fails
-    onProgress?.(2, totalSteps, 'Falling back to Groq AI...');
-    const groqResult = await tryGroq(headlines, geoContext);
-    if (groqResult) {
-      console.log('[BETA] Groq (fallback):', groqResult.summary);
-      return groqResult;
-    }
-
-    // Fallback to OpenRouter if Groq also fails
-    onProgress?.(3, totalSteps, 'Trying OpenRouter...');
-    const openRouterResult = await tryOpenRouter(headlines, geoContext);
-    if (openRouterResult) return openRouterResult;
 
     console.warn('[BETA] All providers failed');
     return null;
