@@ -1487,6 +1487,8 @@
     "new": "NEW",
     "live": "LIVE",
     "cached": "CACHED",
-    "unavailable": "UNAVAILABLE"
+    "unavailable": "UNAVAILABLE",
+    "close": "Close",
+    "currentVariant": "(current)"
   }
 }
