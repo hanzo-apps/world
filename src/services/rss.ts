@@ -5,6 +5,7 @@ import { classifyByKeyword, classifyWithAI } from './threat-classifier';
 import { inferGeoHubsFromTitle } from './geo-hub-index';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { ingestHeadlines } from './trending-keywords';
+import { getCurrentLanguage } from './i18n';
 
 // Per-feed circuit breaker: track failures and cooldowns
 const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes after failure
@@ -84,6 +85,10 @@ function recordFeedSuccess(feedName: string): void {
   feedFailures.delete(feedName);
 }
 
+export function getFeedFailures(): Map<string, { count: number; cooldownUntil: number }> {
+  return new Map(feedFailures);
+}
+
 function toAiKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -128,7 +133,15 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
   }
 
   try {
-    const response = await fetchWithProxy(feed.url);
+    let url = typeof feed.url === 'string' ? feed.url : feed.url['en'];
+    if (typeof feed.url !== 'string') {
+      const lang = getCurrentLanguage();
+      url = feed.url[lang] || feed.url['en'] || Object.values(feed.url)[0] || '';
+    }
+
+    if (!url) throw new Error(`No URL found for feed ${feed.name}`);
+
+    const response = await fetchWithProxy(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = await response.text();
     const parser = new DOMParser();
@@ -176,6 +189,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
           isAlert,
           threat,
           ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
+          lang: feed.lang,
         };
       });
 
@@ -201,7 +215,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
           item.threat = aiResult;
           item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return parsed;
@@ -222,7 +236,14 @@ export async function fetchCategoryFeeds(
 ): Promise<NewsItem[]> {
   const topLimit = 20;
   const batchSize = options.batchSize ?? 5;
-  const batches = chunkArray(feeds, batchSize);
+  const currentLang = getCurrentLanguage();
+
+  // Filter feeds by language:
+  // 1. Feeds with no explicit 'lang' are universal (or multi-url handled inside fetchFeed)
+  // 2. Feeds with explicit 'lang' must match current UI language
+  const filteredFeeds = feeds.filter(feed => !feed.lang || feed.lang === currentLang);
+
+  const batches = chunkArray(filteredFeeds, batchSize);
   const topItems: NewsItem[] = [];
   let totalItems = 0;
 
