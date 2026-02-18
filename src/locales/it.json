@@ -39,9 +39,9 @@
       "conflictEvents": "eventi di conflitto"
     },
     "timeAgo": {
-      "m": "m fa",
-      "h": "h fa",
-      "d": "g fa"
+      "m": "{{count}}m fa",
+      "h": "{{count}}h fa",
+      "d": "{{count}}g fa"
     },
     "infra": {
       "pipeline": "Oleodotti",
@@ -55,7 +55,7 @@
   "header": {
     "world": "MONDO",
     "tech": "TECH",
-    "live": "LIVE",
+    "live": "IN DIRETTA",
     "search": "Cerca",
     "settings": "PANNELLI",
     "sources": "FONTI",
@@ -444,7 +444,7 @@
         "techHQ": "Sede Tech",
         "accelerator": "Acceleratore",
         "cloudRegion": "Regione Cloud",
-        "datacenter": "Datacenter",
+        "datacenter": "Centro dati",
         "stockExchange": "Borsa valori",
         "financialCenter": "Centro finanziario",
         "centralBank": "Banca centrale",
@@ -619,9 +619,14 @@
     "relatedAssets": {
       "pipeline": "Gasdotto",
       "cable": "Cavo",
-      "datacenter": "Datacenter",
+      "datacenter": "Centro dati",
       "base": "Base",
       "nuclear": "Nucleare"
+    },
+    "community": {
+      "joinDiscussion": "Unisciti alla discussione",
+      "openDiscussion": "Apri discussione",
+      "dontShowAgain": "Non mostrare più"
     },
     "threatLabels": {
       "critical": "CRIT",
@@ -636,12 +641,12 @@
       "source": "Fonte:",
       "defcon": "DEFCON {{level}}",
       "updated": "Aggiornato {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
-      "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusClosed": "CHIUSO",
+      "statusSpike": "PICCO",
+      "statusHigh": "ALTO",
+      "statusElevated": "ELEVATO",
+      "statusNominal": "NOMINALE",
+      "statusQuiet": "CALMO",
       "justNow": "proprio adesso",
       "minutesAgo": "{{m}}m fa",
       "hoursAgo": "{{h}}h fa",
@@ -656,7 +661,7 @@
     "playback": {
       "toggleMode": "Attiva/disattiva la modalità di riproduzione",
       "historicalPlayback": "Riproduzione storica",
-      "live": "LIVE"
+      "live": "IN DIRETTA"
     },
     "stablecoins": {
       "pegHealth": "Salute dell'ancoraggio",
@@ -1080,10 +1085,10 @@
     "viewUSGS": "Visualizza su USGS",
     "expired": "Scaduto",
     "timeAgo": {
-      "s": "s fa",
-      "m": "m fa",
-      "h": "h fa",
-      "d": "d fa"
+      "s": "{{count}}s fa",
+      "m": "{{count}}m fa",
+      "h": "{{count}}h fa",
+      "d": "{{count}}d fa"
     },
     "updated": "Aggiornato",
     "cableAdvisory": {
