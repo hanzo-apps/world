@@ -63,9 +63,12 @@ async function withTransaction<T>(
         }
       });
     } catch (err: unknown) {
-      if (attempt === 0 && err instanceof DOMException && err.name === 'InvalidStateError') {
+      if (err instanceof DOMException && err.name === 'InvalidStateError') {
         db = null;
-        continue;
+        if (attempt === 0) continue;
+        // Connection still closing after retry — transient browser event, not actionable.
+        console.warn('[Storage] IndexedDB connection closing, skipping transaction');
+        return undefined as T;
       }
       throw err;
     }
