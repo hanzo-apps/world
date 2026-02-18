@@ -1487,6 +1487,8 @@
     "new": "جديد",
     "live": "مباشر",
     "cached": "مخزّن مؤقتاً",
-    "unavailable": "غير متاح"
+    "unavailable": "غير متاح",
+    "close": "إغلاق",
+    "currentVariant": "(الحالي)"
   }
 }

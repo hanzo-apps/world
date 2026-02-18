@@ -1487,6 +1487,8 @@
     "new": "NUOVO",
     "live": "IN DIRETTA",
     "cached": "IN CACHE",
-    "unavailable": "NON DISPONIBILE"
+    "unavailable": "NON DISPONIBILE",
+    "close": "Chiudi",
+    "currentVariant": "(corrente)"
   }
 }

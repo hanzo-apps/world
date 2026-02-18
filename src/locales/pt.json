@@ -1418,7 +1418,9 @@
     "cached": "EM CACHE",
     "unavailable": "INDISPONIVEL",
     "noData": "Nenhum dado disponível",
-    "ago": "{{time}} atrás"
+    "ago": "{{time}} atrás",
+    "close": "Fechar",
+    "currentVariant": "(atual)"
   },
   "header": {
     "world": "MUNDO",

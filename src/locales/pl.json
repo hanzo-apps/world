@@ -1487,6 +1487,8 @@
     "new": "NOWE",
     "live": "NA ZYWO",
     "cached": "W PAMIECI PODRECZNEJ",
-    "unavailable": "NIEDOSTEPNE"
+    "unavailable": "NIEDOSTEPNE",
+    "close": "Zamknij",
+    "currentVariant": "(bieżący)"
   }
 }
