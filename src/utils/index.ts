@@ -113,10 +113,15 @@ export function generateId(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Breakpoint (px): below this width the app uses the simplified mobile layout. Must match CSS @media (max-width: …). */
+export const MOBILE_BREAKPOINT_PX = 768;
+
+/**
+ * モバイル表示とするか。画面幅のみで判定（タッチ端末は含めない）。
+ * タッチパネル付きノートPCではデスクトップレイアウトになる。
+ */
 export function isMobileDevice(): boolean {
-  const isMobileWidth = window.innerWidth < 768;
-  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
-  return isMobileWidth || isTouchDevice;
+  return window.innerWidth < MOBILE_BREAKPOINT_PX;
 }
 
 export function chunkArray<T>(items: T[], size: number): T[][] {
