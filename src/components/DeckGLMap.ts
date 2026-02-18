@@ -416,6 +416,7 @@ export class DeckGLMap {
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 10,
       useDevicePixels: window.devicePixelRatio > 2 ? 2 : true,
+      onError: (error: Error) => console.warn('[DeckGLMap] Render error (non-fatal):', error.message),
     });
 
     this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
