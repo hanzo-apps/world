@@ -359,7 +359,7 @@ export class App {
 
     this.setupRefreshIntervals();
     this.setupSnapshotSaving();
-    cleanOldSnapshots();
+    cleanOldSnapshots().catch((e) => console.warn('[Storage] Snapshot cleanup failed:', e));
 
     // Handle deep links for story sharing
     this.handleDeepLinks();
@@ -1652,8 +1652,8 @@ export class App {
       });
     };
 
-    saveCurrentSnapshot();
-    this.snapshotIntervalId = setInterval(saveCurrentSnapshot, 15 * 60 * 1000);
+    void saveCurrentSnapshot().catch((e) => console.warn('[Snapshot] save failed:', e));
+    this.snapshotIntervalId = setInterval(() => void saveCurrentSnapshot().catch((e) => console.warn('[Snapshot] save failed:', e)), 15 * 60 * 1000);
   }
 
   private restoreSnapshot(snapshot: import('@/services/storage').DashboardSnapshot): void {
@@ -2378,7 +2378,7 @@ export class App {
         return;
       }
       // Don't start drag if target is the resize handle
-      if (target.classList.contains('panel-resize-handle') || target.closest('.panel-resize-handle')) {
+      if (target.classList?.contains('panel-resize-handle') || target.closest?.('.panel-resize-handle')) {
         e.preventDefault();
         return;
       }
@@ -2444,7 +2444,7 @@ export class App {
     });
 
     document.getElementById('settingsModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
         document.getElementById('settingsModal')?.classList.remove('active');
       }
     });
@@ -2632,9 +2632,14 @@ export class App {
 
   private toggleFullscreen(): void {
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      void document.exitFullscreen().catch(() => {});
     } else {
-      document.documentElement.requestFullscreen();
+      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
+      if (el.requestFullscreen) {
+        void el.requestFullscreen().catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        try { el.webkitRequestFullscreen(); } catch {}
+      }
     }
   }
 
@@ -2821,7 +2826,7 @@ export class App {
     });
 
     document.getElementById('sourcesModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
         document.getElementById('sourcesModal')?.classList.remove('active');
       }
     });
@@ -2876,6 +2881,8 @@ export class App {
       this.inFlight.add(name);
       try {
         await fn();
+      } catch (e) {
+        console.error(`[App] ${name} failed:`, e);
       } finally {
         this.inFlight.delete(name);
       }
@@ -3162,9 +3169,11 @@ export class App {
           }
         }
 
-        const baseline = await updateBaseline(`news:${category}`, items.length);
-        const deviation = calculateDeviation(items.length, baseline);
-        panel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+        try {
+          const baseline = await updateBaseline(`news:${category}`, items.length);
+          const deviation = calculateDeviation(items.length, baseline);
+          panel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+        } catch (e) { console.warn(`[Baseline] news:${category} write failed:`, e); }
       }
 
       this.statusPanel?.updateFeed(category.charAt(0).toUpperCase() + category.slice(1), {
@@ -3227,9 +3236,11 @@ export class App {
           const intel = intelResult[0].value;
           this.renderNewsForCategory('intel', intel);
           if (intelPanel) {
-            const baseline = await updateBaseline('news:intel', intel.length);
-            const deviation = calculateDeviation(intel.length, baseline);
-            intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+            try {
+              const baseline = await updateBaseline('news:intel', intel.length);
+              const deviation = calculateDeviation(intel.length, baseline);
+              intelPanel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+            } catch (e) { console.warn('[Baseline] news:intel write failed:', e); }
           }
           this.statusPanel?.updateFeed('Intel', { status: 'ok', itemCount: intel.length });
           collectedNews.push(...intel);
@@ -3638,13 +3649,13 @@ export class App {
           if (surgeAlerts.length > 0) {
             const surgeSignals = surgeAlerts.map(surgeAlertToSignal);
             addToSignalHistory(surgeSignals);
-            this.signalModal?.show(surgeSignals);
+            if (this.findingsBadge?.isEnabled()) this.signalModal?.show(surgeSignals);
           }
           const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
           if (foreignAlerts.length > 0) {
             const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
             addToSignalHistory(foreignSignals);
-            this.signalModal?.show(foreignSignals);
+            if (this.findingsBadge?.isEnabled()) this.signalModal?.show(foreignSignals);
           }
         }
       } catch (error) {
@@ -3795,10 +3806,12 @@ export class App {
       this.map?.setCyberThreats(threats);
       this.map?.setLayerReady('cyberThreats', threats.length > 0);
       this.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: threats.length });
+      this.statusPanel?.updateApi('Cyber Threats API', { status: 'ok' });
       dataFreshness.recordUpdate('cyber_threats', threats.length);
     } catch (error) {
       this.map?.setLayerReady('cyberThreats', false);
       this.statusPanel?.updateFeed('Cyber Threats', { status: 'error', errorMessage: String(error) });
+      this.statusPanel?.updateApi('Cyber Threats API', { status: 'error' });
       dataFreshness.recordError('cyber_threats', String(error));
     }
   }
@@ -3899,7 +3912,7 @@ export class App {
       } else if (status.acledConfigured === null) {
         this.statusPanel?.updateApi('ACLED', { status: 'warning' });
       }
-      this.statusPanel?.updateApi('GDELT', { status: 'ok' });
+      this.statusPanel?.updateApi('GDELT Doc', { status: 'ok' });
       return;
     }
     try {
@@ -3925,12 +3938,12 @@ export class App {
       } else if (status.acledConfigured === null) {
         this.statusPanel?.updateApi('ACLED', { status: 'warning' });
       }
-      this.statusPanel?.updateApi('GDELT', { status: 'ok' });
+      this.statusPanel?.updateApi('GDELT Doc', { status: 'ok' });
     } catch (error) {
       this.map?.setLayerReady('protests', false);
       this.statusPanel?.updateFeed('Protests', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('ACLED', { status: 'error' });
-      this.statusPanel?.updateApi('GDELT', { status: 'error' });
+      this.statusPanel?.updateApi('GDELT Doc', { status: 'error' });
     }
   }
 
@@ -4008,13 +4021,13 @@ export class App {
         if (surgeAlerts.length > 0) {
           const surgeSignals = surgeAlerts.map(surgeAlertToSignal);
           addToSignalHistory(surgeSignals);
-          this.signalModal?.show(surgeSignals);
+          if (this.findingsBadge?.isEnabled()) this.signalModal?.show(surgeSignals);
         }
         const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
         if (foreignAlerts.length > 0) {
           const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
           addToSignalHistory(foreignSignals);
-          this.signalModal?.show(foreignSignals);
+          if (this.findingsBadge?.isEnabled()) this.signalModal?.show(foreignSignals);
         }
       }
 
@@ -4106,8 +4119,11 @@ export class App {
     try {
       const data = await fetchOilAnalytics();
       economicPanel?.updateOil(data);
+      const hasData = !!(data.wtiPrice || data.brentPrice || data.usProduction || data.usInventory);
+      this.statusPanel?.updateApi('EIA', { status: hasData ? 'ok' : 'error' });
     } catch (e) {
       console.error('[App] Oil analytics failed:', e);
+      this.statusPanel?.updateApi('EIA', { status: 'error' });
     }
   }
 
@@ -4116,8 +4132,10 @@ export class App {
     try {
       const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
       economicPanel?.updateSpending(data);
+      this.statusPanel?.updateApi('USASpending', { status: data.awards.length > 0 ? 'ok' : 'error' });
     } catch (e) {
       console.error('[App] Government spending failed:', e);
+      this.statusPanel?.updateApi('USASpending', { status: 'error' });
     }
   }
 
@@ -4160,7 +4178,7 @@ export class App {
       const allSignals = [...signals, ...geoSignals, ...keywordSpikeSignals];
       if (allSignals.length > 0) {
         addToSignalHistory(allSignals);
-        this.signalModal?.show(allSignals);
+        if (this.findingsBadge?.isEnabled()) this.signalModal?.show(allSignals);
       }
     } catch (error) {
       console.error('[App] Correlation analysis failed:', error);
