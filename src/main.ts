@@ -38,16 +38,18 @@ Sentry.init({
     /requestFullscreen/,
     /vc_text_indicators_context/,
     /Program failed to link: null/,
-    /this\.light is null/,
-    /can't access property "type", \w+ is undefined/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
     if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
+    const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
     // Suppress module-import failures only when originating from browser extensions
     if (/Importing a module script failed/.test(msg)) {
-      const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
       if (frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''))) return null;
+    }
+    // Suppress maplibre internal null-access crashes (light, placement) only when stack is in map chunk
+    if (/this\.light is null|can't access property "type", \w+ is undefined/.test(msg)) {
+      if (frames.some(f => /\/map-[A-Za-z0-9]+\.js/.test(f.filename ?? ''))) return null;
     }
     return event;
   },
