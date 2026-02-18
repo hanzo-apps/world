@@ -60,6 +60,14 @@ All three variants run from a single codebase — switch between them with one c
 
 ## Key Features
 
+### Localization & Regional Support
+
+- **Multilingual UI** — Fully localized interface supporting **English, French, Spanish, German, Italian, Portuguese, Dutch, Swedish, Russian, Arabic, Chinese, and Japanese**.
+- **RTL Support** — Native right-to-left layout support for Arabic (`ar`) and Hebrew.
+- **Localized News Feeds** — Region-specific RSS selection based on language preference (e.g., viewing the app in French loads Le Monde, Jeune Afrique, and France24).
+- **AI Translation** — Integrated LLM translation for news headlines and summaries, enabling cross-language intelligence gathering.
+- **Regional Intelligence** — Dedicated monitoring panels for Africa, Latin America, Middle East, and Asia with local sources.
+
 ### Interactive 3D Globe
 
 - **WebGL-accelerated rendering** — deck.gl + MapLibre GL JS for smooth 60fps performance with thousands of concurrent markers. Switchable between **3D globe** (with pitch/rotation) and **flat map** mode via `VITE_MAP_INTERACTION_MODE`
