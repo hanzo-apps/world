@@ -41,12 +41,10 @@ Sentry.init({
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
     if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
-    // Suppress module-import failures only from extension/webview contexts
+    // Suppress module-import failures only when originating from browser extensions
     if (/Importing a module script failed/.test(msg)) {
-      const url = event.request?.url ?? '';
       const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
-      const isExtension = frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''));
-      if (isExtension || !url.includes('worldmonitor.app')) return null;
+      if (frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''))) return null;
     }
     return event;
   },
