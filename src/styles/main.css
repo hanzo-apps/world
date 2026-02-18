@@ -4534,6 +4534,57 @@ a.prediction-link:hover {
   box-shadow: 0 4px 24px rgba(255, 68, 68, 0.3);
 }
 
+.map-popup.map-popup-sheet {
+  left: 12px !important;
+  right: 12px !important;
+  top: auto !important;
+  bottom: 0;
+  width: auto !important;
+  max-width: none;
+  max-height: min(68vh, calc(100vh - 80px));
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35);
+  transform: translate3d(0, 110%, 0);
+  transition: transform 0.22s ease-out;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.map-popup.map-popup-sheet.open {
+  transform: translate3d(0, 0, 0);
+}
+
+.map-popup.map-popup-sheet.dragging {
+  transition: none;
+}
+
+.map-popup-sheet-handle {
+  display: block;
+  width: 56px;
+  height: 24px;
+  margin: 6px auto 2px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.map-popup-sheet-handle::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: var(--text-dim);
+  opacity: 0.8;
+}
+
 .popup-header {
   display: flex;
   align-items: center;
@@ -4630,6 +4681,10 @@ a.prediction-link:hover {
   font-size: 20px;
   cursor: pointer;
   padding: 0 4px;
+  min-width: 36px;
+  min-height: 36px;
+  line-height: 1;
+  touch-action: manipulation;
 }
 
 .popup-close:hover {
@@ -4638,6 +4693,10 @@ a.prediction-link:hover {
 
 .popup-body {
   padding: 16px;
+}
+
+.map-popup.map-popup-sheet .popup-body {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 .popup-subtitle {
@@ -7481,20 +7540,9 @@ a.prediction-link:hover {
   /* Expand touch targets for all map markers using ::before pseudo-element */
   /* This creates an invisible touch area around small markers */
 
-  .hotspot::before,
-  .base-marker::before,
-  .earthquake-marker::before,
-  .nuclear-marker::before,
-  .economic-marker::before,
-  .datacenter-marker::before,
-  .protest-marker::before,
-  .flight-marker::before,
-  .outage-marker::before,
-  .weather-marker::before,
-  .military-flight-marker::before,
-  .military-vessel-marker::before,
-  .spaceport-marker::before,
-  .mineral-marker::before {
+  #mapOverlays [class*='-marker']::before,
+  #mapOverlays .hotspot::before,
+  #mapOverlays .conflict-click-area::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -7505,7 +7553,13 @@ a.prediction-link:hover {
     min-width: 44px;
     min-height: 44px;
     border-radius: 50%;
+    pointer-events: auto;
     /* Uncomment to debug: background: rgba(255, 0, 0, 0.2); */
+  }
+
+  .conflict-click-area {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   /* Ensure hotspot container is large enough for touch */
@@ -7593,12 +7647,35 @@ a.prediction-link:hover {
   }
 
   /* Simplify time slider on mobile */
+  .map-controls {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    right: calc(env(safe-area-inset-right, 0px) + 8px);
+  }
+
   .time-slider {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
+    right: calc(env(safe-area-inset-right, 0px) + 56px);
+    max-width: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
     padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .time-slider::-webkit-scrollbar {
+    display: none;
   }
 
   .time-slider-label {
     display: none;
+  }
+
+  .time-slider-buttons {
+    flex-wrap: nowrap;
+    min-width: max-content;
   }
 
   /* Larger map controls */
@@ -7610,6 +7687,7 @@ a.prediction-link:hover {
 
   /* Time slider buttons */
   .time-btn {
+    flex: 0 0 auto;
     padding: 8px 12px;
     min-height: 36px;
   }
@@ -7619,6 +7697,17 @@ a.prediction-link:hover {
     max-width: calc(100vw - 32px);
     max-height: 60vh;
     overflow-y: auto;
+  }
+
+  .map-popup.map-popup-sheet {
+    left: 10px !important;
+    right: 10px !important;
+    max-height: min(72vh, calc(100vh - 64px));
+  }
+
+  .popup-close {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   /* Hide some UI elements that clutter mobile view */
@@ -7702,6 +7791,11 @@ a.prediction-link:hover {
     right: 10px !important;
     width: auto !important;
     max-width: none;
+  }
+
+  .map-popup.map-popup-sheet {
+    left: 8px !important;
+    right: 8px !important;
   }
 
   /* Stack header on very small screens */
