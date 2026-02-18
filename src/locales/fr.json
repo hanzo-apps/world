@@ -116,7 +116,7 @@
     "policy": "Politique & Régulation IA",
     "regulation": "Tableau de bord régulation IA",
     "hardware": "Semiconducteurs & Matériel",
-    "cloud": "Cloud & Infrastructure",
+    "cloud": "Cloud et infrastructure",
     "dev": "Communauté développeurs",
     "github": "Tendances GitHub",
     "ipo": "IPO & SPAC",
@@ -1487,6 +1487,8 @@
     "new": "NOUVEAU",
     "live": "EN DIRECT",
     "cached": "EN CACHE",
-    "unavailable": "INDISPONIBLE"
+    "unavailable": "INDISPONIBLE",
+    "close": "Fermer",
+    "currentVariant": "(actuel)"
   }
 }

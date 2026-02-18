@@ -1418,7 +1418,9 @@
     "cached": "IN CACHE",
     "unavailable": "NIET BESCHIKBAAR",
     "noData": "Geen gegevens beschikbaar",
-    "ago": "{{time}} geleden"
+    "ago": "{{time}} geleden",
+    "close": "Sluiten",
+    "currentVariant": "(huidig)"
   },
   "header": {
     "world": "WERELD",
