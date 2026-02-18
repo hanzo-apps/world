@@ -2626,11 +2626,11 @@ export class App {
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {});
     } else {
-      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
       if (el.requestFullscreen) {
         void el.requestFullscreen().catch(() => {});
       } else if (el.webkitRequestFullscreen) {
-        void el.webkitRequestFullscreen().catch(() => {});
+        try { el.webkitRequestFullscreen(); } catch {}
       }
     }
   }
