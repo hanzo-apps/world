@@ -23,7 +23,7 @@ Sentry.init({
     /InvalidAccessError/,
     /importScripts/,
     /^TypeError: Load failed$/,
-    /^TypeError: Failed to fetch/,
+    /^TypeError: Failed to fetch$/,
     /^TypeError: cancelled$/,
     /^TypeError: NetworkError/,
     /runtime\.sendMessage\(\)/,
@@ -34,10 +34,20 @@ Sentry.init({
     /Connection to Indexed Database server lost/,
     /webkit\.messageHandlers/,
     /unsafe-eval.*Content Security Policy/,
+    /Fullscreen request denied/,
+    /requestFullscreen/,
+    /vc_text_indicators_context/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
     if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
+    // Suppress module-import failures only from extension/webview contexts
+    if (/Importing a module script failed/.test(msg)) {
+      const url = event.request?.url ?? '';
+      const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
+      const isExtension = frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''));
+      if (isExtension || !url.includes('worldmonitor.app')) return null;
+    }
     return event;
   },
 });
