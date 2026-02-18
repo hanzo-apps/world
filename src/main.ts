@@ -18,8 +18,17 @@ Sentry.init({
     'Invalid WebGL2RenderingContext',
     'WebGL context lost',
     /ResizeObserver loop/,
+    /NotAllowedError/,
+    /InvalidAccessError/,
+    /importScripts/,
   ],
 });
+// Suppress NotAllowedError from YouTube IFrame API's internal play() — browser autoplay policy,
+// not actionable. The YT IFrame API doesn't expose the play() promise so it leaks as unhandled.
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason?.name === 'NotAllowedError') e.preventDefault();
+});
+
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
