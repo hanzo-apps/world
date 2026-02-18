@@ -38,6 +38,7 @@ interface SummarizeMessage {
   type: 'summarize';
   id: string;
   texts: string[];
+  modelId?: string;
 }
 
 interface SentimentMessage {
@@ -145,9 +146,9 @@ async function embedTexts(texts: string[]): Promise<number[][]> {
   return results;
 }
 
-async function summarizeTexts(texts: string[]): Promise<string[]> {
-  await loadModel('summarization');
-  const pipe = loadedPipelines.get('summarization')!;
+async function summarizeTexts(texts: string[], modelId = 'summarization'): Promise<string[]> {
+  await loadModel(modelId);
+  const pipe = loadedPipelines.get(modelId)!;
 
   const results: string[] = [];
   for (const text of texts) {
@@ -310,7 +311,7 @@ self.onmessage = async (event: MessageEvent<MLWorkerMessage>) => {
       }
 
       case 'summarize': {
-        const summaries = await summarizeTexts(message.texts);
+        const summaries = await summarizeTexts(message.texts, message.modelId);
         self.postMessage({
           type: 'summarize-result',
           id: message.id,
