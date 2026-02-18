@@ -1487,6 +1487,8 @@
     "new": "新",
     "live": "实时",
     "cached": "已缓存",
-    "unavailable": "不可用"
+    "unavailable": "不可用",
+    "close": "关闭",
+    "currentVariant": "(当前)"
   }
 }

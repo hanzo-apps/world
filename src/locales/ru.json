@@ -1487,6 +1487,8 @@
     "new": "НОВОЕ",
     "live": "ПРЯМОЙ ЭФИР",
     "cached": "КЭШ",
-    "unavailable": "НЕДОСТУПНО"
+    "unavailable": "НЕДОСТУПНО",
+    "close": "Закрыть",
+    "currentVariant": "(текущий)"
   }
 }

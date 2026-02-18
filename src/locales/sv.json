@@ -546,7 +546,7 @@
       "unavailable": "Stablecoin-data tillfälligt otillgänglig",
       "token": "Token",
       "mcap": "Börsv.",
-      "vol24h": "24h Vol",
+      "vol24h": "24t volym",
       "chg24h": "24h Ändr"
     },
     "status": {
@@ -1418,7 +1418,9 @@
     "cached": "CACHELAGRAD",
     "unavailable": "INTE TILLGANG",
     "noData": "Inga data tillgängliga",
-    "ago": "{{time}} sedan"
+    "ago": "{{time}} sedan",
+    "close": "Stäng",
+    "currentVariant": "(aktuell)"
   },
   "header": {
     "world": "VÄRLD",
