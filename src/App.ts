@@ -4102,7 +4102,8 @@ export class App {
     try {
       const data = await fetchOilAnalytics();
       economicPanel?.updateOil(data);
-      this.statusPanel?.updateApi('EIA', { status: 'ok' });
+      const hasData = !!(data.wtiPrice || data.brentPrice || data.usProduction || data.usInventory);
+      this.statusPanel?.updateApi('EIA', { status: hasData ? 'ok' : 'error' });
     } catch (e) {
       console.error('[App] Oil analytics failed:', e);
       this.statusPanel?.updateApi('EIA', { status: 'error' });
@@ -4114,7 +4115,7 @@ export class App {
     try {
       const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
       economicPanel?.updateSpending(data);
-      this.statusPanel?.updateApi('USASpending', { status: 'ok' });
+      this.statusPanel?.updateApi('USASpending', { status: data.awards.length > 0 ? 'ok' : 'error' });
     } catch (e) {
       console.error('[App] Government spending failed:', e);
       this.statusPanel?.updateApi('USASpending', { status: 'error' });
