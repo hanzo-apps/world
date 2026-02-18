@@ -39,9 +39,9 @@
       "conflictEvents": "أحداث نزاع"
     },
     "timeAgo": {
-      "m": "د مضت",
-      "h": "س مضت",
-      "d": "ي مضت"
+      "m": "{{count}}د مضت",
+      "h": "{{count}}س مضت",
+      "d": "{{count}}ي مضت"
     },
     "infra": {
       "pipeline": "خطوط أنابيب",
@@ -346,9 +346,9 @@
         "conflictEvents": "أحداث نزاع"
       },
       "timeAgo": {
-        "m": "د مضت",
-        "h": "س مضت",
-        "d": "ي مضت"
+        "m": "{{count}}د مضت",
+        "h": "{{count}}س مضت",
+        "d": "{{count}}ي مضت"
       },
       "infra": {
         "pipeline": "خطوط أنابيب",
@@ -506,6 +506,11 @@
       "datacenter": "مركز بيانات",
       "base": "قاعدة",
       "nuclear": "نووي"
+    },
+    "community": {
+      "joinDiscussion": "انضم إلى النقاش",
+      "openDiscussion": "فتح النقاش",
+      "dontShowAgain": "عدم العرض مجدداً"
     },
     "threatLabels": {
       "critical": "حرج",
@@ -1081,10 +1086,10 @@
     "viewUSGS": "عرض على USGS",
     "expired": "منتهي الصلاحية",
     "timeAgo": {
-      "s": "ث مضت",
-      "m": "د مضت",
-      "h": "س مضت",
-      "d": "ي مضت"
+      "s": "{{count}}ث مضت",
+      "m": "{{count}}د مضت",
+      "h": "{{count}}س مضت",
+      "d": "{{count}}ي مضت"
     },
     "cableAdvisory": {
       "reported": "مُبلّغ",
