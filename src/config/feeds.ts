@@ -461,10 +461,10 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'BBC Asia', url: rss('https://feeds.bbci.co.uk/news/world/asia/rss.xml') },
     { name: 'South China Morning Post', url: railwayRss('https://www.scmp.com/rss/91/feed/') },
     { name: 'Reuters Asia', url: rss('https://news.google.com/rss/search?q=site:reuters.com+(China+OR+Japan+OR+Taiwan+OR+Korea)+when:3d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'NHK World', url: rss('https://rsshub.app/nhk/news/en') },
-    { name: 'Nikkei Asia', url: railwayRss('https://asia.nikkei.com/rss/feed/nar') },
-    { name: 'MIIT (China)', url: rss('https://rsshub.app/gov/miit/zcjd') },
-    { name: 'MOFCOM (China)', url: rss('https://rsshub.app/gov/mofcom/article/xwfb') },
+    { name: 'NHK World', url: railwayRss('https://rsshub.app/nhk/news/en') },
+    { name: 'Nikkei Asia', url: rss('https://news.google.com/rss/search?q=site:asia.nikkei.com+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'MIIT (China)', url: railwayRss('https://rsshub.app/gov/miit/zcjd') },
+    { name: 'MOFCOM (China)', url: railwayRss('https://rsshub.app/gov/mofcom/article/xwfb') },
   ],
   energy: [
     { name: 'Oil & Gas', url: rss('https://news.google.com/rss/search?q=(oil+price+OR+OPEC+OR+"natural+gas"+OR+pipeline+OR+LNG)+when:2d&hl=en-US&gl=US&ceid=US:en') },
@@ -800,7 +800,7 @@ export const INTEL_SOURCES: Feed[] = [
 
   // International Relations (Tier 2)
   { name: 'Chatham House', url: rss('https://news.google.com/rss/search?q=site:chathamhouse.org+when:7d&hl=en-US&gl=US&ceid=US:en'), type: 'intl' },
-  { name: 'ECFR', url: rss('https://ecfr.eu/feed/'), type: 'intl' },
+  { name: 'ECFR', url: rss('https://news.google.com/rss/search?q=site:ecfr.eu+when:7d&hl=en-US&gl=US&ceid=US:en'), type: 'intl' },
   { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/'), type: 'intl' },
   { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml'), type: 'intl' },
   { name: 'Atlantic Council', url: railwayRss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
