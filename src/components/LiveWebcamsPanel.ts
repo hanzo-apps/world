@@ -16,20 +16,20 @@ interface WebcamFeed {
 // Verified YouTube live stream IDs — validated Feb 2026 via title cross-check.
 // IDs may rotate; update when stale.
 const WEBCAM_FEEDS: WebcamFeed[] = [
-  // Middle East
+  // Middle East — Jerusalem & Tehran adjacent (conflict hotspots)
   { id: 'jerusalem', city: 'Jerusalem', country: 'Israel', region: 'middle-east', channelHandle: '@TheWesternWall', fallbackVideoId: 'UyduhBUpO7Q' },
-  { id: 'dubai', city: 'Dubai', country: 'UAE', region: 'middle-east', channelHandle: '@FairmontThePalm', fallbackVideoId: '7dE4IjDQJmE' },
   { id: 'tehran', city: 'Tehran', country: 'Iran', region: 'middle-east', channelHandle: '@IranHDCams', fallbackVideoId: '-zGuR1qVKrU' },
+  { id: 'dubai', city: 'Dubai', country: 'UAE', region: 'middle-east', channelHandle: '@FairmontThePalm', fallbackVideoId: '7dE4IjDQJmE' },
   { id: 'istanbul', city: 'Istanbul', country: 'Turkey', region: 'middle-east', channelHandle: '@IstanbulBosphorus', fallbackVideoId: 'Vqzek6ZWy3Y' },
-  // Americas
-  { id: 'washington', city: 'Washington DC', country: 'USA', region: 'americas', channelHandle: '@AxisCommunications', fallbackVideoId: '1wV9lLe14aU' },
-  { id: 'new-york', city: 'New York', country: 'USA', region: 'americas', channelHandle: '@EarthCam', fallbackVideoId: '4qyZLflp-sI' },
   // Europe
   { id: 'kyiv', city: 'Kyiv', country: 'Ukraine', region: 'europe', channelHandle: '@DWNews', fallbackVideoId: '-Q7FuPINDjA' },
   { id: 'odessa', city: 'Odessa', country: 'Ukraine', region: 'europe', channelHandle: '@UkraineLiveCam', fallbackVideoId: 'e2gC37ILQmk' },
+  { id: 'paris', city: 'Paris', country: 'France', region: 'europe', channelHandle: '@PalaisIena', fallbackVideoId: 'OzYp4NRZlwQ' },
   { id: 'st-petersburg', city: 'St. Petersburg', country: 'Russia', region: 'europe', channelHandle: '@SPBLiveCam', fallbackVideoId: 'CjtIYbmVfck' },
-  { id: 'berlin', city: 'Berlin', country: 'Germany', region: 'europe', channelHandle: '@BerlinWebcam', fallbackVideoId: 'IRqboacDNFg' },
   { id: 'london', city: 'London', country: 'UK', region: 'europe', channelHandle: '@EarthCam', fallbackVideoId: 'Lxqcg1qt0XU' },
+  // Americas
+  { id: 'washington', city: 'Washington DC', country: 'USA', region: 'americas', channelHandle: '@AxisCommunications', fallbackVideoId: '1wV9lLe14aU' },
+  { id: 'new-york', city: 'New York', country: 'USA', region: 'americas', channelHandle: '@EarthCam', fallbackVideoId: '4qyZLflp-sI' },
   // Asia-Pacific
   { id: 'tokyo', city: 'Tokyo', country: 'Japan', region: 'asia', channelHandle: '@ShinjukuLiveCam', fallbackVideoId: 'DjdUEyjx8GM' },
   { id: 'seoul', city: 'Seoul', country: 'South Korea', region: 'asia', channelHandle: '@UNvillage_live', fallbackVideoId: '-JhoMGoAfFc' },
@@ -72,6 +72,19 @@ export class LiveWebcamsPanel extends Panel {
   }
 
   private get gridFeeds(): WebcamFeed[] {
+    if (this.regionFilter === 'all') {
+      // Pick first feed from each region for a diverse grid
+      const seen = new Set<WebcamRegion>();
+      const picks: WebcamFeed[] = [];
+      for (const feed of WEBCAM_FEEDS) {
+        if (!seen.has(feed.region)) {
+          seen.add(feed.region);
+          picks.push(feed);
+          if (picks.length >= MAX_GRID_CELLS) break;
+        }
+      }
+      return picks;
+    }
     return this.filteredFeeds.slice(0, MAX_GRID_CELLS);
   }
 
@@ -105,14 +118,14 @@ export class LiveWebcamsPanel extends Panel {
     const gridBtn = document.createElement('button');
     gridBtn.className = `webcam-view-btn${this.viewMode === 'grid' ? ' active' : ''}`;
     gridBtn.dataset.mode = 'grid';
-    gridBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>';
+    gridBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>';
     gridBtn.title = 'Grid view';
     gridBtn.addEventListener('click', () => this.setViewMode('grid'));
 
     const singleBtn = document.createElement('button');
     singleBtn.className = `webcam-view-btn${this.viewMode === 'single' ? ' active' : ''}`;
     singleBtn.dataset.mode = 'single';
-    singleBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>';
+    singleBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="3" y="3" width="18" height="14" rx="2"/><rect x="3" y="19" width="18" height="2" rx="1"/></svg>';
     singleBtn.title = 'Single view';
     singleBtn.addEventListener('click', () => this.setViewMode('single'));
 
