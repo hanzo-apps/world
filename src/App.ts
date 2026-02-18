@@ -317,15 +317,17 @@ export class App {
     this.signalModal.setLocationClickHandler((lat, lon) => {
       this.map?.setCenter(lat, lon, 4);
     });
-    this.findingsBadge = new IntelligenceGapBadge();
-    this.findingsBadge.setOnSignalClick((signal) => {
-      if (this.countryBriefPage?.isVisible()) return;
-      this.signalModal?.showSignal(signal);
-    });
-    this.findingsBadge.setOnAlertClick((alert) => {
-      if (this.countryBriefPage?.isVisible()) return;
-      this.signalModal?.showAlert(alert);
-    });
+    if (!this.isMobile) {
+      this.findingsBadge = new IntelligenceGapBadge();
+      this.findingsBadge.setOnSignalClick((signal) => {
+        if (this.countryBriefPage?.isVisible()) return;
+        this.signalModal?.showSignal(signal);
+      });
+      this.findingsBadge.setOnAlertClick((alert) => {
+        if (this.countryBriefPage?.isVisible()) return;
+        this.signalModal?.showAlert(alert);
+      });
+    }
     this.setupMobileWarning();
     this.setupPlaybackControl();
     this.setupStatusPanel();
@@ -1155,6 +1157,10 @@ export class App {
     setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, 3000);
   }
 
+  private shouldShowIntelligenceNotifications(): boolean {
+    return !this.isMobile && !!this.findingsBadge?.isEnabled();
+  }
+
   private setupSearchModal(): void {
     const searchOptions = SITE_VARIANT === 'tech'
       ? {
@@ -1804,6 +1810,15 @@ export class App {
    * Render critical military posture banner when buildup detected
    */
   private renderCriticalBanner(postures: TheaterPostureSummary[]): void {
+    if (this.isMobile) {
+      if (this.criticalBannerEl) {
+        this.criticalBannerEl.remove();
+        this.criticalBannerEl = null;
+      }
+      document.body.classList.remove('has-critical-banner');
+      return;
+    }
+
     // Check if banner was dismissed this session
     const dismissedAt = sessionStorage.getItem('banner-dismissed');
     if (dismissedAt && Date.now() - parseInt(dismissedAt, 10) < 30 * 60 * 1000) {
@@ -2721,13 +2736,17 @@ export class App {
       )
       .join('');
 
-    const findingsEnabled = this.findingsBadge?.isEnabled() ?? IntelligenceGapBadge.getStoredEnabledState();
-    const findingsHtml = `
+    const findingsHtml = this.isMobile
+      ? ''
+      : (() => {
+        const findingsEnabled = this.findingsBadge?.isEnabled() ?? IntelligenceGapBadge.getStoredEnabledState();
+        return `
       <div class="panel-toggle-item ${findingsEnabled ? 'active' : ''}" data-panel="intel-findings">
         <div class="panel-toggle-checkbox">${findingsEnabled ? '✓' : ''}</div>
         <span class="panel-toggle-label">Intelligence Findings</span>
       </div>
     `;
+      })();
 
     container.innerHTML = panelHtml + findingsHtml;
 
@@ -2736,7 +2755,8 @@ export class App {
         const panelKey = (item as HTMLElement).dataset.panel!;
 
         if (panelKey === 'intel-findings') {
-          this.findingsBadge?.setEnabled(!this.findingsBadge.isEnabled());
+          if (!this.findingsBadge) return;
+          this.findingsBadge.setEnabled(!this.findingsBadge.isEnabled());
           this.renderPanelToggles();
           return;
         }
@@ -3651,13 +3671,13 @@ export class App {
           if (surgeAlerts.length > 0) {
             const surgeSignals = surgeAlerts.map(surgeAlertToSignal);
             addToSignalHistory(surgeSignals);
-            if (this.findingsBadge?.isEnabled()) this.signalModal?.show(surgeSignals);
+            if (this.shouldShowIntelligenceNotifications()) this.signalModal?.show(surgeSignals);
           }
           const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
           if (foreignAlerts.length > 0) {
             const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
             addToSignalHistory(foreignSignals);
-            if (this.findingsBadge?.isEnabled()) this.signalModal?.show(foreignSignals);
+            if (this.shouldShowIntelligenceNotifications()) this.signalModal?.show(foreignSignals);
           }
         }
       } catch (error) {
@@ -4023,13 +4043,13 @@ export class App {
         if (surgeAlerts.length > 0) {
           const surgeSignals = surgeAlerts.map(surgeAlertToSignal);
           addToSignalHistory(surgeSignals);
-          if (this.findingsBadge?.isEnabled()) this.signalModal?.show(surgeSignals);
+          if (this.shouldShowIntelligenceNotifications()) this.signalModal?.show(surgeSignals);
         }
         const foreignAlerts = detectForeignMilitaryPresence(flightData.flights);
         if (foreignAlerts.length > 0) {
           const foreignSignals = foreignAlerts.map(foreignPresenceToSignal);
           addToSignalHistory(foreignSignals);
-          if (this.findingsBadge?.isEnabled()) this.signalModal?.show(foreignSignals);
+          if (this.shouldShowIntelligenceNotifications()) this.signalModal?.show(foreignSignals);
         }
       }
 
@@ -4180,7 +4200,7 @@ export class App {
       const allSignals = [...signals, ...geoSignals, ...keywordSpikeSignals];
       if (allSignals.length > 0) {
         addToSignalHistory(allSignals);
-        if (this.findingsBadge?.isEnabled()) this.signalModal?.show(allSignals);
+        if (this.shouldShowIntelligenceNotifications()) this.signalModal?.show(allSignals);
       }
     } catch (error) {
       console.error('[App] Correlation analysis failed:', error);
