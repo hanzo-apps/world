@@ -2370,7 +2370,7 @@ export class App {
         return;
       }
       // Don't start drag if target is the resize handle
-      if (target.classList.contains('panel-resize-handle') || target.closest('.panel-resize-handle')) {
+      if (target.classList?.contains('panel-resize-handle') || target.closest?.('.panel-resize-handle')) {
         e.preventDefault();
         return;
       }
@@ -2436,7 +2436,7 @@ export class App {
     });
 
     document.getElementById('settingsModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
         document.getElementById('settingsModal')?.classList.remove('active');
       }
     });
@@ -2624,9 +2624,14 @@ export class App {
 
   private toggleFullscreen(): void {
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      void document.exitFullscreen().catch(() => {});
     } else {
-      document.documentElement.requestFullscreen();
+      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+      if (el.requestFullscreen) {
+        void el.requestFullscreen().catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        void el.webkitRequestFullscreen().catch(() => {});
+      }
     }
   }
 
@@ -2813,7 +2818,7 @@ export class App {
     });
 
     document.getElementById('sourcesModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
+      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
         document.getElementById('sourcesModal')?.classList.remove('active');
       }
     });
