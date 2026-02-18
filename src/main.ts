@@ -104,6 +104,20 @@ app
   count: getCellCount,
 };
 
+// Beta mode toggle: type `beta=true` / `beta=false` in console
+Object.defineProperty(window, 'beta', {
+  get() {
+    const on = localStorage.getItem('worldmonitor-beta-mode') === 'true';
+    console.log(`[Beta] ${on ? 'ON' : 'OFF'}`);
+    return on;
+  },
+  set(v: boolean) {
+    if (v) localStorage.setItem('worldmonitor-beta-mode', 'true');
+    else localStorage.removeItem('worldmonitor-beta-mode');
+    location.reload();
+  },
+});
+
 if (!('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window)) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({
