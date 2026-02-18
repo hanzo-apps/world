@@ -110,6 +110,12 @@ class MLWorkerManager {
           return;
         }
 
+        // Unsolicited model-loaded notification (implicit load inside summarize/sentiment/etc.)
+        if (data.type === 'model-loaded' && !('id' in data && data.id)) {
+          this.loadedModels.add(data.modelId);
+          return;
+        }
+
         if (data.type === 'error') {
           const pending = data.id ? this.pendingRequests.get(data.id) : null;
           if (pending) {
@@ -357,6 +363,13 @@ class MLWorkerManager {
    */
   get loadedModelIds(): string[] {
     return Array.from(this.loadedModels);
+  }
+
+  /**
+   * Check if a specific model is already loaded (no waiting)
+   */
+  isModelLoaded(modelId: string): boolean {
+    return this.loadedModels.has(modelId);
   }
 }
 
