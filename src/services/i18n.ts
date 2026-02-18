@@ -12,6 +12,7 @@ import sv from '../locales/sv.json';
 import ru from '../locales/ru.json';
 import ar from '../locales/ar.json';
 import zh from '../locales/zh.json';
+import ja from '../locales/ja.json';
 
 const resources = {
   en: { translation: en },
@@ -26,6 +27,7 @@ const resources = {
   ru: { translation: ru },
   ar: { translation: ar },
   zh: { translation: zh },
+  ja: { translation: ja },
 };
 
 const RTL_LANGUAGES = new Set(['ar']);
@@ -46,7 +48,7 @@ export async function initI18n(): Promise<void> {
     .use(LanguageDetector)
     .init({
       resources,
-      supportedLngs: ['en', 'fr', 'de', 'es', 'it', 'pl', 'pt', 'nl', 'sv', 'ru', 'ar', 'zh'],
+      supportedLngs: ['en', 'fr', 'de', 'es', 'it', 'pl', 'pt', 'nl', 'sv', 'ru', 'ar', 'zh', 'ja'],
       nonExplicitSupportedLngs: true,
       fallbackLng: 'en',
       debug: import.meta.env.DEV,
@@ -85,7 +87,7 @@ export function isRTL(): boolean {
 
 export function getLocale(): string {
   const lang = getCurrentLanguage();
-  const map: Record<string, string> = { en: 'en-US', zh: 'zh-CN', pt: 'pt-BR' };
+  const map: Record<string, string> = { en: 'en-US', zh: 'zh-CN', pt: 'pt-BR', ja: 'ja-JP' };
   return map[lang] || lang;
 }
 
@@ -102,4 +104,5 @@ export const LANGUAGES = [
   { code: 'nl', label: 'Nederlands', flag: '🇳🇱' },
   { code: 'sv', label: 'Svenska', flag: '🇸🇪' },
   { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
 ];
