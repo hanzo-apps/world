@@ -22,15 +22,15 @@ function getCacheKey(headlines, mode, geoContext = '', variant = 'full', lang = 
   const sorted = headlines.slice(0, 8).sort().join('|');
   const geoHash = geoContext ? ':g' + hashString(geoContext).slice(0, 6) : '';
   const hash = hashString(`${mode}:${sorted}`);
-  const targetLangHash = ((mode === 'translate' && variant) || (mode !== 'translate' && variant && variant !== 'full' && variant !== 'tech')) ? `:${variant}` : '';
-  const langHash = (mode !== 'translate' && variant && (variant.length === 2)) ? `:${variant}` : ''; // Hacky reusing verify for lang
-  // Actually, let's just make the cache key include the full `variant` param which we will overload for language if needed, or add a new param.
-  // To keep it simple without changing `getCacheKey` signature too much:
-  // We'll trust the plan to send `lang` in the body, but getCacheKey needs to know it. 
-  // Let's update `getCacheKey` in the planning phase to accept `lang`. 
-  // Wait, I can't change the signature easily in `handler` without changing all calls.
-  // I'll update `getCacheKey` to accept an options object or just append it.
-  return `summary:${CACHE_VERSION}:${variant}:${hash}${geoHash}:${mode}`;
+  const normalizedVariant = typeof variant === 'string' && variant ? variant.toLowerCase() : 'full';
+  const normalizedLang = typeof lang === 'string' && lang ? lang.toLowerCase() : 'en';
+
+  if (mode === 'translate') {
+    const targetLang = normalizedVariant || normalizedLang;
+    return `summary:${CACHE_VERSION}:${mode}:${targetLang}:${hash}${geoHash}`;
+  }
+
+  return `summary:${CACHE_VERSION}:${mode}:${normalizedVariant}:${normalizedLang}:${hash}${geoHash}`;
 }
 
 // Deduplicate similar headlines (same story from different sources)
