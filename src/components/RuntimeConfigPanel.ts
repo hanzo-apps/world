@@ -234,7 +234,9 @@ export class RuntimeConfigPanel extends Panel {
       ? (pendingValid === false ? 'warn' : 'staged')
       : state.valid ? 'ok' : 'warn';
     const signupUrl = SIGNUP_URLS[key];
-    const helpText = t(`modals.runtimeConfig.help.${key}`);
+    const helpKey = `modals.runtimeConfig.help.${key}`;
+    const helpRaw = t(helpKey);
+    const helpText = helpRaw !== helpKey ? helpRaw : '';
     const linkHtml = signupUrl
       ? ` <a href="#" data-signup-url="${signupUrl}" class="runtime-secret-link" title="Get API key">&#x2197;</a>`
       : '';
