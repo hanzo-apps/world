@@ -2868,6 +2868,8 @@ export class App {
       this.inFlight.add(name);
       try {
         await fn();
+      } catch (e) {
+        console.error(`[App] ${name} failed:`, e);
       } finally {
         this.inFlight.delete(name);
       }
