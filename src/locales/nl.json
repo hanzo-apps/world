@@ -399,7 +399,7 @@
         "advisory": "Adviserend",
         "repairShip": "Reparatie schip",
         "internetOutage": "Internetstoring",
-        "medium": "medium",
+        "medium": "gemiddeld",
         "news": "Nieuws",
         "undisclosed": "Niet openbaar gemaakt",
         "stake": "inzet"
@@ -475,13 +475,13 @@
     "climate": {
       "noAnomalies": "Er zijn geen significante afwijkingen gedetecteerd",
       "zone": "Zone",
-      "temp": "Temp",
+      "temp": "Temp.",
       "precip": "Neerslag",
       "severityLabel": "Ernst",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
-        "normal": "NORMAL"
+        "extreme": "EXTREEM",
+        "moderate": "MATIG",
+        "normal": "NORMAAL"
       },
       "infoTooltip": "<strong>Klimaatafwijkingsmonitor</strong> Temperatuur- en neerslagafwijkingen ten opzichte van de basislijn van 30 dagen. Gegevens uit Open-Meteo (heranalyse van ERA5).<ul><li><strong>Extreem</strong>: afwijking van >5°C of >80 mm/dag</li><li><strong>Gemiddeld</strong>: afwijking van >3°C of >40 mm/dag</li></ul>Bewaakt 15 conflict-/rampgevoelige zones."
     },
@@ -505,6 +505,11 @@
       "base": "Basis",
       "nuclear": "Nucleair"
     },
+    "community": {
+      "joinDiscussion": "Doe mee aan de discussie",
+      "openDiscussion": "Open discussie",
+      "dontShowAgain": "Niet meer tonen"
+    },
     "threatLabels": {
       "critical": "KRIT",
       "high": "HOOG",
@@ -518,12 +523,12 @@
       "source": "Bron:",
       "defcon": "DEFCON {{level}}",
       "updated": "Bijgewerkt {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
-      "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusClosed": "GESLOTEN",
+      "statusSpike": "PIEK",
+      "statusHigh": "HOOG",
+      "statusElevated": "VERHOOGD",
+      "statusNominal": "NOMINAAL",
+      "statusQuiet": "RUSTIG",
       "justNow": "zojuist",
       "minutesAgo": "{{m}}m geleden",
       "hoursAgo": "{{h}}u geleden",
@@ -608,7 +613,7 @@
       "impactLevels": {
         "critical": "kritisch",
         "high": "hoog",
-        "medium": "medium",
+        "medium": "gemiddeld",
         "low": "laag"
       },
       "capacityPercent": "{{percent}}% capaciteit",
@@ -634,10 +639,10 @@
       "more": "+{{count}} meer bevindingen",
       "all": "Alle inlichtingenbevindingen ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "KRITIEK",
+        "high": "HOOG",
+        "medium": "GEMIDDELD",
+        "low": "LAAG"
       },
       "insights": {
         "criticalDestabilization": "Kritische destabilisatie - onmiddellijke aandacht",
@@ -691,8 +696,8 @@
       "hosts": "Gastheren",
       "badges": {
         "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "high": "HOOG",
+        "elevated": "VERHOOGD"
       },
       "country": "Land",
       "status": "Status",
@@ -1011,10 +1016,10 @@
     "viewUSGS": "Bekijk op USGS",
     "expired": "Verlopen",
     "timeAgo": {
-      "s": "s geleden",
-      "m": "m geleden",
-      "h": "u geleden",
-      "d": "d geleden"
+      "s": "{{count}}s geleden",
+      "m": "{{count}}m geleden",
+      "h": "{{count}}u geleden",
+      "d": "{{count}}d geleden"
     },
     "updated": "Bijgewerkt",
     "cableAdvisory": {
@@ -1137,7 +1142,7 @@
       "speed": "SNELHEID",
       "heading": "RUBRIEK",
       "mmsi": "MMSI",
-      "hull": "HULL #",
+      "hull": "ROMP #",
       "darkDescription": "⚠ Het schip is donker geworden - AIS-signaal verloren. Kan duiden op gevoelige operaties."
     },
     "militaryCluster": {
@@ -1416,15 +1421,15 @@
     "ago": "{{time}} geleden"
   },
   "header": {
-    "world": "WORLD",
+    "world": "WERELD",
     "tech": "TECH",
     "viewOnGitHub": "Bekijk op GitHub",
     "live": "LIVE",
     "search": "Zoekopdracht",
     "copyLink": "Kopieer link",
     "fullscreen": "Volledig scherm",
-    "settings": "PANELS",
-    "sources": "SOURCES",
+    "settings": "PANELEN",
+    "sources": "BRONNEN",
     "pinMap": "Kaart bovenaan vastzetten",
     "filterSources": "Bronnen filteren...",
     "sourcesEnabled": "{{enabled}}/{{total}} ingeschakeld",

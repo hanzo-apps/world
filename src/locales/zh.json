@@ -39,9 +39,9 @@
       "conflictEvents": "冲突事件"
     },
     "timeAgo": {
-      "m": "分钟前",
-      "h": "小时前",
-      "d": "天前"
+      "m": "{{count}}分钟前",
+      "h": "{{count}}小时前",
+      "d": "{{count}}天前"
     },
     "infra": {
       "pipeline": "管道",
@@ -346,9 +346,9 @@
         "conflictEvents": "冲突事件"
       },
       "timeAgo": {
-        "m": "分钟前",
-        "h": "小时前",
-        "d": "天前"
+        "m": "{{count}}分钟前",
+        "h": "{{count}}小时前",
+        "d": "{{count}}天前"
       },
       "infra": {
         "pipeline": "管道",
@@ -506,6 +506,11 @@
       "datacenter": "数据中心",
       "base": "基地",
       "nuclear": "核设施"
+    },
+    "community": {
+      "joinDiscussion": "加入讨论",
+      "openDiscussion": "打开讨论",
+      "dontShowAgain": "不再显示"
     },
     "threatLabels": {
       "critical": "危急",
@@ -1081,10 +1086,10 @@
     "viewUSGS": "在USGS上查看",
     "expired": "已过期",
     "timeAgo": {
-      "s": "秒前",
-      "m": "分钟前",
-      "h": "小时前",
-      "d": "天前"
+      "s": "{{count}}秒前",
+      "m": "{{count}}分钟前",
+      "h": "{{count}}小时前",
+      "d": "{{count}}天前"
     },
     "cableAdvisory": {
       "reported": "报告时间",

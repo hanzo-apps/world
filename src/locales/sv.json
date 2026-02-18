@@ -9,19 +9,19 @@
     "status": "Systemstatus",
     "insights": "AI-INSIKTER",
     "map": "Interactive Map",
-    "techMap": "Global Tech",
+    "techMap": "Global Teknik",
     "politics": "Världsnyheter",
     "tech": "Teknologi",
     "finance": "Finansiell",
     "gov": "Regering",
-    "intel": "Intel Feed",
+    "intel": "Underrättelseflöde",
     "middleeast": "Mellanöstern",
     "layoffs": "Uppsägningar Tracker",
     "ai": "AI/ML",
-    "startups": "Startups & VC",
-    "vcblogs": "VC Insights & Essays",
+    "startups": "Startups & Riskkapital",
+    "vcblogs": "Riskkapitalinsikter",
     "regionalStartups": "Globala uppstartsnyheter",
-    "unicorns": "Unicorn Tracker",
+    "unicorns": "Enhörningsspårare",
     "accelerators": "Acceleratorer och demodagar",
     "funding": "Finansiering & VC",
     "producthunt": "Produktjakt",
@@ -37,17 +37,17 @@
     "latam": "Latinamerika",
     "asia": "Asien-Stillahavsområdet",
     "energy": "Energi & resurser",
-    "etfFlows": "BTC ETF Tracker",
+    "etfFlows": "BTC ETF-spårare",
     "economic": "Ekonomiska indikatorer",
     "macroSignals": "Marknadsradar",
     "commodities": "Handelsvaror",
     "monitors": "Mina monitorer",
-    "regulation": "AI Regulation Dashboard",
+    "regulation": "AI-regleringspanel",
     "serviceStatus": "Servicestatus",
     "stablecoins": "Stablecoins",
     "events": "Tekniska evenemang",
-    "techHubs": "Hot Tech Hubs",
-    "techReadiness": "Tech Readiness Index",
+    "techHubs": "Teknikhubbar",
+    "techReadiness": "Teknikberedskapsindex",
     "ucdpEvents": "UCDP-konflikthändelser",
     "strategicRisk": "Strategisk risköversikt",
     "gdeltIntel": "LIVE-INTELLIGENS",
@@ -116,7 +116,7 @@
       "predictionLeading": "Förutsägelse ledande",
       "newsLeading": "Företagsnyheter Leading",
       "silentDivergence": "Tyst divergens",
-      "velocitySpike": "Velocity Spike",
+      "velocitySpike": "Hastighetspik",
       "keywordSpike": "Nyckelord Spike",
       "convergence": "Konvergens",
       "triangulation": "Triangulering",
@@ -298,11 +298,11 @@
       "addKeywords": "Lägg till nyckelord för att övervaka nyheter",
       "noMatches": "Inga matchningar i {{count}} artiklar",
       "showingMatches": "Visar {{count}} av {{total}} matchningar",
-      "match": "match",
-      "matches": "tändstickor"
+      "match": "träff",
+      "matches": "träffar"
     },
     "playback": {
-      "live": "Live",
+      "live": "LIVE",
       "toggleMode": "Växla uppspelningsläge",
       "historicalPlayback": "Historisk uppspelning"
     },
@@ -340,7 +340,7 @@
       },
       "timeAll": "Alla",
       "layers": {
-        "startupHubs": "Startup Hubs",
+        "startupHubs": "Startuphubbar",
         "techHQs": "Tekniska huvudkontor",
         "accelerators": "Acceleratorer",
         "cloudRegions": "Molnregioner",
@@ -372,7 +372,7 @@
         "stockExchanges": "Börser",
         "financialCenters": "Finansiella centra",
         "centralBanks": "centralbanker",
-        "commodityHubs": "Commodity Hubs",
+        "commodityHubs": "Råvaruhubbar",
         "gulfInvestments": "GCC-investeringar"
       },
       "layersTitle": "Lager",
@@ -382,7 +382,7 @@
         "militaryAircraft": "Militära flygplan",
         "vesselCluster": "Fartygskluster",
         "vessels": "fartyg",
-        "flightCluster": "Flight Cluster",
+        "flightCluster": "Flygkluster",
         "aircraft": "flygplan",
         "protest": "Protest",
         "protestsCount": "{{count}} protester",
@@ -399,7 +399,7 @@
         "advisory": "Rådgivande",
         "repairShip": "Reparera skepp",
         "internetOutage": "Internetavbrott",
-        "medium": "medium",
+        "medium": "medel",
         "news": "Nyheter",
         "undisclosed": "Ej avslöjad",
         "stake": "insats"
@@ -475,12 +475,12 @@
     "climate": {
       "noAnomalies": "Inga betydande anomalier upptäcktes",
       "zone": "Zon",
-      "temp": "Temp",
+      "temp": "Temp.",
       "precip": "Nederbörd",
       "severityLabel": "Stränghet",
       "severity": {
-        "extreme": "EXTREME",
-        "moderate": "MODERATE",
+        "extreme": "EXTREM",
+        "moderate": "MÅTTLIG",
         "normal": "NORMAL"
       },
       "infoTooltip": "<strong>Climate Anomaly Monitor</strong> Temperatur- och nederbördsavvikelser från 30-dagars baslinje. Data från Open-Meteo (ERA5-omanalys).<ul><li><strong>Extrem</strong>: >5°C eller >80 mm/dag avvikelse</li><li><strong>Måttlig</strong>: >3°C eller >40mm/dag avvikelse </li>__ eller störst_5__m/dag-avvikelse </li>__ eller högst </ul>__pron. zoner."
@@ -505,6 +505,11 @@
       "base": "Bas",
       "nuclear": "Kärnteknisk"
     },
+    "community": {
+      "joinDiscussion": "Gå med i diskussionen",
+      "openDiscussion": "Öppna diskussion",
+      "dontShowAgain": "Visa inte igen"
+    },
     "threatLabels": {
       "critical": "KRIT",
       "high": "HÖG",
@@ -518,12 +523,12 @@
       "source": "Källa:",
       "defcon": "DEFCON {{level}}",
       "updated": "Uppdaterad {{timeAgo}}",
-      "statusClosed": "CLOSED",
-      "statusSpike": "SPIKE",
-      "statusHigh": "HIGH",
-      "statusElevated": "ELEVATED",
-      "statusNominal": "NOMINAL",
-      "statusQuiet": "QUIET",
+      "statusClosed": "STÄNGD",
+      "statusSpike": "TOPP",
+      "statusHigh": "HÖG",
+      "statusElevated": "FÖRHÖJD",
+      "statusNominal": "NORMAL",
+      "statusQuiet": "LUGN",
       "justNow": "just nu",
       "minutesAgo": "{{m}}m sedan",
       "hoursAgo": "{{h}}h sedan",
@@ -557,10 +562,10 @@
       "elapsed": "Förfluten: {{elapsed}} s",
       "clickToView": "Klicka för att se {{name}} på kartan",
       "units": {
-        "fighters": "Fighters",
+        "fighters": "Jaktplan",
         "tankers": "Tankfartyg",
         "awacs": "AWACS",
-        "recon": "Recon",
+        "recon": "Spaning",
         "transport": "Transport",
         "bombers": "Bombplan",
         "drones": "Drönare",
@@ -594,13 +599,13 @@
         "cables": "Kablar",
         "pipelines": "Rörledningar",
         "ports": "Hamnar",
-        "chokepoints": "Chokepoints"
+        "chokepoints": "Flaskhalsar"
       },
       "filterType": {
         "cable": "kabel",
         "pipeline": "rörledning",
         "port": "hamn",
-        "chokepoint": "chokepoint",
+        "chokepoint": "flaskhals",
         "country": "land"
       },
       "selectPrompt": "Välj {{type}}...",
@@ -608,7 +613,7 @@
       "impactLevels": {
         "critical": "kritisk",
         "high": "hög",
-        "medium": "medium",
+        "medium": "medel",
         "low": "låg"
       },
       "capacityPercent": "{{percent}}% kapacitet",
@@ -634,10 +639,10 @@
       "more": "+{{count}} fler fynd",
       "all": "Alla intelligensfynd ({{count}})",
       "priority": {
-        "critical": "CRITICAL",
-        "high": "HIGH",
-        "medium": "MEDIUM",
-        "low": "LOW"
+        "critical": "KRITISK",
+        "high": "HÖG",
+        "medium": "MEDEL",
+        "low": "LÅG"
       },
       "insights": {
         "criticalDestabilization": "Kritisk destabilisering - omedelbar uppmärksamhet",
@@ -661,7 +666,7 @@
       "in": "i",
       "indicators": "Indikatorer",
       "oil": "Olja",
-      "gov": "Gov",
+      "gov": "Reg.",
       "noOilMetrics": "Inga oljemått tillgängliga. Lägg till EIA_API_KEY för att aktivera.",
       "noSpending": "Inga nya statliga utmärkelser",
       "awards": "utmärkelser",
@@ -672,7 +677,7 @@
       "region": "Område",
       "fires": "Bränder",
       "high": "Hög",
-      "total": "Total",
+      "total": "Totalt",
       "never": "aldrig",
       "time": {
         "justNow": "just nu",
@@ -686,13 +691,13 @@
       "refugees": "Flyktingar",
       "asylumSeekers": "Asylsökande",
       "idps": "internflyktingar",
-      "total": "Total",
+      "total": "Totalt",
       "origins": "Ursprung",
       "hosts": "Värdar",
       "badges": {
-        "crisis": "CRISIS",
-        "high": "HIGH",
-        "elevated": "ELEVATED"
+        "crisis": "KRIS",
+        "high": "HÖG",
+        "elevated": "FÖRHÖJD"
       },
       "country": "Land",
       "status": "Status",
@@ -816,7 +821,7 @@
     "capacity": "Kapacitet",
     "alerts": "Aktiva varningar",
     "common": {
-      "start": "START",
+      "start": "BÖRJA",
       "end": "SLUT",
       "updated": "UPPDATERAD"
     },
@@ -940,10 +945,10 @@
     "reason": "ORSAK",
     "threat": "HOT",
     "aka": "Även känd som",
-    "sponsor": "SPONSOR",
+    "sponsor": "SPONSRING",
     "origin": "URSPRUNG",
     "country": "LAND",
-    "malware": "MALWARE",
+    "malware": "SKADLIG KOD",
     "lastSeen": "SENAST SEDD",
     "open": "ÖPPEN",
     "tradingHours": "HANDELSTIDER",
@@ -989,7 +994,7 @@
     "whyItMatters": "VARFÖR DET SPELAR ROLL",
     "keyEntities": "NYCKELENTITETER",
     "relatedHeadlines": "RELATERADE RUBRIKER",
-    "liveIntel": "Live Intelligence",
+    "liveIntel": "Liveunderrättelser",
     "loadingNews": "Laddar globala nyheter...",
     "noCoverage": "Ingen aktuell global bevakning",
     "time": "Tid",
@@ -1011,10 +1016,10 @@
     "viewUSGS": "Visa på USGS",
     "expired": "Utgången",
     "timeAgo": {
-      "s": "s sedan",
-      "m": "m sedan",
-      "h": "h sedan",
-      "d": "d sedan"
+      "s": "{{count}}s sedan",
+      "m": "{{count}}m sedan",
+      "h": "{{count}}h sedan",
+      "d": "{{count}}d sedan"
     },
     "updated": "Uppdaterad",
     "cableAdvisory": {
@@ -1157,7 +1162,7 @@
         "exercise": "Naval övning",
         "deployment": "Naval utplacering",
         "patrol": "Patrullverksamhet",
-        "transit": "Fleet Transit",
+        "transit": "Flottransit",
         "unknown": "Sjöverksamhet"
       },
       "moreVessels": "+{{count}} fartyg till",
@@ -1416,15 +1421,15 @@
     "ago": "{{time}} sedan"
   },
   "header": {
-    "world": "WORLD",
+    "world": "VÄRLD",
     "tech": "TECH",
     "viewOnGitHub": "Visa på GitHub",
     "live": "LIVE",
     "search": "Söka",
     "copyLink": "Kopiera länk",
     "fullscreen": "Helskärm",
-    "settings": "PANELS",
-    "sources": "SOURCES",
+    "settings": "PANELER",
+    "sources": "KÄLLOR",
     "pinMap": "Fäst kartan överst",
     "filterSources": "Filtrera källor...",
     "sourcesEnabled": "{{enabled}}/{{total}} aktiverad",

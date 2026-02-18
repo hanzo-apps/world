@@ -39,9 +39,9 @@
       "conflictEvents": "conflict events"
     },
     "timeAgo": {
-      "m": "m ago",
-      "h": "h ago",
-      "d": "d ago"
+      "m": "{{count}}m ago",
+      "h": "{{count}}h ago",
+      "d": "{{count}}d ago"
     },
     "infra": {
       "pipeline": "Pipelines",
@@ -346,9 +346,9 @@
         "conflictEvents": "conflict events"
       },
       "timeAgo": {
-        "m": "m ago",
-        "h": "h ago",
-        "d": "d ago"
+        "m": "{{count}}m ago",
+        "h": "{{count}}h ago",
+        "d": "{{count}}d ago"
       },
       "infra": {
         "pipeline": "Pipelines",
@@ -506,6 +506,11 @@
       "datacenter": "Datacenter",
       "base": "Base",
       "nuclear": "Nuclear"
+    },
+    "community": {
+      "joinDiscussion": "Join the Discussion",
+      "openDiscussion": "Open Discussion",
+      "dontShowAgain": "Don't show again"
     },
     "threatLabels": {
       "critical": "CRIT",
@@ -1081,10 +1086,10 @@
     "viewUSGS": "View on USGS",
     "expired": "Expired",
     "timeAgo": {
-      "s": "s ago",
-      "m": "m ago",
-      "h": "h ago",
-      "d": "d ago"
+      "s": "{{count}}s ago",
+      "m": "{{count}}m ago",
+      "h": "{{count}}h ago",
+      "d": "{{count}}d ago"
     },
     "cableAdvisory": {
       "reported": "REPORTED",
