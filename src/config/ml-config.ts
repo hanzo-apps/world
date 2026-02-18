@@ -42,6 +42,15 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     task: 'text2text-generation',
   },
   {
+    id: 'summarization-beta',
+    name: 'Flan-T5-small',
+    hfModel: 'Xenova/flan-t5-small',
+    size: 60_000_000,
+    priority: 3,
+    required: false,
+    task: 'text2text-generation',
+  },
+  {
     id: 'ner',
     name: 'BERT-NER',
     hfModel: 'Xenova/bert-base-NER',

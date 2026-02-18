@@ -267,9 +267,9 @@ class MLWorkerManager {
   /**
    * Generate summaries for texts
    */
-  async summarize(texts: string[]): Promise<string[]> {
+  async summarize(texts: string[], modelId?: string): Promise<string[]> {
     if (!this.isReady) throw new Error('ML Worker not ready');
-    return this.request<string[]>('summarize', { texts });
+    return this.request<string[]>('summarize', { texts, ...(modelId && { modelId }) });
   }
 
   /**
