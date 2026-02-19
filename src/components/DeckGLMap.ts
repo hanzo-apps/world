@@ -323,12 +323,12 @@ export class DeckGLMap {
     this.rebuildDatacenterSupercluster();
 
     this.debouncedRebuildLayers = debounce(() => {
-      if (this.renderPaused || this.webglLost) return;
-      this.maplibreMap?.resize();
+      if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
+      this.maplibreMap.resize();
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     }, 150);
     this.rafUpdateLayers = rafSchedule(() => {
-      if (this.renderPaused || this.webglLost) return;
+      if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     });
 
@@ -3058,7 +3058,7 @@ export class DeckGLMap {
   }
 
   private updateLayers(): void {
-    if (this.renderPaused || this.webglLost) return;
+    if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
     const startTime = performance.now();
     if (this.deckOverlay) {
       this.deckOverlay.setProps({ layers: this.buildLayers() });
@@ -3845,7 +3845,9 @@ export class DeckGLMap {
     this.layerCache.clear();
 
     this.deckOverlay?.finalize();
+    this.deckOverlay = null;
     this.maplibreMap?.remove();
+    this.maplibreMap = null;
 
     this.container.innerHTML = '';
   }
