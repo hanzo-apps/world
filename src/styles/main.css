@@ -1432,8 +1432,8 @@ canvas,
 }
 
 .webcam-view-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--red);
+  border-color: var(--red);
   color: white;
 }
 
@@ -14123,6 +14123,7 @@ body.has-critical-banner .panels-grid {
 /* ── Ultra-wide layout: map left, panels wrap around ── */
 @media (min-width: 2000px) {
   .main-content {
+    --ultrawide-wide-panel-height: clamp(280px, 31vh, 420px);
     display: block;
     overflow-y: auto;
   }
@@ -14130,9 +14131,10 @@ body.has-critical-banner .panels-grid {
   .map-section {
     float: left;
     width: 60%;
-    height: 65vh !important;
-    min-height: 400px;
-    max-height: 65vh;
+    /* Default map height tracks two stacked wide media panels (+ float margins). */
+    height: calc(var(--ultrawide-wide-panel-height) + var(--ultrawide-wide-panel-height) + 12px);
+    min-height: 320px;
+    max-height: 90vh;
     margin: 0 4px 4px 0;
   }
 
@@ -14141,7 +14143,8 @@ body.has-critical-banner .panels-grid {
   }
 
   .map-resize-handle {
-    display: none;
+    /* Keep resize available on ultrawide so users can fine-tune map/panel balance. */
+    display: flex;
   }
 
   .panels-grid {
@@ -14160,7 +14163,7 @@ body.has-critical-banner .panels-grid {
     /* One wide tile must fit exactly in the 40% rail beside the map. */
     width: calc(40% - 10px);
     /* Keep two media-heavy wide tiles stackable beside the map on ultrawide screens. */
-    height: min(420px, 31vh);
+    height: var(--ultrawide-wide-panel-height);
     min-height: 280px;
     max-height: 420px;
   }
