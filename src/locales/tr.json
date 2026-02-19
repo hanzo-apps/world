@@ -50,6 +50,29 @@
       "base": "Askeri Usler",
       "nuclear": "Nukleer Tesisler",
       "port": "Limanlar"
+    },
+    "levels": {
+      "critical": "Kritik",
+      "high": "Yuksek",
+      "elevated": "Yukseldi",
+      "moderate": "Orta",
+      "normal": "Normal",
+      "low": "Dusuk"
+    },
+    "trends": {
+      "rising": "Yukseliyor",
+      "falling": "Dusuyor",
+      "stable": "Sabit"
+    },
+    "fallback": {
+      "instabilityIndex": "**Istikrarsizlik Endeksi: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "{{count}} aktif protesto tespit edildi",
+      "aircraftTracked": "{{count}} askeri ucak takip ediliyor",
+      "vesselsTracked": "{{count}} askeri gemi takip ediliyor",
+      "internetOutages": "{{count}} internet kesintisi",
+      "recentEarthquakes": "{{count}} son deprem",
+      "stockIndex": "Borsa endeksi: {{value}}",
+      "recentHeadlines": "**Son basliklar:**"
     }
   },
   "header": {
@@ -363,6 +386,15 @@
     }
   },
   "components": {
+    "webcams": {
+      "regions": {
+        "all": "TUMU",
+        "mideast": "ORTA DOGU",
+        "europe": "AVRUPA",
+        "americas": "AMERIKA",
+        "asia": "ASYA"
+      }
+    },
     "monitor": {
       "placeholder": "Anahtar kelimeler (virgul ile ayirin)",
       "add": "+ Takip Ekle",
@@ -494,7 +526,46 @@
         "auxiliary": "Yardimci",
         "navalVessels": "Deniz Gemileri"
       },
-      "infoTooltip": "<strong>Metodoloji</strong><p>Askeri ucak ve deniz gemilerini harekat alanlarina gore toplar.</p><ul><li><strong>Normal:</strong> Temel aktivite</li><li><strong>Artmis:</strong> Esik ustunde (50+ ucak)</li><li><strong>Kritik:</strong> Yuksek yogunluk (100+ ucak)</li></ul><p><strong>Taarruz Yetkinligi:</strong> Surdurulebilir operasyonlar icin yeterli sayida Tanker + AWACS + Savas Ucagi bulunmasi.</p>"
+      "infoTooltip": "<strong>Metodoloji</strong><p>Askeri ucak ve deniz gemilerini harekat alanlarina gore toplar.</p><ul><li><strong>Normal:</strong> Temel aktivite</li><li><strong>Artmis:</strong> Esik ustunde (50+ ucak)</li><li><strong>Kritik:</strong> Yuksek yogunluk (100+ ucak)</li></ul><p><strong>Taarruz Yetkinligi:</strong> Surdurulebilir operasyonlar icin yeterli sayida Tanker + AWACS + Savas Ucagi bulunmasi.</p>",
+      "scanningTheaters": "Harekat Alanlari Taraniyor",
+      "positions": "Ucak konumlari",
+      "navalVesselsLoading": "Deniz gemileri",
+      "theaterAnalysis": "Harekat alani analizi",
+      "connectingStreams": "Canli ADS-B ve AIS akislarina baglaniyor...",
+      "initialLoadNote": "Ilk yukleme, takip verileri biriktikce 30-60 saniye surer",
+      "acquiringData": "Veri Aliniyor",
+      "acquiringDesc": "Askeri ucus verileri icin ADS-B agina baglaniyor. Ilk yuklemede 30-60 saniye surebilir.",
+      "openSkyAdsb": "OpenSky ADS-B",
+      "aisVesselStream": "AIS Gemi Akisi",
+      "retryNow": "Simdi Yeniden Dene",
+      "feedRateLimited": "Veri Akisi Hiz Sinirlamasi",
+      "rateLimitedDesc": "OpenSky API istek sinirlarina sahiptir. Panel birkac dakika icinde otomatik olarak yeniden deneyecek veya simdi tekrar deneyebilirsiniz.",
+      "rateLimitedTip": "Ipucu: Yogun saatler (UTC 12:00-20:00) genellikle daha yuksek sinirlamalara sahiptir.",
+      "tryAgain": "Tekrar Dene",
+      "badges": {
+        "critical": "KRIT",
+        "elevated": "ARTM",
+        "normal": "NORM"
+      },
+      "trendStable": "sabit",
+      "domains": {
+        "air": "HAVA",
+        "sea": "DENIZ"
+      },
+      "strike": "STRIKE",
+      "staleWarning": "Onbellek verileri kullaniliyor - canli akis gecici olarak kullanilamiyor",
+      "updated": "Guncelleme:",
+      "theaters": {
+        "iran-theater": "İran Tiyatrosu",
+        "taiwan-theater": "Tayvan Boğazı",
+        "baltic-theater": "Baltık Tiyatrosu",
+        "blacksea-theater": "Karadeniz",
+        "korea-theater": "Kore Yarımadası",
+        "south-china-sea": "Güney Çin Denizi",
+        "east-med-theater": "Doğu Akdeniz",
+        "israel-gaza-theater": "İsrail/Gazze",
+        "yemen-redsea-theater": "Yemen/Kızıldeniz"
+      }
     },
     "countryBrief": {
       "shareStory": "Hikayeyi paylas",
@@ -729,6 +800,18 @@
     },
     "strategicRisk": {
       "noRisks": "Onemli risk tespit edilmedi",
+      "levels": {
+        "critical": "Kritik",
+        "elevated": "Artmis",
+        "moderate": "Orta",
+        "low": "Dusuk"
+      },
+      "trend": "Egilim",
+      "trends": {
+        "escalating": "Tirmaniyor",
+        "deEscalating": "Azaliyor",
+        "stable": "Sabit"
+      },
       "infoTooltip": "<strong>Metodoloji</strong> Bilesik puan (0-100) harmanlama:<ul><li>%50 Ulke Istikrarsizligi (ilk 5 agirlikli)</li><li>%30 Cografi yakinlasma bolgeleri</li><li>%20 Altyapi olaylari</li></ul>Her 5 dakikada otomatik yenilenir."
     },
     "techEvents": {
@@ -867,6 +950,39 @@
     },
     "prediction": {
       "infoTooltip": "<strong>Tahmin Piyasalari</strong> Gercek parali tahmin piyasalari:<ul><li>Fiyatlar kalabalik olasilik tahminlerini yansitir</li><li>Yuksek hacim = daha guvenilir sinyal</li><li>Jeopolitik ve guncel olaylara odakli</li></ul>Kaynak: Polymarket (polymarket.com)"
+    },
+    "etfFlows": {
+      "unavailable": "ETF verileri gecici olarak kullanilamiyor",
+      "netFlow": "Net Akis",
+      "estFlow": "Tahmini Akis",
+      "totalVol": "Toplam Hacim",
+      "etfs": "ETFs",
+      "netInflow": "NET GIRIS",
+      "netOutflow": "NET CIKIS",
+      "table": {
+        "ticker": "Sembol",
+        "issuer": "Ihraccci",
+        "estFlow": "Tahmini Akis",
+        "volume": "Hacim",
+        "change": "Degisim"
+      }
+    },
+    "macroSignals": {
+      "overall": "Genel",
+      "verdict": {
+        "buy": "AL",
+        "cash": "NAKIT"
+      },
+      "bullish": "{{count}}/{{total}} yukselis yonlu",
+      "signals": {
+        "liquidity": "Likidite",
+        "flow": "Akis",
+        "regime": "Rejim",
+        "btcTrend": "BTC Egilimi",
+        "hashRate": "Hash Rate",
+        "mining": "Madencilik",
+        "fearGreed": "Korku &amp; Acgozluluk"
+      }
     }
   },
   "popups": {
