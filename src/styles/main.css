@@ -14118,3 +14118,52 @@ body.has-critical-banner .panels-grid {
 .cw-dismiss:hover {
   color: var(--text-dim, #888);
 }
+
+/* ── Ultra-wide layout: map left, panels wrap around ── */
+@media (min-width: 2000px) {
+  .main-content {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .map-section {
+    float: left;
+    width: 60%;
+    height: 65vh !important;
+    min-height: 400px;
+    max-height: 65vh;
+    margin: 0 4px 4px 0;
+  }
+
+  .map-section.pinned {
+    position: relative;
+  }
+
+  .map-resize-handle {
+    display: none;
+  }
+
+  .panels-grid {
+    display: contents;
+  }
+
+  .panel {
+    float: left;
+    width: calc(20% - 8px);
+    height: 320px;
+    min-height: 200px;
+    margin: 3px;
+  }
+
+  .panel-wide {
+    width: calc(40% - 8px);
+    height: 420px;
+  }
+
+  .panel.span-1,
+  .panel.span-2,
+  .panel.span-3,
+  .panel.span-4 {
+    grid-row: unset !important;
+  }
+}
