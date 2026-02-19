@@ -45,7 +45,7 @@ Sentry.init({
     /Java bridge method invocation error/,
     /Could not compile fragment shader/,
     /can't redefine non-configurable property/,
-    /Can't find variable: (CONFIG|currentInset)/,
+    /Can.t find variable: (CONFIG|currentInset)/,
     /invalid origin/,
     /\.data\.split is not a function/,
   ],
