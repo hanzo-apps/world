@@ -36,6 +36,8 @@ const SIGNUP_URLS: Partial<Record<RuntimeSecretKey, string>> = {
   FINNHUB_API_KEY: 'https://finnhub.io/register',
   NASA_FIRMS_API_KEY: 'https://firms.modaps.eosdis.nasa.gov/api/area/',
   UC_DP_KEY: 'https://ucdp.uu.se/downloads/',
+  OLLAMA_API_URL: 'https://ollama.com/download',
+  OLLAMA_MODEL: 'https://ollama.com/library',
 };
 
 const MASKED_SENTINEL = '__WM_MASKED__';
