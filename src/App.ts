@@ -961,15 +961,15 @@ export class App {
           this.countryBriefPage!.updateBrief({ brief: fallbackBrief, country, code, fallback: true });
         } else {
           const lines: string[] = [];
-          if (score) lines.push(`**Instability Index: ${score.score}/100** (${score.level}, ${score.trend})`);
-          if (signals.protests > 0) lines.push(`${signals.protests} active protests detected`);
-          if (signals.militaryFlights > 0) lines.push(`${signals.militaryFlights} military aircraft tracked`);
-          if (signals.militaryVessels > 0) lines.push(`${signals.militaryVessels} military vessels tracked`);
-          if (signals.outages > 0) lines.push(`${signals.outages} internet outages`);
-          if (signals.earthquakes > 0) lines.push(`${signals.earthquakes} recent earthquakes`);
-          if (context.stockIndex) lines.push(`Stock index: ${context.stockIndex}`);
+          if (score) lines.push(t('countryBrief.fallback.instabilityIndex', { score: String(score.score), level: t(`countryBrief.levels.${score.level}`), trend: t(`countryBrief.trends.${score.trend}`) }));
+          if (signals.protests > 0) lines.push(t('countryBrief.fallback.protestsDetected', { count: String(signals.protests) }));
+          if (signals.militaryFlights > 0) lines.push(t('countryBrief.fallback.aircraftTracked', { count: String(signals.militaryFlights) }));
+          if (signals.militaryVessels > 0) lines.push(t('countryBrief.fallback.vesselsTracked', { count: String(signals.militaryVessels) }));
+          if (signals.outages > 0) lines.push(t('countryBrief.fallback.internetOutages', { count: String(signals.outages) }));
+          if (signals.earthquakes > 0) lines.push(t('countryBrief.fallback.recentEarthquakes', { count: String(signals.earthquakes) }));
+          if (context.stockIndex) lines.push(t('countryBrief.fallback.stockIndex', { value: context.stockIndex }));
           if (briefHeadlines.length > 0) {
-            lines.push('', '**Recent headlines:**');
+            lines.push('', t('countryBrief.fallback.recentHeadlines'));
             briefHeadlines.slice(0, 5).forEach(h => lines.push(`• ${h}`));
           }
           if (lines.length > 0) {
@@ -2794,10 +2794,22 @@ export class App {
     const resizeHandle = document.getElementById('mapResizeHandle');
     if (!mapSection || !resizeHandle) return;
 
+    const getMinHeight = () => (window.innerWidth >= 2000 ? 320 : 400);
+    const getMaxHeight = () => Math.max(getMinHeight(), window.innerHeight - 60);
+
     // Load saved height
     const savedHeight = localStorage.getItem('map-height');
     if (savedHeight) {
-      mapSection.style.height = savedHeight;
+      const numeric = Number.parseInt(savedHeight, 10);
+      if (Number.isFinite(numeric)) {
+        const clamped = Math.max(getMinHeight(), Math.min(numeric, getMaxHeight()));
+        mapSection.style.height = `${clamped}px`;
+        if (clamped !== numeric) {
+          localStorage.setItem('map-height', `${clamped}px`);
+        }
+      } else {
+        localStorage.removeItem('map-height');
+      }
     }
 
     let isResizing = false;
@@ -2816,7 +2828,7 @@ export class App {
     document.addEventListener('mousemove', (e) => {
       if (!isResizing) return;
       const deltaY = e.clientY - startY;
-      const newHeight = Math.max(400, Math.min(startHeight + deltaY, window.innerHeight - 60));
+      const newHeight = Math.max(getMinHeight(), Math.min(startHeight + deltaY, getMaxHeight()));
       mapSection.style.height = `${newHeight}px`;
       this.map?.render();
     });
