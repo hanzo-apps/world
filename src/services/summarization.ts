@@ -7,7 +7,7 @@
 import { mlWorker } from './ml-worker';
 import { SITE_VARIANT } from '@/config';
 import { BETA_MODE } from '@/config/beta';
-import { isFeatureAvailable } from './runtime-config';
+import { isFeatureAvailable, type RuntimeFeatureId } from './runtime-config';
 
 export type SummarizationProvider = 'ollama' | 'groq' | 'openrouter' | 'browser' | 'cache';
 
@@ -19,10 +19,32 @@ export interface SummarizationResult {
 
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
-async function tryOllama(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
-  if (!isFeatureAvailable('aiOllama')) return null;
+// ── Provider interface ──
+
+interface ApiProviderConfig {
+  featureId: RuntimeFeatureId;
+  endpoint: string;
+  name: SummarizationProvider;
+  label: string;  // Human-readable name for progress messages
+}
+
+const API_PROVIDERS: ApiProviderConfig[] = [
+  { featureId: 'aiOllama',      endpoint: '/api/ollama-summarize',     name: 'ollama',     label: 'Ollama' },
+  { featureId: 'aiGroq',        endpoint: '/api/groq-summarize',       name: 'groq',       label: 'Groq AI' },
+  { featureId: 'aiOpenRouter',  endpoint: '/api/openrouter-summarize', name: 'openrouter',  label: 'OpenRouter' },
+];
+
+// ── Unified API provider caller ──
+
+async function tryApiProvider(
+  provider: ApiProviderConfig,
+  headlines: string[],
+  geoContext?: string,
+  lang?: string,
+): Promise<SummarizationResult | null> {
+  if (!isFeatureAvailable(provider.featureId)) return null;
   try {
-    const response = await fetch('/api/ollama-summarize', {
+    const response = await fetch(provider.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
@@ -31,80 +53,24 @@ async function tryOllama(headlines: string[], geoContext?: string, lang?: string
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (data.fallback) return null;
-      throw new Error(`Ollama error: ${response.status}`);
+      throw new Error(`${provider.label} error: ${response.status}`);
     }
 
     const data = await response.json();
-    const provider = data.cached ? 'cache' : 'ollama';
-    console.log(`[Summarization] ${provider === 'cache' ? 'Redis cache hit' : 'Ollama success'}:`, data.model);
+    const resultProvider = data.cached ? 'cache' : provider.name;
+    console.log(`[Summarization] ${data.cached ? 'Redis cache hit' : `${provider.label} success`}:`, data.model);
     return {
       summary: data.summary,
-      provider: provider as SummarizationProvider,
+      provider: resultProvider as SummarizationProvider,
       cached: !!data.cached,
     };
   } catch (error) {
-    console.warn('[Summarization] Ollama failed:', error);
+    console.warn(`[Summarization] ${provider.label} failed:`, error);
     return null;
   }
 }
 
-async function tryGroq(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
-  if (!isFeatureAvailable('aiGroq')) return null;
-  try {
-    const response = await fetch('/api/groq-summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      if (data.fallback) return null;
-      throw new Error(`Groq error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const provider = data.cached ? 'cache' : 'groq';
-    console.log(`[Summarization] ${provider === 'cache' ? 'Redis cache hit' : 'Groq success'}:`, data.model);
-    return {
-      summary: data.summary,
-      provider: provider as SummarizationProvider,
-      cached: !!data.cached,
-    };
-  } catch (error) {
-    console.warn('[Summarization] Groq failed:', error);
-    return null;
-  }
-}
-
-async function tryOpenRouter(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
-  if (!isFeatureAvailable('aiOpenRouter')) return null;
-  try {
-    const response = await fetch('/api/openrouter-summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      if (data.fallback) return null;
-      throw new Error(`OpenRouter error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const provider = data.cached ? 'cache' : 'openrouter';
-    console.log(`[Summarization] ${provider === 'cache' ? 'Redis cache hit' : 'OpenRouter success'}:`, data.model);
-    return {
-      summary: data.summary,
-      provider: provider as SummarizationProvider,
-      cached: !!data.cached,
-    };
-  } catch (error) {
-    console.warn('[Summarization] OpenRouter failed:', error);
-    return null;
-  }
-}
+// ── Browser T5 provider (different interface — no API call) ──
 
 async function tryBrowserT5(headlines: string[], modelId?: string): Promise<SummarizationResult | null> {
   try {
@@ -134,6 +100,26 @@ async function tryBrowserT5(headlines: string[], modelId?: string): Promise<Summ
   }
 }
 
+// ── Fallback chain runner ──
+
+async function runApiChain(
+  providers: ApiProviderConfig[],
+  headlines: string[],
+  geoContext: string | undefined,
+  lang: string | undefined,
+  onProgress: ProgressCallback | undefined,
+  stepOffset: number,
+  totalSteps: number,
+): Promise<SummarizationResult | null> {
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    onProgress?.(stepOffset + i, totalSteps, `Connecting to ${provider.label}...`);
+    const result = await tryApiProvider(provider, headlines, geoContext, lang);
+    if (result) return result;
+  }
+  return null;
+}
+
 /**
  * Generate a summary using the fallback chain: Ollama -> Groq -> OpenRouter -> Browser T5
  * Server-side Redis caching is handled by the API endpoints
@@ -153,97 +139,58 @@ export async function generateSummary(
     const modelReady = mlWorker.isAvailable && mlWorker.isModelLoaded('summarization-beta');
 
     if (modelReady) {
-      const totalSteps = 4;
+      const totalSteps = 1 + API_PROVIDERS.length;
       // Model already loaded — use browser T5-small first
       onProgress?.(1, totalSteps, 'Running local AI model (beta)...');
       const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
       if (browserResult) {
         console.log('[BETA] Browser T5-small:', browserResult.summary);
-        tryGroq(headlines, geoContext).then(r => {
+        tryApiProvider(API_PROVIDERS[1], headlines, geoContext).then(r => {
           if (r) console.log('[BETA] Groq comparison:', r.summary);
         }).catch(() => {});
         return browserResult;
       }
 
-      // Warm model failed inference — fallback chain
-      onProgress?.(2, totalSteps, 'Connecting to Ollama...');
-      const ollamaResult = await tryOllama(headlines, geoContext);
-      if (ollamaResult) return ollamaResult;
-
-      onProgress?.(3, totalSteps, 'Connecting to Groq AI...');
-      const groqResult = await tryGroq(headlines, geoContext);
-      if (groqResult) return groqResult;
-
-      onProgress?.(4, totalSteps, 'Trying OpenRouter...');
-      const openRouterResult = await tryOpenRouter(headlines, geoContext);
-      if (openRouterResult) return openRouterResult;
+      // Warm model failed inference — fallback through API providers
+      const chainResult = await runApiChain(API_PROVIDERS, headlines, geoContext, undefined, onProgress, 2, totalSteps);
+      if (chainResult) return chainResult;
     } else {
-      const totalSteps = 5;
+      const totalSteps = API_PROVIDERS.length + 2;
       console.log('[BETA] T5-small not loaded yet, using cloud providers first');
-      // Kick off model load in background for next time
       if (mlWorker.isAvailable) {
         mlWorker.loadModel('summarization-beta').catch(() => {});
       }
 
-      // Ollama + cloud providers while model loads
-      onProgress?.(1, totalSteps, 'Connecting to Ollama...');
-      const ollamaResult = await tryOllama(headlines, geoContext);
-      if (ollamaResult) return ollamaResult;
-
-      onProgress?.(2, totalSteps, 'Connecting to Groq AI...');
-      const groqResult = await tryGroq(headlines, geoContext);
-      if (groqResult) {
-        console.log('[BETA] Groq:', groqResult.summary);
-        return groqResult;
+      // API providers while model loads
+      const chainResult = await runApiChain(API_PROVIDERS, headlines, geoContext, undefined, onProgress, 1, totalSteps);
+      if (chainResult) {
+        if (chainResult.provider === 'groq') console.log('[BETA] Groq:', chainResult.summary);
+        return chainResult;
       }
-
-      onProgress?.(3, totalSteps, 'Trying OpenRouter...');
-      const openRouterResult = await tryOpenRouter(headlines, geoContext);
-      if (openRouterResult) return openRouterResult;
 
       // Last resort: try browser T5 (may have finished loading by now)
       if (mlWorker.isAvailable) {
-        onProgress?.(4, totalSteps, 'Waiting for local AI model...');
+        onProgress?.(API_PROVIDERS.length + 1, totalSteps, 'Waiting for local AI model...');
         const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
         if (browserResult) return browserResult;
       }
 
-      onProgress?.(5, totalSteps, 'No providers available');
+      onProgress?.(totalSteps, totalSteps, 'No providers available');
     }
 
     console.warn('[BETA] All providers failed');
     return null;
   }
 
-  const totalSteps = 4;
+  // Normal mode: API chain → Browser T5
+  const totalSteps = API_PROVIDERS.length + 1;
 
-  // Step 1: Try Ollama (local LLM, unlimited, desktop-first)
-  onProgress?.(1, totalSteps, 'Connecting to Ollama...');
-  const ollamaResult = await tryOllama(headlines, geoContext, lang);
-  if (ollamaResult) {
-    return ollamaResult;
-  }
+  const chainResult = await runApiChain(API_PROVIDERS, headlines, geoContext, lang, onProgress, 1, totalSteps);
+  if (chainResult) return chainResult;
 
-  // Step 2: Try Groq (fast, 14.4K/day with 8b-instant + Redis cache)
-  onProgress?.(2, totalSteps, 'Connecting to Groq AI...');
-  const groqResult = await tryGroq(headlines, geoContext, lang);
-  if (groqResult) {
-    return groqResult;
-  }
-
-  // Step 3: Try OpenRouter (fallback, 50/day + Redis cache)
-  onProgress?.(3, totalSteps, 'Trying OpenRouter...');
-  const openRouterResult = await tryOpenRouter(headlines, geoContext, lang);
-  if (openRouterResult) {
-    return openRouterResult;
-  }
-
-  // Step 4: Try Browser T5 (local, unlimited but slower)
-  onProgress?.(4, totalSteps, 'Loading local AI model...');
+  onProgress?.(totalSteps, totalSteps, 'Loading local AI model...');
   const browserResult = await tryBrowserT5(headlines);
-  if (browserResult) {
-    return browserResult;
-  }
+  if (browserResult) return browserResult;
 
   console.warn('[Summarization] All providers failed');
   return null;
@@ -262,17 +209,20 @@ export async function translateText(
 ): Promise<string | null> {
   if (!text) return null;
 
-  // Step 1: Try Ollama
-  if (isFeatureAvailable('aiOllama')) {
-    onProgress?.(1, 3, 'Translating with Ollama...');
+  const totalSteps = API_PROVIDERS.length;
+  for (let i = 0; i < API_PROVIDERS.length; i++) {
+    const provider = API_PROVIDERS[i];
+    if (!isFeatureAvailable(provider.featureId)) continue;
+
+    onProgress?.(i + 1, totalSteps, `Translating with ${provider.label}...`);
     try {
-      const response = await fetch('/api/ollama-summarize', {
+      const response = await fetch(provider.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           headlines: [text],
           mode: 'translate',
-          variant: targetLang
+          variant: targetLang,
         }),
       });
 
@@ -281,53 +231,7 @@ export async function translateText(
         return data.summary;
       }
     } catch (e) {
-      console.warn('Ollama translation failed', e);
-    }
-  }
-
-  // Step 2: Try Groq
-  if (isFeatureAvailable('aiGroq')) {
-    onProgress?.(2, 3, 'Translating with Groq...');
-    try {
-      const response = await fetch('/api/groq-summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          headlines: [text],
-          mode: 'translate',
-          variant: targetLang
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.summary;
-      }
-    } catch (e) {
-      console.warn('Groq translation failed', e);
-    }
-  }
-
-  // Step 3: Try OpenRouter
-  if (isFeatureAvailable('aiOpenRouter')) {
-    onProgress?.(3, 3, 'Translating with OpenRouter...');
-    try {
-      const response = await fetch('/api/openrouter-summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          headlines: [text],
-          mode: 'translate',
-          variant: targetLang
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.summary;
-      }
-    } catch (e) {
-      console.warn('OpenRouter translation failed', e);
+      console.warn(`${provider.label} translation failed`, e);
     }
   }
 
