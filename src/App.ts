@@ -566,6 +566,7 @@ export class App {
             url,
             error: error instanceof Error ? error.message : String(error),
           });
+          window.open(url, '_blank', 'noopener');
         });
         return;
       }
