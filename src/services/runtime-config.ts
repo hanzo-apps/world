@@ -19,7 +19,9 @@ export type RuntimeSecretKey =
   | 'AISSTREAM_API_KEY'
   | 'FINNHUB_API_KEY'
   | 'NASA_FIRMS_API_KEY'
-  | 'UC_DP_KEY';
+  | 'UC_DP_KEY'
+  | 'OLLAMA_API_URL'
+  | 'OLLAMA_MODEL';
 
 export type RuntimeFeatureId =
   | 'aiGroq'
@@ -35,7 +37,8 @@ export type RuntimeFeatureId =
   | 'aisRelay'
   | 'openskyRelay'
   | 'finnhubMarkets'
-  | 'nasaFirms';
+  | 'nasaFirms'
+  | 'aiOllama';
 
 export interface RuntimeFeatureDefinition {
   id: RuntimeFeatureId;
@@ -75,9 +78,17 @@ const defaultToggles: Record<RuntimeFeatureId, boolean> = {
   openskyRelay: true,
   finnhubMarkets: true,
   nasaFirms: true,
+  aiOllama: true,
 };
 
 export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
+  {
+    id: 'aiOllama',
+    name: 'Ollama local summarization',
+    description: 'Local LLM provider via Ollama OpenAI-compatible endpoint (desktop-first).',
+    requiredSecrets: ['OLLAMA_API_URL'],
+    fallback: 'Falls back to Groq, then OpenRouter, then local browser model.',
+  },
   {
     id: 'aiGroq',
     name: 'Groq summarization',
@@ -199,6 +210,7 @@ function readStoredToggles(): Record<RuntimeFeatureId, boolean> {
 const URL_SECRET_KEYS = new Set<RuntimeSecretKey>([
   'WS_RELAY_URL',
   'VITE_OPENSKY_RELAY_URL',
+  'OLLAMA_API_URL',
 ]);
 
 export interface SecretVerificationResult {
