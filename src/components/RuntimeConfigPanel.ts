@@ -40,6 +40,13 @@ const SIGNUP_URLS: Partial<Record<RuntimeSecretKey, string>> = {
   OLLAMA_MODEL: 'https://ollama.com/library',
 };
 
+const PLAINTEXT_KEYS = new Set<RuntimeSecretKey>([
+  'OLLAMA_API_URL',
+  'OLLAMA_MODEL',
+  'WS_RELAY_URL',
+  'VITE_OPENSKY_RELAY_URL',
+]);
+
 const MASKED_SENTINEL = '__WM_MASKED__';
 
 interface RuntimeConfigPanelOptions {
@@ -255,7 +262,7 @@ export class RuntimeConfigPanel extends Panel {
         <span class="runtime-secret-status ${statusClass}">${escapeHtml(status)}</span>
         <span class="runtime-secret-check ${checkClass}">&#x2713;</span>
         ${helpText ? `<div class="runtime-secret-meta">${escapeHtml(helpText)}</div>` : ''}
-        <input type="password" data-secret="${key}" placeholder="${pending ? t('modals.runtimeConfig.placeholder.staged') : t('modals.runtimeConfig.placeholder.setSecret')}" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} class="${inputClass}" ${pending ? `value="${MASKED_SENTINEL}"` : ''}>
+        <input type="${PLAINTEXT_KEYS.has(key) ? 'text' : 'password'}" data-secret="${key}" placeholder="${pending ? t('modals.runtimeConfig.placeholder.staged') : t('modals.runtimeConfig.placeholder.setSecret')}" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} class="${inputClass}" ${pending ? `value="${PLAINTEXT_KEYS.has(key) ? escapeHtml(this.pendingSecrets.get(key) || '') : MASKED_SENTINEL}"` : ''}>
         ${hintText ? `<span class="runtime-secret-hint">${escapeHtml(hintText)}</span>` : ''}
       </div>
     `;
@@ -334,8 +341,12 @@ export class RuntimeConfigPanel extends Panel {
             this.validatedKeys.set(key, false);
             this.validationMessages.set(key, result.hint || 'Invalid format');
           }
-          input.type = 'password';
-          input.value = MASKED_SENTINEL;
+          if (PLAINTEXT_KEYS.has(key)) {
+            input.value = raw;
+          } else {
+            input.type = 'password';
+            input.value = MASKED_SENTINEL;
+          }
           input.placeholder = t('modals.runtimeConfig.placeholder.staged');
           const row = input.closest('.runtime-secret-row');
           const check = row?.querySelector('.runtime-secret-check');
