@@ -193,6 +193,7 @@ export class App {
   private readonly isDesktopApp = isDesktopRuntime();
   private readonly UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
   private updateCheckIntervalId: ReturnType<typeof setInterval> | null = null;
+  private clockIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -612,7 +613,7 @@ export class App {
       el.textContent = new Date().toUTCString().replace('GMT', 'UTC');
     };
     tick();
-    setInterval(tick, 1000);
+    this.clockIntervalId = setInterval(tick, 1000);
   }
 
   private setupMobileWarning(): void {
@@ -1988,6 +1989,11 @@ export class App {
     if (this.updateCheckIntervalId) {
       clearInterval(this.updateCheckIntervalId);
       this.updateCheckIntervalId = null;
+    }
+
+    if (this.clockIntervalId) {
+      clearInterval(this.clockIntervalId);
+      this.clockIntervalId = null;
     }
 
     // Clear all refresh timeouts
