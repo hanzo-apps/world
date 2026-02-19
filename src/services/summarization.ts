@@ -111,8 +111,7 @@ async function runApiChain(
   stepOffset: number,
   totalSteps: number,
 ): Promise<SummarizationResult | null> {
-  for (let i = 0; i < providers.length; i++) {
-    const provider = providers[i];
+  for (const [i, provider] of providers.entries()) {
     onProgress?.(stepOffset + i, totalSteps, `Connecting to ${provider.label}...`);
     const result = await tryApiProvider(provider, headlines, geoContext, lang);
     if (result) return result;
@@ -145,9 +144,11 @@ export async function generateSummary(
       const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
       if (browserResult) {
         console.log('[BETA] Browser T5-small:', browserResult.summary);
-        tryApiProvider(API_PROVIDERS[1], headlines, geoContext).then(r => {
+        const groqProvider = API_PROVIDERS.find(p => p.name === 'groq');
+        if (groqProvider) tryApiProvider(groqProvider, headlines, geoContext).then(r => {
           if (r) console.log('[BETA] Groq comparison:', r.summary);
         }).catch(() => {});
+
         return browserResult;
       }
 
@@ -210,8 +211,7 @@ export async function translateText(
   if (!text) return null;
 
   const totalSteps = API_PROVIDERS.length;
-  for (let i = 0; i < API_PROVIDERS.length; i++) {
-    const provider = API_PROVIDERS[i];
+  for (const [i, provider] of API_PROVIDERS.entries()) {
     if (!isFeatureAvailable(provider.featureId)) continue;
 
     onProgress?.(i + 1, totalSteps, `Translating with ${provider.label}...`);
