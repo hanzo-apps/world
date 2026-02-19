@@ -115,7 +115,15 @@ interface DesktopRuntimeInfo {
   arch: string;
 }
 
+type UpdaterOutcome = 'no_update' | 'update_available' | 'open_failed' | 'fetch_failed';
+type DesktopBuildVariant = 'full' | 'tech' | 'finance';
+
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
+const DESKTOP_BUILD_VARIANT: DesktopBuildVariant = (
+  import.meta.env.VITE_VARIANT === 'tech' || import.meta.env.VITE_VARIANT === 'finance'
+    ? import.meta.env.VITE_VARIANT
+    : 'full'
+);
 
 export interface CountryBriefSignals {
   protests: number;
@@ -182,6 +190,8 @@ export class App {
   private pendingDeepLinkCountry: string | null = null;
   private briefRequestToken = 0;
   private readonly isDesktopApp = isDesktopRuntime();
+  private readonly UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+  private updateCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -368,9 +378,7 @@ export class App {
     // Handle deep links for story sharing
     this.handleDeepLinks();
 
-    if (this.isDesktopApp) {
-      setTimeout(() => this.checkForUpdate(), 5000);
-    }
+    this.setupUpdateChecks();
   }
 
   private handleDeepLinks(): void {
@@ -421,25 +429,71 @@ export class App {
     }
   }
 
+  private setupUpdateChecks(): void {
+    if (!this.isDesktopApp || this.isDestroyed) return;
+
+    // Run once shortly after startup, then poll every 6 hours.
+    setTimeout(() => {
+      if (this.isDestroyed) return;
+      void this.checkForUpdate();
+    }, 5000);
+
+    if (this.updateCheckIntervalId) {
+      clearInterval(this.updateCheckIntervalId);
+    }
+    this.updateCheckIntervalId = setInterval(() => {
+      if (this.isDestroyed) return;
+      void this.checkForUpdate();
+    }, this.UPDATE_CHECK_INTERVAL_MS);
+  }
+
+  private logUpdaterOutcome(outcome: UpdaterOutcome, context: Record<string, unknown> = {}): void {
+    const logger = outcome === 'open_failed' || outcome === 'fetch_failed'
+      ? console.warn
+      : console.info;
+    logger('[updater]', outcome, context);
+  }
+
+  private getDesktopBuildVariant(): DesktopBuildVariant {
+    return DESKTOP_BUILD_VARIANT;
+  }
+
   private async checkForUpdate(): Promise<void> {
     try {
       const res = await fetch('https://worldmonitor.app/api/version');
-      if (!res.ok) return;
+      if (!res.ok) {
+        this.logUpdaterOutcome('fetch_failed', { status: res.status });
+        return;
+      }
       const data = await res.json();
       const remote = data.version as string;
-      if (!remote) return;
+      if (!remote) {
+        this.logUpdaterOutcome('fetch_failed', { reason: 'missing_remote_version' });
+        return;
+      }
 
       const current = __APP_VERSION__;
-      if (!this.isNewerVersion(remote, current)) return;
+      if (!this.isNewerVersion(remote, current)) {
+        this.logUpdaterOutcome('no_update', { current, remote });
+        return;
+      }
 
       const dismissKey = `wm-update-dismissed-${remote}`;
-      if (localStorage.getItem(dismissKey)) return;
+      if (localStorage.getItem(dismissKey)) {
+        this.logUpdaterOutcome('update_available', { current, remote, dismissed: true });
+        return;
+      }
 
       const releaseUrl = typeof data.url === 'string' && data.url
         ? data.url
         : 'https://github.com/koala73/worldmonitor/releases/latest';
+      this.logUpdaterOutcome('update_available', { current, remote, dismissed: false });
       await this.showUpdateBadge(remote, releaseUrl);
-    } catch { /* silent */ }
+    } catch (error) {
+      this.logUpdaterOutcome('fetch_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private isNewerVersion(remote: string, current: string): boolean {
@@ -479,7 +533,8 @@ export class App {
       const runtimeInfo = await invokeTauri<DesktopRuntimeInfo>('get_desktop_runtime_info');
       const platform = this.mapDesktopDownloadPlatform(runtimeInfo.os, runtimeInfo.arch);
       if (platform) {
-        return `https://worldmonitor.app/api/download?platform=${platform}`;
+        const variant = this.getDesktopBuildVariant();
+        return `https://worldmonitor.app/api/download?platform=${platform}&variant=${variant}`;
       }
     } catch {
       // Silent fallback to release page when desktop runtime info is unavailable.
@@ -490,14 +545,32 @@ export class App {
   private async showUpdateBadge(version: string, releaseUrl: string): Promise<void> {
     const versionSpan = this.container.querySelector('.version');
     if (!versionSpan) return;
-    const href = await this.resolveUpdateDownloadUrl(releaseUrl);
+    const existingBadge = this.container.querySelector<HTMLElement>('.update-badge');
+    if (existingBadge?.dataset.version === version) return;
+    existingBadge?.remove();
+
+    const url = await this.resolveUpdateDownloadUrl(releaseUrl);
 
     const badge = document.createElement('a');
     badge.className = 'update-badge';
-    badge.href = href;
-    badge.target = '_blank';
+    badge.dataset.version = version;
+    badge.href = url;
+    badge.target = this.isDesktopApp ? '_self' : '_blank';
     badge.rel = 'noopener';
     badge.textContent = `UPDATE v${version}`;
+    badge.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (this.isDesktopApp) {
+        void invokeTauri<void>('open_url', { url }).catch((error) => {
+          this.logUpdaterOutcome('open_failed', {
+            url,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+    });
 
     const dismiss = document.createElement('span');
     dismiss.className = 'update-badge-dismiss';
@@ -1891,6 +1964,11 @@ export class App {
     if (this.snapshotIntervalId) {
       clearInterval(this.snapshotIntervalId);
       this.snapshotIntervalId = null;
+    }
+
+    if (this.updateCheckIntervalId) {
+      clearInterval(this.updateCheckIntervalId);
+      this.updateCheckIntervalId = null;
     }
 
     // Clear all refresh timeouts
