@@ -60,6 +60,12 @@ Sentry.init({
     /WKWebView was deallocated/,
     /Unexpected end of input/,
     /window\.android\.\w+ is not a function/,
+    /Attempted to assign to readonly property/,
+    /FetchEvent\.respondWith/,
+    /e\.toLowerCase is not a function/,
+    /\.trim is not a function/,
+    /\.indexOf is not a function/,
+    /QuotaExceededError/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';

@@ -112,11 +112,33 @@ export function loadFromStorage<T>(key: string, defaultValue: T): T {
   return defaultValue;
 }
 
+let _storageQuotaExceeded = false;
+
+export function isStorageQuotaExceeded(): boolean {
+  return _storageQuotaExceeded;
+}
+
+export function isQuotaError(e: unknown): boolean {
+  return e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22);
+}
+
+export function markStorageQuotaExceeded(): void {
+  if (!_storageQuotaExceeded) {
+    _storageQuotaExceeded = true;
+    console.warn('[Storage] Quota exceeded — disabling further writes');
+  }
+}
+
 export function saveToStorage<T>(key: string, value: T): void {
+  if (_storageQuotaExceeded) return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
-    console.warn(`Failed to save ${key} to storage:`, e);
+    if (isQuotaError(e)) {
+      markStorageQuotaExceeded();
+    } else {
+      console.warn(`Failed to save ${key} to storage:`, e);
+    }
   }
 }
 

@@ -325,11 +325,11 @@ export class DeckGLMap {
     this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       this.maplibreMap.resize();
-      this.deckOverlay?.setProps({ layers: this.buildLayers() });
+      try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
     }, 150);
     this.rafUpdateLayers = rafSchedule(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
-      this.deckOverlay?.setProps({ layers: this.buildLayers() });
+      try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
     });
 
     this.setupDOM();
@@ -3073,9 +3073,9 @@ export class DeckGLMap {
   private updateLayers(): void {
     if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
     const startTime = performance.now();
-    if (this.deckOverlay) {
-      this.deckOverlay.setProps({ layers: this.buildLayers() });
-    }
+    try {
+      this.deckOverlay?.setProps({ layers: this.buildLayers() });
+    } catch { /* map may be mid-teardown (null.getProjection) */ }
     const elapsed = performance.now() - startTime;
     if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
@@ -3782,21 +3782,25 @@ export class DeckGLMap {
       const features = map.queryRenderedFeatures(e.point, { layers: ['country-interactive'] });
       const name = features?.[0]?.properties?.name as string | undefined;
 
-      if (name && name !== hoveredName) {
-        hoveredName = name;
-        map.setFilter('country-hover-fill', ['==', ['get', 'name'], name]);
-        map.getCanvas().style.cursor = 'pointer';
-      } else if (!name && hoveredName) {
-        hoveredName = null;
-        map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
-        map.getCanvas().style.cursor = '';
-      }
+      try {
+        if (name && name !== hoveredName) {
+          hoveredName = name;
+          map.setFilter('country-hover-fill', ['==', ['get', 'name'], name]);
+          map.getCanvas().style.cursor = 'pointer';
+        } else if (!name && hoveredName) {
+          hoveredName = null;
+          map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
+          map.getCanvas().style.cursor = '';
+        }
+      } catch { /* style not done loading during theme switch */ }
     });
 
     map.on('mouseout', () => {
       if (hoveredName) {
         hoveredName = null;
-        map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
+        try {
+          map.setFilter('country-hover-fill', ['==', ['get', 'name'], '']);
+        } catch { /* style not done loading */ }
         map.getCanvas().style.cursor = '';
       }
     });
