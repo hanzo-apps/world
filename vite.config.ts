@@ -162,17 +162,23 @@ function youtubeLivePlugin(): Plugin {
           }
 
           const html = await ytRes.text();
-          const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-          const isLiveMatch = html.match(/"isLive":\s*true/);
+
+          // Scope both fields to the same videoDetails block so we don't
+          // combine a videoId from one object with isLive from another.
+          let videoId: string | null = null;
+          const detailsIdx = html.indexOf('"videoDetails"');
+          if (detailsIdx !== -1) {
+            const block = html.substring(detailsIdx, detailsIdx + 5000);
+            const vidMatch = block.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+            const liveMatch = block.match(/"isLive"\s*:\s*true/);
+            if (vidMatch && liveMatch) {
+              videoId = vidMatch[1];
+            }
+          }
 
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'public, max-age=300');
-
-          if (videoIdMatch && isLiveMatch) {
-            res.end(JSON.stringify({ videoId: videoIdMatch[1], isLive: true, channel }));
-          } else {
-            res.end(JSON.stringify({ videoId: null, isLive: false, channel }));
-          }
+          res.end(JSON.stringify({ videoId, isLive: videoId !== null, channel }));
         } catch (error) {
           console.error(`[YouTube Live] Error:`, error);
           res.statusCode = 500;
