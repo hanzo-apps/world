@@ -1,7 +1,7 @@
-import { escapeHtml } from '../utils/sanitize';
 import { isDesktopRuntime } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
 import { t } from '../services/i18n';
+import { h, replaceChildren } from '../utils/dom-utils';
 
 export interface PanelOptions {
   id: string;
@@ -86,14 +86,9 @@ export class Panel {
     headerLeft.appendChild(title);
 
     if (options.infoTooltip) {
-      const infoBtn = document.createElement('button');
-      infoBtn.className = 'panel-info-btn';
-      infoBtn.innerHTML = '?';
-      infoBtn.setAttribute('aria-label', t('components.panel.showMethodologyInfo'));
+      const infoBtn = h('button', { className: 'panel-info-btn', 'aria-label': t('components.panel.showMethodologyInfo') }, '?');
 
-      const tooltip = document.createElement('div');
-      tooltip.className = 'panel-info-tooltip';
-      tooltip.innerHTML = options.infoTooltip;
+      const tooltip = h('div', { className: 'panel-info-tooltip' }, options.infoTooltip);
 
       infoBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -290,31 +285,33 @@ export class Panel {
   }
 
   public showLoading(message = t('common.loading')): void {
-    this.setContentImmediate(`
-      <div class="panel-loading">
-        <div class="panel-loading-radar">
-          <div class="panel-radar-sweep"></div>
-          <div class="panel-radar-dot"></div>
-        </div>
-        <div class="panel-loading-text">${escapeHtml(message)}</div>
-      </div>
-    `);
+    replaceChildren(this.content,
+      h('div', { className: 'panel-loading' },
+        h('div', { className: 'panel-loading-radar' },
+          h('div', { className: 'panel-radar-sweep' }),
+          h('div', { className: 'panel-radar-dot' }),
+        ),
+        h('div', { className: 'panel-loading-text' }, message),
+      ),
+    );
   }
 
   public showError(message = t('common.failedToLoad')): void {
-    this.setContentImmediate(`<div class="error-message">${escapeHtml(message)}</div>`);
+    replaceChildren(this.content, h('div', { className: 'error-message' }, message));
   }
 
   public showConfigError(message: string): void {
-    const settingsBtn = isDesktopRuntime()
-      ? `<button type="button" class="config-error-settings-btn">${t('components.panel.openSettings')}</button>`
-      : '';
-    this.setContentImmediate(`<div class="config-error-message">${escapeHtml(message)}${settingsBtn}</div>`);
+    const msgEl = h('div', { className: 'config-error-message' }, message);
     if (isDesktopRuntime()) {
-      this.content.querySelector('.config-error-settings-btn')?.addEventListener('click', () => {
-        void invokeTauri<void>('open_settings_window_command').catch(() => { });
-      });
+      msgEl.appendChild(
+        h('button', {
+          type: 'button',
+          className: 'config-error-settings-btn',
+          onClick: () => void invokeTauri<void>('open_settings_window_command').catch(() => { }),
+        }, t('components.panel.openSettings')),
+      );
     }
+    replaceChildren(this.content, msgEl);
   }
 
   public setCount(count: number): void {
