@@ -74,7 +74,7 @@ export class ServiceStatusPanel extends Panel {
 
   private async fetchStatus(): Promise<void> {
     try {
-      const res = await fetch('/api/service-status');
+      const res = await fetch('/api/service-status', { signal: this.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data: ServiceStatusResponse = await res.json();
@@ -84,6 +84,7 @@ export class ServiceStatusPanel extends Panel {
       this.localBackend = data.local ?? null;
       this.error = null;
     } catch (err) {
+      if (this.isAbortError(err)) return;
       this.error = err instanceof Error ? err.message : 'Failed to fetch';
       console.error('[ServiceStatus] Fetch error:', err);
     } finally {
