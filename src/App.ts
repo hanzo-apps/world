@@ -652,6 +652,7 @@ export class App {
       if (status.locationsMonitored === 0) {
         this.pizzintIndicator?.hide();
         this.statusPanel?.updateApi('PizzINT', { status: 'error' });
+        dataFreshness.recordError('pizzint', 'No monitored locations returned');
         return;
       }
 
@@ -659,10 +660,12 @@ export class App {
       this.pizzintIndicator?.updateStatus(status);
       this.pizzintIndicator?.updateTensions(tensions);
       this.statusPanel?.updateApi('PizzINT', { status: 'ok' });
+      dataFreshness.recordUpdate('pizzint', Math.max(status.locationsMonitored, tensions.length));
     } catch (error) {
       console.error('[App] PizzINT load failed:', error);
       this.pizzintIndicator?.hide();
       this.statusPanel?.updateApi('PizzINT', { status: 'error' });
+      dataFreshness.recordError('pizzint', String(error));
     }
   }
 
@@ -702,7 +705,7 @@ export class App {
       weather: ['weather'],
       outages: ['outages'],
       cyberThreats: ['cyber_threats'],
-      protests: ['acled'],
+      protests: ['acled', 'gdelt_doc'],
       ucdpEvents: ['ucdp_events'],
       displacement: ['unhcr'],
       climate: ['climate'],
@@ -739,7 +742,7 @@ export class App {
         weather: ['weather'],
         outages: ['outages'],
         cyberThreats: ['cyber_threats'],
-        protests: ['acled'],
+        protests: ['acled', 'gdelt_doc'],
         ucdpEvents: ['ucdp_events'],
         displacement: ['unhcr'],
         climate: ['climate'],
@@ -3539,6 +3542,7 @@ export class App {
       this.statusPanel?.updateFeed('Polymarket', { status: 'ok', itemCount: predictions.length });
       this.statusPanel?.updateApi('Polymarket', { status: 'ok' });
       dataFreshness.recordUpdate('polymarket', predictions.length);
+      dataFreshness.recordUpdate('predictions', predictions.length);
 
       // Run correlation analysis in background (fire-and-forget via Web Worker)
       void this.runCorrelationAnalysis();
@@ -3546,6 +3550,7 @@ export class App {
       this.statusPanel?.updateFeed('Polymarket', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('Polymarket', { status: 'error' });
       dataFreshness.recordError('polymarket', String(error));
+      dataFreshness.recordError('predictions', String(error));
     }
   }
 
@@ -3712,6 +3717,7 @@ export class App {
         const protestCount = protestData.sources.acled + protestData.sources.gdelt;
         if (protestCount > 0) dataFreshness.recordUpdate('acled', protestCount);
         if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
+        if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt_doc', protestData.sources.gdelt);
         // Update map only if layer is visible
         if (this.mapLayers.protests) {
           this.map?.setProtests(protestData.events);
@@ -4078,6 +4084,7 @@ export class App {
         this.statusPanel?.updateApi('ACLED', { status: 'warning' });
       }
       this.statusPanel?.updateApi('GDELT Doc', { status: 'ok' });
+      if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt_doc', protestData.sources.gdelt);
       return;
     }
     try {
@@ -4091,6 +4098,7 @@ export class App {
       const protestCount = protestData.sources.acled + protestData.sources.gdelt;
       if (protestCount > 0) dataFreshness.recordUpdate('acled', protestCount);
       if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
+      if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt_doc', protestData.sources.gdelt);
       (this.panels['cii'] as CIIPanel)?.refresh();
       const status = getProtestStatus();
       this.statusPanel?.updateFeed('Protests', {
@@ -4109,6 +4117,7 @@ export class App {
       this.statusPanel?.updateFeed('Protests', { status: 'error', errorMessage: String(error) });
       this.statusPanel?.updateApi('ACLED', { status: 'error' });
       this.statusPanel?.updateApi('GDELT Doc', { status: 'error' });
+      dataFreshness.recordError('gdelt_doc', String(error));
     }
   }
 
@@ -4286,9 +4295,16 @@ export class App {
       economicPanel?.updateOil(data);
       const hasData = !!(data.wtiPrice || data.brentPrice || data.usProduction || data.usInventory);
       this.statusPanel?.updateApi('EIA', { status: hasData ? 'ok' : 'error' });
+      if (hasData) {
+        const metricCount = [data.wtiPrice, data.brentPrice, data.usProduction, data.usInventory].filter(Boolean).length;
+        dataFreshness.recordUpdate('oil', metricCount || 1);
+      } else {
+        dataFreshness.recordError('oil', 'Oil analytics returned no values');
+      }
     } catch (e) {
       console.error('[App] Oil analytics failed:', e);
       this.statusPanel?.updateApi('EIA', { status: 'error' });
+      dataFreshness.recordError('oil', String(e));
     }
   }
 
@@ -4298,9 +4314,15 @@ export class App {
       const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
       economicPanel?.updateSpending(data);
       this.statusPanel?.updateApi('USASpending', { status: data.awards.length > 0 ? 'ok' : 'error' });
+      if (data.awards.length > 0) {
+        dataFreshness.recordUpdate('spending', data.awards.length);
+      } else {
+        dataFreshness.recordError('spending', 'No awards returned');
+      }
     } catch (e) {
       console.error('[App] Government spending failed:', e);
       this.statusPanel?.updateApi('USASpending', { status: 'error' });
+      dataFreshness.recordError('spending', String(e));
     }
   }
 
