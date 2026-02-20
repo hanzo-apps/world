@@ -12,7 +12,7 @@ import {
   isAisConfigured,
   initAisStream,
   type AisPositionData,
-} from './ais';
+} from './maritime';
 import { fetchUSNIFleetReport, mergeUSNIWithAIS } from './usni-fleet';
 
 // Cache for API responses

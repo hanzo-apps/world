@@ -7,7 +7,7 @@ AI-powered real-time global intelligence dashboard aggregating news, markets, ge
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
 ![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-2.1.4-blue)
+![Version](https://img.shields.io/badge/version-2.5.1-blue)
 
 ![World Monitor Dashboard](../new-world-monitor.png)
 
@@ -3298,13 +3298,15 @@ const header = `World Monitor v${__APP_VERSION__}`;
 
 ## Installation
 
+**Requirements:** Go 1.21+ and Node.js 18+.
+
 ```bash
 # Clone the repository
 git clone https://github.com/koala73/worldmonitor.git
 cd worldmonitor
 
-# Install dependencies
-npm install
+# Install everything (buf, sebuf plugins, npm deps, proto deps)
+make install
 
 # Start development server
 npm run dev
@@ -3312,6 +3314,14 @@ npm run dev
 # Build for production
 npm run build
 ```
+
+If you modify any `.proto` files, regenerate before building or pushing:
+
+```bash
+make generate   # regenerate TypeScript clients, servers, and OpenAPI docs
+```
+
+See [ADDING_ENDPOINTS.md](ADDING_ENDPOINTS.md) for the full proto workflow.
 
 ## API Dependencies
 
@@ -3642,7 +3652,7 @@ The system degrades gracefully—blocked sources are skipped while others contin
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed planning. Recent intelligence enhancements:
+See [ROADMAP.md](../.planning/ROADMAP.md) for detailed planning. Recent intelligence enhancements:
 
 ### Completed
 
@@ -3698,7 +3708,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed planning. Recent intelligence enhancem
 - **Additional Data Sources** - World Bank, IMF, OFAC sanctions, UNHCR refugee data, FAO food security
 - **Think Tank Feeds** - RUSI, Chatham House, ECFR, CFR, Wilson Center, CNAS, Arms Control Association
 
-The full [ROADMAP.md](ROADMAP.md) documents implementation details, API endpoints, and 30+ free data sources for future integration.
+The full [ROADMAP.md](../.planning/ROADMAP.md) documents implementation details, API endpoints, and 30+ free data sources for future integration.
 
 ---
 
@@ -3994,20 +4004,24 @@ PRs that don't follow the code style or introduce security issues will be asked 
 
 ### Development Tips
 
+**Adding or Modifying API Endpoints**
+
+All JSON API endpoints **must** use sebuf. Do not create standalone `api/*.js` files — the legacy pattern is deprecated.
+
+See **[docs/ADDING_ENDPOINTS.md](ADDING_ENDPOINTS.md)** for the complete guide covering:
+
+- Adding an RPC to an existing service
+- Adding an entirely new service
+- Proto conventions (validation, time fields, shared types)
+- Generated OpenAPI documentation
+
 **Adding a New Data Layer**
 
-1. Create service in `src/services/` for data fetching
-2. Add layer toggle in `src/components/Map.ts`
-3. Add rendering logic for map markers/overlays
-4. Add to help panel documentation
-5. Update README with layer description
-
-**Adding a New API Proxy**
-
-1. Create handler in `api/` directory
-2. Implement input validation (see existing proxies)
-3. Add appropriate cache headers
-4. Document any required environment variables
+1. Define the proto contract and generate code (see [ADDING_ENDPOINTS.md](ADDING_ENDPOINTS.md))
+2. Implement the handler in `server/worldmonitor/{domain}/v1/`
+3. Create the frontend service wrapper in `src/services/`
+4. Add layer toggle in `src/components/Map.ts`
+5. Add rendering logic for map markers/overlays
 
 **Debugging**
 
