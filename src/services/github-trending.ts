@@ -1,5 +1,6 @@
 import { API_URLS } from '@/config';
 import { createCircuitBreaker } from '@/utils';
+import { fetchWithProxy } from '@/utils';
 
 export interface GitHubRepo {
   author: string;
@@ -25,7 +26,7 @@ export async function fetchGitHubTrending(
   since: string = 'daily'
 ): Promise<GitHubRepo[]> {
   return breaker.execute(async () => {
-    const response = await fetch(API_URLS.githubTrending(language, since));
+    const response = await fetchWithProxy(API_URLS.githubTrending(language, since));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();

@@ -1,5 +1,6 @@
 import { API_URLS } from '@/config';
 import { createCircuitBreaker } from '@/utils';
+import { fetchWithProxy } from '@/utils';
 
 export interface ArxivPaper {
   id: string;
@@ -77,7 +78,7 @@ export async function fetchArxivPapers(
   maxResults: number = 50
 ): Promise<ArxivPaper[]> {
   return breaker.execute(async () => {
-    const response = await fetch(API_URLS.arxiv(category, maxResults));
+    const response = await fetchWithProxy(API_URLS.arxiv(category, maxResults));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const xmlText = await response.text();
