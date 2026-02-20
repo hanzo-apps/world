@@ -203,6 +203,214 @@ function polymarketPlugin(): Plugin {
   };
 }
 
+/**
+ * Vite dev server plugin for sebuf API routes.
+ *
+ * Intercepts requests matching /api/{domain}/v1/* and routes them through
+ * the same handler pipeline as the Vercel catch-all gateway. Other /api/*
+ * paths fall through to existing proxy rules.
+ */
+function sebufApiPlugin(): Plugin {
+  // Cache router across requests (H-13 fix). Invalidated by Vite's module graph on HMR.
+  let cachedRouter: Awaited<ReturnType<typeof buildRouter>> | null = null;
+  let cachedCorsMod: any = null;
+
+  async function buildRouter() {
+    const [
+      routerMod, corsMod, errorMod,
+      seismologyServerMod, seismologyHandlerMod,
+      wildfireServerMod, wildfireHandlerMod,
+      climateServerMod, climateHandlerMod,
+      predictionServerMod, predictionHandlerMod,
+      displacementServerMod, displacementHandlerMod,
+      aviationServerMod, aviationHandlerMod,
+      researchServerMod, researchHandlerMod,
+      unrestServerMod, unrestHandlerMod,
+      conflictServerMod, conflictHandlerMod,
+      maritimeServerMod, maritimeHandlerMod,
+      cyberServerMod, cyberHandlerMod,
+      economicServerMod, economicHandlerMod,
+      infrastructureServerMod, infrastructureHandlerMod,
+      marketServerMod, marketHandlerMod,
+      newsServerMod, newsHandlerMod,
+      intelligenceServerMod, intelligenceHandlerMod,
+      militaryServerMod, militaryHandlerMod,
+    ] = await Promise.all([
+        import('./server/router'),
+        import('./server/cors'),
+        import('./server/error-mapper'),
+        import('./src/generated/server/worldmonitor/seismology/v1/service_server'),
+        import('./server/worldmonitor/seismology/v1/handler'),
+        import('./src/generated/server/worldmonitor/wildfire/v1/service_server'),
+        import('./server/worldmonitor/wildfire/v1/handler'),
+        import('./src/generated/server/worldmonitor/climate/v1/service_server'),
+        import('./server/worldmonitor/climate/v1/handler'),
+        import('./src/generated/server/worldmonitor/prediction/v1/service_server'),
+        import('./server/worldmonitor/prediction/v1/handler'),
+        import('./src/generated/server/worldmonitor/displacement/v1/service_server'),
+        import('./server/worldmonitor/displacement/v1/handler'),
+        import('./src/generated/server/worldmonitor/aviation/v1/service_server'),
+        import('./server/worldmonitor/aviation/v1/handler'),
+        import('./src/generated/server/worldmonitor/research/v1/service_server'),
+        import('./server/worldmonitor/research/v1/handler'),
+        import('./src/generated/server/worldmonitor/unrest/v1/service_server'),
+        import('./server/worldmonitor/unrest/v1/handler'),
+        import('./src/generated/server/worldmonitor/conflict/v1/service_server'),
+        import('./server/worldmonitor/conflict/v1/handler'),
+        import('./src/generated/server/worldmonitor/maritime/v1/service_server'),
+        import('./server/worldmonitor/maritime/v1/handler'),
+        import('./src/generated/server/worldmonitor/cyber/v1/service_server'),
+        import('./server/worldmonitor/cyber/v1/handler'),
+        import('./src/generated/server/worldmonitor/economic/v1/service_server'),
+        import('./server/worldmonitor/economic/v1/handler'),
+        import('./src/generated/server/worldmonitor/infrastructure/v1/service_server'),
+        import('./server/worldmonitor/infrastructure/v1/handler'),
+        import('./src/generated/server/worldmonitor/market/v1/service_server'),
+        import('./server/worldmonitor/market/v1/handler'),
+        import('./src/generated/server/worldmonitor/news/v1/service_server'),
+        import('./server/worldmonitor/news/v1/handler'),
+        import('./src/generated/server/worldmonitor/intelligence/v1/service_server'),
+        import('./server/worldmonitor/intelligence/v1/handler'),
+        import('./src/generated/server/worldmonitor/military/v1/service_server'),
+        import('./server/worldmonitor/military/v1/handler'),
+      ]);
+
+    const serverOptions = { onError: errorMod.mapErrorToResponse };
+    const allRoutes = [
+      ...seismologyServerMod.createSeismologyServiceRoutes(seismologyHandlerMod.seismologyHandler, serverOptions),
+      ...wildfireServerMod.createWildfireServiceRoutes(wildfireHandlerMod.wildfireHandler, serverOptions),
+      ...climateServerMod.createClimateServiceRoutes(climateHandlerMod.climateHandler, serverOptions),
+      ...predictionServerMod.createPredictionServiceRoutes(predictionHandlerMod.predictionHandler, serverOptions),
+      ...displacementServerMod.createDisplacementServiceRoutes(displacementHandlerMod.displacementHandler, serverOptions),
+      ...aviationServerMod.createAviationServiceRoutes(aviationHandlerMod.aviationHandler, serverOptions),
+      ...researchServerMod.createResearchServiceRoutes(researchHandlerMod.researchHandler, serverOptions),
+      ...unrestServerMod.createUnrestServiceRoutes(unrestHandlerMod.unrestHandler, serverOptions),
+      ...conflictServerMod.createConflictServiceRoutes(conflictHandlerMod.conflictHandler, serverOptions),
+      ...maritimeServerMod.createMaritimeServiceRoutes(maritimeHandlerMod.maritimeHandler, serverOptions),
+      ...cyberServerMod.createCyberServiceRoutes(cyberHandlerMod.cyberHandler, serverOptions),
+      ...economicServerMod.createEconomicServiceRoutes(economicHandlerMod.economicHandler, serverOptions),
+      ...infrastructureServerMod.createInfrastructureServiceRoutes(infrastructureHandlerMod.infrastructureHandler, serverOptions),
+      ...marketServerMod.createMarketServiceRoutes(marketHandlerMod.marketHandler, serverOptions),
+      ...newsServerMod.createNewsServiceRoutes(newsHandlerMod.newsHandler, serverOptions),
+      ...intelligenceServerMod.createIntelligenceServiceRoutes(intelligenceHandlerMod.intelligenceHandler, serverOptions),
+      ...militaryServerMod.createMilitaryServiceRoutes(militaryHandlerMod.militaryHandler, serverOptions),
+    ];
+    cachedCorsMod = corsMod;
+    return routerMod.createRouter(allRoutes);
+  }
+
+  return {
+    name: 'sebuf-api',
+    configureServer(server) {
+      // Invalidate cached router on HMR updates to server/ files
+      server.watcher.on('change', (file) => {
+        if (file.includes('/server/') || file.includes('/src/generated/server/')) {
+          cachedRouter = null;
+        }
+      });
+
+      server.middlewares.use(async (req, res, next) => {
+        // Only intercept sebuf routes: /api/{domain}/v1/*
+        if (!req.url || !/^\/api\/[a-z]+\/v1\//.test(req.url)) {
+          return next();
+        }
+
+        try {
+          // Build router once, reuse across requests (H-13 fix)
+          if (!cachedRouter) {
+            cachedRouter = await buildRouter();
+          }
+          const router = cachedRouter;
+          const corsMod = cachedCorsMod;
+
+          // Convert Connect IncomingMessage to Web Standard Request
+          const port = server.config.server.port || 3000;
+          const url = new URL(req.url, `http://localhost:${port}`);
+
+          // Read body for POST requests
+          let body: string | undefined;
+          if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+              chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            body = Buffer.concat(chunks).toString();
+          }
+
+          // Extract headers from IncomingMessage
+          const headers: Record<string, string> = {};
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (typeof value === 'string') {
+              headers[key] = value;
+            } else if (Array.isArray(value)) {
+              headers[key] = value.join(', ');
+            }
+          }
+
+          const webRequest = new Request(url.toString(), {
+            method: req.method,
+            headers,
+            body: body || undefined,
+          });
+
+          const corsHeaders = corsMod.getCorsHeaders(webRequest);
+
+          // OPTIONS preflight
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            for (const [key, value] of Object.entries(corsHeaders)) {
+              res.setHeader(key, value);
+            }
+            res.end();
+            return;
+          }
+
+          // Origin check
+          if (corsMod.isDisallowedOrigin(webRequest)) {
+            res.statusCode = 403;
+            res.setHeader('Content-Type', 'application/json');
+            for (const [key, value] of Object.entries(corsHeaders)) {
+              res.setHeader(key, value);
+            }
+            res.end(JSON.stringify({ error: 'Origin not allowed' }));
+            return;
+          }
+
+          // Route matching
+          const matchedHandler = router.match(webRequest);
+          if (!matchedHandler) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            for (const [key, value] of Object.entries(corsHeaders)) {
+              res.setHeader(key, value);
+            }
+            res.end(JSON.stringify({ error: 'Not found' }));
+            return;
+          }
+
+          // Execute handler
+          const response = await matchedHandler(webRequest);
+
+          // Write response
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => {
+            res.setHeader(key, value);
+          });
+          for (const [key, value] of Object.entries(corsHeaders)) {
+            res.setHeader(key, value);
+          }
+          res.end(await response.text());
+        } catch (err) {
+          console.error('[sebuf-api] Error:', err);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Internal server error' }));
+        }
+      });
+    },
+  };
+}
+
 function youtubeLivePlugin(): Plugin {
   return {
     name: 'youtube-live',
@@ -277,6 +485,7 @@ export default defineConfig({
     htmlVariantPlugin(),
     polymarketPlugin(),
     youtubeLivePlugin(),
+    sebufApiPlugin(),
     brotliPrecompressPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -456,26 +665,6 @@ export default defineConfig({
         target: 'https://query1.finance.yahoo.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/yahoo/, ''),
-      },
-      // CoinGecko API
-      '/api/coingecko': {
-        target: 'https://api.coingecko.com',
-        changeOrigin: true,
-        rewrite: (path) => {
-          const idx = path.indexOf('?');
-          const qs = idx >= 0 ? path.substring(idx) : '';
-          const params = new URLSearchParams(qs);
-          if (params.get('endpoint') === 'markets') {
-            params.delete('endpoint');
-            const vs = params.get('vs_currencies') || 'usd';
-            params.delete('vs_currencies');
-            params.set('vs_currency', vs);
-            params.set('sparkline', 'true');
-            params.set('order', 'market_cap_desc');
-            return `/api/v3/coins/markets?${params.toString()}`;
-          }
-          return `/api/v3/simple/price${qs}`;
-        },
       },
       // Polymarket handled by polymarketPlugin() — no prod proxy needed
       // USGS Earthquake API
@@ -791,18 +980,6 @@ export default defineConfig({
         target: 'https://msi.nga.mil',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/nga-msi/, ''),
-      },
-      // ACLED - Armed Conflict Location & Event Data (protests, riots)
-      '/api/acled': {
-        target: 'https://acleddata.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/acled/, ''),
-      },
-      // GDELT GEO 2.0 API - Geolocation endpoint (must come before /api/gdelt)
-      '/api/gdelt-geo': {
-        target: 'https://api.gdeltproject.org',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/gdelt-geo/, '/api/v2/geo/geo'),
       },
       // GDELT GEO 2.0 API - Global event data
       '/api/gdelt': {

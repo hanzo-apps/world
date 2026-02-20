@@ -549,30 +549,40 @@ test.describe('desktop runtime routing guardrails', () => {
       const cryptoRenders: number[] = [];
       const apiStatuses: Array<{ name: string; status: string }> = [];
 
-      window.fetch = (async (input: RequestInfo | URL) => {
+      // Yahoo-only symbols (same set as server handler)
+      const yahooOnly = new Set(['^GSPC', '^DJI', '^IXIC', '^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F']);
+
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = toUrl(input);
         calls.push(url);
         const parsed = new URL(url);
 
-        if (parsed.pathname === '/api/finnhub') {
+        // Sebuf proto: POST /api/market/v1/list-market-quotes
+        if (parsed.pathname === '/api/market/v1/list-market-quotes') {
+          const body = init?.body ? JSON.parse(String(init.body)) : {};
+          const symbols: string[] = body.symbols || [];
+          const quotes = symbols
+            .filter((s: string) => yahooOnly.has(s))
+            .map((s: string) => {
+              const base = s.length * 100;
+              return { symbol: s, name: s, display: s, price: base + 1, change: ((base + 1) - base) / base * 100, sparkline: [base - 2, base - 1, base, base + 1] };
+            });
           return responseJson({
-            quotes: [],
-            skipped: true,
-            reason: 'FINNHUB_API_KEY not configured',
+            quotes,
+            finnhubSkipped: true,
+            skipReason: 'FINNHUB_API_KEY not configured',
           });
         }
 
-        if (parsed.pathname === '/api/yahoo-finance') {
-          const symbol = parsed.searchParams.get('symbol') ?? 'UNKNOWN';
-          return responseJson(yahooChart(symbol));
-        }
-
-        if (parsed.pathname === '/api/coingecko') {
-          return responseJson([
-            { id: 'bitcoin', current_price: 50000, price_change_percentage_24h: 1.2, sparkline_in_7d: { price: [1, 2, 3] } },
-            { id: 'ethereum', current_price: 3000, price_change_percentage_24h: -0.5, sparkline_in_7d: { price: [1, 2, 3] } },
-            { id: 'solana', current_price: 120, price_change_percentage_24h: 2.1, sparkline_in_7d: { price: [1, 2, 3] } },
-          ]);
+        // Sebuf proto: POST /api/market/v1/list-crypto-quotes
+        if (parsed.pathname === '/api/market/v1/list-crypto-quotes') {
+          return responseJson({
+            quotes: [
+              { name: 'Bitcoin', symbol: 'BTC', price: 50000, change: 1.2, sparkline: [1, 2, 3] },
+              { name: 'Ethereum', symbol: 'ETH', price: 3000, change: -0.5, sparkline: [1, 2, 3] },
+              { name: 'Solana', symbol: 'SOL', price: 120, change: 2.1, sparkline: [1, 2, 3] },
+            ],
+          });
         }
 
         return responseJson({});
@@ -608,12 +618,9 @@ test.describe('desktop runtime routing guardrails', () => {
         await (App.prototype as unknown as { loadMarkets: (thisArg: unknown) => Promise<void> })
           .loadMarkets.call(fakeApp);
 
-        const commoditySymbols = ['^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F'];
-        const commodityYahooCalls = commoditySymbols.map((symbol) =>
-          calls.some((url) => {
-            const parsed = new URL(url);
-            return parsed.pathname === '/api/yahoo-finance' && parsed.searchParams.get('symbol') === symbol;
-          })
+        // Commodities now go through listMarketQuotes (batch), not individual Yahoo calls
+        const marketQuoteCalls = calls.filter((url) =>
+          new URL(url).pathname === '/api/market/v1/list-market-quotes'
         );
 
         return {
@@ -626,7 +633,7 @@ test.describe('desktop runtime routing guardrails', () => {
           cryptoRenders,
           apiStatuses,
           latestMarketsCount: fakeApp.latestMarkets.length,
-          commodityYahooCalls,
+          marketQuoteCalls: marketQuoteCalls.length,
         };
       } finally {
         window.fetch = originalFetch;
@@ -642,10 +649,105 @@ test.describe('desktop runtime routing guardrails', () => {
 
     expect(result.commoditiesRenders.some((count) => count > 0)).toBe(true);
     expect(result.commoditiesConfigErrors.length).toBe(0);
-    expect(result.commodityYahooCalls.every(Boolean)).toBe(true);
+    // Commodities go through listMarketQuotes batch (at least 2 calls: stocks + commodities)
+    expect(result.marketQuoteCalls).toBeGreaterThanOrEqual(2);
 
     expect(result.cryptoRenders.some((count) => count > 0)).toBe(true);
     expect(result.apiStatuses.some((entry) => entry.name === 'Finnhub' && entry.status === 'error')).toBe(true);
     expect(result.apiStatuses.some((entry) => entry.name === 'CoinGecko' && entry.status === 'ok')).toBe(true);
+  });
+
+  test('fetchHapiSummary maps proto countryCode to iso2 field', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const originalFetch = window.fetch.bind(window);
+      const toUrl = (input: RequestInfo | URL): string => {
+        if (typeof input === 'string') return new URL(input, window.location.origin).toString();
+        if (input instanceof URL) return input.toString();
+        return new URL(input.url, window.location.origin).toString();
+      };
+      const responseJson = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const seenCountryCodes = new Set<string>();
+
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const parsed = new URL(toUrl(input));
+        if (parsed.pathname === '/api/conflict/v1/get-humanitarian-summary') {
+          const body = init?.body ? JSON.parse(String(init.body)) : {};
+          const countryCode = String(body.countryCode || '').toUpperCase();
+          seenCountryCodes.add(countryCode);
+          return responseJson({
+            summary: {
+              countryCode,
+              countryName: countryCode,
+              conflictEventsTotal: 1,
+              conflictPoliticalViolenceEvents: 1,
+              conflictFatalities: 1,
+              referencePeriod: '2026-02',
+              conflictDemonstrations: 0,
+              updatedAt: Date.now(),
+            },
+          });
+        }
+        return responseJson({});
+      }) as typeof window.fetch;
+
+      try {
+        const conflict = await import('/src/services/conflict/index.ts');
+        const summaries = await conflict.fetchHapiSummary();
+        const us = summaries.get('US') as Record<string, unknown> | undefined;
+        return {
+          fetchedCount: seenCountryCodes.size,
+          usIso2: us?.iso2 ?? null,
+          hasIso3Field: !!us && Object.prototype.hasOwnProperty.call(us, 'iso3'),
+        };
+      } finally {
+        window.fetch = originalFetch;
+      }
+    });
+
+    expect(result.fetchedCount).toBeGreaterThan(0);
+    expect(result.usIso2).toBe('US');
+    expect(result.hasIso3Field).toBe(false);
+  });
+
+  test('country-instability HAPI fallback ignores eventsCivilianTargeting in score', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const cii = await import('/src/services/country-instability.ts');
+
+      const makeSummary = (eventsCivilianTargeting: number) => ({
+        iso2: 'US',
+        locationName: 'United States',
+        month: '2026-02',
+        eventsTotal: 0,
+        eventsPoliticalViolence: 1,
+        eventsCivilianTargeting,
+        eventsDemonstrations: 0,
+        fatalitiesTotalPoliticalViolence: 0,
+        fatalitiesTotalCivilianTargeting: 0,
+      });
+
+      cii.clearCountryData();
+      cii.ingestHapiForCII(new Map([['US', makeSummary(0)]]));
+      const scoreWithoutCivilian = cii.getCountryScore('US');
+
+      cii.clearCountryData();
+      cii.ingestHapiForCII(new Map([['US', makeSummary(999)]]));
+      const scoreWithCivilian = cii.getCountryScore('US');
+
+      return { scoreWithoutCivilian, scoreWithCivilian };
+    });
+
+    expect(result.scoreWithoutCivilian).not.toBeNull();
+    expect(result.scoreWithCivilian).not.toBeNull();
+    expect(result.scoreWithoutCivilian).toBe(result.scoreWithCivilian);
+    expect(result.scoreWithCivilian as number).toBeLessThan(10);
   });
 });

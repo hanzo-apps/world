@@ -7,34 +7,17 @@ import {
   getKeyBackedAvailabilitySummary,
   getNonParityFeatures,
 } from '@/services/desktop-readiness';
+import {
+  fetchServiceStatuses,
+  type ServiceStatusResult as ServiceStatus,
+} from '@/services/infrastructure';
 import { h, replaceChildren, type DomChild } from '@/utils/dom-utils';
-
-interface ServiceStatus {
-  id: string;
-  name: string;
-  category: string;
-  status: 'operational' | 'degraded' | 'outage' | 'unknown';
-  description: string;
-}
 
 interface LocalBackendStatus {
   enabled?: boolean;
   mode?: string;
   port?: number;
   remoteBase?: string;
-}
-
-interface ServiceStatusResponse {
-  success: boolean;
-  timestamp: string;
-  summary: {
-    operational: number;
-    degraded: number;
-    outage: number;
-    unknown: number;
-  };
-  services: ServiceStatus[];
-  local?: LocalBackendStatus;
 }
 
 type CategoryFilter = 'all' | 'cloud' | 'dev' | 'comm' | 'ai' | 'saas';
@@ -75,14 +58,10 @@ export class ServiceStatusPanel extends Panel {
 
   private async fetchStatus(): Promise<void> {
     try {
-      const res = await fetch('/api/service-status', { signal: this.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data: ServiceStatusResponse = await res.json();
+      const data = await fetchServiceStatuses();
       if (!data.success) throw new Error('Failed to load status');
 
       this.services = data.services;
-      this.localBackend = data.local ?? null;
       this.error = null;
     } catch (err) {
       if (this.isAbortError(err)) return;
