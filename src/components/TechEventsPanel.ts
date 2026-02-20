@@ -51,7 +51,7 @@ export class TechEventsPanel extends Panel {
     this.render();
 
     try {
-      const res = await fetch('/api/tech-events?days=180&limit=100');
+      const res = await fetch('/api/tech-events?days=180&limit=100', { signal: this.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data: TechEventsResponse = await res.json();
@@ -60,6 +60,7 @@ export class TechEventsPanel extends Panel {
       this.events = data.events;
       this.setCount(data.conferenceCount);
     } catch (err) {
+      if (this.isAbortError(err)) return;
       this.error = err instanceof Error ? err.message : 'Failed to fetch events';
       console.error('[TechEvents] Fetch error:', err);
     } finally {
