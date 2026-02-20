@@ -417,6 +417,15 @@ export default defineConfig({
             if (id.includes('/topojson-client/')) {
               return 'topojson';
             }
+            if (id.includes('/i18next')) {
+              return 'i18n';
+            }
+            if (id.includes('/@sentry/')) {
+              return 'sentry';
+            }
+          }
+          if (id.includes('/src/components/') && id.endsWith('Panel.ts')) {
+            return 'panels';
           }
           // Give lazy-loaded locale chunks a recognizable prefix so the
           // service worker can exclude them from precache (en.json is
