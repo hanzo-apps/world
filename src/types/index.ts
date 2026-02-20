@@ -255,63 +255,6 @@ export interface UcdpGeoEvent {
   source_original: string;
 }
 
-// UNHCR Displacement Data
-export interface DisplacementFlow {
-  originCode: string;
-  originName: string;
-  asylumCode: string;
-  asylumName: string;
-  refugees: number;
-  originLat?: number;
-  originLon?: number;
-  asylumLat?: number;
-  asylumLon?: number;
-}
-
-export interface CountryDisplacement {
-  code: string;
-  name: string;
-  // Origin-country displacement outflow metrics
-  refugees: number;
-  asylumSeekers: number;
-  idps: number;
-  stateless: number;
-  totalDisplaced: number;
-  // Host-country intake metrics
-  hostRefugees: number;
-  hostAsylumSeekers: number;
-  hostTotal: number;
-  lat?: number;
-  lon?: number;
-}
-
-export interface UnhcrSummary {
-  year: number;
-  globalTotals: {
-    refugees: number;
-    asylumSeekers: number;
-    idps: number;
-    stateless: number;
-    total: number;
-  };
-  countries: CountryDisplacement[];
-  topFlows: DisplacementFlow[];
-}
-
-// Climate Anomaly Data (Open-Meteo / ERA5)
-export type AnomalySeverity = 'normal' | 'moderate' | 'extreme';
-
-export interface ClimateAnomaly {
-  zone: string;
-  lat: number;
-  lon: number;
-  tempDelta: number;
-  precipDelta: number;
-  severity: AnomalySeverity;
-  type: 'warm' | 'cold' | 'wet' | 'dry' | 'mixed';
-  period: string;
-}
-
 // WorldPop Population Exposure
 export interface CountryPopulation {
   code: string;
@@ -625,13 +568,6 @@ export interface CriticalMineralProject {
   significance: string;
 }
 
-export interface PredictionMarket {
-  title: string;
-  yesPrice: number;
-  volume?: number;
-  url?: string;
-}
-
 export interface AppState {
   currentView: 'global' | 'us';
   mapZoom: number;
@@ -686,33 +622,6 @@ export interface ProtestCluster {
   primaryCause?: string;
 }
 
-// Flight Delay Types
-export type FlightDelaySource = 'faa' | 'eurocontrol' | 'computed';
-export type FlightDelaySeverity = 'normal' | 'minor' | 'moderate' | 'major' | 'severe';
-export type FlightDelayType = 'ground_stop' | 'ground_delay' | 'departure_delay' | 'arrival_delay' | 'general';
-export type AirportRegion = 'americas' | 'europe' | 'apac' | 'mena' | 'africa';
-
-export interface AirportDelayAlert {
-  id: string;
-  iata: string;
-  icao: string;
-  name: string;
-  city: string;
-  country: string;
-  lat: number;
-  lon: number;
-  region: AirportRegion;
-  delayType: FlightDelayType;
-  severity: FlightDelaySeverity;
-  avgDelayMinutes: number;
-  delayedFlightsPct?: number;
-  cancelledFlights?: number;
-  totalFlights?: number;
-  reason?: string;
-  source: FlightDelaySource;
-  updatedAt: Date;
-}
-
 export interface MonitoredAirport {
   iata: string;
   icao: string;
@@ -721,7 +630,7 @@ export interface MonitoredAirport {
   country: string;
   lat: number;
   lon: number;
-  region: AirportRegion;
+  region: 'americas' | 'europe' | 'apac' | 'mena' | 'africa';
 }
 
 // Military Flight Tracking Types

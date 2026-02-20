@@ -9,7 +9,6 @@ import type {
   MapLayers,
   Hotspot,
   NewsItem,
-  Earthquake,
   InternetOutage,
   RelatedAsset,
   AssetType,
@@ -18,17 +17,18 @@ import type {
   CableAdvisory,
   RepairShip,
   SocialUnrestEvent,
-  AirportDelayAlert,
   MilitaryFlight,
   MilitaryVessel,
   MilitaryFlightCluster,
   MilitaryVesselCluster,
   NaturalEvent,
   UcdpGeoEvent,
-  DisplacementFlow,
-  ClimateAnomaly,
   CyberThreat,
 } from '@/types';
+import type { AirportDelayAlert } from '@/services/aviation';
+import type { DisplacementFlow } from '@/services/displacement';
+import type { Earthquake } from '@/services/earthquakes';
+import type { ClimateAnomaly } from '@/services/climate';
 import type { WeatherAlert } from '@/services/weather';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';

@@ -15,24 +15,21 @@ import {
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, fetchUSNIFleetReport, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
-import { fetchCountryMarkets } from '@/services/polymarket';
+import { fetchCountryMarkets } from '@/services/prediction';
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
 import { updateAndCheck } from '@/services/temporal-baseline';
-import { fetchAllFires, flattenFires, computeRegionStats } from '@/services/firms-satellite';
+import { fetchAllFires, flattenFires, computeRegionStats, toMapFires } from '@/services/wildfires';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, startLearning, isInLearningMode, calculateCII, getCountryData, TIER1_COUNTRIES } from '@/services/country-instability';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
-import { fetchConflictEvents } from '@/services/conflicts';
-import { fetchUcdpClassifications } from '@/services/ucdp';
-import { fetchHapiSummary } from '@/services/hapi';
-import { fetchUcdpEvents, deduplicateAgainstAcled } from '@/services/ucdp-events';
-import { fetchUnhcrPopulation } from '@/services/unhcr';
+import { fetchConflictEvents, fetchUcdpClassifications, fetchHapiSummary, fetchUcdpEvents, deduplicateAgainstAcled } from '@/services/conflict';
+import { fetchUnhcrPopulation } from '@/services/displacement';
 import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice, setTheme, getCurrentTheme } from '@/utils';
@@ -90,6 +87,7 @@ import { collectStoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { openStoryModal } from '@/components/StoryModal';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, UNDERSEA_CABLES, NUCLEAR_FACILITIES } from '@/config/geo';
+import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { PIPELINES } from '@/config/pipelines';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
@@ -99,12 +97,15 @@ import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } from '@/config/finance-geo';
 import { isDesktopRuntime } from '@/services/runtime';
+import { IntelligenceServiceClient } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
+import { ResearchServiceClient } from '@/generated/client/worldmonitor/research/v1/service_client';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
 import { initI18n, t, changeLanguage } from '@/services/i18n';
 
-import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
+import type { MarketData, ClusteredEvent } from '@/types';
+import type { PredictionMarket } from '@/services/prediction';
 
 type IntlDisplayNamesCtor = new (
   locales: string | string[],
@@ -860,9 +861,18 @@ export class App {
     const shareUrl = this.getShareUrl();
     if (shareUrl) history.replaceState(null, '', shareUrl);
 
-    const stockPromise = fetch(`/api/stock-index?code=${encodeURIComponent(code)}`)
-      .then((r) => r.json())
-      .catch(() => ({ available: false }));
+    const marketClient = new MarketServiceClient('', { fetch: fetch.bind(globalThis) });
+    const stockPromise = marketClient.getCountryStockIndex({ countryCode: code })
+      .then((resp) => ({
+        available: resp.available,
+        code: resp.code,
+        symbol: resp.symbol,
+        indexName: resp.indexName,
+        price: String(resp.price),
+        weekChangePercent: String(resp.weekChangePercent),
+        currency: resp.currency,
+      }))
+      .catch(() => ({ available: false as const, code: '', symbol: '', indexName: '', price: '0', weekChangePercent: '0', currency: '' }));
 
     stockPromise.then((stock) => {
       if (this.countryBriefPage?.getCode() === code) this.countryBriefPage.updateStock(stock);
@@ -931,18 +941,15 @@ export class App {
         context.stockIndex = `${stockData.indexName}: ${stockData.price} (${pct >= 0 ? '+' : ''}${stockData.weekChangePercent}% week)`;
       }
 
-      let data: Record<string, unknown> | null = null;
+      let briefText = '';
       try {
-        const res = await fetch('/api/country-intel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ country, code, context }),
-        });
-        data = await res.json();
+        const intelClient = new IntelligenceServiceClient('', { fetch: fetch.bind(globalThis) });
+        const resp = await intelClient.getCountryIntelBrief({ countryCode: code });
+        briefText = resp.brief;
       } catch { /* server unreachable */ }
 
-      if (data && data.brief && !data.skipped) {
-        this.countryBriefPage!.updateBrief({ ...data, code } as Parameters<typeof this.countryBriefPage.updateBrief>[0]);
+      if (briefText) {
+        this.countryBriefPage!.updateBrief({ brief: briefText, country, code });
       } else {
         const briefHeadlines = (context.headlines as string[] | undefined) || [];
         let fallbackBrief = '';
@@ -1011,9 +1018,9 @@ export class App {
 
     if (this.intelligenceCache.earthquakes) {
       for (const eq of this.intelligenceCache.earthquakes) {
-        if (inCountry(eq.lat, eq.lon) || eq.place?.toLowerCase().includes(countryLower)) {
+        if (inCountry(eq.location?.latitude ?? 0, eq.location?.longitude ?? 0) || eq.place?.toLowerCase().includes(countryLower)) {
           events.push({
-            timestamp: new Date(eq.time).getTime(),
+            timestamp: eq.occurredAt,
             lane: 'natural',
             label: `M${eq.magnitude.toFixed(1)} ${eq.place}`,
             severity: eq.magnitude >= 6 ? 'critical' : eq.magnitude >= 5 ? 'high' : eq.magnitude >= 4 ? 'medium' : 'low',
@@ -1196,7 +1203,7 @@ export class App {
     let earthquakes = 0;
     if (this.intelligenceCache.earthquakes) {
       earthquakes = this.intelligenceCache.earthquakes.filter((eq) => {
-        if (hasGeoShape) return this.isInCountry(eq.lat, eq.lon, code);
+        if (hasGeoShape) return this.isInCountry(eq.location?.latitude ?? 0, eq.location?.longitude ?? 0, code);
         return eq.place?.toLowerCase().includes(countryLower);
       }).length;
     }
@@ -1670,7 +1677,7 @@ export class App {
       this.searchModal.registerSource('prediction', this.latestPredictions.map(p => ({
         id: p.title,
         title: p.title,
-        subtitle: `${(p.yesPrice * 100).toFixed(0)}% probability`,
+        subtitle: `${Math.round(p.yesPrice)}% probability`,
         data: p,
       })));
     }
@@ -1765,7 +1772,7 @@ export class App {
       id: `snap-${i}`,
       title: p.title,
       yesPrice: p.yesPrice,
-      noPrice: 1 - p.yesPrice,
+      noPrice: 100 - p.yesPrice,
       volume24h: 0,
       liquidity: 0,
     }));
@@ -3602,29 +3609,24 @@ export class App {
     }
 
     try {
-      const res = await fetch('/api/tech-events?type=conference&mappable=true&days=90&limit=50');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
+      const client = new ResearchServiceClient('', { fetch: fetch.bind(globalThis) });
+      const data = await client.listTechEvents({
+        type: 'conference',
+        mappable: true,
+        days: 90,
+        limit: 50,
+      });
       if (!data.success) throw new Error(data.error || 'Unknown error');
 
       // Transform events for map markers
       const now = new Date();
-      const mapEvents = data.events.map((e: {
-        id: string;
-        title: string;
-        location: string;
-        coords: { lat: number; lng: number; country: string };
-        startDate: string;
-        endDate: string;
-        url: string | null;
-      }) => ({
+      const mapEvents = data.events.map((e) => ({
         id: e.id,
         title: e.title,
         location: e.location,
-        lat: e.coords.lat,
-        lng: e.coords.lng,
-        country: e.coords.country,
+        lat: e.coords?.lat ?? 0,
+        lng: e.coords?.lng ?? 0,
+        country: e.coords?.country ?? '',
         startDate: e.startDate,
         endDate: e.endDate,
         url: e.url,
@@ -3671,7 +3673,7 @@ export class App {
     outages?: InternetOutage[];
     protests?: { events: SocialUnrestEvent[]; sources: { acled: number; gdelt: number } };
     military?: { flights: MilitaryFlight[]; flightClusters: MilitaryFlightCluster[]; vessels: MilitaryVessel[]; vesselClusters: MilitaryVesselCluster[] };
-    earthquakes?: import('@/types').Earthquake[];
+    earthquakes?: import('@/services/earthquakes').Earthquake[];
     usniFleet?: import('@/types').USNIFleetReport;
   } = {};
   private cyberThreatsCache: CyberThreat[] | null = null;
@@ -4393,16 +4395,16 @@ export class App {
 
         // Feed signal aggregator
         signalAggregator.ingestSatelliteFires(flat.map(f => ({
-          lat: f.lat,
-          lon: f.lon,
+          lat: f.location?.latitude ?? 0,
+          lon: f.location?.longitude ?? 0,
           brightness: f.brightness,
           frp: f.frp,
           region: f.region,
-          acq_date: f.acq_date,
+          acq_date: new Date(f.detectedAt).toISOString().slice(0, 10),
         })));
 
         // Feed map layer
-        this.map?.setFires(flat);
+        this.map?.setFires(toMapFires(flat));
 
         // Feed panel
         (this.panels['satellite-fires'] as SatelliteFiresPanel)?.update(stats, totalCount);
