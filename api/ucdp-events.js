@@ -12,7 +12,8 @@ const UCDP_PAGE_SIZE = 1000;
 const MAX_PAGES = 12;
 const TRAILING_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
-let fallbackCache = { data: null, timestamp: 0 };
+const PARTIAL_CACHE_TTL_MS = 10 * 60 * 1000;
+let fallbackCache = { data: null, timestamp: 0, ttlMs: CACHE_TTL_MS };
 
 const rateLimiter = createIpRateLimiter({
   limit: 15,
@@ -140,7 +141,7 @@ export default async function handler(req) {
     });
   }
 
-  if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < CACHE_TTL_MS) {
+  if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < fallbackCache.ttlMs) {
     recordCacheTelemetry('/api/ucdp-events', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
@@ -222,11 +223,11 @@ export default async function handler(req) {
 
     // Only write full-TTL cache for complete fetches; partial results get short TTL
     if (isPartial) {
-      fallbackCache = { data: result, timestamp: now };
+      fallbackCache = { data: result, timestamp: now, ttlMs: PARTIAL_CACHE_TTL_MS };
       void setCachedJson(CACHE_KEY, result, 10 * 60); // 10 min — retry soon
       recordCacheTelemetry('/api/ucdp-events', 'PARTIAL');
     } else {
-      fallbackCache = { data: result, timestamp: now };
+      fallbackCache = { data: result, timestamp: now, ttlMs: CACHE_TTL_MS };
       void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
       recordCacheTelemetry('/api/ucdp-events', 'MISS');
     }
