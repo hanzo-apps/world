@@ -513,7 +513,7 @@ export default async function handler(req) {
       }, {
         headers: {
           ...corsHeaders,
-          'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30',
+          'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=120',
         },
       });
     }
@@ -559,7 +559,7 @@ export default async function handler(req) {
     return Response.json(result, {
       headers: {
         ...corsHeaders,
-        'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30',
+        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=120',
       },
     });
   } catch (error) {
@@ -577,7 +577,7 @@ export default async function handler(req) {
       }, {
         headers: {
           ...corsHeaders,
-          'Cache-Control': 'public, max-age=30, s-maxage=30, stale-while-revalidate=15',
+          'Cache-Control': 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
         },
       });
     }
@@ -593,7 +593,7 @@ export default async function handler(req) {
       }, {
         headers: {
           ...corsHeaders,
-          'Cache-Control': 'public, max-age=30, s-maxage=30, stale-while-revalidate=15',
+          'Cache-Control': 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
         },
       });
     }

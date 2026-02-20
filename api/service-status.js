@@ -290,7 +290,7 @@ export default async function handler(req) {
     headers: {
       'Content-Type': 'application/json',
       ...cors,
-      'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=30', // 1 min cache
+      'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=120', // 5 min cache (46 service checks — slow-moving data)
     },
   });
 }
