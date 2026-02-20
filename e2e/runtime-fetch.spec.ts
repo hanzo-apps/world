@@ -152,6 +152,96 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.calls.some((url) => url.includes('worldmonitor.app/api/stablecoin-markets'))).toBe(true);
   });
 
+  test('runtime fetch patch never sends local-only endpoints to cloud', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const runtime = await import('/src/services/runtime.ts');
+      const globalWindow = window as unknown as Record<string, unknown>;
+      const originalFetch = window.fetch.bind(window);
+
+      const calls: string[] = [];
+      const responseJson = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      window.fetch = (async (input: RequestInfo | URL) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input.url;
+        calls.push(url);
+
+        if (url.includes('127.0.0.1:46123/api/local-env-update')) {
+          return responseJson({ error: 'Unauthorized' }, 401);
+        }
+        if (url.includes('127.0.0.1:46123/api/local-validate-secret')) {
+          throw new Error('ECONNREFUSED');
+        }
+
+        if (url.includes('worldmonitor.app/api/local-env-update')) {
+          return responseJson({ leaked: true }, 200);
+        }
+        if (url.includes('worldmonitor.app/api/local-validate-secret')) {
+          return responseJson({ leaked: true }, 200);
+        }
+
+        return responseJson({ ok: true }, 200);
+      }) as typeof window.fetch;
+
+      const previousTauri = globalWindow.__TAURI__;
+      globalWindow.__TAURI__ = { core: { invoke: () => Promise.resolve(null) } };
+      delete globalWindow.__wmFetchPatched;
+
+      try {
+        runtime.installRuntimeFetchPatch();
+
+        const envUpdateResponse = await window.fetch('/api/local-env-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'GROQ_API_KEY', value: 'sk-secret-value' }),
+        });
+
+        let validateError: string | null = null;
+        try {
+          await window.fetch('/api/local-validate-secret', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'GROQ_API_KEY', value: 'sk-secret-value' }),
+          });
+        } catch (error) {
+          validateError = error instanceof Error ? error.message : String(error);
+        }
+
+        return {
+          envUpdateStatus: envUpdateResponse.status,
+          validateError,
+          calls,
+        };
+      } finally {
+        window.fetch = originalFetch;
+        delete globalWindow.__wmFetchPatched;
+        if (previousTauri === undefined) {
+          delete globalWindow.__TAURI__;
+        } else {
+          globalWindow.__TAURI__ = previousTauri;
+        }
+      }
+    });
+
+    expect(result.envUpdateStatus).toBe(401);
+    expect(result.validateError).toContain('ECONNREFUSED');
+
+    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/api/local-env-update'))).toBe(true);
+    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/api/local-validate-secret'))).toBe(true);
+    expect(result.calls.some((url) => url.includes('worldmonitor.app/api/local-env-update'))).toBe(false);
+    expect(result.calls.some((url) => url.includes('worldmonitor.app/api/local-validate-secret'))).toBe(false);
+  });
+
   test('chunk preload reload guard is one-shot until app boot clears it', async ({ page }) => {
     await page.goto('/tests/runtime-harness.html');
 
