@@ -1,9 +1,41 @@
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { resolve } from 'path';
+import { resolve, dirname, extname } from 'path';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { brotliCompress } from 'zlib';
+import { promisify } from 'util';
 import pkg from './package.json';
 
 const isE2E = process.env.VITE_E2E === '1';
+
+
+const brotliCompressAsync = promisify(brotliCompress);
+const BROTLI_EXTENSIONS = new Set(['.js', '.mjs', '.css', '.html', '.svg', '.json', '.txt', '.xml', '.wasm']);
+
+function brotliPrecompressPlugin(): Plugin {
+  return {
+    name: 'brotli-precompress',
+    apply: 'build',
+    async writeBundle(outputOptions, bundle) {
+      const outDir = outputOptions.dir;
+      if (!outDir) return;
+
+      await Promise.all(Object.keys(bundle).map(async (fileName) => {
+        const extension = extname(fileName).toLowerCase();
+        if (!BROTLI_EXTENSIONS.has(extension)) return;
+
+        const sourcePath = resolve(outDir, fileName);
+        const compressedPath = `${sourcePath}.br`;
+        const sourceBuffer = await readFile(sourcePath);
+        if (sourceBuffer.length < 1024) return;
+
+        const compressedBuffer = await brotliCompressAsync(sourceBuffer);
+        await mkdir(dirname(compressedPath), { recursive: true });
+        await writeFile(compressedPath, compressedBuffer);
+      }));
+    },
+  };
+}
 
 const VARIANT_META: Record<string, {
   title: string;
@@ -191,11 +223,41 @@ function youtubeLivePlugin(): Plugin {
         }
 
         try {
-          // Use YouTube's oEmbed to check if a video is valid/live
-          // For now, return null to use fallback - will implement proper detection later
+          const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
+          const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
+
+          const ytRes = await fetch(liveUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+            redirect: 'follow',
+          });
+
+          if (!ytRes.ok) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            res.end(JSON.stringify({ videoId: null, channel }));
+            return;
+          }
+
+          const html = await ytRes.text();
+
+          // Scope both fields to the same videoDetails block so we don't
+          // combine a videoId from one object with isLive from another.
+          let videoId: string | null = null;
+          const detailsIdx = html.indexOf('"videoDetails"');
+          if (detailsIdx !== -1) {
+            const block = html.substring(detailsIdx, detailsIdx + 5000);
+            const vidMatch = block.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+            const liveMatch = block.match(/"isLive"\s*:\s*true/);
+            if (vidMatch && liveMatch) {
+              videoId = vidMatch[1];
+            }
+          }
+
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'public, max-age=300');
-          res.end(JSON.stringify({ videoId: null, channel }));
+          res.end(JSON.stringify({ videoId, isLive: videoId !== null, channel }));
         } catch (error) {
           console.error(`[YouTube Live] Error:`, error);
           res.statusCode = 500;
@@ -215,6 +277,7 @@ export default defineConfig({
     htmlVariantPlugin(),
     polymarketPlugin(),
     youtubeLivePlugin(),
+    brotliPrecompressPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false,
@@ -244,10 +307,9 @@ export default defineConfig({
       },
 
       workbox: {
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}', 'index.html'],
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
         globIgnores: ['**/ml-*.js', '**/onnx*.wasm', '**/locale-*.js'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/settings/],
+        navigateFallback: null,
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
