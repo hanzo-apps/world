@@ -1,5 +1,6 @@
 import { isDesktopRuntime } from './runtime';
 import { invokeTauri } from './tauri-bridge';
+import { isStorageQuotaExceeded, isQuotaError, markStorageQuotaExceeded } from '@/utils';
 
 type CacheEnvelope<T> = {
   key: string;
@@ -107,20 +108,22 @@ export async function setPersistentCache<T>(key: string, data: T): Promise<void>
     }
   }
 
-  if (isIndexedDbAvailable()) {
+  if (isIndexedDbAvailable() && !isStorageQuotaExceeded()) {
     try {
       await setInIndexedDb(payload);
       return;
     } catch (error) {
-      console.warn('[persistent-cache] IndexedDB write failed; falling back to localStorage', error);
+      if (isQuotaError(error)) markStorageQuotaExceeded();
+      else console.warn('[persistent-cache] IndexedDB write failed; falling back to localStorage', error);
       cacheDbPromise = null;
     }
   }
 
+  if (isStorageQuotaExceeded()) return;
   try {
     localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(payload));
-  } catch {
-    // Ignore quota errors
+  } catch (error) {
+    if (isQuotaError(error)) markStorageQuotaExceeded();
   }
 }
 
