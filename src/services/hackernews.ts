@@ -1,5 +1,6 @@
 import { API_URLS } from '@/config';
 import { createCircuitBreaker } from '@/utils';
+import { fetchWithProxy } from '@/utils';
 
 export interface HackerNewsStory {
   id: number;
@@ -27,7 +28,7 @@ export async function fetchHackerNews(
   limit: number = 30
 ): Promise<HackerNewsStory[]> {
   return breaker.execute(async () => {
-    const response = await fetch(API_URLS.hackernews(type, limit));
+    const response = await fetchWithProxy(API_URLS.hackernews(type, limit));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: HNApiResponse = await response.json();
