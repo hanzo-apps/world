@@ -153,26 +153,32 @@ export default async function handler(req) {
     const totalPages = Math.max(1, Number(page0?.TotalPages) || 1);
     const newestPage = totalPages - 1;
 
+    // Fetch up to MAX_PAGES in parallel (page0 already fetched during version discovery)
+    const FAILED = Symbol('failed');
+    const pagesToFetch = [];
+    for (let offset = 0; offset < MAX_PAGES && (newestPage - offset) >= 0; offset++) {
+      const page = newestPage - offset;
+      if (page === 0) {
+        pagesToFetch.push(Promise.resolve(page0));
+      } else {
+        pagesToFetch.push(fetchGedPage(version, page).catch(() => FAILED));
+      }
+    }
+
+    const pageResults = await Promise.all(pagesToFetch);
+    let failedPages = 0;
+
     let allEvents = [];
     let latestDatasetMs = NaN;
 
-    for (let offset = 0; offset < MAX_PAGES && (newestPage - offset) >= 0; offset++) {
-      const page = newestPage - offset;
-      const rawData = page === 0 ? page0 : await fetchGedPage(version, page);
+    for (const rawData of pageResults) {
+      if (rawData === FAILED) { failedPages++; continue; }
       const events = Array.isArray(rawData?.Result) ? rawData.Result : [];
       allEvents = allEvents.concat(events);
 
       const pageMaxMs = getMaxDateMs(events);
       if (!Number.isFinite(latestDatasetMs) && Number.isFinite(pageMaxMs)) {
         latestDatasetMs = pageMaxMs;
-      }
-
-      // Pages are ordered oldest->newest; once we are fully outside trailing window, stop.
-      if (Number.isFinite(latestDatasetMs) && Number.isFinite(pageMaxMs)) {
-        const cutoffMs = latestDatasetMs - TRAILING_WINDOW_MS;
-        if (pageMaxMs < cutoffMs) {
-          break;
-        }
       }
     }
 
@@ -204,21 +210,36 @@ export default async function handler(req) {
         return (Number.isFinite(bMs) ? bMs : 0) - (Number.isFinite(aMs) ? aMs : 0);
       });
 
+    const isPartial = failedPages > 0;
     const result = {
       success: true,
       count: sanitized.length,
       data: sanitized,
       version,
       cached_at: new Date().toISOString(),
+      ...(isPartial && { partial: true, failed_pages: failedPages }),
     };
 
-    fallbackCache = { data: result, timestamp: now };
-    void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/ucdp-events', 'MISS');
+    // Only write full-TTL cache for complete fetches; partial results get short TTL
+    if (isPartial) {
+      fallbackCache = { data: result, timestamp: now };
+      void setCachedJson(CACHE_KEY, result, 10 * 60); // 10 min — retry soon
+      recordCacheTelemetry('/api/ucdp-events', 'PARTIAL');
+    } else {
+      fallbackCache = { data: result, timestamp: now };
+      void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
+      recordCacheTelemetry('/api/ucdp-events', 'MISS');
+    }
 
     return Response.json(result, {
       status: 200,
-      headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', 'X-Cache': 'MISS' },
+      headers: {
+        ...corsHeaders,
+        'Cache-Control': isPartial
+          ? 'public, max-age=600, s-maxage=600, stale-while-revalidate=120'
+          : 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600',
+        'X-Cache': isPartial ? 'PARTIAL' : 'MISS',
+      },
     });
   } catch (error) {
     if (isValidResult(fallbackCache.data)) {

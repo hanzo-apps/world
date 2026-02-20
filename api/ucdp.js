@@ -29,10 +29,21 @@ function toErrorMessage(error) {
 }
 
 export default async function handler(req) {
-  const cors = getCorsHeaders(req);
-  if (isDisallowedOrigin(req)) {
-    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { status: 403, headers: cors });
+  const cors = getCorsHeaders(req, 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    if (isDisallowedOrigin(req)) return new Response(null, { status: 403, headers: cors });
+    return new Response(null, { status: 204, headers: cors });
   }
+
+  if (req.method !== 'GET') {
+    return Response.json({ error: 'Method not allowed', conflicts: [] }, { status: 405, headers: cors });
+  }
+
+  if (isDisallowedOrigin(req)) {
+    return Response.json({ error: 'Origin not allowed', conflicts: [] }, { status: 403, headers: cors });
+  }
+
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {

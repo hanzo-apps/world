@@ -24,10 +24,6 @@ interface FredObservation {
   value: string;
 }
 
-interface FredApiResponse {
-  observations: FredObservation[];
-}
-
 const FRED_SERIES: FredConfig[] = [
   { id: 'WALCL', name: 'Fed Total Assets', unit: '$B', precision: 0 },
   { id: 'FEDFUNDS', name: 'Fed Funds Rate', unit: '%', precision: 2 },
@@ -41,24 +37,12 @@ const FRED_SERIES: FredConfig[] = [
 const FRED_API_BASE = '/api/fred-data';
 const breaker = createCircuitBreaker<FredSeries[]>({ name: 'FRED Economic' });
 
-async function fetchSeriesData(seriesId: string): Promise<{ date: string; value: number }[]> {
-  const endDate = new Date().toISOString().split('T')[0] as string;
-  const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] as string;
+interface FredBatchResponse {
+  batch: Record<string, { observations: FredObservation[] }>;
+}
 
-  const params = new URLSearchParams();
-  params.set('series_id', seriesId);
-  params.set('observation_start', startDate);
-  params.set('observation_end', endDate);
-
-  const response = await fetch(`${FRED_API_BASE}?${params}`, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-  const data: FredApiResponse = await response.json();
-
-  return (data.observations || [])
+function parseObservations(observations: FredObservation[]): { date: string; value: number }[] {
+  return observations
     .map(obs => {
       const value = parseFloat(obs.value);
       if (isNaN(value) || obs.value === '.') return null;
@@ -68,53 +52,67 @@ async function fetchSeriesData(seriesId: string): Promise<{ date: string; value:
     .reverse();
 }
 
+function buildFredSeries(config: FredConfig, data: { date: string; value: number }[]): FredSeries | null {
+  if (data.length >= 2) {
+    const latest = data[data.length - 1]!;
+    const previous = data[data.length - 2]!;
+    const change = latest.value - previous.value;
+    const changePercent = (change / previous.value) * 100;
+    let displayValue = latest.value;
+    if (config.id === 'WALCL') displayValue = latest.value / 1000;
+    return {
+      id: config.id, name: config.name,
+      value: Number(displayValue.toFixed(config.precision)),
+      previousValue: Number(previous.value.toFixed(config.precision)),
+      change: Number(change.toFixed(config.precision)),
+      changePercent: Number(changePercent.toFixed(2)),
+      date: latest.date, unit: config.unit,
+    };
+  } else if (data.length === 1) {
+    const latest = data[0]!;
+    let displayValue = latest.value;
+    if (config.id === 'WALCL') displayValue = latest.value / 1000;
+    return {
+      id: config.id, name: config.name,
+      value: Number(displayValue.toFixed(config.precision)),
+      previousValue: null, change: null, changePercent: null,
+      date: latest.date, unit: config.unit,
+    };
+  }
+  return null;
+}
+
 export async function fetchFredData(): Promise<FredSeries[]> {
   if (!isFeatureAvailable('economicFred')) return [];
 
   return breaker.execute(async () => {
-    const fetchPromises = FRED_SERIES.map(async (config): Promise<FredSeries | null> => {
-      const data = await fetchSeriesData(config.id);
+    const endDate = new Date().toISOString().split('T')[0] as string;
+    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] as string;
 
-      if (data.length >= 2) {
-        const latest = data[data.length - 1]!;
-        const previous = data[data.length - 2]!;
-        const change = latest.value - previous.value;
-        const changePercent = (change / previous.value) * 100;
-
-        let displayValue = latest.value;
-        if (config.id === 'WALCL') displayValue = latest.value / 1000;
-
-        return {
-          id: config.id,
-          name: config.name,
-          value: Number(displayValue.toFixed(config.precision)),
-          previousValue: Number(previous.value.toFixed(config.precision)),
-          change: Number(change.toFixed(config.precision)),
-          changePercent: Number(changePercent.toFixed(2)),
-          date: latest.date,
-          unit: config.unit,
-        };
-      } else if (data.length === 1) {
-        const latest = data[0]!;
-        let displayValue = latest.value;
-        if (config.id === 'WALCL') displayValue = latest.value / 1000;
-
-        return {
-          id: config.id,
-          name: config.name,
-          value: Number(displayValue.toFixed(config.precision)),
-          previousValue: null,
-          change: null,
-          changePercent: null,
-          date: latest.date,
-          unit: config.unit,
-        };
-      }
-      return null;
+    // Single batch request for all series (1 edge function invocation instead of 7)
+    const allIds = FRED_SERIES.map(s => s.id).join(',');
+    const params = new URLSearchParams({
+      series_id: allIds,
+      observation_start: startDate,
+      observation_end: endDate,
     });
 
-    const results = await Promise.all(fetchPromises);
-    return results.filter((r): r is FredSeries => r !== null);
+    const response = await fetch(`${FRED_API_BASE}?${params}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const json: FredBatchResponse = await response.json();
+    const batch = json.batch || {};
+
+    const results: FredSeries[] = [];
+    for (const config of FRED_SERIES) {
+      const raw = batch[config.id]?.observations || [];
+      const data = parseObservations(raw);
+      const series = buildFredSeries(config, data);
+      if (series) results.push(series);
+    }
+    return results;
   }, []);
 }
 
