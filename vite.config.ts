@@ -191,11 +191,41 @@ function youtubeLivePlugin(): Plugin {
         }
 
         try {
-          // Use YouTube's oEmbed to check if a video is valid/live
-          // For now, return null to use fallback - will implement proper detection later
+          const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
+          const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
+
+          const ytRes = await fetch(liveUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+            redirect: 'follow',
+          });
+
+          if (!ytRes.ok) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            res.end(JSON.stringify({ videoId: null, channel }));
+            return;
+          }
+
+          const html = await ytRes.text();
+
+          // Scope both fields to the same videoDetails block so we don't
+          // combine a videoId from one object with isLive from another.
+          let videoId: string | null = null;
+          const detailsIdx = html.indexOf('"videoDetails"');
+          if (detailsIdx !== -1) {
+            const block = html.substring(detailsIdx, detailsIdx + 5000);
+            const vidMatch = block.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+            const liveMatch = block.match(/"isLive"\s*:\s*true/);
+            if (vidMatch && liveMatch) {
+              videoId = vidMatch[1];
+            }
+          }
+
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'public, max-age=300');
-          res.end(JSON.stringify({ videoId: null, channel }));
+          res.end(JSON.stringify({ videoId, isLive: videoId !== null, channel }));
         } catch (error) {
           console.error(`[YouTube Live] Error:`, error);
           res.statusCode = 500;
