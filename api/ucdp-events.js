@@ -134,18 +134,24 @@ export default async function handler(req) {
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {
+    const cc = cached.partial
+      ? 'public, max-age=600, s-maxage=600, stale-while-revalidate=120'
+      : 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600';
     recordCacheTelemetry('/api/ucdp-events', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
-      headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', 'X-Cache': 'REDIS-HIT' },
+      headers: { ...corsHeaders, 'Cache-Control': cc, 'X-Cache': 'REDIS-HIT' },
     });
   }
 
   if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < fallbackCache.ttlMs) {
+    const cc = fallbackCache.data.partial
+      ? 'public, max-age=600, s-maxage=600, stale-while-revalidate=120'
+      : 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600';
     recordCacheTelemetry('/api/ucdp-events', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
-      headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', 'X-Cache': 'MEMORY-HIT' },
+      headers: { ...corsHeaders, 'Cache-Control': cc, 'X-Cache': 'MEMORY-HIT' },
     });
   }
 
