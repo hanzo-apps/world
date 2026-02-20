@@ -174,7 +174,14 @@ export class MapPopup {
       this.popup.addEventListener('touchmove', this.handleSheetTouchMove, { passive: false });
       this.popup.addEventListener('touchend', this.handleSheetTouchEnd);
       this.popup.addEventListener('touchcancel', this.handleSheetTouchEnd);
-      requestAnimationFrame(() => this.popup?.classList.add('open'));
+      requestAnimationFrame(() => {
+        if (!this.popup) return;
+        this.popup.classList.add('open');
+        // Remove will-change after slide-in transition to free GPU memory
+        this.popup.addEventListener('transitionend', () => {
+          if (this.popup) this.popup.style.willChange = 'auto';
+        }, { once: true });
+      });
     }
 
     // Click outside to close
