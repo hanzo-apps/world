@@ -145,6 +145,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 function isLocalOnlyApiTarget(target: string): boolean {
+  // Security boundary: endpoints that can carry local secrets must use the
+  // `/api/local-*` prefix so cloud fallback is automatically blocked.
   return target.startsWith('/api/local-');
 }
 
