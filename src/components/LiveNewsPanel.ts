@@ -348,7 +348,7 @@ export class LiveNewsPanel extends Panel {
       }
     });
 
-    if (!channel.videoId) {
+    if (!channel.videoId || !/^[\w-]{10,12}$/.test(channel.videoId)) {
       this.showOfflineMessage(channel);
       return;
     }
@@ -548,7 +548,7 @@ export class LiveNewsPanel extends Panel {
     this.forceFallbackVideoForNextInit = false;
     await this.resolveChannelVideo(this.activeChannel, useFallbackVideo);
 
-    if (!this.activeChannel.videoId) {
+    if (!this.activeChannel.videoId || !/^[\w-]{10,12}$/.test(this.activeChannel.videoId)) {
       this.showOfflineMessage(this.activeChannel);
       return;
     }
