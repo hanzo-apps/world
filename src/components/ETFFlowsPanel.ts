@@ -68,11 +68,12 @@ export class ETFFlowsPanel extends Panel {
 
   private async fetchData(): Promise<void> {
     try {
-      const res = await fetch('/api/etf-flows');
+      const res = await fetch('/api/etf-flows', { signal: this.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this.data = await res.json();
       this.error = null;
     } catch (err) {
+      if (this.isAbortError(err)) return;
       this.error = err instanceof Error ? err.message : 'Failed to fetch';
     } finally {
       this.loading = false;

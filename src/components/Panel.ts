@@ -55,6 +55,7 @@ export class Panel {
   protected statusBadgeEl: HTMLElement | null = null;
   protected newBadgeEl: HTMLElement | null = null;
   protected panelId: string;
+  private abortController: AbortController = new AbortController();
   private tooltipCloseHandler: (() => void) | null = null;
   private resizeHandle: HTMLElement | null = null;
   private isResizing = false;
@@ -423,10 +424,16 @@ export class Panel {
     localStorage.setItem(PANEL_SPANS_KEY, JSON.stringify(spans));
   }
 
-  /**
-   * Clean up event listeners and resources
-   */
+  protected get signal(): AbortSignal {
+    return this.abortController.signal;
+  }
+
+  protected isAbortError(error: unknown): boolean {
+    return error instanceof DOMException && error.name === 'AbortError';
+  }
+
   public destroy(): void {
+    this.abortController.abort();
     if (this.contentDebounceTimer) {
       clearTimeout(this.contentDebounceTimer);
       this.contentDebounceTimer = null;
