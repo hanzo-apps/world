@@ -1508,6 +1508,12 @@
       "heading": "TÍTULO",
       "mmsi": "MMSI",
       "hull": "CASCO #",
+      "region": "REGION",
+      "strikeGroup": "STRIKE GROUP",
+      "deploymentStatus": "STATUS",
+      "usniIntel": "USNI Intel",
+      "usniSource": "Source: USNI News Fleet Tracker",
+      "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
       "darkDescription": "⚠ La embarcación se ha quedado a oscuras: se perdió la señal AIS. Puede indicar operaciones sensibles."
     },
     "militaryCluster": {

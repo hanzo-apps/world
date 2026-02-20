@@ -1485,6 +1485,12 @@
       "heading": "HEADING",
       "mmsi": "MMSI",
       "hull": "HULL #",
+      "region": "REGION",
+      "strikeGroup": "STRIKE GROUP",
+      "deploymentStatus": "STATUS",
+      "usniIntel": "USNI Intel",
+      "usniSource": "Source: USNI News Fleet Tracker",
+      "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
       "darkDescription": "⚠ Vessel has gone dark - AIS signal lost. May indicate sensitive operations."
     },
     "militaryCluster": {

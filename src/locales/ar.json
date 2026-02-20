@@ -1508,6 +1508,12 @@
       "heading": "الاتجاه",
       "mmsi": "MMSI",
       "hull": "رقم الهيكل",
+      "region": "REGION",
+      "strikeGroup": "STRIKE GROUP",
+      "deploymentStatus": "STATUS",
+      "usniIntel": "USNI Intel",
+      "usniSource": "Source: USNI News Fleet Tracker",
+      "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
       "darkDescription": "⚠ السفينة أصبحت مظلمة - فُقدت إشارة AIS. قد يشير إلى عمليات حساسة."
     },
     "militaryCluster": {
