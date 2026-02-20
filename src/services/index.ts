@@ -18,6 +18,7 @@ export * from './protests';
 export * from './flights';
 export * from './military-flights';
 export * from './military-vessels';
+export * from './usni-fleet';
 export * from './pizzint';
 export * from './eonet';
 export { analysisWorker } from './analysis-worker';

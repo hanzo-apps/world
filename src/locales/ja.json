@@ -1508,6 +1508,12 @@
       "heading": "方位",
       "mmsi": "MMSI",
       "hull": "船体番号",
+      "region": "REGION",
+      "strikeGroup": "STRIKE GROUP",
+      "deploymentStatus": "STATUS",
+      "usniIntel": "USNI Intel",
+      "usniSource": "Source: USNI News Fleet Tracker",
+      "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
       "darkDescription": "⚠ 艦艇がAIS信号を喪失 — 機密作戦の可能性。"
     },
     "militaryCluster": {
