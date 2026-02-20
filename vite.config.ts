@@ -308,7 +308,7 @@ export default defineConfig({
 
       workbox: {
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
-        globIgnores: ['**/ml-*.js', '**/onnx*.wasm'],
+        globIgnores: ['**/ml-*.js', '**/onnx*.wasm', '**/locale-*.js'],
         navigateFallback: null,
         skipWaiting: true,
         clientsClaim: true,
@@ -367,6 +367,15 @@ export default defineConfig({
             },
           },
           {
+            urlPattern: /\/assets\/locale-.*\.js$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'locale-files',
+              expiration: { maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
             handler: 'StaleWhileRevalidate',
             options: {
@@ -408,6 +417,13 @@ export default defineConfig({
             if (id.includes('/topojson-client/')) {
               return 'topojson';
             }
+          }
+          // Give lazy-loaded locale chunks a recognizable prefix so the
+          // service worker can exclude them from precache (en.json is
+          // statically imported into the main bundle).
+          const localeMatch = id.match(/\/locales\/(\w+)\.json$/);
+          if (localeMatch && localeMatch[1] !== 'en') {
+            return `locale-${localeMatch[1]}`;
           }
           return undefined;
         },
