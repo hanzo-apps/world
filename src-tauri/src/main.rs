@@ -733,6 +733,13 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
     }
     append_desktop_log(app, "INFO", &format!("injected {secret_count} keychain secrets into sidecar env"));
 
+    // Inject build-time secrets (CI) with runtime env fallback (dev)
+    if let Some(url) = option_env!("CONVEX_URL") {
+        cmd.env("CONVEX_URL", url);
+    } else if let Ok(url) = std::env::var("CONVEX_URL") {
+        cmd.env("CONVEX_URL", url);
+    }
+
     let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to launch local API: {e}"))?;

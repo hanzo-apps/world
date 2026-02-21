@@ -605,28 +605,27 @@ tr.diag-err td { color: var(--settings-red); }
 /* Hero banner */
 .wm-hero {
   text-align: center;
-  padding: 28px 24px;
-  margin-bottom: 28px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
   border: 1px solid rgba(52, 211, 153, 0.15);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(52, 211, 153, 0.04) 0%, transparent 100%);
 }
 
 .wm-hero-title {
-  margin: 0 0 12px;
-  font-size: 24px;
+  margin: 0 0 8px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--settings-text);
   letter-spacing: -0.01em;
 }
 
 .wm-hero-desc {
-  margin: 0;
-  font-size: 14px;
-  color: var(--settings-text-secondary);
-  line-height: 1.6;
-  max-width: 480px;
   margin: 0 auto;
+  font-size: 13px;
+  color: var(--settings-text-secondary);
+  line-height: 1.5;
+  max-width: 480px;
 }
 
 /* OR divider */
@@ -634,7 +633,7 @@ tr.diag-err td { color: var(--settings-red); }
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: 24px 0;
+  margin: 14px 0;
   color: var(--settings-text-secondary);
   font-size: 13px;
   font-weight: 500;
@@ -650,43 +649,43 @@ tr.diag-err td { color: var(--settings-red); }
 
 /* BYOK footer */
 .wm-byok {
-  margin-top: 28px;
-  padding: 16px 20px;
+  margin-top: 14px;
+  padding: 12px 16px;
   background: var(--settings-surface);
   border-radius: 8px;
   border: 1px solid var(--settings-border);
 }
 
 .wm-byok-title {
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 0 0 2px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--settings-text);
 }
 
 .wm-byok-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--settings-text-secondary);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .wm-section {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .wm-section-title {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0 0 2px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--settings-text);
 }
 
 .wm-section-desc {
-  margin: 0 0 12px;
-  font-size: 13px;
+  margin: 0 0 8px;
+  font-size: 12px;
   color: var(--settings-text-secondary);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .wm-key-row {
