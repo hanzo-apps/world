@@ -114,6 +114,27 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Fars News': 3,
   'MIIT (China)': 1,
   'MOFCOM (China)': 1,
+  // Turkish
+  'BBC Turkce': 2,
+  'DW Turkish': 2,
+  'Hurriyet': 2,
+  // Polish
+  'TVN24': 2,
+  'Polsat News': 2,
+  'Rzeczpospolita': 2,
+  // Russian (independent)
+  'BBC Russian': 2,
+  'Meduza': 2,
+  'Novaya Gazeta Europe': 2,
+  // Thai
+  'Bangkok Post': 2,
+  'Thai PBS': 2,
+  // Australian
+  'ABC News Australia': 2,
+  'Guardian Australia': 2,
+  // Vietnamese
+  'VnExpress': 2,
+  'Tuoi Tre News': 2,
 
   // Tier 2 - Premium Startup/VC Sources
   'Y Combinator Blog': 2,
@@ -446,6 +467,24 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'SVT Nyheter', url: rss('https://www.svt.se/nyheter/rss.xml'), lang: 'sv' },
     { name: 'Dagens Nyheter', url: rss('https://www.dn.se/rss/senaste-nytt/'), lang: 'sv' },
     { name: 'Svenska Dagbladet', url: rss('https://www.svd.se/feed/articles.rss'), lang: 'sv' },
+    // Turkish (TR)
+    { name: 'BBC Turkce', url: rss('https://feeds.bbci.co.uk/turkce/rss.xml'), lang: 'tr' },
+    { name: 'DW Turkish', url: rss('https://rss.dw.com/xml/rss-tur-all'), lang: 'tr' },
+    { name: 'Hurriyet', url: rss('https://www.hurriyet.com.tr/rss/anasayfa'), lang: 'tr' },
+    // Polish (PL)
+    { name: 'TVN24', url: rss('https://tvn24.pl/najwazniejsze.xml'), lang: 'pl' },
+    { name: 'Polsat News', url: rss('https://www.polsatnews.pl/rss/wszystkie.xml'), lang: 'pl' },
+    { name: 'Rzeczpospolita', url: rss('https://www.rp.pl/rss_main'), lang: 'pl' },
+    // Russian (RU) — independent sources
+    { name: 'BBC Russian', url: rss('https://feeds.bbci.co.uk/russian/rss.xml'), lang: 'ru' },
+    { name: 'Meduza', url: rss('https://meduza.io/rss/all'), lang: 'ru' },
+    { name: 'Novaya Gazeta Europe', url: rss('https://novayagazeta.eu/feed/rss'), lang: 'ru' },
+    // Thai (TH)
+    { name: 'Bangkok Post', url: rss('https://www.bangkokpost.com/rss'), lang: 'th' },
+    { name: 'Thai PBS', url: rss('https://news.google.com/rss/search?q=site:thaipbsworld.com+when:2d&hl=th&gl=TH&ceid=TH:th'), lang: 'th' },
+    // Vietnamese (VI)
+    { name: 'VnExpress', url: rss('https://vnexpress.net/rss'), lang: 'vi' },
+    { name: 'Tuoi Tre News', url: rss('https://news.google.com/rss/search?q=site:tuoitrenews.vn+when:2d&hl=vi&gl=VN&ceid=VN:vi'), lang: 'vi' },
   ],
   middleeast: [
     { name: 'BBC Middle East', url: rss('https://feeds.bbci.co.uk/news/world/middle_east/rss.xml') },
@@ -569,6 +608,9 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'CNA', url: rss('https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml') },
     { name: 'MIIT (China)', url: railwayRss('https://rsshub.app/gov/miit/zcjd'), lang: 'zh' },
     { name: 'MOFCOM (China)', url: railwayRss('https://rsshub.app/gov/mofcom/article/xwfb'), lang: 'zh' },
+    // Australia
+    { name: 'ABC News Australia', url: rss('https://www.abc.net.au/news/feed/2942460/rss.xml') },
+    { name: 'Guardian Australia', url: rss('https://www.theguardian.com/australia-news/rss') },
   ],
   energy: [
     { name: 'Oil & Gas', url: rss('https://news.google.com/rss/search?q=(oil+price+OR+OPEC+OR+"natural+gas"+OR+pipeline+OR+LNG)+when:2d&hl=en-US&gl=US&ceid=US:en') },
