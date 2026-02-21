@@ -260,7 +260,7 @@ export default async function handler(req) {
             status: redirectResponse.status,
             headers: {
               'Content-Type': 'application/xml',
-              'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
+              'Cache-Control': 'public, max-age=300, s-maxage=600, stale-while-revalidate=300',
               ...corsHeaders,
             },
           });
@@ -278,7 +278,7 @@ export default async function handler(req) {
       status: response.status,
       headers: {
         'Content-Type': 'application/xml',
-        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
+        'Cache-Control': 'public, max-age=600, s-maxage=600, stale-while-revalidate=300',
         ...corsHeaders,
       },
     });
