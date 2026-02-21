@@ -539,8 +539,10 @@ async function handleUcdpEventsRequest(req, res) {
 
 // ── Response caches (eliminates ~1.2TB/day OpenSky + ~30GB/day RSS egress) ──
 const openskyResponseCache = new Map(); // key: sorted query params → { data, timestamp }
+const openskyInFlight = new Map(); // key: cacheKey → Promise (dedup concurrent requests)
 const OPENSKY_CACHE_TTL_MS = 30 * 1000; // 30s — OpenSky updates every ~10s but 58 clients hammer it
 const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp }
+const rssInFlight = new Map(); // key: feed URL → Promise (dedup concurrent requests)
 const RSS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — RSS feeds rarely update faster
 
 // OpenSky OAuth2 token cache + mutex to prevent thundering herd
@@ -653,7 +655,6 @@ async function handleOpenSkyRequest(req, res, PORT) {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     const params = url.searchParams;
 
-    // Build cache key from sorted bounding box params
     const cacheKey = ['lamin', 'lomin', 'lamax', 'lomax']
       .map(k => params.get(k) || '')
       .join(',');
@@ -665,6 +666,21 @@ async function handleOpenSkyRequest(req, res, PORT) {
         'Cache-Control': 'public, max-age=30',
         'X-Cache': 'HIT',
       }, cached.data);
+    }
+
+    const existing = openskyInFlight.get(cacheKey);
+    if (existing) {
+      try {
+        await existing;
+        const deduped = openskyResponseCache.get(cacheKey);
+        if (deduped) {
+          return sendCompressed(req, res, 200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=30',
+            'X-Cache': 'DEDUP',
+          }, deduped.data);
+        }
+      } catch { /* in-flight failed, fall through to own fetch */ }
     }
 
     const token = await getOpenSkyToken();
@@ -685,51 +701,66 @@ async function handleOpenSkyRequest(req, res, PORT) {
 
     console.log('[Relay] OpenSky request (MISS):', openskyUrl);
 
-    const https = require('https');
-    const request = https.get(openskyUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'WorldMonitor/1.0',
-        'Authorization': `Bearer ${token}`,
-      },
-      timeout: 15000
-    }, (response) => {
-      let data = '';
-      response.on('data', chunk => data += chunk);
-      response.on('end', () => {
-        if (response.statusCode === 401) {
-          openskyToken = null;
-          openskyTokenExpiry = 0;
+    const fetchPromise = new Promise((resolve, reject) => {
+      const https = require('https');
+      const request = https.get(openskyUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'WorldMonitor/1.0',
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 15000
+      }, (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => {
+          if (response.statusCode === 401) {
+            openskyToken = null;
+            openskyTokenExpiry = 0;
+          }
+          if (response.statusCode === 200) {
+            openskyResponseCache.set(cacheKey, { data, timestamp: Date.now() });
+          }
+          resolve();
+          sendCompressed(req, res, response.statusCode, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=30',
+            'X-Cache': 'MISS',
+          }, data);
+        });
+      });
+
+      request.on('error', (err) => {
+        console.error('[Relay] OpenSky error:', err.message);
+        if (cached) {
+          resolve();
+          return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' }, cached.data);
         }
-        if (response.statusCode === 200) {
-          openskyResponseCache.set(cacheKey, { data, timestamp: Date.now() });
+        reject(err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
+      });
+
+      request.on('timeout', () => {
+        request.destroy();
+        if (cached) {
+          resolve();
+          return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' }, cached.data);
         }
-        sendCompressed(req, res, response.statusCode, {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=30',
-          'X-Cache': 'MISS',
-        }, data);
+        reject(new Error('timeout'));
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request timeout', time: Date.now(), states: null }));
       });
     });
 
-    request.on('error', (err) => {
-      console.error('[Relay] OpenSky error:', err.message);
-      if (cached) {
-        return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' }, cached.data);
-      }
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
-    });
-
-    request.on('timeout', () => {
-      request.destroy();
-      if (cached) {
-        return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'X-Cache': 'STALE' }, cached.data);
-      }
-      res.writeHead(504, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Request timeout', time: Date.now(), states: null }));
-    });
+    openskyInFlight.set(cacheKey, fetchPromise);
+    fetchPromise.catch(() => {}).finally(() => openskyInFlight.delete(cacheKey));
   } catch (err) {
+    openskyInFlight.delete(
+      ['lamin', 'lomin', 'lamax', 'lomax']
+        .map(k => new URL(req.url, `http://localhost:${PORT}`).searchParams.get(k) || '')
+        .join(',')
+    );
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: err.message, time: Date.now(), states: null }));
   }
@@ -1209,8 +1240,26 @@ const server = http.createServer(async (req, res) => {
         }, rssCached.data);
       }
 
+      // In-flight dedup: if another request for the same feed is already fetching,
+      // wait for it and serve from cache instead of hammering upstream.
+      const existing = rssInFlight.get(feedUrl);
+      if (existing) {
+        try {
+          await existing;
+          const deduped = rssResponseCache.get(feedUrl);
+          if (deduped) {
+            return sendCompressed(req, res, 200, {
+              'Content-Type': deduped.contentType || 'application/xml',
+              'Cache-Control': 'public, max-age=300',
+              'X-Cache': 'DEDUP',
+            }, deduped.data);
+          }
+        } catch { /* in-flight failed, fall through to own fetch */ }
+      }
+
       console.log('[Relay] RSS request (MISS):', feedUrl);
 
+      const fetchPromise = new Promise((resolveInFlight, rejectInFlight) => {
       const https = require('https');
       const http = require('http');
 
@@ -1221,6 +1270,7 @@ const server = http.createServer(async (req, res) => {
         responseHandled = true;
         res.writeHead(statusCode, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: message }));
+        rejectInFlight(new Error(message));
       };
 
       const fetchWithRedirects = (url, redirectCount = 0) => {
@@ -1262,6 +1312,7 @@ const server = http.createServer(async (req, res) => {
             if (response.statusCode >= 200 && response.statusCode < 300) {
               rssResponseCache.set(feedUrl, { data, contentType: 'application/xml', timestamp: Date.now() });
             }
+            resolveInFlight();
             sendCompressed(req, res, response.statusCode, {
               'Content-Type': 'application/xml',
               'Cache-Control': 'public, max-age=300',
@@ -1298,7 +1349,12 @@ const server = http.createServer(async (req, res) => {
       };
 
       fetchWithRedirects(feedUrl);
+      }); // end fetchPromise
+
+      rssInFlight.set(feedUrl, fetchPromise);
+      fetchPromise.catch(() => {}).finally(() => rssInFlight.delete(feedUrl));
     } catch (err) {
+      rssInFlight.delete(feedUrl);
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
