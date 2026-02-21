@@ -796,8 +796,12 @@ async function dispatch(requestUrl, req, routes, context) {
     }
     return json({ verboseMode });
   }
-  // Registration proxy — forward to cloud (bypasses Vercel bot protection)
+  // Registration — call Convex directly (Vercel Attack Challenge Mode blocks server-side)
   if (requestUrl.pathname === '/api/register-interest' && req.method === 'POST') {
+    const convexUrl = process.env.CONVEX_URL;
+    if (!convexUrl) {
+      return json({ error: 'Registration service not configured' }, 503);
+    }
     try {
       const body = await new Promise((resolve, reject) => {
         const chunks = [];
@@ -805,21 +809,29 @@ async function dispatch(requestUrl, req, routes, context) {
         req.on('end', () => resolve(Buffer.concat(chunks).toString()));
         req.on('error', reject);
       });
-      const response = await fetchWithTimeout('https://worldmonitor.app/api/register-interest', {
+      const parsed = JSON.parse(body);
+      const email = parsed.email;
+      if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json({ error: 'Invalid email address' }, 400);
+      }
+      const response = await fetchWithTimeout(`${convexUrl}/api/mutation`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Origin': 'https://worldmonitor.app',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        body,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'registerInterest:register',
+          args: { email, source: parsed.source || 'desktop', appVersion: parsed.appVersion || 'unknown' },
+          format: 'json',
+        }),
       }, 15000);
       const responseBody = await response.text();
-      return new Response(responseBody || '{}', {
-        status: response.status,
-        headers: { 'content-type': 'application/json' },
-      });
+      let result;
+      try { result = JSON.parse(responseBody); } catch { result = { status: 'registered' }; }
+      if (result.status === 'error') {
+        return json({ error: result.errorMessage || 'Registration failed' }, 500);
+      }
+      return json(result.value || result);
     } catch (e) {
+      logVerbose(`[register-interest] error: ${e.message}`);
       return json({ error: 'Registration service unreachable' }, 502);
     }
   }
