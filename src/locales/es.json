@@ -1293,6 +1293,9 @@
         "onStation": "En la estación",
         "enRoute": "En ruta"
       },
+      "health": {
+        "evidence": "EVIDENCIA DE ESTADO"
+      },
       "description": "Cable submarino de telecomunicaciones que transporta tráfico internacional de Internet. Estos cables de fibra óptica forman la columna vertebral de la conectividad global a Internet y transmiten más del 95% de los datos intercontinentales."
     },
     "repairShip": {

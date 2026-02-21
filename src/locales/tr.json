@@ -1294,6 +1294,9 @@
         "onStation": "Konumda",
         "enRoute": "Yolda"
       },
+      "health": {
+        "evidence": "SAĞLIK KANITI"
+      },
       "description": "Uluslararasi internet trafigi tasiyan denizalti telekomünikasyon kablosu. Bu fiber optik kablolar kuresel internet baglantisinin omurgasini olusturur ve kitalar arasi verilerin %95'inden fazlasini tasir."
     },
     "repairShip": {

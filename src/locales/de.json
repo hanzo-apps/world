@@ -1293,6 +1293,9 @@
         "onStation": "Auf der Station",
         "enRoute": "Unterwegs"
       },
+      "health": {
+        "evidence": "ZUSTANDSNACHWEIS"
+      },
       "description": "Untersee-Telekommunikationskabel für den internationalen Internetverkehr. Diese Glasfaserkabel bilden das Rückgrat der globalen Internetkonnektivität und übertragen über 95 % der interkontinentalen Daten."
     },
     "repairShip": {
