@@ -192,6 +192,11 @@ export class RuntimeConfigPanel extends Panel {
       if (!key) return;
       const raw = input.value.trim();
       if (!raw || raw === MASKED_SENTINEL) return;
+      // Skip plaintext keys whose value hasn't changed from stored value
+      if (PLAINTEXT_KEYS.has(key) && !this.pendingSecrets.has(key)) {
+        const stored = getRuntimeConfigSnapshot().secrets[key]?.value || '';
+        if (raw === stored) return;
+      }
       this.pendingSecrets.set(key, raw);
       const result = validateSecret(key, raw);
       if (!result.valid) {
