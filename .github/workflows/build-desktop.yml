@@ -192,6 +192,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: full
           VITE_DESKTOP_RUNTIME: '1'
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
@@ -215,6 +216,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: full
           VITE_DESKTOP_RUNTIME: '1'
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
         with:
           tagName: v__VERSION__
           releaseName: 'World Monitor v__VERSION__'
@@ -232,6 +234,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: tech
           VITE_DESKTOP_RUNTIME: '1'
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
@@ -256,6 +259,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_VARIANT: tech
           VITE_DESKTOP_RUNTIME: '1'
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
         with:
           tagName: v__VERSION__-tech
           releaseName: 'Tech Monitor v__VERSION__'
