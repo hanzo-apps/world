@@ -110,10 +110,21 @@ export async function fetchStockQuote(
 // Crypto -- replaces fetchCrypto
 // ========================================================================
 
+let lastSuccessfulCrypto: CryptoData[] = [];
+
 export async function fetchCrypto(): Promise<CryptoData[]> {
   const resp = await cryptoBreaker.execute(async () => {
     return client.listCryptoQuotes({ ids: [] }); // empty = all defaults
   }, emptyCryptoFallback);
 
-  return resp.quotes.map(toCryptoData);
+  const results = resp.quotes
+    .map(toCryptoData)
+    .filter(c => c.price > 0);
+
+  if (results.length > 0) {
+    lastSuccessfulCrypto = results;
+    return results;
+  }
+
+  return lastSuccessfulCrypto;
 }
