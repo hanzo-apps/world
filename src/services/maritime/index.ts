@@ -9,13 +9,11 @@ import type { AisDisruptionEvent, AisDensityZone, AisDisruptionType } from '@/ty
 import { dataFreshness } from '../data-freshness';
 import { isFeatureAvailable } from '../runtime-config';
 
-// ---- Client + Circuit Breaker ----
+// ---- Proto fallback (desktop safety when relay URL is unavailable) ----
+
 const client = new MaritimeServiceClient('', { fetch: fetch.bind(globalThis) });
 const snapshotBreaker = createCircuitBreaker<GetVesselSnapshotResponse>({ name: 'Maritime Snapshot' });
-
 const emptySnapshotFallback: GetVesselSnapshotResponse = { snapshot: undefined };
-
-// ---- Proto-to-Legacy Type Mapping ----
 
 const DISRUPTION_TYPE_REVERSE: Record<string, AisDisruptionType> = {
   AIS_DISRUPTION_TYPE_GAP_SPIKE: 'gap_spike',
@@ -197,32 +195,31 @@ async function fetchRawRelaySnapshot(includeCandidates: boolean): Promise<unknow
 
 async function fetchSnapshotPayload(includeCandidates: boolean): Promise<unknown> {
   if (includeCandidates) {
-    // When candidates are needed (military vessel tracking), bypass proto RPC
-    // and fetch raw WS relay endpoint directly, because proto VesselSnapshot
-    // does NOT have candidateReports field.
+    // Candidate reports are only available on the raw relay endpoint.
     return fetchRawRelaySnapshot(true);
   }
 
-  // When no candidates needed, use proto RPC for type-safe snapshot (with circuit breaker)
-  const response = await snapshotBreaker.execute(async () => {
-    return client.getVesselSnapshot({});
-  }, emptySnapshotFallback);
+  try {
+    // Prefer direct relay path to avoid normal web traffic double-hop via Vercel.
+    return await fetchRawRelaySnapshot(false);
+  } catch (rawError) {
+    // Desktop fallback: use proto route when relay URL/local relay is unavailable.
+    const response = await snapshotBreaker.execute(async () => {
+      return client.getVesselSnapshot({});
+    }, emptySnapshotFallback);
 
-  if (response.snapshot) {
-    // Convert proto snapshot back to the raw format that parseSnapshot() expects
-    // This is necessary because the rest of the polling system (parseSnapshot,
-    // latestDisruptions, latestDensity) expects the legacy AisDisruptionEvent shape
-    return {
-      sequence: 0, // Proto doesn't carry sequence; use 0 (safe: no candidates)
-      status: { connected: true, vessels: 0, messages: 0 },
-      disruptions: response.snapshot.disruptions.map(toDisruptionEvent),
-      density: response.snapshot.densityZones.map(toDensityZone),
-      candidateReports: [],
-    };
+    if (response.snapshot) {
+      return {
+        sequence: 0, // Proto payload does not include relay sequence.
+        status: { connected: true, vessels: 0, messages: 0 },
+        disruptions: response.snapshot.disruptions.map(toDisruptionEvent),
+        density: response.snapshot.densityZones.map(toDensityZone),
+        candidateReports: [],
+      };
+    }
+
+    throw rawError;
   }
-
-  // Circuit breaker returned fallback (snapshot undefined), try raw relay
-  return fetchRawRelaySnapshot(false);
 }
 
 // ---- Callback Emission ----

@@ -543,9 +543,12 @@ const OPENSKY_CACHE_TTL_MS = 30 * 1000; // 30s — OpenSky updates every ~10s bu
 const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp }
 const RSS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — RSS feeds rarely update faster
 
-// OpenSky OAuth2 token cache
+// OpenSky OAuth2 token cache + mutex to prevent thundering herd
 let openskyToken = null;
 let openskyTokenExpiry = 0;
+let openskyTokenPromise = null; // mutex: single in-flight token request
+let openskyAuthCooldownUntil = 0; // backoff after repeated failures
+const OPENSKY_AUTH_COOLDOWN_MS = 60000; // 1 min cooldown after auth failure
 
 async function getOpenSkyToken() {
   const clientId = process.env.OPENSKY_CLIENT_ID;
@@ -560,11 +563,30 @@ async function getOpenSkyToken() {
     return openskyToken;
   }
 
+  // Cooldown: don't retry auth if it recently failed (prevents stampede)
+  if (Date.now() < openskyAuthCooldownUntil) {
+    return null;
+  }
+
+  // Mutex: if a token fetch is already in flight, wait for it
+  if (openskyTokenPromise) {
+    return openskyTokenPromise;
+  }
+
+  openskyTokenPromise = _fetchOpenSkyToken(clientId, clientSecret);
+  try {
+    return await openskyTokenPromise;
+  } finally {
+    openskyTokenPromise = null;
+  }
+}
+
+async function _fetchOpenSkyToken(clientId, clientSecret) {
   try {
     console.log('[Relay] Fetching new OpenSky OAuth2 token...');
     const https = require('https');
 
-    return new Promise((resolve, reject) => {
+    const token = await new Promise((resolve) => {
       const postData = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
 
       const req = https.request({
@@ -585,7 +607,6 @@ async function getOpenSkyToken() {
             const json = JSON.parse(data);
             if (json.access_token) {
               openskyToken = json.access_token;
-              // Token valid for 30 min, cache with expiry
               openskyTokenExpiry = Date.now() + (json.expires_in || 1800) * 1000;
               console.log('[Relay] OpenSky token acquired, expires in', json.expires_in, 'seconds');
               resolve(openskyToken);
@@ -613,8 +634,16 @@ async function getOpenSkyToken() {
       req.write(postData);
       req.end();
     });
+
+    if (!token) {
+      // Auth failed — cooldown to prevent stampede
+      openskyAuthCooldownUntil = Date.now() + OPENSKY_AUTH_COOLDOWN_MS;
+      console.warn(`[Relay] OpenSky auth failed, cooling down for ${OPENSKY_AUTH_COOLDOWN_MS / 1000}s`);
+    }
+    return token;
   } catch (err) {
     console.error('[Relay] OpenSky token error:', err.message);
+    openskyAuthCooldownUntil = Date.now() + OPENSKY_AUTH_COOLDOWN_MS;
     return null;
   }
 }
@@ -1064,6 +1093,69 @@ const server = http.createServer(async (req, res) => {
       'Content-Type': 'application/json',
       'Cache-Control': 'public, max-age=2'
     }, JSON.stringify(payload));
+  } else if (req.url === '/opensky-diag') {
+    // Temporary diagnostic route with safe output only (no token payloads).
+    const now = Date.now();
+    const hasFreshToken = !!(openskyToken && now < openskyTokenExpiry - 60000);
+    const diag = { timestamp: new Date().toISOString(), steps: [] };
+    const clientId = process.env.OPENSKY_CLIENT_ID;
+    const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+
+    diag.steps.push({ step: 'env_check', hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+    diag.steps.push({
+      step: 'auth_state',
+      cachedToken: !!openskyToken,
+      freshToken: hasFreshToken,
+      tokenExpiry: openskyTokenExpiry ? new Date(openskyTokenExpiry).toISOString() : null,
+      cooldownRemainingMs: Math.max(0, openskyAuthCooldownUntil - now),
+      tokenFetchInFlight: !!openskyTokenPromise,
+    });
+
+    if (!clientId || !clientSecret) {
+      diag.steps.push({ step: 'FAILED', reason: 'Missing OPENSKY_CLIENT_ID or OPENSKY_CLIENT_SECRET' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(diag, null, 2));
+    }
+
+    // Use shared token path so diagnostics respect mutex + cooldown protections.
+    const tokenStart = Date.now();
+    const token = await getOpenSkyToken();
+    diag.steps.push({
+      step: 'token_request',
+      method: 'getOpenSkyToken',
+      success: !!token,
+      fromCache: hasFreshToken,
+      latencyMs: Date.now() - tokenStart,
+      cooldownRemainingMs: Math.max(0, openskyAuthCooldownUntil - Date.now()),
+    });
+
+    if (token) {
+      const https = require('https');
+      const apiResult = await new Promise((resolve) => {
+        const start = Date.now();
+        const apiReq = https.get('https://opensky-network.org/api/states/all?lamin=47&lomin=5&lamax=48&lomax=6', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+          timeout: 15000,
+        }, (apiRes) => {
+          let data = '';
+          apiRes.on('data', chunk => data += chunk);
+          apiRes.on('end', () => resolve({
+            status: apiRes.statusCode,
+            latencyMs: Date.now() - start,
+            bodyLength: data.length,
+            statesCount: (data.match(/"states":\s*\[/) ? 'present' : 'missing'),
+          }));
+        });
+        apiReq.on('error', (err) => resolve({ error: err.message, code: err.code, latencyMs: Date.now() - start }));
+        apiReq.on('timeout', () => { apiReq.destroy(); resolve({ error: 'timeout', latencyMs: Date.now() - start }); });
+      });
+      diag.steps.push({ step: 'api_request', ...apiResult });
+    } else {
+      diag.steps.push({ step: 'api_request', skipped: true, reason: 'No token available (auth failure or cooldown active)' });
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(diag, null, 2));
   } else if (req.url.startsWith('/rss')) {
     // Proxy RSS feeds that block Vercel IPs
     try {
@@ -1098,6 +1190,8 @@ const server = http.createServer(async (req, res) => {
         'feeds.24.com',
         'feeds.capi24.com',  // News24 redirect destination
         'www.atlanticcouncil.org',
+        // RSSHub (NHK, MIIT, MOFCOM)
+        'rsshub.app',
       ];
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
