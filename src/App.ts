@@ -904,7 +904,7 @@ export class App {
     const shareUrl = this.getShareUrl();
     if (shareUrl) history.replaceState(null, '', shareUrl);
 
-    const marketClient = new MarketServiceClient('', { fetch: fetch.bind(globalThis) });
+    const marketClient = new MarketServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
     const stockPromise = marketClient.getCountryStockIndex({ countryCode: code })
       .then((resp) => ({
         available: resp.available,
@@ -986,7 +986,7 @@ export class App {
 
       let briefText = '';
       try {
-        const intelClient = new IntelligenceServiceClient('', { fetch: fetch.bind(globalThis) });
+        const intelClient = new IntelligenceServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
         const resp = await intelClient.getCountryIntelBrief({ countryCode: code });
         briefText = resp.brief;
       } catch { /* server unreachable */ }
@@ -3563,30 +3563,41 @@ export class App {
         );
       }
 
-      const commoditiesResult = await fetchMultipleStocks(COMMODITIES, {
-        onBatch: (partialCommodities) => {
-          (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-            partialCommodities.map((c) => ({
-              display: c.display,
-              price: c.price,
-              change: c.change,
-              sparkline: c.sparkline,
-            }))
-          );
-        },
-      });
-      (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-        commoditiesResult.data.map((c) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline }))
-      );
+      const commoditiesPanel = this.panels['commodities'] as CommoditiesPanel;
+      const mapCommodity = (c: MarketData) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline });
+
+      let commoditiesLoaded = false;
+      for (let attempt = 0; attempt < 3 && !commoditiesLoaded; attempt++) {
+        if (attempt > 0) {
+          commoditiesPanel.showRetrying();
+          await new Promise(r => setTimeout(r, 20_000));
+        }
+        const commoditiesResult = await fetchMultipleStocks(COMMODITIES, {
+          onBatch: (partial) => commoditiesPanel.renderCommodities(partial.map(mapCommodity)),
+        });
+        const mapped = commoditiesResult.data.map(mapCommodity);
+        if (mapped.some(d => d.price !== null)) {
+          commoditiesPanel.renderCommodities(mapped);
+          commoditiesLoaded = true;
+        }
+      }
+      if (!commoditiesLoaded) {
+        commoditiesPanel.renderCommodities([]);
+      }
     } catch {
       this.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }
 
     try {
-      // Crypto
-      const crypto = await fetchCrypto();
+      // Crypto with retry
+      let crypto = await fetchCrypto();
+      if (crypto.length === 0) {
+        (this.panels['crypto'] as CryptoPanel).showRetrying();
+        await new Promise(r => setTimeout(r, 20_000));
+        crypto = await fetchCrypto();
+      }
       (this.panels['crypto'] as CryptoPanel).renderCrypto(crypto);
-      this.statusPanel?.updateApi('CoinGecko', { status: 'ok' });
+      this.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
     } catch {
       this.statusPanel?.updateApi('CoinGecko', { status: 'error' });
     }
@@ -3663,7 +3674,7 @@ export class App {
     }
 
     try {
-      const client = new ResearchServiceClient('', { fetch: fetch.bind(globalThis) });
+      const client = new ResearchServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
       const data = await client.listTechEvents({
         type: 'conference',
         mappable: true,
@@ -3897,10 +3908,13 @@ export class App {
     // Fetch UCDP georeferenced events (battles, one-sided violence, non-state conflict)
     tasks.push((async () => {
       try {
-        const [result, protestEvents] = await Promise.all([
-          fetchUcdpEvents(),
-          protestsTask,
-        ]);
+        const protestEvents = await protestsTask;
+        // Retry up to 3 times — UCDP sidecar can return empty on cold start
+        let result = await fetchUcdpEvents();
+        for (let attempt = 1; attempt < 3 && !result.success; attempt++) {
+          await new Promise(r => setTimeout(r, 15_000));
+          result = await fetchUcdpEvents();
+        }
         if (!result.success) {
           dataFreshness.recordError('ucdp_events', 'UCDP events unavailable (retaining prior event state)');
           return;
@@ -3980,6 +3994,8 @@ export class App {
         const exposures = await enrichEventsWithExposure(events);
         (this.panels['population-exposure'] as PopulationExposurePanel)?.setExposures(exposures);
         if (exposures.length > 0) dataFreshness.recordUpdate('worldpop', exposures.length);
+      } else {
+        (this.panels['population-exposure'] as PopulationExposurePanel)?.setExposures([]);
       }
     } catch (error) {
       console.error('[Intelligence] Population exposure fetch failed:', error);
@@ -4344,11 +4360,24 @@ export class App {
       }
 
       if (data.length === 0) {
-        const reason = isFeatureAvailable('economicFred')
-          ? 'FRED data temporarily unavailable — will retry'
-          : 'FRED_API_KEY not configured — add in Settings';
-        economicPanel?.setErrorState(true, reason);
-        this.statusPanel?.updateApi('FRED', { status: 'error' });
+        if (!isFeatureAvailable('economicFred')) {
+          economicPanel?.setErrorState(true, 'FRED_API_KEY not configured — add in Settings');
+          this.statusPanel?.updateApi('FRED', { status: 'error' });
+          return;
+        }
+        // Transient failure — quick retry once
+        economicPanel?.showRetrying();
+        await new Promise(r => setTimeout(r, 20_000));
+        const retryData = await fetchFredData();
+        if (retryData.length === 0) {
+          economicPanel?.setErrorState(true, 'FRED data temporarily unavailable — will retry');
+          this.statusPanel?.updateApi('FRED', { status: 'error' });
+          return;
+        }
+        economicPanel?.setErrorState(false);
+        economicPanel?.update(retryData);
+        this.statusPanel?.updateApi('FRED', { status: 'ok' });
+        dataFreshness.recordUpdate('economic', retryData.length);
         return;
       }
 
@@ -4357,6 +4386,20 @@ export class App {
       this.statusPanel?.updateApi('FRED', { status: 'ok' });
       dataFreshness.recordUpdate('economic', data.length);
     } catch {
+      if (isFeatureAvailable('economicFred')) {
+        economicPanel?.showRetrying();
+        try {
+          await new Promise(r => setTimeout(r, 20_000));
+          const retryData = await fetchFredData();
+          if (retryData.length > 0) {
+            economicPanel?.setErrorState(false);
+            economicPanel?.update(retryData);
+            this.statusPanel?.updateApi('FRED', { status: 'ok' });
+            dataFreshness.recordUpdate('economic', retryData.length);
+            return;
+          }
+        } catch { /* fall through */ }
+      }
       this.statusPanel?.updateApi('FRED', { status: 'error' });
       economicPanel?.setErrorState(true, 'FRED data temporarily unavailable — will retry');
       economicPanel?.setLoading(false);
