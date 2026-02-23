@@ -148,14 +148,32 @@ requestAnimationFrame(() => {
 // Clear stale settings-open flag (survives ungraceful shutdown)
 localStorage.removeItem('wm-settings-open');
 
-const app = new App('app');
-app
-  .init()
-  .then(() => {
-    // Clear the one-shot guard after a successful boot so future stale-chunk incidents can recover.
-    clearChunkReloadGuard(chunkReloadStorageKey);
-  })
-  .catch(console.error);
+// Standalone windows: ?settings=1 = panel display settings, ?live-channels=1 = channel management
+// Both need i18n initialized so t() does not return undefined.
+const urlParams = new URL(location.href).searchParams;
+if (urlParams.get('settings') === '1') {
+  void Promise.all([import('./services/i18n'), import('./settings-window')]).then(
+    async ([i18n, m]) => {
+      await i18n.initI18n();
+      m.initSettingsWindow();
+    }
+  );
+} else if (urlParams.get('live-channels') === '1') {
+  void Promise.all([import('./services/i18n'), import('./live-channels-window')]).then(
+    async ([i18n, m]) => {
+      await i18n.initI18n();
+      m.initLiveChannelsWindow();
+    }
+  );
+} else {
+  const app = new App('app');
+  app
+    .init()
+    .then(() => {
+      clearChunkReloadGuard(chunkReloadStorageKey);
+    })
+    .catch(console.error);
+}
 
 // Debug helpers for geo-convergence testing (remove in production)
 (window as unknown as Record<string, unknown>).geoDebug = {
