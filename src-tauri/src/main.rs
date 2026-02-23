@@ -315,6 +315,20 @@ fn read_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> Re
 }
 
 #[tauri::command]
+fn delete_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> Result<(), String> {
+    {
+        let mut data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
+        data.remove(&key);
+    }
+    {
+        let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
+        *dirty = true;
+    }
+    // Disk flush deferred to exit handler (cache.flush) — avoids blocking main thread
+    Ok(())
+}
+
+#[tauri::command]
 fn write_cache_entry(app: AppHandle, cache: tauri::State<'_, PersistentCache>, key: String, value: String) -> Result<(), String> {
     let parsed_value: Value = serde_json::from_str(&value)
         .map_err(|e| format!("Invalid cache payload JSON: {e}"))?;
@@ -967,6 +981,7 @@ fn main() {
             get_desktop_runtime_info,
             read_cache_entry,
             write_cache_entry,
+            delete_cache_entry,
             open_logs_folder,
             open_sidecar_log_file,
             open_settings_window_command,
