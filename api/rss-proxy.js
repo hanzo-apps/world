@@ -142,6 +142,16 @@ const ALLOWED_DOMAINS = [
   'www.lemonde.fr',
   'rss.dw.com',
   'www.africanews.com',
+  // Nigeria
+  'www.premiumtimesng.com',
+  'www.vanguardngr.com',
+  'www.channelstv.com',
+  'dailytrust.com',
+  'www.thisdaylive.com',
+  // Greek
+  'www.naftemporiki.gr',
+  'www.in.gr',
+  'www.iefimerida.gr',
   'www.lasillavacia.com',
   'www.channelnewsasia.com',
   'www.thehindu.com',
