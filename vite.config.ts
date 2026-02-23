@@ -533,27 +533,32 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^https?:\/\/.*\/api\/.*/i,
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && /^\/api\//.test(url.pathname),
             handler: 'NetworkOnly',
             method: 'GET',
           },
           {
-            urlPattern: /^https?:\/\/.*\/api\/.*/i,
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && /^\/api\//.test(url.pathname),
             handler: 'NetworkOnly',
             method: 'POST',
           },
           {
-            urlPattern: /^https?:\/\/.*\/ingest\/.*/i,
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && /^\/ingest\//.test(url.pathname),
             handler: 'NetworkOnly',
             method: 'GET',
           },
           {
-            urlPattern: /^https?:\/\/.*\/ingest\/.*/i,
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && /^\/ingest\//.test(url.pathname),
             handler: 'NetworkOnly',
             method: 'POST',
           },
           {
-            urlPattern: /^https?:\/\/.*\/rss\/.*/i,
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && /^\/rss\//.test(url.pathname),
             handler: 'NetworkOnly',
             method: 'GET',
           },
