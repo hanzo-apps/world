@@ -748,9 +748,11 @@ async function handleUcdpEventsRequest(req, res) {
 const openskyResponseCache = new Map(); // key: sorted query params → { data, timestamp }
 const openskyInFlight = new Map(); // key: cacheKey → Promise (dedup concurrent requests)
 const OPENSKY_CACHE_TTL_MS = 30 * 1000; // 30s — OpenSky updates every ~10s but 58 clients hammer it
-const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp }
+const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp, statusCode }
 const rssInFlight = new Map(); // key: feed URL → Promise (dedup concurrent requests)
 const RSS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — RSS feeds rarely update faster
+const RSS_NEGATIVE_CACHE_TTL_MS = 60 * 1000; // 1 min — cache failures to prevent thundering herd
+const RSS_CACHE_MAX_ENTRIES = 200; // hard cap — ~20 allowed domains × ~5 paths max, with headroom
 
 // OpenSky OAuth2 token cache + mutex to prevent thundering herd
 let openskyToken = null;
@@ -1260,7 +1262,9 @@ setInterval(() => {
     if (now - entry.timestamp > OPENSKY_CACHE_TTL_MS * 2) openskyResponseCache.delete(key);
   }
   for (const [key, entry] of rssResponseCache) {
-    if (now - entry.timestamp > RSS_CACHE_TTL_MS * 2) rssResponseCache.delete(key);
+    const maxAge = (entry.statusCode && entry.statusCode >= 200 && entry.statusCode < 300)
+      ? RSS_CACHE_TTL_MS * 2 : RSS_NEGATIVE_CACHE_TTL_MS * 2;
+    if (now - entry.timestamp > maxAge) rssResponseCache.delete(key);
   }
   for (const [key, entry] of worldbankCache) {
     if (now - entry.timestamp > WORLDBANK_CACHE_TTL_MS * 2) worldbankCache.delete(key);
@@ -1456,14 +1460,18 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
       }
 
-      // Serve from cache if fresh (5 min TTL)
+      // Serve from cache if fresh (5 min for success, 1 min for failures)
       const rssCached = rssResponseCache.get(feedUrl);
-      if (rssCached && Date.now() - rssCached.timestamp < RSS_CACHE_TTL_MS) {
-        return sendCompressed(req, res, 200, {
-          'Content-Type': rssCached.contentType || 'application/xml',
-          'Cache-Control': 'public, max-age=300',
-          'X-Cache': 'HIT',
-        }, rssCached.data);
+      if (rssCached) {
+        const ttl = (rssCached.statusCode && rssCached.statusCode >= 200 && rssCached.statusCode < 300)
+          ? RSS_CACHE_TTL_MS : RSS_NEGATIVE_CACHE_TTL_MS;
+        if (Date.now() - rssCached.timestamp < ttl) {
+          return sendCompressed(req, res, rssCached.statusCode || 200, {
+            'Content-Type': rssCached.contentType || 'application/xml',
+            'Cache-Control': rssCached.statusCode >= 200 && rssCached.statusCode < 300 ? 'public, max-age=300' : 'no-cache',
+            'X-Cache': 'HIT',
+          }, rssCached.data);
+        }
       }
 
       // In-flight dedup: if another request for the same feed is already fetching,
@@ -1474,13 +1482,20 @@ const server = http.createServer(async (req, res) => {
           await existing;
           const deduped = rssResponseCache.get(feedUrl);
           if (deduped) {
-            return sendCompressed(req, res, 200, {
+            return sendCompressed(req, res, deduped.statusCode || 200, {
               'Content-Type': deduped.contentType || 'application/xml',
-              'Cache-Control': 'public, max-age=300',
+              'Cache-Control': deduped.statusCode >= 200 && deduped.statusCode < 300 ? 'public, max-age=300' : 'no-cache',
               'X-Cache': 'DEDUP',
             }, deduped.data);
           }
-        } catch { /* in-flight failed, fall through to own fetch */ }
+          // In-flight completed but nothing cached — serve 502 instead of cascading
+          return safeEnd(res, 502, { 'Content-Type': 'application/json' },
+            JSON.stringify({ error: 'Upstream fetch completed but not cached' }));
+        } catch {
+          // In-flight fetch failed — serve 502 instead of starting another fetch
+          return safeEnd(res, 502, { 'Content-Type': 'application/json' },
+            JSON.stringify({ error: 'Upstream fetch failed' }));
+        }
       }
 
       console.log('[Relay] RSS request (MISS):', feedUrl);
@@ -1530,14 +1545,20 @@ const server = http.createServer(async (req, res) => {
             if (responseHandled || res.headersSent) return;
             responseHandled = true;
             const data = Buffer.concat(chunks);
-            // Cache successful responses
-            if (response.statusCode >= 200 && response.statusCode < 300) {
-              rssResponseCache.set(feedUrl, { data, contentType: 'application/xml', timestamp: Date.now() });
+            // Cache all responses: 2xx with full TTL, non-2xx with short TTL (negative cache)
+            // FIFO eviction: drop oldest-inserted entry if at capacity
+            if (rssResponseCache.size >= RSS_CACHE_MAX_ENTRIES && !rssResponseCache.has(feedUrl)) {
+              const oldest = rssResponseCache.keys().next().value;
+              if (oldest) rssResponseCache.delete(oldest);
+            }
+            rssResponseCache.set(feedUrl, { data, contentType: 'application/xml', statusCode: response.statusCode, timestamp: Date.now() });
+            if (response.statusCode < 200 || response.statusCode >= 300) {
+              console.warn(`[Relay] RSS upstream ${response.statusCode} for ${feedUrl}`);
             }
             resolveInFlight();
             sendCompressed(req, res, response.statusCode, {
               'Content-Type': 'application/xml',
-              'Cache-Control': 'public, max-age=300',
+              'Cache-Control': response.statusCode >= 200 && response.statusCode < 300 ? 'public, max-age=300' : 'no-cache',
               'X-Cache': 'MISS',
             }, data);
           });
@@ -1555,6 +1576,7 @@ const server = http.createServer(async (req, res) => {
               responseHandled = true;
               sendCompressed(req, res, 200, { 'Content-Type': 'application/xml', 'X-Cache': 'STALE' }, rssCached.data);
             }
+            resolveInFlight();
             return;
           }
           sendError(502, err.message);
@@ -1564,7 +1586,9 @@ const server = http.createServer(async (req, res) => {
           request.destroy();
           if (rssCached && !responseHandled && !res.headersSent) {
             responseHandled = true;
-            return sendCompressed(req, res, 200, { 'Content-Type': 'application/xml', 'X-Cache': 'STALE' }, rssCached.data);
+            sendCompressed(req, res, 200, { 'Content-Type': 'application/xml', 'X-Cache': 'STALE' }, rssCached.data);
+            resolveInFlight();
+            return;
           }
           sendError(504, 'Request timeout');
         });
@@ -1726,15 +1750,12 @@ setInterval(() => {
   const mem = process.memoryUsage();
   const rssGB = mem.rss / 1024 / 1024 / 1024;
   console.log(`[Monitor] rss=${(mem.rss / 1024 / 1024).toFixed(0)}MB heap=${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB/${(mem.heapTotal / 1024 / 1024).toFixed(0)}MB external=${(mem.external / 1024 / 1024).toFixed(0)}MB vessels=${vessels.size} density=${densityGrid.size} candidates=${candidateReports.size} msgs=${messageCount} dropped=${droppedMessages}`);
-  // Emergency cleanup if memory exceeds 400MB RSS
-  if (rssGB > 0.4) {
+  // Emergency cleanup if memory exceeds 450MB RSS
+  if (rssGB > 0.45) {
     console.warn('[Monitor] High memory — forcing aggressive cleanup');
     cleanupAggregates();
-    // Clear response caches
+    // Clear heavy caches only (RSS/polymarket/worldbank are tiny, keep them)
     openskyResponseCache.clear();
-    rssResponseCache.clear();
-    worldbankCache.clear();
-    polymarketCache.clear();
     if (global.gc) global.gc();
   }
 }, 60 * 1000);
