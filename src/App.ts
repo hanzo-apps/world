@@ -2645,6 +2645,26 @@ export class App {
       document.getElementById('settingsModal')?.classList.add('active');
     });
 
+    // Sync panel state when settings are changed in the separate settings window
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEYS.panels && e.newValue) {
+        try {
+          this.panelSettings = JSON.parse(e.newValue) as Record<string, PanelConfig>;
+          this.applyPanelSettings();
+          this.renderPanelToggles();
+        } catch (_) {}
+      }
+      if (e.key === 'worldmonitor-intel-findings' && this.findingsBadge) {
+        this.findingsBadge.setEnabled(e.newValue !== 'hidden');
+      }
+      if (e.key === STORAGE_KEYS.liveChannels && e.newValue) {
+        const panel = this.panels['live-news'];
+        if (panel && typeof (panel as unknown as { refreshChannelsFromStorage?: () => void }).refreshChannelsFromStorage === 'function') {
+          (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
+        }
+      }
+    });
+
     document.getElementById('modalClose')?.addEventListener('click', () => {
       document.getElementById('settingsModal')?.classList.remove('active');
     });

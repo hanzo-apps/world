@@ -66,7 +66,8 @@
     "filterSources": "Filter sources...",
     "sourcesEnabled": "{{enabled}}/{{total}} enabled",
     "finance": "FINANCE",
-    "toggleTheme": "Toggle dark/light mode"
+    "toggleTheme": "Toggle dark/light mode",
+    "panelDisplayCaption": "Choose which panels to show on the dashboard"
   },
   "panels": {
     "liveNews": "Live News",
@@ -1177,7 +1178,19 @@
       "retry": "Retry",
       "notLive": "{{name}} is not currently live",
       "cannotEmbed": "{{name}} cannot be embedded in this app (YouTube {{code}})",
-      "openOnYouTube": "Open on YouTube"
+      "openOnYouTube": "Open on YouTube",
+      "manage": "Manage channels",
+      "addChannel": "Add channel",
+      "remove": "Remove",
+      "youtubeHandle": "YouTube handle (e.g. @Channel)",
+      "displayName": "Display name (optional)",
+      "openPanelSettings": "Panel display settings",
+      "channelSettings": "Channel Settings",
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirmDelete": "Delete this channel?",
+      "confirmTitle": "Confirm",
+      "restoreDefaults": "Restore default channels"
     }
   },
   "popups": {
