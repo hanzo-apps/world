@@ -424,7 +424,7 @@ const SIDECAR_ALLOWED_ORIGINS = [
   /^tauri:\/\/localhost$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
-  /^https:\/\/tauri\.localhost(:\d+)?$/,
+  /^https?:\/\/tauri\.localhost(:\d+)?$/,
   /^https:\/\/(.*\.)?worldmonitor\.app$/,
 ];
 
