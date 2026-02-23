@@ -9,7 +9,7 @@ import type {
 
 import { mapWingbitsDetails } from './_shared';
 import { CHROME_UA } from '../../../_shared/constants';
-import { getCachedJson, setCachedJson } from '../../../_shared/redis';
+import { getCachedJsonBatch, setCachedJson } from '../../../_shared/redis';
 
 export async function getAircraftDetailsBatch(
   _ctx: ServerContext,
@@ -20,14 +20,18 @@ export async function getAircraftDetailsBatch(
 
   const limitedList = req.icao24s.slice(0, 20).map((id) => id.toLowerCase());
 
-  // Redis shared cache — check per-ICAO24 (reuse single-aircraft cache keys)
+  // Redis shared cache — batch GET all keys in a single pipeline round-trip
   const SINGLE_KEY = 'military:aircraft:v1';
   const SINGLE_TTL = 300;
   const results: Record<string, AircraftDetails> = {};
   const toFetch: string[] = [];
 
-  for (const icao24 of limitedList) {
-    const cached = (await getCachedJson(`${SINGLE_KEY}:${icao24}`)) as { details?: AircraftDetails } | null;
+  const cacheKeys = limitedList.map((icao24) => `${SINGLE_KEY}:${icao24}`);
+  const cachedMap = await getCachedJsonBatch(cacheKeys);
+
+  for (let i = 0; i < limitedList.length; i++) {
+    const icao24 = limitedList[i]!;
+    const cached = cachedMap.get(cacheKeys[i]!) as { details?: AircraftDetails } | null;
     if (cached?.details) {
       results[icao24] = cached.details;
     } else {
