@@ -1797,6 +1797,7 @@
     "close": "閉じる",
     "currentVariant": "（現在）",
     "retry": "Retry",
+    "retrying": "再試行中...",
     "refresh": "Refresh"
   }
 }

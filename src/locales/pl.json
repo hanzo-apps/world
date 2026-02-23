@@ -1797,6 +1797,7 @@
     "close": "Zamknij",
     "currentVariant": "(bieżący)",
     "retry": "Retry",
+    "retrying": "Ponawiam próbę...",
     "refresh": "Refresh"
   }
 }

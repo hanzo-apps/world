@@ -61,6 +61,15 @@ struct SecretsCache {
     secrets: Mutex<HashMap<String, String>>,
 }
 
+/// In-memory mirror of persistent-cache.json. The file can grow to 10+ MB,
+/// so reading/parsing/writing it on every IPC call blocks the main thread.
+/// Instead, load once into RAM and serialize writes to preserve ordering.
+struct PersistentCache {
+    data: Mutex<Map<String, Value>>,
+    dirty: Mutex<bool>,
+    write_lock: Mutex<()>,
+}
+
 impl SecretsCache {
     fn load_from_keychain() -> Self {
         // Try consolidated vault first — single keychain prompt
@@ -113,6 +122,53 @@ impl SecretsCache {
         SecretsCache {
             secrets: Mutex::new(secrets),
         }
+    }
+}
+
+impl PersistentCache {
+    fn load(path: &Path) -> Self {
+        let data = if path.exists() {
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+                .and_then(|v| v.as_object().cloned())
+                .unwrap_or_default()
+        } else {
+            Map::new()
+        };
+        PersistentCache {
+            data: Mutex::new(data),
+            dirty: Mutex::new(false),
+            write_lock: Mutex::new(()),
+        }
+    }
+
+    fn get(&self, key: &str) -> Option<Value> {
+        let data = self.data.lock().unwrap_or_else(|e| e.into_inner());
+        data.get(key).cloned()
+    }
+
+    /// Flush to disk only if dirty. Returns Ok(true) if written.
+    fn flush(&self, path: &Path) -> Result<bool, String> {
+        let _write_guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+
+        let is_dirty = {
+            let dirty = self.dirty.lock().unwrap_or_else(|e| e.into_inner());
+            *dirty
+        };
+        if !is_dirty {
+            return Ok(false);
+        }
+
+        let data = self.data.lock().unwrap_or_else(|e| e.into_inner());
+        let serialized = serde_json::to_string(&Value::Object(data.clone()))
+            .map_err(|e| format!("Failed to serialize cache: {e}"))?;
+        drop(data);
+        std::fs::write(path, serialized)
+            .map_err(|e| format!("Failed to write cache {}: {e}", path.display()))?;
+        let mut dirty = self.dirty.lock().unwrap_or_else(|e| e.into_inner());
+        *dirty = false;
+        Ok(true)
     }
 }
 
@@ -254,46 +310,37 @@ fn cache_file_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn read_cache_entry(app: AppHandle, key: String) -> Result<Option<Value>, String> {
-    let path = cache_file_path(&app)?;
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    let contents = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read cache store {}: {e}", path.display()))?;
-    let parsed: Value =
-        serde_json::from_str(&contents).unwrap_or_else(|_| Value::Object(Map::new()));
-    let Some(root) = parsed.as_object() else {
-        return Ok(None);
-    };
-
-    Ok(root.get(&key).cloned())
+fn read_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> Result<Option<Value>, String> {
+    Ok(cache.get(&key))
 }
 
 #[tauri::command]
-fn write_cache_entry(app: AppHandle, key: String, value: String) -> Result<(), String> {
+fn write_cache_entry(app: AppHandle, cache: tauri::State<'_, PersistentCache>, key: String, value: String) -> Result<(), String> {
+    let parsed_value: Value = serde_json::from_str(&value)
+        .map_err(|e| format!("Invalid cache payload JSON: {e}"))?;
+    let _write_guard = cache.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+    {
+        let mut data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
+        data.insert(key, parsed_value);
+    }
+    {
+        let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
+        *dirty = true;
+    }
+
+    // Flush synchronously under write lock so concurrent writes cannot reorder.
     let path = cache_file_path(&app)?;
-
-    let mut root: Map<String, Value> = if path.exists() {
-        let contents = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read cache store {}: {e}", path.display()))?;
-        serde_json::from_str::<Value>(&contents)
-            .ok()
-            .and_then(|v| v.as_object().cloned())
-            .unwrap_or_default()
-    } else {
-        Map::new()
-    };
-
-    let parsed_value: Value =
-        serde_json::from_str(&value).map_err(|e| format!("Invalid cache payload JSON: {e}"))?;
-    root.insert(key, parsed_value);
-
-    let serialized = serde_json::to_string_pretty(&Value::Object(root))
-        .map_err(|e| format!("Failed to serialize cache store: {e}"))?;
-    std::fs::write(&path, serialized)
-        .map_err(|e| format!("Failed to write cache store {}: {e}", path.display()))
+    let data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
+    let serialized = serde_json::to_string(&Value::Object(data.clone()))
+        .map_err(|e| format!("Failed to serialize cache: {e}"))?;
+    drop(data);
+    std::fs::write(&path, &serialized)
+        .map_err(|e| format!("Failed to write cache {}: {e}", path.display()))?;
+    {
+        let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
+        *dirty = false;
+    }
+    Ok(())
 }
 
 fn logs_dir_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -455,14 +502,14 @@ fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let _settings_window =
-        WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
-            .title("World Monitor Settings")
-            .inner_size(980.0, 760.0)
-            .min_inner_size(820.0, 620.0)
-            .resizable(true)
-            .build()
-            .map_err(|e| format!("Failed to create settings window: {e}"))?;
+    let _settings_window = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+        .title("World Monitor Settings")
+        .inner_size(980.0, 760.0)
+        .min_inner_size(820.0, 620.0)
+        .resizable(true)
+        .background_color(tauri::webview::Color(26, 28, 30, 255))
+        .build()
+        .map_err(|e| format!("Failed to create settings window: {e}"))?;
 
     // On Windows/Linux, menus are per-window. Remove the inherited app menu
     // from the settings window (macOS uses a shared app-wide menu bar instead).
@@ -848,6 +895,10 @@ fn main() {
             fetch_polymarket
         ])
         .setup(|app| {
+            // Load persistent cache into memory (avoids 14MB file I/O on every IPC call)
+            let cache_path = cache_file_path(&app.handle()).unwrap_or_default();
+            app.manage(PersistentCache::load(&cache_path));
+
             if let Err(err) = start_local_api(&app.handle()) {
                 append_desktop_log(
                     &app.handle(),
@@ -898,6 +949,12 @@ fn main() {
                     }
                 }
                 RunEvent::ExitRequested { .. } | RunEvent::Exit => {
+                    // Flush in-memory cache to disk before quitting
+                    if let Ok(path) = cache_file_path(app) {
+                        if let Some(cache) = app.try_state::<PersistentCache>() {
+                            let _ = cache.flush(&path);
+                        }
+                    }
                     stop_local_api(app);
                 }
                 _ => {}

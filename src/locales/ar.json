@@ -1797,6 +1797,7 @@
     "close": "إغلاق",
     "currentVariant": "(الحالي)",
     "retry": "Retry",
+    "retrying": "جاري إعادة المحاولة...",
     "refresh": "Refresh"
   }
 }
