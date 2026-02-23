@@ -792,10 +792,21 @@
           "infraCablesFull": "Major undersea fiber optic cables (20 backbone routes)",
           "infraPipelinesFull": "Oil/gas pipelines (Nord Stream, TAPI, etc.)",
           "infraDatacentersFull": "AI compute clusters >=10,000 GPUs only",
-          "transportShipping": "Vessels, chokepoints, 61 strategic ports",
+          "transportShipping": "Live vessel tracking via AIS (ship positions)",
           "transportDelays": "Airport delays and ground stops (FAA)",
           "naturalEventsFull": "Earthquakes (USGS) + storms, fires, volcanoes, floods (NASA EONET)",
-          "waterwaysLabels": "Strategic chokepoint labels"
+          "firesFull": "Active wildfires and fire perimeters (NASA FIRMS)",
+          "climateAnomalies": "Temperature and precipitation anomalies",
+          "waterwaysLabels": "Strategic chokepoint labels",
+          "geoUcdpEvents": "Uppsala Conflict Data Program armed conflict events",
+          "geoDisplacement": "Refugee and displacement flow patterns",
+          "militarySpaceports": "Rocket launch sites and space facilities",
+          "infraCyberThreats": "Cyber attacks and security events",
+          "mineralsFull": "Strategic mineral deposits and mining sites",
+          "techCyberThreats": "Cyber attacks and security events",
+          "techEvents": "Major tech conferences and events",
+          "techFires": "Active wildfires near tech infrastructure",
+          "financeGulfInvestments": "GCC sovereign wealth fund investments and FDI"
         },
         "notes": {
           "timeAffects": "Affects: Earthquakes, Weather, Protests, Outages"
@@ -996,6 +1007,7 @@
     },
     "intelligenceFindings": {
       "hideFindings": "Hide Intelligence Findings",
+      "popupAlerts": "Pop up new alerts",
       "badgeTitle": "Intelligence findings",
       "title": "Intelligence Findings",
       "none": "No recent intelligence findings",
