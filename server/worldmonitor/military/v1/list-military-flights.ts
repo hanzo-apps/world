@@ -8,6 +8,11 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/military/v1/service_server';
 
 import { isMilitaryCallsign, isMilitaryHex, detectAircraftType, UPSTREAM_TIMEOUT_MS } from './_shared';
+import { CHROME_UA } from '../../../_shared/constants';
+import { getCachedJson, setCachedJson } from '../../../_shared/redis';
+
+const REDIS_CACHE_KEY = 'military:flights:v1';
+const REDIS_CACHE_TTL = 120; // 2 min — real-time ADS-B data
 
 const AIRCRAFT_TYPE_MAP: Record<string, string> = {
   tanker: 'MILITARY_AIRCRAFT_TYPE_TANKER',
@@ -26,6 +31,17 @@ export async function listMilitaryFlights(
     const bb = req.boundingBox;
     if (!bb?.southWest || !bb?.northEast) return { flights: [], clusters: [], pagination: undefined };
 
+    // Redis shared cache — use precise bbox + request qualifiers to avoid cross-request collisions.
+    const preciseBB = [
+      bb.southWest.latitude,
+      bb.southWest.longitude,
+      bb.northEast.latitude,
+      bb.northEast.longitude,
+    ].map((v) => Number.isFinite(v) ? String(v) : 'NaN').join(':');
+    const cacheKey = `${REDIS_CACHE_KEY}:${preciseBB}:${req.operator || ''}:${req.aircraftType || ''}:${req.pagination?.pageSize || 0}`;
+    const cached = (await getCachedJson(cacheKey)) as ListMilitaryFlightsResponse | null;
+    if (cached?.flights?.length) return cached;
+
     const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
     const baseUrl = isSidecar
       ? 'https://opensky-network.org/api/states/all'
@@ -41,7 +57,7 @@ export async function listMilitaryFlights(
 
     const url = `${baseUrl}${params.toString() ? '?' + params.toString() : ''}`;
     const resp = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 WorldMonitor/1.0' },
+      headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
@@ -87,7 +103,11 @@ export async function listMilitaryFlights(
       });
     }
 
-    return { flights, clusters: [], pagination: undefined };
+    const result: ListMilitaryFlightsResponse = { flights, clusters: [], pagination: undefined };
+    if (flights.length > 0) {
+      setCachedJson(cacheKey, result, REDIS_CACHE_TTL).catch(() => {});
+    }
+    return result;
   } catch {
     return { flights: [], clusters: [], pagination: undefined };
   }

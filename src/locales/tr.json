@@ -1797,6 +1797,7 @@
     "close": "Kapat",
     "currentVariant": "(mevcut)",
     "retry": "Retry",
+    "retrying": "Tekrar deneniyor...",
     "refresh": "Refresh"
   }
 }

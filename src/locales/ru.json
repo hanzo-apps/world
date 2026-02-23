@@ -1797,6 +1797,7 @@
     "close": "Закрыть",
     "currentVariant": "(текущий)",
     "retry": "Retry",
+    "retrying": "Повторная попытка...",
     "refresh": "Refresh"
   }
 }
