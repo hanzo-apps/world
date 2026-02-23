@@ -1297,7 +1297,7 @@ export class App {
   }
 
   private shouldShowIntelligenceNotifications(): boolean {
-    return !this.isMobile && !!this.findingsBadge?.isEnabled();
+    return !this.isMobile && !!this.findingsBadge?.isEnabled() && !!this.findingsBadge?.isPopupEnabled();
   }
 
   private setupSearchModal(): void {

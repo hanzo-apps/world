@@ -537,6 +537,10 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            urlPattern: /^https?:\/\/.*\/ingest\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
             urlPattern: /^https?:\/\/.*\/rss\/.*/i,
             handler: 'NetworkOnly',
           },

@@ -137,6 +137,7 @@ All three variants run from a single codebase — switch between them with one c
 <summary><strong>Market & Crypto Intelligence</strong></summary>
 
 - 7-signal macro radar with composite BUY/CASH verdict
+- Real-time crypto prices (BTC, ETH, SOL, XRP, and more) via CoinGecko
 - BTC spot ETF flow tracker (IBIT, FBTC, GBTC, and 7 more)
 - Stablecoin peg health monitor (USDT, USDC, DAI, FDUSD, USDe)
 - Fear & Greed Index with 30-day history
@@ -251,6 +252,7 @@ All three variants run from a single codebase — switch between them with one c
 - **Dark/light theme** — persistent theme toggle with 20+ semantic color variable overrides. Dark theme is the default. Theme preference is stored in localStorage, applied before first paint (no flash of wrong theme), and syncs the `<meta name="theme-color">` for native browser chrome. A `theme-changed` custom event allows panels to react to switches
 - **Panel drag-and-drop reordering** — panels can be reordered via drag-and-drop within the grid. The custom order is persisted to localStorage and restored on reload. Touch events are supported for tablet use
 - **Map pin mode** — a 📌 button pins the map in a fixed position so it remains visible while scrolling through panels. Pin state is persisted to localStorage
+- **Opt-in intelligence alert popups** — the Intelligence Findings badge accumulates signals and alerts silently in the background. A toggle switch in the badge's dropdown header lets users opt in to automatic popup notifications when high-priority findings arrive. The popup preference is stored in localStorage (default: off), so the dashboard never interrupts users who haven't explicitly requested it. The badge continues counting and pulsing regardless of the popup setting — clicking the badge always opens the full findings dropdown
 
 ---
 
@@ -607,7 +609,7 @@ Protest data is sourced from two independent providers to reduce single-source b
 1. **ACLED** (Armed Conflict Location & Event Data) — 30-day window, tokenized API with Redis caching (10-minute TTL). Covers protests, riots, strikes, and demonstrations with actor attribution and fatality counts.
 2. **GDELT** (Global Database of Events, Language, and Tone) — 7-day geospatial event feed filtered to protest keywords. Events with mention count ≥5 are included; those above 30 are marked as `validated`.
 
-Events from both sources are **Haversine-deduplicated** on a 0.5° grid (~50km) with same-day matching. ACLED events take priority due to higher editorial confidence. Severity is classified as:
+Events from both sources are **Haversine-deduplicated** on a 0.1° grid (~10km) with same-day matching. ACLED events take priority due to higher editorial confidence. Severity is classified as:
 
 - **High** — fatalities present or riot/clash keywords
 - **Medium** — standard protest/demonstration
@@ -710,6 +712,8 @@ Theme state is stored in localStorage and applied via a `[data-theme="light"]` a
 
 20+ CSS custom properties are overridden in light mode to maintain contrast ratios: severity colors shift (e.g., `--semantic-high` changes from `#ff8800` to `#ea580c`), backgrounds lighten, and text inverts. Language-specific font stacks switch in `:lang()` selectors — Arabic uses Geeza Pro, Chinese uses PingFang SC.
 
+**Typography** — the dashboard uses a consolidated `--font-mono` CSS custom property that cascades through the entire UI: SF Mono → Monaco → Cascadia Code → Fira Code → DejaVu Sans Mono → Liberation Mono → system monospace. This single variable ensures typographic consistency across macOS (SF Mono/Monaco), Windows (Cascadia Code), and Linux (DejaVu Sans Mono/Liberation Mono). The settings window inherits the same variable, preventing font divergence between the main dashboard and configuration UI.
+
 A `theme-changed` CustomEvent is dispatched on toggle, allowing panels with custom rendering (charts, maps, gauges) to re-render with the new palette.
 
 ### Privacy & Offline Architecture
@@ -735,6 +739,28 @@ With Ollama or LM Studio configured, AI summarization runs entirely on local har
 | Data leaves machine | Yes | Partially | No |
 
 The desktop readiness framework (`desktop-readiness.ts`) catalogs each feature's locality class — `fully-local` (no API required), `api-key` (degrades gracefully without keys), or `cloud-fallback` (proxy available) — enabling clear communication about what works offline.
+
+### Product Analytics
+
+World Monitor includes privacy-first product analytics via PostHog to understand usage patterns and improve the dashboard. The implementation enforces strict data safety at multiple levels:
+
+**Typed event allowlists** — every analytics event has a schema defining exactly which properties are permitted. Unlisted properties are silently dropped before transmission. This prevents accidental inclusion of sensitive data in analytics payloads, even if a developer passes extra fields.
+
+**API key stripping** — a `sanitize_properties` callback runs on every outgoing event. Any string value matching common API key prefixes (`sk-`, `gsk_`, `or-`, `Bearer `) is replaced with `[REDACTED]` before it leaves the browser. This is defense-in-depth: even if a key somehow ends up in an event payload, it never reaches the analytics backend.
+
+**No session recordings, no autocapture** — PostHog's session replay and automatic DOM event capture are explicitly disabled. Only explicitly instrumented events are tracked.
+
+**Pseudonymous identity** — each installation generates a random UUID stored in localStorage. There is no user login, no email collection, and no cross-device tracking. The UUID is purely pseudonymous — it enables session attribution without identifying individuals.
+
+**Ad-blocker bypass** — on the web, PostHog traffic is routed through a reverse proxy on the app's own domain (`/ingest`) rather than directly to PostHog's servers. This prevents ad blockers from silently dropping analytics requests, ensuring usage data is representative. Desktop builds use PostHog's direct endpoint since ad blockers aren't a factor in native apps.
+
+**Offline event queue** — the desktop app may launch without network connectivity. Events captured while offline are queued in localStorage (capped at 200 entries) and flushed to PostHog when connectivity is restored. A `window.online` listener triggers automatic flush on reconnection.
+
+**Super properties** — every event automatically carries platform context: variant (world/tech/finance), app version, platform (web/desktop), screen dimensions, viewport size, device pixel ratio, browser language, and desktop OS/arch. This enables segmentation without per-event instrumentation.
+
+30+ typed events cover core user interactions: app load timing, panel views, LLM summary generation (provider, model, cache status), API key configuration snapshots, map layer toggles, variant switches, country brief opens, theme changes, language changes, search usage, panel resizing, webcam selections, and auto-update interactions.
+
+Analytics is entirely opt-out by omitting the `VITE_POSTHOG_KEY` environment variable. When the key is absent, all analytics functions are no-ops with zero runtime overhead.
 
 ### Responsive Layout System
 
@@ -898,7 +924,7 @@ A single codebase produces three specialized dashboards, each with distinct feed
 | Principle                           | Implementation                                                                                                                                                                                                                                                                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Speed over perfection**           | Keyword classifier is instant; LLM refines asynchronously. Users never wait.                                                                                                                                                                                                                                                              |
-| **Assume failure**                  | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Ollama (local) → Groq → OpenRouter → browser-side T5. Redis cache failures degrade to in-memory fallback with stale-on-error. Negative caching prevents hammering downed upstream APIs. Every edge function returns stale cached data when upstream APIs are down. In-flight request deduplication prevents concurrent clients from stampeding the same upstream endpoint. |
+| **Assume failure**                  | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Ollama (local) → Groq → OpenRouter → browser-side T5. Redis cache failures degrade to in-memory fallback with stale-on-error. Negative caching (5-minute backoff after upstream failures) prevents hammering downed APIs. Every edge function returns stale cached data when upstream APIs are down. In-flight request deduplication prevents concurrent clients from stampeding the same upstream endpoint. Rate-sensitive APIs (Yahoo Finance) use staggered sequential requests with 150ms inter-request delays to avoid 429 throttling. UCDP conflict data uses automatic version discovery (probing multiple API versions in parallel), discovered-version caching (1-hour TTL), and stale-on-error fallback. |
 | **Show what you can't see**         | Intelligence gap tracker explicitly reports data source outages rather than silently hiding them.                                                                                                                                                                                                                                         |
 | **Browser-first compute**           | Analysis (clustering, instability scoring, surge detection) runs client-side — no backend compute dependency for core intelligence.                                                                                                                                                                                                       |
 | **Local-first geolocation**         | Country detection uses browser-side ray-casting against GeoJSON polygons rather than network reverse-geocoding. Sub-millisecond response, zero API dependency, works offline. Network geocoding is a fallback, not the primary path.                                                                                                      |
@@ -1024,6 +1050,8 @@ At sidecar launch, the vault is read, parsed, and injected as environment variab
 
 **Verification pipeline** — when you enter a credential in Settings, the app validates it against the actual provider API (Groq → `/openai/v1/models`, Ollama → `/api/tags`, FRED → GDP test query, NASA FIRMS → fire data fetch, etc.). Network errors (timeouts, DNS failures, unreachable hosts) are treated as soft passes — the key is saved with a "could not verify" notice rather than blocking. Only explicit 401/403 responses from the provider mark a key as invalid. This prevents transient network issues from locking users out of their own credentials.
 
+**Smart re-verification** — when saving settings, the verification pipeline skips keys that haven't been modified since their last successful verification. This prevents unnecessary round-trips to provider APIs when a user changes one key but has 15 others already configured and validated. Only newly entered or modified keys trigger verification requests.
+
 **Desktop-specific requirements** — some features require fewer credentials on desktop than on the web. For example, AIS vessel tracking on the web requires both a relay URL and an API key, but the desktop sidecar handles relay connections internally, so only the API key is needed. The settings panel adapts its required-fields display based on the detected platform.
 
 ### Sidecar Authentication
@@ -1039,6 +1067,16 @@ The `/api/service-status` health check endpoint is exempt from token validation 
 ### Local RSS Proxy
 
 The sidecar includes a built-in RSS proxy handler that fetches news feeds directly from source domains, bypassing the cloud RSS proxy entirely. This means the desktop app can load all 150+ RSS feeds without any cloud dependency — the same domain allowlist used by the Vercel edge proxy is enforced locally. Combined with the local API handlers, this enables the desktop app to operate as a fully self-contained intelligence aggregation platform.
+
+### Sidecar Resilience
+
+The sidecar employs multiple resilience patterns to maintain data availability when upstream APIs degrade:
+
+- **Stale-on-error** — when an upstream API returns a 5xx error or times out, the sidecar serves the last successful response from its in-memory cache rather than propagating the failure. Panels display stale data with a visual "retrying" indicator rather than going blank
+- **Negative caching** — after an upstream failure, the sidecar records a 5-minute negative cache entry to prevent immediately re-hitting the same broken endpoint. Subsequent requests during the cooldown receive the stale response instantly
+- **Staggered requests** — APIs with strict rate limits (Yahoo Finance) use sequential request batching with 150ms inter-request delays instead of `Promise.all`. This transforms 10 concurrent requests that would trigger HTTP 429 into a staggered sequence that stays under rate limits
+- **In-flight deduplication** — concurrent requests for the same resource (e.g., multiple panels polling the same endpoint) are collapsed into a single upstream fetch. The first request creates a Promise stored in an in-flight map; all concurrent requests await that single Promise
+- **Panel retry indicator** — when a panel's data fetch fails and retries, the Panel base class displays a non-intrusive "Retrying..." indicator so users understand the dashboard is self-healing rather than broken
 
 ### Cloud Fallback
 
@@ -1129,6 +1167,8 @@ Request → [1] In-Memory Cache → [2] Redis (Upstash) → [3] Upstream API
 | **Upstream**        | Source of truth            | N/A                | External API (Yahoo Finance, CoinGecko, etc.) |
 
 Cache keys are versioned (`opensky:v2:lamin=...`, `macro-signals:v2:default`) so schema changes don't serve stale formats. Every response includes an `X-Cache` header (`HIT`, `REDIS-HIT`, `MISS`, `REDIS-STALE`, `REDIS-ERROR-FALLBACK`) for debugging.
+
+**Shared caching layer** — all 37 sebuf handler implementations share a unified Upstash Redis caching module (`_upstash-cache.js`) with a consistent API: `getCachedOrFetch(cacheKey, ttlSeconds, fetchFn)`. This eliminates per-handler caching boilerplate and ensures every RPC endpoint benefits from the three-tier strategy. Cache keys include request-varying parameters (e.g., requested symbols, country codes, bounding boxes) to prevent cache contamination across callers with different inputs. On desktop, the same module runs in the sidecar with an in-memory + persistent file backend when Redis is unavailable.
 
 The AI summarization pipeline adds content-based deduplication: headlines are hashed and checked against Redis before calling Groq, so the same breaking news viewed by 1,000 concurrent users triggers exactly one LLM call.
 
@@ -1258,7 +1298,7 @@ This runs the frontend without the API layer. Panels that require server-side pr
 | Platform               | Status                  | Notes                                                                                                                          |
 | ---------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Vercel**             | Full support            | Recommended deployment target                                                                                                  |
-| **Linux x86_64**       | Full support            | Works with `vercel dev` for local development. Desktop .AppImage available for x86_64                                          |
+| **Linux x86_64**       | Full support            | Works with `vercel dev` for local development. Desktop .AppImage available for x86_64. WebKitGTK rendering uses DMA-BUF with fallback to SHM for GPU compatibility. Font stack includes DejaVu Sans Mono and Liberation Mono for consistent rendering across distros |
 | **macOS**              | Works with `vercel dev` | Full local development                                                                                                         |
 | **Raspberry Pi / ARM** | Partial                 | `vercel dev` edge runtime emulation may not work on ARM. Use Option 1 (deploy to Vercel) or Option 3 (static frontend) instead |
 | **Docker**             | Planned                 | See [Roadmap](#roadmap)                                                                                                        |
@@ -1290,6 +1330,7 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 | **Economic APIs**     | FRED (Federal Reserve), EIA (Energy), Finnhub (stock quotes)                                                                                   |
 | **Localization**      | i18next (16 languages: en, fr, de, es, it, pl, pt, nl, sv, ru, ar, zh, ja, tr, th, vi), RTL support, lazy-loaded bundles, native-language feeds for 7 locales |
 | **API Contracts**     | Protocol Buffers (92 proto files, 17 services), sebuf HTTP annotations, buf CLI (lint + breaking checks), auto-generated TypeScript clients/servers + OpenAPI 3.1.0 docs |
+| **Analytics**         | PostHog (privacy-first, typed event schemas, pseudonymous identity, ad-blocker bypass via reverse proxy, offline queue for desktop)             |
 | **Deployment**        | Vercel Edge Functions (60+ endpoints) + Railway (WebSocket relay) + Tauri (macOS/Windows/Linux) + PWA (installable)                            |
 | **Finance Data**      | 92 stock exchanges, 19 financial centers, 13 central banks, 10 commodity hubs, 64 Gulf FDI investments                                         |
 | **Data**              | 150+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery, 8 live YouTube streams                                         |
@@ -1300,7 +1341,7 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING](./docs/DOCUMENTATION.md#contributing) for guidelines.
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines, including the Sebuf RPC framework workflow, how to add data sources and RSS feeds, and our AI-assisted development policy. The project also maintains a [Code of Conduct](./CODE_OF_CONDUCT.md) and [Security Policy](./SECURITY.md) for responsible vulnerability disclosure.
 
 ```bash
 # Development
@@ -1398,6 +1439,15 @@ Desktop release details, signing hooks, variant outputs, and clean-machine valid
 - [x] Desktop sidecar RSS proxy (local feed fetching without cloud fallback)
 - [x] Negative caching and version discovery for UCDP upstream API resilience
 - [x] XRP (Ripple) added to crypto market tracking
+- [x] Shared Upstash Redis caching layer across all 37 RPC handlers with parameterized cache keys
+- [x] PostHog product analytics with typed event schemas, API key stripping, and ad-blocker bypass
+- [x] Opt-in intelligence alert popups (default off, toggle in dropdown header)
+- [x] Linux WebKitGTK DMA-BUF rendering with SHM fallback and cross-distro font stack
+- [x] Consolidated `--font-mono` CSS variable for cross-platform typographic consistency
+- [x] Dedup coordinate precision increased to 0.1° (~10km) for finer-grained event matching
+- [x] Community guidelines (CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md)
+- [x] Yahoo Finance staggered request batching to prevent 429 rate limiting
+- [x] Panel base class retry indicator (`showRetrying`) for visual feedback during data refresh
 - [ ] Mobile-optimized views
 - [ ] Push notifications for critical alerts
 - [ ] Self-hosted Docker image
