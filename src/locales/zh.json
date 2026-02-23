@@ -1797,6 +1797,7 @@
     "close": "关闭",
     "currentVariant": "(当前)",
     "retry": "Retry",
+    "retrying": "正在重试...",
     "refresh": "Refresh"
   }
 }

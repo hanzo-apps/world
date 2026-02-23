@@ -12,12 +12,20 @@ import type {
   MarketQuote,
 } from '../../../../src/generated/server/worldmonitor/market/v1/service_server';
 import { YAHOO_ONLY_SYMBOLS, fetchFinnhubQuote, fetchYahooQuotesBatch } from './_shared';
+import { getCachedJson, setCachedJson } from '../../../_shared/redis';
+
+const REDIS_CACHE_KEY = 'market:quotes:v1';
+const REDIS_CACHE_TTL = 120; // 2 min — shared across all Vercel instances
 
 const quotesCache = new Map<string, { data: ListMarketQuotesResponse; timestamp: number }>();
-const QUOTES_CACHE_TTL = 120_000; // 2 minutes
+const QUOTES_CACHE_TTL = 120_000; // 2 minutes (in-memory fallback)
 
 function cacheKey(symbols: string[]): string {
   return [...symbols].sort().join(',');
+}
+
+function redisCacheKey(symbols: string[]): string {
+  return `${REDIS_CACHE_KEY}:${[...symbols].sort().join(',')}`;
 }
 
 export async function listMarketQuotes(
@@ -26,9 +34,19 @@ export async function listMarketQuotes(
 ): Promise<ListMarketQuotesResponse> {
   const now = Date.now();
   const key = cacheKey(req.symbols);
-  const cached = quotesCache.get(key);
-  if (cached && now - cached.timestamp < QUOTES_CACHE_TTL) {
-    return cached.data;
+
+  // Layer 1: in-memory cache (same instance)
+  const memCached = quotesCache.get(key);
+  if (memCached && now - memCached.timestamp < QUOTES_CACHE_TTL) {
+    return memCached.data;
+  }
+
+  // Layer 2: Redis shared cache (cross-instance)
+  const redisKey = redisCacheKey(req.symbols);
+  const redisCached = (await getCachedJson(redisKey)) as ListMarketQuotesResponse | null;
+  if (redisCached?.quotes?.length) {
+    quotesCache.set(key, { data: redisCached, timestamp: now });
+    return redisCached;
   }
 
   try {
@@ -79,17 +97,18 @@ export async function listMarketQuotes(
     }
 
     // Stale-while-revalidate: if Yahoo rate-limited and no fresh data, serve cached
-    if (quotes.length === 0 && cached) {
-      return cached.data;
+    if (quotes.length === 0 && memCached) {
+      return memCached.data;
     }
 
     const result: ListMarketQuotesResponse = { quotes, finnhubSkipped: !apiKey, skipReason: !apiKey ? 'FINNHUB_API_KEY not configured' : '' };
     if (quotes.length > 0) {
       quotesCache.set(key, { data: result, timestamp: now });
+      setCachedJson(redisKey, result, REDIS_CACHE_TTL).catch(() => {});
     }
     return result;
   } catch {
-    if (cached) return cached.data;
+    if (memCached) return memCached.data;
     return { quotes: [], finnhubSkipped: false, skipReason: '' };
   }
 }

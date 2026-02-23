@@ -309,7 +309,8 @@
           "submitting": "Submitting...",
           "success": "You're on the list! We'll notify you first.",
           "alreadyRegistered": "You're already on the waitlist.",
-          "error": "Registration failed. Please try again."
+          "error": "Registration failed. Please try again.",
+          "invalidEmail": "Please enter a valid email address."
         },
         "byokTitle": "Or bring your own keys",
         "byokDescription": "Prefer full control? Head to the API Keys and LLMs tabs to configure each data source and AI provider individually."
@@ -474,6 +475,7 @@
       "noSpending": "No recent government awards",
       "awards": "awards",
       "noIndicatorData": "No indicator data yet - FRED may be loading",
+      "fredKeyMissing": "FRED API key required — add it in Settings to enable economic indicators",
       "noOilDataRetry": "Oil data temporarily unavailable - will retry",
       "vsPreviousWeek": "vs previous week",
       "in": "in"
@@ -1800,6 +1802,7 @@
     "close": "Close",
     "currentVariant": "(current)",
     "retry": "Retry",
+    "retrying": "Retrying...",
     "refresh": "Refresh"
   }
 }

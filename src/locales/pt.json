@@ -1705,6 +1705,7 @@
     "close": "Fechar",
     "currentVariant": "(atual)",
     "retry": "Retry",
+    "retrying": "Tentando novamente...",
     "refresh": "Refresh"
   },
   "header": {

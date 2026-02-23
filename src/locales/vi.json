@@ -1774,6 +1774,7 @@
     "close": "Đóng",
     "currentVariant": "(hiện tại)",
     "retry": "Thử lại",
+    "retrying": "Đang thử lại...",
     "refresh": "Làm mới"
   }
 }

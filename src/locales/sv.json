@@ -1705,6 +1705,7 @@
     "close": "Stäng",
     "currentVariant": "(aktuell)",
     "retry": "Retry",
+    "retrying": "Försöker igen...",
     "refresh": "Refresh"
   },
   "header": {

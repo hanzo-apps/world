@@ -65,9 +65,9 @@ All three variants run from a single codebase — switch between them with one c
 
 ### Localization & Regional Support
 
-- **Multilingual UI** — Fully localized interface supporting **14 languages: English, French, Spanish, German, Italian, Polish, Portuguese, Dutch, Swedish, Russian, Arabic, Chinese, Japanese, and Turkish**. Language bundles are lazy-loaded on demand — only the active language is fetched, keeping initial bundle size minimal.
+- **Multilingual UI** — Fully localized interface supporting **16 languages: English, French, Spanish, German, Italian, Polish, Portuguese, Dutch, Swedish, Russian, Arabic, Chinese, Japanese, Turkish, Thai, and Vietnamese**. Language bundles are lazy-loaded on demand — only the active language is fetched, keeping initial bundle size minimal.
 - **RTL Support** — Native right-to-left layout support for Arabic (`ar`) and Hebrew.
-- **Localized News Feeds** — Region-specific RSS selection based on language preference (e.g., viewing the app in French loads Le Monde, Jeune Afrique, and France24).
+- **Localized News Feeds** — Region-specific RSS selection based on language preference (e.g., viewing the app in French loads Le Monde, Jeune Afrique, and France24). Seven locales have dedicated native-language feed sets: French, Arabic, German, Spanish, Turkish (BBC Türkçe, Hurriyet, DW Turkish), Polish (TVN24, Polsat News, Rzeczpospolita), Russian (BBC Russian, Meduza, Novaya Gazeta Europe), Thai (Bangkok Post, Thai PBS), and Vietnamese (VnExpress, Tuoi Tre News).
 - **AI Translation** — Integrated LLM translation for news headlines and summaries, enabling cross-language intelligence gathering.
 - **Regional Intelligence** — Dedicated monitoring panels for Africa, Latin America, Middle East, and Asia with local sources.
 
@@ -177,6 +177,7 @@ All three variants run from a single codebase — switch between them with one c
 - **19 live webcams** — real-time YouTube streams from geopolitical hotspots across 4 regions (Middle East, Europe, Americas, Asia-Pacific). Grid view shows 4 strategic feeds simultaneously; single-feed view available. Region filtering (ALL/MIDEAST/EUROPE/AMERICAS/ASIA), idle-aware playback that pauses after 5 minutes, and Intersection Observer-based lazy loading
 - **Custom keyword monitors** — user-defined keyword alerts with word-boundary matching (prevents "ai" from matching "train"), automatic color-coding from a 10-color palette, and multi-keyword support (comma-separated). Monitors search across both headline titles and descriptions and show real-time match counts
 - **Entity extraction** — Auto-links countries, leaders, organizations
+- **Instant flat render** — news items appear immediately as a flat list the moment feed data arrives. ML-based clustering (topic grouping, entity extraction, sentiment analysis) runs asynchronously in the background and progressively upgrades the view when ready — eliminating the 1–3 second blank delay that would occur if clustering blocked initial render. Finance variant categories fetch with 5 concurrent requests (vs 3) for ~10–15 second faster cold starts
 - **Virtual scrolling** — news panels with 15+ items use a custom virtual list renderer that only creates DOM elements for visible items plus a 3-item overscan buffer. Viewport spacers simulate full-list height. Uses `requestAnimationFrame`-batched scroll handling and `ResizeObserver` for responsive adaptation. DOM elements are pooled and recycled rather than created/destroyed
 
 ### Signal Aggregation & Anomaly Detection
@@ -229,7 +230,7 @@ All three variants run from a single codebase — switch between them with one c
 - **Cmd+K search** — fuzzy search across 20+ result types: news headlines, countries (with direct country brief navigation), hotspots, markets, military bases, cables, pipelines, datacenters, nuclear facilities, tech companies, and more
 - **Historical playback** — dashboard snapshots are stored in IndexedDB. A time slider allows rewinding to any saved state, with live updates paused during playback
 - **Mobile detection** — screens below 768px receive a warning modal since the dashboard is designed for multi-panel desktop use
-- **UCDP conflict classification** — countries with active wars (1,000+ battle deaths/year) receive automatic CII floor scores, preventing optimistic drift
+- **UCDP conflict classification** — countries with active wars (1,000+ battle deaths/year) receive automatic CII floor scores, preventing optimistic drift. The UCDP GED API integration uses automatic version discovery (probing multiple year-based API versions in parallel), negative caching (5-minute backoff after upstream failures), discovered-version caching (1-hour TTL), and stale-on-error fallback to ensure conflict data is always available even when the upstream API is intermittently down
 - **HAPI humanitarian data** — UN OCHA humanitarian access metrics and displacement flows feed into country-level instability scoring with dual-perspective (origins vs. hosts) panel
 - **Idle-aware resource management** — animations pause after 2 minutes of inactivity and when the tab is hidden, preventing battery drain. Video streams are destroyed from the DOM and recreated on return
 - **Country-specific stock indices** — country briefs display the primary stock market index with 1-week change (S&P 500 for US, Shanghai Composite for China, etc.) via the `/api/stock-index` endpoint
@@ -346,12 +347,15 @@ The Ollama tier communicates via the OpenAI-compatible `/v1/chat/completions` en
 
 ### Threat Classification Pipeline
 
-Every news item passes through a two-stage classification pipeline:
+Every news item passes through a three-stage classification pipeline:
 
-1. **Keyword classifier** (instant) — pattern-matches against ~120 threat keywords organized by severity tier (critical → high → medium → low → info) and category (conflict, terrorism, cyber, disaster, etc.). Returns immediately with a confidence score.
-2. **LLM classifier** (async) — fires in the background via a Vercel Edge Function calling Groq's Llama 3.1 8B at temperature 0. Results are cached in Redis (24h TTL) keyed by headline hash. When the LLM result arrives, it overrides the keyword result only if its confidence is higher.
+1. **Keyword classifier** (instant, `source: 'keyword'`) — pattern-matches against ~120 threat keywords organized by severity tier (critical → high → medium → low → info) and 14 event categories (conflict, protest, disaster, diplomatic, economic, terrorism, cyber, health, environmental, military, crime, infrastructure, tech, general). Keywords use word-boundary regex matching to prevent false positives (e.g., "war" won't match "award"). Each match returns a severity level, category, and confidence score. Variant-specific keyword sets ensure the tech variant doesn't flag "sanctions" in non-geopolitical contexts.
 
-This hybrid approach means the UI is never blocked waiting for AI — users see keyword results instantly, with LLM refinements arriving within seconds and persisting for all subsequent visitors.
+2. **Browser-side ML** (async, `source: 'ml'`) — Transformers.js runs NER, sentiment analysis, and topic classification directly in the browser with no server dependency. Provides a second classification opinion without any API call.
+
+3. **LLM classifier** (batched async, `source: 'llm'`) — headlines are collected into a batch queue and fired as parallel `classifyEvent` RPCs via the sebuf proto client. Each RPC calls the configured LLM provider (Groq Llama 3.1 8B at temperature 0, or Ollama for local inference). Results are cached in Redis (24h TTL) keyed by headline hash. When 500-series errors occur, the LLM classifier automatically pauses its queue to avoid wasting API quota, resuming after an exponential backoff delay. When the LLM result arrives, it overrides the keyword result only if its confidence is higher.
+
+This hybrid approach means the UI is never blocked waiting for AI — users see keyword results instantly, with ML and LLM refinements arriving within seconds and persisting for all subsequent visitors. Each classification carries its `source` tag (`keyword`, `ml`, or `llm`) so downstream consumers can weight confidence accordingly.
 
 ### Country Instability Index (CII)
 
@@ -446,6 +450,15 @@ Beyond displaying static cable routes on the map, the system actively monitors c
 2. **AIS Cable Ship Tracking** — dedicated cable repair vessels (CS Reliance, Île de Bréhat, Cable Innovator, etc.) are identified by name pattern matching against AIS transponder data. Ship status is classified as `enroute` (transiting to repair site) or `on-station` (actively working) based on keyword analysis of the warning text.
 
 Advisories are classified by severity: `fault` (cable break, cut, or damage — potential traffic rerouting) or `degraded` (repair work in progress with partial capacity). Impact descriptions are generated dynamically, linking the advisory to the specific cable and the countries it serves — enabling questions like "which cables serving South Asia are currently under repair?"
+
+**Health scoring algorithm** — Each cable receives a composite health score (0–100) computed from weighted signals with exponential time decay:
+
+```
+signal_weight = severity × (e^(-λ × age_hours))     where λ = ln(2) / 168 (7-day half-life)
+health_score  = max(0, 100 − Σ(signal_weights) × 100)
+```
+
+Signals are classified into two kinds: `operator_fault` (confirmed cable damage — severity 1.0) and `cable_advisory` (repair operations, navigational warnings — severity 0.6). Geographic matching uses cosine-latitude-corrected equirectangular approximation to find the nearest cataloged cable within 50km of each NGA warning's coordinates. Results are cached in Redis (6-hour TTL for complete results, 10 minutes for partial) with an in-memory fallback that serves stale data when Redis is unavailable — ensuring the cable health layer never shows blank data even during cache failures.
 
 ### Infrastructure Cascade Modeling
 
@@ -745,6 +758,24 @@ All real-time data sources feed into a central signal aggregator that builds a u
 2. **Detects regional convergence** — identifies when multiple signal types spike in the same geographic corridor (e.g., military flights + protests + satellite fires in Eastern Mediterranean)
 3. **Feeds downstream analysis** — the CII, hotspot escalation, focal point detection, and AI insights modules all consume the aggregated signal picture rather than raw data
 
+### PizzINT Activity Monitor & GDELT Tension Index
+
+The dashboard integrates two complementary geopolitical pulse indicators:
+
+**PizzINT DEFCON scoring** — monitors foot traffic patterns at key military, intelligence, and government locations worldwide via the PizzINT API. Aggregate activity levels across monitored sites are converted into a 5-level DEFCON-style readout:
+
+| Adjusted Activity | DEFCON Level | Label             |
+| ----------------- | ------------ | ----------------- |
+| ≥ 85%             | 1            | Maximum Activity  |
+| 70% – 84%         | 2            | High Activity     |
+| 50% – 69%         | 3            | Elevated Activity |
+| 25% – 49%         | 4            | Above Normal      |
+| < 25%             | 5            | Normal Activity   |
+
+Activity spikes at individual locations boost the aggregate score (+10 per spike, capped at 100). Data freshness is tracked per-location — the system distinguishes between stale readings (location sensor lag) and genuine low activity. Per-location detail includes current popularity percentage, spike magnitude, and open/closed status.
+
+**GDELT bilateral tension pairs** — six strategic country pairs (USA↔Russia, Russia↔Ukraine, USA↔China, China↔Taiwan, USA↔Iran, USA↔Venezuela) are tracked via GDELT's GPR (Goldstein Political Relations) batch API. Each pair shows a current tension score, a percentage change from the previous data point, and a trend direction (rising/stable/falling, with ±5% thresholds). Rising bilateral tension scores that coincide with military signal spikes in the same region feed into the focal point detection algorithm.
+
 ### Data Freshness & Intelligence Gaps
 
 A singleton tracker monitors 22 data sources (GDELT, RSS, AIS, military flights, earthquakes, weather, outages, ACLED, Polymarket, economic indicators, NASA FIRMS, cyber threat feeds, trending keywords, oil/energy, population exposure, and more) with status categorization: fresh (<15 min), stale (1h), very_stale (6h), no_data, error, disabled. It explicitly reports **intelligence gaps** — what analysts can't see — preventing false confidence when critical data sources are down or degraded.
@@ -867,7 +898,7 @@ A single codebase produces three specialized dashboards, each with distinct feed
 | Principle                           | Implementation                                                                                                                                                                                                                                                                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Speed over perfection**           | Keyword classifier is instant; LLM refines asynchronously. Users never wait.                                                                                                                                                                                                                                                              |
-| **Assume failure**                  | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Ollama (local) → Groq → OpenRouter → browser-side T5. Redis cache failures degrade gracefully. Every edge function returns stale cached data when upstream APIs are down.                                                                                           |
+| **Assume failure**                  | Per-feed circuit breakers with 5-minute cooldowns. AI fallback chain: Ollama (local) → Groq → OpenRouter → browser-side T5. Redis cache failures degrade to in-memory fallback with stale-on-error. Negative caching prevents hammering downed upstream APIs. Every edge function returns stale cached data when upstream APIs are down. In-flight request deduplication prevents concurrent clients from stampeding the same upstream endpoint. |
 | **Show what you can't see**         | Intelligence gap tracker explicitly reports data source outages rather than silently hiding them.                                                                                                                                                                                                                                         |
 | **Browser-first compute**           | Analysis (clustering, instability scoring, surge detection) runs client-side — no backend compute dependency for core intelligence.                                                                                                                                                                                                       |
 | **Local-first geolocation**         | Country detection uses browser-side ray-casting against GeoJSON polygons rather than network reverse-geocoding. Sub-millisecond response, zero API dependency, works offline. Network geocoding is a fallback, not the primary path.                                                                                                      |
@@ -973,9 +1004,9 @@ The Tauri desktop app wraps the dashboard in a native window (macOS, Windows, Li
                       ▼
 ┌─────────────────────────────────────────────────┐
 │         Node.js Sidecar (port 46123)            │
-│  60+ API handlers · Gzip compression            │
-│  Cloud fallback · Traffic logging               │
-│  Verbose debug mode · Circuit breakers          │
+│  60+ API handlers · Local RSS proxy             │
+│  Brotli/Gzip compression · Cloud fallback       │
+│  Traffic logging · Verbose debug mode           │
 └─────────────────────┬───────────────────────────┘
                       │ fetch (on local failure)
                       ▼
@@ -1004,6 +1035,10 @@ A unique 32-character hex token is generated per app launch using randomized has
 3. Attached as `Authorization: Bearer <token>` to every local request
 
 The `/api/service-status` health check endpoint is exempt from token validation to support monitoring tools.
+
+### Local RSS Proxy
+
+The sidecar includes a built-in RSS proxy handler that fetches news feeds directly from source domains, bypassing the cloud RSS proxy entirely. This means the desktop app can load all 150+ RSS feeds without any cloud dependency — the same domain allowlist used by the Vercel edge proxy is enforced locally. Combined with the local API handlers, this enables the desktop app to operate as a fully self-contained intelligence aggregation platform.
 
 ### Cloud Fallback
 
@@ -1058,6 +1093,10 @@ Cloudflare will negotiate Brotli automatically for compatible clients when the o
 
 All relay server responses pass through `gzipSync` when the client accepts gzip and the payload exceeds 1KB. Sidecar API responses prefer Brotli and use gzip fallback with proper `Content-Encoding`/`Vary` headers for the same threshold. This applies to OpenSky aircraft JSON, RSS XML feeds, UCDP event data, AIS snapshots, and health checks — reducing wire size by approximately 50–80%.
 
+### In-Flight Request Deduplication
+
+When multiple connected clients poll simultaneously (common with the relay's multi-tenant WebSocket architecture), identical upstream requests are deduplicated at the relay level. The first request for a given resource key (e.g., an RSS feed URL or OpenSky bounding box) creates a Promise stored in an in-flight Map. All concurrent requests for the same key await that single Promise rather than stampeding the upstream API. Subsequent requests are served from cache with an `X-Cache: DEDUP` header. This prevents scenarios like 53 concurrent RSS cache misses or 5 simultaneous OpenSky requests for the same geographic region — all resolved by a single upstream fetch.
+
 ### Frontend Polling Intervals
 
 Panels refresh at staggered intervals to avoid synchronized API storms:
@@ -1109,6 +1148,7 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 | **Desktop sidecar auth**       | The local API sidecar requires a per-session `Bearer` token generated at launch. The token is stored in Rust state and injected into the sidecar environment — only the Tauri frontend can retrieve it via IPC. Health check endpoints are exempt. |
 | **OS keychain storage**        | Desktop API keys are stored in the operating system's credential manager (macOS Keychain, Windows Credential Manager), never in plaintext files or environment variables on disk.                                                                  |
 | **Bot-aware social previews**  | The `/api/story` endpoint detects social crawlers (10+ signatures: Twitter, Facebook, LinkedIn, Telegram, Discord, Reddit, WhatsApp, Google) and serves OG-tagged HTML with dynamic preview images. Regular browsers receive a 302 redirect to the SPA. |
+| **Bot protection middleware**  | Edge Middleware blocks crawlers and scrapers from all `/api/*` routes — bot user-agents and requests with short or missing `User-Agent` headers receive 403. Social preview bots are selectively allowed on `/api/story` and `/api/og-story` for Open Graph image generation. Reinforced by `robots.txt` Disallow rules on API paths. |
 | **No debug endpoints**         | The `api/debug-env.js` endpoint returns 404 in production — it exists only as a disabled placeholder.                                                                                                                                              |
 
 ---
@@ -1248,7 +1288,7 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 | **Market APIs**       | Yahoo Finance (equities, forex, crypto), CoinGecko (stablecoins), mempool.space (BTC hashrate), alternative.me (Fear & Greed)                  |
 | **Threat Intel APIs** | abuse.ch (Feodo Tracker, URLhaus), AlienVault OTX, AbuseIPDB, C2IntelFeeds                                                                     |
 | **Economic APIs**     | FRED (Federal Reserve), EIA (Energy), Finnhub (stock quotes)                                                                                   |
-| **Localization**      | i18next (14 languages: en, fr, de, es, it, pl, pt, nl, sv, ru, ar, zh, ja, tr), RTL support, lazy-loaded bundles                                |
+| **Localization**      | i18next (16 languages: en, fr, de, es, it, pl, pt, nl, sv, ru, ar, zh, ja, tr, th, vi), RTL support, lazy-loaded bundles, native-language feeds for 7 locales |
 | **API Contracts**     | Protocol Buffers (92 proto files, 17 services), sebuf HTTP annotations, buf CLI (lint + breaking checks), auto-generated TypeScript clients/servers + OpenAPI 3.1.0 docs |
 | **Deployment**        | Vercel Edge Functions (60+ endpoints) + Railway (WebSocket relay) + Tauri (macOS/Windows/Linux) + PWA (installable)                            |
 | **Finance Data**      | 92 stock exchanges, 19 financial centers, 13 central banks, 10 commodity hubs, 64 Gulf FDI investments                                         |
@@ -1348,6 +1388,16 @@ Desktop release details, signing hooks, variant outputs, and clean-machine valid
 - [x] Dynamic Open Graph images for social sharing (SVG card generation with CII scores)
 - [x] Storage quota management (graceful degradation on exhausted localStorage/IndexedDB)
 - [x] Chunk reload guard (one-shot recovery from stale-asset 404s after deployments)
+- [x] PizzINT activity monitor with DEFCON-style scoring and GDELT bilateral tension tracking
+- [x] Bot protection middleware (edge-level crawler blocking with social preview exceptions)
+- [x] In-flight request deduplication on relay (prevents upstream API stampede from concurrent clients)
+- [x] Instant flat-render news panels (ML clustering runs async, items appear immediately)
+- [x] Cable health scoring algorithm (time-decay weighted signals from NGA warnings with cos-lat distance matching)
+- [x] Thai and Vietnamese localization (16 total languages, 1,361 keys per locale)
+- [x] Native-language RSS feeds for Turkish, Polish, Russian, Thai, and Vietnamese locales
+- [x] Desktop sidecar RSS proxy (local feed fetching without cloud fallback)
+- [x] Negative caching and version discovery for UCDP upstream API resilience
+- [x] XRP (Ripple) added to crypto market tracking
 - [ ] Mobile-optimized views
 - [ ] Push notifications for critical alerts
 - [ ] Self-hosted Docker image

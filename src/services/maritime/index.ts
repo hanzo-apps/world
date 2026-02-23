@@ -11,7 +11,7 @@ import { isFeatureAvailable } from '../runtime-config';
 
 // ---- Proto fallback (desktop safety when relay URL is unavailable) ----
 
-const client = new MaritimeServiceClient('', { fetch: fetch.bind(globalThis) });
+const client = new MaritimeServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
 const snapshotBreaker = createCircuitBreaker<GetVesselSnapshotResponse>({ name: 'Maritime Snapshot' });
 const emptySnapshotFallback: GetVesselSnapshotResponse = { snapshot: undefined };
 

@@ -1705,6 +1705,7 @@
     "close": "Sluiten",
     "currentVariant": "(huidig)",
     "retry": "Retry",
+    "retrying": "Opnieuw proberen...",
     "refresh": "Refresh"
   },
   "header": {
