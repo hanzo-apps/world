@@ -2763,6 +2763,26 @@ export class App {
       this.updateHeaderThemeIcon();
     });
 
+    // Desktop: intercept external link clicks and open in system browser.
+    // Tauri WKWebView/WebView2 traps target="_blank" — links don't open otherwise.
+    if (this.isDesktopApp) {
+      document.addEventListener('click', (e) => {
+        const anchor = (e.target as HTMLElement).closest?.('a[href]') as HTMLAnchorElement | null;
+        if (!anchor) return;
+        const href = anchor.href;
+        if (!href || href.startsWith('javascript:') || href === '#' || href.startsWith('#')) return;
+        try {
+          const url = new URL(href, window.location.href);
+          if (url.origin === window.location.origin) return;
+          e.preventDefault();
+          e.stopPropagation();
+          void invokeTauri<void>('open_url', { url: url.toString() }).catch(() => {
+            window.open(url.toString(), '_blank');
+          });
+        } catch { /* malformed URL — let browser handle */ }
+      }, true);
+    }
+
     // Idle detection - pause animations after 2 minutes of inactivity
     this.setupIdleDetection();
   }
