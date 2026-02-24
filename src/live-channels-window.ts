@@ -8,6 +8,8 @@ import {
   saveChannelsToStorage,
   BUILTIN_IDS,
   getDefaultLiveChannels,
+  OPTIONAL_LIVE_CHANNELS,
+  OPTIONAL_CHANNEL_REGIONS,
 } from '@/components/LiveNewsPanel';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
@@ -87,6 +89,17 @@ function showConfirmModal(options: {
   overlay.classList.add('active');
 }
 
+// Persist active region tab across re-renders
+let activeRegionTab = OPTIONAL_CHANNEL_REGIONS[0]?.key ?? 'na';
+
+// Build a lookup map: channel id → LiveChannel for optional channels
+const optionalChannelMap = new Map<string, LiveChannel>();
+for (const c of OPTIONAL_LIVE_CHANNELS) optionalChannelMap.set(c.id, c);
+
+function channelInitials(name: string): string {
+  return name.split(/[\s-]+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
 export function initLiveChannelsWindow(): void {
   const appEl = document.getElementById('app');
   if (!appEl) return;
@@ -163,6 +176,7 @@ export function initLiveChannelsWindow(): void {
       listEl.appendChild(row);
     }
     updateRestoreButton();
+    renderAvailableChannels(listEl);
   }
 
   /** Returns default (built-in) channels that are not in the current list. */
@@ -275,6 +289,92 @@ export function initLiveChannelsWindow(): void {
     row.appendChild(cancelBtn);
   }
 
+  // ── Available Channels: Tab-based region cards ──
+
+  function renderAvailableChannels(listEl: HTMLElement): void {
+    const tabBar = document.getElementById('liveChannelsTabBar');
+    const tabContents = document.getElementById('liveChannelsTabContents');
+    if (!tabBar || !tabContents) return;
+
+    const currentIds = new Set(channels.map((c) => c.id));
+
+    // Render tab buttons
+    tabBar.innerHTML = '';
+    for (const region of OPTIONAL_CHANNEL_REGIONS) {
+      const addedCount = region.channelIds.filter((id) => currentIds.has(id)).length;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'live-news-manage-tab-btn' + (region.key === activeRegionTab ? ' active' : '');
+      const label = t(region.labelKey) ?? region.key.toUpperCase();
+      btn.textContent = addedCount > 0 ? `${label} (${addedCount})` : label;
+      btn.addEventListener('click', () => {
+        activeRegionTab = region.key;
+        renderAvailableChannels(listEl);
+      });
+      tabBar.appendChild(btn);
+    }
+
+    // Render tab content panels
+    tabContents.innerHTML = '';
+    for (const region of OPTIONAL_CHANNEL_REGIONS) {
+      const panel = document.createElement('div');
+      panel.className = 'live-news-manage-tab-content' + (region.key === activeRegionTab ? ' active' : '');
+
+      const grid = document.createElement('div');
+      grid.className = 'live-news-manage-card-grid';
+
+      for (const chId of region.channelIds) {
+        const ch = optionalChannelMap.get(chId);
+        if (!ch) continue;
+        const isAdded = currentIds.has(chId);
+        grid.appendChild(createCard(ch, isAdded, listEl));
+      }
+
+      panel.appendChild(grid);
+      tabContents.appendChild(panel);
+    }
+  }
+
+  function createCard(ch: LiveChannel, isAdded: boolean, listEl: HTMLElement): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'live-news-manage-card' + (isAdded ? ' added' : '');
+
+    const icon = document.createElement('div');
+    icon.className = 'live-news-manage-card-icon';
+    icon.textContent = channelInitials(ch.name);
+
+    const info = document.createElement('div');
+    info.className = 'live-news-manage-card-info';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'live-news-manage-card-name';
+    nameEl.textContent = ch.name;
+    const handleEl = document.createElement('span');
+    handleEl.className = 'live-news-manage-card-handle';
+    handleEl.textContent = ch.handle;
+    info.appendChild(nameEl);
+    info.appendChild(handleEl);
+
+    const action = document.createElement('span');
+    action.className = 'live-news-manage-card-action';
+    action.textContent = isAdded ? '✓' : '+';
+
+    card.appendChild(icon);
+    card.appendChild(info);
+    card.appendChild(action);
+
+    if (!isAdded) {
+      card.addEventListener('click', () => {
+        if (channels.some((c) => c.id === ch.id)) return;
+        channels.push({ ...ch });
+        saveChannelsToStorage(channels);
+        renderList(listEl);
+      });
+    }
+    return card;
+  }
+
+  // ── Render shell ──
+
   appEl.innerHTML = `
     <div class="live-channels-window-shell">
       <div class="live-channels-window-header">
@@ -285,8 +385,13 @@ export function initLiveChannelsWindow(): void {
           <button type="button" class="live-news-manage-restore-defaults" id="liveChannelsRestoreBtn" style="display: none;">${escapeHtml(t('components.liveNews.restoreDefaults') ?? 'Restore default channels')}</button>
         </div>
         <div class="live-news-manage-list" id="liveChannelsList"></div>
+        <div class="live-news-manage-available-section">
+          <span class="live-news-manage-add-title">${escapeHtml(t('components.liveNews.availableChannels') ?? 'Available channels')}</span>
+          <div class="live-news-manage-tab-bar" id="liveChannelsTabBar"></div>
+          <div class="live-news-manage-tab-contents" id="liveChannelsTabContents"></div>
+        </div>
         <div class="live-news-manage-add-section">
-          <span class="live-news-manage-add-title">${escapeHtml(t('components.liveNews.addChannel') ?? 'Add channel')}</span>
+          <span class="live-news-manage-add-title">${escapeHtml(t('components.liveNews.customChannel') ?? 'Custom channel')}</span>
           <div class="live-news-manage-add">
             <div class="live-news-manage-add-field">
               <label class="live-news-manage-add-label" for="liveChannelsHandle">${escapeHtml(t('components.liveNews.youtubeHandle') ?? 'YouTube handle (e.g. @Channel)')}</label>

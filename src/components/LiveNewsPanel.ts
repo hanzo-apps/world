@@ -74,6 +74,58 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
 ];
 
+// Optional channels users can add from the "Available Channels" tab UI
+export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
+  // North America
+  { id: 'livenow-fox', name: 'LiveNOW from FOX', handle: '@LiveNOWfromFOX' },
+  { id: 'fox-news', name: 'Fox News', handle: '@FoxNews', fallbackVideoId: 'QaftgYkG-ek', useFallbackOnly: true },
+  { id: 'newsmax', name: 'Newsmax', handle: '@NEWSMAX', fallbackVideoId: 'cZikyozILOY', useFallbackOnly: true },
+  { id: 'abc-news', name: 'ABC News', handle: '@ABCNews' },
+  { id: 'cbs-news', name: 'CBS News', handle: '@CBSNews' },
+  { id: 'nbc-news', name: 'NBC News', handle: '@NBCNews' },
+  // Europe
+  { id: 'welt', name: 'WELT', handle: '@WELTNachrichtensender' },
+  { id: 'rtve', name: 'RTVE 24H', handle: '@RTVENoticias', fallbackVideoId: '7_srED6k0bE' },
+  { id: 'trt-haber', name: 'TRT Haber', handle: '@trthaber' },
+  { id: 'ntv-turkey', name: 'NTV', handle: '@NTV' },
+  { id: 'cnn-turk', name: 'CNN TURK', handle: '@cnnturk' },
+  { id: 'tv-rain', name: 'TV Rain', handle: '@tvrain' },
+  // Latin America & Portuguese
+  { id: 'cnn-brasil', name: 'CNN Brasil', handle: '@CNNbrasil', fallbackVideoId: '1kWRw-DA6Ns' },
+  { id: 'jovem-pan', name: 'Jovem Pan News', handle: '@jovempannews' },
+  { id: 'record-news', name: 'Record News', handle: '@recordnewsoficial' },
+  { id: 'band-jornalismo', name: 'Band Jornalismo', handle: '@BandJornalismo' },
+  { id: 'tn-argentina', name: 'TN (Todo Noticias)', handle: '@todonoticias', fallbackVideoId: 'cb12KmMMDJA' },
+  { id: 'c5n', name: 'C5N', handle: '@c5n', fallbackVideoId: 'NdQSOItOQ5Y' },
+  { id: 'milenio', name: 'MILENIO', handle: '@MILENIO' },
+  { id: 'noticias-caracol', name: 'Noticias Caracol', handle: '@NoticiasCaracol' },
+  { id: 'ntn24', name: 'NTN24', handle: '@NTN24' },
+  { id: 't13', name: 'T13', handle: '@T13' },
+  // Asia
+  { id: 'tbs-news', name: 'TBS NEWS DIG', handle: '@tbsnewsdig', fallbackVideoId: 'ohI356mwBp8' },
+  { id: 'ann-news', name: 'ANN News', handle: '@ANNnewsCH' },
+  { id: 'ntv-news', name: 'NTV News (Japan)', handle: '@ntv_news' },
+  { id: 'cti-news', name: 'CTI News (Taiwan)', handle: '@CtiTv', fallbackVideoId: 'wUPPkSANpyo', useFallbackOnly: true },
+  { id: 'wion', name: 'WION', handle: '@WIONews' },
+  { id: 'vtc-now', name: 'VTC NOW', handle: '@VTCNOW' },
+  { id: 'cna-asia', name: 'CNA (NewsAsia)', handle: '@channelnewsasia' },
+  { id: 'nhk-world', name: 'NHK World Japan', handle: '@NHKWORLDJAPAN' },
+  // Africa
+  { id: 'africanews', name: 'Africanews', handle: '@africanews' },
+  { id: 'channels-tv', name: 'Channels TV', handle: '@channelstv' },
+  { id: 'ktn-news', name: 'KTN News', handle: '@KTNNewsKE' },
+  { id: 'enca', name: 'eNCA', handle: '@enewschannel' },
+  { id: 'sabc-news', name: 'SABC News', handle: '@SABCNews' },
+];
+
+export const OPTIONAL_CHANNEL_REGIONS: { key: string; labelKey: string; channelIds: string[] }[] = [
+  { key: 'na', labelKey: 'components.liveNews.regionNorthAmerica', channelIds: ['livenow-fox', 'fox-news', 'newsmax', 'abc-news', 'cbs-news', 'nbc-news'] },
+  { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain'] },
+  { key: 'latam', labelKey: 'components.liveNews.regionLatinAmerica', channelIds: ['cnn-brasil', 'jovem-pan', 'record-news', 'band-jornalismo', 'tn-argentina', 'c5n', 'milenio', 'noticias-caracol', 'ntn24', 't13'] },
+  { key: 'asia', labelKey: 'components.liveNews.regionAsia', channelIds: ['tbs-news', 'ann-news', 'ntv-news', 'cti-news', 'wion', 'vtc-now', 'cna-asia', 'nhk-world'] },
+  { key: 'africa', labelKey: 'components.liveNews.regionAfrica', channelIds: ['africanews', 'channels-tv', 'ktn-news', 'enca', 'sabc-news'] },
+];
+
 const DEFAULT_LIVE_CHANNELS = SITE_VARIANT === 'tech' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
 
 /** Default channel list for the current variant (for restore in channel management). */
@@ -95,6 +147,7 @@ const DEFAULT_STORED: StoredLiveChannels = {
 export const BUILTIN_IDS = new Set([
   ...FULL_LIVE_CHANNELS.map((c) => c.id),
   ...TECH_LIVE_CHANNELS.map((c) => c.id),
+  ...OPTIONAL_LIVE_CHANNELS.map((c) => c.id),
 ]);
 
 export function loadChannelsFromStorage(): LiveChannel[] {
@@ -103,6 +156,7 @@ export function loadChannelsFromStorage(): LiveChannel[] {
   const channelMap = new Map<string, LiveChannel>();
   for (const c of FULL_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
   for (const c of TECH_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
+  for (const c of OPTIONAL_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
   for (const c of stored.custom ?? []) {
     if (c.id && c.handle) channelMap.set(c.id, { ...c });
   }
@@ -123,7 +177,7 @@ export function saveChannelsToStorage(channels: LiveChannel[]): void {
   const order = channels.map((c) => c.id);
   const custom = channels.filter((c) => !BUILTIN_IDS.has(c.id));
   const builtinNames = new Map<string, string>();
-  for (const c of [...FULL_LIVE_CHANNELS, ...TECH_LIVE_CHANNELS]) builtinNames.set(c.id, c.name);
+  for (const c of [...FULL_LIVE_CHANNELS, ...TECH_LIVE_CHANNELS, ...OPTIONAL_LIVE_CHANNELS]) builtinNames.set(c.id, c.name);
   const displayNameOverrides: Record<string, string> = {};
   for (const c of channels) {
     if (builtinNames.has(c.id) && c.name !== builtinNames.get(c.id)) {

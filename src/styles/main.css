@@ -1524,6 +1524,131 @@ canvas,
   margin-top: 20px;
 }
 
+/* Available channels section */
+.live-news-manage-available-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+/* Tab bar */
+.live-news-manage-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+.live-news-manage-tab-bar::-webkit-scrollbar { display: none; }
+.live-news-manage-tab-btn {
+  font-family: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.live-news-manage-tab-btn:hover { color: var(--text-dim); }
+.live-news-manage-tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+/* Tab content panels */
+.live-news-manage-tab-content { display: none; }
+.live-news-manage-tab-content.active { display: block; }
+
+/* 2-column card grid */
+.live-news-manage-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Channel card */
+.live-news-manage-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.live-news-manage-card:hover {
+  border-color: var(--text-faint);
+  background: var(--surface-hover);
+}
+.live-news-manage-card.added {
+  border-color: rgba(68, 255, 136, 0.3);
+  background: rgba(68, 255, 136, 0.05);
+  cursor: default;
+}
+
+/* Card icon (initials) */
+.live-news-manage-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* Card text */
+.live-news-manage-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.live-news-manage-card-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-news-manage-card-handle {
+  font-size: 9px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Add/check indicator */
+.live-news-manage-card-action {
+  font-size: 14px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.live-news-manage-card:hover .live-news-manage-card-action { color: var(--green); }
+.live-news-manage-card.added .live-news-manage-card-action { color: var(--green); }
+
+/* Tab count badge */
+.live-news-manage-tab-count {
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-left: 4px;
+}
+
 .live-offline {
   display: flex;
   flex-direction: column;

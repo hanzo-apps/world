@@ -106,6 +106,8 @@ const ALLOWED_ENV_KEYS = new Set([
   'OLLAMA_API_URL', 'OLLAMA_MODEL', 'WORLDMONITOR_API_KEY',
 ]);
 
+const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -507,6 +509,10 @@ function isAuthFailure(status, text = '') {
   return /unauthori[sz]ed|forbidden|invalid api key|invalid token|bad credentials/i.test(text);
 }
 
+function isCloudflare403(response) {
+  return response.status === 403 && response.headers.get('cf-ray');
+}
+
 async function validateSecretAgainstProvider(key, rawValue, context = {}) {
   const value = String(rawValue || '').trim();
   if (!value) return { valid: false, message: 'Value is required' };
@@ -518,9 +524,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     switch (key) {
     case 'GROQ_API_KEY': {
       const response = await fetchWithTimeout('https://api.groq.com/openai/v1/models', {
-        headers: { Authorization: `Bearer ${value}` },
+        headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('Groq key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('Groq rejected this key');
       if (!response.ok) return fail(`Groq probe failed (${response.status})`);
       return ok('Groq key verified');
@@ -528,9 +535,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
 
     case 'OPENROUTER_API_KEY': {
       const response = await fetchWithTimeout('https://openrouter.ai/api/v1/models', {
-        headers: { Authorization: `Bearer ${value}` },
+        headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('OpenRouter key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('OpenRouter rejected this key');
       if (!response.ok) return fail(`OpenRouter probe failed (${response.status})`);
       return ok('OpenRouter key verified');
@@ -539,7 +547,7 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     case 'FRED_API_KEY': {
       const response = await fetchWithTimeout(
         `https://api.stlouisfed.org/fred/series?series_id=GDP&api_key=${encodeURIComponent(value)}&file_type=json`,
-        { headers: { Accept: 'application/json' } }
+        { headers: { Accept: 'application/json', 'User-Agent': CHROME_UA } }
       );
       const text = await response.text();
       if (!response.ok) return fail(`FRED probe failed (${response.status})`);
@@ -553,9 +561,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     case 'EIA_API_KEY': {
       const response = await fetchWithTimeout(
         `https://api.eia.gov/v2/?api_key=${encodeURIComponent(value)}`,
-        { headers: { Accept: 'application/json' } }
+        { headers: { Accept: 'application/json', 'User-Agent': CHROME_UA } }
       );
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('EIA key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('EIA rejected this key');
       if (!response.ok) return fail(`EIA probe failed (${response.status})`);
       let payload = null;
@@ -567,9 +576,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     case 'CLOUDFLARE_API_TOKEN': {
       const response = await fetchWithTimeout(
         'https://api.cloudflare.com/client/v4/radar/annotations/outages?dateRange=1d&limit=1',
-        { headers: { Authorization: `Bearer ${value}` } }
+        { headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA } }
       );
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('Cloudflare token stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('Cloudflare rejected this token');
       if (!response.ok) return fail(`Cloudflare probe failed (${response.status})`);
       let payload = null;
@@ -583,9 +593,11 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${value}`,
+          'User-Agent': CHROME_UA,
         },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('ACLED token stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('ACLED rejected this token');
       if (!response.ok) return fail(`ACLED probe failed (${response.status})`);
       return ok('ACLED token verified');
@@ -596,9 +608,11 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         headers: {
           Accept: 'application/json',
           'Auth-Key': value,
+          'User-Agent': CHROME_UA,
         },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('URLhaus key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('URLhaus rejected this key');
       if (!response.ok) return fail(`URLhaus probe failed (${response.status})`);
       return ok('URLhaus key verified');
@@ -609,9 +623,11 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         headers: {
           Accept: 'application/json',
           'X-OTX-API-KEY': value,
+          'User-Agent': CHROME_UA,
         },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('OTX key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('OTX rejected this key');
       if (!response.ok) return fail(`OTX probe failed (${response.status})`);
       return ok('OTX key verified');
@@ -622,9 +638,11 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         headers: {
           Accept: 'application/json',
           Key: value,
+          'User-Agent': CHROME_UA,
         },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('AbuseIPDB key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('AbuseIPDB rejected this key');
       if (!response.ok) return fail(`AbuseIPDB probe failed (${response.status})`);
       return ok('AbuseIPDB key verified');
@@ -635,9 +653,11 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         headers: {
           Accept: 'application/json',
           'x-api-key': value,
+          'User-Agent': CHROME_UA,
         },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('Wingbits key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('Wingbits rejected this key');
       if (response.status >= 500) return fail(`Wingbits probe failed (${response.status})`);
       return ok('Wingbits key accepted');
@@ -645,9 +665,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
 
     case 'FINNHUB_API_KEY': {
       const response = await fetchWithTimeout(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${encodeURIComponent(value)}`, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
       });
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('Finnhub key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('Finnhub rejected this key');
       if (response.status === 429) return ok('Finnhub key accepted (rate limited)');
       if (!response.ok) return fail(`Finnhub probe failed (${response.status})`);
@@ -663,9 +684,10 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
     case 'NASA_FIRMS_API_KEY': {
       const response = await fetchWithTimeout(
         `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(value)}/VIIRS_SNPP_NRT/22,44,40,53/1`,
-        { headers: { Accept: 'text/csv' } }
+        { headers: { Accept: 'text/csv', 'User-Agent': CHROME_UA } }
       );
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('NASA FIRMS key stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('NASA FIRMS rejected this key');
       if (!response.ok) return fail(`NASA FIRMS probe failed (${response.status})`);
       if (/invalid api key|not authorized|forbidden/i.test(text)) return fail('NASA FIRMS rejected this key');
@@ -732,11 +754,12 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
         'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': CHROME_UA },
           body,
         }
       );
       const text = await response.text();
+      if (isCloudflare403(response)) return ok('OpenSky credentials stored (Cloudflare blocked verification)');
       if (isAuthFailure(response.status, text)) return fail('OpenSky rejected these credentials');
       if (!response.ok) return fail(`OpenSky auth probe failed (${response.status})`);
       let payload = null;
@@ -845,7 +868,7 @@ async function dispatch(requestUrl, req, routes, context) {
       const parsed = new URL(feedUrl);
       const response = await fetchWithTimeout(feedUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': CHROME_UA,
           'Accept': 'application/rss+xml, application/xml, text/xml, */*',
           'Accept-Language': 'en-US,en;q=0.9',
         },
