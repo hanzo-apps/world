@@ -89,7 +89,38 @@
     "filterSources": "Kaynaklari filtrele...",
     "sourcesEnabled": "{{enabled}}/{{total}} aktif",
     "finance": "FINANS",
-    "toggleTheme": "Koyu/acik tema degistir"
+    "toggleTheme": "Koyu/acik tema degistir",
+    "panelDisplayCaption": "Gösterge panelinde hangi panellerin gösterileceğini seçin",
+    "tabGeneral": "Genel",
+    "tabPanels": "Paneller",
+    "tabSources": "Kaynaklar",
+    "languageLabel": "Dil",
+    "sourceRegionAll": "Tümü",
+    "sourceRegionWorldwide": "Dünya",
+    "sourceRegionUS": "ABD",
+    "sourceRegionMiddleEast": "Orta Doğu",
+    "sourceRegionAfrica": "Afrika",
+    "sourceRegionLatAm": "Latin Amerika",
+    "sourceRegionAsiaPacific": "Asya-Pasifik",
+    "sourceRegionEurope": "Avrupa",
+    "sourceRegionTopical": "Tematik",
+    "sourceRegionIntel": "İstihbarat",
+    "sourceRegionTechNews": "Tech News",
+    "sourceRegionAiMl": "AI & ML",
+    "sourceRegionStartupsVc": "Startups & VC",
+    "sourceRegionRegionalTech": "Regional Ecosystems",
+    "sourceRegionDeveloper": "Developer",
+    "sourceRegionCybersecurity": "Cybersecurity",
+    "sourceRegionTechPolicy": "Policy & Research",
+    "sourceRegionTechMedia": "Media & Podcasts",
+    "sourceRegionMarkets": "Markets & Analysis",
+    "sourceRegionFixedIncomeFx": "Fixed Income & FX",
+    "sourceRegionCommodities": "Commodities",
+    "sourceRegionCryptoDigital": "Crypto & Digital",
+    "sourceRegionCentralBanks": "Central Banks & Economy",
+    "sourceRegionDeals": "Deals & Corporate",
+    "sourceRegionFinRegulation": "Financial Regulation",
+    "sourceRegionGulfMena": "Gulf & MENA"
   },
   "panels": {
     "liveNews": "Canli Haberler",
@@ -106,6 +137,8 @@
     "gdeltIntel": "Canli Istihbarat",
     "cascade": "Altyapi Domino Etkisi",
     "politics": "Dunya Haberleri",
+    "us": "ABD",
+    "europe": "Avrupa",
     "middleeast": "Orta Dogu",
     "africa": "Afrika",
     "latam": "Latin Amerika",
@@ -810,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "AI Analiz Ayarlari",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "Bulut AI (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Basliklari AI ozetleme icin buluta gonder (onerilen)",
       "aiFlowBrowserLabel": "Tarayici Yerel Modeli",
@@ -824,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "Yalnizca tarayici modeli",
       "aiFlowStatusDisabled": "Etkinlestirilmis AI saglayici yok",
       "insightsDisabledTitle": "AI analizi devre disi",
-      "insightsDisabledHint": "Yukaridaki ⚙ dugmesiyle saglayicilari etkinlestirin"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "Ulke etkisi tespit edilmedi",
@@ -1036,8 +1074,7 @@
         "minutesAgo": "{{count}}dk once",
         "hoursAgo": "{{count}}sa once",
         "daysAgo": "{{count}}g once"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "simdi",
@@ -1187,7 +1224,14 @@
       "cancel": "İptal",
       "confirmDelete": "Bu kanal silinsin mi?",
       "confirmTitle": "Onayla",
-      "restoreDefaults": "Varsayılan kanalları geri yükle"
+      "restoreDefaults": "Varsayılan kanalları geri yükle",
+      "availableChannels": "Mevcut kanallar",
+      "customChannel": "Özel kanal",
+      "regionNorthAmerica": "Kuzey Amerika",
+      "regionEurope": "Avrupa",
+      "regionLatinAmerica": "Latin Amerika",
+      "regionAsia": "Asya",
+      "regionAfrica": "Afrika"
     }
   },
   "popups": {

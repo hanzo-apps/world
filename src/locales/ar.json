@@ -89,7 +89,38 @@
     "filterSources": "تصفية المصادر...",
     "sourcesEnabled": "{{enabled}}/{{total}} مفعّلة",
     "finance": "المالية",
-    "toggleTheme": "تبديل الوضع الداكن/الفاتح"
+    "toggleTheme": "تبديل الوضع الداكن/الفاتح",
+    "panelDisplayCaption": "اختر اللوحات التي تريد عرضها على لوحة المعلومات",
+    "tabGeneral": "عام",
+    "tabPanels": "اللوحات",
+    "tabSources": "المصادر",
+    "languageLabel": "اللغة",
+    "sourceRegionAll": "الكل",
+    "sourceRegionWorldwide": "عالمي",
+    "sourceRegionUS": "الولايات المتحدة",
+    "sourceRegionMiddleEast": "الشرق الأوسط",
+    "sourceRegionAfrica": "أفريقيا",
+    "sourceRegionLatAm": "أمريكا اللاتينية",
+    "sourceRegionAsiaPacific": "آسيا والمحيط الهادئ",
+    "sourceRegionEurope": "أوروبا",
+    "sourceRegionTopical": "موضوعي",
+    "sourceRegionIntel": "استخبارات",
+    "sourceRegionTechNews": "أخبار التقنية",
+    "sourceRegionAiMl": "الذكاء الاصطناعي",
+    "sourceRegionStartupsVc": "الشركات الناشئة",
+    "sourceRegionRegionalTech": "النظم الإقليمية",
+    "sourceRegionDeveloper": "المطورين",
+    "sourceRegionCybersecurity": "الأمن السيبراني",
+    "sourceRegionTechPolicy": "السياسات والأبحاث",
+    "sourceRegionTechMedia": "الإعلام والبودكاست",
+    "sourceRegionMarkets": "الأسواق والتحليل",
+    "sourceRegionFixedIncomeFx": "الدخل الثابت والعملات",
+    "sourceRegionCommodities": "السلع",
+    "sourceRegionCryptoDigital": "العملات الرقمية",
+    "sourceRegionCentralBanks": "البنوك المركزية والاقتصاد",
+    "sourceRegionDeals": "الصفقات والشركات",
+    "sourceRegionFinRegulation": "التنظيم المالي",
+    "sourceRegionGulfMena": "الخليج والشرق الأوسط"
   },
   "panels": {
     "liveNews": "أخبار مباشرة",
@@ -106,6 +137,8 @@
     "gdeltIntel": "استخبارات مباشرة",
     "cascade": "تأثير متتالي للبنية التحتية",
     "politics": "أخبار العالم",
+    "us": "الولايات المتحدة",
+    "europe": "أوروبا",
     "middleeast": "الشرق الأوسط",
     "africa": "أفريقيا",
     "latam": "أمريكا اللاتينية",
@@ -810,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "إعدادات تحليل الذكاء الاصطناعي",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "Cloud AI (Groq & OpenRouter)",
       "aiFlowCloudDesc": "إرسال العناوين إلى السحابة لتلخيص الذكاء الاصطناعي (موصى به)",
       "aiFlowBrowserLabel": "نموذج محلي في المتصفح",
@@ -824,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "نموذج المتصفح فقط",
       "aiFlowStatusDisabled": "لا يوجد مزود ذكاء اصطناعي مفعّل",
       "insightsDisabledTitle": "تحليل الذكاء الاصطناعي معطّل",
-      "insightsDisabledHint": "قم بتفعيل المزودين باستخدام زر ⚙ أعلاه"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "لم يتم رصد تأثيرات على الدول",
@@ -1036,8 +1074,7 @@
         "minutesAgo": "{{count}}د مضت",
         "hoursAgo": "{{count}}س مضت",
         "daysAgo": "{{count}}ي مضت"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "الآن",
@@ -1187,7 +1224,14 @@
       "cancel": "إلغاء",
       "confirmDelete": "حذف هذه القناة؟",
       "confirmTitle": "تأكيد",
-      "restoreDefaults": "استعادة القنوات الافتراضية"
+      "restoreDefaults": "استعادة القنوات الافتراضية",
+      "availableChannels": "القنوات المتاحة",
+      "customChannel": "قناة مخصصة",
+      "regionNorthAmerica": "أمريكا الشمالية",
+      "regionEurope": "أوروبا",
+      "regionLatinAmerica": "أمريكا اللاتينية",
+      "regionAsia": "آسيا",
+      "regionAfrica": "أفريقيا"
     }
   },
   "popups": {

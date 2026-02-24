@@ -3,7 +3,7 @@ import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
 import { loadFromStorage, saveToStorage } from '@/utils';
-import { STORAGE_KEYS } from '@/config';
+import { STORAGE_KEYS, SITE_VARIANT } from '@/config';
 
 // YouTube IFrame Player API types
 type YouTubePlayer = {
@@ -52,7 +52,6 @@ export interface LiveChannel {
   useFallbackOnly?: boolean; // Skip auto-detection, always use fallback
 }
 
-const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
 
 // Full variant: World news channels (24/7 live streams)
 const FULL_LIVE_CHANNELS: LiveChannel[] = [

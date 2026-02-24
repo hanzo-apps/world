@@ -89,7 +89,38 @@
     "filterSources": "Фильтр источников...",
     "sourcesEnabled": "{{enabled}}/{{total}} включено",
     "finance": "ФИНАНСЫ",
-    "toggleTheme": "Переключить тёмную/светлую тему"
+    "toggleTheme": "Переключить тёмную/светлую тему",
+    "panelDisplayCaption": "Выберите панели для отображения на панели управления",
+    "tabGeneral": "Общее",
+    "tabPanels": "Панели",
+    "tabSources": "Источники",
+    "languageLabel": "Язык",
+    "sourceRegionAll": "Все",
+    "sourceRegionWorldwide": "Мировые",
+    "sourceRegionUS": "США",
+    "sourceRegionMiddleEast": "Ближний Восток",
+    "sourceRegionAfrica": "Африка",
+    "sourceRegionLatAm": "Латинская Америка",
+    "sourceRegionAsiaPacific": "Азиатско-Тихоокеанский",
+    "sourceRegionEurope": "Европа",
+    "sourceRegionTopical": "Тематические",
+    "sourceRegionIntel": "Разведка",
+    "sourceRegionTechNews": "Тех-новости",
+    "sourceRegionAiMl": "ИИ и МО",
+    "sourceRegionStartupsVc": "Стартапы и ВК",
+    "sourceRegionRegionalTech": "Региональные экосистемы",
+    "sourceRegionDeveloper": "Разработчики",
+    "sourceRegionCybersecurity": "Кибербезопасность",
+    "sourceRegionTechPolicy": "Политика и исследования",
+    "sourceRegionTechMedia": "Медиа и подкасты",
+    "sourceRegionMarkets": "Рынки и аналитика",
+    "sourceRegionFixedIncomeFx": "Облигации и валюты",
+    "sourceRegionCommodities": "Сырьё",
+    "sourceRegionCryptoDigital": "Крипто и цифровое",
+    "sourceRegionCentralBanks": "Центробанки и экономика",
+    "sourceRegionDeals": "Сделки и корпорации",
+    "sourceRegionFinRegulation": "Финансовое регулирование",
+    "sourceRegionGulfMena": "Залив и БВСА"
   },
   "panels": {
     "liveNews": "Новости в реальном времени",
@@ -106,6 +137,8 @@
     "gdeltIntel": "Оперативная разведка",
     "cascade": "Каскад инфраструктуры",
     "politics": "Мировые новости",
+    "us": "США",
+    "europe": "Европа",
     "middleeast": "Ближний Восток",
     "africa": "Африка",
     "latam": "Латинская Америка",
@@ -810,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "Настройки анализа ИИ",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "Облачный ИИ (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Отправлять заголовки в облако для ИИ-суммирования (рекомендуется)",
       "aiFlowBrowserLabel": "Локальная модель браузера",
@@ -824,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "Только модель браузера",
       "aiFlowStatusDisabled": "Нет включённых провайдеров ИИ",
       "insightsDisabledTitle": "Анализ ИИ отключён",
-      "insightsDisabledHint": "Включите провайдеров с помощью кнопки ⚙ выше"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "Воздействие на страны не обнаружено",
@@ -1069,8 +1107,7 @@
         "minutesAgo": "{{count}}м назад",
         "hoursAgo": "{{count}}ч назад",
         "daysAgo": "{{count}}д назад"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "сейчас",
@@ -1187,7 +1224,14 @@
       "cancel": "Отмена",
       "confirmDelete": "Удалить этот канал?",
       "confirmTitle": "Подтверждение",
-      "restoreDefaults": "Восстановить каналы по умолчанию"
+      "restoreDefaults": "Восстановить каналы по умолчанию",
+      "availableChannels": "Доступные каналы",
+      "customChannel": "Пользовательский канал",
+      "regionNorthAmerica": "Северная Америка",
+      "regionEurope": "Европа",
+      "regionLatinAmerica": "Латинская Америка",
+      "regionAsia": "Азия",
+      "regionAfrica": "Африка"
     }
   },
   "popups": {
