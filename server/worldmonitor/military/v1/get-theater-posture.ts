@@ -29,6 +29,20 @@ const BACKUP_TTL = 604800;
 // Flight fetching (OpenSky + Wingbits fallback)
 // ========================================================================
 
+function getRelayRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'User-Agent': CHROME_UA,
+  };
+  const relaySecret = process.env.RELAY_SHARED_SECRET;
+  if (relaySecret) {
+    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+    headers.Authorization = `Bearer ${relaySecret}`;
+  }
+  return headers;
+}
+
 async function fetchMilitaryFlightsFromOpenSky(): Promise<RawFlight[]> {
   const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
   const baseUrl = isSidecar
@@ -38,7 +52,7 @@ async function fetchMilitaryFlightsFromOpenSky(): Promise<RawFlight[]> {
   if (!baseUrl) return [];
 
   const resp = await fetch(baseUrl, {
-    headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+    headers: getRelayRequestHeaders(),
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
   if (!resp.ok) throw new Error(`OpenSky API error: ${resp.status}`);

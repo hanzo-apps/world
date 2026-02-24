@@ -26,6 +26,20 @@ function getRelayBaseUrl(): string | null {
     .replace(/\/$/, '');
 }
 
+function getRelayRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'User-Agent': CHROME_UA,
+  };
+  const relaySecret = process.env.RELAY_SHARED_SECRET;
+  if (relaySecret) {
+    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+    headers.Authorization = `Bearer ${relaySecret}`;
+  }
+  return headers;
+}
+
 const DISRUPTION_TYPE_MAP: Record<string, AisDisruptionType> = {
   gap_spike: 'AIS_DISRUPTION_TYPE_GAP_SPIKE',
   chokepoint_congestion: 'AIS_DISRUPTION_TYPE_CHOKEPOINT_CONGESTION',
@@ -76,7 +90,7 @@ async function fetchVesselSnapshotFromRelay(): Promise<VesselSnapshot | undefine
     const response = await fetch(
       `${relayBaseUrl}/ais/snapshot?candidates=false`,
       {
-        headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+        headers: getRelayRequestHeaders(),
         signal: AbortSignal.timeout(10000),
       },
     );

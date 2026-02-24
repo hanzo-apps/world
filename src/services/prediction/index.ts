@@ -37,11 +37,13 @@ interface PolymarketEvent {
 // Internal constants and state
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 
-// Railway relay URL for Polymarket proxy (Cloudflare JA3 blocks Vercel)
+// Polymarket proxy URL (Vercel server route injects Railway secret server-side)
+const POLYMARKET_PROXY_URL = '/api/polymarket';
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_POLY_URL = wsRelayUrl
+const DIRECT_RAILWAY_POLY_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/polymarket'
   : '';
+const isLocalhostRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const breaker = createCircuitBreaker<PredictionMarket[]>({ name: 'Polymarket' });
 
@@ -128,10 +130,19 @@ async function polyFetch(endpoint: 'events' | 'markets', params: Record<string, 
   }
   const proxyQs = new URLSearchParams(proxyParams).toString();
 
-  // Try Railway relay (different IP/TLS fingerprint than Vercel)
-  if (RAILWAY_POLY_URL) {
+  // Try Vercel proxy first; it forwards to Railway with server-side auth headers.
+  try {
+    const resp = await fetch(`${POLYMARKET_PROXY_URL}?${proxyQs}`);
+    if (resp.ok) {
+      const data = await resp.clone().json();
+      if (Array.isArray(data) && data.length > 0) return resp;
+    }
+  } catch { /* Proxy unavailable */ }
+
+  // Local development fallback: allow direct Railway requests.
+  if (isLocalhostRuntime && DIRECT_RAILWAY_POLY_URL) {
     try {
-      const resp = await fetch(`${RAILWAY_POLY_URL}?${proxyQs}`);
+      const resp = await fetch(`${DIRECT_RAILWAY_POLY_URL}?${proxyQs}`);
       if (resp.ok) {
         const data = await resp.clone().json();
         if (Array.isArray(data) && data.length > 0) return resp;
@@ -164,8 +175,8 @@ async function polyFetch(endpoint: 'events' | 'markets', params: Record<string, 
     }
   } catch { /* sebuf handler failed (Cloudflare expected) */ }
 
-  // Final fallback: hit production endpoint directly
-  return fetch(`https://worldmonitor.app/api/polymarket?${proxyQs}`);
+  // Final fallback: same-origin proxy
+  return fetch(`${POLYMARKET_PROXY_URL}?${proxyQs}`);
 }
 
 const GEOPOLITICAL_TAGS = [
