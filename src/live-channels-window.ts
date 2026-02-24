@@ -26,70 +26,6 @@ function customChannelIdFromHandle(handle: string): string {
   return 'custom-' + normalized;
 }
 
-function showConfirmModal(options: {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}): void {
-  const { title, message, confirmLabel, cancelLabel, onConfirm, onCancel } = options;
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.innerHTML = `
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title"></span>
-        <button type="button" class="modal-close">×</button>
-      </div>
-      <p class="confirm-modal-message"></p>
-      <div class="confirm-modal-actions">
-        <button type="button" class="live-news-manage-cancel confirm-modal-cancel"></button>
-        <button type="button" class="live-news-manage-remove confirm-modal-confirm"></button>
-      </div>
-    </div>
-  `;
-  const titleEl = overlay.querySelector('.modal-title');
-  const messageEl = overlay.querySelector('.confirm-modal-message');
-  const cancelBtn = overlay.querySelector('.confirm-modal-cancel') as HTMLButtonElement | null;
-  const confirmBtn = overlay.querySelector('.confirm-modal-confirm') as HTMLButtonElement | null;
-  const closeBtn = overlay.querySelector('.modal-close') as HTMLButtonElement | null;
-  if (titleEl) titleEl.textContent = title;
-  if (messageEl) messageEl.textContent = message;
-  if (cancelBtn) cancelBtn.textContent = cancelLabel;
-  if (confirmBtn) confirmBtn.textContent = confirmLabel;
-  if (closeBtn) closeBtn.setAttribute('aria-label', t('common.close') ?? 'Close');
-
-  const close = () => {
-    overlay.remove();
-  };
-  const doConfirm = () => {
-    close();
-    onConfirm();
-  };
-  overlay.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).classList.contains('modal-overlay')) {
-      close();
-      onCancel();
-    }
-  });
-  closeBtn?.addEventListener('click', () => {
-    close();
-    onCancel();
-  });
-  cancelBtn?.addEventListener('click', () => {
-    close();
-    onCancel();
-  });
-  confirmBtn?.addEventListener('click', () => {
-    doConfirm();
-  });
-  document.body.appendChild(overlay);
-  overlay.classList.add('active');
-}
-
 // Persist active region tab across re-renders
 let activeRegionTab = OPTIONAL_CHANNEL_REGIONS[0]?.key ?? 'na';
 
@@ -101,11 +37,13 @@ function channelInitials(name: string): string {
   return name.split(/[\s-]+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
 
-export function initLiveChannelsWindow(): void {
-  const appEl = document.getElementById('app');
+export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
+  const appEl = containerEl ?? document.getElementById('app');
   if (!appEl) return;
 
-  document.title = `${t('components.liveNews.manage') ?? 'Channel management'} - World Monitor`;
+  if (!containerEl) {
+    document.title = `${t('components.liveNews.manage') ?? 'Channel management'} - World Monitor`;
+  }
 
   let channels = loadChannelsFromStorage();
 
@@ -250,18 +188,9 @@ export function initLiveChannelsWindow(): void {
     removeBtn.className = 'live-news-manage-remove live-news-manage-remove-in-form';
     removeBtn.textContent = t('components.liveNews.remove') ?? 'Remove';
     removeBtn.addEventListener('click', () => {
-      showConfirmModal({
-        title: t('components.liveNews.confirmTitle') ?? 'Confirm',
-        message: t('components.liveNews.confirmDelete') ?? 'Delete this channel?',
-        cancelLabel: t('components.liveNews.cancel') ?? 'Cancel',
-        confirmLabel: t('components.liveNews.remove') ?? 'Remove',
-        onCancel: () => {},
-        onConfirm: () => {
-          channels = channels.filter((c) => c.id !== ch.id);
-          saveChannelsToStorage(channels);
-          renderList(listEl);
-        },
-      });
+      channels = channels.filter((c) => c.id !== ch.id);
+      saveChannelsToStorage(channels);
+      renderList(listEl);
     });
     row.appendChild(removeBtn);
 

@@ -1528,6 +1528,54 @@ canvas,
   margin-top: 20px;
 }
 
+/* Channel management modal overlay */
+.live-channels-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.live-channels-modal-overlay.active {
+  opacity: 1;
+}
+.live-channels-modal {
+  position: relative;
+  width: 680px;
+  max-width: 95vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.live-channels-modal .live-channels-window-shell {
+  min-height: auto;
+}
+.live-channels-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.live-channels-modal-close:hover {
+  color: var(--text);
+  background: var(--darken);
+}
+
 /* Available channels section */
 .live-news-manage-available-section {
   border-top: 1px solid var(--border);
