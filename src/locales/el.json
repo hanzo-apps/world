@@ -50,6 +50,29 @@
       "base": "Στρατιωτικές Βάσεις",
       "nuclear": "Πυρηνικές Εγκαταστάσεις",
       "port": "Λιμάνια"
+    },
+    "levels": {
+      "critical": "Κρίσιμο",
+      "high": "Υψηλό",
+      "elevated": "Αυξημένο",
+      "moderate": "Μέτριο",
+      "normal": "Κανονικό",
+      "low": "Χαμηλό"
+    },
+    "trends": {
+      "rising": "Ανοδικά",
+      "falling": "Πτωτικά",
+      "stable": "Σταθερό"
+    },
+    "fallback": {
+      "instabilityIndex": "**Δείκτης Αστάθειας: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "{{count}} ενεργές διαμαρτυρίες ανιχνεύθηκαν",
+      "aircraftTracked": "{{count}} στρατιωτικά αεροσκάφη παρακολουθούνται",
+      "vesselsTracked": "{{count}} στρατιωτικά πλοία παρακολουθούνται",
+      "internetOutages": "{{count}} διακοπές διαδικτύου",
+      "recentEarthquakes": "{{count}} πρόσφατοι σεισμοί",
+      "stockIndex": "Χρηματιστηριακός δείκτης: {{value}}",
+      "recentHeadlines": "**Πρόσφατοι τίτλοι:**"
     }
   },
   "header": {
@@ -1807,6 +1830,7 @@
     "information": "Πληροφορίες",
     "shareStory": "Κοινοποίηση ιστορίας",
     "exportImage": "Εξαγωγή Εικόνας",
+    "exportPdf": "Εξαγωγή PDF",
     "new": "ΝΕΟ",
     "live": "ΖΩΝΤΑΝΑ",
     "cached": "ΑΠΟΘΗΚΕΥΜΕΝΟ",
