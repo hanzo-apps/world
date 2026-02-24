@@ -217,6 +217,7 @@ export class LiveNewsPanel extends Panel {
   private useDesktopEmbedProxy = false;
   private desktopEmbedIframe: HTMLIFrameElement | null = null;
   private desktopEmbedRenderToken = 0;
+  private suppressChannelClick = false;
   private boundMessageHandler!: (e: MessageEvent) => void;
   private muteSyncInterval: ReturnType<typeof setInterval> | null = null;
   private static readonly MUTE_SYNC_POLL_MS = 500;
@@ -465,6 +466,11 @@ export class LiveNewsPanel extends Panel {
     btn.textContent = channel.name;
     btn.style.cursor = 'grab';
     btn.addEventListener('click', (e) => {
+      if (this.suppressChannelClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.preventDefault();
       this.switchChannel(channel);
     });
@@ -489,6 +495,7 @@ export class LiveNewsPanel extends Panel {
       if (e.button !== 0) return;
       const btn = (e.target as HTMLElement).closest('.live-channel-btn') as HTMLElement | null;
       if (!btn) return;
+      this.suppressChannelClick = false;
       dragging = btn;
       dragStarted = false;
       startX = e.clientX;
@@ -520,6 +527,10 @@ export class LiveNewsPanel extends Panel {
       if (dragStarted) {
         dragging.classList.remove('live-channel-dragging');
         this.applyChannelOrderFromDom();
+        this.suppressChannelClick = true;
+        setTimeout(() => {
+          this.suppressChannelClick = false;
+        }, 0);
       }
       dragging = null;
       dragStarted = false;
