@@ -11925,6 +11925,27 @@ a.prediction-link:hover {
   display: none;
 }
 
+/* Map tile attribution */
+.map-attribution {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
+  color: var(--text-dim);
+  opacity: 0.6;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.map-attribution a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.map-attribution a:hover {
+  text-decoration: underline;
+}
+
 /* deck.gl mode indicator */
 .map-container.deckgl-mode::after {
   content: 'WebGL';
