@@ -1016,8 +1016,8 @@ async function handleUcdpEventsRequest(req, res) {
 const openskyResponseCache = new Map(); // key: sorted query params → { data, gzip, timestamp }
 const openskyNegativeCache = new Map(); // key: cacheKey → { status, timestamp, body, gzip } — prevents retry storms on 429/5xx
 const openskyInFlight = new Map(); // key: cacheKey → Promise (dedup concurrent requests)
-const OPENSKY_CACHE_TTL_MS = 30 * 1000; // 30s — OpenSky updates every ~10s but 58 clients hammer it
-const OPENSKY_NEGATIVE_CACHE_TTL_MS = 30 * 1000; // 30s — cache 429/5xx to stop thundering herd
+const OPENSKY_CACHE_TTL_MS = Number(process.env.OPENSKY_CACHE_TTL_MS) || 60 * 1000; // 60s default — env-configurable
+const OPENSKY_NEGATIVE_CACHE_TTL_MS = Number(process.env.OPENSKY_NEGATIVE_CACHE_TTL_MS) || 30 * 1000; // 30s — env-configurable
 const OPENSKY_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENSKY_CACHE_MAX_ENTRIES || 128));
 const OPENSKY_NEGATIVE_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENSKY_NEGATIVE_CACHE_MAX_ENTRIES || 256));
 const OPENSKY_BBOX_QUANT_STEP = Number.isFinite(Number(process.env.OPENSKY_BBOX_QUANT_STEP))
