@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import http, { createServer } from 'node:http';
 import https from 'node:https';
+import dns from 'node:dns/promises';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
@@ -107,6 +108,97 @@ const ALLOWED_ENV_KEYS = new Set([
 ]);
 
 const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+// ── SSRF protection ──────────────────────────────────────────────────────
+// Block requests to private/reserved IP ranges to prevent the RSS proxy
+// from being used as a localhost pivot or internal network scanner.
+
+function isPrivateIP(ip) {
+  // IPv4-mapped IPv6 — extract the v4 portion
+  const v4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  const addr = v4Mapped ? v4Mapped[1] : ip;
+
+  // IPv6 loopback
+  if (addr === '::1' || addr === '::') return true;
+
+  // IPv6 link-local / unique-local
+  if (/^f[cd][0-9a-f]{2}:/i.test(addr)) return true; // fc00::/7 (ULA)
+  if (/^fe[89ab][0-9a-f]:/i.test(addr)) return true;  // fe80::/10 (link-local)
+
+  const parts = addr.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(p => isNaN(p))) return false; // not an IPv4
+
+  const [a, b] = parts;
+  if (a === 127) return true;                       // 127.0.0.0/8  loopback
+  if (a === 10) return true;                        // 10.0.0.0/8   private
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 private
+  if (a === 192 && b === 168) return true;           // 192.168.0.0/16 private
+  if (a === 169 && b === 254) return true;           // 169.254.0.0/16 link-local
+  if (a === 0) return true;                          // 0.0.0.0/8
+  if (a >= 224) return true;                         // 224.0.0.0+ multicast/reserved
+  return false;
+}
+
+async function isSafeUrl(urlString) {
+  let parsed;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    return { safe: false, reason: 'Invalid URL' };
+  }
+
+  // Only allow http(s) protocols
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { safe: false, reason: 'Only http and https protocols are allowed' };
+  }
+
+  // Block URLs with credentials
+  if (parsed.username || parsed.password) {
+    return { safe: false, reason: 'URLs with credentials are not allowed' };
+  }
+
+  const hostname = parsed.hostname;
+
+  // Quick-reject obvious private hostnames before DNS resolution
+  if (hostname === 'localhost' || hostname === '[::1]') {
+    return { safe: false, reason: 'Requests to localhost are not allowed' };
+  }
+
+  // Check if the hostname is already an IP literal
+  const ipLiteral = hostname.replace(/^\[|\]$/g, '');
+  if (isPrivateIP(ipLiteral)) {
+    return { safe: false, reason: 'Requests to private/reserved IP addresses are not allowed' };
+  }
+
+  // DNS resolution check — resolve the hostname and verify all resolved IPs
+  // are public. This prevents DNS rebinding attacks where a public domain
+  // resolves to a private IP.
+  try {
+    let addresses = [];
+    try {
+      const v4 = await dns.resolve4(hostname);
+      addresses = addresses.concat(v4);
+    } catch { /* no A records — try AAAA */ }
+    try {
+      const v6 = await dns.resolve6(hostname);
+      addresses = addresses.concat(v6);
+    } catch { /* no AAAA records */ }
+
+    if (addresses.length === 0) {
+      return { safe: false, reason: 'Could not resolve hostname' };
+    }
+
+    for (const addr of addresses) {
+      if (isPrivateIP(addr)) {
+        return { safe: false, reason: 'Hostname resolves to a private/reserved IP address' };
+      }
+    }
+  } catch {
+    return { safe: false, reason: 'DNS resolution failed' };
+  }
+
+  return { safe: true, resolvedAddresses: addresses };
+}
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -427,7 +519,10 @@ const SIDECAR_ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
-  /^https:\/\/(.*\.)?worldmonitor\.app$/,
+  // Only allow exact domain or single-level subdomains (e.g. preview-xyz.worldmonitor.app).
+  // The previous (.*\.)? pattern was overly broad. Anchored to prevent spoofing
+  // via domains like worldmonitorEVIL.vercel.app.
+  /^https:\/\/([a-z0-9-]+\.)?worldmonitor\.app$/,
 ];
 
 function getSidecarCorsOrigin(req) {
@@ -460,6 +555,11 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
         headers: options.headers || {},
         family: 4,
       };
+      // Pin to a pre-resolved IP to prevent TOCTOU DNS rebinding.
+      // The hostname is kept for SNI / TLS certificate validation.
+      if (options.resolvedAddress) {
+        reqOpts.lookup = (_hostname, _opts, cb) => cb(null, options.resolvedAddress, 4);
+      }
       const req = https.request(reqOpts, (res) => {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
@@ -484,10 +584,20 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
     });
   }
   // HTTP fallback (localhost sidecar, etc.)
+  // For pinned addresses on plain HTTP, rewrite the URL to connect to the
+  // validated IP and set the Host header so virtual-host routing still works.
+  let fetchUrl = url;
+  const fetchHeaders = { ...(options.headers || {}) };
+  if (options.resolvedAddress && u.protocol === 'http:') {
+    const pinned = new URL(url);
+    fetchHeaders['Host'] = pinned.host;
+    pinned.hostname = options.resolvedAddress;
+    fetchUrl = pinned.toString();
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(fetchUrl, { ...options, headers: fetchHeaders, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -802,11 +912,24 @@ async function dispatch(requestUrl, req, routes, context) {
     return new Response(null, { status: 204, headers: makeCorsHeaders(req) });
   }
 
+  // Health check — exempt from auth to support external monitoring tools
   if (requestUrl.pathname === '/api/service-status') {
     return handleLocalServiceStatus(context);
   }
 
-  // Localhost-only diagnostics — no token required
+  // ── Global auth gate ────────────────────────────────────────────────────
+  // Every endpoint below requires a valid LOCAL_API_TOKEN.  This prevents
+  // other local processes, malicious browser scripts, and rogue extensions
+  // from accessing the sidecar API without the per-session token.
+  const expectedToken = process.env.LOCAL_API_TOKEN;
+  if (expectedToken) {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader !== `Bearer ${expectedToken}`) {
+      context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
+      return json({ error: 'Unauthorized' }, 401);
+    }
+  }
+
   if (requestUrl.pathname === '/api/local-status') {
     return json({
       success: true,
@@ -823,7 +946,13 @@ async function dispatch(requestUrl, req, routes, context) {
       trafficLog.length = 0;
       return json({ cleared: true });
     }
-    return json({ entries: [...trafficLog], verboseMode, maxEntries: TRAFFIC_LOG_MAX });
+    // Strip query strings from logged paths to avoid leaking feed URLs and
+    // user research patterns to anyone who can read the traffic log.
+    const sanitized = trafficLog.map(entry => ({
+      ...entry,
+      path: entry.path?.split('?')[0] ?? entry.path,
+    }));
+    return json({ entries: sanitized, verboseMode, maxEntries: TRAFFIC_LOG_MAX });
   }
   if (requestUrl.pathname === '/api/local-debug-toggle') {
     if (req.method === 'POST') {
@@ -869,23 +998,36 @@ async function dispatch(requestUrl, req, routes, context) {
       }
       return json(result.value || result);
     } catch (e) {
-      logVerbose(`[register-interest] error: ${e.message}`);
+      context.logger.error(`[register-interest] error: ${e.message}`);
       return json({ error: 'Registration service unreachable' }, 502);
     }
   }
 
-  // RSS proxy — fetch public feeds directly from desktop, no auth needed
+  // RSS proxy — fetch public feeds with SSRF protection
   if (requestUrl.pathname === '/api/rss-proxy') {
     const feedUrl = requestUrl.searchParams.get('url');
     if (!feedUrl) return json({ error: 'Missing url parameter' }, 400);
+
+    // SSRF protection: block private IPs, reserved ranges, and DNS rebinding
+    const safety = await isSafeUrl(feedUrl);
+    if (!safety.safe) {
+      context.logger.warn(`[local-api] rss-proxy SSRF blocked: ${safety.reason} (url=${feedUrl})`);
+      return json({ error: safety.reason }, 403);
+    }
+
     try {
       const parsed = new URL(feedUrl);
+      // Pin to the first IPv4 address validated by isSafeUrl() so the
+      // actual TCP connection goes to the same IP we checked, closing
+      // the TOCTOU DNS-rebinding window.
+      const pinnedV4 = safety.resolvedAddresses?.find(a => a.includes('.'));
       const response = await fetchWithTimeout(feedUrl, {
         headers: {
           'User-Agent': CHROME_UA,
           'Accept': 'application/rss+xml, application/xml, text/xml, */*',
           'Accept-Language': 'en-US,en;q=0.9',
         },
+        ...(pinnedV4 ? { resolvedAddress: pinnedV4 } : {}),
       }, parsed.hostname.includes('news.google.com') ? 20000 : 12000);
       const contentType = response.headers?.get?.('content-type') || 'application/xml';
       const rssBody = await response.text();
@@ -896,16 +1038,6 @@ async function dispatch(requestUrl, req, routes, context) {
     } catch (e) {
       const isTimeout = e.name === 'AbortError' || e.message?.includes('timeout');
       return json({ error: isTimeout ? 'Feed timeout' : 'Failed to fetch feed', url: feedUrl }, isTimeout ? 504 : 502);
-    }
-  }
-
-  // Token auth — required for env mutations and all API handlers
-  const expectedToken = process.env.LOCAL_API_TOKEN;
-  if (expectedToken) {
-    const authHeader = req.headers.authorization || '';
-    if (authHeader !== `Bearer ${expectedToken}`) {
-      context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
-      return json({ error: 'Unauthorized' }, 401);
     }
   }
 
