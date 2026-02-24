@@ -15,6 +15,35 @@ async function fetchWithTimeout(url, options, timeoutMs = 15000) {
   }
 }
 
+function getRelayBaseUrl() {
+  const relayUrl = process.env.WS_RELAY_URL || '';
+  if (!relayUrl) return '';
+  return relayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '');
+}
+
+function getRelayHeaders(baseHeaders = {}) {
+  const headers = { ...baseHeaders };
+  const relaySecret = process.env.RELAY_SHARED_SECRET || '';
+  if (relaySecret) {
+    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+    headers.Authorization = `Bearer ${relaySecret}`;
+  }
+  return headers;
+}
+
+async function fetchViaRailway(feedUrl, timeoutMs) {
+  const relayBaseUrl = getRelayBaseUrl();
+  if (!relayBaseUrl) return null;
+  const relayUrl = `${relayBaseUrl}/rss?url=${encodeURIComponent(feedUrl)}`;
+  return fetchWithTimeout(relayUrl, {
+    headers: getRelayHeaders({
+      'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+      'User-Agent': 'WorldMonitor-RSS-Proxy/1.0',
+    }),
+  }, timeoutMs);
+}
+
 // Allowed RSS feed domains for security
 const ALLOWED_DOMAINS = [
   'feeds.bbci.co.uk',
@@ -247,48 +276,50 @@ export default async function handler(req) {
     const isGoogleNews = feedUrl.includes('news.google.com');
     const timeout = isGoogleNews ? 20000 : 12000;
 
-    const response = await fetchWithTimeout(feedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      redirect: 'manual',
-    }, timeout);
+    const fetchDirect = async () => {
+      const response = await fetchWithTimeout(feedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'manual',
+      }, timeout);
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (location) {
-        try {
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location) {
           const redirectUrl = new URL(location, feedUrl);
           if (!ALLOWED_DOMAINS.includes(redirectUrl.hostname)) {
-            return new Response(JSON.stringify({ error: 'Redirect to disallowed domain' }), {
-              status: 403,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            });
+            throw new Error('Redirect to disallowed domain');
           }
-          const redirectResponse = await fetchWithTimeout(redirectUrl.href, {
+          return fetchWithTimeout(redirectUrl.href, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               'Accept': 'application/rss+xml, application/xml, text/xml, */*',
               'Accept-Language': 'en-US,en;q=0.9',
             },
           }, timeout);
-          const data = await redirectResponse.text();
-          return new Response(data, {
-            status: redirectResponse.status,
-            headers: {
-              'Content-Type': 'application/xml',
-              'Cache-Control': 'public, max-age=300, s-maxage=600, stale-while-revalidate=300',
-              ...corsHeaders,
-            },
-          });
-        } catch {
-          return new Response(JSON.stringify({ error: 'Invalid redirect' }), {
-            status: 502,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          });
         }
+      }
+
+      return response;
+    };
+
+    let response;
+    let usedRelay = false;
+    try {
+      response = await fetchDirect();
+    } catch (directError) {
+      response = await fetchViaRailway(feedUrl, timeout);
+      usedRelay = !!response;
+      if (!response) throw directError;
+    }
+
+    if (!response.ok && !usedRelay) {
+      const relayResponse = await fetchViaRailway(feedUrl, timeout);
+      if (relayResponse && relayResponse.ok) {
+        response = relayResponse;
       }
     }
 
@@ -296,8 +327,8 @@ export default async function handler(req) {
     return new Response(data, {
       status: response.status,
       headers: {
-        'Content-Type': 'application/xml',
-        'Cache-Control': 'public, max-age=600, s-maxage=600, stale-while-revalidate=300',
+        'Content-Type': response.headers.get('content-type') || 'application/xml',
+        'Cache-Control': response.headers.get('cache-control') || 'public, max-age=600, s-maxage=600, stale-while-revalidate=300',
         ...corsHeaders,
       },
     });

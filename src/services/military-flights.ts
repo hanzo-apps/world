@@ -14,11 +14,13 @@ import {
 } from './wingbits';
 import { isFeatureAvailable } from './runtime-config';
 
-// OpenSky Network API - use Railway relay (Vercel is blocked by OpenSky)
+// OpenSky API path — route through Vercel so Railway secret never reaches the browser.
+const OPENSKY_PROXY_URL = '/api/opensky';
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const OPENSKY_BASE_URL = wsRelayUrl
+const DIRECT_OPENSKY_BASE_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/opensky'
   : '';
+const isLocalhostRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes - match refresh interval
@@ -259,27 +261,28 @@ function parseOpenSkyResponse(data: OpenSkyResponse): MilitaryFlight[] {
  */
 async function fetchHotspotRegion(hotspot: typeof MILITARY_HOTSPOTS[number]): Promise<MilitaryFlight[]> {
   try {
-    if (!OPENSKY_BASE_URL) return [];
-
     const lamin = hotspot.lat - hotspot.radius;
     const lamax = hotspot.lat + hotspot.radius;
     const lomin = hotspot.lon - hotspot.radius;
     const lomax = hotspot.lon + hotspot.radius;
-
-    const response = await fetch(
-      `${OPENSKY_BASE_URL}?lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`,
-      { headers: { 'Accept': 'application/json' } }
-    );
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.warn(`[Military Flights] Rate limited for ${hotspot.name}`);
-      }
-      return [];
+    const query = `lamin=${lamin}&lamax=${lamax}&lomin=${lomin}&lomax=${lomax}`;
+    const urls = [`${OPENSKY_PROXY_URL}?${query}`];
+    if (isLocalhostRuntime && DIRECT_OPENSKY_BASE_URL) {
+      urls.push(`${DIRECT_OPENSKY_BASE_URL}?${query}`);
     }
 
-    const data: OpenSkyResponse = await response.json();
-    return parseOpenSkyResponse(data);
+    for (const url of urls) {
+      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn(`[Military Flights] Rate limited for ${hotspot.name}`);
+        }
+        continue;
+      }
+      const data: OpenSkyResponse = await response.json();
+      return parseOpenSkyResponse(data);
+    }
+    return [];
   } catch {
     return [];
   }

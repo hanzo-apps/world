@@ -134,8 +134,9 @@ const MAX_CALLBACK_TRACKED_VESSELS = 20000;
 
 // ---- Raw Relay URL (for candidate reports path) ----
 
+const SNAPSHOT_PROXY_URL = '/api/ais-snapshot';
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_SNAPSHOT_URL = wsRelayUrl
+const DIRECT_RAILWAY_SNAPSHOT_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ais/snapshot'
   : '';
 const LOCAL_SNAPSHOT_FALLBACK = 'http://localhost:3004/ais/snapshot';
@@ -178,9 +179,15 @@ function parseSnapshot(data: unknown): {
 async function fetchRawRelaySnapshot(includeCandidates: boolean): Promise<unknown> {
   const query = `?candidates=${includeCandidates ? 'true' : 'false'}`;
 
-  if (RAILWAY_SNAPSHOT_URL) {
+  try {
+    const proxied = await fetch(`${SNAPSHOT_PROXY_URL}${query}`, { headers: { Accept: 'application/json' } });
+    if (proxied.ok) return proxied.json();
+  } catch { /* Proxy unavailable -- fall through */ }
+
+  // Local development fallback only.
+  if (isLocalhost && DIRECT_RAILWAY_SNAPSHOT_URL) {
     try {
-      const railway = await fetch(`${RAILWAY_SNAPSHOT_URL}${query}`, { headers: { Accept: 'application/json' } });
+      const railway = await fetch(`${DIRECT_RAILWAY_SNAPSHOT_URL}${query}`, { headers: { Accept: 'application/json' } });
       if (railway.ok) return railway.json();
     } catch { /* Railway unavailable -- fall through */ }
   }
