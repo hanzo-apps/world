@@ -184,6 +184,7 @@ const ALLOWED_DOMAINS = [
   'www.iefimerida.gr',
   'www.lasillavacia.com',
   'www.channelnewsasia.com',
+  'japantoday.com',
   'www.thehindu.com',
   // International Organizations
   'news.un.org',
