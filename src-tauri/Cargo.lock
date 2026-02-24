@@ -4890,7 +4890,7 @@ dependencies = [
 
 [[package]]
 name = "world-monitor"
-version = "2.5.5"
+version = "2.5.6"
 dependencies = [
  "keyring",
  "reqwest 0.12.28",
