@@ -573,8 +573,8 @@ fn open_live_channels_window(app: &AppHandle, base_url: Option<String>) -> Resul
 
     let _live_channels_window = WebviewWindowBuilder::new(app, "live-channels", url)
     .title("Channel management - World Monitor")
-    .inner_size(440.0, 560.0)
-    .min_inner_size(360.0, 480.0)
+    .inner_size(680.0, 760.0)
+    .min_inner_size(520.0, 600.0)
     .resizable(true)
     .background_color(tauri::webview::Color(26, 28, 30, 255))
     .build()

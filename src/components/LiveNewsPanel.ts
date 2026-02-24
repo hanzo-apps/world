@@ -531,7 +531,7 @@ export class LiveNewsPanel extends Panel {
       }
       const url = new URL(window.location.href);
       url.searchParams.set('live-channels', '1');
-      window.open(url.toString(), 'worldmonitor-live-channels', 'width=440,height=560,scrollbars=yes');
+      window.open(url.toString(), 'worldmonitor-live-channels', 'width=680,height=760,scrollbars=yes');
     });
     toolbar.appendChild(openBtn);
   }
