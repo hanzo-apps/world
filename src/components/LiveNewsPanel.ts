@@ -1,7 +1,6 @@
 import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
-import { invokeTauri } from '@/services/tauri-bridge';
 import { t } from '../services/i18n';
 import { loadFromStorage, saveToStorage } from '@/utils';
 import { STORAGE_KEYS } from '@/config';
@@ -523,17 +522,49 @@ export class LiveNewsPanel extends Panel {
     openBtn.innerHTML =
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
     openBtn.addEventListener('click', () => {
-      if (isDesktopRuntime()) {
-        void invokeTauri<void>('open_live_channels_window_command', {
-          base_url: window.location.origin,
-        }).catch(() => {});
-        return;
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.set('live-channels', '1');
-      window.open(url.toString(), 'worldmonitor-live-channels', 'width=680,height=760,scrollbars=yes');
+      this.openChannelManagementModal();
     });
     toolbar.appendChild(openBtn);
+  }
+
+  private openChannelManagementModal(): void {
+    const existing = document.querySelector('.live-channels-modal-overlay');
+    if (existing) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'live-channels-modal-overlay';
+    overlay.setAttribute('aria-modal', 'true');
+
+    const modal = document.createElement('div');
+    modal.className = 'live-channels-modal';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'live-channels-modal-close';
+    closeBtn.setAttribute('aria-label', t('common.close') ?? 'Close');
+    closeBtn.innerHTML = '&times;';
+
+    const container = document.createElement('div');
+
+    modal.appendChild(closeBtn);
+    modal.appendChild(container);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    import('@/live-channels-window').then(({ initLiveChannelsWindow }) => {
+      initLiveChannelsWindow(container);
+    });
+
+    const close = () => {
+      overlay.remove();
+      this.refreshChannelsFromStorage();
+    };
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
   }
 
   private refreshChannelSwitcher(): void {
