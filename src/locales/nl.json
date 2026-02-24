@@ -11,6 +11,8 @@
     "map": "Interactive Map",
     "techMap": "Mondiale technologie",
     "politics": "Wereldnieuws",
+    "us": "Verenigde Staten",
+    "europe": "Europa",
     "tech": "Technologie",
     "finance": "Financieel",
     "gov": "Regering",
@@ -750,8 +752,7 @@
         "minutesAgo": "{{count}}m geleden",
         "hoursAgo": "{{count}}u geleden",
         "daysAgo": "{{count}}d geleden"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "economic": {
       "noIndicatorData": "Nog geen indicatorgegevens - FRED wordt mogelijk geladen",
@@ -918,7 +919,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "AI-analyse-instellingen",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "Cloud AI (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Koppen naar de cloud sturen voor AI-samenvatting (aanbevolen)",
       "aiFlowBrowserLabel": "Lokaal browsermodel",
@@ -932,7 +938,7 @@
       "aiFlowStatusBrowserOnly": "Alleen browsermodel",
       "aiFlowStatusDisabled": "Geen AI-aanbieders ingeschakeld",
       "insightsDisabledTitle": "AI-analyse is uitgeschakeld",
-      "insightsDisabledHint": "Schakel aanbieders in via de ⚙-knop hierboven"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "techHubs": {
       "infoTooltip": "<strong>Tech Hub-activiteit</strong><br>Toont tech-hubs met de meeste nieuwsactiviteit.<br><br><em>Activiteitsniveaus:</em><br>• <span style=\"color: {{highColor}}\">Hoog</span> — Breaking news of 50+ score<br>• <span style=\"color: {{elevatedColor}}\">Verhoogd</span> — Score 20-49<br>• <span style=\"color: {{lowColor}}\">Laag</span> — Score lager dan 20<br><br>Klik op een hub om naar de locatie ervan te zoomen.",
@@ -1095,7 +1101,14 @@
       "cancel": "Annuleren",
       "confirmDelete": "Dit kanaal verwijderen?",
       "confirmTitle": "Bevestigen",
-      "restoreDefaults": "Standaardkanalen herstellen"
+      "restoreDefaults": "Standaardkanalen herstellen",
+      "availableChannels": "Beschikbare kanalen",
+      "customChannel": "Aangepast kanaal",
+      "regionNorthAmerica": "Noord-Amerika",
+      "regionEurope": "Europa",
+      "regionLatinAmerica": "Latijns-Amerika",
+      "regionAsia": "Azië",
+      "regionAfrica": "Afrika"
     }
   },
   "popups": {
@@ -1749,7 +1762,38 @@
     "filterSources": "Bronnen filteren...",
     "sourcesEnabled": "{{enabled}}/{{total}} ingeschakeld",
     "finance": "FINANCE",
-    "toggleTheme": "Schakel tussen de donkere/lichte modus"
+    "toggleTheme": "Schakel tussen de donkere/lichte modus",
+    "panelDisplayCaption": "Kies welke panelen op het dashboard worden weergegeven",
+    "tabGeneral": "Algemeen",
+    "tabPanels": "Panelen",
+    "tabSources": "Bronnen",
+    "languageLabel": "Taal",
+    "sourceRegionAll": "Alles",
+    "sourceRegionWorldwide": "Wereldwijd",
+    "sourceRegionUS": "Verenigde Staten",
+    "sourceRegionMiddleEast": "Midden-Oosten",
+    "sourceRegionAfrica": "Afrika",
+    "sourceRegionLatAm": "Latijns-Amerika",
+    "sourceRegionAsiaPacific": "Azië-Pacific",
+    "sourceRegionEurope": "Europa",
+    "sourceRegionTopical": "Thematisch",
+    "sourceRegionIntel": "Inlichtingen",
+    "sourceRegionTechNews": "Tech News",
+    "sourceRegionAiMl": "AI & ML",
+    "sourceRegionStartupsVc": "Startups & VC",
+    "sourceRegionRegionalTech": "Regional Ecosystems",
+    "sourceRegionDeveloper": "Developer",
+    "sourceRegionCybersecurity": "Cybersecurity",
+    "sourceRegionTechPolicy": "Policy & Research",
+    "sourceRegionTechMedia": "Media & Podcasts",
+    "sourceRegionMarkets": "Markets & Analysis",
+    "sourceRegionFixedIncomeFx": "Fixed Income & FX",
+    "sourceRegionCommodities": "Commodities",
+    "sourceRegionCryptoDigital": "Crypto & Digital",
+    "sourceRegionCentralBanks": "Central Banks & Economy",
+    "sourceRegionDeals": "Deals & Corporate",
+    "sourceRegionFinRegulation": "Financial Regulation",
+    "sourceRegionGulfMena": "Gulf & MENA"
   },
   "app": {
     "title": "World Monitor",

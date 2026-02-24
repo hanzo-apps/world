@@ -89,7 +89,38 @@
     "filterSources": "筛选数据源...",
     "sourcesEnabled": "已启用{{enabled}}/{{total}}",
     "finance": "金融",
-    "toggleTheme": "切换深色/浅色模式"
+    "toggleTheme": "切换深色/浅色模式",
+    "panelDisplayCaption": "选择要在仪表板上显示的面板",
+    "tabGeneral": "常规",
+    "tabPanels": "面板",
+    "tabSources": "来源",
+    "languageLabel": "语言",
+    "sourceRegionAll": "全部",
+    "sourceRegionWorldwide": "全球",
+    "sourceRegionUS": "美国",
+    "sourceRegionMiddleEast": "中东",
+    "sourceRegionAfrica": "非洲",
+    "sourceRegionLatAm": "拉丁美洲",
+    "sourceRegionAsiaPacific": "亚太地区",
+    "sourceRegionEurope": "欧洲",
+    "sourceRegionTopical": "专题",
+    "sourceRegionIntel": "情报",
+    "sourceRegionTechNews": "科技新闻",
+    "sourceRegionAiMl": "AI与ML",
+    "sourceRegionStartupsVc": "创业与风投",
+    "sourceRegionRegionalTech": "区域生态",
+    "sourceRegionDeveloper": "开发者",
+    "sourceRegionCybersecurity": "网络安全",
+    "sourceRegionTechPolicy": "政策与研究",
+    "sourceRegionTechMedia": "媒体与播客",
+    "sourceRegionMarkets": "市场与分析",
+    "sourceRegionFixedIncomeFx": "固定收益与外汇",
+    "sourceRegionCommodities": "大宗商品",
+    "sourceRegionCryptoDigital": "加密与数字",
+    "sourceRegionCentralBanks": "央行与经济",
+    "sourceRegionDeals": "交易与企业",
+    "sourceRegionFinRegulation": "金融监管",
+    "sourceRegionGulfMena": "海湾与中东"
   },
   "panels": {
     "liveNews": "实时新闻",
@@ -106,6 +137,8 @@
     "gdeltIntel": "实时情报",
     "cascade": "基础设施级联",
     "politics": "世界新闻",
+    "us": "美国",
+    "europe": "欧洲",
     "middleeast": "中东",
     "africa": "非洲",
     "latam": "拉丁美洲",
@@ -810,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "AI分析设置",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "云端AI（Groq & OpenRouter）",
       "aiFlowCloudDesc": "将标题发送到云端进行AI摘要（推荐）",
       "aiFlowBrowserLabel": "浏览器本地模型",
@@ -824,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "仅浏览器模型",
       "aiFlowStatusDisabled": "没有启用的AI提供商",
       "insightsDisabledTitle": "AI分析已禁用",
-      "insightsDisabledHint": "使用上方的⚙按钮启用提供商"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "未检测到国家影响",
@@ -1036,8 +1074,7 @@
         "minutesAgo": "{{count}}分钟前",
         "hoursAgo": "{{count}}小时前",
         "daysAgo": "{{count}}天前"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "现在",
@@ -1187,7 +1224,14 @@
       "cancel": "取消",
       "confirmDelete": "确定要删除此频道吗？",
       "confirmTitle": "确认",
-      "restoreDefaults": "恢复默认频道"
+      "restoreDefaults": "恢复默认频道",
+      "availableChannels": "可用频道",
+      "customChannel": "自定义频道",
+      "regionNorthAmerica": "北美",
+      "regionEurope": "欧洲",
+      "regionLatinAmerica": "拉丁美洲",
+      "regionAsia": "亚洲",
+      "regionAfrica": "非洲"
     }
   },
   "popups": {

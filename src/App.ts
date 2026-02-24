@@ -80,7 +80,6 @@ import {
   ClimateAnomalyPanel,
   PopulationExposurePanel,
   InvestmentsPanel,
-  LanguageSelector,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { collectStoryData } from '@/services/story-data';
@@ -97,13 +96,15 @@ import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } from '@/config/finance-geo';
 import { isDesktopRuntime } from '@/services/runtime';
+import { UnifiedSettings } from '@/components/UnifiedSettings';
+import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { IntelligenceServiceClient } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
 import { ResearchServiceClient } from '@/generated/client/worldmonitor/research/v1/service_client';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { trackEvent, trackPanelView, trackVariantSwitch, trackThemeChanged, trackMapViewChange, trackMapLayerToggle, trackCountrySelected, trackCountryBriefOpened, trackSearchResultSelected, trackPanelToggled, trackUpdateShown, trackUpdateClicked, trackUpdateDismissed, trackCriticalBannerAction, trackDeeplinkOpened } from '@/services/analytics';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
-import { initI18n, t, changeLanguage } from '@/services/i18n';
+import { initI18n, t } from '@/services/i18n';
 
 import type { MarketData, ClusteredEvent } from '@/types';
 import type { PredictionMarket } from '@/services/prediction';
@@ -157,7 +158,7 @@ export class App {
   private playbackControl: PlaybackControl | null = null;
   private statusPanel: StatusPanel | null = null;
   private exportPanel: ExportPanel | null = null;
-  private languageSelector: LanguageSelector | null = null;
+  private unifiedSettings: UnifiedSettings | null = null;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
@@ -371,7 +372,7 @@ export class App {
     this.setupStatusPanel();
     this.setupPizzIntIndicator();
     this.setupExportPanel();
-    this.setupLanguageSelector();
+    this.setupUnifiedSettings();
     this.setupSearchModal();
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
@@ -747,16 +748,42 @@ export class App {
     }
   }
 
-  private setupLanguageSelector(): void {
-    this.languageSelector = new LanguageSelector();
-    const headerRight = this.container.querySelector('.header-right');
-    const searchBtn = this.container.querySelector('#searchBtn');
+  private setupUnifiedSettings(): void {
+    this.unifiedSettings = new UnifiedSettings({
+      getPanelSettings: () => this.panelSettings,
+      togglePanel: (key: string) => {
+        const config = this.panelSettings[key];
+        if (config) {
+          config.enabled = !config.enabled;
+          trackPanelToggled(key, config.enabled);
+          saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+          this.applyPanelSettings();
+        }
+      },
+      getDisabledSources: () => this.disabledSources,
+      toggleSource: (name: string) => {
+        if (this.disabledSources.has(name)) {
+          this.disabledSources.delete(name);
+        } else {
+          this.disabledSources.add(name);
+        }
+        saveToStorage(STORAGE_KEYS.disabledFeeds, Array.from(this.disabledSources));
+      },
+      setSourcesEnabled: (names: string[], enabled: boolean) => {
+        for (const name of names) {
+          if (enabled) this.disabledSources.delete(name);
+          else this.disabledSources.add(name);
+        }
+        saveToStorage(STORAGE_KEYS.disabledFeeds, Array.from(this.disabledSources));
+      },
+      getAllSourceNames: () => this.getAllSourceNames(),
+      getLocalizedPanelName: (key: string, fallback: string) => this.getLocalizedPanelName(key, fallback),
+      isDesktopApp: this.isDesktopApp,
+    });
 
-    if (headerRight && searchBtn) {
-      // Insert before search button or at the beginning if search button not found
-      headerRight.insertBefore(this.languageSelector.getElement(), searchBtn);
-    } else if (headerRight) {
-      headerRight.insertBefore(this.languageSelector.getElement(), headerRight.firstChild);
+    const mount = document.getElementById('unifiedSettingsMount');
+    if (mount) {
+      mount.appendChild(this.unifiedSettings.getButton());
     }
   }
 
@@ -1301,7 +1328,7 @@ export class App {
   }
 
   private shouldShowIntelligenceNotifications(): boolean {
-    return !this.isMobile && !!this.findingsBadge?.isEnabled() && !!this.findingsBadge?.isPopupEnabled();
+    return !this.isMobile && !!this.findingsBadge?.isPopupEnabled();
   }
 
   private setupSearchModal(): void {
@@ -1835,34 +1862,38 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <div class="variant-switcher">
-            <a href="${this.isDesktopApp ? '#' : (SITE_VARIANT === 'full' ? '#' : 'https://worldmonitor.app')}"
+          <div class="variant-switcher">${(() => {
+            const local = this.isDesktopApp || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            const vHref = (v: string, prod: string) => local || SITE_VARIANT === v ? '#' : prod;
+            const vTarget = (v: string) => !local && SITE_VARIANT !== v ? 'target="_blank" rel="noopener"' : '';
+            return `
+            <a href="${vHref('full', 'https://worldmonitor.app')}"
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
                data-variant="full"
-               ${!this.isDesktopApp && SITE_VARIANT !== 'full' ? 'target="_blank" rel="noopener"' : ''}
+               ${vTarget('full')}
                title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">🌍</span>
               <span class="variant-label">${t('header.world')}</span>
             </a>
             <span class="variant-divider"></span>
-            <a href="${this.isDesktopApp ? '#' : (SITE_VARIANT === 'tech' ? '#' : 'https://tech.worldmonitor.app')}"
+            <a href="${vHref('tech', 'https://tech.worldmonitor.app')}"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
-               ${!this.isDesktopApp && SITE_VARIANT !== 'tech' ? 'target="_blank" rel="noopener"' : ''}
+               ${vTarget('tech')}
                title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
             </a>
             <span class="variant-divider"></span>
-            <a href="${this.isDesktopApp ? '#' : (SITE_VARIANT === 'finance' ? '#' : 'https://finance.worldmonitor.app')}"
+            <a href="${vHref('finance', 'https://finance.worldmonitor.app')}"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
                data-variant="finance"
-               ${!this.isDesktopApp && SITE_VARIANT !== 'finance' ? 'target="_blank" rel="noopener"' : ''}
+               ${vTarget('finance')}
                title="${t('header.finance')}${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">📈</span>
               <span class="variant-label">${t('header.finance')}</span>
-            </a>
-          </div>
+            </a>`;
+          })()}</div>
           <span class="logo">MONITOR</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
             <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -1897,8 +1928,7 @@ export class App {
         : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
           </button>
           ${this.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
-          <button class="settings-btn" id="settingsBtn">⚙ ${t('header.settings')}</button>
-          <button class="sources-btn" id="sourcesBtn">📡 ${t('header.sources')}</button>
+          <span id="unifiedSettingsMount"></span>
         </div>
       </div>
       <div class="main-content">
@@ -1919,36 +1949,9 @@ export class App {
         </div>
         <div class="panels-grid" id="panelsGrid"></div>
       </div>
-      <div class="modal-overlay" id="settingsModal">
-        <div class="modal">
-          <div class="modal-header">
-            <span class="modal-title">${t('header.settings')}</span>
-            <button class="modal-close" id="modalClose">×</button>
-          </div>
-          <div class="panel-toggle-grid" id="panelToggles"></div>
-        </div>
-      </div>
-      <div class="modal-overlay" id="sourcesModal">
-        <div class="modal sources-modal">
-          <div class="modal-header">
-            <span class="modal-title">${t('header.sources')}</span>
-            <span class="sources-counter" id="sourcesCounter"></span>
-            <button class="modal-close" id="sourcesModalClose">×</button>
-          </div>
-          <div class="sources-search">
-            <input type="text" id="sourcesSearch" placeholder="${t('header.filterSources')}" />
-          </div>
-          <div class="sources-toggle-grid" id="sourceToggles"></div>
-          <div class="sources-footer">
-            <button class="sources-select-all" id="sourcesSelectAll">${t('common.selectAll')}</button>
-            <button class="sources-select-none" id="sourcesSelectNone">${t('common.selectNone')}</button>
-          </div>
-        </div>
-      </div>
     `;
 
     this.createPanels();
-    this.renderPanelToggles();
   }
 
   /**
@@ -2093,6 +2096,9 @@ export class App {
     // Clean up panel drag listeners (used by mouse-based panel reordering).
     this.panelDragCleanupHandlers.forEach((cleanup) => cleanup());
     this.panelDragCleanupHandlers = [];
+
+    this.unifiedSettings?.destroy();
+    this.unifiedSettings = null;
 
     // Clean up map and AIS
     this.map?.destroy();
@@ -2694,38 +2700,20 @@ export class App {
       }
     });
 
-    // Settings modal
-    document.getElementById('settingsBtn')?.addEventListener('click', () => {
-      document.getElementById('settingsModal')?.classList.add('active');
-    });
-
     // Sync panel state when settings are changed in the separate settings window
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEYS.panels && e.newValue) {
         try {
           this.panelSettings = JSON.parse(e.newValue) as Record<string, PanelConfig>;
           this.applyPanelSettings();
-          this.renderPanelToggles();
+          this.unifiedSettings?.refreshPanelToggles();
         } catch (_) {}
-      }
-      if (e.key === 'worldmonitor-intel-findings' && this.findingsBadge) {
-        this.findingsBadge.setEnabled(e.newValue !== 'hidden');
       }
       if (e.key === STORAGE_KEYS.liveChannels && e.newValue) {
         const panel = this.panels['live-news'];
         if (panel && typeof (panel as unknown as { refreshChannelsFromStorage?: () => void }).refreshChannelsFromStorage === 'function') {
           (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
         }
-      }
-    });
-
-    document.getElementById('modalClose')?.addEventListener('click', () => {
-      document.getElementById('settingsModal')?.classList.remove('active');
-    });
-
-    document.getElementById('settingsModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
-        document.getElementById('settingsModal')?.classList.remove('active');
       }
     });
 
@@ -2738,11 +2726,10 @@ export class App {
       trackThemeChanged(next);
     });
 
-    // Sources modal
-    this.setupSourcesModal();
 
-    // Variant switcher: switch variant locally on desktop (reload with new config)
-    if (this.isDesktopApp) {
+    // Variant switcher: switch variant locally on desktop or localhost dev (reload with new config)
+    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (this.isDesktopApp || isLocalDev) {
       this.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
         link.addEventListener('click', (e) => {
           const variant = link.dataset.variant;
@@ -2772,12 +2759,6 @@ export class App {
     regionSelect?.addEventListener('change', () => {
       this.map?.setView(regionSelect.value as MapView);
       trackMapViewChange(regionSelect.value);
-    });
-
-    // Language selector
-    const langSelect = document.getElementById('langSelect') as HTMLSelectElement;
-    langSelect?.addEventListener('change', () => {
-      void changeLanguage(langSelect.value);
     });
 
     // Window resize
@@ -3028,62 +3009,6 @@ export class App {
     });
   }
 
-  private renderPanelToggles(): void {
-    const container = document.getElementById('panelToggles')!;
-    const panelHtml = Object.entries(this.panelSettings)
-      .filter(([key]) => key !== 'runtime-config' || this.isDesktopApp)
-      .map(
-        ([key, panel]) => `
-        <div class="panel-toggle-item ${panel.enabled ? 'active' : ''}" data-panel="${key}">
-          <div class="panel-toggle-checkbox">${panel.enabled ? '✓' : ''}</div>
-          <span class="panel-toggle-label">${this.getLocalizedPanelName(key, panel.name)}</span>
-        </div>
-      `
-      )
-      .join('');
-
-    const findingsHtml = this.isMobile
-      ? ''
-      : (() => {
-        const findingsEnabled = this.findingsBadge?.isEnabled() ?? IntelligenceGapBadge.getStoredEnabledState();
-        return `
-      <div class="panel-toggle-item ${findingsEnabled ? 'active' : ''}" data-panel="intel-findings">
-        <div class="panel-toggle-checkbox">${findingsEnabled ? '✓' : ''}</div>
-        <span class="panel-toggle-label">Intelligence Findings</span>
-      </div>
-    `;
-      })();
-
-    container.innerHTML = panelHtml + findingsHtml;
-
-    container.querySelectorAll('.panel-toggle-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        const panelKey = (item as HTMLElement).dataset.panel!;
-
-        if (panelKey === 'intel-findings') {
-          if (!this.findingsBadge) return;
-          const newState = !this.findingsBadge.isEnabled();
-          this.findingsBadge.setEnabled(newState);
-          trackPanelToggled('intel-findings', newState);
-          this.renderPanelToggles();
-          return;
-        }
-
-        const config = this.panelSettings[panelKey];
-        console.log('[Panel Toggle] Clicked:', panelKey, 'Current enabled:', config?.enabled);
-        if (config) {
-          config.enabled = !config.enabled;
-          trackPanelToggled(panelKey, config.enabled);
-          console.log('[Panel Toggle] New enabled:', config.enabled);
-          saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
-          this.renderPanelToggles();
-          this.applyPanelSettings();
-          console.log('[Panel Toggle] After apply - config.enabled:', this.panelSettings[panelKey]?.enabled);
-        }
-      });
-    });
-  }
-
   private getLocalizedPanelName(panelKey: string, fallback: string): string {
     if (panelKey === 'runtime-config') {
       return t('modals.runtimeConfig.title');
@@ -3101,86 +3026,6 @@ export class App {
     });
     INTEL_SOURCES.forEach(f => sources.add(f.name));
     return Array.from(sources).sort((a, b) => a.localeCompare(b));
-  }
-
-  private renderSourceToggles(filter = ''): void {
-    const container = document.getElementById('sourceToggles')!;
-    const allSources = this.getAllSourceNames();
-    const filterLower = filter.toLowerCase();
-    const filteredSources = filter
-      ? allSources.filter(s => s.toLowerCase().includes(filterLower))
-      : allSources;
-
-    container.innerHTML = filteredSources.map(source => {
-      const isEnabled = !this.disabledSources.has(source);
-      const escaped = escapeHtml(source);
-      return `
-        <div class="source-toggle-item ${isEnabled ? 'active' : ''}" data-source="${escaped}">
-          <div class="source-toggle-checkbox">${isEnabled ? '✓' : ''}</div>
-          <span class="source-toggle-label">${escaped}</span>
-        </div>
-      `;
-    }).join('');
-
-    container.querySelectorAll('.source-toggle-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const sourceName = (item as HTMLElement).dataset.source!;
-        if (this.disabledSources.has(sourceName)) {
-          this.disabledSources.delete(sourceName);
-        } else {
-          this.disabledSources.add(sourceName);
-        }
-        saveToStorage(STORAGE_KEYS.disabledFeeds, Array.from(this.disabledSources));
-        this.renderSourceToggles(filter);
-      });
-    });
-
-    // Update counter
-    const enabledCount = allSources.length - this.disabledSources.size;
-    const counterEl = document.getElementById('sourcesCounter');
-    if (counterEl) {
-      counterEl.textContent = t('header.sourcesEnabled', { enabled: String(enabledCount), total: String(allSources.length) });
-    }
-  }
-
-  private setupSourcesModal(): void {
-    document.getElementById('sourcesBtn')?.addEventListener('click', () => {
-      document.getElementById('sourcesModal')?.classList.add('active');
-      // Clear search and show all sources on open
-      const searchInput = document.getElementById('sourcesSearch') as HTMLInputElement | null;
-      if (searchInput) searchInput.value = '';
-      this.renderSourceToggles();
-    });
-
-    document.getElementById('sourcesModalClose')?.addEventListener('click', () => {
-      document.getElementById('sourcesModal')?.classList.remove('active');
-    });
-
-    document.getElementById('sourcesModal')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
-        document.getElementById('sourcesModal')?.classList.remove('active');
-      }
-    });
-
-    document.getElementById('sourcesSearch')?.addEventListener('input', (e) => {
-      const filter = (e.target as HTMLInputElement).value;
-      this.renderSourceToggles(filter);
-    });
-
-    document.getElementById('sourcesSelectAll')?.addEventListener('click', () => {
-      this.disabledSources.clear();
-      saveToStorage(STORAGE_KEYS.disabledFeeds, []);
-      const filter = (document.getElementById('sourcesSearch') as HTMLInputElement)?.value || '';
-      this.renderSourceToggles(filter);
-    });
-
-    document.getElementById('sourcesSelectNone')?.addEventListener('click', () => {
-      const allSources = this.getAllSourceNames();
-      this.disabledSources = new Set(allSources);
-      saveToStorage(STORAGE_KEYS.disabledFeeds, allSources);
-      const filter = (document.getElementById('sourcesSearch') as HTMLInputElement)?.value || '';
-      this.renderSourceToggles(filter);
-    });
   }
 
   private applyPanelSettings(): void {
@@ -3355,6 +3200,7 @@ export class App {
 
   private flashMapForNews(items: NewsItem[]): void {
     if (!this.map || !this.initialLoadComplete) return;
+    if (!getAiFlowSettings().mapNewsFlash) return;
     const now = Date.now();
 
     for (const [key, timestamp] of this.mapFlashCache.entries()) {

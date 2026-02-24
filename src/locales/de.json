@@ -89,7 +89,38 @@
     "filterSources": "Quellen filtern...",
     "sourcesEnabled": "{{enabled}}/{{total}} aktiviert",
     "finance": "FINANCE",
-    "toggleTheme": "Schalten Sie den Dunkel-/Hellmodus um"
+    "toggleTheme": "Schalten Sie den Dunkel-/Hellmodus um",
+    "panelDisplayCaption": "Wählen Sie aus, welche Panels auf dem Dashboard angezeigt werden",
+    "tabGeneral": "Allgemein",
+    "tabPanels": "Panels",
+    "tabSources": "Quellen",
+    "languageLabel": "Sprache",
+    "sourceRegionAll": "Alle",
+    "sourceRegionWorldwide": "Weltweit",
+    "sourceRegionUS": "Vereinigte Staaten",
+    "sourceRegionMiddleEast": "Naher Osten",
+    "sourceRegionAfrica": "Afrika",
+    "sourceRegionLatAm": "Lateinamerika",
+    "sourceRegionAsiaPacific": "Asien-Pazifik",
+    "sourceRegionEurope": "Europa",
+    "sourceRegionTopical": "Thematisch",
+    "sourceRegionIntel": "Nachrichtendienst",
+    "sourceRegionTechNews": "Tech-News",
+    "sourceRegionAiMl": "KI & ML",
+    "sourceRegionStartupsVc": "Startups & VC",
+    "sourceRegionRegionalTech": "Regionale Ökosysteme",
+    "sourceRegionDeveloper": "Entwickler",
+    "sourceRegionCybersecurity": "Cybersicherheit",
+    "sourceRegionTechPolicy": "Politik & Forschung",
+    "sourceRegionTechMedia": "Medien & Podcasts",
+    "sourceRegionMarkets": "Märkte & Analyse",
+    "sourceRegionFixedIncomeFx": "Anleihen & Devisen",
+    "sourceRegionCommodities": "Rohstoffe",
+    "sourceRegionCryptoDigital": "Krypto & Digital",
+    "sourceRegionCentralBanks": "Zentralbanken & Wirtschaft",
+    "sourceRegionDeals": "Deals & Unternehmen",
+    "sourceRegionFinRegulation": "Finanzregulierung",
+    "sourceRegionGulfMena": "Golf & MENA"
   },
   "panels": {
     "liveNews": "Live-Nachrichten",
@@ -105,6 +136,8 @@
     "gdeltIntel": "Live-Intelligence",
     "cascade": "Infrastruktur-Kaskade",
     "politics": "Weltnachrichten",
+    "us": "Vereinigte Staaten",
+    "europe": "Europa",
     "middleeast": "Naher Osten",
     "africa": "Afrika",
     "latam": "Lateinamerika",
@@ -910,8 +943,7 @@
         "minutesAgo": "Vor {{count}}m",
         "hoursAgo": "Vor {{count}}h",
         "daysAgo": "Vor {{count}}d"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "satelliteFires": {
       "noData": "Keine Branddaten verfügbar",
@@ -1064,7 +1096,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "KI-Analyseeinstellungen",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "Cloud-KI (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Schlagzeilen zur KI-Zusammenfassung an die Cloud senden (empfohlen)",
       "aiFlowBrowserLabel": "Lokales Browser-Modell",
@@ -1078,7 +1115,7 @@
       "aiFlowStatusBrowserOnly": "Nur Browser-Modell",
       "aiFlowStatusDisabled": "Keine KI-Anbieter aktiviert",
       "insightsDisabledTitle": "KI-Analyse ist deaktiviert",
-      "insightsDisabledHint": "Aktivieren Sie Anbieter über die ⚙-Schaltfläche oben"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "export": {
       "exportData": "Daten exportieren"
@@ -1187,7 +1224,14 @@
       "cancel": "Abbrechen",
       "confirmDelete": "Diesen Kanal löschen?",
       "confirmTitle": "Bestätigen",
-      "restoreDefaults": "Standardkanäle wiederherstellen"
+      "restoreDefaults": "Standardkanäle wiederherstellen",
+      "availableChannels": "Verfügbare Kanäle",
+      "customChannel": "Benutzerdefinierter Kanal",
+      "regionNorthAmerica": "Nordamerika",
+      "regionEurope": "Europa",
+      "regionLatinAmerica": "Lateinamerika",
+      "regionAsia": "Asien",
+      "regionAfrica": "Afrika"
     }
   },
   "popups": {

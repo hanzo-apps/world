@@ -89,7 +89,38 @@
     "filterSources": "Filtrer les sources...",
     "sourcesEnabled": "{{enabled}}/{{total}} activé",
     "finance": "FINANCE",
-    "toggleTheme": "Basculer en mode sombre/clair"
+    "toggleTheme": "Basculer en mode sombre/clair",
+    "panelDisplayCaption": "Choisissez les panneaux à afficher sur le tableau de bord",
+    "tabGeneral": "Général",
+    "tabPanels": "Panneaux",
+    "tabSources": "Sources",
+    "languageLabel": "Langue",
+    "sourceRegionAll": "Tout",
+    "sourceRegionWorldwide": "Mondial",
+    "sourceRegionUS": "États-Unis",
+    "sourceRegionMiddleEast": "Moyen-Orient",
+    "sourceRegionAfrica": "Afrique",
+    "sourceRegionLatAm": "Amérique latine",
+    "sourceRegionAsiaPacific": "Asie-Pacifique",
+    "sourceRegionEurope": "Europe",
+    "sourceRegionTopical": "Thématique",
+    "sourceRegionIntel": "Renseignement",
+    "sourceRegionTechNews": "Actualités Tech",
+    "sourceRegionAiMl": "IA et ML",
+    "sourceRegionStartupsVc": "Startups et VC",
+    "sourceRegionRegionalTech": "Écosystèmes Régionaux",
+    "sourceRegionDeveloper": "Développeurs",
+    "sourceRegionCybersecurity": "Cybersécurité",
+    "sourceRegionTechPolicy": "Politique et Recherche",
+    "sourceRegionTechMedia": "Médias et Podcasts",
+    "sourceRegionMarkets": "Marchés et Analyse",
+    "sourceRegionFixedIncomeFx": "Taux et Devises",
+    "sourceRegionCommodities": "Matières Premières",
+    "sourceRegionCryptoDigital": "Crypto et Digital",
+    "sourceRegionCentralBanks": "Banques Centrales et Économie",
+    "sourceRegionDeals": "Opérations et Entreprises",
+    "sourceRegionFinRegulation": "Régulation Financière",
+    "sourceRegionGulfMena": "Golfe et MENA"
   },
   "panels": {
     "liveNews": "Actualités en direct",
@@ -105,6 +136,8 @@
     "gdeltIntel": "Renseignements en direct",
     "cascade": "Cascade d'infrastructure",
     "politics": "Actualités mondiales",
+    "us": "États-Unis",
+    "europe": "Europe",
     "middleeast": "Moyen-Orient",
     "africa": "Afrique",
     "latam": "Amérique latine",
@@ -810,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "Paramètres d'analyse IA",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "IA Cloud (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Envoyer les titres au cloud pour le résumé IA (recommandé)",
       "aiFlowBrowserLabel": "Modèle local du navigateur",
@@ -824,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "Modèle navigateur uniquement",
       "aiFlowStatusDisabled": "Aucun fournisseur IA activé",
       "insightsDisabledTitle": "L'analyse IA est désactivée",
-      "insightsDisabledHint": "Activez les fournisseurs avec le bouton ⚙ ci-dessus"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "Aucun impact pays détecté",
@@ -1069,8 +1107,7 @@
         "minutesAgo": "il y a {{count}} min",
         "hoursAgo": "il y a {{count}} h",
         "daysAgo": "il y a {{count}} j"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "maintenant",
@@ -1187,7 +1224,14 @@
       "cancel": "Annuler",
       "confirmDelete": "Supprimer cette chaîne ?",
       "confirmTitle": "Confirmer",
-      "restoreDefaults": "Restaurer les chaînes par défaut"
+      "restoreDefaults": "Restaurer les chaînes par défaut",
+      "availableChannels": "Chaînes disponibles",
+      "customChannel": "Chaîne personnalisée",
+      "regionNorthAmerica": "Amérique du Nord",
+      "regionEurope": "Europe",
+      "regionLatinAmerica": "Amérique latine",
+      "regionAsia": "Asie",
+      "regionAfrica": "Afrique"
     }
   },
   "popups": {
