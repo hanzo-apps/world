@@ -809,7 +809,22 @@
       "rankingStories": "Đang xếp hạng tin quan trọng...",
       "analyzingSentiment": "Đang phân tích cảm xúc...",
       "generatingBrief": "Đang tạo bản tin thế giới...",
-      "infoTooltip": "<strong>Phân tích Hỗ trợ AI</strong><br>• <strong>Bản tin Thế giới</strong>: Tóm tắt AI (Groq/OpenRouter)<br>• <strong>Cảm xúc</strong>: Phân tích sắc thái tin tức<br>• <strong>Tốc độ</strong>: Tin đang lan nhanh<br>• <strong>Điểm Hội tụ</strong>: Tương quan thực thể tin tức với tín hiệu bản đồ (quân sự, biểu tình, gián đoạn)<br><em>Chỉ Desktop • Được hỗ trợ bởi Llama 3.3 + Phát hiện Điểm Hội tụ</em>"
+      "infoTooltip": "<strong>Phân tích Hỗ trợ AI</strong><br>• <strong>Bản tin Thế giới</strong>: Tóm tắt AI (Groq/OpenRouter)<br>• <strong>Cảm xúc</strong>: Phân tích sắc thái tin tức<br>• <strong>Tốc độ</strong>: Tin đang lan nhanh<br>• <strong>Điểm Hội tụ</strong>: Tương quan thực thể tin tức với tín hiệu bản đồ (quân sự, biểu tình, gián đoạn)<br><em>Chỉ Desktop • Được hỗ trợ bởi Llama 3.3 + Phát hiện Điểm Hội tụ</em>",
+      "aiFlowTitle": "Cài đặt Phân tích AI",
+      "aiFlowCloudLabel": "Cloud AI (Groq & OpenRouter)",
+      "aiFlowCloudDesc": "Gửi tiêu đề tới cloud để AI tóm tắt (khuyến nghị)",
+      "aiFlowBrowserLabel": "Mô hình cục bộ trên trình duyệt",
+      "aiFlowBrowserDesc": "Chạy AI cục bộ trong trình duyệt của bạn",
+      "aiFlowBrowserWarn": "Sẽ tải xuống khoảng 250MB dữ liệu vào máy tính của bạn",
+      "aiFlowOllamaCta": "Muốn AI hoàn toàn cục bộ?",
+      "aiFlowOllamaCtaDesc": "Tải ứng dụng desktop để hỗ trợ Ollama",
+      "aiFlowDownloadDesktop": "Tải Desktop App →",
+      "aiFlowStatusActive": "Cloud AI đang hoạt động",
+      "aiFlowStatusCloudAndBrowser": "Cloud AI + Mô hình trình duyệt đang hoạt động",
+      "aiFlowStatusBrowserOnly": "Chỉ mô hình trình duyệt",
+      "aiFlowStatusDisabled": "Không có nhà cung cấp AI nào được bật",
+      "insightsDisabledTitle": "Phân tích AI đã bị tắt",
+      "insightsDisabledHint": "Bật nhà cung cấp bằng nút ⚙ ở trên"
     },
     "cascade": {
       "noImpacts": "Không phát hiện tác động quốc gia",
