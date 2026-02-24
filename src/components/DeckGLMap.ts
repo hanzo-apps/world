@@ -376,6 +376,12 @@ export class DeckGLMap {
     mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
     wrapper.appendChild(mapContainer);
 
+    // Map attribution (CARTO basemap + OpenStreetMap data)
+    const attribution = document.createElement('div');
+    attribution.className = 'map-attribution';
+    attribution.innerHTML = '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+    wrapper.appendChild(attribution);
+
     this.container.appendChild(wrapper);
   }
 
