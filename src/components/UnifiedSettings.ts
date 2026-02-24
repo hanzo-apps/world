@@ -1,4 +1,6 @@
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
+import { PANEL_CATEGORY_MAP } from '@/config/panels';
+import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting } from '@/services/ai-flow-settings';
 import { escapeHtml } from '@/utils/sanitize';
@@ -28,6 +30,8 @@ export class UnifiedSettings {
   private activeTab: TabId = 'general';
   private activeSourceRegion = 'all';
   private sourceFilter = '';
+  private activePanelCategory = 'all';
+  private panelFilter = '';
   private escapeHandler: (e: KeyboardEvent) => void;
 
   constructor(config: UnifiedSettingsConfig) {
@@ -63,6 +67,18 @@ export class UnifiedSettings {
       const tab = target.closest<HTMLElement>('.unified-settings-tab');
       if (tab?.dataset.tab) {
         this.switchTab(tab.dataset.tab as TabId);
+        return;
+      }
+
+      // Panel category pill
+      const panelCatPill = target.closest<HTMLElement>('[data-panel-cat]');
+      if (panelCatPill?.dataset.panelCat) {
+        this.activePanelCategory = panelCatPill.dataset.panelCat;
+        this.panelFilter = '';
+        const searchInput = this.overlay.querySelector<HTMLInputElement>('.panels-search input');
+        if (searchInput) searchInput.value = '';
+        this.renderPanelCategoryPills();
+        this.renderPanelsTab();
         return;
       }
 
@@ -118,7 +134,10 @@ export class UnifiedSettings {
     // Handle input events for search
     this.overlay.addEventListener('input', (e) => {
       const target = e.target as HTMLInputElement;
-      if (target.closest('.sources-search')) {
+      if (target.closest('.panels-search')) {
+        this.panelFilter = target.value;
+        this.renderPanelsTab();
+      } else if (target.closest('.sources-search')) {
         this.sourceFilter = target.value;
         this.renderSourcesGrid();
         this.updateSourcesCounter();
@@ -204,6 +223,12 @@ export class UnifiedSettings {
           ${this.renderGeneralContent()}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'panels' ? ' active' : ''}" data-panel-id="panels">
+          <div class="unified-settings-region-wrapper">
+            <div class="unified-settings-region-bar" id="usPanelCatBar"></div>
+          </div>
+          <div class="panels-search">
+            <input type="text" placeholder="${t('header.filterPanels')}" value="${escapeHtml(this.panelFilter)}" />
+          </div>
           <div class="panel-toggle-grid" id="usPanelToggles"></div>
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'sources' ? ' active' : ''}" data-panel-id="sources">
@@ -224,6 +249,7 @@ export class UnifiedSettings {
     `;
 
     // Populate dynamic sections after innerHTML is set
+    this.renderPanelCategoryPills();
     this.renderPanelsTab();
     this.renderRegionPills();
     this.renderSourcesGrid();
@@ -327,19 +353,71 @@ export class UnifiedSettings {
     }
   }
 
+  private getAvailablePanelCategories(): Array<{ key: string; label: string }> {
+    const panelKeys = new Set(Object.keys(this.config.getPanelSettings()));
+    const variant = SITE_VARIANT || 'full';
+    const categories: Array<{ key: string; label: string }> = [
+      { key: 'all', label: t('header.sourceRegionAll') }
+    ];
+
+    for (const [catKey, catDef] of Object.entries(PANEL_CATEGORY_MAP)) {
+      if (catDef.variants && !catDef.variants.includes(variant)) continue;
+      const hasPanel = catDef.panelKeys.some(pk => panelKeys.has(pk));
+      if (hasPanel) {
+        categories.push({ key: catKey, label: t(catDef.labelKey) });
+      }
+    }
+
+    return categories;
+  }
+
+  private getVisiblePanelEntries(): Array<[string, PanelConfig]> {
+    const panelSettings = this.config.getPanelSettings();
+    const variant = SITE_VARIANT || 'full';
+    let entries = Object.entries(panelSettings)
+      .filter(([key]) => key !== 'runtime-config' || this.config.isDesktopApp);
+
+    if (this.activePanelCategory !== 'all') {
+      const catDef = PANEL_CATEGORY_MAP[this.activePanelCategory];
+      if (catDef && (!catDef.variants || catDef.variants.includes(variant))) {
+        const allowed = new Set(catDef.panelKeys);
+        entries = entries.filter(([key]) => allowed.has(key));
+      }
+    }
+
+    if (this.panelFilter) {
+      const lower = this.panelFilter.toLowerCase();
+      entries = entries.filter(([key, panel]) =>
+        key.toLowerCase().includes(lower) ||
+        panel.name.toLowerCase().includes(lower) ||
+        this.config.getLocalizedPanelName(key, panel.name).toLowerCase().includes(lower)
+      );
+    }
+
+    return entries;
+  }
+
+  private renderPanelCategoryPills(): void {
+    const bar = this.overlay.querySelector('#usPanelCatBar');
+    if (!bar) return;
+
+    const categories = this.getAvailablePanelCategories();
+    bar.innerHTML = categories.map(c =>
+      `<button class="unified-settings-region-pill${this.activePanelCategory === c.key ? ' active' : ''}" data-panel-cat="${c.key}">${escapeHtml(c.label)}</button>`
+    ).join('');
+  }
+
   private renderPanelsTab(): void {
     const container = this.overlay.querySelector('#usPanelToggles');
     if (!container) return;
 
-    const panelSettings = this.config.getPanelSettings();
-    container.innerHTML = Object.entries(panelSettings)
-      .filter(([key]) => key !== 'runtime-config' || this.config.isDesktopApp)
-      .map(([key, panel]) => `
-        <div class="panel-toggle-item ${panel.enabled ? 'active' : ''}" data-panel="${escapeHtml(key)}">
-          <div class="panel-toggle-checkbox">${panel.enabled ? '✓' : ''}</div>
-          <span class="panel-toggle-label">${escapeHtml(this.config.getLocalizedPanelName(key, panel.name))}</span>
-        </div>
-      `).join('');
+    const entries = this.getVisiblePanelEntries();
+    container.innerHTML = entries.map(([key, panel]) => `
+      <div class="panel-toggle-item ${panel.enabled ? 'active' : ''}" data-panel="${escapeHtml(key)}">
+        <div class="panel-toggle-checkbox">${panel.enabled ? '✓' : ''}</div>
+        <span class="panel-toggle-label">${escapeHtml(this.config.getLocalizedPanelName(key, panel.name))}</span>
+      </div>
+    `).join('');
   }
 
   private getAvailableRegions(): Array<{ key: string; label: string }> {

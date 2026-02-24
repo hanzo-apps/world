@@ -391,6 +391,107 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
   climate: ['climate'],
 };
 
+// ============================================
+// PANEL CATEGORY MAP (variant-aware)
+// ============================================
+// Maps category keys to panel keys. Only categories with at least one
+// matching panel in the active variant's DEFAULT_PANELS are shown.
+// The `variants` field restricts a category to specific site variants;
+// omit it to show the category for all variants.
+export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[]; variants?: string[] }> = {
+  // All variants — essential panels
+  core: {
+    labelKey: 'header.panelCatCore',
+    panelKeys: ['map', 'live-news', 'live-webcams', 'insights', 'strategic-posture'],
+  },
+
+  // Full (geopolitical) variant
+  intelligence: {
+    labelKey: 'header.panelCatIntelligence',
+    panelKeys: ['cii', 'strategic-risk', 'intel', 'gdelt-intel', 'cascade'],
+    variants: ['full'],
+  },
+  regionalNews: {
+    labelKey: 'header.panelCatRegionalNews',
+    panelKeys: ['politics', 'us', 'europe', 'middleeast', 'africa', 'latam', 'asia'],
+    variants: ['full'],
+  },
+  marketsFinance: {
+    labelKey: 'header.panelCatMarketsFinance',
+    panelKeys: ['commodities', 'markets', 'economic', 'finance', 'polymarket', 'macro-signals', 'etf-flows', 'stablecoins', 'crypto', 'heatmap'],
+    variants: ['full'],
+  },
+  topical: {
+    labelKey: 'header.panelCatTopical',
+    panelKeys: ['energy', 'gov', 'thinktanks', 'tech', 'ai', 'layoffs'],
+    variants: ['full'],
+  },
+  dataTracking: {
+    labelKey: 'header.panelCatDataTracking',
+    panelKeys: ['monitors', 'satellite-fires', 'ucdp-events', 'displacement', 'climate', 'population-exposure'],
+    variants: ['full'],
+  },
+
+  // Tech variant
+  techAi: {
+    labelKey: 'header.panelCatTechAi',
+    panelKeys: ['ai', 'tech', 'hardware', 'cloud', 'dev', 'github', 'producthunt', 'events', 'service-status', 'tech-readiness'],
+    variants: ['tech'],
+  },
+  startupsVc: {
+    labelKey: 'header.panelCatStartupsVc',
+    panelKeys: ['startups', 'vcblogs', 'regionalStartups', 'unicorns', 'accelerators', 'funding', 'ipo'],
+    variants: ['tech'],
+  },
+  securityPolicy: {
+    labelKey: 'header.panelCatSecurityPolicy',
+    panelKeys: ['security', 'policy', 'regulation'],
+    variants: ['tech'],
+  },
+  techMarkets: {
+    labelKey: 'header.panelCatMarkets',
+    panelKeys: ['markets', 'finance', 'crypto', 'economic', 'polymarket', 'macro-signals', 'etf-flows', 'stablecoins', 'layoffs', 'monitors'],
+    variants: ['tech'],
+  },
+
+  // Finance variant
+  finMarkets: {
+    labelKey: 'header.panelCatMarkets',
+    panelKeys: ['markets', 'markets-news', 'heatmap', 'macro-signals', 'analysis', 'polymarket'],
+    variants: ['finance'],
+  },
+  fixedIncomeFx: {
+    labelKey: 'header.panelCatFixedIncomeFx',
+    panelKeys: ['forex', 'bonds'],
+    variants: ['finance'],
+  },
+  finCommodities: {
+    labelKey: 'header.panelCatCommodities',
+    panelKeys: ['commodities', 'commodities-news'],
+    variants: ['finance'],
+  },
+  cryptoDigital: {
+    labelKey: 'header.panelCatCryptoDigital',
+    panelKeys: ['crypto', 'crypto-news', 'etf-flows', 'stablecoins', 'fintech'],
+    variants: ['finance'],
+  },
+  centralBanksEcon: {
+    labelKey: 'header.panelCatCentralBanks',
+    panelKeys: ['centralbanks', 'economic', 'economic-news'],
+    variants: ['finance'],
+  },
+  dealsInstitutional: {
+    labelKey: 'header.panelCatDeals',
+    panelKeys: ['ipo', 'derivatives', 'institutional', 'regulation'],
+    variants: ['finance'],
+  },
+  gulfMena: {
+    labelKey: 'header.panelCatGulfMena',
+    panelKeys: ['gcc-investments', 'gccNews', 'monitors'],
+    variants: ['finance'],
+  },
+};
+
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
   '#44ff88',

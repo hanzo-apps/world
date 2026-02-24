@@ -5148,11 +5148,13 @@ a.prediction-link:hover {
   margin-right: 12px;
 }
 
-.sources-search {
+.sources-search,
+.panels-search {
   margin-bottom: 12px;
 }
 
-.sources-search input {
+.sources-search input,
+.panels-search input {
   width: 100%;
   padding: 8px 10px;
   background: var(--bg);
@@ -5162,7 +5164,8 @@ a.prediction-link:hover {
   font-size: 11px;
 }
 
-.sources-search input:focus {
+.sources-search input:focus,
+.panels-search input:focus {
   outline: none;
   border-color: var(--text-dim);
 }
