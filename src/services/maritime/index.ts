@@ -289,6 +289,9 @@ function emitCandidateReports(reports: SnapshotCandidateReport[]): void {
 
 async function pollSnapshot(force = false): Promise<void> {
   if (!isAisConfigured()) return;
+  // Skip polling when tab is hidden to avoid wasting relay bandwidth.
+  // The interval keeps running so polling resumes instantly on focus.
+  if (!force && isClientRuntime && document.hidden) return;
   if (inFlight && !force) return;
 
   inFlight = true;
@@ -333,6 +336,36 @@ function startPolling(): void {
   pollInterval = setInterval(() => {
     void pollSnapshot(false);
   }, SNAPSHOT_POLL_INTERVAL_MS);
+}
+
+function pausePolling(): void {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
+function resumePolling(): void {
+  if (!isPolling || pollInterval) return;
+  // Avoid overlapping relay requests if a poll is already in flight.
+  if (!inFlight) {
+    void pollSnapshot(false);
+  }
+  pollInterval = setInterval(() => {
+    void pollSnapshot(false);
+  }, SNAPSHOT_POLL_INTERVAL_MS);
+}
+
+// Pause AIS polling when the browser tab is hidden to avoid wasting
+// Railway relay bandwidth on backgrounded tabs.
+if (isClientRuntime) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      pausePolling();
+    } else {
+      resumePolling();
+    }
+  });
 }
 
 // ---- Exported Functions ----
