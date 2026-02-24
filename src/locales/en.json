@@ -1190,7 +1190,14 @@
       "cancel": "Cancel",
       "confirmDelete": "Delete this channel?",
       "confirmTitle": "Confirm",
-      "restoreDefaults": "Restore default channels"
+      "restoreDefaults": "Restore default channels",
+      "availableChannels": "Available channels",
+      "customChannel": "Custom channel",
+      "regionNorthAmerica": "North America",
+      "regionEurope": "Europe",
+      "regionLatinAmerica": "Latin America",
+      "regionAsia": "Asia",
+      "regionAfrica": "Africa"
     }
   },
   "popups": {
