@@ -1075,3 +1075,275 @@ test('uses gzip compression when Brotli is unavailable but gzip is accepted', as
     await remote.close();
   }
 });
+
+// ── Security hardening tests ────────────────────────────────────────────
+
+test('rejects unauthenticated requests to /api/local-status when token is set', async () => {
+  const localApi = await setupApiDir({});
+  const originalToken = process.env.LOCAL_API_TOKEN;
+  process.env.LOCAL_API_TOKEN = 'security-test-token';
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/local-status`);
+    assert.equal(response.status, 401);
+    const body = await response.json();
+    assert.equal(body.error, 'Unauthorized');
+
+    // With token should succeed
+    const authed = await fetch(`http://127.0.0.1:${port}/api/local-status`, {
+      headers: { 'Authorization': 'Bearer security-test-token' },
+    });
+    assert.equal(authed.status, 200);
+  } finally {
+    if (originalToken !== undefined) {
+      process.env.LOCAL_API_TOKEN = originalToken;
+    } else {
+      delete process.env.LOCAL_API_TOKEN;
+    }
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rejects unauthenticated requests to /api/local-traffic-log when token is set', async () => {
+  const localApi = await setupApiDir({});
+  const originalToken = process.env.LOCAL_API_TOKEN;
+  process.env.LOCAL_API_TOKEN = 'security-test-token';
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/local-traffic-log`);
+    assert.equal(response.status, 401);
+  } finally {
+    if (originalToken !== undefined) {
+      process.env.LOCAL_API_TOKEN = originalToken;
+    } else {
+      delete process.env.LOCAL_API_TOKEN;
+    }
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rejects unauthenticated requests to /api/local-debug-toggle when token is set', async () => {
+  const localApi = await setupApiDir({});
+  const originalToken = process.env.LOCAL_API_TOKEN;
+  process.env.LOCAL_API_TOKEN = 'security-test-token';
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/local-debug-toggle`);
+    assert.equal(response.status, 401);
+  } finally {
+    if (originalToken !== undefined) {
+      process.env.LOCAL_API_TOKEN = originalToken;
+    } else {
+      delete process.env.LOCAL_API_TOKEN;
+    }
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rejects unauthenticated requests to /api/rss-proxy when token is set', async () => {
+  const localApi = await setupApiDir({});
+  const originalToken = process.env.LOCAL_API_TOKEN;
+  process.env.LOCAL_API_TOKEN = 'security-test-token';
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=https://example.com/rss`);
+    assert.equal(response.status, 401);
+  } finally {
+    if (originalToken !== undefined) {
+      process.env.LOCAL_API_TOKEN = originalToken;
+    } else {
+      delete process.env.LOCAL_API_TOKEN;
+    }
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('allows unauthenticated requests to /api/service-status (health check exempt)', async () => {
+  const localApi = await setupApiDir({});
+  const originalToken = process.env.LOCAL_API_TOKEN;
+  process.env.LOCAL_API_TOKEN = 'security-test-token';
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/service-status`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.success, true);
+  } finally {
+    if (originalToken !== undefined) {
+      process.env.LOCAL_API_TOKEN = originalToken;
+    } else {
+      delete process.env.LOCAL_API_TOKEN;
+    }
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rss-proxy blocks requests to localhost (SSRF protection)', async () => {
+  const localApi = await setupApiDir({});
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=http://127.0.0.1:3000`);
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.ok(body.error.includes('private') || body.error.includes('localhost'));
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rss-proxy blocks requests to private IP ranges (SSRF protection)', async () => {
+  const localApi = await setupApiDir({});
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    // Test 192.168.x.x range
+    const response1 = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=http://192.168.1.1/`);
+    assert.equal(response1.status, 403);
+
+    // Test 10.x.x.x range
+    const response2 = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=http://10.0.0.1/`);
+    assert.equal(response2.status, 403);
+
+    // Test 172.16-31.x.x range
+    const response3 = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=http://172.16.0.1/`);
+    assert.equal(response3.status, 403);
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rss-proxy blocks non-http protocols (SSRF protection)', async () => {
+  const localApi = await setupApiDir({});
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=file:///etc/passwd`);
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.ok(body.error.includes('http'));
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('rss-proxy blocks URLs with credentials (SSRF protection)', async () => {
+  const localApi = await setupApiDir({});
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/rss-proxy?url=http://user:pass@example.com/rss`);
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.ok(body.error.includes('credentials'));
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+  }
+});
+
+test('traffic log strips query strings from entries to protect privacy', async () => {
+  const localApi = await setupApiDir({
+    'test-endpoint.js': `
+      export default async function handler() {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+    `,
+  });
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    // Make a request that will be recorded in the traffic log
+    await fetch(`http://127.0.0.1:${port}/api/test-endpoint?secret=value&key=data`);
+
+    // Retrieve the traffic log
+    const logResponse = await fetch(`http://127.0.0.1:${port}/api/local-traffic-log`);
+    assert.equal(logResponse.status, 200);
+    const logBody = await logResponse.json();
+
+    // Verify query strings are stripped
+    const entry = logBody.entries.find(e => e.path.includes('test-endpoint'));
+    assert.ok(entry, 'Traffic log should contain the test-endpoint entry');
+    assert.equal(entry.path, '/api/test-endpoint');
+    assert.ok(!entry.path.includes('secret='), 'Query string should be stripped from traffic log');
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+  }
+});
