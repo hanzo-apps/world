@@ -46,6 +46,7 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
   }
 
   let channels = loadChannelsFromStorage();
+  let suppressRowClick = false;
 
   /** Reads current row order from DOM and persists to storage. */
   function applyOrderFromDom(listEl: HTMLElement): void {
@@ -99,6 +100,10 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
       if (dragStarted) {
         dragging.classList.remove('live-news-manage-row-dragging');
         applyOrderFromDom(listEl);
+        suppressRowClick = true;
+        setTimeout(() => {
+          suppressRowClick = false;
+        }, 0);
       }
       dragging = null;
       dragStarted = false;
@@ -118,8 +123,8 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
       row.appendChild(nameSpan);
 
       row.addEventListener('click', (e) => {
-        // Don't open edit if row was just dragged
-        if (row.classList.contains('live-news-manage-row-dragging')) return;
+        // Suppress click immediately after drag-drop to avoid accidental edit open.
+        if (suppressRowClick || row.classList.contains('live-news-manage-row-dragging')) return;
         if ((e.target as HTMLElement).closest('input, button, textarea, select')) return;
         e.preventDefault();
         showEditForm(row, ch, listEl);

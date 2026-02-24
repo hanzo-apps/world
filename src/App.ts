@@ -200,6 +200,7 @@ export class App {
   private readonly UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
   private updateCheckIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
+  private panelDragCleanupHandlers: Array<() => void> = [];
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -2089,6 +2090,10 @@ export class App {
       this.boundIdleResetHandler = null;
     }
 
+    // Clean up panel drag listeners (used by mouse-based panel reordering).
+    this.panelDragCleanupHandlers.forEach((cleanup) => cleanup());
+    this.panelDragCleanupHandlers = [];
+
     // Clean up map and AIS
     this.map?.destroy();
     disconnectAisStream();
@@ -2611,6 +2616,19 @@ export class App {
     el.addEventListener('mousedown', onMouseDown);
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+
+    this.panelDragCleanupHandlers.push(() => {
+      el.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      isDragging = false;
+      dragStarted = false;
+      el.classList.remove('dragging');
+    });
   }
 
   private handlePanelDragMove(dragging: HTMLElement, clientX: number, clientY: number): void {
