@@ -1,16 +1,20 @@
 /**
- * AI Flow Settings — Web-only user preferences for AI analysis pipeline.
- * Controls which AI providers the InsightsPanel uses.
+ * Quick Settings — Web-only user preferences for AI pipeline and map behavior.
  * Desktop (Tauri) manages AI config via its own settings window.
+ *
+ * TODO: Migrate panel visibility, sources, and language selector into this
+ *       settings hub once the UI is extended with additional sections.
  */
 
 const STORAGE_KEY_BROWSER_MODEL = 'wm-ai-flow-browser-model';
 const STORAGE_KEY_CLOUD_LLM = 'wm-ai-flow-cloud-llm';
+const STORAGE_KEY_MAP_NEWS_FLASH = 'wm-map-news-flash';
 const EVENT_NAME = 'ai-flow-changed';
 
 export interface AiFlowSettings {
   browserModel: boolean;
   cloudLlm: boolean;
+  mapNewsFlash: boolean;
 }
 
 function readBool(key: string, defaultValue: boolean): boolean {
@@ -31,17 +35,29 @@ function writeBool(key: string, value: boolean): void {
   }
 }
 
+const STORAGE_KEY_MAP: Record<keyof AiFlowSettings, string> = {
+  browserModel: STORAGE_KEY_BROWSER_MODEL,
+  cloudLlm: STORAGE_KEY_CLOUD_LLM,
+  mapNewsFlash: STORAGE_KEY_MAP_NEWS_FLASH,
+};
+
+const DEFAULTS: AiFlowSettings = {
+  browserModel: false,
+  cloudLlm: true,
+  mapNewsFlash: true,
+};
+
 export function getAiFlowSettings(): AiFlowSettings {
   return {
-    browserModel: readBool(STORAGE_KEY_BROWSER_MODEL, false),
-    cloudLlm: readBool(STORAGE_KEY_CLOUD_LLM, true),
+    browserModel: readBool(STORAGE_KEY_BROWSER_MODEL, DEFAULTS.browserModel),
+    cloudLlm: readBool(STORAGE_KEY_CLOUD_LLM, DEFAULTS.cloudLlm),
+    mapNewsFlash: readBool(STORAGE_KEY_MAP_NEWS_FLASH, DEFAULTS.mapNewsFlash),
   };
 }
 
 export function setAiFlowSetting(key: keyof AiFlowSettings, value: boolean): void {
-  const storageKey = key === 'browserModel' ? STORAGE_KEY_BROWSER_MODEL : STORAGE_KEY_CLOUD_LLM;
-  writeBool(storageKey, value);
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  writeBool(STORAGE_KEY_MAP[key], value);
+  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { key } }));
 }
 
 export function isAnyAiProviderEnabled(): boolean {
@@ -49,8 +65,11 @@ export function isAnyAiProviderEnabled(): boolean {
   return s.cloudLlm || s.browserModel;
 }
 
-export function subscribeAiFlowChange(cb: () => void): () => void {
-  const handler = () => cb();
+export function subscribeAiFlowChange(cb: (changedKey?: keyof AiFlowSettings) => void): () => void {
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent).detail as { key?: keyof AiFlowSettings } | undefined;
+    cb(detail?.key);
+  };
   window.addEventListener(EVENT_NAME, handler);
   return () => window.removeEventListener(EVENT_NAME, handler);
 }

@@ -89,7 +89,38 @@
     "filterSources": "Filtra fonti...",
     "sourcesEnabled": "{{enabled}}/{{total}} abilitate",
     "finance": "FINANZA",
-    "toggleTheme": "Attiva/disattiva tema chiaro/scuro"
+    "toggleTheme": "Attiva/disattiva tema chiaro/scuro",
+    "panelDisplayCaption": "Scegli quali pannelli mostrare nella dashboard",
+    "tabGeneral": "Generale",
+    "tabPanels": "Pannelli",
+    "tabSources": "Fonti",
+    "languageLabel": "Lingua",
+    "sourceRegionAll": "Tutti",
+    "sourceRegionWorldwide": "Mondiale",
+    "sourceRegionUS": "Stati Uniti",
+    "sourceRegionMiddleEast": "Medio Oriente",
+    "sourceRegionAfrica": "Africa",
+    "sourceRegionLatAm": "America Latina",
+    "sourceRegionAsiaPacific": "Asia-Pacifico",
+    "sourceRegionEurope": "Europa",
+    "sourceRegionTopical": "Tematico",
+    "sourceRegionIntel": "Intelligence",
+    "sourceRegionTechNews": "Notizie Tech",
+    "sourceRegionAiMl": "IA e ML",
+    "sourceRegionStartupsVc": "Startup e VC",
+    "sourceRegionRegionalTech": "Ecosistemi Regionali",
+    "sourceRegionDeveloper": "Sviluppatori",
+    "sourceRegionCybersecurity": "Cybersicurezza",
+    "sourceRegionTechPolicy": "Politica e Ricerca",
+    "sourceRegionTechMedia": "Media e Podcast",
+    "sourceRegionMarkets": "Mercati e Analisi",
+    "sourceRegionFixedIncomeFx": "Reddito Fisso e Valute",
+    "sourceRegionCommodities": "Materie Prime",
+    "sourceRegionCryptoDigital": "Crypto e Digitale",
+    "sourceRegionCentralBanks": "Banche Centrali ed Economia",
+    "sourceRegionDeals": "Operazioni Societarie",
+    "sourceRegionFinRegulation": "Regolamentazione Finanziaria",
+    "sourceRegionGulfMena": "Golfo e MENA"
   },
   "panels": {
     "liveNews": "Notizie in diretta",
@@ -105,6 +136,8 @@
     "gdeltIntel": "Intelligence in tempo reale",
     "cascade": "Cascata infrastrutturale",
     "politics": "Notizie mondiali",
+    "us": "Stati Uniti",
+    "europe": "Europa",
     "middleeast": "Medio Oriente",
     "africa": "Africa",
     "latam": "America Latina",
@@ -910,8 +943,7 @@
         "minutesAgo": "{{count}} min fa",
         "hoursAgo": "{{count}} h fa",
         "daysAgo": "{{count}} g fa"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "satelliteFires": {
       "noData": "Nessun dato sugli incendi disponibile",
@@ -1064,7 +1096,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "Impostazioni analisi IA",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "IA Cloud (Groq & OpenRouter)",
       "aiFlowCloudDesc": "Invia i titoli al cloud per il riepilogo IA (consigliato)",
       "aiFlowBrowserLabel": "Modello locale del browser",
@@ -1078,7 +1115,7 @@
       "aiFlowStatusBrowserOnly": "Solo modello browser",
       "aiFlowStatusDisabled": "Nessun fornitore IA abilitato",
       "insightsDisabledTitle": "L'analisi IA è disattivata",
-      "insightsDisabledHint": "Abilita i fornitori usando il pulsante ⚙ sopra"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "etfFlows": {
       "unavailable": "Dati ETF temporaneamente non disponibili",
@@ -1187,7 +1224,14 @@
       "cancel": "Annulla",
       "confirmDelete": "Eliminare questo canale?",
       "confirmTitle": "Conferma",
-      "restoreDefaults": "Ripristina canali predefiniti"
+      "restoreDefaults": "Ripristina canali predefiniti",
+      "availableChannels": "Canali disponibili",
+      "customChannel": "Canale personalizzato",
+      "regionNorthAmerica": "Nord America",
+      "regionEurope": "Europa",
+      "regionLatinAmerica": "America Latina",
+      "regionAsia": "Asia",
+      "regionAfrica": "Africa"
     }
   },
   "popups": {

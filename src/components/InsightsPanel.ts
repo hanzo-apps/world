@@ -12,7 +12,6 @@ import { SITE_VARIANT } from '@/config';
 import { deletePersistentCache, getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import { t } from '@/services/i18n';
 import { isDesktopRuntime } from '@/services/runtime';
-import { AiFlowPopup } from './AiFlowPopup';
 import { getAiFlowSettings, isAnyAiProviderEnabled, subscribeAiFlowChange } from '@/services/ai-flow-settings';
 import type { ClusteredEvent, FocalPoint, MilitaryFlight } from '@/types';
 
@@ -25,7 +24,6 @@ export class InsightsPanel extends Panel {
   private lastFocalPoints: FocalPoint[] = [];
   private lastMilitaryFlights: MilitaryFlight[] = [];
   private lastClusters: ClusteredEvent[] = [];
-  private aiFlowPopup: AiFlowPopup | null = null;
   private aiFlowUnsubscribe: (() => void) | null = null;
   private updateGeneration = 0;
   private static readonly BRIEF_COOLDOWN_MS = 120000; // 2 min cooldown (API has limits)
@@ -44,14 +42,10 @@ export class InsightsPanel extends Panel {
       this.isHidden = true;
     }
 
-    // Web-only: add gear icon for AI flow settings
+    // Web-only: subscribe to AI flow changes so toggling providers re-runs analysis
     if (!isDesktopRuntime() && !isMobileDevice()) {
-      this.aiFlowPopup = new AiFlowPopup();
-      const headerLeft = this.header.querySelector('.panel-header-left');
-      if (headerLeft) {
-        headerLeft.appendChild(this.aiFlowPopup.wrapper);
-      }
-      this.aiFlowUnsubscribe = subscribeAiFlowChange(() => {
+      this.aiFlowUnsubscribe = subscribeAiFlowChange((changedKey) => {
+        if (changedKey === 'mapNewsFlash') return;
         void this.onAiFlowChanged();
       });
     }
@@ -712,7 +706,6 @@ export class InsightsPanel extends Panel {
   }
 
   public override destroy(): void {
-    this.aiFlowPopup?.destroy();
     this.aiFlowUnsubscribe?.();
     super.destroy();
   }

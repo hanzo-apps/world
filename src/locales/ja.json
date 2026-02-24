@@ -90,7 +90,37 @@
     "sourcesEnabled": "{{enabled}}/{{total}} 有効",
     "finance": "金融",
     "toggleTheme": "ダーク/ライトモード切替",
-    "panelDisplayCaption": "ダッシュボードに表示するパネルを選択"
+    "panelDisplayCaption": "ダッシュボードに表示するパネルを選択",
+    "tabGeneral": "一般",
+    "tabPanels": "パネル",
+    "tabSources": "ソース",
+    "languageLabel": "言語",
+    "sourceRegionAll": "すべて",
+    "sourceRegionWorldwide": "世界",
+    "sourceRegionUS": "アメリカ",
+    "sourceRegionMiddleEast": "中東",
+    "sourceRegionAfrica": "アフリカ",
+    "sourceRegionLatAm": "ラテンアメリカ",
+    "sourceRegionAsiaPacific": "アジア太平洋",
+    "sourceRegionEurope": "ヨーロッパ",
+    "sourceRegionTopical": "トピック",
+    "sourceRegionIntel": "インテリジェンス",
+    "sourceRegionTechNews": "テックニュース",
+    "sourceRegionAiMl": "AI・ML",
+    "sourceRegionStartupsVc": "スタートアップ・VC",
+    "sourceRegionRegionalTech": "地域エコシステム",
+    "sourceRegionDeveloper": "開発者",
+    "sourceRegionCybersecurity": "サイバーセキュリティ",
+    "sourceRegionTechPolicy": "政策・研究",
+    "sourceRegionTechMedia": "メディア・ポッドキャスト",
+    "sourceRegionMarkets": "市場・分析",
+    "sourceRegionFixedIncomeFx": "債券・外国為替",
+    "sourceRegionCommodities": "コモディティ",
+    "sourceRegionCryptoDigital": "暗号資産・デジタル",
+    "sourceRegionCentralBanks": "中央銀行・経済",
+    "sourceRegionDeals": "M&A・企業",
+    "sourceRegionFinRegulation": "金融規制",
+    "sourceRegionGulfMena": "湾岸・中東"
   },
   "panels": {
     "liveNews": "ライブニュース",
@@ -107,6 +137,8 @@
     "gdeltIntel": "ライブインテリジェンス",
     "cascade": "インフラカスケード",
     "politics": "世界ニュース",
+    "us": "アメリカ合衆国",
+    "europe": "ヨーロッパ",
     "middleeast": "中東",
     "africa": "アフリカ",
     "latam": "中南米",
@@ -811,7 +843,12 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "aiFlowTitle": "AI分析設定",
+      "settingsTitle": "Settings",
+      "sectionMap": "Map",
+      "sectionAi": "AI Analysis",
+      "mapFlashLabel": "Live Event Pulse",
+      "mapFlashDesc": "Flash locations on the map when breaking news arrives",
+      "aiFlowTitle": "Settings",
       "aiFlowCloudLabel": "クラウドAI（Groq & OpenRouter）",
       "aiFlowCloudDesc": "見出しをクラウドに送信してAI要約（推奨）",
       "aiFlowBrowserLabel": "ブラウザローカルモデル",
@@ -825,7 +862,7 @@
       "aiFlowStatusBrowserOnly": "ブラウザモデルのみ",
       "aiFlowStatusDisabled": "AIプロバイダーが有効になっていません",
       "insightsDisabledTitle": "AI分析が無効です",
-      "insightsDisabledHint": "上の⚙ボタンでプロバイダーを有効にしてください"
+      "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
     "cascade": {
       "noImpacts": "国への影響未検出",
@@ -1037,8 +1074,7 @@
         "minutesAgo": "{{count}}分前",
         "hoursAgo": "{{count}}時間前",
         "daysAgo": "{{count}}日前"
-      },
-      "hideFindings": "Hide Intelligence Findings"
+      }
     },
     "countryTimeline": {
       "now": "現在",
@@ -1188,7 +1224,14 @@
       "cancel": "キャンセル",
       "confirmDelete": "このチャンネルを削除しますか？",
       "confirmTitle": "確認",
-      "restoreDefaults": "デフォルトのチャンネルを復元"
+      "restoreDefaults": "デフォルトのチャンネルを復元",
+      "availableChannels": "利用可能なチャンネル",
+      "customChannel": "カスタムチャンネル",
+      "regionNorthAmerica": "北米",
+      "regionEurope": "ヨーロッパ",
+      "regionLatinAmerica": "中南米",
+      "regionAsia": "アジア",
+      "regionAfrica": "アフリカ"
     }
   },
   "popups": {
