@@ -15,6 +15,18 @@ import {
 import { CHROME_UA } from '../../../_shared/constants';
 
 // ======================================================================
+// Reasoning preamble detection
+// ======================================================================
+
+export const TASK_NARRATION = /^(we need to|i need to|let me|i'll |i should|i will |the task is|the instructions|according to the rules|so we need to|okay[,.]\s*(i'll|let me|so|we need|the task|i should|i will)|sure[,.]\s*(i'll|let me|so|we need|the task|i should|i will|here))/i;
+export const PROMPT_ECHO = /^(summarize the top story|summarize the key|rules:|here are the rules|the top story is likely)/i;
+
+export function hasReasoningPreamble(text: string): boolean {
+  const trimmed = text.trim();
+  return TASK_NARRATION.test(trimmed) || PROMPT_ECHO.test(trimmed);
+}
+
+// ======================================================================
 // SummarizeArticle: Multi-provider LLM summarization with Redis caching
 // Ported from api/_summarize-handler.js
 // ======================================================================
@@ -158,15 +170,28 @@ export async function summarizeArticle(
 
     const data = await response.json() as any;
     const message = data.choices?.[0]?.message;
-    let rawContent = (typeof message?.content === 'string' ? message.content.trim() : '')
-      || (typeof message?.reasoning === 'string' ? message.reasoning.trim() : '');
+    let rawContent = typeof message?.content === 'string' ? message.content.trim() : '';
 
-    // Strip <think>...</think> reasoning tokens (common in DeepSeek-R1, QwQ, etc.)
-    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Strip thinking/reasoning tags from various model formats
+    rawContent = rawContent
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<\|thinking\|>[\s\S]*?<\|\/thinking\|>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<reflection>[\s\S]*?<\/reflection>/gi, '')
+      .trim();
 
-    // Some models output unterminated <think> blocks -- strip from <think> to end if no closing tag
-    if (rawContent.includes('<think>') && !rawContent.includes('</think>')) {
-      rawContent = rawContent.replace(/<think>[\s\S]*/gi, '').trim();
+    // Strip unterminated thinking blocks (no closing tag)
+    rawContent = rawContent
+      .replace(/<think>[\s\S]*/gi, '')
+      .replace(/<\|thinking\|>[\s\S]*/gi, '')
+      .replace(/<reasoning>[\s\S]*/gi, '')
+      .replace(/<reflection>[\s\S]*/gi, '')
+      .trim();
+
+    // Reject plain-text reasoning for summarization modes only
+    if (['brief', 'analysis'].includes(mode) && hasReasoningPreamble(rawContent)) {
+      console.warn(`[SummarizeArticle:${provider}] Reasoning preamble detected, rejecting`);
+      rawContent = '';
     }
 
     const summary = rawContent;
