@@ -5,7 +5,7 @@ declare const process: { env: Record<string, string | undefined> };
 // ========================================================================
 
 export const CACHE_TTL_SECONDS = 86400; // 24 hours
-export const CACHE_VERSION = 'v3';
+export const CACHE_VERSION = 'v4';
 
 // ========================================================================
 // Hash utility (unified FNV-1a 52-bit -- H-7 fix)
