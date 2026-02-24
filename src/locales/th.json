@@ -50,6 +50,29 @@
       "base": "ฐานทัพ",
       "nuclear": "สิ่งอำนวยความสะดวกนิวเคลียร์",
       "port": "ท่าเรือ"
+    },
+    "levels": {
+      "critical": "วิกฤต",
+      "high": "สูง",
+      "elevated": "ยกระดับ",
+      "moderate": "ปานกลาง",
+      "normal": "ปกติ",
+      "low": "ต่ำ"
+    },
+    "trends": {
+      "rising": "เพิ่มขึ้น",
+      "falling": "ลดลง",
+      "stable": "คงที่"
+    },
+    "fallback": {
+      "instabilityIndex": "**ดัชนีความไม่มั่นคง: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "ตรวจพบการประท้วงที่ยังดำเนินอยู่ {{count}} รายการ",
+      "aircraftTracked": "ติดตามอากาศยานทหาร {{count}} ลำ",
+      "vesselsTracked": "ติดตามเรือรบ {{count}} ลำ",
+      "internetOutages": "การหยุดชะงักอินเทอร์เน็ต {{count}} รายการ",
+      "recentEarthquakes": "แผ่นดินไหวล่าสุด {{count}} ครั้ง",
+      "stockIndex": "ดัชนีหุ้น: {{value}}",
+      "recentHeadlines": "**พาดหัวข่าวล่าสุด:**"
     }
   },
   "header": {
@@ -1779,6 +1802,7 @@
     "information": "ข้อมูล",
     "shareStory": "แชร์เรื่องราว",
     "exportImage": "ส่งออกรูปภาพ",
+    "exportPdf": "ส่งออก PDF",
     "new": "ใหม่",
     "live": "สด",
     "cached": "แคช",

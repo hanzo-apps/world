@@ -50,6 +50,29 @@
       "base": "Căn cứ Quân sự",
       "nuclear": "Cơ sở Hạt nhân",
       "port": "Cảng biển"
+    },
+    "levels": {
+      "critical": "Nghiêm trọng",
+      "high": "Cao",
+      "elevated": "Nâng cao",
+      "moderate": "Trung bình",
+      "normal": "Bình thường",
+      "low": "Thấp"
+    },
+    "trends": {
+      "rising": "Tăng",
+      "falling": "Giảm",
+      "stable": "Ổn định"
+    },
+    "fallback": {
+      "instabilityIndex": "**Chỉ số Bất ổn: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "Phát hiện {{count}} cuộc biểu tình đang diễn ra",
+      "aircraftTracked": "Đang theo dõi {{count}} máy bay quân sự",
+      "vesselsTracked": "Đang theo dõi {{count}} tàu quân sự",
+      "internetOutages": "{{count}} sự cố gián đoạn internet",
+      "recentEarthquakes": "{{count}} trận động đất gần đây",
+      "stockIndex": "Chỉ số chứng khoán: {{value}}",
+      "recentHeadlines": "**Tin tức gần đây:**"
     }
   },
   "header": {
@@ -1779,6 +1802,7 @@
     "information": "Thông tin",
     "shareStory": "Chia sẻ bài viết",
     "exportImage": "Xuất Hình ảnh",
+    "exportPdf": "Xuất PDF",
     "new": "MỚI",
     "live": "TRỰC TIẾP",
     "cached": "ĐÃ LƯU",

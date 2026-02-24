@@ -50,6 +50,29 @@
       "base": "Military Bases",
       "nuclear": "Nuclear Facilities",
       "port": "Ports"
+    },
+    "levels": {
+      "critical": "Critical",
+      "high": "High",
+      "elevated": "Elevated",
+      "moderate": "Moderate",
+      "normal": "Normal",
+      "low": "Low"
+    },
+    "trends": {
+      "rising": "Rising",
+      "falling": "Falling",
+      "stable": "Stable"
+    },
+    "fallback": {
+      "instabilityIndex": "**Instability Index: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "{{count}} active protests detected",
+      "aircraftTracked": "{{count}} military aircraft tracked",
+      "vesselsTracked": "{{count}} military vessels tracked",
+      "internetOutages": "{{count}} internet outages",
+      "recentEarthquakes": "{{count}} recent earthquakes",
+      "stockIndex": "Stock index: {{value}}",
+      "recentHeadlines": "**Recent headlines:**"
     }
   },
   "header": {
@@ -1830,6 +1853,7 @@
     "information": "Information",
     "shareStory": "Share story",
     "exportImage": "Export Image",
+    "exportPdf": "Export PDF",
     "new": "NEW",
     "live": "LIVE",
     "cached": "CACHED",
