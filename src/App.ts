@@ -1159,6 +1159,7 @@ export class App {
     GB: { n: 58.7, s: 49.9, e: 1.8, w: -8.2 }, DE: { n: 55.1, s: 47.3, e: 15.0, w: 5.9 },
     FR: { n: 51.1, s: 41.3, e: 9.6, w: -5.1 }, TR: { n: 42.1, s: 36, e: 44.8, w: 26 },
     BR: { n: 5.3, s: -33.8, e: -34.8, w: -73.9 },
+    MX: { n: 32.7, s: 14.5, e: -86.7, w: -118.4 },
   };
 
   private static COUNTRY_ALIASES: Record<string, string[]> = {
@@ -1184,6 +1185,7 @@ export class App {
     GB: ['united kingdom', 'british', 'london', 'uk '],
     BR: ['brazil', 'brazilian', 'brasilia', 'lula', 'bolsonaro'],
     AE: ['united arab emirates', 'uae', 'emirati', 'dubai', 'abu dhabi'],
+    MX: ['mexico', 'mexican', 'cartel', 'sinaloa', 'jalisco', 'cjng', 'tijuana', 'juarez', 'fentanyl', 'sheinbaum', 'sedena', 'narco'],
   };
 
   private static otherCountryTermsCache: Map<string, string[]> = new Map();
