@@ -186,6 +186,27 @@ async function fetchLocalWithStartupRetry(
     : new Error('Local API unavailable');
 }
 
+// ── Security threat model for the fetch patch ──────────────────────────
+// The LOCAL_API_TOKEN exists to prevent OTHER local processes from
+// accessing the sidecar on port 46123. The renderer IS the intended
+// client — injecting the token automatically is correct by design.
+//
+// If the renderer is compromised (XSS, supply chain), the attacker
+// already has access to strictly more powerful Tauri IPC commands
+// (get_all_secrets, set_secret, etc.) via window.__TAURI_INTERNALS__.
+// The fetch patch does not expand the attack surface beyond what IPC
+// already provides.
+//
+// Defense layers that protect the renderer trust boundary:
+//   1. CSP: script-src 'self' (no unsafe-inline/eval)
+//   2. IPC origin validation: sensitive commands gated to trusted windows
+//   3. Sidecar allowlists: env-update restricted to ALLOWED_ENV_KEYS
+//   4. DevTools disabled in production builds
+//
+// The token has a 5-minute TTL in the closure to limit exposure window
+// if IPC access is revoked mid-session.
+const TOKEN_TTL_MS = 5 * 60 * 1000;
+
 export function installRuntimeFetchPatch(): void {
   if (!isDesktopRuntime() || typeof window === 'undefined' || (window as unknown as Record<string, unknown>).__wmFetchPatched) {
     return;
@@ -194,6 +215,7 @@ export function installRuntimeFetchPatch(): void {
   const nativeFetch = window.fetch.bind(window);
   const localBase = getApiBaseUrl();
   let localApiToken: string | null = null;
+  let tokenFetchedAt = 0;
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const target = getApiTargetFromRequestInput(input);
@@ -207,11 +229,16 @@ export function installRuntimeFetchPatch(): void {
       return nativeFetch(input, init);
     }
 
-    if (!localApiToken) {
+    const tokenExpired = localApiToken && (Date.now() - tokenFetchedAt > TOKEN_TTL_MS);
+    if (!localApiToken || tokenExpired) {
       try {
         const { tryInvokeTauri } = await import('@/services/tauri-bridge');
         localApiToken = await tryInvokeTauri<string>('get_local_api_token');
-      } catch { /* token unavailable — sidecar may not require it */ }
+        tokenFetchedAt = Date.now();
+      } catch {
+        localApiToken = null;
+        tokenFetchedAt = 0;
+      }
     }
 
     const headers = new Headers(init?.headers);
