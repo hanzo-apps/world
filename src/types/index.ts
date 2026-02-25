@@ -25,6 +25,10 @@ export interface NewsItem {
   lon?: number;
   locationName?: string;
   lang?: string;
+  // Happy variant: positive content category
+  happyCategory?: import('@/services/positive-classifier').HappyContentCategory;
+  // Image URL extracted from RSS media/enclosure tags
+  imageUrl?: string;
 }
 
 export type VelocityLevel = 'normal' | 'elevated' | 'spike';
@@ -519,6 +523,12 @@ export interface MapLayers {
   commodityHubs: boolean;
   // Gulf FDI layers
   gulfInvestments: boolean;
+  // Happy variant layers
+  positiveEvents: boolean;
+  kindness: boolean;
+  happiness: boolean;
+  speciesRecovery: boolean;
+  renewableInstallations: boolean;
 }
 
 export interface AIDataCenter {

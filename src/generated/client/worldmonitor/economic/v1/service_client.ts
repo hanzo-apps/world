@@ -146,6 +146,26 @@ export interface MacroMeta {
   qqqSparkline: number[];
 }
 
+export interface GetEnergyCapacityRequest {
+  energySources: string[];
+  years: number;
+}
+
+export interface GetEnergyCapacityResponse {
+  series: EnergyCapacitySeries[];
+}
+
+export interface EnergyCapacitySeries {
+  energySource: string;
+  name: string;
+  data: EnergyCapacityYear[];
+}
+
+export interface EnergyCapacityYear {
+  year: number;
+  capacityMw: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -288,6 +308,30 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetMacroSignalsResponse;
+  }
+
+  async getEnergyCapacity(req: GetEnergyCapacityRequest, options?: EconomicServiceCallOptions): Promise<GetEnergyCapacityResponse> {
+    let path = "/api/economic/v1/get-energy-capacity";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(req),
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetEnergyCapacityResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

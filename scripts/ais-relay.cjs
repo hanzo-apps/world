@@ -12,6 +12,8 @@
 const http = require('http');
 const https = require('https');
 const zlib = require('zlib');
+const path = require('path');
+const { readFileSync } = require('fs');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 
@@ -113,6 +115,177 @@ function sendPreGzipped(req, res, statusCode, headers, rawBody, gzippedBody) {
   } else {
     safeEnd(res, statusCode, headers, rawBody);
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Telegram OSINT ingestion (public channels) → Early Signals
+// Web-first: runs on this Railway relay process, serves /telegram/feed
+// Requires env:
+// - TELEGRAM_API_ID
+// - TELEGRAM_API_HASH
+// - TELEGRAM_SESSION (StringSession)
+// ─────────────────────────────────────────────────────────────
+const TELEGRAM_ENABLED = Boolean(process.env.TELEGRAM_API_ID && process.env.TELEGRAM_API_HASH && process.env.TELEGRAM_SESSION);
+const TELEGRAM_POLL_INTERVAL_MS = Math.max(15_000, Number(process.env.TELEGRAM_POLL_INTERVAL_MS || 60_000));
+const TELEGRAM_MAX_FEED_ITEMS = Math.max(50, Number(process.env.TELEGRAM_MAX_FEED_ITEMS || 200));
+const TELEGRAM_MAX_TEXT_CHARS = Math.max(200, Number(process.env.TELEGRAM_MAX_TEXT_CHARS || 800));
+
+const telegramState = {
+  client: null,
+  channels: [],
+  cursorByHandle: Object.create(null),
+  items: [],
+  lastPollAt: 0,
+  lastError: null,
+  startedAt: Date.now(),
+};
+
+function loadTelegramChannels() {
+  // Product-managed curated list lives in repo root under data/ (shared by web + desktop).
+  // Relay is executed from scripts/, so resolve ../data.
+  const p = path.join(__dirname, '..', 'data', 'telegram-channels.json');
+  const set = String(process.env.TELEGRAM_CHANNEL_SET || 'full').toLowerCase();
+  try {
+    const raw = JSON.parse(readFileSync(p, 'utf8'));
+    const bucket = raw?.channels?.[set];
+    const channels = Array.isArray(bucket) ? bucket : [];
+
+    telegramState.channels = channels
+      .filter(c => c && typeof c.handle === 'string' && c.handle.length > 1)
+      .map(c => ({
+        handle: String(c.handle).replace(/^@/, ''),
+        label: c.label ? String(c.label) : undefined,
+        topic: c.topic ? String(c.topic) : undefined,
+        region: c.region ? String(c.region) : undefined,
+        tier: c.tier != null ? Number(c.tier) : undefined,
+        enabled: c.enabled !== false,
+        maxMessages: c.maxMessages != null ? Number(c.maxMessages) : undefined,
+      }))
+      .filter(c => c.enabled);
+
+    if (!telegramState.channels.length) {
+      console.warn(`[Relay] Telegram channel set "${set}" is empty — no channels to poll`);
+    }
+
+    return telegramState.channels;
+  } catch (e) {
+    telegramState.channels = [];
+    telegramState.lastError = `failed to load telegram-channels.json: ${e?.message || String(e)}`;
+    return [];
+  }
+}
+
+function normalizeTelegramMessage(msg, channel) {
+  const textRaw = String(msg?.message || '');
+  const text = textRaw.slice(0, TELEGRAM_MAX_TEXT_CHARS);
+  const ts = msg?.date ? new Date(msg.date * 1000).toISOString() : new Date().toISOString();
+  return {
+    id: `${channel.handle}:${msg.id}`,
+    source: 'telegram',
+    channel: channel.handle,
+    channelTitle: channel.label || channel.handle,
+    url: `https://t.me/${channel.handle}/${msg.id}`,
+    ts,
+    text,
+    topic: channel.topic || 'other',
+    tags: [channel.region].filter(Boolean),
+    earlySignal: true,
+  };
+}
+
+async function initTelegramClientIfNeeded() {
+  if (!TELEGRAM_ENABLED) return false;
+  if (telegramState.client) return true;
+
+  const apiId = parseInt(String(process.env.TELEGRAM_API_ID || ''), 10);
+  const apiHash = String(process.env.TELEGRAM_API_HASH || '');
+  const sessionStr = String(process.env.TELEGRAM_SESSION || '');
+
+  if (!apiId || !apiHash || !sessionStr) return false;
+
+  try {
+    const { TelegramClient } = await import('telegram');
+    const { StringSession } = await import('telegram/sessions');
+
+    const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash, {
+      connectionRetries: 3,
+    });
+
+    await client.connect();
+    telegramState.client = client;
+    telegramState.lastError = null;
+    console.log('[Relay] Telegram client connected');
+    return true;
+  } catch (e) {
+    telegramState.lastError = `telegram init failed: ${e?.message || String(e)}`;
+    console.warn('[Relay] Telegram init failed:', telegramState.lastError);
+    return false;
+  }
+}
+
+async function pollTelegramOnce() {
+  const ok = await initTelegramClientIfNeeded();
+  if (!ok) return;
+
+  const channels = telegramState.channels.length ? telegramState.channels : loadTelegramChannels();
+  if (!channels.length) return;
+
+  const client = telegramState.client;
+  const newItems = [];
+
+  for (const channel of channels) {
+    const handle = channel.handle;
+    const minId = telegramState.cursorByHandle[handle] || 0;
+
+    try {
+      const entity = await client.getEntity(handle);
+      const msgs = await client.getMessages(entity, {
+        limit: Math.max(1, Math.min(50, channel.maxMessages || 25)),
+        minId,
+      });
+
+      for (const msg of msgs) {
+        if (!msg || !msg.id || !msg.message) continue;
+        const item = normalizeTelegramMessage(msg, channel);
+        newItems.push(item);
+        if (!telegramState.cursorByHandle[handle] || msg.id > telegramState.cursorByHandle[handle]) {
+          telegramState.cursorByHandle[handle] = msg.id;
+        }
+      }
+
+      // Gentle rate limiting between channels
+      await new Promise(r => setTimeout(r, Math.max(300, Number(process.env.TELEGRAM_RATE_LIMIT_MS || 800))));
+    } catch (e) {
+      const em = e?.message || String(e);
+      telegramState.lastError = `poll ${handle} failed: ${em}`;
+      console.warn('[Relay] Telegram poll error:', telegramState.lastError);
+    }
+  }
+
+  if (newItems.length) {
+    const seen = new Set();
+    telegramState.items = [...newItems, ...telegramState.items]
+      .filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      })
+      .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''))
+      .slice(0, TELEGRAM_MAX_FEED_ITEMS);
+  }
+
+  telegramState.lastPollAt = Date.now();
+}
+
+function startTelegramPollLoop() {
+  if (!TELEGRAM_ENABLED) return;
+  loadTelegramChannels();
+  // Don’t block server startup.
+  pollTelegramOnce().catch(e => console.warn('[Relay] Telegram poll error:', e?.message || e));
+  setInterval(() => {
+    pollTelegramOnce().catch(e => console.warn('[Relay] Telegram poll error:', e?.message || e));
+  }, TELEGRAM_POLL_INTERVAL_MS).unref?.();
+  console.log('[Relay] Telegram poll loop started');
 }
 
 function gzipSyncBuffer(body) {
@@ -1819,6 +1992,13 @@ const server = http.createServer(async (req, res) => {
       upstreamPaused,
       vessels: vessels.size,
       densityZones: Array.from(densityGrid.values()).filter(c => c.vessels.size >= 2).length,
+      telegram: {
+        enabled: TELEGRAM_ENABLED,
+        channels: telegramState.channels?.length || 0,
+        items: telegramState.items?.length || 0,
+        lastPollAt: telegramState.lastPollAt ? new Date(telegramState.lastPollAt).toISOString() : null,
+        hasError: !!telegramState.lastError,
+      },
       memory: {
         rss: `${(mem.rss / 1024 / 1024).toFixed(0)}MB`,
         heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB`,
@@ -1953,6 +2133,36 @@ const server = http.createServer(async (req, res) => {
 
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(diag, null, 2));
+  } else if (pathname === '/telegram' || pathname.startsWith('/telegram/')) {
+    // Telegram Early Signals feed (public channels)
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));
+      const topic = (url.searchParams.get('topic') || '').trim().toLowerCase();
+      const channel = (url.searchParams.get('channel') || '').trim().toLowerCase();
+
+      const items = Array.isArray(telegramState.items) ? telegramState.items : [];
+      const filtered = items.filter((it) => {
+        if (topic && String(it.topic || '').toLowerCase() !== topic) return false;
+        if (channel && String(it.channel || '').toLowerCase() !== channel) return false;
+        return true;
+      }).slice(0, limit);
+
+      sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=10',
+      }, JSON.stringify({
+        source: 'telegram',
+        earlySignal: true,
+        enabled: TELEGRAM_ENABLED,
+        count: filtered.length,
+        updatedAt: telegramState.lastPollAt ? new Date(telegramState.lastPollAt).toISOString() : null,
+        items: filtered,
+      }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal error' }));
+    }
   } else if (pathname.startsWith('/rss')) {
     // Proxy RSS feeds that block Vercel IPs
     let feedUrl = '';
@@ -2262,6 +2472,7 @@ const wss = new WebSocketServer({ server });
 
 server.listen(PORT, () => {
   console.log(`[Relay] WebSocket relay on port ${PORT}`);
+  startTelegramPollLoop();
 });
 
 wss.on('connection', (ws, req) => {

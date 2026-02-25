@@ -1,9 +1,10 @@
 /**
  * Unit tests for flushStaleRefreshes logic.
  *
- * Executes the actual flushStaleRefreshes method body extracted from App.ts
- * using deterministic fake timers. This avoids Playwright/browser overhead,
- * avoids wall-clock sleeps, and keeps behavior coverage aligned with source.
+ * Executes the actual flushStaleRefreshes method body extracted from
+ * refresh-scheduler.ts using deterministic fake timers. This avoids
+ * Playwright/browser overhead, avoids wall-clock sleeps, and keeps
+ * behavior coverage aligned with source.
  */
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
@@ -13,12 +14,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const appSrc = readFileSync(resolve(__dirname, '..', 'src', 'App.ts'), 'utf-8');
+const appSrc = readFileSync(resolve(__dirname, '..', 'src', 'app', 'refresh-scheduler.ts'), 'utf-8');
 
 function extractMethodBody(source, methodName) {
-  const signature = new RegExp(`private\\s+${methodName}\\s*\\(\\)\\s*(?::[^\\{]+)?\\{`);
+  const signature = new RegExp(`(?:private\\s+)?${methodName}\\s*\\(\\)\\s*(?::[^\\{]+)?\\{`);
   const match = signature.exec(source);
-  if (!match) throw new Error(`Could not find ${methodName} in App.ts`);
+  if (!match) throw new Error(`Could not find ${methodName} in source`);
 
   const bodyStart = match.index + match[0].length;
   let depth = 1;

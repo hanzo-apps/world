@@ -578,6 +578,14 @@ components:
                 timespan:
                     type: string
                     description: Time span filter (e.g., "15min", "1h", "24h").
+                toneFilter:
+                    type: string
+                    description: |-
+                        Tone filter appended to query (e.g., "tone>5" for positive, "tone<-5" for negative).
+                         Left empty to skip tone filtering.
+                sort:
+                    type: string
+                    description: 'Sort mode: "DateDesc" (default), "ToneDesc", "ToneAsc", "HybridRel".'
             required:
                 - query
             description: SearchGdeltDocumentsRequest specifies filters for searching GDELT news articles.
