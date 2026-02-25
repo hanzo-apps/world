@@ -15,7 +15,7 @@ import { createCircuitBreaker } from '@/utils';
 // ---- Client + Circuit Breaker ----
 
 const client = new CyberServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
-const breaker = createCircuitBreaker<ListCyberThreatsResponse>({ name: 'Cyber Threats' });
+const breaker = createCircuitBreaker<ListCyberThreatsResponse>({ name: 'Cyber Threats', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 const emptyFallback: ListCyberThreatsResponse = { threats: [], pagination: undefined };
 

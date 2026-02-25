@@ -7,6 +7,7 @@ import "worldmonitor/economic/v1/get_fred_series.proto";
 import "worldmonitor/economic/v1/list_world_bank_indicators.proto";
 import "worldmonitor/economic/v1/get_energy_prices.proto";
 import "worldmonitor/economic/v1/get_macro_signals.proto";
+import "worldmonitor/economic/v1/get_energy_capacity.proto";
 
 // EconomicService provides APIs for macroeconomic data from FRED, World Bank, and EIA.
 service EconomicService {
@@ -30,5 +31,10 @@ service EconomicService {
   // GetMacroSignals computes 7 macro signals from 6 upstream sources with BUY/CASH verdict.
   rpc GetMacroSignals(GetMacroSignalsRequest) returns (GetMacroSignalsResponse) {
     option (sebuf.http.config) = {path: "/get-macro-signals"};
+  }
+
+  // GetEnergyCapacity retrieves installed capacity data (solar, wind, coal) from EIA.
+  rpc GetEnergyCapacity(GetEnergyCapacityRequest) returns (GetEnergyCapacityResponse) {
+    option (sebuf.http.config) = {path: "/get-energy-capacity"};
   }
 }

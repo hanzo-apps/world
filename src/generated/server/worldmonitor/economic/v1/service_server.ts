@@ -146,6 +146,26 @@ export interface MacroMeta {
   qqqSparkline: number[];
 }
 
+export interface GetEnergyCapacityRequest {
+  energySources: string[];
+  years: number;
+}
+
+export interface GetEnergyCapacityResponse {
+  series: EnergyCapacitySeries[];
+}
+
+export interface EnergyCapacitySeries {
+  energySource: string;
+  name: string;
+  data: EnergyCapacityYear[];
+}
+
+export interface EnergyCapacityYear {
+  year: number;
+  capacityMw: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -195,6 +215,7 @@ export interface EconomicServiceHandler {
   listWorldBankIndicators(ctx: ServerContext, req: ListWorldBankIndicatorsRequest): Promise<ListWorldBankIndicatorsResponse>;
   getEnergyPrices(ctx: ServerContext, req: GetEnergyPricesRequest): Promise<GetEnergyPricesResponse>;
   getMacroSignals(ctx: ServerContext, req: GetMacroSignalsRequest): Promise<GetMacroSignalsResponse>;
+  getEnergyCapacity(ctx: ServerContext, req: GetEnergyCapacityRequest): Promise<GetEnergyCapacityResponse>;
 }
 
 export function createEconomicServiceRoutes(
@@ -353,6 +374,49 @@ export function createEconomicServiceRoutes(
 
           const result = await handler.getMacroSignals(ctx, body);
           return new Response(JSON.stringify(result as GetMacroSignalsResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/economic/v1/get-energy-capacity",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = await req.json() as GetEnergyCapacityRequest;
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getEnergyCapacity", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getEnergyCapacity(ctx, body);
+          return new Response(JSON.stringify(result as GetEnergyCapacityResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

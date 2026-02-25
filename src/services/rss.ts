@@ -160,6 +160,76 @@ function canQueueAiClassification(title: string): boolean {
   return true;
 }
 
+/**
+ * Extract the best image URL from an RSS item element.
+ * Tries multiple RSS image sources in priority order:
+ * 1. media:content (Yahoo MRSS namespace)
+ * 2. media:thumbnail (Yahoo MRSS namespace)
+ * 3. <enclosure> with image type
+ * 4. First <img> in description/content:encoded
+ * Returns undefined if no image found. Never throws.
+ */
+function extractImageUrl(item: Element): string | undefined {
+  const MRSS_NS = 'http://search.yahoo.com/mrss/';
+  const IMG_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|avif|svg)(\?|$)/i;
+
+  try {
+    // 1. media:content with MRSS namespace
+    const mediaContents = item.getElementsByTagNameNS(MRSS_NS, 'content');
+    for (let i = 0; i < mediaContents.length; i++) {
+      const el = mediaContents[i]!;
+      const url = el.getAttribute('url');
+      if (!url) continue;
+      const medium = el.getAttribute('medium');
+      const type = el.getAttribute('type');
+      // Accept if medium is image, type contains image, URL looks like image, or no type specified
+      if (medium === 'image' || type?.startsWith('image/') || IMG_EXTENSIONS.test(url) || (!type && !medium)) {
+        return url;
+      }
+    }
+  } catch {
+    // Namespace not supported or other XML issue, fall through
+  }
+
+  try {
+    // 2. media:thumbnail with MRSS namespace
+    const thumbnails = item.getElementsByTagNameNS(MRSS_NS, 'thumbnail');
+    for (let i = 0; i < thumbnails.length; i++) {
+      const url = thumbnails[i]!.getAttribute('url');
+      if (url) return url;
+    }
+  } catch {
+    // Fall through
+  }
+
+  try {
+    // 3. <enclosure> with image type
+    const enclosures = item.getElementsByTagName('enclosure');
+    for (let i = 0; i < enclosures.length; i++) {
+      const el = enclosures[i]!;
+      const type = el.getAttribute('type');
+      const url = el.getAttribute('url');
+      if (url && type?.startsWith('image/')) return url;
+    }
+  } catch {
+    // Fall through
+  }
+
+  try {
+    // 4. Fallback: parse first <img src="..."> from description or content:encoded
+    const description = item.querySelector('description')?.textContent || '';
+    const contentEncoded = item.getElementsByTagNameNS('http://purl.org/rss/1.0/modules/content/', 'encoded');
+    const contentText = contentEncoded.length > 0 ? (contentEncoded[0]!.textContent || '') : '';
+    const htmlContent = contentText || description;
+    const imgMatch = htmlContent.match(/<img[^>]+src=["']([^"']+)["']/);
+    if (imgMatch?.[1]) return imgMatch[1];
+  } catch {
+    // Fall through
+  }
+
+  return undefined;
+}
+
 export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
   if (feedCache.size > MAX_CACHE_ENTRIES / 2) cleanupCaches();
   const currentLang = getCurrentLanguage();
@@ -233,6 +303,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
           threat,
           ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
           lang: feed.lang,
+          ...(SITE_VARIANT === 'happy' && { imageUrl: extractImageUrl(item) }),
         };
       });
 

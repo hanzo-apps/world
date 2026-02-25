@@ -4,10 +4,12 @@ import { getFredSeries } from './get-fred-series';
 import { listWorldBankIndicators } from './list-world-bank-indicators';
 import { getEnergyPrices } from './get-energy-prices';
 import { getMacroSignals } from './get-macro-signals';
+import { getEnergyCapacity } from './get-energy-capacity';
 
 export const economicHandler: EconomicServiceHandler = {
   getFredSeries,
   listWorldBankIndicators,
   getEnergyPrices,
   getMacroSignals,
+  getEnergyCapacity,
 };

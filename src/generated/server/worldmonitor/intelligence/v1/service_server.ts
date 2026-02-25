@@ -118,6 +118,8 @@ export interface SearchGdeltDocumentsRequest {
   query: string;
   maxRecords: number;
   timespan: string;
+  toneFilter: string;
+  sort: string;
 }
 
 export interface SearchGdeltDocumentsResponse {

@@ -11,6 +11,8 @@ import { createCircuitBreaker } from '@/utils';
 const client = new UnrestServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
 const unrestBreaker = createCircuitBreaker<ListUnrestEventsResponse>({
   name: 'Unrest Events',
+  cacheTtlMs: 10 * 60 * 1000,
+  persistCache: true,
 });
 
 // ---- Enum Mapping Functions ----

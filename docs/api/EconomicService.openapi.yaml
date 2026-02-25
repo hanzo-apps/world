@@ -131,6 +131,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/get-energy-capacity:
+        post:
+            tags:
+                - EconomicService
+            summary: GetEnergyCapacity
+            description: GetEnergyCapacity retrieves installed capacity data (solar, wind, coal) from EIA.
+            operationId: GetEnergyCapacity
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/GetEnergyCapacityRequest'
+                required: true
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetEnergyCapacityResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -527,3 +559,44 @@ components:
                         format: double
                         description: Last 30 QQQ close prices for sparkline.
             description: MacroMeta contains supplementary chart data.
+        GetEnergyCapacityRequest:
+            type: object
+            properties:
+                energySources:
+                    type: array
+                    items:
+                        type: string
+                        description: |-
+                            Energy source codes to query (e.g., "SUN", "WND", "COL").
+                             Empty returns all tracked sources (SUN, WND, COL).
+                years:
+                    type: integer
+                    format: int32
+                    description: Number of years of historical data. Default 20 if not set.
+        GetEnergyCapacityResponse:
+            type: object
+            properties:
+                series:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EnergyCapacitySeries'
+        EnergyCapacitySeries:
+            type: object
+            properties:
+                energySource:
+                    type: string
+                name:
+                    type: string
+                data:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EnergyCapacityYear'
+        EnergyCapacityYear:
+            type: object
+            properties:
+                year:
+                    type: integer
+                    format: int32
+                capacityMw:
+                    type: number
+                    format: double
