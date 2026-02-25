@@ -14,6 +14,7 @@ import {
   type WorldBankCountryData as ProtoWorldBankCountryData,
   type GetEnergyPricesResponse,
   type EnergyPrice as ProtoEnergyPrice,
+  type GetEnergyCapacityResponse,
 } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getCSSColor } from '@/utils';
@@ -23,13 +24,15 @@ import { dataFreshness } from '../data-freshness';
 // ---- Client + Circuit Breakers ----
 
 const client = new EconomicServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
-const fredBreaker = createCircuitBreaker<GetFredSeriesResponse>({ name: 'FRED Economic' });
-const wbBreaker = createCircuitBreaker<ListWorldBankIndicatorsResponse>({ name: 'World Bank' });
-const eiaBreaker = createCircuitBreaker<GetEnergyPricesResponse>({ name: 'EIA Energy' });
+const fredBreaker = createCircuitBreaker<GetFredSeriesResponse>({ name: 'FRED Economic', cacheTtlMs: 15 * 60 * 1000, persistCache: true });
+const wbBreaker = createCircuitBreaker<ListWorldBankIndicatorsResponse>({ name: 'World Bank', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
+const eiaBreaker = createCircuitBreaker<GetEnergyPricesResponse>({ name: 'EIA Energy', cacheTtlMs: 15 * 60 * 1000, persistCache: true });
+const capacityBreaker = createCircuitBreaker<GetEnergyCapacityResponse>({ name: 'EIA Capacity', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 
 const emptyFredFallback: GetFredSeriesResponse = { series: undefined };
 const emptyWbFallback: ListWorldBankIndicatorsResponse = { data: [], pagination: undefined };
 const emptyEiaFallback: GetEnergyPricesResponse = { prices: [] };
+const emptyCapacityFallback: GetEnergyCapacityResponse = { series: [] };
 
 // ========================================================================
 // FRED -- replaces src/services/fred.ts
@@ -248,6 +251,27 @@ export function getTrendColor(trend: OilMetric['trend'], inverse = false): strin
     case 'up': return upColor;
     case 'down': return downColor;
     default: return getCSSColor('--text-dim');
+  }
+}
+
+// ========================================================================
+// EIA Capacity -- installed generation capacity (solar, wind, coal)
+// ========================================================================
+
+export async function fetchEnergyCapacityRpc(
+  energySources?: string[],
+  years?: number,
+): Promise<GetEnergyCapacityResponse> {
+  if (!isFeatureAvailable('energyEia')) return emptyCapacityFallback;
+  try {
+    return await capacityBreaker.execute(async () => {
+      return client.getEnergyCapacity({
+        energySources: energySources ?? [],
+        years: years ?? 0,
+      });
+    }, emptyCapacityFallback);
+  } catch {
+    return emptyCapacityFallback;
   }
 }
 

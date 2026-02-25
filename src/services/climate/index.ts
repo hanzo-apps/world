@@ -28,7 +28,7 @@ export interface ClimateFetchResult {
 }
 
 const client = new ClimateServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
-const breaker = createCircuitBreaker<ListClimateAnomaliesResponse>({ name: 'Climate Anomalies' });
+const breaker = createCircuitBreaker<ListClimateAnomaliesResponse>({ name: 'Climate Anomalies', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 const emptyClimateFallback: ListClimateAnomaliesResponse = { anomalies: [] };
 

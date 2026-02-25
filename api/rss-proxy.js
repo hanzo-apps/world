@@ -242,6 +242,17 @@ const ALLOWED_DOMAINS = [
   'seekingalpha.com',
   'www.coindesk.com',
   'cointelegraph.com',
+  // Happy variant — positive news sources
+  'www.goodnewsnetwork.org',
+  'www.positive.news',
+  'reasonstobecheerful.world',
+  'www.optimistdaily.com',
+  'www.sunnyskyz.com',
+  'www.huffpost.com',
+  'www.sciencedaily.com',
+  'feeds.nature.com',
+  'www.livescience.com',
+  'www.newscientist.com',
 ];
 
 export default async function handler(req) {

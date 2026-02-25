@@ -11,9 +11,9 @@ export type { ArxivPaper, GithubRepo, HackernewsItem };
 
 const client = new ResearchServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
 
-const arxivBreaker = createCircuitBreaker<ArxivPaper[]>({ name: 'ArXiv Papers' });
-const trendingBreaker = createCircuitBreaker<GithubRepo[]>({ name: 'GitHub Trending' });
-const hnBreaker = createCircuitBreaker<HackernewsItem[]>({ name: 'Hacker News' });
+const arxivBreaker = createCircuitBreaker<ArxivPaper[]>({ name: 'ArXiv Papers', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
+const trendingBreaker = createCircuitBreaker<GithubRepo[]>({ name: 'GitHub Trending', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
+const hnBreaker = createCircuitBreaker<HackernewsItem[]>({ name: 'Hacker News', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 export async function fetchArxivPapers(
   category = 'cs.AI',

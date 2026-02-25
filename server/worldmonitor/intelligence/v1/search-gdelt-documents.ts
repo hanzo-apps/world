@@ -28,9 +28,14 @@ export async function searchGdeltDocuments(
   _ctx: ServerContext,
   req: SearchGdeltDocumentsRequest,
 ): Promise<SearchGdeltDocumentsResponse> {
-  const query = req.query;
+  let query = req.query;
   if (!query || query.length < 2) {
     return { articles: [], query: query || '', error: 'Query parameter required (min 2 characters)' };
+  }
+
+  // Append tone filter to query if provided (e.g., "tone>5" for positive articles)
+  if (req.toneFilter) {
+    query = `${query} ${req.toneFilter}`;
   }
 
   const maxRecords = Math.min(
@@ -49,7 +54,7 @@ export async function searchGdeltDocuments(
     gdeltUrl.searchParams.set('mode', 'artlist');
     gdeltUrl.searchParams.set('maxrecords', maxRecords.toString());
     gdeltUrl.searchParams.set('format', 'json');
-    gdeltUrl.searchParams.set('sort', 'date');
+    gdeltUrl.searchParams.set('sort', req.sort || 'date');
     gdeltUrl.searchParams.set('timespan', timespan);
 
     const response = await fetch(gdeltUrl.toString(), {

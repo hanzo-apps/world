@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package worldmonitor.economic.v1;
+
+message GetEnergyCapacityRequest {
+  // Energy source codes to query (e.g., "SUN", "WND", "COL").
+  // Empty returns all tracked sources (SUN, WND, COL).
+  repeated string energy_sources = 1;
+  // Number of years of historical data. Default 20 if not set.
+  int32 years = 2;
+}
+
+message EnergyCapacityYear {
+  int32 year = 1;
+  double capacity_mw = 2;
+}
+
+message EnergyCapacitySeries {
+  string energy_source = 1;
+  string name = 2;
+  repeated EnergyCapacityYear data = 3;
+}
+
+message GetEnergyCapacityResponse {
+  repeated EnergyCapacitySeries series = 1;
+}

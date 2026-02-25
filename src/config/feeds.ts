@@ -273,6 +273,16 @@ export const SOURCE_TIERS: Record<string, number> = {
   'ArXiv AI': 4,
   'AI News': 4,
   'Layoffs News': 4,
+
+  // Tier 2 - Positive News Sources (Happy variant)
+  'Good News Network': 2,
+  'Positive.News': 2,
+  'Reasons to be Cheerful': 2,
+  'Optimist Daily': 2,
+  'GNN Science': 3,
+  'GNN Animals': 3,
+  'GNN Health': 3,
+  'GNN Heroes': 3,
 };
 
 export function getSourceTier(sourceName: string): number {
@@ -972,8 +982,41 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
   ],
 };
 
+const HAPPY_FEEDS: Record<string, Feed[]> = {
+  positive: [
+    { name: 'Good News Network', url: rss('https://www.goodnewsnetwork.org/feed/') },
+    { name: 'Positive.News', url: rss('https://www.positive.news/feed/') },
+    { name: 'Reasons to be Cheerful', url: rss('https://reasonstobecheerful.world/feed/') },
+    { name: 'Optimist Daily', url: rss('https://www.optimistdaily.com/feed/') },
+    { name: 'Sunny Skyz', url: rss('https://www.sunnyskyz.com/rss.xml') },
+    { name: 'HuffPost Good News', url: rss('https://www.huffpost.com/section/good-news/feed') },
+  ],
+  science: [
+    { name: 'GNN Science', url: rss('https://www.goodnewsnetwork.org/category/news/science/feed/') },
+    { name: 'ScienceDaily', url: rss('https://www.sciencedaily.com/rss/top.xml') },
+    { name: 'Nature News', url: rss('https://feeds.nature.com/nature/rss/current') },
+    { name: 'Live Science', url: rss('https://www.livescience.com/feeds/all') },
+    { name: 'New Scientist', url: rss('https://www.newscientist.com/feed/home/') },
+  ],
+  nature: [
+    { name: 'GNN Animals', url: rss('https://www.goodnewsnetwork.org/category/news/animals/feed/') },
+  ],
+  health: [
+    { name: 'GNN Health', url: rss('https://www.goodnewsnetwork.org/category/news/health/feed/') },
+  ],
+  inspiring: [
+    { name: 'GNN Heroes', url: rss('https://www.goodnewsnetwork.org/category/news/inspiring/feed/') },
+  ],
+};
+
 // Variant-aware exports
-export const FEEDS = SITE_VARIANT === 'tech' ? TECH_FEEDS : SITE_VARIANT === 'finance' ? FINANCE_FEEDS : FULL_FEEDS;
+export const FEEDS = SITE_VARIANT === 'tech'
+  ? TECH_FEEDS
+  : SITE_VARIANT === 'finance'
+    ? FINANCE_FEEDS
+    : SITE_VARIANT === 'happy'
+      ? HAPPY_FEEDS
+      : FULL_FEEDS;
 
 export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: string[] }> = {
   // Full (geopolitical) variant regions
