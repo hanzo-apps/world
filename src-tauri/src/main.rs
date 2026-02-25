@@ -16,7 +16,7 @@ use reqwest::Url;
 use serde::Serialize;
 use serde_json::{Map, Value};
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, RunEvent, Webview, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const LOCAL_API_PORT: &str = "46123";
 const KEYRING_SERVICE: &str = "world-monitor";
@@ -24,7 +24,9 @@ const LOCAL_API_LOG_FILE: &str = "local-api.log";
 const DESKTOP_LOG_FILE: &str = "desktop.log";
 const MENU_FILE_SETTINGS_ID: &str = "file.settings";
 const MENU_HELP_GITHUB_ID: &str = "help.github";
+#[cfg(feature = "devtools")]
 const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
+const TRUSTED_WINDOWS: [&str; 3] = ["main", "settings", "live-channels"];
 const SUPPORTED_SECRET_KEYS: [&str; 21] = [
     "GROQ_API_KEY",
     "OPENROUTER_API_KEY",
@@ -195,8 +197,17 @@ fn generate_local_token() -> String {
     buf.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn require_trusted_window(label: &str) -> Result<(), String> {
+    if TRUSTED_WINDOWS.contains(&label) {
+        Ok(())
+    } else {
+        Err(format!("Command not allowed from window '{label}'"))
+    }
+}
+
 #[tauri::command]
-fn get_local_api_token(state: tauri::State<'_, LocalApiState>) -> Result<String, String> {
+fn get_local_api_token(webview: Webview, state: tauri::State<'_, LocalApiState>) -> Result<String, String> {
+    require_trusted_window(webview.label())?;
     let token = state
         .token
         .lock()
@@ -224,9 +235,11 @@ fn list_supported_secret_keys() -> Vec<String> {
 
 #[tauri::command]
 fn get_secret(
+    webview: Webview,
     key: String,
     cache: tauri::State<'_, SecretsCache>,
 ) -> Result<Option<String>, String> {
+    require_trusted_window(webview.label())?;
     if !SUPPORTED_SECRET_KEYS.contains(&key.as_str()) {
         return Err(format!("Unsupported secret key: {key}"));
     }
@@ -238,20 +251,23 @@ fn get_secret(
 }
 
 #[tauri::command]
-fn get_all_secrets(cache: tauri::State<'_, SecretsCache>) -> HashMap<String, String> {
-    cache
+fn get_all_secrets(webview: Webview, cache: tauri::State<'_, SecretsCache>) -> Result<HashMap<String, String>, String> {
+    require_trusted_window(webview.label())?;
+    Ok(cache
         .secrets
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .clone()
+        .clone())
 }
 
 #[tauri::command]
 fn set_secret(
+    webview: Webview,
     key: String,
     value: String,
     cache: tauri::State<'_, SecretsCache>,
 ) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     if !SUPPORTED_SECRET_KEYS.contains(&key.as_str()) {
         return Err(format!("Unsupported secret key: {key}"));
     }
@@ -273,7 +289,8 @@ fn set_secret(
 }
 
 #[tauri::command]
-fn delete_secret(key: String, cache: tauri::State<'_, SecretsCache>) -> Result<(), String> {
+fn delete_secret(webview: Webview, key: String, cache: tauri::State<'_, SecretsCache>) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     if !SUPPORTED_SECRET_KEYS.contains(&key.as_str()) {
         return Err(format!("Unsupported secret key: {key}"));
     }
@@ -299,12 +316,14 @@ fn cache_file_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn read_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> Result<Option<Value>, String> {
+fn read_cache_entry(webview: Webview, cache: tauri::State<'_, PersistentCache>, key: String) -> Result<Option<Value>, String> {
+    require_trusted_window(webview.label())?;
     Ok(cache.get(&key))
 }
 
 #[tauri::command]
-fn delete_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> Result<(), String> {
+fn delete_cache_entry(webview: Webview, cache: tauri::State<'_, PersistentCache>, key: String) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     {
         let mut data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
         data.remove(&key);
@@ -318,7 +337,8 @@ fn delete_cache_entry(cache: tauri::State<'_, PersistentCache>, key: String) -> 
 }
 
 #[tauri::command]
-fn write_cache_entry(app: AppHandle, cache: tauri::State<'_, PersistentCache>, key: String, value: String) -> Result<(), String> {
+fn write_cache_entry(webview: Webview, app: AppHandle, cache: tauri::State<'_, PersistentCache>, key: String, value: String) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     let parsed_value: Value = serde_json::from_str(&value)
         .map_err(|e| format!("Invalid cache payload JSON: {e}"))?;
     let _write_guard = cache.write_lock.lock().unwrap_or_else(|e| e.into_inner());
@@ -488,7 +508,8 @@ fn close_live_channels_window(app: AppHandle) -> Result<(), String> {
 /// Fetch JSON from Polymarket Gamma API using native TLS (bypasses Cloudflare JA3 blocking).
 /// Called from frontend when browser CORS and sidecar Node.js TLS both fail.
 #[tauri::command]
-async fn fetch_polymarket(path: String, params: String) -> Result<String, String> {
+async fn fetch_polymarket(webview: Webview, path: String, params: String) -> Result<String, String> {
+    require_trusted_window(webview.label())?;
     let allowed = ["events", "markets", "tags"];
     let segment = path.trim_start_matches('/');
     if !allowed.iter().any(|a| segment.starts_with(a)) {
@@ -641,19 +662,31 @@ fn build_app_menu(handle: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let devtools_item = MenuItem::with_id(
-        handle,
-        MENU_HELP_DEVTOOLS_ID,
-        "Toggle Developer Tools",
-        true,
-        Some("CmdOrCtrl+Alt+I"),
-    )?;
     let help_separator = PredefinedMenuItem::separator(handle)?;
+
+    #[cfg(feature = "devtools")]
+    let help_menu = {
+        let devtools_item = MenuItem::with_id(
+            handle,
+            MENU_HELP_DEVTOOLS_ID,
+            "Toggle Developer Tools",
+            true,
+            Some("CmdOrCtrl+Alt+I"),
+        )?;
+        Submenu::with_items(
+            handle,
+            "Help",
+            true,
+            &[&about_item, &help_separator, &github_item, &devtools_item],
+        )?
+    };
+
+    #[cfg(not(feature = "devtools"))]
     let help_menu = Submenu::with_items(
         handle,
         "Help",
         true,
-        &[&about_item, &help_separator, &github_item, &devtools_item],
+        &[&about_item, &help_separator, &github_item],
     )?;
 
     let edit_menu = {
@@ -686,6 +719,7 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         MENU_HELP_GITHUB_ID => {
             let _ = open_in_shell("https://github.com/koala73/worldmonitor");
         }
+        #[cfg(feature = "devtools")]
         MENU_HELP_DEVTOOLS_ID => {
             if let Some(window) = app.get_webview_window("main") {
                 if window.is_devtools_open() {
