@@ -195,6 +195,10 @@ const ALLOWED_DOMAINS = [
   'www.channelnewsasia.com',
   'japantoday.com',
   'www.thehindu.com',
+  'indianexpress.com',
+  'www.indianewsnetwork.com',
+  'www.twz.com',
+  'gcaptain.com',
   // International Organizations
   'news.un.org',
   'www.iaea.org',
