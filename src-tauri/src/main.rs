@@ -1163,6 +1163,28 @@ fn main() {
             eprintln!("[tauri] VM detected; disabled WebKitGTK accelerated compositing for iframe/video compatibility");
         }
 
+        // NVIDIA proprietary drivers often fail to create a surfaceless EGL
+        // display (EGL_BAD_ALLOC) in WebKitGTK's web process, especially on
+        // Wayland where explicit sync can also cause flickering/crashes.
+        // Detect NVIDIA by checking for /proc/driver/nvidia (created by
+        // nvidia.ko) and apply Wayland-specific workarounds.
+        let has_nvidia = std::path::Path::new("/proc/driver/nvidia").exists();
+        if has_nvidia {
+            if env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none() {
+                unsafe { env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1") };
+            }
+            // Force X11 backend on NVIDIA + Wayland to avoid surfaceless EGL
+            // failures.  Users who prefer native Wayland can override with
+            // GDK_BACKEND=wayland.
+            if env::var_os("WAYLAND_DISPLAY").is_some() && env::var_os("GDK_BACKEND").is_none() {
+                unsafe { env::set_var("GDK_BACKEND", "x11") };
+                eprintln!(
+                    "[tauri] NVIDIA GPU + Wayland detected; forcing GDK_BACKEND=x11 to avoid EGL_BAD_ALLOC. \
+                     Set GDK_BACKEND=wayland to override."
+                );
+            }
+        }
+
         // On Wayland-only compositors (e.g. niri, river, sway without XWayland),
         // GTK3 may fail to initialise if it defaults to X11 backend first and no
         // DISPLAY is set.  Explicitly prefer the Wayland backend when a Wayland
