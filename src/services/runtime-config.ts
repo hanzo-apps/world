@@ -1,4 +1,4 @@
-import { isDesktopRuntime } from './runtime';
+import { getApiBaseUrl, isDesktopRuntime } from './runtime';
 import { invokeTauri } from './tauri-bridge';
 
 export type RuntimeSecretKey =
@@ -64,8 +64,12 @@ export interface RuntimeConfig {
 }
 
 const TOGGLES_STORAGE_KEY = 'worldmonitor-runtime-feature-toggles';
-const SIDECAR_ENV_UPDATE_URL = 'http://127.0.0.1:46123/api/local-env-update';
-const SIDECAR_SECRET_VALIDATE_URL = 'http://127.0.0.1:46123/api/local-validate-secret';
+function getSidecarEnvUpdateUrl(): string {
+  return `${getApiBaseUrl()}/api/local-env-update`;
+}
+function getSidecarSecretValidateUrl(): string {
+  return `${getApiBaseUrl()}/api/local-validate-secret`;
+}
 
 const defaultToggles: Record<RuntimeFeatureId, boolean> = {
   aiGroq: true,
@@ -415,7 +419,7 @@ async function pushSecretToSidecar(key: string, value: string): Promise<void> {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(SIDECAR_ENV_UPDATE_URL, {
+  const response = await fetch(getSidecarEnvUpdateUrl(), {
     method: 'POST',
     headers,
     body: JSON.stringify({ key, value: value || null }),
@@ -454,7 +458,7 @@ export async function verifySecretWithApi(
   }
 
   try {
-    const response = await callSidecarWithAuth(SIDECAR_SECRET_VALIDATE_URL, {
+    const response = await callSidecarWithAuth(getSidecarSecretValidateUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: value.trim(), context }),
