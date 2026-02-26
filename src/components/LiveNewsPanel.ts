@@ -72,7 +72,7 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'bloomberg', name: 'Bloomberg', handle: '@Bloomberg', fallbackVideoId: 'iEpJwprxDdk' },
   { id: 'yahoo', name: 'Yahoo Finance', handle: '@YahooFinance', fallbackVideoId: 'KQp-e_XQnDE' },
   { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
-  { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
+  { id: 'nasa', name: 'Sen Space Live', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
 ];
 
 // Optional channels users can add from the "Available Channels" tab UI
@@ -85,6 +85,8 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'cbs-news', name: 'CBS News', handle: '@CBSNews' },
   { id: 'nbc-news', name: 'NBC News', handle: '@NBCNews' },
   // Europe
+  { id: 'bbc-news', name: 'BBC News', handle: '@BBCNews' },
+  { id: 'france24-en', name: 'France 24 English', handle: '@FRANCE24English' },
   { id: 'welt', name: 'WELT', handle: '@WELTNachrichtensender' },
   { id: 'rtve', name: 'RTVE 24H', handle: '@RTVENoticias', fallbackVideoId: '7_srED6k0bE' },
   { id: 'trt-haber', name: 'TRT Haber', handle: '@trthaber' },
@@ -111,6 +113,12 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'vtc-now', name: 'VTC NOW', handle: '@VTCNOW' },
   { id: 'cna-asia', name: 'CNA (NewsAsia)', handle: '@channelnewsasia' },
   { id: 'nhk-world', name: 'NHK World Japan', handle: '@NHKWORLDJAPAN' },
+  // Middle East
+  { id: 'al-hadath', name: 'Al Hadath', handle: '@AlHadath', fallbackVideoId: 'xWXpl7azI8k', useFallbackOnly: true },
+  { id: 'sky-news-arabia', name: 'Sky News Arabia', handle: '@skynewsarabia' },
+  { id: 'trt-world', name: 'TRT World', handle: '@taborrtworld' },
+  { id: 'iran-intl', name: 'Iran International', handle: '@IranIntl' },
+  { id: 'cgtn-arabic', name: 'CGTN Arabic', handle: '@CGTNArabic' },
   // Africa
   { id: 'africanews', name: 'Africanews', handle: '@africanews' },
   { id: 'channels-tv', name: 'Channels TV', handle: '@channelstv' },
@@ -121,9 +129,10 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
 
 export const OPTIONAL_CHANNEL_REGIONS: { key: string; labelKey: string; channelIds: string[] }[] = [
   { key: 'na', labelKey: 'components.liveNews.regionNorthAmerica', channelIds: ['livenow-fox', 'fox-news', 'newsmax', 'abc-news', 'cbs-news', 'nbc-news'] },
-  { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain'] },
+  { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['bbc-news', 'france24-en', 'welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain'] },
   { key: 'latam', labelKey: 'components.liveNews.regionLatinAmerica', channelIds: ['cnn-brasil', 'jovem-pan', 'record-news', 'band-jornalismo', 'tn-argentina', 'c5n', 'milenio', 'noticias-caracol', 'ntn24', 't13'] },
   { key: 'asia', labelKey: 'components.liveNews.regionAsia', channelIds: ['tbs-news', 'ann-news', 'ntv-news', 'cti-news', 'wion', 'vtc-now', 'cna-asia', 'nhk-world'] },
+  { key: 'me', labelKey: 'components.liveNews.regionMiddleEast', channelIds: ['al-hadath', 'sky-news-arabia', 'trt-world', 'iran-intl', 'cgtn-arabic'] },
   { key: 'africa', labelKey: 'components.liveNews.regionAfrica', channelIds: ['africanews', 'channels-tv', 'ktn-news', 'enca', 'sabc-news'] },
 ];
 

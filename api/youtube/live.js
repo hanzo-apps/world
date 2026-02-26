@@ -15,6 +15,28 @@ export default async function handler(request) {
   }
   const url = new URL(request.url);
   const channel = url.searchParams.get('channel');
+  const videoIdParam = url.searchParams.get('videoId');
+
+  // Video ID lookup: resolve author name via oembed
+  if (videoIdParam && /^[A-Za-z0-9_-]{11}$/.test(videoIdParam)) {
+    try {
+      const oembedRes = await fetch(
+        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoIdParam}&format=json`,
+        { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } },
+      );
+      if (oembedRes.ok) {
+        const data = await oembedRes.json();
+        return new Response(JSON.stringify({ channelName: data.author_name || null, title: data.title || null, videoId: videoIdParam }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+        });
+      }
+    } catch {}
+    return new Response(JSON.stringify({ channelName: null, title: null, videoId: videoIdParam }), {
+      status: 200,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
 
   if (!channel) {
     return new Response(JSON.stringify({ error: 'Missing channel parameter' }), {
@@ -47,6 +69,16 @@ export default async function handler(request) {
     // Channel exists if the page contains canonical channel metadata
     const channelExists = html.includes('"channelId"') || html.includes('og:url');
 
+    // Extract channel name from page metadata (prefer channel name over video title)
+    let channelName = null;
+    const ownerMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
+    if (ownerMatch) {
+      channelName = ownerMatch[1];
+    } else {
+      const authorMatch = html.match(/"author"\s*:\s*"([^"]+)"/);
+      if (authorMatch) channelName = authorMatch[1];
+    }
+
     // Scope both fields to the same videoDetails block so we don't
     // combine a videoId from one object with isLive from another.
     let videoId = null;
@@ -60,7 +92,7 @@ export default async function handler(request) {
       }
     }
 
-    return new Response(JSON.stringify({ videoId, isLive: videoId !== null, channelExists }), {
+    return new Response(JSON.stringify({ videoId, isLive: videoId !== null, channelExists, channelName }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

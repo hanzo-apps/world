@@ -1268,6 +1268,7 @@
       "addChannel": "เพิ่มช่อง",
       "remove": "ลบ",
       "youtubeHandle": "YouTube handle (เช่น @Channel)",
+      "youtubeHandleOrUrl": "แฮนเดิล YouTube หรือ URL",
       "displayName": "ชื่อที่แสดง (ไม่บังคับ)",
       "openPanelSettings": "การตั้งค่าการแสดงผลแผง",
       "channelSettings": "การตั้งค่าช่อง",
@@ -1282,6 +1283,7 @@
       "regionEurope": "ยุโรป",
       "regionLatinAmerica": "ละตินอเมริกา",
       "regionAsia": "เอเชีย",
+      "regionMiddleEast": "ตะวันออกกลาง",
       "regionAfrica": "แอฟริกา"
     }
   },

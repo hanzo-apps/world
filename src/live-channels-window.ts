@@ -26,6 +26,35 @@ function customChannelIdFromHandle(handle: string): string {
   return 'custom-' + normalized;
 }
 
+/** Parse YouTube URL into a handle or video ID. Returns null if not a YouTube URL. */
+function parseYouTubeInput(raw: string): { handle: string } | { videoId: string } | null {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (!url.hostname.match(/^(www\.)?(youtube\.com|youtu\.be)$/)) return null;
+
+  // youtu.be/VIDEO_ID
+  if (url.hostname.includes('youtu.be')) {
+    const vid = url.pathname.slice(1);
+    if (/^[A-Za-z0-9_-]{11}$/.test(vid)) return { videoId: vid };
+    return null;
+  }
+  // youtube.com/watch?v=VIDEO_ID
+  const v = url.searchParams.get('v');
+  if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return { videoId: v };
+  // youtube.com/@Handle
+  const handleMatch = url.pathname.match(/^\/@([\w.-]{3,30})$/);
+  if (handleMatch) return { handle: `@${handleMatch[1]}` };
+  // youtube.com/c/ChannelName or /channel/ID
+  const channelMatch = url.pathname.match(/^\/(c|channel)\/([\w.-]+)$/);
+  if (channelMatch) return { handle: `@${channelMatch[2]}` };
+
+  return null;
+}
+
 // Persist active region tab across re-renders
 let activeRegionTab = OPTIONAL_CHANNEL_REGIONS[0]?.key ?? 'na';
 
@@ -341,8 +370,8 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
           <span class="live-news-manage-add-title">${escapeHtml(t('components.liveNews.customChannel') ?? 'Custom channel')}</span>
           <div class="live-news-manage-add">
             <div class="live-news-manage-add-field">
-              <label class="live-news-manage-add-label" for="liveChannelsHandle">${escapeHtml(t('components.liveNews.youtubeHandle') ?? 'YouTube handle (e.g. @Channel)')}</label>
-              <input type="text" class="live-news-manage-handle" id="liveChannelsHandle" placeholder="@Channel" />
+              <label class="live-news-manage-add-label" for="liveChannelsHandle">${escapeHtml(t('components.liveNews.youtubeHandleOrUrl') ?? 'YouTube handle or URL')}</label>
+              <input type="text" class="live-news-manage-handle" id="liveChannelsHandle" placeholder="@Channel or youtube.com/watch?v=..." />
             </div>
             <div class="live-news-manage-add-field">
               <label class="live-news-manage-add-label" for="liveChannelsName">${escapeHtml(t('components.liveNews.displayName') ?? 'Display name (optional)')}</label>
@@ -379,7 +408,53 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
     const nameInput = document.getElementById('liveChannelsName') as HTMLInputElement | null;
     const raw = handleInput?.value?.trim();
     if (!raw) return;
-    const handle = raw.startsWith('@') ? raw : `@${raw}`;
+    if (handleInput) handleInput.classList.remove('invalid');
+
+    // Try parsing as a YouTube URL first
+    const parsed = parseYouTubeInput(raw);
+
+    // Direct video URL (watch?v= or youtu.be/)
+    if (parsed && 'videoId' in parsed) {
+      const videoId = parsed.videoId;
+      const id = `custom-vid-${videoId}`;
+      if (channels.some((c) => c.id === id)) return;
+
+      if (addBtn) {
+        addBtn.disabled = true;
+        addBtn.textContent = t('components.liveNews.verifying') ?? 'Verifying…';
+      }
+
+      // Try to resolve video/channel title via our proxy (YouTube oembed has no CORS)
+      let resolvedName = nameInput?.value?.trim() || '';
+      if (!resolvedName) {
+        try {
+          const baseUrl = isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
+          const res = await fetch(`${baseUrl}/api/youtube/live?videoId=${encodeURIComponent(videoId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            resolvedName = data.channelName || data.title || '';
+          }
+        } catch { /* use fallback */ }
+      }
+      if (!resolvedName) resolvedName = `Video ${videoId}`;
+
+      if (addBtn) {
+        addBtn.disabled = false;
+        addBtn.textContent = t('components.liveNews.addChannel') ?? 'Add channel';
+      }
+
+      channels.push({ id, name: resolvedName, handle: `@video`, fallbackVideoId: videoId, useFallbackOnly: true });
+      saveChannelsToStorage(channels);
+      renderList(listEl);
+      if (handleInput) handleInput.value = '';
+      if (nameInput) nameInput.value = '';
+      return;
+    }
+
+    // Extract handle from URL, or treat raw input as handle
+    const handle = parsed && 'handle' in parsed
+      ? parsed.handle
+      : raw.startsWith('@') ? raw : `@${raw}`;
 
     // Validate YouTube handle format: @<3-30 alphanumeric/dot/hyphen/underscore chars>
     if (!/^@[\w.-]{3,30}$/i.test(handle)) {
@@ -393,13 +468,13 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
     const id = customChannelIdFromHandle(handle);
     if (channels.some((c) => c.id === id)) return;
 
-    // Validate channel exists on YouTube
+    // Validate channel exists on YouTube + resolve name
     if (addBtn) {
       addBtn.disabled = true;
       addBtn.textContent = t('components.liveNews.verifying') ?? 'Verifying…';
     }
-    if (handleInput) handleInput.classList.remove('invalid');
 
+    let resolvedName = '';
     try {
       const baseUrl = isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
       const res = await fetch(`${baseUrl}/api/youtube/live?channel=${encodeURIComponent(handle)}`);
@@ -412,6 +487,7 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
           }
           return;
         }
+        resolvedName = data.channelName || '';
       }
       // Non-OK status (429, 5xx) or ambiguous response — allow adding anyway
     } catch (e) {
@@ -424,7 +500,7 @@ export function initLiveChannelsWindow(containerEl?: HTMLElement): void {
       }
     }
 
-    const name = nameInput?.value?.trim() || handle;
+    const name = nameInput?.value?.trim() || resolvedName || handle;
     channels.push({ id, name, handle });
     saveChannelsToStorage(channels);
     renderList(listEl);

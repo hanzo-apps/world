@@ -1127,6 +1127,7 @@
       "addChannel": "Lägg till kanal",
       "remove": "Ta bort",
       "youtubeHandle": "YouTube-handtag (t.ex. @Channel)",
+      "youtubeHandleOrUrl": "YouTube-handtag eller URL",
       "displayName": "Visningsnamn (valfritt)",
       "openPanelSettings": "Panelvisningsinställningar",
       "channelSettings": "Kanalinställningar",
@@ -1141,6 +1142,7 @@
       "regionEurope": "Europa",
       "regionLatinAmerica": "Latinamerika",
       "regionAsia": "Asien",
+      "regionMiddleEast": "Mellanöstern",
       "regionAfrica": "Afrika"
     }
   },
