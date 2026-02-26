@@ -1268,6 +1268,7 @@
       "addChannel": "Добавить канал",
       "remove": "Удалить",
       "youtubeHandle": "YouTube- handle (напр. @Channel)",
+      "youtubeHandleOrUrl": "Имя канала или URL YouTube",
       "displayName": "Отображаемое имя (необяз.)",
       "openPanelSettings": "Настройки отображения панели",
       "channelSettings": "Настройки канала",
@@ -1282,6 +1283,7 @@
       "regionEurope": "Европа",
       "regionLatinAmerica": "Латинская Америка",
       "regionAsia": "Азия",
+      "regionMiddleEast": "Ближний Восток",
       "regionAfrica": "Африка"
     }
   },

@@ -1268,6 +1268,7 @@
       "addChannel": "Thêm kênh",
       "remove": "Xóa",
       "youtubeHandle": "Handle YouTube (vd: @Channel)",
+      "youtubeHandleOrUrl": "Tên kênh hoặc URL YouTube",
       "displayName": "Tên hiển thị (tùy chọn)",
       "openPanelSettings": "Cài đặt hiển thị bảng",
       "channelSettings": "Cài đặt kênh",
@@ -1282,6 +1283,7 @@
       "regionEurope": "Châu Âu",
       "regionLatinAmerica": "Mỹ Latinh",
       "regionAsia": "Châu Á",
+      "regionMiddleEast": "Trung Đông",
       "regionAfrica": "Châu Phi"
     }
   },

@@ -1268,6 +1268,7 @@
       "addChannel": "إضافة قناة",
       "remove": "إزالة",
       "youtubeHandle": "معرّف YouTube (مثال: @Channel)",
+      "youtubeHandleOrUrl": "رابط أو معرّف يوتيوب",
       "displayName": "اسم العرض (اختياري)",
       "openPanelSettings": "إعدادات عرض اللوحة",
       "channelSettings": "إعدادات القناة",
@@ -1282,6 +1283,7 @@
       "regionEurope": "أوروبا",
       "regionLatinAmerica": "أمريكا اللاتينية",
       "regionAsia": "آسيا",
+      "regionMiddleEast": "الشرق الأوسط",
       "regionAfrica": "أفريقيا"
     }
   },

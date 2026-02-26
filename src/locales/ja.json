@@ -1268,6 +1268,7 @@
       "addChannel": "チャンネルを追加",
       "remove": "削除",
       "youtubeHandle": "YouTube ハンドル（例: @Channel）",
+      "youtubeHandleOrUrl": "YouTubeハンドルまたはURL",
       "displayName": "表示名（任意）",
       "openPanelSettings": "表示パネル設定",
       "channelSettings": "チャンネル設定",
@@ -1282,6 +1283,7 @@
       "regionEurope": "ヨーロッパ",
       "regionLatinAmerica": "中南米",
       "regionAsia": "アジア",
+      "regionMiddleEast": "中東",
       "regionAfrica": "アフリカ"
     }
   },
