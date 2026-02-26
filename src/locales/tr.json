@@ -1268,6 +1268,7 @@
       "addChannel": "Kanal ekle",
       "remove": "Kaldır",
       "youtubeHandle": "YouTube tanıtıcı (örn. @Channel)",
+      "youtubeHandleOrUrl": "YouTube tanıtıcısı veya URL",
       "displayName": "Görünen ad (isteğe bağlı)",
       "openPanelSettings": "Panel görüntü ayarları",
       "channelSettings": "Kanal ayarları",
@@ -1282,6 +1283,7 @@
       "regionEurope": "Avrupa",
       "regionLatinAmerica": "Latin Amerika",
       "regionAsia": "Asya",
+      "regionMiddleEast": "Orta Doğu",
       "regionAfrica": "Afrika"
     }
   },

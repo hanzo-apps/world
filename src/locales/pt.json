@@ -1127,6 +1127,7 @@
       "addChannel": "Adicionar canal",
       "remove": "Remover",
       "youtubeHandle": "Handle do YouTube (ex.: @Channel)",
+      "youtubeHandleOrUrl": "Identificador ou URL do YouTube",
       "displayName": "Nome de exibição (opcional)",
       "openPanelSettings": "Configurações de exibição do painel",
       "channelSettings": "Configurações do canal",
@@ -1141,6 +1142,7 @@
       "regionEurope": "Europa",
       "regionLatinAmerica": "América Latina",
       "regionAsia": "Ásia",
+      "regionMiddleEast": "Oriente Médio",
       "regionAfrica": "África"
     }
   },
