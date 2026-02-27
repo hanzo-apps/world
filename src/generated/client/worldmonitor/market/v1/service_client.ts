@@ -9,7 +9,7 @@ export interface ListMarketQuotesResponse {
   quotes: MarketQuote[];
   finnhubSkipped: boolean;
   skipReason: string;
-  rateLimited?: boolean;
+  rateLimited: boolean;
 }
 
 export interface MarketQuote {
@@ -107,7 +107,7 @@ export interface ListEtfFlowsResponse {
   timestamp: string;
   summary?: EtfFlowsSummary;
   etfs: EtfFlow[];
-  rateLimited?: boolean;
+  rateLimited: boolean;
 }
 
 export interface EtfFlowsSummary {
@@ -196,7 +196,9 @@ export class MarketServiceClient {
 
   async listMarketQuotes(req: ListMarketQuotesRequest, options?: MarketServiceCallOptions): Promise<ListMarketQuotesResponse> {
     let path = "/api/market/v1/list-market-quotes";
-    const url = this.baseURL + path;
+    const params = new URLSearchParams();
+    if (req.symbols && req.symbols.length > 0) req.symbols.forEach(v => params.append("symbols", v));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -205,9 +207,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -220,7 +221,9 @@ export class MarketServiceClient {
 
   async listCryptoQuotes(req: ListCryptoQuotesRequest, options?: MarketServiceCallOptions): Promise<ListCryptoQuotesResponse> {
     let path = "/api/market/v1/list-crypto-quotes";
-    const url = this.baseURL + path;
+    const params = new URLSearchParams();
+    if (req.ids && req.ids.length > 0) req.ids.forEach(v => params.append("ids", v));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -229,9 +232,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -244,7 +246,9 @@ export class MarketServiceClient {
 
   async listCommodityQuotes(req: ListCommodityQuotesRequest, options?: MarketServiceCallOptions): Promise<ListCommodityQuotesResponse> {
     let path = "/api/market/v1/list-commodity-quotes";
-    const url = this.baseURL + path;
+    const params = new URLSearchParams();
+    if (req.symbols && req.symbols.length > 0) req.symbols.forEach(v => params.append("symbols", v));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -253,9 +257,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -268,7 +271,9 @@ export class MarketServiceClient {
 
   async getSectorSummary(req: GetSectorSummaryRequest, options?: MarketServiceCallOptions): Promise<GetSectorSummaryResponse> {
     let path = "/api/market/v1/get-sector-summary";
-    const url = this.baseURL + path;
+    const params = new URLSearchParams();
+    if (req.period != null && req.period !== "") params.set("period", String(req.period));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -277,9 +282,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -292,7 +296,9 @@ export class MarketServiceClient {
 
   async listStablecoinMarkets(req: ListStablecoinMarketsRequest, options?: MarketServiceCallOptions): Promise<ListStablecoinMarketsResponse> {
     let path = "/api/market/v1/list-stablecoin-markets";
-    const url = this.baseURL + path;
+    const params = new URLSearchParams();
+    if (req.coins && req.coins.length > 0) req.coins.forEach(v => params.append("coins", v));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -301,9 +307,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -314,7 +319,7 @@ export class MarketServiceClient {
     return await resp.json() as ListStablecoinMarketsResponse;
   }
 
-  async listEtfFlows(req: ListEtfFlowsRequest, options?: MarketServiceCallOptions): Promise<ListEtfFlowsResponse> {
+  async listEtfFlows(_req: ListEtfFlowsRequest, options?: MarketServiceCallOptions): Promise<ListEtfFlowsResponse> {
     let path = "/api/market/v1/list-etf-flows";
     const url = this.baseURL + path;
 
@@ -325,9 +330,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
@@ -339,7 +343,8 @@ export class MarketServiceClient {
   }
 
   async getCountryStockIndex(req: GetCountryStockIndexRequest, options?: MarketServiceCallOptions): Promise<GetCountryStockIndexResponse> {
-    let path = "/api/market/v1/get-country-stock-index";
+    let path = "/api/market/v1/get-country-stock-index/{country_code}";
+    path = path.replace("{country_code}", encodeURIComponent(String(req.countryCode)));
     const url = this.baseURL + path;
 
     const headers: Record<string, string> = {
@@ -349,9 +354,8 @@ export class MarketServiceClient {
     };
 
     const resp = await this.fetchFn(url, {
-      method: "POST",
+      method: "GET",
       headers,
-      body: JSON.stringify(req),
       signal: options?.signal,
     });
 
