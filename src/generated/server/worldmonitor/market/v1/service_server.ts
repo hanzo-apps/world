@@ -9,7 +9,7 @@ export interface ListMarketQuotesResponse {
   quotes: MarketQuote[];
   finnhubSkipped: boolean;
   skipReason: string;
-  rateLimited?: boolean;
+  rateLimited: boolean;
 }
 
 export interface MarketQuote {
@@ -107,7 +107,7 @@ export interface ListEtfFlowsResponse {
   timestamp: string;
   summary?: EtfFlowsSummary;
   etfs: EtfFlow[];
-  rateLimited?: boolean;
+  rateLimited: boolean;
 }
 
 export interface EtfFlowsSummary {
@@ -206,12 +206,16 @@ export function createMarketServiceRoutes(
 ): RouteDescriptor[] {
   return [
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/list-market-quotes",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as ListMarketQuotesRequest;
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: ListMarketQuotesRequest = {
+            symbols: params.getAll("symbols"),
+          };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("listMarketQuotes", body);
             if (bodyViolations) {
@@ -249,12 +253,16 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/list-crypto-quotes",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as ListCryptoQuotesRequest;
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: ListCryptoQuotesRequest = {
+            ids: params.getAll("ids"),
+          };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("listCryptoQuotes", body);
             if (bodyViolations) {
@@ -292,12 +300,16 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/list-commodity-quotes",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as ListCommodityQuotesRequest;
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: ListCommodityQuotesRequest = {
+            symbols: params.getAll("symbols"),
+          };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("listCommodityQuotes", body);
             if (bodyViolations) {
@@ -335,12 +347,16 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/get-sector-summary",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as GetSectorSummaryRequest;
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: GetSectorSummaryRequest = {
+            period: params.get("period") ?? "",
+          };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("getSectorSummary", body);
             if (bodyViolations) {
@@ -378,12 +394,16 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/list-stablecoin-markets",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as ListStablecoinMarketsRequest;
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: ListStablecoinMarketsRequest = {
+            coins: params.getAll("coins"),
+          };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("listStablecoinMarkets", body);
             if (bodyViolations) {
@@ -421,18 +441,12 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
+      method: "GET",
       path: "/api/market/v1/list-etf-flows",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as ListEtfFlowsRequest;
-          if (options?.validateRequest) {
-            const bodyViolations = options.validateRequest("listEtfFlows", body);
-            if (bodyViolations) {
-              throw new ValidationError(bodyViolations);
-            }
-          }
+          const body = {} as ListEtfFlowsRequest;
 
           const ctx: ServerContext = {
             request: req,
@@ -464,18 +478,18 @@ export function createMarketServiceRoutes(
       },
     },
     {
-      method: "POST",
-      path: "/api/market/v1/get-country-stock-index",
+      method: "GET",
+      path: "/api/market/v1/get-country-stock-index/{country_code}",
       handler: async (req: Request): Promise<Response> => {
         try {
           const pathParams: Record<string, string> = {};
-          const body = await req.json() as GetCountryStockIndexRequest;
-          if (options?.validateRequest) {
-            const bodyViolations = options.validateRequest("getCountryStockIndex", body);
-            if (bodyViolations) {
-              throw new ValidationError(bodyViolations);
-            }
-          }
+          const url = new URL(req.url, "http://localhost");
+          const pathSegments = url.pathname.split("/");
+          pathParams["country_code"] = decodeURIComponent(pathSegments[5] ?? "");
+
+          const body: GetCountryStockIndexRequest = {
+            countryCode: pathParams["country_code"],
+          };
 
           const ctx: ServerContext = {
             request: req,
