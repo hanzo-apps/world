@@ -73,6 +73,14 @@ const RELAY_RSS_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_RSS_RA
 const RELAY_LOG_THROTTLE_MS = Math.max(1000, Number(process.env.RELAY_LOG_THROTTLE_MS || 10000));
 const ALLOW_VERCEL_PREVIEW_ORIGINS = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS === 'true';
 
+// OREF (Israel Home Front Command) siren alerts — fetched via HTTP proxy (Israel exit)
+const OREF_PROXY_AUTH = process.env.OREF_PROXY_AUTH || ''; // format: user:pass@host:port
+const OREF_ALERTS_URL = 'https://www.oref.org.il/WarningMessages/alert/alerts.json';
+const OREF_POLL_INTERVAL_MS = Math.max(30_000, Number(process.env.OREF_POLL_INTERVAL_MS || 300_000));
+const OREF_ENABLED = !!OREF_PROXY_AUTH;
+const RELAY_OREF_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_OREF_RATE_LIMIT_MAX))
+  ? Number(process.env.RELAY_OREF_RATE_LIMIT_MAX) : 600;
+
 if (IS_PRODUCTION_RELAY && !RELAY_SHARED_SECRET && !ALLOW_UNAUTHENTICATED_RELAY) {
   console.error('[Relay] Error: RELAY_SHARED_SECRET is required in production');
   console.error('[Relay] Set RELAY_SHARED_SECRET on Railway and Vercel to secure relay endpoints');
@@ -160,6 +168,15 @@ const telegramState = {
   lastPollAt: 0,
   lastError: null,
   startedAt: Date.now(),
+};
+
+const orefState = {
+  lastAlerts: [],
+  lastAlertsJson: '[]',
+  lastPollAt: 0,
+  lastError: null,
+  historyCount24h: 0,
+  history: [],
 };
 
 function loadTelegramChannels() {
@@ -332,6 +349,79 @@ function startTelegramPollLoop() {
   console.log('[Relay] Telegram poll loop started');
 }
 
+// ─────────────────────────────────────────────────────────────
+// OREF Siren Alerts (Israel Home Front Command)
+// Polls oref.org.il via HTTP CONNECT tunnel through residential proxy (Israel exit)
+// ─────────────────────────────────────────────────────────────
+
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+}
+
+function orefCurlFetch(proxyAuth, url) {
+  // Use curl via child_process — Node.js TLS fingerprint (JA3) gets blocked by Akamai,
+  // but curl's fingerprint passes. curl is available on Railway (Linux) and macOS.
+  const { execSync } = require('child_process');
+  const proxyUrl = `http://${proxyAuth}`;
+  const result = execSync(
+    `curl -s -x "${proxyUrl}" --max-time 15 -H "Accept: application/json" -H "Referer: https://www.oref.org.il/" "${url}"`,
+    { encoding: 'utf8', timeout: 20000 }
+  );
+  return result;
+}
+
+async function orefFetchAlerts() {
+  if (!OREF_ENABLED) return;
+  try {
+    const raw = orefCurlFetch(OREF_PROXY_AUTH, OREF_ALERTS_URL);
+    const cleaned = stripBom(raw).trim();
+
+    let alerts = [];
+    if (cleaned && cleaned !== '[]' && cleaned !== 'null') {
+      try {
+        const parsed = JSON.parse(cleaned);
+        alerts = Array.isArray(parsed) ? parsed : [parsed];
+      } catch { alerts = []; }
+    }
+
+    const newJson = JSON.stringify(alerts);
+    const changed = newJson !== orefState.lastAlertsJson;
+
+    orefState.lastAlerts = alerts;
+    orefState.lastAlertsJson = newJson;
+    orefState.lastPollAt = Date.now();
+    orefState.lastError = null;
+
+    if (changed && alerts.length > 0) {
+      orefState.history.push({
+        alerts,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    orefState.history = orefState.history.filter(
+      h => new Date(h.timestamp).getTime() > cutoff
+    );
+    orefState.historyCount24h = orefState.history.length;
+  } catch (err) {
+    orefState.lastError = err.message || String(err);
+    console.warn('[Relay] OREF poll error:', orefState.lastError);
+  }
+}
+
+function startOrefPollLoop() {
+  if (!OREF_ENABLED) {
+    console.log('[Relay] OREF disabled (no OREF_PROXY_AUTH)');
+    return;
+  }
+  orefFetchAlerts().catch(e => console.warn('[Relay] OREF initial poll error:', e?.message || e));
+  setInterval(() => {
+    orefFetchAlerts().catch(e => console.warn('[Relay] OREF poll error:', e?.message || e));
+  }, OREF_POLL_INTERVAL_MS).unref?.();
+  console.log(`[Relay] OREF poll loop started (interval ${OREF_POLL_INTERVAL_MS}ms)`);
+}
+
 function gzipSyncBuffer(body) {
   try {
     return zlib.gzipSync(typeof body === 'string' ? Buffer.from(body) : body);
@@ -386,12 +476,14 @@ function getRouteGroup(pathname) {
   if (pathname.startsWith('/worldbank')) return 'worldbank';
   if (pathname.startsWith('/polymarket')) return 'polymarket';
   if (pathname.startsWith('/ucdp-events')) return 'ucdp-events';
+  if (pathname.startsWith('/oref')) return 'oref';
   return 'other';
 }
 
 function getRateLimitForPath(pathname) {
   if (pathname.startsWith('/opensky')) return RELAY_OPENSKY_RATE_LIMIT_MAX;
   if (pathname.startsWith('/rss')) return RELAY_RSS_RATE_LIMIT_MAX;
+  if (pathname.startsWith('/oref')) return RELAY_OREF_RATE_LIMIT_MAX;
   return RELAY_RATE_LIMIT_MAX;
 }
 
@@ -2140,6 +2232,13 @@ const server = http.createServer(async (req, res) => {
         lastPollAt: telegramState.lastPollAt ? new Date(telegramState.lastPollAt).toISOString() : null,
         hasError: !!telegramState.lastError,
       },
+      oref: {
+        enabled: OREF_ENABLED,
+        alertCount: orefState.lastAlerts?.length || 0,
+        historyCount24h: orefState.historyCount24h,
+        lastPollAt: orefState.lastPollAt ? new Date(orefState.lastPollAt).toISOString() : null,
+        hasError: !!orefState.lastError,
+      },
       memory: {
         rss: `${(mem.rss / 1024 / 1024).toFixed(0)}MB`,
         heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB`,
@@ -2506,6 +2605,27 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: err.message }));
       }
     }
+  } else if (pathname === '/oref/alerts') {
+    sendCompressed(req, res, 200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=5, s-maxage=5, stale-while-revalidate=3',
+    }, JSON.stringify({
+      configured: OREF_ENABLED,
+      alerts: orefState.lastAlerts || [],
+      historyCount24h: orefState.historyCount24h,
+      timestamp: orefState.lastPollAt ? new Date(orefState.lastPollAt).toISOString() : new Date().toISOString(),
+      ...(orefState.lastError ? { error: orefState.lastError } : {}),
+    }));
+  } else if (pathname === '/oref/history') {
+    sendCompressed(req, res, 200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=30, s-maxage=30, stale-while-revalidate=10',
+    }, JSON.stringify({
+      configured: OREF_ENABLED,
+      history: orefState.history || [],
+      historyCount24h: orefState.historyCount24h,
+      timestamp: orefState.lastPollAt ? new Date(orefState.lastPollAt).toISOString() : new Date().toISOString(),
+    }));
   } else if (pathname.startsWith('/ucdp-events')) {
     handleUcdpEventsRequest(req, res);
   } else if (pathname.startsWith('/opensky')) {
@@ -2625,6 +2745,7 @@ const wss = new WebSocketServer({ server });
 server.listen(PORT, () => {
   console.log(`[Relay] WebSocket relay on port ${PORT}`);
   startTelegramPollLoop();
+  startOrefPollLoop();
 });
 
 wss.on('connection', (ws, req) => {
