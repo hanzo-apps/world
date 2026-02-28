@@ -44,6 +44,7 @@ export class RefreshScheduler implements AppModule {
     const HIDDEN_REFRESH_MULTIPLIER = 10;
     const JITTER_FRACTION = 0.1;
     const MIN_REFRESH_MS = 1000;
+    // Max effective interval: intervalMs * 4 (backoff) * 10 (hidden) = 40x base
     const MAX_BACKOFF_MULTIPLIER = 4;
 
     let currentMultiplier = 1;
