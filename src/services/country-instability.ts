@@ -7,7 +7,7 @@ import { focalPointDetector } from './focal-point-detector';
 import type { ConflictEvent, UcdpConflictStatus, HapiConflictSummary } from './conflict';
 import type { CountryDisplacement } from '@/services/displacement';
 import type { ClimateAnomaly } from '@/services/climate';
-import { getCountryAtCoordinates, iso3ToIso2Code, nameToCountryCode, getCountryNameByCode, matchCountryNamesInText } from './country-geometry';
+import { getCountryAtCoordinates, iso3ToIso2Code, nameToCountryCode, getCountryNameByCode, matchCountryNamesInText, ME_STRIKE_BOUNDS, resolveCountryFromBounds } from './country-geometry';
 
 export interface CountryScore {
   code: string;
@@ -385,18 +385,8 @@ export function ingestNewsForCII(events: ClusteredEvent[]): void {
   }
 }
 
-const STRIKE_COUNTRY_BOUNDS: Record<string, { n: number; s: number; e: number; w: number }> = {
-  IR: { n: 40, s: 25, e: 63, w: 44 }, IL: { n: 33.3, s: 29.5, e: 35.9, w: 34.3 },
-  SA: { n: 32, s: 16, e: 55, w: 35 }, IQ: { n: 37.4, s: 29.1, e: 48.6, w: 38.8 },
-  SY: { n: 37.3, s: 32.3, e: 42.4, w: 35.7 }, YE: { n: 19, s: 12, e: 54.5, w: 42 },
-  LB: { n: 34.7, s: 33.1, e: 36.6, w: 35.1 }, AE: { n: 26.1, s: 22.6, e: 56.4, w: 51.6 },
-};
-
 function coordsToBoundsCountry(lat: number, lon: number): string | null {
-  for (const [code, b] of Object.entries(STRIKE_COUNTRY_BOUNDS)) {
-    if (lat >= b.s && lat <= b.n && lon >= b.w && lon <= b.e) return code;
-  }
-  return null;
+  return resolveCountryFromBounds(lat, lon, ME_STRIKE_BOUNDS);
 }
 
 export function ingestStrikesForCII(events: Array<{
