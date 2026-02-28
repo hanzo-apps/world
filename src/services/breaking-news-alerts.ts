@@ -22,7 +22,6 @@ const SETTINGS_KEY = 'wm-breaking-alerts-v1';
 const RECENCY_GATE_MS = 15 * 60 * 1000;
 const PER_EVENT_COOLDOWN_MS = 30 * 60 * 1000;
 const GLOBAL_COOLDOWN_MS = 60 * 1000;
-const SESSION_START = Date.now();
 
 const DEFAULT_SETTINGS: AlertSettings = {
   enabled: true,
@@ -87,9 +86,7 @@ export function updateAlertSettings(partial: Partial<AlertSettings>): void {
 }
 
 function isRecent(pubDate: Date): boolean {
-  const now = Date.now();
-  const recencyCutoff = Math.max(now - RECENCY_GATE_MS, SESSION_START);
-  return pubDate.getTime() >= recencyCutoff;
+  return pubDate.getTime() >= (Date.now() - RECENCY_GATE_MS);
 }
 
 function pruneDedupeMap(): void {
