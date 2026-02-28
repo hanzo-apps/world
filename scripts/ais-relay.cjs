@@ -1847,38 +1847,76 @@ function handleWorldBankRequest(req, res) {
 const polymarketCache = new Map(); // key: query string → { data, timestamp }
 const polymarketInflight = new Map(); // key → Promise (dedup concurrent requests)
 const POLYMARKET_CACHE_TTL_MS = 2 * 60 * 1000; // 2 min — market data changes frequently
-const POLYMARKET_NEG_TTL_MS = 30 * 1000; // 30s negative cache on 429/error
+const POLYMARKET_NEG_TTL_MS = 60 * 1000; // 60s negative cache on 429/error
+
+// Circuit breaker — stops upstream requests after repeated failures to prevent OOM
+const polymarketCircuitBreaker = { failures: 0, openUntil: 0 };
+const POLYMARKET_CB_THRESHOLD = 5;
+const POLYMARKET_CB_COOLDOWN_MS = 60 * 1000;
+
+// Concurrent upstream limiter — caps in-flight upstream requests
+const POLYMARKET_MAX_CONCURRENT = 3;
+let polymarketActiveUpstream = 0;
+
+function tripPolymarketCircuitBreaker() {
+  polymarketCircuitBreaker.failures++;
+  if (polymarketCircuitBreaker.failures >= POLYMARKET_CB_THRESHOLD) {
+    polymarketCircuitBreaker.openUntil = Date.now() + POLYMARKET_CB_COOLDOWN_MS;
+    console.error(`[Relay] Polymarket circuit OPEN — cooling down ${POLYMARKET_CB_COOLDOWN_MS / 1000}s`);
+  }
+}
 
 function fetchPolymarketUpstream(cacheKey, endpoint, params, tag) {
+  if (polymarketActiveUpstream >= POLYMARKET_MAX_CONCURRENT) {
+    polymarketCache.set(cacheKey, { data: '[]', timestamp: Date.now() - POLYMARKET_CACHE_TTL_MS + POLYMARKET_NEG_TTL_MS });
+    return Promise.resolve(null);
+  }
+
   const gammaUrl = `https://gamma-api.polymarket.com/${endpoint}?${params}`;
   console.log('[Relay] Polymarket request (MISS):', endpoint, tag || '');
+  polymarketActiveUpstream++;
 
   return new Promise((resolve) => {
+    let finalized = false;
+    function finalize(ok) {
+      if (finalized) return;
+      finalized = true;
+      polymarketActiveUpstream--;
+      if (ok) {
+        polymarketCircuitBreaker.failures = 0;
+      } else {
+        tripPolymarketCircuitBreaker();
+        polymarketCache.set(cacheKey, { data: '[]', timestamp: Date.now() - POLYMARKET_CACHE_TTL_MS + POLYMARKET_NEG_TTL_MS });
+      }
+    }
     const request = https.get(gammaUrl, {
       headers: { 'Accept': 'application/json' },
       timeout: 10000,
     }, (response) => {
       if (response.statusCode !== 200) {
-        console.error(`[Relay] Polymarket upstream ${response.statusCode}`);
+        console.error(`[Relay] Polymarket upstream ${response.statusCode} (failures: ${polymarketCircuitBreaker.failures + 1})`);
         response.resume();
-        polymarketCache.set(cacheKey, { data: '[]', timestamp: Date.now() - POLYMARKET_CACHE_TTL_MS + POLYMARKET_NEG_TTL_MS });
+        finalize(false);
         resolve(null);
         return;
       }
       let data = '';
       response.on('data', chunk => data += chunk);
       response.on('end', () => {
+        finalize(true);
         polymarketCache.set(cacheKey, { data, timestamp: Date.now() });
         resolve(data);
       });
+      response.on('error', () => { finalize(false); });
     });
     request.on('error', (err) => {
       console.error('[Relay] Polymarket error:', err.message);
-      polymarketCache.set(cacheKey, { data: '[]', timestamp: Date.now() - POLYMARKET_CACHE_TTL_MS + POLYMARKET_NEG_TTL_MS });
+      finalize(false);
       resolve(null);
     });
     request.on('timeout', () => {
       request.destroy();
+      finalize(false);
       resolve(null);
     });
   });
@@ -1897,6 +1935,20 @@ function handlePolymarketRequest(req, res) {
       'X-Cache': 'HIT',
       'X-Polymarket-Source': 'railway-cache',
     }, cached.data);
+  }
+
+  // Circuit breaker open — serve stale cache or empty, skip upstream
+  if (Date.now() < polymarketCircuitBreaker.openUntil) {
+    if (cached) {
+      return sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'X-Cache': 'STALE',
+        'X-Circuit': 'OPEN',
+        'X-Polymarket-Source': 'railway-stale',
+      }, cached.data);
+    }
+    return safeEnd(res, 200, { 'Content-Type': 'application/json', 'X-Circuit': 'OPEN' }, JSON.stringify([]));
   }
 
   const endpoint = url.searchParams.get('endpoint') || 'markets';
