@@ -3,12 +3,24 @@
 
 import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
 
-export const config = {
-  runtime: 'edge',
-};
+export const config = { runtime: 'edge' };
 
-const RELAY_URL = process.env.VITE_WS_API_URL || '';
-const RELAY_AUTH = process.env.RELAY_SHARED_SECRET || '';
+function getRelayBaseUrl() {
+  const relayUrl = process.env.WS_RELAY_URL;
+  if (!relayUrl) return null;
+  return relayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '');
+}
+
+function getRelayHeaders(baseHeaders = {}) {
+  const headers = { ...baseHeaders };
+  const relaySecret = process.env.RELAY_SHARED_SECRET || '';
+  if (relaySecret) {
+    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+    headers.Authorization = `Bearer ${relaySecret}`;
+  }
+  return headers;
+}
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
@@ -20,7 +32,6 @@ export default async function handler(request) {
   const channel = url.searchParams.get('channel');
   const videoIdParam = url.searchParams.get('videoId');
 
-  // Build relay URL with same query params
   const params = new URLSearchParams();
   if (channel) params.set('channel', channel);
   if (videoIdParam) params.set('videoId', videoIdParam);
@@ -34,11 +45,11 @@ export default async function handler(request) {
   }
 
   // Proxy to Railway relay
-  if (RELAY_URL) {
+  const relayBase = getRelayBaseUrl();
+  if (relayBase) {
     try {
-      const relayHeaders = { 'User-Agent': 'WorldMonitor-Edge/1.0' };
-      if (RELAY_AUTH) relayHeaders['x-relay-key'] = RELAY_AUTH;
-      const relayRes = await fetch(`${RELAY_URL}/youtube-live?${qs}`, { headers: relayHeaders });
+      const relayHeaders = getRelayHeaders({ 'User-Agent': 'WorldMonitor-Edge/1.0' });
+      const relayRes = await fetch(`${relayBase}/youtube-live?${qs}`, { headers: relayHeaders });
       if (relayRes.ok) {
         const data = await relayRes.json();
         const cacheTime = videoIdParam ? 3600 : 300;
