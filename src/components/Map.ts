@@ -3463,6 +3463,10 @@ export class MapComponent {
     // SVG/mobile fallback intentionally does not render this layer to stay lightweight.
   }
 
+  public setIranEvents(_events: import('@/services/conflict').IranEvent[]): void {
+    // SVG/mobile fallback intentionally does not render this layer.
+  }
+
   public setNewsLocations(_data: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }>): void {
     // SVG fallback: news locations rendered as simple circles
     // For now, skip on SVG map to keep mobile lightweight
