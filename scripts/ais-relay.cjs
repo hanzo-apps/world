@@ -278,6 +278,19 @@ async function initTelegramClientIfNeeded() {
   }
 }
 
+const TELEGRAM_CHANNEL_TIMEOUT_MS = 15_000; // 15s timeout per channel (getEntity + getMessages)
+const TELEGRAM_POLL_CYCLE_TIMEOUT_MS = 180_000; // 3min max for entire poll cycle
+
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`TIMEOUT after ${ms}ms: ${label}`)), ms);
+    promise.then(
+      v => { clearTimeout(timer); resolve(v); },
+      e => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 async function pollTelegramOnce() {
   const ok = await initTelegramClientIfNeeded();
   if (!ok) return;
@@ -287,20 +300,34 @@ async function pollTelegramOnce() {
 
   const client = telegramState.client;
   const newItems = [];
+  const pollStart = Date.now();
+  let channelsPolled = 0;
+  let channelsFailed = 0;
+  let mediaSkipped = 0;
 
   for (const channel of channels) {
+    if (Date.now() - pollStart > TELEGRAM_POLL_CYCLE_TIMEOUT_MS) {
+      console.warn(`[Relay] Telegram poll cycle timeout (${Math.round(TELEGRAM_POLL_CYCLE_TIMEOUT_MS / 1000)}s), polled ${channelsPolled}/${channels.length} channels`);
+      break;
+    }
+
     const handle = channel.handle;
     const minId = telegramState.cursorByHandle[handle] || 0;
 
     try {
-      const entity = await client.getEntity(handle);
-      const msgs = await client.getMessages(entity, {
-        limit: Math.max(1, Math.min(50, channel.maxMessages || 25)),
-        minId,
-      });
+      const entity = await withTimeout(client.getEntity(handle), TELEGRAM_CHANNEL_TIMEOUT_MS, `getEntity(${handle})`);
+      const msgs = await withTimeout(
+        client.getMessages(entity, {
+          limit: Math.max(1, Math.min(50, channel.maxMessages || 25)),
+          minId,
+        }),
+        TELEGRAM_CHANNEL_TIMEOUT_MS,
+        `getMessages(${handle})`
+      );
 
       for (const msg of msgs) {
-        if (!msg || !msg.id || !msg.message) continue;
+        if (!msg || !msg.id) continue;
+        if (!msg.message) { mediaSkipped++; continue; }
         const item = normalizeTelegramMessage(msg, channel);
         newItems.push(item);
         if (!telegramState.cursorByHandle[handle] || msg.id > telegramState.cursorByHandle[handle]) {
@@ -308,10 +335,11 @@ async function pollTelegramOnce() {
         }
       }
 
-      // Gentle rate limiting between channels
+      channelsPolled++;
       await new Promise(r => setTimeout(r, Math.max(300, Number(process.env.TELEGRAM_RATE_LIMIT_MS || 800))));
     } catch (e) {
       const em = e?.message || String(e);
+      channelsFailed++;
       telegramState.lastError = `poll ${handle} failed: ${em}`;
       console.warn('[Relay] Telegram poll error:', telegramState.lastError);
       if (/AUTH_KEY_DUPLICATED/.test(em)) {
@@ -320,6 +348,11 @@ async function pollTelegramOnce() {
         console.error('[Relay] Telegram session permanently invalidated (AUTH_KEY_DUPLICATED). Generate a new session with: node scripts/telegram/session-auth.mjs');
         try { telegramState.client?.disconnect(); } catch {}
         telegramState.client = null;
+        break;
+      }
+      if (/FLOOD_WAIT/.test(em)) {
+        const wait = parseInt(em.match(/(\d+)/)?.[1] || '60', 10);
+        console.warn(`[Relay] Telegram FLOOD_WAIT ${wait}s — stopping poll cycle early`);
         break;
       }
     }
@@ -338,13 +371,25 @@ async function pollTelegramOnce() {
   }
 
   telegramState.lastPollAt = Date.now();
+  const elapsed = ((Date.now() - pollStart) / 1000).toFixed(1);
+  console.log(`[Relay] Telegram poll: ${channelsPolled}/${channels.length} channels, ${newItems.length} new msgs, ${telegramState.items.length} total, ${channelsFailed} errors, ${mediaSkipped} media-only skipped (${elapsed}s)`);
 }
 
 let telegramPollInFlight = false;
+let telegramPollStartedAt = 0;
 
 function guardedTelegramPoll() {
-  if (telegramPollInFlight) return;
+  if (telegramPollInFlight) {
+    const stuck = Date.now() - telegramPollStartedAt;
+    if (stuck > TELEGRAM_POLL_CYCLE_TIMEOUT_MS + 30_000) {
+      console.warn(`[Relay] Telegram poll stuck for ${Math.round(stuck / 1000)}s — force-clearing in-flight flag`);
+      telegramPollInFlight = false;
+    } else {
+      return;
+    }
+  }
   telegramPollInFlight = true;
+  telegramPollStartedAt = Date.now();
   pollTelegramOnce()
     .catch(e => console.warn('[Relay] Telegram poll error:', e?.message || e))
     .finally(() => { telegramPollInFlight = false; });
@@ -2441,6 +2486,9 @@ const server = http.createServer(async (req, res) => {
         items: telegramState.items?.length || 0,
         lastPollAt: telegramState.lastPollAt ? new Date(telegramState.lastPollAt).toISOString() : null,
         hasError: !!telegramState.lastError,
+        lastError: telegramState.lastError || null,
+        pollInFlight: telegramPollInFlight,
+        pollInFlightSince: telegramPollInFlight && telegramPollStartedAt ? new Date(telegramPollStartedAt).toISOString() : null,
       },
       oref: {
         enabled: OREF_ENABLED,
