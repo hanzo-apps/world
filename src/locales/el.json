@@ -204,7 +204,8 @@
     "gccInvestments": "Επενδύσεις GCC",
     "geoHubs": "Γεωπολιτικά Κέντρα",
     "liveWebcams": "Ζωντανές Κάμερες",
-    "securityAdvisories": "Προειδοποιήσεις Ασφαλείας"
+    "securityAdvisories": "Προειδοποιήσεις Ασφαλείας",
+    "orefSirens": "OREF Sirens"
   },
   "modals": {
     "search": {
@@ -1339,6 +1340,17 @@
         "daysAgo": "{{count}} ημέρες πριν"
       },
       "infoTooltip": "<strong>Προειδοποιήσεις Ασφαλείας</strong><br>Ταξιδιωτικές οδηγίες και προειδοποιήσεις ασφαλείας."
+    },
+    "orefSirens": {
+      "checking": "Checking OREF alerts...",
+      "noAlerts": "No active sirens — all clear",
+      "notConfigured": "OREF proxy not configured",
+      "activeSirens": "{{count}} active siren(s)",
+      "area": "Area",
+      "time": "Time",
+      "justNow": "just now",
+      "historyCount": "{{count}} alerts in last 24h",
+      "infoTooltip": "<strong>OREF Sirens</strong><br>Real-time rocket and missile siren alerts from Israel Home Front Command (oref.org.il).<br><br>Data is polled every 10 seconds via a proxy relay. A pulsing red indicator means active sirens are sounding."
     }
   },
   "popups": {

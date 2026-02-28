@@ -72,6 +72,7 @@ import { fetchConflictEvents, fetchUcdpClassifications, fetchHapiSummary, fetchU
 import { fetchUnhcrPopulation } from '@/services/displacement';
 import { fetchClimateAnomalies } from '@/services/climate';
 import { fetchSecurityAdvisories } from '@/services/security-advisories';
+import { fetchOrefAlerts, startOrefPolling, stopOrefPolling, onOrefAlertsUpdate } from '@/services/oref-alerts';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
 import { isFeatureAvailable } from '@/services/runtime-config';
@@ -101,6 +102,7 @@ import {
   TradePolicyPanel,
   SupplyChainPanel,
   SecurityAdvisoriesPanel,
+  OrefSirensPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { classifyNewsItem } from '@/services/positive-classifier';
@@ -143,7 +145,9 @@ export class DataLoaderManager implements AppModule {
 
   init(): void {}
 
-  destroy(): void {}
+  destroy(): void {
+    stopOrefPolling();
+  }
 
   private shouldShowIntelligenceNotifications(): boolean {
     return !this.ctx.isMobile && !!this.ctx.findingsBadge?.isPopupEnabled();
@@ -1071,6 +1075,20 @@ export class DataLoaderManager implements AppModule {
 
     // Security advisories
     tasks.push(this.loadSecurityAdvisories());
+
+    // OREF sirens
+    tasks.push((async () => {
+      try {
+        const data = await fetchOrefAlerts();
+        (this.ctx.panels['oref-sirens'] as OrefSirensPanel)?.setData(data);
+        onOrefAlertsUpdate((update) => {
+          (this.ctx.panels['oref-sirens'] as OrefSirensPanel)?.setData(update);
+        });
+        startOrefPolling();
+      } catch (error) {
+        console.error('[Intelligence] OREF alerts fetch failed:', error);
+      }
+    })());
 
     await Promise.allSettled(tasks);
 

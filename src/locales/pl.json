@@ -204,7 +204,8 @@
     "gccInvestments": "Inwestycje GCC",
     "geoHubs": "Geopolitical Hotspots",
     "liveWebcams": "Kamery na Żywo",
-    "securityAdvisories": "Ostrzeżenia Bezpieczeństwa"
+    "securityAdvisories": "Ostrzeżenia Bezpieczeństwa",
+    "orefSirens": "OREF Sirens"
   },
   "modals": {
     "search": {
@@ -1312,6 +1313,17 @@
         "daysAgo": "{{count}} dni temu"
       },
       "infoTooltip": "<strong>Ostrzeżenia Bezpieczeństwa</strong><br>Ostrzeżenia podróżne i alerty bezpieczeństwa z agencji rządowych."
+    },
+    "orefSirens": {
+      "checking": "Checking OREF alerts...",
+      "noAlerts": "No active sirens — all clear",
+      "notConfigured": "OREF proxy not configured",
+      "activeSirens": "{{count}} active siren(s)",
+      "area": "Area",
+      "time": "Time",
+      "justNow": "just now",
+      "historyCount": "{{count}} alerts in last 24h",
+      "infoTooltip": "<strong>OREF Sirens</strong><br>Real-time rocket and missile siren alerts from Israel Home Front Command (oref.org.il).<br><br>Data is polled every 10 seconds via a proxy relay. A pulsing red indicator means active sirens are sounding."
     }
   },
   "popups": {
