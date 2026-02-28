@@ -215,12 +215,12 @@ function normalizeTelegramMessage(msg, channel) {
   };
 }
 
-let telegramImportFailed = false;
+let telegramPermanentlyDisabled = false;
 
 async function initTelegramClientIfNeeded() {
   if (!TELEGRAM_ENABLED) return false;
   if (telegramState.client) return true;
-  if (telegramImportFailed) return false;
+  if (telegramPermanentlyDisabled) return false;
 
   const apiId = parseInt(String(process.env.TELEGRAM_API_ID || ''), 10);
   const apiHash = String(process.env.TELEGRAM_API_HASH || '');
@@ -242,13 +242,20 @@ async function initTelegramClientIfNeeded() {
     console.log('[Relay] Telegram client connected');
     return true;
   } catch (e) {
-    if (e?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find package|Directory import/.test(e?.message)) {
-      telegramImportFailed = true;
+    const em = e?.message || String(e);
+    if (e?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find package|Directory import/.test(em)) {
+      telegramPermanentlyDisabled = true;
       telegramState.lastError = 'telegram package not installed';
       console.warn('[Relay] Telegram package not installed — disabling permanently for this session');
       return false;
     }
-    telegramState.lastError = `telegram init failed: ${e?.message || String(e)}`;
+    if (/AUTH_KEY_DUPLICATED/.test(em)) {
+      telegramPermanentlyDisabled = true;
+      telegramState.lastError = 'session invalidated (AUTH_KEY_DUPLICATED) — generate a new TELEGRAM_SESSION';
+      console.error('[Relay] Telegram session permanently invalidated (AUTH_KEY_DUPLICATED). Generate a new session with: node scripts/telegram/session-auth.mjs');
+      return false;
+    }
+    telegramState.lastError = `telegram init failed: ${em}`;
     console.warn('[Relay] Telegram init failed:', telegramState.lastError);
     return false;
   }
