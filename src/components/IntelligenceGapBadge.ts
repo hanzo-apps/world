@@ -37,7 +37,14 @@ export class IntelligenceFindingsBadge {
   private onAlertClick: ((alert: UnifiedAlert) => void) | null = null;
   private findings: UnifiedFinding[] = [];
   private boundCloseDropdown = () => this.closeDropdown();
-  private boundUpdate = () => this.update();
+  private pendingUpdateFrame = 0;
+  private boundUpdate = () => {
+    if (this.pendingUpdateFrame) return;
+    this.pendingUpdateFrame = requestAnimationFrame(() => {
+      this.pendingUpdateFrame = 0;
+      this.update();
+    });
+  };
   private audio: HTMLAudioElement | null = null;
   private audioEnabled = true;
   private enabled: boolean;
@@ -518,6 +525,9 @@ export class IntelligenceFindingsBadge {
   public destroy(): void {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
+    }
+    if (this.pendingUpdateFrame) {
+      cancelAnimationFrame(this.pendingUpdateFrame);
     }
     document.removeEventListener('wm:intelligence-updated', this.boundUpdate);
     document.removeEventListener('click', this.boundCloseDropdown);

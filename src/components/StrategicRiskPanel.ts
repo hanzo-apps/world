@@ -89,7 +89,8 @@ export class StrategicRiskPanel extends Panel {
 
     this.render();
 
-    const fp = `${this.overview?.compositeScore}|${this.overview?.trend}|${this.alerts.length}`;
+    const alertIds = this.alerts.map(a => a.id).sort().join(',');
+    const fp = `${this.overview?.compositeScore}|${this.overview?.trend}|${alertIds}`;
     const changed = fp !== this.lastRiskFingerprint;
     this.lastRiskFingerprint = fp;
     return changed;

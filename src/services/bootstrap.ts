@@ -14,7 +14,9 @@ export async function fetchBootstrapData(): Promise<void> {
     if (!resp.ok) return;
     const { data } = (await resp.json()) as { data: Record<string, unknown> };
     for (const [k, v] of Object.entries(data)) {
-      hydrationCache.set(k, v);
+      if (v !== null && v !== undefined) {
+        hydrationCache.set(k, v);
+      }
     }
   } catch {
     // silent — panels fall through to individual calls
