@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import { mlWorker } from '@/services/ml-worker';
 import { generateSummary, type SummarizeOptions } from '@/services/summarization';
 import { parallelAnalysis, type AnalyzedHeadline } from '@/services/parallel-analysis';
-import { signalAggregator, logSignalSummary, type RegionalConvergence } from '@/services/signal-aggregator';
+import { signalAggregator, type RegionalConvergence } from '@/services/signal-aggregator';
 import { focalPointDetector } from '@/services/focal-point-detector';
 import { ingestNewsForCII } from '@/services/country-instability';
 import { getTheaterPostureSummaries } from '@/services/military-surge';
@@ -290,15 +290,10 @@ export class InsightsPanel extends Panel {
 
       const importantClusters = this.selectTopStories(clusters, 8);
 
-      // Run parallel multi-perspective analysis in background (logs to console)
+      // Run parallel multi-perspective analysis in background
       // This analyzes ALL clusters, not just the keyword-filtered ones
       const parallelPromise = parallelAnalysis.analyzeHeadlines(clusters).then(report => {
         this.lastMissedStories = report.missedByKeywords;
-        const suggestions = parallelAnalysis.getSuggestedImprovements();
-        if (suggestions.length > 0) {
-          console.log('%c💡 Improvement Suggestions:', 'color: #f59e0b; font-weight: bold');
-          suggestions.forEach(s => console.log(`  • ${s}`));
-        }
       }).catch(err => {
         console.warn('[ParallelAnalysis] Error:', err);
       });
@@ -311,15 +306,10 @@ export class InsightsPanel extends Panel {
       if (SITE_VARIANT === 'full') {
         signalSummary = signalAggregator.getSummary();
         this.lastConvergenceZones = signalSummary.convergenceZones;
-        if (signalSummary.totalSignals > 0) {
-          logSignalSummary();
-        }
-
         // Run focal point detection (correlates news entities with map signals)
         focalSummary = focalPointDetector.analyze(clusters, signalSummary);
         this.lastFocalPoints = focalSummary.focalPoints;
         if (focalSummary.focalPoints.length > 0) {
-          focalPointDetector.logSummary();
           // Ingest news for CII BEFORE signaling (so CII has data when it calculates)
           ingestNewsForCII(clusters);
           // Signal CII to refresh now that focal points AND news data are available
@@ -393,7 +383,6 @@ export class InsightsPanel extends Panel {
           this.lastBriefUpdate = now;
           usedCachedBrief = false;
           void setPersistentCache(InsightsPanel.BRIEF_CACHE_KEY, { summary: worldBrief });
-          console.log(`[InsightsPanel] Brief generated${result.cached ? ' (cached)' : ''}${geoContext ? ' (with geo context)' : ''}`);
         }
       } else {
         usedCachedBrief = true;
