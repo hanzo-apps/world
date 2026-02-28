@@ -37,6 +37,7 @@ import type {
 } from '@/types';
 import { fetchMilitaryBases, type MilitaryBaseCluster as ServerBaseCluster } from '@/services/military-bases';
 import type { AirportDelayAlert } from '@/services/aviation';
+import type { IranEvent } from '@/services/conflict';
 import type { DisplacementFlow } from '@/services/displacement';
 import type { Earthquake } from '@/services/earthquakes';
 import type { ClimateAnomaly } from '@/services/climate';
@@ -263,6 +264,7 @@ export class DeckGLMap {
   private weatherAlerts: WeatherAlert[] = [];
   private outages: InternetOutage[] = [];
   private cyberThreats: CyberThreat[] = [];
+  private iranEvents: IranEvent[] = [];
   private aisDisruptions: AisDisruptionEvent[] = [];
   private aisDensity: AisDensityZone[] = [];
   private cableAdvisories: CableAdvisory[] = [];
@@ -1035,6 +1037,12 @@ export class DeckGLMap {
       layers.push(this.createFiresLayer());
     }
 
+    // Iran events layer
+    if (mapLayers.iranAttacks && this.iranEvents.length > 0) {
+      layers.push(this.createIranEventsLayer());
+      layers.push(this.createGhostLayer('iran-events-layer', this.iranEvents, d => [d.longitude, d.latitude], { radiusMinPixels: 12 }));
+    }
+
     // Weather alerts layer
     if (mapLayers.weather && filteredWeatherAlerts.length > 0) {
       layers.push(this.createWeatherLayer(filteredWeatherAlerts));
@@ -1595,6 +1603,23 @@ export class DeckGLMap {
       },
       radiusMinPixels: 3,
       radiusMaxPixels: 12,
+      pickable: true,
+    });
+  }
+
+  private createIranEventsLayer(): ScatterplotLayer {
+    return new ScatterplotLayer({
+      id: 'iran-events-layer',
+      data: this.iranEvents,
+      getPosition: (d: IranEvent) => [d.longitude, d.latitude],
+      getRadius: (d: IranEvent) => d.severity === 'high' ? 20000 : d.severity === 'medium' ? 15000 : 10000,
+      getFillColor: (d: IranEvent) => {
+        if (d.category === 'military') return [255, 50, 50, 220] as [number, number, number, number];
+        if (d.category === 'politics' || d.category === 'diplomacy') return [255, 165, 0, 200] as [number, number, number, number];
+        return [255, 255, 0, 180] as [number, number, number, number];
+      },
+      radiusMinPixels: 4,
+      radiusMaxPixels: 16,
       pickable: true,
     });
   }
@@ -2723,6 +2748,8 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.asn || t('components.deckgl.tooltip.internetOutage'))}</strong><br/>${text(obj.country)}</div>` };
       case 'cyber-threats-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${t('popups.cyberThreat.title')}</strong><br/>${text(obj.severity || t('components.deckgl.tooltip.medium'))} · ${text(obj.country || t('popups.unknown'))}</div>` };
+      case 'iran-events-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${t('components.deckgl.layers.iranAttacks')}: ${text(obj.category || '')}</strong><br/>${text((obj.title || '').slice(0, 80))}</div>` };
       case 'news-locations-layer':
         return { html: `<div class="deckgl-tooltip"><strong>📰 ${t('components.deckgl.tooltip.news')}</strong><br/>${text(obj.title?.slice(0, 80) || '')}</div>` };
       case 'positive-events-layer': {
@@ -2908,6 +2935,7 @@ export class DeckGLMap {
       'weather-layer': 'weather',
       'outages-layer': 'outage',
       'cyber-threats-layer': 'cyberThreat',
+      'iran-events-layer': 'iranEvent',
       'protests-layer': 'protest',
       'military-flights-layer': 'militaryFlight',
       'military-vessels-layer': 'militaryVessel',
@@ -3116,6 +3144,7 @@ export class DeckGLMap {
         { key: 'waterways', label: t('components.deckgl.layers.strategicWaterways'), icon: '&#9875;' },
         { key: 'economic', label: t('components.deckgl.layers.economicCenters'), icon: '&#128176;' },
         { key: 'minerals', label: t('components.deckgl.layers.criticalMinerals'), icon: '&#128142;' },
+        { key: 'iranAttacks', label: t('components.deckgl.layers.iranAttacks'), icon: '&#127919;' },
       ];
 
     toggles.innerHTML = `
@@ -3638,6 +3667,11 @@ export class DeckGLMap {
 
   public setCyberThreats(threats: CyberThreat[]): void {
     this.cyberThreats = threats;
+    this.render();
+  }
+
+  public setIranEvents(events: IranEvent[]): void {
+    this.iranEvents = events;
     this.render();
   }
 
