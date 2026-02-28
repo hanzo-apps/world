@@ -1844,6 +1844,7 @@ function handleWorldBankRequest(req, res) {
 }
 
 // ── Polymarket proxy (Cloudflare JA3 blocks Vercel edge runtime) ──
+const POLYMARKET_ENABLED = String(process.env.POLYMARKET_ENABLED || 'true').toLowerCase() !== 'false';
 const polymarketCache = new Map(); // key: query string → { data, timestamp }
 const polymarketInflight = new Map(); // key → Promise (dedup concurrent requests)
 const POLYMARKET_CACHE_TTL_MS = 2 * 60 * 1000; // 2 min — market data changes frequently
@@ -1923,6 +1924,12 @@ function fetchPolymarketUpstream(cacheKey, endpoint, params, tag) {
 }
 
 function handlePolymarketRequest(req, res) {
+  if (!POLYMARKET_ENABLED) {
+    return sendCompressed(req, res, 503, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    }, JSON.stringify({ error: 'polymarket disabled', reason: 'POLYMARKET_ENABLED=false' }));
+  }
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const cacheKey = url.search || '';
 
