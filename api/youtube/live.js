@@ -2,9 +2,6 @@
 // Uses residential proxy to bypass YouTube's datacenter IP blocking
 
 import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
-import http from 'node:http';
-import https from 'node:https';
-import zlib from 'node:zlib';
 
 export const config = {
   runtime: 'nodejs',
@@ -12,6 +9,17 @@ export const config = {
 };
 
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+// Lazy-loaded Node.js modules (unavailable in edge runtime)
+let _http, _https, _zlib;
+async function loadNodeModules() {
+  if (!_http) {
+    _http = await import('node:http');
+    _https = await import('node:https');
+    _zlib = await import('node:zlib');
+  }
+  return { http: _http, https: _https, zlib: _zlib };
+}
 
 // Parse proxy URL: http://user:pass@host:port
 function parseProxy(proxyUrl) {
@@ -27,7 +35,8 @@ function parseProxy(proxyUrl) {
 }
 
 // Fetch via HTTP CONNECT proxy tunnel
-function fetchViaProxy(targetUrl, proxy) {
+async function fetchViaProxy(targetUrl, proxy) {
+  const { http, https, zlib } = await loadNodeModules();
   return new Promise((resolve, reject) => {
     const target = new URL(targetUrl);
     const connectOpts = {
@@ -76,13 +85,17 @@ function fetchViaProxy(targetUrl, proxy) {
   });
 }
 
-// Fetch YouTube - uses proxy if configured, otherwise direct fetch
+// Fetch YouTube - proxy with fallback to direct fetch
 async function ytFetch(url) {
   const proxy = parseProxy(process.env.YOUTUBE_PROXY_URL);
   if (proxy) {
-    return fetchViaProxy(url, proxy);
+    try {
+      return await fetchViaProxy(url, proxy);
+    } catch {
+      // Proxy failed — fall back to direct fetch
+    }
   }
-  return globalThis.fetch(url, { headers: { 'User-Agent': CHROME_UA, 'Accept-Encoding': 'gzip, deflate' }, redirect: 'follow' });
+  return globalThis.fetch(url, { headers: { 'User-Agent': CHROME_UA }, redirect: 'follow' });
 }
 
 export default async function handler(request) {
