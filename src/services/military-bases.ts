@@ -90,7 +90,8 @@ export async function fetchMilitaryBases(
       };
       lastResult = result;
       return result;
-    } catch {
+    } catch (err) {
+      console.error('[bases-svc] error', err);
       return lastResult;
     } finally {
       pendingFetch = null;
