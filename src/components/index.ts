@@ -42,4 +42,5 @@ export * from './UnifiedSettings';
 export * from './TradePolicyPanel';
 export * from './SupplyChainPanel';
 export * from './SecurityAdvisoriesPanel';
+export * from './OrefSirensPanel';
 export * from './BreakingNewsBanner';

@@ -63,7 +63,8 @@
     "polymarket": "Förutsägelser",
     "climate": "Klimatanomalier",
     "liveWebcams": "Webbkameror",
-    "securityAdvisories": "Säkerhetsvarningar"
+    "securityAdvisories": "Säkerhetsvarningar",
+    "orefSirens": "OREF Sirens"
   },
   "modals": {
     "search": {
@@ -1171,6 +1172,17 @@
         "daysAgo": "{{count}} dagar sedan"
       },
       "infoTooltip": "<strong>Säkerhetsvarningar</strong><br>Resevarningar och säkerhetsmeddelanden från myndigheters utrikesdepartement."
+    },
+    "orefSirens": {
+      "checking": "Checking OREF alerts...",
+      "noAlerts": "No active sirens — all clear",
+      "notConfigured": "OREF proxy not configured",
+      "activeSirens": "{{count}} active siren(s)",
+      "area": "Area",
+      "time": "Time",
+      "justNow": "just now",
+      "historyCount": "{{count}} alerts in last 24h",
+      "infoTooltip": "<strong>OREF Sirens</strong><br>Real-time rocket and missile siren alerts from Israel Home Front Command (oref.org.il).<br><br>Data is polled every 10 seconds via a proxy relay. A pulsing red indicator means active sirens are sounding."
     }
   },
   "popups": {
