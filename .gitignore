@@ -20,6 +20,7 @@ CLAUDE.md
 skills/
 ideas/
 docs/internal/
+internal/
 test-results/
 src-tauri/sidecar/node/*
 !src-tauri/sidecar/node/.gitkeep
