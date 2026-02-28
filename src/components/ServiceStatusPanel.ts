@@ -53,9 +53,9 @@ export class ServiceStatusPanel extends Panel {
       const data = await fetchServiceStatuses();
       if (!data.success) throw new Error('Failed to load status');
 
-      const json = JSON.stringify(data.services);
-      const changed = json !== this.lastServicesJson;
-      this.lastServicesJson = json;
+      const fingerprint = data.services.map(s => `${s.name}:${s.status}`).join(',');
+      const changed = fingerprint !== this.lastServicesJson;
+      this.lastServicesJson = fingerprint;
       this.services = data.services;
       this.error = null;
       return changed;
