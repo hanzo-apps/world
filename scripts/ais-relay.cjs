@@ -230,7 +230,7 @@ async function initTelegramClientIfNeeded() {
 
   try {
     const { TelegramClient } = await import('telegram');
-    const { StringSession } = await import('telegram/sessions/index.js');
+    const { StringSession } = await import('telegram/sessions');
 
     const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash, {
       connectionRetries: 3,
@@ -242,7 +242,7 @@ async function initTelegramClientIfNeeded() {
     console.log('[Relay] Telegram client connected');
     return true;
   } catch (e) {
-    if (e?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find package|Directory import/.test(e?.message)) {
+    if (e?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find package/.test(e?.message)) {
       telegramImportFailed = true;
       telegramState.lastError = 'telegram package not installed';
       console.warn('[Relay] Telegram package not installed — disabling permanently for this session');
