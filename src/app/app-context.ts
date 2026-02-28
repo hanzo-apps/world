@@ -34,6 +34,8 @@ export interface CountryBriefSignals {
   climateStress: number;
   conflictEvents: number;
   activeStrikes: number;
+  orefSirens: number;
+  orefHistory24h: number;
   isTier1: boolean;
 }
 
@@ -44,6 +46,7 @@ export interface IntelligenceCache {
   earthquakes?: Earthquake[];
   usniFleet?: USNIFleetReport;
   iranEvents?: IranEvent[];
+  orefAlerts?: { alertCount: number; historyCount24h: number };
 }
 
 export interface AppModule {
