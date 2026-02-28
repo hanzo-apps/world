@@ -1,4 +1,5 @@
 import type { NewsItem } from '@/types';
+import { getSourceTier } from '@/config/feeds';
 
 export interface BreakingAlert {
   id: string;
@@ -132,6 +133,11 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
     const level = item.threat.level;
     if (level !== 'critical' && level !== 'high') continue;
     if (settings.sensitivity === 'critical-only' && level !== 'critical') continue;
+
+    // Tier 3+ sources (think tanks, specialty) need LLM confirmation to fire alerts.
+    // Keyword-only "war" matches on analysis articles are too noisy.
+    const tier = getSourceTier(item.source);
+    if (tier >= 3 && item.threat.source === 'keyword') continue;
 
     const key = makeAlertKey(item.title, item.source, item.link);
     if (isDuplicate(key)) continue;
