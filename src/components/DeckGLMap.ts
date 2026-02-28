@@ -344,6 +344,7 @@ export class DeckGLMap {
   private lastCableHealthSignature = '';
   private lastPipelineHighlightSignature = '';
   private debouncedRebuildLayers: () => void;
+  private debouncedFetchBases: () => void;
   private rafUpdateLayers: () => void;
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -357,6 +358,7 @@ export class DeckGLMap {
       this.maplibreMap.resize();
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
     }, 150);
+    this.debouncedFetchBases = debounce(() => this.fetchServerBases(), 300);
     this.rafUpdateLayers = rafSchedule(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
@@ -473,7 +475,7 @@ export class DeckGLMap {
     this.maplibreMap.on('moveend', () => {
       this.lastSCZoom = -1;
       this.rafUpdateLayers();
-      this.fetchServerBases();
+      this.debouncedFetchBases();
     });
 
     this.maplibreMap.on('move', () => {
@@ -3697,6 +3699,8 @@ export class DeckGLMap {
       this.serverBaseClusters = result.clusters;
       this.serverBasesLoaded = true;
       this.render();
+    }).catch((err) => {
+      console.error('[bases] fetch error', err);
     });
   }
 
