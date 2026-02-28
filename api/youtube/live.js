@@ -1,102 +1,14 @@
 // YouTube Live Stream Detection API
-// Uses residential proxy to bypass YouTube's datacenter IP blocking
+// Proxies to Railway relay which uses residential proxy for YouTube scraping
 
 import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
 
 export const config = {
-  runtime: 'nodejs',
-  maxDuration: 15,
+  runtime: 'edge',
 };
 
-const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-
-// Lazy-loaded Node.js modules (unavailable in edge runtime)
-let _http, _https, _zlib;
-async function loadNodeModules() {
-  if (!_http) {
-    _http = await import('node:http');
-    _https = await import('node:https');
-    _zlib = await import('node:zlib');
-  }
-  return { http: _http, https: _https, zlib: _zlib };
-}
-
-// Parse proxy URL: http://user:pass@host:port
-function parseProxy(proxyUrl) {
-  if (!proxyUrl) return null;
-  try {
-    const u = new URL(proxyUrl);
-    return {
-      host: u.hostname,
-      port: parseInt(u.port, 10),
-      auth: u.username ? `${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}` : null,
-    };
-  } catch { return null; }
-}
-
-// Fetch via HTTP CONNECT proxy tunnel
-async function fetchViaProxy(targetUrl, proxy) {
-  const { http, https, zlib } = await loadNodeModules();
-  return new Promise((resolve, reject) => {
-    const target = new URL(targetUrl);
-    const connectOpts = {
-      host: proxy.host,
-      port: proxy.port,
-      method: 'CONNECT',
-      path: `${target.hostname}:443`,
-      headers: {},
-    };
-    if (proxy.auth) {
-      connectOpts.headers['Proxy-Authorization'] = 'Basic ' + Buffer.from(proxy.auth).toString('base64');
-    }
-    const connectReq = http.request(connectOpts);
-    connectReq.on('connect', (_res, socket) => {
-      const req = https.request({
-        hostname: target.hostname,
-        path: target.pathname + target.search,
-        method: 'GET',
-        headers: { 'User-Agent': CHROME_UA, 'Accept-Encoding': 'gzip, deflate' },
-        socket,
-        agent: false,
-      }, (res) => {
-        let stream = res;
-        const encoding = (res.headers['content-encoding'] || '').trim().toLowerCase();
-        if (encoding === 'gzip') stream = res.pipe(zlib.createGunzip());
-        else if (encoding === 'deflate') stream = res.pipe(zlib.createInflate());
-
-        const chunks = [];
-        stream.on('data', (c) => chunks.push(c));
-        stream.on('end', () => {
-          resolve({
-            ok: res.statusCode >= 200 && res.statusCode < 300,
-            status: res.statusCode,
-            text: () => Promise.resolve(Buffer.concat(chunks).toString()),
-            json: () => Promise.resolve(JSON.parse(Buffer.concat(chunks).toString())),
-          });
-        });
-        stream.on('error', reject);
-      });
-      req.on('error', reject);
-      req.end();
-    });
-    connectReq.on('error', reject);
-    connectReq.setTimeout(12000, () => { connectReq.destroy(); reject(new Error('Proxy timeout')); });
-    connectReq.end();
-  });
-}
-
-// Fetch YouTube - proxy with fallback to direct fetch
-async function ytFetch(url) {
-  const proxy = parseProxy(process.env.YOUTUBE_PROXY_URL);
-  if (proxy) {
-    try {
-      return await fetchViaProxy(url, proxy);
-    } catch {
-      // Proxy failed — fall back to direct fetch
-    }
-  }
-  return globalThis.fetch(url, { headers: { 'User-Agent': CHROME_UA }, redirect: 'follow' });
-}
+const RELAY_URL = process.env.VITE_WS_API_URL || '';
+const RELAY_AUTH = process.env.RELAY_AUTH_TOKEN || '';
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
@@ -108,11 +20,46 @@ export default async function handler(request) {
   const channel = url.searchParams.get('channel');
   const videoIdParam = url.searchParams.get('videoId');
 
-  // Video ID lookup: resolve author name via oembed
+  // Build relay URL with same query params
+  const params = new URLSearchParams();
+  if (channel) params.set('channel', channel);
+  if (videoIdParam) params.set('videoId', videoIdParam);
+  const qs = params.toString();
+
+  if (!qs) {
+    return new Response(JSON.stringify({ error: 'Missing channel or videoId parameter' }), {
+      status: 400,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Proxy to Railway relay
+  if (RELAY_URL) {
+    try {
+      const relayHeaders = { 'User-Agent': 'WorldMonitor-Edge/1.0' };
+      if (RELAY_AUTH) relayHeaders['X-Relay-Auth'] = RELAY_AUTH;
+      const relayRes = await fetch(`${RELAY_URL}/youtube-live?${qs}`, { headers: relayHeaders });
+      if (relayRes.ok) {
+        const data = await relayRes.json();
+        const cacheTime = videoIdParam ? 3600 : 300;
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: {
+            ...cors,
+            'Content-Type': 'application/json',
+            'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}, stale-while-revalidate=60`,
+          },
+        });
+      }
+    } catch {}
+  }
+
+  // Fallback: direct fetch (works for oembed, limited for live detection from datacenter IPs)
   if (videoIdParam && /^[A-Za-z0-9_-]{11}$/.test(videoIdParam)) {
     try {
-      const oembedRes = await ytFetch(
+      const oembedRes = await fetch(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoIdParam}&format=json`,
+        { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } },
       );
       if (oembedRes.ok) {
         const data = await oembedRes.json();
@@ -131,35 +78,28 @@ export default async function handler(request) {
   if (!channel) {
     return new Response(JSON.stringify({ error: 'Missing channel parameter' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 
+  // Fallback: direct scrape (limited from datacenter IPs)
   try {
     const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
-    const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
-
-    const response = await ytFetch(liveUrl);
-
+    const response = await fetch(`https://www.youtube.com/${channelHandle}/live`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      redirect: 'follow',
+    });
     if (!response.ok) {
       return new Response(JSON.stringify({ videoId: null, channelExists: false }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
-
     const html = await response.text();
-
     const channelExists = html.includes('"channelId"') || html.includes('og:url');
-
     let channelName = null;
     const ownerMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
-    if (ownerMatch) {
-      channelName = ownerMatch[1];
-    } else {
-      const authorMatch = html.match(/"author"\s*:\s*"([^"]+)"/);
-      if (authorMatch) channelName = authorMatch[1];
-    }
+    if (ownerMatch) channelName = ownerMatch[1];
+    else { const am = html.match(/"author"\s*:\s*"([^"]+)"/); if (am) channelName = am[1]; }
 
     let videoId = null;
     const detailsIdx = html.indexOf('"videoDetails"');
@@ -167,30 +107,20 @@ export default async function handler(request) {
       const block = html.substring(detailsIdx, detailsIdx + 5000);
       const vidMatch = block.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
       const liveMatch = block.match(/"isLive"\s*:\s*true/);
-      if (vidMatch && liveMatch) {
-        videoId = vidMatch[1];
-      }
+      if (vidMatch && liveMatch) videoId = vidMatch[1];
     }
 
     let hlsUrl = null;
     const hlsMatch = html.match(/"hlsManifestUrl"\s*:\s*"([^"]+)"/);
-    if (hlsMatch && videoId) {
-      hlsUrl = hlsMatch[1].replace(/\\u0026/g, '&');
-    }
+    if (hlsMatch && videoId) hlsUrl = hlsMatch[1].replace(/\\u0026/g, '&');
 
     return new Response(JSON.stringify({ videoId, isLive: videoId !== null, channelExists, channelName, hlsUrl }), {
       status: 200,
-      headers: {
-        ...cors,
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
-      },
+      headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60' },
     });
   } catch (error) {
-    console.error('YouTube live check error:', error);
     return new Response(JSON.stringify({ videoId: null, error: error.message }), {
-      status: 200,
-      headers: { ...cors, 'Content-Type': 'application/json' },
+      status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 }

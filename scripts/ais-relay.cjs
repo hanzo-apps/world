@@ -2158,6 +2158,201 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
+// ── YouTube Live Detection (residential proxy bypass) ──────────────
+const YOUTUBE_PROXY_URL = process.env.YOUTUBE_PROXY_URL || '';
+const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+function parseProxyUrl(proxyUrl) {
+  if (!proxyUrl) return null;
+  try {
+    const u = new URL(proxyUrl);
+    return {
+      host: u.hostname,
+      port: parseInt(u.port, 10),
+      auth: u.username ? `${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}` : null,
+    };
+  } catch { return null; }
+}
+
+function ytFetchViaProxy(targetUrl, proxy) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(targetUrl);
+    const connectOpts = {
+      host: proxy.host, port: proxy.port, method: 'CONNECT',
+      path: `${target.hostname}:443`, headers: {},
+    };
+    if (proxy.auth) {
+      connectOpts.headers['Proxy-Authorization'] = 'Basic ' + Buffer.from(proxy.auth).toString('base64');
+    }
+    const connectReq = http.request(connectOpts);
+    connectReq.on('connect', (_res, socket) => {
+      const req = https.request({
+        hostname: target.hostname,
+        path: target.pathname + target.search,
+        method: 'GET',
+        headers: { 'User-Agent': CHROME_UA, 'Accept-Encoding': 'gzip, deflate' },
+        socket, agent: false,
+      }, (res) => {
+        let stream = res;
+        const enc = (res.headers['content-encoding'] || '').trim().toLowerCase();
+        if (enc === 'gzip') stream = res.pipe(zlib.createGunzip());
+        else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+        const chunks = [];
+        stream.on('data', (c) => chunks.push(c));
+        stream.on('end', () => resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          body: Buffer.concat(chunks).toString(),
+        }));
+        stream.on('error', reject);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    connectReq.on('error', reject);
+    connectReq.setTimeout(12000, () => { connectReq.destroy(); reject(new Error('Proxy timeout')); });
+    connectReq.end();
+  });
+}
+
+function ytFetchDirect(targetUrl) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(targetUrl);
+    const req = https.request({
+      hostname: target.hostname,
+      path: target.pathname + target.search,
+      method: 'GET',
+      headers: { 'User-Agent': CHROME_UA, 'Accept-Encoding': 'gzip, deflate' },
+    }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return ytFetchDirect(res.headers.location).then(resolve, reject);
+      }
+      let stream = res;
+      const enc = (res.headers['content-encoding'] || '').trim().toLowerCase();
+      if (enc === 'gzip') stream = res.pipe(zlib.createGunzip());
+      else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+      const chunks = [];
+      stream.on('data', (c) => chunks.push(c));
+      stream.on('end', () => resolve({
+        ok: res.statusCode >= 200 && res.statusCode < 300,
+        status: res.statusCode,
+        body: Buffer.concat(chunks).toString(),
+      }));
+      stream.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(12000, () => { req.destroy(); reject(new Error('YouTube timeout')); });
+    req.end();
+  });
+}
+
+async function ytFetch(url) {
+  const proxy = parseProxyUrl(YOUTUBE_PROXY_URL);
+  if (proxy) {
+    try { return await ytFetchViaProxy(url, proxy); } catch { /* fall through */ }
+  }
+  return ytFetchDirect(url);
+}
+
+const ytLiveCache = new Map();
+const YT_CACHE_TTL = 5 * 60 * 1000;
+
+function handleYouTubeLiveRequest(req, res) {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const channel = url.searchParams.get('channel');
+  const videoIdParam = url.searchParams.get('videoId');
+
+  if (videoIdParam && /^[A-Za-z0-9_-]{11}$/.test(videoIdParam)) {
+    const cacheKey = `vid:${videoIdParam}`;
+    const cached = ytLiveCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 3600000) {
+      return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' }, cached.json);
+    }
+    ytFetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoIdParam}&format=json`)
+      .then(r => {
+        if (r.ok) {
+          try {
+            const data = JSON.parse(r.body);
+            const json = JSON.stringify({ channelName: data.author_name || null, title: data.title || null, videoId: videoIdParam });
+            ytLiveCache.set(cacheKey, { json, ts: Date.now() });
+            return sendCompressed(req, res, 200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' }, json);
+          } catch {}
+        }
+        sendCompressed(req, res, 200, { 'Content-Type': 'application/json' },
+          JSON.stringify({ channelName: null, title: null, videoId: videoIdParam }));
+      })
+      .catch(() => {
+        sendCompressed(req, res, 200, { 'Content-Type': 'application/json' },
+          JSON.stringify({ channelName: null, title: null, videoId: videoIdParam }));
+      });
+    return;
+  }
+
+  if (!channel) {
+    return sendCompressed(req, res, 400, { 'Content-Type': 'application/json' },
+      JSON.stringify({ error: 'Missing channel parameter' }));
+  }
+
+  const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
+  const cacheKey = `ch:${channelHandle}`;
+  const cached = ytLiveCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < YT_CACHE_TTL) {
+    return sendCompressed(req, res, 200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
+    }, cached.json);
+  }
+
+  const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
+  ytFetch(liveUrl)
+    .then(r => {
+      if (!r.ok) {
+        return sendCompressed(req, res, 200, { 'Content-Type': 'application/json' },
+          JSON.stringify({ videoId: null, channelExists: false }));
+      }
+      const html = r.body;
+      const channelExists = html.includes('"channelId"') || html.includes('og:url');
+      let channelName = null;
+      const ownerMatch = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
+      if (ownerMatch) channelName = ownerMatch[1];
+      else { const am = html.match(/"author"\s*:\s*"([^"]+)"/); if (am) channelName = am[1]; }
+
+      let videoId = null;
+      const detailsIdx = html.indexOf('"videoDetails"');
+      if (detailsIdx !== -1) {
+        const block = html.substring(detailsIdx, detailsIdx + 5000);
+        const vidMatch = block.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+        const liveMatch = block.match(/"isLive"\s*:\s*true/);
+        if (vidMatch && liveMatch) videoId = vidMatch[1];
+      }
+
+      let hlsUrl = null;
+      const hlsMatch = html.match(/"hlsManifestUrl"\s*:\s*"([^"]+)"/);
+      if (hlsMatch && videoId) hlsUrl = hlsMatch[1].replace(/\\u0026/g, '&');
+
+      const json = JSON.stringify({ videoId, isLive: videoId !== null, channelExists, channelName, hlsUrl });
+      ytLiveCache.set(cacheKey, { json, ts: Date.now() });
+      sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=60',
+      }, json);
+    })
+    .catch(err => {
+      console.error('[Relay] YouTube live check error:', err.message);
+      sendCompressed(req, res, 200, { 'Content-Type': 'application/json' },
+        JSON.stringify({ videoId: null, error: err.message }));
+    });
+}
+
+// Periodic cleanup for YouTube cache
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of ytLiveCache) {
+    const ttl = key.startsWith('vid:') ? 3600000 : YT_CACHE_TTL;
+    if (now - val.ts > ttl * 2) ytLiveCache.delete(key);
+  }
+}, 5 * 60 * 1000);
+
 // CORS origin allowlist — only our domains can use this relay
 const ALLOWED_ORIGINS = [
   'https://worldmonitor.app',
@@ -2637,6 +2832,8 @@ const server = http.createServer(async (req, res) => {
     handleWorldBankRequest(req, res);
   } else if (pathname.startsWith('/polymarket')) {
     handlePolymarketRequest(req, res);
+  } else if (pathname === '/youtube-live') {
+    handleYouTubeLiveRequest(req, res);
   } else {
     res.writeHead(404);
     res.end();
