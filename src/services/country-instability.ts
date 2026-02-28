@@ -38,6 +38,8 @@ interface CountryData {
   strikes: Array<{ severity: string; timestamp: number; lat: number; lon: number; title: string; id: string }>;
   displacementOutflow: number;
   climateStress: number;
+  orefAlertCount: number;
+  orefHistoryCount24h: number;
 }
 
 export { TIER1_COUNTRIES } from '@/config/countries';
@@ -119,7 +121,7 @@ const countryDataMap = new Map<string, CountryData>();
 const previousScores = new Map<string, number>();
 
 function initCountryData(): CountryData {
-  return { protests: [], conflicts: [], ucdpStatus: null, hapiSummary: null, militaryFlights: [], militaryVessels: [], newsEvents: [], outages: [], strikes: [], displacementOutflow: 0, climateStress: 0 };
+  return { protests: [], conflicts: [], ucdpStatus: null, hapiSummary: null, militaryFlights: [], militaryVessels: [], newsEvents: [], outages: [], strikes: [], displacementOutflow: 0, climateStress: 0, orefAlertCount: 0, orefHistoryCount24h: 0 };
 }
 
 const newsEventIndexMap = new Map<string, Map<string, number>>();
@@ -429,6 +431,18 @@ export function ingestOutagesForCII(outages: InternetOutage[]): void {
   }
 }
 
+export function ingestOrefForCII(alertCount: number, historyCount24h: number): void {
+  if (!countryDataMap.has('IL')) countryDataMap.set('IL', initCountryData());
+  const data = countryDataMap.get('IL')!;
+  data.orefAlertCount = alertCount;
+  data.orefHistoryCount24h = historyCount24h;
+}
+
+function getOrefBlendBoost(code: string, data: CountryData): number {
+  if (code !== 'IL') return 0;
+  return (data.orefAlertCount > 0 ? 15 : 0) + (data.orefHistoryCount24h >= 10 ? 10 : data.orefHistoryCount24h >= 3 ? 5 : 0);
+}
+
 function calcUnrestScore(data: CountryData, countryCode: string): number {
   const protestCount = data.protests.length;
   const multiplier = CURATED_COUNTRIES[countryCode]?.eventMultiplier ?? DEFAULT_EVENT_MULTIPLIER;
@@ -531,7 +545,12 @@ function calcConflictScore(data: CountryData, countryCode: string): number {
     strikeBoost = Math.min(50, recentStrikes.length * 3 + highCount * 5);
   }
 
-  return Math.min(100, Math.max(acledScore, hapiFallback, newsFloor) + strikeBoost);
+  let orefBoost = 0;
+  if (countryCode === 'IL' && data.orefAlertCount > 0) {
+    orefBoost = 25 + Math.min(25, data.orefAlertCount * 5);
+  }
+
+  return Math.min(100, Math.max(acledScore, hapiFallback, newsFloor) + strikeBoost + orefBoost);
 }
 
 function getUcdpFloor(data: CountryData): number {
@@ -631,7 +650,7 @@ export function calculateCII(): CountryScore[] {
       : 0;
     const climateBoost = data.climateStress;
 
-    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost;
+    const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost + getOrefBlendBoost(code, data);
 
     const floor = getUcdpFloor(data);
     const score = Math.round(Math.min(100, Math.max(floor, blendedScore)));
@@ -684,7 +703,7 @@ export function getCountryScore(code: string): number | null {
     : data.displacementOutflow >= 100_000 ? 4
     : 0;
   const climateBoost = data.climateStress;
-  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost;
+  const blendedScore = baselineRisk * 0.4 + eventScore * 0.6 + hotspotBoost + newsUrgencyBoost + focalBoost + displacementBoost + climateBoost + getOrefBlendBoost(code, data);
 
   const floor = getUcdpFloor(data);
   return Math.round(Math.min(100, Math.max(floor, blendedScore)));

@@ -387,6 +387,13 @@ export class CountryIntelManager implements AppModule {
     const ciiData = getCountryData(code);
     const isTier1 = !!TIER1_COUNTRIES[code];
 
+    let orefSirens = 0;
+    let orefHistory24h = 0;
+    if (code === 'IL' && this.ctx.intelligenceCache.orefAlerts) {
+      orefSirens = this.ctx.intelligenceCache.orefAlerts.alertCount;
+      orefHistory24h = this.ctx.intelligenceCache.orefAlerts.historyCount24h;
+    }
+
     return {
       protests,
       militaryFlights,
@@ -397,6 +404,8 @@ export class CountryIntelManager implements AppModule {
       climateStress: ciiData?.climateStress ?? 0,
       conflictEvents: ciiData?.conflicts?.length ?? 0,
       activeStrikes,
+      orefSirens,
+      orefHistory24h,
       isTier1,
     };
   }
