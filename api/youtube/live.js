@@ -8,7 +8,7 @@ export const config = {
 };
 
 const RELAY_URL = process.env.VITE_WS_API_URL || '';
-const RELAY_AUTH = process.env.RELAY_AUTH_TOKEN || '';
+const RELAY_AUTH = process.env.RELAY_SHARED_SECRET || '';
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
@@ -37,7 +37,7 @@ export default async function handler(request) {
   if (RELAY_URL) {
     try {
       const relayHeaders = { 'User-Agent': 'WorldMonitor-Edge/1.0' };
-      if (RELAY_AUTH) relayHeaders['X-Relay-Auth'] = RELAY_AUTH;
+      if (RELAY_AUTH) relayHeaders['x-relay-key'] = RELAY_AUTH;
       const relayRes = await fetch(`${RELAY_URL}/youtube-live?${qs}`, { headers: relayHeaders });
       if (relayRes.ok) {
         const data = await relayRes.json();
