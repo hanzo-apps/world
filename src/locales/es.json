@@ -1192,6 +1192,9 @@
       "aiFlowStatusCloudAndBrowser": "IA en la nube + Modelo del navegador activos",
       "aiFlowStatusBrowserOnly": "Solo modelo del navegador",
       "aiFlowStatusDisabled": "Ningún proveedor de IA habilitado",
+      "sectionIntelligence": "Inteligencia",
+      "headlineMemoryLabel": "Memoria de titulares",
+      "headlineMemoryDesc": "Recordar titulares anteriores para enriquecer informes de países con contexto histórico",
       "insightsDisabledTitle": "El análisis de IA está desactivado",
       "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
