@@ -605,7 +605,50 @@ export class DataLoaderManager implements AppModule {
         return items;
       }
 
-      // Fallback path when digest is unavailable: stale-first, then limited per-feed fan-out.
+      // Digest branch: server already aggregated feeds — map proto items to client types
+      if (digest?.categories && category in digest.categories) {
+        const enabledNames = new Set(enabledFeeds.map(f => f.name));
+        let items = (digest.categories[category]?.items ?? [])
+          .map(protoItemToNewsItem)
+          .filter(i => enabledNames.has(i.source));
+
+        ingestHeadlines(items.map(i => ({ title: i.title, pubDate: i.pubDate, source: i.source, link: i.link })));
+
+        const aiCandidates = items
+          .filter(i => i.threat?.source === 'keyword')
+          .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
+          .slice(0, AI_CLASSIFY_MAX_PER_FEED);
+        for (const item of aiCandidates) {
+          if (!canQueueAiClassification(item.title)) continue;
+          classifyWithAI(item.title, SITE_VARIANT).then(ai => {
+            if (ai && item.threat && ai.confidence > item.threat.confidence) {
+              item.threat = ai;
+              item.isAlert = ai.level === 'critical' || ai.level === 'high';
+            }
+          }).catch(() => {});
+        }
+
+        checkBatchForBreakingAlerts(items);
+        this.flashMapForNews(items);
+        this.renderNewsForCategory(category, items);
+
+        this.ctx.statusPanel?.updateFeed(category.charAt(0).toUpperCase() + category.slice(1), {
+          status: 'ok',
+          itemCount: items.length,
+        });
+
+        if (panel) {
+          try {
+            const baseline = await updateBaseline(`news:${category}`, items.length);
+            const deviation = calculateDeviation(items.length, baseline);
+            panel.setDeviation(deviation.zScore, deviation.percentChange, deviation.level);
+          } catch (e) { console.warn(`[Baseline] news:${category} write failed:`, e); }
+        }
+
+        return items;
+      }
+
+      // Per-feed fallback: fetch each feed individually (first load or digest unavailable)
       const renderIntervalMs = 100;
       let lastRenderTime = 0;
       let renderTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1458,8 +1501,9 @@ export class DataLoaderManager implements AppModule {
       this.ctx.intelligenceCache.iranEvents = events;
       this.ctx.map?.setIranEvents(events);
       this.ctx.map?.setLayerReady('iranAttacks', events.length > 0);
-      signalAggregator.ingestConflictEvents(events);
-      ingestStrikesForCII(events);
+      const coerced = events.map(e => ({ ...e, timestamp: Number(e.timestamp) || 0 }));
+      signalAggregator.ingestConflictEvents(coerced);
+      ingestStrikesForCII(coerced);
       (this.ctx.panels['cii'] as CIIPanel)?.refresh();
     } catch {
       this.ctx.map?.setLayerReady('iranAttacks', false);
