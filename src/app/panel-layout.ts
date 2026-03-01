@@ -219,6 +219,36 @@ export class PanelLayoutManager implements AppModule {
     `;
 
     this.createPanels();
+
+    if (this.ctx.isMobile) {
+      this.setupMobileMapToggle();
+    }
+  }
+
+  private setupMobileMapToggle(): void {
+    const mapSection = document.getElementById('mapSection');
+    const headerLeft = mapSection?.querySelector('.panel-header-left');
+    if (!mapSection || !headerLeft) return;
+
+    const stored = localStorage.getItem('mobile-map-collapsed');
+    const collapsed = stored === null || stored === 'true';
+    if (collapsed) mapSection.classList.add('collapsed');
+
+    const updateBtn = (btn: HTMLButtonElement, isCollapsed: boolean) => {
+      btn.textContent = isCollapsed ? `▶ ${t('components.map.showMap')}` : `▼ ${t('components.map.hideMap')}`;
+    };
+
+    const btn = document.createElement('button');
+    btn.className = 'map-collapse-btn';
+    updateBtn(btn, collapsed);
+    headerLeft.after(btn);
+
+    btn.addEventListener('click', () => {
+      const isCollapsed = mapSection.classList.toggle('collapsed');
+      updateBtn(btn, isCollapsed);
+      localStorage.setItem('mobile-map-collapsed', String(isCollapsed));
+      if (!isCollapsed) window.dispatchEvent(new Event('resize'));
+    });
   }
 
   renderCriticalBanner(postures: TheaterPostureSummary[]): void {
