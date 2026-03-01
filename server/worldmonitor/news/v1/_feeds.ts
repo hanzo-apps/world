@@ -31,6 +31,7 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'BBC Middle East', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml' },
       { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
       { name: 'Guardian ME', url: 'https://www.theguardian.com/world/middleeast/rss' },
+      { name: 'Oman Observer', url: 'https://www.omanobserver.om/rssFeed/1' },
     ],
     tech: [
       { name: 'Hacker News', url: 'https://hnrss.org/frontpage' },
@@ -74,6 +75,7 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'The Diplomat', url: 'https://thediplomat.com/feed/' },
       { name: 'Nikkei Asia', url: gn('site:asia.nikkei.com when:3d') },
       { name: 'CNA', url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml' },
+      { name: 'NDTV', url: 'https://feeds.feedburner.com/ndtvnews-top-stories' },
     ],
     energy: [
       { name: 'Oil & Gas', url: gn('(oil price OR OPEC OR "natural gas" OR pipeline OR LNG) when:2d') },
