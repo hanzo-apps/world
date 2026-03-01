@@ -12,6 +12,7 @@ import type {
 
 import { classifyNewsItem } from '../../../../src/services/positive-classifier';
 import { cachedFetchJson } from '../../../_shared/redis';
+import { markNoCacheResponse } from '../../../_shared/response-headers';
 
 const GDELT_GEO_URL = 'https://api.gdeltproject.org/api/v2/geo/geo';
 
@@ -85,7 +86,7 @@ async function fetchGdeltGeoPositive(query: string): Promise<PositiveGeoEvent[]>
 }
 
 export async function listPositiveGeoEvents(
-  _ctx: ServerContext,
+  ctx: ServerContext,
   _req: ListPositiveGeoEventsRequest,
 ): Promise<ListPositiveGeoEventsResponse> {
   try {
@@ -117,6 +118,7 @@ export async function listPositiveGeoEvents(
     });
     return result || { events: [] };
   } catch {
+    markNoCacheResponse(ctx.request);
     return { events: [] };
   }
 }
