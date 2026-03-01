@@ -43,6 +43,7 @@ import { PositiveNewsFeedPanel } from '@/components/PositiveNewsFeedPanel';
 import { CountersPanel } from '@/components/CountersPanel';
 import { ProgressChartsPanel } from '@/components/ProgressChartsPanel';
 import { BreakthroughsTickerPanel } from '@/components/BreakthroughsTickerPanel';
+import { DeductionPanel } from '@/components/DeductionPanel';
 import { HeroSpotlightPanel } from '@/components/HeroSpotlightPanel';
 import { GoodThingsDigestPanel } from '@/components/GoodThingsDigestPanel';
 import { SpeciesComebackPanel } from '@/components/SpeciesComebackPanel';
@@ -500,6 +501,11 @@ export class PanelLayoutManager implements AppModule {
       const gdeltIntelPanel = new GdeltIntelPanel();
       this.ctx.panels['gdelt-intel'] = gdeltIntelPanel;
 
+      if (this.ctx.isDesktopApp) {
+        const deductionPanel = new DeductionPanel(() => this.ctx.allNews);
+        this.ctx.panels['deduction'] = deductionPanel;
+      }
+
       const ciiPanel = new CIIPanel();
       ciiPanel.setShareStoryHandler((code, name) => {
         this.callbacks.openCountryStory(code, name);
@@ -518,7 +524,7 @@ export class PanelLayoutManager implements AppModule {
       });
       this.ctx.panels['strategic-risk'] = strategicRiskPanel;
 
-      const strategicPosturePanel = new StrategicPosturePanel();
+      const strategicPosturePanel = new StrategicPosturePanel(() => this.ctx.allNews);
       strategicPosturePanel.setLocationClickHandler((lat, lon) => {
         console.log('[App] StrategicPosture handler called:', { lat, lon, hasMap: !!this.ctx.map });
         this.ctx.map?.setCenter(lat, lon, 4);
@@ -581,7 +587,7 @@ export class PanelLayoutManager implements AppModule {
       const liveWebcamsPanel = new LiveWebcamsPanel();
       this.ctx.panels['live-webcams'] = liveWebcamsPanel;
 
-      this.ctx.panels['events'] = new TechEventsPanel('events');
+      this.ctx.panels['events'] = new TechEventsPanel('events', () => this.ctx.allNews);
 
       const serviceStatusPanel = new ServiceStatusPanel();
       this.ctx.panels['service-status'] = serviceStatusPanel;
