@@ -1192,6 +1192,9 @@
       "aiFlowStatusCloudAndBrowser": "Cloud AI + Model przeglądarki aktywne",
       "aiFlowStatusBrowserOnly": "Tylko model przeglądarki",
       "aiFlowStatusDisabled": "Brak włączonych dostawców AI",
+      "sectionIntelligence": "Wywiad",
+      "headlineMemoryLabel": "Pamięć nagłówków",
+      "headlineMemoryDesc": "Zapamiętuj wcześniejsze nagłówki, aby wzbogacić raporty krajowe kontekstem historycznym",
       "insightsDisabledTitle": "Analiza AI jest wyłączona",
       "insightsDisabledHint": "Enable providers via the settings gear in the map header"
     },
