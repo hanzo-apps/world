@@ -1284,7 +1284,7 @@ function processRawUpstreamMessage(raw) {
   messageCount++;
   if (messageCount % 5000 === 0) {
     const mem = process.memoryUsage();
-    console.log(`[Relay] ${messageCount} msgs, ${clients.size} ws-clients, ${vessels.size} vessels, queue=${getUpstreamQueueSize()}, dropped=${droppedMessages}, rss=${(mem.rss / 1024 / 1024).toFixed(0)}MB heap=${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB, cache: opensky=${openskyResponseCache.size} opensky_neg=${openskyNegativeCache.size} rss_feed=${rssResponseCache.size}`);
+    console.log(`[Relay] ${messageCount} msgs, ${clients.size} ws-clients, ${vessels.size} vessels, queue=${getUpstreamQueueSize()}, dropped=${droppedMessages}, rss=${(mem.rss / 1024 / 1024).toFixed(0)}MB heap=${(mem.heapUsed / 1024 / 1024).toFixed(0)}MB, cache: opensky=${openskyResponseCache.size} opensky_neg=${openskyNegativeCache.size} rss_feed=${rssResponseCache.size} rss_backoff=${rssFailureCount.size}`);
   }
 
   try {
@@ -1803,9 +1803,25 @@ const OPENSKY_DEDUP_EMPTY_RESPONSE_JSON = JSON.stringify({ states: [], time: 0 }
 const OPENSKY_DEDUP_EMPTY_RESPONSE_GZIP = gzipSyncBuffer(OPENSKY_DEDUP_EMPTY_RESPONSE_JSON);
 const rssResponseCache = new Map(); // key: feed URL → { data, contentType, timestamp, statusCode }
 const rssInFlight = new Map(); // key: feed URL → Promise (dedup concurrent requests)
+const rssFailureCount = new Map(); // key: feed URL → consecutive failure count (for exponential backoff)
+const rssBackoffUntil = new Map(); // key: feed URL → timestamp when backoff expires
 const RSS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — RSS feeds rarely update faster
-const RSS_NEGATIVE_CACHE_TTL_MS = 60 * 1000; // 1 min — cache failures to prevent thundering herd
+const RSS_NEGATIVE_CACHE_TTL_MS = 60 * 1000; // 1 min base — scaled by 2^failures via backoff
+const RSS_MAX_NEGATIVE_CACHE_TTL_MS = 15 * 60 * 1000; // 15 min cap — stop hammering broken feeds
 const RSS_CACHE_MAX_ENTRIES = 200; // hard cap — ~20 allowed domains × ~5 paths max, with headroom
+
+function rssRecordFailure(feedUrl) {
+  const prev = rssFailureCount.get(feedUrl) || 0;
+  const ttl = Math.min(RSS_NEGATIVE_CACHE_TTL_MS * Math.pow(2, prev), RSS_MAX_NEGATIVE_CACHE_TTL_MS);
+  rssFailureCount.set(feedUrl, prev + 1);
+  rssBackoffUntil.set(feedUrl, Date.now() + ttl);
+  return { failures: prev + 1, backoffSec: Math.round(ttl / 1000) };
+}
+
+function rssResetFailure(feedUrl) {
+  rssFailureCount.delete(feedUrl);
+  rssBackoffUntil.delete(feedUrl);
+}
 
 function setBoundedCacheEntry(cache, key, value, maxEntries) {
   if (!cache.has(key) && cache.size >= maxEntries) {
@@ -2636,9 +2652,18 @@ setInterval(() => {
     if (now - entry.timestamp > OPENSKY_NEGATIVE_CACHE_TTL_MS * 2) openskyNegativeCache.delete(key);
   }
   for (const [key, entry] of rssResponseCache) {
-    const maxAge = (entry.statusCode && entry.statusCode >= 200 && entry.statusCode < 300)
-      ? RSS_CACHE_TTL_MS * 2 : RSS_NEGATIVE_CACHE_TTL_MS * 2;
-    if (now - entry.timestamp > maxAge) rssResponseCache.delete(key);
+    if (now - entry.timestamp > RSS_CACHE_TTL_MS * 2) rssResponseCache.delete(key);
+  }
+  for (const [key, expiry] of rssBackoffUntil) {
+    // Only clear backoff timer on expiry — preserve failureCount so
+    // the next failure re-escalates immediately instead of resetting to 1min
+    if (now > expiry) rssBackoffUntil.delete(key);
+  }
+  // Clean up failure counts when no backoff is active AND no cache entry exists.
+  // Edge case: if cache is evicted (FIFO/age) right when backoff expires, failureCount
+  // resets — next failure starts at 1min instead of re-escalating. Window is ~60s, acceptable.
+  for (const key of rssFailureCount.keys()) {
+    if (!rssBackoffUntil.has(key) && !rssResponseCache.has(key)) rssFailureCount.delete(key);
   }
   for (const [key, entry] of worldbankCache) {
     if (now - entry.timestamp > WORLDBANK_CACHE_TTL_MS * 2) worldbankCache.delete(key);
@@ -3328,7 +3353,28 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
       }
 
-      // Serve from cache if fresh (5 min for success, 1 min for failures)
+      // Backoff guard: if feed is in exponential backoff, don't hit upstream
+      const backoffExpiry = rssBackoffUntil.get(feedUrl);
+      const backoffNow = Date.now();
+      if (backoffExpiry && backoffNow < backoffExpiry) {
+        const rssCachedForBackoff = rssResponseCache.get(feedUrl);
+        if (rssCachedForBackoff && rssCachedForBackoff.statusCode >= 200 && rssCachedForBackoff.statusCode < 300) {
+          return sendCompressed(req, res, 200, {
+            'Content-Type': rssCachedForBackoff.contentType || 'application/xml',
+            'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store',
+            'X-Cache': 'BACKOFF-STALE',
+          }, rssCachedForBackoff.data);
+        }
+        const remainSec = Math.max(1, Math.round((backoffExpiry - backoffNow) / 1000));
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': String(remainSec) });
+        return res.end(JSON.stringify({ error: 'Feed in backoff', retryAfterSec: remainSec }));
+      }
+
+      // Two-layer negative caching:
+      // 1. Backoff guard above: exponential (1→15min) for network errors (socket hang up, timeout)
+      // 2. This cache check: flat 1min TTL for non-2xx upstream responses (429, 503, etc.)
+      // Both layers work correctly together — backoff handles persistent failures,
+      // negative cache prevents thundering herd on transient upstream errors.
       const rssCached = rssResponseCache.get(feedUrl);
       if (rssCached) {
         const ttl = (rssCached.statusCode && rssCached.statusCode >= 200 && rssCached.statusCode < 300)
@@ -3415,6 +3461,7 @@ const server = http.createServer(async (req, res) => {
           if (response.statusCode === 304 && rssCached) {
             responseHandled = true;
             rssCached.timestamp = Date.now();
+            rssResetFailure(feedUrl);
             resolveInFlight();
             logThrottled('log', `rss-revalidated:${feedUrl}`, '[Relay] RSS 304 revalidated:', feedUrl);
             sendCompressed(req, res, 200, {
@@ -3449,8 +3496,11 @@ const server = http.createServer(async (req, res) => {
               etag: response.headers['etag'] || null,
               lastModified: response.headers['last-modified'] || null,
             });
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              logThrottled('warn', `rss-upstream:${feedUrl}:${response.statusCode}`, `[Relay] RSS upstream ${response.statusCode} for ${feedUrl}`);
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+              rssResetFailure(feedUrl);
+            } else {
+              const { failures, backoffSec } = rssRecordFailure(feedUrl);
+              logThrottled('warn', `rss-upstream:${feedUrl}:${response.statusCode}`, `[Relay] RSS upstream ${response.statusCode} for ${feedUrl} (backoff ${backoffSec}s, failures=${failures})`);
             }
             resolveInFlight();
             sendCompressed(req, res, response.statusCode, {
@@ -3461,15 +3511,17 @@ const server = http.createServer(async (req, res) => {
             }, data);
           });
           stream.on('error', (err) => {
-            logThrottled('error', `rss-decompress:${feedUrl}:${err.code || err.message}`, '[Relay] Decompression error:', err.message);
+            const { failures, backoffSec } = rssRecordFailure(feedUrl);
+            logThrottled('error', `rss-decompress:${feedUrl}:${err.code || err.message}`, `[Relay] Decompression error: ${err.message} (backoff ${backoffSec}s, failures=${failures})`);
             sendError(502, 'Decompression failed: ' + err.message);
           });
         });
 
         request.on('error', (err) => {
-          logThrottled('error', `rss-error:${feedUrl}:${err.code || err.message}`, '[Relay] RSS error:', err.message);
-          // Serve stale on error
-          if (rssCached) {
+          const { failures, backoffSec } = rssRecordFailure(feedUrl);
+          logThrottled('error', `rss-error:${feedUrl}:${err.code || err.message}`, `[Relay] RSS error: ${err.message} (backoff ${backoffSec}s, failures=${failures})`);
+          // Serve stale on error (only if we have previous successful data)
+          if (rssCached && rssCached.statusCode >= 200 && rssCached.statusCode < 300) {
             if (!responseHandled && !res.headersSent) {
               responseHandled = true;
               sendCompressed(req, res, 200, { 'Content-Type': 'application/xml', 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'X-Cache': 'STALE' }, rssCached.data);
@@ -3482,7 +3534,9 @@ const server = http.createServer(async (req, res) => {
 
         request.on('timeout', () => {
           request.destroy();
-          if (rssCached && !responseHandled && !res.headersSent) {
+          const { failures, backoffSec } = rssRecordFailure(feedUrl);
+          logThrottled('warn', `rss-timeout:${feedUrl}`, `[Relay] RSS timeout for ${feedUrl} (backoff ${backoffSec}s, failures=${failures})`);
+          if (rssCached && rssCached.statusCode >= 200 && rssCached.statusCode < 300 && !responseHandled && !res.headersSent) {
             responseHandled = true;
             sendCompressed(req, res, 200, { 'Content-Type': 'application/xml', 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'X-Cache': 'STALE' }, rssCached.data);
             resolveInFlight();
