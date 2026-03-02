@@ -1521,7 +1521,7 @@
     "liveNews": {
       "retry": "Retry",
       "notLive": "{{name}} is not currently live",
-      "cannotEmbed": "{{name}} cannot be embedded in this app (YouTube {{code}})",
+      "cannotEmbed": "{{name}} can't be played here — it may be restricted in your region (error {{code}})",
       "botCheck": "YouTube is requesting sign-in to play {{name}}",
       "signInToYouTube": "Sign in to YouTube",
       "openOnYouTube": "Open on YouTube",
