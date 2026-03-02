@@ -67,7 +67,7 @@ export class GoodThingsDigestPanel extends Panel {
     // Summarize in parallel with progressive updates
     const signal = this.summaryAbort.signal;
     await Promise.allSettled(top5.map(async (item, idx) => {
-      if (signal.aborted) return;
+      if (signal.aborted || !this.element?.isConnected) return;
       try {
         // Pass [title, source] as two headlines to satisfy generateSummary's
         // minimum length requirement (headlines.length >= 2).
@@ -76,11 +76,11 @@ export class GoodThingsDigestPanel extends Panel {
           undefined,
           item.locationName,
         );
-        if (signal.aborted) return;
+        if (signal.aborted || !this.element?.isConnected) return;
         const summary = result?.summary ?? item.title.slice(0, 200);
         this.updateCardSummary(idx, summary);
       } catch {
-        if (!signal.aborted) {
+        if (!signal.aborted && this.element?.isConnected) {
           this.updateCardSummary(idx, item.title.slice(0, 200));
         }
       }
