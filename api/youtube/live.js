@@ -2,25 +2,9 @@
 // Proxies to Railway relay which uses residential proxy for YouTube scraping
 
 import { getCorsHeaders, isDisallowedOrigin } from '../_cors.js';
+import { getRelayBaseUrl, getRelayHeaders } from '../_relay.js';
 
 export const config = { runtime: 'edge' };
-
-function getRelayBaseUrl() {
-  const relayUrl = process.env.WS_RELAY_URL;
-  if (!relayUrl) return null;
-  return relayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '');
-}
-
-function getRelayHeaders(baseHeaders = {}) {
-  const headers = { ...baseHeaders };
-  const relaySecret = process.env.RELAY_SHARED_SECRET || '';
-  if (relaySecret) {
-    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-    headers[relayHeader] = relaySecret;
-    headers.Authorization = `Bearer ${relaySecret}`;
-  }
-  return headers;
-}
 
 export default async function handler(request) {
   const cors = getCorsHeaders(request);
