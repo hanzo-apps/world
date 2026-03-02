@@ -58,6 +58,7 @@ export interface EventHandlerCallbacks {
   loadDataForLayer: (layer: string) => void;
   waitForAisData: () => void;
   syncDataFreshnessWithLayers: () => void;
+  ensureCorrectZones: () => void;
 }
 
 export class EventHandlerManager implements AppModule {
@@ -76,7 +77,7 @@ export class EventHandlerManager implements AppModule {
   private debouncedUrlSync = debounce(() => {
     const shareUrl = this.getShareUrl();
     if (!shareUrl) return;
-    try { history.replaceState(null, '', shareUrl); } catch {}
+    try { history.replaceState(null, '', shareUrl); } catch { }
   }, 250);
 
   constructor(ctx: AppContext, callbacks: EventHandlerCallbacks) {
@@ -199,7 +200,7 @@ export class EventHandlerManager implements AppModule {
           this.ctx.panelSettings = JSON.parse(e.newValue) as Record<string, PanelConfig>;
           this.applyPanelSettings();
           this.ctx.unifiedSettings?.refreshPanelToggles();
-        } catch (_) {}
+        } catch (_) { }
       }
       if (e.key === STORAGE_KEYS.liveChannels && e.newValue) {
         const panel = this.ctx.panels['live-news'];
@@ -477,13 +478,13 @@ export class EventHandlerManager implements AppModule {
 
   toggleFullscreen(): void {
     if (document.fullscreenElement) {
-      try { void document.exitFullscreen()?.catch(() => {}); } catch {}
+      try { void document.exitFullscreen()?.catch(() => { }); } catch { }
     } else {
       const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
       if (el.requestFullscreen) {
-        try { void el.requestFullscreen()?.catch(() => {}); } catch {}
+        try { void el.requestFullscreen()?.catch(() => { }); } catch { }
       } else if (el.webkitRequestFullscreen) {
-        try { el.webkitRequestFullscreen(); } catch {}
+        try { el.webkitRequestFullscreen(); } catch { }
       }
     }
   }
@@ -723,18 +724,35 @@ export class EventHandlerManager implements AppModule {
 
   setupMapResize(): void {
     const mapSection = document.getElementById('mapSection');
+    const mapContainer = document.getElementById('mapContainer');
     const resizeHandle = document.getElementById('mapResizeHandle');
-    if (!mapSection || !resizeHandle) return;
+    if (!mapSection || !mapContainer || !resizeHandle) return;
 
-    const getMinHeight = () => (window.innerWidth >= 2000 ? 320 : 350);
-    const getMaxHeight = () => Math.max(getMinHeight(), window.innerHeight - 60);
+    const getMinHeight = () => (window.innerWidth >= 1600 ? 280 : 350);
+    const getMaxHeight = () => {
+      if (window.innerWidth < 1600) return Math.max(getMinHeight(), window.innerHeight - 150);
+
+      const bottomGrid = document.getElementById('mapBottomGrid');
+      const isEmpty = !bottomGrid || bottomGrid.children.length === 0;
+      const headerHeight = 60; // Approximate header height
+      const totalAvailable = window.innerHeight - headerHeight;
+
+      if (isEmpty) {
+        // Allow map to take almost all space if bottom is empty, but leave 25px for handle
+        return totalAvailable - 25;
+      } else {
+        // Guarantee at least 300px for the bottom area
+        return totalAvailable - 300;
+      }
+    };
 
     const savedHeight = localStorage.getItem('map-height');
     if (savedHeight) {
       const numeric = Number.parseInt(savedHeight, 10);
       if (Number.isFinite(numeric)) {
         const clamped = Math.max(getMinHeight(), Math.min(numeric, getMaxHeight()));
-        mapSection.style.height = `${clamped}px`;
+        mapContainer.style.height = `${clamped}px`;
+        mapContainer.style.flex = 'none'; // Lock height
         if (clamped !== numeric) {
           localStorage.setItem('map-height', `${clamped}px`);
         }
@@ -754,24 +772,47 @@ export class EventHandlerManager implements AppModule {
       this.ctx.map?.render();
       mapSection.classList.remove('resizing');
       document.body.style.cursor = '';
-      localStorage.setItem('map-height', mapSection.style.height);
+      localStorage.setItem('map-height', mapContainer.style.height);
     };
 
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizing = true;
       startY = e.clientY;
-      startHeight = mapSection.offsetHeight;
+      startHeight = mapContainer.offsetHeight;
       this.ctx.map?.setIsResizing(true);
       mapSection.classList.add('resizing');
+      mapContainer.style.flex = 'none'; // Ensure manual resize locks it
       document.body.style.cursor = 'ns-resize';
       e.preventDefault();
+    });
+
+    resizeHandle.addEventListener('dblclick', () => {
+      const targetHeight = window.innerHeight * 0.5;
+      const finalHeight = Math.max(getMinHeight(), Math.min(targetHeight, getMaxHeight()));
+
+      this.ctx.map?.setIsResizing(true);
+      mapContainer.classList.add('map-container-smooth');
+      mapContainer.style.height = `${finalHeight}px`;
+      mapContainer.style.flex = 'none';
+
+      const onEnd = () => {
+        mapContainer.classList.remove('map-container-smooth');
+        mapContainer.removeEventListener('transitionend', onEnd);
+        localStorage.setItem('map-height', `${finalHeight}px`);
+        this.ctx.map?.setIsResizing(false);
+        this.ctx.map?.render();
+      };
+
+      mapContainer.addEventListener('transitionend', onEnd);
+      // Fallback for transitionend
+      setTimeout(onEnd, 500);
     });
 
     document.addEventListener('mousemove', (e) => {
       if (!isResizing) return;
       const deltaY = e.clientY - startY;
       const newHeight = Math.max(getMinHeight(), Math.min(startHeight + deltaY, getMaxHeight()));
-      mapSection.style.height = `${newHeight}px`;
+      mapContainer.style.height = `${newHeight}px`;
     });
 
     document.addEventListener('mouseup', endResize);
@@ -847,6 +888,11 @@ export class EventHandlerManager implements AppModule {
         const mapSection = document.getElementById('mapSection');
         if (mapSection) {
           mapSection.classList.toggle('hidden', !config.enabled);
+          const mainContent = document.querySelector('.main-content');
+          if (mainContent) {
+            mainContent.classList.toggle('map-hidden', !config.enabled);
+          }
+          this.callbacks.ensureCorrectZones();
         }
         return;
       }
