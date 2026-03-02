@@ -47,10 +47,11 @@ describe('deploy/cache configuration guardrails', () => {
   });
 
   it('contains variant-specific metadata fields used by html replacement and manifest', () => {
-    assert.match(viteConfigSource, /shortName:\s*'/);
-    assert.match(viteConfigSource, /subject:\s*'/);
-    assert.match(viteConfigSource, /classification:\s*'/);
-    assert.match(viteConfigSource, /categories:\s*\[/);
+    const variantMetaSource = readFileSync(resolve(__dirname, '../src/config/variant-meta.ts'), 'utf-8');
+    assert.match(variantMetaSource, /shortName:\s*'/);
+    assert.match(variantMetaSource, /subject:\s*'/);
+    assert.match(variantMetaSource, /classification:\s*'/);
+    assert.match(variantMetaSource, /categories:\s*\[/);
     assert.match(
       viteConfigSource,
       /\.replace\(\/<meta name="subject" content="\.\*\?" \\\/>\/,\s*`<meta name="subject"/
@@ -137,5 +138,18 @@ describe('security header guardrails', () => {
     const csp = getHeaderValue('Content-Security-Policy');
     const connectSrc = csp.match(/connect-src\s+([^;]+)/)?.[1] ?? '';
     assert.ok(!connectSrc.includes('http://localhost'), 'CSP connect-src must not contain http://localhost in production');
+  });
+
+  it('CSP script-src uses hashes instead of unsafe-inline', () => {
+    const csp = getHeaderValue('Content-Security-Policy');
+    const scriptSrc = csp.match(/script-src\s+([^;]+)/)?.[1] ?? '';
+    assert.ok(!scriptSrc.includes("'unsafe-inline'"), 'CSP script-src must not contain unsafe-inline — use sha256 hashes');
+    assert.match(scriptSrc, /sha256-/, 'CSP script-src should contain at least one sha256 hash');
+  });
+
+  it('security.txt exists in public/.well-known/', () => {
+    const secTxt = readFileSync(resolve(__dirname, '../public/.well-known/security.txt'), 'utf-8');
+    assert.match(secTxt, /^Contact:/m, 'security.txt must have a Contact field');
+    assert.match(secTxt, /^Expires:/m, 'security.txt must have an Expires field');
   });
 });
