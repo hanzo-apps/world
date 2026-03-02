@@ -190,6 +190,7 @@ export class DataLoaderManager implements AppModule {
   init(): void {}
 
   destroy(): void {
+    this.applyTimeRangeFilterToNewsPanelsDebounced.cancel();
     stopOrefPolling();
   }
 

@@ -365,9 +365,9 @@ export class DeckGLMap {
   private lastCableHighlightSignature = '';
   private lastCableHealthSignature = '';
   private lastPipelineHighlightSignature = '';
-  private debouncedRebuildLayers: () => void;
-  private debouncedFetchBases: () => void;
-  private rafUpdateLayers: () => void;
+  private debouncedRebuildLayers: (() => void) & { cancel(): void };
+  private debouncedFetchBases: (() => void) & { cancel(): void };
+  private rafUpdateLayers: (() => void) & { cancel(): void };
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
@@ -4569,6 +4569,10 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
+    this.debouncedRebuildLayers.cancel();
+    this.debouncedFetchBases.cancel();
+    this.rafUpdateLayers.cancel();
+
     if (this.moveTimeoutId) {
       clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = null;
