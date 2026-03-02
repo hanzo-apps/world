@@ -113,9 +113,38 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'VentureBeat', url: 'https://venturebeat.com/feed/' },
       { name: 'Crunchbase News', url: 'https://news.crunchbase.com/feed/' },
     ],
+    vcblogs: [
+      { name: 'Y Combinator Blog', url: 'https://www.ycombinator.com/blog/rss/' },
+      { name: 'a16z Blog', url: 'https://a16z.com/feed/' },
+      { name: 'First Round Review', url: 'https://review.firstround.com/feed.xml' },
+      { name: 'Sequoia Blog', url: 'https://www.sequoiacap.com/feed/' },
+      { name: 'Stratechery', url: 'https://stratechery.com/feed/' },
+    ],
+    regionalStartups: [
+      { name: 'EU Startups', url: 'https://www.eu-startups.com/feed/' },
+      { name: 'Tech.eu', url: 'https://tech.eu/feed/' },
+      { name: 'Sifted (Europe)', url: 'https://sifted.eu/feed' },
+      { name: 'Tech in Asia', url: 'https://www.techinasia.com/feed' },
+      { name: 'TechCabal (Africa)', url: 'https://techcabal.com/feed/' },
+      { name: 'Inc42 (India)', url: 'https://inc42.com/feed/' },
+    ],
+    unicorns: [
+      { name: 'Unicorn News', url: gn('("unicorn startup" OR "unicorn valuation" OR "$1 billion valuation") when:7d') },
+      { name: 'Decacorn News', url: gn('("decacorn" OR "$10 billion valuation") startup when:14d') },
+    ],
+    accelerators: [
+      { name: 'YC News', url: 'https://news.ycombinator.com/rss' },
+      { name: 'YC Blog', url: 'https://www.ycombinator.com/blog/rss/' },
+      { name: 'Demo Day News', url: gn('("demo day" OR "YC batch" OR "accelerator batch") startup when:7d') },
+    ],
     security: [
       { name: 'Krebs Security', url: 'https://krebsonsecurity.com/feed/' },
       { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml' },
+    ],
+    policy: [
+      { name: 'Politico Tech', url: 'https://rss.politico.com/technology.xml' },
+      { name: 'AI Regulation', url: gn('AI regulation OR "artificial intelligence" law OR policy when:7d') },
+      { name: 'Tech Antitrust', url: gn('tech antitrust OR FTC Google OR FTC Apple OR FTC Amazon when:7d') },
     ],
     github: [
       { name: 'GitHub Blog', url: 'https://github.blog/feed/' },
