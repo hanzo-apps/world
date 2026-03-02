@@ -12,15 +12,11 @@ import type {
   GithubRepo,
 } from '../../../../src/generated/server/worldmonitor/research/v1/service_server';
 
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, clampInt } from '../../../_shared/constants';
 import { cachedFetchJson } from '../../../_shared/redis';
 
 const REDIS_CACHE_KEY = 'research:trending:v1';
 const REDIS_CACHE_TTL = 3600; // 1 hr — daily trending data
-
-/** Clamp a numeric value to [min, max], falling back to `def` when undefined/NaN. */
-const clampInt = (v: number | undefined, def: number, min: number, max: number): number =>
-  Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v as number))) : def;
 
 // ---------- Fetch ----------
 

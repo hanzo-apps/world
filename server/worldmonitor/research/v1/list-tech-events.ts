@@ -19,15 +19,11 @@ import type {
   TechEventCoords,
 } from '../../../../src/generated/server/worldmonitor/research/v1/service_server';
 import { CITY_COORDS } from '../../../../api/data/city-coords';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, clampInt } from '../../../_shared/constants';
 import { cachedFetchJson } from '../../../_shared/redis';
 
 const REDIS_CACHE_KEY = 'research:tech-events:v1';
 const REDIS_CACHE_TTL = 21600; // 6 hr — weekly event data
-
-/** Clamp a numeric value to [min, max], falling back to `def` when undefined/NaN. */
-const clampInt = (v: number | undefined, def: number, min: number, max: number): number =>
-  Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v as number))) : def;
 
 // ---------- Constants ----------
 
@@ -260,8 +256,8 @@ function parseDevEventsRSS(rssText: string): TechEvent[] {
 
 async function fetchTechEvents(req: ListTechEventsRequest): Promise<ListTechEventsResponse> {
   const { type, mappable } = req;
-  const limit = req.limit > 0 ? clampInt(req.limit, 50, 1, 200) : 0;
-  const days = req.days > 0 ? clampInt(req.days, 90, 1, 365) : 0;
+  const limit = clampInt(req.limit, 50, 1, 200);
+  const days = clampInt(req.days, 90, 1, 365);
 
   // Fetch both sources in parallel
   const [icsResponse, rssResponse] = await Promise.allSettled([
@@ -374,8 +370,8 @@ export async function listTechEvents(
     if (!result) {
       return { success: true, count: 0, conferenceCount: 0, mappableCount: 0, lastUpdated: new Date().toISOString(), events: [], error: '' };
     }
-    const limit = req.limit > 0 ? clampInt(req.limit, 50, 1, 200) : 0;
-    if (limit > 0 && result.events.length > limit) {
+    const limit = clampInt(req.limit, 50, 1, 200);
+    if (result.events.length > limit) {
       return applyLimit(result, limit);
     }
     return result;
