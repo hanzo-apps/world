@@ -6,7 +6,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { CHROME_UA } from '../../../_shared/constants';
+import { CHROME_UA, clampInt } from '../../../_shared/constants';
 import { cachedFetchJson } from '../../../_shared/redis';
 
 const REDIS_CACHE_KEY = 'research:arxiv:v1';
@@ -17,10 +17,6 @@ import type {
   ListArxivPapersResponse,
   ArxivPaper,
 } from '../../../../src/generated/server/worldmonitor/research/v1/service_server';
-
-/** Clamp a numeric value to [min, max], falling back to `def` when undefined/NaN. */
-const clampInt = (v: number | undefined, def: number, min: number, max: number): number =>
-  Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v as number))) : def;
 
 // ---------- XML Parser ----------
 
