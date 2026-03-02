@@ -361,13 +361,16 @@ export class EventHandlerManager implements AppModule {
     const state = this.ctx.map.getState();
     const center = this.ctx.map.getCenter();
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    const briefPage = this.ctx.countryBriefPage;
+    const isCountryVisible = briefPage?.isVisible() ?? false;
     return buildMapUrl(baseUrl, {
       view: state.view,
       zoom: state.zoom,
       center,
       timeRange: state.timeRange,
       layers: state.layers,
-      country: this.ctx.countryBriefPage?.isVisible() ? (this.ctx.countryBriefPage.getCode() ?? undefined) : undefined,
+      country: isCountryVisible ? (briefPage!.getCode() ?? undefined) : undefined,
+      expanded: isCountryVisible && briefPage?.getIsMaximized?.() ? true : undefined,
     });
   }
 
