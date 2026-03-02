@@ -687,7 +687,11 @@ export class LiveNewsPanel extends Panel {
       this.originalNextSibling = this.element.nextSibling;
       document.body.appendChild(this.element);
     } else if (this.originalParent) {
-      this.originalParent.insertBefore(this.element, this.originalNextSibling);
+      if (this.originalNextSibling && this.originalParent.contains(this.originalNextSibling)) {
+        this.originalParent.insertBefore(this.element, this.originalNextSibling);
+      } else {
+        this.originalParent.appendChild(this.element);
+      }
       this.originalParent = null;
       this.originalNextSibling = null;
     }
