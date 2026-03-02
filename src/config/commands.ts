@@ -1,5 +1,6 @@
 import type { MapLayers } from '@/types';
 import { CURATED_COUNTRIES } from '@/config/countries';
+import { getCurrentLanguage } from '@/services/i18n';
 
 export interface Command {
   id: string;
@@ -131,30 +132,49 @@ const ISO_CODES = [
   'YE', 'ZA', 'ZM', 'ZW',
 ];
 
-const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+let _cachedLang = '';
+let _cachedCountryCommands: Command[] = [];
+let _cachedAllCommands: Command[] = [];
 
-const COUNTRY_COMMANDS: Command[] = ISO_CODES.flatMap(code => {
-  const curated = CURATED_COUNTRIES[code];
-  const name = curated?.name || displayNames.of(code) || code;
-  const keywords = curated
-    ? [name.toLowerCase(), ...curated.searchAliases]
-    : [name.toLowerCase()];
-  return [
-    {
-      id: `country-map:${code}`,
-      keywords: [...keywords, 'map'],
-      label: name,
-      icon: toFlagEmoji(code),
-      category: 'navigate' as const,
-    },
-    {
-      id: `country:${code}`,
-      keywords: [...keywords, 'brief'],
-      label: name,
-      icon: toFlagEmoji(code),
-      category: 'country' as const,
-    },
-  ];
-});
+function buildCountryCommands(): Command[] {
+  const lang = getCurrentLanguage();
+  if (lang === _cachedLang && _cachedCountryCommands.length > 0) {
+    return _cachedCountryCommands;
+  }
 
-COMMANDS.push(...COUNTRY_COMMANDS);
+  const displayNames = new Intl.DisplayNames([lang], { type: 'region' });
+
+  const result = ISO_CODES.flatMap(code => {
+    const curated = CURATED_COUNTRIES[code];
+    const name = displayNames.of(code) || curated?.name || code;
+    const keywords = curated
+      ? [name.toLowerCase(), curated.name.toLowerCase(), ...curated.searchAliases].filter(Boolean)
+      : [name.toLowerCase()];
+    return [
+      {
+        id: `country-map:${code}`,
+        keywords: [...keywords, 'map'],
+        label: name,
+        icon: toFlagEmoji(code),
+        category: 'navigate' as const,
+      },
+      {
+        id: `country:${code}`,
+        keywords: [...keywords, 'brief'],
+        label: name,
+        icon: toFlagEmoji(code),
+        category: 'country' as const,
+      },
+    ];
+  });
+
+  _cachedLang = lang;
+  _cachedCountryCommands = result;
+  _cachedAllCommands = [...COMMANDS, ...result];
+  return result;
+}
+
+export function getAllCommands(): Command[] {
+  buildCountryCommands();
+  return _cachedAllCommands.length > 0 ? _cachedAllCommands : COMMANDS;
+}
