@@ -19,6 +19,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   giving:           'giving:summary:v1',
   climateAnomalies: 'climate:anomalies:v1',
   wildfires:        'wildfire:fires:v1',
+  ucdpEvents:       'conflict:ucdp-events:v1',
 };
 
 const NEG_SENTINEL = '__WM_NEG__';
