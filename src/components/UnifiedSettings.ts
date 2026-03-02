@@ -461,6 +461,7 @@ export class UnifiedSettings {
     try {
       if ('storage' in navigator && 'estimate' in navigator.storage) {
         const estimate = await navigator.storage.estimate();
+        if (!container.isConnected) return;
         const used = estimate.usage ? (estimate.usage / 1024 / 1024).toFixed(2) : '0';
         const quota = estimate.quota ? (estimate.quota / 1024 / 1024).toFixed(0) : 'N/A';
         container.innerHTML = `<div class="status-row">
@@ -471,6 +472,7 @@ export class UnifiedSettings {
         container.innerHTML = `<div class="status-row">${t('components.status.storageUnavailable')}</div>`;
       }
     } catch {
+      if (!container.isConnected) return;
       container.innerHTML = `<div class="status-row">${t('components.status.storageUnavailable')}</div>`;
     }
   }
