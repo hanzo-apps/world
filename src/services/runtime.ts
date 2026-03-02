@@ -6,6 +6,7 @@ const KEYED_CLOUD_API_PATTERN = /^\/api\/(?:[^/]+\/v1\/|bootstrap(?:\?|$)|rss-pr
 const DEFAULT_REMOTE_HOSTS: Record<string, string> = {
   tech: WS_API_URL,
   full: WS_API_URL,
+  finance: WS_API_URL,
   world: WS_API_URL,
   happy: WS_API_URL,
 };
