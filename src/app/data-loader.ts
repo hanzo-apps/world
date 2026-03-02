@@ -946,36 +946,37 @@ export class DataLoaderManager implements AppModule {
 
       if (stocksResult.rateLimited && stocksResult.data.length === 0) {
         const rlMsg = 'Market data temporarily unavailable (rate limited) — retrying shortly';
-        this.ctx.panels['heatmap']?.showError(rlMsg);
         this.ctx.panels['commodities']?.showError(rlMsg);
       } else if (stocksResult.skipped) {
         this.ctx.statusPanel?.updateApi('Finnhub', { status: 'error' });
         if (stocksResult.data.length === 0) {
           this.ctx.panels['markets']?.showConfigError(finnhubConfigMsg);
         }
-        this.ctx.panels['heatmap']?.showConfigError(finnhubConfigMsg);
       } else {
         this.ctx.statusPanel?.updateApi('Finnhub', { status: 'ok' });
+      }
 
-        const hydratedSectors = getHydratedData('sectors') as GetSectorSummaryResponse | undefined;
-        if (hydratedSectors?.sectors?.length) {
-          const mapped = hydratedSectors.sectors.map((s) => ({ name: s.name, change: s.change }));
-          (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(mapped);
-        } else {
-          const sectorsResult = await fetchMultipleStocks(
-            SECTORS.map((s) => ({ ...s, display: s.name })),
-            {
-              onBatch: (partialSectors) => {
-                (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(
-                  partialSectors.map((s) => ({ name: s.name, change: s.change }))
-                );
-              },
-            }
-          );
-          (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(
-            sectorsResult.data.map((s) => ({ name: s.name, change: s.change }))
-          );
-        }
+      // Sector heatmap: always attempt loading regardless of market rate-limit status
+      const hydratedSectors = getHydratedData('sectors') as GetSectorSummaryResponse | undefined;
+      if (hydratedSectors?.sectors?.length) {
+        const mapped = hydratedSectors.sectors.map((s) => ({ name: s.name, change: s.change }));
+        (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(mapped);
+      } else if (!stocksResult.skipped) {
+        const sectorsResult = await fetchMultipleStocks(
+          SECTORS.map((s) => ({ ...s, display: s.name })),
+          {
+            onBatch: (partialSectors) => {
+              (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(
+                partialSectors.map((s) => ({ name: s.name, change: s.change }))
+              );
+            },
+          }
+        );
+        (this.ctx.panels['heatmap'] as HeatmapPanel).renderHeatmap(
+          sectorsResult.data.map((s) => ({ name: s.name, change: s.change }))
+        );
+      } else {
+        this.ctx.panels['heatmap']?.showConfigError(finnhubConfigMsg);
       }
 
       const commoditiesPanel = this.ctx.panels['commodities'] as CommoditiesPanel;
