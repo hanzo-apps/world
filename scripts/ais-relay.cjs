@@ -1078,6 +1078,257 @@ async function startMarketDataSeedLoop() {
   }, MARKET_SEED_INTERVAL_MS).unref?.();
 }
 
+// ─────────────────────────────────────────────────────────────
+// Aviation Seed — Railway fetches AviationStack → writes to Redis
+// so Vercel handler serves from cache (avoids 114 API calls per miss)
+// ─────────────────────────────────────────────────────────────
+const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
+const AVIATION_SEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h
+const AVIATION_SEED_TTL = 14400; // 4h — survives 1 missed cycle
+const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
+const AVIATION_BATCH_CONCURRENCY = 10;
+const AVIATION_MIN_FLIGHTS_FOR_CLOSURE = 10;
+
+// Must match src/config/airports.ts AVIATIONSTACK_AIRPORTS — update both when changing
+const AVIATIONSTACK_AIRPORTS = [
+  'YYZ', 'MEX', 'GRU', 'EZE', 'BOG',
+  'LHR', 'CDG', 'FRA', 'AMS', 'MAD', 'FCO', 'MUC', 'BCN', 'ZRH', 'IST', 'VIE', 'CPH',
+  'HND', 'NRT', 'PEK', 'PVG', 'HKG', 'SIN', 'ICN', 'BKK', 'SYD', 'DEL', 'BOM', 'KUL',
+  'DXB', 'DOH', 'AUH', 'RUH', 'CAI', 'TLV',
+  'JNB', 'NBO', 'LOS', 'ADD', 'CPT',
+];
+
+// Airport metadata needed for alert construction (inlined from airports.ts)
+const AIRPORT_META = {
+  YYZ: { icao: 'CYYZ', name: 'Toronto Pearson', city: 'Toronto', country: 'Canada', lat: 43.6777, lon: -79.6248, region: 'americas' },
+  MEX: { icao: 'MMMX', name: 'Mexico City International', city: 'Mexico City', country: 'Mexico', lat: 19.4363, lon: -99.0721, region: 'americas' },
+  GRU: { icao: 'SBGR', name: 'São Paulo–Guarulhos', city: 'São Paulo', country: 'Brazil', lat: -23.4356, lon: -46.4731, region: 'americas' },
+  EZE: { icao: 'SAEZ', name: 'Ministro Pistarini', city: 'Buenos Aires', country: 'Argentina', lat: -34.8222, lon: -58.5358, region: 'americas' },
+  BOG: { icao: 'SKBO', name: 'El Dorado International', city: 'Bogotá', country: 'Colombia', lat: 4.7016, lon: -74.1469, region: 'americas' },
+  LHR: { icao: 'EGLL', name: 'London Heathrow', city: 'London', country: 'UK', lat: 51.4700, lon: -0.4543, region: 'europe' },
+  CDG: { icao: 'LFPG', name: 'Paris Charles de Gaulle', city: 'Paris', country: 'France', lat: 49.0097, lon: 2.5479, region: 'europe' },
+  FRA: { icao: 'EDDF', name: 'Frankfurt Airport', city: 'Frankfurt', country: 'Germany', lat: 50.0379, lon: 8.5622, region: 'europe' },
+  AMS: { icao: 'EHAM', name: 'Amsterdam Schiphol', city: 'Amsterdam', country: 'Netherlands', lat: 52.3105, lon: 4.7683, region: 'europe' },
+  MAD: { icao: 'LEMD', name: 'Adolfo Suárez Madrid–Barajas', city: 'Madrid', country: 'Spain', lat: 40.4983, lon: -3.5676, region: 'europe' },
+  FCO: { icao: 'LIRF', name: 'Leonardo da Vinci–Fiumicino', city: 'Rome', country: 'Italy', lat: 41.8003, lon: 12.2389, region: 'europe' },
+  MUC: { icao: 'EDDM', name: 'Munich Airport', city: 'Munich', country: 'Germany', lat: 48.3537, lon: 11.7750, region: 'europe' },
+  BCN: { icao: 'LEBL', name: 'Barcelona–El Prat', city: 'Barcelona', country: 'Spain', lat: 41.2974, lon: 2.0833, region: 'europe' },
+  ZRH: { icao: 'LSZH', name: 'Zurich Airport', city: 'Zurich', country: 'Switzerland', lat: 47.4647, lon: 8.5492, region: 'europe' },
+  IST: { icao: 'LTFM', name: 'Istanbul Airport', city: 'Istanbul', country: 'Turkey', lat: 41.2753, lon: 28.7519, region: 'europe' },
+  VIE: { icao: 'LOWW', name: 'Vienna International', city: 'Vienna', country: 'Austria', lat: 48.1103, lon: 16.5697, region: 'europe' },
+  CPH: { icao: 'EKCH', name: 'Copenhagen Airport', city: 'Copenhagen', country: 'Denmark', lat: 55.6180, lon: 12.6508, region: 'europe' },
+  HND: { icao: 'RJTT', name: 'Tokyo Haneda', city: 'Tokyo', country: 'Japan', lat: 35.5494, lon: 139.7798, region: 'apac' },
+  NRT: { icao: 'RJAA', name: 'Narita International', city: 'Tokyo', country: 'Japan', lat: 35.7720, lon: 140.3929, region: 'apac' },
+  PEK: { icao: 'ZBAA', name: 'Beijing Capital', city: 'Beijing', country: 'China', lat: 40.0799, lon: 116.6031, region: 'apac' },
+  PVG: { icao: 'ZSPD', name: 'Shanghai Pudong', city: 'Shanghai', country: 'China', lat: 31.1443, lon: 121.8083, region: 'apac' },
+  HKG: { icao: 'VHHH', name: 'Hong Kong International', city: 'Hong Kong', country: 'China', lat: 22.3080, lon: 113.9185, region: 'apac' },
+  SIN: { icao: 'WSSS', name: 'Singapore Changi', city: 'Singapore', country: 'Singapore', lat: 1.3644, lon: 103.9915, region: 'apac' },
+  ICN: { icao: 'RKSI', name: 'Incheon International', city: 'Seoul', country: 'South Korea', lat: 37.4602, lon: 126.4407, region: 'apac' },
+  BKK: { icao: 'VTBS', name: 'Suvarnabhumi Airport', city: 'Bangkok', country: 'Thailand', lat: 13.6900, lon: 100.7501, region: 'apac' },
+  SYD: { icao: 'YSSY', name: 'Sydney Kingsford Smith', city: 'Sydney', country: 'Australia', lat: -33.9461, lon: 151.1772, region: 'apac' },
+  DEL: { icao: 'VIDP', name: 'Indira Gandhi International', city: 'Delhi', country: 'India', lat: 28.5562, lon: 77.1000, region: 'apac' },
+  BOM: { icao: 'VABB', name: 'Chhatrapati Shivaji Maharaj', city: 'Mumbai', country: 'India', lat: 19.0896, lon: 72.8656, region: 'apac' },
+  KUL: { icao: 'WMKK', name: 'Kuala Lumpur International', city: 'Kuala Lumpur', country: 'Malaysia', lat: 2.7456, lon: 101.7099, region: 'apac' },
+  DXB: { icao: 'OMDB', name: 'Dubai International', city: 'Dubai', country: 'UAE', lat: 25.2532, lon: 55.3657, region: 'mena' },
+  DOH: { icao: 'OTHH', name: 'Hamad International', city: 'Doha', country: 'Qatar', lat: 25.2731, lon: 51.6081, region: 'mena' },
+  AUH: { icao: 'OMAA', name: 'Abu Dhabi International', city: 'Abu Dhabi', country: 'UAE', lat: 24.4330, lon: 54.6511, region: 'mena' },
+  RUH: { icao: 'OERK', name: 'King Khalid International', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.9576, lon: 46.6988, region: 'mena' },
+  CAI: { icao: 'HECA', name: 'Cairo International', city: 'Cairo', country: 'Egypt', lat: 30.1219, lon: 31.4056, region: 'mena' },
+  TLV: { icao: 'LLBG', name: 'Ben Gurion Airport', city: 'Tel Aviv', country: 'Israel', lat: 32.0055, lon: 34.8854, region: 'mena' },
+  JNB: { icao: 'FAOR', name: 'O.R. Tambo International', city: 'Johannesburg', country: 'South Africa', lat: -26.1392, lon: 28.2460, region: 'africa' },
+  NBO: { icao: 'HKJK', name: 'Jomo Kenyatta International', city: 'Nairobi', country: 'Kenya', lat: -1.3192, lon: 36.9278, region: 'africa' },
+  LOS: { icao: 'DNMM', name: 'Murtala Muhammed International', city: 'Lagos', country: 'Nigeria', lat: 6.5774, lon: 3.3212, region: 'africa' },
+  ADD: { icao: 'HAAB', name: 'Bole International', city: 'Addis Ababa', country: 'Ethiopia', lat: 8.9779, lon: 38.7993, region: 'africa' },
+  CPT: { icao: 'FACT', name: 'Cape Town International', city: 'Cape Town', country: 'South Africa', lat: -33.9715, lon: 18.6021, region: 'africa' },
+};
+
+const REGION_MAP = {
+  americas: 'AIRPORT_REGION_AMERICAS',
+  europe: 'AIRPORT_REGION_EUROPE',
+  apac: 'AIRPORT_REGION_APAC',
+  mena: 'AIRPORT_REGION_MENA',
+  africa: 'AIRPORT_REGION_AFRICA',
+};
+
+const DELAY_TYPE_MAP = {
+  ground_stop: 'FLIGHT_DELAY_TYPE_GROUND_STOP',
+  ground_delay: 'FLIGHT_DELAY_TYPE_GROUND_DELAY',
+  departure_delay: 'FLIGHT_DELAY_TYPE_DEPARTURE_DELAY',
+  arrival_delay: 'FLIGHT_DELAY_TYPE_ARRIVAL_DELAY',
+  general: 'FLIGHT_DELAY_TYPE_GENERAL',
+  closure: 'FLIGHT_DELAY_TYPE_CLOSURE',
+};
+
+const SEVERITY_MAP = {
+  normal: 'FLIGHT_DELAY_SEVERITY_NORMAL',
+  minor: 'FLIGHT_DELAY_SEVERITY_MINOR',
+  moderate: 'FLIGHT_DELAY_SEVERITY_MODERATE',
+  major: 'FLIGHT_DELAY_SEVERITY_MAJOR',
+  severe: 'FLIGHT_DELAY_SEVERITY_SEVERE',
+};
+
+function aviationDetermineSeverity(avgDelay, delayedPct) {
+  if (avgDelay >= 60 || (delayedPct && delayedPct >= 60)) return 'severe';
+  if (avgDelay >= 45 || (delayedPct && delayedPct >= 45)) return 'major';
+  if (avgDelay >= 30 || (delayedPct && delayedPct >= 30)) return 'moderate';
+  if (avgDelay >= 15 || (delayedPct && delayedPct >= 15)) return 'minor';
+  return 'normal';
+}
+
+function fetchAviationStackSingle(apiKey, iata) {
+  return new Promise((resolve) => {
+    const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&dep_iata=${iata}&limit=100`;
+    const req = https.get(url, {
+      headers: { 'User-Agent': CHROME_UA },
+      timeout: 5000,
+      family: 4,
+    }, (resp) => {
+      if (resp.statusCode !== 200) {
+        resp.resume();
+        logThrottled('warn', `aviation-http-${resp.statusCode}:${iata}`, `[Aviation] ${iata}: HTTP ${resp.statusCode}`);
+        return resolve({ ok: false, alert: null });
+      }
+      let body = '';
+      resp.on('data', (chunk) => { body += chunk; });
+      resp.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (json.error) {
+            logThrottled('warn', `aviation-api-err:${iata}`, `[Aviation] ${iata}: API error: ${json.error.message}`);
+            return resolve({ ok: false, alert: null });
+          }
+          const flights = json?.data ?? [];
+          const alert = aviationAggregateFlights(iata, flights);
+          resolve({ ok: true, alert });
+        } catch { resolve({ ok: false, alert: null }); }
+      });
+    });
+    req.on('error', (err) => {
+      logThrottled('warn', `aviation-err:${iata}`, `[Aviation] ${iata}: fetch error: ${err.message}`);
+      resolve({ ok: false, alert: null });
+    });
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, alert: null }); });
+  });
+}
+
+function aviationAggregateFlights(iata, flights) {
+  if (flights.length === 0) return null;
+  const meta = AIRPORT_META[iata];
+  if (!meta) return null;
+
+  let delayed = 0, cancelled = 0, totalDelay = 0;
+  for (const f of flights) {
+    if (f.flight_status === 'cancelled') cancelled++;
+    if (f.departure?.delay && f.departure.delay > 0) {
+      delayed++;
+      totalDelay += f.departure.delay;
+    }
+  }
+
+  const total = flights.length;
+  const cancelledPct = (cancelled / total) * 100;
+  const delayedPct = (delayed / total) * 100;
+  const avgDelay = delayed > 0 ? Math.round(totalDelay / delayed) : 0;
+
+  let severity, delayType, reason;
+  if (cancelledPct >= 80 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
+    severity = 'severe'; delayType = 'closure';
+    reason = 'Airport closure / airspace restrictions';
+  } else if (cancelledPct >= 50 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
+    severity = 'major'; delayType = 'ground_stop';
+    reason = `${Math.round(cancelledPct)}% flights cancelled`;
+  } else if (cancelledPct >= 20 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
+    severity = 'moderate'; delayType = 'ground_delay';
+    reason = `${Math.round(cancelledPct)}% flights cancelled`;
+  } else if (cancelledPct >= 10 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
+    severity = 'minor'; delayType = 'general';
+    reason = `${Math.round(cancelledPct)}% flights cancelled`;
+  } else if (avgDelay > 0) {
+    severity = aviationDetermineSeverity(avgDelay, delayedPct);
+    delayType = avgDelay >= 60 ? 'ground_delay' : 'general';
+    reason = `Avg ${avgDelay}min delay, ${Math.round(delayedPct)}% delayed`;
+  } else {
+    return null;
+  }
+  if (severity === 'normal') return null;
+
+  return {
+    id: `avstack-${iata}`,
+    iata,
+    icao: meta.icao,
+    name: meta.name,
+    city: meta.city,
+    country: meta.country,
+    location: { latitude: meta.lat, longitude: meta.lon },
+    region: REGION_MAP[meta.region] || 'AIRPORT_REGION_UNSPECIFIED',
+    delayType: DELAY_TYPE_MAP[delayType] || 'FLIGHT_DELAY_TYPE_GENERAL',
+    severity: SEVERITY_MAP[severity] || 'FLIGHT_DELAY_SEVERITY_NORMAL',
+    avgDelayMinutes: avgDelay,
+    delayedFlightsPct: Math.round(delayedPct),
+    cancelledFlights: cancelled,
+    totalFlights: total,
+    reason,
+    source: 'FLIGHT_DELAY_SOURCE_COMPUTED',
+    updatedAt: Date.now(),
+  };
+}
+
+async function seedAviationDelays() {
+  if (!AVIATIONSTACK_API_KEY) {
+    console.log('[Aviation] No AVIATIONSTACK_API key — skipping seed');
+    return;
+  }
+
+  const t0 = Date.now();
+  const alerts = [];
+  let succeeded = 0, failed = 0;
+  const deadline = Date.now() + 50_000;
+
+  for (let i = 0; i < AVIATIONSTACK_AIRPORTS.length; i += AVIATION_BATCH_CONCURRENCY) {
+    if (Date.now() >= deadline) {
+      console.warn(`[Aviation] Deadline hit after ${succeeded + failed}/${AVIATIONSTACK_AIRPORTS.length} airports`);
+      break;
+    }
+    const chunk = AVIATIONSTACK_AIRPORTS.slice(i, i + AVIATION_BATCH_CONCURRENCY);
+    const results = await Promise.allSettled(
+      chunk.map((iata) => fetchAviationStackSingle(AVIATIONSTACK_API_KEY, iata))
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        if (r.value.ok) { succeeded++; if (r.value.alert) alerts.push(r.value.alert); }
+        else failed++;
+      } else {
+        failed++;
+      }
+    }
+  }
+
+  const healthy = AVIATIONSTACK_AIRPORTS.length < 5 || failed <= succeeded;
+  if (!healthy) {
+    console.warn(`[Aviation] Systemic failure: ${failed}/${failed + succeeded} airports failed — preserving existing cache`);
+    return;
+  }
+
+  const ok = await upstashSet(AVIATION_REDIS_KEY, { alerts }, AVIATION_SEED_TTL);
+  console.log(`[Aviation] Seeded ${alerts.length} alerts (${succeeded} ok, ${failed} failed, redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+}
+
+async function startAviationSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[Aviation] Disabled (no Upstash Redis)');
+    return;
+  }
+  if (!AVIATIONSTACK_API_KEY) {
+    console.log('[Aviation] Disabled (no AVIATIONSTACK_API key)');
+    return;
+  }
+  console.log(`[Aviation] Seed loop starting (interval ${AVIATION_SEED_INTERVAL_MS / 1000 / 60 / 60}h, airports: ${AVIATIONSTACK_AIRPORTS.length})`);
+  seedAviationDelays().catch((e) => console.warn('[Aviation] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedAviationDelays().catch((e) => console.warn('[Aviation] Seed error:', e?.message || e));
+  }, AVIATION_SEED_INTERVAL_MS).unref?.();
+}
+
 function gzipSyncBuffer(body) {
   try {
     return zlib.gzipSync(typeof body === 'string' ? Buffer.from(body) : body);
@@ -3902,6 +4153,7 @@ server.listen(PORT, () => {
   startOrefPollLoop();
   startUcdpSeedLoop();
   startMarketDataSeedLoop();
+  startAviationSeedLoop();
 });
 
 wss.on('connection', (ws, req) => {
