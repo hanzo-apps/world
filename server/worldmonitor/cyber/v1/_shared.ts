@@ -49,10 +49,7 @@ const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 // Helper utilities
 // ========================================================================
 
-export function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(min, Math.min(max, Math.floor(value as number)));
-}
+export { clampInt } from '../../../_shared/constants';
 
 function cleanString(value: unknown, maxLen = 120): string {
   if (typeof value !== 'string') return '';
