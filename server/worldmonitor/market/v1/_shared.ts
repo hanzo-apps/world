@@ -4,6 +4,28 @@
 import { CHROME_UA, yahooGate } from '../../../_shared/constants';
 
 // ========================================================================
+// Relay helpers (Railway proxy for Yahoo when Vercel IPs are rate-limited)
+// ========================================================================
+
+function getRelayBaseUrl(): string | null {
+  const relayUrl = process.env.WS_RELAY_URL;
+  if (!relayUrl) return null;
+  return relayUrl
+    .replace(/^ws(s?):\/\//, 'http$1://')
+    .replace(/\/$/, '');
+}
+
+function getRelayHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'User-Agent': CHROME_UA };
+  const relaySecret = process.env.RELAY_SHARED_SECRET;
+  if (relaySecret) {
+    const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
+    headers[relayHeader] = relaySecret;
+  }
+  return headers;
+}
+
+// ========================================================================
 // Constants
 // ========================================================================
 
@@ -126,33 +148,51 @@ export async function fetchFinnhubQuote(
 //   5. get-macro-signals.ts needs chart data (1y range) — use /stable/historical-price-eod/light
 // ========================================================================
 
+function parseYahooChartResponse(data: YahooChartResponse): { price: number; change: number; sparkline: number[] } | null {
+  const result = data.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!meta) return null;
+
+  const price = meta.regularMarketPrice;
+  const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+  const change = ((price - prevClose) / prevClose) * 100;
+
+  const closes = result.indicators?.quote?.[0]?.close;
+  const sparkline = closes?.filter((v): v is number => v != null) || [];
+
+  return { price, change, sparkline };
+}
+
 export async function fetchYahooQuote(
   symbol: string,
 ): Promise<{ price: number; change: number; sparkline: number[] } | null> {
+  // Try direct Yahoo first
   try {
     await yahooGate();
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
     const resp = await fetch(url, {
-      headers: {
-        'User-Agent': CHROME_UA,
-      },
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    if (resp.ok) {
+      const data: YahooChartResponse = await resp.json();
+      const parsed = parseYahooChartResponse(data);
+      if (parsed) return parsed;
+    }
+  } catch { /* fall through to relay */ }
+
+  // Fallback: Railway relay (different IP, not rate-limited by Yahoo)
+  const relayBase = getRelayBaseUrl();
+  if (!relayBase) return null;
+  try {
+    const relayUrl = `${relayBase}/yahoo-chart?symbol=${encodeURIComponent(symbol)}`;
+    const resp = await fetch(relayUrl, {
+      headers: getRelayHeaders(),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     if (!resp.ok) return null;
-
     const data: YahooChartResponse = await resp.json();
-    const result = data.chart.result[0];
-    const meta = result?.meta;
-    if (!meta) return null;
-
-    const price = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
-    const change = ((price - prevClose) / prevClose) * 100;
-
-    const closes = result.indicators?.quote?.[0]?.close;
-    const sparkline = closes?.filter((v): v is number => v != null) || [];
-
-    return { price, change, sparkline };
+    return parseYahooChartResponse(data);
   } catch {
     return null;
   }

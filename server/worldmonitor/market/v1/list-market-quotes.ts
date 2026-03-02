@@ -77,10 +77,8 @@ export async function listMarketQuotes(
     const allYahoo = [...yahooSymbols, ...missedFinnhub];
 
     // Fetch Yahoo Finance quotes (staggered to avoid 429)
-    let yahooRateLimited = false;
     if (allYahoo.length > 0) {
       const batch = await fetchYahooQuotesBatch(allYahoo);
-      yahooRateLimited = batch.rateLimited;
       for (const s of allYahoo) {
         if (quotes.some((q) => q.symbol === s)) continue;
         const yahoo = batch.results.get(s);
@@ -103,9 +101,7 @@ export async function listMarketQuotes(
     }
 
     if (quotes.length === 0) {
-      return yahooRateLimited
-        ? { quotes: [], finnhubSkipped: false, skipReason: '', rateLimited: true }
-        : null;
+      return null; // negative cache (120s) — never cache empty results at full TTL
     }
 
     // Only report skipped if Finnhub key missing AND Yahoo fallback didn't cover the gap

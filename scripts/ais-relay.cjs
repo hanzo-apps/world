@@ -940,6 +940,7 @@ function getRouteGroup(pathname) {
   if (pathname.startsWith('/ucdp-events')) return 'ucdp-events';
   if (pathname.startsWith('/oref')) return 'oref';
   if (pathname === '/notam') return 'notam';
+  if (pathname === '/yahoo-chart') return 'yahoo-chart';
   return 'other';
 }
 
@@ -2645,6 +2646,9 @@ setInterval(() => {
   for (const [key, entry] of polymarketCache) {
     if (now - entry.timestamp > POLYMARKET_CACHE_TTL_MS * 2) polymarketCache.delete(key);
   }
+  for (const [key, entry] of yahooChartCache) {
+    if (now - entry.ts > YAHOO_CHART_CACHE_TTL_MS * 2) yahooChartCache.delete(key);
+  }
   for (const [key, bucket] of requestRateBuckets) {
     if (now >= bucket.resetAt + RELAY_RATE_LIMIT_WINDOW_MS * 2) requestRateBuckets.delete(key);
   }
@@ -2652,6 +2656,83 @@ setInterval(() => {
     if (now - ts > RELAY_LOG_THROTTLE_MS * 6) logThrottleState.delete(key);
   }
 }, 60 * 1000);
+
+// ── Yahoo Finance Chart Proxy ──────────────────────────────────────
+const YAHOO_CHART_CACHE_TTL_MS = 300_000; // 5 min
+const yahooChartCache = new Map(); // key: symbol:range:interval → { json, gzip, ts }
+const YAHOO_SYMBOL_RE = /^[A-Za-z0-9^=\-\.]{1,15}$/;
+
+function handleYahooChartRequest(req, res) {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const symbol = url.searchParams.get('symbol');
+  const range = url.searchParams.get('range') || '1d';
+  const interval = url.searchParams.get('interval') || '1d';
+
+  if (!symbol || !YAHOO_SYMBOL_RE.test(symbol)) {
+    return sendCompressed(req, res, 400, { 'Content-Type': 'application/json' },
+      JSON.stringify({ error: 'Invalid or missing symbol parameter' }));
+  }
+
+  const cacheKey = `${symbol}:${range}:${interval}`;
+  const cached = yahooChartCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < YAHOO_CHART_CACHE_TTL_MS) {
+    return sendCompressed(req, res, 200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
+      'X-Yahoo-Source': 'relay-cache',
+    }, cached.json);
+  }
+
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
+  const yahooReq = https.get(yahooUrl, {
+    headers: {
+      'User-Agent': CHROME_UA,
+      Accept: 'application/json',
+    },
+    timeout: 10000,
+  }, (upstream) => {
+    let body = '';
+    upstream.on('data', (chunk) => { body += chunk; });
+    upstream.on('end', () => {
+      if (upstream.statusCode !== 200) {
+        logThrottled('warn', `yahoo-chart-upstream-${upstream.statusCode}:${symbol}`,
+          `[Relay] Yahoo chart upstream ${upstream.statusCode} for ${symbol}`);
+        return sendCompressed(req, res, upstream.statusCode || 502, {
+          'Content-Type': 'application/json',
+          'X-Yahoo-Source': 'relay-upstream-error',
+        }, JSON.stringify({ error: `Yahoo upstream ${upstream.statusCode}`, symbol }));
+      }
+      yahooChartCache.set(cacheKey, { json: body, ts: Date.now() });
+      sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
+        'X-Yahoo-Source': 'relay-upstream',
+      }, body);
+    });
+  });
+  yahooReq.on('error', (err) => {
+    logThrottled('error', `yahoo-chart-error:${symbol}`, `[Relay] Yahoo chart error for ${symbol}: ${err.message}`);
+    if (cached) {
+      return sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'X-Yahoo-Source': 'relay-stale',
+      }, cached.json);
+    }
+    sendCompressed(req, res, 502, { 'Content-Type': 'application/json' },
+      JSON.stringify({ error: 'Yahoo upstream error', symbol }));
+  });
+  yahooReq.on('timeout', () => {
+    yahooReq.destroy();
+    if (cached) {
+      return sendCompressed(req, res, 200, {
+        'Content-Type': 'application/json',
+        'X-Yahoo-Source': 'relay-stale',
+      }, cached.json);
+    }
+    sendCompressed(req, res, 504, { 'Content-Type': 'application/json' },
+      JSON.stringify({ error: 'Yahoo upstream timeout', symbol }));
+  });
+}
 
 // ── YouTube Live Detection (residential proxy bypass) ──────────────
 const YOUTUBE_PROXY_URL = process.env.YOUTUBE_PROXY_URL || '';
@@ -3039,6 +3120,7 @@ const server = http.createServer(async (req, res) => {
         ucdp: ucdpCache.data ? 'warm' : 'cold',
         worldbank: worldbankCache.size,
         polymarket: polymarketCache.size,
+        yahooChart: yahooChartCache.size,
         polymarketInflight: polymarketInflight.size,
       },
       auth: {
@@ -3455,6 +3537,8 @@ const server = http.createServer(async (req, res) => {
     handlePolymarketRequest(req, res);
   } else if (pathname === '/youtube-live') {
     handleYouTubeLiveRequest(req, res);
+  } else if (pathname === '/yahoo-chart') {
+    handleYahooChartRequest(req, res);
   } else if (pathname === '/notam') {
     handleNotamProxyRequest(req, res);
   } else {
@@ -3616,6 +3700,7 @@ setInterval(() => {
     rssResponseCache.clear();
     polymarketCache.clear();
     worldbankCache.clear();
+    yahooChartCache.clear();
     if (global.gc) global.gc();
   }
 }, 60 * 1000);
