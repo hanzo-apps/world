@@ -11,7 +11,7 @@ export default createRelayHandler({
   timeout: 12000,
   onlyOk: true,
   cacheHeaders: () => ({
-    'Cache-Control': 'public, max-age=60, s-maxage=180, stale-while-revalidate=60, stale-if-error=600',
+    'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=120, stale-if-error=900',
   }),
   fallback: (_req, corsHeaders) => new Response(JSON.stringify({
     configured: false,
