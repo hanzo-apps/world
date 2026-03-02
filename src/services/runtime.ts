@@ -1,3 +1,5 @@
+import { SITE_VARIANT } from '@/config/variant';
+
 const WS_API_URL = import.meta.env.VITE_WS_API_URL || '';
 const KEYED_CLOUD_API_PATTERN = /^\/api\/(?:[^/]+\/v1\/|bootstrap(?:\?|$)|rss-proxy(?:\?|$)|polymarket(?:\?|$)|ais-snapshot(?:\?|$))/;
 
@@ -113,8 +115,7 @@ export function getRemoteApiBaseUrl(): string {
     return normalizeBaseUrl(configuredRemoteBase);
   }
 
-  const variant = import.meta.env.VITE_VARIANT || 'full';
-  const fromHosts = DEFAULT_REMOTE_HOSTS[variant] ?? DEFAULT_REMOTE_HOSTS.full ?? '';
+  const fromHosts = DEFAULT_REMOTE_HOSTS[SITE_VARIANT] ?? DEFAULT_REMOTE_HOSTS.full ?? '';
   if (fromHosts) return fromHosts;
 
   // Desktop builds may not set VITE_WS_API_URL; default to production.
