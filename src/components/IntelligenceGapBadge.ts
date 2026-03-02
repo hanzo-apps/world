@@ -141,7 +141,7 @@ export class IntelligenceFindingsBadge {
   private playSound(): void {
     if (this.audioEnabled && this.audio) {
       this.audio.currentTime = 0;
-      this.audio.play().catch(() => {});
+      this.audio.play()?.catch(() => {});
     }
   }
 
