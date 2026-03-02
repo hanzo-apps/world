@@ -1,7 +1,7 @@
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
 import { trackSearchUsed } from '@/services/analytics';
-import { COMMANDS, type Command } from '@/config/commands';
+import { getAllCommands, type Command } from '@/config/commands';
 
 interface CommandResult {
   command: Command;
@@ -172,7 +172,7 @@ export class SearchModal {
   private matchCommands(query: string): CommandResult[] {
     if (query.length < 2) return [];
     const matched: CommandResult[] = [];
-    for (const cmd of COMMANDS) {
+    for (const cmd of getAllCommands()) {
       if (cmd.id.startsWith('panel:') && this.activePanelIds.size > 0) {
         const panelId = cmd.id.slice(6);
         if (!this.activePanelIds.has(panelId)) continue;

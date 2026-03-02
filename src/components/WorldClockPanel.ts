@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { getLocale } from '@/services/i18n';
 
 interface CityEntry {
   id: string;
@@ -94,9 +95,10 @@ function saveSelectedCities(ids: string[]): void {
 
 function getTimeInZone(tz: string): { h: number; m: number; s: number; dayOfWeek: string } {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat(getLocale(), {
     timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric',
     hour12: false, weekday: 'short',
+    numberingSystem: 'latn',
   }).formatToParts(now);
   let h = 0, m = 0, s = 0, dayOfWeek = '';
   for (const p of parts) {
@@ -111,7 +113,7 @@ function getTimeInZone(tz: string): { h: number; m: number; s: number; dayOfWeek
 
 function getTzAbbr(tz: string): string {
   try {
-    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' });
+    const fmt = new Intl.DateTimeFormat(getLocale(), { timeZone: tz, timeZoneName: 'short' });
     const parts = fmt.formatToParts(new Date());
     const tzPart = parts.find(p => p.type === 'timeZoneName');
     return tzPart?.value ?? '';
