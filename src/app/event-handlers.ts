@@ -74,7 +74,7 @@ export class EventHandlerManager implements AppModule {
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000;
-  private debouncedUrlSync = debounce(() => {
+  private readonly debouncedUrlSync = debounce(() => {
     const shareUrl = this.getShareUrl();
     if (!shareUrl) return;
     try { history.replaceState(null, '', shareUrl); } catch { }
@@ -133,6 +133,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   destroy(): void {
+    this.debouncedUrlSync.cancel();
     if (this.boundFullscreenHandler) {
       document.removeEventListener('fullscreenchange', this.boundFullscreenHandler);
       this.boundFullscreenHandler = null;
