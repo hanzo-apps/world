@@ -47,6 +47,7 @@ export class StrategicPosturePanel extends Panel {
     if (!this.isPanelVisible() || this.postures.length === 0) return;
     console.log('[StrategicPosturePanel] Re-augmenting with vessels...');
     await this.augmentWithVessels();
+    if (!this.element?.isConnected) return;
     this.render();
   }
 
@@ -125,6 +126,7 @@ export class StrategicPosturePanel extends Panel {
       // Fetch aircraft data from server
       this.showLoadingStage('aircraft');
       const data = await fetchCachedTheaterPosture(this.signal);
+      if (!this.element?.isConnected) return;
       if (!data || data.postures.length === 0) {
         this.showNoData();
         return;
@@ -141,6 +143,7 @@ export class StrategicPosturePanel extends Panel {
       // Try to augment with vessel data (client-side)
       this.showLoadingStage('vessels');
       await this.augmentWithVessels();
+      if (!this.element?.isConnected) return;
 
       this.showLoadingStage('analysis');
       this.updateBadges();
@@ -275,6 +278,7 @@ export class StrategicPosturePanel extends Panel {
     this.lastTimestamp = data.timestamp;
     this.isStale = data.stale || false;
     this.augmentWithVessels().then(() => {
+      if (!this.element?.isConnected) return;
       this.updateBadges();
       this.render();
     });

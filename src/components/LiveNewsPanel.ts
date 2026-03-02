@@ -914,6 +914,7 @@ export class LiveNewsPanel extends Panel {
     });
 
     await this.resolveChannelVideo(channel);
+    if (!this.element?.isConnected) return;
 
     this.channelSwitcher?.querySelectorAll('.live-channel-btn').forEach(btn => {
       const btnEl = btn as HTMLElement;
@@ -1212,6 +1213,7 @@ export class LiveNewsPanel extends Panel {
     const useFallbackVideo = this.activeChannel.useFallbackOnly || this.forceFallbackVideoForNextInit;
     this.forceFallbackVideoForNextInit = false;
     await this.resolveChannelVideo(this.activeChannel, useFallbackVideo);
+    if (!this.element?.isConnected) return;
 
     if (this.getDirectHlsUrl(this.activeChannel.id) || this.getProxiedHlsUrl(this.activeChannel.id)) {
       this.renderNativeHlsPlayer();
@@ -1229,6 +1231,7 @@ export class LiveNewsPanel extends Panel {
     }
 
     await LiveNewsPanel.loadYouTubeApi();
+    if (!this.element?.isConnected) return;
     if (this.player || !this.playerElement || !window.YT?.Player) return;
 
     this.player = new window.YT!.Player(this.playerElement, {
