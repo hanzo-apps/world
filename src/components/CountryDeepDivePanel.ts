@@ -533,6 +533,25 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     });
     this.maximizeButton = maxBtn;
 
+    const shareBtn = this.el('button', 'cdp-action-btn cdp-share-btn') as HTMLButtonElement;
+    shareBtn.setAttribute('type', 'button');
+    shareBtn.setAttribute('aria-label', t('components.countryBrief.shareLink'));
+    shareBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>';
+    shareBtn.addEventListener('click', () => {
+      if (!this.currentCode || !this.currentName) return;
+      const url = `${window.location.origin}/?c=${this.currentCode}`;
+      const title = `${this.currentName} — World Monitor`;
+      if (navigator.share) {
+        navigator.share({ title, url }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(url).then(() => {
+          const orig = shareBtn.innerHTML;
+          shareBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => { shareBtn.innerHTML = orig; }, 1500);
+        }).catch(() => {});
+      }
+    });
+
     const storyButton = this.el('button', 'cdp-action-btn', 'Story') as HTMLButtonElement;
     storyButton.setAttribute('type', 'button');
     storyButton.addEventListener('click', () => {
@@ -548,7 +567,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         this.onExportImage(this.currentCode, this.currentName);
       }
     });
-    right.append(maxBtn, storyButton, exportButton);
+    right.append(shareBtn, maxBtn, storyButton, exportButton);
     header.append(left, right);
 
     const scoreCard = this.el('section', 'cdp-card cdp-score-card');

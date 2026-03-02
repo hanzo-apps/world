@@ -838,6 +838,7 @@
       }
     },
     "countryBrief": {
+      "shareLink": "Share link",
       "shareStory": "Share story",
       "printPdf": "Print / PDF",
       "exportData": "Export data",
