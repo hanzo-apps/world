@@ -61,3 +61,81 @@ describe('deploy/cache configuration guardrails', () => {
     );
   });
 });
+
+const getSecurityHeaders = () => {
+  const rule = vercelConfig.headers.find((entry) => entry.source === '/(.*)');
+  return rule?.headers ?? [];
+};
+
+const getHeaderValue = (key) => {
+  const headers = getSecurityHeaders();
+  const header = headers.find((h) => h.key.toLowerCase() === key.toLowerCase());
+  return header?.value ?? null;
+};
+
+describe('security header guardrails', () => {
+  it('includes all 6 required security headers on catch-all route', () => {
+    const required = [
+      'X-Content-Type-Options',
+      'X-Frame-Options',
+      'Strict-Transport-Security',
+      'Referrer-Policy',
+      'Permissions-Policy',
+      'Content-Security-Policy',
+    ];
+    const headerKeys = getSecurityHeaders().map((h) => h.key);
+    for (const name of required) {
+      assert.ok(headerKeys.includes(name), `Missing security header: ${name}`);
+    }
+  });
+
+  it('Permissions-Policy disables all expected browser APIs', () => {
+    const policy = getHeaderValue('Permissions-Policy');
+    const expectedDisabled = [
+      'camera=()',
+      'microphone=()',
+      'geolocation=()',
+      'accelerometer=()',
+      'bluetooth=()',
+      'display-capture=()',
+      'gyroscope=()',
+      'hid=()',
+      'idle-detection=()',
+      'magnetometer=()',
+      'midi=()',
+      'payment=()',
+      'screen-wake-lock=()',
+      'serial=()',
+      'usb=()',
+      'xr-spatial-tracking=()',
+    ];
+    for (const directive of expectedDisabled) {
+      assert.ok(policy.includes(directive), `Permissions-Policy missing: ${directive}`);
+    }
+  });
+
+  it('Permissions-Policy delegates YouTube APIs to YouTube origins', () => {
+    const policy = getHeaderValue('Permissions-Policy');
+    const ytDelegated = ['autoplay', 'encrypted-media', 'picture-in-picture'];
+    for (const api of ytDelegated) {
+      assert.match(
+        policy,
+        new RegExp(`${api}=\\(self "https://www\\.youtube\\.com" "https://www\\.youtube-nocookie\\.com"\\)`),
+        `Permissions-Policy should delegate ${api} to YouTube origins`
+      );
+    }
+  });
+
+  it('CSP connect-src does not allow unencrypted WebSocket (ws:)', () => {
+    const csp = getHeaderValue('Content-Security-Policy');
+    const connectSrc = csp.match(/connect-src\s+([^;]+)/)?.[1] ?? '';
+    assert.ok(!connectSrc.includes(' ws:'), 'CSP connect-src must not contain ws: (unencrypted WebSocket)');
+    assert.ok(connectSrc.includes('wss:'), 'CSP connect-src should keep wss: for secure WebSocket');
+  });
+
+  it('CSP connect-src does not contain localhost in production', () => {
+    const csp = getHeaderValue('Content-Security-Policy');
+    const connectSrc = csp.match(/connect-src\s+([^;]+)/)?.[1] ?? '';
+    assert.ok(!connectSrc.includes('http://localhost'), 'CSP connect-src must not contain http://localhost in production');
+  });
+});
