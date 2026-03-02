@@ -29,7 +29,7 @@ import {
 } from './_shared';
 
 const REDIS_CACHE_KEY = 'cyber:threats:v1';
-const REDIS_CACHE_TTL = 900; // 15 min — threat feeds update infrequently
+const REDIS_CACHE_TTL = 7200; // 2 hr — IOC feeds update at most daily
 
 export async function listCyberThreats(
   _ctx: ServerContext,
