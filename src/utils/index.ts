@@ -143,7 +143,7 @@ export function saveToStorage<T>(key: string, value: T): void {
 }
 
 export function generateId(): string {
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `id-${crypto.randomUUID()}`;
 }
 
 /** Breakpoint (px): below this width the app uses the simplified mobile layout. Must match CSS @media (max-width: …). */
