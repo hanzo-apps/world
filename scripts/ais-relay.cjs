@@ -101,6 +101,7 @@ const UPSTASH_ENABLED = !!(
 );
 const RELAY_ENV_PREFIX = process.env.RELAY_ENV ? `${process.env.RELAY_ENV}:` : '';
 const OREF_REDIS_KEY = `${RELAY_ENV_PREFIX}relay:oref:history:v1`;
+const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
 if (UPSTASH_REDIS_REST_URL && !UPSTASH_REDIS_REST_URL.startsWith('https://')) {
   console.warn('[Relay] UPSTASH_REDIS_REST_URL must start with https:// — Redis disabled');
@@ -882,6 +883,199 @@ async function startUcdpSeedLoop() {
   setInterval(() => {
     seedUcdpEvents().catch(e => console.warn('[UCDP] Seed error:', e?.message || e));
   }, UCDP_POLL_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Market Data Seed — Railway fetches Yahoo/Finnhub → writes to Redis
+// so Vercel handlers serve from cache (avoids Yahoo 429 from Vercel IPs)
+// ─────────────────────────────────────────────────────────────
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+const MARKET_SEED_INTERVAL_MS = 300_000; // 5 min
+const MARKET_SEED_TTL = 1800; // 30 min — survives 5 missed cycles
+
+// Must match src/config/markets.ts MARKET_SYMBOLS — update both when changing
+const MARKET_SYMBOLS = [
+  'AAPL', 'AMZN', 'AVGO', 'BAC', 'BRK-B', 'COST', 'GOOGL', 'HD',
+  'JNJ', 'JPM', 'LLY', 'MA', 'META', 'MSFT', 'NFLX', 'NVO', 'NVDA',
+  'ORCL', 'PG', 'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'XOM',
+  '^DJI', '^GSPC', '^IXIC',
+];
+
+const COMMODITY_SYMBOLS = ['^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F'];
+
+const SECTOR_SYMBOLS = ['XLK', 'XLF', 'XLE', 'XLV', 'XLY', 'XLI', 'XLP', 'XLU', 'XLB', 'XLRE', 'XLC', 'SMH'];
+
+const YAHOO_ONLY = new Set(['^GSPC', '^DJI', '^IXIC', '^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F']);
+
+function fetchYahooChartDirect(symbol) {
+  return new Promise((resolve) => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
+    const req = https.get(url, {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
+      timeout: 10000,
+    }, (resp) => {
+      if (resp.statusCode !== 200) {
+        resp.resume();
+        logThrottled('warn', `market-yahoo-${resp.statusCode}:${symbol}`, `[Market] Yahoo ${symbol} HTTP ${resp.statusCode}`);
+        return resolve(null);
+      }
+      let body = '';
+      resp.on('data', (chunk) => { body += chunk; });
+      resp.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          const result = data?.chart?.result?.[0];
+          const meta = result?.meta;
+          if (!meta) return resolve(null);
+          const price = meta.regularMarketPrice;
+          const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+          const change = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+          const closes = result.indicators?.quote?.[0]?.close;
+          const sparkline = Array.isArray(closes) ? closes.filter((v) => v != null) : [];
+          resolve({ price, change, sparkline });
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', (err) => { logThrottled('warn', `market-yahoo-err:${symbol}`, `[Market] Yahoo ${symbol} error: ${err.message}`); resolve(null); });
+    req.on('timeout', () => { req.destroy(); logThrottled('warn', `market-yahoo-timeout:${symbol}`, `[Market] Yahoo ${symbol} timeout`); resolve(null); });
+  });
+}
+
+function fetchFinnhubQuoteDirect(symbol, apiKey) {
+  return new Promise((resolve) => {
+    const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}`;
+    const req = https.get(url, {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json', 'X-Finnhub-Token': apiKey },
+      timeout: 10000,
+    }, (resp) => {
+      if (resp.statusCode !== 200) {
+        resp.resume();
+        return resolve(null);
+      }
+      let body = '';
+      resp.on('data', (chunk) => { body += chunk; });
+      resp.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.c === 0 && data.h === 0 && data.l === 0) return resolve(null);
+          resolve({ price: data.c, changePercent: data.dp });
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function seedMarketQuotes() {
+  const quotes = [];
+  const finnhubSymbols = MARKET_SYMBOLS.filter((s) => !YAHOO_ONLY.has(s));
+  const yahooSymbols = MARKET_SYMBOLS.filter((s) => YAHOO_ONLY.has(s));
+
+  if (FINNHUB_API_KEY && finnhubSymbols.length > 0) {
+    const results = await Promise.all(finnhubSymbols.map((s) => fetchFinnhubQuoteDirect(s, FINNHUB_API_KEY)));
+    for (let i = 0; i < finnhubSymbols.length; i++) {
+      const r = results[i];
+      if (r) quotes.push({ symbol: finnhubSymbols[i], name: finnhubSymbols[i], display: finnhubSymbols[i], price: r.price, change: r.changePercent, sparkline: [] });
+    }
+  }
+
+  const missedFinnhub = FINNHUB_API_KEY
+    ? finnhubSymbols.filter((s) => !quotes.some((q) => q.symbol === s))
+    : finnhubSymbols;
+  const allYahoo = [...yahooSymbols, ...missedFinnhub];
+
+  for (const s of allYahoo) {
+    if (quotes.some((q) => q.symbol === s)) continue;
+    const yahoo = await fetchYahooChartDirect(s);
+    if (yahoo) quotes.push({ symbol: s, name: s, display: s, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
+    await sleep(150);
+  }
+
+  if (quotes.length === 0) {
+    console.warn('[Market] No quotes fetched — skipping Redis write');
+    return 0;
+  }
+
+  const coveredByYahoo = finnhubSymbols.every((s) => quotes.some((q) => q.symbol === s));
+  const skipped = !FINNHUB_API_KEY && !coveredByYahoo;
+  const payload = { quotes, finnhubSkipped: skipped, skipReason: skipped ? 'FINNHUB_API_KEY not configured' : '', rateLimited: false };
+  const redisKey = `market:quotes:v1:${[...MARKET_SYMBOLS].sort().join(',')}`;
+  const ok = await upstashSet(redisKey, payload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${quotes.length}/${MARKET_SYMBOLS.length} quotes (redis: ${ok ? 'OK' : 'FAIL'})`);
+  return quotes.length;
+}
+
+async function seedCommodityQuotes() {
+  const quotes = [];
+  for (const s of COMMODITY_SYMBOLS) {
+    const yahoo = await fetchYahooChartDirect(s);
+    if (yahoo) quotes.push({ symbol: s, name: s, display: s, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
+    await sleep(150);
+  }
+
+  if (quotes.length === 0) {
+    console.warn('[Market] No commodity quotes fetched — skipping Redis write');
+    return 0;
+  }
+
+  const payload = { quotes };
+  const redisKey = `market:commodities:v1:${[...COMMODITY_SYMBOLS].sort().join(',')}`;
+  const ok = await upstashSet(redisKey, payload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${quotes.length}/${COMMODITY_SYMBOLS.length} commodities (redis: ${ok ? 'OK' : 'FAIL'})`);
+  return quotes.length;
+}
+
+async function seedSectorSummary() {
+  const sectors = [];
+
+  if (FINNHUB_API_KEY) {
+    const results = await Promise.all(SECTOR_SYMBOLS.map((s) => fetchFinnhubQuoteDirect(s, FINNHUB_API_KEY)));
+    for (let i = 0; i < SECTOR_SYMBOLS.length; i++) {
+      const r = results[i];
+      if (r) sectors.push({ symbol: SECTOR_SYMBOLS[i], name: SECTOR_SYMBOLS[i], change: r.changePercent });
+    }
+  }
+
+  if (sectors.length === 0) {
+    for (const s of SECTOR_SYMBOLS) {
+      const yahoo = await fetchYahooChartDirect(s);
+      if (yahoo) sectors.push({ symbol: s, name: s, change: yahoo.change });
+      await sleep(150);
+    }
+  }
+
+  if (sectors.length === 0) {
+    console.warn('[Market] No sector data fetched — skipping Redis write');
+    return 0;
+  }
+
+  const payload = { sectors };
+  const ok = await upstashSet('market:sectors:v1', payload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${sectors.length}/${SECTOR_SYMBOLS.length} sectors (redis: ${ok ? 'OK' : 'FAIL'})`);
+  return sectors.length;
+}
+
+async function seedAllMarketData() {
+  const t0 = Date.now();
+  const q = await seedMarketQuotes();
+  const c = await seedCommodityQuotes();
+  const s = await seedSectorSummary();
+  console.log(`[Market] Seed complete: ${q} quotes, ${c} commodities, ${s} sectors (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+}
+
+async function startMarketDataSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[Market] Disabled (no Upstash Redis)');
+    return;
+  }
+  console.log(`[Market] Seed loop starting (interval ${MARKET_SEED_INTERVAL_MS / 1000 / 60}min, finnhub: ${FINNHUB_API_KEY ? 'yes' : 'no'})`);
+  seedAllMarketData().catch((e) => console.warn('[Market] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedAllMarketData().catch((e) => console.warn('[Market] Seed error:', e?.message || e));
+  }, MARKET_SEED_INTERVAL_MS).unref?.();
 }
 
 function gzipSyncBuffer(body) {
@@ -2761,7 +2955,6 @@ function handleYahooChartRequest(req, res) {
 
 // ── YouTube Live Detection (residential proxy bypass) ──────────────
 const YOUTUBE_PROXY_URL = process.env.YOUTUBE_PROXY_URL || '';
-const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
 function parseProxyUrl(proxyUrl) {
   if (!proxyUrl) return null;
@@ -3708,6 +3901,7 @@ server.listen(PORT, () => {
   startTelegramPollLoop();
   startOrefPollLoop();
   startUcdpSeedLoop();
+  startMarketDataSeedLoop();
 });
 
 wss.on('connection', (ws, req) => {
