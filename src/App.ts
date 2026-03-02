@@ -47,6 +47,7 @@ export type { CountryBriefSignals } from '@/app/app-context';
 export class App {
   private state: AppContext;
   private pendingDeepLinkCountry: string | null = null;
+  private pendingDeepLinkExpanded = false;
 
   private panelLayout: PanelLayoutManager;
   private dataLoader: DataLoaderManager;
@@ -430,10 +431,15 @@ export class App {
 
     // Phase 5: Event listeners + URL sync
     this.eventHandlers.init();
-    // Capture ?country= BEFORE URL sync overwrites it
+    // Capture ?country= and ?expanded= BEFORE URL sync overwrites them
     const initState = parseMapUrlState(window.location.search, this.state.mapLayers);
     this.pendingDeepLinkCountry = initState.country ?? null;
+    this.pendingDeepLinkExpanded = initState.expanded === true;
     this.eventHandlers.setupUrlStateSync();
+
+    this.state.countryBriefPage?.onStateChange?.(() => {
+      this.eventHandlers.syncUrlState();
+    });
 
     // Phase 6: Data loading
     this.dataLoader.syncDataFreshnessWithLayers();
@@ -520,16 +526,21 @@ export class App {
       }
     }
 
-    // Check for country brief deep link: ?country=UA
+    // Check for country brief deep link: ?country=UA or ?country=UA&expanded=1
     const deepLinkCountry = this.pendingDeepLinkCountry;
+    const deepLinkExpanded = this.pendingDeepLinkExpanded;
     this.pendingDeepLinkCountry = null;
+    this.pendingDeepLinkExpanded = false;
     if (deepLinkCountry) {
       trackDeeplinkOpened('country', deepLinkCountry);
       const cName = CountryIntelManager.resolveCountryName(deepLinkCountry);
       let attempts = 0;
       const checkAndOpenBrief = () => {
         if (dataFreshness.hasSufficientData()) {
-          this.countryIntel.openCountryBriefByCode(deepLinkCountry, cName);
+          this.countryIntel.openCountryBriefByCode(deepLinkCountry, cName, {
+            maximize: deepLinkExpanded,
+          });
+          this.eventHandlers.syncUrlState();
           return;
         }
         attempts += 1;

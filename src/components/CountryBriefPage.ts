@@ -6,7 +6,7 @@ import type { NewsItem } from '@/types';
 import type { PredictionMarket } from '@/services/prediction';
 import type { AssetType } from '@/types';
 import type { CountryBriefSignals } from '@/app/app-context';
-import type { StockIndexData } from '@/components/CountryIntelModal';
+import type { CountryBriefPanel, CountryIntelData, StockIndexData } from '@/components/CountryBriefPanel';
 import { getNearbyInfrastructure, haversineDistanceKm } from '@/services/related-assets';
 import { PORTS } from '@/config/ports';
 import type { Port } from '@/config/ports';
@@ -16,19 +16,7 @@ import { ME_STRIKE_BOUNDS } from '@/services/country-geometry';
 
 type BriefAssetType = AssetType | 'port';
 
-interface CountryIntelData {
-  brief: string;
-  country: string;
-  code: string;
-  cached?: boolean;
-  generatedAt?: string;
-  error?: string;
-  skipped?: boolean;
-  reason?: string;
-  fallback?: boolean;
-}
-
-export class CountryBriefPage {
+export class CountryBriefPage implements CountryBriefPanel {
   private static BRIEF_BOUNDS: Record<string, { n: number; s: number; e: number; w: number }> = {
     ...ME_STRIKE_BOUNDS,
     CN: { n: 53.6, s: 18.2, e: 134.8, w: 73.5 }, TW: { n: 25.3, s: 21.9, e: 122, w: 120 },
