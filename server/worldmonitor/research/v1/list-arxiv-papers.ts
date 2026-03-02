@@ -18,6 +18,10 @@ import type {
   ArxivPaper,
 } from '../../../../src/generated/server/worldmonitor/research/v1/service_server';
 
+/** Clamp a numeric value to [min, max], falling back to `def` when undefined/NaN. */
+const clampInt = (v: number | undefined, def: number, min: number, max: number): number =>
+  Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v as number))) : def;
+
 // ---------- XML Parser ----------
 
 const xmlParser = new XMLParser({
@@ -31,7 +35,7 @@ const xmlParser = new XMLParser({
 
 async function fetchArxivPapers(req: ListArxivPapersRequest): Promise<ArxivPaper[]> {
   const category = req.category || 'cs.AI';
-  const pageSize = req.pageSize || 50;
+  const pageSize = clampInt(req.pageSize, 50, 1, 100);
 
   let searchQuery: string;
   if (req.query) {
@@ -92,7 +96,7 @@ export async function listArxivPapers(
   req: ListArxivPapersRequest,
 ): Promise<ListArxivPapersResponse> {
   try {
-    const cacheKey = `${REDIS_CACHE_KEY}:${req.category || 'cs.AI'}:${req.query || ''}:${req.pageSize || 50}`;
+    const cacheKey = `${REDIS_CACHE_KEY}:${req.category || 'cs.AI'}:${req.query || ''}:${clampInt(req.pageSize, 50, 1, 100)}`;
     const result = await cachedFetchJson<ListArxivPapersResponse>(
       cacheKey,
       REDIS_CACHE_TTL,
