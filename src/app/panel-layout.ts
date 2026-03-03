@@ -76,7 +76,7 @@ export class PanelLayoutManager implements AppModule {
   private callbacks: PanelLayoutCallbacks;
   private panelDragCleanupHandlers: Array<() => void> = [];
   private criticalBannerEl: HTMLElement | null = null;
-  private readonly applyTimeRangeFilterDebounced: () => void;
+  private readonly applyTimeRangeFilterDebounced: (() => void) & { cancel(): void };
 
   constructor(ctx: AppContext, callbacks: PanelLayoutCallbacks) {
     this.ctx = ctx;
@@ -91,6 +91,7 @@ export class PanelLayoutManager implements AppModule {
   }
 
   destroy(): void {
+    this.applyTimeRangeFilterDebounced.cancel();
     this.panelDragCleanupHandlers.forEach((cleanup) => cleanup());
     this.panelDragCleanupHandlers = [];
     if (this.criticalBannerEl) {
