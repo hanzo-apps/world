@@ -59,6 +59,7 @@ export interface EventHandlerCallbacks {
   waitForAisData: () => void;
   syncDataFreshnessWithLayers: () => void;
   ensureCorrectZones: () => void;
+  refreshOpenCountryBrief?: () => void;
 }
 
 export class EventHandlerManager implements AppModule {
@@ -271,6 +272,7 @@ export class EventHandlerManager implements AppModule {
 
     window.addEventListener('focal-points-ready', () => {
       (this.ctx.panels['cii'] as CIIPanel)?.refresh(true);
+      this.callbacks.refreshOpenCountryBrief?.();
     });
 
     window.addEventListener('theme-changed', () => {
