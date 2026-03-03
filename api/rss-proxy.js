@@ -322,6 +322,14 @@ const ALLOWED_DOMAINS = [
   'www.nature.com',
   'www.livescience.com',
   'www.newscientist.com',
+  // US broadcast & print news
+  'www.pbs.org',
+  'feeds.abcnews.com',
+  'feeds.nbcnews.com',
+  'www.cbsnews.com',
+  'moxie.foxnews.com',
+  'feeds.content.dowjones.io',
+  'thehill.com',
 ];
 
 export default async function handler(req) {
