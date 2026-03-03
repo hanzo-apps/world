@@ -77,6 +77,10 @@ export class EventHandlerManager implements AppModule {
   private boundThemeChangedHandler: (() => void) | null = null;
   private boundDropdownClickHandler: ((e: MouseEvent) => void) | null = null;
   private boundDropdownKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private boundMapResizeMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private boundMapEndResizeHandler: (() => void) | null = null;
+  private boundMapResizeVisChangeHandler: (() => void) | null = null;
+  private boundMapFullscreenEscHandler: ((e: KeyboardEvent) => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -199,6 +203,23 @@ export class EventHandlerManager implements AppModule {
     if (this.boundDropdownKeydownHandler) {
       document.removeEventListener('keydown', this.boundDropdownKeydownHandler);
       this.boundDropdownKeydownHandler = null;
+    }
+    if (this.boundMapResizeMoveHandler) {
+      document.removeEventListener('mousemove', this.boundMapResizeMoveHandler);
+      this.boundMapResizeMoveHandler = null;
+    }
+    if (this.boundMapEndResizeHandler) {
+      document.removeEventListener('mouseup', this.boundMapEndResizeHandler);
+      window.removeEventListener('blur', this.boundMapEndResizeHandler);
+      this.boundMapEndResizeHandler = null;
+    }
+    if (this.boundMapResizeVisChangeHandler) {
+      document.removeEventListener('visibilitychange', this.boundMapResizeVisChangeHandler);
+      this.boundMapResizeVisChangeHandler = null;
+    }
+    if (this.boundMapFullscreenEscHandler) {
+      document.removeEventListener('keydown', this.boundMapFullscreenEscHandler);
+      this.boundMapFullscreenEscHandler = null;
     }
     this.ctx.tvMode?.destroy();
     this.ctx.tvMode = null;
@@ -819,15 +840,16 @@ export class EventHandlerManager implements AppModule {
 
     const getTarget = () => (window.innerWidth >= 1600 ? mapContainer : mapSection);
 
-    const endResize = () => {
+    this.boundMapEndResizeHandler = () => {
       if (!isResizing) return;
       isResizing = false;
       this.ctx.map?.setIsResizing(false);
-      this.ctx.map?.resize(); // Final pass to sync canvas size post-drag
+      this.ctx.map?.resize();
       mapSection.classList.remove('resizing');
       document.body.style.cursor = '';
       localStorage.setItem('map-height', getTarget().style.height);
     };
+    const endResize = this.boundMapEndResizeHandler;
 
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizing = true;
@@ -870,7 +892,7 @@ export class EventHandlerManager implements AppModule {
       setTimeout(onEnd, 500);
     });
 
-    document.addEventListener('mousemove', (e) => {
+    this.boundMapResizeMoveHandler = (e: MouseEvent) => {
       if (!isResizing) return;
       const isWide = window.innerWidth >= 1600;
       const target = isWide ? mapContainer : mapSection;
@@ -881,15 +903,16 @@ export class EventHandlerManager implements AppModule {
       if (isWide) target.style.flex = 'none';
       target.style.height = `${newHeight}px`;
 
-      // Trigger dynamic map update
       this.ctx.map?.resize();
-    });
+    };
+    document.addEventListener('mousemove', this.boundMapResizeMoveHandler);
 
     document.addEventListener('mouseup', endResize);
     window.addEventListener('blur', endResize);
-    document.addEventListener('visibilitychange', () => {
+    this.boundMapResizeVisChangeHandler = () => {
       if (document.hidden) endResize();
-    });
+    };
+    document.addEventListener('visibilitychange', this.boundMapResizeVisChangeHandler);
   }
 
   setupMapPin(): void {
@@ -928,9 +951,10 @@ export class EventHandlerManager implements AppModule {
     };
 
     btn.addEventListener('click', toggle);
-    document.addEventListener('keydown', (e) => {
+    this.boundMapFullscreenEscHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isFullscreen) toggle();
-    });
+    };
+    document.addEventListener('keydown', this.boundMapFullscreenEscHandler);
   }
 
   getLocalizedPanelName(panelKey: string, fallback: string): string {
