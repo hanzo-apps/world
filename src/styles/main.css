@@ -2187,6 +2187,16 @@ body.live-news-fullscreen-active .community-widget {
   display: none;
 }
 
+/* Hide map overlays and sibling panels behind fullscreen panel (#829, #859) */
+body.live-news-fullscreen-active .layer-toggles,
+body.live-news-fullscreen-active .map-legend {
+  display: none !important;
+}
+
+body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
+  visibility: hidden !important;
+}
+
 .live-indicator-btn {
   background: transparent;
   border: none;
@@ -15657,6 +15667,7 @@ body.has-breaking-alert .panels-grid {
   color: var(--accent);
 }
 
+.cb-link-share-btn,
 .cb-share-btn,
 .cb-print-btn,
 .cb-export-btn {
@@ -15671,6 +15682,7 @@ body.has-breaking-alert .panels-grid {
   align-items: center;
 }
 
+.cb-link-share-btn:hover,
 .cb-share-btn:hover,
 .cb-print-btn:hover,
 .cb-export-btn:hover {
@@ -16104,6 +16116,7 @@ body.has-breaking-alert .panels-grid {
   }
 
   .cb-close,
+  .cb-link-share-btn,
   .cb-share-btn,
   .cb-print-btn,
   .cb-export-btn,

@@ -163,6 +163,28 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'CNBC Tech', url: 'https://www.cnbc.com/id/19854910/device/rss/rss.html' },
       { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/rss/topstories' },
     ],
+    dev: [
+      { name: 'Dev.to', url: 'https://dev.to/feed' },
+      { name: 'Lobsters', url: 'https://lobste.rs/rss' },
+      { name: 'Changelog', url: 'https://changelog.com/feed' },
+      { name: 'Show HN', url: 'https://hnrss.org/show' },
+    ],
+    ipo: [
+      { name: 'IPO News', url: gn('(IPO OR "initial public offering" OR SPAC) tech when:7d') },
+      { name: 'Tech IPO News', url: gn('tech IPO OR "tech company" IPO when:7d') },
+    ],
+    producthunt: [
+      { name: 'Product Hunt', url: 'https://www.producthunt.com/feed' },
+    ],
+    hardware: [
+      { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all' },
+      { name: 'SemiAnalysis', url: 'https://www.semianalysis.com/feed' },
+      { name: 'Semiconductor News', url: gn('semiconductor OR chip OR TSMC OR NVIDIA OR Intel when:3d') },
+    ],
+    outages: [
+      { name: 'AWS Status', url: gn('AWS outage OR "Amazon Web Services" down when:1d') },
+      { name: 'Cloud Outages', url: gn('(Azure outage OR "Google Cloud" outage OR Cloudflare outage OR Slack down OR GitHub down) when:1d') },
+    ],
   },
 
   finance: {
