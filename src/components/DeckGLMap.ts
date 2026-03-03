@@ -1044,15 +1044,6 @@ export class DeckGLMap {
       this.layerCache.delete('day-night-layer');
     }
 
-    // Day/night overlay (rendered first as background)
-    if (mapLayers.dayNight) {
-      if (!this.dayNightIntervalId) this.startDayNightTimer();
-      layers.push(this.createDayNightLayer());
-    } else {
-      if (this.dayNightIntervalId) this.stopDayNightTimer();
-      this.layerCache.delete('day-night-layer');
-    }
-
     // Undersea cables layer
     if (mapLayers.cables) {
       layers.push(this.createCablesLayer());
