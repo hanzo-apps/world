@@ -855,11 +855,6 @@ export class EventHandlerManager implements AppModule {
 
     const getTarget = () => (window.innerWidth >= 1600 ? mapContainer : mapSection);
 
-    const endResize = () => {
-      if (!isResizing) return;
-      isResizing = false;
-      this.ctx.map?.setIsResizing(false);
-      this.ctx.map?.resize(); // Final pass to sync canvas size post-drag
     this.boundMapEndResizeHandler = () => {
       if (!isResizing) return;
       isResizing = false;
@@ -924,8 +919,6 @@ export class EventHandlerManager implements AppModule {
       target.style.height = `${newHeight}px`;
 
       // Trigger dynamic map update
-      this.ctx.map?.resize();
-    });
       this.ctx.map?.resize();
     };
     document.addEventListener('mousemove', this.boundMapResizeMoveHandler);
