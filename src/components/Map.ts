@@ -261,9 +261,9 @@ export class MapComponent {
     const controls = document.createElement('div');
     controls.className = 'map-controls';
     controls.innerHTML = `
-      <button class="map-control-btn" data-action="zoom-in">+</button>
-      <button class="map-control-btn" data-action="zoom-out">−</button>
-      <button class="map-control-btn" data-action="reset">⟲</button>
+      <button class="map-control-btn" data-action="zoom-in" aria-label="Zoom in">+</button>
+      <button class="map-control-btn" data-action="zoom-out" aria-label="Zoom out">−</button>
+      <button class="map-control-btn" data-action="reset" aria-label="Reset rotation">⟲</button>
     `;
 
     controls.addEventListener('click', (e) => {
@@ -430,6 +430,7 @@ export class MapComponent {
     helpBtn.className = 'layer-help-btn';
     helpBtn.textContent = '?';
     helpBtn.title = t('components.deckgl.layerGuide');
+    helpBtn.setAttribute('aria-label', t('components.deckgl.layerGuide'));
     helpBtn.addEventListener('click', () => this.showLayerHelp());
     toggles.appendChild(helpBtn);
 
@@ -460,7 +461,7 @@ export class MapComponent {
     const helpHeader = `
       <div class="layer-help-header">
         <span>${t('components.deckgl.layerHelp.title')}</span>
-        <button class="layer-help-close">×</button>
+        <button class="layer-help-close" aria-label="Close">×</button>
       </div>
     `;
 
