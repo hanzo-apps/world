@@ -687,9 +687,13 @@ export class CountryBriefPage implements CountryBriefPanel {
     </head><body>${header ? header.outerHTML : ''}${content.outerHTML}</body></html>`);
     doc.close();
 
-    iframe.contentWindow!.onafterprint = () => document.body.removeChild(iframe);
+    if (iframe.contentWindow) {
+      iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+    }
     setTimeout(() => {
-      iframe.contentWindow!.print();
+      if (iframe.contentWindow) {
+        iframe.contentWindow.print();
+      }
       setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe); }, 5000);
     }, 300);
   }
