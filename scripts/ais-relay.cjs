@@ -1004,7 +1004,9 @@ async function seedMarketQuotes() {
   const payload = { quotes, finnhubSkipped: skipped, skipReason: skipped ? 'FINNHUB_API_KEY not configured' : '', rateLimited: false };
   const redisKey = `market:quotes:v1:${[...MARKET_SYMBOLS].sort().join(',')}`;
   const ok = await upstashSet(redisKey, payload, MARKET_SEED_TTL);
-  console.log(`[Market] Seeded ${quotes.length}/${MARKET_SYMBOLS.length} quotes (redis: ${ok ? 'OK' : 'FAIL'})`);
+  // Bootstrap-friendly fixed key — frontend hydrates from /api/bootstrap without RPC
+  const ok2 = await upstashSet('market:stocks-bootstrap:v1', payload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${quotes.length}/${MARKET_SYMBOLS.length} quotes (redis: ${ok && ok2 ? 'OK' : 'PARTIAL'})`);
   return quotes.length;
 }
 
@@ -1029,7 +1031,9 @@ async function seedCommodityQuotes() {
   const quotesKey = `market:quotes:v1:${[...COMMODITY_SYMBOLS].sort().join(',')}`;
   const quotesPayload = { quotes, finnhubSkipped: false, skipReason: '', rateLimited: false };
   const ok2 = await upstashSet(quotesKey, quotesPayload, MARKET_SEED_TTL);
-  console.log(`[Market] Seeded ${quotes.length}/${COMMODITY_SYMBOLS.length} commodities (redis: ${ok && ok2 ? 'OK' : 'PARTIAL'})`);
+  // Bootstrap-friendly fixed key — frontend hydrates from /api/bootstrap without RPC
+  const ok3 = await upstashSet('market:commodities-bootstrap:v1', quotesPayload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${quotes.length}/${COMMODITY_SYMBOLS.length} commodities (redis: ${ok && ok2 && ok3 ? 'OK' : 'PARTIAL'})`);
   return quotes.length;
 }
 

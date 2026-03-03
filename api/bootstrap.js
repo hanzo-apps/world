@@ -7,6 +7,8 @@ const BOOTSTRAP_CACHE_KEYS = {
   earthquakes:      'seismology:earthquakes:v1',
   outages:          'infra:outages:v1',
   serviceStatuses:  'infra:service-statuses:v1',
+  marketQuotes:     'market:stocks-bootstrap:v1',
+  commodityQuotes:  'market:commodities-bootstrap:v1',
   sectors:          'market:sectors:v1',
   etfFlows:         'market:etf-flows:v1',
   macroSignals:     'economic:macro-signals:v1',
@@ -27,6 +29,7 @@ const SLOW_KEYS = new Set([
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints',
+  'marketQuotes', 'commodityQuotes',
 ]);
 
 const TIER_CACHE = {
