@@ -27,11 +27,6 @@ const root = resolve(__dirname, '..');
 
 const readSrc = (relPath) => readFileSync(resolve(root, relPath), 'utf-8');
 
-// Shared URL for dynamic imports in behavioral tests
-const CIRCUIT_BREAKER_URL = pathToFileURL(
-  resolve(root, 'src/utils/circuit-breaker.ts'),
-).href;
-
 // ============================================================
 // 1. Static analysis: conflict/index.ts — per-country HAPI breakers
 // ============================================================
@@ -39,9 +34,10 @@ const CIRCUIT_BREAKER_URL = pathToFileURL(
 describe('conflict/index.ts — per-country HAPI circuit breakers', () => {
   const src = readSrc('src/services/conflict/index.ts');
 
-  // Scoped function body slice — guard against rename/removal silently broadening scope
+  // Scoped slices to avoid false positives from comments or unrelated code
+  const breakerSection = src.slice(src.indexOf('hapiBreakers'), src.indexOf('hapiBreakers') + 400);
   const fnStart = src.indexOf('export async function fetchHapiSummary');
-  assert.ok(fnStart !== -1, 'fetchHapiSummary must exist in conflict/index.ts');
+  assert.ok(fnStart !== -1, 'fetchHapiSummary not found in conflict/index.ts — was it renamed?');
   const fnBody = src.slice(fnStart, src.indexOf('\nexport ', fnStart + 1));
 
   it('does NOT have a single shared hapiBreaker', () => {
@@ -53,10 +49,9 @@ describe('conflict/index.ts — per-country HAPI circuit breakers', () => {
   });
 
   it('has a hapiBreakers Map for per-country instances', () => {
-    // Check src directly — pattern is specific enough to avoid false positives
     assert.match(
-      src,
-      /\bhapiBreakers\s*=\s*new\s+Map/,
+      breakerSection,
+      /new\s+Map/,
       'hapiBreakers Map must exist to store per-country circuit breakers',
     );
   });
@@ -78,9 +73,8 @@ describe('conflict/index.ts — per-country HAPI circuit breakers', () => {
   });
 
   it('per-country breaker names embed iso2', () => {
-    // Check src directly — template literal is specific enough without window slicing
     assert.match(
-      src,
+      breakerSection,
       /name\s*:\s*`HDX HAPI:\$\{iso2\}`/,
       'Breaker name must embed iso2 (e.g. "HDX HAPI:US") for unique IndexedDB persistence per country',
     );
@@ -94,13 +88,12 @@ describe('conflict/index.ts — per-country HAPI circuit breakers', () => {
 describe('gdelt-intel.ts — dedicated circuit breakers per GDELT query type', () => {
   const src = readSrc('src/services/gdelt-intel.ts');
 
-  // Scoped function body slices — guard against rename/removal silently broadening scope
+  // Scoped function body slices
   const posStart = src.indexOf('export async function fetchPositiveGdeltArticles');
-  assert.ok(posStart !== -1, 'fetchPositiveGdeltArticles must exist in gdelt-intel.ts');
+  assert.ok(posStart !== -1, 'fetchPositiveGdeltArticles not found in gdelt-intel.ts — was it renamed?');
   const posBody = src.slice(posStart, src.indexOf('\nexport ', posStart + 1));
-
   const regStart = src.indexOf('export async function fetchGdeltArticles');
-  assert.ok(regStart !== -1, 'fetchGdeltArticles must exist in gdelt-intel.ts');
+  assert.ok(regStart !== -1, 'fetchGdeltArticles not found in gdelt-intel.ts — was it renamed?');
   const regBody = src.slice(regStart, src.indexOf('\nexport ', regStart + 1));
 
   it('has a dedicated positiveGdeltBreaker separate from gdeltBreaker', () => {
@@ -143,7 +136,7 @@ describe('gdelt-intel.ts — dedicated circuit breakers per GDELT query type', (
       /positiveGdeltBreaker\.execute/,
       'fetchPositiveGdeltArticles must use positiveGdeltBreaker.execute',
     );
-    // \b word-boundary ensures `positiveGdeltBreaker.execute` (uppercase G) is not matched
+    // word-boundary prevents matching `positiveGdeltBreaker.execute`
     assert.doesNotMatch(
       posBody,
       /\bgdeltBreaker\.execute/,
@@ -157,12 +150,17 @@ describe('gdelt-intel.ts — dedicated circuit breakers per GDELT query type', (
 // ============================================================
 
 describe('CircuitBreaker isolation — HAPI per-country independence', () => {
+  const CIRCUIT_BREAKER_URL = pathToFileURL(
+    resolve(root, 'src/utils/circuit-breaker.ts'),
+  ).href;
+
   it('HAPI: failure in one country does not trip another', async () => {
     const { createCircuitBreaker, clearAllCircuitBreakers } = await import(
       `${CIRCUIT_BREAKER_URL}?t=${Date.now()}`
     );
 
     clearAllCircuitBreakers();
+
     try {
       const breakerUS = createCircuitBreaker({ name: 'HDX HAPI:US', cacheTtlMs: 30 * 60 * 1000 });
       const breakerRU = createCircuitBreaker({ name: 'HDX HAPI:RU', cacheTtlMs: 30 * 60 * 1000 });
@@ -170,7 +168,7 @@ describe('CircuitBreaker isolation — HAPI per-country independence', () => {
       const fallback = { summary: null };
       const alwaysFail = () => { throw new Error('HDX HAPI unavailable'); };
 
-      // Default maxFailures is 2 — force breakerUS into cooldown
+      // Force breakerUS into cooldown (2 failures = maxFailures)
       await breakerUS.execute(alwaysFail, fallback); // failure 1
       await breakerUS.execute(alwaysFail, fallback); // failure 2 → cooldown
       assert.equal(breakerUS.isOnCooldown(), true, 'breakerUS should be on cooldown after 2 failures');
@@ -193,6 +191,7 @@ describe('CircuitBreaker isolation — HAPI per-country independence', () => {
     );
 
     clearAllCircuitBreakers();
+
     try {
       const breakerUS = createCircuitBreaker({ name: 'HDX HAPI:US', cacheTtlMs: 30 * 60 * 1000 });
       const breakerRU = createCircuitBreaker({ name: 'HDX HAPI:RU', cacheTtlMs: 30 * 60 * 1000 });
@@ -222,12 +221,17 @@ describe('CircuitBreaker isolation — HAPI per-country independence', () => {
 });
 
 describe('CircuitBreaker isolation — GDELT split breaker independence', () => {
+  const CIRCUIT_BREAKER_URL = pathToFileURL(
+    resolve(root, 'src/utils/circuit-breaker.ts'),
+  ).href;
+
   it('GDELT: positive breaker failure does not trip regular breaker', async () => {
     const { createCircuitBreaker, clearAllCircuitBreakers } = await import(
       `${CIRCUIT_BREAKER_URL}?t=${Date.now()}`
     );
 
     clearAllCircuitBreakers();
+
     try {
       const gdelt = createCircuitBreaker({ name: 'GDELT Intelligence', cacheTtlMs: 10 * 60 * 1000 });
       const positive = createCircuitBreaker({ name: 'GDELT Positive', cacheTtlMs: 10 * 60 * 1000 });
@@ -235,7 +239,7 @@ describe('CircuitBreaker isolation — GDELT split breaker independence', () => 
       const fallback = { articles: [], totalArticles: 0 };
       const alwaysFail = () => { throw new Error('GDELT API unavailable'); };
 
-      // Default maxFailures is 2 — force positive breaker into cooldown
+      // Force positive breaker into cooldown (2 failures)
       await positive.execute(alwaysFail, fallback); // failure 1
       await positive.execute(alwaysFail, fallback); // failure 2 → cooldown
       assert.equal(positive.isOnCooldown(), true, 'positive breaker should be on cooldown after 2 failures');
@@ -258,6 +262,7 @@ describe('CircuitBreaker isolation — GDELT split breaker independence', () => 
     );
 
     clearAllCircuitBreakers();
+
     try {
       const gdelt = createCircuitBreaker({ name: 'GDELT Intelligence', cacheTtlMs: 10 * 60 * 1000 });
       const positive = createCircuitBreaker({ name: 'GDELT Positive', cacheTtlMs: 10 * 60 * 1000 });
