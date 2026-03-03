@@ -17,8 +17,15 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'CNN World', url: gn('site:cnn.com world news when:1d') },
     ],
     us: [
+      { name: 'Reuters US', url: gn('site:reuters.com US') },
       { name: 'NPR News', url: 'https://feeds.npr.org/1001/rss.xml' },
-      { name: 'Politico', url: gn('site:politico.com when:1d') },
+      { name: 'PBS NewsHour', url: 'https://www.pbs.org/newshour/feeds/rss/headlines' },
+      { name: 'ABC News', url: 'https://feeds.abcnews.com/abcnews/topstories' },
+      { name: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/main' },
+      { name: 'NBC News', url: 'https://feeds.nbcnews.com/nbcnews/public/news' },
+      { name: 'Wall Street Journal', url: 'https://feeds.content.dowjones.io/public/rss/RSSUSnews' },
+      { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml' },
+      { name: 'The Hill', url: 'https://thehill.com/news/feed' },
       { name: 'Axios', url: 'https://api.axios.com/feed/' },
     ],
     europe: [
