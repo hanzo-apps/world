@@ -291,6 +291,7 @@ export class App {
 
     this.dataLoader = new DataLoaderManager(this.state, {
       renderCriticalBanner: (postures) => this.panelLayout.renderCriticalBanner(postures),
+      refreshOpenCountryBrief: () => this.countryIntel.refreshOpenBrief(),
     });
 
     this.searchManager = new SearchManager(this.state, {
@@ -313,6 +314,7 @@ export class App {
       waitForAisData: () => this.dataLoader.waitForAisData(),
       syncDataFreshnessWithLayers: () => this.dataLoader.syncDataFreshnessWithLayers(),
       ensureCorrectZones: () => this.panelLayout.ensureCorrectZones(),
+      refreshOpenCountryBrief: () => this.countryIntel.refreshOpenBrief(),
     });
 
     // Wire cross-module callback: DataLoader → SearchManager
