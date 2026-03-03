@@ -31,6 +31,18 @@ function getRelayHeaders(): Record<string, string> {
 
 export const UPSTREAM_TIMEOUT_MS = 10_000;
 
+/**
+ * Defensive parser for repeated-string query params.
+ * The sebuf codegen assigns `params.get("symbols")` (a string) to a field
+ * typed as `string[]`.  At runtime `req.symbols` may therefore be a
+ * comma-separated string rather than an actual array.
+ */
+export function parseStringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw === 'string' && raw.length > 0) return raw.split(',').filter(Boolean);
+  return [];
+}
+
 export async function fetchYahooQuotesBatch(
   symbols: string[],
 ): Promise<{ results: Map<string, { price: number; change: number; sparkline: number[] }>; rateLimited: boolean }> {

@@ -1024,7 +1024,12 @@ async function seedCommodityQuotes() {
   const payload = { quotes };
   const redisKey = `market:commodities:v1:${[...COMMODITY_SYMBOLS].sort().join(',')}`;
   const ok = await upstashSet(redisKey, payload, MARKET_SEED_TTL);
-  console.log(`[Market] Seeded ${quotes.length}/${COMMODITY_SYMBOLS.length} commodities (redis: ${ok ? 'OK' : 'FAIL'})`);
+  // Also write under market:quotes:v1: key — the frontend routes commodities through
+  // listMarketQuotes RPC, which constructs this key pattern (not market:commodities:v1:)
+  const quotesKey = `market:quotes:v1:${[...COMMODITY_SYMBOLS].sort().join(',')}`;
+  const quotesPayload = { quotes, finnhubSkipped: false, skipReason: '', rateLimited: false };
+  const ok2 = await upstashSet(quotesKey, quotesPayload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${quotes.length}/${COMMODITY_SYMBOLS.length} commodities (redis: ${ok && ok2 ? 'OK' : 'PARTIAL'})`);
   return quotes.length;
 }
 
@@ -1054,7 +1059,16 @@ async function seedSectorSummary() {
 
   const payload = { sectors };
   const ok = await upstashSet('market:sectors:v1', payload, MARKET_SEED_TTL);
-  console.log(`[Market] Seeded ${sectors.length}/${SECTOR_SYMBOLS.length} sectors (redis: ${ok ? 'OK' : 'FAIL'})`);
+  // Also write under market:quotes:v1: key — the frontend routes sectors through
+  // fetchMultipleStocks → listMarketQuotes RPC, which constructs this key pattern
+  const quotesKey = `market:quotes:v1:${[...SECTOR_SYMBOLS].sort().join(',')}`;
+  const sectorQuotes = sectors.map((s) => ({
+    symbol: s.symbol, name: s.name, display: s.name,
+    price: 0, change: s.change, sparkline: [],
+  }));
+  const quotesPayload = { quotes: sectorQuotes, finnhubSkipped: false, skipReason: '', rateLimited: false };
+  const ok2 = await upstashSet(quotesKey, quotesPayload, MARKET_SEED_TTL);
+  console.log(`[Market] Seeded ${sectors.length}/${SECTOR_SYMBOLS.length} sectors (redis: ${ok && ok2 ? 'OK' : 'PARTIAL'})`);
   return sectors.length;
 }
 
