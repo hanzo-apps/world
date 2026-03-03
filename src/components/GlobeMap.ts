@@ -924,6 +924,7 @@ export class GlobeMap {
     const el = document.createElement('div');
     el.className = 'map-controls deckgl-controls';
     el.innerHTML = `
+      <span class="globe-beta-badge">BETA</span>
       <div class="zoom-controls">
         <button class="map-btn zoom-in"    title="Zoom in">+</button>
         <button class="map-btn zoom-out"   title="Zoom out">-</button>
