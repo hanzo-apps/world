@@ -171,14 +171,14 @@ export class App {
 
     // Desktop key management panel must always remain accessible in Tauri.
     if (isDesktopApp) {
-      const runtimePanel = panelSettings['runtime-config'] ?? {
-        name: 'Desktop Configuration',
-        enabled: true,
-        priority: 2,
-      };
-      runtimePanel.enabled = true;
-      panelSettings['runtime-config'] = runtimePanel;
-      saveToStorage(STORAGE_KEYS.panels, panelSettings);
+      if (!panelSettings['runtime-config']) {
+        panelSettings['runtime-config'] = {
+          name: 'Desktop Configuration',
+          enabled: true,
+          priority: 2,
+        };
+        saveToStorage(STORAGE_KEYS.panels, panelSettings);
+      }
     }
 
     let initialUrlState: ParsedMapUrlState | null = parseMapUrlState(window.location.search, mapLayers);
