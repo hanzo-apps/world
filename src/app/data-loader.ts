@@ -66,7 +66,7 @@ import { updateAndCheck } from '@/services/temporal-baseline';
 import { fetchAllFires, flattenFires, computeRegionStats, toMapFires } from '@/services/wildfires';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, ingestStrikesForCII, ingestOrefForCII, ingestAviationForCII, ingestAdvisoriesForCII, ingestGpsJammingForCII, ingestAisDisruptionsForCII, ingestSatelliteFiresForCII, ingestCyberThreatsForCII, ingestTemporalAnomaliesForCII, isInLearningMode } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, ingestStrikesForCII, ingestOrefForCII, ingestAviationForCII, ingestAdvisoriesForCII, ingestGpsJammingForCII, ingestAisDisruptionsForCII, ingestSatelliteFiresForCII, ingestCyberThreatsForCII, ingestTemporalAnomaliesForCII, isInLearningMode, resetHotspotActivity, setIntelligenceSignalsLoaded, hasAnyIntelligenceData } from '@/services/country-instability';
 import { fetchGpsInterference } from '@/services/gps-interference';
 import { dataFreshness, type DataSourceId } from '@/services/data-freshness';
 import { fetchConflictEvents, fetchUcdpClassifications, fetchHapiSummary, fetchUcdpEvents, deduplicateAgainstAcled, fetchIranEvents } from '@/services/conflict';
@@ -159,6 +159,7 @@ const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
 
 export interface DataLoaderCallbacks {
   renderCriticalBanner: (postures: TheaterPostureSummary[]) => void;
+  refreshOpenCountryBrief: () => void;
 }
 
 export class DataLoaderManager implements AppModule {
@@ -192,6 +193,11 @@ export class DataLoaderManager implements AppModule {
   destroy(): void {
     this.applyTimeRangeFilterToNewsPanelsDebounced.cancel();
     stopOrefPolling();
+  }
+
+  private refreshCiiAndBrief(): void {
+    (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+    this.callbacks.refreshOpenCountryBrief();
   }
 
   private async tryFetchDigest(): Promise<ListFeedDigestResponse | null> {
@@ -888,7 +894,7 @@ export class DataLoaderManager implements AppModule {
       if (anomalies.length > 0) {
         signalAggregator.ingestTemporalAnomalies(anomalies);
         ingestTemporalAnomaliesForCII(anomalies);
-        (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+        this.refreshCiiAndBrief();
       }
     }).catch(() => { });
 
@@ -1182,6 +1188,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadIntelligenceSignals(): Promise<void> {
+    resetHotspotActivity();
     const tasks: Promise<void>[] = [];
 
     tasks.push((async () => {
@@ -1296,7 +1303,7 @@ export class DataLoaderManager implements AppModule {
           if (anomalies.length > 0) {
             signalAggregator.ingestTemporalAnomalies(anomalies);
             ingestTemporalAnomaliesForCII(anomalies);
-            (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+            this.refreshCiiAndBrief();
           }
         }).catch(() => { });
         if (this.ctx.mapLayers.military) {
@@ -1473,7 +1480,10 @@ export class DataLoaderManager implements AppModule {
       dataFreshness.recordError('worldpop', String(error));
     }
 
-    (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+    if (hasAnyIntelligenceData()) {
+      setIntelligenceSignalsLoaded();
+    }
+    this.refreshCiiAndBrief();
     console.log('[Intelligence] All signals loaded for CII calculation');
   }
 
@@ -1512,7 +1522,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setCyberThreats(this.ctx.cyberThreatsCache);
       this.ctx.map?.setLayerReady('cyberThreats', this.ctx.cyberThreatsCache.length > 0);
       ingestCyberThreatsForCII(this.ctx.cyberThreatsCache);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
       this.ctx.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: this.ctx.cyberThreatsCache.length });
       return;
     }
@@ -1523,7 +1533,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setCyberThreats(threats);
       this.ctx.map?.setLayerReady('cyberThreats', threats.length > 0);
       ingestCyberThreatsForCII(threats);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
       this.ctx.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: threats.length });
       this.ctx.statusPanel?.updateApi('Cyber Threats API', { status: 'ok' });
       dataFreshness.recordUpdate('cyber_threats', threats.length);
@@ -1544,7 +1554,7 @@ export class DataLoaderManager implements AppModule {
       const coerced = events.map(e => ({ ...e, timestamp: Number(e.timestamp) || 0 }));
       signalAggregator.ingestConflictEvents(coerced);
       ingestStrikesForCII(coerced);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
     } catch {
       this.ctx.map?.setLayerReady('iranAttacks', false);
     }
@@ -1558,14 +1568,14 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setAisData(disruptions, density);
       signalAggregator.ingestAisDisruptions(disruptions);
       ingestAisDisruptionsForCII(disruptions);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
       updateAndCheck([
         { type: 'ais_gaps', region: 'global', count: disruptions.length },
       ]).then(anomalies => {
         if (anomalies.length > 0) {
           signalAggregator.ingestTemporalAnomalies(anomalies);
           ingestTemporalAnomaliesForCII(anomalies);
-          (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+          this.refreshCiiAndBrief();
         }
       }).catch(() => { });
 
@@ -1680,7 +1690,7 @@ export class DataLoaderManager implements AppModule {
       if (protestCount > 0) dataFreshness.recordUpdate('acled', protestCount);
       if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt', protestData.sources.gdelt);
       if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt_doc', protestData.sources.gdelt);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
       const status = getProtestStatus();
       this.ctx.statusPanel?.updateFeed('Protests', {
         status: 'ok',
@@ -1773,11 +1783,11 @@ export class DataLoaderManager implements AppModule {
         if (anomalies.length > 0) {
           signalAggregator.ingestTemporalAnomalies(anomalies);
           ingestTemporalAnomaliesForCII(anomalies);
-          (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+          this.refreshCiiAndBrief();
         }
       }).catch(() => { });
       this.ctx.map?.updateMilitaryForEscalation(flightData.flights, vesselData.vessels);
-      (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+      this.refreshCiiAndBrief();
       if (!isInLearningMode()) {
         const surgeAlerts = analyzeFlightsForSurge(flightData.flights);
         if (surgeAlerts.length > 0) {
@@ -2035,7 +2045,7 @@ export class DataLoaderManager implements AppModule {
       if (this.ctx.latestClusters.length > 0) {
         ingestNewsForCII(this.ctx.latestClusters);
         dataFreshness.recordUpdate('gdelt', this.ctx.latestClusters.length);
-        (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+        this.refreshCiiAndBrief();
       }
 
       const signals = await analysisWorker.analyzeCorrelations(
@@ -2084,7 +2094,7 @@ export class DataLoaderManager implements AppModule {
 
         signalAggregator.ingestSatelliteFires(satelliteFires);
         ingestSatelliteFiresForCII(satelliteFires);
-        (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+        this.refreshCiiAndBrief();
 
         this.ctx.map?.setFires(toMapFires(flat));
 
@@ -2098,12 +2108,12 @@ export class DataLoaderManager implements AppModule {
           if (anomalies.length > 0) {
             signalAggregator.ingestTemporalAnomalies(anomalies);
             ingestTemporalAnomaliesForCII(anomalies);
-            (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+            this.refreshCiiAndBrief();
           }
         }).catch(() => { });
       } else {
         ingestSatelliteFiresForCII([]);
-        (this.ctx.panels['cii'] as CIIPanel)?.refresh();
+        this.refreshCiiAndBrief();
         (this.ctx.panels['satellite-fires'] as SatelliteFiresPanel)?.update([], 0);
       }
       this.ctx.statusPanel?.updateApi('FIRMS', { status: 'ok' });
