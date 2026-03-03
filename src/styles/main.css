@@ -666,6 +666,25 @@ canvas,
   color: var(--accent);
 }
 
+.mobile-settings-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  margin-left: 6px;
+  transition: color 0.2s, transform 0.3s;
+}
+
+.mobile-settings-btn:hover {
+  color: var(--accent);
+  transform: rotate(45deg);
+}
+
 .github-link {
   color: var(--text-dim);
   margin-left: 8px;
@@ -3393,6 +3412,9 @@ body.playback-mode .status-dot {
   position: relative;
   overflow: hidden;
   background: var(--map-bg);
+  /* Let the map library handle all touch gestures (pinch-zoom, pan)
+     instead of the browser intercepting them on mobile/Android */
+  touch-action: none;
 }
 
 .map-wrapper {
@@ -9539,6 +9561,19 @@ a.prediction-link:hover {
     display: inline-block;
   }
 
+  /* Hide GitHub icon on mobile, show settings gear instead */
+  .github-link {
+    display: none !important;
+  }
+
+  .header-right .unified-settings-btn {
+    display: none;
+  }
+
+  .header-center .mobile-settings-btn {
+    display: inline-flex;
+  }
+
   /* Reduce header clutter on mobile */
   .header-center {
     gap: 4px;
@@ -12422,6 +12457,9 @@ a.prediction-link:hover {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /* Prevent browser from intercepting touch gestures (pinch-zoom, pan)
+     so MapLibre/deck.gl can handle them directly — fixes Android pinch-zoom */
+  touch-action: none;
 }
 
 #deckgl-basemap {
@@ -12430,6 +12468,9 @@ a.prediction-link:hover {
   left: 0;
   width: 100%;
   height: 100%;
+  /* Let MapLibre handle all touch gestures (pinch-zoom, pan, rotate)
+     instead of the browser intercepting them for page zoom on Android */
+  touch-action: none;
 }
 
 #deckgl-overlay {
@@ -12445,6 +12486,33 @@ a.prediction-link:hover {
 #deckgl-overlay canvas {
   pointer-events: auto;
   background: transparent !important;
+}
+
+/* Globe Beta Badge */
+.globe-beta-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 4px;
+  box-shadow:
+    0 0 6px rgba(0, 229, 255, 0.3),
+    0 0 20px rgba(0, 229, 255, 0.15),
+    inset 0 0 8px rgba(0, 229, 255, 0.05);
+  animation: globe-beta-pulse 2.5s ease-in-out infinite;
+  pointer-events: none;
+  align-self: flex-end;
+}
+
+@keyframes globe-beta-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(0, 229, 255, 0.3), 0 0 20px rgba(0, 229, 255, 0.15), inset 0 0 8px rgba(0, 229, 255, 0.05); }
+  50% { box-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 30px rgba(0, 229, 255, 0.25), inset 0 0 12px rgba(0, 229, 255, 0.1); }
 }
 
 /* deck.gl Controls */
@@ -12621,6 +12689,20 @@ a.prediction-link:hover {
 
 .deckgl-layer-toggles .layer-toggle:hover {
   background: var(--bg);
+}
+
+.deckgl-layer-toggles .layer-toggle.zoom-hidden .toggle-label {
+  opacity: 0.45;
+}
+
+.deckgl-layer-toggles .layer-toggle.zoom-hidden::after {
+  content: '🔍+';
+  position: absolute;
+  top: -4px;
+  right: 2px;
+  font-size: 7px;
+  opacity: 0.65;
+  pointer-events: none;
 }
 
 .deckgl-layer-toggles .layer-toggle input[type="checkbox"] {
@@ -16469,4 +16551,16 @@ body.has-breaking-alert .panels-grid {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* ─── Globe Map Styles ──────────────────────────────────────────────────────── */
+
+.globe-mode {
+  background: #000 !important;
+  overflow: hidden;
+}
+
+@keyframes globe-pulse {
+  0%   { transform: scale(1); opacity: 0.6; }
+  70%  { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(2.5); opacity: 0; }
 }

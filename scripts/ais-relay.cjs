@@ -79,6 +79,16 @@ const OREF_ALERTS_URL = 'https://www.oref.org.il/WarningMessages/alert/alerts.js
 const OREF_HISTORY_URL = 'https://www.oref.org.il/WarningMessages/alert/History/AlertsHistory.json';
 const OREF_POLL_INTERVAL_MS = Math.max(30_000, Number(process.env.OREF_POLL_INTERVAL_MS || 300_000));
 const OREF_ENABLED = !!OREF_PROXY_AUTH;
+const OREF_DATA_DIR = process.env.OREF_DATA_DIR || '';
+const OREF_LOCAL_FILE = (() => {
+  if (!OREF_DATA_DIR) return '';
+  try {
+    const stat = require('fs').statSync(OREF_DATA_DIR);
+    if (!stat.isDirectory()) { console.warn(`[Relay] OREF_DATA_DIR is not a directory: ${OREF_DATA_DIR}`); return ''; }
+  } catch { console.warn(`[Relay] OREF_DATA_DIR does not exist: ${OREF_DATA_DIR}`); return ''; }
+  console.log(`[Relay] OREF local persistence: ${OREF_DATA_DIR}`);
+  return path.join(OREF_DATA_DIR, 'oref-history.json');
+})();
 const RELAY_OREF_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_OREF_RATE_LIMIT_MAX))
   ? Number(process.env.RELAY_OREF_RATE_LIMIT_MAX) : 600;
 
@@ -541,7 +551,7 @@ function orefCurlFetch(proxyAuth, url, { toFile } = {}) {
   const { execFileSync } = require('child_process');
   const proxyUrl = `http://${proxyAuth}`;
   const args = [
-    '-sS', '-x', proxyUrl, '--max-time', '15',
+    '-sS', '--compressed', '-x', proxyUrl, '--max-time', '15',
     '-H', 'Accept: application/json',
     '-H', 'Referer: https://www.oref.org.il/',
     '-H', 'X-Requested-With: XMLHttpRequest',
@@ -662,6 +672,7 @@ async function orefBootstrapHistoryFromUpstream() {
   orefState.bootstrapSource = 'upstream';
   if (history.length > 0) orefState._persistVersion++;
   console.log(`[Relay] OREF history bootstrap: ${totalAlertRecords} records across ${history.length} waves`);
+  orefSaveLocalHistory();
 }
 
 const OREF_PERSIST_MAX_WAVES = 200;
@@ -689,12 +700,81 @@ async function orefPersistHistory() {
     if (ok) {
       orefState._lastPersistedVersion = versionAtStart;
     }
+    orefSaveLocalHistory();
   } finally {
     orefState._persistInFlight = false;
   }
 }
 
+function orefLoadLocalHistory() {
+  if (!OREF_LOCAL_FILE) return null;
+  try {
+    const raw = require('fs').readFileSync(OREF_LOCAL_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.history) || data.history.length === 0) return null;
+    const valid = data.history.every(
+      h => Array.isArray(h.alerts) && typeof h.timestamp === 'string'
+    );
+    if (!valid) return null;
+    const purgeCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const filtered = data.history.filter(
+      h => new Date(h.timestamp).getTime() > purgeCutoff
+    );
+    if (filtered.length === 0) {
+      console.log('[Relay] OREF local file data all stale (>7d)');
+      return null;
+    }
+    console.log(`[Relay] OREF local file: ${filtered.length} waves (saved ${data.savedAt || 'unknown'})`);
+    return filtered;
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.warn('[Relay] OREF local file read error:', err.message);
+    return null;
+  }
+}
+
+function orefSaveLocalHistory() {
+  if (!OREF_LOCAL_FILE) return;
+  try {
+    const fs = require('fs');
+    let waves = orefState.history;
+    if (waves.length > OREF_PERSIST_MAX_WAVES) {
+      waves = waves.slice(-OREF_PERSIST_MAX_WAVES);
+    }
+    const payload = JSON.stringify({
+      history: waves,
+      historyCount24h: orefState.historyCount24h,
+      totalHistoryCount: orefState.totalHistoryCount,
+      savedAt: new Date().toISOString(),
+    });
+    const tmpPath = OREF_LOCAL_FILE + '.tmp';
+    fs.writeFileSync(tmpPath, payload, 'utf8');
+    fs.renameSync(tmpPath, OREF_LOCAL_FILE);
+  } catch (err) {
+    console.warn('[Relay] OREF local file save error:', err.message);
+  }
+}
+
 async function orefBootstrapHistoryWithRetry() {
+  // Phase 0: local file (Railway volume — instant, no network)
+  if (OREF_LOCAL_FILE) {
+    const local = orefLoadLocalHistory();
+    if (local && local.length > 0) {
+      const cutoff24h = Date.now() - 24 * 60 * 60 * 1000;
+      orefState.history = local;
+      orefState.totalHistoryCount = local.reduce((sum, h) => {
+        return sum + h.alerts.reduce((s, a) => s + (Array.isArray(a.data) ? a.data.length : 1), 0);
+      }, 0);
+      orefState.historyCount24h = local
+        .filter(h => new Date(h.timestamp).getTime() > cutoff24h)
+        .reduce((sum, h) => sum + h.alerts.reduce((s, a) => s + (Array.isArray(a.data) ? a.data.length : 1), 0), 0);
+      const newest = local[local.length - 1];
+      orefState.lastAlertsJson = JSON.stringify(newest.alerts);
+      orefState.bootstrapSource = 'local-file';
+      console.log(`[Relay] OREF history loaded from local file: ${orefState.totalHistoryCount} records across ${local.length} waves`);
+      return;
+    }
+  }
+
   // Phase 1: try Redis first
   try {
     const cached = await upstashGet(OREF_REDIS_KEY);
