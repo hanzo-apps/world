@@ -918,7 +918,6 @@ export class EventHandlerManager implements AppModule {
       if (isWide) target.style.flex = 'none';
       target.style.height = `${newHeight}px`;
 
-      // Trigger dynamic map update
       this.ctx.map?.resize();
     };
     document.addEventListener('mousemove', this.boundMapResizeMoveHandler);
