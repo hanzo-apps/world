@@ -787,6 +787,7 @@ export class EventHandlerManager implements AppModule {
       if (!isResizing) return;
       isResizing = false;
       this.ctx.map?.setIsResizing(false);
+      this.ctx.map?.resize(); // Final pass to sync canvas size post-drag
       mapSection.classList.remove('resizing');
       document.body.style.cursor = '';
       localStorage.setItem('map-height', getTarget().style.height);
@@ -811,20 +812,24 @@ export class EventHandlerManager implements AppModule {
       const finalHeight = Math.max(getMinHeight(), Math.min(targetHeight, getMaxHeight()));
 
       this.ctx.map?.setIsResizing(true);
-      mapSection.classList.add('map-section-smooth');
+      target.classList.add('map-section-smooth');
 
       if (isWide) target.style.flex = 'none';
       target.style.height = `${finalHeight}px`;
 
+      let fired = false;
       const onEnd = () => {
-        mapSection.classList.remove('map-section-smooth');
-        mapSection.removeEventListener('transitionend', onEnd);
+        if (fired) return;
+        fired = true;
+
+        target.classList.remove('map-section-smooth');
+        target.removeEventListener('transitionend', onEnd);
         localStorage.setItem('map-height', `${finalHeight}px`);
         this.ctx.map?.setIsResizing(false);
         this.ctx.map?.resize();
       };
 
-      mapSection.addEventListener('transitionend', onEnd);
+      target.addEventListener('transitionend', onEnd);
       this.ctx.map?.resize();
       setTimeout(onEnd, 500);
     });
