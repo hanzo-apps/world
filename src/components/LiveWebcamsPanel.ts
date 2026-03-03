@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { IDLE_PAUSE_MS } from '@/config';
 import { isDesktopRuntime, getLocalApiPort } from '@/services/runtime';
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '../services/i18n';
@@ -64,7 +65,7 @@ export class LiveWebcamsPanel extends Panel {
   private idleTimeout: ReturnType<typeof setTimeout> | null = null;
   private boundIdleResetHandler!: () => void;
   private boundVisibilityHandler!: () => void;
-  private readonly IDLE_PAUSE_MS = 5 * 60 * 1000;
+  private readonly IDLE_PAUSE_MS = IDLE_PAUSE_MS;
   private isIdle = false;
   private fullscreenBtn: HTMLButtonElement | null = null;
   private isFullscreen = false;
