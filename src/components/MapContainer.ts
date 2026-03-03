@@ -209,11 +209,6 @@ export class MapContainer {
 
   public setIsResizing(isResizing: boolean): void {
     this.isResizingInternal = isResizing;
-    if (this.useDeckGL) {
-      this.deckGLMap?.setIsResizing(isResizing);
-    } else {
-      this.svgMap?.setIsResizing(isResizing);
-    }
     if (this.useGlobe) { this.globeMap?.setIsResizing(isResizing); return; }
     if (this.useDeckGL) { this.deckGLMap?.setIsResizing(isResizing); } else { this.svgMap?.setIsResizing(isResizing); }
   }
@@ -702,13 +697,12 @@ export class MapContainer {
 
   public destroy(): void {
     this.resizeObserver?.disconnect();
-    if (this.useDeckGL) {
+    if (this.useGlobe) {
+      this.globeMap?.destroy();
+    } else if (this.useDeckGL) {
       this.deckGLMap?.destroy();
     } else {
       this.svgMap?.destroy();
     }
-    this.globeMap?.destroy();
-    this.deckGLMap?.destroy();
-    this.svgMap?.destroy();
   }
 }
