@@ -71,6 +71,12 @@ export class EventHandlerManager implements AppModule {
   private boundVisibilityHandler: (() => void) | null = null;
   private boundDesktopExternalLinkHandler: ((e: MouseEvent) => void) | null = null;
   private boundIdleResetHandler: (() => void) | null = null;
+  private boundStorageHandler: ((e: StorageEvent) => void) | null = null;
+  private boundTvKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private boundFocalPointsReadyHandler: (() => void) | null = null;
+  private boundThemeChangedHandler: (() => void) | null = null;
+  private boundDropdownClickHandler: ((e: MouseEvent) => void) | null = null;
+  private boundDropdownKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -104,7 +110,7 @@ export class EventHandlerManager implements AppModule {
       tvExitBtn.addEventListener('click', () => this.toggleTvMode());
     }
     // Keyboard shortcut: Shift+T
-    document.addEventListener('keydown', (e) => {
+    this.boundTvKeydownHandler = (e: KeyboardEvent) => {
       if (e.shiftKey && e.key === 'T' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const active = document.activeElement;
         if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
@@ -112,7 +118,8 @@ export class EventHandlerManager implements AppModule {
           this.toggleTvMode();
         }
       }
-    });
+    };
+    document.addEventListener('keydown', this.boundTvKeydownHandler);
   }
 
   private toggleTvMode(): void {
@@ -169,6 +176,30 @@ export class EventHandlerManager implements AppModule {
       clearInterval(this.clockIntervalId);
       this.clockIntervalId = null;
     }
+    if (this.boundStorageHandler) {
+      window.removeEventListener('storage', this.boundStorageHandler);
+      this.boundStorageHandler = null;
+    }
+    if (this.boundTvKeydownHandler) {
+      document.removeEventListener('keydown', this.boundTvKeydownHandler);
+      this.boundTvKeydownHandler = null;
+    }
+    if (this.boundFocalPointsReadyHandler) {
+      window.removeEventListener('focal-points-ready', this.boundFocalPointsReadyHandler);
+      this.boundFocalPointsReadyHandler = null;
+    }
+    if (this.boundThemeChangedHandler) {
+      window.removeEventListener('theme-changed', this.boundThemeChangedHandler);
+      this.boundThemeChangedHandler = null;
+    }
+    if (this.boundDropdownClickHandler) {
+      document.removeEventListener('click', this.boundDropdownClickHandler);
+      this.boundDropdownClickHandler = null;
+    }
+    if (this.boundDropdownKeydownHandler) {
+      document.removeEventListener('keydown', this.boundDropdownKeydownHandler);
+      this.boundDropdownKeydownHandler = null;
+    }
     this.ctx.tvMode?.destroy();
     this.ctx.tvMode = null;
     this.ctx.unifiedSettings?.destroy();
@@ -196,7 +227,7 @@ export class EventHandlerManager implements AppModule {
 
     this.initDownloadDropdown();
 
-    window.addEventListener('storage', (e) => {
+    this.boundStorageHandler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.panels && e.newValue) {
         try {
           this.ctx.panelSettings = JSON.parse(e.newValue) as Record<string, PanelConfig>;
@@ -210,7 +241,8 @@ export class EventHandlerManager implements AppModule {
           (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
         }
       }
-    });
+    };
+    window.addEventListener('storage', this.boundStorageHandler);
 
     document.getElementById('headerThemeToggle')?.addEventListener('click', () => {
       const next = getCurrentTheme() === 'dark' ? 'light' : 'dark';
@@ -270,15 +302,17 @@ export class EventHandlerManager implements AppModule {
     };
     document.addEventListener('visibilitychange', this.boundVisibilityHandler);
 
-    window.addEventListener('focal-points-ready', () => {
+    this.boundFocalPointsReadyHandler = () => {
       (this.ctx.panels['cii'] as CIIPanel)?.refresh(true);
       this.callbacks.refreshOpenCountryBrief?.();
-    });
+    };
+    window.addEventListener('focal-points-ready', this.boundFocalPointsReadyHandler);
 
-    window.addEventListener('theme-changed', () => {
+    this.boundThemeChangedHandler = () => {
       this.ctx.map?.render();
       this.updateHeaderThemeIcon();
-    });
+    };
+    window.addEventListener('theme-changed', this.boundThemeChangedHandler);
 
     if (this.ctx.isDesktopApp) {
       if (this.boundDesktopExternalLinkHandler) {
@@ -460,15 +494,17 @@ export class EventHandlerManager implements AppModule {
       dropdown.classList.toggle('open');
     });
 
-    document.addEventListener('click', (e) => {
+    this.boundDropdownClickHandler = (e: MouseEvent) => {
       if (!dropdown.contains(e.target as Node) && !btn.contains(e.target as Node)) {
         dropdown.classList.remove('open');
       }
-    });
+    };
+    document.addEventListener('click', this.boundDropdownClickHandler);
 
-    document.addEventListener('keydown', (e) => {
+    this.boundDropdownKeydownHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') dropdown.classList.remove('open');
-    });
+    };
+    document.addEventListener('keydown', this.boundDropdownKeydownHandler);
   }
 
   private setCopyLinkFeedback(button: HTMLElement | null, message: string): void {
