@@ -66,6 +66,7 @@ import { trackCriticalBannerAction } from '@/services/analytics';
 
 export interface PanelLayoutCallbacks {
   openCountryStory: (code: string, name: string) => void;
+  openCountryBrief: (code: string) => void;
   loadAllData: () => Promise<void>;
   updateMonitorResults: () => void;
   loadSecurityAdvisories?: () => Promise<void>;
@@ -567,6 +568,9 @@ export class PanelLayoutManager implements AppModule {
       const ciiPanel = new CIIPanel();
       ciiPanel.setShareStoryHandler((code, name) => {
         this.callbacks.openCountryStory(code, name);
+      });
+      ciiPanel.setCountryClickHandler((code) => {
+        this.callbacks.openCountryBrief(code);
       });
       this.ctx.panels['cii'] = ciiPanel;
 

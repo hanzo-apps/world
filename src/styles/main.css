@@ -2193,7 +2193,7 @@ body.live-news-fullscreen-active .map-legend {
   display: none !important;
 }
 
-body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
+body.live-news-fullscreen-active .panels-grid>*:not(.live-news-fullscreen) {
   visibility: hidden !important;
 }
 
@@ -9825,6 +9825,14 @@ a.prediction-link:hover {
   background: var(--darken-medium);
   border-radius: 4px;
   padding: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+  border: 1px solid transparent;
+}
+
+.cii-country:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
 }
 
 .cii-header {
