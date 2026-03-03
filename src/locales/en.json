@@ -594,6 +594,8 @@
   "components": {
     "webcams": {
       "expand": "Expand",
+      "paused": "Webcams paused",
+      "pausedIdle": "Webcams paused \u2014 move mouse to resume",
       "regions": {
         "iran": "IRAN ATTACKS",
         "all": "ALL",
@@ -602,6 +604,16 @@
         "americas": "AMERICAS",
         "asia": "ASIA"
       }
+    },
+    "positiveNewsFeed": {
+      "noStories": "No stories in this category yet"
+    },
+    "goodThingsDigest": {
+      "noStories": "No stories available",
+      "summarizing": "Summarizing\u2026"
+    },
+    "progressCharts": {
+      "noData": "No progress data available"
     },
     "monitor": {
       "placeholder": "Keywords (comma separated)",

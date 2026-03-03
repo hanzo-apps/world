@@ -2,6 +2,7 @@ import { Panel } from './Panel';
 import type { NewsItem } from '@/types';
 import { generateSummary } from '@/services/summarization';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { t } from '@/services/i18n';
 
 /**
  * GoodThingsDigestPanel -- Displays the top 5 positive stories of the day,
@@ -34,7 +35,7 @@ export class GoodThingsDigestPanel extends Panel {
     const top5 = items.slice(0, 5);
 
     if (top5.length === 0) {
-      this.content.innerHTML = '<p class="digest-placeholder">No stories available</p>';
+      this.content.innerHTML = `<p class="digest-placeholder">${t('components.goodThingsDigest.noStories')}</p>`;
       this.cardElements = [];
       return;
     }
@@ -56,7 +57,7 @@ export class GoodThingsDigestPanel extends Panel {
             ${escapeHtml(item.title)}
           </a>
           <span class="digest-card-source">${escapeHtml(item.source)}</span>
-          <p class="digest-card-summary digest-card-summary--loading">Summarizing\u2026</p>
+          <p class="digest-card-summary digest-card-summary--loading">${t('components.goodThingsDigest.summarizing')}</p>
         </div>
       `;
       list.appendChild(card);
