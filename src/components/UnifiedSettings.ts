@@ -4,6 +4,7 @@ import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
 import { getGlobeRenderScale, setGlobeRenderScale, GLOBE_RENDER_SCALE_OPTIONS, type GlobeRenderScale } from '@/services/globe-render-settings';
+import { getLiveStreamsAlwaysOn, setLiveStreamsAlwaysOn } from '@/services/live-stream-settings';
 import type { StreamQuality } from '@/services/ai-flow-settings';
 import { escapeHtml } from '@/utils/sanitize';
 import { trackLanguageChange } from '@/services/analytics';
@@ -171,6 +172,11 @@ export class UnifiedSettings {
 
       if (target.id === 'us-globe-render-scale') {
         setGlobeRenderScale(target.value as GlobeRenderScale);
+        return;
+      }
+
+      if (target.id === 'us-live-streams-always-on') {
+        setLiveStreamsAlwaysOn(target.checked);
         return;
       }
 
@@ -401,6 +407,14 @@ export class UnifiedSettings {
       html += `<option value="${opt.value}"${selected}>${opt.label}</option>`;
     }
     html += `</select>`;
+
+    // Live streams idle behavior
+    html += this.toggleRowHtml(
+      'us-live-streams-always-on',
+      t('components.insights.streamAlwaysOnLabel'),
+      t('components.insights.streamAlwaysOnDesc'),
+      getLiveStreamsAlwaysOn(),
+    );
 
     // Language section
     html += `<div class="ai-flow-section-label">${t('header.languageLabel')}</div>`;
