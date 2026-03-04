@@ -697,12 +697,8 @@ export class MapContainer {
 
   public destroy(): void {
     this.resizeObserver?.disconnect();
-    if (this.useGlobe) {
-      this.globeMap?.destroy();
-    } else if (this.useDeckGL) {
-      this.deckGLMap?.destroy();
-    } else {
-      this.svgMap?.destroy();
-    }
+    this.globeMap?.destroy();
+    this.deckGLMap?.destroy();
+    this.svgMap?.destroy();
   }
 }
