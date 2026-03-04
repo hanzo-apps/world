@@ -302,10 +302,6 @@ export class PanelLayoutManager implements AppModule {
           <div class="map-bottom-grid" id="mapBottomGrid"></div>
         </div>
         <div class="panels-grid" id="panelsGrid"></div>
-        <div class="search-mobile-trigger" id="searchMobileTrigger">
-          <span>\u{1F50D}</span>
-          <span>${t('modals.search.placeholder')}</span>
-        </div>
       </div>
     `;
 
