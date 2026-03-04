@@ -196,6 +196,10 @@ export class MapContainer {
   }
 
   public resize(): void {
+    if (this.useGlobe) {
+      this.globeMap?.resize();
+      return;
+    }
     if (this.useDeckGL) {
       this.deckGLMap?.resize();
     } else {
