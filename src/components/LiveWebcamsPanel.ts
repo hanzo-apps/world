@@ -6,6 +6,7 @@ import { t } from '../services/i18n';
 import { trackWebcamSelected, trackWebcamRegionFiltered } from '@/services/analytics';
 import { getStreamQuality, subscribeStreamQualityChange } from '@/services/ai-flow-settings';
 import { isMobileDevice } from '@/utils';
+import { getLiveStreamsAlwaysOn, subscribeLiveStreamsSettingsChange } from '@/services/live-stream-settings';
 
 type WebcamRegion = 'iran' | 'middle-east' | 'europe' | 'asia' | 'americas';
 
@@ -52,6 +53,10 @@ const WEBCAM_FEEDS: WebcamFeed[] = [
 
 const MAX_GRID_CELLS = 4;
 
+// Eco mode pauses streams after inactivity to save CPU/bandwidth.
+const ECO_IDLE_PAUSE_MS = IDLE_PAUSE_MS;
+const IDLE_ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'] as const;
+
 type ViewMode = 'grid' | 'single';
 type RegionFilter = 'all' | WebcamRegion;
 
@@ -63,11 +68,16 @@ export class LiveWebcamsPanel extends Panel {
   private iframes: HTMLIFrameElement[] = [];
   private observer: IntersectionObserver | null = null;
   private isVisible = false;
+  // Stream lifecycle
   private idleTimeout: ReturnType<typeof setTimeout> | null = null;
   private boundIdleResetHandler!: () => void;
   private boundVisibilityHandler!: () => void;
-  private readonly IDLE_PAUSE_MS = IDLE_PAUSE_MS;
+  private idleDetectionEnabled = false;
   private isIdle = false;
+  private alwaysOn = getLiveStreamsAlwaysOn();
+  private unsubscribeStreamSettings: (() => void) | null = null;
+
+  // UI
   private fullscreenBtn: HTMLButtonElement | null = null;
   private isFullscreen = false;
   private readonly forceSingleView = !isDesktopRuntime() && isMobileDevice();
@@ -84,6 +94,10 @@ export class LiveWebcamsPanel extends Panel {
     this.setupIntersectionObserver();
     this.setupIdleDetection();
     subscribeStreamQualityChange(() => this.render());
+    this.unsubscribeStreamSettings = subscribeLiveStreamsSettingsChange((alwaysOn) => {
+      this.alwaysOn = alwaysOn;
+      this.applyIdleMode();
+    });
     this.render();
     document.addEventListener('keydown', this.boundFullscreenEscHandler);
   }
@@ -385,21 +399,57 @@ export class LiveWebcamsPanel extends Panel {
     this.observer.observe(this.element);
   }
 
+  private applyIdleMode(): void {
+    if (this.alwaysOn) {
+      if (this.idleTimeout) {
+        clearTimeout(this.idleTimeout);
+        this.idleTimeout = null;
+      }
+      if (this.idleDetectionEnabled) {
+        IDLE_ACTIVITY_EVENTS.forEach((event) => {
+          document.removeEventListener(event, this.boundIdleResetHandler);
+        });
+        this.idleDetectionEnabled = false;
+      }
+      if (this.isIdle && !document.hidden) {
+        this.isIdle = false;
+        if (this.isVisible) this.render();
+      }
+      return;
+    }
+
+    if (!this.idleDetectionEnabled) {
+      IDLE_ACTIVITY_EVENTS.forEach((event) => {
+        document.addEventListener(event, this.boundIdleResetHandler, { passive: true });
+      });
+      this.idleDetectionEnabled = true;
+    }
+
+    this.boundIdleResetHandler();
+  }
+
   private setupIdleDetection(): void {
+    // Background: always suspend when the document is hidden.
     this.boundVisibilityHandler = () => {
       if (document.hidden) {
+        // Suspend idle timer so background playback isn't killed.
         if (this.idleTimeout) clearTimeout(this.idleTimeout);
-      } else {
-        if (this.isIdle) {
-          this.isIdle = false;
-          if (this.isVisible) this.render();
-        }
-        this.boundIdleResetHandler();
+        return;
       }
+
+      // Visible again.
+      if (this.isIdle) {
+        this.isIdle = false;
+        if (this.isVisible) this.render();
+      }
+
+      this.applyIdleMode();
     };
     document.addEventListener('visibilitychange', this.boundVisibilityHandler);
 
+    // Eco mode idle timer.
     this.boundIdleResetHandler = () => {
+      if (this.alwaysOn) return;
       if (this.idleTimeout) clearTimeout(this.idleTimeout);
       if (this.isIdle) {
         this.isIdle = false;
@@ -409,14 +459,10 @@ export class LiveWebcamsPanel extends Panel {
         this.isIdle = true;
         this.destroyIframes();
         this.content.innerHTML = `<div class="webcam-placeholder">${escapeHtml(t('components.webcams.pausedIdle'))}</div>`;
-      }, this.IDLE_PAUSE_MS);
+      }, ECO_IDLE_PAUSE_MS);
     };
 
-    ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'].forEach(event => {
-      document.addEventListener(event, this.boundIdleResetHandler, { passive: true });
-    });
-
-    this.boundIdleResetHandler();
+    this.applyIdleMode();
   }
 
   public refresh(): void {
@@ -432,11 +478,13 @@ export class LiveWebcamsPanel extends Panel {
     }
     document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
     document.removeEventListener('keydown', this.boundFullscreenEscHandler);
-    ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'].forEach(event => {
+    IDLE_ACTIVITY_EVENTS.forEach(event => {
       document.removeEventListener(event, this.boundIdleResetHandler);
     });
     if (this.isFullscreen) this.toggleFullscreen();
     this.observer?.disconnect();
+    this.unsubscribeStreamSettings?.();
+    this.unsubscribeStreamSettings = null;
     this.destroyIframes();
     super.destroy();
   }
