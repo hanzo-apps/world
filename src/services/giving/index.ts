@@ -154,7 +154,7 @@ const REFETCH_INTERVAL_MS = 30 * 60 * 1000; // 30 min
 export async function fetchGivingSummary(): Promise<GivingFetchResult> {
   // Check bootstrap hydration first
   const hydrated = getHydratedData('giving') as ProtoResponse | undefined;
-  if (hydrated) {
+  if (hydrated?.summary?.platforms?.length) {
     const data = toDisplaySummary(hydrated);
     cachedData = data;
     cachedAt = Date.now();

@@ -82,7 +82,7 @@ export async function fetchInternetOutages(): Promise<InternetOutage[]> {
   }
 
   const hydrated = getHydratedData('outages') as ListInternetOutagesResponse | undefined;
-  const resp = hydrated ?? await outageBreaker.execute(async () => {
+  const resp = (hydrated?.outages?.length ? hydrated : null) ?? await outageBreaker.execute(async () => {
     return client.listInternetOutages({
       country: '',
       start: 0,
@@ -162,10 +162,9 @@ function computeSummary(services: ServiceStatusResult[]): ServiceStatusSummary {
 }
 
 export async function fetchServiceStatuses(): Promise<ServiceStatusResponse> {
-  const hydrated = getHydratedData('serviceStatuses');
-  if (hydrated) {
-    const raw = hydrated as { statuses?: ProtoServiceStatus[] };
-    const services = (raw.statuses ?? []).map(toServiceResult);
+  const hydrated = getHydratedData('serviceStatuses') as { statuses?: ProtoServiceStatus[] } | undefined;
+  if (hydrated?.statuses?.length) {
+    const services = hydrated.statuses.map(toServiceResult);
     return { success: true, timestamp: new Date().toISOString(), summary: computeSummary(services), services };
   }
 

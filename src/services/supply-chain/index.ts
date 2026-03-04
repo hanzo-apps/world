@@ -35,7 +35,7 @@ const emptyMinerals: GetCriticalMineralsResponse = { minerals: [], fetchedAt: ''
 
 export async function fetchShippingRates(): Promise<GetShippingRatesResponse> {
   const hydrated = getHydratedData('shippingRates') as GetShippingRatesResponse | undefined;
-  if (hydrated) return hydrated;
+  if (hydrated?.indices?.length) return hydrated;
 
   try {
     return await shippingBreaker.execute(async () => {
@@ -48,7 +48,7 @@ export async function fetchShippingRates(): Promise<GetShippingRatesResponse> {
 
 export async function fetchChokepointStatus(): Promise<GetChokepointStatusResponse> {
   const hydrated = getHydratedData('chokepoints') as GetChokepointStatusResponse | undefined;
-  if (hydrated) return hydrated;
+  if (hydrated?.chokepoints?.length) return hydrated;
 
   try {
     return await chokepointBreaker.execute(async () => {
@@ -61,7 +61,7 @@ export async function fetchChokepointStatus(): Promise<GetChokepointStatusRespon
 
 export async function fetchCriticalMinerals(): Promise<GetCriticalMineralsResponse> {
   const hydrated = getHydratedData('minerals') as GetCriticalMineralsResponse | undefined;
-  if (hydrated) return hydrated;
+  if (hydrated?.minerals?.length) return hydrated;
 
   try {
     return await mineralsBreaker.execute(async () => {
