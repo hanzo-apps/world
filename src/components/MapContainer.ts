@@ -438,6 +438,11 @@ export class MapContainer {
     // SVG map does not support choropleth overlay
   }
 
+  public setCIIScores(scores: Array<{ code: string; score: number; level: string }>): void {
+    if (this.useGlobe) { this.globeMap?.setCIIScores(scores); return; }
+    if (this.useDeckGL) { this.deckGLMap?.setCIIScores(scores); }
+  }
+
   public setSpeciesRecoveryZones(species: SpeciesRecovery[]): void {
     if (this.useGlobe) { this.globeMap?.setSpeciesRecoveryZones(species); return; }
     if (this.useDeckGL) {
