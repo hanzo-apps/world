@@ -81,6 +81,12 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
   let suppressRowClick = false;
   let searchQuery = '';
 
+  const searchInput = document.getElementById('liveChannelsSearch') as HTMLInputElement | null;
+  if (searchInput) {
+    searchInput.value = '';
+    searchQuery = '';
+  }
+
   /** Reads current row order from DOM and persists to storage. */
   function applyOrderFromDom(listEl: HTMLElement): void {
     const rows = listEl.querySelectorAll<HTMLElement>('.live-news-manage-row');
@@ -572,7 +578,6 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     if (nameInput) nameInput.value = '';
   });
 
-  const searchInput = document.getElementById('liveChannelsSearch') as HTMLInputElement | null;
   searchInput?.addEventListener('input', (e) => {
     searchQuery = (e.target as HTMLInputElement).value;
     renderAvailableChannels(listEl);
