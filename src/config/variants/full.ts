@@ -98,7 +98,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   speciesRecovery: false,
   renewableInstallations: false,
   tradeRoutes: false,
-  iranAttacks: false,
+  iranAttacks: true,
   ciiChoropleth: false,
   dayNight: false,
 };
@@ -151,7 +151,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   speciesRecovery: false,
   renewableInstallations: false,
   tradeRoutes: false,
-  iranAttacks: false,
+  iranAttacks: true,
   ciiChoropleth: false,
   dayNight: false,
 };
