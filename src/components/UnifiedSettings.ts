@@ -425,6 +425,13 @@ export class UnifiedSettings {
     }
     html += `</select>`;
 
+    // Community section
+    html += `<div class="ai-flow-section-label">${t('components.community.sectionLabel')}</div>`;
+    html += `<a href="https://github.com/koala73/worldmonitor/discussions/94" target="_blank" rel="noopener" class="us-discussion-link">
+      <span class="us-discussion-dot"></span>
+      <span>${t('components.community.joinDiscussion')}</span>
+    </a>`;
+
     // AI status footer (web-only)
     if (!this.config.isDesktopApp) {
       html += `<div class="ai-flow-popup-footer"><span class="ai-flow-status-dot" id="usStatusDot"></span><span class="ai-flow-status-text" id="usStatusText"></span></div>`;

@@ -855,7 +855,8 @@
     "community": {
       "joinDiscussion": "انضم إلى النقاش",
       "openDiscussion": "فتح النقاش",
-      "dontShowAgain": "عدم العرض مجدداً"
+      "dontShowAgain": "عدم العرض مجدداً",
+      "sectionLabel": "المجتمع"
     },
     "threatLabels": {
       "critical": "حرج",
