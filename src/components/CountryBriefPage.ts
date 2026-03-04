@@ -178,10 +178,10 @@ export class CountryBriefPage implements CountryBriefPanel {
     if (signals.travelAdvisories > 0 && signals.travelAdvisoryMaxLevel) {
       const advisoryClass = signals.travelAdvisoryMaxLevel === 'do-not-travel' ? 'conflict'
         : signals.travelAdvisoryMaxLevel === 'reconsider' ? 'outage'
-          : 'military';
+        : 'military';
       const advisoryLabel = signals.travelAdvisoryMaxLevel === 'do-not-travel' ? 'Do Not Travel'
         : signals.travelAdvisoryMaxLevel === 'reconsider' ? 'Reconsider Travel'
-          : 'Exercise Caution';
+        : 'Exercise Caution';
       chips.push(`<span class="signal-chip ${advisoryClass}">\u26A0\uFE0F ${signals.travelAdvisories} Advisory: ${advisoryLabel}</span>`);
     }
     if (signals.orefSirens > 0) chips.push(`<span class="signal-chip conflict">\u{1F6A8} ${signals.orefSirens} Active Sirens</span>`);
@@ -358,7 +358,7 @@ export class CountryBriefPage implements CountryBriefPanel {
         const orig = linkShareBtn!.innerHTML;
         linkShareBtn!.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
         setTimeout(() => { linkShareBtn!.innerHTML = orig; }, 1500);
-      }).catch(() => { });
+      }).catch(() => {});
     });
     this.overlay.querySelector('.cb-share-btn')?.addEventListener('click', () => {
       if (this.onShareStory && this.currentCode && this.currentName) {
@@ -494,8 +494,8 @@ export class CountryBriefPage implements CountryBriefPanel {
       const safeUrl = sanitizeUrl(item.link);
       const threatColor = item.threat?.level === 'critical' ? getCSSColor('--threat-critical')
         : item.threat?.level === 'high' ? getCSSColor('--threat-high')
-          : item.threat?.level === 'medium' ? getCSSColor('--threat-medium')
-            : getCSSColor('--threat-info');
+        : item.threat?.level === 'medium' ? getCSSColor('--threat-medium')
+        : getCSSColor('--threat-info');
       const timeAgo = this.timeAgo(item.pubDate);
       const cardBody = `
         <span class="cb-news-threat" style="background:${threatColor}"></span>
@@ -594,7 +594,7 @@ export class CountryBriefPage implements CountryBriefPanel {
       html = html.replace(/\[(\d{1,2})\]/g, (_match, numStr) => {
         const n = parseInt(numStr, 10);
         if (n >= 1 && n <= headlineCount) {
-          return `<a href="#cb-news-${n}" class="cb-citation" title="${t('countryBrief.sourceRef', { n: String(n) })}">[${n}]</a>`;
+          return `<a href="#cb-news-${n}" class="cb-citation" title="${t('components.countryBrief.sourceRef', { n: String(n) })}">[${n}]</a>`;
         }
         return `[${numStr}]`;
       });
