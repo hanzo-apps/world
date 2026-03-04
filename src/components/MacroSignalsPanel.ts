@@ -132,7 +132,7 @@ export class MacroSignalsPanel extends Panel {
 
   public async fetchData(): Promise<boolean> {
     const hydrated = getHydratedData('macroSignals') as GetMacroSignalsResponse | undefined;
-    if (hydrated) {
+    if (hydrated?.signals && hydrated.totalCount > 0) {
       this.data = mapProtoToData(hydrated);
       this.lastTimestamp = this.data.timestamp;
       this.error = null;
