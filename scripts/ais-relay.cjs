@@ -4752,7 +4752,7 @@ const server = http.createServer(async (req, res) => {
               ? response.headers.location
               : new URL(response.headers.location, url).href;
             const redirectHost = new URL(redirectUrl).hostname;
-            if (!allowedDomains.includes(redirectHost)) {
+            if (!RSS_ALLOWED_DOMAINS.has(redirectHost)) {
               return sendError(403, 'Redirect to disallowed domain');
             }
             logThrottled('log', `rss-redirect:${feedUrl}:${redirectUrl}`, `[Relay] Following redirect to: ${redirectUrl}`);
