@@ -264,9 +264,7 @@ export class EventHandlerManager implements AppModule {
           (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
         }
       }
-      if (e.key === STORAGE_KEYS.mapMode) {
-        this.syncMapModeUI();
-      }
+
     };
     window.addEventListener('storage', this.boundStorageHandler);
 
@@ -316,7 +314,7 @@ export class EventHandlerManager implements AppModule {
 
     this.setupMapResize();
     this.setupMapPin();
-    this.setupMap3D();
+
 
     this.boundVisibilityHandler = () => {
       document.body?.classList.toggle('animations-paused', document.hidden);
@@ -656,8 +654,6 @@ export class EventHandlerManager implements AppModule {
       },
       isDesktopApp: this.ctx.isDesktopApp,
       statusPanel: this.ctx.statusPanel,
-      isGlobeMode: () => this.ctx.map?.isGlobeMode() ?? false,
-      onMapModeChange: (useGlobe: boolean) => this.setMapMode(useGlobe),
     });
 
     if (this.ctx.statusPanel) {
@@ -952,33 +948,6 @@ export class EventHandlerManager implements AppModule {
     this.setupMapFullscreen(mapSection);
   }
 
-  setupMap3D(): void {
-    const btn = document.getElementById('map3dBtn');
-    if (!btn) return;
-
-    this.syncMapModeUI();
-
-    btn.addEventListener('click', () => {
-      const isGlobe = this.ctx.map?.isGlobeMode();
-      this.setMapMode(!isGlobe);
-    });
-  }
-
-  private setMapMode(useGlobe: boolean): void {
-    if (useGlobe) {
-      this.ctx.map?.switchToGlobe();
-    } else {
-      this.ctx.map?.switchToFlat();
-    }
-    saveToStorage(STORAGE_KEYS.mapMode, useGlobe ? 'globe' : 'flat');
-    this.syncMapModeUI();
-  }
-
-  private syncMapModeUI(): void {
-    const isGlobe = this.ctx.map?.isGlobeMode();
-    document.getElementById('map3dBtn')?.classList.toggle('active', isGlobe);
-    this.ctx.unifiedSettings?.refreshMapMode();
-  }
 
   private setupMapFullscreen(mapSection: HTMLElement): void {
     const btn = document.getElementById('mapFullscreenBtn');

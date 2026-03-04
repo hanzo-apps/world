@@ -952,9 +952,7 @@ canvas,
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  width: 26px;
-  height: 26px;
-  padding: 0;
+  padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
   display: flex;
@@ -964,10 +962,7 @@ canvas,
   flex-shrink: 0;
 }
 
-#map3dBtn {
-  font-size: 9px;
-  font-weight: bold;
-}
+
 
 .map-pin-btn:hover {
   background: var(--surface-hover);
@@ -2597,6 +2592,7 @@ body.live-news-fullscreen-active .panels-grid>*:not(.live-news-fullscreen) {
 
 /* Mobile: make toolbars swipeable (horizontal scroll) */
 @media (max-width: 768px) {
+
   /* Live News channels */
   .live-news-switcher {
     flex-wrap: nowrap;
@@ -2649,6 +2645,7 @@ body.live-news-fullscreen-active .panels-grid>*:not(.live-news-fullscreen) {
     flex: 0 0 auto;
   }
 }
+
 /* News Items */
 .item {
   padding: 8px 0;

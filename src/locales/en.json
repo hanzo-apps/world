@@ -28,6 +28,11 @@
       "security": "Security",
       "information": "Information"
     },
+    "shareLink": "Share link",
+    "shareStory": "Share story",
+    "printPdf": "Print / PDF",
+    "exportData": "Export data",
+    "sourceRef": "Source [{{n}}]",
     "signals": {
       "protests": "protests",
       "militaryAir": "mil. aircraft",
@@ -569,86 +574,54 @@
       "fresh": "Fresh",
       "noMarkets": "No prediction markets found",
       "predictionMarkets": "Prediction Markets",
-      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings."
+      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+      "gpsJammingZones": "GPS Jamming Zones"
     },
-    "countryBrief": {
-      "identifying": "Identifying country...",
-      "locating": "Locating region...",
-      "limitedCoverage": "Limited coverage",
-      "instabilityIndex": "Instability Index",
-      "notTracked": "Not tracked — {{country}} is not in the CII tier-1 list",
-      "intelBrief": "Intelligence Brief",
-      "generatingBrief": "Generating intelligence brief...",
-      "topNews": "Top News",
-      "activeSignals": "Active Signals",
-      "timeline": "7-Day Timeline",
-      "predictionMarkets": "Prediction Markets",
-      "loadingMarkets": "Loading prediction markets...",
-      "infrastructure": "Infrastructure Exposure",
-      "briefUnavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
-      "cached": "Cached",
-      "fresh": "Fresh",
-      "noMarkets": "No prediction markets found",
-      "loadingIndex": "Loading index...",
-      "components": {
-        "unrest": "Unrest",
-        "conflict": "Conflict",
-        "security": "Security",
-        "information": "Information"
-      },
-      "signals": {
-        "protests": "protests",
-        "militaryAir": "mil. aircraft",
-        "militarySea": "mil. vessels",
-        "outages": "outages",
-        "earthquakes": "earthquakes",
-        "displaced": "displaced",
-        "climate": "Climate stress",
-        "conflictEvents": "conflict events",
-        "activeStrikes": "active strikes",
-        "aviationDisruptions": "airport disruptions",
-        "gpsJammingZones": "GPS Jamming Zones"
-      },
-      "timeAgo": {
-        "m": "{{count}}m ago",
-        "h": "{{count}}h ago",
-        "d": "{{count}}d ago"
-      },
-      "infra": {
-        "pipeline": "Pipelines",
-        "cable": "Undersea Cables",
-        "datacenter": "Data Centers",
-        "base": "Military Bases",
-        "nuclear": "Nuclear Facilities",
-        "port": "Ports"
-      },
-      "levels": {
-        "critical": "Critical",
-        "high": "High",
-        "elevated": "Elevated",
-        "moderate": "Moderate",
-        "normal": "Normal",
-        "low": "Low"
-      },
-      "trends": {
-        "rising": "Rising",
-        "falling": "Falling",
-        "stable": "Stable"
-      },
-      "fallback": {
-        "instabilityIndex": "**Instability Index: {{score}}/100** ({{level}}, {{trend}})",
-        "protestsDetected": "{{count}} active protests detected",
-        "aircraftTracked": "{{count}} military aircraft tracked",
-        "vesselsTracked": "{{count}} military vessels tracked",
-        "activeStrikes": "{{count}} active strikes detected",
-        "internetOutages": "{{count}} internet outages",
-        "recentEarthquakes": "{{count}} recent earthquakes",
-        "stockIndex": "Stock index: {{value}}",
-        "recentHeadlines": "**Recent headlines:**"
-      }
+    "timeAgo": {
+      "m": "{{count}}m ago",
+      "h": "{{count}}h ago",
+      "d": "{{count}}d ago"
+    },
+    "infra": {
+      "pipeline": "Pipelines",
+      "cable": "Undersea Cables",
+      "datacenter": "Data Centers",
+      "base": "Military Bases",
+      "nuclear": "Nuclear Facilities",
+      "port": "Ports"
+    },
+    "levels": {
+      "critical": "Critical",
+      "high": "High",
+      "elevated": "Elevated",
+      "moderate": "Moderate",
+      "normal": "Normal",
+      "low": "Low"
+    },
+    "trends": {
+      "rising": "Rising",
+      "falling": "Falling",
+      "stable": "Stable"
+    },
+    "fallback": {
+      "instabilityIndex": "**Instability Index: {{score}}/100** ({{level}}, {{trend}})",
+      "protestsDetected": "{{count}} active protests detected",
+      "aircraftTracked": "{{count}} military aircraft tracked",
+      "vesselsTracked": "{{count}} military vessels tracked",
+      "activeStrikes": "{{count}} active strikes detected",
+      "internetOutages": "{{count}} internet outages",
+      "recentEarthquakes": "{{count}} recent earthquakes",
+      "stockIndex": "Stock index: {{value}}",
+      "recentHeadlines": "**Recent headlines:**"
     }
   },
   "components": {
+    "countryBrief": {
+      "shareLink": "Share link",
+      "shareStory": "Share story",
+      "printPdf": "Print / PDF",
+      "exportData": "Export data"
+    },
     "webcams": {
       "expand": "Expand",
       "paused": "Webcams paused",
@@ -911,13 +884,6 @@
         "israel-gaza-theater": "Israel/Gaza",
         "yemen-redsea-theater": "Yemen/Red Sea"
       }
-    },
-    "countryBrief": {
-      "shareLink": "Share link",
-      "shareStory": "Share story",
-      "printPdf": "Print / PDF",
-      "exportData": "Export data",
-      "sourceRef": "Source [{{n}}]"
     },
     "relatedAssets": {
       "pipeline": "Pipeline",
@@ -1654,7 +1620,8 @@
       "regionOceania": "Oceania",
       "invalidHandle": "Enter a valid YouTube handle (e.g. @ChannelName)",
       "channelNotFound": "YouTube channel not found",
-      "verifying": "Verifying…"
+      "verifying": "Verifying…",
+      "noResults": "No channels found"
     },
     "map": {
       "showMap": "Show Map",
