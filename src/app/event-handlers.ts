@@ -6,7 +6,6 @@ import type { DashboardSnapshot } from '@/services/storage';
 import {
   PlaybackControl,
   StatusPanel,
-  MobileWarningModal,
   PizzIntIndicator,
   CIIPanel,
   PredictionPanel,
@@ -241,6 +240,11 @@ export class EventHandlerManager implements AppModule {
     };
     document.getElementById('searchBtn')?.addEventListener('click', openSearch);
     document.getElementById('mobileSearchBtn')?.addEventListener('click', openSearch);
+
+    document.getElementById('searchMobileTrigger')?.addEventListener('click', () => {
+      this.callbacks.updateSearchIndex();
+      this.ctx.searchModal?.open();
+    });
 
     document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
       const shareUrl = this.getShareUrl();
@@ -718,13 +722,6 @@ export class EventHandlerManager implements AppModule {
     };
     tick();
     this.clockIntervalId = setInterval(tick, 1000);
-  }
-
-  setupMobileWarning(): void {
-    if (MobileWarningModal.shouldShow()) {
-      this.ctx.mobileWarningModal = new MobileWarningModal();
-      this.ctx.mobileWarningModal.show();
-    }
   }
 
   setupStatusPanel(): void {

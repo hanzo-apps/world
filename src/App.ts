@@ -260,7 +260,6 @@ export class App {
       playbackControl: null,
       exportPanel: null,
       unifiedSettings: null,
-      mobileWarningModal: null,
       pizzintIndicator: null,
       countryBriefPage: null,
       countryTimeline: null,
@@ -433,7 +432,6 @@ export class App {
 
     // Phase 3: UI setup methods
     this.eventHandlers.startHeaderClock();
-    this.eventHandlers.setupMobileWarning();
     this.eventHandlers.setupPlaybackControl();
     this.eventHandlers.setupStatusPanel();
     this.eventHandlers.setupPizzIntIndicator();
