@@ -284,10 +284,13 @@ interface GlobePath {
 interface GlobePolygon {
   coords: number[][][];
   name: string;
-  _kind: 'boundary' | 'cii';
+  _kind: 'boundary' | 'cii' | 'conflict';
   level?: string;
   score?: number;
   boundaryType?: string;
+  intensity?: string;
+  parties?: string[];
+  casualties?: string;
 }
 type GlobeMarker =
   | ConflictMarker | HotspotMarker | FlightMarker | VesselMarker
@@ -695,22 +698,16 @@ export class GlobeMap {
     } else if (d._kind === 'conflictZone') {
       const intColor = d.intensity === 'high' ? '#ff2020' : d.intensity === 'medium' ? '#ff8800' : '#ffcc00';
       el.innerHTML = `
-        <div style="position:relative;width:28px;height:28px;">
+        <div style="position:relative;width:20px;height:20px;">
           <div style="
             position:absolute;inset:0;border-radius:50%;
             background:${intColor}33;
-            border:2px solid ${intColor}99;
-            box-shadow:0 0 10px 4px ${intColor}44;
-          "></div>
-          <div style="
-            position:absolute;inset:-6px;border-radius:50%;
-            background:${intColor}11;
-            border:1px solid ${intColor}44;
-            animation:globe-pulse 2.5s ease-out infinite;
+            border:1.5px solid ${intColor}99;
+            box-shadow:0 0 6px 2px ${intColor}44;
           "></div>
           <div style="
             position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-            font-size:11px;line-height:1;color:${intColor};
+            font-size:9px;line-height:1;color:${intColor};
           ">⚔</div>
         </div>`;
       el.title = d.name;
@@ -1217,9 +1214,26 @@ export class GlobeMap {
     if (!this.globe || !this.initialized || this.destroyed) return;
     const polys: GlobePolygon[] = [];
 
-    if (this.layers.conflicts) {
+    if (this.layers.geopoliticalBoundaries) {
       for (const b of GEOPOLITICAL_BOUNDARIES) {
         polys.push({ coords: [b.coords], name: b.name, _kind: 'boundary', boundaryType: b.boundaryType });
+      }
+    }
+
+    if (this.layers.conflicts) {
+      for (const z of CONFLICT_ZONES) {
+        const ring: number[][] = z.coords.map(c => [c[0], c[1]]);
+        if (ring.length < 3) continue;
+        const first = ring[0]!, last = ring[ring.length - 1]!;
+        if (first[0] !== last[0] || first[1] !== last[1]) ring.push(first.slice());
+        polys.push({
+          coords: [ring],
+          name: z.name,
+          _kind: 'conflict',
+          intensity: z.intensity ?? 'low',
+          parties: z.parties,
+          casualties: z.casualties,
+        });
       }
     }
 
@@ -1238,13 +1252,42 @@ export class GlobeMap {
     }
 
     const colors = GlobeMap.CII_GLOBE_COLORS;
+    const conflictCap: Record<string, string> = { high: 'rgba(255,40,40,0.25)', medium: 'rgba(255,120,0,0.20)', low: 'rgba(255,200,0,0.15)' };
+    const conflictSide: Record<string, string> = { high: 'rgba(255,40,40,0.12)', medium: 'rgba(255,120,0,0.08)', low: 'rgba(255,200,0,0.06)' };
+    const conflictStroke: Record<string, string> = { high: '#ff3030', medium: '#ff8800', low: '#ffcc00' };
+    const conflictAlt: Record<string, number> = { high: 0.006, medium: 0.004, low: 0.003 };
     (this.globe as any)
       .polygonsData(polys)
-      .polygonCapColor((d: GlobePolygon) => d._kind === 'cii' ? (colors[d.level!] ?? 'rgba(0,0,0,0)') : 'rgba(255, 60, 60, 0.15)')
-      .polygonSideColor((d: GlobePolygon) => d._kind === 'cii' ? 'rgba(0,0,0,0)' : 'rgba(255, 60, 60, 0.08)')
-      .polygonStrokeColor((d: GlobePolygon) => d._kind === 'cii' ? 'rgba(80, 80, 80, 0.3)' : '#ff4444')
-      .polygonAltitude((d: GlobePolygon) => d._kind === 'cii' ? 0.002 : 0.005)
-      .polygonLabel((d: GlobePolygon) => d._kind === 'cii' ? `<b>${escapeHtml(d.name)}</b><br/>CII: ${d.score}/100 (${escapeHtml(d.level ?? '')})` : escapeHtml(d.name));
+      .polygonCapColor((d: GlobePolygon) => {
+        if (d._kind === 'cii') return colors[d.level!] ?? 'rgba(0,0,0,0)';
+        if (d._kind === 'conflict') return conflictCap[d.intensity!] ?? conflictCap.low;
+        return 'rgba(255,60,60,0.15)';
+      })
+      .polygonSideColor((d: GlobePolygon) => {
+        if (d._kind === 'cii') return 'rgba(0,0,0,0)';
+        if (d._kind === 'conflict') return conflictSide[d.intensity!] ?? conflictSide.low;
+        return 'rgba(255,60,60,0.08)';
+      })
+      .polygonStrokeColor((d: GlobePolygon) => {
+        if (d._kind === 'cii') return 'rgba(80,80,80,0.3)';
+        if (d._kind === 'conflict') return conflictStroke[d.intensity!] ?? conflictStroke.low;
+        return '#ff4444';
+      })
+      .polygonAltitude((d: GlobePolygon) => {
+        if (d._kind === 'cii') return 0.002;
+        if (d._kind === 'conflict') return conflictAlt[d.intensity!] ?? conflictAlt.low;
+        return 0.005;
+      })
+      .polygonLabel((d: GlobePolygon) => {
+        if (d._kind === 'cii') return `<b>${escapeHtml(d.name)}</b><br/>CII: ${d.score}/100 (${escapeHtml(d.level ?? '')})`;
+        if (d._kind === 'conflict') {
+          let label = `<b>${escapeHtml(d.name)}</b>`;
+          if (d.parties?.length) label += `<br/>Parties: ${d.parties.map(p => escapeHtml(p)).join(', ')}`;
+          if (d.casualties) label += `<br/>Casualties: ${escapeHtml(d.casualties)}`;
+          return label;
+        }
+        return escapeHtml(d.name);
+      });
   }
 
   // ─── Public data setters ──────────────────────────────────────────────────
