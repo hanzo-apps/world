@@ -9901,7 +9901,7 @@ a.prediction-link:hover {
   }
 
   .mobile-search-btn {
-    display: flex;
+    display: none;
   }
 
   .mobile-menu-overlay {
