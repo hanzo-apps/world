@@ -23,6 +23,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   wildfires:        'wildfire:fires:v1',
   cyberThreats:     'cyber:threats-bootstrap:v2',
   techReadiness:    'economic:worldbank-techreadiness:v1',
+  positiveGeoEvents: 'positive-events:geo-bootstrap:v1',
 };
 
 const SLOW_KEYS = new Set([
@@ -32,7 +33,7 @@ const SLOW_KEYS = new Set([
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints',
-  'marketQuotes', 'commodityQuotes',
+  'marketQuotes', 'commodityQuotes', 'positiveGeoEvents',
 ]);
 
 const TIER_CACHE = {
