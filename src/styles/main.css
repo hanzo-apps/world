@@ -9933,6 +9933,14 @@ a.prediction-link:hover {
   background: var(--darken-medium);
   border-radius: 4px;
   padding: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+  border: 1px solid transparent;
+}
+
+.cii-country:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
 }
 
 .cii-header {
@@ -16619,6 +16627,7 @@ body.has-breaking-alert .panels-grid {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 /* ─── Globe Map Styles ──────────────────────────────────────────────────────── */
 
 .globe-mode {
