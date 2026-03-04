@@ -3220,7 +3220,7 @@ body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
   display: none;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .signal-modal-overlay.active {
@@ -5704,7 +5704,7 @@ a.prediction-link:hover {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .modal-overlay.active {
