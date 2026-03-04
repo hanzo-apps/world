@@ -50,3 +50,18 @@ export function resolveGlobePixelRatio(scale: GlobeRenderScale): number {
   if (!Number.isFinite(num) || num <= 0) return 1;
   return Math.min(3, Math.max(1, num));
 }
+
+export interface GlobePerformanceProfile {
+  disablePulseAnimations: boolean;
+  disableDashAnimations: boolean;
+  disableAtmosphere: boolean;
+}
+
+export function resolvePerformanceProfile(scale: GlobeRenderScale): GlobePerformanceProfile {
+  const isEco = scale === '1';
+  return {
+    disablePulseAnimations: isEco,
+    disableDashAnimations: isEco,
+    disableAtmosphere: isEco,
+  };
+}
