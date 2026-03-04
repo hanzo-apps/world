@@ -1166,6 +1166,10 @@ async function seedAllMarketData() {
 }
 
 async function startMarketDataSeedLoop() {
+  if (process.env.DISABLE_RELAY_MARKET_SEED) {
+    console.log('[Market] Relay market seeding disabled via DISABLE_RELAY_MARKET_SEED');
+    return;
+  }
   if (!UPSTASH_ENABLED) {
     console.log('[Market] Disabled (no Upstash Redis)');
     return;

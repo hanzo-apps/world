@@ -185,8 +185,18 @@ async function fetchInsights() {
   const digest = await readDigestFromRedis();
   if (!digest) throw new Error('No news digest found in Redis');
 
-  const items = Array.isArray(digest) ? digest :
-    (digest.items || digest.articles || digest.headlines || []);
+  // Digest shape: { categories: { politics: { items: [...] }, ... }, feedStatuses, generatedAt }
+  let items;
+  if (Array.isArray(digest)) {
+    items = digest;
+  } else if (digest.categories && typeof digest.categories === 'object') {
+    items = [];
+    for (const bucket of Object.values(digest.categories)) {
+      if (Array.isArray(bucket.items)) items.push(...bucket.items);
+    }
+  } else {
+    items = digest.items || digest.articles || digest.headlines || [];
+  }
 
   if (items.length === 0) {
     const keys = typeof digest === 'object' && digest !== null ? Object.keys(digest).join(', ') : typeof digest;
