@@ -1017,7 +1017,12 @@
         "iranAttacks": "Iran Attacks",
         "gpsJamming": "GPS JAMMING",
         "dayNight": "Day/Night",
-        "geopoliticalBoundaries": "Geopolitical Boundaries"
+        "geopoliticalBoundaries": "Geopolitical Boundaries",
+        "positiveEvents": "Positive Events",
+        "kindness": "Acts of Kindness",
+        "happiness": "World Happiness",
+        "speciesRecovery": "Species Recovery",
+        "renewableInstallations": "Clean Energy"
       },
       "tooltip": {
         "earthquake": "Earthquake",
