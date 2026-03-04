@@ -13566,6 +13566,24 @@ a.prediction-link:hover {
   }
 }
 
+/* Mobile: prevent horizontal overflow from deck.gl legend */
+@media (max-width: 520px) {
+  .deckgl-legend {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+
+  .deckgl-legend .legend-item {
+    max-width: 100%;
+  }
+}
+
 /* Scrollbar styling for layer toggles */
 .deckgl-layer-toggles::-webkit-scrollbar {
   width: 4px;
