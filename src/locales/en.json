@@ -1198,6 +1198,16 @@
       "streamAlwaysOnLabel": "Keep live streams running",
       "streamAlwaysOnDesc": "Prevents Live Cams and Live News from auto-pausing when you are idle. Recommended for second-monitor / wallboard usage. Disable (Eco) to save CPU/bandwidth."
     },
+    "settings": {
+      "dataManagementLabel": "Data Management",
+      "exportSettings": "Export Settings",
+      "importSettings": "Import Settings",
+      "exportSuccess": "Settings exported successfully",
+      "exportFailed": "Failed to export settings",
+      "importSuccess": "Imported {{count}} settings",
+      "importFailed": "Failed to import settings",
+      "reloadNow": "Reload now"
+    },
     "cascade": {
       "noImpacts": "No country impacts detected",
       "filters": {
@@ -2335,3 +2345,4 @@
     "all": "All"
   }
 }
+
