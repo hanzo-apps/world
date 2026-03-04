@@ -1153,6 +1153,15 @@
       "sectionStreaming": "Streaming",
       "streamQualityLabel": "Video Quality",
       "streamQualityDesc": "Set quality for all live streams (lower saves bandwidth)",
+      "globeRenderQualityLabel": "Globe render quality",
+      "globeRenderQualityDesc": "Controls the globe canvas resolution. Higher values look sharper on 4K displays but can melt GPUs.",
+      "globeRenderScaleOptions": {
+        "auto": "Auto (device)",
+        "1": "Eco (1x)",
+        "1_5": "Sharp (1.5x)",
+        "2": "4K (2x)",
+        "3": "Insane (3x)"
+      },
       "mapFlashLabel": "Live Event Pulse",
       "mapFlashDesc": "Flash locations on the map when breaking news arrives",
       "aiFlowTitle": "Settings",
