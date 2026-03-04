@@ -329,6 +329,10 @@ export class DeckGLMap {
   private renewableInstallations: RenewableInstallation[] = [];
   private countriesGeoJsonData: FeatureCollection<Geometry> | null = null;
 
+  // CII choropleth data
+  private ciiScoresMap: Map<string, { score: number; level: string }> = new Map();
+  private ciiScoresVersion = 0;
+
   // Country highlight state
   private countryGeoJsonLoaded = false;
   private countryHoverSetup = false;
@@ -1312,6 +1316,11 @@ export class DeckGLMap {
     if (mapLayers.happiness) {
       const choropleth = this.createHappinessChoroplethLayer();
       if (choropleth) layers.push(choropleth);
+    }
+    // CII choropleth (country instability heat-map)
+    if (mapLayers.ciiChoropleth) {
+      const ciiLayer = this.createCIIChoroplethLayer();
+      if (ciiLayer) layers.push(ciiLayer);
     }
     // Phase 8: Species recovery zones
     if (mapLayers.speciesRecovery && this.speciesRecoveryZones.length > 0) {
@@ -2702,6 +2711,40 @@ export class DeckGLMap {
     });
   }
 
+  private static readonly CII_LEVEL_COLORS: Record<string, [number, number, number, number]> = {
+    low:      [40, 180, 60, 130],
+    normal:   [220, 200, 50, 135],
+    elevated: [240, 140, 30, 145],
+    high:     [220, 50, 20, 155],
+    critical: [140, 10, 0, 170],
+  };
+
+  private static readonly CII_LEVEL_HEX: Record<string, string> = {
+    critical: '#b91c1c', high: '#dc2626', elevated: '#f59e0b', normal: '#eab308', low: '#22c55e',
+  };
+
+  private createCIIChoroplethLayer(): GeoJsonLayer | null {
+    if (!this.countriesGeoJsonData || this.ciiScoresMap.size === 0) return null;
+    const scores = this.ciiScoresMap;
+    const colors = DeckGLMap.CII_LEVEL_COLORS;
+    return new GeoJsonLayer({
+      id: 'cii-choropleth-layer',
+      data: this.countriesGeoJsonData,
+      filled: true,
+      stroked: true,
+      getFillColor: (feature: { properties?: Record<string, unknown> }) => {
+        const code = feature.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+        const entry = code ? scores.get(code) : undefined;
+        return entry ? (colors[entry.level] ?? [0, 0, 0, 0]) : [0, 0, 0, 0];
+      },
+      getLineColor: [80, 80, 80, 80] as [number, number, number, number],
+      getLineWidth: 1,
+      lineWidthMinPixels: 0.5,
+      pickable: true,
+      updateTriggers: { getFillColor: [this.ciiScoresVersion] },
+    });
+  }
+
   private createSpeciesRecoveryLayer(): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'species-recovery-layer',
@@ -2899,6 +2942,14 @@ export class DeckGLMap {
         const hcScore = hcCode ? this.happinessScores.get(hcCode as string) : undefined;
         const hcScoreStr = hcScore != null ? hcScore.toFixed(1) : 'No data';
         return { html: `<div class="deckgl-tooltip"><strong>${text(hcName)}</strong><br/>Happiness: ${hcScoreStr}/10${hcScore != null ? `<br/><span style="opacity:.7">${text(this.happinessSource)} (${this.happinessYear})</span>` : ''}</div>` };
+      }
+      case 'cii-choropleth-layer': {
+        const ciiName = obj.properties?.name ?? 'Unknown';
+        const ciiCode = obj.properties?.['ISO3166-1-Alpha-2'];
+        const ciiEntry = ciiCode ? this.ciiScoresMap.get(ciiCode as string) : undefined;
+        if (!ciiEntry) return { html: `<div class="deckgl-tooltip"><strong>${text(ciiName)}</strong><br/><span style="opacity:.7">No CII data</span></div>` };
+        const levelColor = DeckGLMap.CII_LEVEL_HEX[ciiEntry.level] ?? '#888';
+        return { html: `<div class="deckgl-tooltip"><strong>${text(ciiName)}</strong><br/>CII: <span style="color:${levelColor};font-weight:600">${ciiEntry.score}/100</span><br/><span style="text-transform:capitalize;opacity:.7">${text(ciiEntry.level)}</span></div>` };
       }
       case 'species-recovery-layer': {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.commonName)}</strong><br/>${text(obj.recoveryZone?.name ?? obj.region)}<br/><span style="opacity:.7">Status: ${text(obj.recoveryStatus)}</span></div>` };
@@ -3305,6 +3356,11 @@ export class DeckGLMap {
           this.state.layers[layer] = (input as HTMLInputElement).checked;
           this.render();
           this.onLayerChange?.(layer, (input as HTMLInputElement).checked, 'user');
+          // Show/hide CII legend when toggling the CII layer
+          if (layer === 'ciiChoropleth') {
+            const ciiLeg = this.container.querySelector('#ciiChoroplethLegend') as HTMLElement | null;
+            if (ciiLeg) ciiLeg.style.display = (input as HTMLInputElement).checked ? 'block' : 'none';
+          }
         }
       });
     });
@@ -3545,6 +3601,22 @@ export class DeckGLMap {
       <span class="legend-label-title">${t('components.deckgl.legend.title')}</span>
       ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${label}</span></span>`).join('')}
     `;
+
+    // CII choropleth gradient legend (shown when layer is active)
+    const ciiLegend = document.createElement('div');
+    ciiLegend.className = 'cii-choropleth-legend';
+    ciiLegend.id = 'ciiChoroplethLegend';
+    ciiLegend.style.display = this.state.layers.ciiChoropleth ? 'block' : 'none';
+    ciiLegend.innerHTML = `
+      <span class="legend-label-title" style="font-size:9px;letter-spacing:0.5px;">CII SCALE</span>
+      <div style="display:flex;align-items:center;gap:2px;margin-top:2px;">
+        <div style="width:100%;height:8px;border-radius:3px;background:linear-gradient(to right,#28b33e,#dcc030,#e87425,#dc2626,#7f1d1d);"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;opacity:0.7;margin-top:1px;">
+        <span>0</span><span>31</span><span>51</span><span>66</span><span>81</span><span>100</span>
+      </div>
+    `;
+    legend.appendChild(ciiLegend);
 
     this.container.appendChild(legend);
   }
@@ -4048,6 +4120,12 @@ export class DeckGLMap {
     this.happinessScores = data.scores;
     this.happinessYear = data.year;
     this.happinessSource = data.source;
+    this.render();
+  }
+
+  public setCIIScores(scores: Array<{ code: string; score: number; level: string }>): void {
+    this.ciiScoresMap = new Map(scores.map(s => [s.code, { score: s.score, level: s.level }]));
+    this.ciiScoresVersion++;
     this.render();
   }
 
