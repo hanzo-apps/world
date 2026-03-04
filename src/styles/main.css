@@ -2523,6 +2523,62 @@ body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
   }
 }
 
+
+
+/* Mobile: make toolbars swipeable (horizontal scroll) */
+@media (max-width: 768px) {
+  /* Live News channels */
+  .live-news-switcher {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+    padding-bottom: 2px;
+  }
+
+  .live-news-switcher::-webkit-scrollbar {
+    display: none;
+  }
+
+  .live-news-switcher {
+    scrollbar-width: none;
+  }
+
+  .live-channel-btn {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+
+  /* Webcams regions */
+  .webcam-toolbar {
+    align-items: flex-start;
+  }
+
+  .webcam-toolbar-group {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  .webcam-toolbar-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .webcam-toolbar-group {
+    scrollbar-width: none;
+  }
+
+  .webcam-region-btn {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+}
 /* News Items */
 .item {
   padding: 8px 0;
