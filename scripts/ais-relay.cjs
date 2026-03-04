@@ -17,6 +17,7 @@ const { readFileSync } = require('fs');
 const crypto = require('crypto');
 const v8 = require('v8');
 const { WebSocketServer, WebSocket } = require('ws');
+const RSS_ALLOWED_DOMAINS = new Set(require('../shared/rss-allowed-domains.cjs'));
 
 // Log effective heap limit at startup (verifies NODE_OPTIONS=--max-old-space-size is active)
 const _heapStats = v8.getHeapStatistics();
@@ -2199,7 +2200,15 @@ function gzipSyncBuffer(body) {
   }
 }
 
-function getClientIp(req) {
+function getClientIp(req, isPublic = false) {
+  if (isPublic) {
+    // Public routes: only trust CF-Connecting-IP (set by Cloudflare, not spoofable).
+    // x-real-ip is excluded — client-spoofable on unauthenticated endpoints.
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (typeof cfIp === 'string' && cfIp.trim()) return cfIp.trim();
+    return req.socket?.remoteAddress || 'unknown';
+  }
+  // Authenticated routes: x-real-ip is safe because auth token validates the caller
   const xRealIp = req.headers['x-real-ip'];
   if (typeof xRealIp === 'string' && xRealIp.trim()) {
     return xRealIp.trim();
@@ -2207,7 +2216,6 @@ function getClientIp(req) {
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string' && xff) {
     const parts = xff.split(',').map((part) => part.trim()).filter(Boolean);
-    // Proxy chain order is client,proxy1,proxy2...; use first hop as client IP.
     if (parts.length > 0) return parts[0];
   }
   return req.socket?.remoteAddress || 'unknown';
@@ -2258,12 +2266,12 @@ function getRateLimitForPath(pathname) {
   return RELAY_RATE_LIMIT_MAX;
 }
 
-function consumeRateLimit(req, pathname) {
+function consumeRateLimit(req, pathname, isPublic = false) {
   const maxRequests = getRateLimitForPath(pathname);
   if (!Number.isFinite(maxRequests) || maxRequests <= 0) return { limited: false, limit: 0, remaining: 0, resetInMs: 0 };
 
   const now = Date.now();
-  const ip = getClientIp(req);
+  const ip = getClientIp(req, isPublic);
   const key = `${getRouteGroup(pathname)}:${ip}`;
   const existing = requestRateBuckets.get(key);
   if (!existing || now >= existing.resetAt) {
@@ -4363,6 +4371,11 @@ const ALLOWED_ORIGINS = [
 function getCorsOrigin(req) {
   const origin = req.headers.origin || '';
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  // Wildcard: any *.worldmonitor.app subdomain (for variant subdomains)
+  try {
+    const url = new URL(origin);
+    if (url.hostname.endsWith('.worldmonitor.app') && url.protocol === 'https:') return origin;
+  } catch { /* invalid origin — fall through */ }
   // Optional: allow Vercel preview deployments when explicitly enabled.
   if (ALLOW_VERCEL_PREVIEW_ORIGINS && origin.endsWith('.vercel.app')) return origin;
   return '';
@@ -4371,8 +4384,13 @@ function getCorsOrigin(req) {
 const server = http.createServer(async (req, res) => {
   const pathname = (req.url || '/').split('?')[0];
   const corsOrigin = getCorsOrigin(req);
+  // Always emit Vary: Origin on /rss (browser-direct via CDN) to prevent
+  // cached no-CORS responses from being served to browser clients.
+  const isRssRoute = pathname.startsWith('/rss');
   if (corsOrigin) {
     res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Vary', 'Origin');
+  } else if (isRssRoute) {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -4388,13 +4406,16 @@ const server = http.createServer(async (req, res) => {
   // served to unauthenticated requests from edge cache. This is acceptable — all proxied data
   // is public (RSS, WorldBank, UCDP, Polymarket, OpenSky, AIS). Auth exists for abuse
   // prevention (rate limiting), not data protection. Cloudflare WAF provides edge-level protection.
-  const isPublicRoute = pathname === '/health' || pathname === '/';
+  const isPublicRoute = pathname === '/health' || pathname === '/' || isRssRoute;
   if (!isPublicRoute) {
     if (!isAuthorizedRequest(req)) {
       return safeEnd(res, 401, { 'Content-Type': 'application/json' },
         JSON.stringify({ error: 'Unauthorized', time: Date.now() }));
     }
-    const rl = consumeRateLimit(req, pathname);
+  }
+  // Rate limiting applies to all non-health routes (including public /rss)
+  if (pathname !== '/health' && pathname !== '/') {
+    const rl = consumeRateLimit(req, pathname, isPublicRoute);
     if (rl.limited) {
       const retryAfterSec = Math.max(1, Math.ceil(rl.resetInMs / 1000));
       return safeEnd(res, 429, {
@@ -4620,31 +4641,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Missing url parameter' }));
       }
 
-      // Allow domains that block Vercel IPs (must match feeds.ts railwayRss usage)
-      const allowedDomains = [
-        // Original
-        'rss.cnn.com',
-        'www.defensenews.com',
-        'layoffs.fyi',
-        // International Organizations
-        'news.un.org',
-        'www.cisa.gov',
-        'www.iaea.org',
-        'www.who.int',
-        'www.crisisgroup.org',
-        // Middle East & Regional News
-        'english.alarabiya.net',
-        'www.arabnews.com',
-        'www.timesofisrael.com',
-        'www.scmp.com',
-        'kyivindependent.com',
-        'www.themoscowtimes.com',
-        // Africa
-        'feeds.24.com',
-        'feeds.capi24.com',  // News24 redirect destination
-        'islandtimes.org',
-        'www.atlanticcouncil.org',
-      ];
+      // Domain allowlist from shared source of truth (shared/rss-allowed-domains.js)
       const parsed = new URL(feedUrl);
       // Block deprecated/stale feed domains — stale clients still request these
       const blockedDomains = ['rsshub.app'];
@@ -4652,7 +4649,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(410, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'Feed deprecated' }));
       }
-      if (!allowedDomains.includes(parsed.hostname)) {
+      if (!RSS_ALLOWED_DOMAINS.has(parsed.hostname)) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
       }

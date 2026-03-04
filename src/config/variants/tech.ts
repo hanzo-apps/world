@@ -24,8 +24,9 @@ export {
 
 // Tech-specific FEEDS configuration
 import type { Feed } from '@/types';
+import { rssProxyUrl } from '@/utils';
 
-const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+const rss = rssProxyUrl;
 
 export const FEEDS: Record<string, Feed[]> = {
   // Core Tech News

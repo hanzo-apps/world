@@ -21,8 +21,9 @@ export {
 
 // Finance-specific FEEDS configuration
 import type { Feed } from '@/types';
+import { rssProxyUrl } from '@/utils';
 
-const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+const rss = rssProxyUrl;
 
 export const FEEDS: Record<string, Feed[]> = {
   // Core Markets & Trading News (all free RSS / Google News proxies)
