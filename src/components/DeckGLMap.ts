@@ -36,7 +36,8 @@ import type {
   MilitaryBaseEnriched,
 } from '@/types';
 import { fetchMilitaryBases, type MilitaryBaseCluster as ServerBaseCluster } from '@/services/military-bases';
-import type { AirportDelayAlert } from '@/services/aviation';
+import type { AirportDelayAlert, PositionSample } from '@/services/aviation';
+import { fetchAircraftPositions } from '@/services/aviation';
 import type { IranEvent } from '@/services/conflict';
 import type { GpsJamHex } from '@/services/gps-interference';
 import type { DisplacementFlow } from '@/services/displacement';
@@ -250,11 +251,14 @@ const MARKER_ICONS = {
   circle: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="white"/></svg>`),
   // Star - for special markers
   star: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 20,12 30,12 22,19 25,30 16,23 7,30 10,19 2,12 12,12" fill="white"/></svg>`),
+  // Airplane silhouette - top-down with wings and tail (pointing north, rotated by trackDeg)
+  plane: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16 2 L17.5 10 L17 12 L27 17 L27 19 L17 16 L17 24 L20 26.5 L20 28 L16 27 L12 28 L12 26.5 L15 24 L15 16 L5 19 L5 17 L15 12 L14.5 10 Z" fill="white"/></svg>`),
 };
 
 const BASES_ICON_MAPPING = { triangleUp: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 const NUCLEAR_ICON_MAPPING = { hexagon: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 const DATACENTER_ICON_MAPPING = { square: { x: 0, y: 0, width: 32, height: 32, mask: true } };
+const AIRCRAFT_ICON_MAPPING = { plane: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 
 const CONFLICT_ZONES_GEOJSON: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
@@ -302,6 +306,8 @@ export class DeckGLMap {
   private firmsFireData: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }> = [];
   private techEvents: TechEventMarker[] = [];
   private flightDelays: AirportDelayAlert[] = [];
+  private aircraftPositions: PositionSample[] = [];
+  private aircraftFetchTimer: ReturnType<typeof setInterval> | null = null;
   private news: NewsItem[] = [];
   private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }> = [];
   private newsLocationFirstSeen = new Map<string, number>();
@@ -336,6 +342,7 @@ export class DeckGLMap {
   private onCountryClick?: (country: CountryClickPayload) => void;
   private onLayerChange?: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void;
   private onStateChange?: (state: DeckMapState) => void;
+  private onAircraftPositionsUpdate?: (positions: PositionSample[]) => void;
 
   // Highlighted assets
   private highlightedAssets: Record<AssetType, Set<string>> = {
@@ -376,8 +383,12 @@ export class DeckGLMap {
   private lastPipelineHighlightSignature = '';
   private debouncedRebuildLayers: (() => void) & { cancel(): void };
   private debouncedFetchBases: (() => void) & { cancel(): void };
+  private debouncedFetchAircraft: (() => void) & { cancel(): void };
   private rafUpdateLayers: (() => void) & { cancel(): void };
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private lastAircraftFetchCenter: [number, number] | null = null;
+  private lastAircraftFetchZoom = -1;
+  private aircraftFetchSeq = 0;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
@@ -390,6 +401,7 @@ export class DeckGLMap {
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
     }, 150);
     this.debouncedFetchBases = debounce(() => this.fetchServerBases(), 300);
+    this.debouncedFetchAircraft = debounce(() => this.fetchViewportAircraft(), 500);
     this.rafUpdateLayers = rafSchedule(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
@@ -549,6 +561,7 @@ export class DeckGLMap {
       this.lastSCZoom = -1;
       this.rafUpdateLayers();
       this.debouncedFetchBases();
+      this.debouncedFetchAircraft();
       this.state.zoom = this.maplibreMap?.getZoom() ?? this.state.zoom;
       this.onStateChange?.(this.state);
     });
@@ -1184,6 +1197,11 @@ export class DeckGLMap {
       layers.push(this.createFlightDelaysLayer(filteredFlightDelays));
     }
 
+    // Aircraft positions layer (live tracking, under flights toggle)
+    if (mapLayers.flights && this.aircraftPositions.length > 0) {
+      layers.push(this.createAircraftPositionsLayer());
+    }
+
     // Protests layer (Supercluster-based deck.gl layers)
     if (mapLayers.protests && this.protests.length > 0) {
       layers.push(...this.createProtestClusterLayers());
@@ -1600,6 +1618,28 @@ export class DeckGLMap {
       radiusMinPixels: 4,
       radiusMaxPixels: 15,
       pickable: true,
+    });
+  }
+
+  private createAircraftPositionsLayer(): IconLayer<PositionSample> {
+    return new IconLayer<PositionSample>({
+      id: 'aircraft-positions-layer',
+      data: this.aircraftPositions,
+      getPosition: (d) => [d.lon, d.lat],
+      getIcon: () => 'plane',
+      iconAtlas: MARKER_ICONS.plane,
+      iconMapping: AIRCRAFT_ICON_MAPPING,
+      getSize: (d) => d.onGround ? 14 : 18,
+      getColor: (d) => {
+        if (d.onGround) return [120, 120, 120, 160] as [number, number, number, number];
+        return [160, 100, 255, 220] as [number, number, number, number]; // Purple for all airborne
+      },
+      getAngle: (d) => -d.trackDeg,
+      sizeMinPixels: 8,
+      sizeMaxPixels: 28,
+      sizeScale: 1,
+      pickable: true,
+      billboard: false,
     });
   }
 
@@ -2871,6 +2911,8 @@ export class DeckGLMap {
       }
       case 'flight-delays-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)} (${text(obj.iata)})</strong><br/>${text(obj.severity)}: ${text(obj.reason)}</div>` };
+      case 'aircraft-positions-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.callsign || obj.icao24)}</strong><br/>${obj.altitudeFt?.toLocaleString() ?? 0} ft · ${obj.groundSpeedKts ?? 0} kts · ${Math.round(obj.trackDeg ?? 0)}°</div>` };
       case 'apt-groups-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.aka)}<br/>${t('popups.sponsor')}: ${text(obj.sponsor)}</div>` };
       case 'minerals-layer':
@@ -3146,6 +3188,7 @@ export class DeckGLMap {
       'spaceports-layer': 'spaceport',
       'ports-layer': 'port',
       'flight-delays-layer': 'flight',
+      'aircraft-positions-layer': 'aircraft',
       'startup-hubs-layer': 'startupHub',
       'tech-hqs-layer': 'techHQ',
       'accelerators-layer': 'accelerator',
@@ -3318,6 +3361,7 @@ export class DeckGLMap {
         const layer = (input as HTMLInputElement).closest('.layer-toggle')?.getAttribute('data-layer') as keyof MapLayers;
         if (layer) {
           this.state.layers[layer] = (input as HTMLInputElement).checked;
+          if (layer === 'flights') this.manageAircraftTimer((input as HTMLInputElement).checked);
           this.render();
           this.onLayerChange?.(layer, (input as HTMLInputElement).checked, 'user');
           // Show/hide CII legend when toggling the CII layer
@@ -3551,6 +3595,7 @@ export class DeckGLMap {
             { shape: shapes.square('rgb(34, 180, 100)'), label: 'Happy Country' },
             { shape: shapes.circle('rgb(74, 222, 128)'), label: 'Species Recovery Zone' },
             { shape: shapes.circle('rgb(255, 200, 50)'), label: 'Renewable Installation' },
+            { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
           ]
           : [
             { shape: shapes.circle('rgb(255, 68, 68)'), label: t('components.deckgl.legend.highAlert') },
@@ -3559,6 +3604,7 @@ export class DeckGLMap {
             { shape: shapes.triangle('rgb(68, 136, 255)'), label: t('components.deckgl.legend.base') },
             { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: t('components.deckgl.legend.nuclear') },
             { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
+            { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
           ];
 
     legend.innerHTML = `
@@ -3710,6 +3756,7 @@ export class DeckGLMap {
 
   public setLayers(layers: MapLayers): void {
     this.state.layers = layers;
+    this.manageAircraftTimer(layers.flights);
     this.render(); // Debounced
 
     // Update toggle checkboxes
@@ -3984,6 +4031,11 @@ export class DeckGLMap {
     this.render();
   }
 
+  public setAircraftPositions(positions: PositionSample[]): void {
+    this.aircraftPositions = positions;
+    this.render();
+  }
+
   public setMilitaryFlights(flights: MilitaryFlight[], clusters: MilitaryFlightCluster[] = []): void {
     this.militaryFlights = flights;
     this.militaryFlightClusters = clusters;
@@ -4013,6 +4065,70 @@ export class DeckGLMap {
       this.render();
     }).catch((err) => {
       console.error('[bases] fetch error', err);
+    });
+  }
+
+  private manageAircraftTimer(enabled: boolean): void {
+    if (enabled) {
+      if (!this.aircraftFetchTimer) {
+        this.aircraftFetchTimer = setInterval(() => {
+          this.lastAircraftFetchCenter = null; // force refresh on poll
+          this.fetchViewportAircraft();
+        }, 120_000); // Match server cache TTL (120s anonymous OpenSky tier)
+        this.debouncedFetchAircraft();
+      }
+    } else {
+      if (this.aircraftFetchTimer) {
+        clearInterval(this.aircraftFetchTimer);
+        this.aircraftFetchTimer = null;
+      }
+      this.aircraftPositions = [];
+    }
+  }
+
+  private hasAircraftViewportChanged(): boolean {
+    if (!this.maplibreMap) return false;
+    if (!this.lastAircraftFetchCenter) return true;
+    const center = this.maplibreMap.getCenter();
+    const zoom = this.maplibreMap.getZoom();
+    if (Math.abs(zoom - this.lastAircraftFetchZoom) >= 1) return true;
+    const [prevLng, prevLat] = this.lastAircraftFetchCenter;
+    // Threshold scales with zoom — higher zoom = smaller movement triggers fetch
+    const threshold = Math.max(0.1, 2 / Math.pow(2, Math.max(0, zoom - 3)));
+    return Math.abs(center.lat - prevLat) > threshold || Math.abs(center.lng - prevLng) > threshold;
+  }
+
+  private fetchViewportAircraft(): void {
+    if (!this.maplibreMap) return;
+    if (!this.state.layers.flights) return;
+    const zoom = this.maplibreMap.getZoom();
+    if (zoom < 2) {
+      if (this.aircraftPositions.length > 0) {
+        this.aircraftPositions = [];
+        this.render();
+      }
+      return;
+    }
+    if (!this.hasAircraftViewportChanged()) return;
+    const bounds = this.maplibreMap.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const seq = ++this.aircraftFetchSeq;
+    fetchAircraftPositions({
+      swLat: sw.lat, swLon: sw.lng,
+      neLat: ne.lat, neLon: ne.lng,
+    }).then((positions) => {
+      if (seq !== this.aircraftFetchSeq) return; // discard stale response
+      this.aircraftPositions = positions;
+      this.onAircraftPositionsUpdate?.(positions);
+      const center = this.maplibreMap?.getCenter();
+      if (center) {
+        this.lastAircraftFetchCenter = [center.lng, center.lat];
+        this.lastAircraftFetchZoom = this.maplibreMap!.getZoom();
+      }
+      this.render();
+    }).catch((err) => {
+      console.error('[aircraft] fetch error', err);
     });
   }
 
@@ -4219,6 +4335,10 @@ export class DeckGLMap {
 
   public setOnStateChange(callback: (state: DeckMapState) => void): void {
     this.onStateChange = callback;
+  }
+
+  public setOnAircraftPositionsUpdate(callback: (positions: PositionSample[]) => void): void {
+    this.onAircraftPositionsUpdate = callback;
   }
 
   public getHotspotLevels(): Record<string, string> {
@@ -4618,6 +4738,7 @@ export class DeckGLMap {
   public destroy(): void {
     this.debouncedRebuildLayers.cancel();
     this.debouncedFetchBases.cancel();
+    this.debouncedFetchAircraft.cancel();
     this.rafUpdateLayers.cancel();
 
     if (this.moveTimeoutId) {
@@ -4627,6 +4748,10 @@ export class DeckGLMap {
 
     this.stopPulseAnimation();
     this.stopDayNightTimer();
+    if (this.aircraftFetchTimer) {
+      clearInterval(this.aircraftFetchTimer);
+      this.aircraftFetchTimer = null;
+    }
 
 
     this.layerCache.clear();
