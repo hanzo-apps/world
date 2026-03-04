@@ -265,5 +265,14 @@ export default [
   "www.cbsnews.com",
   "moxie.foxnews.com",
   "feeds.content.dowjones.io",
-  "thehill.com"
+  "thehill.com",
+  "www.flightglobal.com",
+  "simpleflying.com",
+  "aerotime.aero",
+  "thepointsguy.com",
+  "airlinegeeks.com",
+  "onemileatatime.com",
+  "viewfromthewing.com",
+  "www.aviationpros.com",
+  "www.aviationweek.com"
 ];

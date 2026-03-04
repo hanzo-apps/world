@@ -1211,6 +1211,7 @@ export class GlobeMap {
     critical: 'rgba(140, 10, 0, 0.50)',
   };
 
+
   private flushPolygons(): void {
     if (!this.globe || !this.initialized || this.destroyed) return;
     const polys: GlobePolygon[] = [];
