@@ -264,7 +264,6 @@ export class EventHandlerManager implements AppModule {
           (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
         }
       }
-
     };
     window.addEventListener('storage', this.boundStorageHandler);
 
@@ -314,7 +313,6 @@ export class EventHandlerManager implements AppModule {
 
     this.setupMapResize();
     this.setupMapPin();
-
 
     this.boundVisibilityHandler = () => {
       document.body?.classList.toggle('animations-paused', document.hidden);
@@ -654,6 +652,15 @@ export class EventHandlerManager implements AppModule {
       },
       isDesktopApp: this.ctx.isDesktopApp,
       statusPanel: this.ctx.statusPanel,
+      isGlobeMode: () => this.ctx.map?.isGlobeMode() ?? false,
+      onMapModeChange: (useGlobe: boolean) => {
+        saveToStorage(STORAGE_KEYS.mapMode, useGlobe ? 'globe' : 'flat');
+        if (useGlobe) {
+          this.ctx.map?.switchToGlobe();
+        } else {
+          this.ctx.map?.switchToFlat();
+        }
+      },
     });
 
     if (this.ctx.statusPanel) {
@@ -947,7 +954,6 @@ export class EventHandlerManager implements AppModule {
 
     this.setupMapFullscreen(mapSection);
   }
-
 
   private setupMapFullscreen(mapSection: HTMLElement): void {
     const btn = document.getElementById('mapFullscreenBtn');
