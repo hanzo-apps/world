@@ -2521,9 +2521,42 @@ body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
 }
 
 .webcam-single {
+  position: relative;
   flex: 1;
   background: #000;
   aspect-ratio: 16 / 9;
+}
+
+.webcam-embed-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.webcam-embed-fallback-text {
+  color: var(--text);
+  font-size: 12px;
+  max-width: 280px;
+}
+
+.webcam-embed-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.webcam-embed-fallback .offline-retry {
+  margin: 0;
 }
 
 .webcam-switcher {
