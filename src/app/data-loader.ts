@@ -122,7 +122,8 @@ import { fetchHappinessScores } from '@/services/happiness-data';
 import { fetchRenewableInstallations } from '@/services/renewable-installations';
 import { filterBySentiment } from '@/services/sentiment-gate';
 import { fetchAllPositiveTopicIntelligence } from '@/services/gdelt-intel';
-import { fetchPositiveGeoEvents, geocodePositiveNewsItems } from '@/services/positive-events-geo';
+import { fetchPositiveGeoEvents, geocodePositiveNewsItems, type PositiveGeoEvent } from '@/services/positive-events-geo';
+import type { HappyContentCategory } from '@/services/positive-classifier';
 import { fetchKindnessData } from '@/services/kindness-data';
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import type { ThreatLevel as ClientThreatLevel } from '@/services/threat-classifier';
@@ -2254,7 +2255,17 @@ export class DataLoaderManager implements AppModule {
   }
 
   private async loadPositiveEvents(): Promise<void> {
-    const gdeltEvents = await fetchPositiveGeoEvents();
+    const hydrated = getHydratedData('positiveGeoEvents') as { events?: Array<{ latitude: number; longitude: number; name: string; category: string; count: number; timestamp: number }> } | undefined;
+    let gdeltEvents: PositiveGeoEvent[];
+    if (hydrated?.events?.length) {
+      gdeltEvents = hydrated.events.map(e => ({
+        lat: e.latitude, lon: e.longitude, name: e.name,
+        category: (e.category || 'humanity-kindness') as HappyContentCategory,
+        count: e.count, timestamp: e.timestamp,
+      }));
+    } else {
+      gdeltEvents = await fetchPositiveGeoEvents();
+    }
     const rssEvents = geocodePositiveNewsItems(
       this.ctx.happyAllItems.map(item => ({
         title: item.title,
