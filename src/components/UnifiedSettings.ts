@@ -217,6 +217,13 @@ export class UnifiedSettings {
     if (this.activeTab === 'panels') this.renderPanelsTab();
   }
 
+  public refreshMapMode(): void {
+    if (this.activeTab === 'general') {
+      const cb = this.overlay.querySelector('#us-globe-mode') as HTMLInputElement;
+      if (cb) cb.checked = this.config.isGlobeMode?.() ?? false;
+    }
+  }
+
   public getButton(): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = 'unified-settings-btn';

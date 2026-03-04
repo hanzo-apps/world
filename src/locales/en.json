@@ -80,14 +80,7 @@
     "noSignals": "No recent high-severity signals.",
     "assessmentUnavailable": "Assessment unavailable.",
     "noNews": "No recent country-specific coverage.",
-    "noMarkets": "No active markets for this country.",
     "noIndicators": "No country-specific indicators available.",
-    "components": {
-      "unrest": "Unrest",
-      "conflict": "Conflict",
-      "security": "Security",
-      "information": "Information"
-    },
     "nearbyPorts": "Nearby Ports",
     "detected": "Detected",
     "notDetected": "No",
@@ -139,6 +132,7 @@
     "downloadApp": "Download App",
     "fullscreen": "Fullscreen",
     "pinMap": "Pin map to top",
+    "globeMode": "3D Globe Mode",
     "viewOnGitHub": "View on GitHub",
     "filterSources": "Filter sources...",
     "sourcesEnabled": "{{enabled}}/{{total}} enabled",
