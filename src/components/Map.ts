@@ -1454,7 +1454,7 @@ export class MapComponent {
         const pos = projection([ev.longitude, ev.latitude]);
         if (!pos || !Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) return;
 
-        const size = ev.severity === 'high' ? 14 : ev.severity === 'medium' ? 11 : 8;
+        const size = (ev.severity === 'high' || ev.severity === 'critical') ? 14 : ev.severity === 'medium' ? 11 : 8;
         const color = ev.category === 'military' ? 'rgba(255,50,50,0.85)'
           : (ev.category === 'politics' || ev.category === 'diplomacy') ? 'rgba(255,165,0,0.8)'
             : 'rgba(255,255,0,0.7)';

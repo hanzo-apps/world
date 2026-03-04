@@ -39,6 +39,7 @@ import type { HappinessData } from '@/services/happiness-data';
 import type { SpeciesRecovery } from '@/services/conservation-data';
 import type { RenewableInstallation } from '@/services/renewable-installations';
 import type { GpsJamHex } from '@/services/gps-interference';
+import type { IranEvent } from '@/services/conflict';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -64,6 +65,10 @@ interface TechEventMarker {
   daysUntil: number;
 }
 
+type FireMarker = { lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string };
+type NewsLocationMarker = { lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date };
+type CIIScore = { code: string; score: number; level: string };
+
 /**
  * Unified map interface that delegates to either DeckGLMap or MapComponent
  * based on device capabilities
@@ -79,6 +84,50 @@ export class MapContainer {
   private useGlobe: boolean;
   private isResizingInternal = false;
   private resizeObserver: ResizeObserver | null = null;
+
+  // ─── Callback cache (survives map mode switches) ───────────────────────────
+  private cachedOnStateChanged: ((state: MapContainerState) => void) | null = null;
+  private cachedOnLayerChange: ((layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void) | null = null;
+  private cachedOnTimeRangeChanged: ((range: TimeRange) => void) | null = null;
+  private cachedOnCountryClicked: ((country: CountryClickPayload) => void) | null = null;
+  private cachedOnHotspotClicked: ((hotspot: Hotspot) => void) | null = null;
+  private cachedOnAircraftPositionsUpdate: ((positions: PositionSample[]) => void) | null = null;
+
+  // ─── Data cache (survives map mode switches) ───────────────────────────────
+  private cachedEarthquakes: Earthquake[] | null = null;
+  private cachedWeatherAlerts: WeatherAlert[] | null = null;
+  private cachedOutages: InternetOutage[] | null = null;
+  private cachedAisDisruptions: AisDisruptionEvent[] | null = null;
+  private cachedAisDensity: AisDensityZone[] | null = null;
+  private cachedCableAdvisories: CableAdvisory[] | null = null;
+  private cachedRepairShips: RepairShip[] | null = null;
+  private cachedCableHealth: Record<string, CableHealthRecord> | null = null;
+  private cachedProtests: SocialUnrestEvent[] | null = null;
+  private cachedFlightDelays: AirportDelayAlert[] | null = null;
+  private cachedAircraftPositions: PositionSample[] | null = null;
+  private cachedMilitaryFlights: MilitaryFlight[] | null = null;
+  private cachedMilitaryFlightClusters: MilitaryFlightCluster[] | null = null;
+  private cachedMilitaryVessels: MilitaryVessel[] | null = null;
+  private cachedMilitaryVesselClusters: MilitaryVesselCluster[] | null = null;
+  private cachedNaturalEvents: NaturalEvent[] | null = null;
+  private cachedFires: FireMarker[] | null = null;
+  private cachedTechEvents: TechEventMarker[] | null = null;
+  private cachedUcdpEvents: UcdpGeoEvent[] | null = null;
+  private cachedDisplacementFlows: DisplacementFlow[] | null = null;
+  private cachedClimateAnomalies: ClimateAnomaly[] | null = null;
+  private cachedGpsJamming: GpsJamHex[] | null = null;
+  private cachedCyberThreats: CyberThreat[] | null = null;
+  private cachedIranEvents: IranEvent[] | null = null;
+  private cachedNewsLocations: NewsLocationMarker[] | null = null;
+  private cachedPositiveEvents: PositiveGeoEvent[] | null = null;
+  private cachedKindnessData: KindnessPoint[] | null = null;
+  private cachedHappinessScores: HappinessData | null = null;
+  private cachedCIIScores: CIIScore[] | null = null;
+  private cachedSpeciesRecovery: SpeciesRecovery[] | null = null;
+  private cachedRenewableInstallations: RenewableInstallation[] | null = null;
+  private cachedHotspotActivity: NewsItem[] | null = null;
+  private cachedEscalationFlights: MilitaryFlight[] | null = null;
+  private cachedEscalationVessels: MilitaryVessel[] | null = null;
 
   constructor(container: HTMLElement, initialState: MapContainerState, preferGlobe = false) {
     this.container = container;
@@ -159,20 +208,80 @@ export class MapContainer {
   /** Switch to 3D globe mode at runtime (called from Settings). */
   public switchToGlobe(): void {
     if (this.useGlobe) return;
+    const snapshot = this.getState();
+    const center = this.getCenter();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.destroyFlatMap();
     this.useGlobe = true;
     this.useDeckGL = false;
     this.globeMap = new GlobeMap(this.container, this.initialState);
+    this.restoreViewport(snapshot, center);
+    this.rehydrateActiveMap();
   }
 
   /** Switch back to flat map at runtime (called from Settings). */
   public switchToFlat(): void {
     if (!this.useGlobe) return;
+    const snapshot = this.getState();
+    const center = this.getCenter();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.globeMap?.destroy();
     this.globeMap = null;
     this.useGlobe = false;
     this.useDeckGL = this.shouldUseDeckGL();
     this.init();
+    this.restoreViewport(snapshot, center);
+    this.rehydrateActiveMap();
+  }
+
+  private restoreViewport(snapshot: MapContainerState, center: { lat: number; lon: number } | null): void {
+    this.setLayers(snapshot.layers);
+    this.setTimeRange(snapshot.timeRange);
+    this.setView(snapshot.view);
+    if (center) this.setCenter(center.lat, center.lon, snapshot.zoom);
+  }
+
+  private rehydrateActiveMap(): void {
+    // 1. Re-wire callbacks (through own public methods for adapter safety)
+    if (this.cachedOnStateChanged) this.onStateChanged(this.cachedOnStateChanged);
+    if (this.cachedOnLayerChange) this.setOnLayerChange(this.cachedOnLayerChange);
+    if (this.cachedOnTimeRangeChanged) this.onTimeRangeChanged(this.cachedOnTimeRangeChanged);
+    if (this.cachedOnCountryClicked) this.onCountryClicked(this.cachedOnCountryClicked);
+    if (this.cachedOnHotspotClicked) this.onHotspotClicked(this.cachedOnHotspotClicked);
+    if (this.cachedOnAircraftPositionsUpdate) this.setOnAircraftPositionsUpdate(this.cachedOnAircraftPositionsUpdate);
+
+    // 2. Re-push all cached data
+    if (this.cachedEarthquakes) this.setEarthquakes(this.cachedEarthquakes);
+    if (this.cachedWeatherAlerts) this.setWeatherAlerts(this.cachedWeatherAlerts);
+    if (this.cachedOutages) this.setOutages(this.cachedOutages);
+    if (this.cachedAisDisruptions != null && this.cachedAisDensity != null) this.setAisData(this.cachedAisDisruptions, this.cachedAisDensity);
+    if (this.cachedCableAdvisories != null && this.cachedRepairShips != null) this.setCableActivity(this.cachedCableAdvisories, this.cachedRepairShips);
+    if (this.cachedCableHealth) this.setCableHealth(this.cachedCableHealth);
+    if (this.cachedProtests) this.setProtests(this.cachedProtests);
+    if (this.cachedFlightDelays) this.setFlightDelays(this.cachedFlightDelays);
+    if (this.cachedAircraftPositions) this.setAircraftPositions(this.cachedAircraftPositions);
+    if (this.cachedMilitaryFlights) this.setMilitaryFlights(this.cachedMilitaryFlights, this.cachedMilitaryFlightClusters ?? []);
+    if (this.cachedMilitaryVessels) this.setMilitaryVessels(this.cachedMilitaryVessels, this.cachedMilitaryVesselClusters ?? []);
+    if (this.cachedNaturalEvents) this.setNaturalEvents(this.cachedNaturalEvents);
+    if (this.cachedFires) this.setFires(this.cachedFires);
+    if (this.cachedTechEvents) this.setTechEvents(this.cachedTechEvents);
+    if (this.cachedUcdpEvents) this.setUcdpEvents(this.cachedUcdpEvents);
+    if (this.cachedDisplacementFlows) this.setDisplacementFlows(this.cachedDisplacementFlows);
+    if (this.cachedClimateAnomalies) this.setClimateAnomalies(this.cachedClimateAnomalies);
+    if (this.cachedGpsJamming) this.setGpsJamming(this.cachedGpsJamming);
+    if (this.cachedCyberThreats) this.setCyberThreats(this.cachedCyberThreats);
+    if (this.cachedIranEvents) this.setIranEvents(this.cachedIranEvents);
+    if (this.cachedNewsLocations) this.setNewsLocations(this.cachedNewsLocations);
+    if (this.cachedPositiveEvents) this.setPositiveEvents(this.cachedPositiveEvents);
+    if (this.cachedKindnessData) this.setKindnessData(this.cachedKindnessData);
+    if (this.cachedHappinessScores) this.setHappinessScores(this.cachedHappinessScores);
+    if (this.cachedCIIScores) this.setCIIScores(this.cachedCIIScores);
+    if (this.cachedSpeciesRecovery) this.setSpeciesRecoveryZones(this.cachedSpeciesRecovery);
+    if (this.cachedRenewableInstallations) this.setRenewableInstallations(this.cachedRenewableInstallations);
+    if (this.cachedHotspotActivity) this.updateHotspotActivity(this.cachedHotspotActivity);
+    if (this.cachedEscalationFlights && this.cachedEscalationVessels) this.updateMilitaryForEscalation(this.cachedEscalationFlights, this.cachedEscalationVessels);
   }
 
   public isGlobeMode(): boolean {
@@ -267,21 +376,26 @@ export class MapContainer {
   // ─── Data setters ────────────────────────────────────────────────────────────
 
   public setEarthquakes(earthquakes: Earthquake[]): void {
+    this.cachedEarthquakes = earthquakes;
     if (this.useGlobe) { this.globeMap?.setEarthquakes(earthquakes); return; }
     if (this.useDeckGL) { this.deckGLMap?.setEarthquakes(earthquakes); } else { this.svgMap?.setEarthquakes(earthquakes); }
   }
 
   public setWeatherAlerts(alerts: WeatherAlert[]): void {
+    this.cachedWeatherAlerts = alerts;
     if (this.useGlobe) { this.globeMap?.setWeatherAlerts(alerts); return; }
     if (this.useDeckGL) { this.deckGLMap?.setWeatherAlerts(alerts); } else { this.svgMap?.setWeatherAlerts(alerts); }
   }
 
   public setOutages(outages: InternetOutage[]): void {
+    this.cachedOutages = outages;
     if (this.useGlobe) { this.globeMap?.setOutages(outages); return; }
     if (this.useDeckGL) { this.deckGLMap?.setOutages(outages); } else { this.svgMap?.setOutages(outages); }
   }
 
   public setAisData(disruptions: AisDisruptionEvent[], density: AisDensityZone[]): void {
+    this.cachedAisDisruptions = disruptions;
+    this.cachedAisDensity = density;
     if (this.useGlobe) { this.globeMap?.setAisData(disruptions, density); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setAisData(disruptions, density);
@@ -291,6 +405,8 @@ export class MapContainer {
   }
 
   public setCableActivity(advisories: CableAdvisory[], repairShips: RepairShip[]): void {
+    this.cachedCableAdvisories = advisories;
+    this.cachedRepairShips = repairShips;
     if (this.useGlobe) { this.globeMap?.setCableActivity(advisories, repairShips); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setCableActivity(advisories, repairShips);
@@ -300,6 +416,7 @@ export class MapContainer {
   }
 
   public setCableHealth(healthMap: Record<string, CableHealthRecord>): void {
+    this.cachedCableHealth = healthMap;
     if (this.useGlobe) { this.globeMap?.setCableHealth(healthMap); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setCableHealth(healthMap);
@@ -309,6 +426,7 @@ export class MapContainer {
   }
 
   public setProtests(events: SocialUnrestEvent[]): void {
+    this.cachedProtests = events;
     if (this.useGlobe) { this.globeMap?.setProtests(events); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setProtests(events);
@@ -318,6 +436,7 @@ export class MapContainer {
   }
 
   public setFlightDelays(delays: AirportDelayAlert[]): void {
+    this.cachedFlightDelays = delays;
     if (this.useGlobe) { this.globeMap?.setFlightDelays(delays); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setFlightDelays(delays);
@@ -327,6 +446,7 @@ export class MapContainer {
   }
 
   public setAircraftPositions(positions: PositionSample[]): void {
+    this.cachedAircraftPositions = positions;
     if (this.useDeckGL) {
       this.deckGLMap?.setAircraftPositions(positions);
     } else {
@@ -335,21 +455,27 @@ export class MapContainer {
   }
 
   public setMilitaryFlights(flights: MilitaryFlight[], clusters: MilitaryFlightCluster[] = []): void {
+    this.cachedMilitaryFlights = flights;
+    this.cachedMilitaryFlightClusters = clusters;
     if (this.useGlobe) { this.globeMap?.setMilitaryFlights(flights); return; }
     if (this.useDeckGL) { this.deckGLMap?.setMilitaryFlights(flights, clusters); } else { this.svgMap?.setMilitaryFlights(flights, clusters); }
   }
 
   public setMilitaryVessels(vessels: MilitaryVessel[], clusters: MilitaryVesselCluster[] = []): void {
+    this.cachedMilitaryVessels = vessels;
+    this.cachedMilitaryVesselClusters = clusters;
     if (this.useGlobe) { this.globeMap?.setMilitaryVessels(vessels); return; }
     if (this.useDeckGL) { this.deckGLMap?.setMilitaryVessels(vessels, clusters); } else { this.svgMap?.setMilitaryVessels(vessels, clusters); }
   }
 
   public setNaturalEvents(events: NaturalEvent[]): void {
+    this.cachedNaturalEvents = events;
     if (this.useGlobe) { this.globeMap?.setNaturalEvents(events); return; }
     if (this.useDeckGL) { this.deckGLMap?.setNaturalEvents(events); } else { this.svgMap?.setNaturalEvents(events); }
   }
 
-  public setFires(fires: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }>): void {
+  public setFires(fires: FireMarker[]): void {
+    this.cachedFires = fires;
     if (this.useGlobe) { this.globeMap?.setFires(fires); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setFires(fires);
@@ -359,6 +485,7 @@ export class MapContainer {
   }
 
   public setTechEvents(events: TechEventMarker[]): void {
+    this.cachedTechEvents = events;
     if (this.useGlobe) { this.globeMap?.setTechEvents(events); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setTechEvents(events);
@@ -368,6 +495,7 @@ export class MapContainer {
   }
 
   public setUcdpEvents(events: UcdpGeoEvent[]): void {
+    this.cachedUcdpEvents = events;
     if (this.useGlobe) { this.globeMap?.setUcdpEvents(events); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setUcdpEvents(events);
@@ -375,6 +503,7 @@ export class MapContainer {
   }
 
   public setDisplacementFlows(flows: DisplacementFlow[]): void {
+    this.cachedDisplacementFlows = flows;
     if (this.useGlobe) { this.globeMap?.setDisplacementFlows(flows); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setDisplacementFlows(flows);
@@ -382,6 +511,7 @@ export class MapContainer {
   }
 
   public setClimateAnomalies(anomalies: ClimateAnomaly[]): void {
+    this.cachedClimateAnomalies = anomalies;
     if (this.useGlobe) { this.globeMap?.setClimateAnomalies(anomalies); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setClimateAnomalies(anomalies);
@@ -389,6 +519,7 @@ export class MapContainer {
   }
 
   public setGpsJamming(hexes: GpsJamHex[]): void {
+    this.cachedGpsJamming = hexes;
     if (this.useGlobe) { this.globeMap?.setGpsJamming(hexes); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setGpsJamming(hexes);
@@ -396,6 +527,7 @@ export class MapContainer {
   }
 
   public setCyberThreats(threats: CyberThreat[]): void {
+    this.cachedCyberThreats = threats;
     if (this.useGlobe) { this.globeMap?.setCyberThreats(threats); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setCyberThreats(threats);
@@ -404,7 +536,8 @@ export class MapContainer {
     }
   }
 
-  public setIranEvents(events: import('@/services/conflict').IranEvent[]): void {
+  public setIranEvents(events: IranEvent[]): void {
+    this.cachedIranEvents = events;
     if (this.useGlobe) { this.globeMap?.setIranEvents(events); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setIranEvents(events);
@@ -413,7 +546,8 @@ export class MapContainer {
     }
   }
 
-  public setNewsLocations(data: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }>): void {
+  public setNewsLocations(data: NewsLocationMarker[]): void {
+    this.cachedNewsLocations = data;
     if (this.useGlobe) { this.globeMap?.setNewsLocations(data); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setNewsLocations(data);
@@ -423,6 +557,7 @@ export class MapContainer {
   }
 
   public setPositiveEvents(events: PositiveGeoEvent[]): void {
+    this.cachedPositiveEvents = events;
     if (this.useGlobe) { this.globeMap?.setPositiveEvents(events); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setPositiveEvents(events);
@@ -431,6 +566,7 @@ export class MapContainer {
   }
 
   public setKindnessData(points: KindnessPoint[]): void {
+    this.cachedKindnessData = points;
     if (this.useGlobe) { this.globeMap?.setKindnessData(points); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setKindnessData(points);
@@ -439,6 +575,7 @@ export class MapContainer {
   }
 
   public setHappinessScores(data: HappinessData): void {
+    this.cachedHappinessScores = data;
     if (this.useGlobe) { this.globeMap?.setHappinessScores(data); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setHappinessScores(data);
@@ -446,12 +583,14 @@ export class MapContainer {
     // SVG map does not support choropleth overlay
   }
 
-  public setCIIScores(scores: Array<{ code: string; score: number; level: string }>): void {
+  public setCIIScores(scores: CIIScore[]): void {
+    this.cachedCIIScores = scores;
     if (this.useGlobe) { this.globeMap?.setCIIScores(scores); return; }
     if (this.useDeckGL) { this.deckGLMap?.setCIIScores(scores); }
   }
 
   public setSpeciesRecoveryZones(species: SpeciesRecovery[]): void {
+    this.cachedSpeciesRecovery = species;
     if (this.useGlobe) { this.globeMap?.setSpeciesRecoveryZones(species); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setSpeciesRecoveryZones(species);
@@ -460,6 +599,7 @@ export class MapContainer {
   }
 
   public setRenewableInstallations(installations: RenewableInstallation[]): void {
+    this.cachedRenewableInstallations = installations;
     if (this.useGlobe) { this.globeMap?.setRenewableInstallations(installations); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setRenewableInstallations(installations);
@@ -468,6 +608,7 @@ export class MapContainer {
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
+    this.cachedHotspotActivity = news;
     if (this.useDeckGL) {
       this.deckGLMap?.updateHotspotActivity(news);
     } else {
@@ -476,6 +617,8 @@ export class MapContainer {
   }
 
   public updateMilitaryForEscalation(flights: MilitaryFlight[], vessels: MilitaryVessel[]): void {
+    this.cachedEscalationFlights = flights;
+    this.cachedEscalationVessels = vessels;
     if (this.useDeckGL) {
       this.deckGLMap?.updateMilitaryForEscalation(flights, vessels);
     } else {
@@ -501,27 +644,32 @@ export class MapContainer {
   // ─── Callback setters ────────────────────────────────────────────────────────
 
   public onHotspotClicked(callback: (hotspot: Hotspot) => void): void {
+    this.cachedOnHotspotClicked = callback;
     if (this.useGlobe) { this.globeMap?.setOnHotspotClick(callback); return; }
     if (this.useDeckGL) { this.deckGLMap?.setOnHotspotClick(callback); } else { this.svgMap?.onHotspotClicked(callback); }
   }
 
   public onTimeRangeChanged(callback: (range: TimeRange) => void): void {
+    this.cachedOnTimeRangeChanged = callback;
     if (this.useGlobe) { this.globeMap?.onTimeRangeChanged(callback); return; }
     if (this.useDeckGL) { this.deckGLMap?.setOnTimeRangeChange(callback); } else { this.svgMap?.onTimeRangeChanged(callback); }
   }
 
   public setOnLayerChange(callback: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void): void {
+    this.cachedOnLayerChange = callback;
     if (this.useGlobe) { this.globeMap?.setOnLayerChange(callback); return; }
     if (this.useDeckGL) { this.deckGLMap?.setOnLayerChange(callback); } else { this.svgMap?.setOnLayerChange(callback); }
   }
 
   public setOnAircraftPositionsUpdate(callback: (positions: PositionSample[]) => void): void {
+    this.cachedOnAircraftPositionsUpdate = callback;
     if (this.useDeckGL) {
       this.deckGLMap?.setOnAircraftPositionsUpdate(callback);
     }
   }
 
   public onStateChanged(callback: (state: MapContainerState) => void): void {
+    this.cachedOnStateChanged = callback;
     if (this.useGlobe) { this.globeMap?.onStateChanged(callback); return; }
     if (this.useDeckGL) {
       this.deckGLMap?.setOnStateChange((state) => {
@@ -674,6 +822,7 @@ export class MapContainer {
   }
 
   public onCountryClicked(callback: (country: CountryClickPayload) => void): void {
+    this.cachedOnCountryClicked = callback;
     if (this.useGlobe) { this.globeMap?.setOnCountryClick(callback); return; }
     if (this.useDeckGL) { this.deckGLMap?.setOnCountryClick(callback); } else { this.svgMap?.setOnCountryClick(callback); }
   }
@@ -719,5 +868,49 @@ export class MapContainer {
     this.globeMap?.destroy();
     this.deckGLMap?.destroy();
     this.svgMap?.destroy();
+    this.clearCache();
+  }
+
+  private clearCache(): void {
+    this.cachedOnStateChanged = null;
+    this.cachedOnLayerChange = null;
+    this.cachedOnTimeRangeChanged = null;
+    this.cachedOnCountryClicked = null;
+    this.cachedOnHotspotClicked = null;
+    this.cachedOnAircraftPositionsUpdate = null;
+    this.cachedEarthquakes = null;
+    this.cachedWeatherAlerts = null;
+    this.cachedOutages = null;
+    this.cachedAisDisruptions = null;
+    this.cachedAisDensity = null;
+    this.cachedCableAdvisories = null;
+    this.cachedRepairShips = null;
+    this.cachedCableHealth = null;
+    this.cachedProtests = null;
+    this.cachedFlightDelays = null;
+    this.cachedAircraftPositions = null;
+    this.cachedMilitaryFlights = null;
+    this.cachedMilitaryFlightClusters = null;
+    this.cachedMilitaryVessels = null;
+    this.cachedMilitaryVesselClusters = null;
+    this.cachedNaturalEvents = null;
+    this.cachedFires = null;
+    this.cachedTechEvents = null;
+    this.cachedUcdpEvents = null;
+    this.cachedDisplacementFlows = null;
+    this.cachedClimateAnomalies = null;
+    this.cachedGpsJamming = null;
+    this.cachedCyberThreats = null;
+    this.cachedIranEvents = null;
+    this.cachedNewsLocations = null;
+    this.cachedPositiveEvents = null;
+    this.cachedKindnessData = null;
+    this.cachedHappinessScores = null;
+    this.cachedCIIScores = null;
+    this.cachedSpeciesRecovery = null;
+    this.cachedRenewableInstallations = null;
+    this.cachedHotspotActivity = null;
+    this.cachedEscalationFlights = null;
+    this.cachedEscalationVessels = null;
   }
 }
