@@ -18,6 +18,9 @@ import Globe from 'globe.gl';
 import type { GlobeInstance, ConfigOptions } from 'globe.gl';
 import { INTEL_HOTSPOTS, CONFLICT_ZONES, GEOPOLITICAL_BOUNDARIES, MILITARY_BASES, NUCLEAR_FACILITIES, SPACEPORTS, ECONOMIC_CENTERS, STRATEGIC_WATERWAYS, CRITICAL_MINERALS, UNDERSEA_CABLES } from '@/config/geo';
 import { PIPELINES } from '@/config/pipelines';
+import { t } from '@/services/i18n';
+import { SITE_VARIANT } from '@/config/variant';
+import { getLayersForVariant, resolveLayerLabel, type MapVariant } from '@/config/map-layer-definitions';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
@@ -489,9 +492,7 @@ export class GlobeMap {
     // Navigate to initial view
     this.setView(this.currentView);
 
-    // Day/Night is a DeckGL solar-terminator polygon layer — not available on globe
-    this.layers.dayNight = false;
-    this.hideLayerToggle('dayNight');
+    // dayNight toggle excluded by catalog (renderers: ['flat'])
 
     // Flush any data that arrived before init completed
     this.flushMarkers();
@@ -957,39 +958,12 @@ export class GlobeMap {
   }
 
   private createLayerToggles(): void {
-    const layers: Array<{ key: keyof MapLayers; label: string; icon: string }> = [
-      // Conflict & Security
-      { key: 'iranAttacks',  label: 'Iran Attacks',          icon: '&#127919;' },
-      { key: 'hotspots',     label: 'Intel Hotspots',        icon: '&#127919;' },
-      { key: 'conflicts',    label: 'Conflict Zones',         icon: '&#9876;'   },
-      { key: 'bases',        label: 'Military Bases',         icon: '&#127963;' },
-      { key: 'nuclear',      label: 'Nuclear Sites',          icon: '&#9762;'   },
-      { key: 'irradiators',  label: 'Gamma Irradiators',      icon: '&#9888;'   },
-      { key: 'spaceports',   label: 'Spaceports',             icon: '&#128640;' },
-      { key: 'military',     label: 'Military Activity',      icon: '&#9992;'   },
-      { key: 'ais',          label: 'Ship Traffic',           icon: '&#128674;' },
-      { key: 'flights',      label: 'Flight Delays',          icon: '&#9992;'   },
-      { key: 'protests',     label: 'Protests & Unrest',      icon: '&#128226;' },
-      { key: 'ucdpEvents',   label: 'UCDP Events',            icon: '&#9876;'   },
-      { key: 'displacement', label: 'Displacement Flows',     icon: '&#128101;' },
-      // Infrastructure
-      { key: 'cables',       label: 'Undersea Cables',        icon: '&#128268;' },
-      { key: 'pipelines',    label: 'Pipelines',              icon: '&#128738;' },
-      { key: 'datacenters',  label: 'Data Centers',           icon: '&#128421;' },
-      { key: 'tradeRoutes',  label: 'Trade Routes',           icon: '&#9875;'   },
-      { key: 'waterways',    label: 'Strategic Waterways',    icon: '&#9875;'   },
-      { key: 'economic',     label: 'Economic Centers',       icon: '&#128176;' },
-      { key: 'minerals',     label: 'Critical Minerals',      icon: '&#128142;' },
-      // Hazards & Environment
-      { key: 'weather',      label: 'Weather Alerts',         icon: '&#9928;'   },
-      { key: 'natural',      label: 'Natural Events',         icon: '&#127755;' },
-      { key: 'fires',        label: 'Wildfires',              icon: '&#128293;' },
-      { key: 'climate',      label: 'Climate Anomalies',      icon: '&#127787;' },
-      { key: 'outages',      label: 'Internet Outages',       icon: '&#128225;' },
-      { key: 'cyberThreats', label: 'Cyber Threats',          icon: '&#128737;' },
-      { key: 'gpsJamming',   label: 'GPS Jamming',            icon: '&#128225;' },
-      { key: 'dayNight',     label: 'Day / Night',            icon: '&#127763;' },
-    ];
+    const layerDefs = getLayersForVariant((SITE_VARIANT || 'full') as MapVariant, 'globe');
+    const layers = layerDefs.map(def => ({
+      key: def.key,
+      label: resolveLayerLabel(def, t),
+      icon: def.icon,
+    }));
 
     const el = document.createElement('div');
     el.className = 'layer-toggles deckgl-layer-toggles';
@@ -998,7 +972,7 @@ export class GlobeMap {
     el.style.top = '10px';
     el.innerHTML = `
       <div class="toggle-header">
-        <span>LAYERS</span>
+        <span>${t('components.deckgl.layersTitle')}</span>
         <button class="toggle-collapse">&#9660;</button>
       </div>
       <div class="toggle-list" style="max-height:32vh;overflow-y:auto;scrollbar-width:thin;">
@@ -1356,12 +1330,13 @@ export class GlobeMap {
   // ─── Layer control ────────────────────────────────────────────────────────
 
   public setLayers(layers: MapLayers): void {
-    this.layers = { ...layers, dayNight: false }; // dayNight unsupported on globe
+    // dayNight toggle excluded by catalog — harmless if true in memory
+    this.layers = { ...layers };
     this.flushMarkers();
   }
 
   public enableLayer(layer: keyof MapLayers): void {
-    if (layer === 'dayNight') return; // unsupported on globe
+    // dayNight toggle excluded by catalog — no guard needed
     (this.layers as any)[layer] = true;
     this.flushMarkers();
   }
