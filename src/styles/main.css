@@ -8248,11 +8248,6 @@ a.prediction-link:hover {
   margin-right: 4px;
 }
 
-/* Mobile search trigger bar — hidden on desktop */
-.search-mobile-trigger {
-  display: none;
-}
-
 /* Mobile bottom sheet search */
 .search-overlay.search-mobile {
   align-items: flex-end;
@@ -8262,7 +8257,7 @@ a.prediction-link:hover {
 
 .search-overlay.search-mobile .search-sheet {
   width: 100%;
-  max-height: 75vh;
+  max-height: 50vh;
   background: var(--surface);
   border-radius: 16px 16px 0 0;
   display: flex;
@@ -8309,11 +8304,11 @@ a.prediction-link:hover {
   background: none;
   border: none;
   color: var(--accent, #4488ff);
-  font-size: 14px;
+  font-size: 20px;
   font-family: inherit;
   cursor: pointer;
   padding: 4px 8px;
-  white-space: nowrap;
+  line-height: 1;
 }
 
 .search-sheet-chips {
@@ -8347,35 +8342,13 @@ a.prediction-link:hover {
 }
 
 @media (max-width: 768px) {
-  .search-mobile-trigger {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: fixed;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    left: 16px;
-    right: 16px;
-    padding: 12px 18px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 28px;
-    box-shadow: 0 4px 20px var(--shadow-color);
-    color: var(--text-dim);
-    font-size: 14px;
-    cursor: pointer;
-    z-index: 500;
-  }
-
-  .search-mobile-trigger:active {
-    background: var(--bg);
-  }
-
   .search-btn {
     display: none !important;
   }
 
   .search-overlay.search-mobile .search-results {
-    max-height: calc(75vh - 120px);
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -10026,7 +9999,6 @@ a.prediction-link:hover {
     flex-direction: column;
     gap: 8px;
     padding: 8px;
-    padding-bottom: 72px;
   }
 
   body {

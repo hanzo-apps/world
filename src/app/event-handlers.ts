@@ -241,11 +241,6 @@ export class EventHandlerManager implements AppModule {
     document.getElementById('searchBtn')?.addEventListener('click', openSearch);
     document.getElementById('mobileSearchBtn')?.addEventListener('click', openSearch);
 
-    document.getElementById('searchMobileTrigger')?.addEventListener('click', () => {
-      this.callbacks.updateSearchIndex();
-      this.ctx.searchModal?.open();
-    });
-
     document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
       const shareUrl = this.getShareUrl();
       if (!shareUrl) return;

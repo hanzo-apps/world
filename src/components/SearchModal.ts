@@ -83,6 +83,7 @@ export class SearchModal {
   private resultsList: HTMLElement | null = null;
   private chipsContainer: HTMLElement | null = null;
   private closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private viewportHandler: (() => void) | null = null;
   private sources: SearchableSource[] = [];
   private results: SearchResult[] = [];
   private commandResults: CommandResult[] = [];
@@ -138,6 +139,10 @@ export class SearchModal {
   }
 
   public close(): void {
+    if (this.viewportHandler && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this.viewportHandler);
+      this.viewportHandler = null;
+    }
     if (this.overlay) {
       this.overlay.classList.remove('open');
       const remove = () => {
@@ -176,7 +181,7 @@ export class SearchModal {
           <div class="search-sheet-header">
             <span class="search-sheet-icon">\u{1F50D}</span>
             <input type="text" class="search-input" placeholder="${this.placeholder}" autofocus />
-            <button class="search-sheet-cancel">${t('modals.search.close')}</button>
+            <button class="search-sheet-cancel" aria-label="Close">\u00D7</button>
           </div>
           <div class="search-sheet-chips"></div>
           <div class="search-results"></div>
@@ -193,6 +198,16 @@ export class SearchModal {
 
       this.container.appendChild(this.overlay);
       requestAnimationFrame(() => this.overlay?.classList.add('open'));
+
+      const sheet = this.overlay.querySelector('.search-sheet') as HTMLElement | null;
+      if (sheet && window.visualViewport) {
+        const vv = window.visualViewport;
+        this.viewportHandler = () => {
+          if (!sheet.isConnected) return;
+          sheet.style.maxHeight = `${vv.height * 0.85}px`;
+        };
+        vv.addEventListener('resize', this.viewportHandler);
+      }
     } else {
       this.overlay.className = 'search-overlay';
       this.overlay.innerHTML = `
@@ -294,15 +309,16 @@ export class SearchModal {
       'techcompany', 'ailab', 'startup', 'techevent', 'techhq', 'accelerator'
     ];
 
+    const maxResults = this.isMobile ? 5 : MAX_RESULTS;
     this.results = [];
     for (const type of priority) {
       const matches = byType.get(type) || [];
       matches.sort((a, b) => b._score - a._score);
-      const limit = type === 'news' ? 6 : type === 'country' ? 4 : 3;
+      const limit = this.isMobile ? 2 : (type === 'news' ? 6 : type === 'country' ? 4 : 3);
       this.results.push(...matches.slice(0, limit));
-      if (this.results.length >= MAX_RESULTS) break;
+      if (this.results.length >= maxResults) break;
     }
-    this.results = this.results.slice(0, MAX_RESULTS);
+    this.results = this.results.slice(0, maxResults);
 
     trackSearchUsed(query.length, this.results.length + this.commandResults.length);
     this.selectedIndex = 0;
@@ -362,7 +378,7 @@ export class SearchModal {
       { icon: '\u2699\uFE0F', key: 'commands.tips.settings', exampleKey: 'commands.tips.settingsExample' },
     ];
 
-    const shuffled = tips.sort(() => Math.random() - 0.5).slice(0, 4);
+    const shuffled = tips.sort(() => Math.random() - 0.5).slice(0, this.isMobile ? 2 : 4);
 
     let html = `<div class="search-section-header">${t('modals.search.empty')}</div>`;
     shuffled.forEach((tip, i) => {
@@ -480,7 +496,7 @@ export class SearchModal {
 
   private renderChips(query?: string): void {
     if (!this.chipsContainer) return;
-    if (query && query.length >= 3) {
+    if (query && query.length >= 1) {
       this.chipsContainer.innerHTML = '';
       return;
     }
