@@ -81,11 +81,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
   let suppressRowClick = false;
   let searchQuery = '';
 
-  const searchInput = document.getElementById('liveChannelsSearch') as HTMLInputElement | null;
-  if (searchInput) {
-    searchInput.value = '';
-    searchQuery = '';
-  }
+
 
   /** Reads current row order from DOM and persists to storage. */
   function applyOrderFromDom(listEl: HTMLElement): void {
@@ -578,8 +574,13 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     if (nameInput) nameInput.value = '';
   });
 
-  searchInput?.addEventListener('input', (e) => {
-    searchQuery = (e.target as HTMLInputElement).value;
-    renderAvailableChannels(listEl);
-  });
+  const searchInput = document.getElementById('liveChannelsSearch') as HTMLInputElement | null;
+  if (searchInput) {
+    searchInput.value = '';
+    searchQuery = '';
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = (e.target as HTMLInputElement).value;
+      renderAvailableChannels(listEl);
+    });
+  }
 }
