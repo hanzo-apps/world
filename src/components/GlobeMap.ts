@@ -20,6 +20,7 @@ import { INTEL_HOTSPOTS, CONFLICT_ZONES, GEOPOLITICAL_BOUNDARIES, MILITARY_BASES
 import { PIPELINES } from '@/config/pipelines';
 import { t } from '@/services/i18n';
 import { SITE_VARIANT } from '@/config/variant';
+import { getGlobeRenderScale, resolveGlobePixelRatio, subscribeGlobeRenderScaleChange, type GlobeRenderScale } from '@/services/globe-render-settings';
 import { getLayersForVariant, resolveLayerLabel, type MapVariant } from '@/config/map-layer-definitions';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
@@ -290,6 +291,8 @@ type GlobeMarker =
 export class GlobeMap {
   private container: HTMLElement;
   private globe: GlobeInstance | null = null;
+  private unsubscribeGlobeQuality: (() => void) | null = null;
+
   private initialized = false;
   private destroyed = false;
   private flushTimer: ReturnType<typeof requestAnimationFrame> | null = null;
@@ -369,9 +372,11 @@ export class GlobeMap {
   private async initGlobe(): Promise<void> {
     if (this.destroyed) return;
 
+    const initialScale = getGlobeRenderScale();
+    const initialPixelRatio = resolveGlobePixelRatio(initialScale);
     const config: ConfigOptions = {
       animateIn: false,
-      rendererConfig: { logarithmicDepthBuffer: true },
+      rendererConfig: { logarithmicDepthBuffer: true, antialias: initialPixelRatio > 1 },
     };
 
     const globe = new Globe(this.container, config) as GlobeInstance;
@@ -380,6 +385,23 @@ export class GlobeMap {
       globe._destructor();
       return;
     }
+
+    const applyRenderQuality = (scale?: GlobeRenderScale, width?: number, height?: number) => {
+      try {
+        const pr = resolveGlobePixelRatio(scale ?? getGlobeRenderScale());
+        const renderer = globe.renderer();
+        renderer.setPixelRatio(pr);
+        const w = (width ?? this.container.clientWidth) || window.innerWidth;
+        const h = (height ?? this.container.clientHeight) || window.innerHeight;
+        if (w > 0 && h > 0) globe.width(w).height(h);
+      } catch {
+        // best-effort
+      }
+    };
+
+    applyRenderQuality(initialScale);
+    this.unsubscribeGlobeQuality?.();
+    this.unsubscribeGlobeQuality = subscribeGlobeRenderScaleChange((scale) => applyRenderQuality(scale));
 
     // Initial sizing: use container dimensions, fall back to window if not yet laid out
     const initW = this.container.clientWidth || window.innerWidth;
@@ -420,7 +442,7 @@ export class GlobeMap {
       if (!this.globe || this.destroyed) return;
       const w = this.container.clientWidth;
       const h = this.container.clientHeight;
-      if (w > 0 && h > 0) this.globe.width(w).height(h);
+      applyRenderQuality(undefined, w, h);
     });
     this.resizeObserver.observe(this.container);
 
@@ -1713,6 +1735,8 @@ export class GlobeMap {
   // ─── Destroy ──────────────────────────────────────────────────────────────
 
   public destroy(): void {
+    this.unsubscribeGlobeQuality?.();
+    this.unsubscribeGlobeQuality = null;
     this.destroyed = true;
     if (this.flushTimer) { cancelAnimationFrame(this.flushTimer); this.flushTimer = null; }
     if (this.autoRotateTimer) clearTimeout(this.autoRotateTimer);

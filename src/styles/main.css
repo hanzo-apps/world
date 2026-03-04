@@ -13688,7 +13688,8 @@ a.prediction-link:hover {
   color: var(--green);
 }
 
-/* Language select */
+/* Unified settings selects */
+.unified-settings-select,
 .unified-settings-lang-select {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -13701,6 +13702,7 @@ a.prediction-link:hover {
   margin-top: 4px;
 }
 
+.unified-settings-select:focus,
 .unified-settings-lang-select:focus {
   outline: none;
   border-color: var(--text-dim);
