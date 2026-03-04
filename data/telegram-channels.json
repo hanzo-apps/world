@@ -237,6 +237,78 @@
         "enabled": true,
         "region": "ukraine",
         "maxMessages": 20
+      },
+      {
+        "handle": "nayaforiraq",
+        "label": "Naya for Iraq",
+        "topic": "politics",
+        "tier": 3,
+        "enabled": true,
+        "region": "middleeast",
+        "maxMessages": 20
+      },
+      {
+        "handle": "yediotnews25",
+        "label": "Yedioth News",
+        "topic": "breaking",
+        "tier": 3,
+        "enabled": true,
+        "region": "middleeast",
+        "maxMessages": 20
+      },
+      {
+        "handle": "DDGeopolitics",
+        "label": "DD Geopolitics",
+        "topic": "geopolitics",
+        "tier": 3,
+        "enabled": true,
+        "region": "global",
+        "maxMessages": 20
+      },
+      {
+        "handle": "FotrosResistancee",
+        "label": "Fotros Resistance",
+        "topic": "conflict",
+        "tier": 3,
+        "enabled": true,
+        "region": "iran",
+        "maxMessages": 20
+      },
+      {
+        "handle": "RezistanceTrench1",
+        "label": "Resistance Trench",
+        "topic": "conflict",
+        "tier": 3,
+        "enabled": true,
+        "region": "middleeast",
+        "maxMessages": 20
+      },
+      {
+        "handle": "geopolitics_prime",
+        "label": "Geopolitics Prime",
+        "topic": "geopolitics",
+        "tier": 3,
+        "enabled": true,
+        "region": "global",
+        "maxMessages": 20
+      },
+      {
+        "handle": "thecradlemedia",
+        "label": "The Cradle",
+        "topic": "middleeast",
+        "tier": 3,
+        "enabled": true,
+        "region": "middleeast",
+        "maxMessages": 20
+      },
+      {
+        "handle": "LebUpdate",
+        "label": "Lebanon Update",
+        "topic": "breaking",
+        "tier": 3,
+        "enabled": true,
+        "region": "middleeast",
+        "maxMessages": 20
       }
     ],
     "tech": [],
