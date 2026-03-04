@@ -8,6 +8,7 @@ export { SITE_VARIANT } from './variant';
 
 // Shared base configuration (always included)
 export {
+  IDLE_PAUSE_MS,
   REFRESH_INTERVALS,
   MONITOR_COLORS,
   STORAGE_KEYS,

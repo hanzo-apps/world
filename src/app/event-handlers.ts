@@ -20,6 +20,7 @@ import {
   setTheme,
 } from '@/utils';
 import {
+  IDLE_PAUSE_MS,
   STORAGE_KEYS,
   SITE_VARIANT,
   LAYER_TO_SOURCE,
@@ -84,7 +85,8 @@ export class EventHandlerManager implements AppModule {
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
-  private readonly IDLE_PAUSE_MS = 2 * 60 * 1000;
+
+  private readonly idlePauseMs = IDLE_PAUSE_MS;
   private readonly debouncedUrlSync = debounce(() => {
     const shareUrl = this.getShareUrl();
     if (!shareUrl) return;
@@ -318,6 +320,9 @@ export class EventHandlerManager implements AppModule {
 
     this.boundVisibilityHandler = () => {
       document.body?.classList.toggle('animations-paused', document.hidden);
+      if (this.ctx.isDesktopApp) {
+        this.ctx.map?.setRenderPaused(document.hidden);
+      }
       if (document.hidden) {
         this.callbacks.setHiddenSince(Date.now());
         mlWorker.unloadOptionalModels();
@@ -396,7 +401,7 @@ export class EventHandlerManager implements AppModule {
         document.body?.classList.add('animations-paused');
         console.log('[App] User idle - pausing animations to save resources');
       }
-    }, this.IDLE_PAUSE_MS);
+    }, this.idlePauseMs);
   }
 
   setupUrlStateSync(): void {
