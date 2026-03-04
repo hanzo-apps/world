@@ -564,12 +564,13 @@ export class GlobeMap {
 
     // Flush any data that arrived before init completed
     this.flushMarkers();
+    this.flushPolygons();
 
     // Load countries GeoJSON for CII choropleth
     getCountriesGeoJson().then(geojson => {
       if (geojson && !this.destroyed) {
         this.countriesGeoData = geojson;
-        if (this.ciiScoresMap.size > 0) this.flushPolygons();
+        this.flushPolygons();
       }
     }).catch(err => { if (import.meta.env.DEV) console.warn('[GlobeMap] Failed to load countries GeoJSON', err); });
   }
@@ -1482,12 +1483,14 @@ export class GlobeMap {
     // dayNight toggle excluded by catalog — harmless if true in memory
     this.layers = { ...layers };
     this.flushMarkers();
+    this.flushPolygons();
   }
 
   public enableLayer(layer: keyof MapLayers): void {
     // dayNight toggle excluded by catalog — no guard needed
     (this.layers as any)[layer] = true;
     this.flushMarkers();
+    this.flushPolygons();
   }
 
   // ─── Camera / navigation ──────────────────────────────────────────────────
