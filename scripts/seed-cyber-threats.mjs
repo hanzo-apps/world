@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, runSeed, verifySeedKey, writeExtraKey } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
+const ABUSEIPDB_RATE_KEY = 'rate:abuseipdb:last-call';
+const ABUSEIPDB_CACHE_KEY = 'cache:abuseipdb:threats';
+const ABUSEIPDB_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h — keeps daily calls under 100/day limit
+
 const CANONICAL_KEY = 'cyber:threats:v2';
 const BOOTSTRAP_KEY = 'cyber:threats-bootstrap:v2';
-const CACHE_TTL = 7200; // 2 hours
+const CACHE_TTL = 10800; // 3h — survives 1 missed 2h cron cycle
 
 const FEODO_URL = 'https://feodotracker.abuse.ch/downloads/ipblocklist.json';
 const URLHAUS_RECENT_URL = (limit) => `https://urlhaus-api.abuse.ch/v1/urls/recent/limit/${limit}/`;
@@ -430,6 +434,21 @@ async function fetchOtx(days) {
 async function fetchAbuseIpDb() {
   const apiKey = clean(process.env.ABUSEIPDB_API_KEY || '', 200);
   if (!apiKey) { console.log('  AbuseIPDB: skipped (no ABUSEIPDB_API_KEY)'); return { ok: false, threats: [] }; }
+
+  try {
+    const lastCall = await verifySeedKey(ABUSEIPDB_RATE_KEY);
+    const lastTs = lastCall?.calledAt || 0;
+    if (Date.now() - lastTs < ABUSEIPDB_MIN_INTERVAL_MS) {
+      const cached = await verifySeedKey(ABUSEIPDB_CACHE_KEY);
+      if (Array.isArray(cached) && cached.length > 0) {
+        console.log(`  AbuseIPDB: ${cached.length} threats (cached, called ${Math.round((Date.now() - lastTs) / 60000)}m ago)`);
+        return { ok: true, threats: cached };
+      }
+      console.log('  AbuseIPDB: skipped (rate limit, no cache)');
+      return { ok: false, threats: [] };
+    }
+  } catch { /* proceed if rate check fails */ }
+
   try {
     const url = `${ABUSEIPDB_BLACKLIST_URL}?confidenceMinimum=90&limit=${Math.min(MAX_LIMIT, 500)}`;
     const resp = await fetch(url, {
@@ -455,6 +474,8 @@ async function fetchAbuseIpDb() {
       if (threats.length >= MAX_LIMIT) break;
     }
     console.log(`  AbuseIPDB: ${threats.length} threats`);
+    await writeExtraKey(ABUSEIPDB_CACHE_KEY, threats, 86400).catch(() => {});
+    await writeExtraKey(ABUSEIPDB_RATE_KEY, { calledAt: Date.now() }, 86400).catch(() => {});
     return { ok: true, threats };
   } catch (e) {
     console.warn(`  AbuseIPDB: failed — ${e.message}`);
