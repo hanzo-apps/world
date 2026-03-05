@@ -18,7 +18,6 @@ import { getServerInsights, type ServerInsights, type ServerInsightStory } from 
 import type { ClusteredEvent, FocalPoint, MilitaryFlight } from '@/types';
 
 export class InsightsPanel extends Panel {
-  private isHidden = false;
   private lastBriefUpdate = 0;
   private cachedBrief: string | null = null;
   private lastMissedStories: AnalyzedHeadline[] = [];
@@ -39,12 +38,8 @@ export class InsightsPanel extends Panel {
       infoTooltip: t('components.insights.infoTooltip'),
     });
 
-    if (isMobileDevice()) {
-      this.hide();
-      this.isHidden = true;
-    }
-
     // Web-only: subscribe to AI flow changes so toggling providers re-runs analysis
+    // Skip on mobile — only server-side insights are used there (no client-side AI)
     if (!isDesktopRuntime() && !isMobileDevice()) {
       this.aiFlowUnsubscribe = subscribeAiFlowChange((changedKey) => {
         if (changedKey === 'mapNewsFlash') return;
@@ -258,8 +253,6 @@ export class InsightsPanel extends Panel {
   }
 
   public async updateInsights(clusters: ClusteredEvent[]): Promise<void> {
-    if (this.isHidden) return;
-
     this.lastClusters = clusters;
     this.updateGeneration++;
     const thisGeneration = this.updateGeneration;
@@ -277,7 +270,12 @@ export class InsightsPanel extends Panel {
       return;
     }
 
-    // Fallback: full client-side pipeline
+    // Fallback: full client-side pipeline (skip on mobile — too heavy)
+    if (isMobileDevice()) {
+      this.setDataBadge('unavailable');
+      this.setContent(`<div class="insights-empty">${t('components.insights.waitingForData')}</div>`);
+      return;
+    }
     await this.updateFromClient(clusters, thisGeneration);
   }
 
