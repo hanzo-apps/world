@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const BATCH_SIZE = 500;
+const R2_BUCKET_URL = 'https://api.cloudflare.com/client/v4/accounts/{acct}/r2/buckets/worldmonitor-data/objects/seed-data/military-bases-final.json';
+const CF_ACCOUNT_ID = 'c1dd10ed1008132d1e8d479b79a98b32';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
 const PROGRESS_INTERVAL = 5000;
@@ -241,7 +243,32 @@ async function main() {
 
   const volumePath = '/data/military-bases-final.json';
   const localPath = join(__dirname, 'data', 'military-bases-final.json');
-  const dataPath = existsSync(volumePath) ? volumePath : existsSync(localPath) ? localPath : null;
+  let dataPath = existsSync(volumePath) ? volumePath : existsSync(localPath) ? localPath : null;
+
+  if (!dataPath) {
+    const cfToken = process.env.CLOUDFLARE_R2_TOKEN || process.env.CLOUDFLARE_API_TOKEN || '';
+    if (cfToken) {
+      console.log('  Local file not found — downloading from R2...');
+      try {
+        const r2Url = R2_BUCKET_URL.replace('{acct}', CF_ACCOUNT_ID);
+        const resp = await fetch(r2Url, {
+          headers: { Authorization: `Bearer ${cfToken}` },
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (resp.ok) {
+          const body = await resp.text();
+          mkdirSync(join(__dirname, 'data'), { recursive: true });
+          writeFileSync(localPath, body);
+          dataPath = localPath;
+          console.log(`  Downloaded ${(body.length / 1024 / 1024).toFixed(1)}MB from R2`);
+        } else {
+          console.log(`  R2 download failed: HTTP ${resp.status}`);
+        }
+      } catch (err) {
+        console.log(`  R2 download failed: ${err.message}`);
+      }
+    }
+  }
 
   if (!dataPath) {
     const activeKey = `${prefix}military:bases:active`;
@@ -251,7 +278,7 @@ async function main() {
       console.log(`No data file found — Redis already has active version ${existing}, skipping.`);
       process.exit(0);
     }
-    console.error(`Data file not found at ${volumePath} or ${localPath}, and no existing data in Redis.`);
+    console.error(`Data file not found locally or on R2, and no existing data in Redis.`);
     process.exit(1);
   }
 
