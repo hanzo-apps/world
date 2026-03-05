@@ -6498,7 +6498,7 @@ a.prediction-link:hover {
 /* Map legend bar */
 .map-legend {
   position: absolute;
-  bottom: 8px;
+  bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -13567,7 +13567,8 @@ a.prediction-link:hover {
 .map-container::before {
   content: '© Elie Habib · Someone™';
   position: absolute;
-  left: 280px;
+  left: 12px;
+  bottom: 8px;
   z-index: 101;
   padding: 3px 10px;
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
@@ -13583,16 +13584,6 @@ a.prediction-link:hover {
     0 0 20px rgba(0, 229, 255, 0.15),
     inset 0 0 8px rgba(0, 229, 255, 0.05);
   pointer-events: none;
-}
-
-/* In 3D globe mode the legend bar is hidden, so the badge can sit lower */
-.map-container.globe-mode::before {
-  bottom: 38px;
-}
-
-/* In 2D flat-map mode, push above the legend bar */
-.map-container:not(.globe-mode)::before {
-  bottom: 58px;
 }
 
 /* Map tile attribution */
