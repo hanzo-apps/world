@@ -416,6 +416,23 @@ export function startSmartPollLoop(
   };
 }
 
+export async function waitForSidecarReady(timeoutMs = 3000): Promise<boolean> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) return false;
+  const pollInterval = 200;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${baseUrl}/api/service-status`, { method: 'GET' });
+      if (res.ok) return true;
+    } catch {
+      // sidecar not ready yet
+    }
+    await sleep(pollInterval);
+  }
+  return false;
+}
+
 function isLocalOnlyApiTarget(target: string): boolean {
   // Security boundary: endpoints that can carry local secrets must use the
   // `/api/local-*` prefix so cloud fallback is automatically blocked.
