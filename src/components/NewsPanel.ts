@@ -118,6 +118,14 @@ export class NewsPanel extends Panel {
     this.summaryContainer.style.display = 'none';
     this.element.insertBefore(this.summaryContainer, this.content);
 
+    // Event delegation: handle close button clicks inside summaryContainer
+    // regardless of how many times innerHTML is replaced by showSummary()
+    this.summaryContainer.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.panel-summary-close')) {
+        this.hideSummary();
+      }
+    });
+
     // Create summarize button
     this.summaryBtn = document.createElement('button');
     this.summaryBtn.className = 'panel-summarize-btn';
@@ -229,7 +237,7 @@ export class NewsPanel extends Panel {
         <button class="panel-summary-close" title="${t('components.newsPanel.close')}" aria-label="${t('components.newsPanel.close')}">×</button>
       </div>
     `;
-    this.summaryContainer.querySelector('.panel-summary-close')?.addEventListener('click', () => this.hideSummary());
+    // Close button click is handled via event delegation on summaryContainer (set up in constructor)
   }
 
   private hideSummary(): void {

@@ -192,9 +192,14 @@ export class MapPopup {
     // Append to body to avoid container overflow clipping
     document.body.appendChild(this.popup);
 
-    // Close button handler
-    this.popup.querySelector('.popup-close')?.addEventListener('click', () => this.hide());
-    this.popup.querySelector('.map-popup-sheet-handle')?.addEventListener('click', () => this.hide());
+    // Close button handler via event delegation on the popup element.
+    // This avoids re-querying and re-attaching listeners after innerHTML.
+    this.popup.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.popup-close') || target.closest('.map-popup-sheet-handle')) {
+        this.hide();
+      }
+    });
 
     if (this.isMobileSheet) {
       this.popup.addEventListener('touchstart', this.handleSheetTouchStart, { passive: true });
