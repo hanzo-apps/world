@@ -64,7 +64,7 @@ function toEpochMs(value) {
 async function fetchOutages() {
   const token = process.env.CLOUDFLARE_API_TOKEN;
   if (!token) {
-    console.error('CLOUDFLARE_API_TOKEN not set — skipping');
+    console.log('CLOUDFLARE_API_TOKEN not set — skipping');
     process.exit(0);
   }
 

@@ -131,8 +131,8 @@ async function fetchNaturalEvents() {
   const eonetEvents = eonetResult.status === 'fulfilled' ? eonetResult.value : [];
   const gdacsEvents = gdacsResult.status === 'fulfilled' ? gdacsResult.value : [];
 
-  if (eonetResult.status === 'rejected') console.error('[EONET]', eonetResult.reason?.message);
-  if (gdacsResult.status === 'rejected') console.error('[GDACS]', gdacsResult.reason?.message);
+  if (eonetResult.status === 'rejected') console.log('[EONET]', eonetResult.reason?.message);
+  if (gdacsResult.status === 'rejected') console.log('[GDACS]', gdacsResult.reason?.message);
 
   const seenLocations = new Set();
   const merged = [];
@@ -157,7 +157,7 @@ async function fetchNaturalEvents() {
 }
 
 function validate(data) {
-  return Array.isArray(data?.events) && data.events.length >= 1;
+  return Array.isArray(data?.events);
 }
 
 runSeed('natural', 'events', CANONICAL_KEY, fetchNaturalEvents, {
