@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, runSeed, sleep } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -15,14 +15,28 @@ const CRYPTO_META = {
   ripple: { name: 'XRP', symbol: 'XRP' },
 };
 
+async function fetchWithRateLimitRetry(url, maxAttempts = 5) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const resp = await fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (resp.status === 429) {
+      const wait = Math.min(10_000 * (i + 1), 60_000);
+      console.warn(`  CoinGecko 429 — waiting ${wait / 1000}s (attempt ${i + 1}/${maxAttempts})`);
+      await sleep(wait);
+      continue;
+    }
+    if (!resp.ok) throw new Error(`CoinGecko HTTP ${resp.status}`);
+    return resp;
+  }
+  throw new Error('CoinGecko rate limit exceeded after retries');
+}
+
 async function fetchCryptoQuotes() {
   const ids = CRYPTO_IDS.join(',');
   const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
-  const resp = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!resp.ok) throw new Error(`CoinGecko HTTP ${resp.status}`);
+  const resp = await fetchWithRateLimitRetry(url);
 
   const data = await resp.json();
   if (!Array.isArray(data) || data.length === 0) {

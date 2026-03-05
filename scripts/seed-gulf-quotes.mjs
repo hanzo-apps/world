@@ -29,6 +29,28 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (resp.status === 429) {
+      const wait = 5000 * (i + 1);
+      console.warn(`  [Yahoo] ${label} 429 — waiting ${wait / 1000}s (attempt ${i + 1}/${maxAttempts})`);
+      await sleep(wait);
+      continue;
+    }
+    if (!resp.ok) {
+      console.warn(`  [Yahoo] ${label} HTTP ${resp.status}`);
+      return null;
+    }
+    return resp;
+  }
+  console.warn(`  [Yahoo] ${label} rate limited after ${maxAttempts} attempts`);
+  return null;
+}
+
 function parseYahooChart(data, meta) {
   const result = data?.chart?.result?.[0];
   const chartMeta = result?.meta;
@@ -63,12 +85,8 @@ async function fetchGulfQuotes() {
 
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(meta.symbol)}`;
-      const resp = await fetch(url, {
-        headers: { 'User-Agent': CHROME_UA },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!resp.ok) {
-        console.warn(`  [Yahoo] ${meta.symbol} HTTP ${resp.status}`);
+      const resp = await fetchYahooWithRetry(url, meta.symbol);
+      if (!resp) {
         misses++;
         continue;
       }
