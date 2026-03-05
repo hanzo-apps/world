@@ -51,7 +51,7 @@
       "cable": "Undersea Cables",
       "datacenter": "Data Centers",
       "base": "Military Bases",
-      "nuclear": "Nuclear Facilities",
+      "nuclear": "Nearby Nuclear",
       "port": "Ports"
     },
     "levels": {

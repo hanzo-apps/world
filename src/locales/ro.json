@@ -51,7 +51,7 @@
       "cable": "Cabluri submarine",
       "datacenter": "Centre de date",
       "base": "Bazele militare",
-      "nuclear": "Instalații nucleare",
+      "nuclear": "Nuclear apropiat",
       "port": "Porturi"
     },
     "levels": {
@@ -618,7 +618,7 @@
         "cable": "Cabluri submarine",
         "datacenter": "Centre de date",
         "base": "Bazele militare",
-        "nuclear": "Instalații nucleare",
+        "nuclear": "Nuclear apropiat",
         "port": "Porturi"
       },
       "levels": {

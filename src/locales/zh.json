@@ -51,7 +51,7 @@
       "cable": "海底电缆",
       "datacenter": "数据中心",
       "base": "军事基地",
-      "nuclear": "核设施",
+      "nuclear": "附近核设施",
       "port": "港口"
     },
     "levels": {
@@ -512,7 +512,7 @@
         "cable": "海底电缆",
         "datacenter": "数据中心",
         "base": "军事基地",
-        "nuclear": "核设施",
+        "nuclear": "附近核设施",
         "port": "港口"
       },
       "levels": {
