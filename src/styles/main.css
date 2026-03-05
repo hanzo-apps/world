@@ -3782,7 +3782,7 @@ body.playback-mode .status-dot {
 
 .layer-toggles:not(.deckgl-layer-toggles) {
   position: absolute;
-  bottom: 10px;
+  bottom: 36px;
   left: 10px;
   display: flex;
   gap: 4px;
@@ -13253,7 +13253,7 @@ a.prediction-link:hover {
 /* deck.gl Layer Toggles */
 .deckgl-layer-toggles {
   position: absolute;
-  bottom: 10px;
+  bottom: 36px;
   left: 10px;
   z-index: 100;
   background: var(--bg);
