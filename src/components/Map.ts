@@ -159,6 +159,8 @@ export class MapComponent {
     nuclear: new Set(),
   };
   private boundVisibilityHandler!: () => void;
+  private handleThemeChange: () => void;
+  private resizeObserver: ResizeObserver | null = null;
   private renderScheduled = false;
   private lastRenderTime = 0;
   private readonly MIN_RENDER_INTERVAL_MS = 100;
@@ -211,16 +213,17 @@ export class MapComponent {
     this.loadMapData();
     this.setupResizeObserver();
 
-    window.addEventListener('theme-changed', () => {
+    this.handleThemeChange = () => {
       this.baseRendered = false;
       this.render();
-    });
+    };
+    window.addEventListener('theme-changed', this.handleThemeChange);
   }
 
   private setupResizeObserver(): void {
     let lastWidth = 0;
     let lastHeight = 0;
-    const resizeObserver = new ResizeObserver((entries) => {
+    this.resizeObserver = new ResizeObserver((entries) => {
       if (this.isResizing) return;
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -231,7 +234,7 @@ export class MapComponent {
         }
       }
     });
-    resizeObserver.observe(this.container);
+    this.resizeObserver.observe(this.container);
 
     // Re-render when page becomes visible again (after browser throttling)
     this.boundVisibilityHandler = () => {
@@ -255,7 +258,12 @@ export class MapComponent {
   }
 
   public destroy(): void {
+    window.removeEventListener('theme-changed', this.handleThemeChange);
     document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
     if (this.healthCheckLoop) {
       this.healthCheckLoop.stop();
       this.healthCheckLoop = null;
