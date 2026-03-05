@@ -11,6 +11,7 @@ import {
 } from '@/generated/client/worldmonitor/conflict/v1/service_client';
 import type { UcdpGeoEvent, UcdpEventType } from '@/types';
 import { createCircuitBreaker } from '@/utils';
+import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Client + Circuit Breakers (per-RPC; HAPI uses per-country map) ----
 
@@ -272,6 +273,9 @@ export async function fetchConflictEvents(): Promise<ConflictData> {
 }
 
 export async function fetchUcdpClassifications(): Promise<Map<string, UcdpConflictStatus>> {
+  const hydrated = getHydratedData('ucdpEvents') as ListUcdpEventsResponse | undefined;
+  if (hydrated?.events?.length) return deriveUcdpClassifications(hydrated.events);
+
   const resp = await ucdpBreaker.execute(async () => {
     return client.listUcdpEvents({ country: '', start: 0, end: 0, pageSize: 0, cursor: '' });
   }, emptyUcdpFallback);
@@ -313,6 +317,12 @@ interface UcdpEventsResponse {
 }
 
 export async function fetchUcdpEvents(): Promise<UcdpEventsResponse> {
+  const hydrated = getHydratedData('ucdpEvents') as ListUcdpEventsResponse | undefined;
+  if (hydrated?.events?.length) {
+    const events = hydrated.events.map(toUcdpGeoEvent);
+    return { success: true, count: events.length, data: events, cached_at: '' };
+  }
+
   const resp = await ucdpBreaker.execute(async () => {
     return client.listUcdpEvents({ country: '', start: 0, end: 0, pageSize: 0, cursor: '' });
   }, emptyUcdpFallback);
@@ -383,6 +393,9 @@ export function groupByType(events: UcdpGeoEvent[]): Record<string, UcdpGeoEvent
 }
 
 export async function fetchIranEvents(): Promise<IranEvent[]> {
+  const hydrated = getHydratedData('iranEvents') as ListIranEventsResponse | undefined;
+  if (hydrated?.events?.length) return hydrated.events;
+
   const resp = await iranBreaker.execute(async () => {
     const cacheBust = Math.floor(Date.now() / 120_000);
     const r = await globalThis.fetch(`/api/conflict/v1/list-iran-events?_v=${cacheBust}`);

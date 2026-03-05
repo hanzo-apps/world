@@ -10,6 +10,7 @@ import {
   type CabinClass,
 } from '@/generated/client/worldmonitor/aviation/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
+import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Consumer-friendly display types ----
 
@@ -281,6 +282,9 @@ const breakerNews = createCircuitBreaker<AviationNewsItem[]>({ name: 'Aviation N
 // ---- Public API ----
 
 export async function fetchFlightDelays(): Promise<AirportDelayAlert[]> {
+  const hydrated = getHydratedData('flightDelays') as { alerts?: ProtoAlert[] } | undefined;
+  if (hydrated?.alerts?.length) return hydrated.alerts.map(toDisplayAlert);
+
   return breakerDelays.execute(async () => {
     const r = await client.listAirportDelays({ region: 'AIRPORT_REGION_UNSPECIFIED', minSeverity: 'FLIGHT_DELAY_SEVERITY_UNSPECIFIED', pageSize: 0, cursor: '' });
     return r.alerts.map(toDisplayAlert);

@@ -6,6 +6,7 @@ import { miniSparkline } from '@/utils/sparkline';
 import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
 import type { ListGulfQuotesResponse, GulfQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { startSmartPollLoop, type SmartPollLoopHandle } from '@/services/runtime';
+import { getHydratedData } from '@/services/bootstrap';
 
 const client = new MarketServiceClient('', { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
 
@@ -48,6 +49,12 @@ export class GulfEconomiesPanel extends Panel {
 
   public async fetchData(): Promise<void> {
     try {
+      const hydrated = getHydratedData('gulfQuotes') as ListGulfQuotesResponse | undefined;
+      if (hydrated?.quotes?.length) {
+        if (!this.element?.isConnected) return;
+        this.renderGulf(hydrated);
+        return;
+      }
       const data = await client.listGulfQuotes({});
       if (!this.element?.isConnected) return;
       this.renderGulf(data);
