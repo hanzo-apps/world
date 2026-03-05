@@ -51,7 +51,7 @@
       "cable": "Cáp ngầm",
       "datacenter": "Trung tâm Dữ liệu",
       "base": "Căn cứ Quân sự",
-      "nuclear": "Cơ sở Hạt nhân",
+      "nuclear": "Hạt nhân lân cận",
       "port": "Cảng biển"
     },
     "levels": {
@@ -512,7 +512,7 @@
         "cable": "Cáp ngầm",
         "datacenter": "Trung tâm Dữ liệu",
         "base": "Căn cứ Quân sự",
-        "nuclear": "Cơ sở Hạt nhân",
+        "nuclear": "Hạt nhân lân cận",
         "port": "Cảng biển"
       },
       "levels": {

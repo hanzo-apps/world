@@ -51,7 +51,7 @@
       "cable": "Podmořské kabely",
       "datacenter": "Datová centra",
       "base": "Vojenské základny",
-      "nuclear": "Jaderná zařízení",
+      "nuclear": "Blízká jaderná",
       "port": "Přístavy"
     },
     "levels": {
@@ -512,7 +512,7 @@
         "cable": "Podmořské kabely",
         "datacenter": "Datová centra",
         "base": "Vojenské základny",
-        "nuclear": "Jaderná zařízení",
+        "nuclear": "Blízká jaderná",
         "port": "Přístavy"
       },
       "levels": {

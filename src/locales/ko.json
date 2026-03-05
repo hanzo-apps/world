@@ -51,7 +51,7 @@
       "cable": "해저 케이블",
       "datacenter": "데이터 센터",
       "base": "군사 기지",
-      "nuclear": "핵 시설",
+      "nuclear": "인근 핵시설",
       "port": "항구"
     },
     "levels": {
@@ -516,7 +516,7 @@
         "cable": "해저 케이블",
         "datacenter": "데이터 센터",
         "base": "군사 기지",
-        "nuclear": "핵 시설",
+        "nuclear": "인근 핵시설",
         "port": "항구"
       },
       "levels": {
