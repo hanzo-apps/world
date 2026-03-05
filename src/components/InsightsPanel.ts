@@ -323,7 +323,7 @@ export class InsightsPanel extends Panel {
 
       if (this.updateGeneration !== thisGeneration) return;
 
-      this.setDataBadge(serverInsights.status === 'ok' ? 'live' : 'cached');
+      this.setDataBadge('live');
       this.renderServerInsights(serverInsights, sentiments);
     } catch (error) {
       console.error('[InsightsPanel] Server path error, falling back:', error);
@@ -426,13 +426,12 @@ export class InsightsPanel extends Panel {
       if (this.updateGeneration !== thisGeneration) return;
 
       // Step 3: Generate World Brief (with cooldown)
-      const loadedFromPersistentCache = await this.loadBriefFromCache();
+      await this.loadBriefFromCache();
       if (this.updateGeneration !== thisGeneration) return;
 
       let worldBrief = this.cachedBrief;
       const now = Date.now();
 
-      let usedCachedBrief = loadedFromPersistentCache;
       if (!worldBrief || now - this.lastBriefUpdate > InsightsPanel.BRIEF_COOLDOWN_MS) {
         this.setProgress(3, totalSteps, t('components.insights.generatingBrief'));
 
@@ -453,15 +452,13 @@ export class InsightsPanel extends Panel {
           worldBrief = result.summary;
           this.cachedBrief = worldBrief;
           this.lastBriefUpdate = now;
-          usedCachedBrief = false;
           void setPersistentCache(InsightsPanel.BRIEF_CACHE_KEY, { summary: worldBrief });
         }
       } else {
-        usedCachedBrief = true;
         this.setProgress(3, totalSteps, 'Using cached brief...');
       }
 
-      this.setDataBadge(worldBrief ? (usedCachedBrief ? 'cached' : 'live') : 'unavailable');
+      this.setDataBadge(worldBrief ? 'live' : 'unavailable');
 
       // Step 4: Wait for parallel analysis to complete
       this.setProgress(4, totalSteps, 'Multi-perspective analysis...');
