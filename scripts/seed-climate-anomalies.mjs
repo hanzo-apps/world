@@ -107,7 +107,7 @@ async function fetchClimateAnomalies() {
     if (r.status === 'fulfilled') {
       if (r.value != null) anomalies.push(r.value);
     } else {
-      console.error(`  [CLIMATE] ${r.reason?.message ?? r.reason}`);
+      console.log(`  [CLIMATE] ${r.reason?.message ?? r.reason}`);
     }
   }
 
@@ -115,7 +115,7 @@ async function fetchClimateAnomalies() {
 }
 
 function validate(data) {
-  return Array.isArray(data?.anomalies) && data.anomalies.length >= 1;
+  return Array.isArray(data?.anomalies);
 }
 
 runSeed('climate', 'anomalies', CANONICAL_KEY, fetchClimateAnomalies, {

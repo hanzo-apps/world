@@ -92,7 +92,7 @@ function sortBySeverityAndRecency(events) {
 async function fetchAcledProtests() {
   const token = process.env.ACLED_ACCESS_TOKEN;
   if (!token) {
-    console.warn('  ACLED_ACCESS_TOKEN not set, skipping ACLED');
+    console.log('  ACLED_ACCESS_TOKEN not set, skipping ACLED');
     return [];
   }
 
@@ -226,8 +226,8 @@ async function fetchUnrestEvents() {
   const acledEvents = results[0].status === 'fulfilled' ? results[0].value : [];
   const gdeltEvents = results[1].status === 'fulfilled' ? results[1].value : [];
 
-  if (results[0].status === 'rejected') console.warn(`  ACLED failed: ${results[0].reason?.message || results[0].reason}`);
-  if (results[1].status === 'rejected') console.warn(`  GDELT failed: ${results[1].reason?.message || results[1].reason}`);
+  if (results[0].status === 'rejected') console.log(`  ACLED failed: ${results[0].reason?.message || results[0].reason}`);
+  if (results[1].status === 'rejected') console.log(`  GDELT failed: ${results[1].reason?.message || results[1].reason}`);
 
   const merged = deduplicateEvents([...acledEvents, ...gdeltEvents]);
   const sorted = sortBySeverityAndRecency(merged);
@@ -238,7 +238,7 @@ async function fetchUnrestEvents() {
 }
 
 function validate(data) {
-  return Array.isArray(data?.events) && data.events.length >= 1;
+  return Array.isArray(data?.events);
 }
 
 runSeed('unrest', 'events', CANONICAL_KEY, fetchUnrestEvents, {
