@@ -18,7 +18,7 @@ import {
   getFeedFailures,
   fetchMultipleStocks,
   fetchCrypto,
-  fetchPredictions,
+  fetchPredictions, type PredictionMarket,
   fetchEarthquakes,
   fetchWeatherAlerts,
   fetchFredData,
@@ -1108,6 +1108,19 @@ export class DataLoaderManager implements AppModule {
 
   async loadPredictions(): Promise<void> {
     try {
+      // Try bootstrap hydration first (instant data from seed)
+      const hydrated = getHydratedData('predictions') as { geopolitical?: PredictionMarket[]; tech?: PredictionMarket[] } | undefined;
+      if (hydrated) {
+        const bootstrapMarkets = (SITE_VARIANT === 'tech' ? hydrated.tech : hydrated.geopolitical) ?? [];
+        if (bootstrapMarkets.length > 0) {
+          this.ctx.latestPredictions = bootstrapMarkets;
+          (this.ctx.panels['polymarket'] as PredictionPanel).renderPredictions(bootstrapMarkets);
+          this.ctx.statusPanel?.updateFeed('Polymarket', { status: 'ok', itemCount: bootstrapMarkets.length });
+          dataFreshness.recordUpdate('polymarket', bootstrapMarkets.length);
+          dataFreshness.recordUpdate('predictions', bootstrapMarkets.length);
+        }
+      }
+
       const predictions = await fetchPredictions();
       this.ctx.latestPredictions = predictions;
       (this.ctx.panels['polymarket'] as PredictionPanel).renderPredictions(predictions);
