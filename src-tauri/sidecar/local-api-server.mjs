@@ -1201,6 +1201,37 @@ async function dispatch(requestUrl, req, routes, context) {
     return json({ error: 'POST required' }, 405);
   }
 
+  if (requestUrl.pathname === '/api/local-env-update-batch') {
+    if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
+    const body = await readBody(req);
+    if (!body) return json({ error: 'expected { entries: [{key, value}, ...] }' }, 400);
+    try {
+      const { entries } = JSON.parse(body.toString());
+      if (!Array.isArray(entries)) return json({ error: 'entries must be an array' }, 400);
+      if (entries.length > 50) return json({ error: 'too many entries (max 50)' }, 400);
+      const results = [];
+      for (const { key, value } of entries) {
+        if (typeof key !== 'string' || !key.length || !ALLOWED_ENV_KEYS.has(key)) {
+          results.push({ key, ok: false, error: 'not in allowlist' });
+          continue;
+        }
+        if (value == null || value === '') {
+          delete process.env[key];
+          context.logger.log(`[local-api] env unset: ${key}`);
+        } else {
+          process.env[key] = String(value);
+          context.logger.log(`[local-api] env set: ${key}`);
+        }
+        results.push({ key, ok: true });
+      }
+      moduleCache.clear();
+      failedImports.clear();
+      cloudPreferred.clear();
+      return json({ ok: true, results });
+    } catch { /* bad JSON */ }
+    return json({ error: 'invalid JSON' }, 400);
+  }
+
   if (requestUrl.pathname === '/api/local-validate-secret') {
     if (req.method !== 'POST') {
       return json({ error: 'POST required' }, 405);
@@ -1301,6 +1332,7 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-traffic-log'
       || requestUrl.pathname === '/api/local-debug-toggle'
       || requestUrl.pathname === '/api/local-env-update'
+      || requestUrl.pathname === '/api/local-env-update-batch'
       || requestUrl.pathname === '/api/local-validate-secret';
 
     try {

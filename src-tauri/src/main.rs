@@ -75,6 +75,8 @@ struct PersistentCache {
     data: Mutex<Map<String, Value>>,
     dirty: Mutex<bool>,
     write_lock: Mutex<()>,
+    generation: Mutex<u64>,
+    flush_scheduled: Mutex<bool>,
 }
 
 impl SecretsCache {
@@ -147,6 +149,8 @@ impl PersistentCache {
             data: Mutex::new(data),
             dirty: Mutex::new(false),
             write_lock: Mutex::new(()),
+            generation: Mutex::new(0),
+            flush_scheduled: Mutex::new(false),
         }
     }
 
@@ -156,6 +160,7 @@ impl PersistentCache {
     }
 
     /// Flush to disk only if dirty. Returns Ok(true) if written.
+    /// Uses atomic write (temp file + rename) to prevent corruption on crash.
     fn flush(&self, path: &Path) -> Result<bool, String> {
         let _write_guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -171,8 +176,13 @@ impl PersistentCache {
         let serialized = serde_json::to_string(&Value::Object(data.clone()))
             .map_err(|e| format!("Failed to serialize cache: {e}"))?;
         drop(data);
-        std::fs::write(path, serialized)
-            .map_err(|e| format!("Failed to write cache {}: {e}", path.display()))?;
+
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, &serialized)
+            .map_err(|e| format!("Failed to write cache tmp {}: {e}", tmp.display()))?;
+        std::fs::rename(&tmp, path)
+            .map_err(|e| format!("Failed to rename cache {}: {e}", path.display()))?;
+
         let mut dirty = self.dirty.lock().unwrap_or_else(|e| e.into_inner());
         *dirty = false;
         Ok(true)
@@ -338,7 +348,7 @@ fn read_cache_entry(webview: Webview, cache: tauri::State<'_, PersistentCache>, 
 }
 
 #[tauri::command]
-fn delete_cache_entry(webview: Webview, cache: tauri::State<'_, PersistentCache>, key: String) -> Result<(), String> {
+fn delete_cache_entry(webview: Webview, app: AppHandle, cache: tauri::State<'_, PersistentCache>, key: String) -> Result<(), String> {
     require_trusted_window(webview.label())?;
     {
         let mut data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
@@ -348,7 +358,39 @@ fn delete_cache_entry(webview: Webview, cache: tauri::State<'_, PersistentCache>
         let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
         *dirty = true;
     }
-    // Disk flush deferred to exit handler (cache.flush) — avoids blocking main thread
+    {
+        let mut gen = cache.generation.lock().unwrap_or_else(|e| e.into_inner());
+        *gen += 1;
+    }
+
+    let mut sched = cache.flush_scheduled.lock().unwrap_or_else(|e| e.into_inner());
+    if !*sched {
+        *sched = true;
+        let handle = app.app_handle().clone();
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let Some(c) = handle.try_state::<PersistentCache>() else { break };
+                let Ok(path) = cache_file_path(&handle) else { break };
+                let gen_before = *c.generation.lock().unwrap_or_else(|e| e.into_inner());
+                match c.flush(&path) {
+                    Ok(_) => {
+                        let gen_after = *c.generation.lock().unwrap_or_else(|e| e.into_inner());
+                        if gen_after > gen_before {
+                            continue;
+                        }
+                        *c.flush_scheduled.lock().unwrap_or_else(|e| e.into_inner()) = false;
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("[cache] flush error: {e}");
+                        continue;
+                    }
+                }
+            }
+        });
+    }
+
     Ok(())
 }
 
@@ -357,7 +399,6 @@ fn write_cache_entry(webview: Webview, app: AppHandle, cache: tauri::State<'_, P
     require_trusted_window(webview.label())?;
     let parsed_value: Value = serde_json::from_str(&value)
         .map_err(|e| format!("Invalid cache payload JSON: {e}"))?;
-    let _write_guard = cache.write_lock.lock().unwrap_or_else(|e| e.into_inner());
     {
         let mut data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
         data.insert(key, parsed_value);
@@ -366,19 +407,39 @@ fn write_cache_entry(webview: Webview, app: AppHandle, cache: tauri::State<'_, P
         let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
         *dirty = true;
     }
-
-    // Flush synchronously under write lock so concurrent writes cannot reorder.
-    let path = cache_file_path(&app)?;
-    let data = cache.data.lock().unwrap_or_else(|e| e.into_inner());
-    let serialized = serde_json::to_string(&Value::Object(data.clone()))
-        .map_err(|e| format!("Failed to serialize cache: {e}"))?;
-    drop(data);
-    std::fs::write(&path, &serialized)
-        .map_err(|e| format!("Failed to write cache {}: {e}", path.display()))?;
     {
-        let mut dirty = cache.dirty.lock().unwrap_or_else(|e| e.into_inner());
-        *dirty = false;
+        let mut gen = cache.generation.lock().unwrap_or_else(|e| e.into_inner());
+        *gen += 1;
     }
+
+    let mut sched = cache.flush_scheduled.lock().unwrap_or_else(|e| e.into_inner());
+    if !*sched {
+        *sched = true;
+        let handle = app.app_handle().clone();
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let Some(c) = handle.try_state::<PersistentCache>() else { break };
+                let Ok(path) = cache_file_path(&handle) else { break };
+                let gen_before = *c.generation.lock().unwrap_or_else(|e| e.into_inner());
+                match c.flush(&path) {
+                    Ok(_) => {
+                        let gen_after = *c.generation.lock().unwrap_or_else(|e| e.into_inner());
+                        if gen_after > gen_before {
+                            continue;
+                        }
+                        *c.flush_scheduled.lock().unwrap_or_else(|e| e.into_inner()) = false;
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("[cache] flush error: {e}");
+                        continue;
+                    }
+                }
+            }
+        });
+    }
+
     Ok(())
 }
 
