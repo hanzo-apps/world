@@ -389,6 +389,7 @@ export class DeckGLMap {
   private debouncedFetchBases: (() => void) & { cancel(): void };
   private debouncedFetchAircraft: (() => void) & { cancel(): void };
   private rafUpdateLayers: (() => void) & { cancel(): void };
+  private handleThemeChange: (e: Event) => void;
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private lastAircraftFetchCenter: [number, number] | null = null;
   private lastAircraftFetchZoom = -1;
@@ -414,13 +415,14 @@ export class DeckGLMap {
     this.setupDOM();
     this.popup = new MapPopup(container);
 
-    window.addEventListener('theme-changed', (e: Event) => {
+    this.handleThemeChange = (e: Event) => {
       const theme = (e as CustomEvent).detail?.theme as 'dark' | 'light';
       if (theme) {
         this.switchBasemap(theme);
         this.render(); // Rebuilds Deck.GL layers with new theme-aware colors
       }
-    });
+    };
+    window.addEventListener('theme-changed', this.handleThemeChange);
 
     this.initMapLibre();
 
@@ -4780,6 +4782,7 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
+    window.removeEventListener('theme-changed', this.handleThemeChange);
     this.debouncedRebuildLayers.cancel();
     this.debouncedFetchBases.cancel();
     this.debouncedFetchAircraft.cancel();
