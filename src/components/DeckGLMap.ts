@@ -150,14 +150,15 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 const MAP_INTERACTION_MODE: MapInteractionMode =
   import.meta.env.VITE_MAP_INTERACTION_MODE === 'flat' ? 'flat' : '3d';
 
-// Theme-aware basemap vector style URLs (English labels, no local scripts)
-// Happy variant uses self-hosted warm styles; default uses CARTO CDN
 const DARK_STYLE = SITE_VARIANT === 'happy'
   ? '/map-styles/happy-dark.json'
   : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const LIGHT_STYLE = SITE_VARIANT === 'happy'
   ? '/map-styles/happy-light.json'
   : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+
+const FALLBACK_DARK_STYLE = 'https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json';
+const FALLBACK_LIGHT_STYLE = 'https://tiles.stadiamaps.com/styles/alidade_smooth.json';
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
@@ -357,6 +358,7 @@ export class DeckGLMap {
   private renderPaused = false;
   private renderPending = false;
   private webglLost = false;
+  private usedFallbackStyle = false;
 
 
   private layerCache: Map<string, Layer> = new Map();
@@ -498,6 +500,16 @@ export class DeckGLMap {
           touchPitch: false,
         }
         : {}),
+    });
+
+    this.maplibreMap.on('error', (e: { error?: Error; message?: string }) => {
+      const msg = e.error?.message ?? e.message ?? '';
+      if (!this.usedFallbackStyle && (msg.includes('Failed to fetch') || msg.includes('AJAXError'))) {
+        this.usedFallbackStyle = true;
+        const fallback = initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
+        console.warn(`[DeckGLMap] Primary basemap failed, switching to fallback: ${fallback}`);
+        this.maplibreMap?.setStyle(fallback);
+      }
     });
 
     const canvas = this.maplibreMap.getCanvas();
@@ -4713,7 +4725,9 @@ export class DeckGLMap {
 
   private switchBasemap(theme: 'dark' | 'light'): void {
     if (!this.maplibreMap) return;
-    this.maplibreMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
+    const primary = theme === 'light' ? LIGHT_STYLE : DARK_STYLE;
+    const fallback = theme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
+    this.maplibreMap.setStyle(this.usedFallbackStyle ? fallback : primary);
     // setStyle() replaces all sources/layers — reset guard so country layers are re-added
     this.countryGeoJsonLoaded = false;
     this.maplibreMap.once('style.load', () => {
