@@ -1,19 +1,30 @@
-# World Monitor v2
+# World Monitor — Full Documentation
 
 AI-powered real-time global intelligence dashboard aggregating news, markets, geopolitical data, and infrastructure monitoring into a unified situation awareness interface.
 
-🌐 **[Live Demo: worldmonitor.app](https://worldmonitor.app)** | 💻 **[Tech Variant: tech.worldmonitor.app](https://tech.worldmonitor.app)**
+[Live Demo: worldmonitor.app](https://worldmonitor.app) | [Tech Variant: tech.worldmonitor.app](https://tech.worldmonitor.app) | [Finance Variant: finance.worldmonitor.app](https://finance.worldmonitor.app) | [Happy Variant: happy.worldmonitor.app](https://happy.worldmonitor.app)
 
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
-![D3.js](https://img.shields.io/badge/D3.js-F9A03C?style=flat&logo=d3.js&logoColor=white)
-![Version](https://img.shields.io/badge/version-2.5.1-blue)
+## Documentation Index
 
-![World Monitor Dashboard](../new-world-monitor.png)
+| Document | Description |
+|---|---|
+| [README](../README.md) | Project overview, quick start, and self-hosting guide |
+| [Algorithms](./ALGORITHMS.md) | Scoring formulas, detection algorithms, classification pipelines |
+| [Data Sources](./DATA_SOURCES.md) | All 31+ data sources, feed tiers, and collection methods |
+| [Architecture](./ARCHITECTURE.md) | System design, caching, bootstrap hydration, edge functions |
+| [Map Engine](./MAP_ENGINE.md) | 3D globe and flat map rendering details |
+| [AI Intelligence](./AI_INTELLIGENCE.md) | LLM chains, RAG, threat classification, deduction |
+| [Desktop App](./DESKTOP_APP.md) | Tauri architecture, sidecar, secret management |
+| [Finance Data](./FINANCE_DATA.md) | Market radar, Gulf FDI, stablecoins, BIS, WTO |
+| [API Reference](./api/) | OpenAPI specs for all 22 services |
+| [Adding Endpoints](./ADDING_ENDPOINTS.md) | Guide for adding new RPC endpoints |
+| [Release Packaging](./RELEASE_PACKAGING.md) | Desktop build and release process |
+
+---
 
 ## Platform Variants
 
-World Monitor runs two specialized variants from a single codebase, each optimized for different monitoring needs:
+World Monitor runs four specialized variants from a single codebase, each optimized for different monitoring needs:
 
 | Variant | URL | Focus |
 |---------|-----|-------|
