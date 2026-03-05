@@ -956,6 +956,37 @@ canvas,
   z-index: 100;
 }
 
+.map-dimension-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-right: 2px;
+}
+
+.map-dim-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.map-dim-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.map-dim-btn.active {
+  background: var(--green);
+  color: var(--bg);
+}
+
 .map-pin-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -13375,6 +13406,16 @@ a.prediction-link:hover {
   border-color: rgba(68, 255, 136, 0.2);
 }
 
+.deckgl-layer-toggles .layer-toggle.limit-reached {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.layer-toggles:not(.deckgl-layer-toggles) .layer-toggle.limit-reached {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 /* deck.gl Legend - horizontal bar at bottom center */
 .deckgl-legend {
   position: absolute;
@@ -13520,6 +13561,29 @@ a.prediction-link:hover {
 .maplibregl-ctrl-top-right,
 .maplibregl-ctrl-bottom-right {
   display: none;
+}
+
+/* Map author credit badge (bottom-left, styled like globe BETA badge) */
+.map-container::before {
+  content: '© Elie Habib · Someone™';
+  position: absolute;
+  bottom: 38px;
+  left: 280px;
+  z-index: 101;
+  padding: 3px 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 4px;
+  box-shadow:
+    0 0 6px rgba(0, 229, 255, 0.3),
+    0 0 20px rgba(0, 229, 255, 0.15),
+    inset 0 0 8px rgba(0, 229, 255, 0.05);
+  pointer-events: none;
 }
 
 /* Map tile attribution */
