@@ -27,12 +27,23 @@ export const serverOptions: ServerOptions = { onError: mapErrorToResponse };
 type CacheTier = 'fast' | 'medium' | 'slow' | 'static' | 'daily' | 'no-store';
 
 const TIER_HEADERS: Record<CacheTier, string> = {
-  fast: 'public, s-maxage=120, stale-while-revalidate=30, stale-if-error=300',
-  medium: 'public, s-maxage=300, stale-while-revalidate=60, stale-if-error=600',
-  slow: 'public, s-maxage=900, stale-while-revalidate=120, stale-if-error=1800',
-  static: 'public, s-maxage=3600, stale-while-revalidate=300, stale-if-error=7200',
-  daily: 'public, s-maxage=86400, stale-while-revalidate=3600, stale-if-error=172800',
+  fast: 'public, s-maxage=300, stale-while-revalidate=60, stale-if-error=600',
+  medium: 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900',
+  slow: 'public, s-maxage=1800, stale-while-revalidate=300, stale-if-error=3600',
+  static: 'public, s-maxage=7200, stale-while-revalidate=600, stale-if-error=14400',
+  daily: 'public, s-maxage=86400, stale-while-revalidate=7200, stale-if-error=172800',
   'no-store': 'no-store',
+};
+
+// Cloudflare-specific cache TTLs — more aggressive than s-maxage since CF can
+// revalidate via ETag/If-None-Match without full payload transfer.
+const TIER_CDN_CACHE: Record<CacheTier, string | null> = {
+  fast: 'public, s-maxage=600, stale-while-revalidate=300, stale-if-error=1200',
+  medium: 'public, s-maxage=1200, stale-while-revalidate=600, stale-if-error=1800',
+  slow: 'public, s-maxage=3600, stale-while-revalidate=900, stale-if-error=7200',
+  static: 'public, s-maxage=14400, stale-while-revalidate=3600, stale-if-error=28800',
+  daily: 'public, s-maxage=86400, stale-while-revalidate=14400, stale-if-error=172800',
+  'no-store': null,
 };
 
 const RPC_CACHE_TIER: Record<string, CacheTier> = {
@@ -227,12 +238,39 @@ export function createDomainGateway(
         const envOverride = process.env[`CACHE_TIER_OVERRIDE_${rpcName.replace(/-/g, '_').toUpperCase()}`] as CacheTier | undefined;
         const tier = (envOverride && envOverride in TIER_HEADERS ? envOverride : null) ?? RPC_CACHE_TIER[pathname] ?? 'medium';
         mergedHeaders.set('Cache-Control', TIER_HEADERS[tier]);
+        const cdnCache = TIER_CDN_CACHE[tier];
+        if (cdnCache) mergedHeaders.set('CDN-Cache-Control', cdnCache);
         mergedHeaders.set('X-Cache-Tier', tier);
       }
     }
     mergedHeaders.delete('X-No-Cache');
     if (!new URL(request.url).searchParams.has('_debug')) {
       mergedHeaders.delete('X-Cache-Tier');
+    }
+
+    // ETag / 304 Not Modified — avoid resending unchanged data
+    if (response.status === 200 && request.method === 'GET' && response.body) {
+      const bodyBytes = await response.arrayBuffer();
+      // FNV-1a inspired fast hash — good enough for cache validation
+      let hash = 2166136261;
+      const view = new Uint8Array(bodyBytes);
+      for (let i = 0; i < view.length; i++) {
+        hash ^= view[i]!;
+        hash = Math.imul(hash, 16777619);
+      }
+      const etag = `"${(hash >>> 0).toString(36)}-${view.length.toString(36)}"`;
+      mergedHeaders.set('ETag', etag);
+
+      const ifNoneMatch = request.headers.get('If-None-Match');
+      if (ifNoneMatch === etag) {
+        return new Response(null, { status: 304, headers: mergedHeaders });
+      }
+
+      return new Response(bodyBytes, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: mergedHeaders,
+      });
     }
 
     return new Response(response.body, {

@@ -303,8 +303,8 @@ export function startOrefPolling(): void {
     for (const cb of updateCallbacks) cb(data);
   }, {
     intervalMs: 120_000,
-    // 2m -> 20m while hidden; restore with immediate refresh when visible.
-    hiddenMultiplier: 10,
+    // 2m -> 60m while hidden; restore with immediate refresh when visible.
+    hiddenMultiplier: 30,
     refreshOnVisible: true,
     runImmediately: false,
   });

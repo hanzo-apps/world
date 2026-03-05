@@ -34,7 +34,7 @@ export class GulfEconomiesPanel extends Panel {
     super({ id: 'gulf-economies', title: t('panels.gulfEconomies') });
     this.pollLoop = startSmartPollLoop(() => this.fetchData(), {
       intervalMs: 60_000,
-      hiddenMultiplier: 10,
+      hiddenMultiplier: 30,
       refreshOnVisible: true,
       runImmediately: false,
     });
