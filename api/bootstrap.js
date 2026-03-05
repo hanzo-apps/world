@@ -45,6 +45,10 @@ const TIER_CACHE = {
   slow: 'public, s-maxage=3600, stale-while-revalidate=600, stale-if-error=3600',
   fast: 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900',
 };
+const TIER_CDN_CACHE = {
+  slow: 'public, s-maxage=7200, stale-while-revalidate=1800, stale-if-error=7200',
+  fast: 'public, s-maxage=1200, stale-while-revalidate=300, stale-if-error=1800',
+};
 
 const NEG_SENTINEL = '__WM_NEG__';
 
@@ -137,6 +141,7 @@ export default async function handler(req) {
       ...cors,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
+      'CDN-Cache-Control': (tier && TIER_CDN_CACHE[tier]) || TIER_CDN_CACHE.fast,
     },
   });
 }
