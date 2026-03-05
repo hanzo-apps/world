@@ -50,6 +50,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import { tokenizeForMatch, matchKeyword, matchesAnyKeyword, findMatchingKeywords } from '@/utils/keyword-match';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
+import { localizeMapLabels } from '@/utils/map-locale';
 import {
   INTEL_HOTSPOTS,
   CONFLICT_ZONES,
@@ -424,6 +425,7 @@ export class DeckGLMap {
     this.initMapLibre();
 
     this.maplibreMap?.on('load', () => {
+      localizeMapLabels(this.maplibreMap);
       this.rebuildTechHQSupercluster();
       this.rebuildDatacenterSupercluster();
       this.initDeck();
@@ -482,6 +484,16 @@ export class DeckGLMap {
   }
 
   private initMapLibre(): void {
+    // Load the RTL text plugin for correct Arabic/Hebrew glyph joining.
+    // Self-hosted in public/ to avoid CSP issues with external CDN scripts.
+    // Lazy-loaded — only fetched when a RTL text-field is actually rendered.
+    if (maplibregl.getRTLTextPluginStatus() === 'unavailable') {
+      maplibregl.setRTLTextPlugin(
+        '/mapbox-gl-rtl-text.min.js',
+        true,
+      );
+    }
+
     const preset = VIEW_PRESETS[this.state.view];
     const initialTheme = getCurrentTheme();
 
@@ -4748,6 +4760,7 @@ export class DeckGLMap {
     // setStyle() replaces all sources/layers — reset guard so country layers are re-added
     this.countryGeoJsonLoaded = false;
     this.maplibreMap.once('style.load', () => {
+      localizeMapLabels(this.maplibreMap);
       this.loadCountryBoundaries();
       this.updateCountryLayerPaint(theme);
       // Re-render deck.gl overlay after style swap — interleaved layers need

@@ -453,6 +453,9 @@ export class UnifiedSettings {
       html += `<option value="${lang.code}"${selected}>${lang.flag} ${lang.label}</option>`;
     }
     html += `</select>`;
+    if (currentLang === 'vi') {
+      html += `<div class="ai-flow-toggle-desc">${t('components.languageSelector.mapLabelsFallbackVi')}</div>`;
+    }
 
     // Data Management section
     html += `<div class="ai-flow-section-label">${t('components.settings.dataManagementLabel')}</div>`;
