@@ -56,6 +56,17 @@ function parseYouTubeInput(raw: string): { handle: string } | { videoId: string 
   return null;
 }
 
+/** Check if input is an HLS stream URL (.m3u8) */
+function isHlsUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+    return url.pathname.endsWith('.m3u8') || raw.includes('.m3u8');
+  } catch {
+    return false;
+  }
+}
+
 // Persist active region tab across re-renders
 let activeRegionTab = 'all';
 
@@ -73,11 +84,21 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
   const optionalChannelMap = new Map<string, LiveChannel>();
   for (const c of filteredChannels) optionalChannelMap.set(c.id, c);
 
+  let channels: LiveChannel[] = [];
+
+  if (document.getElementById('liveChannelsList')) {
+    // Already initialized, just update the list
+    channels = loadChannelsFromStorage();
+    const listEl = document.getElementById('liveChannelsList') as HTMLElement;
+    renderList(listEl);
+    return;
+  }
+
   if (!containerEl) {
     document.title = `${t('components.liveNews.manage') ?? 'Channel management'} - World Monitor`;
   }
 
-  let channels = loadChannelsFromStorage();
+  channels = loadChannelsFromStorage();
   let suppressRowClick = false;
   let searchQuery = '';
 
@@ -179,7 +200,6 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       listEl.appendChild(row);
     }
     updateRestoreButton();
-    renderAvailableChannels(listEl);
   }
 
   /** Returns default (built-in) channels that are not in the current list. */
@@ -234,7 +254,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       const handleInput = document.createElement('input');
       handleInput.type = 'text';
       handleInput.className = 'live-news-manage-edit-handle';
-      handleInput.value = ch.handle;
+      handleInput.value = ch.handle ?? '';
       handleInput.placeholder = t('components.liveNews.youtubeHandle') ?? 'YouTube handle';
       row.appendChild(handleInput);
     }
@@ -262,7 +282,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     saveBtn.className = 'live-news-manage-save';
     saveBtn.textContent = t('components.liveNews.save') ?? 'Save';
     saveBtn.addEventListener('click', () => {
-      const displayName = nameInput.value.trim() || ch.name || ch.handle;
+      const displayName = nameInput.value.trim() || ch.name || ch.handle || '';
       const next = applyEditFormToChannels(ch, row, isCustom, displayName);
       if (next) {
         channels = next;
@@ -300,7 +320,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
         .filter((ch): ch is LiveChannel => !!ch);
 
       const matchingChannels = term
-        ? regionChannels.filter(ch => ch.name.toLowerCase().includes(term) || ch.handle.toLowerCase().includes(term))
+        ? regionChannels.filter(ch => ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term))
         : regionChannels;
 
       const addedCount = matchingChannels.filter(ch => currentIds.has(ch.id)).length;
@@ -332,7 +352,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       for (const chId of region.channelIds) {
         const ch = optionalChannelMap.get(chId);
         if (!ch) continue;
-        if (term && !ch.name.toLowerCase().includes(term) && !ch.handle.toLowerCase().includes(term)) continue;
+        if (term && !ch.name.toLowerCase().includes(term) && !ch.handle?.toLowerCase().includes(term)) continue;
         const isAdded = currentIds.has(chId);
         grid.appendChild(createCard(ch, isAdded, listEl));
         matchCount++;
@@ -365,7 +385,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     nameEl.textContent = ch.name;
     const handleEl = document.createElement('span');
     handleEl.className = 'live-news-manage-card-handle';
-    handleEl.textContent = ch.handle;
+    handleEl.textContent = ch.handle ?? '';
     info.appendChild(nameEl);
     info.appendChild(handleEl);
 
@@ -430,6 +450,10 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
               <input type="text" class="live-news-manage-handle" id="liveChannelsHandle" placeholder="@Channel or youtube.com/watch?v=..." />
             </div>
             <div class="live-news-manage-add-field">
+              <label class="live-news-manage-add-label" for="liveChannelsHlsUrl">${escapeHtml(t('components.liveNews.hlsUrl') ?? 'HLS Stream URL (optional)')}</label>
+              <input type="text" class="live-news-manage-handle" id="liveChannelsHlsUrl" placeholder="https://example.com/stream.m3u8" />
+            </div>
+            <div class="live-news-manage-add-field">
               <label class="live-news-manage-add-label" for="liveChannelsName">${escapeHtml(t('components.liveNews.displayName') ?? 'Display name (optional)')}</label>
               <input type="text" class="live-news-manage-name" id="liveChannelsName" placeholder="" />
             </div>
@@ -444,9 +468,13 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
   if (!listEl) return;
   setupListDnD(listEl);
   renderList(listEl);
+  renderAvailableChannels(listEl);
 
   // Clear validation state on input
   document.getElementById('liveChannelsHandle')?.addEventListener('input', (e) => {
+    (e.target as HTMLInputElement).classList.remove('invalid');
+  });
+  document.getElementById('liveChannelsHlsUrl')?.addEventListener('input', (e) => {
     (e.target as HTMLInputElement).classList.remove('invalid');
   });
 
@@ -461,10 +489,40 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
   const addBtn = document.getElementById('liveChannelsAddBtn') as HTMLButtonElement | null;
   addBtn?.addEventListener('click', async () => {
     const handleInput = document.getElementById('liveChannelsHandle') as HTMLInputElement | null;
+    const hlsInput = document.getElementById('liveChannelsHlsUrl') as HTMLInputElement | null;
     const nameInput = document.getElementById('liveChannelsName') as HTMLInputElement | null;
     const raw = handleInput?.value?.trim();
-    if (!raw) return;
+    const hlsUrl = hlsInput?.value?.trim();
+    if (!raw && !hlsUrl) return;
     if (handleInput) handleInput.classList.remove('invalid');
+    if (hlsInput) hlsInput.classList.remove('invalid');
+
+    // Check if HLS URL is provided
+    if (hlsUrl) {
+      if (!isHlsUrl(hlsUrl)) {
+        if (hlsInput) {
+          hlsInput.classList.add('invalid');
+          hlsInput.setAttribute('title', t('components.liveNews.invalidHlsUrl') ?? 'Enter a valid HLS stream URL (.m3u8)');
+        }
+        return;
+      }
+
+      // Create custom HLS channel
+      const id = `custom-hls-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      if (channels.some((c) => c.id === id)) return;
+
+      const name = nameInput?.value?.trim() || 'HLS Stream';
+      channels.push({ id, name, hlsUrl, useFallbackOnly: true });
+      saveChannelsToStorage(channels);
+      renderList(listEl);
+      if (handleInput) handleInput.value = '';
+      if (hlsInput) hlsInput.value = '';
+      if (nameInput) nameInput.value = '';
+      return;
+    }
+
+    // Handle YouTube input (existing logic)
+    if (!raw) return;
 
     // Try parsing as a YouTube URL first
     const parsed = parseYouTubeInput(raw);
@@ -503,6 +561,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       saveChannelsToStorage(channels);
       renderList(listEl);
       if (handleInput) handleInput.value = '';
+      if (hlsInput) hlsInput.value = '';
       if (nameInput) nameInput.value = '';
       return;
     }
@@ -561,6 +620,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     saveChannelsToStorage(channels);
     renderList(listEl);
     if (handleInput) handleInput.value = '';
+    if (hlsInput) hlsInput.value = '';
     if (nameInput) nameInput.value = '';
   });
 
