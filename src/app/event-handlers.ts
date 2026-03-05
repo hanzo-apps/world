@@ -1102,6 +1102,29 @@ export class EventHandlerManager implements AppModule {
     });
 
     this.setupMapFullscreen(mapSection);
+    this.setupMapDimensionToggle();
+  }
+
+  private setupMapDimensionToggle(): void {
+    const toggle = document.getElementById('mapDimensionToggle');
+    if (!toggle) return;
+    toggle.querySelectorAll<HTMLButtonElement>('.map-dim-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (!mode) return;
+        const isGlobe = mode === 'globe';
+        const alreadyGlobe = this.ctx.map?.isGlobeMode() ?? false;
+        if (isGlobe === alreadyGlobe) return;
+        toggle.querySelectorAll('.map-dim-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        saveToStorage(STORAGE_KEYS.mapMode, isGlobe ? 'globe' : 'flat');
+        if (isGlobe) {
+          this.ctx.map?.switchToGlobe();
+        } else {
+          this.ctx.map?.switchToFlat();
+        }
+      });
+    });
   }
 
   private setupMapFullscreen(mapSection: HTMLElement): void {
