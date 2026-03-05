@@ -1,7 +1,11 @@
 export type GlobeRenderScale = 'auto' | '1' | '1.5' | '2' | '3';
+export type GlobeTexture = 'topographic' | 'blue-marble';
 
 const STORAGE_KEY = 'wm-globe-render-scale';
 const EVENT_NAME = 'wm-globe-render-scale-changed';
+
+const TEXTURE_STORAGE_KEY = 'wm-globe-texture';
+const TEXTURE_EVENT_NAME = 'wm-globe-texture-changed';
 
 export const GLOBE_RENDER_SCALE_OPTIONS: {
   value: GlobeRenderScale;
@@ -68,4 +72,36 @@ export function resolvePerformanceProfile(scale: GlobeRenderScale): GlobePerform
     disableDashAnimations: isEco,
     disableAtmosphere: isEco,
   };
+}
+
+export const GLOBE_TEXTURE_OPTIONS: { value: GlobeTexture; label: string }[] = [
+  { value: 'topographic', label: 'Topographic' },
+  { value: 'blue-marble', label: 'Blue Marble (NASA)' },
+];
+
+export const GLOBE_TEXTURE_URLS: Record<GlobeTexture, string> = {
+  'topographic': '/textures/earth-topo-bathy.jpg',
+  'blue-marble': '/textures/earth-blue-marble.jpg',
+};
+
+export function getGlobeTexture(): GlobeTexture {
+  try {
+    const raw = localStorage.getItem(TEXTURE_STORAGE_KEY);
+    if (raw === 'topographic' || raw === 'blue-marble') return raw;
+  } catch { /* ignore */ }
+  return 'topographic';
+}
+
+export function setGlobeTexture(texture: GlobeTexture): void {
+  try { localStorage.setItem(TEXTURE_STORAGE_KEY, texture); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent(TEXTURE_EVENT_NAME, { detail: { texture } }));
+}
+
+export function subscribeGlobeTextureChange(cb: (texture: GlobeTexture) => void): () => void {
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent).detail as { texture?: GlobeTexture } | undefined;
+    cb(detail?.texture ?? getGlobeTexture());
+  };
+  window.addEventListener(TEXTURE_EVENT_NAME, handler);
+  return () => window.removeEventListener(TEXTURE_EVENT_NAME, handler);
 }
