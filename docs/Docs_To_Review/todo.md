@@ -1000,6 +1000,6 @@ Add scheduled export and a public API endpoint for integration with external too
 ### TODO-131 — Self-Hosted Map Tiles via Protomaps + CloudFront
 
 - **Priority:** 🔴 High | **Effort:** ~2 days
-- Replace CARTO/Stadia third-party basemap tiles with self-hosted Protomaps PMTiles on CloudFront. Eliminates CORS failures, third-party availability issues, and rate limits. CARTO has been intermittently blocking cross-origin requests (no `Access-Control-Allow-Origin` header), causing blank maps until the Stadia fallback kicks in. Self-hosted tiles = zero external dependency for the base map.
+- Replace CARTO/Stadia third-party basemap tiles with self-hosted Protomaps PMTiles on CloudFront. Eliminates CORS failures, third-party availability issues, and rate limits. CARTO has been intermittently blocking cross-origin requests (no `Access-Control-Allow-Origin` header), causing blank maps until the OpenFreeMap fallback kicks in. Self-hosted tiles = zero external dependency for the base map.
 - **Approach:** Download a PMTiles archive (OpenStreetMap-based, ~70GB planet or extract regions), host on S3 + CloudFront CDN, use `pmtiles://` protocol with MapLibre GL JS. Style JSON also self-hosted.
 - **References:** protomaps.com, github.com/protomaps/PMTiles
