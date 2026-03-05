@@ -5378,7 +5378,8 @@ server.listen(PORT, () => {
   startUcdpSeedLoop();
   startMarketDataSeedLoop();
   startAviationSeedLoop();
-  startCyberThreatsSeedLoop();
+  // Cyber seed disabled — standalone cron seed-cyber-threats.mjs handles this
+  // (avoids burning 12 extra AbuseIPDB calls/day from duplicate relay loop)
   startCiiSeedLoop();
   startPositiveEventsSeedLoop();
   startGpsJamSeedLoop();
