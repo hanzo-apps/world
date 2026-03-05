@@ -157,8 +157,8 @@ const LIGHT_STYLE = SITE_VARIANT === 'happy'
   ? '/map-styles/happy-light.json'
   : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
-const FALLBACK_DARK_STYLE = 'https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json';
-const FALLBACK_LIGHT_STYLE = 'https://tiles.stadiamaps.com/styles/alidade_smooth.json';
+const FALLBACK_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+const FALLBACK_LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
@@ -359,6 +359,7 @@ export class DeckGLMap {
   private renderPending = false;
   private webglLost = false;
   private usedFallbackStyle = false;
+  private styleLoadTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 
   private layerCache: Map<string, Layer> = new Map();
@@ -512,15 +513,21 @@ export class DeckGLMap {
 
     this.maplibreMap.on('error', (e: { error?: Error; message?: string }) => {
       const msg = e.error?.message ?? e.message ?? '';
-      if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('style.json')) {
+      if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('cartocdn.com')) {
         switchToFallback();
       }
     });
 
-    const styleLoadTimeout = setTimeout(() => {
+    this.styleLoadTimeoutId = setTimeout(() => {
+      this.styleLoadTimeoutId = null;
       if (!this.maplibreMap?.isStyleLoaded()) switchToFallback();
     }, 5000);
-    this.maplibreMap.once('style.load', () => clearTimeout(styleLoadTimeout));
+    this.maplibreMap.once('style.load', () => {
+      if (this.styleLoadTimeoutId) {
+        clearTimeout(this.styleLoadTimeoutId);
+        this.styleLoadTimeoutId = null;
+      }
+    });
 
     const canvas = this.maplibreMap.getCanvas();
     canvas.addEventListener('webglcontextlost', (e) => {
@@ -4770,6 +4777,10 @@ export class DeckGLMap {
       this.moveTimeoutId = null;
     }
 
+    if (this.styleLoadTimeoutId) {
+      clearTimeout(this.styleLoadTimeoutId);
+      this.styleLoadTimeoutId = null;
+    }
     this.stopPulseAnimation();
     this.stopDayNightTimer();
     if (this.aircraftFetchTimer) {
