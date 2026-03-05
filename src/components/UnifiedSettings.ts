@@ -3,7 +3,7 @@ import { PANEL_CATEGORY_MAP } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
-import { getGlobeRenderScale, setGlobeRenderScale, GLOBE_RENDER_SCALE_OPTIONS, type GlobeRenderScale } from '@/services/globe-render-settings';
+import { getGlobeRenderScale, setGlobeRenderScale, GLOBE_RENDER_SCALE_OPTIONS, getGlobeTexture, setGlobeTexture, GLOBE_TEXTURE_OPTIONS, type GlobeRenderScale, type GlobeTexture } from '@/services/globe-render-settings';
 import { getLiveStreamsAlwaysOn, setLiveStreamsAlwaysOn } from '@/services/live-stream-settings';
 import type { StreamQuality } from '@/services/ai-flow-settings';
 import { escapeHtml } from '@/utils/sanitize';
@@ -204,6 +204,11 @@ export class UnifiedSettings {
         return;
       }
 
+      if (target.id === 'us-globe-texture') {
+        setGlobeTexture(target.value as GlobeTexture);
+        return;
+      }
+
       if (target.id === 'us-live-streams-always-on') {
         setLiveStreamsAlwaysOn(target.checked);
         return;
@@ -391,6 +396,21 @@ export class UnifiedSettings {
       const translatedLabel = t(opt.labelKey);
       const label = translatedLabel === opt.labelKey ? opt.fallbackLabel : translatedLabel;
       html += `<option value="${opt.value}"${selected}${disabled}>${label}</option>`;
+    }
+    html += `</select>`;
+
+    // Globe texture selection
+    const currentTexture = getGlobeTexture();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">Globe texture</div>
+        <div class="ai-flow-toggle-desc">Choose between topographic or NASA Blue Marble Earth imagery.</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-globe-texture">`;
+    for (const opt of GLOBE_TEXTURE_OPTIONS) {
+      const selected = opt.value === currentTexture ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${opt.label}</option>`;
     }
     html += `</select>`;
 
