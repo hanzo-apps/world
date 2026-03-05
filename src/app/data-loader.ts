@@ -79,6 +79,7 @@ import { fetchOrefAlerts, startOrefPolling, stopOrefPolling, onOrefAlertsUpdate 
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
 import { isFeatureAvailable, isFeatureEnabled } from '@/services/runtime-config';
+import { isDesktopRuntime } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
@@ -378,12 +379,12 @@ export class DataLoaderManager implements AppModule {
     if (SITE_VARIANT === 'full') tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
     if (this.ctx.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
-    if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
+    if (SITE_VARIANT !== 'happy' && !isDesktopRuntime() && this.ctx.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.cables) tasks.push({ name: 'cables', task: runGuarded('cables', () => this.loadCableActivity()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.cables) tasks.push({ name: 'cableHealth', task: runGuarded('cableHealth', () => this.loadCableHealth()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
     if (SITE_VARIANT !== 'happy' && CYBER_LAYER_ENABLED && this.ctx.mapLayers.cyberThreats) tasks.push({ name: 'cyberThreats', task: runGuarded('cyberThreats', () => this.loadCyberThreats()) });
-    if (SITE_VARIANT !== 'happy') tasks.push({ name: 'iranAttacks', task: runGuarded('iranAttacks', () => this.loadIranEvents()) });
+    if (SITE_VARIANT !== 'happy' && !isDesktopRuntime()) tasks.push({ name: 'iranAttacks', task: runGuarded('iranAttacks', () => this.loadIranEvents()) });
     if (SITE_VARIANT !== 'happy' && (this.ctx.mapLayers.techEvents || SITE_VARIANT === 'tech')) tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
     if (SITE_VARIANT === 'tech') {
@@ -1487,28 +1488,30 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    // GPS/GNSS jamming
-    tasks.push((async () => {
-      try {
-        const data = await fetchGpsInterference();
-        if (!data) {
-          ingestGpsJammingForCII([]);
+    // GPS/GNSS jamming (cloud-only — needs gpsjam.org relay)
+    if (!isDesktopRuntime()) {
+      tasks.push((async () => {
+        try {
+          const data = await fetchGpsInterference();
+          if (!data) {
+            ingestGpsJammingForCII([]);
+            this.ctx.map?.setLayerReady('gpsJamming', false);
+            return;
+          }
+          ingestGpsJammingForCII(data.hexes);
+          if (this.ctx.mapLayers.gpsJamming) {
+            this.ctx.map?.setGpsJamming(data.hexes);
+            this.ctx.map?.setLayerReady('gpsJamming', data.hexes.length > 0);
+          }
+          this.ctx.statusPanel?.updateFeed('GPS Jam', { status: 'ok', itemCount: data.hexes.length });
+          dataFreshness.recordUpdate('gpsjam', data.hexes.length);
+        } catch (error) {
           this.ctx.map?.setLayerReady('gpsJamming', false);
-          return;
+          this.ctx.statusPanel?.updateFeed('GPS Jam', { status: 'error' });
+          dataFreshness.recordError('gpsjam', String(error));
         }
-        ingestGpsJammingForCII(data.hexes);
-        if (this.ctx.mapLayers.gpsJamming) {
-          this.ctx.map?.setGpsJamming(data.hexes);
-          this.ctx.map?.setLayerReady('gpsJamming', data.hexes.length > 0);
-        }
-        this.ctx.statusPanel?.updateFeed('GPS Jam', { status: 'ok', itemCount: data.hexes.length });
-        dataFreshness.recordUpdate('gpsjam', data.hexes.length);
-      } catch (error) {
-        this.ctx.map?.setLayerReady('gpsJamming', false);
-        this.ctx.statusPanel?.updateFeed('GPS Jam', { status: 'error' });
-        dataFreshness.recordError('gpsjam', String(error));
-      }
-    })());
+      })());
+    }
 
     await Promise.allSettled(tasks);
 
