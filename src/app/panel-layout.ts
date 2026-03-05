@@ -769,50 +769,74 @@ export class PanelLayoutManager implements AppModule {
 
     // Happy variant panels (lazy-loaded — only relevant for happy variant)
     if (SITE_VARIANT === 'happy') {
-      import('@/components/PositiveNewsFeedPanel').then(m => {
-        this.ctx.positivePanel = new m.PositiveNewsFeedPanel();
-        this.ctx.panels['positive-feed'] = this.ctx.positivePanel;
-      });
+      this.lazyPanel('positive-feed', () =>
+        import('@/components/PositiveNewsFeedPanel').then(m => {
+          const p = new m.PositiveNewsFeedPanel();
+          this.ctx.positivePanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/CountersPanel').then(m => {
-        this.ctx.countersPanel = new m.CountersPanel();
-        this.ctx.panels['counters'] = this.ctx.countersPanel;
-        this.ctx.countersPanel.startTicking();
-      });
+      this.lazyPanel('counters', () =>
+        import('@/components/CountersPanel').then(m => {
+          const p = new m.CountersPanel();
+          p.startTicking();
+          this.ctx.countersPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/ProgressChartsPanel').then(m => {
-        this.ctx.progressPanel = new m.ProgressChartsPanel();
-        this.ctx.panels['progress'] = this.ctx.progressPanel;
-      });
+      this.lazyPanel('progress', () =>
+        import('@/components/ProgressChartsPanel').then(m => {
+          const p = new m.ProgressChartsPanel();
+          this.ctx.progressPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/BreakthroughsTickerPanel').then(m => {
-        this.ctx.breakthroughsPanel = new m.BreakthroughsTickerPanel();
-        this.ctx.panels['breakthroughs'] = this.ctx.breakthroughsPanel;
-      });
+      this.lazyPanel('breakthroughs', () =>
+        import('@/components/BreakthroughsTickerPanel').then(m => {
+          const p = new m.BreakthroughsTickerPanel();
+          this.ctx.breakthroughsPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/HeroSpotlightPanel').then(m => {
-        this.ctx.heroPanel = new m.HeroSpotlightPanel();
-        this.ctx.panels['spotlight'] = this.ctx.heroPanel;
-        this.ctx.heroPanel.onLocationRequest = (lat: number, lon: number) => {
-          this.ctx.map?.setCenter(lat, lon, 4);
-          this.ctx.map?.flashLocation(lat, lon, 3000);
-        };
-      });
+      this.lazyPanel('spotlight', () =>
+        import('@/components/HeroSpotlightPanel').then(m => {
+          const p = new m.HeroSpotlightPanel();
+          p.onLocationRequest = (lat: number, lon: number) => {
+            this.ctx.map?.setCenter(lat, lon, 4);
+            this.ctx.map?.flashLocation(lat, lon, 3000);
+          };
+          this.ctx.heroPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/GoodThingsDigestPanel').then(m => {
-        this.ctx.digestPanel = new m.GoodThingsDigestPanel();
-        this.ctx.panels['digest'] = this.ctx.digestPanel;
-      });
+      this.lazyPanel('digest', () =>
+        import('@/components/GoodThingsDigestPanel').then(m => {
+          const p = new m.GoodThingsDigestPanel();
+          this.ctx.digestPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/SpeciesComebackPanel').then(m => {
-        this.ctx.speciesPanel = new m.SpeciesComebackPanel();
-        this.ctx.panels['species'] = this.ctx.speciesPanel;
-      });
+      this.lazyPanel('species', () =>
+        import('@/components/SpeciesComebackPanel').then(m => {
+          const p = new m.SpeciesComebackPanel();
+          this.ctx.speciesPanel = p;
+          return p;
+        }),
+      );
 
-      import('@/components/RenewableEnergyPanel').then(m => {
-        this.ctx.renewablePanel = new m.RenewableEnergyPanel();
-        this.ctx.panels['renewable'] = this.ctx.renewablePanel;
-      });
+      this.lazyPanel('renewable', () =>
+        import('@/components/RenewableEnergyPanel').then(m => {
+          const p = new m.RenewableEnergyPanel();
+          this.ctx.renewablePanel = p;
+          return p;
+        }),
+      );
     }
 
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -1116,6 +1140,8 @@ export class PanelLayoutManager implements AppModule {
       this.makeDraggable(el, key);
       const grid = document.getElementById('panelsGrid');
       if (grid) grid.appendChild(el);
+    }).catch((err) => {
+      console.error(`[panel] failed to lazy-load "${key}"`, err);
     });
   }
 
