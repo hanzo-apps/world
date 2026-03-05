@@ -51,7 +51,7 @@
       "cable": "Unterseekabel",
       "datacenter": "Rechenzentren",
       "base": "Militärstützpunkte",
-      "nuclear": "Nuklearanlagen",
+      "nuclear": "Nahe Nuklear",
       "port": "Häfen"
     },
     "levels": {
@@ -464,7 +464,7 @@
         "cable": "Unterseekabel",
         "datacenter": "Rechenzentren",
         "base": "Militärstützpunkte",
-        "nuclear": "Nuklearanlagen",
+        "nuclear": "Nahe Nuklear",
         "port": "Häfen"
       },
       "levels": {

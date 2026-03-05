@@ -51,7 +51,7 @@
       "cable": "Câbles sous-marins",
       "datacenter": "Centres de données",
       "base": "Bases militaires",
-      "nuclear": "Installations nucléaires",
+      "nuclear": "Nucléaire proche",
       "port": "Ports"
     },
     "levels": {
@@ -512,7 +512,7 @@
         "cable": "Câbles sous-marins",
         "datacenter": "Centres de données",
         "base": "Bases militaires",
-        "nuclear": "Installations nucléaires",
+        "nuclear": "Nucléaire proche",
         "port": "Ports"
       },
       "levels": {

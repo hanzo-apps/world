@@ -51,7 +51,7 @@
       "cable": "Kable podmorskie",
       "datacenter": "Centra danych",
       "base": "Bazy wojskowe",
-      "nuclear": "Obiekty jądrowe",
+      "nuclear": "Pobliskie jądrowe",
       "port": "Porty"
     },
     "levels": {
@@ -464,7 +464,7 @@
         "cable": "Kable podmorskie",
         "datacenter": "Centra danych",
         "base": "Bazy wojskowe",
-        "nuclear": "Obiekty jądrowe",
+        "nuclear": "Pobliskie jądrowe",
         "port": "Porty"
       },
       "levels": {

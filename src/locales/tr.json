@@ -51,7 +51,7 @@
       "cable": "Denizalti Kablolari",
       "datacenter": "Veri Merkezleri",
       "base": "Askeri Usler",
-      "nuclear": "Nukleer Tesisler",
+      "nuclear": "Yakın nükleer",
       "port": "Limanlar"
     },
     "levels": {
@@ -512,7 +512,7 @@
         "cable": "Denizalti Kablolari",
         "datacenter": "Veri Merkezleri",
         "base": "Askeri Usler",
-        "nuclear": "Nukleer Tesisler",
+        "nuclear": "Yakın nükleer",
         "port": "Limanlar"
       },
       "levels": {

@@ -304,7 +304,7 @@
         "cable": "Onderzeese kabels",
         "datacenter": "Datacenters",
         "base": "Militaire bases",
-        "nuclear": "Nucleaire faciliteiten",
+        "nuclear": "Nabij nucleair",
         "port": "Havens"
       },
       "levels": {
@@ -2135,7 +2135,7 @@
       "cable": "Onderzeese kabels",
       "datacenter": "Datacenters",
       "base": "Militaire bases",
-      "nuclear": "Nucleaire faciliteiten",
+      "nuclear": "Nabij nucleair",
       "port": "Havens"
     },
     "levels": {
