@@ -239,9 +239,19 @@ async function main() {
     process.exit(1);
   }
 
-  const dataPath = join(__dirname, 'data', 'military-bases-final.json');
-  if (!existsSync(dataPath)) {
-    console.error(`Data file not found: ${dataPath}`);
+  const volumePath = '/data/military-bases-final.json';
+  const localPath = join(__dirname, 'data', 'military-bases-final.json');
+  const dataPath = existsSync(volumePath) ? volumePath : existsSync(localPath) ? localPath : null;
+
+  if (!dataPath) {
+    const activeKey = `${prefix}military:bases:active`;
+    const check = await pipelineRequest(redisUrl, redisToken, [['GET', activeKey]]);
+    const existing = check[0]?.result;
+    if (existing) {
+      console.log(`No data file found — Redis already has active version ${existing}, skipping.`);
+      process.exit(0);
+    }
+    console.error(`Data file not found at ${volumePath} or ${localPath}, and no existing data in Redis.`);
     process.exit(1);
   }
 
