@@ -502,15 +502,25 @@ export class DeckGLMap {
         : {}),
     });
 
+    const switchToFallback = () => {
+      if (this.usedFallbackStyle) return;
+      this.usedFallbackStyle = true;
+      const fallback = initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
+      console.warn(`[DeckGLMap] Primary basemap failed, switching to fallback: ${fallback}`);
+      this.maplibreMap?.setStyle(fallback);
+    };
+
     this.maplibreMap.on('error', (e: { error?: Error; message?: string }) => {
       const msg = e.error?.message ?? e.message ?? '';
-      if (!this.usedFallbackStyle && (msg.includes('Failed to fetch') || msg.includes('AJAXError'))) {
-        this.usedFallbackStyle = true;
-        const fallback = initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
-        console.warn(`[DeckGLMap] Primary basemap failed, switching to fallback: ${fallback}`);
-        this.maplibreMap?.setStyle(fallback);
+      if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('style.json')) {
+        switchToFallback();
       }
     });
+
+    const styleLoadTimeout = setTimeout(() => {
+      if (!this.maplibreMap?.isStyleLoaded()) switchToFallback();
+    }, 5000);
+    this.maplibreMap.once('style.load', () => clearTimeout(styleLoadTimeout));
 
     const canvas = this.maplibreMap.getCanvas();
     canvas.addEventListener('webglcontextlost', (e) => {
