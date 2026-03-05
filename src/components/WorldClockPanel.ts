@@ -326,7 +326,7 @@ export class WorldClockPanel extends Panel {
       return;
     }
 
-    let html = STYLE + '<div class="wc-container">';
+    let html = STYLE + '<div class="wc-container" translate="no">';
     for (const city of sorted) {
       const { h, m, s, dayOfWeek } = getTimeInZone(city.timezone);
       const isDay = h >= 6 && h < 20;
