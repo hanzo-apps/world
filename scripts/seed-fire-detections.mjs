@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, maskToken, runSeed, CHROME_UA } from './_seed-utils.mjs';
+import { loadEnvFile, maskToken, runSeed, CHROME_UA, sleep } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'wildfire:fires:v1';
-const FIRMS_SOURCE = 'VIIRS_SNPP_NRT';
+const FIRMS_SOURCES = ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT'];
 
 const MONITORED_REGIONS = {
   'Ukraine': '22,44,40,53',
@@ -50,54 +50,58 @@ function parseDetectedAt(acqDate, acqTime) {
   return new Date(`${acqDate}T${hours}:${minutes}:00Z`).getTime();
 }
 
+async function fetchRegionSource(apiKey, regionName, bbox, source) {
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${source}/${bbox}/1`;
+  const res = await fetch(url, {
+    headers: { Accept: 'text/csv', 'User-Agent': CHROME_UA },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`FIRMS ${res.status} for ${regionName}/${source}`);
+  const csv = await res.text();
+  return parseCSV(csv);
+}
+
 async function fetchAllRegions(apiKey) {
   const entries = Object.entries(MONITORED_REGIONS);
-  const results = await Promise.allSettled(
-    entries.map(async ([regionName, bbox]) => {
-      const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${FIRMS_SOURCE}/${bbox}/1`;
-      const res = await fetch(url, {
-        headers: { Accept: 'text/csv', 'User-Agent': CHROME_UA },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!res.ok) throw new Error(`FIRMS ${res.status} for ${regionName}`);
-      const csv = await res.text();
-      const rows = parseCSV(csv);
-      return { regionName, rows };
-    }),
-  );
-
+  const seen = new Set();
   const fireDetections = [];
   let fulfilled = 0;
   let failed = 0;
 
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      fulfilled++;
-      const { regionName, rows } = r.value;
-      for (const row of rows) {
-        const detectedAt = parseDetectedAt(row.acq_date || '', row.acq_time || '');
-        fireDetections.push({
-          id: `${row.latitude ?? ''}-${row.longitude ?? ''}-${row.acq_date ?? ''}-${row.acq_time ?? ''}`,
-          location: {
-            latitude: parseFloat(row.latitude ?? '0') || 0,
-            longitude: parseFloat(row.longitude ?? '0') || 0,
-          },
-          brightness: parseFloat(row.bright_ti4 ?? '0') || 0,
-          frp: parseFloat(row.frp ?? '0') || 0,
-          confidence: mapConfidence(row.confidence || ''),
-          satellite: row.satellite || '',
-          detectedAt,
-          region: regionName,
-          dayNight: row.daynight || '',
-        });
+  for (const source of FIRMS_SOURCES) {
+    for (const [regionName, bbox] of entries) {
+      try {
+        const rows = await fetchRegionSource(apiKey, regionName, bbox, source);
+        fulfilled++;
+        for (const row of rows) {
+          const id = `${row.latitude ?? ''}-${row.longitude ?? ''}-${row.acq_date ?? ''}-${row.acq_time ?? ''}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          const detectedAt = parseDetectedAt(row.acq_date || '', row.acq_time || '');
+          fireDetections.push({
+            id,
+            location: {
+              latitude: parseFloat(row.latitude ?? '0') || 0,
+              longitude: parseFloat(row.longitude ?? '0') || 0,
+            },
+            brightness: parseFloat(row.bright_ti4 ?? '0') || 0,
+            frp: parseFloat(row.frp ?? '0') || 0,
+            confidence: mapConfidence(row.confidence || ''),
+            satellite: row.satellite || '',
+            detectedAt,
+            region: regionName,
+            dayNight: row.daynight || '',
+          });
+        }
+      } catch (err) {
+        failed++;
+        console.error(`  [FIRMS] ${source}/${regionName}: ${err.message || err}`);
       }
-    } else {
-      failed++;
-      console.error(`  [FIRMS] ${r.reason?.message || r.reason}`);
+      await sleep(200);
     }
+    console.log(`  ${source}: ${fireDetections.length} total (${fulfilled} ok, ${failed} failed)`);
   }
 
-  console.log(`  Regions: ${fulfilled} ok, ${failed} failed | Detections: ${fireDetections.length}`);
   return { fireDetections, pagination: undefined };
 }
 
@@ -111,9 +115,9 @@ async function main() {
   console.log(`  FIRMS key: ${maskToken(apiKey)}`);
 
   await runSeed('wildfire', 'fires', CANONICAL_KEY, () => fetchAllRegions(apiKey), {
-    validateFn: (data) => Array.isArray(data?.fireDetections),
+    validateFn: (data) => Array.isArray(data?.fireDetections) && data.fireDetections.length > 0,
     ttlSeconds: 7200,
-    sourceVersion: FIRMS_SOURCE,
+    sourceVersion: FIRMS_SOURCES.join('+'),
   });
 }
 
