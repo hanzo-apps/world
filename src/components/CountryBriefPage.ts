@@ -60,8 +60,6 @@ export class CountryBriefPage implements CountryBriefPanel {
   private onCloseCallback?: () => void;
   private onShareStory?: (code: string, name: string) => void;
   private onExportImage?: (code: string, name: string) => void;
-  private boundExportMenuClose: (() => void) | null = null;
-  private boundCitationClick: ((e: Event) => void) | null = null;
   private abortController: AbortController = new AbortController();
 
   constructor() {
@@ -69,9 +67,96 @@ export class CountryBriefPage implements CountryBriefPanel {
     this.overlay.className = 'country-brief-overlay';
     document.body.appendChild(this.overlay);
 
+    // Single delegated click handler for all interactive elements.
+    // This prevents listener accumulation when show()/showLoading() replace innerHTML.
     this.overlay.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('country-brief-overlay')) this.hide();
+      const target = e.target as HTMLElement;
+
+      // Click on overlay background to close
+      if (target.classList.contains('country-brief-overlay')) {
+        this.hide();
+        return;
+      }
+
+      // Close button
+      if (target.closest('.cb-close')) {
+        this.hide();
+        return;
+      }
+
+      // Link share button (copy URL to clipboard)
+      const linkShareBtn = target.closest('.cb-link-share-btn') as HTMLButtonElement | null;
+      if (linkShareBtn) {
+        if (!this.currentCode || !this.currentName) return;
+        const url = `${window.location.origin}/?c=${this.currentCode}`;
+        navigator.clipboard.writeText(url).then(() => {
+          const orig = linkShareBtn.innerHTML;
+          linkShareBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => { linkShareBtn.innerHTML = orig; }, 1500);
+        }).catch(() => {});
+        return;
+      }
+
+      // Share button
+      if (target.closest('.cb-share-btn')) {
+        if (this.onShareStory && this.currentCode && this.currentName) {
+          this.onShareStory(this.currentCode, this.currentName);
+        }
+        return;
+      }
+
+      // Print button
+      if (target.closest('.cb-print-btn')) {
+        window.print();
+        return;
+      }
+
+      // Export button (toggle menu)
+      if (target.closest('.cb-export-btn')) {
+        e.stopPropagation();
+        const exportMenu = this.overlay.querySelector('.cb-export-menu');
+        exportMenu?.classList.toggle('hidden');
+        return;
+      }
+
+      // Export option buttons
+      const exportOption = target.closest('.cb-export-option') as HTMLElement | null;
+      if (exportOption) {
+        const format = exportOption.dataset.format;
+        if (format === 'image') {
+          if (this.onExportImage && this.currentCode && this.currentName) {
+            this.onExportImage(this.currentCode, this.currentName);
+          }
+        } else if (format === 'pdf') {
+          this.exportPdf();
+        } else if (format === 'json' || format === 'csv') {
+          this.exportBrief(format);
+        }
+        const exportMenu = this.overlay.querySelector('.cb-export-menu');
+        exportMenu?.classList.add('hidden');
+        return;
+      }
+
+      // Citation links
+      if (target.classList.contains('cb-citation')) {
+        e.preventDefault();
+        const href = target.getAttribute('href');
+        if (href) {
+          const el = this.overlay.querySelector(href);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el?.classList.add('cb-news-highlight');
+          setTimeout(() => el?.classList.remove('cb-news-highlight'), 2000);
+        }
+        return;
+      }
+
+      // Clicking anywhere else closes the export menu if open
+      const exportMenu = this.overlay.querySelector('.cb-export-menu');
+      if (exportMenu && !exportMenu.classList.contains('hidden')) {
+        exportMenu.classList.add('hidden');
+      }
     });
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.overlay.classList.contains('active')) this.hide();
     });
@@ -221,7 +306,7 @@ export class CountryBriefPage implements CountryBriefPanel {
           </div>
         </div>
       </div>`;
-    this.overlay.querySelector('.cb-close')?.addEventListener('click', () => this.hide());
+    // Close button click is handled via event delegation on the overlay (set up in constructor)
     this.overlay.classList.add('active');
   }
 
@@ -349,68 +434,8 @@ export class CountryBriefPage implements CountryBriefPanel {
         </div>
       </div>`;
 
-    this.overlay.querySelector('.cb-close')?.addEventListener('click', () => this.hide());
-    const linkShareBtn = this.overlay.querySelector('.cb-link-share-btn') as HTMLButtonElement | null;
-    linkShareBtn?.addEventListener('click', () => {
-      if (!this.currentCode || !this.currentName) return;
-      const url = `${window.location.origin}/?c=${this.currentCode}`;
-      navigator.clipboard.writeText(url).then(() => {
-        const orig = linkShareBtn!.innerHTML;
-        linkShareBtn!.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-        setTimeout(() => { linkShareBtn!.innerHTML = orig; }, 1500);
-      }).catch(() => {});
-    });
-    this.overlay.querySelector('.cb-share-btn')?.addEventListener('click', () => {
-      if (this.onShareStory && this.currentCode && this.currentName) {
-        this.onShareStory(this.currentCode, this.currentName);
-      }
-    });
-    this.overlay.querySelector('.cb-print-btn')?.addEventListener('click', () => {
-      window.print();
-    });
-
-    const exportBtn = this.overlay.querySelector('.cb-export-btn');
-    const exportMenu = this.overlay.querySelector('.cb-export-menu');
-    exportBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      exportMenu?.classList.toggle('hidden');
-    });
-    this.overlay.querySelectorAll('.cb-export-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        const format = (opt as HTMLElement).dataset.format;
-        if (format === 'image') {
-          if (this.onExportImage && this.currentCode && this.currentName) {
-            this.onExportImage(this.currentCode, this.currentName);
-          }
-        } else if (format === 'pdf') {
-          this.exportPdf();
-        } else {
-          this.exportBrief(format as 'json' | 'csv');
-        }
-        exportMenu?.classList.add('hidden');
-      });
-    });
-    // Remove previous overlay-level listeners to prevent accumulation
-    if (this.boundExportMenuClose) this.overlay.removeEventListener('click', this.boundExportMenuClose);
-    if (this.boundCitationClick) this.overlay.removeEventListener('click', this.boundCitationClick);
-
-    this.boundExportMenuClose = () => exportMenu?.classList.add('hidden');
-    this.overlay.addEventListener('click', this.boundExportMenuClose);
-
-    this.boundCitationClick = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.classList.contains('cb-citation')) {
-        e.preventDefault();
-        const href = target.getAttribute('href');
-        if (href) {
-          const el = this.overlay.querySelector(href);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el?.classList.add('cb-news-highlight');
-          setTimeout(() => el?.classList.remove('cb-news-highlight'), 2000);
-        }
-      }
-    };
-    this.overlay.addEventListener('click', this.boundCitationClick);
+    // All button click handlers (close, share, print, export, citation, link-share) are handled
+    // via event delegation on the overlay (set up in constructor)
 
     this.overlay.classList.add('active');
   }
