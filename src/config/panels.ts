@@ -1,6 +1,9 @@
 import type { PanelConfig, MapLayers } from '@/types';
 import type { DataSourceId } from '@/services/data-freshness';
 import { SITE_VARIANT } from './variant';
+import { isDesktopRuntime } from '@/services/runtime';
+
+const _desktop = isDesktopRuntime();
 
 // ============================================
 // FULL VARIANT (Geopolitical)
@@ -59,11 +62,11 @@ const FULL_PANELS: Record<string, PanelConfig> = {
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
-  iranAttacks: true,
+  iranAttacks: _desktop ? false : true,
   gpsJamming: false,
 
   conflicts: true,
-  bases: true,
+  bases: _desktop ? false : true,
   cables: false,
   pipelines: false,
   hotspots: true,
