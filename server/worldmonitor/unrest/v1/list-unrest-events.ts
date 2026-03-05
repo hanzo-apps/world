@@ -209,10 +209,14 @@ export async function listUnrestEvents(
       cacheKey,
       REDIS_CACHE_TTL,
       async () => {
-        const [acledEvents, gdeltEvents] = await Promise.all([
+        const [acledResult, gdeltResult] = await Promise.allSettled([
           fetchAcledProtests(req),
           fetchGdeltEvents(),
         ]);
+        const acledEvents = acledResult.status === 'fulfilled' ? acledResult.value : [];
+        const gdeltEvents = gdeltResult.status === 'fulfilled' ? gdeltResult.value : [];
+        if (acledResult.status === 'rejected') console.warn('[unrest] ACLED fetch failed, using partial results:', acledResult.reason);
+        if (gdeltResult.status === 'rejected') console.warn('[unrest] GDELT fetch failed, using partial results:', gdeltResult.reason);
         const merged = deduplicateEvents([...acledEvents, ...gdeltEvents]);
         const sorted = sortBySeverityAndRecency(merged);
         return sorted.length > 0 ? { events: sorted, clusters: [], pagination: undefined } : null;

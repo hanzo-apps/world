@@ -67,7 +67,7 @@ async function fetchBarriers(
   const reporters = MAJOR_REPORTERS.join(',');
 
   // Fetch agricultural and non-agricultural tariffs in parallel
-  const [agriData, nonAgriData] = await Promise.all([
+  const [agriResult, nonAgriResult] = await Promise.allSettled([
     wtoFetch('/data', {
       i: 'TP_A_0160',
       r: reporters,
@@ -85,6 +85,10 @@ async function fetchBarriers(
       max: '500',
     }),
   ]);
+  const agriData = agriResult.status === 'fulfilled' ? agriResult.value : null;
+  const nonAgriData = nonAgriResult.status === 'fulfilled' ? nonAgriResult.value : null;
+  if (agriResult.status === 'rejected') console.warn('[trade] agricultural tariff fetch failed, using partial results:', agriResult.reason);
+  if (nonAgriResult.status === 'rejected') console.warn('[trade] non-agricultural tariff fetch failed, using partial results:', nonAgriResult.reason);
 
   if (!agriData && !nonAgriData) return { barriers: [], ok: false };
 
