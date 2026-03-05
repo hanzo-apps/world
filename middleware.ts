@@ -63,9 +63,9 @@ export default function middleware(request: Request) {
   if (path === '/' && SOCIAL_PREVIEW_UA.test(ua)) {
     const variant = VARIANT_HOST_MAP[host];
     if (variant && isAllowedHost(host)) {
-      const og = VARIANT_OG[variant] as { title: string; description: string; image: string; url: string } | undefined;
-      if (!og) return;
-      const html = `<!DOCTYPE html><html><head>
+      const og = VARIANT_OG[variant as keyof typeof VARIANT_OG];
+      if (og) {
+        const html = `<!DOCTYPE html><html><head>
 <meta property="og:type" content="website"/>
 <meta property="og:title" content="${og.title}"/>
 <meta property="og:description" content="${og.description}"/>
@@ -77,14 +77,15 @@ export default function middleware(request: Request) {
 <meta name="twitter:image" content="${og.image}"/>
 <title>${og.title}</title>
 </head><body></body></html>`;
-      return new Response(html, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-          'Vary': 'User-Agent, Host',
-        },
-      });
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'User-Agent, Host',
+          },
+        });
+      }
     }
   }
 

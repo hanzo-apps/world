@@ -50,7 +50,7 @@ declare global {
 export interface LiveChannel {
   id: string;
   name: string;
-  handle: string; // YouTube channel handle (e.g., @bloomberg)
+  handle?: string; // YouTube channel handle (e.g., @bloomberg) - optional for HLS streams
   fallbackVideoId?: string; // Fallback if no live stream detected
   videoId?: string; // Dynamically fetched live video ID
   isLive?: boolean;
@@ -389,7 +389,7 @@ export class LiveNewsPanel extends Panel {
 
     const label = document.createElement('div');
     label.style.cssText = 'color:var(--text-secondary);font-size:13px;';
-    label.textContent = this.activeChannel.name;
+    label.textContent = this.getChannelDisplayName(this.activeChannel);
 
     const playBtn = document.createElement('button');
     playBtn.className = 'offline-retry';
@@ -744,12 +744,18 @@ export class LiveNewsPanel extends Panel {
     this.syncPlayerState();
   }
 
+  private getChannelDisplayName(channel: LiveChannel): string {
+    return channel.hlsUrl && !channel.handle ? `${channel.name} 🔗` : channel.name;
+  }
+
   /** Creates a single channel tab button with click and drag handlers. */
   private createChannelButton(channel: LiveChannel): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `live-channel-btn ${channel.id === this.activeChannel.id ? 'active' : ''}`;
     btn.dataset.channelId = channel.id;
-    btn.textContent = channel.name;
+
+    btn.textContent = this.getChannelDisplayName(channel);
+
     btn.style.cursor = 'grab';
     btn.addEventListener('click', (e) => {
       if (this.suppressChannelClick) {
@@ -920,6 +926,14 @@ export class LiveNewsPanel extends Panel {
       channel.hlsUrl = undefined;
       return;
     }
+
+    // Skip fetchLiveVideoInfo for channels without handle (HLS-only)
+    if (!channel.handle) {
+      channel.videoId = channel.fallbackVideoId;
+      channel.isLive = false;
+      return;
+    }
+
     const info = await fetchLiveVideoInfo(channel.handle);
     channel.videoId = info.videoId || channel.fallbackVideoId;
     channel.isLive = !!info.videoId;
@@ -990,7 +1004,9 @@ export class LiveNewsPanel extends Panel {
     this.destroyPlayer();
     const watchUrl = channel.videoId
       ? `https://www.youtube.com/watch?v=${encodeURIComponent(channel.videoId)}`
-      : `https://www.youtube.com/${encodeURIComponent(channel.handle)}`;
+      : channel.handle
+      ? `https://www.youtube.com/${encodeURIComponent(channel.handle)}`
+      : 'https://www.youtube.com';
     const safeName = escapeHtml(channel.name);
 
     this.content.innerHTML = `
@@ -1346,7 +1362,9 @@ export class LiveNewsPanel extends Panel {
     const channel = this.activeChannel;
     const watchUrl = channel.videoId
       ? `https://www.youtube.com/watch?v=${encodeURIComponent(channel.videoId)}`
-      : `https://www.youtube.com/${encodeURIComponent(channel.handle)}`;
+      : channel.handle
+      ? `https://www.youtube.com/${encodeURIComponent(channel.handle)}`
+      : 'https://www.youtube.com';
 
     this.destroyPlayer();
     this.content.innerHTML = '';
