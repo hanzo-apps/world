@@ -1157,12 +1157,164 @@ async function seedSectorSummary() {
   return sectors.length;
 }
 
+// Gulf Quotes — Yahoo Finance (14 symbols: indices, currencies, oil)
+const GULF_SYMBOLS = [
+  { symbol: '^TASI.SR', name: 'Tadawul All Share', country: 'Saudi Arabia', flag: '\u{1F1F8}\u{1F1E6}', type: 'index' },
+  { symbol: 'DFMGI.AE', name: 'Dubai Financial Market', country: 'UAE', flag: '\u{1F1E6}\u{1F1EA}', type: 'index' },
+  { symbol: 'UAE', name: 'Abu Dhabi (iShares)', country: 'UAE', flag: '\u{1F1E6}\u{1F1EA}', type: 'index' },
+  { symbol: 'QAT', name: 'Qatar (iShares)', country: 'Qatar', flag: '\u{1F1F6}\u{1F1E6}', type: 'index' },
+  { symbol: 'GULF', name: 'Gulf Dividend (WisdomTree)', country: 'Kuwait', flag: '\u{1F1F0}\u{1F1FC}', type: 'index' },
+  { symbol: '^MSM', name: 'Muscat MSM 30', country: 'Oman', flag: '\u{1F1F4}\u{1F1F2}', type: 'index' },
+  { symbol: 'SARUSD=X', name: 'Saudi Riyal', country: 'Saudi Arabia', flag: '\u{1F1F8}\u{1F1E6}', type: 'currency' },
+  { symbol: 'AEDUSD=X', name: 'UAE Dirham', country: 'UAE', flag: '\u{1F1E6}\u{1F1EA}', type: 'currency' },
+  { symbol: 'QARUSD=X', name: 'Qatari Riyal', country: 'Qatar', flag: '\u{1F1F6}\u{1F1E6}', type: 'currency' },
+  { symbol: 'KWDUSD=X', name: 'Kuwaiti Dinar', country: 'Kuwait', flag: '\u{1F1F0}\u{1F1FC}', type: 'currency' },
+  { symbol: 'BHDUSD=X', name: 'Bahraini Dinar', country: 'Bahrain', flag: '\u{1F1E7}\u{1F1ED}', type: 'currency' },
+  { symbol: 'OMRUSD=X', name: 'Omani Rial', country: 'Oman', flag: '\u{1F1F4}\u{1F1F2}', type: 'currency' },
+  { symbol: 'CL=F', name: 'WTI Crude', country: '', flag: '\u{1F6E2}\u{FE0F}', type: 'oil' },
+  { symbol: 'BZ=F', name: 'Brent Crude', country: '', flag: '\u{1F6E2}\u{FE0F}', type: 'oil' },
+];
+const GULF_SEED_TTL = 5400; // 90min — survives 1 missed cycle
+
+async function seedGulfQuotes() {
+  const quotes = [];
+  for (const meta of GULF_SYMBOLS) {
+    const yahoo = await fetchYahooChartDirect(meta.symbol);
+    if (yahoo) {
+      quotes.push({
+        symbol: meta.symbol, name: meta.name, country: meta.country,
+        flag: meta.flag, type: meta.type,
+        price: yahoo.price, change: +(yahoo.change).toFixed(2), sparkline: yahoo.sparkline,
+      });
+    }
+    await sleep(150);
+  }
+  if (quotes.length === 0) { console.warn('[Gulf] No quotes fetched — skipping'); return 0; }
+  const payload = { quotes, rateLimited: false };
+  const ok1 = await upstashSet('market:gulf-quotes:v1', payload, GULF_SEED_TTL);
+  const ok2 = await upstashSet('seed-meta:market:gulf-quotes', { fetchedAt: Date.now(), recordCount: quotes.length }, 604800);
+  console.log(`[Gulf] Seeded ${quotes.length}/${GULF_SYMBOLS.length} quotes (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'})`);
+  return quotes.length;
+}
+
+// ETF Flows — Yahoo Finance (10 BTC spot ETFs)
+const ETF_LIST = [
+  { ticker: 'IBIT', issuer: 'BlackRock' }, { ticker: 'FBTC', issuer: 'Fidelity' },
+  { ticker: 'ARKB', issuer: 'ARK/21Shares' }, { ticker: 'BITB', issuer: 'Bitwise' },
+  { ticker: 'GBTC', issuer: 'Grayscale' }, { ticker: 'HODL', issuer: 'VanEck' },
+  { ticker: 'BRRR', issuer: 'Valkyrie' }, { ticker: 'EZBC', issuer: 'Franklin' },
+  { ticker: 'BTCO', issuer: 'Invesco' }, { ticker: 'BTCW', issuer: 'WisdomTree' },
+];
+const ETF_SEED_TTL = 5400; // 90min
+
+function parseEtfChart(chart, ticker, issuer) {
+  const result = chart?.chart?.result?.[0];
+  if (!result) return null;
+  const closes = (result.indicators?.quote?.[0]?.close || []).filter((v) => v != null);
+  const volumes = (result.indicators?.quote?.[0]?.volume || []).filter((v) => v != null);
+  if (closes.length < 2) return null;
+  const price = closes[closes.length - 1];
+  const prev = closes[closes.length - 2];
+  const priceChange = prev ? ((price - prev) / prev) * 100 : 0;
+  const vol = volumes.length > 0 ? volumes[volumes.length - 1] : 0;
+  const avgVol = volumes.length > 1 ? volumes.slice(0, -1).reduce((a, b) => a + b, 0) / (volumes.length - 1) : vol;
+  const volumeRatio = avgVol > 0 ? vol / avgVol : 1;
+  const direction = priceChange > 0.1 ? 'inflow' : priceChange < -0.1 ? 'outflow' : 'neutral';
+  return { ticker, issuer, price: +price.toFixed(2), priceChange: +priceChange.toFixed(2), volume: vol, avgVolume: Math.round(avgVol), volumeRatio: +volumeRatio.toFixed(2), direction, estFlow: Math.round(vol * price * (priceChange > 0 ? 1 : -1) * 0.1) };
+}
+
+async function seedEtfFlows() {
+  const etfs = [];
+  for (const { ticker, issuer } of ETF_LIST) {
+    try {
+      const raw = await new Promise((resolve) => {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=5d&interval=1d`;
+        const req = https.get(url, { headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' }, timeout: 10000 }, (resp) => {
+          if (resp.statusCode !== 200) { resp.resume(); return resolve(null); }
+          let body = '';
+          resp.on('data', (chunk) => { body += chunk; });
+          resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+        });
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
+      });
+      const parsed = raw ? parseEtfChart(raw, ticker, issuer) : null;
+      if (parsed) etfs.push(parsed);
+    } catch {}
+    await sleep(150);
+  }
+  if (etfs.length === 0) { console.warn('[ETF] No data fetched — skipping'); return 0; }
+  const totalVolume = etfs.reduce((s, e) => s + e.volume, 0);
+  const totalEstFlow = etfs.reduce((s, e) => s + e.estFlow, 0);
+  const payload = {
+    timestamp: new Date().toISOString(),
+    summary: { etfCount: etfs.length, totalVolume, totalEstFlow, netDirection: totalEstFlow > 0 ? 'NET INFLOW' : totalEstFlow < 0 ? 'NET OUTFLOW' : 'NEUTRAL', inflowCount: etfs.filter((e) => e.direction === 'inflow').length, outflowCount: etfs.filter((e) => e.direction === 'outflow').length },
+    etfs, rateLimited: false,
+  };
+  const ok1 = await upstashSet('market:etf-flows:v1', payload, ETF_SEED_TTL);
+  const ok2 = await upstashSet('seed-meta:market:etf-flows', { fetchedAt: Date.now(), recordCount: etfs.length }, 604800);
+  console.log(`[ETF] Seeded ${etfs.length}/${ETF_LIST.length} ETFs (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'})`);
+  return etfs.length;
+}
+
+// Crypto Quotes — CoinGecko free API
+const CRYPTO_IDS = ['bitcoin', 'ethereum', 'solana', 'ripple'];
+const CRYPTO_META = { bitcoin: { name: 'Bitcoin', symbol: 'BTC' }, ethereum: { name: 'Ethereum', symbol: 'ETH' }, solana: { name: 'Solana', symbol: 'SOL' }, ripple: { name: 'XRP', symbol: 'XRP' } };
+const CRYPTO_SEED_TTL = 3600; // 1h
+
+async function seedCryptoQuotes() {
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${CRYPTO_IDS.join(',')}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+  const data = await cyberHttpGetJson(url, { Accept: 'application/json' }, 15000);
+  if (!Array.isArray(data) || data.length === 0) { console.warn('[Crypto] CoinGecko returned no data — skipping'); return 0; }
+  const quotes = [];
+  for (const id of CRYPTO_IDS) {
+    const coin = data.find((c) => c.id === id);
+    if (!coin) continue;
+    const meta = CRYPTO_META[id];
+    const prices = coin.sparkline_in_7d?.price;
+    quotes.push({ name: meta?.name || id, symbol: meta?.symbol || id.toUpperCase(), price: coin.current_price ?? 0, change: coin.price_change_percentage_24h ?? 0, sparkline: prices && prices.length > 24 ? prices.slice(-48) : (prices || []) });
+  }
+  if (quotes.length === 0 || quotes.every((q) => q.price === 0)) { console.warn('[Crypto] No valid quotes — skipping'); return 0; }
+  const ok1 = await upstashSet('market:crypto:v1', { quotes }, CRYPTO_SEED_TTL);
+  const ok2 = await upstashSet('seed-meta:market:crypto', { fetchedAt: Date.now(), recordCount: quotes.length }, 604800);
+  console.log(`[Crypto] Seeded ${quotes.length}/${CRYPTO_IDS.length} quotes (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'})`);
+  return quotes.length;
+}
+
+// Stablecoin Markets — CoinGecko free API
+const STABLECOIN_IDS = 'tether,usd-coin,dai,first-digital-usd,ethena-usde';
+const STABLECOIN_SEED_TTL = 3600; // 1h
+
+async function seedStablecoinMarkets() {
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${STABLECOIN_IDS}&order=market_cap_desc&sparkline=false&price_change_percentage=7d`;
+  const data = await cyberHttpGetJson(url, { Accept: 'application/json' }, 15000);
+  if (!Array.isArray(data) || data.length === 0) { console.warn('[Stablecoin] CoinGecko returned no data — skipping'); return 0; }
+  const stablecoins = data.map((coin) => {
+    const price = coin.current_price || 0;
+    const deviation = Math.abs(price - 1.0);
+    const pegStatus = deviation <= 0.005 ? 'ON PEG' : deviation <= 0.01 ? 'SLIGHT DEPEG' : 'DEPEGGED';
+    return { id: coin.id, symbol: (coin.symbol || '').toUpperCase(), name: coin.name, price, deviation: +(deviation * 100).toFixed(3), pegStatus, marketCap: coin.market_cap || 0, volume24h: coin.total_volume || 0, change24h: coin.price_change_percentage_24h || 0, change7d: coin.price_change_percentage_7d_in_currency || 0, image: coin.image || '' };
+  });
+  const totalMarketCap = stablecoins.reduce((s, c) => s + c.marketCap, 0);
+  const totalVolume24h = stablecoins.reduce((s, c) => s + c.volume24h, 0);
+  const depeggedCount = stablecoins.filter((c) => c.pegStatus === 'DEPEGGED').length;
+  const payload = { timestamp: new Date().toISOString(), summary: { totalMarketCap, totalVolume24h, coinCount: stablecoins.length, depeggedCount, healthStatus: depeggedCount === 0 ? 'HEALTHY' : depeggedCount === 1 ? 'CAUTION' : 'WARNING' }, stablecoins };
+  const ok1 = await upstashSet('market:stablecoins:v1', payload, STABLECOIN_SEED_TTL);
+  const ok2 = await upstashSet('seed-meta:market:stablecoins', { fetchedAt: Date.now(), recordCount: stablecoins.length }, 604800);
+  console.log(`[Stablecoin] Seeded ${stablecoins.length} coins (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'})`);
+  return stablecoins.length;
+}
+
 async function seedAllMarketData() {
   const t0 = Date.now();
   const q = await seedMarketQuotes();
   const c = await seedCommodityQuotes();
   const s = await seedSectorSummary();
-  console.log(`[Market] Seed complete: ${q} quotes, ${c} commodities, ${s} sectors (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+  const g = await seedGulfQuotes();
+  const e = await seedEtfFlows();
+  const cr = await seedCryptoQuotes();
+  const sc = await seedStablecoinMarkets();
+  console.log(`[Market] Seed complete: ${q} quotes, ${c} commodities, ${s} sectors, ${g} gulf, ${e} etf, ${cr} crypto, ${sc} stablecoins (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 }
 
 async function startMarketDataSeedLoop() {
@@ -1441,7 +1593,7 @@ const OTX_API_KEY = process.env.OTX_API_KEY || '';
 const ABUSEIPDB_API_KEY = process.env.ABUSEIPDB_API_KEY || '';
 const CYBER_SEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h — matches IOC feed update cadence
 const CYBER_SEED_TTL = 10800; // 3h — survives 1 missed cycle
-const CYBER_RPC_KEY = 'cyber:threats:v2:0:::'; // matches handler default cache key
+const CYBER_RPC_KEY = 'cyber:threats:v2'; // must match handler REDIS_CACHE_KEY in list-cyber-threats.ts
 const CYBER_BOOTSTRAP_KEY = 'cyber:threats-bootstrap:v2';
 const CYBER_MAX_CACHED = 2000;
 const CYBER_GEO_MAX = 200;
@@ -1749,7 +1901,8 @@ async function seedCyberThreats() {
   const payload = { threats };
   const ok1 = await upstashSet(CYBER_RPC_KEY, payload, CYBER_SEED_TTL);
   const ok2 = await upstashSet(CYBER_BOOTSTRAP_KEY, payload, CYBER_SEED_TTL);
-  console.log(`[Cyber] Seeded ${threats.length} threats (feodo:${feodo.length} urlhaus:${urlhaus.length} c2intel:${c2intel.length} otx:${otx.length} abuseipdb:${abuseipdb.length} redis:${ok1 && ok2 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  const ok3 = await upstashSet('seed-meta:cyber:threats', { fetchedAt: Date.now(), recordCount: threats.length }, 604800);
+  console.log(`[Cyber] Seeded ${threats.length} threats (feodo:${feodo.length} urlhaus:${urlhaus.length} c2intel:${c2intel.length} otx:${otx.length} abuseipdb:${abuseipdb.length} redis:${ok1 && ok2 && ok3 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   return threats.length;
 }
 
