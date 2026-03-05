@@ -291,10 +291,23 @@ export const SOURCE_TIERS: Record<string, number> = {
   'Positive.News': 2,
   'Reasons to be Cheerful': 2,
   'Optimist Daily': 2,
+  'Yes! Magazine': 2,
+  'My Modern Met': 2,
+  'Upworthy': 3,
+  'DailyGood': 3,
+  'Good Good Good': 3,
+  'GOOD Magazine': 3,
+  'Sunny Skyz': 3,
+  'The Better India': 3,
+  'Mongabay': 3,
+  'Conservation Optimism': 3,
+  'Shareable': 3,
+  'GNN Heroes Spotlight': 3,
   'GNN Science': 3,
   'GNN Animals': 3,
   'GNN Health': 3,
   'GNN Heroes': 3,
+  'GNN Earth': 3,
 };
 
 export function getSourceTier(sourceName: string): number {
@@ -1037,6 +1050,7 @@ const HAPPY_FEEDS: Record<string, Feed[]> = {
     { name: 'GOOD Magazine', url: rss('https://www.good.is/feed/') },
     { name: 'Sunny Skyz', url: rss('https://www.sunnyskyz.com/rss_tebow.php') },
     { name: 'The Better India', url: rss('https://thebetterindia.com/feed/') },
+    { name: 'My Modern Met', url: rss('https://mymodernmet.com/feed/') },
   ],
   science: [
     { name: 'GNN Science', url: rss('https://www.goodnewsnetwork.org/category/news/science/feed/') },
@@ -1050,12 +1064,20 @@ const HAPPY_FEEDS: Record<string, Feed[]> = {
   ],
   nature: [
     { name: 'GNN Animals', url: rss('https://www.goodnewsnetwork.org/category/news/animals/feed/') },
+    { name: 'GNN Earth', url: rss('https://www.goodnewsnetwork.org/category/news/earth/feed/') },
+    { name: 'Mongabay', url: rss('https://news.mongabay.com/feed/') },
+    { name: 'Conservation Optimism', url: rss('https://conservationoptimism.org/feed/') },
   ],
   health: [
     { name: 'GNN Health', url: rss('https://www.goodnewsnetwork.org/category/news/health/feed/') },
   ],
   inspiring: [
     { name: 'GNN Heroes', url: rss('https://www.goodnewsnetwork.org/category/news/inspiring/feed/') },
+    { name: 'GNN Heroes Spotlight', url: rss('https://www.goodnewsnetwork.org/category/news/heroes/feed/') },
+  ],
+  community: [
+    { name: 'Shareable', url: rss('https://www.shareable.net/feed/') },
+    { name: 'Yes! Magazine', url: rss('https://www.yesmagazine.org/feed') },
   ],
 };
 

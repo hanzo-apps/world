@@ -45,6 +45,7 @@ import type { Earthquake } from '@/services/earthquakes';
 import type { ClimateAnomaly } from '@/services/climate';
 import { ArcLayer } from '@deck.gl/layers';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { tokenizeForMatch, matchKeyword, matchesAnyKeyword, findMatchingKeywords } from '@/utils/keyword-match';
@@ -404,12 +405,14 @@ export class DeckGLMap {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       this.maplibreMap.resize();
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
+      this.maplibreMap.triggerRepaint();
     }, 150);
     this.debouncedFetchBases = debounce(() => this.fetchServerBases(), 300);
     this.debouncedFetchAircraft = debounce(() => this.fetchViewportAircraft(), 500);
     this.rafUpdateLayers = rafSchedule(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }
+      this.maplibreMap?.triggerRepaint();
     });
 
     this.setupDOM();
@@ -1917,22 +1920,23 @@ export class DeckGLMap {
     });
   }
 
-  private createGpsJammingLayer(): ScatterplotLayer {
-    return new ScatterplotLayer({
+  private createGpsJammingLayer(): H3HexagonLayer {
+    return new H3HexagonLayer({
       id: 'gps-jamming-layer',
       data: this.gpsJammingHexes,
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => d.level === 'high' ? 15000 : 10000,
-      getFillColor: (d) => {
-        if (d.level === 'high') return [255, 80, 80, 200] as [number, number, number, number];
-        return [255, 180, 50, 180] as [number, number, number, number];
+      getHexagon: (d: GpsJamHex) => d.h3,
+      getFillColor: (d: GpsJamHex) => {
+        if (d.level === 'high') return [255, 80, 80, 180] as [number, number, number, number];
+        return [255, 180, 50, 140] as [number, number, number, number];
       },
-      radiusMinPixels: 4,
-      radiusMaxPixels: 14,
-      pickable: true,
+      getElevation: 0,
+      extruded: false,
+      filled: true,
       stroked: true,
-      getLineColor: [255, 255, 255, 100] as [number, number, number, number],
+      getLineColor: [255, 255, 255, 80] as [number, number, number, number],
+      getLineWidth: 1,
       lineWidthMinPixels: 1,
+      pickable: true,
     });
   }
 
@@ -3741,6 +3745,7 @@ export class DeckGLMap {
     try {
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     } catch { /* map may be mid-teardown (null.getProjection) */ }
+    this.maplibreMap.triggerRepaint();
     const elapsed = performance.now() - startTime;
     if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
