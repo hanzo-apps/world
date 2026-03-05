@@ -3782,7 +3782,7 @@ body.playback-mode .status-dot {
 
 .layer-toggles:not(.deckgl-layer-toggles) {
   position: absolute;
-  bottom: 36px;
+  bottom: 10px;
   left: 10px;
   display: flex;
   gap: 4px;
@@ -6498,7 +6498,7 @@ a.prediction-link:hover {
 /* Map legend bar */
 .map-legend {
   position: absolute;
-  bottom: 32px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -13253,7 +13253,7 @@ a.prediction-link:hover {
 /* deck.gl Layer Toggles */
 .deckgl-layer-toggles {
   position: absolute;
-  bottom: 36px;
+  bottom: 10px;
   left: 10px;
   z-index: 100;
   background: var(--bg);
@@ -13563,26 +13563,15 @@ a.prediction-link:hover {
   display: none;
 }
 
-/* Map author credit badge (bottom-left, styled like globe BETA badge) */
-.map-container::before {
-  content: '© Elie Habib · Someone™';
-  position: absolute;
-  left: 12px;
-  bottom: 8px;
-  z-index: 101;
-  padding: 3px 10px;
+/* Map author credit badge (inside layers panel) */
+.map-author-badge {
+  padding: 6px 10px;
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
   color: #00e5ff;
-  background: rgba(0, 229, 255, 0.08);
-  border: 1px solid rgba(0, 229, 255, 0.4);
-  border-radius: 4px;
-  box-shadow:
-    0 0 6px rgba(0, 229, 255, 0.3),
-    0 0 20px rgba(0, 229, 255, 0.15),
-    inset 0 0 8px rgba(0, 229, 255, 0.05);
+  border-top: 1px solid rgba(0, 229, 255, 0.2);
   pointer-events: none;
 }
 
