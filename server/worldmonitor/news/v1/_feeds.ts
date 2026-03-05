@@ -267,11 +267,25 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'Positive.News', url: 'https://www.positive.news/feed/' },
       { name: 'Reasons to be Cheerful', url: 'https://reasonstobecheerful.world/feed/' },
       { name: 'Optimist Daily', url: 'https://www.optimistdaily.com/feed/' },
+      { name: 'My Modern Met', url: 'https://mymodernmet.com/feed/' },
     ],
     science: [
       { name: 'ScienceDaily', url: 'https://www.sciencedaily.com/rss/all.xml' },
       { name: 'Nature News', url: 'https://feeds.nature.com/nature/rss/current' },
       { name: 'Singularity Hub', url: 'https://singularityhub.com/feed/' },
+      { name: 'Human Progress', url: 'https://humanprogress.org/feed/' },
+    ],
+    nature: [
+      { name: 'Mongabay', url: 'https://news.mongabay.com/feed/' },
+      { name: 'Conservation Optimism', url: 'https://conservationoptimism.org/feed/' },
+    ],
+    inspiring: [
+      { name: 'GNN Heroes', url: 'https://www.goodnewsnetwork.org/category/news/inspiring/feed/' },
+      { name: 'GNN Health', url: 'https://www.goodnewsnetwork.org/category/news/health/feed/' },
+    ],
+    community: [
+      { name: 'Yes! Magazine', url: 'https://www.yesmagazine.org/feed' },
+      { name: 'Shareable', url: 'https://www.shareable.net/feed/' },
     ],
   },
 };
