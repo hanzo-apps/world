@@ -14,6 +14,7 @@ import {
 } from '@/generated/client/worldmonitor/market/v1/service_client';
 import type { MarketData, CryptoData } from '@/types';
 import { createCircuitBreaker } from '@/utils';
+import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Client + Circuit Breakers ----
 
@@ -121,6 +122,12 @@ export async function fetchStockQuote(
 let lastSuccessfulCrypto: CryptoData[] = [];
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
+  const hydrated = getHydratedData('cryptoQuotes') as ListCryptoQuotesResponse | undefined;
+  if (hydrated?.quotes?.length) {
+    const mapped = hydrated.quotes.map(toCryptoData).filter(c => c.price > 0);
+    if (mapped.length > 0) { lastSuccessfulCrypto = mapped; return mapped; }
+  }
+
   const resp = await cryptoBreaker.execute(async () => {
     return client.listCryptoQuotes({ ids: [] }); // empty = all defaults
   }, emptyCryptoFallback);

@@ -30,16 +30,24 @@ const BOOTSTRAP_CACHE_KEYS = {
   flightDelays: 'aviation:delays-bootstrap:v1',
   insights: 'news:insights:v1',
   predictions: 'prediction:markets-bootstrap:v1',
+  cryptoQuotes: 'market:crypto:v1',
+  gulfQuotes: 'market:gulf-quotes:v1',
+  stablecoinMarkets: 'market:stablecoins:v1',
+  unrestEvents: 'unrest:events:v1',
+  iranEvents: 'conflict:iran-events:v1',
+  ucdpEvents: 'conflict:ucdp-events:v1',
 };
 
 const SLOW_KEYS = new Set([
   'bisPolicy', 'bisExchange', 'bisCredit', 'minerals', 'giving',
   'sectors', 'etfFlows', 'shippingRates', 'wildfires', 'climateAnomalies',
   'cyberThreats', 'techReadiness', 'theaterPosture', 'naturalEvents',
+  'cryptoQuotes', 'gulfQuotes', 'stablecoinMarkets', 'unrestEvents', 'ucdpEvents',
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
+  'iranEvents',
 ]);
 
 const TIER_CACHE = {
