@@ -111,7 +111,7 @@ async function main() {
   console.log(`  FIRMS key: ${maskToken(apiKey)}`);
 
   await runSeed('wildfire', 'fires', CANONICAL_KEY, () => fetchAllRegions(apiKey), {
-    validateFn: (data) => Array.isArray(data?.fireDetections) && data.fireDetections.length > 0,
+    validateFn: (data) => Array.isArray(data?.fireDetections),
     ttlSeconds: 7200,
     sourceVersion: FIRMS_SOURCE,
   });

@@ -8,6 +8,28 @@ const CANONICAL_KEY = 'market:commodities-bootstrap:v1';
 const CACHE_TTL = 1800;
 const YAHOO_DELAY_MS = 200;
 
+async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (resp.status === 429) {
+      const wait = 5000 * (i + 1);
+      console.warn(`  [Yahoo] ${label} 429 — waiting ${wait / 1000}s (attempt ${i + 1}/${maxAttempts})`);
+      await sleep(wait);
+      continue;
+    }
+    if (!resp.ok) {
+      console.warn(`  [Yahoo] ${label} HTTP ${resp.status}`);
+      return null;
+    }
+    return resp;
+  }
+  console.warn(`  [Yahoo] ${label} rate limited after ${maxAttempts} attempts`);
+  return null;
+}
+
 const COMMODITY_SYMBOLS = ['^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F'];
 
 async function fetchCommodityQuotes() {
@@ -20,12 +42,8 @@ async function fetchCommodityQuotes() {
 
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
-      const resp = await fetch(url, {
-        headers: { 'User-Agent': CHROME_UA },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!resp.ok) {
-        console.warn(`  [Yahoo] ${symbol} HTTP ${resp.status}`);
+      const resp = await fetchYahooWithRetry(url, symbol);
+      if (!resp) {
         misses++;
         continue;
       }
