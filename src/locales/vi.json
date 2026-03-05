@@ -1346,7 +1346,8 @@
       "openSettings": "Mở Cài đặt"
     },
     "languageSelector": {
-      "selectLanguage": "Chọn Ngôn ngữ"
+      "selectLanguage": "Chọn Ngôn ngữ",
+      "mapLabelsFallbackVi": "Nhãn bản đồ hiện sẽ dùng tiếng Anh khi chọn tiếng Việt."
     },
     "serviceStatus": {
       "checkingServices": "Đang kiểm tra dịch vụ...",

@@ -1587,7 +1587,8 @@
       "openSettings": "Open Settings"
     },
     "languageSelector": {
-      "selectLanguage": "Select Language"
+      "selectLanguage": "Select Language",
+      "mapLabelsFallbackVi": "Map labels currently fall back to English for Vietnamese."
     },
     "serviceStatus": {
       "checkingServices": "Checking services...",
@@ -2333,4 +2334,3 @@
     "all": "All"
   }
 }
-
