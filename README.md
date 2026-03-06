@@ -499,7 +499,40 @@ If you find World Monitor useful:
 
 ## License
 
-GNU Affero General Public License v3.0 (AGPL-3.0) — see [LICENSE](LICENSE) for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see [LICENSE](LICENSE) for the full text.
+
+### What This Means
+
+**You are free to:**
+
+- **Use** — run World Monitor for any purpose, including commercial use
+- **Study** — read, audit, and learn from the source code
+- **Modify** — adapt, extend, and build upon the code
+- **Distribute** — share copies with anyone
+
+**Under these conditions:**
+
+- **Source code disclosure** — if you distribute or modify this software, you **must** make the complete source code available under the same AGPL-3.0 license
+- **Network use is distribution** — if you run a modified version as a network service (SaaS, web app, API), you **must** provide the source code to all users who interact with it over the network. This is the key difference from GPL-3.0 — you cannot run a modified version behind a server without sharing the source
+- **Same license (copyleft)** — any derivative work must be released under AGPL-3.0. You cannot re-license under a proprietary or more permissive license
+- **Attribution** — you must retain all copyright notices, give appropriate credit to the original author, and clearly indicate any changes you made
+- **State changes** — modified files must carry prominent notices stating that you changed them, with the date of the change
+- **No additional restrictions** — you may not impose any further restrictions on the rights granted by this license (e.g., no DRM, no additional terms)
+
+**In plain terms:**
+
+| Use Case | Allowed? | Condition |
+|----------|----------|-----------|
+| Personal / internal use | Yes | No conditions |
+| Self-hosted deployment | Yes | No conditions if unmodified |
+| Forking & modifying | Yes | Must share source under AGPL-3.0 |
+| Commercial use | Yes | Must share source under AGPL-3.0 |
+| Running as a SaaS/web service | Yes | Must share source under AGPL-3.0 |
+| Bundling into a proprietary product | No | AGPL-3.0 copyleft prevents this |
+
+**No warranty** — the software is provided "as is" without warranty of any kind.
+
+Copyright (C) 2024-2026 Elie Habib. All rights reserved under AGPL-3.0.
 
 ---
 
@@ -521,7 +554,7 @@ GNU Affero General Public License v3.0 (AGPL-3.0) — see [LICENSE](LICENSE) for
 
 We thank the following researchers for responsibly disclosing security issues:
 
-- **Cody Richard** — Disclosed three security findings covering IPC command exposure via DevTools in production builds, renderer-to-sidecar trust boundary analysis, and the global fetch patch credential injection architecture (2025)
+- **Cody Richard** — Disclosed three security findings covering IPC command exposure via DevTools in production builds, renderer-to-sidecar trust boundary analysis, and the global fetch patch credential injection architecture (2026)
 
 If you discover a vulnerability, please see our [Security Policy](./SECURITY.md) for responsible disclosure guidelines.
 
