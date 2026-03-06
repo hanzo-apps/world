@@ -79,7 +79,10 @@ export async function listStablecoinMarkets(
     const coinIds = coins.split(',');
     const data = await fetchCryptoMarkets(coinIds);
 
-    if (data.length === 0 && stablecoinCache) return null;
+    if (data.length === 0 && stablecoinCache) {
+      console.warn('[stablecoin] empty response — returning stale cache');
+      return null;
+    }
 
     const stablecoins: Stablecoin[] = data.map(coin => {
       const price = coin.current_price || 0;
