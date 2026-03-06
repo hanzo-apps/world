@@ -17044,6 +17044,45 @@ body.has-breaking-alert .panels-grid {
   padding: 40px 24px;
 }
 
+.cb-geo-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.cb-geo-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cb-geo-retry-btn,
+.cb-geo-close-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cb-geo-retry-btn:hover,
+.cb-geo-close-btn:hover {
+  background: color-mix(in srgb, var(--text-faint) 15%, transparent);
+}
+
+.cb-geo-retry-btn {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .cb-empty {
   color: var(--text-faint);
   font-size: 12px;
