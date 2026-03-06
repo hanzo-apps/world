@@ -798,6 +798,9 @@ export class EventHandlerManager implements AppModule {
           this.ctx.map?.switchToFlat();
         }
       },
+      onMapProviderChange: () => {
+        this.ctx.map?.reloadBasemap();
+      },
     });
 
     if (this.ctx.statusPanel) {

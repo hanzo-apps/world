@@ -48,3 +48,4 @@ scripts/data/iran-events-latest.json
 
 # Military bases rebuild script (references external Supabase URLs)
 scripts/rebuild-military-bases.mjs
+.wrangler
