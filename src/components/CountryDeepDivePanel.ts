@@ -148,6 +148,32 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.open();
   }
 
+  public showGeoError(onRetry: () => void): void {
+    this.currentCode = '__error__';
+    this.currentName = null;
+    this.content.replaceChildren();
+
+    const wrapper = this.el('div', 'cdp-geo-error');
+    wrapper.append(
+      this.el('div', 'cdp-geo-error-icon', '\u26A0\uFE0F'),
+      this.el('div', 'cdp-geo-error-msg', t('countryBrief.geocodeFailed')),
+    );
+
+    const actions = this.el('div', 'cdp-geo-error-actions');
+
+    const retryBtn = this.el('button', 'cdp-geo-error-retry', t('countryBrief.retryBtn')) as HTMLButtonElement;
+    retryBtn.type = 'button';
+    retryBtn.addEventListener('click', () => onRetry(), { once: true });
+
+    const closeBtn = this.el('button', 'cdp-geo-error-close', t('countryBrief.closeBtn')) as HTMLButtonElement;
+    closeBtn.type = 'button';
+    closeBtn.addEventListener('click', () => this.hide(), { once: true });
+
+    actions.append(retryBtn, closeBtn);
+    wrapper.append(actions);
+    this.content.append(wrapper);
+  }
+
   public show(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals): void {
     this.abortController.abort();
     this.abortController = new AbortController();
