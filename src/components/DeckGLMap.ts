@@ -7,6 +7,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, PolygonLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
+import { registerPMTilesProtocol, buildPMTilesStyle, FALLBACK_DARK_STYLE, FALLBACK_LIGHT_STYLE, getMapProvider, getStyleForProvider } from '@/config/basemap';
 import Supercluster from 'supercluster';
 import type {
   MapLayers,
@@ -153,15 +154,9 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 const MAP_INTERACTION_MODE: MapInteractionMode =
   import.meta.env.VITE_MAP_INTERACTION_MODE === 'flat' ? 'flat' : '3d';
 
-const DARK_STYLE = SITE_VARIANT === 'happy'
-  ? '/map-styles/happy-dark.json'
-  : 'https://tiles.openfreemap.org/styles/dark';
-const LIGHT_STYLE = SITE_VARIANT === 'happy'
-  ? '/map-styles/happy-light.json'
-  : 'https://tiles.openfreemap.org/styles/positron';
-
-const FALLBACK_DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const FALLBACK_LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+const HAPPY_DARK_STYLE = '/map-styles/happy-dark.json';
+const HAPPY_LIGHT_STYLE = '/map-styles/happy-light.json';
+const isHappyVariant = SITE_VARIANT === 'happy';
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
@@ -480,10 +475,11 @@ export class DeckGLMap {
     mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
     wrapper.appendChild(mapContainer);
 
-    // Map attribution (OpenFreeMap basemap + OpenStreetMap data)
     const attribution = document.createElement('div');
     attribution.className = 'map-attribution';
-    attribution.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+    attribution.innerHTML = isHappyVariant
+      ? '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+      : '© <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
     wrapper.appendChild(attribution);
 
     this.container.appendChild(wrapper);
@@ -497,9 +493,20 @@ export class DeckGLMap {
       );
     }
 
+    if (!isHappyVariant) registerPMTilesProtocol();
+
     const preset = VIEW_PRESETS[this.state.view];
     const initialTheme = getCurrentTheme();
-    const primaryStyle = initialTheme === 'light' ? LIGHT_STYLE : DARK_STYLE;
+    const pmtilesStyle = !isHappyVariant ? buildPMTilesStyle(initialTheme) : null;
+    const primaryStyle = isHappyVariant
+      ? (initialTheme === 'light' ? HAPPY_LIGHT_STYLE : HAPPY_DARK_STYLE)
+      : pmtilesStyle ?? (initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE);
+    if (!isHappyVariant && !pmtilesStyle) {
+      this.usedFallbackStyle = true;
+      const attr = this.container.querySelector('.map-attribution');
+      if (attr) attr.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+      console.warn('[DeckGLMap] VITE_PMTILES_URL not set — using OpenFreeMap fallback');
+    }
 
     this.maplibreMap = new maplibregl.Map({
       container: 'deckgl-basemap',
@@ -524,6 +531,8 @@ export class DeckGLMap {
       this.usedFallbackStyle = true;
       const fallback = initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
       console.warn(`[DeckGLMap] Primary basemap failed, recreating with fallback: ${fallback}`);
+      const attr = this.container.querySelector('.map-attribution');
+      if (attr) attr.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
       this.maplibreMap?.remove();
       this.maplibreMap = new maplibregl.Map({
         container: 'deckgl-basemap',
@@ -553,28 +562,34 @@ export class DeckGLMap {
       });
     };
 
-    let styleLoaded = false;
+    let tileLoadOk = false;
+    let tileErrorCount = 0;
 
     this.maplibreMap.on('error', (e: { error?: Error; message?: string }) => {
       const msg = e.error?.message ?? e.message ?? '';
-      if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('cartocdn.com') || msg.includes('403') || msg.includes('Forbidden')) {
-        if (!styleLoaded) {
+      console.warn('[DeckGLMap] map error:', msg);
+      if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('403') || msg.includes('Forbidden')) {
+        tileErrorCount++;
+        if (!tileLoadOk && tileErrorCount >= 2) {
           recreateWithFallback();
+        }
+      }
+    });
+
+    this.maplibreMap.on('data', (e: { dataType?: string }) => {
+      if (e.dataType === 'source') {
+        tileLoadOk = true;
+        if (this.styleLoadTimeoutId) {
+          clearTimeout(this.styleLoadTimeoutId);
+          this.styleLoadTimeoutId = null;
         }
       }
     });
 
     this.styleLoadTimeoutId = setTimeout(() => {
       this.styleLoadTimeoutId = null;
-      if (!this.maplibreMap?.isStyleLoaded()) recreateWithFallback();
-    }, 5000);
-    this.maplibreMap.once('style.load', () => {
-      styleLoaded = true;
-      if (this.styleLoadTimeoutId) {
-        clearTimeout(this.styleLoadTimeoutId);
-        this.styleLoadTimeoutId = null;
-      }
-    });
+      if (!tileLoadOk) recreateWithFallback();
+    }, 10000);
 
     const canvas = this.maplibreMap.getCanvas();
     canvas.addEventListener('webglcontextlost', (e) => {
@@ -4816,19 +4831,29 @@ export class DeckGLMap {
 
   private switchBasemap(theme: 'dark' | 'light'): void {
     if (!this.maplibreMap) return;
-    const primary = theme === 'light' ? LIGHT_STYLE : DARK_STYLE;
-    const fallback = theme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
-    this.maplibreMap.setStyle(this.usedFallbackStyle ? fallback : primary);
-    // setStyle() replaces all sources/layers — reset guard so country layers are re-added
+    const provider = getMapProvider();
+    const style = isHappyVariant
+      ? (theme === 'light' ? HAPPY_LIGHT_STYLE : HAPPY_DARK_STYLE)
+      : (this.usedFallbackStyle && provider === 'auto')
+        ? (theme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE)
+        : getStyleForProvider(provider, theme);
+    this.maplibreMap.setStyle(style);
     this.countryGeoJsonLoaded = false;
     this.maplibreMap.once('style.load', () => {
       localizeMapLabels(this.maplibreMap);
       this.loadCountryBoundaries();
       this.updateCountryLayerPaint(theme);
-      // Re-render deck.gl overlay after style swap — interleaved layers need
-      // the new MapLibre style to be loaded before they can re-insert.
       this.render();
     });
+  }
+
+  public reloadBasemap(): void {
+    if (!this.maplibreMap) return;
+    const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    const provider = getMapProvider();
+    if (provider === 'pmtiles' || provider === 'auto') registerPMTilesProtocol();
+    this.usedFallbackStyle = false;
+    this.switchBasemap(theme as 'dark' | 'light');
   }
 
   private updateCountryLayerPaint(theme: 'dark' | 'light'): void {

@@ -3,6 +3,7 @@ import { PANEL_CATEGORY_MAP } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
+import { getMapProvider, setMapProvider, MAP_PROVIDER_OPTIONS, type MapProvider } from '@/config/basemap';
 import { getLiveStreamsAlwaysOn, setLiveStreamsAlwaysOn } from '@/services/live-stream-settings';
 import { getGlobeVisualPreset, setGlobeVisualPreset, GLOBE_VISUAL_PRESET_OPTIONS, type GlobeVisualPreset } from '@/services/globe-render-settings';
 import type { StreamQuality } from '@/services/ai-flow-settings';
@@ -31,6 +32,8 @@ export interface UnifiedSettingsConfig {
   isGlobeMode?: () => boolean;
   /** Switch between flat-map and 3D-globe */
   onMapModeChange?: (useGlobe: boolean) => void;
+  /** Switch map tile provider */
+  onMapProviderChange?: (provider: MapProvider) => void;
 }
 
 type TabId = 'general' | 'panels' | 'sources' | 'status';
@@ -205,6 +208,13 @@ export class UnifiedSettings {
         return;
       }
 
+      if (target.id === 'us-map-provider') {
+        const provider = target.value as MapProvider;
+        setMapProvider(provider);
+        this.config.onMapProviderChange?.(provider);
+        return;
+      }
+
       if (target.id === 'us-live-streams-always-on') {
         setLiveStreamsAlwaysOn(target.checked);
         return;
@@ -354,6 +364,21 @@ export class UnifiedSettings {
 
     // Map section
     html += `<div class="ai-flow-section-label">${t('components.insights.sectionMap')}</div>`;
+
+    // Map tile provider
+    const currentProvider = getMapProvider();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">Map Tile Provider</div>
+        <div class="ai-flow-toggle-desc">Choose where map tiles are loaded from. Auto uses self-hosted PMTiles with OpenFreeMap fallback.</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-map-provider">`;
+    for (const opt of MAP_PROVIDER_OPTIONS) {
+      const selected = opt.value === currentProvider ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${opt.label}</option>`;
+    }
+    html += `</select>`;
 
     html += this.toggleRowHtml('us-map-flash', t('components.insights.mapFlashLabel'), t('components.insights.mapFlashDesc'), settings.mapNewsFlash);
 
