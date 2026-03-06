@@ -8,7 +8,7 @@ import { getStreamQuality, subscribeStreamQualityChange } from '@/services/ai-fl
 import { isMobileDevice } from '@/utils';
 import { getLiveStreamsAlwaysOn, subscribeLiveStreamsSettingsChange } from '@/services/live-stream-settings';
 
-type WebcamRegion = 'iran' | 'middle-east' | 'europe' | 'asia' | 'americas';
+type WebcamRegion = 'iran' | 'middle-east' | 'europe' | 'asia' | 'americas' | 'space';
 
 interface WebcamFeed {
   id: string;
@@ -49,6 +49,9 @@ const WEBCAM_FEEDS: WebcamFeed[] = [
   { id: 'tokyo', city: 'Tokyo', country: 'Japan', region: 'asia', channelHandle: '@TokyoLiveCam4K', fallbackVideoId: '4pu9sF5Qssw' },
   { id: 'seoul', city: 'Seoul', country: 'South Korea', region: 'asia', channelHandle: '@UNvillage_live', fallbackVideoId: '-JhoMGoAfFc' },
   { id: 'sydney', city: 'Sydney', country: 'Australia', region: 'asia', channelHandle: '@WebcamSydney', fallbackVideoId: '7pcL-0Wo77U' },
+  // Space
+  { id: 'iss-earth', city: 'ISS Earth View', country: 'Space', region: 'space', channelHandle: '@NASA', fallbackVideoId: 'P9C25Un7xaM' },
+  { id: 'nasa-live', city: 'NASA TV', country: 'Space', region: 'space', channelHandle: '@NASA', fallbackVideoId: '21X5lGlDOfg' },
 ];
 
 const MAX_GRID_CELLS = 4;
@@ -173,6 +176,7 @@ export class LiveWebcamsPanel extends Panel {
       { key: 'europe', label: t('components.webcams.regions.europe') },
       { key: 'americas', label: t('components.webcams.regions.americas') },
       { key: 'asia', label: t('components.webcams.regions.asia') },
+      { key: 'space', label: t('components.webcams.regions.space') },
     ];
 
     regions.forEach(({ key, label }) => {
