@@ -314,6 +314,9 @@ export class LiveWebcamsPanel extends Panel {
 
     // YouTube embeds post yt-ready/yt-state (desktop sidecar) or native YT API events (web with enablejsapi=1).
     // If nothing arrives within the timeout, assume blocked/stuck.
+    // Fallback: iframe load event cancels the timeout — Firefox privacy restrictions
+    // can block YouTube JS API postMessage while the video plays fine.
+    iframe.addEventListener('load', () => this.markIframeReady(iframe), { once: true });
     tracker.timeout = setTimeout(() => this.markIframeBlocked(iframe), this.EMBED_READY_TIMEOUT_MS);
   }
 
