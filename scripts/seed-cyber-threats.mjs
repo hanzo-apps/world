@@ -231,6 +231,9 @@ async function hydrateCoordinates(threats) {
   const capped = unresolvedIps.slice(0, GEO_MAX_UNRESOLVED);
   const resolved = new Map();
   const controller = new AbortController();
+  if (typeof controller.signal.setMaxListeners === 'function') {
+    controller.signal.setMaxListeners(capped.length * 2 + 20);
+  }
   const timeout = setTimeout(() => controller.abort(), GEO_OVERALL_TIMEOUT_MS);
 
   const queue = [...capped];
