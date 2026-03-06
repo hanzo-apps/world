@@ -546,9 +546,11 @@ async function fetchAllThreats() {
 
   const hydrated = await hydrateCoordinates(combined);
 
-  let results = hydrated.filter((t) =>
-    t.lat !== null && t.lon !== null && t.lat >= -90 && t.lat <= 90 && t.lon >= -180 && t.lon <= 180
-  );
+  // Keep all threats — geo-resolved first, then unresolved (so the seed never returns 0
+  // when GeoIP APIs are rate-limited). Frontend handles missing location gracefully.
+  let results = hydrated.slice();
+  const geoCount = results.filter((t) => validCoords(t.lat, t.lon)).length;
+  console.log(`  Geo resolved: ${geoCount}/${results.length}`);
 
   results.sort((a, b) => {
     const bySev = (SEVERITY_RANK[SEVERITY_MAP[b.severity] || ''] || 0) - (SEVERITY_RANK[SEVERITY_MAP[a.severity] || ''] || 0);
@@ -566,34 +568,12 @@ function validate(data) {
   return Array.isArray(data?.threats) && data.threats.length >= 1;
 }
 
-import { atomicPublish } from './_seed-utils.mjs';
-
-let cachedResult = null;
-
-async function fetchOnce() {
-  if (cachedResult) return cachedResult;
-  cachedResult = await fetchAllThreats();
-  return cachedResult;
-}
-
-async function run() {
-  const result = await runSeed('cyber', 'threats', CANONICAL_KEY, fetchOnce, {
-    validateFn: validate,
-    ttlSeconds: CACHE_TTL,
-    sourceVersion: 'multi-ioc-v2',
-  });
-
-  if (result?.success && cachedResult) {
-    try {
-      await atomicPublish(BOOTSTRAP_KEY, cachedResult, validate, CACHE_TTL);
-      console.log(`  Bootstrap key written: ${BOOTSTRAP_KEY}`);
-    } catch (e) {
-      console.warn(`  Bootstrap write failed (non-fatal): ${e.message}`);
-    }
-  }
-}
-
-run().catch((err) => {
+runSeed('cyber', 'threats', CANONICAL_KEY, fetchAllThreats, {
+  validateFn: validate,
+  ttlSeconds: CACHE_TTL,
+  sourceVersion: 'multi-ioc-v2',
+  extraKeys: [{ key: BOOTSTRAP_KEY }],
+}).catch((err) => {
   console.error('FATAL:', err.message || err);
   process.exit(1);
 });
