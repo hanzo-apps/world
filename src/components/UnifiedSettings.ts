@@ -3,7 +3,7 @@ import { PANEL_CATEGORY_MAP } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
-import { getMapProvider, setMapProvider, MAP_PROVIDER_OPTIONS, type MapProvider } from '@/config/basemap';
+import { getMapProvider, setMapProvider, MAP_PROVIDER_OPTIONS, MAP_THEME_OPTIONS, getMapTheme, setMapTheme, type MapProvider } from '@/config/basemap';
 import { getLiveStreamsAlwaysOn, setLiveStreamsAlwaysOn } from '@/services/live-stream-settings';
 import { getGlobeVisualPreset, setGlobeVisualPreset, GLOBE_VISUAL_PRESET_OPTIONS, type GlobeVisualPreset } from '@/services/globe-render-settings';
 import type { StreamQuality } from '@/services/ai-flow-settings';
@@ -217,7 +217,16 @@ export class UnifiedSettings {
       if (target.id === 'us-map-provider') {
         const provider = target.value as MapProvider;
         setMapProvider(provider);
+        this.renderMapThemeDropdown(provider);
         this.config.onMapProviderChange?.(provider);
+        window.dispatchEvent(new CustomEvent('map-theme-changed'));
+        return;
+      }
+
+      if (target.id === 'us-map-theme') {
+        const provider = getMapProvider();
+        setMapTheme(provider, target.value);
+        window.dispatchEvent(new CustomEvent('map-theme-changed'));
         return;
       }
 
@@ -407,6 +416,21 @@ export class UnifiedSettings {
     }
     html += `</select>`;
 
+    // Map theme dropdown
+    const currentMapTheme = getMapTheme(currentProvider);
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">Map Theme</div>
+        <div class="ai-flow-toggle-desc">Visual style of the map tiles. Options vary by provider.</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-map-theme">`;
+    for (const opt of MAP_THEME_OPTIONS[currentProvider]) {
+      const selected = opt.value === currentMapTheme ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${opt.label}</option>`;
+    }
+    html += `</select>`;
+
     html += this.toggleRowHtml('us-map-flash', t('components.insights.mapFlashLabel'), t('components.insights.mapFlashDesc'), settings.mapNewsFlash);
 
     // Panels section
@@ -510,6 +534,15 @@ export class UnifiedSettings {
     }
 
     return html;
+  }
+
+  private renderMapThemeDropdown(provider: MapProvider): void {
+    const select = this.overlay.querySelector<HTMLSelectElement>('#us-map-theme');
+    if (!select) return;
+    const currentTheme = getMapTheme(provider);
+    select.innerHTML = MAP_THEME_OPTIONS[provider]
+      .map(opt => `<option value="${opt.value}"${opt.value === currentTheme ? ' selected' : ''}>${opt.label}</option>`)
+      .join('');
   }
 
   private toggleRowHtml(id: string, label: string, desc: string, checked: boolean): string {
