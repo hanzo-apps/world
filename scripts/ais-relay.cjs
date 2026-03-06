@@ -1257,15 +1257,38 @@ async function seedEtfFlows() {
   return etfs.length;
 }
 
-// Crypto Quotes — CoinGecko free API
+// Crypto Quotes — CoinGecko → CoinPaprika fallback
 const CRYPTO_IDS = ['bitcoin', 'ethereum', 'solana', 'ripple'];
 const CRYPTO_META = { bitcoin: { name: 'Bitcoin', symbol: 'BTC' }, ethereum: { name: 'Ethereum', symbol: 'ETH' }, solana: { name: 'Solana', symbol: 'SOL' }, ripple: { name: 'XRP', symbol: 'XRP' } };
+const CRYPTO_PAPRIKA_MAP = { bitcoin: 'btc-bitcoin', ethereum: 'eth-ethereum', solana: 'sol-solana', ripple: 'xrp-ripple' };
 const CRYPTO_SEED_TTL = 3600; // 1h
 
+async function fetchCryptoCoinPaprika() {
+  const data = await cyberHttpGetJson('https://api.coinpaprika.com/v1/tickers?quotes=USD', { Accept: 'application/json' }, 15000);
+  if (!Array.isArray(data)) throw new Error('CoinPaprika returned non-array');
+  const paprikaIds = new Set(CRYPTO_IDS.map((id) => CRYPTO_PAPRIKA_MAP[id]).filter(Boolean));
+  const reverseMap = Object.fromEntries(Object.entries(CRYPTO_PAPRIKA_MAP).map(([g, p]) => [p, g]));
+  return data.filter((t) => paprikaIds.has(t.id)).map((t) => ({
+    id: reverseMap[t.id] || t.id, current_price: t.quotes.USD.price,
+    price_change_percentage_24h: t.quotes.USD.percent_change_24h,
+    sparkline_in_7d: undefined, symbol: t.symbol.toLowerCase(), name: t.name,
+  }));
+}
+
 async function seedCryptoQuotes() {
-  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${CRYPTO_IDS.join(',')}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
-  const data = await cyberHttpGetJson(url, { Accept: 'application/json' }, 15000);
-  if (!Array.isArray(data) || data.length === 0) { console.warn('[Crypto] CoinGecko returned no data — skipping'); return 0; }
+  let data;
+  try {
+    const apiKey = process.env.COINGECKO_API_KEY;
+    const base = apiKey ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
+    const headers = { Accept: 'application/json' };
+    if (apiKey) headers['x-cg-pro-api-key'] = apiKey;
+    const url = `${base}/coins/markets?vs_currency=usd&ids=${CRYPTO_IDS.join(',')}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+    data = await cyberHttpGetJson(url, headers, 15000);
+    if (!Array.isArray(data) || data.length === 0) throw new Error('CoinGecko returned no data');
+  } catch (err) {
+    console.warn(`[Crypto] CoinGecko failed: ${err.message} — trying CoinPaprika`);
+    try { data = await fetchCryptoCoinPaprika(); } catch (e2) { console.warn(`[Crypto] CoinPaprika also failed: ${e2.message} — skipping`); return 0; }
+  }
   const quotes = [];
   for (const id of CRYPTO_IDS) {
     const coin = data.find((c) => c.id === id);
@@ -1281,14 +1304,40 @@ async function seedCryptoQuotes() {
   return quotes.length;
 }
 
-// Stablecoin Markets — CoinGecko free API
+// Stablecoin Markets — CoinGecko → CoinPaprika fallback
 const STABLECOIN_IDS = 'tether,usd-coin,dai,first-digital-usd,ethena-usde';
+const STABLECOIN_PAPRIKA_MAP = { tether: 'usdt-tether', 'usd-coin': 'usdc-usd-coin', dai: 'dai-dai', 'first-digital-usd': 'fdusd-first-digital-usd', 'ethena-usde': 'usde-ethena-usde' };
 const STABLECOIN_SEED_TTL = 3600; // 1h
 
+async function fetchStablecoinCoinPaprika() {
+  const data = await cyberHttpGetJson('https://api.coinpaprika.com/v1/tickers?quotes=USD', { Accept: 'application/json' }, 15000);
+  if (!Array.isArray(data)) throw new Error('CoinPaprika returned non-array');
+  const ids = STABLECOIN_IDS.split(',');
+  const paprikaIds = new Set(ids.map((id) => STABLECOIN_PAPRIKA_MAP[id]).filter(Boolean));
+  const reverseMap = Object.fromEntries(Object.entries(STABLECOIN_PAPRIKA_MAP).map(([g, p]) => [p, g]));
+  return data.filter((t) => paprikaIds.has(t.id)).map((t) => ({
+    id: reverseMap[t.id] || t.id, current_price: t.quotes.USD.price,
+    price_change_percentage_24h: t.quotes.USD.percent_change_24h,
+    price_change_percentage_7d_in_currency: t.quotes.USD.percent_change_7d,
+    market_cap: t.quotes.USD.market_cap, total_volume: t.quotes.USD.volume_24h,
+    symbol: t.symbol.toLowerCase(), name: t.name, image: '',
+  }));
+}
+
 async function seedStablecoinMarkets() {
-  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${STABLECOIN_IDS}&order=market_cap_desc&sparkline=false&price_change_percentage=7d`;
-  const data = await cyberHttpGetJson(url, { Accept: 'application/json' }, 15000);
-  if (!Array.isArray(data) || data.length === 0) { console.warn('[Stablecoin] CoinGecko returned no data — skipping'); return 0; }
+  let data;
+  try {
+    const apiKey = process.env.COINGECKO_API_KEY;
+    const base = apiKey ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
+    const headers = { Accept: 'application/json' };
+    if (apiKey) headers['x-cg-pro-api-key'] = apiKey;
+    const url = `${base}/coins/markets?vs_currency=usd&ids=${STABLECOIN_IDS}&order=market_cap_desc&sparkline=false&price_change_percentage=7d`;
+    data = await cyberHttpGetJson(url, headers, 15000);
+    if (!Array.isArray(data) || data.length === 0) throw new Error('CoinGecko returned no data');
+  } catch (err) {
+    console.warn(`[Stablecoin] CoinGecko failed: ${err.message} — trying CoinPaprika`);
+    try { data = await fetchStablecoinCoinPaprika(); } catch (e2) { console.warn(`[Stablecoin] CoinPaprika also failed: ${e2.message} — skipping`); return 0; }
+  }
   const stablecoins = data.map((coin) => {
     const price = coin.current_price || 0;
     const deviation = Math.abs(price - 1.0);
