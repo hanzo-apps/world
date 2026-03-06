@@ -313,10 +313,10 @@ export class EventHandlerManager implements AppModule {
       trackMapViewChange(regionSelect.value);
     });
 
-    this.boundResizeHandler = () => {
+    this.boundResizeHandler = debounce(() => {
       this.ctx.map?.setIsResizing(false);
       this.ctx.map?.render();
-    };
+    }, 150);
     window.addEventListener('resize', this.boundResizeHandler);
 
     this.setupMapResize();

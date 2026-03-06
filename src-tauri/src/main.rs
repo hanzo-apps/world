@@ -55,11 +55,26 @@ const SUPPORTED_SECRET_KEYS: [&str; 25] = [
     "ICAO_API_KEY",
 ];
 
-#[derive(Default)]
 struct LocalApiState {
     child: Mutex<Option<Child>>,
     token: Mutex<Option<String>>,
     port: Mutex<Option<u16>>,
+    http_client: reqwest::Client,
+}
+
+impl Default for LocalApiState {
+    fn default() -> Self {
+        Self {
+            child: Mutex::new(None),
+            token: Mutex::new(None),
+            port: Mutex::new(None),
+            http_client: reqwest::Client::builder()
+                .use_native_tls()
+                .pool_max_idle_per_host(2)
+                .build()
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// In-memory cache for keychain secrets. Populated once at startup to avoid
@@ -234,13 +249,14 @@ fn get_local_api_token(webview: Webview, state: tauri::State<'_, LocalApiState>)
 }
 
 #[tauri::command]
-fn get_desktop_runtime_info(state: tauri::State<'_, LocalApiState>) -> DesktopRuntimeInfo {
+fn get_desktop_runtime_info(webview: Webview, state: tauri::State<'_, LocalApiState>) -> Result<DesktopRuntimeInfo, String> {
+    require_trusted_window(webview.label())?;
     let port = state.port.lock().ok().and_then(|g| *g);
-    DesktopRuntimeInfo {
+    Ok(DesktopRuntimeInfo {
         os: env::consts::OS.to_string(),
         arch: env::consts::ARCH.to_string(),
         local_api_port: port,
-    }
+    })
 }
 
 #[tauri::command]
@@ -499,7 +515,8 @@ fn open_path_in_shell(path: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
+fn open_url(webview: Webview, url: String) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     let parsed = Url::parse(&url).map_err(|_| "Invalid URL".to_string())?;
 
     match parsed.scheme() {
@@ -555,9 +572,24 @@ fn close_settings_window(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn open_live_channels_window_command(
+    webview: Webview,
     app: AppHandle,
     base_url: Option<String>,
 ) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
+    if let Some(ref url) = base_url {
+        if !url.is_empty() {
+            let parsed = Url::parse(url).map_err(|_| "Invalid base URL".to_string())?;
+            match parsed.scheme() {
+                "http" => match parsed.host_str() {
+                    Some("localhost") | Some("127.0.0.1") => {}
+                    _ => return Err("base_url http only allowed for localhost".to_string()),
+                },
+                "https" => {}
+                _ => return Err("base_url must be http(s)".to_string()),
+            }
+        }
+    }
     open_live_channels_window(&app, base_url)
 }
 
@@ -574,7 +606,7 @@ fn close_live_channels_window(app: AppHandle) -> Result<(), String> {
 /// Fetch JSON from Polymarket Gamma API using native TLS (bypasses Cloudflare JA3 blocking).
 /// Called from frontend when browser CORS and sidecar Node.js TLS both fail.
 #[tauri::command]
-async fn fetch_polymarket(webview: Webview, path: String, params: String) -> Result<String, String> {
+async fn fetch_polymarket(webview: Webview, state: tauri::State<'_, LocalApiState>, path: String, params: String) -> Result<String, String> {
     require_trusted_window(webview.label())?;
     let allowed = ["events", "markets", "tags"];
     let segment = path.trim_start_matches('/');
@@ -582,11 +614,7 @@ async fn fetch_polymarket(webview: Webview, path: String, params: String) -> Res
         return Err("Invalid Polymarket path".into());
     }
     let url = format!("https://gamma-api.polymarket.com/{}?{}", segment, params);
-    let client = reqwest::Client::builder()
-        .use_native_tls()
-        .build()
-        .map_err(|e| format!("HTTP client error: {e}"))?;
-    let resp = client
+    let resp = state.http_client
         .get(&url)
         .header("Accept", "application/json")
         .timeout(std::time::Duration::from_secs(10))
@@ -612,6 +640,7 @@ fn open_settings_window(app: &AppHandle) -> Result<(), String> {
 
     let _settings_window = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .title("World Monitor Settings")
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
         .inner_size(980.0, 600.0)
         .min_inner_size(820.0, 480.0)
         .resizable(true)
@@ -649,6 +678,7 @@ fn open_live_channels_window(app: &AppHandle, base_url: Option<String>) -> Resul
 
     let _live_channels_window = WebviewWindowBuilder::new(app, "live-channels", url)
     .title("Channel management - World Monitor")
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
     .inner_size(680.0, 760.0)
     .min_inner_size(520.0, 600.0)
     .resizable(true)
@@ -690,7 +720,8 @@ fn open_youtube_login_window(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn open_youtube_login(app: AppHandle) -> Result<(), String> {
+async fn open_youtube_login(webview: Webview, app: AppHandle) -> Result<(), String> {
+    require_trusted_window(webview.label())?;
     open_youtube_login_window(&app)
 }
 
