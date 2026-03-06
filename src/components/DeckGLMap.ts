@@ -51,6 +51,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import { tokenizeForMatch, matchKeyword, matchesAnyKeyword, findMatchingKeywords } from '@/utils/keyword-match';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
+import { showLayerWarning } from '@/utils/layer-warning';
 import { localizeMapLabels } from '@/utils/map-locale';
 import {
   INTEL_HOTSPOTS,
@@ -4446,34 +4447,21 @@ export class DeckGLMap {
     setGeoAlertGetter(getAlertsNearLocation);
   }
 
+  private layerWarningShown = false;
+
   private enforceLayerLimit(): void {
-    const MAX_FLAT_LAYERS = 9;
+    const WARN_THRESHOLD = 9;
     const togglesEl = this.container.querySelector('.deckgl-layer-toggles');
     if (!togglesEl) return;
-    const allToggles = Array.from(togglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
-      .filter(i => (i.closest('.layer-toggle') as HTMLElement)?.style.display !== 'none');
-    const checked = allToggles.filter(i => i.checked);
-    if (checked.length > MAX_FLAT_LAYERS) {
-      const excess = checked.slice(MAX_FLAT_LAYERS);
-      for (const inp of excess) {
-        inp.checked = false;
-        const layer = inp.closest('.layer-toggle')?.getAttribute('data-layer') as keyof MapLayers | null;
-        if (layer) {
-          this.state.layers[layer] = false;
-        }
-      }
-      this.render();
+    const activeCount = Array.from(togglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
+      .filter(i => (i.closest('.layer-toggle') as HTMLElement)?.style.display !== 'none')
+      .filter(i => i.checked).length;
+    if (activeCount >= WARN_THRESHOLD && !this.layerWarningShown) {
+      this.layerWarningShown = true;
+      showLayerWarning(WARN_THRESHOLD);
+    } else if (activeCount < WARN_THRESHOLD) {
+      this.layerWarningShown = false;
     }
-    const activeCount = allToggles.filter(i => i.checked).length;
-    allToggles.forEach(i => {
-      if (!i.checked) {
-        i.disabled = activeCount >= MAX_FLAT_LAYERS;
-        i.closest('.layer-toggle')?.classList.toggle('limit-reached', activeCount >= MAX_FLAT_LAYERS);
-      } else {
-        i.disabled = false;
-        i.closest('.layer-toggle')?.classList.remove('limit-reached');
-      }
-    });
   }
 
   // UI visibility methods
