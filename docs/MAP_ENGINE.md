@@ -39,7 +39,21 @@ The flat map supports multiple tile providers, selectable at runtime via **Setti
 3. Set `VITE_PMTILES_URL=https://your-server.example/planet.pmtiles` in `.env.local`
 4. The PMTiles and Auto options will appear in Settings
 
-**Fallback behavior**: When using PMTiles or Auto mode, if tile loading fails (CORS errors, server downtime, 403s), the map automatically falls back to OpenFreeMap after detecting 2+ errors within 10 seconds. A console warning is logged when fallback activates.
+### Map Themes
+
+Each tile provider offers different visual themes, selectable via **Settings → Map Theme**. The theme selection is **per-provider** — switching providers remembers each provider's last-used theme. Map theme is fully independent of the app theme (Auto/Dark/Light); the app theme only affects UI chrome, while the map theme controls basemap appearance.
+
+| Provider | Available Themes | Default |
+|----------|-----------------|---------|
+| **PMTiles** | Black (deepest dark), Dark, Grayscale, Light, White | Black |
+| **OpenFreeMap** | Dark, Positron (light) | Dark |
+| **CARTO** | Dark Matter, Voyager (light), Positron (light) | Dark Matter |
+
+**Sprite mapping**: PMTiles themes `black`, `dark`, and `grayscale` use the `dark` Protomaps sprite sheet; `light` and `white` use the `light` sprite sheet.
+
+**Overlay paint adaptation**: Country highlight/hover paint colors automatically adapt to the selected map theme (not the app theme), using lower opacity on light themes for visibility.
+
+**Fallback behavior**: When using PMTiles or Auto mode, if tile loading fails (CORS errors, server downtime, 403s), the map automatically falls back to OpenFreeMap after detecting 2+ errors within 10 seconds. The fallback respects the current map theme's light/dark nature — a light PMTiles theme falls back to OpenFreeMap Positron, not Dark. A console warning is logged when fallback activates.
 
 **Flat Map (deck.gl + MapLibre GL JS)** — a WebGL-accelerated 2D map with smooth 60fps rendering and thousands of concurrent markers:
 
