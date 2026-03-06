@@ -7,7 +7,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, PolygonLayer } from '@deck.gl/layers';
 import maplibregl from 'maplibre-gl';
-import { registerPMTilesProtocol, buildPMTilesStyle, FALLBACK_DARK_STYLE, FALLBACK_LIGHT_STYLE, getMapProvider, getStyleForProvider } from '@/config/basemap';
+import { registerPMTilesProtocol, FALLBACK_DARK_STYLE, FALLBACK_LIGHT_STYLE, getMapProvider, getStyleForProvider } from '@/config/basemap';
 import Supercluster from 'supercluster';
 import type {
   MapLayers,
@@ -493,19 +493,18 @@ export class DeckGLMap {
       );
     }
 
-    if (!isHappyVariant) registerPMTilesProtocol();
+    const initialProvider = isHappyVariant ? 'openfreemap' as const : getMapProvider();
+    if (initialProvider === 'pmtiles' || initialProvider === 'auto') registerPMTilesProtocol();
 
     const preset = VIEW_PRESETS[this.state.view];
     const initialTheme = getCurrentTheme();
-    const pmtilesStyle = !isHappyVariant ? buildPMTilesStyle(initialTheme) : null;
     const primaryStyle = isHappyVariant
       ? (initialTheme === 'light' ? HAPPY_LIGHT_STYLE : HAPPY_DARK_STYLE)
-      : pmtilesStyle ?? (initialTheme === 'light' ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE);
-    if (!isHappyVariant && !pmtilesStyle) {
+      : getStyleForProvider(initialProvider, initialTheme);
+    if (!isHappyVariant && typeof primaryStyle === 'string' && !primaryStyle.includes('pmtiles')) {
       this.usedFallbackStyle = true;
       const attr = this.container.querySelector('.map-attribution');
       if (attr) attr.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
-      console.warn('[DeckGLMap] VITE_PMTILES_URL not set — using OpenFreeMap fallback');
     }
 
     this.maplibreMap = new maplibregl.Map({
