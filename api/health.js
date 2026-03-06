@@ -3,17 +3,8 @@ export const config = { runtime: 'edge' };
 const BOOTSTRAP_KEYS = {
   earthquakes:       'seismology:earthquakes:v1',
   outages:           'infra:outages:v1',
-  serviceStatuses:   'infra:service-statuses:v1',
   sectors:           'market:sectors:v1',
   etfFlows:          'market:etf-flows:v1',
-  macroSignals:      'economic:macro-signals:v1',
-  bisPolicy:         'economic:bis:policy:v1',
-  bisExchange:       'economic:bis:eer:v1',
-  bisCredit:         'economic:bis:credit:v1',
-  shippingRates:     'supply_chain:shipping:v2',
-  chokepoints:       'supply_chain:chokepoints:v2',
-  minerals:          'supply_chain:minerals:v2',
-  giving:            'giving:summary:v1',
   climateAnomalies:  'climate:anomalies:v1',
   wildfires:         'wildfire:fires:v1',
   marketQuotes:      'market:stocks-bootstrap:v1',
@@ -21,7 +12,6 @@ const BOOTSTRAP_KEYS = {
   cyberThreats:      'cyber:threats-bootstrap:v2',
   techReadiness:     'economic:worldbank-techreadiness:v1',
   positiveGeoEvents: 'positive-events:geo-bootstrap:v1',
-  theaterPosture:    'theater-posture:sebuf:stale:v1',
   riskScores:        'risk:scores:sebuf:stale:v1',
   naturalEvents:     'natural:events:v1',
   flightDelays:      'aviation:delays-bootstrap:v1',
@@ -36,7 +26,17 @@ const BOOTSTRAP_KEYS = {
 };
 
 const STANDALONE_KEYS = {
+  serviceStatuses:       'infra:service-statuses:v1',
+  macroSignals:          'economic:macro-signals:v1',
+  bisPolicy:             'economic:bis:policy:v1',
+  bisExchange:           'economic:bis:eer:v1',
+  bisCredit:             'economic:bis:credit:v1',
+  shippingRates:         'supply_chain:shipping:v2',
+  chokepoints:           'supply_chain:chokepoints:v2',
+  minerals:              'supply_chain:minerals:v2',
+  giving:                'giving:summary:v1',
   gpsjam:                'intelligence:gpsjam:v1',
+  theaterPosture:        'theater-posture:sebuf:stale:v1',
   theaterPostureLive:    'theater-posture:sebuf:v1',
   theaterPostureBackup:  'theater-posture:sebuf:backup:v1',
   riskScoresLive:        'risk:scores:sebuf:v1',
@@ -64,8 +64,8 @@ const SEED_META = {
   flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 30 },
   predictions:      { key: 'seed-meta:prediction:markets',      maxStaleMin: 15 },
   insights:         { key: 'seed-meta:news:insights',           maxStaleMin: 30 },
-  marketQuotes:     { key: 'seed-meta:market:quotes',           maxStaleMin: 15 },
-  commodityQuotes:  { key: 'seed-meta:market:commodities',      maxStaleMin: 30 },
+  marketQuotes:     { key: 'seed-meta:market:stocks',         maxStaleMin: 30 },
+  commodityQuotes:  { key: 'seed-meta:market:commodities',    maxStaleMin: 30 },
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
@@ -73,6 +73,8 @@ const SEED_META = {
 const ON_DEMAND_KEYS = new Set([
   'theaterPostureLive', 'theaterPostureBackup', 'riskScoresLive',
   'usniFleet', 'usniFleetStale', 'positiveEventsLive', 'cableHealth',
+  'theaterPosture', 'bisPolicy', 'bisExchange', 'bisCredit',
+  'serviceStatuses', 'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
 ]);
 
 const NEG_SENTINEL = '__WM_NEG__';
