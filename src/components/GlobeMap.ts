@@ -28,6 +28,7 @@ import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
 import { getCountryBbox, getCountriesGeoJson } from '@/services/country-geometry';
 import { escapeHtml } from '@/utils/sanitize';
+import { showLayerWarning } from '@/utils/layer-warning';
 import type { FeatureCollection, Geometry } from 'geojson';
 import type { MapLayers, Hotspot, MilitaryFlight, MilitaryVessel, NaturalEvent, InternetOutage, CyberThreat, SocialUnrestEvent, UcdpGeoEvent, MilitaryBase, GammaIrradiator, Spaceport, EconomicCenter, StrategicWaterway, CriticalMineralProject, AIDataCenter, UnderseaCable, Pipeline, CableAdvisory, RepairShip, AisDisruptionEvent, AisDensityZone, AisDisruptionType } from '@/types';
 import type { Earthquake } from '@/services/earthquakes';
@@ -1625,32 +1626,19 @@ export class GlobeMap {
     this.enforceLayerLimit();
   }
 
+  private layerWarningShown = false;
+
   private enforceLayerLimit(): void {
     if (!this.layerTogglesEl) return;
-    const MAX_GLOBE_LAYERS = 6;
-    const allToggles = Array.from(this.layerTogglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'));
-    const checked = allToggles.filter(i => i.checked);
-    if (checked.length > MAX_GLOBE_LAYERS) {
-      const excess = checked.slice(MAX_GLOBE_LAYERS);
-      for (const inp of excess) {
-        inp.checked = false;
-        const layer = inp.closest('.layer-toggle')?.getAttribute('data-layer') as keyof MapLayers | null;
-        if (layer) {
-          this.layers[layer] = false;
-          this.flushLayerChannels(layer);
-        }
-      }
+    const WARN_THRESHOLD = 6;
+    const activeCount = Array.from(this.layerTogglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
+      .filter(i => i.checked).length;
+    if (activeCount >= WARN_THRESHOLD && !this.layerWarningShown) {
+      this.layerWarningShown = true;
+      showLayerWarning(WARN_THRESHOLD);
+    } else if (activeCount < WARN_THRESHOLD) {
+      this.layerWarningShown = false;
     }
-    const activeCount = allToggles.filter(i => i.checked).length;
-    allToggles.forEach(i => {
-      if (!i.checked) {
-        i.disabled = activeCount >= MAX_GLOBE_LAYERS;
-        i.closest('.layer-toggle')?.classList.toggle('limit-reached', activeCount >= MAX_GLOBE_LAYERS);
-      } else {
-        i.disabled = false;
-        i.closest('.layer-toggle')?.classList.remove('limit-reached');
-      }
-    });
   }
 
   // ─── Camera / navigation ──────────────────────────────────────────────────
