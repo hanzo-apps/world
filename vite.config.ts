@@ -656,7 +656,7 @@ export default defineConfig({
             options: {
               cacheName: 'pmtiles-ranges',
               expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
-              cacheableResponse: { statuses: [0, 200, 206] },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
           {
