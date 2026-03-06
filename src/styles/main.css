@@ -13406,14 +13406,109 @@ a.prediction-link:hover {
   border-color: rgba(68, 255, 136, 0.2);
 }
 
-.deckgl-layer-toggles .layer-toggle.limit-reached {
-  opacity: 0.35;
-  pointer-events: none;
+/* Layer performance warning dialog */
+.layer-warn-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+  transition: background 0.2s, backdrop-filter 0.2s;
 }
 
-.layer-toggles:not(.deckgl-layer-toggles) .layer-toggle.limit-reached {
-  opacity: 0.35;
-  pointer-events: none;
+.layer-warn-overlay.layer-warn-in {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.layer-warn-overlay.layer-warn-out {
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+}
+
+.layer-warn-dialog {
+  background: var(--bg, #0a0e14);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(255, 170, 0, 0.1), 0 8px 32px rgba(0, 0, 0, 0.6);
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.layer-warn-in .layer-warn-dialog {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.layer-warn-out .layer-warn-dialog {
+  transform: scale(0.95);
+  opacity: 0;
+}
+
+.layer-warn-icon {
+  color: #ffaa00;
+  line-height: 1;
+}
+
+.layer-warn-text strong {
+  display: block;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #ffaa00;
+  margin-bottom: 6px;
+}
+
+.layer-warn-text p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim, #8899aa);
+  line-height: 1.5;
+}
+
+.layer-warn-dismiss {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim, #8899aa);
+  cursor: pointer;
+  user-select: none;
+}
+
+.layer-warn-dismiss input {
+  accent-color: #ffaa00;
+  cursor: pointer;
+}
+
+.layer-warn-ok {
+  padding: 6px 28px;
+  background: rgba(255, 170, 0, 0.12);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  border-radius: 4px;
+  color: #ffaa00;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.layer-warn-ok:hover {
+  background: rgba(255, 170, 0, 0.2);
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.2);
 }
 
 /* deck.gl Legend - horizontal bar at bottom center */
