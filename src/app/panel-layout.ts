@@ -410,6 +410,10 @@ export class PanelLayoutManager implements AppModule {
         const mapSection = document.getElementById('mapSection');
         if (mapSection) {
           mapSection.classList.toggle('hidden', !config.enabled);
+          const mainContent = document.querySelector('.main-content');
+          if (mainContent) {
+            mainContent.classList.toggle('map-hidden', !config.enabled);
+          }
         }
         return;
       }
