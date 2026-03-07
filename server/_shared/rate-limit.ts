@@ -69,8 +69,8 @@ interface EndpointRatePolicy {
 }
 
 const ENDPOINT_RATE_POLICIES: Record<string, EndpointRatePolicy> = {
-  '/api/news/v1/summarize-article': { limit: 20, window: '60 s' },
   '/api/news/v1/summarize-article-cache': { limit: 3000, window: '60 s' },
+  '/api/intelligence/v1/classify-event': { limit: 600, window: '60 s' },
 };
 
 const endpointLimiters = new Map<string, Ratelimit>();
