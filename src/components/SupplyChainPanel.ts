@@ -20,7 +20,7 @@ export class SupplyChainPanel extends Panel {
   constructor() {
     super({ id: 'supply-chain', title: t('panels.supplyChain') });
     this.content.addEventListener('click', (e) => {
-      const target = (e.target as HTMLElement).closest('.economic-tab') as HTMLElement | null;
+      const target = (e.target as HTMLElement).closest('.panel-tab') as HTMLElement | null;
       if (!target) return;
       const tabId = target.dataset.tab as TabId;
       if (tabId && tabId !== this.activeTab) {
@@ -47,14 +47,14 @@ export class SupplyChainPanel extends Panel {
 
   private render(): void {
     const tabsHtml = `
-      <div class="economic-tabs">
-        <button class="economic-tab ${this.activeTab === 'chokepoints' ? 'active' : ''}" data-tab="chokepoints">
+      <div class="panel-tabs">
+        <button class="panel-tab ${this.activeTab === 'chokepoints' ? 'active' : ''}" data-tab="chokepoints">
           ${t('components.supplyChain.chokepoints')}
         </button>
-        <button class="economic-tab ${this.activeTab === 'shipping' ? 'active' : ''}" data-tab="shipping">
+        <button class="panel-tab ${this.activeTab === 'shipping' ? 'active' : ''}" data-tab="shipping">
           ${t('components.supplyChain.shipping')}
         </button>
-        <button class="economic-tab ${this.activeTab === 'minerals' ? 'active' : ''}" data-tab="minerals">
+        <button class="panel-tab ${this.activeTab === 'minerals' ? 'active' : ''}" data-tab="minerals">
           ${t('components.supplyChain.minerals')}
         </button>
       </div>

@@ -22,7 +22,7 @@ export class TradePolicyPanel extends Panel {
   constructor() {
     super({ id: 'trade-policy', title: t('panels.tradePolicy') });
     this.content.addEventListener('click', (e) => {
-      const target = (e.target as HTMLElement).closest('.economic-tab') as HTMLElement | null;
+      const target = (e.target as HTMLElement).closest('.panel-tab') as HTMLElement | null;
       if (!target) return;
       const tabId = target.dataset.tab as TabId;
       if (tabId && tabId !== this.activeTab) {
@@ -64,17 +64,17 @@ export class TradePolicyPanel extends Panel {
     const hasBarriers = this.barriersData && this.barriersData.barriers?.length > 0;
 
     const tabsHtml = `
-      <div class="economic-tabs">
-        <button class="economic-tab ${this.activeTab === 'restrictions' ? 'active' : ''}" data-tab="restrictions">
+      <div class="panel-tabs">
+        <button class="panel-tab ${this.activeTab === 'restrictions' ? 'active' : ''}" data-tab="restrictions">
           ${t('components.tradePolicy.restrictions')}
         </button>
-        ${hasTariffs ? `<button class="economic-tab ${this.activeTab === 'tariffs' ? 'active' : ''}" data-tab="tariffs">
+        ${hasTariffs ? `<button class="panel-tab ${this.activeTab === 'tariffs' ? 'active' : ''}" data-tab="tariffs">
           ${t('components.tradePolicy.tariffs')}
         </button>` : ''}
-        ${hasFlows ? `<button class="economic-tab ${this.activeTab === 'flows' ? 'active' : ''}" data-tab="flows">
+        ${hasFlows ? `<button class="panel-tab ${this.activeTab === 'flows' ? 'active' : ''}" data-tab="flows">
           ${t('components.tradePolicy.flows')}
         </button>` : ''}
-        ${hasBarriers ? `<button class="economic-tab ${this.activeTab === 'barriers' ? 'active' : ''}" data-tab="barriers">
+        ${hasBarriers ? `<button class="panel-tab ${this.activeTab === 'barriers' ? 'active' : ''}" data-tab="barriers">
           ${t('components.tradePolicy.barriers')}
         </button>` : ''}
       </div>

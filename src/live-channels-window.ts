@@ -330,7 +330,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'live-news-manage-tab-btn' + (region.key === activeRegionTab ? ' active' : '');
+      btn.className = 'panel-tab' + (region.key === activeRegionTab ? ' active' : '');
       const label = t(region.labelKey) ?? region.key.toUpperCase();
       btn.textContent = term
         ? `${label} (${matchingChannels.length})`
@@ -442,7 +442,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
               <input type="text" id="liveChannelsSearch" class="live-news-manage-search-input" placeholder="${escapeHtml(t('header.search') ?? 'Search')}..." autocomplete="off" />
             </div>
           </div>
-          <div class="live-news-manage-tab-bar" id="liveChannelsTabBar"></div>
+          <div class="panel-tabs" id="liveChannelsTabBar"></div>
           <div class="live-news-manage-tab-contents" id="liveChannelsTabContents"></div>
         </div>
         <div class="live-news-manage-add-section">
