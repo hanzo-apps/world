@@ -60,7 +60,7 @@ export class TechEventsPanel extends Panel {
           if (!this.element?.isConnected) return;
           continue;
         }
-        this.error = err instanceof Error ? err.message : 'Failed to fetch events';
+        this.error = t('common.failedToLoad');
         console.error('[TechEvents] Fetch error:', err);
       }
     }
@@ -84,6 +84,7 @@ export class TechEventsPanel extends Panel {
       return;
     }
 
+    this.setErrorState(false);
     const filteredEvents = this.getFilteredEvents();
     const upcomingConferences = this.events.filter(e => e.type === 'conference' && new Date(e.startDate) >= new Date());
     const mappableCount = upcomingConferences.filter(e => e.coords && !e.coords.virtual).length;
