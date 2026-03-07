@@ -1930,7 +1930,7 @@ export class DataLoaderManager implements AppModule {
 
       if (data.length === 0) {
         if (!isFeatureAvailable('economicFred')) {
-          economicPanel?.showError();
+          economicPanel?.showConfigError(t('components.economic.fredKeyMissing'));
           this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
           return;
         }
@@ -1942,14 +1942,12 @@ export class DataLoaderManager implements AppModule {
           this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
           return;
         }
-        economicPanel?.setErrorState(false);
         economicPanel?.update(retryData);
         this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
         dataFreshness.recordUpdate('economic', retryData.length);
         return;
       }
 
-      economicPanel?.setErrorState(false);
       economicPanel?.update(data);
       this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
       dataFreshness.recordUpdate('economic', data.length);
@@ -1960,7 +1958,6 @@ export class DataLoaderManager implements AppModule {
           await new Promise(r => setTimeout(r, 20_000));
           const retryData = await fetchFredData();
           if (retryData.length > 0) {
-            economicPanel?.setErrorState(false);
             economicPanel?.update(retryData);
             this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
             dataFreshness.recordUpdate('economic', retryData.length);

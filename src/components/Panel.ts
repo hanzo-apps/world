@@ -638,6 +638,7 @@ export class Panel {
 
   public showLoading(message = t('common.loading')): void {
     if (this._locked) return;
+    this.setErrorState(false);
     this.clearRetryCountdown();
     replaceChildren(this.content,
       h('div', { className: 'panel-loading' },
@@ -690,7 +691,7 @@ export class Panel {
     this.retryAttempt = 0;
   }
 
-  public showLocked(_features: string[] = []): void {
+  public showLocked(features: string[] = []): void {
     this._locked = true;
     this.clearRetryCountdown();
 
@@ -707,6 +708,14 @@ export class Panel {
       iconEl,
       h('div', { className: 'panel-locked-desc' }, t('premium.lockedDesc')),
     ];
+
+    if (features.length > 0) {
+      const featureList = h('ul', { className: 'panel-locked-features' });
+      for (const feat of features) {
+        featureList.appendChild(h('li', {}, feat));
+      }
+      lockedChildren.push(featureList);
+    }
 
     const ctaBtn = h('button', { type: 'button', className: 'panel-locked-cta' }, t('premium.joinWaitlist'));
     if (isDesktopRuntime()) {
@@ -812,6 +821,7 @@ export class Panel {
 
   public setContent(html: string): void {
     if (this._locked) return;
+    this.setErrorState(false);
     this.clearRetryCountdown();
     this.retryAttempt = 0;
     if (this.pendingContentHtml === html || this.content.innerHTML === html) {

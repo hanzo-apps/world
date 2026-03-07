@@ -68,7 +68,8 @@ export class StablecoinPanel extends Panel {
           if (!this.element?.isConnected) return;
           continue;
         }
-        this.error = err instanceof Error ? err.message : 'Failed to fetch';
+        console.warn('[Stablecoin] Fetch error:', err);
+        this.error = null;
       }
     }
     this.loading = false;
