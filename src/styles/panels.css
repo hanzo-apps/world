@@ -18,6 +18,24 @@
   -ms-overflow-style: none;
 }
 
+/* When .panel-content contains tabs (at any depth), remove top padding
+   so tabs sit flush against the header — matching panels using insertBefore(). */
+.panel-content:has(.panel-tabs) {
+  padding-top: 0;
+}
+
+/* Bleed tabs full-width: negate .panel-content's 8px horizontal padding.
+   Direct children get simple negative margin. For nested tabs, the
+   wrapper div is also pulled flush. */
+.panel-content > .panel-tabs {
+  margin-left: -8px;
+  margin-right: -8px;
+}
+.panel-content > :first-child:has(.panel-tabs) {
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
 .panel-tabs::-webkit-scrollbar {
   display: none;
 }
