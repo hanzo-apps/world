@@ -2978,6 +2978,160 @@ async function startCiiSeedLoop() {
   }, CII_SEED_INTERVAL_MS).unref?.();
 }
 
+// ─────────────────────────────────────────────────────────────
+// Weather Alerts Seed — NWS API → Redis every 15 min
+// ─────────────────────────────────────────────────────────────
+const WEATHER_SEED_INTERVAL_MS = 15 * 60 * 1000; // 15 min
+const WEATHER_REDIS_KEY = 'weather:alerts:v1';
+const WEATHER_CACHE_TTL = 900;
+let weatherSeedInFlight = false;
+
+async function seedWeatherAlerts() {
+  if (weatherSeedInFlight) return;
+  weatherSeedInFlight = true;
+  const t0 = Date.now();
+  try {
+    const resp = await fetch('https://api.weather.gov/alerts/active', {
+      headers: { Accept: 'application/geo+json', 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[Weather] Seed failed: HTTP ${resp.status}`);
+      return;
+    }
+    const data = await resp.json();
+    const features = data.features || [];
+    const alerts = features
+      .filter((f) => f?.properties?.severity !== 'Unknown')
+      .slice(0, 50)
+      .map((f) => {
+        const p = f.properties;
+        let coords = [];
+        try {
+          const g = f.geometry;
+          if (g?.type === 'Polygon') coords = g.coordinates[0]?.map((c) => [c[0], c[1]]) || [];
+          else if (g?.type === 'MultiPolygon') coords = g.coordinates[0]?.[0]?.map((c) => [c[0], c[1]]) || [];
+        } catch { /* ignore */ }
+        const centroid = coords.length > 0
+          ? [coords.reduce((s, c) => s + c[0], 0) / coords.length, coords.reduce((s, c) => s + c[1], 0) / coords.length]
+          : undefined;
+        return {
+          id: f.id || '', event: p.event || '', severity: p.severity || 'Unknown',
+          headline: p.headline || '', description: (p.description || '').slice(0, 500),
+          areaDesc: p.areaDesc || '', onset: p.onset || '', expires: p.expires || '',
+          coordinates: coords, centroid,
+        };
+      });
+    if (alerts.length === 0) {
+      console.warn('[Weather] No alerts returned — preserving last good data');
+      return;
+    }
+    const payload = { alerts };
+    const ok1 = await upstashSet(WEATHER_REDIS_KEY, payload, WEATHER_CACHE_TTL);
+    const ok2 = await upstashSet('seed-meta:weather:alerts', { fetchedAt: Date.now(), recordCount: alerts.length }, 604800);
+    console.log(`[Weather] Seeded ${alerts.length} alerts (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.warn('[Weather] Seed error:', e?.message || e);
+  } finally {
+    weatherSeedInFlight = false;
+  }
+}
+
+async function startWeatherSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[Weather] Disabled (no Upstash Redis)');
+    return;
+  }
+  console.log(`[Weather] Seed loop starting (interval ${WEATHER_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  seedWeatherAlerts().catch((e) => console.warn('[Weather] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedWeatherAlerts().catch((e) => console.warn('[Weather] Seed error:', e?.message || e));
+  }, WEATHER_SEED_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
+// USASpending Seed — federal awards → Redis every 60 min
+// ─────────────────────────────────────────────────────────────
+const SPENDING_SEED_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const SPENDING_REDIS_KEY = 'economic:spending:v1';
+const SPENDING_CACHE_TTL = 3600;
+let spendingSeedInFlight = false;
+
+function getDateDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().split('T')[0];
+}
+
+const AWARD_TYPE_MAP = {
+  A: 'contract', B: 'contract', C: 'contract', D: 'contract',
+  '02': 'grant', '03': 'grant', '04': 'grant', '05': 'grant', '06': 'grant', '10': 'grant',
+  '07': 'loan', '08': 'loan',
+};
+
+async function seedUsaSpending() {
+  if (spendingSeedInFlight) return;
+  spendingSeedInFlight = true;
+  const t0 = Date.now();
+  try {
+    const periodStart = getDateDaysAgo(7);
+    const periodEnd = new Date().toISOString().split('T')[0];
+    const resp = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({
+        filters: {
+          time_period: [{ start_date: periodStart, end_date: periodEnd }],
+          award_type_codes: ['A', 'B', 'C', 'D'],
+        },
+        fields: ['Award ID', 'Recipient Name', 'Award Amount', 'Awarding Agency', 'Description', 'Start Date', 'Award Type'],
+        limit: 15, order: 'desc', sort: 'Award Amount',
+      }),
+    });
+    if (!resp.ok) {
+      console.warn(`[Spending] Seed failed: HTTP ${resp.status}`);
+      return;
+    }
+    const data = await resp.json();
+    const results = data.results || [];
+    const awards = results.map((r) => ({
+      id: String(r['Award ID'] || ''),
+      recipientName: String(r['Recipient Name'] || 'Unknown'),
+      amount: Number(r['Award Amount']) || 0,
+      agency: String(r['Awarding Agency'] || 'Unknown'),
+      description: String(r['Description'] || '').slice(0, 200),
+      startDate: String(r['Start Date'] || ''),
+      awardType: AWARD_TYPE_MAP[String(r['Award Type'] || '')] || 'other',
+    }));
+    if (awards.length === 0) {
+      console.warn('[Spending] No awards returned — preserving last good data');
+      return;
+    }
+    const totalAmount = awards.reduce((s, a) => s + a.amount, 0);
+    const payload = { awards, totalAmount, periodStart, periodEnd, fetchedAt: Date.now() };
+    const ok1 = await upstashSet(SPENDING_REDIS_KEY, payload, SPENDING_CACHE_TTL);
+    const ok2 = await upstashSet('seed-meta:economic:spending', { fetchedAt: Date.now(), recordCount: awards.length }, 604800);
+    console.log(`[Spending] Seeded ${awards.length} awards, $${(totalAmount / 1e6).toFixed(1)}M (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.warn('[Spending] Seed error:', e?.message || e);
+  } finally {
+    spendingSeedInFlight = false;
+  }
+}
+
+async function startSpendingSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[Spending] Disabled (no Upstash Redis)');
+    return;
+  }
+  console.log(`[Spending] Seed loop starting (interval ${SPENDING_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  seedUsaSpending().catch((e) => console.warn('[Spending] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedUsaSpending().catch((e) => console.warn('[Spending] Seed error:', e?.message || e));
+  }, SPENDING_SEED_INTERVAL_MS).unref?.();
+}
+
 function gzipSyncBuffer(body) {
   try {
     return zlib.gzipSync(typeof body === 'string' ? Buffer.from(body) : body);
@@ -5805,6 +5959,8 @@ server.listen(PORT, () => {
   startServiceStatusesSeedLoop();
   startTheaterPostureSeedLoop();
   startGpsJamSeedLoop();
+  startWeatherSeedLoop();
+  startSpendingSeedLoop();
 });
 
 wss.on('connection', (ws, req) => {
