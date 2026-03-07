@@ -234,6 +234,7 @@
     "telegram": "Telegram",
     "shareText": "Я записался в лист ожидания World Monitor Pro — глобальная аналитика в реальном времени на базе ИИ. Присоединяйтесь:",
     "joinWaitlistShare": "Запишитесь в лист ожидания World Monitor Pro:",
-    "youreIn": "Вы в списке!"
+    "youreIn": "Вы в списке!",
+    "invitedBanner": "Вас пригласили — присоединяйтесь к списку"
   }
 }

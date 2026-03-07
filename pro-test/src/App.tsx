@@ -218,6 +218,12 @@ const Hero = () => (
           {t('hero.missionLine')}
         </p>
 
+        {getRefCode() && (
+          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-sm border border-wm-green/30 bg-wm-green/5 text-sm font-mono text-wm-green">
+            <Users className="w-4 h-4" aria-hidden="true" />
+            {t('referral.invitedBanner')}
+          </div>
+        )}
         <form className="flex flex-col gap-3 max-w-md mx-auto" onSubmit={(e) => { e.preventDefault(); const form = e.currentTarget; const email = new FormData(form).get('email') as string; submitWaitlist(email, form); }}>
           <input type="text" name="website" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 pointer-events-none" />
           <div className="flex flex-col sm:flex-row gap-3">
