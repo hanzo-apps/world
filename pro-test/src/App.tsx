@@ -382,7 +382,7 @@ const LivePreview = () => (
             className="absolute inset-0 w-full h-full object-cover"
           />
           <iframe
-            src="https://worldmonitor.app"
+            src="https://worldmonitor.app?alert=false"
             title={t('livePreview.iframeTitle')}
             className="relative w-full h-full border-0"
             loading="lazy"
