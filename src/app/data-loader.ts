@@ -1999,8 +1999,8 @@ export class DataLoaderManager implements AppModule {
     try {
       const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
       economicPanel?.updateSpending(data);
-      this.ctx.statusPanel?.updateApi('USASpending', { status: data.awards.length > 0 ? 'ok' : 'error' });
-      if (data.awards.length > 0) {
+      this.ctx.statusPanel?.updateApi('USASpending', { status: data.awards?.length > 0 ? 'ok' : 'error' });
+      if (data.awards?.length > 0) {
         dataFreshness.recordUpdate('spending', data.awards.length);
       } else {
         dataFreshness.recordError('spending', 'No awards returned');
@@ -2017,10 +2017,10 @@ export class DataLoaderManager implements AppModule {
     try {
       const data = await fetchBisData();
       economicPanel?.updateBis(data);
-      const hasData = data.policyRates.length > 0;
+      const hasData = data.policyRates?.length > 0;
       this.ctx.statusPanel?.updateApi('BIS', { status: hasData ? 'ok' : 'error' });
       if (hasData) {
-        dataFreshness.recordUpdate('bis', data.policyRates.length);
+        dataFreshness.recordUpdate('bis', data.policyRates!.length);
       }
     } catch (e) {
       console.error('[App] BIS data failed:', e);
