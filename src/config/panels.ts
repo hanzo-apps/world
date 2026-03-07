@@ -640,8 +640,6 @@ const COMMODITY_PANELS: Record<string, PanelConfig> = {
   economic: { name: 'Economic Indicators', enabled: true, priority: 1 },
   'gulf-economies': { name: 'Gulf & OPEC Economies', enabled: true, priority: 1 },
   'gcc-investments': { name: 'GCC Resource Investments', enabled: true, priority: 2 },
-  climate: { name: 'Climate & Weather Impact', enabled: true, priority: 2 },
-  'satellite-fires': { name: 'Fires & Operational Risk', enabled: true, priority: 2 },
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
   finance: { name: 'Financial News', enabled: true, priority: 2 },
   polymarket: { name: 'Commodity Predictions', enabled: true, priority: 2 },
