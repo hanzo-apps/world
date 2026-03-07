@@ -44,7 +44,13 @@
       ]
     },
     {
-      "source": "/pro/(.*)",
+      "source": "/pro/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/pro",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]
