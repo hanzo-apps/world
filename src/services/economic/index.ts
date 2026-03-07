@@ -558,9 +558,9 @@ export async function fetchBisData(): Promise<BisData> {
       hCredit?.entries?.length ? Promise.resolve(hCredit) : bisCreditBreaker.execute(() => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }), emptyBisCreditFallback),
     ]);
     return {
-      policyRates: policy.rates,
-      exchangeRates: eer.rates,
-      creditToGdp: credit.entries,
+      policyRates: policy.rates ?? [],
+      exchangeRates: eer.rates ?? [],
+      creditToGdp: credit.entries ?? [],
       fetchedAt: new Date(),
     };
   } catch {

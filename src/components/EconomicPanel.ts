@@ -59,8 +59,8 @@ export class EconomicPanel extends Panel {
 
   private render(): void {
     const hasOil = this.oilData && (this.oilData.wtiPrice || this.oilData.brentPrice);
-    const hasSpending = this.spendingData && this.spendingData.awards.length > 0;
-    const hasBis = this.bisData && this.bisData.policyRates.length > 0;
+    const hasSpending = this.spendingData && this.spendingData.awards?.length > 0;
+    const hasBis = this.bisData && this.bisData.policyRates?.length > 0;
 
     // Build tabs HTML
     const tabsHtml = `
@@ -206,7 +206,7 @@ export class EconomicPanel extends Panel {
   }
 
   private renderSpending(): string {
-    if (!this.spendingData || this.spendingData.awards.length === 0) {
+    if (!this.spendingData || !this.spendingData.awards?.length) {
       return `<div class="economic-empty">${t('components.economic.noSpending')}</div>`;
     }
 
@@ -236,7 +236,7 @@ export class EconomicPanel extends Panel {
   }
 
   private renderCentralBanks(): string {
-    if (!this.bisData || this.bisData.policyRates.length === 0) {
+    if (!this.bisData || !this.bisData.policyRates?.length) {
       return `<div class="economic-empty">${t('components.economic.noBisData')}</div>`;
     }
 
@@ -274,7 +274,7 @@ export class EconomicPanel extends Panel {
 
     // Exchange Rates
     let eerHtml = '';
-    if (this.bisData.exchangeRates.length > 0) {
+    if (this.bisData.exchangeRates?.length > 0) {
       eerHtml = `
         <div class="bis-section">
           <div class="bis-section-title">${t('components.economic.realEer')}</div>
@@ -302,7 +302,7 @@ export class EconomicPanel extends Panel {
 
     // Credit-to-GDP
     let creditHtml = '';
-    if (this.bisData.creditToGdp.length > 0) {
+    if (this.bisData.creditToGdp?.length > 0) {
       const sortedCredit = [...this.bisData.creditToGdp].sort((a, b) => b.creditGdpRatio - a.creditGdpRatio);
       creditHtml = `
         <div class="bis-section">
