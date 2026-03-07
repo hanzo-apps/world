@@ -772,11 +772,7 @@ export class PanelLayoutManager implements AppModule {
       this.ctx.panels['service-status'] = serviceStatusPanel;
 
       this.lazyPanel('tech-readiness', () =>
-        import('@/components/TechReadinessPanel').then(m => {
-          const p = new m.TechReadinessPanel();
-          void p.refresh();
-          return p;
-        }),
+        import('@/components/TechReadinessPanel').then(m => new m.TechReadinessPanel()),
       );
 
       this.ctx.panels['macro-signals'] = new MacroSignalsPanel();
