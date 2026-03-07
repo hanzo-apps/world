@@ -627,6 +627,11 @@ export class App {
       () => !!this.state.panels['strategic-risk']
     );
 
+    // Server-side temporal anomalies (news + satellite_fires)
+    if (SITE_VARIANT !== 'happy') {
+      this.refreshScheduler.scheduleRefresh('temporalBaseline', () => this.dataLoader.refreshTemporalBaseline(), 600_000);
+    }
+
     // WTO trade policy data — annual data, poll every 10 min to avoid hammering upstream
     if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance') {
       this.refreshScheduler.scheduleRefresh('tradePolicy', () => this.dataLoader.loadTradePolicy(), 10 * 60 * 1000);
