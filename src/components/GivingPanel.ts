@@ -23,7 +23,7 @@ export class GivingPanel extends Panel {
 
   public setData(data: GivingSummary): void {
     this.data = data;
-    this.setCount(data.platforms.length);
+    this.setCount(data.platforms?.length ?? 0);
     this.renderContent();
   }
 

@@ -59,9 +59,9 @@ export class TradePolicyPanel extends Panel {
       return;
     }
 
-    const hasTariffs = this.tariffsData && this.tariffsData.datapoints.length > 0;
-    const hasFlows = this.flowsData && this.flowsData.flows.length > 0;
-    const hasBarriers = this.barriersData && this.barriersData.barriers.length > 0;
+    const hasTariffs = this.tariffsData && this.tariffsData.datapoints?.length > 0;
+    const hasFlows = this.flowsData && this.flowsData.flows?.length > 0;
+    const hasBarriers = this.barriersData && this.barriersData.barriers?.length > 0;
 
     const tabsHtml = `
       <div class="economic-tabs">
@@ -82,12 +82,12 @@ export class TradePolicyPanel extends Panel {
 
     // Only show unavailable banner when active tab has NO data and upstream is down
     const activeHasData = this.activeTab === 'restrictions'
-      ? (this.restrictionsData?.restrictions.length ?? 0) > 0
+      ? (this.restrictionsData?.restrictions?.length ?? 0) > 0
       : this.activeTab === 'tariffs'
-      ? (this.tariffsData?.datapoints.length ?? 0) > 0
+      ? (this.tariffsData?.datapoints?.length ?? 0) > 0
       : this.activeTab === 'flows'
-      ? (this.flowsData?.flows.length ?? 0) > 0
-      : (this.barriersData?.barriers.length ?? 0) > 0;
+      ? (this.flowsData?.flows?.length ?? 0) > 0
+      : (this.barriersData?.barriers?.length ?? 0) > 0;
     const activeData = this.activeTab === 'restrictions' ? this.restrictionsData
       : this.activeTab === 'tariffs' ? this.tariffsData
       : this.activeTab === 'flows' ? this.flowsData
@@ -116,7 +116,7 @@ export class TradePolicyPanel extends Panel {
   }
 
   private renderRestrictions(): string {
-    if (!this.restrictionsData || this.restrictionsData.restrictions.length === 0) {
+    if (!this.restrictionsData || !this.restrictionsData.restrictions?.length) {
       return `<div class="economic-empty">${t('components.tradePolicy.noRestrictions')}</div>`;
     }
 
@@ -146,7 +146,7 @@ export class TradePolicyPanel extends Panel {
   }
 
   private renderTariffs(): string {
-    if (!this.tariffsData || this.tariffsData.datapoints.length === 0) {
+    if (!this.tariffsData || !this.tariffsData.datapoints?.length) {
       return `<div class="economic-empty">${t('components.tradePolicy.noTariffData')}</div>`;
     }
 
@@ -173,7 +173,7 @@ export class TradePolicyPanel extends Panel {
   }
 
   private renderFlows(): string {
-    if (!this.flowsData || this.flowsData.flows.length === 0) {
+    if (!this.flowsData || !this.flowsData.flows?.length) {
       return `<div class="economic-empty">${t('components.tradePolicy.noFlowData')}</div>`;
     }
 
@@ -203,7 +203,7 @@ export class TradePolicyPanel extends Panel {
   }
 
   private renderBarriers(): string {
-    if (!this.barriersData || this.barriersData.barriers.length === 0) {
+    if (!this.barriersData || !this.barriersData.barriers?.length) {
       return `<div class="economic-empty">${t('components.tradePolicy.noBarriers')}</div>`;
     }
 
