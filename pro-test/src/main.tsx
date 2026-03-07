@@ -14,13 +14,9 @@ initI18n().then(() => {
   );
 
   // Render widgets once React has mounted and the async Turnstile script is ready.
-  let initialized = false;
   const initWidgets = () => {
-    if (initialized || !window.turnstile) return false;
-    const rendered = renderTurnstileWidgets();
-    if (rendered === 0) return false;
-    initialized = true;
-    return true;
+    if (!window.turnstile) return false;
+    return renderTurnstileWidgets() > 0;
   };
 
   const turnstileScript = document.querySelector<HTMLScriptElement>(TURNSTILE_SCRIPT_SELECTOR);
@@ -34,4 +30,9 @@ initI18n().then(() => {
       if (initWidgets() || ++attempts >= 20) window.clearInterval(retryInterval);
     }, 500);
   }
+
+  // Re-render Turnstile widgets when navigating between pages (hash routing).
+  window.addEventListener('hashchange', () => {
+    setTimeout(() => initWidgets(), 100);
+  });
 });
