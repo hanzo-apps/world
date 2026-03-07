@@ -34,8 +34,6 @@ export function renderTurnstileWidgets(): number {
   document.querySelectorAll<HTMLElement>('.cf-turnstile:not([data-rendered])').forEach(el => {
     const widgetId = window.turnstile!.render(el, {
       sitekey: TURNSTILE_SITE_KEY,
-      theme: 'dark',
-      size: 'invisible',
       callback: (token: string) => { el.dataset.token = token; },
       'expired-callback': () => { delete el.dataset.token; },
       'error-callback': () => { delete el.dataset.token; },
@@ -237,7 +235,7 @@ const Hero = () => (
               {t('hero.reserveEarlyAccess')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
-          <div className="cf-turnstile mx-auto" data-size="invisible" />
+          <div className="cf-turnstile mx-auto" />
         </form>
         <div className="flex items-center justify-center gap-4 mt-4">
           <p className="text-xs text-wm-muted font-mono">{t('hero.launchingDate')}</p>
@@ -845,7 +843,7 @@ const Footer = () => (
             {t('finalCta.getPro')}
           </button>
         </div>
-        <div className="cf-turnstile mx-auto" data-size="invisible" />
+        <div className="cf-turnstile mx-auto" />
       </form>
 
       <a
@@ -1014,7 +1012,7 @@ const EnterprisePage = () => (
             </div>
             <input type="text" name="organization" placeholder={t('enterpriseShowcase.orgPlaceholder')} className="w-full bg-wm-bg border border-wm-border rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-wm-green transition-colors font-mono" />
             <textarea name="message" placeholder={t('enterpriseShowcase.messagePlaceholder')} rows={4} className="w-full bg-wm-bg border border-wm-border rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-wm-green transition-colors font-mono resize-none" />
-            <div className="cf-turnstile mx-auto" data-size="invisible" />
+            <div className="cf-turnstile mx-auto" />
             <button type="submit" className="w-full bg-wm-green text-wm-bg py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
               {t('enterpriseShowcase.submitContact')}
             </button>
