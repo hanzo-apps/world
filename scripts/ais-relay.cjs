@@ -2121,6 +2121,45 @@ async function startPositiveEventsSeedLoop() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Service Statuses Seed — warm-pings Vercel RPC every 15 min
+// so service statuses are always cached (TTL is 30 min).
+// ─────────────────────────────────────────────────────────────
+const SERVICE_STATUSES_SEED_INTERVAL_MS = 15 * 60 * 1000; // 15 min (TTL/2)
+const SERVICE_STATUSES_RPC_URL = 'https://worldmonitor.app/api/infrastructure/v1/list-service-statuses';
+
+async function seedServiceStatuses() {
+  try {
+    const resp = await fetch(SERVICE_STATUSES_RPC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': CHROME_UA,
+        Origin: 'https://worldmonitor.app',
+      },
+      body: '{}',
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[ServiceStatuses] Seed ping failed: HTTP ${resp.status}`);
+      return;
+    }
+    const data = await resp.json();
+    const count = data?.statuses?.length || 0;
+    console.log(`[ServiceStatuses] Seed ping OK — ${count} statuses`);
+  } catch (e) {
+    console.warn('[ServiceStatuses] Seed ping error:', e?.message || e);
+  }
+}
+
+function startServiceStatusesSeedLoop() {
+  console.log(`[ServiceStatuses] Seed loop starting (interval ${SERVICE_STATUSES_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  seedServiceStatuses().catch((e) => console.warn('[ServiceStatuses] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedServiceStatuses().catch((e) => console.warn('[ServiceStatuses] Seed error:', e?.message || e));
+  }, SERVICE_STATUSES_SEED_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
 // Theater Posture Seed — warm-pings Vercel RPC every 10 min
 // so the strategic posture panel always has data in Redis.
 // ─────────────────────────────────────────────────────────────
@@ -5487,6 +5526,7 @@ server.listen(PORT, () => {
   // (avoids burning 12 extra AbuseIPDB calls/day from duplicate relay loop)
   startCiiSeedLoop();
   startPositiveEventsSeedLoop();
+  startServiceStatusesSeedLoop();
   startTheaterPostureSeedLoop();
   startGpsJamSeedLoop();
 });

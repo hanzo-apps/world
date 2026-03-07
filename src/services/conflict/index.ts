@@ -1,11 +1,13 @@
 import {
   ConflictServiceClient,
+  ApiError,
   type AcledConflictEvent as ProtoAcledEvent,
   type UcdpViolenceEvent as ProtoUcdpEvent,
   type HumanitarianCountrySummary as ProtoHumanSummary,
   type ListAcledEventsResponse,
   type ListUcdpEventsResponse,
   type GetHumanitarianSummaryResponse,
+  type GetHumanitarianSummaryBatchResponse,
   type IranEvent,
   type ListIranEventsResponse,
 } from '@/generated/client/worldmonitor/conflict/v1/service_client';
@@ -244,6 +246,8 @@ interface AcledEvent {
 const emptyAcledFallback: ListAcledEventsResponse = { events: [], pagination: undefined };
 const emptyUcdpFallback: ListUcdpEventsResponse = { events: [], pagination: undefined };
 const emptyHapiFallback: GetHumanitarianSummaryResponse = { summary: undefined };
+const emptyHapiBatchFallback: GetHumanitarianSummaryBatchResponse = { results: {}, fetched: 0, requested: 0 };
+const hapiBatchBreaker = createCircuitBreaker<GetHumanitarianSummaryBatchResponse>({ name: 'HDX HAPI Batch', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 // ---- Exported Functions ----
 
@@ -272,8 +276,7 @@ export async function fetchConflictEvents(): Promise<ConflictData> {
   };
 }
 
-export async function fetchUcdpClassifications(): Promise<Map<string, UcdpConflictStatus>> {
-  const hydrated = getHydratedData('ucdpEvents') as ListUcdpEventsResponse | undefined;
+export async function fetchUcdpClassifications(hydrated?: ListUcdpEventsResponse): Promise<Map<string, UcdpConflictStatus>> {
   if (hydrated?.events?.length) return deriveUcdpClassifications(hydrated.events);
 
   const resp = await ucdpBreaker.execute(async () => {
@@ -287,23 +290,39 @@ export async function fetchUcdpClassifications(): Promise<Map<string, UcdpConfli
 }
 
 export async function fetchHapiSummary(): Promise<Map<string, HapiConflictSummary>> {
-  const results = await Promise.allSettled(
-    HAPI_COUNTRY_CODES.map(async (iso2) => {
-      const resp = await getHapiBreaker(iso2).execute(async () => {
-        return client.getHumanitarianSummary({ countryCode: iso2 });
-      }, emptyHapiFallback);
-      return { iso2, resp };
-    }),
-  );
-
   const byCode = new Map<string, HapiConflictSummary>();
 
-  for (const result of results) {
-    if (result.status === 'fulfilled' && result.value.resp.summary) {
-      const { iso2, resp } = result.value;
-      const summary = toHapiSummary(resp.summary!);
-      byCode.set(iso2, summary);
+  const resp = await hapiBatchBreaker.execute(async () => {
+    try {
+      return await client.getHumanitarianSummaryBatch(
+        { countryCodes: [...HAPI_COUNTRY_CODES] },
+        { signal: AbortSignal.timeout(60_000) },
+      );
+    } catch (err: unknown) {
+      // 404 deploy-skew fallback: batch endpoint not yet deployed, use per-item calls
+      if (err instanceof ApiError && err.statusCode === 404) {
+        const results = await Promise.allSettled(
+          HAPI_COUNTRY_CODES.map(async (iso2) => {
+            const r = await getHapiBreaker(iso2).execute(async () => {
+              return client.getHumanitarianSummary({ countryCode: iso2 });
+            }, emptyHapiFallback);
+            return { iso2, r };
+          }),
+        );
+        const fallbackResults: Record<string, ProtoHumanSummary> = {};
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.r.summary) {
+            fallbackResults[result.value.iso2] = result.value.r.summary;
+          }
+        }
+        return { results: fallbackResults, fetched: Object.keys(fallbackResults).length, requested: HAPI_COUNTRY_CODES.length };
+      }
+      throw err;
     }
+  }, emptyHapiBatchFallback);
+
+  for (const [cc, summary] of Object.entries(resp.results)) {
+    byCode.set(cc, toHapiSummary(summary));
   }
 
   return byCode;
@@ -316,8 +335,7 @@ interface UcdpEventsResponse {
   cached_at: string;
 }
 
-export async function fetchUcdpEvents(): Promise<UcdpEventsResponse> {
-  const hydrated = getHydratedData('ucdpEvents') as ListUcdpEventsResponse | undefined;
+export async function fetchUcdpEvents(hydrated?: ListUcdpEventsResponse): Promise<UcdpEventsResponse> {
   if (hydrated?.events?.length) {
     const events = hydrated.events.map(toUcdpGeoEvent);
     return { success: true, count: events.length, data: events, cached_at: '' };

@@ -96,7 +96,7 @@ const ON_DEMAND_KEYS = new Set([
   'riskScoresLive',
   'usniFleet', 'usniFleetStale', 'positiveEventsLive', 'cableHealth',
   'bisPolicy', 'bisExchange', 'bisCredit',
-  'serviceStatuses', 'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
+  'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
 ]);
 
 // Cascade groups: if any key in the group has data, all empty siblings are OK.

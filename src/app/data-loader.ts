@@ -19,7 +19,7 @@ import {
   getFeedFailures,
   fetchMultipleStocks,
   fetchCrypto,
-  fetchPredictions, type PredictionMarket,
+  fetchPredictions,
   fetchEarthquakes,
   fetchWeatherAlerts,
   fetchFredData,
@@ -1122,19 +1122,6 @@ export class DataLoaderManager implements AppModule {
 
   async loadPredictions(): Promise<void> {
     try {
-      // Try bootstrap hydration first (instant data from seed)
-      const hydrated = getHydratedData('predictions') as { geopolitical?: PredictionMarket[]; tech?: PredictionMarket[] } | undefined;
-      if (hydrated) {
-        const bootstrapMarkets = (SITE_VARIANT === 'tech' ? hydrated.tech : hydrated.geopolitical) ?? [];
-        if (bootstrapMarkets.length > 0) {
-          this.ctx.latestPredictions = bootstrapMarkets;
-          (this.ctx.panels['polymarket'] as PredictionPanel).renderPredictions(bootstrapMarkets);
-          this.ctx.statusPanel?.updateFeed('Polymarket', { status: 'ok', itemCount: bootstrapMarkets.length });
-          dataFreshness.recordUpdate('polymarket', bootstrapMarkets.length);
-          dataFreshness.recordUpdate('predictions', bootstrapMarkets.length);
-        }
-      }
-
       const predictions = await fetchPredictions();
       this.ctx.latestPredictions = predictions;
       (this.ctx.panels['polymarket'] as PredictionPanel).renderPredictions(predictions);
@@ -1318,9 +1305,11 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
+    const hydratedUcdp = getHydratedData('ucdpEvents') as import('@/generated/client/worldmonitor/conflict/v1/service_client').ListUcdpEventsResponse | undefined;
+
     tasks.push((async () => {
       try {
-        const classifications = await fetchUcdpClassifications();
+        const classifications = await fetchUcdpClassifications(hydratedUcdp);
         ingestUcdpForCII(classifications);
         if (classifications.size > 0) dataFreshness.recordUpdate('ucdp', classifications.size);
       } catch (error) {
@@ -1407,7 +1396,7 @@ export class DataLoaderManager implements AppModule {
     tasks.push((async () => {
       try {
         const protestEvents = await protestsTask;
-        let result = await fetchUcdpEvents();
+        let result = await fetchUcdpEvents(hydratedUcdp);
         for (let attempt = 1; attempt < 3 && !result.success; attempt++) {
           await new Promise(r => setTimeout(r, 15_000));
           result = await fetchUcdpEvents();
