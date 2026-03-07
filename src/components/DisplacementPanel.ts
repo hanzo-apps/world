@@ -52,9 +52,9 @@ export class DisplacementPanel extends Panel {
     ).join('');
 
     const tabsHtml = `
-      <div class="disp-tabs" role="tablist" aria-label="Displacement data view">
-        <button class="disp-tab ${this.activeTab === 'origins' ? 'disp-tab-active' : ''}" data-tab="origins" role="tab" aria-selected="${this.activeTab === 'origins'}" id="disp-tab-origins" aria-controls="disp-tab-panel">${t('components.displacement.origins')}</button>
-        <button class="disp-tab ${this.activeTab === 'hosts' ? 'disp-tab-active' : ''}" data-tab="hosts" role="tab" aria-selected="${this.activeTab === 'hosts'}" id="disp-tab-hosts" aria-controls="disp-tab-panel">${t('components.displacement.hosts')}</button>
+      <div class="panel-tabs" role="tablist" aria-label="Displacement data view">
+        <button class="panel-tab ${this.activeTab === 'origins' ? 'active' : ''}" data-tab="origins" role="tab" aria-selected="${this.activeTab === 'origins'}" id="disp-tab-origins" aria-controls="disp-tab-panel">${t('components.displacement.origins')}</button>
+        <button class="panel-tab ${this.activeTab === 'hosts' ? 'active' : ''}" data-tab="hosts" role="tab" aria-selected="${this.activeTab === 'hosts'}" id="disp-tab-hosts" aria-controls="disp-tab-panel">${t('components.displacement.hosts')}</button>
       </div>
     `;
 
@@ -121,7 +121,7 @@ export class DisplacementPanel extends Panel {
       </div>
     `);
 
-    this.content.querySelectorAll('.disp-tab').forEach(btn => {
+    this.content.querySelectorAll('.panel-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         this.activeTab = (btn as HTMLElement).dataset.tab as DisplacementTab;
         this.renderContent();

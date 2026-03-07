@@ -105,10 +105,10 @@ export class AirlineIntelPanel extends Panel {
 
         // Insert tab bar between header and content
         this.tabBar = document.createElement('div');
-        this.tabBar.className = 'airline-intel-tabs';
+        this.tabBar.className = 'panel-tabs';
         TABS.forEach(tab => {
             const btn = document.createElement('button');
-            btn.className = `tab-btn${tab === this.activeTab ? ' active' : ''}`;
+            btn.className = `panel-tab${tab === this.activeTab ? ' active' : ''}`;
             btn.textContent = TAB_LABELS[tab];
             btn.dataset.tab = tab;
             btn.addEventListener('click', () => this.switchTab(tab as Tab));
@@ -159,7 +159,7 @@ export class AirlineIntelPanel extends Panel {
 
     private switchTab(tab: Tab): void {
         this.activeTab = tab;
-        this.tabBar.querySelectorAll('.tab-btn').forEach(b => {
+        this.tabBar.querySelectorAll('.panel-tab').forEach(b => {
             b.classList.toggle('active', (b as HTMLElement).dataset.tab === tab);
         });
         this.renderTab();

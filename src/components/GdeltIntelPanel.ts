@@ -30,10 +30,10 @@ export class GdeltIntelPanel extends Panel {
   }
 
   private createTabs(): void {
-    this.tabsEl = h('div', { className: 'gdelt-intel-tabs' },
+    this.tabsEl = h('div', { className: 'panel-tabs' },
       ...getIntelTopics().map(topic =>
         h('button', {
-          className: `gdelt-intel-tab ${topic.id === this.activeTopic.id ? 'active' : ''}`,
+          className: `panel-tab ${topic.id === this.activeTopic.id ? 'active' : ''}`,
           dataset: { topicId: topic.id },
           title: topic.description,
           onClick: () => this.selectTopic(topic),
@@ -52,7 +52,7 @@ export class GdeltIntelPanel extends Panel {
 
     this.activeTopic = topic;
 
-    this.tabsEl?.querySelectorAll('.gdelt-intel-tab').forEach(tab => {
+    this.tabsEl?.querySelectorAll('.panel-tab').forEach(tab => {
       tab.classList.toggle('active', (tab as HTMLElement).dataset.topicId === topic.id);
     });
 

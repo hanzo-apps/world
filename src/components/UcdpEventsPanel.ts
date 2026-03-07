@@ -53,7 +53,7 @@ export class UcdpEventsPanel extends Panel {
     const totalDeaths = filtered.reduce((sum, e) => sum + e.deaths_best, 0);
 
     const tabsHtml = tabs.map(t =>
-      `<button class="ucdp-tab ${t.key === this.activeTab ? 'ucdp-tab-active' : ''}" data-tab="${t.key}">${t.label} <span class="ucdp-tab-count">${tabCounts[t.key]}</span></button>`
+      `<button class="panel-tab ${t.key === this.activeTab ? 'active' : ''}" data-tab="${t.key}">${t.label} <span class="ucdp-tab-count">${tabCounts[t.key]}</span></button>`
     ).join('');
 
     const displayed = filtered.slice(0, 50);
@@ -100,7 +100,7 @@ export class UcdpEventsPanel extends Panel {
     this.setContent(`
       <div class="ucdp-panel-content">
         <div class="ucdp-header">
-          <div class="ucdp-tabs">${tabsHtml}</div>
+          <div class="panel-tabs">${tabsHtml}</div>
           ${totalDeaths > 0 ? `<span class="ucdp-total-deaths">${t('components.ucdpEvents.deathsCount', { count: totalDeaths.toLocaleString() })}</span>` : ''}
         </div>
         ${bodyHtml}
@@ -108,7 +108,7 @@ export class UcdpEventsPanel extends Panel {
       </div>
     `);
 
-    this.content.querySelectorAll('.ucdp-tab').forEach(btn => {
+    this.content.querySelectorAll('.panel-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         this.activeTab = (btn as HTMLElement).dataset.tab as UcdpEventType;
         this.renderContent();

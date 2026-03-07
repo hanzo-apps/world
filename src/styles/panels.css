@@ -5,6 +5,61 @@
    ========================================================== */
 
 /* ----------------------------------------------------------
+   Shared Panel Tabs (gold standard: Telegram Intel style)
+   ---------------------------------------------------------- */
+.panel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.panel-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.panel-tab {
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.panel-tab:hover {
+  color: var(--text);
+  background: var(--overlay-subtle);
+}
+
+.panel-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.panel-tab .tab-icon {
+  font-size: 12px;
+}
+
+.panel-tab .tab-label {
+  font-weight: 500;
+}
+
+.panel-tab.active .tab-label {
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------
    Satellite Fires Panel
    ---------------------------------------------------------- */
 .fires-panel-content {
@@ -303,33 +358,7 @@
   color: var(--accent);
 }
 
-.disp-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.disp-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.disp-tab:hover {
-  color: var(--text);
-}
-
-.disp-tab-active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* disp-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .disp-table {
   width: 100%;
@@ -416,33 +445,7 @@
   gap: 4px;
 }
 
-.ucdp-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.ucdp-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.ucdp-tab:hover {
-  color: var(--text);
-}
-
-.ucdp-tab-active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* ucdp-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .ucdp-tab-count {
   font-variant-numeric: tabular-nums;
@@ -707,34 +710,7 @@
   font-size: 22px;
 }
 
-.giving-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.giving-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.giving-tab:hover {
-  color: var(--text);
-}
-
-.giving-tab-active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* giving-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .giving-table {
   width: 100%;
