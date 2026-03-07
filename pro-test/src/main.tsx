@@ -32,7 +32,13 @@ initI18n().then(() => {
   }
 
   // Re-render Turnstile widgets when navigating between pages (hash routing).
+  // Retry a few times since React needs to mount the new page's .cf-turnstile divs.
   window.addEventListener('hashchange', () => {
-    setTimeout(() => initWidgets(), 100);
+    let tries = 0;
+    const poll = () => {
+      if (initWidgets() || ++tries >= 10) return;
+      setTimeout(poll, 200);
+    };
+    setTimeout(poll, 100);
   });
 });
