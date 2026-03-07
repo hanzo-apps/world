@@ -5732,8 +5732,6 @@ a.prediction-link:hover {
   gap: 8px;
   padding: 1.5rem 1rem;
   min-height: 120px;
-  padding: 24px 12px;
-  min-height: 100px;
 }
 
 .panel-error-radar {

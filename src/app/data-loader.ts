@@ -1912,7 +1912,7 @@ export class DataLoaderManager implements AppModule {
     const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
     const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
     if (cbInfo.onCooldown) {
-      economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${cbInfo.remainingSeconds}s)`);
+      economicPanel?.showRetrying(undefined, cbInfo.remainingSeconds);
       this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
       return;
     }
@@ -1923,14 +1923,14 @@ export class DataLoaderManager implements AppModule {
 
       const postInfo = getCircuitBreakerCooldownInfo('FRED Economic');
       if (postInfo.onCooldown) {
-        economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${postInfo.remainingSeconds}s)`);
+        economicPanel?.showRetrying(undefined, postInfo.remainingSeconds);
         this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
         return;
       }
 
       if (data.length === 0) {
         if (!isFeatureAvailable('economicFred')) {
-          economicPanel?.setErrorState(true, 'FRED_API_KEY not configured — add in Settings');
+          economicPanel?.showError();
           this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
           return;
         }
@@ -1938,7 +1938,7 @@ export class DataLoaderManager implements AppModule {
         await new Promise(r => setTimeout(r, 20_000));
         const retryData = await fetchFredData();
         if (retryData.length === 0) {
-          economicPanel?.setErrorState(true, 'FRED data temporarily unavailable — will retry');
+          economicPanel?.showError();
           this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
           return;
         }
@@ -1969,7 +1969,7 @@ export class DataLoaderManager implements AppModule {
         } catch { /* fall through */ }
       }
       this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-      economicPanel?.setErrorState(true, 'FRED data temporarily unavailable — will retry');
+      economicPanel?.showError();
       economicPanel?.setLoading(false);
     }
   }

@@ -653,6 +653,7 @@ export class Panel {
   public showError(message?: string, onRetry?: () => void, autoRetrySeconds?: number): void {
     if (this._locked) return;
     this.clearRetryCountdown();
+    this.setErrorState(true);
     if (onRetry !== undefined) this.retryCallback = onRetry;
 
     const radarEl = h('div', { className: 'panel-loading-radar panel-error-radar' },
@@ -721,6 +722,7 @@ export class Panel {
   public showRetrying(message?: string, countdownSeconds?: number): void {
     if (this._locked) return;
     this.clearRetryCountdown();
+    this.setErrorState(true);
 
     const radarEl = h('div', { className: 'panel-loading-radar panel-error-radar' },
       h('div', { className: 'panel-radar-sweep' }),

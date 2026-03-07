@@ -235,13 +235,26 @@ export default async function handler(req) {
     });
   }
 
-  // Cloudflare Turnstile verification
-  const turnstileOk = await verifyTurnstile(body.turnstileToken || '', ip);
-  if (!turnstileOk) {
-    return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+  // Cloudflare Turnstile verification — skip for desktop app (no browser captcha available).
+  // Desktop bypasses captcha, so enforce stricter rate limit (2/hr vs 5/hr).
+  const DESKTOP_SOURCES = new Set(['desktop-settings']);
+  const isDesktopSource = typeof body.source === 'string' && DESKTOP_SOURCES.has(body.source);
+  if (isDesktopSource) {
+    const entry = rateLimitMap.get(ip);
+    if (entry && entry.count > 2) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
+  } else {
+    const turnstileOk = await verifyTurnstile(body.turnstileToken || '', ip);
+    if (!turnstileOk) {
+      return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
   }
 
   const { email, source, appVersion, referredBy } = body;
