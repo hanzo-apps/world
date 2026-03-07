@@ -39,7 +39,7 @@ const STANDALONE_KEYS = {
   chokepoints:           'supply_chain:chokepoints:v2',
   minerals:              'supply_chain:minerals:v2',
   giving:                'giving:summary:v1',
-  gpsjam:                'intelligence:gpsjam:v1',
+  gpsjam:                'intelligence:gpsjam:v2',
   theaterPosture:        'theater-posture:sebuf:stale:v1',
   theaterPostureLive:    'theater-posture:sebuf:v1',
   theaterPostureBackup:  'theater-posture:sebuf:backup:v1',
