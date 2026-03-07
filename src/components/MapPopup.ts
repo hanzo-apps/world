@@ -847,8 +847,10 @@ export class MapPopup {
     `;
   }
 
-  private getTimeUntil(date: Date): string {
-    const ms = date.getTime() - Date.now();
+  private getTimeUntil(date: Date | string): string {
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return '—';
+    const ms = d.getTime() - Date.now();
     if (ms <= 0) return t('popups.expired');
     const hours = Math.floor(ms / (1000 * 60 * 60));
     if (hours < 1) return `${Math.floor(ms / (1000 * 60))}${t('popups.timeUnits.m')}`;
