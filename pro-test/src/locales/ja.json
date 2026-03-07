@@ -234,6 +234,7 @@
     "telegram": "Telegram",
     "shareText": "World Monitor Pro のウェイトリストに登録しました — AIが駆動するリアルタイムグローバルインテリジェンス。一緒に参加しよう：",
     "joinWaitlistShare": "World Monitor Pro ウェイトリストに登録：",
-    "youreIn": "登録完了！"
+    "youreIn": "登録完了！",
+    "invitedBanner": "招待されました — ウェイトリストに参加"
   }
 }
