@@ -234,6 +234,7 @@
     "telegram": "Telegram",
     "shareText": "我刚加入了 World Monitor Pro 等候名单 — AI 驱动的全球实时情报。快来加入：",
     "joinWaitlistShare": "加入 World Monitor Pro 等候名单：",
-    "youreIn": "注册成功！"
+    "youreIn": "注册成功！",
+    "invitedBanner": "你被邀请了 — 加入等待名单"
   }
 }

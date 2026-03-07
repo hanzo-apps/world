@@ -304,6 +304,7 @@
     "telegram": "Telegram",
     "shareText": "I just joined the World Monitor Pro waitlist — real-time global intelligence powered by AI. Join me:",
     "joinWaitlistShare": "Join the World Monitor Pro waitlist:",
-    "youreIn": "You're in!"
+    "youreIn": "You're in!",
+    "invitedBanner": "You've been invited — join the waitlist"
   }
 }
