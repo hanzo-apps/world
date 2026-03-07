@@ -1486,6 +1486,265 @@
 }
 
 /* ----------------------------------------------------------
+   World Clock Panel
+   ---------------------------------------------------------- */
+.wc-settings-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.wc-settings-btn:hover,
+.wc-settings-btn.wc-active {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.wc-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.wc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+
+.wc-row:last-child {
+  border-bottom: none;
+}
+
+.wc-row:hover {
+  background: var(--surface-hover);
+}
+
+.wc-row.wc-night {
+  opacity: 0.7;
+}
+
+.wc-row.wc-home {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.wc-drag-handle {
+  cursor: grab;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+}
+
+.wc-drag-handle:hover {
+  color: var(--text-dim);
+}
+
+.wc-row.wc-dragging {
+  opacity: 0.4;
+}
+
+.wc-row.wc-drag-over-above {
+  border-top: 2px solid var(--accent);
+}
+
+.wc-row.wc-drag-over-below {
+  border-bottom: 2px solid var(--accent);
+}
+
+.wc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wc-home-tag {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.wc-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+}
+
+.wc-exchange {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.wc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.wc-status.open {
+  color: var(--semantic-positive, #44ff88);
+}
+
+.wc-status.closed {
+  color: var(--text-faint);
+}
+
+.wc-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wc-dot.open {
+  background: var(--semantic-positive, #44ff88);
+}
+
+.wc-dot.closed {
+  background: var(--text-faint);
+}
+
+.wc-clock {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.wc-time {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.wc-tz {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+  justify-content: flex-end;
+}
+
+.wc-bar-wrap {
+  width: 40px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wc-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.wc-bar.day {
+  background: var(--semantic-elevated, #f59e0b);
+}
+
+.wc-bar.night {
+  background: var(--semantic-info, #3b82f6);
+}
+
+.wc-empty {
+  padding: 20px 8px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* World Clock Settings View */
+.wc-settings-view {
+  padding: 4px 0;
+}
+
+.wc-region-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 8px 3px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wc-region-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  padding: 4px;
+}
+
+.wc-city-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.1s;
+}
+
+.wc-city-option:hover {
+  background: var(--surface-hover);
+}
+
+.wc-city-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.wc-opt-name {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wc-opt-label {
+  color: var(--text-faint);
+  font-size: 9px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------
    Map Bottom Grid (Large Screen Drop Zone)
    ---------------------------------------------------------- */
 .map-bottom-grid {
