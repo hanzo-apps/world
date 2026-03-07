@@ -98,10 +98,10 @@ export class TechEventsPanel extends Panel {
 
     replaceChildren(this.content,
       h('div', { className: 'tech-events-panel' },
-        h('div', { className: 'tech-events-tabs' },
+        h('div', { className: 'panel-tabs' },
           ...tabEntries.map(([view, label]) =>
             h('button', {
-              className: `tab ${this.viewMode === view ? 'active' : ''}`,
+              className: `panel-tab ${this.viewMode === view ? 'active' : ''}`,
               dataset: { view },
               onClick: () => { this.viewMode = view; this.render(); },
             }, label),

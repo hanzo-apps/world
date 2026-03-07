@@ -2059,42 +2059,7 @@ body.panel-resize-active iframe {
   margin-top: 4px;
 }
 
-/* Tab bar */
-.live-news-manage-tab-bar {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
-  overflow-x: auto;
-}
-
-.live-news-manage-tab-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.live-news-manage-tab-btn {
-  font-family: inherit;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.75px;
-  padding: 6px 10px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-
-.live-news-manage-tab-btn:hover {
-  color: var(--text-dim);
-}
-
-.live-news-manage-tab-btn.active {
-  color: var(--text);
-  border-bottom-color: var(--text);
-}
+/* live-news-manage-tab: now uses shared .panel-tabs / .panel-tab */
 
 /* Tab content panels */
 .live-news-manage-tab-content {
@@ -7792,34 +7757,7 @@ a.prediction-link:hover {
   color: var(--text-dim);
 }
 
-/* Economic Panel Tabs */
-.economic-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.economic-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.economic-tab:hover {
-  color: var(--text);
-}
-
-.economic-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* economic-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .economic-content {
   padding: 8px;
@@ -7827,34 +7765,7 @@ a.prediction-link:hover {
   overflow-y: auto;
 }
 
-/* Regulation Panel Tabs */
-.regulation-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.regulation-tabs .tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.regulation-tabs .tab:hover {
-  color: var(--text);
-}
-
-.regulation-tabs .tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* regulation-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .economic-empty {
   padding: 16px;
@@ -10531,55 +10442,7 @@ a.prediction-link:hover {
    GDELT Intelligence Panel
    ========================================================================== */
 
-.gdelt-intel-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.gdelt-intel-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.gdelt-intel-tab {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.gdelt-intel-tab:hover {
-  color: var(--text);
-  background: var(--overlay-subtle);
-}
-
-.gdelt-intel-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.gdelt-intel-tab .tab-icon {
-  font-size: 12px;
-}
-
-.gdelt-intel-tab .tab-label {
-  font-weight: 500;
-}
+/* gdelt-intel-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .gdelt-intel-articles {
   display: flex;
@@ -11208,33 +11071,7 @@ a.prediction-link:hover {
   gap: 8px;
 }
 
-.cascade-filters {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.cascade-filter-btn {
-  padding: 4px 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-dim);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.cascade-filter-btn:hover {
-  background: var(--overlay-medium);
-  color: var(--text);
-}
-
-.cascade-filter-btn.active {
-  background: rgba(68, 255, 136, 0.15);
-  border-color: var(--green);
-  color: var(--green);
-}
+/* cascade-filters: now uses shared .panel-tabs / .panel-tab */
 
 .cascade-select {
   width: 100%;
@@ -12819,33 +12656,7 @@ a.prediction-link:hover {
   color: var(--text-dim);
 }
 
-.tech-events-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tech-events-tabs .tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.tech-events-tabs .tab:hover {
-  color: var(--text);
-}
-
-.tech-events-tabs .tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+/* tech-events-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .tech-events-stats {
   display: flex;
@@ -17526,45 +17337,7 @@ body.has-breaking-alert .panels-grid {
    Telegram Intel Panel
    ========================================================================== */
 
-.telegram-intel-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.telegram-intel-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.telegram-intel-tab {
-  padding: 6px 10px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.telegram-intel-tab:hover {
-  color: var(--text);
-  background: var(--overlay-subtle);
-}
-
-.telegram-intel-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-  font-weight: 500;
-}
+/* telegram-intel-tabs: now uses shared .panel-tabs / .panel-tab */
 
 .telegram-intel-items {
   display: flex;

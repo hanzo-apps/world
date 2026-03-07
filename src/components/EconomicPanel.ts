@@ -22,7 +22,7 @@ export class EconomicPanel extends Panel {
   constructor() {
     super({ id: 'economic', title: t('panels.economic') });
     this.content.addEventListener('click', (e) => {
-      const tab = (e.target as HTMLElement).closest('.economic-tab') as HTMLElement | null;
+      const tab = (e.target as HTMLElement).closest('.panel-tab') as HTMLElement | null;
       if (tab?.dataset.tab) {
         this.activeTab = tab.dataset.tab as TabId;
         this.render();
@@ -64,22 +64,22 @@ export class EconomicPanel extends Panel {
 
     // Build tabs HTML
     const tabsHtml = `
-      <div class="economic-tabs">
-        <button class="economic-tab ${this.activeTab === 'indicators' ? 'active' : ''}" data-tab="indicators">
+      <div class="panel-tabs">
+        <button class="panel-tab ${this.activeTab === 'indicators' ? 'active' : ''}" data-tab="indicators">
           📊 ${t('components.economic.indicators')}
         </button>
         ${hasOil ? `
-          <button class="economic-tab ${this.activeTab === 'oil' ? 'active' : ''}" data-tab="oil">
+          <button class="panel-tab ${this.activeTab === 'oil' ? 'active' : ''}" data-tab="oil">
             🛢️ ${t('components.economic.oil')}
           </button>
         ` : ''}
         ${hasSpending ? `
-          <button class="economic-tab ${this.activeTab === 'spending' ? 'active' : ''}" data-tab="spending">
+          <button class="panel-tab ${this.activeTab === 'spending' ? 'active' : ''}" data-tab="spending">
             🏛️ ${t('components.economic.gov')}
           </button>
         ` : ''}
         ${hasBis ? `
-          <button class="economic-tab ${this.activeTab === 'centralBanks' ? 'active' : ''}" data-tab="centralBanks">
+          <button class="panel-tab ${this.activeTab === 'centralBanks' ? 'active' : ''}" data-tab="centralBanks">
             🏦 ${t('components.economic.centralBanks')}
           </button>
         ` : ''}
