@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'module';
 import { loadEnvFile, CHROME_UA, sleep, runSeed, parseYahooChart, writeExtraKey } from './_seed-utils.mjs';
+
+const require = createRequire(import.meta.url);
+const commodityConfig = require('../shared/commodities.json');
 
 loadEnvFile(import.meta.url);
 
@@ -30,7 +34,7 @@ async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
   return null;
 }
 
-const COMMODITY_SYMBOLS = ['^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F'];
+const COMMODITY_SYMBOLS = commodityConfig.commodities.map(c => c.symbol);
 
 async function fetchCommodityQuotes() {
   const quotes = [];
