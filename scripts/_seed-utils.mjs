@@ -247,7 +247,8 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     const recordCount = Array.isArray(data) ? data.length
       : (data?.events?.length ?? data?.earthquakes?.length ?? data?.outages?.length
         ?? data?.fireDetections?.length ?? data?.anomalies?.length ?? data?.threats?.length
-        ?? data?.quotes?.length ?? data?.stablecoins?.length ?? 0);
+        ?? data?.quotes?.length ?? data?.stablecoins?.length
+        ?? data?.cables?.length ?? 0);
 
     // Write extra keys (e.g., bootstrap hydration keys)
     if (extraKeys) {
