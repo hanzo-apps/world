@@ -39,6 +39,8 @@ const BOOTSTRAP_CACHE_KEYS = {
   iranEvents: 'conflict:iran-events:v1',
   ucdpEvents: 'conflict:ucdp-events:v1',
   temporalAnomalies: 'temporal:anomalies:v1',
+  weatherAlerts:     'weather:alerts:v1',
+  spending:          'economic:spending:v1',
 };
 
 const SLOW_KEYS = new Set([
@@ -51,7 +53,7 @@ const SLOW_KEYS = new Set([
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
-  'iranEvents', 'temporalAnomalies',
+  'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending',
 ]);
 
 const TIER_CACHE = {
