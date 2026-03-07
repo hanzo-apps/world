@@ -17,7 +17,13 @@ const { readFileSync } = require('fs');
 const crypto = require('crypto');
 const v8 = require('v8');
 const { WebSocketServer, WebSocket } = require('ws');
-const RSS_ALLOWED_DOMAINS = new Set(require('../shared/rss-allowed-domains.cjs'));
+
+function requireShared(name) {
+  const candidates = [path.join(__dirname, '..', 'shared', name), path.join(__dirname, 'shared', name)];
+  for (const p of candidates) { try { return require(p); } catch {} }
+  throw new Error(`Cannot find shared/${name}`);
+}
+const RSS_ALLOWED_DOMAINS = new Set(requireShared('rss-allowed-domains.cjs'));
 
 // Log effective heap limit at startup (verifies NODE_OPTIONS=--max-old-space-size is active)
 const _heapStats = v8.getHeapStatistics();
@@ -1296,7 +1302,7 @@ async function seedEtfFlows() {
 }
 
 // Crypto Quotes — CoinGecko → CoinPaprika fallback
-const _cryptoCfg = require('../shared/crypto.json');
+const _cryptoCfg = requireShared('crypto.json');
 const CRYPTO_IDS = _cryptoCfg.ids;
 const CRYPTO_META = _cryptoCfg.meta;
 const CRYPTO_PAPRIKA_MAP = _cryptoCfg.coinpaprika;
