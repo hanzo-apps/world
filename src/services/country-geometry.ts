@@ -12,7 +12,7 @@ interface CountryHit {
   name: string;
 }
 
-const COUNTRY_GEOJSON_URL = '/data/countries.geojson';
+const COUNTRY_GEOJSON_URL = 'https://maps.worldmonitor.app/countries.geojson';
 
 /** Optional higher-resolution boundary overrides sourced from Natural Earth. */
 const COUNTRY_OVERRIDES_URL = '/data/country-boundary-overrides.geojson';
