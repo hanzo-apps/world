@@ -720,17 +720,18 @@ export class PanelLayoutManager implements AppModule {
       );
 
       const _wmKeyPresent = getSecretState('WORLDMONITOR_API_KEY').present;
+      const _lockPanels = this.ctx.isDesktopApp && !_wmKeyPresent;
 
       this.lazyPanel('oref-sirens', () =>
         import('@/components/OrefSirensPanel').then(m => new m.OrefSirensPanel()),
         undefined,
-        !_wmKeyPresent ? [t('premium.features.orefSirens1'), t('premium.features.orefSirens2')] : undefined,
+        _lockPanels ? [t('premium.features.orefSirens1'), t('premium.features.orefSirens2')] : undefined,
       );
 
       this.lazyPanel('telegram-intel', () =>
         import('@/components/TelegramIntelPanel').then(m => new m.TelegramIntelPanel()),
         undefined,
-        !_wmKeyPresent ? [t('premium.features.telegramIntel1'), t('premium.features.telegramIntel2')] : undefined,
+        _lockPanels ? [t('premium.features.telegramIntel1'), t('premium.features.telegramIntel2')] : undefined,
       );
     }
 
