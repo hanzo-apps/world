@@ -25,8 +25,12 @@ function sanitize(val: unknown): string {
   return String(val ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
 }
 
-function showReferralSuccess(formEl: HTMLFormElement, data: { referralCode?: string; position?: number }) {
-  if (!data.referralCode) return;
+function showReferralSuccess(formEl: HTMLFormElement, data: { referralCode?: string; position?: number; status?: string }) {
+  if (!data.referralCode) {
+    const btn = formEl.querySelector('button[type="submit"]') as HTMLButtonElement;
+    if (btn) { btn.textContent = 'Join Waitlist'; btn.disabled = false; }
+    return;
+  }
   const safeCode = sanitize(data.referralCode);
   const safePosition = sanitize(data.position);
   const referralLink = `${PRO_URL}?ref=${safeCode}`;
@@ -42,12 +46,19 @@ function showReferralSuccess(formEl: HTMLFormElement, data: { referralCode?: str
 
   const successDiv = el('div', 'text-center');
 
-  const badge = el('div', 'inline-block bg-wm-card border border-wm-green/30 px-6 py-4 mb-4');
-  badge.appendChild(el('p', 'text-xs text-wm-green font-mono uppercase tracking-widest mb-1', 'Your position'));
-  badge.appendChild(el('p', 'text-4xl font-display font-bold text-wm-text', `#${safePosition || '?'}`));
-  successDiv.appendChild(badge);
+  const isAlreadyRegistered = data.status === 'already_registered';
+  const shareHint = 'Share your link to move up the line. Each friend who joins bumps you closer to the front.';
 
-  successDiv.appendChild(el('p', 'text-sm text-wm-muted mb-4', 'Share your link to move up the line. Each friend who joins bumps you closer to the front.'));
+  if (isAlreadyRegistered) {
+    successDiv.appendChild(el('p', 'text-lg font-display font-bold text-wm-green mb-2', "You're already on the list."));
+    successDiv.appendChild(el('p', 'text-sm text-wm-muted mb-4', shareHint));
+  } else {
+    const badge = el('div', 'inline-block bg-wm-card border border-wm-green/30 px-6 py-4 mb-4');
+    badge.appendChild(el('p', 'text-xs text-wm-green font-mono uppercase tracking-widest mb-1', 'Your position'));
+    badge.appendChild(el('p', 'text-4xl font-display font-bold text-wm-text', `#${safePosition || '?'}`));
+    successDiv.appendChild(badge);
+    successDiv.appendChild(el('p', 'text-sm text-wm-muted mb-4', shareHint));
+  }
 
   const linkBox = el('div', 'bg-wm-card border border-wm-border px-4 py-3 mb-4 font-mono text-xs text-wm-green break-all select-all cursor-pointer', referralLink);
   linkBox.addEventListener('click', () => {
@@ -97,7 +108,7 @@ async function submitWaitlist(email: string, formEl: HTMLFormElement) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Registration failed');
-    showReferralSuccess(formEl, data);
+    showReferralSuccess(formEl, { referralCode: data.referralCode, position: data.position, status: data.status });
   } catch (err: any) {
     btn.textContent = err.message === 'Too many requests' ? 'Too many requests' : 'Failed \u2014 try again';
     btn.disabled = false;
