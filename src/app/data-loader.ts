@@ -1947,7 +1947,7 @@ export class DataLoaderManager implements AppModule {
   async loadGovernmentSpending(): Promise<void> {
     const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
     try {
-      const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
+      const data = await fetchRecentAwards();
       economicPanel?.updateSpending(data);
       this.ctx.statusPanel?.updateApi('USASpending', { status: data.awards?.length > 0 ? 'ok' : 'error' });
       if (data.awards?.length > 0) {
