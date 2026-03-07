@@ -68,7 +68,8 @@ export class ETFFlowsPanel extends Panel {
           if (!this.element?.isConnected) return;
           continue;
         }
-        this.error = err instanceof Error ? err.message : 'Failed to fetch';
+        console.warn('[ETFFlows] Fetch error:', err);
+        this.error = null;
       }
     }
     this.loading = false;
