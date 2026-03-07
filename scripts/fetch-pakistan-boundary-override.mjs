@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Fetches Pakistan's boundary from Natural Earth 50m Admin 0 Countries and writes
- * public/data/country-boundary-overrides.geojson.
+ * country-boundary-overrides.geojson locally. After running, upload to R2:
+ *   rclone copy public/data/country-boundary-overrides.geojson r2:worldmonitor-maps/
  *
  * Note: downloads the full NE 50m countries file (~24 MB) to extract Pakistan.
  *
