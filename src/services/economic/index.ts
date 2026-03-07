@@ -496,8 +496,7 @@ export async function getTechReadinessRankings(
   if (hydrated?.length && !countries) return hydrated;
 
   // Fallback: fetch the pre-computed seed key directly from bootstrap endpoint.
-  // The data is seeded by seed-wb-indicators.mjs — we never call the World Bank
-  // API directly from the frontend (it hangs/fails from Vercel Edge).
+  // Data is seeded by seed-wb-indicators.mjs — never call WB API from frontend.
   try {
     const resp = await fetch('/api/bootstrap?keys=techReadiness', {
       signal: AbortSignal.timeout(5_000),
@@ -518,9 +517,18 @@ export async function getTechReadinessRankings(
 
 export async function getCountryComparison(
   indicator: string,
-  countryCodes: string[],
+  _countryCodes: string[],
 ): Promise<WorldBankResponse> {
-  return getIndicatorData(indicator, { countries: countryCodes, years: 10 });
+  // All WB data is now pre-seeded by seed-wb-indicators.mjs.
+  // This function is unused but kept for API compat.
+  return {
+    indicator,
+    indicatorName: TECH_INDICATORS[indicator] || indicator,
+    metadata: { page: 0, pages: 0, total: 0 },
+    byCountry: {},
+    latestByCountry: {},
+    timeSeries: [],
+  };
 }
 
 // ========================================================================
