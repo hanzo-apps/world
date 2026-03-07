@@ -1,4 +1,5 @@
 import type { Sector, Commodity, MarketSymbol } from '@/types';
+import cryptoConfig from '../../shared/crypto.json';
 
 export const SECTORS: Sector[] = [
   { symbol: 'XLK', name: 'Tech' },
@@ -55,11 +56,5 @@ export const MARKET_SYMBOLS: MarketSymbol[] = [
   { symbol: 'BAC', name: 'BofA', display: 'BAC' },
 ];
 
-export const CRYPTO_IDS = ['bitcoin', 'ethereum', 'solana', 'ripple'] as const;
-
-export const CRYPTO_MAP: Record<string, { name: string; symbol: string }> = {
-  bitcoin: { name: 'Bitcoin', symbol: 'BTC' },
-  ethereum: { name: 'Ethereum', symbol: 'ETH' },
-  solana: { name: 'Solana', symbol: 'SOL' },
-  ripple: { name: 'XRP', symbol: 'XRP' },
-};
+export const CRYPTO_IDS = cryptoConfig.ids as readonly string[];
+export const CRYPTO_MAP: Record<string, { name: string; symbol: string }> = cryptoConfig.meta;

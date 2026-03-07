@@ -1296,9 +1296,10 @@ async function seedEtfFlows() {
 }
 
 // Crypto Quotes — CoinGecko → CoinPaprika fallback
-const CRYPTO_IDS = ['bitcoin', 'ethereum', 'solana', 'ripple'];
-const CRYPTO_META = { bitcoin: { name: 'Bitcoin', symbol: 'BTC' }, ethereum: { name: 'Ethereum', symbol: 'ETH' }, solana: { name: 'Solana', symbol: 'SOL' }, ripple: { name: 'XRP', symbol: 'XRP' } };
-const CRYPTO_PAPRIKA_MAP = { bitcoin: 'btc-bitcoin', ethereum: 'eth-ethereum', solana: 'sol-solana', ripple: 'xrp-ripple' };
+const _cryptoCfg = require('../shared/crypto.json');
+const CRYPTO_IDS = _cryptoCfg.ids;
+const CRYPTO_META = _cryptoCfg.meta;
+const CRYPTO_PAPRIKA_MAP = _cryptoCfg.coinpaprika;
 const CRYPTO_SEED_TTL = 3600; // 1h
 
 async function fetchCryptoCoinPaprika() {
