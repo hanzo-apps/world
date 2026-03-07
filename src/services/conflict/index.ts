@@ -410,6 +410,50 @@ export function groupByType(events: UcdpGeoEvent[]): Record<string, UcdpGeoEvent
   };
 }
 
+const IRAN_RED_CATEGORIES = new Set(['military', 'airstrike', 'defense']);
+const IRAN_ORANGE_CATEGORIES = new Set(['political', 'international']);
+
+type IranColorTier = 'red' | 'orange' | 'yellow';
+
+function iranColorTier(ev: Pick<IranEvent, 'severity' | 'category'>): IranColorTier {
+  if (ev.severity === 'critical' || IRAN_RED_CATEGORIES.has(ev.category)) return 'red';
+  if (IRAN_ORANGE_CATEGORIES.has(ev.category)) return 'orange';
+  return 'yellow';
+}
+
+const IRAN_RGBA: Record<IranColorTier, [number, number, number, number]> = {
+  red: [255, 50, 50, 220], orange: [255, 165, 0, 200], yellow: [255, 255, 0, 180],
+};
+const IRAN_CSS: Record<IranColorTier, string> = {
+  red: 'rgba(255,50,50,0.85)', orange: 'rgba(255,165,0,0.8)', yellow: 'rgba(255,255,0,0.7)',
+};
+
+export function getIranEventColor(ev: Pick<IranEvent, 'severity' | 'category'>): [number, number, number, number] {
+  return IRAN_RGBA[iranColorTier(ev)];
+}
+
+export function getIranEventCssColor(ev: Pick<IranEvent, 'severity' | 'category'>): string {
+  return IRAN_CSS[iranColorTier(ev)];
+}
+
+export function getIranEventHexColor(ev: Pick<IranEvent, 'severity'>): string {
+  if (ev.severity === 'high' || ev.severity === 'critical') return '#ff3030';
+  if (ev.severity === 'elevated') return '#ff8800';
+  return '#ffcc00';
+}
+
+export function getIranEventRadius(severity: string): number {
+  if (severity === 'high' || severity === 'critical') return 20000;
+  if (severity === 'elevated') return 15000;
+  return 10000;
+}
+
+export function getIranEventSize(severity: string): number {
+  if (severity === 'high' || severity === 'critical') return 14;
+  if (severity === 'elevated') return 11;
+  return 8;
+}
+
 export async function fetchIranEvents(): Promise<IranEvent[]> {
   const hydrated = getHydratedData('iranEvents') as ListIranEventsResponse | undefined;
   if (hydrated?.events?.length) return hydrated.events;
