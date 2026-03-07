@@ -1012,6 +1012,12 @@ canvas,
   color: var(--bg);
 }
 
+.map-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .map-pin-btn {
   background: transparent;
   border: 1px solid var(--border);
