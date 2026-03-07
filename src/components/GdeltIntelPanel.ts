@@ -73,15 +73,15 @@ export class GdeltIntelPanel extends Panel {
         if (!this.element?.isConnected) return;
         this.topicData.set(this.activeTopic.id, data);
 
-        if (data.articles.length === 0 && attempt < 2) {
+        if (!data.articles?.length && attempt < 2) {
           this.showRetrying(undefined, 15);
           await new Promise(r => setTimeout(r, 15_000));
           if (!this.element?.isConnected) return;
           continue;
         }
 
-        this.renderArticles(data.articles);
-        this.setCount(data.articles.length);
+        this.renderArticles(data.articles ?? []);
+        this.setCount(data.articles?.length ?? 0);
         return;
       } catch (error) {
         if (this.isAbortError(error)) return;

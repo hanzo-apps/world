@@ -52,7 +52,7 @@ export class StablecoinPanel extends Panel {
         if (!this.element?.isConnected) return;
         this.error = null;
 
-        if (this.data && this.data.stablecoins.length === 0 && attempt < 2) {
+        if (this.data && !this.data.stablecoins?.length && attempt < 2) {
           this.showRetrying(undefined, 20);
           await new Promise(r => setTimeout(r, 20_000));
           if (!this.element?.isConnected) return;
@@ -88,7 +88,7 @@ export class StablecoinPanel extends Panel {
     }
 
     const d = this.data;
-    if (!d.stablecoins.length) {
+    if (!d.stablecoins?.length) {
       this.setContent(`<div class="panel-empty">${t('common.noDataShort')}</div>`);
       return;
     }

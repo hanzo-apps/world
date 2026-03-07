@@ -28,7 +28,7 @@ export class DisplacementPanel extends Panel {
 
   public setData(data: UnhcrSummary): void {
     this.data = data;
-    this.setCount(data.countries.length);
+    this.setCount(data.countries?.length ?? 0);
     this.renderContent();
   }
 
