@@ -3,6 +3,7 @@
  */
 import { CHROME_UA, yahooGate } from '../../../_shared/constants';
 import cryptoConfig from '../../../../shared/crypto.json';
+import stablecoinConfig from '../../../../shared/stablecoins.json';
 
 // ========================================================================
 // Relay helpers (Railway proxy for Yahoo when Vercel IPs are rate-limited)
@@ -271,11 +272,7 @@ export async function fetchCoinGeckoMarkets(
 // CoinGecko ID → CoinPaprika ID mapping (shared ids + stablecoin-specific)
 const COINPAPRIKA_ID_MAP: Record<string, string> = {
   ...cryptoConfig.coinpaprika,
-  tether: 'usdt-tether',
-  'usd-coin': 'usdc-usd-coin',
-  dai: 'dai-dai',
-  'first-digital-usd': 'fdusd-first-digital-usd',
-  'ethena-usde': 'usde-ethena-usde',
+  ...stablecoinConfig.coinpaprika,
 };
 
 interface CoinPaprikaTicker {
