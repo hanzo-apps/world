@@ -809,7 +809,7 @@ const Footer = () => (
             {t('nav.joinWaitlist')}
           </button>
         </div>
-        <div className="cf-turnstile mx-auto" data-sitekey={TURNSTILE_SITE_KEY} data-theme="dark" data-size="compact" />
+        <div className="cf-turnstile mx-auto" />
       </form>
       <p className="text-sm text-wm-muted">
         {t('footer.lookingForEnterprise')} <a href="mailto:enterprise@worldmonitor.app" className="text-wm-text underline underline-offset-4 hover:text-wm-green transition-colors">{t('footer.contactUs')}</a>.
