@@ -178,6 +178,41 @@ function upstashSet(key, value, ttlSeconds) {
   });
 }
 
+function upstashMGet(keys) {
+  return new Promise((resolve) => {
+    if (!UPSTASH_ENABLED || keys.length === 0) return resolve([]);
+    const url = new URL('/pipeline', UPSTASH_REDIS_REST_URL);
+    const body = JSON.stringify(keys.map((k) => ['GET', k]));
+    const req = https.request(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    }, (resp) => {
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        resp.resume();
+        return resolve(keys.map(() => null));
+      }
+      let data = '';
+      resp.on('data', (chunk) => { data += chunk; });
+      resp.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve(parsed.map((r) => {
+            if (!r?.result) return null;
+            try { return JSON.parse(r.result); } catch { return null; }
+          }));
+        } catch { resolve(keys.map(() => null)); }
+      });
+    });
+    req.on('error', () => resolve(keys.map(() => null)));
+    req.on('timeout', () => { req.destroy(); resolve(keys.map(() => null)); });
+    req.end(body);
+  });
+}
+
 let upstreamSocket = null;
 let upstreamPaused = false;
 let upstreamQueue = [];
@@ -2118,6 +2153,227 @@ async function startPositiveEventsSeedLoop() {
   setInterval(() => {
     seedPositiveEvents().catch((e) => console.warn('[PositiveEvents] Seed error:', e?.message || e));
   }, POSITIVE_EVENTS_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI Classification Seed — batch-classify digest titles via LLM → Redis
+// Clients get pre-classified items from digest, zero classify-event RPCs
+// ─────────────────────────────────────────────────────────────
+const CLASSIFY_SEED_INTERVAL_MS = 15 * 60 * 1000;
+const CLASSIFY_CACHE_TTL = 86400;
+const CLASSIFY_SKIP_TTL = 1800;
+const CLASSIFY_BATCH_SIZE = 50;
+const CLASSIFY_VARIANTS = ['full', 'tech', 'finance', 'happy', 'commodity'];
+const CLASSIFY_VARIANT_STAGGER_MS = 3 * 60 * 1000;
+
+const CLASSIFY_VALID_LEVELS = ['critical', 'high', 'medium', 'low', 'info'];
+const CLASSIFY_VALID_CATEGORIES = [
+  'conflict', 'protest', 'disaster', 'diplomatic', 'economic',
+  'terrorism', 'cyber', 'health', 'environmental', 'military',
+  'crime', 'infrastructure', 'tech', 'general',
+];
+
+const CLASSIFY_SYSTEM_PROMPT = `You classify news headlines by threat level and category. Return ONLY a JSON array, no other text.
+
+Levels: critical, high, medium, low, info
+Categories: conflict, protest, disaster, diplomatic, economic, terrorism, cyber, health, environmental, military, crime, infrastructure, tech, general
+
+Input: numbered lines "index|Title"
+Output: [{"i":0,"l":"high","c":"conflict"}, ...]
+
+Focus: geopolitical events, conflicts, disasters, diplomacy. Classify by real-world severity and impact.`;
+
+function classifyCacheKey(title) {
+  const hash = crypto.createHash('sha256').update(title.toLowerCase()).digest('hex').slice(0, 16);
+  return `classify:sebuf:v1:${hash}`;
+}
+
+function classifyFetchLlm(titles, apiKey, apiUrl, model) {
+  return new Promise((resolve) => {
+    const sanitized = titles.map((t) => t.replace(/[\n\r]/g, ' ').replace(/\|/g, '/').slice(0, 200).trim());
+    const prompt = sanitized.map((t, i) => `${i}|${t}`).join('\n');
+    const bodyStr = JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0,
+      max_tokens: titles.length * 40,
+    });
+
+    const parsed = new URL(apiUrl);
+    const transport = parsed.protocol === 'http:' ? http : https;
+    const req = transport.request(parsed, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': CHROME_UA,
+        'Content-Length': Buffer.byteLength(bodyStr),
+      },
+      timeout: 30000,
+    }, (resp) => {
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        resp.resume();
+        return resolve(null);
+      }
+      let data = '';
+      resp.on('data', (chunk) => { data += chunk; });
+      resp.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const raw = json?.choices?.[0]?.message?.content?.trim();
+          if (!raw) return resolve(null);
+          const match = raw.match(/\[[\s\S]*\]/);
+          if (!match) return resolve(null);
+          resolve(JSON.parse(match[0]));
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.end(bodyStr);
+  });
+}
+
+let classifyInFlight = false;
+
+async function seedClassifyForVariant(variant, apiKey, apiUrl, model) {
+  const digestUrl = `https://api.worldmonitor.app/api/news/v1/list-feed-digest?variant=${variant}&lang=en`;
+  let digest;
+  try {
+    const resp = await new Promise((resolve, reject) => {
+      const req = https.get(digestUrl, {
+        headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+        timeout: 15000,
+      }, resolve);
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+    if (resp.statusCode !== 200) { resp.resume(); return { total: 0, classified: 0, skipped: 0 }; }
+    const body = await new Promise((resolve) => {
+      let d = '';
+      resp.on('data', (c) => { d += c; });
+      resp.on('end', () => resolve(d));
+    });
+    digest = JSON.parse(body);
+  } catch {
+    return { total: 0, classified: 0, skipped: 0 };
+  }
+
+  const allTitles = new Set();
+  if (digest?.categories) {
+    for (const bucket of Object.values(digest.categories)) {
+      for (const item of bucket?.items ?? []) {
+        if (item?.title) allTitles.add(item.title);
+      }
+    }
+  }
+  if (allTitles.size === 0) return { total: 0, classified: 0, skipped: 0 };
+
+  const titleArr = [...allTitles];
+  const cacheKeys = titleArr.map((t) => classifyCacheKey(t));
+
+  const cached = await upstashMGet(cacheKeys);
+  const misses = [];
+  for (let i = 0; i < titleArr.length; i++) {
+    if (!cached[i]) misses.push(titleArr[i]);
+  }
+
+  if (misses.length === 0) return { total: titleArr.length, classified: 0, skipped: 0 };
+
+  let classified = 0;
+  let skipped = 0;
+
+  for (let b = 0; b < misses.length; b += CLASSIFY_BATCH_SIZE) {
+    const chunk = misses.slice(b, b + CLASSIFY_BATCH_SIZE);
+    const llmResult = await classifyFetchLlm(chunk, apiKey, apiUrl, model);
+
+    if (!Array.isArray(llmResult)) {
+      for (const title of chunk) {
+        await upstashSet(classifyCacheKey(title), { level: '_skip', timestamp: Date.now() }, CLASSIFY_SKIP_TTL);
+        skipped++;
+      }
+      continue;
+    }
+
+    const classifiedSet = new Set();
+    for (const entry of llmResult) {
+      const idx = entry?.i;
+      if (typeof idx !== 'number' || idx < 0 || idx >= chunk.length) continue;
+      if (classifiedSet.has(idx)) continue;
+      const level = CLASSIFY_VALID_LEVELS.includes(entry?.l) ? entry.l : null;
+      const category = CLASSIFY_VALID_CATEGORIES.includes(entry?.c) ? entry.c : null;
+      if (!level || !category) continue;
+      classifiedSet.add(idx);
+      await upstashSet(classifyCacheKey(chunk[idx]), { level, category, timestamp: Date.now() }, CLASSIFY_CACHE_TTL);
+      classified++;
+    }
+
+    for (let i = 0; i < chunk.length; i++) {
+      if (!classifiedSet.has(i)) {
+        await upstashSet(classifyCacheKey(chunk[i]), { level: '_skip', timestamp: Date.now() }, CLASSIFY_SKIP_TTL);
+        skipped++;
+      }
+    }
+  }
+
+  return { total: titleArr.length, classified, skipped };
+}
+
+async function seedClassify() {
+  if (classifyInFlight) return;
+  classifyInFlight = true;
+  const t0 = Date.now();
+  try {
+    const apiKey = process.env.LLM_API_KEY || process.env.GROQ_API_KEY;
+    const apiUrl = process.env.LLM_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
+    const model = process.env.LLM_MODEL || 'llama-3.1-8b-instant';
+    if (!apiKey) {
+      console.log('[Classify] Skipped — no LLM_API_KEY or GROQ_API_KEY');
+      return;
+    }
+    const isProd = process.env.RAILWAY_ENVIRONMENT === 'production';
+    if (isProd && !apiUrl.startsWith('https://') && !apiUrl.startsWith('http://localhost')) {
+      console.warn('[Classify] LLM_API_URL must be HTTPS in production — skipping');
+      return;
+    }
+
+    let totalClassified = 0;
+    let totalSkipped = 0;
+    for (let v = 0; v < CLASSIFY_VARIANTS.length; v++) {
+      if (v > 0) await new Promise((r) => setTimeout(r, CLASSIFY_VARIANT_STAGGER_MS));
+      try {
+        const stats = await seedClassifyForVariant(CLASSIFY_VARIANTS[v], apiKey, apiUrl, model);
+        totalClassified += stats.classified;
+        totalSkipped += stats.skipped;
+        console.log(`[Classify] ${CLASSIFY_VARIANTS[v]}: ${stats.total} titles, ${stats.classified} classified, ${stats.skipped} skipped`);
+      } catch (e) {
+        console.warn(`[Classify] ${CLASSIFY_VARIANTS[v]} error:`, e?.message || e);
+      }
+    }
+
+    await upstashSet('seed-meta:classify', { fetchedAt: Date.now(), recordCount: totalClassified }, 604800);
+    console.log(`[Classify] Done in ${((Date.now() - t0) / 1000).toFixed(1)}s — ${totalClassified} classified, ${totalSkipped} skipped`);
+  } catch (e) {
+    console.warn('[Classify] Seed error:', e?.message || e);
+  } finally {
+    classifyInFlight = false;
+  }
+}
+
+async function startClassifySeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[Classify] Disabled (no Upstash Redis)');
+    return;
+  }
+  const apiKey = process.env.LLM_API_KEY || process.env.GROQ_API_KEY;
+  console.log(`[Classify] Seed loop starting (interval ${CLASSIFY_SEED_INTERVAL_MS / 1000 / 60}min, apiKey:${apiKey ? 'yes' : 'no'})`);
+  seedClassify().catch((e) => console.warn('[Classify] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedClassify().catch((e) => console.warn('[Classify] Seed error:', e?.message || e));
+  }, CLASSIFY_SEED_INTERVAL_MS).unref?.();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -5526,6 +5782,7 @@ server.listen(PORT, () => {
   // (avoids burning 12 extra AbuseIPDB calls/day from duplicate relay loop)
   startCiiSeedLoop();
   startPositiveEventsSeedLoop();
+  startClassifySeedLoop();
   startServiceStatusesSeedLoop();
   startTheaterPostureSeedLoop();
   startGpsJamSeedLoop();
