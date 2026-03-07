@@ -1002,6 +1002,10 @@ const EnterprisePage = () => (
             } catch {
               btn.textContent = t('enterpriseShowcase.contactFailed');
               btn.disabled = false;
+              if (turnstileWidget?.dataset.widgetId && window.turnstile) {
+                window.turnstile.reset(turnstileWidget.dataset.widgetId);
+                delete turnstileWidget.dataset.token;
+              }
               setTimeout(() => { btn.textContent = origText; }, 4000);
             }
           }}>
