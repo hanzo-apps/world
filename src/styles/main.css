@@ -9190,10 +9190,19 @@ a.prediction-link:hover {
   border-left: 2px solid var(--accent);
 }
 
-.cluster-more {
+.cluster-toggle {
+  display: block;
   padding: 4px 8px;
-  color: var(--text-muted);
-  font-style: italic;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.cluster-toggle:hover {
+  text-decoration: underline;
 }
 
 .popup-description.alert {
