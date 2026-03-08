@@ -8,6 +8,8 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
+import { sanitizeLayersForVariant } from '@/config/map-layer-definitions';
+import type { MapVariant } from '@/config/map-layer-definitions';
 import { initDB, cleanOldSnapshots, isAisConfigured, initAisStream, isOutagesConfigured, disconnectAisStream } from '@/services';
 import { mlWorker } from '@/services/ml-worker';
 import { getAiFlowSettings, subscribeAiFlowChange, isHeadlineMemoryEnabled } from '@/services/ai-flow-settings';
@@ -91,15 +93,13 @@ export class App {
       localStorage.removeItem(PANEL_ORDER_KEY + '-bottom');
       localStorage.removeItem(PANEL_ORDER_KEY + '-bottom-set');
       localStorage.removeItem(PANEL_SPANS_KEY);
-      mapLayers = { ...defaultLayers };
+      mapLayers = sanitizeLayersForVariant({ ...defaultLayers }, currentVariant as MapVariant);
       panelSettings = { ...DEFAULT_PANELS };
     } else {
-      mapLayers = loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers);
-      // Happy variant: force non-happy layers off even if localStorage has stale true values
-      if (currentVariant === 'happy') {
-        const unhappyLayers: (keyof MapLayers)[] = ['conflicts', 'bases', 'hotspots', 'nuclear', 'irradiators', 'sanctions', 'military', 'protests', 'pipelines', 'waterways', 'ais', 'flights', 'spaceports', 'minerals', 'natural', 'fires', 'outages', 'cyberThreats', 'weather', 'economic', 'cables', 'datacenters', 'ucdpEvents', 'displacement', 'climate', 'iranAttacks'];
-        unhappyLayers.forEach(layer => { mapLayers[layer] = false; });
-      }
+      mapLayers = sanitizeLayersForVariant(
+        loadFromStorage<MapLayers>(STORAGE_KEYS.mapLayers, defaultLayers),
+        currentVariant as MapVariant,
+      );
       panelSettings = loadFromStorage<Record<string, PanelConfig>>(
         STORAGE_KEYS.panels,
         DEFAULT_PANELS
@@ -187,22 +187,8 @@ export class App {
 
     let initialUrlState: ParsedMapUrlState | null = parseMapUrlState(window.location.search, mapLayers);
     if (initialUrlState.layers) {
-      if (currentVariant === 'tech') {
-        const geoLayers: (keyof MapLayers)[] = ['conflicts', 'bases', 'hotspots', 'nuclear', 'irradiators', 'sanctions', 'military', 'protests', 'pipelines', 'waterways', 'ais', 'flights', 'spaceports', 'minerals'];
-        const urlLayers = initialUrlState.layers;
-        geoLayers.forEach(layer => {
-          urlLayers[layer] = false;
-        });
-      }
-      // For happy variant, force off all non-happy layers (including natural events)
-      if (currentVariant === 'happy') {
-        const unhappyLayers: (keyof MapLayers)[] = ['conflicts', 'bases', 'hotspots', 'nuclear', 'irradiators', 'sanctions', 'military', 'protests', 'pipelines', 'waterways', 'ais', 'flights', 'spaceports', 'minerals', 'natural', 'fires', 'outages', 'cyberThreats', 'weather', 'economic', 'cables', 'datacenters', 'ucdpEvents', 'displacement', 'climate', 'iranAttacks'];
-        const urlLayers = initialUrlState.layers;
-        unhappyLayers.forEach(layer => {
-          urlLayers[layer] = false;
-        });
-      }
-      mapLayers = initialUrlState.layers;
+      mapLayers = sanitizeLayersForVariant(initialUrlState.layers, currentVariant as MapVariant);
+      initialUrlState.layers = mapLayers;
     }
     if (!CYBER_LAYER_ENABLED) {
       mapLayers.cyberThreats = false;
