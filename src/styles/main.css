@@ -5933,6 +5933,11 @@ a.prediction-link:hover {
   border-color: var(--green);
 }
 
+.panel-toggle-item.changed {
+  background: rgba(68, 255, 136, 0.06);
+  border-color: rgba(68, 255, 136, 0.35);
+}
+
 .panel-toggle-checkbox {
   width: 14px;
   height: 14px;
@@ -6042,10 +6047,25 @@ a.prediction-link:hover {
 
 .panels-footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   padding-top: 8px;
 }
 
+.panels-status {
+  margin-right: auto;
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--green);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.panels-status.visible {
+  opacity: 1;
+}
+
+.panels-save-layout,
 .panels-reset-layout {
   padding: 6px 12px;
   background: var(--bg);
@@ -6055,6 +6075,23 @@ a.prediction-link:hover {
   font-size: 10px;
   cursor: pointer;
   text-transform: uppercase;
+}
+
+.panels-save-layout {
+  color: var(--green);
+  border-color: rgba(68, 255, 136, 0.35);
+}
+
+.panels-save-layout:hover:not(:disabled) {
+  background: rgba(68, 255, 136, 0.08);
+  border-color: var(--green);
+}
+
+.panels-save-layout:disabled {
+  color: var(--text-dim);
+  border-color: var(--border);
+  opacity: 0.6;
+  cursor: default;
 }
 
 .panels-reset-layout:hover {
