@@ -7,11 +7,11 @@
     "joinWaitlist": "Zapsat se do pořadníku"
   },
   "hero": {
-    "title1": "Zpravodajství v reálném čase",
-    "title2": "pro propojený svět.",
-    "subtitle": "Sledujte geopolitiku, trhy, energetiku, infrastrukturu a přírodní události z více než 435+ zdrojů. AI, která vám řekne, co to znamená — doručeno tam, kde pracujete.",
-    "joinProWaitlist": "Zapsat se do pořadníku Pro",
-    "launchingSoon": "Spuštění již brzy",
+    "noiseWord": "Šum",
+    "signalWord": "Signál",
+    "valueProps": "Akciový výzkum poháněný AI, geopolitická analýza a makroekonomické zpravodajství — korelováno v reálném čase.",
+    "reserveEarlyAccess": "Rezervujte si přednostní přístup",
+    "launchingDate": "Spuštění březen 2026",
     "tryFreeDashboard": "Vyzkoušejte bezplatný dashboard",
     "emailPlaceholder": "Zadejte svůj e-mail",
     "emailAriaLabel": "E-mailová adresa pro pořadník"

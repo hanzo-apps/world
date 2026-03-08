@@ -7,10 +7,9 @@
     "reserveAccess": "Reserve Your Early Access"
   },
   "hero": {
-    "title1": "Global intelligence",
-    "title2": "markets, geopolitics, and macro — in one view.",
-    "subtitle": "Track stocks, monitor geopolitical risk, and get AI-powered daily briefings. From market moves to macroeconomic shifts — understand the full picture.",
-    "missionLine": "The core platform stays free. Pro unlocks equity research, geopolitical analysis, and economy analytics. Enterprise adds team deployments and TV apps.",
+    "noiseWord": "Noise",
+    "signalWord": "Signal",
+    "valueProps": "AI-powered equity research, geopolitical analysis, and macro intelligence — correlated in real time.",
     "reserveEarlyAccess": "Reserve Your Early Access",
     "launchingDate": "Launching March 2026",
     "tryFreeDashboard": "Try the free dashboard",

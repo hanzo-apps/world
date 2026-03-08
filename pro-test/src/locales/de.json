@@ -7,11 +7,11 @@
     "joinWaitlist": "Auf die Warteliste"
   },
   "hero": {
-    "title1": "Echtzeit-Intelligence",
-    "title2": "für eine vernetzte Welt.",
-    "subtitle": "Verfolgen Sie Geopolitik, Märkte, Energie, Infrastruktur und Naturereignisse aus 435+ Quellen. KI, die Ihnen sagt, was es bedeutet — geliefert dorthin, wo Sie arbeiten.",
-    "joinProWaitlist": "Pro-Warteliste beitreten",
-    "launchingSoon": "Start in Kürze",
+    "noiseWord": "Rauschen",
+    "signalWord": "Signal",
+    "valueProps": "KI-gestützte Aktienanalyse, geopolitische Analyse und Makro-Intelligence — in Echtzeit korreliert.",
+    "reserveEarlyAccess": "Frühzugang reservieren",
+    "launchingDate": "Start März 2026",
     "tryFreeDashboard": "Kostenloses Dashboard testen",
     "emailPlaceholder": "E-Mail-Adresse eingeben",
     "emailAriaLabel": "E-Mail-Adresse für Warteliste"
