@@ -1,10 +1,3 @@
 {
-  "$schema": "https://schema.railpack.com",
-  "steps": {
-    "install": {
-      "commands": [
-        { "cmd": "npm install --omit=dev" }
-      ]
-    }
-  }
+  "$schema": "https://schema.railpack.com"
 }
