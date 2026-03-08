@@ -377,6 +377,8 @@
       "noResults": "Không có kết quả",
       "commands": "Lệnh",
       "results": "Kết quả",
+      "seeAllCommands": "Xem tất cả lệnh",
+      "hideCommandList": "Quay lại",
       "navigate": "điều hướng",
       "select": "chọn",
       "close": "đóng",

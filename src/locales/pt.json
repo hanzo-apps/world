@@ -205,7 +205,9 @@
       "placeholderFinance": "Pesquisar ou digitar um comando...",
       "hintFinance": "Pesquisa • Bolsas • Mercados • Camadas • Navegação • Configurações",
       "commands": "Comandos",
-      "results": "Resultados"
+      "results": "Resultados",
+      "seeAllCommands": "Ver todos os comandos",
+      "hideCommandList": "Voltar"
     },
     "signal": {
       "source": "Source",

@@ -401,7 +401,9 @@
       "placeholderFinance": "Rechercher ou saisir une commande...",
       "hintFinance": "Recherche • Bourses • Marchés • Couches • Navigation • Paramètres",
       "commands": "Commandes",
-      "results": "Résultats"
+      "results": "Résultats",
+      "seeAllCommands": "Voir toutes les commandes",
+      "hideCommandList": "Retour"
     },
     "signal": {
       "title": "DÉCOUVERTE RENSEIGNEMENT",

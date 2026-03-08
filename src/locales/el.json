@@ -377,6 +377,8 @@
       "noResults": "Κανένα αποτέλεσμα",
       "commands": "Εντολές",
       "results": "Αποτελέσματα",
+      "seeAllCommands": "Εμφάνιση όλων των εντολών",
+      "hideCommandList": "Πίσω",
       "navigate": "πλοήγηση",
       "select": "επιλογή",
       "close": "κλείσιμο",

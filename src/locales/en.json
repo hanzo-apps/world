@@ -379,6 +379,8 @@
       "noResults": "No results",
       "commands": "Commands",
       "results": "Results",
+      "seeAllCommands": "See all commands",
+      "hideCommandList": "Back",
       "navigate": "navigate",
       "select": "select",
       "close": "close",
