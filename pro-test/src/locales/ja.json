@@ -7,11 +7,11 @@
     "joinWaitlist": "ウェイトリストに登録"
   },
   "hero": {
-    "title1": "リアルタイムインテリジェンス",
-    "title2": "つながる世界のために。",
-    "subtitle": "地政学、マーケット、エネルギー、インフラ、自然災害を435以上のソースからトラッキング。AIがその意味を解説 — あなたの作業環境に直接お届けします。",
-    "joinProWaitlist": "Pro ウェイトリストに登録",
-    "launchingSoon": "まもなくローンチ",
+    "noiseWord": "ノイズ",
+    "signalWord": "シグナル",
+    "valueProps": "AIによる株式リサーチ、地政学分析、マクロインテリジェンス — リアルタイムで相関分析。",
+    "reserveEarlyAccess": "早期アクセスを予約",
+    "launchingDate": "2026年3月ローンチ",
     "tryFreeDashboard": "無料ダッシュボードを試す",
     "emailPlaceholder": "メールアドレスを入力",
     "emailAriaLabel": "ウェイトリスト用メールアドレス"

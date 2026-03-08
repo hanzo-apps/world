@@ -7,11 +7,11 @@
     "joinWaitlist": "대기 목록 등록"
   },
   "hero": {
-    "title1": "실시간 인텔리전스",
-    "title2": "연결된 세계를 위해.",
-    "subtitle": "435개 이상의 소스에서 지정학, 시장, 에너지, 인프라, 자연 이벤트를 추적합니다. AI가 그 의미를 분석해 — 당신이 일하는 곳으로 전달합니다.",
-    "joinProWaitlist": "Pro 대기 목록 등록",
-    "launchingSoon": "곧 출시",
+    "noiseWord": "노이즈",
+    "signalWord": "시그널",
+    "valueProps": "AI 기반 주식 리서치, 지정학 분석, 매크로 인텔리전스 — 실시간 상관 분석.",
+    "reserveEarlyAccess": "얼리 액세스 예약",
+    "launchingDate": "2026년 3월 출시",
     "tryFreeDashboard": "무료 대시보드 사용해 보기",
     "emailPlaceholder": "이메일을 입력하세요",
     "emailAriaLabel": "대기 목록용 이메일 주소"

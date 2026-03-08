@@ -7,11 +7,11 @@
     "joinWaitlist": "Ställ dig i kö"
   },
   "hero": {
-    "title1": "Omvärldsbevakning i realtid",
-    "title2": "för en uppkopplad värld.",
-    "subtitle": "Följ geopolitik, marknader, energi, infrastruktur och naturhändelser från 435+ källor. AI som berättar vad det betyder — levererat dit du arbetar.",
-    "joinProWaitlist": "Ställ dig i Pro-kön",
-    "launchingSoon": "Lanseras snart",
+    "noiseWord": "Brus",
+    "signalWord": "Signal",
+    "valueProps": "AI-driven aktieanalys, geopolitisk analys och makrounderrättelser — korrelerade i realtid.",
+    "reserveEarlyAccess": "Reservera din tidiga åtkomst",
+    "launchingDate": "Lansering mars 2026",
     "tryFreeDashboard": "Testa den gratis instrumentpanelen",
     "emailPlaceholder": "Ange din e-postadress",
     "emailAriaLabel": "E-postadress för väntelistan"

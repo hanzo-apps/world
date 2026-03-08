@@ -7,11 +7,11 @@
     "joinWaitlist": "Tham gia danh sách chờ"
   },
   "hero": {
-    "title1": "Thông tin tình báo thời gian thực",
-    "title2": "cho một thế giới kết nối.",
-    "subtitle": "Theo dõi địa chính trị, thị trường, năng lượng, cơ sở hạ tầng và sự kiện tự nhiên từ hơn 435+ nguồn. AI cho bạn biết ý nghĩa của chúng — được gửi đến nơi bạn làm việc.",
-    "joinProWaitlist": "Tham gia danh sách chờ Pro",
-    "launchingSoon": "Sắp ra mắt",
+    "noiseWord": "Nhiễu",
+    "signalWord": "Tín hiệu",
+    "valueProps": "Nghiên cứu cổ phiếu bằng AI, phân tích địa chính trị và tình báo kinh tế vĩ mô — tương quan theo thời gian thực.",
+    "reserveEarlyAccess": "Đặt trước quyền truy cập sớm",
+    "launchingDate": "Ra mắt tháng 3 năm 2026",
     "tryFreeDashboard": "Dùng thử bảng điều khiển miễn phí",
     "emailPlaceholder": "Nhập email của bạn",
     "emailAriaLabel": "Địa chỉ email cho danh sách chờ"

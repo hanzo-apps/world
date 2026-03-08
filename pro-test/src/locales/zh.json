@@ -7,11 +7,11 @@
     "joinWaitlist": "加入等候名单"
   },
   "hero": {
-    "title1": "实时情报",
-    "title2": "洞察互联世界。",
-    "subtitle": "追踪地缘政治、市场、能源、基础设施和自然事件，覆盖 435+ 数据源。AI 告诉你这意味着什么 — 送达你工作的地方。",
-    "joinProWaitlist": "加入 Pro 等候名单",
-    "launchingSoon": "即将上线",
+    "noiseWord": "噪音",
+    "signalWord": "信号",
+    "valueProps": "AI 驱动的股票研究、地缘政治分析和宏观情报 — 实时关联。",
+    "reserveEarlyAccess": "预约抢先体验",
+    "launchingDate": "2026 年 3 月上线",
     "tryFreeDashboard": "试用免费仪表盘",
     "emailPlaceholder": "输入你的邮箱",
     "emailAriaLabel": "等候名单邮箱地址"

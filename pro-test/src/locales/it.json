@@ -7,11 +7,11 @@
     "joinWaitlist": "Iscriviti alla lista"
   },
   "hero": {
-    "title1": "Intelligence in tempo reale",
-    "title2": "per un mondo connesso.",
-    "subtitle": "Monitora geopolitica, mercati, energia, infrastrutture ed eventi naturali da 435+ fonti. Un'IA che ti dice cosa significa — consegnata dove lavori.",
-    "joinProWaitlist": "Iscriviti alla lista Pro",
-    "launchingSoon": "Lancio imminente",
+    "noiseWord": "Rumore",
+    "signalWord": "Segnale",
+    "valueProps": "Ricerca azionaria potenziata dall'IA, analisi geopolitica e intelligence macroeconomica — correlate in tempo reale.",
+    "reserveEarlyAccess": "Riserva il tuo accesso anticipato",
+    "launchingDate": "Lancio marzo 2026",
     "tryFreeDashboard": "Prova la dashboard gratuita",
     "emailPlaceholder": "Inserisci la tua email",
     "emailAriaLabel": "Indirizzo email per la lista d'attesa"

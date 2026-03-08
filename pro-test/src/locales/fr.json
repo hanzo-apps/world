@@ -7,11 +7,11 @@
     "joinWaitlist": "Rejoindre la liste"
   },
   "hero": {
-    "title1": "Renseignement en temps réel",
-    "title2": "pour un monde connecté.",
-    "subtitle": "Suivez la géopolitique, les marchés, l'énergie, les infrastructures et les événements naturels à travers 435+ sources. Une IA qui vous explique ce que cela signifie — livrée là où vous travaillez.",
-    "joinProWaitlist": "Rejoindre la liste Pro",
-    "launchingSoon": "Lancement imminent",
+    "noiseWord": "Bruit",
+    "signalWord": "Signal",
+    "valueProps": "Recherche actions propulsée par l'IA, analyse géopolitique et renseignement macroéconomique — corrélés en temps réel.",
+    "reserveEarlyAccess": "Réservez votre accès anticipé",
+    "launchingDate": "Lancement mars 2026",
     "tryFreeDashboard": "Essayer le tableau de bord gratuit",
     "emailPlaceholder": "Entrez votre email",
     "emailAriaLabel": "Adresse email pour la liste d'attente"

@@ -184,7 +184,7 @@ const Navbar = () => (
   </nav>
 );
 
-/* ─── 1. Hero (draft headline + current waitlist form) ─── */
+/* ─── 1. Hero — Less noise, more signal ─── */
 const WiredBadge = () => (
   <a
     href="https://www.wired.me/story/the-music-streaming-ceo-who-built-a-global-war-map"
@@ -196,36 +196,87 @@ const WiredBadge = () => (
   </a>
 );
 
+const SignalBars = () => {
+  const total = 60;
+  const center = total / 2;
+  const signalRadius = 8;
+
+  return (
+    <div className="relative my-4 md:my-8 -mx-6">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-64 h-40 md:w-96 md:h-56 bg-wm-green/8 rounded-full blur-[80px]" />
+      </div>
+      <div className="flex items-end justify-center gap-[3px] md:gap-1 h-28 md:h-44 relative px-4" aria-hidden="true">
+        {Array.from({ length: total }).map((_, i) => {
+          const distFromCenter = Math.abs(i - center);
+          const isSignal = distFromCenter <= signalRadius;
+          const signalIntensity = isSignal ? 1 - distFromCenter / signalRadius : 0;
+          const peakHeight = 60 + signalIntensity * 110;
+          const noiseBase = Math.max(8, 35 - distFromCenter * 0.8);
+
+          return (
+            <motion.div
+              key={i}
+              className={`flex-1 max-w-2 md:max-w-3 rounded-sm ${isSignal ? 'bg-wm-green' : 'bg-wm-muted/20'}`}
+              style={isSignal ? { boxShadow: `0 0 ${6 + signalIntensity * 12}px rgba(74,222,128,${signalIntensity * 0.5})` } : undefined}
+              initial={{ height: isSignal ? peakHeight * 0.3 : noiseBase * 0.5, opacity: isSignal ? 0.4 : 0.08 }}
+              animate={isSignal
+                ? {
+                    height: [peakHeight * 0.5, peakHeight, peakHeight * 0.65, peakHeight * 0.9],
+                    opacity: [0.6 + signalIntensity * 0.3, 1, 0.75 + signalIntensity * 0.2, 0.95],
+                  }
+                : {
+                    height: [noiseBase, noiseBase * 0.3, noiseBase * 0.7, noiseBase * 0.15, noiseBase * 0.5],
+                    opacity: [0.2, 0.06, 0.15, 0.04, 0.12],
+                  }
+              }
+              transition={{
+                duration: isSignal ? 2.5 + signalIntensity * 0.5 : 1 + Math.random() * 0.6,
+                repeat: Infinity,
+                repeatType: 'reverse',
+                delay: isSignal ? distFromCenter * 0.07 : Math.random() * 0.6,
+                ease: 'easeInOut',
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const Hero = () => (
-  <section className="pt-28 pb-16 px-6 relative overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(74,222,128,0.05)_0%,transparent_60%)] pointer-events-none" />
+  <section className="pt-28 pb-12 px-6 relative overflow-hidden">
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(74,222,128,0.08)_0%,transparent_50%)] pointer-events-none" />
     <div className="max-w-4xl mx-auto text-center relative z-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <div className="mb-6">
+        <div className="mb-4">
           <WiredBadge />
         </div>
-        <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tighter mb-6 leading-[1.1]">
-          {t('hero.title1')} <br className="hidden md:block" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-wm-green to-emerald-300">{t('hero.title2')}</span>
+
+        <h1 className="text-6xl md:text-8xl font-display font-bold tracking-tighter leading-[0.95]">
+          <span className="text-wm-muted/40">{t('hero.noiseWord')}</span>
+          <span className="mx-3 md:mx-5 text-wm-border/50">→</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-wm-green to-emerald-300 text-glow">{t('hero.signalWord')}</span>
         </h1>
-        <p className="text-lg md:text-xl text-wm-muted mb-4 max-w-2xl mx-auto font-light">
-          {t('hero.subtitle')}
-        </p>
-        <p className="text-sm text-wm-muted/80 mb-8 max-w-2xl mx-auto font-mono">
-          {t('hero.missionLine')}
+
+        <SignalBars />
+
+        <p className="text-lg md:text-xl text-wm-muted max-w-xl mx-auto font-light leading-relaxed">
+          {t('hero.valueProps')}
         </p>
 
         {getRefCode() && (
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-sm border border-wm-green/30 bg-wm-green/5 text-sm font-mono text-wm-green">
+          <div className="inline-flex items-center gap-2 px-4 py-2 mt-4 rounded-sm border border-wm-green/30 bg-wm-green/5 text-sm font-mono text-wm-green">
             <Users className="w-4 h-4" aria-hidden="true" />
             {t('referral.invitedBanner')}
           </div>
         )}
-        <form className="flex flex-col gap-3 max-w-md mx-auto" onSubmit={(e) => { e.preventDefault(); const form = e.currentTarget; const email = new FormData(form).get('email') as string; submitWaitlist(email, form); }}>
+        <form className="flex flex-col gap-3 max-w-md mx-auto mt-8" onSubmit={(e) => { e.preventDefault(); const form = e.currentTarget; const email = new FormData(form).get('email') as string; submitWaitlist(email, form); }}>
           <input type="text" name="website" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 pointer-events-none" />
           <div className="flex flex-col sm:flex-row gap-3">
             <input

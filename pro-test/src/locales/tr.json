@@ -7,11 +7,11 @@
     "joinWaitlist": "Bekleme listesine katıl"
   },
   "hero": {
-    "title1": "Gerçek zamanlı istihbarat",
-    "title2": "bağlantılı bir dünya için.",
-    "subtitle": "Jeopolitik, piyasalar, enerji, altyapı ve doğa olaylarını 435+ kaynaktan takip edin. Ne anlama geldiğini söyleyen AI — çalıştığınız yerde teslim edilir.",
-    "joinProWaitlist": "Pro bekleme listesine katıl",
-    "launchingSoon": "Yakında yayında",
+    "noiseWord": "Gürültü",
+    "signalWord": "Sinyal",
+    "valueProps": "AI destekli hisse senedi araştırması, jeopolitik analiz ve makro istihbarat — gerçek zamanlı korelasyon.",
+    "reserveEarlyAccess": "Erken erişiminizi ayırın",
+    "launchingDate": "Mart 2026'da yayında",
     "tryFreeDashboard": "Ücretsiz paneli deneyin",
     "emailPlaceholder": "E-postanızı girin",
     "emailAriaLabel": "Bekleme listesi için e-posta adresi"
