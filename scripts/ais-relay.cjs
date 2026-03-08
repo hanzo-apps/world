@@ -908,13 +908,23 @@ function ucdpFetchPage(version, page) {
     const headers = { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' };
     if (UCDP_ACCESS_TOKEN) headers['x-ucdp-access-token'] = UCDP_ACCESS_TOKEN;
     const req = https.request(pageUrl, { method: 'GET', headers, timeout: 30000 }, (resp) => {
+      if (resp.statusCode === 401 || resp.statusCode === 403) {
+        resp.resume();
+        return reject(new Error(`UCDP ${version} page ${page}: HTTP ${resp.statusCode} — API token required (set UCDP_ACCESS_TOKEN env var)`));
+      }
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         resp.resume();
         return reject(new Error(`UCDP ${version} page ${page}: HTTP ${resp.statusCode}`));
       }
       let data = '';
       resp.on('data', (chunk) => { data += chunk; });
-      resp.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+      resp.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (typeof parsed === 'string') return reject(new Error(`UCDP ${version} page ${page}: ${parsed}`));
+          resolve(parsed);
+        } catch (e) { reject(e); }
+      });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('UCDP timeout')); });
@@ -925,17 +935,18 @@ function ucdpFetchPage(version, page) {
 async function ucdpDiscoverVersion() {
   const year = new Date().getFullYear() - 2000;
   const candidates = [...new Set([`${year}.1`, `${year - 1}.1`, '25.1', '24.1'])];
-  const results = await Promise.allSettled(
-    candidates.map(async (v) => {
-      const p0 = await ucdpFetchPage(v, 0);
-      if (!Array.isArray(p0?.Result)) throw new Error('No results');
-      return { version: v, page0: p0 };
-    }),
-  );
-  for (const r of results) {
-    if (r.status === 'fulfilled') return r.value;
+  // Race all candidates — first valid result wins (avoids 30s hang on broken versions)
+  const attempts = candidates.map(async (v) => {
+    const p0 = await ucdpFetchPage(v, 0);
+    if (!Array.isArray(p0?.Result) || p0.Result.length === 0) throw new Error(`${v}: no results`);
+    return { version: v, page0: p0 };
+  });
+  try {
+    return await Promise.any(attempts);
+  } catch (aggErr) {
+    const reasons = aggErr.errors?.map(e => e?.message).join('; ') || aggErr.message;
+    throw new Error(`No valid UCDP GED version found (${reasons})`);
   }
-  throw new Error('No valid UCDP GED version found');
 }
 
 async function seedUcdpEvents() {
