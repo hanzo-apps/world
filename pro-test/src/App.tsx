@@ -735,7 +735,7 @@ const EnterpriseShowcase = () => (
 
       <div className="text-center mt-12">
         <a
-          href="#enterprise"
+          href="#enterprise-contact"
           aria-label="Talk to sales about Enterprise plans"
           className="inline-flex items-center gap-2 bg-wm-green text-wm-bg px-8 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors"
         >
@@ -864,7 +864,7 @@ const Footer = () => (
       </form>
 
       <a
-        href="#enterprise"
+        href="#enterprise-contact"
         className="inline-flex items-center gap-2 text-sm text-wm-muted hover:text-wm-text transition-colors font-mono"
       >
         {t('finalCta.talkToSales')} <ArrowRight className="w-3 h-3" aria-hidden="true" />
@@ -892,10 +892,10 @@ const EnterprisePage = () => (
         <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }}><Logo /></a>
         <div className="hidden md:flex items-center gap-8 text-sm font-mono text-wm-muted">
           <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} className="hover:text-wm-text transition-colors">{t('nav.pro')}</a>
-          <a href="#features" className="hover:text-wm-text transition-colors">{t('nav.enterprise')}</a>
-          <a href="#contact" className="hover:text-wm-green transition-colors">{t('enterpriseShowcase.talkToSales')}</a>
+          <a href="#enterprise" onClick={(e) => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-wm-text transition-colors">{t('nav.enterprise')}</a>
+          <a href="#enterprise-contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-wm-green transition-colors">{t('enterpriseShowcase.talkToSales')}</a>
         </div>
-        <a href="#contact" className="bg-wm-green text-wm-bg px-4 py-2 rounded-sm font-mono text-xs uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
+        <a href="#enterprise-contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }} className="bg-wm-green text-wm-bg px-4 py-2 rounded-sm font-mono text-xs uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
           {t('enterpriseShowcase.talkToSales')}
         </a>
       </div>
@@ -912,7 +912,7 @@ const EnterprisePage = () => (
           <p className="text-lg text-wm-muted max-w-2xl mx-auto mb-10">
             {t('enterpriseShowcase.subtitle')}
           </p>
-          <a href="#contact" className="inline-flex items-center gap-2 bg-wm-green text-wm-bg px-8 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
+          <a href="#enterprise-contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }} className="inline-flex items-center gap-2 bg-wm-green text-wm-bg px-8 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
             {t('enterpriseShowcase.talkToSales')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
           </a>
         </div>
@@ -1061,16 +1061,31 @@ const EnterprisePage = () => (
 
 /* ─── Page Layout ─── */
 export default function App() {
-  const [page, setPage] = useState(() => window.location.hash === '#enterprise' ? 'enterprise' : 'home');
+  const [page, setPage] = useState(() => window.location.hash.startsWith('#enterprise') ? 'enterprise' : 'home');
 
   useEffect(() => {
     const onHash = () => {
-      const next = window.location.hash === '#enterprise' ? 'enterprise' : 'home';
+      const hash = window.location.hash;
+      const next = hash.startsWith('#enterprise') ? 'enterprise' : 'home';
+      const wasEnterprise = page === 'enterprise';
       setPage(next);
-      if (next === 'enterprise') window.scrollTo(0, 0);
+      if (next === 'enterprise' && !wasEnterprise) window.scrollTo(0, 0);
+      if (hash === '#enterprise-contact') {
+        setTimeout(() => {
+          document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+        }, wasEnterprise ? 0 : 100);
+      }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
+  }, [page]);
+
+  useEffect(() => {
+    if (page === 'enterprise' && window.location.hash === '#enterprise-contact') {
+      setTimeout(() => {
+        document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
   }, []);
 
   if (page === 'enterprise') return <EnterprisePage />;
