@@ -406,7 +406,11 @@ export class DeckGLMap {
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
-    this.state = initialState;
+    this.state = {
+      ...initialState,
+      pan: { ...initialState.pan },
+      layers: { ...initialState.layers },
+    };
     this.hotspots = [...INTEL_HOTSPOTS];
 
     this.debouncedRebuildLayers = debounce(() => {
@@ -674,7 +678,7 @@ export class DeckGLMap {
       this.debouncedFetchBases();
       this.debouncedFetchAircraft();
       this.state.zoom = this.maplibreMap?.getZoom() ?? this.state.zoom;
-      this.onStateChange?.(this.state);
+      this.onStateChange?.(this.getState());
     });
 
     this.maplibreMap.on('move', () => {
@@ -701,7 +705,7 @@ export class DeckGLMap {
         this.debouncedRebuildLayers();
       }
       this.state.zoom = this.maplibreMap?.getZoom() ?? this.state.zoom;
-      this.onStateChange?.(this.state);
+      this.onStateChange?.(this.getState());
     });
   }
 
@@ -3968,7 +3972,7 @@ export class DeckGLMap {
     const viewSelect = this.container.querySelector('.view-select') as HTMLSelectElement;
     if (viewSelect) viewSelect.value = view;
 
-    this.onStateChange?.(this.state);
+    this.onStateChange?.(this.getState());
   }
 
   public setZoom(zoom: number): void {
@@ -4020,19 +4024,22 @@ export class DeckGLMap {
   }
 
   public setLayers(layers: MapLayers): void {
-    this.state.layers = layers;
-    this.manageAircraftTimer(layers.flights);
+    this.state.layers = { ...layers };
+    this.manageAircraftTimer(this.state.layers.flights);
     this.render(); // Debounced
 
-    // Update toggle checkboxes
-    Object.entries(layers).forEach(([key, value]) => {
+    Object.entries(this.state.layers).forEach(([key, value]) => {
       const toggle = this.container.querySelector(`.layer-toggle[data-layer="${key}"] input`) as HTMLInputElement;
       if (toggle) toggle.checked = value;
     });
   }
 
   public getState(): DeckMapState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      pan: { ...this.state.pan },
+      layers: { ...this.state.layers },
+    };
   }
 
   // Zoom controls - public for external access
