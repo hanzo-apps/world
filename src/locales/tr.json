@@ -377,6 +377,8 @@
       "noResults": "Sonuc bulunamadi",
       "commands": "Komutlar",
       "results": "Sonuçlar",
+      "seeAllCommands": "Tüm komutları gör",
+      "hideCommandList": "Geri",
       "navigate": "gezin",
       "select": "sec",
       "close": "kapat",

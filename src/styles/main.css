@@ -8451,6 +8451,70 @@ a.prediction-link:hover {
   margin: 0 2px;
 }
 
+.search-all-commands-wrap {
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.search-all-commands-link {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.search-all-commands-link:hover {
+  color: var(--green);
+  text-decoration: underline;
+}
+
+.search-command-list-back {
+  padding: 8px 16px;
+}
+
+.search-all-commands-back {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.search-all-commands-back:hover {
+  color: var(--green);
+  text-decoration: underline;
+}
+
+.search-command-category {
+  border-bottom: 1px solid var(--border);
+}
+
+.search-command-category:last-child {
+  border-bottom: none;
+}
+
+.search-command-category-summary {
+  padding: 8px 16px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: var(--bg);
+  cursor: pointer;
+  list-style: none;
+}
+
+.search-command-category-summary::-webkit-details-marker {
+  display: none;
+}
+
+.search-command-category-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.search-command-category-list .command-item {
+  border-left: none;
+}
+
 .search-footer {
   display: flex;
   gap: 16px;

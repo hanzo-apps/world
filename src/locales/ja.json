@@ -377,6 +377,8 @@
       "noResults": "結果なし",
       "commands": "コマンド",
       "results": "結果",
+      "seeAllCommands": "コマンド一覧を見る",
+      "hideCommandList": "戻る",
       "navigate": "移動",
       "select": "選択",
       "close": "閉じる",

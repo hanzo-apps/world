@@ -205,7 +205,9 @@
       "placeholderFinance": "Zoeken of commando typen...",
       "hintFinance": "Zoeken • Beurzen • Markten • Lagen • Navigatie • Instellingen",
       "commands": "Opdrachten",
-      "results": "Resultaten"
+      "results": "Resultaten",
+      "seeAllCommands": "Alle opdrachten tonen",
+      "hideCommandList": "Terug"
     },
     "signal": {
       "source": "Source",

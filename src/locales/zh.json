@@ -377,6 +377,8 @@
       "noResults": "无结果",
       "commands": "命令",
       "results": "结果",
+      "seeAllCommands": "查看所有命令",
+      "hideCommandList": "返回",
       "navigate": "导航",
       "select": "选择",
       "close": "关闭",
