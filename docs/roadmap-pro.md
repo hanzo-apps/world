@@ -3,6 +3,7 @@
 ## Context
 
 The `/pro` landing page promises features across 4 tiers (Free, Pro, API, Enterprise) but almost nothing beyond the marketing page exists. Current state:
+
 - **Convex**: bare — `registrations` + `counters` tables only
 - **Auth**: none — no Clerk, no sessions. Desktop uses manual `WORLDMONITOR_API_KEY` in keychain
 - **Payments**: none — no Stripe
@@ -74,6 +75,7 @@ Phase 0 (Decisions)
 Evaluate and select an authentication provider for WorldMonitor Pro.
 
 **Options**:
+
 1. **Clerk** (recommended) — first-class Convex integration, handles email/social login, webhook sync to Convex. `@clerk/clerk-js` headless SDK for vanilla TS app, `@clerk/clerk-react` for `/pro` React page.
 2. **Convex Auth** — built-in, fewer moving parts, but newer and less battle-tested.
 3. **Supabase Auth** — battle-tested but adds another infra layer on top of Convex.
@@ -81,6 +83,7 @@ Evaluate and select an authentication provider for WorldMonitor Pro.
 **Key constraint**: Main app is vanilla TS + Vite (NOT React). Auth SDK must support headless DOM mounting (`mountSignIn()` / `mountSignUp()`).
 
 **Acceptance criteria**:
+
 - [ ] Decision documented with rationale
 - [ ] Prototype: sign-in flow working in vanilla TS with chosen provider
 - [ ] Verify Convex webhook sync works (user created in Clerk → user appears in Convex)
@@ -100,6 +103,7 @@ Select payment processing approach.
 **Recommendation**: Stripe Checkout (hosted). Simpler than embedded, handles SCA/3DS automatically, less frontend code. Stripe Customer Portal for billing management.
 
 **Acceptance criteria**:
+
 - [ ] Stripe account configured with test mode
 - [ ] Decision documented: hosted vs embedded checkout
 
@@ -116,12 +120,14 @@ Select payment processing approach.
 The marketing page states API is "separate from Pro — use both or either." Define the entitlement model.
 
 **Decision points**:
+
 - Separate Stripe products: Pro Monthly/Annual + API Starter + API Business
 - A user can have Pro (dashboard features) without API access, or API access without Pro
 - Single `entitlements` projection table derives access from all active subscriptions
 - Rate limits per `rateLimitTier`, not per product
 
 **Acceptance criteria**:
+
 - [ ] Entitlement matrix documented (which endpoints are free/pro/api-only)
 - [ ] Schema for `entitlements` projection table designed
 
@@ -142,6 +148,7 @@ The marketing page states API is "separate from Pro — use both or either." Def
 Set up Clerk as the authentication provider and wire it into Convex via webhook.
 
 **Implementation**:
+
 1. Install `@clerk/clerk-js` (vanilla TS main app) + `@clerk/clerk-react` (pro-test React page)
 2. Add `users` table to `convex/schema.ts` (see schema in Phase 2)
 3. Create Clerk webhook handler as Convex HTTP action:
@@ -151,11 +158,13 @@ Set up Clerk as the authentication provider and wire it into Convex via webhook.
 4. Configure environment variables: `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`
 
 **Key files**:
+
 - `convex/schema.ts` — add users table
 - `convex/clerk-webhook.ts` — new HTTP action
 - `.env.example` — add Clerk env vars
 
 **Acceptance criteria**:
+
 - [ ] User signs up via Clerk → user document created in Convex `users` table
 - [ ] User updates profile in Clerk → Convex user updated
 - [ ] Webhook signature verified (reject unsigned/invalid requests)
@@ -174,6 +183,7 @@ Set up Clerk as the authentication provider and wire it into Convex via webhook.
 Add authentication UI to the main vanilla TS dashboard using Clerk's headless `@clerk/clerk-js` SDK.
 
 **Implementation**:
+
 1. Initialize `Clerk` instance in app entry point
 2. Use `clerk.mountSignIn(element)` / `clerk.mountSignUp(element)` for auth modals
 3. Add user avatar + dropdown to existing navbar (sign out, account, billing links)
@@ -181,6 +191,7 @@ Add authentication UI to the main vanilla TS dashboard using Clerk's headless `@
 5. Update locked panel CTA from "Join Waitlist" to "Sign Up / Sign In"
 
 **Key files**:
+
 - `src/main.ts` — Clerk initialization
 - `src/services/auth.ts` — new auth service
 - `src/components/Panel.ts` — update locked panel CTA (line ~300)
@@ -189,6 +200,7 @@ Add authentication UI to the main vanilla TS dashboard using Clerk's headless `@
 **Risk**: `@clerk/clerk-js` headless is less documented than React SDK. Prototype `mountSignIn()` early to validate the approach.
 
 **Acceptance criteria**:
+
 - [ ] Sign in / sign up modal works in vanilla TS app
 - [ ] User avatar + dropdown in navbar
 - [ ] Locked panel CTA says "Sign In to Unlock" (or "Upgrade to Pro" if already signed in as free)
@@ -207,6 +219,7 @@ Add authentication UI to the main vanilla TS dashboard using Clerk's headless `@
 Implement Clerk auth flow for the Tauri desktop app with proper session persistence.
 
 **Implementation**:
+
 1. Register `worldmonitor://auth/callback` deep link URI scheme in Tauri config
 2. Use PKCE OAuth flow (Clerk supports this)
 3. On successful callback, store Clerk session token in macOS Keychain via existing `setSecret()` pattern
@@ -215,6 +228,7 @@ Implement Clerk auth flow for the Tauri desktop app with proper session persiste
 6. Fallback: if deep link fails, show one-time code flow (email-based)
 
 **Key files**:
+
 - `src-tauri/tauri.conf.json` — register deep link
 - `src-tauri/capabilities/default.json` — add deep-link capability
 - `src/services/runtime-config.ts` — existing `getSecretState`/`setSecret`
@@ -222,6 +236,7 @@ Implement Clerk auth flow for the Tauri desktop app with proper session persiste
 **Risk**: Tauri WKWebView has known limitations. Use system browser for OAuth callback, pass token back via deep link.
 
 **Acceptance criteria**:
+
 - [ ] Sign in works on macOS desktop app
 - [ ] Session persists across app restarts (keychain)
 - [ ] Token auto-refreshes
@@ -240,6 +255,7 @@ Implement Clerk auth flow for the Tauri desktop app with proper session persiste
 Migrate existing Convex `registrations` table entries to the new `users` table.
 
 **Migration playbook**:
+
 1. **Dry-run**: migrate to staging Convex first, validate counts match
 2. **Dedupe**: normalize emails, merge duplicate registrations by `normalizedEmail`
 3. **Consent**: existing Turnstile-verified registrations have implicit consent; send "your account is ready" email with opt-out link via Resend
@@ -249,6 +265,7 @@ Migrate existing Convex `registrations` table entries to the new `users` table.
 7. **Validation**: post-migration script compares `registrations` count vs `users` count, flags mismatches
 
 **Acceptance criteria**:
+
 - [ ] All waitlist emails have corresponding `users` entries
 - [ ] Referral codes and counts preserved
 - [ ] "Account ready" emails sent via Resend
@@ -272,6 +289,7 @@ Migrate existing Convex `registrations` table entries to the new `users` table.
 Design and implement the full Convex schema for Pro features.
 
 **Schema**:
+
 ```typescript
 // New tables alongside existing registrations + counters
 
@@ -371,6 +389,7 @@ auditLog: {
 **Key file**: `convex/schema.ts`
 
 **Acceptance criteria**:
+
 - [ ] All tables created with proper indexes
 - [ ] Schema passes Convex validation (`npx convex dev`)
 - [ ] `entitlements` table has unique constraint on `userId`
@@ -388,6 +407,7 @@ auditLog: {
 Implement Convex mutations and queries for user management.
 
 **Functions**:
+
 - `users.getByClerkId(clerkId)` — query
 - `users.getByApiKey(keyHash)` — query (joins apiKeys → users → entitlements)
 - `users.create({ clerkId, email, name })` — mutation (from Clerk webhook)
@@ -398,6 +418,7 @@ Implement Convex mutations and queries for user management.
 - `auditLog.write({ userId, action, resource, metadata, ip })` — mutation
 
 **Acceptance criteria**:
+
 - [ ] CRUD operations work via Convex dashboard
 - [ ] `recompute` correctly derives entitlements from multiple subscriptions
 - [ ] Anonymize replaces PII with `deleted-{hash}` but preserves audit records
@@ -416,6 +437,7 @@ Implement Convex mutations and queries for user management.
 Implement secure API key lifecycle management.
 
 **Implementation**:
+
 1. **Generation**: 256-bit random via `crypto.getRandomValues()`, prefixed `wm_live_` or `wm_test_`
 2. **Storage**: SHA-256 hash only in Convex. Plaintext returned once on creation — never again.
 3. **Validation**: constant-time comparison via `crypto.timingSafeEqual` on hashed input
@@ -425,12 +447,14 @@ Implement secure API key lifecycle management.
 7. **Audit**: all create/revoke/rotate events logged to `auditLog`
 
 **Functions**:
+
 - `apiKeys.create({ userId, name, scopes, tier })` — returns plaintext key ONCE
 - `apiKeys.validate(keyHash)` — query, returns entitlements if valid
 - `apiKeys.revoke(keyId)` — mutation, sets `revokedAt`
 - `apiKeys.listByUser(userId)` — query (returns prefix + metadata, never hash)
 
 **Acceptance criteria**:
+
 - [ ] Key format: `wm_live_<32 hex chars>`
 - [ ] Plaintext never stored or logged
 - [ ] Revoked keys return 401
@@ -450,11 +474,13 @@ Implement secure API key lifecycle management.
 Track API usage per key per day for billing and dashboard display.
 
 **Functions**:
+
 - `usage.record(apiKeyId, endpoint)` — mutation (increment or create daily counter)
 - `usage.getDaily(apiKeyId, date)` — query
 - `usage.getMonthly(apiKeyId, month)` — query (aggregate)
 
 **Acceptance criteria**:
+
 - [ ] Daily counters increment correctly
 - [ ] Monthly aggregation sums daily values
 
@@ -475,17 +501,20 @@ Track API usage per key per day for billing and dashboard display.
 Create Stripe products and price objects for all tiers.
 
 **Products**:
+
 1. **WorldMonitor Pro Monthly** — $X/mo
 2. **WorldMonitor Pro Annual** — $X/yr (discount)
 3. **WorldMonitor API Starter** — $Y/mo (1,000 req/day, 5 webhook rules)
 4. **WorldMonitor API Business** — $Z/mo (50,000 req/day, unlimited webhooks + SLA)
 
 **Environment variables**:
+
 - `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_PRO_MONTHLY_PRICE_ID`, `STRIPE_PRO_ANNUAL_PRICE_ID`
 - `STRIPE_API_STARTER_PRICE_ID`, `STRIPE_API_BUSINESS_PRICE_ID`
 
 **Acceptance criteria**:
+
 - [ ] Products created in Stripe test mode
 - [ ] Price IDs stored as env vars
 - [ ] `.env.example` updated
@@ -503,6 +532,7 @@ Create Stripe products and price objects for all tiers.
 Create a Convex HTTP action that generates a Stripe Checkout Session and returns the URL.
 
 **Implementation**:
+
 1. Convex HTTP action receives authenticated user ID + product choice
 2. Look up or create Stripe customer (store `stripeCustomerId` on user)
 3. Create Stripe Checkout Session with `success_url` and `cancel_url`
@@ -510,6 +540,7 @@ Create a Convex HTTP action that generates a Stripe Checkout Session and returns
 5. Handle upgrade (free → pro), API tier purchase, and plan switching
 
 **Acceptance criteria**:
+
 - [ ] Authenticated user can initiate checkout
 - [ ] Redirects to Stripe Checkout
 - [ ] Success URL leads back to dashboard with success message
@@ -528,6 +559,7 @@ Create a Convex HTTP action that generates a Stripe Checkout Session and returns
 Handle Stripe webhook events to manage subscription lifecycle in Convex.
 
 **Safety requirements**:
+
 - **Signature verification**: `stripe.webhooks.constructEvent()` with `STRIPE_WEBHOOK_SECRET`
 - **Idempotency**: check `stripeEvents` table by `event.id` before processing; skip duplicates
 - **Event age monitoring**: log alerts for events older than 5 minutes (indicates outage/retry), but do NOT reject them — legitimate Stripe retries can arrive late
@@ -536,6 +568,7 @@ Handle Stripe webhook events to manage subscription lifecycle in Convex.
 - **Entitlement recomputation**: every subscription change triggers `recomputeEntitlements(userId)` + Redis cache invalidation
 
 **Webhook events**:
+
 - `checkout.session.completed` → create subscription, link to user, recompute entitlements
 - `invoice.paid` → renew subscription period
 - `invoice.payment_failed` → update status to `past_due`, send warning email via Resend
@@ -543,6 +576,7 @@ Handle Stripe webhook events to manage subscription lifecycle in Convex.
 - `customer.subscription.deleted` → mark canceled, recompute entitlements (downgrade)
 
 **Acceptance criteria**:
+
 - [ ] All 5 webhook events handled correctly
 - [ ] Duplicate events are idempotent (no double processing)
 - [ ] Entitlements update within seconds of payment
@@ -562,6 +596,7 @@ Handle Stripe webhook events to manage subscription lifecycle in Convex.
 Replace the current waitlist form on `/pro` with a real pricing page that initiates checkout.
 
 **Implementation**:
+
 - Side-by-side comparison: Free vs Pro vs API vs Enterprise
 - Monthly/annual toggle for Pro
 - "Get Started" buttons → Clerk sign-in (if not authed) → Stripe Checkout
@@ -569,6 +604,7 @@ Replace the current waitlist form on `/pro` with a real pricing page that initia
 - Integrate with existing i18n (23 languages)
 
 **Acceptance criteria**:
+
 - [ ] Pricing page shows all tiers with features
 - [ ] Checkout flow works end-to-end
 - [ ] Works in all 23 supported languages
@@ -586,6 +622,7 @@ Replace the current waitlist form on `/pro` with a real pricing page that initia
 Add a link/button that redirects to Stripe Customer Portal for self-service billing management (update payment method, view invoices, cancel subscription, switch plans).
 
 **Acceptance criteria**:
+
 - [ ] Portal link accessible from `/account/billing`
 - [ ] User can update payment method, view invoices, cancel
 
@@ -602,6 +639,7 @@ Add a link/button that redirects to Stripe Customer Portal for self-service bill
 Configure Stripe to offer a 14-day trial for Pro tier (no credit card required). Trial expiry → email reminder via Resend. Auto-downgrade on trial end via webhook.
 
 **Acceptance criteria**:
+
 - [ ] Trial activates without credit card
 - [ ] Reminder email sent 3 days before trial ends
 - [ ] Auto-downgrade on expiry triggers entitlement recomputation
@@ -623,6 +661,7 @@ Configure Stripe to offer a 14-day trial for Pro tier (no credit card required).
 Add entitlement-aware middleware to the server gateway so pro-only endpoints are enforced server-side.
 
 **Implementation**:
+
 1. After `validateApiKey()` (gateway.ts line 161), inject entitlement check
 2. Look up user entitlements from Redis cache (`ent:{userId}` or `ent:key:{keyHash}`)
 3. If cache miss, query Convex, populate cache with 60s TTL
@@ -632,6 +671,7 @@ Add entitlement-aware middleware to the server gateway so pro-only endpoints are
 7. Return `403 { error: "Upgrade required", requiredPlan: "pro", upgradeUrl: "/pro" }` for gated endpoints
 
 **Entitlement matrix**:
+
 | Endpoint Category | free_anon | free_authed | pro | api_starter | api_business |
 |---|---|---|---|---|---|
 | Public data (seismology, news, weather) | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -642,16 +682,19 @@ Add entitlement-aware middleware to the server gateway so pro-only endpoints are
 | Risk scoring, scenario analysis | — | — | ✓ | — | ✓ |
 
 **API key migration (dual-read rollout)**:
+
 1. **Phase A**: validate against BOTH static `WORLDMONITOR_VALID_KEYS` AND new entitlements. Log comparison metrics.
 2. **Phase B**: after 1 week with 0 mismatches, flip flag to new system only. Keep env var as emergency rollback.
 3. **Phase C**: remove static key validation code after 30 days.
 
 **Key files**:
+
 - `server/gateway.ts` — main middleware injection point
 - `api/_api-key.js` — extend validation logic
 - `server/_shared/rate-limit.ts` — rate limit by entitlement tier
 
 **Acceptance criteria**:
+
 - [ ] Free user gets 403 on equity research endpoint
 - [ ] Pro user gets 200 on equity research endpoint
 - [ ] API starter gets 200 on data endpoints, 403 on dashboard-only features
@@ -672,6 +715,7 @@ Add entitlement-aware middleware to the server gateway so pro-only endpoints are
 Create a client-side service that exposes user plan/entitlements for UI gating.
 
 **Implementation**:
+
 1. New service: `src/services/plan-context.ts`
 2. On auth, query user entitlements from Convex
 3. Expose helpers: `isPro()`, `hasApiAccess()`, `getPlan()`, `hasFeature(name)`
@@ -680,12 +724,14 @@ Create a client-side service that exposes user plan/entitlements for UI gating.
 6. Include `computedAt` timestamp for staleness detection
 
 **Key files to update**:
+
 - `src/components/Panel.ts` — replace `getSecretState` check
 - `src/components/DeckGLMap.ts` — replace layer premium check
 - `src/components/GlobeMap.ts` — replace layer premium check
 - `src/app/panel-layout.ts` — replace `_wmKeyPresent` logic
 
 **Acceptance criteria**:
+
 - [ ] `isPro()` returns true for pro users, false for free
 - [ ] All `getSecretState('WORLDMONITOR_API_KEY')` references replaced
 - [ ] Plan context updates within 60s of subscription change
@@ -703,12 +749,14 @@ Create a client-side service that exposes user plan/entitlements for UI gating.
 Update panel and map layer configurations to use the new plan context instead of desktop-only `isDesktopRuntime()` checks.
 
 **Changes**:
+
 - `src/config/panels.ts` — premium flags read from plan context, apply to web AND desktop
 - `src/config/map-layer-definitions.ts` — same
 - Locked panel CTA: "Upgrade to Pro" → links to pricing page (not waitlist)
 - Expand locked panels beyond current 2+4 to cover all pro-tier features
 
 **Acceptance criteria**:
+
 - [ ] Premium gating works on web (not just desktop)
 - [ ] Locked panels link to `/pro` pricing page
 - [ ] Enhanced panels show "PRO" badge for free users
@@ -726,6 +774,7 @@ Update panel and map layer configurations to use the new plan context instead of
 Implement tiered rate limiting based on user plan.
 
 **Rate limits**:
+
 | Tier | Requests/day | Requests/min |
 |------|-------------|-------------|
 | Free (no auth) | 100 | 5 |
@@ -735,12 +784,14 @@ Implement tiered rate limiting based on user plan.
 | API Business | 50,000 | 300 |
 
 **Unauthenticated identity**:
+
 - Key: `cf-connecting-ip` + endpoint path bucket
 - **Trusted-proxy rule**: only honor `cf-connecting-ip` from Cloudflare IP ranges. Non-CF sources fall back to actual remote address. Log spoofing attempts.
 - Turnstile challenge at 50% daily quota
 - Abuse flag at 3x daily limit
 
 **Acceptance criteria**:
+
 - [ ] Free user rate-limited at 100 req/day
 - [ ] Pro user rate-limited at 10,000 req/day
 - [ ] Rate limit headers returned: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
@@ -763,12 +814,14 @@ Implement tiered rate limiting based on user plan.
 Create an account page at `/account` showing profile info, current plan, and API key management.
 
 **Sections**:
+
 1. **Profile**: name, email (from Clerk), avatar
 2. **Plan**: current plan badge, expiry date, upgrade button
 3. **API Keys**: list keys (prefix only), create, copy (once), revoke, regenerate
 4. **Referral**: referral code, count, share link (preserved from waitlist)
 
 **Acceptance criteria**:
+
 - [ ] Profile info displayed from Clerk
 - [ ] Plan badge shows current tier
 - [ ] API key CRUD works (create shows plaintext once, subsequent views show prefix only)
@@ -787,12 +840,14 @@ Create an account page at `/account` showing profile info, current plan, and API
 Create a billing page showing current subscription, next payment date, and link to Stripe Customer Portal.
 
 **Sections**:
+
 1. Current plan + next billing date + amount
 2. Payment method (last 4 digits)
 3. Link to Stripe Customer Portal for self-service management
 4. Upgrade/downgrade buttons
 
 **Acceptance criteria**:
+
 - [ ] Shows current plan and billing cycle
 - [ ] Stripe portal link works
 - [ ] Upgrade/downgrade triggers new checkout
@@ -810,6 +865,7 @@ Create a billing page showing current subscription, next payment date, and link 
 Display API usage charts on the account page (daily and monthly breakdowns).
 
 **Acceptance criteria**:
+
 - [ ] Daily usage bar chart
 - [ ] Monthly aggregation
 - [ ] Per-endpoint breakdown
@@ -827,6 +883,7 @@ Display API usage charts on the account page (daily and monthly breakdowns).
 Settings page for configuring notification delivery channels (Slack webhook URL, Telegram bot, Discord webhook, email preferences).
 
 **Acceptance criteria**:
+
 - [ ] Add/remove delivery channels
 - [ ] Test notification button per channel
 - [ ] Channel credentials encrypted at rest
@@ -844,6 +901,7 @@ Settings page for configuring notification delivery channels (Slack webhook URL,
 Generate OpenAPI 3.1 spec from existing sebuf proto definitions (50+ RPCs across 15+ domains). Host interactive API explorer.
 
 **Implementation**:
+
 - Parse proto files with `(sebuf.http.config)` annotations
 - Generate OpenAPI 3.1 spec
 - Host via Swagger UI or Redoc at `/developers` or `/api/docs`
@@ -851,6 +909,7 @@ Generate OpenAPI 3.1 spec from existing sebuf proto definitions (50+ RPCs across
 - Code examples in curl, Python, JS/TS
 
 **Acceptance criteria**:
+
 - [ ] OpenAPI spec covers all public endpoints
 - [ ] Interactive explorer works
 - [ ] Plan requirements shown per endpoint
@@ -872,6 +931,7 @@ Generate OpenAPI 3.1 spec from existing sebuf proto definitions (50+ RPCs across
 Build a new data pipeline for equity research features (pro-only).
 
 **Data to add**:
+
 - Financial statements (income, balance sheet, cash flow)
 - Analyst consensus price targets
 - Valuation metrics (PE, PB, EV/EBITDA)
@@ -880,12 +940,14 @@ Build a new data pipeline for equity research features (pro-only).
 **Sources** (evaluate): Finnhub premium, Financial Modeling Prep (FMP), Alpha Vantage
 
 **Implementation**:
+
 - New sebuf proto service: `worldmonitor/equity/v1/`
 - RPCs: `get-company-financials`, `get-analyst-consensus`, `get-valuation-metrics`, `list-earnings-calendar`
 - Redis caching via `cachedFetchJson` pattern
 - New panel: Equity Research dashboard (pro-only, gated via entitlements)
 
 **Acceptance criteria**:
+
 - [ ] Financial data available for major US stocks
 - [ ] Analyst targets displayed with consensus rating
 - [ ] Equity panel shows for pro users, locked for free
@@ -904,6 +966,7 @@ Build a new data pipeline for equity research features (pro-only).
 Build a scheduled AI briefing system that synthesizes overnight developments and delivers via configured channels.
 
 **Implementation**:
+
 1. Cron job (Railway or Convex cron) runs at configurable time per user timezone
 2. Aggregates latest data from Redis bootstrap keys (40+ keys exist)
 3. Ranks events by user's configured focus areas (markets, geopolitics, energy, etc.)
@@ -914,6 +977,7 @@ Build a scheduled AI briefing system that synthesizes overnight developments and
 **Flash alerts**: real-time event detection → LLM classification (existing `classify-event` RPC) → push notification
 
 **Acceptance criteria**:
+
 - [ ] Daily brief generated and delivered
 - [ ] Focus areas configurable per user
 - [ ] Brief stored and viewable in dashboard
@@ -932,10 +996,12 @@ Build a scheduled AI briefing system that synthesizes overnight developments and
 Reduce data refresh interval for pro users from 5-15 minutes to <60 seconds.
 
 **Phased approach**:
+
 1. **Phase 1**: reduce client-side polling interval based on plan (simplest — just change `DataLoaderManager` interval for pro users)
 2. **Phase 2**: Server-Sent Events (SSE) for high-frequency data (markets, alerts) — push new data as it arrives
 
 **Acceptance criteria**:
+
 - [ ] Pro users see data refresh <60s
 - [ ] Free users unchanged (5-15 min)
 - [ ] Server load monitored (10x more requests from pro)
@@ -953,15 +1019,18 @@ Reduce data refresh interval for pro users from 5-15 minutes to <60 seconds.
 Migrate watchlists from localStorage to Convex `savedViews` table for cross-device sync.
 
 **Currently localStorage-only**:
+
 - `src/services/market-watchlist.ts`
 - `src/services/aviation/watchlist.ts`
 
 **Implementation**:
+
 - On first sign-in, import existing localStorage watchlists to Convex
 - Sync changes bidirectionally (Convex → client on load, client → Convex on change)
 - Cross-device sync (web ↔ desktop)
 
 **Acceptance criteria**:
+
 - [ ] Watchlists persist across devices
 - [ ] localStorage data migrated on first sign-in
 - [ ] Offline-first: works without connection, syncs on reconnect
@@ -979,6 +1048,7 @@ Migrate watchlists from localStorage to Convex `savedViews` table for cross-devi
 Build multi-channel delivery infrastructure for AI briefs and alerts.
 
 **Channels** (in priority order):
+
 1. **Email** — Resend (already integrated). Extend for formatted briefs/alerts.
 2. **Slack** — incoming webhook URL (user provides). Format messages with blocks.
 3. **Telegram** — Bot API. Create `@WorldMonitorBot`. User starts conversation, store `chat_id`.
@@ -986,12 +1056,14 @@ Build multi-channel delivery infrastructure for AI briefs and alerts.
 5. **WhatsApp** — P3 (requires Twilio/Meta business verification, highest cost)
 
 **Security**:
+
 - Webhook URL allowlisting: only `hooks.slack.com`, `discord.com/api/webhooks`, Telegram API
 - Secrets encrypted via server-managed envelope encryption (`APP_ENCRYPTION_KEY` env var)
 - PII redacted from outbound payloads
 - Per-channel signing/verification where supported
 
 **Acceptance criteria**:
+
 - [ ] Email delivery works (formatted brief)
 - [ ] Slack webhook delivery works
 - [ ] Telegram bot delivery works
@@ -1012,12 +1084,14 @@ Build multi-channel delivery infrastructure for AI briefs and alerts.
 Build correlation views on top of existing economic data (FRED, BIS, World Bank RPCs already exist).
 
 **New visualizations**:
+
 - GDP growth vs market performance
 - Inflation trends vs central bank rates
 - Growth cycle detection and labeling
 - Cross-country comparison charts
 
 **Acceptance criteria**:
+
 - [ ] Correlation charts display correctly
 - [ ] Data from existing FRED/BIS/World Bank endpoints
 - [ ] Pro-only (gated via entitlements)
@@ -1035,17 +1109,20 @@ Build correlation views on top of existing economic data (FRED, BIS, World Bank 
 Enhance existing risk analytics with scenario analysis and convergence alerting.
 
 **Existing engines** (enhance, don't rebuild):
+
 - `src/services/geo-convergence.ts` — convergence detection
 - `src/services/focal-point-detector.ts` — focal point detection
 - `src/services/country-instability.ts` — CII scoring
 - `src/services/signal-aggregator.ts` — signal aggregation
 
 **New**:
+
 - Scenario analysis UI (what-if modeling)
 - Convergence alerting (push when signals converge in a region)
 - Risk trend visualization over time
 
 **Acceptance criteria**:
+
 - [ ] Scenario analysis UI works
 - [ ] Convergence alerts delivered via configured channels
 - [ ] Pro-only (gated via entitlements)
@@ -1063,15 +1140,18 @@ Enhance existing risk analytics with scenario analysis and convergence alerting.
 Pro users should NOT need to configure individual API keys for Finnhub, FRED, ACLED, etc. A single WorldMonitor Pro subscription gives access to all 22 services.
 
 **Implementation**:
+
 - Server-side: pro requests use WorldMonitor's own upstream API keys (already configured as env vars)
 - Free tier: continues using BYOK via desktop settings panel
 - Gateway identifies pro user → skips BYOK requirement → uses server-side keys for upstream calls
 
 **Key files**:
+
 - `src/services/settings-constants.ts` — 20+ key definitions
 - `server/gateway.ts` — skip BYOK check for pro users
 
 **Acceptance criteria**:
+
 - [ ] Pro user sees data without configuring any individual API keys
 - [ ] Free user still uses BYOK
 - [ ] No upstream API key leakage to client
@@ -1093,12 +1173,14 @@ Pro users should NOT need to configure individual API keys for Finnhub, FRED, AC
 Extend the account page with API key management specifically for API tier subscribers.
 
 **Features**:
+
 - Create multiple keys with different names/scopes
 - View usage per key
 - Rotate keys (create new → confirm → revoke old)
 - Set per-key rate limits within tier allowance
 
 **Acceptance criteria**:
+
 - [ ] Multiple keys can be created
 - [ ] Per-key usage visible
 - [ ] Key rotation flow works
@@ -1116,12 +1198,14 @@ Extend the account page with API key management specifically for API tier subscr
 Track and enforce daily usage limits per API key based on tier (Starter: 1,000/day, Business: 50,000/day).
 
 **Implementation**:
+
 - Increment `usage` counter on each request
 - Check daily total before processing
 - Return `429` with `Retry-After` header when limit exceeded
 - Dashboard shows usage vs limit
 
 **Acceptance criteria**:
+
 - [ ] Daily limit enforced per key
 - [ ] 429 returned with retry info when exceeded
 - [ ] Usage dashboard shows consumption
@@ -1139,6 +1223,7 @@ Track and enforce daily usage limits per API key based on tier (Starter: 1,000/d
 Auto-generate OpenAPI 3.1 specification from existing sebuf proto definitions.
 
 **Acceptance criteria**:
+
 - [ ] Spec covers all public RPC endpoints
 - [ ] Plan requirements documented per endpoint
 - [ ] Code examples in curl, Python, JS/TS
@@ -1156,6 +1241,7 @@ Auto-generate OpenAPI 3.1 specification from existing sebuf proto definitions.
 Allow API tier subscribers to configure webhook endpoints for event delivery.
 
 **Implementation**:
+
 - Convex table: `webhookEndpoints` (userId, url, events, secret)
 - HMAC-SHA256 signature on each delivery
 - Exponential backoff retry (3 attempts)
@@ -1163,6 +1249,7 @@ Allow API tier subscribers to configure webhook endpoints for event delivery.
 - Delivery log with status codes
 
 **Acceptance criteria**:
+
 - [ ] Webhook delivery works with signature
 - [ ] Failed deliveries retried with backoff
 - [ ] Tier limits enforced
