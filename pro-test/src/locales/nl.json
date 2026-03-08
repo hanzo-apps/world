@@ -7,11 +7,11 @@
     "joinWaitlist": "Schrijf je in"
   },
   "hero": {
-    "title1": "Real-time inlichtingen",
-    "title2": "voor een verbonden wereld.",
-    "subtitle": "Volg geopolitiek, markten, energie, infrastructuur en natuurlijke gebeurtenissen via 435+ bronnen. AI die je vertelt wat het betekent — geleverd waar jij werkt.",
-    "joinProWaitlist": "Schrijf je in voor Pro",
-    "launchingSoon": "Binnenkort beschikbaar",
+    "noiseWord": "Ruis",
+    "signalWord": "Signaal",
+    "valueProps": "AI-aangedreven aandelenonderzoek, geopolitieke analyse en macro-inlichtingen — in real-time gecorreleerd.",
+    "reserveEarlyAccess": "Reserveer je vroege toegang",
+    "launchingDate": "Lancering maart 2026",
     "tryFreeDashboard": "Probeer het gratis dashboard",
     "emailPlaceholder": "Vul je e-mailadres in",
     "emailAriaLabel": "E-mailadres voor wachtlijst"
