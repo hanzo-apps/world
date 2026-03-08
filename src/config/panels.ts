@@ -230,8 +230,8 @@ const TECH_MAP_LAYERS: MapLayers = {
   nuclear: false,
   irradiators: false,
   sanctions: false,
-  weather: true,
-  economic: true,
+  weather: false,
+  economic: false,
   waterways: false,
   outages: true,
   cyberThreats: false,
@@ -652,10 +652,10 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
 
   conflicts: false,
   bases: false,
-  cables: true,
+  cables: false,
   pipelines: true,
   hotspots: false,
-  ais: true,            // Commodity shipping, tanker routes, bulk carriers
+  ais: true,
   nuclear: false,
   irradiators: false,
   sanctions: true,
@@ -671,7 +671,7 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
   natural: true,
   spaceports: false,
   minerals: true,
-  fires: true,          // Fires near mining/forestry operations
+  fires: true,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
