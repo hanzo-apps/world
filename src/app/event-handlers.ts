@@ -752,14 +752,21 @@ export class EventHandlerManager implements AppModule {
   setupUnifiedSettings(): void {
     this.ctx.unifiedSettings = new UnifiedSettings({
       getPanelSettings: () => this.ctx.panelSettings,
-      togglePanel: (key: string) => {
-        const config = this.ctx.panelSettings[key];
-        if (config) {
-          config.enabled = !config.enabled;
-          trackPanelToggled(key, config.enabled);
-          saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
-          this.applyPanelSettings();
-        }
+      savePanelSettings: (panels: Record<string, PanelConfig>) => {
+        Object.entries(panels).forEach(([key, nextConfig]) => {
+          const current = this.ctx.panelSettings[key];
+          if (!current) {
+            this.ctx.panelSettings[key] = { ...nextConfig };
+            trackPanelToggled(key, nextConfig.enabled);
+            return;
+          }
+          if (current.enabled !== nextConfig.enabled) {
+            trackPanelToggled(key, nextConfig.enabled);
+          }
+          Object.assign(current, nextConfig);
+        });
+        saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+        this.applyPanelSettings();
       },
       getDisabledSources: () => this.ctx.disabledSources,
       toggleSource: (name: string) => {
