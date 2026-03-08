@@ -310,7 +310,7 @@ const TwoPathSplit = () => (
         <p className="text-sm text-wm-muted mb-6">{t('twoPath.entDesc')}</p>
         <ul className="space-y-3 mb-8">
           <li className="text-xs font-mono text-wm-green uppercase tracking-wider mb-1">{t('twoPath.entF1')}</li>
-          {[t('twoPath.entF2'), t('twoPath.entF3'), t('twoPath.entF4'), t('twoPath.entF5'), t('twoPath.entF6'), t('twoPath.entF7'), t('twoPath.entF8'), t('twoPath.entF9'), t('twoPath.entF10')].map((f, i) => (
+          {[t('twoPath.entF2'), t('twoPath.entF3'), t('twoPath.entF4'), t('twoPath.entF5'), t('twoPath.entF6'), t('twoPath.entF7'), t('twoPath.entF8'), t('twoPath.entF9'), t('twoPath.entF10'), t('twoPath.entF11')].map((f, i) => (
             <li key={i} className="flex items-start gap-3 text-sm">
               <Check className="w-4 h-4 shrink-0 mt-0.5 text-wm-muted" aria-hidden="true" />
               <span className="text-wm-muted">{f}</span>
@@ -329,7 +329,7 @@ const TwoPathSplit = () => (
 const WhyUpgrade = () => {
   const items = [
     { icon: <Filter className="w-6 h-6" aria-hidden="true" />, title: t('whyUpgrade.noiseTitle'), desc: t('whyUpgrade.noiseDesc') },
-    { icon: <Lightbulb className="w-6 h-6" aria-hidden="true" />, title: t('whyUpgrade.fasterTitle'), desc: t('whyUpgrade.fasterDesc') },
+    { icon: <TrendingUp className="w-6 h-6" aria-hidden="true" />, title: t('whyUpgrade.fasterTitle'), desc: t('whyUpgrade.fasterDesc') },
     { icon: <SlidersHorizontal className="w-6 h-6" aria-hidden="true" />, title: t('whyUpgrade.controlTitle'), desc: t('whyUpgrade.controlDesc') },
     { icon: <Telescope className="w-6 h-6" aria-hidden="true" />, title: t('whyUpgrade.deeperTitle'), desc: t('whyUpgrade.deeperDesc') },
   ];
@@ -411,13 +411,12 @@ const LivePreview = () => (
 /* ─── 6. Source Marquee (current) ─── */
 const SourceMarquee = () => {
   const sources = [
-    "ACLED", "UCDP", "GDELT", "NASA FIRMS", "USGS", "OpenSky", "AISStream",
-    "Finnhub", "FRED", "CoinGecko", "Polymarket", "UNHCR", "Cloudflare Radar",
-    "BGPStream", "GPSJam", "NOAA", "Copernicus", "IAEA", "Bloomberg",
-    "Reuters", "Al Jazeera", "Sky News", "Euronews", "DW News", "France 24",
-    "CNBC", "Nikkei", "Haaretz", "Al Arabiya", "TRT World",
-    "Defense One", "Jane's", "The War Zone", "Maritime Executive",
-    "OilPrice", "Rigzone", "Hellenic Shipping News",
+    "Finnhub", "FRED", "Bloomberg", "CNBC", "Nikkei", "CoinGecko", "Polymarket",
+    "Reuters", "ACLED", "UCDP", "GDELT", "NASA FIRMS", "USGS", "OpenSky", "AISStream",
+    "Cloudflare Radar", "BGPStream", "GPSJam", "NOAA", "Copernicus", "IAEA",
+    "Al Jazeera", "Sky News", "Euronews", "DW News", "France 24",
+    "OilPrice", "Rigzone", "Maritime Executive", "Hellenic Shipping News",
+    "Defense One", "Jane's", "The War Zone",
     "TechCrunch", "Ars Technica", "The Verge", "Wired",
     "Krebs on Security", "BleepingComputer", "The Record",
   ];
@@ -447,17 +446,31 @@ const ProShowcase = () => (
 
         <div className="space-y-6">
           <div className="flex gap-4">
-            <Zap className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
+            <TrendingUp className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.nearRealTime')}</h4>
-              <p className="text-sm text-wm-muted">{t('proShowcase.nearRealTimeDesc')}</p>
+              <h4 className="font-bold mb-1">{t('proShowcase.equityResearch')}</h4>
+              <p className="text-sm text-wm-muted">{t('proShowcase.equityResearchDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
-            <Brain className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
+            <Globe className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.soWhat')}</h4>
-              <p className="text-sm text-wm-muted">{t('proShowcase.soWhatDesc')}</p>
+              <h4 className="font-bold mb-1">{t('proShowcase.geopoliticalAnalysis')}</h4>
+              <p className="text-sm text-wm-muted">{t('proShowcase.geopoliticalAnalysisDesc')}</p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <BarChart3 className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
+            <div>
+              <h4 className="font-bold mb-1">{t('proShowcase.economyAnalytics')}</h4>
+              <p className="text-sm text-wm-muted">{t('proShowcase.economyAnalyticsDesc')}</p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <ShieldAlert className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
+            <div>
+              <h4 className="font-bold mb-1">{t('proShowcase.riskMonitoring')}</h4>
+              <p className="text-sm text-wm-muted">{t('proShowcase.riskMonitoringDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
@@ -465,13 +478,6 @@ const ProShowcase = () => (
             <div>
               <h4 className="font-bold mb-1">{t('proShowcase.morningBriefs')}</h4>
               <p className="text-sm text-wm-muted">{t('proShowcase.morningBriefsDesc')}</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <Bell className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
-            <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.alerting')}</h4>
-              <p className="text-sm text-wm-muted">{t('proShowcase.alertingDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
@@ -523,9 +529,9 @@ const ProShowcase = () => (
               <p className="text-gray-300 font-bold mb-3">{t('slackMock.morningBrief')} &middot; Mar 6</p>
 
               <div className="space-y-3">
-                <div className="pl-3 border-l-2 border-red-500">
-                  <span className="text-red-400 font-bold text-xs uppercase tracking-wider">{t('slackMock.critical')}</span>
-                  <p className="text-gray-300 mt-1">{t('slackMock.criticalText')}</p>
+                <div className="pl-3 border-l-2 border-blue-500">
+                  <span className="text-blue-400 font-bold text-xs uppercase tracking-wider">{t('slackMock.markets')}</span>
+                  <p className="text-gray-300 mt-1">{t('slackMock.marketsText')}</p>
                 </div>
 
                 <div className="pl-3 border-l-2 border-orange-500">
@@ -550,10 +556,10 @@ const ProShowcase = () => (
 const AudiencePersonas = () => {
   const personas = [
     { icon: <LineChart className="w-6 h-6" aria-hidden="true" />, title: t('audience.investorsTitle'), desc: t('audience.investorsDesc') },
-    { icon: <Search className="w-6 h-6" aria-hidden="true" />, title: t('audience.researchersTitle'), desc: t('audience.researchersDesc') },
-    { icon: <Shield className="w-6 h-6" aria-hidden="true" />, title: t('audience.securityTitle'), desc: t('audience.securityDesc') },
-    { icon: <Landmark className="w-6 h-6" aria-hidden="true" />, title: t('audience.govTitle'), desc: t('audience.govDesc') },
     { icon: <Fuel className="w-6 h-6" aria-hidden="true" />, title: t('audience.tradersTitle'), desc: t('audience.tradersDesc') },
+    { icon: <Search className="w-6 h-6" aria-hidden="true" />, title: t('audience.researchersTitle'), desc: t('audience.researchersDesc') },
+    { icon: <Globe className="w-6 h-6" aria-hidden="true" />, title: t('audience.journalistsTitle'), desc: t('audience.journalistsDesc') },
+    { icon: <Landmark className="w-6 h-6" aria-hidden="true" />, title: t('audience.govTitle'), desc: t('audience.govDesc') },
     { icon: <Building2 className="w-6 h-6" aria-hidden="true" />, title: t('audience.teamsTitle'), desc: t('audience.teamsDesc') },
   ];
 
