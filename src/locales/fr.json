@@ -173,6 +173,7 @@
     "sourceRegionGulfMena": "Golfe et MENA",
     "filterPanels": "Filtrer les panneaux...",
     "resetLayout": "Réinitialiser la disposition",
+    "resetLayoutTooltip": "Rétablir la disposition des panneaux par défaut",
     "unsavedChanges": "Vous avez des modifications de panneaux non enregistrées. Les abandonner ?",
     "panelCatCore": "Principal",
     "panelCatIntelligence": "Renseignement",
