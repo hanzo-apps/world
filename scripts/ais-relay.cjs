@@ -2453,39 +2453,226 @@ function startServiceStatusesSeedLoop() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Theater Posture Seed — warm-pings Vercel RPC every 10 min
-// so the strategic posture panel always has data in Redis.
+// Theater Posture Seed — fetches OpenSky directly via localhost
+// proxy, computes military postures, writes to Redis.
+// Eliminates circular dependency on Vercel RPC.
 // ─────────────────────────────────────────────────────────────
 const THEATER_POSTURE_SEED_INTERVAL_MS = 600_000; // 10 min
-const THEATER_POSTURE_RPC_URL = 'https://api.worldmonitor.app/api/military/v1/get-theater-posture';
+const THEATER_POSTURE_LIVE_KEY = 'theater-posture:sebuf:v1';
+const THEATER_POSTURE_STALE_KEY = 'theater-posture:sebuf:stale:v1';
+const THEATER_POSTURE_BACKUP_KEY = 'theater-posture:sebuf:backup:v1';
+const THEATER_POSTURE_LIVE_TTL = 900;    // 15 min
+const THEATER_POSTURE_STALE_TTL = 86400; // 24h
+const THEATER_POSTURE_BACKUP_TTL = 604800; // 7d
 
-async function seedTheaterPosture() {
-  try {
-    const resp = await fetch(THEATER_POSTURE_RPC_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': CHROME_UA,
-        Origin: 'https://worldmonitor.app',
-      },
-      body: '{}',
-      signal: AbortSignal.timeout(30_000),
+const THEATER_MIL_PREFIXES = [
+  'RCH', 'REACH', 'MOOSE', 'EVAC', 'DUSTOFF', 'PEDRO',
+  'DUKE', 'HAVOC', 'KNIFE', 'WARHAWK', 'VIPER', 'RAGE', 'FURY',
+  'SHELL', 'TEXACO', 'ARCO', 'ESSO', 'PETRO',
+  'SENTRY', 'AWACS', 'MAGIC', 'DISCO', 'DARKSTAR',
+  'COBRA', 'PYTHON', 'RAPTOR', 'EAGLE', 'HAWK', 'TALON',
+  'BOXER', 'OMNI', 'TOPCAT', 'SKULL', 'REAPER', 'HUNTER',
+  'ARMY', 'NAVY', 'USAF', 'USMC', 'USCG',
+  'CNV', 'EXEC',
+  'NATO', 'GAF', 'RRF', 'RAF', 'FAF', 'IAF', 'RNLAF', 'BAF', 'DAF', 'HAF', 'PAF',
+  'SWORD', 'LANCE', 'ARROW', 'SPARTAN',
+  'RSAF', 'EMIRI', 'UAEAF', 'KAF', 'QAF', 'BAHAF', 'OMAAF',
+  'IRIAF', 'IRGC',
+  'TUAF',
+  'RSD', 'RFF', 'VKS',
+  'CHN', 'PLAAF', 'PLA',
+];
+const THEATER_MIL_SHORT_PREFIXES = ['AE', 'RF', 'TF', 'PAT', 'SAM', 'OPS', 'CTF', 'IRG', 'TAF'];
+const THEATER_AIRLINE_CODES = new Set([
+  'SVA', 'QTR', 'THY', 'UAE', 'ETD', 'GFA', 'MEA', 'RJA', 'KAC', 'ELY',
+  'IAW', 'IRA', 'MSR', 'SYR', 'PGT', 'AXB', 'FDB', 'KNE', 'FAD', 'ADY', 'OMA',
+  'ABQ', 'ABY', 'NIA', 'FJA', 'SWR', 'HZA', 'OMS', 'EGF', 'NOS', 'SXD',
+]);
+
+function theaterIsMilCallsign(callsign) {
+  if (!callsign) return false;
+  const cs = callsign.toUpperCase().trim();
+  for (const prefix of THEATER_MIL_PREFIXES) {
+    if (cs.startsWith(prefix)) return true;
+  }
+  for (const prefix of THEATER_MIL_SHORT_PREFIXES) {
+    if (cs.startsWith(prefix) && cs.length > prefix.length && /\d/.test(cs.charAt(prefix.length))) return true;
+  }
+  if (/^[A-Z]{3}\d{1,2}$/.test(cs)) {
+    const prefix = cs.slice(0, 3);
+    if (!THEATER_AIRLINE_CODES.has(prefix)) return true;
+  }
+  return false;
+}
+
+function theaterDetectAircraftType(callsign) {
+  if (!callsign) return 'unknown';
+  const cs = callsign.toUpperCase().trim();
+  if (/^(SHELL|TEXACO|ARCO|ESSO|PETRO|KC|STRAT)/.test(cs)) return 'tanker';
+  if (/^(SENTRY|AWACS|MAGIC|DISCO|DARKSTAR|E3|E8|E6)/.test(cs)) return 'awacs';
+  if (/^(RCH|REACH|MOOSE|EVAC|DUSTOFF|C17|C5|C130|C40)/.test(cs)) return 'transport';
+  if (/^(HOMER|OLIVE|JAKE|PSEUDO|GORDO|RC|U2|SR)/.test(cs)) return 'reconnaissance';
+  if (/^(RQ|MQ|REAPER|PREDATOR|GLOBAL)/.test(cs)) return 'drone';
+  if (/^(DEATH|BONE|DOOM|B52|B1|B2)/.test(cs)) return 'bomber';
+  return 'unknown';
+}
+
+const POSTURE_THEATERS = [
+  { id: 'iran-theater', bounds: { north: 42, south: 20, east: 65, west: 30 }, thresholds: { elevated: 8, critical: 20 }, strikeIndicators: { minTankers: 2, minAwacs: 1, minFighters: 5 } },
+  { id: 'taiwan-theater', bounds: { north: 30, south: 18, east: 130, west: 115 }, thresholds: { elevated: 6, critical: 15 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 4 } },
+  { id: 'baltic-theater', bounds: { north: 65, south: 52, east: 32, west: 10 }, thresholds: { elevated: 5, critical: 12 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+  { id: 'blacksea-theater', bounds: { north: 48, south: 40, east: 42, west: 26 }, thresholds: { elevated: 4, critical: 10 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+  { id: 'korea-theater', bounds: { north: 43, south: 33, east: 132, west: 124 }, thresholds: { elevated: 5, critical: 12 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+  { id: 'south-china-sea', bounds: { north: 25, south: 5, east: 121, west: 105 }, thresholds: { elevated: 6, critical: 15 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 4 } },
+  { id: 'east-med-theater', bounds: { north: 37, south: 33, east: 37, west: 25 }, thresholds: { elevated: 4, critical: 10 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+  { id: 'israel-gaza-theater', bounds: { north: 33, south: 29, east: 36, west: 33 }, thresholds: { elevated: 3, critical: 8 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+  { id: 'yemen-redsea-theater', bounds: { north: 22, south: 11, east: 54, west: 32 }, thresholds: { elevated: 4, critical: 10 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 3 } },
+];
+
+const THEATER_QUERY_REGIONS = [
+  { name: 'WESTERN', lamin: 10, lamax: 66, lomin: 9, lomax: 66 },
+  { name: 'PACIFIC', lamin: 4, lamax: 44, lomin: 104, lomax: 133 },
+];
+
+async function fetchTheaterFlightsFromOpenSky() {
+  const seenIds = new Set();
+  const allFlights = [];
+  for (const region of THEATER_QUERY_REGIONS) {
+    const params = `lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
+    const resp = await fetch(`http://localhost:${PORT}/opensky?${params}`, {
+      headers: { 'User-Agent': CHROME_UA, ...(RELAY_SHARED_SECRET ? { 'x-relay-key': RELAY_SHARED_SECRET } : {}) },
+      signal: AbortSignal.timeout(20_000),
     });
-    if (!resp.ok) {
-      console.warn(`[TheaterPosture] Seed ping failed: HTTP ${resp.status}`);
-      return;
-    }
+    if (!resp.ok) throw new Error(`OpenSky proxy ${resp.status} for ${region.name}`);
     const data = await resp.json();
-    const theaters = data?.theaters?.length || 0;
-    console.log(`[TheaterPosture] Seed ping OK — ${theaters} theaters`);
-  } catch (e) {
-    console.warn('[TheaterPosture] Seed ping error:', e?.message || e);
+    if (!data.states) continue;
+    for (const state of data.states) {
+      const [icao24, callsign, , , , lon, lat, altitude, onGround, velocity, heading] = state;
+      if (lat == null || lon == null || onGround) continue;
+      if (!theaterIsMilCallsign(callsign)) continue;
+      if (seenIds.has(icao24)) continue;
+      seenIds.add(icao24);
+      allFlights.push({
+        id: icao24,
+        callsign: (callsign || '').trim(),
+        lat, lon,
+        altitude: altitude || 0,
+        heading: heading || 0,
+        speed: velocity || 0,
+        aircraftType: theaterDetectAircraftType(callsign),
+      });
+    }
+  }
+  return allFlights;
+}
+
+async function fetchTheaterFlightsFromWingbits() {
+  const apiKey = process.env.WINGBITS_API_KEY;
+  if (!apiKey) return null;
+  const areas = POSTURE_THEATERS.map((t) => ({
+    alias: t.id,
+    by: 'box',
+    la: (t.bounds.north + t.bounds.south) / 2,
+    lo: (t.bounds.east + t.bounds.west) / 2,
+    w: Math.abs(t.bounds.east - t.bounds.west) * 60,
+    h: Math.abs(t.bounds.north - t.bounds.south) * 60,
+    unit: 'nm',
+  }));
+  try {
+    const resp = await fetch('https://customer-api.wingbits.com/v1/flights', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': CHROME_UA },
+      body: JSON.stringify(areas),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const flights = [];
+    const seenIds = new Set();
+    for (const areaResult of data) {
+      const flightList = Array.isArray(areaResult.flights || areaResult) ? (areaResult.flights || areaResult) : [];
+      for (const f of flightList) {
+        const icao24 = f.h || f.icao24 || f.id;
+        if (!icao24 || seenIds.has(icao24)) continue;
+        seenIds.add(icao24);
+        const callsign = (f.f || f.callsign || f.flight || '').trim();
+        if (!theaterIsMilCallsign(callsign)) continue;
+        flights.push({
+          id: icao24, callsign,
+          lat: f.la || f.latitude || f.lat,
+          lon: f.lo || f.longitude || f.lon || f.lng,
+          altitude: f.ab || f.altitude || f.alt || 0,
+          heading: f.th || f.heading || f.track || 0,
+          speed: f.gs || f.groundSpeed || f.speed || f.velocity || 0,
+          aircraftType: theaterDetectAircraftType(callsign),
+        });
+      }
+    }
+    return flights;
+  } catch {
+    return null;
   }
 }
 
+function calculateTheaterPostures(flights) {
+  return POSTURE_THEATERS.map((theater) => {
+    const tf = flights.filter(
+      (f) => f.lat >= theater.bounds.south && f.lat <= theater.bounds.north &&
+        f.lon >= theater.bounds.west && f.lon <= theater.bounds.east,
+    );
+    const total = tf.length;
+    const tankers = tf.filter((f) => f.aircraftType === 'tanker').length;
+    const awacs = tf.filter((f) => f.aircraftType === 'awacs').length;
+    const fighters = tf.filter((f) => f.aircraftType === 'fighter').length;
+    const postureLevel = total >= theater.thresholds.critical ? 'critical'
+      : total >= theater.thresholds.elevated ? 'elevated' : 'normal';
+    const strikeCapable = tankers >= theater.strikeIndicators.minTankers &&
+      awacs >= theater.strikeIndicators.minAwacs && fighters >= theater.strikeIndicators.minFighters;
+    const ops = [];
+    if (strikeCapable) ops.push('strike_capable');
+    if (tankers > 0) ops.push('aerial_refueling');
+    if (awacs > 0) ops.push('airborne_early_warning');
+    return {
+      theater: theater.id, postureLevel, activeFlights: total,
+      trackedVessels: 0, activeOperations: ops, assessedAt: Date.now(),
+    };
+  });
+}
+
+async function seedTheaterPosture() {
+  const t0 = Date.now();
+  let flights = [];
+  try {
+    flights = await fetchTheaterFlightsFromOpenSky();
+  } catch (e) {
+    console.warn(`[TheaterPosture] OpenSky failed: ${e?.message || e}`);
+  }
+  if (flights.length === 0) {
+    const wb = await fetchTheaterFlightsFromWingbits();
+    if (wb && wb.length > 0) flights = wb;
+  }
+  if (flights.length === 0) {
+    console.warn('[TheaterPosture] No military flights from OpenSky or Wingbits — skipping');
+    return;
+  }
+  const theaters = calculateTheaterPostures(flights);
+  const payload = { theaters };
+  const ok1 = await upstashSet(THEATER_POSTURE_LIVE_KEY, payload, THEATER_POSTURE_LIVE_TTL);
+  const ok2 = await upstashSet(THEATER_POSTURE_STALE_KEY, payload, THEATER_POSTURE_STALE_TTL);
+  const ok3 = await upstashSet(THEATER_POSTURE_BACKUP_KEY, payload, THEATER_POSTURE_BACKUP_TTL);
+  await upstashSet('seed-meta:theater-posture', { fetchedAt: Date.now(), recordCount: flights.length }, 604800);
+  const elevated = theaters.filter((t) => t.postureLevel !== 'normal').length;
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log(`[TheaterPosture] Seeded ${flights.length} mil flights, ${theaters.length} theaters (${elevated} elevated), redis: ${ok1 && ok2 && ok3 ? 'OK' : 'PARTIAL'} [${elapsed}s]`);
+}
+
 function startTheaterPostureSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[TheaterPosture] Disabled (no Upstash Redis)');
+    return;
+  }
   console.log(`[TheaterPosture] Seed loop starting (interval ${THEATER_POSTURE_SEED_INTERVAL_MS / 1000 / 60}min)`);
-  // Delay initial seed 30s to let the relay start up first (it proxies OpenSky)
+  // Delay initial seed 30s to let the relay's OpenSky proxy start up
   setTimeout(() => {
     seedTheaterPosture().catch((e) => console.warn('[TheaterPosture] Initial seed error:', e?.message || e));
     setInterval(() => {
