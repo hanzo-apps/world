@@ -1444,7 +1444,7 @@ async function startMarketDataSeedLoop() {
 // so Vercel handler serves from cache (avoids 114 API calls per miss)
 // ─────────────────────────────────────────────────────────────
 const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
-const AVIATION_SEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h
+const AVIATION_SEED_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1h
 const AVIATION_SEED_TTL = 14400; // 4h — survives 1 missed cycle
 const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
 const AVIATION_BATCH_CONCURRENCY = 10;
