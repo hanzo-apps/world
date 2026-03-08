@@ -69,7 +69,7 @@ const SEED_META = {
   gulfQuotes:       { key: 'seed-meta:market:gulf-quotes',      maxStaleMin: 30 },
   stablecoinMarkets:{ key: 'seed-meta:market:stablecoins',      maxStaleMin: 60 },
   naturalEvents:    { key: 'seed-meta:natural:events',          maxStaleMin: 120 },
-  flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 30 },
+  flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 90 },
   predictions:      { key: 'seed-meta:prediction:markets',      maxStaleMin: 15 },
   insights:         { key: 'seed-meta:news:insights',           maxStaleMin: 30 },
   marketQuotes:     { key: 'seed-meta:market:stocks',         maxStaleMin: 30 },
