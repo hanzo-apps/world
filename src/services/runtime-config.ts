@@ -40,6 +40,7 @@ export type RuntimeFeatureId =
   | 'wingbitsEnrichment'
   | 'aisRelay'
   | 'openskyRelay'
+  | 'militaryFlights'
   | 'finnhubMarkets'
   | 'nasaFirms'
   | 'aiOllama'
@@ -94,6 +95,7 @@ const defaultToggles: Record<RuntimeFeatureId, boolean> = {
   wingbitsEnrichment: true,
   aisRelay: true,
   openskyRelay: true,
+  militaryFlights: true,
   finnhubMarkets: true,
   nasaFirms: true,
   aiOllama: true,
@@ -199,11 +201,18 @@ export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
   },
   {
     id: 'openskyRelay',
-    name: 'OpenSky military flights',
-    description: 'OpenSky OAuth credentials for military flight data.',
+    name: 'OpenSky military flights (legacy)',
+    description: 'OpenSky OAuth credentials for military flight data (legacy direct proxy).',
     requiredSecrets: ['VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'],
     desktopRequiredSecrets: ['OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'],
     fallback: 'Military flights fall back to limited/no data.',
+  },
+  {
+    id: 'militaryFlights',
+    name: 'Military flight tracking',
+    description: 'Military flight data via Redis-backed edge handler (no credentials needed).',
+    requiredSecrets: [],
+    fallback: 'Military flights panel is disabled.',
   },
   {
     id: 'finnhubMarkets',
