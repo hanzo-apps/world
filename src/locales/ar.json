@@ -377,6 +377,8 @@
       "noResults": "لا توجد نتائج",
       "commands": "أوامر",
       "results": "نتائج",
+      "seeAllCommands": "عرض جميع الأوامر",
+      "hideCommandList": "رجوع",
       "navigate": "تنقّل",
       "select": "اختيار",
       "close": "إغلاق",

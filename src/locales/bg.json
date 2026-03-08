@@ -377,6 +377,8 @@
       "noResults": "Няма резултати",
       "commands": "Команди",
       "results": "Резултати",
+      "seeAllCommands": "Виж всички команди",
+      "hideCommandList": "Назад",
       "navigate": "навигиране",
       "select": "избор",
       "close": "затвори",

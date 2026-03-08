@@ -377,6 +377,8 @@
       "noResults": "결과 없음",
       "commands": "명령어",
       "results": "결과",
+      "seeAllCommands": "모든 명령 보기",
+      "hideCommandList": "뒤로",
       "navigate": "탐색",
       "select": "선택",
       "close": "닫기",

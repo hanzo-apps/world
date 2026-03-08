@@ -205,7 +205,9 @@
       "placeholderFinance": "Sök eller skriv ett kommando...",
       "hintFinance": "Sök • Börser • Marknader • Lager • Navigering • Inställningar",
       "commands": "Kommandon",
-      "results": "Resultat"
+      "results": "Resultat",
+      "seeAllCommands": "Visa alla kommandon",
+      "hideCommandList": "Tillbaka"
     },
     "signal": {
       "source": "Source",

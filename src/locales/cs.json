@@ -401,7 +401,9 @@
         "accelerator": "Akcelerátor"
       },
       "commands": "Příkazy",
-      "results": "Výsledky"
+      "results": "Výsledky",
+      "seeAllCommands": "Zobrazit všechny příkazy",
+      "hideCommandList": "Zpět"
     },
     "signal": {
       "title": "ZPRAVODAJSKÉ ZJIŠTĚNÍ",
