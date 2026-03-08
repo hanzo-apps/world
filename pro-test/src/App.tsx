@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { t } from './i18n';
 import dashboardFallback from './assets/worldmonitor-7-mar-2026.jpg';
+import wiredLogo from './assets/wired-logo.svg';
 
 const API_BASE = location.hostname === 'localhost' ? 'https://api.worldmonitor.app' : '/api';
 const TURNSTILE_SITE_KEY = '0x4AAAAAACnaYgHIyxclu8Tj';
@@ -276,7 +277,7 @@ const SocialProof = () => (
         </p>
         <footer className="mt-6 flex items-center justify-center gap-3">
           <a href="https://www.wired.me/story/the-music-streaming-ceo-who-built-a-global-war-map" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-wm-muted hover:text-wm-text transition-colors">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/9/95/Wired_logo.svg" alt="WIRED" className="h-5 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
+            <img src={wiredLogo} alt="WIRED" className="h-5 brightness-0 invert opacity-60 hover:opacity-100 transition-opacity" />
           </a>
         </footer>
       </blockquote>
@@ -287,6 +288,7 @@ const SocialProof = () => (
 /* ─── 3. Two-path split (new — from draft) ─── */
 const TwoPathSplit = () => (
   <section className="py-24 px-6 max-w-5xl mx-auto" id="tiers">
+    <h2 className="sr-only">Plans</h2>
     <div className="grid md:grid-cols-2 gap-8">
       <div className="bg-wm-card border border-wm-green p-8 relative border-glow">
         <div className="absolute top-0 left-0 w-full h-1 bg-wm-green" />
@@ -448,42 +450,42 @@ const ProShowcase = () => (
           <div className="flex gap-4">
             <TrendingUp className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.equityResearch')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.equityResearch')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.equityResearchDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
             <Globe className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.geopoliticalAnalysis')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.geopoliticalAnalysis')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.geopoliticalAnalysisDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
             <BarChart3 className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.economyAnalytics')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.economyAnalytics')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.economyAnalyticsDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
             <ShieldAlert className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.riskMonitoring')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.riskMonitoring')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.riskMonitoringDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
             <Clock className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.morningBriefs')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.morningBriefs')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.morningBriefsDesc')}</p>
             </div>
           </div>
           <div className="flex gap-4">
             <Key className="w-6 h-6 text-wm-green shrink-0" aria-hidden="true" />
             <div>
-              <h4 className="font-bold mb-1">{t('proShowcase.oneKey')}</h4>
+              <h3 className="font-bold mb-1">{t('proShowcase.oneKey')}</h3>
               <p className="text-sm text-wm-muted">{t('proShowcase.oneKeyDesc')}</p>
             </div>
           </div>
@@ -673,53 +675,53 @@ const EnterpriseShowcase = () => (
       <div className="grid md:grid-cols-3 gap-6 mb-6">
         <div className="bg-wm-card border border-wm-border p-6">
           <ShieldAlert className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.security')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.security')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.securityDesc')}</p>
         </div>
         <div className="bg-wm-card border border-wm-border p-6">
           <Cpu className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.aiAgents')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.aiAgents')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.aiAgentsDesc')}</p>
         </div>
         <div className="bg-wm-card border border-wm-border p-6">
           <Layers className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.dataLayers')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.dataLayers')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.dataLayersDesc')}</p>
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-6 mb-12">
         <div className="bg-wm-card border border-wm-border p-6">
           <Plug className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.connectors')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.connectors')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.connectorsDesc')}</p>
         </div>
         <div className="bg-wm-card border border-wm-border p-6">
           <PanelTop className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.whiteLabel')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.whiteLabel')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.whiteLabelDesc')}</p>
         </div>
         <div className="bg-wm-card border border-wm-border p-6">
           <BarChart3 className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-          <h4 className="font-bold mb-2">{t('enterpriseShowcase.financial')}</h4>
+          <h3 className="font-bold mb-2">{t('enterpriseShowcase.financial')}</h3>
           <p className="text-sm text-wm-muted">{t('enterpriseShowcase.financialDesc')}</p>
         </div>
       </div>
 
       <div className="data-grid mb-12">
         <div className="data-cell">
-          <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.commodity')}</h5>
+          <h4 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.commodity')}</h4>
           <p className="text-sm">{t('enterpriseShowcase.commodityDesc')}</p>
         </div>
         <div className="data-cell">
-          <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.government')}</h5>
+          <h4 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.government')}</h4>
           <p className="text-sm">{t('enterpriseShowcase.governmentDesc')}</p>
         </div>
         <div className="data-cell">
-          <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.risk')}</h5>
+          <h4 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.risk')}</h4>
           <p className="text-sm">{t('enterpriseShowcase.riskDesc')}</p>
         </div>
         <div className="data-cell">
-          <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.soc')}</h5>
+          <h4 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.soc')}</h4>
           <p className="text-sm">{t('enterpriseShowcase.socDesc')}</p>
         </div>
       </div>
@@ -727,6 +729,7 @@ const EnterpriseShowcase = () => (
       <div className="text-center mt-12">
         <a
           href="#enterprise"
+          aria-label="Talk to sales about Enterprise plans"
           className="inline-flex items-center gap-2 bg-wm-green text-wm-bg px-8 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors"
         >
           {t('enterpriseShowcase.talkToSales')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
@@ -866,9 +869,9 @@ const Footer = () => (
         <Logo />
       </div>
       <div className="flex gap-6">
-        <a href="https://x.com/eliehabib" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">X</a>
-        <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
-        <a href="https://www.wired.me/story/the-music-streaming-ceo-who-built-a-global-war-map" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">{t('footer.wiredArticle')}</a>
+        <a href="https://x.com/worldmonitorai" target="_blank" rel="noreferrer" aria-label="Follow World Monitor on X" className="hover:text-wm-text transition-colors">X</a>
+        <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" aria-label="World Monitor on GitHub" className="hover:text-wm-text transition-colors">GitHub</a>
+        <a href="https://www.wired.me/story/the-music-streaming-ceo-who-built-a-global-war-map" target="_blank" rel="noreferrer" aria-label="Read the WIRED article about World Monitor" className="hover:text-wm-text transition-colors">{t('footer.wiredArticle')}</a>
       </div>
     </div>
   </footer>
@@ -898,7 +901,7 @@ const EnterprisePage = () => (
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-wm-border bg-wm-card text-wm-muted text-xs font-mono mb-6">
             {t('enterpriseShowcase.enterpriseTier')}
           </div>
-          <h1 className="text-4xl md:text-6xl font-display font-bold mb-6">{t('enterpriseShowcase.title')}</h1>
+          <h2 className="text-4xl md:text-6xl font-display font-bold mb-6">{t('enterpriseShowcase.title')}</h2>
           <p className="text-lg text-wm-muted max-w-2xl mx-auto mb-10">
             {t('enterpriseShowcase.subtitle')}
           </p>
@@ -911,37 +914,38 @@ const EnterprisePage = () => (
       {/* Features grid */}
       <section className="py-24 px-6" id="features">
         <div className="max-w-7xl mx-auto">
+          <h2 className="sr-only">Enterprise Features</h2>
           <div className="grid md:grid-cols-3 gap-6 mb-6">
             <div className="bg-wm-card border border-wm-border p-6">
               <ShieldAlert className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.security')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.security')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.securityDesc')}</p>
             </div>
             <div className="bg-wm-card border border-wm-border p-6">
               <Cpu className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.aiAgents')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.aiAgents')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.aiAgentsDesc')}</p>
             </div>
             <div className="bg-wm-card border border-wm-border p-6">
               <Layers className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.dataLayers')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.dataLayers')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.dataLayersDesc')}</p>
             </div>
           </div>
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             <div className="bg-wm-card border border-wm-border p-6">
               <Plug className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.connectors')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.connectors')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.connectorsDesc')}</p>
             </div>
             <div className="bg-wm-card border border-wm-border p-6">
               <PanelTop className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.whiteLabel')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.whiteLabel')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.whiteLabelDesc')}</p>
             </div>
             <div className="bg-wm-card border border-wm-border p-6">
               <BarChart3 className="w-8 h-8 text-wm-muted mb-4" aria-hidden="true" />
-              <h4 className="font-bold mb-2">{t('enterpriseShowcase.financial')}</h4>
+              <h3 className="font-bold mb-2">{t('enterpriseShowcase.financial')}</h3>
               <p className="text-sm text-wm-muted">{t('enterpriseShowcase.financialDesc')}</p>
             </div>
           </div>
@@ -954,19 +958,19 @@ const EnterprisePage = () => (
           <h2 className="text-3xl font-display font-bold mb-12 text-center">{t('enterpriseShowcase.title')}</h2>
           <div className="data-grid">
             <div className="data-cell">
-              <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.commodity')}</h5>
+              <h3 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.commodity')}</h3>
               <p className="text-sm">{t('enterpriseShowcase.commodityDesc')}</p>
             </div>
             <div className="data-cell">
-              <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.government')}</h5>
+              <h3 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.government')}</h3>
               <p className="text-sm">{t('enterpriseShowcase.governmentDesc')}</p>
             </div>
             <div className="data-cell">
-              <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.risk')}</h5>
+              <h3 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.risk')}</h3>
               <p className="text-sm">{t('enterpriseShowcase.riskDesc')}</p>
             </div>
             <div className="data-cell">
-              <h5 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.soc')}</h5>
+              <h3 className="font-mono text-xs text-wm-muted uppercase tracking-widest mb-2">{t('enterpriseShowcase.soc')}</h3>
               <p className="text-sm">{t('enterpriseShowcase.socDesc')}</p>
             </div>
           </div>
@@ -1040,7 +1044,7 @@ const EnterprisePage = () => (
         </div>
         <div className="flex gap-6">
           <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} className="hover:text-wm-text transition-colors">{t('nav.pro')}</a>
-          <a href="https://x.com/eliehabib" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">X</a>
+          <a href="https://x.com/worldmonitorai" target="_blank" rel="noreferrer" aria-label="Follow World Monitor on X" className="hover:text-wm-text transition-colors">X</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
         </div>
       </div>
