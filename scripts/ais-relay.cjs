@@ -2649,25 +2649,44 @@ async function seedMilitaryFlights() {
     const allStates = [];
     for (const region of MIL_QUERY_REGIONS) {
       const params = `lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
+      let data = null;
+      // Try authenticated proxy first
       try {
         const resp = await fetch(`http://localhost:${PORT}/opensky?${params}`, {
           headers: { 'User-Agent': CHROME_UA, ...(RELAY_SHARED_SECRET ? { 'x-relay-key': RELAY_SHARED_SECRET } : {}) },
           signal: AbortSignal.timeout(20_000),
         });
-        if (!resp.ok) {
-          console.warn(`[MilitaryFlights] OpenSky ${resp.status} for ${region.name}`);
-          continue;
-        }
-        const data = await resp.json();
-        if (!data.states) continue;
-        for (const state of data.states) {
-          const icao24 = state[0];
-          if (seenIds.has(icao24)) continue;
-          seenIds.add(icao24);
-          allStates.push(state);
+        if (resp.ok) {
+          data = await resp.json();
+        } else {
+          console.warn(`[MilitaryFlights] Proxy ${resp.status} for ${region.name}, trying anonymous`);
         }
       } catch (e) {
-        console.warn(`[MilitaryFlights] ${region.name} fetch error: ${e?.message || e}`);
+        console.warn(`[MilitaryFlights] Proxy failed for ${region.name}: ${e?.message || e}, trying anonymous`);
+      }
+      // Fallback to anonymous OpenSky API (no auth, ~10 req/min)
+      if (!data || !data.states) {
+        try {
+          const anonResp = await fetch(`https://opensky-network.org/api/states/all?${params}`, {
+            headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (anonResp.ok) {
+            data = await anonResp.json();
+            if (data?.states) console.log(`[MilitaryFlights] Anonymous fallback OK for ${region.name}: ${data.states.length} states`);
+          } else {
+            console.warn(`[MilitaryFlights] Anonymous ${anonResp.status} for ${region.name}`);
+          }
+        } catch (e) {
+          console.warn(`[MilitaryFlights] Anonymous failed for ${region.name}: ${e?.message || e}`);
+        }
+      }
+      if (!data?.states) continue;
+      for (const state of data.states) {
+        const icao24 = state[0];
+        if (seenIds.has(icao24)) continue;
+        seenIds.add(icao24);
+        allStates.push(state);
       }
     }
 
