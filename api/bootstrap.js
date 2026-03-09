@@ -62,7 +62,7 @@ const TIER_CACHE = {
 };
 const TIER_CDN_CACHE = {
   slow: 'public, s-maxage=7200, stale-while-revalidate=1800, stale-if-error=7200',
-  fast: 'public, s-maxage=1200, stale-while-revalidate=300, stale-if-error=1800',
+  fast: 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900',
 };
 
 const NEG_SENTINEL = '__WM_NEG__';
