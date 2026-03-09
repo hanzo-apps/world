@@ -44,6 +44,8 @@ import type { GpsJamHex } from '@/services/gps-interference';
 import type { SatellitePosition } from '@/services/satellites';
 
 const SAT_COUNTRY_COLORS: Record<string, string> = { CN: '#ff2020', RU: '#ff8800', US: '#4488ff', EU: '#44cc44', KR: '#aa66ff', IN: '#ff66aa', TR: '#ff4466', OTHER: '#ccccff' };
+const SAT_TYPE_EMOJI: Record<string, string> = { sar: '\u{1F4E1}', optical: '\u{1F4F7}', military: '\u{1F396}', sigint: '\u{1F4FB}' };
+const SAT_TYPE_LABEL: Record<string, string> = { sar: 'SAR Imaging', optical: 'Optical Imaging', military: 'Military', sigint: 'SIGINT' };
 
 // ─── Marker discriminated union ─────────────────────────────────────────────
 interface BaseMarker {
@@ -286,6 +288,8 @@ interface SatelliteMarker extends BaseMarker {
   country: string;
   type: string;
   alt: number;
+  velocity: number;
+  inclination: number;
 }
 interface SatFootprintMarker extends BaseMarker {
   _kind: 'satFootprint';
@@ -419,6 +423,8 @@ export class GlobeMap {
   // Overlay UI elements
   private layerTogglesEl: HTMLElement | null = null;
   private tooltipEl: HTMLElement | null = null;
+  private tooltipHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private satHoverStyle: HTMLStyleElement | null = null;
 
   // Callbacks
   private onLayerChangeCb: ((layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void) | null = null;
@@ -462,6 +468,11 @@ export class GlobeMap {
       globe._destructor();
       return;
     }
+
+    const satStyle = document.createElement('style');
+    satStyle.textContent = `.sat-hit:hover .sat-dot { transform: scale(2.5); box-shadow: 0 0 10px 4px currentColor; }`;
+    document.head.appendChild(satStyle);
+    this.satHoverStyle = satStyle;
 
     this.unsubscribeGlobeQuality?.();
     this.unsubscribeGlobeQuality = subscribeGlobeRenderScaleChange((scale) => {
@@ -921,8 +932,8 @@ export class GlobeMap {
       el.title = d.name;
     } else if (d._kind === 'satellite') {
       const c = SAT_COUNTRY_COLORS[(d as SatelliteMarker).country] || '#ccccff';
-      el.innerHTML = `<div style="width:4px;height:4px;border-radius:50%;background:${c};box-shadow:0 0 6px 2px ${c}88"></div>`;
-      el.title = `${(d as SatelliteMarker).name} (${(d as SatelliteMarker).country}) · ${d.type === 'sar' ? 'SAR' : d.type === 'optical' ? 'Optical' : d.type} · ${Math.round((d as SatelliteMarker).alt)}km`;
+      el.innerHTML = `<div class="sat-hit" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;margin:-8px 0 0 -8px;color:${c}"><div class="sat-dot" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px 2px ${c}88;transition:transform .15s,box-shadow .15s;"></div></div>`;
+      el.title = `${(d as SatelliteMarker).name}`;
     } else if (d._kind === 'satFootprint') {
       const colors: Record<string, string> = { CN: '#ff2020', RU: '#ff8800', US: '#4488ff', EU: '#44cc44' };
       const c = colors[(d as SatFootprintMarker).country] || '#ccccff';
@@ -1116,29 +1127,45 @@ export class GlobeMap {
              `<br><span style="opacity:.5;">${esc(d.threatLevel)}</span>`;
     } else if (d._kind === 'satellite') {
       const sc = SAT_COUNTRY_COLORS[d.country] || '#ccccff';
-      const typeLabel = d.type === 'sar' ? 'SAR Imaging' : d.type === 'optical' ? 'Optical Imaging' : d.type === 'military' ? 'Military' : 'SIGINT';
-      html = `<span style="color:${sc};font-weight:bold;">🛰 ${esc(d.name)}</span>` +
-             `<br><span style="opacity:.7;">${esc(d.country)} · ${esc(typeLabel)}</span>` +
-             `<br><span style="opacity:.5;">${Math.round(d.alt)}km altitude</span>`;
+      const altBand = d.alt < 2000 ? 'LEO' : d.alt < 35786 ? 'MEO' : 'GEO';
+      html = `<div style="min-width:220px;">` +
+        `<span style="color:${sc};font-weight:bold;font-size:12px;">${SAT_TYPE_EMOJI[d.type] || '\u{1F6F0}'} ${esc(d.name)}</span>` +
+        `<div style="opacity:.5;font-size:10px;margin:2px 0 6px;">NORAD ${esc(d.id)}</div>` +
+        `<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px;">` +
+        `<span style="opacity:.5;">Type</span><span>${esc(SAT_TYPE_LABEL[d.type] || d.type)}</span>` +
+        `<span style="opacity:.5;">Operator</span><span style="color:${sc}">${esc(d.country)}</span>` +
+        `<span style="opacity:.5;">Alt. band</span><span>${altBand} \u00B7 ${Math.round(d.alt)} km</span>` +
+        `<span style="opacity:.5;">Incl.</span><span>${d.inclination.toFixed(1)}\u00B0</span>` +
+        `<span style="opacity:.5;">Velocity</span><span>${d.velocity.toFixed(1)} km/s</span>` +
+        `</div></div>`;
     }
     el.innerHTML = html;
+    if (d._kind === 'satellite') el.style.maxWidth = '300px';
 
-    // Position relative to container
+    this.container.appendChild(el);
+
+    // Position relative to container using measured dimensions
     const ar = anchor.getBoundingClientRect();
     const cr = this.container.getBoundingClientRect();
-    let left = ar.left - cr.left + (anchor.offsetWidth ?? 14) + 6;
-    let top  = ar.top  - cr.top  - 8;
-    left = Math.max(4, Math.min(left, cr.width  - 248));
-    top  = Math.max(4, Math.min(top,  cr.height - 80));
+    const left = Math.max(4, Math.min(
+      ar.left - cr.left + (anchor.offsetWidth ?? 14) + 6,
+      cr.width - el.offsetWidth - 4
+    ));
+    const top = Math.max(4, Math.min(
+      ar.top - cr.top - 8,
+      cr.height - el.offsetHeight - 4
+    ));
     el.style.left = left + 'px';
     el.style.top  = top  + 'px';
 
-    this.container.appendChild(el);
     this.tooltipEl = el;
-    setTimeout(() => this.hideTooltip(), 3500);
+    if (this.tooltipHideTimer) clearTimeout(this.tooltipHideTimer);
+    const hideDelay = d._kind === 'satellite' ? 6000 : 3500;
+    this.tooltipHideTimer = setTimeout(() => this.hideTooltip(), hideDelay);
   }
 
   private hideTooltip(): void {
+    if (this.tooltipHideTimer) { clearTimeout(this.tooltipHideTimer); this.tooltipHideTimer = null; }
     this.tooltipEl?.remove();
     this.tooltipEl = null;
   }
@@ -2067,6 +2094,8 @@ export class GlobeMap {
       country: s.country,
       type: s.type,
       alt: s.alt,
+      velocity: s.velocity,
+      inclination: s.inclination,
     }));
 
     this.satelliteFootprintMarkers = positions.map(s => ({
@@ -2349,6 +2378,7 @@ export class GlobeMap {
     if (this.autoRotateTimer) clearTimeout(this.autoRotateTimer);
     this.reversedRingCache.clear();
     this.hideTooltip();
+    if (this.satHoverStyle) { this.satHoverStyle.remove(); this.satHoverStyle = null; }
     this.controls = null;
     this.controlsAutoRotateBeforePause = null;
     this.controlsDampingBeforePause = null;
