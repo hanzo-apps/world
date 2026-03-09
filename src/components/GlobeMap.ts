@@ -403,6 +403,7 @@ export class GlobeMap {
   private satelliteMarkers: SatelliteMarker[] = [];
   private satelliteTrailPaths: GlobePath[] = [];
   private satelliteFootprintMarkers: SatFootprintMarker[] = [];
+  private satBeamGroup: any = null;
   private tradeRouteSegments: TradeRouteSegment[] = [];
   private globePaths: GlobePath[] = [];
   private cableFaultIds = new Set<string>();
@@ -1670,6 +1671,9 @@ export class GlobeMap {
     if (needArcs)     this.flushArcs();
     if (needPaths)    this.flushPaths();
     if (needPolygons) this.flushPolygons();
+    if (prev.satellites !== layers.satellites && this.satBeamGroup) {
+      this.satBeamGroup.visible = !!layers.satellites;
+    }
   }
 
   public enableLayer(layer: keyof MapLayers): void {
@@ -2089,6 +2093,115 @@ export class GlobeMap {
     this.flushMarkers();
   }
 
+  private static latLngAltToVec3(lat: number, lng: number, alt: number, vec3Ctor: any): any {
+    const R = 1;
+    const r = R + alt / 6371;
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lng + 180) * (Math.PI / 180);
+    return new vec3Ctor(
+      -r * Math.sin(phi) * Math.cos(theta),
+      r * Math.cos(phi),
+      r * Math.sin(phi) * Math.sin(theta),
+    );
+  }
+
+  private async rebuildSatBeams(positions: SatellitePosition[]): Promise<void> {
+    if (!this.globe || this.destroyed) return;
+    const THREE = await import('three');
+    const scene = this.globe.scene();
+
+    if (this.satBeamGroup) {
+      scene.remove(this.satBeamGroup);
+      this.satBeamGroup.traverse((child: any) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+    }
+    this.satBeamGroup = new THREE.Group();
+    this.satBeamGroup.name = 'satBeams';
+
+    if (!this.layers.satellites || positions.length === 0) return;
+
+    const colorMap: Record<string, number> = {
+      CN: 0xff2020, RU: 0xff8800, US: 0x4488ff, EU: 0x44cc44,
+      KR: 0xaa66ff, IN: 0xff66aa, TR: 0xff4466, OTHER: 0xccccff,
+    };
+
+    const RAY_COUNT = 8;
+    const GROUND_SPREAD_RAD = 0.018;
+
+    const allRayPositions: number[] = [];
+    const allRayColors: number[] = [];
+    const allConePositions: number[] = [];
+    const allConeColors: number[] = [];
+
+    const tmpColor = new THREE.Color();
+
+    for (const s of positions) {
+      const satPos = GlobeMap.latLngAltToVec3(s.lat, s.lng, s.alt, THREE.Vector3);
+      const groundCenter = GlobeMap.latLngAltToVec3(s.lat, s.lng, 0, THREE.Vector3);
+      if (satPos.distanceTo(groundCenter) < 0.001) continue;
+
+      const hex = colorMap[s.country] ?? 0xccccff;
+      tmpColor.setHex(hex);
+      const r = tmpColor.r, g = tmpColor.g, b = tmpColor.b;
+
+      const dir = new THREE.Vector3().subVectors(groundCenter, satPos).normalize();
+      const up = new THREE.Vector3(0, 1, 0);
+      if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0);
+      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
+      const forward = new THREE.Vector3().crossVectors(right, dir).normalize();
+
+      const groundPts: InstanceType<typeof THREE.Vector3>[] = [];
+      for (let i = 0; i < RAY_COUNT; i++) {
+        const angle = (i / RAY_COUNT) * Math.PI * 2;
+        const gp = new THREE.Vector3()
+          .copy(groundCenter)
+          .addScaledVector(right, Math.cos(angle) * GROUND_SPREAD_RAD)
+          .addScaledVector(forward, Math.sin(angle) * GROUND_SPREAD_RAD)
+          .normalize();
+        groundPts.push(gp);
+        allRayPositions.push(satPos.x, satPos.y, satPos.z, gp.x, gp.y, gp.z);
+        allRayColors.push(r, g, b, r, g, b);
+      }
+
+      for (let i = 0; i < RAY_COUNT; i++) {
+        const next = (i + 1) % RAY_COUNT;
+        const gi = groundPts[i]!;
+        const gn = groundPts[next]!;
+        allConePositions.push(
+          satPos.x, satPos.y, satPos.z,
+          gi.x, gi.y, gi.z,
+          gn.x, gn.y, gn.z,
+        );
+        allConeColors.push(r, g, b, r, g, b, r, g, b);
+      }
+    }
+
+    if (allRayPositions.length > 0) {
+      const rayGeo = new THREE.BufferGeometry();
+      rayGeo.setAttribute('position', new THREE.Float32BufferAttribute(allRayPositions, 3));
+      rayGeo.setAttribute('color', new THREE.Float32BufferAttribute(allRayColors, 3));
+      const rayMat = new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false,
+      });
+      this.satBeamGroup.add(new THREE.LineSegments(rayGeo, rayMat));
+    }
+
+    if (allConePositions.length > 0) {
+      const coneGeo = new THREE.BufferGeometry();
+      coneGeo.setAttribute('position', new THREE.Float32BufferAttribute(allConePositions, 3));
+      coneGeo.setAttribute('color', new THREE.Float32BufferAttribute(allConeColors, 3));
+      const coneMat = new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.06,
+        side: THREE.DoubleSide, depthWrite: false,
+      });
+      this.satBeamGroup.add(new THREE.Mesh(coneGeo, coneMat));
+    }
+
+    scene.add(this.satBeamGroup);
+  }
+
   public setSatellites(positions: SatellitePosition[]): void {
     this.satelliteMarkers = positions.map(s => ({
       _kind: 'satellite' as const,
@@ -2122,6 +2235,7 @@ export class GlobeMap {
         country: s.country,
       }));
 
+    this.rebuildSatBeams(positions);
     this.flushMarkers();
     this.flushPaths();
   }
@@ -2364,6 +2478,14 @@ export class GlobeMap {
       this.extrasAnimFrameId = null;
     }
     const scene = this.globe?.scene();
+    if (this.satBeamGroup && scene) {
+      scene.remove(this.satBeamGroup);
+      this.satBeamGroup.traverse((child: any) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+      this.satBeamGroup = null;
+    }
     for (const obj of [this.outerGlow, this.innerGlow, this.starField, this.cyanLight]) {
       if (!obj) continue;
       if (scene) scene.remove(obj);
