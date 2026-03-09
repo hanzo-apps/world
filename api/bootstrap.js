@@ -47,13 +47,13 @@ const SLOW_KEYS = new Set([
   'bisPolicy', 'bisExchange', 'bisCredit', 'minerals', 'giving',
   'sectors', 'etfFlows', 'shippingRates', 'wildfires', 'climateAnomalies',
   'cyberThreats', 'techReadiness', 'progressData', 'renewableEnergy',
-  'theaterPosture', 'naturalEvents',
+  'naturalEvents',
   'cryptoQuotes', 'gulfQuotes', 'stablecoinMarkets', 'unrestEvents', 'ucdpEvents',
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
-  'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending',
+  'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending', 'theaterPosture',
 ]);
 
 const TIER_CACHE = {
