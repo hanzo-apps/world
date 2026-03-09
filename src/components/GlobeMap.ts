@@ -2128,8 +2128,10 @@ export class GlobeMap {
       KR: 0xaa66ff, IN: 0xff66aa, TR: 0xff4466, OTHER: 0xccccff,
     };
 
-    const RAY_COUNT = 8;
-    const GROUND_SPREAD_RAD = 1.8;
+    const RAY_COUNT = 6;
+    const GLOBE_R = 100;
+    const BEAM_HEIGHT = 25;
+    const GROUND_SPREAD_RAD = 4.0;
 
     const allRayPositions: number[] = [];
     const allRayColors: number[] = [];
@@ -2139,15 +2141,14 @@ export class GlobeMap {
     const tmpColor = new THREE.Color();
 
     for (const s of positions) {
-      const satPos = GlobeMap.latLngAltToVec3(s.lat, s.lng, s.alt, THREE.Vector3);
       const groundCenter = GlobeMap.latLngAltToVec3(s.lat, s.lng, 0, THREE.Vector3);
-      if (satPos.distanceTo(groundCenter) < 0.001) continue;
+      const beamTop = new THREE.Vector3().copy(groundCenter).normalize().multiplyScalar(GLOBE_R + BEAM_HEIGHT);
 
       const hex = colorMap[s.country] ?? 0xccccff;
       tmpColor.setHex(hex);
       const r = tmpColor.r, g = tmpColor.g, b = tmpColor.b;
 
-      const dir = new THREE.Vector3().subVectors(groundCenter, satPos).normalize();
+      const dir = new THREE.Vector3().copy(groundCenter).normalize().negate();
       const up = new THREE.Vector3(0, 1, 0);
       if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0);
       const right = new THREE.Vector3().crossVectors(dir, up).normalize();
@@ -2160,10 +2161,10 @@ export class GlobeMap {
           .copy(groundCenter)
           .addScaledVector(right, Math.cos(angle) * GROUND_SPREAD_RAD)
           .addScaledVector(forward, Math.sin(angle) * GROUND_SPREAD_RAD)
-          .normalize().multiplyScalar(100);
+          .normalize().multiplyScalar(GLOBE_R);
         groundPts.push(gp);
-        allRayPositions.push(satPos.x, satPos.y, satPos.z, gp.x, gp.y, gp.z);
-        allRayColors.push(r, g, b, r, g, b);
+        allRayPositions.push(beamTop.x, beamTop.y, beamTop.z, gp.x, gp.y, gp.z);
+        allRayColors.push(r, g, b, r * 0.3, g * 0.3, b * 0.3);
       }
 
       for (let i = 0; i < RAY_COUNT; i++) {
@@ -2171,11 +2172,11 @@ export class GlobeMap {
         const gi = groundPts[i]!;
         const gn = groundPts[next]!;
         allConePositions.push(
-          satPos.x, satPos.y, satPos.z,
+          beamTop.x, beamTop.y, beamTop.z,
           gi.x, gi.y, gi.z,
           gn.x, gn.y, gn.z,
         );
-        allConeColors.push(r, g, b, r, g, b, r, g, b);
+        allConeColors.push(r, g, b, r * 0.2, g * 0.2, b * 0.2, r * 0.2, g * 0.2, b * 0.2);
       }
     }
 
@@ -2184,7 +2185,7 @@ export class GlobeMap {
       rayGeo.setAttribute('position', new THREE.Float32BufferAttribute(allRayPositions, 3));
       rayGeo.setAttribute('color', new THREE.Float32BufferAttribute(allRayColors, 3));
       const rayMat = new THREE.LineBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false,
+        vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false,
       });
       this.satBeamGroup.add(new THREE.LineSegments(rayGeo, rayMat));
     }
@@ -2194,7 +2195,7 @@ export class GlobeMap {
       coneGeo.setAttribute('position', new THREE.Float32BufferAttribute(allConePositions, 3));
       coneGeo.setAttribute('color', new THREE.Float32BufferAttribute(allConeColors, 3));
       const coneMat = new THREE.MeshBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.06,
+        vertexColors: true, transparent: true, opacity: 0.1,
         side: THREE.DoubleSide, depthWrite: false,
       });
       this.satBeamGroup.add(new THREE.Mesh(coneGeo, coneMat));
