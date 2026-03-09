@@ -666,10 +666,25 @@ export class EventHandlerManager implements AppModule {
     }, 1500);
   }
 
+  private getFullscreenDocument(): Document & {
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => Promise<void> | void;
+  } {
+    return document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+  }
+
   private async exitFullscreenForNavigation(): Promise<void> {
-    if (!document.fullscreenElement) return;
+    const fullscreenDocument = this.getFullscreenDocument();
+    if (!fullscreenDocument.fullscreenElement && !fullscreenDocument.webkitFullscreenElement) return;
     try {
-      await document.exitFullscreen?.();
+      if (typeof fullscreenDocument.exitFullscreen === 'function') {
+        await fullscreenDocument.exitFullscreen();
+        return;
+      }
+      await fullscreenDocument.webkitExitFullscreen?.();
     } catch { /* proceed with navigation regardless */ }
   }
 
@@ -691,8 +706,14 @@ export class EventHandlerManager implements AppModule {
   }
 
   toggleFullscreen(): void {
-    if (document.fullscreenElement) {
-      try { void document.exitFullscreen()?.catch(() => { }); } catch { }
+    const fullscreenDocument = this.getFullscreenDocument();
+    if (fullscreenDocument.fullscreenElement || fullscreenDocument.webkitFullscreenElement) {
+      try {
+        const exitResult = typeof fullscreenDocument.exitFullscreen === 'function'
+          ? fullscreenDocument.exitFullscreen()
+          : fullscreenDocument.webkitExitFullscreen?.();
+        void Promise.resolve(exitResult).catch(() => { });
+      } catch { }
     } else {
       const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
       if (el.requestFullscreen) {
