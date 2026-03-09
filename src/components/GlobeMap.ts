@@ -2201,6 +2201,7 @@ export class GlobeMap {
       this.satBeamGroup.add(new THREE.Mesh(coneGeo, coneMat));
     }
 
+    this.satBeamGroup.visible = !!this.layers.satellites;
     scene.add(this.satBeamGroup);
   }
 
