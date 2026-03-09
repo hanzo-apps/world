@@ -3243,12 +3243,19 @@ export class DeckGLMap {
     }
   }
 
+  private static readonly CHOROPLETH_LAYER_IDS = new Set([
+    'cii-choropleth-layer',
+    'happiness-choropleth-layer',
+  ]);
+
   private handleClick(info: PickingInfo): void {
-    if (!info.object) {
-      // Empty map click → country detection
+    const isChoropleth = info.layer?.id ? DeckGLMap.CHOROPLETH_LAYER_IDS.has(info.layer.id) : false;
+    if (!info.object || isChoropleth) {
       if (info.coordinate && this.onCountryClick) {
         const [lon, lat] = info.coordinate as [number, number];
-        const country = this.resolveCountryFromCoordinate(lon, lat);
+        const country = isChoropleth && info.object?.properties
+          ? { code: info.object.properties['ISO3166-1-Alpha-2'] as string, name: info.object.properties.name as string }
+          : this.resolveCountryFromCoordinate(lon, lat);
         this.onCountryClick({
           lat,
           lon,
