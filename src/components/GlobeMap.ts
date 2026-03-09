@@ -2094,14 +2094,15 @@ export class GlobeMap {
   }
 
   private static latLngAltToVec3(lat: number, lng: number, alt: number, vec3Ctor: any): any {
-    const R = 1;
-    const r = R + alt / 6371;
+    const GLOBE_R = 100;
+    const r = GLOBE_R * (1 + alt / 6371);
     const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (lng + 180) * (Math.PI / 180);
+    const theta = (90 - lng) * (Math.PI / 180);
+    const sinPhi = Math.sin(phi);
     return new vec3Ctor(
-      -r * Math.sin(phi) * Math.cos(theta),
+      r * sinPhi * Math.cos(theta),
       r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta),
+      r * sinPhi * Math.sin(theta),
     );
   }
 
@@ -2128,7 +2129,7 @@ export class GlobeMap {
     };
 
     const RAY_COUNT = 8;
-    const GROUND_SPREAD_RAD = 0.018;
+    const GROUND_SPREAD_RAD = 1.8;
 
     const allRayPositions: number[] = [];
     const allRayColors: number[] = [];
@@ -2159,7 +2160,7 @@ export class GlobeMap {
           .copy(groundCenter)
           .addScaledVector(right, Math.cos(angle) * GROUND_SPREAD_RAD)
           .addScaledVector(forward, Math.sin(angle) * GROUND_SPREAD_RAD)
-          .normalize();
+          .normalize().multiplyScalar(100);
         groundPts.push(gp);
         allRayPositions.push(satPos.x, satPos.y, satPos.z, gp.x, gp.y, gp.z);
         allRayColors.push(r, g, b, r, g, b);
