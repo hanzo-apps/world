@@ -27,7 +27,7 @@ import { getSecretState } from '@/services/runtime-config';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
-import { getCountryBbox, getCountriesGeoJson } from '@/services/country-geometry';
+import { getCountryBbox, getCountriesGeoJson, getCountryAtCoordinates, getCountryNameByCode } from '@/services/country-geometry';
 import { escapeHtml } from '@/utils/sanitize';
 import { showLayerWarning } from '@/utils/layer-warning';
 import type { FeatureCollection, Geometry } from 'geojson';
@@ -46,6 +46,7 @@ import type { SatellitePosition } from '@/services/satellites';
 const SAT_COUNTRY_COLORS: Record<string, string> = { CN: '#ff2020', RU: '#ff8800', US: '#4488ff', EU: '#44cc44', KR: '#aa66ff', IN: '#ff66aa', TR: '#ff4466', OTHER: '#ccccff' };
 const SAT_TYPE_EMOJI: Record<string, string> = { sar: '\u{1F4E1}', optical: '\u{1F4F7}', military: '\u{1F396}', sigint: '\u{1F4FB}' };
 const SAT_TYPE_LABEL: Record<string, string> = { sar: 'SAR Imaging', optical: 'Optical Imaging', military: 'Military', sigint: 'SIGINT' };
+const SAT_OPERATOR_NAME: Record<string, string> = { CN: 'China', RU: 'Russia', US: 'United States', EU: 'ESA / EU', KR: 'South Korea', IN: 'India', TR: 'Turkey', OTHER: 'Other' };
 
 // ─── Marker discriminated union ─────────────────────────────────────────────
 interface BaseMarker {
@@ -1128,12 +1129,16 @@ export class GlobeMap {
     } else if (d._kind === 'satellite') {
       const sc = SAT_COUNTRY_COLORS[d.country] || '#ccccff';
       const altBand = d.alt < 2000 ? 'LEO' : d.alt < 35786 ? 'MEO' : 'GEO';
+      const operatorName = SAT_OPERATOR_NAME[d.country] || getCountryNameByCode(d.country) || d.country;
+      const overHit = getCountryAtCoordinates(d._lat, d._lng);
+      const overLabel = overHit ? overHit.name : 'Ocean';
       html = `<div style="min-width:220px;">` +
         `<span style="color:${sc};font-weight:bold;font-size:12px;">${SAT_TYPE_EMOJI[d.type] || '\u{1F6F0}'} ${esc(d.name)}</span>` +
         `<div style="opacity:.5;font-size:10px;margin:2px 0 6px;">NORAD ${esc(d.id)}</div>` +
         `<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px;">` +
         `<span style="opacity:.5;">Type</span><span>${esc(SAT_TYPE_LABEL[d.type] || d.type)}</span>` +
-        `<span style="opacity:.5;">Operator</span><span style="color:${sc}">${esc(d.country)}</span>` +
+        `<span style="opacity:.5;">Operator</span><span style="color:${sc}">${esc(operatorName)}</span>` +
+        `<span style="opacity:.5;">Over</span><span>${esc(overLabel)}</span>` +
         `<span style="opacity:.5;">Alt. band</span><span>${altBand} \u00B7 ${Math.round(d.alt)} km</span>` +
         `<span style="opacity:.5;">Incl.</span><span>${d.inclination.toFixed(1)}\u00B0</span>` +
         `<span style="opacity:.5;">Velocity</span><span>${d.velocity.toFixed(1)} km/s</span>` +
