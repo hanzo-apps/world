@@ -404,7 +404,7 @@ The image is **frontend-only**: it serves the Vite-built static app with nginx a
 **Build (from repo root):**
 
 ```bash
-docker build -t ghcr.io/koala73/worldmonitor:latest .
+docker build -f docker/Dockerfile -t ghcr.io/koala73/worldmonitor:latest .
 ```
 
 **Run (default API: `https://api.worldmonitor.app`):**
