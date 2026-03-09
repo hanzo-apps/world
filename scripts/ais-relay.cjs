@@ -740,6 +740,7 @@ async function orefPersistHistory() {
       history: waves,
       historyCount24h: orefState.historyCount24h,
       totalHistoryCount: orefState.totalHistoryCount,
+      activeAlertCount: orefState.lastAlerts?.length || 0,
       persistedAt: new Date().toISOString(),
     };
     const ok = await upstashSet(OREF_REDIS_KEY, payload, OREF_PERSIST_TTL_SECONDS);
@@ -6475,7 +6476,8 @@ server.listen(PORT, () => {
   startAviationSeedLoop();
   // Cyber seed disabled — standalone cron seed-cyber-threats.mjs handles this
   // (avoids burning 12 extra AbuseIPDB calls/day from duplicate relay loop)
-  startCiiSeedLoop();
+  // CII scoring now computed on-demand by the RPC handler (get-risk-scores.ts)
+  // startCiiSeedLoop();
   startPositiveEventsSeedLoop();
   startClassifySeedLoop();
   startServiceStatusesSeedLoop();
