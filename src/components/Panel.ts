@@ -632,6 +632,16 @@ export class Panel {
     if (!this.statusBadgeEl) return;
     this.statusBadgeEl.style.display = 'none';
   }
+
+  protected insertLiveCountBadge(count: number): void {
+    const headerLeft = this.header.querySelector('.panel-header-left');
+    if (!headerLeft) return;
+    const badge = document.createElement('span');
+    badge.className = 'panel-live-count';
+    badge.textContent = `${count} live`;
+    headerLeft.appendChild(badge);
+  }
+
   public getElement(): HTMLElement {
     return this.element;
   }
