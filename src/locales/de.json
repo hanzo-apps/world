@@ -884,6 +884,7 @@
         "renewableInstallations": "Saubere Energie"
       },
       "layersTitle": "Schichten",
+      "layerSearch": "Schichten suchen...",
       "layerGuide": "Ebenenführer",
       "layerWarningTitle": "Leistungshinweis",
       "layerWarningBody": "Das Aktivieren von mehr als {{threshold}} Ebenen kann die Renderleistung und Bildrate beeinträchtigen.",
