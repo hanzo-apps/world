@@ -90,7 +90,7 @@ import {
 } from '@/config';
 import type { GulfInvestment } from '@/types';
 import { resolveTradeRouteSegments, TRADE_ROUTES as TRADE_ROUTES_LIST, type TradeRouteSegment } from '@/config/trade-routes';
-import { getLayersForVariant, resolveLayerLabel, type MapVariant } from '@/config/map-layer-definitions';
+import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
 import { getSecretState } from '@/services/runtime-config';
 import { MapPopup, type PopupType } from './MapPopup';
 import {
@@ -3811,6 +3811,7 @@ export class DeckGLMap {
         <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
         <button class="toggle-collapse">&#9660;</button>
       </div>
+      <input type="text" class="layer-search" placeholder="${t('components.deckgl.layerSearch')}" autocomplete="off" spellcheck="false" />
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
         ${layerConfig.map(({ key, label, icon, premium }) => {
           const isLocked = premium === 'locked' && !_wmKey;
@@ -3868,8 +3869,12 @@ export class DeckGLMap {
       }, { passive: false });
       toggles.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
     }
+    bindLayerSearch(toggles);
+    const searchEl = toggles.querySelector('.layer-search') as HTMLElement | null;
+
     collapseBtn?.addEventListener('click', () => {
       toggleList?.classList.toggle('collapsed');
+      if (searchEl) searchEl.style.display = toggleList?.classList.contains('collapsed') ? 'none' : '';
       if (collapseBtn) collapseBtn.innerHTML = toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
     });
   }
@@ -4884,7 +4889,10 @@ export class DeckGLMap {
   // UI visibility methods
   public hideLayerToggle(layer: keyof MapLayers): void {
     const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"]`);
-    if (toggle) (toggle as HTMLElement).style.display = 'none';
+    if (toggle) {
+      (toggle as HTMLElement).style.display = 'none';
+      toggle.setAttribute('data-layer-hidden', '');
+    }
   }
 
   public setLayerLoading(layer: keyof MapLayers, loading: boolean): void {
