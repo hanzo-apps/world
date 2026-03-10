@@ -691,7 +691,7 @@ export class DeckGLMap {
       this.debouncedFetchAircraft();
       this.state.zoom = this.maplibreMap?.getZoom() ?? this.state.zoom;
       this.onStateChange?.(this.getState());
-      if (this.state.layers.satelliteImagery) {
+      if (this.state.layers.satellites && this.imageryScenes.length > 0) {
         if (this.imagerySearchTimer) clearTimeout(this.imagerySearchTimer);
         this.imagerySearchTimer = setTimeout(() => this.fetchImageryForViewport(), 500);
       }
@@ -1484,7 +1484,7 @@ export class DeckGLMap {
       layers.push(this.createRenewableInstallationsLayer());
     }
 
-    if (mapLayers.satelliteImagery && this.imageryScenes.length > 0) {
+    if (mapLayers.satellites && this.imageryScenes.length > 0) {
       layers.push(this.createImageryFootprintLayer());
     }
 

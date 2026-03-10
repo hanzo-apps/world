@@ -7,8 +7,8 @@ import type {
 import { cachedFetchJson } from '../../../_shared/redis';
 import { CHROME_UA } from '../../../_shared/constants';
 
-const STAC_BASE = 'https://capella-open-data.s3.us-west-2.amazonaws.com';
-const STAC_HOST = 'capella-open-data.s3.us-west-2.amazonaws.com';
+const STAC_SEARCH = 'https://earth-search.aws.element84.com/v1/search';
+const COLLECTIONS = ['sentinel-2-l2a', 'sentinel-1-grd'];
 const CACHE_TTL = 3600;
 
 function fnv1a(str: string): number {
@@ -33,76 +33,57 @@ function validateBbox(bbox: string): [number, number, number, number] | null {
   return [w, s, e, n];
 }
 
-function validateDatetime(dt: string): boolean {
-  if (!dt) return true;
-  const isoPattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?(\/\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?)?$/;
-  if (!isoPattern.test(dt)) return false;
-  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  return dt.split('/').every(part => {
-    const d = new Date(part.slice(0, 10));
-    return d >= oneYearAgo && d <= now;
-  });
-}
-
-function isAllowedStacUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === STAC_HOST && parsed.protocol === 'https:';
-  } catch { return false; }
-}
-
 function cacheKey(bbox: string, datetime: string, source: string, limit: number): string {
   const hash = fnv1a(`${bbox}|${datetime}|${source}|${limit}`).toString(36);
   return `imagery:search:${hash}`;
 }
 
-function bboxIntersects(
-  sceneBbox: [number, number, number, number],
-  queryBbox: [number, number, number, number],
-): boolean {
-  const [sw, ss, se, sn] = sceneBbox;
-  const [qw, qs, qe, qn] = queryBbox;
-  return sw < qe && se > qw && ss < qn && sn > qs;
-}
-
-interface StacItem {
+interface StacFeature {
   id: string;
   properties: {
     datetime?: string;
     constellation?: string;
+    platform?: string;
     'sar:instrument_mode'?: string;
     'sar:resolution_range'?: number;
+    'eo:cloud_cover'?: number;
     gsd?: number;
   };
   geometry: unknown;
-  bbox?: [number, number, number, number];
-  assets?: Record<string, { href?: string; type?: string }>;
+  bbox?: number[];
+  assets?: Record<string, { href?: string; type?: string; roles?: string[] }>;
   links?: Array<{ rel: string; href: string; type?: string }>;
 }
 
-interface StacCollection {
-  links: Array<{ rel: string; href: string }>;
+interface StacSearchResponse {
+  type: string;
+  features: StacFeature[];
+  numberMatched?: number;
+  context?: { matched?: number };
 }
 
-function mapStacItem(item: StacItem): ImageryScene {
-  const props = item.properties;
-  const preview = item.assets?.['thumbnail']?.href
-    ?? item.links?.find(l => l.rel === 'thumbnail')?.href
+function mapFeature(f: StacFeature): ImageryScene {
+  const props = f.properties;
+  const thumbnail = f.assets?.['thumbnail']?.href
+    ?? f.assets?.['overview']?.href
+    ?? f.links?.find(l => l.rel === 'thumbnail')?.href
     ?? '';
-  const asset = item.assets?.['HH']?.href
-    ?? item.assets?.['VV']?.href
-    ?? Object.values(item.assets ?? {})[0]?.href
+  const asset = f.assets?.['visual']?.href
+    ?? f.assets?.['vv']?.href
+    ?? f.assets?.['vh']?.href
     ?? '';
+  const satellite = props.constellation ?? props.platform ?? 'unknown';
+  const mode = props['sar:instrument_mode'] ?? (satellite.includes('sentinel-2') ? 'MSI' : '');
+  const resolution = props.gsd ?? props['sar:resolution_range'] ?? 10;
 
   return {
-    id: item.id,
-    satellite: props.constellation ?? 'capella',
+    id: f.id,
+    satellite,
     datetime: props.datetime ?? '',
-    resolutionM: props.gsd ?? props['sar:resolution_range'] ?? 0,
-    mode: props['sar:instrument_mode'] ?? '',
-    geometryGeojson: JSON.stringify(item.geometry),
-    previewUrl: preview,
+    resolutionM: resolution,
+    mode,
+    geometryGeojson: JSON.stringify(f.geometry),
+    previewUrl: thumbnail,
     assetUrl: asset,
   };
 }
@@ -120,96 +101,67 @@ export async function searchImagery(
     return { scenes: [], totalResults: 0, cacheHit: false };
   }
 
-  if (!validateDatetime(req.datetime)) {
-    return { scenes: [], totalResults: 0, cacheHit: false };
-  }
-
   const limit = Math.max(1, Math.min(50, req.limit || 10));
-  const key = cacheKey(req.bbox, req.datetime, req.source, limit);
+  const snappedBbox = parsedBbox.map(v => Math.round(v)).join(',');
+  const nowHour = new Date();
+  nowHour.setMinutes(0, 0, 0);
+  const weekAgo = new Date(nowHour.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const defaultDatetime = `${weekAgo.toISOString().split('.')[0]}Z/${nowHour.toISOString().split('.')[0]}Z`;
+  const datetime = req.datetime || defaultDatetime;
+  const key = cacheKey(snappedBbox, datetime, req.source, limit);
 
   try {
     const result = await cachedFetchJson<{ scenes: ImageryScene[]; totalResults: number }>(
       key,
       CACHE_TTL,
       async () => {
-        const catalogUrl = `${STAC_BASE}/catalog.json`;
-        const catalogResp = await fetch(catalogUrl, {
-          headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-          signal: AbortSignal.timeout(10_000),
-        });
 
-        if (!catalogResp.ok) {
-          console.warn(`[Imagery] Catalog fetch failed: ${catalogResp.status}`);
-          return { scenes: [], totalResults: 0 };
-        }
-
-        const catalog = (await catalogResp.json()) as StacCollection;
-        const childLinks = catalog.links.filter(l => l.rel === 'child');
-
-        const allScenes: ImageryScene[] = [];
-        const collectionsToFetch = childLinks.slice(0, 5);
-
-        for (const link of collectionsToFetch) {
-          if (allScenes.length >= limit) break;
-
-          try {
-            const collUrl = link.href.startsWith('http')
-              ? link.href
-              : `${STAC_BASE}/${link.href}`;
-            if (!isAllowedStacUrl(collUrl)) continue;
-            const collResp = await fetch(collUrl, {
-              headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-              signal: AbortSignal.timeout(8_000),
-            });
-
-            if (!collResp.ok) continue;
-
-            const collection = (await collResp.json()) as StacCollection;
-            const itemLinks = collection.links.filter(l => l.rel === 'item');
-
-            for (const itemLink of itemLinks.slice(0, 20)) {
-              if (allScenes.length >= limit) break;
-
-              try {
-                const itemUrl = itemLink.href.startsWith('http')
-                  ? itemLink.href
-                  : `${STAC_BASE}/${itemLink.href}`;
-                if (!isAllowedStacUrl(itemUrl)) continue;
-                const itemResp = await fetch(itemUrl, {
-                  headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-                  signal: AbortSignal.timeout(5_000),
-                });
-
-                if (!itemResp.ok) continue;
-
-                const item = (await itemResp.json()) as StacItem;
-                if (item.bbox && !bboxIntersects(item.bbox, parsedBbox)) continue;
-                if (req.datetime && item.properties.datetime) {
-                  const itemDate = new Date(item.properties.datetime);
-                  const parts = req.datetime.split('/');
-                  const start = new Date(parts[0]!);
-                  const endStr = parts[1] ?? parts[0]!;
-                  const isDateOnly = !endStr.includes('T');
-                  const end = isDateOnly
-                    ? new Date(new Date(endStr).getTime() + 86_400_000 - 1)
-                    : new Date(endStr);
-                  if (itemDate < start || itemDate > end) continue;
-                }
-                if (req.source && item.properties.constellation) {
-                  if (item.properties.constellation.toLowerCase() !== req.source.toLowerCase()) continue;
-                }
-
-                allScenes.push(mapStacItem(item));
-              } catch {
-                continue;
-              }
-            }
-          } catch {
-            continue;
+        const LEGACY_SOURCE_MAP: Record<string, string[]> = {
+          capella: COLLECTIONS,
+          'sentinel-1': ['sentinel-1-grd'],
+          'sentinel-2': ['sentinel-2-l2a'],
+        };
+        let collections = COLLECTIONS;
+        if (req.source) {
+          const src = req.source.toLowerCase();
+          const legacy = LEGACY_SOURCE_MAP[src];
+          if (legacy) {
+            collections = legacy;
+          } else {
+            const matched = COLLECTIONS.filter(c => c.toLowerCase().includes(src));
+            if (matched.length > 0) collections = matched;
           }
         }
 
-        return { scenes: allScenes.slice(0, limit), totalResults: allScenes.length };
+        const body = {
+          bbox: parsedBbox,
+          datetime,
+          collections,
+          limit,
+          sortby: [{ field: 'properties.datetime', direction: 'desc' }],
+        };
+
+        const resp = await fetch(STAC_SEARCH, {
+          method: 'POST',
+          headers: {
+            'User-Agent': CHROME_UA,
+            'Content-Type': 'application/json',
+            Accept: 'application/geo+json',
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000),
+        });
+
+        if (!resp.ok) {
+          console.warn(`[Imagery] STAC search failed: ${resp.status}`);
+          return { scenes: [], totalResults: 0 };
+        }
+
+        const data = (await resp.json()) as StacSearchResponse;
+        const scenes = data.features.map(mapFeature);
+        const totalResults = data.numberMatched ?? data.context?.matched ?? scenes.length;
+
+        return { scenes, totalResults };
       },
     );
 

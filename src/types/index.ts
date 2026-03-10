@@ -553,10 +553,10 @@ export interface MapLayers {
   iranAttacks: boolean;
   // GPS/GNSS interference layer
   gpsJamming: boolean;
-  // Satellite orbital tracking
+  // Satellite orbital tracking + imagery footprints
   satellites: boolean;
-  // Satellite imagery footprints
-  satelliteImagery: boolean;
+  // NOTAM overlay (airspace closures)
+  notamOverlay: boolean;
 
   // CII choropleth layer
   ciiChoropleth: boolean;
