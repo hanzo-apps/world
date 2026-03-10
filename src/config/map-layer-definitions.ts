@@ -160,7 +160,7 @@ export const LAYER_SYNONYMS: Record<string, Array<keyof MapLayers>> = {
   missile: ['iranAttacks', 'military'],
   nuke: ['nuclear'],
   radiation: ['nuclear', 'irradiators'],
-  space: ['spaceports', 'satellites', 'satelliteImagery'],
+  space: ['spaceports', 'satellites'],
   orbit: ['satellites'],
   internet: ['outages', 'cables', 'cyberThreats'],
   cyber: ['cyberThreats', 'outages'],
