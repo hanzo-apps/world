@@ -1575,8 +1575,8 @@ async function startMarketDataSeedLoop() {
 // so Vercel handler serves from cache (avoids 114 API calls per miss)
 // ─────────────────────────────────────────────────────────────
 const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
-const AVIATION_SEED_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1h
-const AVIATION_SEED_TTL = 14400; // 4h — survives 1 missed cycle
+const AVIATION_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
+const AVIATION_SEED_TTL = 3600; // 1h — survives 1 missed cycle
 const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
 const AVIATION_BATCH_CONCURRENCY = 10;
 const AVIATION_MIN_FLIGHTS_FOR_CLOSURE = 10;
@@ -1778,7 +1778,7 @@ function aviationAggregateFlights(iata, flights) {
     cancelledFlights: cancelled,
     totalFlights: total,
     reason,
-    source: 'FLIGHT_DELAY_SOURCE_COMPUTED',
+    source: 'FLIGHT_DELAY_SOURCE_AVIATIONSTACK',
     updatedAt: Date.now(),
   };
 }

@@ -186,6 +186,8 @@ export function toProtoSource(s: string): FlightDelaySource {
     faa: 'FLIGHT_DELAY_SOURCE_FAA',
     eurocontrol: 'FLIGHT_DELAY_SOURCE_EUROCONTROL',
     computed: 'FLIGHT_DELAY_SOURCE_COMPUTED',
+    aviationstack: 'FLIGHT_DELAY_SOURCE_AVIATIONSTACK',
+    notam: 'FLIGHT_DELAY_SOURCE_NOTAM',
   };
   return map[s] || 'FLIGHT_DELAY_SOURCE_COMPUTED';
 }
@@ -353,7 +355,7 @@ function aggregateFlights(
     cancelledFlights: cancelled,
     totalFlights: total,
     reason,
-    source: toProtoSource('computed'),
+    source: toProtoSource('aviationstack'),
     updatedAt: Date.now(),
   };
 }
@@ -506,7 +508,7 @@ export function buildNotamAlert(
     cancelledFlights: 0,
     totalFlights: 0,
     reason: reason.length > 200 ? reason.slice(0, 200) + '…' : reason,
-    source: toProtoSource('computed'),
+    source: toProtoSource('notam'),
     updatedAt: Date.now(),
   };
 }
@@ -514,8 +516,8 @@ export function buildNotamAlert(
 // ---------- Shared NOTAM loader (used by both list-airport-delays and get-airport-ops-summary) ----------
 
 const NOTAM_CACHE_KEY = 'aviation:notam:closures:v2';
-const NOTAM_CACHE_TTL = 7200;
-const SEED_FRESHNESS_MS = 45 * 60 * 1000;
+const NOTAM_CACHE_TTL = 1800; // 30 minutes
+const SEED_FRESHNESS_MS = 20 * 60 * 1000; // 20 minutes
 
 export interface LoadedNotamResult {
   closedIcaos: string[];
@@ -595,68 +597,8 @@ export function mergeNotamWithExistingAlert(
     severity: toProtoSeverity(effectiveSev),
     delayType: toProtoDelayType(delayType),
     reason: reason.length > 200 ? reason.slice(0, 200) + '…' : reason,
-    source: toProtoSource('computed'),
+    source: toProtoSource('notam'),
     updatedAt: Date.now(),
   };
 }
 
-// ---------- Simulated delay generation ----------
-
-export function generateSimulatedDelay(airport: typeof MONITORED_AIRPORTS[number]): AirportDelayAlert | null {
-  const hour = new Date().getUTCHours();
-  const isRushHour = (hour >= 6 && hour <= 10) || (hour >= 16 && hour <= 20);
-  const busyAirports = ['LHR', 'CDG', 'FRA', 'JFK', 'LAX', 'ORD', 'PEK', 'HND', 'DXB', 'SIN'];
-  const isBusy = busyAirports.includes(airport.iata);
-  const random = Math.random();
-  const delayChance = isRushHour ? 0.35 : 0.15;
-  const hasDelay = random < (isBusy ? delayChance * 1.5 : delayChance);
-
-  if (!hasDelay) return null;
-
-  let avgDelayMinutes = 0;
-  let delayType = 'general';
-  let reason = 'Minor delays';
-
-  const severityRoll = Math.random();
-  if (severityRoll < 0.05) {
-    avgDelayMinutes = 60 + Math.floor(Math.random() * 60);
-    delayType = Math.random() < 0.3 ? 'ground_stop' : 'ground_delay';
-    reason = Math.random() < 0.5 ? 'Weather conditions' : 'Air traffic volume';
-  } else if (severityRoll < 0.2) {
-    avgDelayMinutes = 45 + Math.floor(Math.random() * 20);
-    delayType = 'ground_delay';
-    reason = Math.random() < 0.5 ? 'Weather' : 'High traffic volume';
-  } else if (severityRoll < 0.5) {
-    avgDelayMinutes = 25 + Math.floor(Math.random() * 20);
-    delayType = Math.random() < 0.5 ? 'departure_delay' : 'arrival_delay';
-    reason = 'Congestion';
-  } else {
-    avgDelayMinutes = 15 + Math.floor(Math.random() * 15);
-    delayType = 'general';
-    reason = 'Minor delays';
-  }
-
-  const severity = determineSeverity(avgDelayMinutes);
-  // Only return if severity is not normal (matching legacy behavior: filter out normal)
-  if (severity === 'normal') return null;
-
-  return {
-    id: `sim-${airport.iata}`,
-    iata: airport.iata,
-    icao: airport.icao,
-    name: airport.name,
-    city: airport.city,
-    country: airport.country,
-    location: { latitude: airport.lat, longitude: airport.lon },
-    region: toProtoRegion(airport.region),
-    delayType: toProtoDelayType(delayType),
-    severity: toProtoSeverity(severity),
-    avgDelayMinutes,
-    delayedFlightsPct: 0,
-    cancelledFlights: 0,
-    totalFlights: 0,
-    reason,
-    source: toProtoSource('computed'),
-    updatedAt: Date.now(),
-  };
-}

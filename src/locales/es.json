@@ -1761,7 +1761,9 @@
       "sources": {
         "faa": "ASWS de la FAA",
         "eurocontrol": "Eurocontrol",
-        "computed": "Calculado"
+        "computed": "Calculado",
+        "aviationstack": "Flight Data",
+        "notam": "NOTAM"
       },
       "regions": {
         "americas": "Américas",
