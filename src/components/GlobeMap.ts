@@ -1788,6 +1788,9 @@ export class GlobeMap {
     if (ch.arcs)     this.flushArcs();
     if (ch.paths)    this.flushPaths();
     if (ch.polygons) this.flushPolygons();
+    if (layer === 'satellites' && this.satBeamGroup) {
+      this.satBeamGroup.visible = !!this.layers.satellites;
+    }
   }
 
   public setLayers(layers: MapLayers): void {
