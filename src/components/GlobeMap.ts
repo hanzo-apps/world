@@ -1425,9 +1425,9 @@ export class GlobeMap {
     if (this.layers.satellites) {
       markers.push(...this.satelliteMarkers);
       markers.push(...this.satelliteFootprintMarkers);
+      markers.push(...this.imagerySceneMarkers);
     }
     if (this.layers.techEvents) markers.push(...this.techMarkers);
-    if (this.layers.satelliteImagery) markers.push(...this.imagerySceneMarkers);
     if (this.layers.cables) {
       markers.push(...this.cableAdvisoryMarkers);
       markers.push(...this.repairShipMarkers);
@@ -1530,7 +1530,7 @@ export class GlobeMap {
       }
     }
 
-    if (this.layers.satelliteImagery) {
+    if (this.layers.satellites) {
       polys.push(...this.imageryFootprintPolygons);
     }
 
@@ -1782,8 +1782,8 @@ export class GlobeMap {
     ['pipelines',     { markers: false, arcs: false, paths: true,  polygons: false }],
     ['conflicts',     { markers: true,  arcs: false, paths: false, polygons: true }],
     ['cables',        { markers: true,  arcs: false, paths: true,  polygons: false }],
-    ['satellites',        { markers: true,  arcs: false, paths: true,  polygons: false }],
-    ['satelliteImagery',  { markers: true,  arcs: false, paths: false, polygons: true }],
+    ['satellites',        { markers: true,  arcs: false, paths: true,  polygons: true }],
+    ['notamOverlay',      { markers: true,  arcs: false, paths: false, polygons: false }],
     ['natural',           { markers: true,  arcs: false, paths: true,  polygons: true }],
   ]);
 
@@ -2076,7 +2076,7 @@ export class GlobeMap {
         datetime: s.datetime,
       };
     });
-    if (this.layers.satelliteImagery) {
+    if (this.layers.satellites) {
       this.flushMarkers();
       this.flushPolygons();
     }
