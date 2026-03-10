@@ -16,7 +16,6 @@ import {
   toProtoRegion,
   toProtoSource,
   determineSeverity,
-  generateSimulatedDelay,
   buildNotamAlert,
   loadNotamClosures,
   mergeNotamWithExistingAlert,
@@ -26,7 +25,7 @@ import { cachedFetchJson, getCachedJson, setCachedJson } from '../../../_shared/
 
 const FAA_CACHE_KEY = 'aviation:delays:faa:v1';
 const INTL_CACHE_KEY = 'aviation:delays:intl:v3';
-const CACHE_TTL = 7200;
+const CACHE_TTL = 1800; // 30 minutes
 
 export async function listAirportDelays(
   _ctx: ServerContext,
@@ -34,7 +33,7 @@ export async function listAirportDelays(
 ): Promise<ListAirportDelaysResponse> {
   const t0 = Date.now();
   // 1. FAA (US) — seed-first with live fallback
-  const SEED_FRESHNESS_MS = 45 * 60 * 1000;
+  const SEED_FRESHNESS_MS = 20 * 60 * 1000; // 20 minutes
   let faaAlerts: AirportDelayAlert[] = [];
   let faaFromSeed = false;
   try {
@@ -117,9 +116,6 @@ export async function listAirportDelays(
     const cached = await getCachedJson(INTL_CACHE_KEY) as { alerts: AirportDelayAlert[] } | null;
     if (cached?.alerts) {
       intlAlerts = cached.alerts;
-    } else {
-      const nonUs = MONITORED_AIRPORTS.filter(a => a.country !== 'USA');
-      intlAlerts = nonUs.map(a => generateSimulatedDelay(a)).filter(Boolean) as AirportDelayAlert[];
     }
   } catch (err) {
     console.warn(`[Aviation] Intl fetch failed: ${err instanceof Error ? err.message : 'unknown'}`);
@@ -187,7 +183,7 @@ export async function listAirportDelays(
 
   // Write bootstrap key for initial page load hydration
   try {
-    await setCachedJson('aviation:delays-bootstrap:v1', { alerts: allAlerts }, 7200);
+    await setCachedJson('aviation:delays-bootstrap:v1', { alerts: allAlerts }, 1800);
   } catch { /* non-critical */ }
 
   return { alerts: allAlerts };

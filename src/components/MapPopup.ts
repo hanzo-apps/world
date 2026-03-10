@@ -1100,6 +1100,8 @@ export class MapPopup {
       'faa': t('popups.flight.sources.faa'),
       'eurocontrol': t('popups.flight.sources.eurocontrol'),
       'computed': t('popups.flight.sources.computed'),
+      'aviationstack': t('popups.flight.sources.aviationstack'),
+      'notam': t('popups.flight.sources.notam'),
     };
     const sourceLabel = sourceLabels[delay.source] || escapeHtml(delay.source);
     const regionLabels: Record<string, string> = {
