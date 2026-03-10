@@ -257,6 +257,11 @@ export class LiveWebcamsPanel extends Panel {
       return `http://localhost:${getLocalApiPort()}/api/youtube-embed?${params.toString()}`;
     }
     const vq = quality !== 'auto' ? `&vq=${quality}` : '';
+    // Web path uses youtube-nocookie.com for privacy (no tracking cookies).
+    // The Storage Access API bot-check fix only works through the sidecar/bridge
+    // embed (desktop) where we control the document and can call requestStorageAccess().
+    // A raw YouTube iframe cannot invoke the API, so switching to youtube.com here
+    // would regress privacy without actually fixing the bot-check.
     return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&origin=${window.location.origin}${vq}`;
   }
 
