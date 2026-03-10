@@ -52,7 +52,7 @@ const COUNTRY_KEYWORDS: Record<string, string[]> = {
   CU: ['cuba', 'havana', 'diaz-canel'],
   MX: ['mexico', 'mexican', 'sheinbaum', 'cartel', 'sinaloa'],
   BR: ['brazil', 'brasilia', 'lula'],
-  AE: ['uae', 'emirates', 'dubai', 'abu dhabi'],
+  AE: ['uae', 'emirates', 'dubai', 'abu dhabi', 'united arab emirates'],
 };
 
 const COUNTRY_BBOX: Record<string, { minLat: number; maxLat: number; minLon: number; maxLon: number }> = {
@@ -107,10 +107,14 @@ function normalizeCountryName(text: string): string | null {
   return null;
 }
 
+const BBOX_BY_AREA = Object.entries(COUNTRY_BBOX)
+  .map(([code, b]) => ({ code, ...b, area: (b.maxLat - b.minLat) * (b.maxLon - b.minLon) }))
+  .sort((a, b) => a.area - b.area);
+
 function geoToCountry(lat: number, lon: number): string | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  for (const [code, bbox] of Object.entries(COUNTRY_BBOX)) {
-    if (lat >= bbox.minLat && lat <= bbox.maxLat && lon >= bbox.minLon && lon <= bbox.maxLon) return code;
+  for (const b of BBOX_BY_AREA) {
+    if (lat >= b.minLat && lat <= b.maxLat && lon >= b.minLon && lon <= b.maxLon) return b.code;
   }
   return null;
 }
@@ -275,7 +279,7 @@ export function computeCIIScores(
     const sev = String(o.severity || '').toUpperCase();
     if (sev.includes('TOTAL') || sev === 'NATIONWIDE') data[code].outageTotalCount++;
     else if (sev.includes('MAJOR') || sev === 'REGIONAL') data[code].outageMajorCount++;
-    else data[code].outagePartialCount++;
+    else if (sev.includes('PARTIAL') || sev.includes('LOCAL') || sev.includes('MINOR')) data[code].outagePartialCount++;
   }
 
   // --- Climate ---
