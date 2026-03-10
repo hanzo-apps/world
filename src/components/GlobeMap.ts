@@ -315,14 +315,15 @@ interface GlobePath {
   id: string;
   name: string;
   points: number[][];
-  pathType: 'cable' | 'oil' | 'gas' | 'products' | 'orbit';
+  pathType: 'cable' | 'oil' | 'gas' | 'products' | 'orbit' | 'stormTrack' | 'stormHistory';
   status: string;
   country?: string;
+  windKt?: number;
 }
 interface GlobePolygon {
   coords: number[][][];
   name: string;
-  _kind: 'cii' | 'conflict' | 'imageryFootprint';
+  _kind: 'cii' | 'conflict' | 'imageryFootprint' | 'forecastCone';
   level?: string;
   score?: number;
 
@@ -420,6 +421,8 @@ export class GlobeMap {
   private aisMarkers: AisDisruptionMarker[] = [];
   private satelliteMarkers: SatelliteMarker[] = [];
   private satelliteTrailPaths: GlobePath[] = [];
+  private stormTrackPaths: GlobePath[] = [];
+  private stormConePolygons: GlobePolygon[] = [];
   private satelliteFootprintMarkers: SatFootprintMarker[] = [];
   private imagerySceneMarkers: ImagerySceneMarker[] = [];
   private imageryFootprintPolygons: GlobePolygon[] = [];
@@ -658,12 +661,44 @@ export class GlobeMap {
         }
         if (d.pathType === 'oil')   return 'rgba(255,140,0,0.6)';
         if (d.pathType === 'gas')   return 'rgba(80,220,120,0.6)';
+        if (d.pathType === 'stormTrack') return 'rgba(255,100,100,0.8)';
+        if (d.pathType === 'stormHistory') {
+          const w = d.windKt || 0;
+          if (w >= 137) return 'rgba(255,96,96,0.8)';
+          if (w >= 96) return 'rgba(255,140,0,0.8)';
+          if (w >= 64) return 'rgba(255,231,117,0.8)';
+          if (w >= 34) return 'rgba(94,186,255,0.8)';
+          return 'rgba(160,160,160,0.6)';
+        }
         return 'rgba(180,160,255,0.6)';
       })
-      .pathStroke((d: GlobePath) => d.pathType === 'orbit' ? 0.3 : d.pathType === 'cable' ? 0.3 : 0.6)
-      .pathDashLength((d: GlobePath) => d.pathType === 'orbit' ? 0.4 : d.pathType === 'cable' ? 1 : 0.6)
-      .pathDashGap((d: GlobePath) => d.pathType === 'orbit' ? 0.15 : d.pathType === 'cable' ? 0 : 0.25)
-      .pathDashAnimateTime((d: GlobePath) => d.pathType === 'orbit' ? 0 : d.pathType === 'cable' ? 0 : 5000)
+      .pathStroke((d: GlobePath) => {
+        if (d.pathType === 'orbit') return 0.3;
+        if (d.pathType === 'cable') return 0.3;
+        if (d.pathType === 'stormTrack' || d.pathType === 'stormHistory') return 1.2;
+        return 0.6;
+      })
+      .pathDashLength((d: GlobePath) => {
+        if (d.pathType === 'orbit') return 0.4;
+        if (d.pathType === 'cable') return 1;
+        if (d.pathType === 'stormTrack') return 0.8;
+        if (d.pathType === 'stormHistory') return 1;
+        return 0.6;
+      })
+      .pathDashGap((d: GlobePath) => {
+        if (d.pathType === 'orbit') return 0.15;
+        if (d.pathType === 'cable') return 0;
+        if (d.pathType === 'stormTrack') return 0.4;
+        if (d.pathType === 'stormHistory') return 0;
+        return 0.25;
+      })
+      .pathDashAnimateTime((d: GlobePath) => {
+        if (d.pathType === 'orbit') return 0;
+        if (d.pathType === 'cable') return 0;
+        if (d.pathType === 'stormTrack') return 3000;
+        if (d.pathType === 'stormHistory') return 0;
+        return 5000;
+      })
       .pathLabel((d: GlobePath) => d.name);
 
     // Polygon accessors — set once
@@ -673,18 +708,21 @@ export class GlobeMap {
         if (d._kind === 'cii') return GlobeMap.CII_GLOBE_COLORS[d.level!] ?? 'rgba(0,0,0,0)';
         if (d._kind === 'conflict') return GlobeMap.CONFLICT_CAP[d.intensity!] ?? GlobeMap.CONFLICT_CAP.low;
         if (d._kind === 'imageryFootprint') return 'rgba(0,180,255,0.08)';
+        if (d._kind === 'forecastCone') return 'rgba(255,140,60,0.2)';
         return 'rgba(255,60,60,0.15)';
       })
       .polygonSideColor((d: GlobePolygon) => {
         if (d._kind === 'cii') return 'rgba(0,0,0,0)';
         if (d._kind === 'conflict') return GlobeMap.CONFLICT_SIDE[d.intensity!] ?? GlobeMap.CONFLICT_SIDE.low;
         if (d._kind === 'imageryFootprint') return 'rgba(0,180,255,0.04)';
+        if (d._kind === 'forecastCone') return 'rgba(255,140,60,0.1)';
         return 'rgba(255,60,60,0.08)';
       })
       .polygonStrokeColor((d: GlobePolygon) => {
         if (d._kind === 'cii') return 'rgba(80,80,80,0.3)';
         if (d._kind === 'conflict') return GlobeMap.CONFLICT_STROKE[d.intensity!] ?? GlobeMap.CONFLICT_STROKE.low;
         if (d._kind === 'imageryFootprint') return '#00b4ff';
+        if (d._kind === 'forecastCone') return 'rgba(255,140,60,0.5)';
         return '#ff4444';
       })
       .polygonAltitude((d: GlobePolygon) => {
@@ -1411,7 +1449,8 @@ export class GlobeMap {
       ? this.globePaths
       : this.globePaths.filter(p => p.pathType === 'cable' ? showCables : showPipelines);
     const orbitPaths = this.layers.satellites ? this.satelliteTrailPaths : [];
-    (this.globe as any).pathsData([...paths, ...orbitPaths]);
+    const stormPaths = this.layers.natural ? this.stormTrackPaths : [];
+    (this.globe as any).pathsData([...paths, ...orbitPaths, ...stormPaths]);
   }
 
   private static readonly CII_GLOBE_COLORS: Record<string, string> = {
@@ -1486,6 +1525,10 @@ export class GlobeMap {
 
     if (this.layers.satelliteImagery) {
       polys.push(...this.imageryFootprintPolygons);
+    }
+
+    if (this.layers.natural) {
+      polys.push(...this.stormConePolygons);
     }
 
     (this.globe as any).polygonsData(polys);
@@ -1674,7 +1717,54 @@ export class GlobeMap {
       category: e.category ?? '',
       title: e.title ?? '',
     }));
+
+    const trackPaths: GlobePath[] = [];
+    const conePolys: GlobePolygon[] = [];
+
+    for (const e of events ?? []) {
+      if (e.forecastTrack?.length) {
+        trackPaths.push({
+          id: `storm-forecast-${e.id}`,
+          name: e.stormName || e.title || '',
+          points: [
+            [e.lon, e.lat, 0],
+            ...e.forecastTrack.map(p => [p.lon, p.lat, 0]),
+          ],
+          pathType: 'stormTrack',
+          status: 'active',
+        });
+      }
+      if (e.pastTrack?.length) {
+        let segIdx = 0;
+        for (let i = 0; i < e.pastTrack.length - 1; i++) {
+          const a = e.pastTrack[i]!;
+          const b = e.pastTrack[i + 1]!;
+          trackPaths.push({
+            id: `storm-past-${e.id}-${segIdx++}`,
+            name: e.stormName || e.title || '',
+            points: [[a.lon, a.lat, 0], [b.lon, b.lat, 0]],
+            pathType: 'stormHistory',
+            status: 'active',
+            windKt: b.windKt ?? a.windKt ?? 0,
+          });
+        }
+      }
+      if (e.conePolygon?.length) {
+        for (const ring of e.conePolygon) {
+          conePolys.push({
+            coords: [ring],
+            name: `${e.stormName || e.title || ''} Forecast Cone`,
+            _kind: 'forecastCone',
+          });
+        }
+      }
+    }
+
+    this.stormTrackPaths = trackPaths;
+    this.stormConePolygons = conePolys;
     this.flushMarkers();
+    this.flushPaths();
+    this.flushPolygons();
   }
 
   // ─── Layer control ────────────────────────────────────────────────────────
@@ -1688,6 +1778,7 @@ export class GlobeMap {
     ['satellites',        { markers: true,  arcs: false, paths: true,  polygons: false }],
     ['satelliteImagery',  { markers: true,  arcs: false, paths: false, polygons: true }],
     ['notamOverlay',      { markers: true,  arcs: false, paths: false, polygons: false }],
+    ['natural',           { markers: true,  arcs: false, paths: true,  polygons: true }],
   ]);
 
   private flushLayerChannels(layer: keyof MapLayers): void {

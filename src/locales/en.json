@@ -2111,7 +2111,13 @@
       "active": "ACTIVE",
       "reported": "REPORTED",
       "viewOnSource": "View on {{source}}",
-      "attribution": "Data: NASA EONET"
+      "attribution": "Data: NASA EONET",
+      "storm": "Storm",
+      "classification": "Classification",
+      "maxWind": "Max Wind",
+      "pressure": "Pressure",
+      "movement": "Movement",
+      "tropicalSystem": "Tropical System"
     },
     "port": {
       "types": {
