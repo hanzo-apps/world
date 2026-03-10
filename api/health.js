@@ -154,7 +154,8 @@ function dataSize(parsed) {
                       'papers', 'repos', 'articles', 'signals', 'rates', 'countries',
                       'chokepoints', 'minerals', 'anomalies', 'flows', 'bases', 'flights',
                       'theaters', 'fleets', 'warnings', 'closures', 'cables',
-                      'airports', 'categories', 'regions', 'entries', 'satellites']) {
+                      'airports', 'categories', 'regions', 'entries', 'satellites',
+                      'sectors', 'statuses', 'scores']) {
       if (Array.isArray(parsed[k])) return parsed[k].length;
     }
     return Object.keys(parsed).length;
@@ -240,7 +241,7 @@ export default async function handler(req) {
       okCount++;
     }
 
-    const entry = { status, redisKey, records: size };
+    const entry = { status, records: size };
     if (seedAge !== null) entry.seedAgeMin = seedAge;
     if (seedCfg) entry.maxStaleMin = seedCfg.maxStaleMin;
     checks[name] = entry;
@@ -317,7 +318,7 @@ export default async function handler(req) {
       okCount++;
     }
 
-    const entry = { status, redisKey, records: size };
+    const entry = { status, records: size };
     if (seedAge !== null) entry.seedAgeMin = seedAge;
     if (seedCfg) entry.maxStaleMin = seedCfg.maxStaleMin;
     checks[name] = entry;
@@ -325,11 +326,11 @@ export default async function handler(req) {
 
   let overall;
   if (critCount === 0 && warnCount === 0) overall = 'HEALTHY';
-  else if (critCount === 0) overall = 'DEGRADED';
+  else if (critCount === 0) overall = 'WARNING';
   else if (critCount <= 3) overall = 'DEGRADED';
   else overall = 'UNHEALTHY';
 
-  const httpStatus = overall === 'HEALTHY' ? 200 : overall === 'DEGRADED' ? 200 : 503;
+  const httpStatus = overall === 'HEALTHY' || overall === 'WARNING' ? 200 : 503;
 
   const url = new URL(req.url);
   const compact = url.searchParams.get('compact') === '1';
@@ -350,7 +351,7 @@ export default async function handler(req) {
   } else {
     const problems = {};
     for (const [name, check] of Object.entries(checks)) {
-      if (check.status !== 'OK') problems[name] = check;
+      if (check.status !== 'OK' && check.status !== 'OK_CASCADE') problems[name] = check;
     }
     if (Object.keys(problems).length > 0) body.problems = problems;
   }
