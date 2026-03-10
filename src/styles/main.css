@@ -13569,6 +13569,26 @@ a.prediction-link:hover {
   display: none;
 }
 
+.deckgl-layer-toggles .layer-search {
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.deckgl-layer-toggles .layer-search::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+.deckgl-layer-toggles .layer-search:focus {
+  border-color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.12);
+}
+
 .deckgl-layer-toggles .layer-toggle {
   display: flex;
   align-items: center;

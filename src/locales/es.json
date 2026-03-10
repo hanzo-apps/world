@@ -884,6 +884,7 @@
         "renewableInstallations": "Energía limpia"
       },
       "layersTitle": "capas",
+      "layerSearch": "Buscar capas...",
       "layerGuide": "Guía de capas",
       "layerWarningTitle": "Aviso de rendimiento",
       "layerWarningBody": "Activar más de {{threshold}} capas puede afectar el rendimiento de renderizado y la tasa de fotogramas.",
