@@ -691,7 +691,7 @@ export class DeckGLMap {
       this.debouncedFetchAircraft();
       this.state.zoom = this.maplibreMap?.getZoom() ?? this.state.zoom;
       this.onStateChange?.(this.getState());
-      if (this.state.layers.satellites && this.imageryScenes.length > 0) {
+      if (this.state.layers.satellites) {
         if (this.imagerySearchTimer) clearTimeout(this.imagerySearchTimer);
         this.imagerySearchTimer = setTimeout(() => this.fetchImageryForViewport(), 500);
       }
