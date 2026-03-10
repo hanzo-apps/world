@@ -8,7 +8,7 @@ import type {
   SeverityLevel,
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 
-import { getCachedJson, setCachedJson, cachedFetchJson } from '../../../_shared/redis';
+import { getCachedJson, setCachedJson, cachedFetchJsonWithMeta } from '../../../_shared/redis';
 import { TIER1_COUNTRIES } from './_shared';
 import { fetchAcledCached } from '../../../_shared/acled';
 
@@ -458,7 +458,7 @@ export async function getRiskScores(
   _req: GetRiskScoresRequest,
 ): Promise<GetRiskScoresResponse> {
   try {
-    const result = await cachedFetchJson<GetRiskScoresResponse>(
+    const { data: result } = await cachedFetchJsonWithMeta<GetRiskScoresResponse>(
       RISK_CACHE_KEY,
       RISK_CACHE_TTL,
       async () => {
@@ -468,12 +468,13 @@ export async function getRiskScores(
         ]);
         const ciiScores = computeCIIScores(acled, aux);
         const strategicRisks = computeStrategicRisks(ciiScores);
-        const r: GetRiskScoresResponse = { ciiScores, strategicRisks };
-        await setCachedJson(RISK_STALE_CACHE_KEY, r, RISK_STALE_TTL).catch(() => {});
-        return r;
+        return { ciiScores, strategicRisks };
       },
     );
-    if (result) return result;
+    if (result) {
+      await setCachedJson(RISK_STALE_CACHE_KEY, result, RISK_STALE_TTL).catch(() => {});
+      return result;
+    }
   } catch { /* upstream failed, fall through to stale */ }
 
   const stale = (await getCachedJson(RISK_STALE_CACHE_KEY)) as GetRiskScoresResponse | null;

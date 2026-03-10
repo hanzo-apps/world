@@ -90,7 +90,7 @@ const SEED_META = {
   gpsjam:           { key: 'seed-meta:intelligence:gpsjam',       maxStaleMin: 720 },
   cableHealth:      { key: 'seed-meta:cable-health',              maxStaleMin: 60 },
   positiveGeoEvents:{ key: 'seed-meta:positive-events:geo',       maxStaleMin: 60 },
-  riskScores:       { key: 'seed-meta:risk:scores',               maxStaleMin: 30 },
+  riskScores:       { key: 'seed-meta:risk:scores:sebuf',          maxStaleMin: 30 },
   iranEvents:       { key: 'seed-meta:conflict:iran-events',      maxStaleMin: 10080 },
   ucdpEvents:       { key: 'seed-meta:conflict:ucdp-events',      maxStaleMin: 420 },
   militaryFlights:  { key: 'seed-meta:military:flights',           maxStaleMin: 15 },
