@@ -18,6 +18,10 @@ export class SatelliteImageryPanel extends Panel {
       const btn = (e.target as HTMLElement).closest('.imagery-search-btn');
       if (btn) this.onSearchArea?.();
     });
+    this.element.addEventListener('error', (e) => {
+      const img = e.target as HTMLElement;
+      if (img.tagName === 'IMG') img.style.display = 'none';
+    }, true);
   }
 
   public setOnSearchArea(cb: () => void): void {
@@ -39,7 +43,7 @@ export class SatelliteImageryPanel extends Panel {
     const rows = this.scenes.slice(0, 20).map(s => {
       const dt = s.datetime ? new Date(s.datetime).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
       const preview = s.previewUrl
-        ? `<img src="${escapeHtml(s.previewUrl)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:6px;vertical-align:middle;" loading="lazy" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHtml(s.previewUrl)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:6px;vertical-align:middle;" loading="lazy">`
         : '';
       return `<div class="imagery-row" style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
         ${preview}
