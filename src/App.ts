@@ -160,6 +160,17 @@ export class App {
       }
     }
 
+    // One-time migration: enable satellite imagery panel for existing users
+    const IMAGERY_PANEL_MIGRATION_KEY = 'worldmonitor-imagery-panel-enabled-v1';
+    if (!localStorage.getItem(IMAGERY_PANEL_MIGRATION_KEY)) {
+      if (panelSettings['satellite-imagery'] && !panelSettings['satellite-imagery'].enabled) {
+        panelSettings['satellite-imagery'].enabled = true;
+        saveToStorage(STORAGE_KEYS.panels, panelSettings);
+        console.log('[App] Migration: enabled satellite imagery panel');
+      }
+      localStorage.setItem(IMAGERY_PANEL_MIGRATION_KEY, 'done');
+    }
+
     // One-time migration: clear stale panel ordering and sizing state
     const LAYOUT_RESET_MIGRATION_KEY = 'worldmonitor-layout-reset-v2.5';
     if (!localStorage.getItem(LAYOUT_RESET_MIGRATION_KEY)) {
