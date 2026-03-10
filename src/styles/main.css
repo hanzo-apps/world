@@ -1347,6 +1347,35 @@ body.panel-resize-active iframe {
   background: rgba(255, 139, 139, 0.12);
 }
 
+/* Panel Sort Toggle Button (#107) */
+.panel-sort-btn {
+  background: var(--overlay-medium);
+  border: 1px solid var(--overlay-medium);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  margin-right: 2px;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  line-height: 1;
+}
+
+.panel-sort-btn:hover {
+  opacity: 1;
+  background: var(--overlay-heavy);
+  transform: scale(1.05);
+  color: var(--text);
+}
+
+.panel-sort-btn svg {
+  display: block;
+}
+
 /* Panel Summarize Button */
 .panel-summarize-btn {
   background: var(--overlay-medium);
