@@ -11,7 +11,7 @@ It is separate from the core premium-finance architecture on purpose.
 
 Core premium finance can still function without this layer. The search layer exists to improve stock-news discovery quality for targeted ticker analysis, especially where feed-only coverage is weak.
 
-See the core system document in [PREMIUM_FINANCE.md](/PREMIUM_FINANCE).
+See the core system document in [PREMIUM_FINANCE.md](/premium-finance).
 
 ---
 
