@@ -758,7 +758,7 @@ Headlines are scored against curated word lists:
 
 **Positive indicators**: peace, deal, agreement, breakthrough, recovery, growth, ceasefire, treaty, alliance, victory...
 
-Score determines sentiment classification: negative (<-1), neutral (-1 to +1), positive (>+1)
+Score determines sentiment classification: negative (&lt;-1), neutral (-1 to +1), positive (>+1)
 
 ### Entity Extraction
 
@@ -814,8 +814,8 @@ Deviation levels:
 
 - **Spike**: Z > 2.5 (statistically rare increase)
 - **Elevated**: Z > 1.5
-- **Normal**: -2 < Z < 1.5
-- **Quiet**: Z < -2 (unusually low activity)
+- **Normal**: -2 &lt; Z &lt; 1.5
+- **Quiet**: Z &lt; -2 (unusually low activity)
 
 This enables detection of anomalous activity even when absolute numbers seem normal.
 
@@ -881,7 +881,7 @@ The system maintains 48-point history (24 hours at 30-minute intervals) per hots
 
 - **Linear regression** calculates slope of recent scores
 - **Rising**: Slope > +0.1 points per interval
-- **Falling**: Slope < -0.1 points per interval
+- **Falling**: Slope &lt; -0.1 points per interval
 - **Stable**: Slope within ±0.1
 
 **Signal Generation**
@@ -2091,7 +2091,7 @@ This applies to:
 - Map popup content
 - Tension pair labels
 
-The `<mark>` highlighting in search escapes text *before* wrapping matches, preventing injection via crafted search queries.
+The `mark` element highlighting in search escapes text *before* wrapping matches, preventing injection via crafted search queries.
 
 ### Proxy Endpoint Validation
 
@@ -2554,7 +2554,7 @@ When news mentions flow disruptions, two signal types may trigger:
 | Signal | Criteria | Meaning |
 |--------|----------|---------|
 | **Flow Drop** | Pipeline keywords + disruption terms | Potential supply interruption |
-| **Flow-Price Divergence** | Flow drop news + oil price stable (< $1.50 move) | Markets not yet pricing in disruption |
+| **Flow-Price Divergence** | Flow drop news + oil price stable (&lt; $1.50 move) | Markets not yet pricing in disruption |
 
 ### Why This Matters
 
@@ -2930,7 +2930,7 @@ When both GDACS and EONET report the same event:
 
 To prevent map clutter, natural events are filtered:
 
-- **Wildfires**: Only events < 48 hours old (older fires are either contained or well-known)
+- **Wildfires**: Only events &lt; 48 hours old (older fires are either contained or well-known)
 - **Earthquakes**: M4.5+ globally, lower threshold for populated areas
 - **Storms**: Only named storms or those with warnings
 
@@ -3137,7 +3137,7 @@ Each country's score combines a static baseline (40%) with a dynamic event score
 
 | Sub-component | Weight | Scoring |
 |---------------|--------|---------|
-| Unrest | 25% | Log2 dampening for democracies (multiplier < 0.7), linear for authoritarian states. Base capped at 50, plus protest fatality boost (up to 30), plus outage severity boost (TOTAL 30pts, MAJOR 15pts, PARTIAL 5pts, capped at 50) |
+| Unrest | 25% | Log2 dampening for democracies (multiplier &lt; 0.7), linear for authoritarian states. Base capped at 50, plus protest fatality boost (up to 30), plus outage severity boost (TOTAL 30pts, MAJOR 15pts, PARTIAL 5pts, capped at 50) |
 | Conflict | 30% | Weighted ACLED events (battles x3, explosions x4, civilian violence x5), sqrt-scaled fatalities, civilian boost, Iran strike severity, OREF alert boost (IL only: 25 base + 5 per alert) |
 | Security | 20% | GPS/GNSS jamming hexes (high: 5pts, medium: 2pts, capped at 35) |
 | Information | 25% | Reserved (0); no server-side news data |

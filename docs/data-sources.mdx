@@ -147,7 +147,7 @@ Government travel advisories serve as expert risk assessments from national inte
 
 **Sources**: 4 government advisory feeds (US State Dept, Australia DFAT Smartraveller, UK FCDO, New Zealand MFAT), 13 US Embassy country-specific alert feeds (Thailand, UAE, Germany, Ukraine, Mexico, India, Pakistan, Colombia, Poland, Bangladesh, Italy, Dominican Republic, Myanmar), and health agency feeds (CDC Travel Notices, ECDC epidemiological updates, WHO News, WHO Africa Emergencies).
 
-**Advisory levels** (ranked): Do-Not-Travel (4) → Reconsider Travel (3) → Exercise Caution (2) → Normal (1) → Info (0). Both RSS (`<item>`) and Atom (`<entry>`) formats are parsed. Country extraction uses regex parsing of advisory titles with `nameToCountryCode()` lookup.
+**Advisory levels** (ranked): Do-Not-Travel (4) → Reconsider Travel (3) → Exercise Caution (2) → Normal (1) → Info (0). Both RSS (item) and Atom (entry) formats are parsed. Country extraction uses regex parsing of advisory titles with `nameToCountryCode()` lookup.
 
 **CII integration** — advisories feed into instability scores through two mechanisms:
 
@@ -342,7 +342,7 @@ Client (1 RPC call) → listFeedDigest → Redis check (digest:v1:{variant}:{lan
                            └─────────────────────────┘
 ```
 
-The digest cache key is `news:digest:v1:{variant}:{lang}` with a 900-second TTL. Individual feed results are separately cached per URL for 600 seconds. Items per feed are capped at 5, categories at 20 items each. XML parsing is edge-runtime-compatible (regex-based, no DOM parser), handling both RSS `<item>` and Atom `<entry>` formats. Each item is keyword-classified at aggregation time. An in-memory fallback cache (capped at 50 entries) provides last-known-good data if Redis fails.
+The digest cache key is `news:digest:v1:{variant}:{lang}` with a 900-second TTL. Individual feed results are separately cached per URL for 600 seconds. Items per feed are capped at 5, categories at 20 items each. XML parsing is edge-runtime-compatible (regex-based, no DOM parser), handling both RSS item and Atom entry formats. Each item is keyword-classified at aggregation time. An in-memory fallback cache (capped at 50 entries) provides last-known-good data if Redis fails.
 
 This eliminates per-client feed fan-out — 1,000 concurrent users each polling 25 feed categories would have generated 25,000 edge invocations per poll cycle. With server-side aggregation, they generate exactly 1 (or 0 if the digest is cached).
 
