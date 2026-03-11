@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "World Monitor",
+  "name": "World Monitor Docs",
   "logo": {
     "dark": "/logo.png",
     "light": "/logo.png"
