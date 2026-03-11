@@ -22,7 +22,7 @@ The server-side score (`get-risk-scores.ts`) uses the same formulas as the front
 | **Baseline risk**    | 40%    | Pre-configured per country reflecting structural fragility (0-50 scale) |
 | **Event score**      | 60%    | Blend of Unrest (25%), Conflict (30%), Security (20%), Information (25%) |
 
-**Unrest score** (0-100): Log2 dampening for high-volume low-multiplier countries (`multiplier < 0.7`), linear otherwise. Base capped at 50, plus protest/riot fatality boost (up to 30), plus outage severity boost (TOTAL: 30pts, MAJOR: 15pts, PARTIAL: 5pts, capped at 50).
+**Unrest score** (0-100): Log2 dampening for high-volume low-multiplier countries (`multiplier &lt; 0.7`), linear otherwise. Base capped at 50, plus protest/riot fatality boost (up to 30), plus outage severity boost (TOTAL: 30pts, MAJOR: 15pts, PARTIAL: 5pts, capped at 50).
 
 **Conflict score** (0-100): Weighted ACLED events (battles x3, explosions x4, civilian violence x5, capped at 50), sqrt-scaled fatalities (up to 40), civilian boost (up to 10), Iran strike boost with severity weighting (up to 50), and OREF alert boost for Israel (25 base + 5 per active alert, up to 50 total).
 
@@ -339,7 +339,7 @@ The dashboard integrates two complementary geopolitical pulse indicators:
 | 70% – 84%         | 2            | High Activity     |
 | 50% – 69%         | 3            | Elevated Activity |
 | 25% – 49%         | 4            | Above Normal      |
-| < 25%             | 5            | Normal Activity   |
+| &lt; 25%             | 5            | Normal Activity   |
 
 Activity spikes at individual locations boost the aggregate score (+10 per spike, capped at 100). Data freshness is tracked per-location — the system distinguishes between stale readings (location sensor lag) and genuine low activity. Per-location detail includes current popularity percentage, spike magnitude, and open/closed status.
 
