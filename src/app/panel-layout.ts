@@ -322,7 +322,6 @@ export class PanelLayoutManager implements AppModule {
           </div>
         </div>
         <nav>
-          <a href="/">Dashboard</a>
           <a href="/pro">Pro</a>
           <a href="/blog/">Blog</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener">GitHub</a>
