@@ -724,7 +724,7 @@ similarity(A, B) = |A ∩ B| / |A ∪ B|
 
 - Headlines are lowercased and split on word boundaries
 - Stop words removed: "the", "a", "an", "in", "on", "at", "to", "for", "of", "and", "or"
-- Short tokens (<3 characters) filtered out
+- Short tokens (&lt;3 characters) filtered out
 - Result cached per headline for performance
 
 **Inverted Index Optimization**:
@@ -748,7 +748,7 @@ Each news cluster tracks publication velocity:
 
 - **Sources per hour** = article count / time span
 - **Trend** = rising/stable/falling based on first-half vs second-half publication rate
-- **Levels**: Normal (<3/hr), Elevated (3-6/hr), Spike (>6/hr)
+- **Levels**: Normal (&lt;3/hr), Elevated (3-6/hr), Spike (>6/hr)
 
 ### Sentiment Detection
 
@@ -839,7 +839,7 @@ The system counts matching news articles in the current feed, applies velocity a
 
 | Level | Criteria | Visual |
 |-------|----------|--------|
-| **Low** | <3 matches, normal velocity | Gray marker |
+| **Low** | &lt;3 matches, normal velocity | Gray marker |
 | **Elevated** | 3-6 matches OR elevated velocity | Yellow pulse |
 | **High** | >6 matches OR spike velocity | Red pulse |
 
@@ -1072,7 +1072,7 @@ Beyond the base component scores, several contextual factors can boost a country
 
 - Information ≥70: +5 points
 - Information ≥50: +3 points
-- Information <50: +0 points
+- Information &lt;50: +0 points
 
 **Focal Point Boost Tiers**:
 
@@ -1398,7 +1398,7 @@ Aggregate activity maps to a 5-level readiness scale:
 | **DEFCON 2** | ≥75% | FAST PACE | High activity; significant event underway |
 | **DEFCON 3** | ≥50% | ROUND HOUSE | Elevated; above-normal operations |
 | **DEFCON 4** | ≥25% | DOUBLE TAKE | Increased vigilance |
-| **DEFCON 5** | <25% | FADE OUT | Normal peacetime operations |
+| **DEFCON 5** | &lt;25% | FADE OUT | Normal peacetime operations |
 
 ### GDELT Tension Pairs
 
@@ -2231,12 +2231,12 @@ Each data source has calibrated freshness expectations:
 
 | Source | Expected Interval | "Fresh" Threshold |
 |--------|------------------|-------------------|
-| News feeds | 5 minutes | <10 minutes |
-| Stock quotes | 1 minute | <5 minutes |
-| Earthquakes | 5 minutes | <15 minutes |
-| Weather | 10 minutes | <30 minutes |
-| Flight delays | 10 minutes | <20 minutes |
-| AIS vessels | Real-time | <1 minute |
+| News feeds | 5 minutes | &lt;10 minutes |
+| Stock quotes | 1 minute | &lt;5 minutes |
+| Earthquakes | 5 minutes | &lt;15 minutes |
+| Weather | 10 minutes | &lt;30 minutes |
+| Flight delays | 10 minutes | &lt;20 minutes |
+| AIS vessels | Real-time | &lt;1 minute |
 
 ### Visual Indicators
 
