@@ -329,7 +329,7 @@ export class PanelLayoutManager implements AppModule {
           <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noopener">Discussions</a>
           <a href="https://x.com/worldmonitorai" target="_blank" rel="noopener">X</a>
         </nav>
-        <span class="site-footer-copy">&copy; ${new Date().getFullYear()} WorldMonitor</span>
+        <span class="site-footer-copy">&copy; ${new Date().getFullYear()} World Monitor</span>
       </footer>
     `;
 
