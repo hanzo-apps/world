@@ -924,11 +924,15 @@ const Footer = () => (
 
     <div className="flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto pt-8 border-t border-wm-border/50 text-xs text-wm-muted font-mono">
       <div className="flex items-center gap-3 mb-4 md:mb-0">
-        <Logo />
-        <span className="text-[9px] uppercase tracking-[2px] opacity-60">by Someone.ceo</span>
+        <img src="/favico/favicon-32x32.png" alt="" width="28" height="28" className="rounded-full" />
+        <div className="flex flex-col">
+          <span className="font-display font-bold text-sm leading-none tracking-tight text-wm-text">WORLD MONITOR</span>
+          <span className="text-[9px] uppercase tracking-[2px] opacity-60 mt-0.5">by Someone.ceo</span>
+        </div>
       </div>
       <div className="flex items-center gap-6">
         <a href="/" className="hover:text-wm-text transition-colors">Dashboard</a>
+        <a href="/pro" className="hover:text-wm-text transition-colors">Pro</a>
         <a href="/blog/" className="hover:text-wm-text transition-colors">Blog</a>
         <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
         <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">Discussions</a>
@@ -1119,12 +1123,15 @@ const EnterprisePage = () => (
     <footer className="border-t border-wm-border bg-[#020202] py-8 px-6 text-center">
       <div className="flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto text-xs text-wm-muted font-mono">
         <div className="flex items-center gap-3 mb-4 md:mb-0">
-          <Logo />
-          <span className="text-[9px] uppercase tracking-[2px] opacity-60">by Someone.ceo</span>
+          <img src="/favico/favicon-32x32.png" alt="" width="28" height="28" className="rounded-full" />
+          <div className="flex flex-col">
+            <span className="font-display font-bold text-sm leading-none tracking-tight text-wm-text">WORLD MONITOR</span>
+            <span className="text-[9px] uppercase tracking-[2px] opacity-60 mt-0.5">by Someone.ceo</span>
+          </div>
         </div>
         <div className="flex items-center gap-6">
           <a href="/" className="hover:text-wm-text transition-colors">Dashboard</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} className="hover:text-wm-text transition-colors">{t('nav.pro')}</a>
+          <a href="/pro" className="hover:text-wm-text transition-colors">Pro</a>
           <a href="/blog/" className="hover:text-wm-text transition-colors">Blog</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
           <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">Discussions</a>
