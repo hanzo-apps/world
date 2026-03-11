@@ -15,7 +15,7 @@ import { t } from './i18n';
 import dashboardFallback from './assets/worldmonitor-7-mar-2026.jpg';
 import wiredLogo from './assets/wired-logo.svg';
 
-const API_BASE = 'https://api.worldmonitor.app';
+const API_BASE = 'https://api.worldmonitor.app/api';
 const TURNSTILE_SITE_KEY = '0x4AAAAAACnaYgHIyxclu8Tj';
 const PRO_URL = 'https://worldmonitor.app/pro';
 
