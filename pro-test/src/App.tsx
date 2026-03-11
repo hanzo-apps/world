@@ -932,7 +932,6 @@ const Footer = () => (
       </div>
       <div className="flex items-center gap-6">
         <a href="/" className="hover:text-wm-text transition-colors">Dashboard</a>
-        <a href="/pro" className="hover:text-wm-text transition-colors">Pro</a>
         <a href="/blog/" className="hover:text-wm-text transition-colors">Blog</a>
         <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
         <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">Discussions</a>
@@ -1131,7 +1130,6 @@ const EnterprisePage = () => (
         </div>
         <div className="flex items-center gap-6">
           <a href="/" className="hover:text-wm-text transition-colors">Dashboard</a>
-          <a href="/pro" className="hover:text-wm-text transition-colors">Pro</a>
           <a href="/blog/" className="hover:text-wm-text transition-colors">Blog</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
           <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">Discussions</a>
