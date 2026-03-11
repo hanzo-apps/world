@@ -284,6 +284,16 @@ img { max-width: 100%; height: auto; border-radius: var(--radius); }
   overflow: hidden;
 }
 
+.hero-image {
+  display: block;
+  max-width: var(--max-width);
+  width: 100%;
+  height: auto;
+  margin: 0 auto 2rem;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
 .post-card-img {
   width: 100%;
   height: auto;
