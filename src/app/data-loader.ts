@@ -335,7 +335,7 @@ export class DataLoaderManager implements AppModule {
     return panelIds.some((panelId) => this.isPanelNearViewport(panelId, marginPx));
   }
 
-  async loadAllData(): Promise<void> {
+  async loadAllData(forceAll = false): Promise<void> {
     const runGuarded = async (name: string, fn: () => Promise<void>): Promise<void> => {
       if (this.ctx.isDestroyed || this.ctx.inFlight.has(name)) return;
       this.ctx.inFlight.add(name);
@@ -348,26 +348,29 @@ export class DataLoaderManager implements AppModule {
       }
     };
 
+    const shouldLoad = (id: string): boolean => forceAll || this.isPanelNearViewport(id);
+    const shouldLoadAny = (ids: string[]): boolean => forceAll || this.isAnyPanelNearViewport(ids);
+
     const tasks: Array<{ name: string; task: Promise<void> }> = [
       { name: 'news', task: runGuarded('news', () => this.loadNews()) },
     ];
 
     // Happy variant only loads news data -- skip all geopolitical/financial/military data
     if (SITE_VARIANT !== 'happy') {
-      if (this.isAnyPanelNearViewport(['markets', 'heatmap', 'commodities', 'crypto'])) {
+      if (shouldLoadAny(['markets', 'heatmap', 'commodities', 'crypto'])) {
         tasks.push({ name: 'markets', task: runGuarded('markets', () => this.loadMarkets()) });
       }
-      if (SITE_VARIANT === 'finance' && getSecretState('WORLDMONITOR_API_KEY').present && this.isPanelNearViewport('stock-analysis')) {
+      if (SITE_VARIANT === 'finance' && getSecretState('WORLDMONITOR_API_KEY').present && shouldLoad('stock-analysis')) {
         tasks.push({ name: 'stockAnalysis', task: runGuarded('stockAnalysis', () => this.loadStockAnalysis()) });
       }
-      if (SITE_VARIANT === 'finance' && getSecretState('WORLDMONITOR_API_KEY').present && this.isPanelNearViewport('stock-backtest')) {
+      if (SITE_VARIANT === 'finance' && getSecretState('WORLDMONITOR_API_KEY').present && shouldLoad('stock-backtest')) {
         tasks.push({ name: 'stockBacktest', task: runGuarded('stockBacktest', () => this.loadStockBacktest()) });
       }
-      if (this.isPanelNearViewport('polymarket')) {
+      if (shouldLoad('polymarket')) {
         tasks.push({ name: 'predictions', task: runGuarded('predictions', () => this.loadPredictions()) });
       }
       tasks.push({ name: 'pizzint', task: runGuarded('pizzint', () => this.loadPizzInt()) });
-      if (this.isPanelNearViewport('economic')) {
+      if (shouldLoad('economic')) {
         tasks.push({ name: 'fred', task: runGuarded('fred', () => this.loadFredData()) });
         tasks.push({ name: 'oil', task: runGuarded('oil', () => this.loadOilAnalytics()) });
         tasks.push({ name: 'spending', task: runGuarded('spending', () => this.loadGovernmentSpending()) });
@@ -376,10 +379,10 @@ export class DataLoaderManager implements AppModule {
 
       // Trade policy data (FULL and FINANCE only)
       if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'commodity') {
-        if (this.isPanelNearViewport('trade-policy')) {
+        if (shouldLoad('trade-policy')) {
           tasks.push({ name: 'tradePolicy', task: runGuarded('tradePolicy', () => this.loadTradePolicy()) });
         }
-        if (this.isPanelNearViewport('supply-chain')) {
+        if (shouldLoad('supply-chain')) {
           tasks.push({ name: 'supplyChain', task: runGuarded('supplyChain', () => this.loadSupplyChain()) });
         }
       }
@@ -387,19 +390,19 @@ export class DataLoaderManager implements AppModule {
 
     // Progress charts data (happy variant only)
     if (SITE_VARIANT === 'happy') {
-      if (this.isPanelNearViewport('progress')) {
+      if (shouldLoad('progress')) {
         tasks.push({
           name: 'progress',
           task: runGuarded('progress', () => this.loadProgressData()),
         });
       }
-      if (this.isPanelNearViewport('species')) {
+      if (shouldLoad('species')) {
         tasks.push({
           name: 'species',
           task: runGuarded('species', () => this.loadSpeciesData()),
         });
       }
-      if (this.isPanelNearViewport('renewable')) {
+      if (shouldLoad('renewable')) {
         tasks.push({
           name: 'renewable',
           task: runGuarded('renewable', () => this.loadRenewableData()),
