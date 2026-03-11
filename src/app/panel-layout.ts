@@ -324,6 +324,7 @@ export class PanelLayoutManager implements AppModule {
         <nav>
           <a href="https://www.worldmonitor.app/pro">Pro</a>
           <a href="https://www.worldmonitor.app/blog/">Blog</a>
+          <a href="https://www.worldmonitor.app/docs">Docs</a>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener">GitHub</a>
           <a href="https://github.com/koala73/worldmonitor/discussions" target="_blank" rel="noopener">Discussions</a>
           <a href="https://x.com/worldmonitorai" target="_blank" rel="noopener">X</a>
