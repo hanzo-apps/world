@@ -12,8 +12,7 @@
   "colors": {
     "primary": "#4ade80",
     "light": "#4ade80",
-    "dark": "#22c55e",
-    "anchors": "#4ade80"
+    "dark": "#22c55e"
   },
   "navbar": {
     "links": [
