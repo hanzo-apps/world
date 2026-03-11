@@ -14,20 +14,20 @@ AI-powered real-time global intelligence dashboard aggregating news, markets, ge
 | Document | Description |
 |---|---|
 | [README](https://github.com/koala73/worldmonitor#readme) | Project overview, quick start, and self-hosting guide |
-| [Algorithms](/ALGORITHMS) | Scoring formulas, detection algorithms, classification pipelines |
-| [Data Sources](/DATA_SOURCES) | All 31+ data sources, feed tiers, and collection methods |
-| [Architecture](/ARCHITECTURE) | System design, caching, bootstrap hydration, edge functions |
-| [Map Engine](/MAP_ENGINE) | 3D globe and flat map rendering details |
-| [AI Intelligence](/AI_INTELLIGENCE) | LLM chains, RAG, threat classification, deduction |
-| [Desktop App](/DESKTOP_APP) | Tauri architecture, sidecar, secret management |
-| [Finance Data](/FINANCE_DATA) | Market radar, Gulf FDI, stablecoins, BIS, WTO |
-| [Premium Finance](/PREMIUM_FINANCE) | Premium stock analysis, stored history, backtests, daily brief |
-| [Premium Finance Search Layer](/PREMIUM_FINANCE_SEARCH) | Targeted stock-news provider chain layered on top of premium finance |
-| [Orbital Surveillance](/ORBITAL_SURVEILLANCE) | Satellite tracking, SGP4 propagation, tier availability, roadmap |
+| [Algorithms](/algorithms) | Scoring formulas, detection algorithms, classification pipelines |
+| [Data Sources](/data-sources) | All 31+ data sources, feed tiers, and collection methods |
+| [Architecture](/architecture) | System design, caching, bootstrap hydration, edge functions |
+| [Map Engine](/map-engine) | 3D globe and flat map rendering details |
+| [AI Intelligence](/ai-intelligence) | LLM chains, RAG, threat classification, deduction |
+| [Desktop App](/desktop-app) | Tauri architecture, sidecar, secret management |
+| [Finance Data](/finance-data) | Market radar, Gulf FDI, stablecoins, BIS, WTO |
+| [Premium Finance](/premium-finance) | Premium stock analysis, stored history, backtests, daily brief |
+| [Premium Finance Search Layer](/premium-finance-search) | Targeted stock-news provider chain layered on top of premium finance |
+| [Orbital Surveillance](/orbital-surveillance) | Satellite tracking, SGP4 propagation, tier availability, roadmap |
 | [API Reference](./api/) | OpenAPI specs for all 22 services |
-| [Health Endpoints](/HEALTH_ENDPOINTS) | `/api/health` and `/api/seed-health` reference, staleness thresholds, monitoring integration |
-| [Adding Endpoints](/ADDING_ENDPOINTS) | Guide for adding new RPC endpoints |
-| [Release Packaging](/RELEASE_PACKAGING) | Desktop build and release process |
+| [Health Endpoints](/health-endpoints) | `/api/health` and `/api/seed-health` reference, staleness thresholds, monitoring integration |
+| [Adding Endpoints](/adding-endpoints) | Guide for adding new RPC endpoints |
+| [Release Packaging](/release-packaging) | Desktop build and release process |
 
 ---
 

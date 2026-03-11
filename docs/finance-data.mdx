@@ -9,8 +9,8 @@ Market radar, Gulf FDI tracking, stablecoin monitoring, energy analytics, and tr
 
 For the premium stock-analysis product layer, see:
 
-- [Premium Finance](/PREMIUM_FINANCE)
-- [Premium Finance Search Layer](/PREMIUM_FINANCE_SEARCH)
+- [Premium Finance](/premium-finance)
+- [Premium Finance Search Layer](/premium-finance-search)
 
 ---
 

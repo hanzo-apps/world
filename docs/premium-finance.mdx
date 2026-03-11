@@ -197,7 +197,7 @@ Core premium finance currently depends on:
 - Google News RSS as the baseline stock-news fallback
 - the shared LLM provider chain in [llm.ts](https://github.com/koala73/worldmonitor/blob/main/server/_shared/llm.ts)
 
-The provider-backed targeted stock-news layer is documented separately in [PREMIUM_FINANCE_SEARCH.md](/PREMIUM_FINANCE_SEARCH).
+The provider-backed targeted stock-news layer is documented separately in [PREMIUM_FINANCE_SEARCH.md](/premium-finance-search).
 
 ---
 
@@ -230,7 +230,7 @@ The core layer is:
 
 The search-backed stock-news layer is intentionally separate because it improves analysis quality but is not required for the feature to function. If all search providers are unavailable, premium stock analysis still works using Google News RSS fallback.
 
-See [PREMIUM_FINANCE_SEARCH.md](/PREMIUM_FINANCE_SEARCH).
+See [PREMIUM_FINANCE_SEARCH.md](/premium-finance-search).
 
 ---
 
