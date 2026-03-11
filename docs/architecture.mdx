@@ -127,7 +127,7 @@ This pattern is enforced project-wide across all panel subclasses. In E2E tests,
 
 ## API & Data Pipeline
 
-> **CORS** — all API endpoints enforce an origin allowlist. See [CORS.md](/CORS) for the allowed origins, implementation details, and how to add CORS to new endpoints.
+> **CORS** — all API endpoints enforce an origin allowlist. See [CORS.md](/cors) for the allowed origins, implementation details, and how to add CORS to new endpoints.
 
 ### Proto-First API Contracts
 

@@ -92,4 +92,4 @@ To allow additional headers, update `Access-Control-Allow-Headers` in both files
 
 ## Railway Relay CORS
 
-The Railway relay (`scripts/ais-relay.cjs`) has its own CORS handling with the `ALLOW_VERCEL_PREVIEW_ORIGINS` env var. See [RELAY_PARAMETERS.md](/RELAY_PARAMETERS) for details.
+The Railway relay (`scripts/ais-relay.cjs`) has its own CORS handling with the `ALLOW_VERCEL_PREVIEW_ORIGINS` env var. See [RELAY_PARAMETERS.md](/relay-parameters) for details.
