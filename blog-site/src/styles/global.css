@@ -199,14 +199,10 @@ img { max-width: 100%; height: auto; border-radius: var(--radius); }
 .site-footer .footer-links a:hover { color: var(--wm-text); }
 
 .site-footer .footer-copy {
-  width: 100%;
-  text-align: center;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--wm-border);
   color: var(--wm-muted);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   font-family: var(--font-mono);
+  opacity: 0.6;
 }
 
 /* ─── Blog Listing ─── */
