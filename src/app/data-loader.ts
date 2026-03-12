@@ -1401,17 +1401,34 @@ export class DataLoaderManager implements AppModule {
     }
 
     try {
-      const client = new ResearchServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
-      const data = await client.listTechEvents({
-        type: 'conference',
-        mappable: true,
-        days: 90,
-        limit: 50,
-      });
-      if (!data.success) throw new Error(data.error || 'Unknown error');
+      // Try hydrated bootstrap data first (instant, no RPC)
+      const hydrated = getHydratedData('techEvents') as { events?: Array<{ id: string; title: string; type: string; location: string; coords?: { lat: number; lng: number; country: string; virtual?: boolean }; startDate: string; endDate: string; url: string }> } | undefined;
+      let events = hydrated?.events;
+
+      if (!events?.length) {
+        // Fallback: RPC call
+        const client = new ResearchServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+        const data = await client.listTechEvents({
+          type: 'conference',
+          mappable: true,
+          days: 90,
+          limit: 50,
+        });
+        if (!data.success) throw new Error(data.error || 'Unknown error');
+        events = data.events;
+      } else {
+        // Filter hydrated data to match map layer needs (conferences, mappable, 90 days)
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() + 90);
+        events = events.filter(e =>
+          e.type === 'conference' &&
+          e.coords && !e.coords.virtual &&
+          new Date(e.startDate) <= cutoff,
+        ).slice(0, 50);
+      }
 
       const now = new Date();
-      const mapEvents = data.events.map((e: any) => ({
+      const mapEvents = (events || []).map((e: any) => ({
         id: e.id,
         title: e.title,
         location: e.location,
