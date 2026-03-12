@@ -109,6 +109,12 @@
               "relay-parameters",
               "data-sources"
             ]
+          },
+          {
+            "group": "Legal",
+            "pages": [
+              "license"
+            ]
           }
         ]
       },
