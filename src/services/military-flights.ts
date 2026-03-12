@@ -35,6 +35,24 @@ const HISTORY_MAX_POINTS = 20;
 const HISTORY_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 let historyCleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 
+function upsertFlightHistory(historyKey: string, lat: number, lon: number): [number, number][] {
+  let history = flightHistory.get(historyKey);
+  const now = Date.now();
+
+  if (!history) {
+    history = { positions: [], lastUpdate: now };
+    flightHistory.set(historyKey, history);
+  }
+
+  history.positions.push([lat, lon]);
+  if (history.positions.length > HISTORY_MAX_POINTS) {
+    history.positions.shift();
+  }
+  history.lastUpdate = now;
+
+  return history.positions;
+}
+
 // Circuit breaker for API calls
 const breaker = createCircuitBreaker<{ flights: MilitaryFlight[]; clusters: MilitaryFlightCluster[] }>({
   name: 'Military Flight Tracking',
@@ -82,17 +100,7 @@ async function fetchFromRedis(): Promise<MilitaryFlight[]> {
 
   const now = new Date();
   return data.flights.map((f) => {
-    const historyKey = f.hexCode.toLowerCase();
-    let history = flightHistory.get(historyKey);
-    if (!history) {
-      history = { positions: [], lastUpdate: Date.now() };
-      flightHistory.set(historyKey, history);
-    }
-    history.positions.push([f.lat, f.lon]);
-    if (history.positions.length > HISTORY_MAX_POINTS) {
-      history.positions.shift();
-    }
-    history.lastUpdate = Date.now();
+    const positions = upsertFlightHistory(f.hexCode.toLowerCase(), f.lat, f.lon);
 
     return {
       id: f.id,
@@ -110,7 +118,7 @@ async function fetchFromRedis(): Promise<MilitaryFlight[]> {
       onGround: f.onGround,
       squawk: f.squawk,
       lastSeen: f.lastSeenMs ? new Date(f.lastSeenMs) : now,
-      track: history.positions.length > 1 ? [...history.positions] : undefined,
+      track: positions.length > 1 ? [...positions] : undefined,
       confidence: f.confidence,
       isInteresting: f.isInteresting,
       note: f.note,
@@ -168,12 +176,7 @@ function parseOpenSkyResponse(data: OpenSkyResponse): MilitaryFlight[] {
     const lat = state[6]; const lon = state[5];
     if (lat === null || lon === null) continue;
     const info = determineAircraftInfo(callsign, icao24, state[2]);
-    const historyKey = icao24;
-    let history = flightHistory.get(historyKey);
-    if (!history) { history = { positions: [], lastUpdate: Date.now() }; flightHistory.set(historyKey, history); }
-    history.positions.push([lat, lon]);
-    if (history.positions.length > HISTORY_MAX_POINTS) history.positions.shift();
-    history.lastUpdate = Date.now();
+    const positions = upsertFlightHistory(icao24, lat, lon);
     const nearbyHotspot = getNearbyHotspot(lat, lon);
     const baroAlt = state[7]; const velocity = state[9]; const track = state[10]; const vertRate = state[11];
     flights.push({
@@ -188,7 +191,7 @@ function parseOpenSkyResponse(data: OpenSkyResponse): MilitaryFlight[] {
       verticalRate: vertRate != null ? Math.round(vertRate * 196.85) : undefined,
       onGround: state[8], squawk: state[14] || undefined,
       lastSeen: now,
-      track: history.positions.length > 1 ? [...history.positions] : undefined,
+      track: positions.length > 1 ? [...positions] : undefined,
       confidence: info.confidence,
       isInteresting: nearbyHotspot?.priority === 'high' || info.type === 'bomber' || info.type === 'reconnaissance' || info.type === 'awacs',
       note: nearbyHotspot ? `Near ${nearbyHotspot.name}` : undefined,
