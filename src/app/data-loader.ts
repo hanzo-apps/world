@@ -308,6 +308,9 @@ export class DataLoaderManager implements AppModule {
   }
 
   private isPerFeedFallbackEnabled(): boolean {
+    // Desktop: server digest has fewer categories than client FEEDS config.
+    // Enable per-feed RSS fallback so missing categories fetch directly.
+    if (isDesktopRuntime()) return true;
     return isFeatureEnabled('newsPerFeedFallback');
   }
 
@@ -1457,6 +1460,7 @@ export class DataLoaderManager implements AppModule {
 
   async loadIntelligenceSignals(): Promise<void> {
     resetHotspotActivity();
+    const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
     const tasks: Promise<void>[] = [];
 
     tasks.push((async () => {
@@ -1676,32 +1680,36 @@ export class DataLoaderManager implements AppModule {
     // Security advisories
     tasks.push(this.loadSecurityAdvisories());
 
-    // Telegram Intel
-    tasks.push(this.loadTelegramIntel());
+    // Telegram Intel (premium-locked on desktop without API key)
+    if (!_desktopLocked) {
+      tasks.push(this.loadTelegramIntel());
+    }
 
-    // OREF sirens
-    tasks.push((async () => {
-      try {
-        const data = await fetchOrefAlerts();
-        this.callPanel('oref-sirens', 'setData', data);
-        const alertCount = data.alerts?.length ?? 0;
-        const historyCount24h = data.historyCount24h ?? 0;
-        ingestOrefForCII(alertCount, historyCount24h);
-        this.ctx.intelligenceCache.orefAlerts = { alertCount, historyCount24h };
-        if (data.alerts?.length) dispatchOrefBreakingAlert(data.alerts);
-        onOrefAlertsUpdate((update) => {
-          this.callPanel('oref-sirens', 'setData', update);
-          const updAlerts = update.alerts?.length ?? 0;
-          const updHistory = update.historyCount24h ?? 0;
-          ingestOrefForCII(updAlerts, updHistory);
-          this.ctx.intelligenceCache.orefAlerts = { alertCount: updAlerts, historyCount24h: updHistory };
-          if (update.alerts?.length) dispatchOrefBreakingAlert(update.alerts);
-        });
-        startOrefPolling();
-      } catch (error) {
-        console.error('[Intelligence] OREF alerts fetch failed:', error);
-      }
-    })());
+    // OREF sirens (premium-locked on desktop without API key)
+    if (!_desktopLocked) {
+      tasks.push((async () => {
+        try {
+          const data = await fetchOrefAlerts();
+          this.callPanel('oref-sirens', 'setData', data);
+          const alertCount = data.alerts?.length ?? 0;
+          const historyCount24h = data.historyCount24h ?? 0;
+          ingestOrefForCII(alertCount, historyCount24h);
+          this.ctx.intelligenceCache.orefAlerts = { alertCount, historyCount24h };
+          if (data.alerts?.length) dispatchOrefBreakingAlert(data.alerts);
+          onOrefAlertsUpdate((update) => {
+            this.callPanel('oref-sirens', 'setData', update);
+            const updAlerts = update.alerts?.length ?? 0;
+            const updHistory = update.historyCount24h ?? 0;
+            ingestOrefForCII(updAlerts, updHistory);
+            this.ctx.intelligenceCache.orefAlerts = { alertCount: updAlerts, historyCount24h: updHistory };
+            if (update.alerts?.length) dispatchOrefBreakingAlert(update.alerts);
+          });
+          startOrefPolling();
+        } catch (error) {
+          console.error('[Intelligence] OREF alerts fetch failed:', error);
+        }
+      })());
+    }
 
     // GPS/GNSS jamming (cloud-only — seeded by Wingbits API via fetch-gpsjam.mjs)
     if (!isDesktopRuntime()) {
@@ -2572,6 +2580,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadTelegramIntel(): Promise<void> {
+    if (isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present) return;
     try {
       const result = await fetchTelegramFeed();
       this.callPanel('telegram-intel', 'setData', result);
