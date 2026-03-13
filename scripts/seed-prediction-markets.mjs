@@ -5,6 +5,7 @@ import {
   isExcluded, isMemeCandidate, tagRegions, parseYesPrice,
   shouldInclude, scoreMarket, filterAndScore, isExpired,
 } from './_prediction-scoring.mjs';
+import predictionTags from '../shared/prediction-tags.json' with { type: 'json' };
 
 loadEnvFile(import.meta.url);
 
@@ -17,22 +18,9 @@ const KALSHI_ENABLED = process.env.KALSHI_API_KEY !== undefined && process.env.K
 const FETCH_TIMEOUT = 10_000;
 const TAG_DELAY_MS = 300;
 
-const GEOPOLITICAL_TAGS = [
-  'politics', 'geopolitics', 'elections', 'world',
-  'ukraine', 'china', 'middle-east', 'europe',
-  'economy', 'fed', 'inflation',
-];
-
-const TECH_TAGS = [
-  'ai', 'tech', 'crypto', 'science',
-  'elon-musk', 'business', 'economy',
-];
-
-const FINANCE_TAGS = [
-  'economy', 'fed', 'inflation', 'interest-rates', 'recession',
-  'trade', 'tariffs', 'debt-ceiling',
-  'crypto', 'business', 'markets',
-];
+const GEOPOLITICAL_TAGS = predictionTags.geopolitical;
+const TECH_TAGS = predictionTags.tech;
+const FINANCE_TAGS = predictionTags.finance;
 
 async function fetchEventsByTag(tag, limit = 20) {
   const params = new URLSearchParams({

@@ -18,6 +18,7 @@ import {
 
 import { CHROME_UA, clampInt } from '../../../_shared/constants';
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
+import predictionTags from '../../../../shared/prediction-tags.json';
 
 const REDIS_CACHE_KEY = 'prediction:markets:v1';
 const REDIS_CACHE_TTL = 600; // 10 min
@@ -96,18 +97,9 @@ interface BootstrapData {
   finance?: BootstrapMarket[];
 }
 
-const EXCLUDE_KEYWORDS = [
-  'nba', 'nfl', 'mlb', 'nhl', 'fifa', 'world cup', 'super bowl', 'championship',
-  'playoffs', 'oscar', 'grammy', 'emmy', 'box office', 'movie', 'album', 'song',
-  'streamer', 'influencer', 'celebrity', 'kardashian',
-  'bachelor', 'reality tv', 'mvp', 'touchdown', 'home run', 'goal scorer',
-  'academy award', 'bafta', 'golden globe', 'cannes', 'sundance',
-  'documentary', 'feature film', 'tv series', 'season finale',
-];
-
 function isExcluded(title: string): boolean {
   const lower = title.toLowerCase();
-  return EXCLUDE_KEYWORDS.some(kw => lower.includes(kw));
+  return predictionTags.excludeKeywords.some(kw => lower.includes(kw));
 }
 
 const KALSHI_VOLUME_THRESHOLD = 5000;
@@ -146,7 +138,7 @@ function mapEvent(event: GammaEvent, category: string): PredictionMarket {
     closesAt: Number.isFinite(closesAtMs) ? closesAtMs : 0,
     category: category || '',
     source: MarketSource.MARKET_SOURCE_POLYMARKET,
-    openInterest: 0,
+
   };
 }
 
@@ -162,7 +154,7 @@ function mapMarket(market: GammaMarket): PredictionMarket {
     closesAt: Number.isFinite(closesAtMs) ? closesAtMs : 0,
     category: '',
     source: MarketSource.MARKET_SOURCE_POLYMARKET,
-    openInterest: 0,
+
   };
 }
 
@@ -179,7 +171,6 @@ function mapKalshiMarket(market: KalshiMarket, category: string, eventTitle?: st
     closesAt: Number.isFinite(closesAtMs) ? closesAtMs : 0,
     category: category || '',
     source: MarketSource.MARKET_SOURCE_KALSHI,
-    openInterest: parseFloat(market.open_interest_fp || '0'),
   };
 }
 
@@ -259,7 +250,7 @@ export const listPredictionMarkets: PredictionServiceHandler['listPredictionMark
               closesAt: m.endDate ? Date.parse(m.endDate) : 0,
               category: category || '',
               source: m.source === 'kalshi' ? MarketSource.MARKET_SOURCE_KALSHI : MarketSource.MARKET_SOURCE_POLYMARKET,
-              openInterest: 0,
+          
             }));
             return { markets, pagination: undefined };
           }
