@@ -18,7 +18,7 @@ import {
 
 import { CHROME_UA, clampInt } from '../../../_shared/constants';
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
-import predictionTags from '../../../../shared/prediction-tags.json';
+import predictionTags from '../../../../scripts/data/prediction-tags.json';
 
 const REDIS_CACHE_KEY = 'prediction:markets:v1';
 const REDIS_CACHE_TTL = 600; // 10 min

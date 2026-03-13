@@ -5,7 +5,7 @@ import {
   isExcluded, isMemeCandidate, tagRegions, parseYesPrice,
   shouldInclude, scoreMarket, filterAndScore, isExpired,
 } from './_prediction-scoring.mjs';
-import predictionTags from '../shared/prediction-tags.json' with { type: 'json' };
+import predictionTags from './data/prediction-tags.json' with { type: 'json' };
 
 loadEnvFile(import.meta.url);
 
