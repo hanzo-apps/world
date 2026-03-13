@@ -1,6 +1,6 @@
 import type { AppContext } from '@/app/app-context';
 import type { DomainAdapter, SignalEvidence } from '../types';
-import { matchCountryNamesInText, getCountryAtCoordinates } from '@/services/country-geometry';
+import { matchCountryNamesInText, getCountryAtCoordinates, nameToCountryCode, getCountryNameByCode, iso3ToIso2Code } from '@/services/country-geometry';
 
 // v1 weights: displacement and cii_delta deferred — renormalized to sum to 1.0.
 const WEIGHTS: Record<string, number> = {
@@ -8,6 +8,24 @@ const WEIGHTS: Record<string, number> = {
   escalation_outage: 0.25,
   news_severity: 0.30,
 };
+
+function normalizeToCode(country: string | undefined, lat?: number, lon?: number): string | undefined {
+  const trimmed = country?.trim();
+  if (trimmed) {
+    const fromName = nameToCountryCode(trimmed);
+    if (fromName) return fromName;
+    if (trimmed.length === 3) {
+      const fromIso3 = iso3ToIso2Code(trimmed);
+      if (fromIso3) return fromIso3;
+    }
+    if (trimmed.length === 2) return trimmed.toUpperCase();
+  }
+  if (lat != null && lon != null && !(lat === 0 && lon === 0)) {
+    const geo = getCountryAtCoordinates(lat, lon);
+    if (geo?.code) return geo.code;
+  }
+  return undefined;
+}
 
 const ESCALATION_KEYWORDS = /\b((?:military|armed|air)\s*(?:strike|attack|offensive)|invasion|bombing|missile|airstrike|shelling|drone\s+strike|war(?:fare)?|ceasefire|martial\s+law|armed\s+clash(?:es)?|gunfire|coup(?:\s+attempt)?|insurgent|rebel|militia|terror(?:ist|ism)|hostage|siege|blockade|mobiliz(?:ation|e)|escalat(?:ion|ing|e)|retaliat|deploy(?:ment|ed)|incursion|annex(?:ation|ed)|occupation|humanitarian\s+crisis|refugee|evacuat|nuclear|chemical\s+weapon|biological\s+weapon)\b/i;
 
@@ -32,6 +50,9 @@ export const escalationAdapter: DomainAdapter = {
       const age = now - (p.time?.getTime?.() ?? now);
       if (age > windowMs) continue;
 
+      const normalizedCountry = normalizeToCode(p.country, p.lat, p.lon);
+      if (!normalizedCountry) continue;
+
       const severityMap: Record<string, number> = { high: 85, medium: 55, low: 30 };
       const severity = severityMap[p.severity] ?? 40;
 
@@ -41,7 +62,7 @@ export const escalationAdapter: DomainAdapter = {
         severity,
         lat: p.lat,
         lon: p.lon,
-        country: p.country,
+        country: normalizedCountry,
         timestamp: p.time?.getTime?.() ?? now,
         label: `${p.eventType}: ${p.title}`,
         rawData: p,
@@ -55,6 +76,9 @@ export const escalationAdapter: DomainAdapter = {
       if (age > windowMs) continue;
       if (o.lat != null && o.lon != null && o.lat === 0 && o.lon === 0) continue;
 
+      const normalizedCountry = normalizeToCode(o.country, o.lat, o.lon);
+      if (!normalizedCountry) continue;
+
       const severityMap: Record<string, number> = { total: 90, major: 70, partial: 40 };
       const severity = severityMap[o.severity] ?? 30;
 
@@ -64,7 +88,7 @@ export const escalationAdapter: DomainAdapter = {
         severity,
         lat: o.lat,
         lon: o.lon,
-        country: o.country,
+        country: normalizedCountry,
         timestamp: o.pubDate?.getTime?.() ?? now,
         label: `${o.severity} outage: ${o.title}`,
         rawData: o,
@@ -85,12 +109,8 @@ export const escalationAdapter: DomainAdapter = {
 
       // Extract country from title text
       const matchedCountries = matchCountryNamesInText(c.primaryTitle);
-      let country: string | undefined = matchedCountries[0];
-      if (!country && c.lat != null && c.lon != null) {
-        const geo = getCountryAtCoordinates(c.lat, c.lon);
-        country = geo?.code;
-      }
-      if (!country) continue; // can't cluster without country
+      const normalizedCountry = normalizeToCode(matchedCountries[0], c.lat, c.lon);
+      if (!normalizedCountry) continue;
 
       signals.push({
         type: 'news_severity',
@@ -98,7 +118,7 @@ export const escalationAdapter: DomainAdapter = {
         severity,
         lat: c.lat,
         lon: c.lon,
-        country,
+        country: normalizedCountry,
         timestamp: c.lastUpdated.getTime(),
         label: c.primaryTitle,
         rawData: c,
@@ -115,7 +135,8 @@ export const escalationAdapter: DomainAdapter = {
   generateTitle(cluster: SignalEvidence[]): string {
     const types = new Set(cluster.map(s => s.type));
     const countries = [...new Set(cluster.map(s => s.country).filter(Boolean))];
-    const countryLabel = countries[0] || 'Unknown';
+    const code = countries[0];
+    const countryLabel = code ? getCountryNameByCode(code) ?? code : 'Unknown';
 
     const parts: string[] = [];
     if (types.has('conflict_event')) parts.push('conflict');
