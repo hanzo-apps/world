@@ -24,7 +24,7 @@ const breaker = createCircuitBreaker<PredictionMarket[]>({ name: 'Polymarket', c
 
 const client = new PredictionServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 
-import predictionTags from '../../../shared/prediction-tags.json';
+import predictionTags from '../../../scripts/data/prediction-tags.json';
 
 const GEOPOLITICAL_TAGS = predictionTags.geopolitical;
 const TECH_TAGS = predictionTags.tech;
