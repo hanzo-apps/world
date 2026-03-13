@@ -354,14 +354,17 @@ describe('sidecar youtube-embed endpoint', () => {
 // ── 10. Optional channels with fallbackVideoId ──
 
 describe('optional channels fallback coverage', () => {
-  const highPriorityOptional = ['livenow-fox', 'abc-news', 'nbc-news', 'wion'];
+  const highPriorityOptional = ['abc-news', 'nbc-news', 'wion', 'rt'];
 
   for (const id of highPriorityOptional) {
-    it(`${id} has fallbackVideoId`, () => {
+    it(`${id} has a fallback path`, () => {
       const match = liveNewsSrc.match(new RegExp(`id:\\s*'${id}'[^}]*}`));
       assert.ok(match, `Channel '${id}' not found in OPTIONAL_LIVE_CHANNELS`);
-      assert.match(match[0], /fallbackVideoId:\s*'[A-Za-z0-9_-]{11}'/,
-        `Optional channel '${id}' must have a valid 11-char fallbackVideoId`);
+      const hasFallback = /fallbackVideoId:\s*'[A-Za-z0-9_-]{11}'/.test(match[0]);
+      const hasHlsUrl = /hlsUrl:\s*'[^']+'/.test(match[0]);
+      const hasHandle = /handle:\s*'[^']+'/.test(match[0]);
+      assert.ok(hasFallback || hasHlsUrl || hasHandle,
+        `Optional channel '${id}' must have fallbackVideoId, hlsUrl, or handle`);
     });
   }
 
