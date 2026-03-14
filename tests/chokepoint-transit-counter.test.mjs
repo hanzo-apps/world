@@ -65,8 +65,8 @@ describe('chokepoint definitions', () => {
   const cpBlock = cpMatch[1];
   const names = [...cpBlock.matchAll(/name:\s*'([^']+)'/g)].map(m => m[1]);
 
-  it('defines exactly 12 chokepoints', () => {
-    assert.equal(names.length, 12);
+  it('defines exactly 15 chokepoints', () => {
+    assert.equal(names.length, 15);
   });
 
   it('includes original 8 chokepoints', () => {
@@ -79,8 +79,8 @@ describe('chokepoint definitions', () => {
     }
   });
 
-  it('includes 4 new chokepoints with correct names', () => {
-    const added = ['Cape of Good Hope', 'Strait of Gibraltar', 'Bosphorus Strait', 'Dardanelles'];
+  it('includes new chokepoints with correct names', () => {
+    const added = ['Cape of Good Hope', 'Strait of Gibraltar', 'Bosporus Strait'];
     for (const name of added) {
       assert.ok(names.includes(name), `missing new chokepoint: ${name}`);
     }
