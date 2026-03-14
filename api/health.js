@@ -64,6 +64,7 @@ const STANDALONE_KEYS = {
   portwatch:             'supply_chain:portwatch:v1',
   corridorrisk:          'supply_chain:corridorrisk:v1',
   chokepointTransits:    'supply_chain:chokepoint_transits:v1',
+  transitSummaries:      'supply_chain:transit-summaries:v1',
 };
 
 const SEED_META = {
@@ -117,6 +118,7 @@ const SEED_META = {
   portwatch:           { key: 'seed-meta:supply_chain:portwatch',            maxStaleMin: 720 },
   corridorrisk:        { key: 'seed-meta:supply_chain:corridorrisk',         maxStaleMin: 120 },
   chokepointTransits:  { key: 'seed-meta:supply_chain:chokepoint_transits',  maxStaleMin: 15 },
+  transitSummaries:    { key: 'seed-meta:supply_chain:transit-summaries',    maxStaleMin: 15 },
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).

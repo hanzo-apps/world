@@ -3688,6 +3688,7 @@ const PORTWATCH_CHOKEPOINT_NAMES = [
   { name: 'Lombok Strait', id: 'lombok_strait' },
 ];
 let portwatchSeedInFlight = false;
+let latestPortwatchData = null;
 
 function pwFormatDate(ts) {
   const d = new Date(ts);
@@ -3777,9 +3778,11 @@ async function seedPortWatch() {
       console.warn('[PortWatch] No data fetched — skipping');
       return;
     }
+    latestPortwatchData = result;
     const ok = await upstashSet(PORTWATCH_REDIS_KEY, result, PORTWATCH_TTL);
     await upstashSet('seed-meta:supply_chain:portwatch', { fetchedAt: Date.now(), recordCount: Object.keys(result).length }, 604800);
     console.log(`[PortWatch] Seeded ${Object.keys(result).length} chokepoints (redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    seedTransitSummaries().catch(e => console.warn('[TransitSummary] Post-PortWatch seed error:', e?.message || e));
   } catch (e) {
     console.warn('[PortWatch] Seed error:', e?.message || e);
   } finally {
@@ -3799,33 +3802,32 @@ async function startPortWatchSeedLoop() {
   }, PORTWATCH_SEED_INTERVAL_MS).unref?.();
 }
 
-const CORRIDOR_RISK_API_KEY = process.env.CORRIDOR_RISK_API_KEY || '';
-const CORRIDOR_RISK_BASE_URL = 'https://api.corridorrisk.io/v1/corridors';
+const CORRIDOR_RISK_BASE_URL = 'https://corridorrisk.io/api/corridors';
 const CORRIDOR_RISK_REDIS_KEY = 'supply_chain:corridorrisk:v1';
 const CORRIDOR_RISK_TTL = 7200;
 const CORRIDOR_RISK_SEED_INTERVAL_MS = 60 * 60 * 1000;
-const CORRIDOR_RISK_NAMES = [
-  { name: 'Suez', id: 'suez' },
-  { name: 'Malacca', id: 'malacca_strait' },
-  { name: 'Hormuz', id: 'hormuz_strait' },
-  { name: 'Bab el-Mandeb', id: 'bab_el_mandeb' },
-  { name: 'Panama', id: 'panama' },
-  { name: 'Taiwan', id: 'taiwan_strait' },
-  { name: 'Cape of Good Hope', id: 'cape_of_good_hope' },
+// API name -> canonical chokepoint ID (partial substring match)
+const CORRIDOR_RISK_NAME_MAP = [
+  { pattern: 'hormuz', id: 'hormuz_strait' },
+  { pattern: 'bab-el-mandeb', id: 'bab_el_mandeb' },
+  { pattern: 'red sea', id: 'bab_el_mandeb' },
+  { pattern: 'suez', id: 'suez' },
+  { pattern: 'south china sea', id: 'taiwan_strait' },
+  { pattern: 'black sea', id: 'bosphorus' },
 ];
 let corridorRiskSeedInFlight = false;
+let latestCorridorRiskData = null;
 
 async function seedCorridorRisk() {
-  if (!CORRIDOR_RISK_API_KEY) return;
   if (corridorRiskSeedInFlight) return;
   corridorRiskSeedInFlight = true;
   const t0 = Date.now();
   try {
     const resp = await fetch(CORRIDOR_RISK_BASE_URL, {
       headers: {
-        Authorization: `Bearer ${CORRIDOR_RISK_API_KEY}`,
         Accept: 'application/json',
         'User-Agent': CHROME_UA,
+        Referer: 'https://corridorrisk.io/dashboard.html',
       },
       signal: AbortSignal.timeout(10000),
     });
@@ -3833,32 +3835,37 @@ async function seedCorridorRisk() {
       console.warn(`[CorridorRisk] HTTP ${resp.status}`);
       return;
     }
-    const body = await resp.json();
-    const corridors = Array.isArray(body) ? body : body.data;
-    if (!corridors?.length) {
+    const corridors = await resp.json();
+    if (!Array.isArray(corridors) || !corridors.length) {
       console.warn('[CorridorRisk] No corridors returned — skipping');
       return;
     }
-    const crNameMap = new Map(CORRIDOR_RISK_NAMES.map(c => [c.name.toLowerCase(), c.id]));
     const result = {};
     for (const corridor of corridors) {
-      const name = corridor.name;
-      if (!name) continue;
-      const id = crNameMap.get(name.toLowerCase());
-      if (!id) continue;
-      result[id] = {
-        riskLevel: String(corridor.risk_level ?? ''),
+      const name = (corridor.name || '').toLowerCase();
+      const mapping = CORRIDOR_RISK_NAME_MAP.find(m => name.includes(m.pattern));
+      if (!mapping) continue;
+      const score = Number(corridor.score ?? 0);
+      const riskLevel = score >= 70 ? 'critical' : score >= 50 ? 'high' : score >= 30 ? 'elevated' : 'normal';
+      result[mapping.id] = {
+        riskLevel,
+        riskScore: score,
         incidentCount7d: Number(corridor.incident_count_7d ?? 0),
+        eventCount7d: Number(corridor.event_count_7d ?? 0),
         disruptionPct: Number(corridor.disruption_pct ?? 0),
+        vesselCount: Number(corridor.vessel_count ?? 0),
+        riskSummary: String(corridor.risk_summary || '').slice(0, 200),
       };
     }
     if (Object.keys(result).length === 0) {
       console.warn('[CorridorRisk] No matching corridors — skipping');
       return;
     }
+    latestCorridorRiskData = result;
     const ok = await upstashSet(CORRIDOR_RISK_REDIS_KEY, result, CORRIDOR_RISK_TTL);
     await upstashSet('seed-meta:supply_chain:corridorrisk', { fetchedAt: Date.now(), recordCount: Object.keys(result).length }, 604800);
     console.log(`[CorridorRisk] Seeded ${Object.keys(result).length} corridors (redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    seedTransitSummaries().catch(e => console.warn('[TransitSummary] Post-CorridorRisk seed error:', e?.message || e));
   } catch (e) {
     console.warn('[CorridorRisk] Seed error:', e?.message || e);
   } finally {
@@ -3869,10 +3876,6 @@ async function seedCorridorRisk() {
 async function startCorridorRiskSeedLoop() {
   if (!UPSTASH_ENABLED) {
     console.log('[CorridorRisk] Disabled (no Upstash Redis)');
-    return;
-  }
-  if (!CORRIDOR_RISK_API_KEY) {
-    console.log('[CorridorRisk] Disabled (no CORRIDOR_RISK_API_KEY)');
     return;
   }
   console.log(`[CorridorRisk] Seed loop starting (interval ${CORRIDOR_RISK_SEED_INTERVAL_MS / 1000 / 60}min)`);
@@ -4710,6 +4713,123 @@ setTimeout(() => {
 setInterval(() => {
   seedChokepointTransits().catch(err => console.error('[Transit] Seed error:', err.message));
 }, CHOKEPOINT_TRANSIT_INTERVAL_MS).unref?.();
+
+// --- Pre-assembled Transit Summaries (Railway advantage: avoids large Redis reads on Vercel) ---
+const TRANSIT_SUMMARY_REDIS_KEY = 'supply_chain:transit-summaries:v1';
+const TRANSIT_SUMMARY_TTL = 900; // 15 min
+const TRANSIT_SUMMARY_INTERVAL_MS = 10 * 60 * 1000;
+
+// Threat levels for anomaly detection.
+// IMPORTANT: Must stay in sync with CHOKEPOINTS[].threatLevel in
+// server/worldmonitor/supply-chain/v1/get-chokepoint-status.ts
+// Only war_zone and critical trigger anomaly signals.
+const CHOKEPOINT_THREAT_LEVELS = {
+  suez: 'high', malacca_strait: 'normal', hormuz_strait: 'war_zone',
+  bab_el_mandeb: 'critical', panama: 'normal', taiwan_strait: 'elevated',
+  cape_of_good_hope: 'normal', gibraltar: 'normal', bosphorus: 'elevated',
+  korea_strait: 'normal', dover_strait: 'normal', kerch_strait: 'war_zone',
+  lombok_strait: 'normal',
+};
+
+// ID mapping: relay geofence name -> canonical ID
+const RELAY_NAME_TO_ID = {
+  'Suez Canal': 'suez', 'Malacca Strait': 'malacca_strait',
+  'Strait of Hormuz': 'hormuz_strait', 'Bab el-Mandeb Strait': 'bab_el_mandeb',
+  'Panama Canal': 'panama', 'Taiwan Strait': 'taiwan_strait',
+  'Cape of Good Hope': 'cape_of_good_hope', 'Gibraltar Strait': 'gibraltar',
+  'Bosporus Strait': 'bosphorus', 'Korea Strait': 'korea_strait',
+  'Dover Strait': 'dover_strait', 'Kerch Strait': 'kerch_strait',
+  'Lombok Strait': 'lombok_strait',
+  'South China Sea': null, 'Black Sea': null, // area geofences, not chokepoints
+};
+
+// Duplicated from server/worldmonitor/supply-chain/v1/_scoring.mjs because
+// ais-relay.cjs is CJS and cannot import .mjs modules. Keep in sync.
+function detectTrafficAnomalyRelay(history, threatLevel) {
+  if (!history || history.length < 37) return { dropPct: 0, signal: false };
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  let recent7 = 0, baseline30 = 0;
+  for (let i = 0; i < 7 && i < sorted.length; i++) recent7 += sorted[i].total;
+  for (let i = 7; i < 37 && i < sorted.length; i++) baseline30 += sorted[i].total;
+  const baselineAvg7 = (baseline30 / Math.min(30, sorted.length - 7)) * 7;
+  if (baselineAvg7 < 14) return { dropPct: 0, signal: false };
+  const dropPct = Math.round(((baselineAvg7 - recent7) / baselineAvg7) * 100);
+  const isHighThreat = threatLevel === 'war_zone' || threatLevel === 'critical';
+  return { dropPct, signal: dropPct >= 50 && isHighThreat };
+}
+
+async function seedTransitSummaries() {
+  // Hydrate from Redis on cold start (in-memory state lost after relay restart)
+  if (!latestPortwatchData) {
+    const persisted = await upstashGet(PORTWATCH_REDIS_KEY);
+    if (persisted && typeof persisted === 'object' && Object.keys(persisted).length > 0) {
+      latestPortwatchData = persisted;
+      console.log(`[TransitSummary] Hydrated PortWatch from Redis (${Object.keys(persisted).length} chokepoints)`);
+    }
+  }
+  if (!latestCorridorRiskData) {
+    const persisted = await upstashGet(CORRIDOR_RISK_REDIS_KEY);
+    if (persisted && typeof persisted === 'object' && Object.keys(persisted).length > 0) {
+      latestCorridorRiskData = persisted;
+      console.log(`[TransitSummary] Hydrated CorridorRisk from Redis (${Object.keys(persisted).length} corridors)`);
+    }
+  }
+
+  const pw = latestPortwatchData;
+  if (!pw || Object.keys(pw).length === 0) return;
+
+  const now = Date.now();
+  const summaries = {};
+
+  for (const [cpId, cpData] of Object.entries(pw)) {
+    const threatLevel = CHOKEPOINT_THREAT_LEVELS[cpId] || 'normal';
+    const anomaly = detectTrafficAnomalyRelay(cpData.history, threatLevel);
+
+    // Get relay transit counts for this chokepoint
+    let relayTransit = null;
+    for (const [relayName, canonicalId] of Object.entries(RELAY_NAME_TO_ID)) {
+      if (canonicalId === cpId) {
+        const crossings = chokepointCrossings.get(relayName) || [];
+        const recent = crossings.filter(c => now - c.ts < TRANSIT_WINDOW_MS);
+        if (recent.length > 0) {
+          relayTransit = {
+            tanker: recent.filter(c => c.type === 'tanker').length,
+            cargo: recent.filter(c => c.type === 'cargo').length,
+            other: recent.filter(c => c.type === 'other').length,
+            total: recent.length,
+          };
+        }
+        break;
+      }
+    }
+
+    const cr = latestCorridorRiskData?.[cpId];
+    summaries[cpId] = {
+      todayTotal: relayTransit?.total ?? 0,
+      todayTanker: relayTransit?.tanker ?? 0,
+      todayCargo: relayTransit?.cargo ?? 0,
+      todayOther: relayTransit?.other ?? 0,
+      wowChangePct: cpData.wowChangePct ?? 0,
+      history: cpData.history ?? [],
+      riskLevel: cr?.riskLevel ?? '',
+      incidentCount7d: cr?.incidentCount7d ?? 0,
+      disruptionPct: cr?.disruptionPct ?? 0,
+      anomaly,
+    };
+  }
+
+  const ok = await upstashSet(TRANSIT_SUMMARY_REDIS_KEY, { summaries, fetchedAt: now }, TRANSIT_SUMMARY_TTL);
+  await upstashSet('seed-meta:supply_chain:transit-summaries', { fetchedAt: now, recordCount: Object.keys(summaries).length }, 604800);
+  console.log(`[TransitSummary] Seeded ${Object.keys(summaries).length} summaries (redis: ${ok ? 'OK' : 'FAIL'})`);
+}
+
+// Seed transit summaries every 10 min (same as transit counter)
+setTimeout(() => {
+  seedTransitSummaries().catch(e => console.warn('[TransitSummary] Initial seed error:', e?.message || e));
+}, 35_000);
+setInterval(() => {
+  seedTransitSummaries().catch(e => console.warn('[TransitSummary] Seed error:', e?.message || e));
+}, TRANSIT_SUMMARY_INTERVAL_MS).unref?.();
 
 // UCDP GED Events cache (persistent in-memory — Railway advantage)
 const UCDP_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
