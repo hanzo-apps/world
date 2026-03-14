@@ -77,6 +77,8 @@ interface PreBuiltTransitSummary {
   riskLevel: string;
   incidentCount7d: number;
   disruptionPct: number;
+  riskSummary: string;
+  riskReportAction: string;
   anomaly: { dropPct: number; signal: boolean };
 }
 
@@ -237,7 +239,7 @@ interface ChokepointFetchResult {
   upstreamUnavailable: boolean;
 }
 
-interface CorridorRiskEntry { riskLevel: string; incidentCount7d: number; disruptionPct: number }
+interface CorridorRiskEntry { riskLevel: string; incidentCount7d: number; disruptionPct: number; riskSummary: string; riskReportAction: string }
 interface RelayTransitEntry { tanker: number; cargo: number; other: number; total: number }
 interface RelayTransitPayload { transits: Record<string, RelayTransitEntry>; fetchedAt: number }
 
@@ -270,6 +272,8 @@ function buildFallbackSummaries(
       riskLevel: cr?.riskLevel ?? '',
       incidentCount7d: cr?.incidentCount7d ?? 0,
       disruptionPct: cr?.disruptionPct ?? 0,
+      riskSummary: cr?.riskSummary ?? '',
+      riskReportAction: cr?.riskReportAction ?? '',
       anomaly,
     };
   }
@@ -333,6 +337,9 @@ async function fetchChokepointData(): Promise<ChokepointFetchResult> {
     if (anomaly.signal) {
       descriptions.push(`Traffic down ${anomaly.dropPct}% vs 30-day baseline, vessels may be transiting dark (AIS off)`);
     }
+    if (ts?.riskSummary) {
+      descriptions.push(ts.riskSummary);
+    }
     if (!threatConfigFresh) {
       descriptions.push(THREAT_CONFIG_STALE_NOTE);
     }
@@ -367,7 +374,9 @@ async function fetchChokepointData(): Promise<ChokepointFetchResult> {
         riskLevel: ts.riskLevel,
         incidentCount7d: ts.incidentCount7d,
         disruptionPct: ts.disruptionPct,
-      } : { todayTotal: 0, todayTanker: 0, todayCargo: 0, todayOther: 0, wowChangePct: 0, history: [], riskLevel: '', incidentCount7d: 0, disruptionPct: 0 },
+        riskSummary: ts.riskSummary,
+        riskReportAction: ts.riskReportAction,
+      } : { todayTotal: 0, todayTanker: 0, todayCargo: 0, todayOther: 0, wowChangePct: 0, history: [], riskLevel: '', incidentCount7d: 0, disruptionPct: 0, riskSummary: '', riskReportAction: '' },
     };
   });
 
