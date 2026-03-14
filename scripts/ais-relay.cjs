@@ -3705,12 +3705,18 @@ function pwComputeWowChangePct(history) {
   return Math.round(((thisWeek - lastWeek) / lastWeek) * 1000) / 10;
 }
 
+function pwEpochToTimestamp(epochMs) {
+  const d = new Date(epochMs);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `timestamp '${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}'`;
+}
+
 async function pwFetchAllPages(portname, sinceEpoch) {
   const all = [];
   let offset = 0;
   for (;;) {
     const params = new URLSearchParams({
-      where: `portname='${portname.replace(/'/g, "''")}' AND date >= ${sinceEpoch}`,
+      where: `portname='${portname.replace(/'/g, "''")}' AND date >= ${pwEpochToTimestamp(sinceEpoch)}`,
       outFields: 'date,n_tanker,n_cargo,n_total',
       f: 'json',
       resultOffset: String(offset),
