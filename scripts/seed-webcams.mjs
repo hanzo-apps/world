@@ -52,7 +52,9 @@ async function pipelineRequest(commands) {
   return resp.json();
 }
 
-async function fetchRegion(bounds, regionName) {
+const MAX_SPLIT_DEPTH = 3;
+
+async function fetchRegion(bounds, regionName, depth = 0) {
   const [S, W, N, E] = bounds;
   const cameras = [];
   let offset = 0;
@@ -70,21 +72,8 @@ async function fetchRegion(bounds, regionName) {
 
     if (!resp.ok) {
       if (resp.status === 400 && offset > 0) {
-        console.warn(`  [${regionName}] API limit reached at offset ${offset}, splitting into quadrants...`);
-        const midLat = (S + N) / 2;
-        const midLon = (W + E) / 2;
-        const quadrants = [
-          [[S, W, midLat, midLon], `${regionName} SW`],
-          [[S, midLon, midLat, E], `${regionName} SE`],
-          [[midLat, W, N, midLon], `${regionName} NW`],
-          [[midLat, midLon, N, E], `${regionName} NE`],
-        ];
-        cameras.length = 0;
-        for (const [qBounds, qName] of quadrants) {
-          const qCameras = await fetchRegion(qBounds, qName);
-          cameras.push(...qCameras);
-        }
-        return cameras;
+        console.log(`  [${regionName}] API offset limit at ${offset}, keeping ${cameras.length} cameras`);
+        break;
       }
       console.warn(`  [${regionName}] API error at offset ${offset}: ${resp.status}`);
       break;
@@ -113,9 +102,8 @@ async function fetchRegion(bounds, regionName) {
     if (webcams.length < PAGE_LIMIT) break;
   }
 
-  // Adaptive split: if we hit the 10K cap, split into quadrants
-  if (offset >= MAX_OFFSET - 50 && cameras.length >= MAX_OFFSET - 50) {
-    console.log(`  [${regionName}] Hit 10K cap, splitting into quadrants...`);
+  if (offset >= MAX_OFFSET - 50 && cameras.length >= MAX_OFFSET - 50 && depth < MAX_SPLIT_DEPTH) {
+    console.log(`  [${regionName}] Hit 10K cap (depth ${depth}), splitting into quadrants...`);
     const midLat = (S + N) / 2;
     const midLon = (W + E) / 2;
     const quadrants = [
@@ -126,7 +114,7 @@ async function fetchRegion(bounds, regionName) {
     ];
     cameras.length = 0;
     for (const [qBounds, qName] of quadrants) {
-      const qCameras = await fetchRegion(qBounds, qName);
+      const qCameras = await fetchRegion(qBounds, qName, depth + 1);
       cameras.push(...qCameras);
     }
   }
