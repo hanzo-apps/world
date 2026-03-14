@@ -19,7 +19,7 @@ import type { PortWatchData } from './_portwatch-upstream';
 import type { CorridorRiskData } from './_corridorrisk-upstream';
 import { CANONICAL_CHOKEPOINTS } from './_chokepoint-ids';
 // @ts-expect-error — .mjs module, no declaration file
-import { computeDisruptionScore, scoreToStatus, SEVERITY_SCORE, THREAT_LEVEL } from './_scoring.mjs';
+import { computeDisruptionScore, scoreToStatus, SEVERITY_SCORE, THREAT_LEVEL, detectTrafficAnomaly } from './_scoring.mjs';
 
 const REDIS_CACHE_KEY = 'supply_chain:chokepoints:v4';
 const PORTWATCH_REDIS_KEY = 'supply_chain:portwatch:v1';
@@ -295,7 +295,10 @@ async function fetchChokepointData(): Promise<ChokepointFetchResult> {
     }, 0);
 
     const threatScore = (THREAT_LEVEL as Record<string, number>)[cp.threatLevel] ?? 0;
-    const disruptionScore = computeDisruptionScore(threatScore, matchedWarnings.length, maxSeverity);
+    const pw = portwatchData?.[cp.id];
+    const anomaly = detectTrafficAnomaly(pw?.history ?? [], cp.threatLevel);
+    const anomalyBonus = anomaly.signal ? 10 : 0;
+    const disruptionScore = Math.min(100, computeDisruptionScore(threatScore, matchedWarnings.length, maxSeverity) + anomalyBonus);
     const status = scoreToStatus(disruptionScore);
 
     const congestionLevel = maxSeverity >= 3 ? 'high' : maxSeverity >= 2 ? 'elevated' : maxSeverity >= 1 ? 'low' : 'normal';
@@ -304,13 +307,16 @@ async function fetchChokepointData(): Promise<ChokepointFetchResult> {
     if (cp.threatDescription) {
       descriptions.push(cp.threatDescription);
     }
+    if (anomaly.signal) {
+      descriptions.push(`Traffic down ${anomaly.dropPct}% vs 30-day baseline — vessels may be transiting dark (AIS off)`);
+    }
     if (!threatConfigFresh) {
       descriptions.push(THREAT_CONFIG_STALE_NOTE);
     }
     if (matchedWarnings.length > 0 || matchedDisruptions.length > 0) {
       descriptions.push(`Navigational warnings: ${matchedWarnings.length}`);
       descriptions.push(`AIS vessel disruptions: ${matchedDisruptions.length}`);
-    } else if (!cp.threatDescription) {
+    } else if (!cp.threatDescription && !anomaly.signal) {
       descriptions.push('No active disruptions');
     }
 
