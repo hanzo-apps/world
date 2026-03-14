@@ -2075,7 +2075,12 @@
       "usniIntel": "USNI Intel",
       "usniSource": "Източник: USNI новини Fleet Tracker",
       "approximatePosition": "Позиция приблизителна — на базата на USNI седмичен доклад, не реално време AIS.",
-      "darkDescription": "⚠ Кораб е отишло тъмно - AIS сигнал загубен. Може да указва на чувствителни операции."
+      "darkDescription": "⚠ Кораб е отишло тъмно - AIS сигнал загубен. Може да указва на чувствителни операции.",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {

@@ -1863,7 +1863,12 @@
       "usniIntel": "USNI Intel",
       "usniSource": "Source: USNI News Fleet Tracker",
       "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
-      "darkDescription": "⚠ Het schip is donker geworden - AIS-signaal verloren. Kan duiden op gevoelige operaties."
+      "darkDescription": "⚠ Het schip is donker geworden - AIS-signaal verloren. Kan duiden op gevoelige operaties.",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {

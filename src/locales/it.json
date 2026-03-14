@@ -2067,7 +2067,12 @@
       "usniIntel": "USNI Intel",
       "usniSource": "Source: USNI News Fleet Tracker",
       "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
-      "darkDescription": "⚠ L'imbarcazione si è oscurata: segnale AIS perso. Può indicare operazioni sensibili."
+      "darkDescription": "⚠ L'imbarcazione si è oscurata: segnale AIS perso. Può indicare operazioni sensibili.",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {

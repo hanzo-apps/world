@@ -7028,6 +7028,143 @@ a.prediction-link:hover {
   color: var(--accent);
 }
 
+/* Vessel Popup Enhancements */
+.popup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hull-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--overlay-subtle);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.popup-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.flag-icon {
+  font-size: 1.25em;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.flag-icon-small {
+  font-size: 1em;
+  vertical-align: middle;
+}
+
+.usni-intel-section {
+  background: rgba(255, 136, 0, 0.05);
+  border: 1px solid rgba(255, 136, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 12px 0;
+}
+
+.section-header.usni {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--semantic-high);
+}
+
+.section-header.usni .section-label {
+  font-weight: 700;
+  color: inherit;
+  margin-bottom: 0;
+  letter-spacing: 1px;
+}
+
+.usni-intel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usni-field {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.usni-description {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  border-left: 2px solid rgba(255, 136, 0, 0.3);
+  padding-left: 8px;
+  margin: 4px 0;
+}
+
+.usni-source-row {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.usni-link {
+  color: var(--semantic-high);
+  text-decoration: none;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.usni-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.vessel-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vessel-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.history-point {
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.history-tag {
+  background: var(--overlay-light);
+  color: var(--accent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.popup-stat.warning .stat-value {
+  color: var(--semantic-high);
+  font-weight: 600;
+}
+
+.popup-stat.full-width {
+  grid-column: 1 / -1;
+}
+
 .popup-link {
   display: inline-block;
   color: var(--green);

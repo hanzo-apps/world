@@ -2075,7 +2075,12 @@
       "usniIntel": "ข่าวกรอง USNI",
       "usniSource": "แหล่งที่มา: USNI News Fleet Tracker",
       "approximatePosition": "ตำแหน่งโดยประมาณ — อ้างอิงจากรายงานรายสัปดาห์ของ USNI ไม่ใช่ AIS แบบเรียลไทม์",
-      "darkDescription": "⚠ เรือสูญเสียสัญญาณ - สัญญาณ AIS หายไป อาจบ่งชี้ปฏิบัติการลับ"
+      "darkDescription": "⚠ เรือสูญเสียสัญญาณ - สัญญาณ AIS หายไป อาจบ่งชี้ปฏิบัติการลับ",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {
