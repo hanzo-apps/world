@@ -119,13 +119,14 @@ const SEED_META = {
   corridorrisk:        { key: 'seed-meta:supply_chain:corridorrisk',         maxStaleMin: 120 },
   chokepointTransits:  { key: 'seed-meta:supply_chain:chokepoint_transits',  maxStaleMin: 15 },
   transitSummaries:    { key: 'seed-meta:supply_chain:transit-summaries',    maxStaleMin: 15 },
+  usniFleet:           { key: 'seed-meta:military:usni-fleet',               maxStaleMin: 420 },
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
 // Empty = WARN not CRIT since they only exist after first request.
 const ON_DEMAND_KEYS = new Set([
   'riskScoresLive',
-  'usniFleet', 'usniFleetStale', 'positiveEventsLive', 'cableHealth',
+  'usniFleetStale', 'positiveEventsLive', 'cableHealth',
   'bisPolicy', 'bisExchange', 'bisCredit',
   'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
   'cyberThreatsRpc', 'militaryBases', 'temporalAnomalies', 'displacement',

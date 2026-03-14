@@ -378,8 +378,16 @@ import {
   ApiError,
   type ClassifyEventResponse,
 } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
+import { createCircuitBreaker } from '@/utils';
 
 const classifyClient = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+
+const classifyBreaker = createCircuitBreaker<ThreatClassification | null>({
+  name: 'AIClassify',
+  cacheTtlMs: 6 * 60 * 60 * 1000,
+  persistCache: true,
+  maxCacheEntries: 256,
+});
 
 const VALID_LEVELS: Record<string, ThreatLevel> = {
   critical: 'critical', high: 'high', medium: 'medium', low: 'low', info: 'info',
@@ -509,7 +517,7 @@ function scheduleBatch(): void {
   }
 }
 
-export function classifyWithAI(
+function classifyWithAIUncached(
   title: string,
   variant: string
 ): Promise<ThreatClassification | null> {
@@ -522,6 +530,18 @@ export function classifyWithAI(
     batchQueue.push({ title, variant, resolve });
     scheduleBatch();
   });
+}
+
+export function classifyWithAI(
+  title: string,
+  variant: string,
+): Promise<ThreatClassification | null> {
+  const cacheKey = title.trim().toLowerCase().replace(/\s+/g, ' ');
+  return classifyBreaker.execute(
+    () => classifyWithAIUncached(title, variant),
+    null,
+    { cacheKey, shouldCache: (result) => result !== null },
+  );
 }
 
 export function aggregateThreats(
