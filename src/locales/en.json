@@ -2108,7 +2108,12 @@
       "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
       "darkDescription": "⚠ Vessel has gone dark - AIS signal lost. May indicate sensitive operations.",
       "estPosition": "EST. POSITION",
-      "aisLive": "AIS LIVE"
+      "aisLive": "AIS LIVE",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {

@@ -2075,7 +2075,12 @@
       "usniIntel": "USNI 정보",
       "usniSource": "출처: USNI News Fleet Tracker",
       "approximatePosition": "대략적 위치 — USNI 주간 보고서 기반이며 실시간 AIS가 아닙니다.",
-      "darkDescription": "⚠ 함정의 AIS 신호가 소실되었습니다 — 민감한 작전 수행 가능성이 있습니다."
+      "darkDescription": "⚠ 함정의 AIS 신호가 소실되었습니다 — 민감한 작전 수행 가능성이 있습니다.",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {

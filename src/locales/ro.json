@@ -2075,7 +2075,12 @@
       "usniIntel": "USNI Intel",
       "usniSource": "Sursa: USNI News Fleet Tracker",
       "approximatePosition": "Poziția aproximativă - bazată pe raportul săptămânal USNI, nu AIS în timp real.",
-      "darkDescription": "⚠ Nava s-a întunecat - semnalul AIS s-a pierdut. Poate indica operațiuni sensibile."
+      "darkDescription": "⚠ Nava s-a întunecat - semnalul AIS s-a pierdut. Poate indica operațiuni sensibile.",
+      "recentTracking": "Recent Tracking",
+      "lastReport": "LATEST",
+      "nearChokepoint": "NEAR CHOKEPOINT",
+      "nearBase": "NEAR BASE",
+      "lastSeen": "LAST SEEN"
     },
     "militaryCluster": {
       "flightActivity": {
