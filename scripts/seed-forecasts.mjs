@@ -407,7 +407,8 @@ function detectSupplyChainScenarios(inputs) {
     }
 
     const riskNorm = normalize(cp.riskScore || 70, 40, 100);
-    const prob = Math.min(0.85, riskNorm * 0.7 + (aisGaps.length > 0 ? 0.1 : 0) + (nearbyJam.length > 0 ? 0.05 : 0));
+    const severityFloor = cp.riskLevel === 'critical' ? 0.55 : cp.riskLevel === 'high' ? 0.35 : 0;
+    const prob = Math.min(0.85, Math.max(severityFloor, riskNorm * 0.9) + (aisGaps.length > 0 ? 0.1 : 0) + (nearbyJam.length > 0 ? 0.05 : 0));
     const confidence = Math.max(0.3, normalize(sourceCount, 0, 4));
 
     predictions.push(makePrediction(
@@ -646,7 +647,7 @@ function detectGpsJammingScenarios(inputs) {
     predictions.push(makePrediction(
       'supply_chain', region,
       `GPS interference in ${region} shipping zone`,
-      Math.min(0.6, normalize(inRegion.length, 2, 30) * 0.5),
+      Math.min(0.75, normalize(inRegion.length, 2, 60) * 0.7 + (inRegion.length > 20 ? 0.1 : 0)),
       0.3, '7d',
       [{ type: 'gps_jamming', value: `${inRegion.length} jamming hexes in ${region}`, weight: 0.5 }],
     ));
@@ -1086,6 +1087,11 @@ function validateScenarios(scenarios, predictions) {
 }
 
 async function callForecastLLM(systemPrompt, userPrompt) {
+  const available = FORECAST_LLM_PROVIDERS.filter(p => !!process.env[p.envKey]);
+  if (available.length === 0) {
+    console.warn(`  [LLM] No providers configured. Set one of: ${FORECAST_LLM_PROVIDERS.map(p => p.envKey).join(', ')}`);
+    return null;
+  }
   for (const provider of FORECAST_LLM_PROVIDERS) {
     const apiKey = process.env[provider.envKey];
     if (!apiKey) continue;
@@ -1273,7 +1279,12 @@ async function fetchForecasts() {
     ...detectFromPredictionMarkets(inputs),
   ];
 
-  console.log(`  Generated ${predictions.length} predictions`);
+  // Log per-domain breakdown and top predictions for diagnostics
+  const byDomain = {};
+  for (const p of predictions) byDomain[p.domain] = (byDomain[p.domain] || 0) + 1;
+  console.log(JSON.stringify({ event: 'detectors', total: predictions.length, byDomain }));
+  const top5 = [...predictions].sort((a, b) => b.probability - a.probability).slice(0, 5);
+  for (const p of top5) console.log(`  top: ${p.domain} | ${p.region} | prob=${p.probability} | ${p.title.slice(0, 60)}`);
 
   attachNewsContext(predictions, inputs.newsInsights, inputs.newsDigest);
   calibrateWithMarkets(predictions, inputs.predictionMarkets);
