@@ -740,8 +740,8 @@ export class PanelLayoutManager implements AppModule {
       this.ctx.panels['live-webcams'] = new LiveWebcamsPanel();
     }
 
-    if (this.shouldCreatePanel('pinned-webcams')) {
-      this.ctx.panels['pinned-webcams'] = new PinnedWebcamsPanel();
+    if (this.shouldCreatePanel('windy-webcams')) {
+      this.ctx.panels['windy-webcams'] = new PinnedWebcamsPanel();
     }
 
     this.createPanel('events', () => new TechEventsPanel('events', () => this.ctx.allNews));
