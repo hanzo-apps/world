@@ -3607,7 +3607,7 @@ async function startWorldBankSeedLoop() {
   }, WB_SEED_INTERVAL_MS).unref?.();
 }
 
-const PORTWATCH_ARCGIS_BASE = 'https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/portal_chokepoint_daily/FeatureServer/0/query';
+const PORTWATCH_ARCGIS_BASE = 'https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query';
 const PORTWATCH_PAGE_SIZE = 2000;
 const PORTWATCH_FETCH_TIMEOUT_MS = 30000;
 const PORTWATCH_REDIS_KEY = 'supply_chain:portwatch:v1';
@@ -3615,31 +3615,24 @@ const PORTWATCH_TTL = 43200;
 const PORTWATCH_SEED_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const PORTWATCH_CHOKEPOINT_NAMES = [
   { name: 'Suez Canal', id: 'suez' },
-  { name: 'Strait of Malacca', id: 'malacca_strait' },
+  { name: 'Malacca Strait', id: 'malacca_strait' },
   { name: 'Strait of Hormuz', id: 'hormuz_strait' },
-  { name: 'Bab el-Mandeb', id: 'bab_el_mandeb' },
+  { name: 'Bab el-Mandeb Strait', id: 'bab_el_mandeb' },
   { name: 'Panama Canal', id: 'panama' },
   { name: 'Taiwan Strait', id: 'taiwan_strait' },
   { name: 'Cape of Good Hope', id: 'cape_of_good_hope' },
-  { name: 'Strait of Gibraltar', id: 'gibraltar' },
-  { name: 'Bosphorus', id: 'bosphorus' },
-  { name: 'Dardanelles', id: 'dardanelles' },
+  { name: 'Gibraltar Strait', id: 'gibraltar' },
+  { name: 'Bosporus Strait', id: 'bosphorus' },
+  { name: 'Korea Strait', id: 'korea_strait' },
+  { name: 'Dover Strait', id: 'dover_strait' },
+  { name: 'Kerch Strait', id: 'kerch_strait' },
+  { name: 'Lombok Strait', id: 'lombok_strait' },
 ];
 let portwatchSeedInFlight = false;
 
-function pwClassifyVesselType(name) {
-  const lower = String(name).toLowerCase();
-  if (lower.includes('tanker') || lower.includes('lng') || lower.includes('lpg')) return 'tanker';
-  if (lower.includes('cargo') || lower.includes('container') || lower.includes('bulk')) return 'cargo';
-  return 'other';
-}
-
 function pwFormatDate(ts) {
   const d = new Date(ts);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 function pwComputeWowChangePct(history) {
@@ -3653,13 +3646,13 @@ function pwComputeWowChangePct(history) {
   return Math.round(((thisWeek - lastWeek) / lastWeek) * 1000) / 10;
 }
 
-async function pwFetchAllPages(chokepoint, since) {
+async function pwFetchAllPages(portname, sinceEpoch) {
   const all = [];
   let offset = 0;
   for (;;) {
     const params = new URLSearchParams({
-      where: `chokepoint='${chokepoint.replace(/'/g, "''")}' AND observation_date >= '${since}'`,
-      outFields: '*',
+      where: `portname='${portname.replace(/'/g, "''")}' AND date >= ${sinceEpoch}`,
+      outFields: 'date,n_tanker,n_cargo,n_total',
       f: 'json',
       resultOffset: String(offset),
       resultRecordCount: String(PORTWATCH_PAGE_SIZE),
@@ -3678,21 +3671,15 @@ async function pwFetchAllPages(chokepoint, since) {
 }
 
 function pwBuildHistory(features) {
-  const dayMap = new Map();
-  for (const f of features) {
-    const attrs = f.attributes;
-    const rawDate = attrs.observation_date;
-    if (!rawDate) continue;
-    const date = typeof rawDate === 'number' ? pwFormatDate(rawDate) : String(rawDate).slice(0, 10);
-    const vesselType = String(attrs.vessel_type ?? attrs.ship_type ?? 'other');
-    const count = Number(attrs.n_vessels ?? attrs.count ?? attrs.total ?? 1);
-    const category = pwClassifyVesselType(vesselType);
-    let day = dayMap.get(date);
-    if (!day) { day = { tanker: 0, cargo: 0, other: 0 }; dayMap.set(date, day); }
-    day[category] += count;
-  }
-  return Array.from(dayMap.entries())
-    .map(([date, counts]) => ({ date, tanker: counts.tanker, cargo: counts.cargo, other: counts.other, total: counts.tanker + counts.cargo + counts.other }))
+  return features
+    .filter(f => f.attributes?.date)
+    .map(f => {
+      const a = f.attributes;
+      const tanker = Number(a.n_tanker ?? 0);
+      const cargo = Number(a.n_cargo ?? 0);
+      const total = Number(a.n_total ?? tanker + cargo);
+      return { date: pwFormatDate(a.date), tanker, cargo, other: Math.max(0, total - tanker - cargo), total };
+    })
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -3701,12 +3688,12 @@ async function seedPortWatch() {
   portwatchSeedInFlight = true;
   const t0 = Date.now();
   try {
-    const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const sinceEpoch = Date.now() - 180 * 24 * 60 * 60 * 1000;
     const result = {};
     const CONCURRENCY = 3;
     for (let i = 0; i < PORTWATCH_CHOKEPOINT_NAMES.length; i += CONCURRENCY) {
       const batch = PORTWATCH_CHOKEPOINT_NAMES.slice(i, i + CONCURRENCY);
-      const settled = await Promise.allSettled(batch.map(cp => pwFetchAllPages(cp.name, since)));
+      const settled = await Promise.allSettled(batch.map(cp => pwFetchAllPages(cp.name, sinceEpoch)));
       for (let j = 0; j < batch.length; j++) {
         const outcome = settled[j];
         if (outcome.status !== 'fulfilled' || !outcome.value.length) continue;
@@ -4113,8 +4100,11 @@ const CHOKEPOINTS = [
   { name: 'Black Sea', lat: 43.5, lon: 34.0, radius: 3 },
   { name: 'Cape of Good Hope', lat: -34.36, lon: 18.49, radius: 2 },
   { name: 'Strait of Gibraltar', lat: 35.96, lon: -5.35, radius: 1 },
-  { name: 'Bosphorus Strait', lat: 41.12, lon: 29.05, radius: 0.5 },
-  { name: 'Dardanelles', lat: 40.20, lon: 26.40, radius: 0.5 },
+  { name: 'Bosporus Strait', lat: 40.70, lon: 28.0, radius: 1.5 },
+  { name: 'Korea Strait', lat: 34.0, lon: 129.0, radius: 1.5 },
+  { name: 'Dover Strait', lat: 51.05, lon: 1.45, radius: 0.5 },
+  { name: 'Kerch Strait', lat: 45.33, lon: 36.60, radius: 0.5 },
+  { name: 'Lombok Strait', lat: -8.47, lon: 115.72, radius: 0.5 },
 ];
 
 function classifyVesselType(shipType) {
