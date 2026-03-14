@@ -2855,7 +2855,10 @@ async function fetchTheaterFlightsFromOpenSky() {
 
 async function fetchTheaterFlightsFromWingbits() {
   const apiKey = process.env.WINGBITS_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn('[Wingbits] WINGBITS_API_KEY not set — skipped');
+    return null;
+  }
   const areas = POSTURE_THEATERS.map((t) => ({
     alias: t.id,
     by: 'box',
@@ -2872,7 +2875,10 @@ async function fetchTheaterFlightsFromWingbits() {
       body: JSON.stringify(areas),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      console.warn(`[Wingbits] API error: ${resp.status} ${resp.statusText}`);
+      return null;
+    }
     const data = await resp.json();
     const flights = [];
     const seenIds = new Set();
@@ -2897,8 +2903,10 @@ async function fetchTheaterFlightsFromWingbits() {
         });
       }
     }
+    console.log(`[Wingbits] Fetched ${flights.length} military flights from ${data.length} areas`);
     return flights;
-  } catch {
+  } catch (err) {
+    console.warn(`[Wingbits] Fetch failed: ${err?.message || err}`);
     return null;
   }
 }
