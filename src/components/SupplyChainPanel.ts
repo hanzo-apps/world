@@ -22,7 +22,7 @@ export class SupplyChainPanel extends Panel {
   private chartObserver: MutationObserver | null = null;
 
   constructor() {
-    super({ id: 'supply-chain', title: t('panels.supplyChain') });
+    super({ id: 'supply-chain', title: t('panels.supplyChain'), defaultRowSpan: 2 });
     this.content.addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest('.panel-tab') as HTMLElement | null;
       if (tab) {
