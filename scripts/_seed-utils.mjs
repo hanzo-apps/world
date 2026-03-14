@@ -205,17 +205,12 @@ export async function writeExtraKey(key, data, ttl) {
     body: JSON.stringify(['SET', key, payload, 'EX', ttl]),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!resp.ok) {
-    console.warn(`  Extra key ${key}: write failed (HTTP ${resp.status})`);
-    return false;
-  }
+  if (!resp.ok) throw new Error(`Extra key ${key}: write failed (HTTP ${resp.status})`);
   console.log(`  Extra key ${key}: written`);
-  return true;
 }
 
 export async function writeExtraKeyWithMeta(key, data, ttl, recordCount, metaKeyOverride) {
-  const ok = await writeExtraKey(key, data, ttl);
-  if (!ok) return; // data write failed — do NOT write seed-meta (avoids false-positive health)
+  await writeExtraKey(key, data, ttl);
   const { url, token } = getRedisCredentials();
   const metaKey = metaKeyOverride || `seed-meta:${key.replace(/:v\d+$/, '')}`;
   const meta = { fetchedAt: Date.now(), recordCount: recordCount ?? 0 };
@@ -285,8 +280,26 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     process.exit(0);
   }
 
+  // Phase 1: Fetch data (graceful on failure — extend TTL on stale data)
+  let data;
   try {
-    const data = await withRetry(fetchFn);
+    data = await withRetry(fetchFn);
+  } catch (err) {
+    await releaseLock(`${domain}:${resource}`, runId);
+    const durationMs = Date.now() - startMs;
+    console.error(`  FETCH FAILED: ${err.message || err}`);
+
+    const ttl = ttlSeconds || 600;
+    const keys = [canonicalKey];
+    if (extraKeys) keys.push(...extraKeys.map(ek => ek.key));
+    await extendExistingTtl(keys, ttl);
+
+    console.log(`\n=== Failed gracefully (${Math.round(durationMs)}ms) ===`);
+    process.exit(0);
+  }
+
+  // Phase 2: Publish to Redis (rethrow on failure — data was fetched but not stored)
+  try {
     const publishResult = await atomicPublish(canonicalKey, data, validateFn, ttlSeconds);
     if (publishResult.skipped) {
       const durationMs = Date.now() - startMs;
@@ -333,15 +346,6 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     process.exit(0);
   } catch (err) {
     await releaseLock(`${domain}:${resource}`, runId);
-    const durationMs = Date.now() - startMs;
-    console.error(`  FETCH FAILED: ${err.message || err}`);
-
-    const ttl = ttlSeconds || 600;
-    const keys = [canonicalKey];
-    if (extraKeys) keys.push(...extraKeys.map(ek => ek.key));
-    await extendExistingTtl(keys, ttl);
-
-    console.log(`\n=== Failed gracefully (${Math.round(durationMs)}ms) ===`);
-    process.exit(0);
+    throw err;
   }
 }
