@@ -1092,6 +1092,7 @@ async function callForecastLLM(systemPrompt, userPrompt) {
     console.warn(`  [LLM] No providers configured. Set one of: ${FORECAST_LLM_PROVIDERS.map(p => p.envKey).join(', ')}`);
     return null;
   }
+  console.log(`  [LLM] Trying providers: ${available.map(p => p.name).join(', ')}`);
   for (const provider of FORECAST_LLM_PROVIDERS) {
     const apiKey = process.env[provider.envKey];
     if (!apiKey) continue;
@@ -1115,13 +1116,22 @@ async function callForecastLLM(systemPrompt, userPrompt) {
         }),
         signal: AbortSignal.timeout(provider.timeout),
       });
-      if (!resp.ok) { console.warn(`  [LLM] ${provider.name}: HTTP ${resp.status}`); continue; }
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        console.warn(`  [LLM] ${provider.name}: HTTP ${resp.status} ${errBody.slice(0, 100)}`);
+        continue;
+      }
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content?.trim();
-      if (!text || text.length < 20) continue;
+      if (!text || text.length < 20) {
+        console.warn(`  [LLM] ${provider.name}: empty/short response (${text?.length || 0} chars)`);
+        continue;
+      }
+      console.log(`  [LLM] ${provider.name} OK (${text.length} chars)`);
       return { text, model: json.model || provider.model, provider: provider.name };
     } catch (err) { console.warn(`  [LLM] ${provider.name}: ${err.message}`); continue; }
   }
+  console.warn('  [LLM] All providers failed');
   return null;
 }
 
