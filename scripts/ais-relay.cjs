@@ -3862,6 +3862,7 @@ async function seedCorridorRisk() {
         disruptionPct: Number(corridor.disruption_pct ?? 0),
         vesselCount: Number(corridor.vessel_count ?? 0),
         riskSummary: String(corridor.risk_summary || '').slice(0, 200),
+        riskReportAction: String((corridor.risk_report?.action) || '').slice(0, 500),
       };
     }
     if (Object.keys(result).length === 0) {
@@ -5085,6 +5086,8 @@ async function seedTransitSummaries() {
       riskLevel: cr?.riskLevel ?? '',
       incidentCount7d: cr?.incidentCount7d ?? 0,
       disruptionPct: cr?.disruptionPct ?? 0,
+      riskSummary: cr?.riskSummary ?? '',
+      riskReportAction: cr?.riskReportAction ?? '',
       anomaly,
     };
   }

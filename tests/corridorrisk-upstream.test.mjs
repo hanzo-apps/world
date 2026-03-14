@@ -64,6 +64,10 @@ describe('CorridorRisk relay seed loop', () => {
     assert.match(relaySrc, /risk_summary.*\.slice\(0,\s*200\)/);
   });
 
+  it('stores riskReportAction truncated to 500 chars', () => {
+    assert.match(relaySrc, /risk_report\?\.action.*\.slice\(0,\s*500\)/);
+  });
+
   it('triggers seedTransitSummaries after successful seed', () => {
     assert.match(relaySrc, /seedTransitSummaries\(\).*Post-CorridorRisk/);
   });
