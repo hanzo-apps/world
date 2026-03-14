@@ -8,8 +8,8 @@ import {
 } from '../server/worldmonitor/supply-chain/v1/_chokepoint-ids.ts';
 
 describe('CANONICAL_CHOKEPOINTS registry', () => {
-  it('contains exactly 10 canonical chokepoints', () => {
-    assert.equal(CANONICAL_CHOKEPOINTS.length, 10);
+  it('contains exactly 13 canonical chokepoints', () => {
+    assert.equal(CANONICAL_CHOKEPOINTS.length, 13);
   });
 
   it('has no duplicate IDs', () => {
@@ -22,9 +22,14 @@ describe('CANONICAL_CHOKEPOINTS registry', () => {
     assert.equal(new Set(names).size, names.length);
   });
 
-  it('has no duplicate portwatch names', () => {
-    const names = CANONICAL_CHOKEPOINTS.map(c => c.portwatchName);
+  it('has no duplicate portwatch names (excluding empty)', () => {
+    const names = CANONICAL_CHOKEPOINTS.map(c => c.portwatchName).filter(n => n);
     assert.equal(new Set(names).size, names.length);
+  });
+
+  it('Bosphorus has relayName "Bosporus Strait"', () => {
+    const bos = CANONICAL_CHOKEPOINTS.find(c => c.id === 'bosphorus');
+    assert.equal(bos.relayName, 'Bosporus Strait');
   });
 });
 
@@ -43,10 +48,24 @@ describe('portwatchNameToId', () => {
     assert.equal(portwatchNameToId('Suez Canal'), 'suez');
   });
 
+  it('maps actual PortWatch feed names correctly', () => {
+    assert.equal(portwatchNameToId('Malacca Strait'), 'malacca_strait');
+    assert.equal(portwatchNameToId('Bab el-Mandeb Strait'), 'bab_el_mandeb');
+    assert.equal(portwatchNameToId('Gibraltar Strait'), 'gibraltar');
+    assert.equal(portwatchNameToId('Bosporus Strait'), 'bosphorus');
+    assert.equal(portwatchNameToId('Korea Strait'), 'korea_strait');
+    assert.equal(portwatchNameToId('Dover Strait'), 'dover_strait');
+    assert.equal(portwatchNameToId('Kerch Strait'), 'kerch_strait');
+    assert.equal(portwatchNameToId('Lombok Strait'), 'lombok_strait');
+  });
+
+  it('returns undefined for empty string', () => {
+    assert.equal(portwatchNameToId(''), undefined);
+  });
+
   it('is case-insensitive', () => {
     assert.equal(portwatchNameToId('suez canal'), 'suez');
-    assert.equal(portwatchNameToId('SUEZ CANAL'), 'suez');
-    assert.equal(portwatchNameToId('SuEz CaNaL'), 'suez');
+    assert.equal(portwatchNameToId('MALACCA STRAIT'), 'malacca_strait');
   });
 });
 
@@ -67,10 +86,5 @@ describe('corridorRiskNameToId', () => {
   it('Bosphorus has null corridorRiskName', () => {
     const bos = CANONICAL_CHOKEPOINTS.find(c => c.id === 'bosphorus');
     assert.equal(bos.corridorRiskName, null);
-  });
-
-  it('Dardanelles has null corridorRiskName', () => {
-    const dar = CANONICAL_CHOKEPOINTS.find(c => c.id === 'dardanelles');
-    assert.equal(dar.corridorRiskName, null);
   });
 });

@@ -79,8 +79,10 @@ describe('PortWatch relay seed loop', () => {
     assert.match(relaySrc, /function startPortWatchSeedLoop/);
   });
 
-  it('classifies vessel types in relay', () => {
-    assert.match(relaySrc, /pwClassifyVesselType/);
+  it('reads pre-aggregated n_tanker/n_cargo/n_total columns', () => {
+    assert.match(relaySrc, /n_tanker/);
+    assert.match(relaySrc, /n_cargo/);
+    assert.match(relaySrc, /n_total/);
   });
 
   it('computes week-over-week change percentage in relay', () => {
