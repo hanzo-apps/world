@@ -254,8 +254,9 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
       process.exit(0);
     }
     const { payloadBytes } = publishResult;
+    const topicArticleCount = data?.topics?.reduce?.((n, t) => n + (t?.articles?.length || t?.events?.length || 0), 0);
     const recordCount = Array.isArray(data) ? data.length
-      : (data?.events?.length ?? data?.earthquakes?.length ?? data?.outages?.length
+      : (topicArticleCount || data?.events?.length ?? data?.earthquakes?.length ?? data?.outages?.length
         ?? data?.fireDetections?.length ?? data?.anomalies?.length ?? data?.threats?.length
         ?? data?.quotes?.length ?? data?.stablecoins?.length
         ?? data?.cables?.length ?? 0);
