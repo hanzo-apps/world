@@ -142,9 +142,12 @@ export class SupplyChainPanel extends Panel {
             ? `<div class="trade-sector">${t('components.supplyChain.wowChange')}: ${wowSpan}</div>`
             : '';
         const riskRow = ts?.riskLevel
-          ? `<div class="trade-sector">${t('components.supplyChain.riskLevel')}: ${escapeHtml(ts.riskLevel)} | ${ts.incidentCount7d} incidents (7d)</div>`
+          ? `<div class="trade-sector">${t('components.supplyChain.riskLevel')}: ${escapeHtml(ts.riskLevel)} | ${ts.incidentCount7d} incidents (7d)${ts.riskSummary ? ` | ${escapeHtml(ts.riskSummary)}` : ''}</div>`
           : '';
         const expanded = this.expandedChokepoint === cp.name;
+        const actionRow = expanded && ts?.riskReportAction
+          ? `<div class="trade-sector"><strong>${t('components.supplyChain.routingAction')}:</strong> ${escapeHtml(ts.riskReportAction)}</div>`
+          : '';
         const chartPlaceholder = expanded && ts?.history?.length
           ? `<div data-chart-cp="${escapeHtml(cp.name)}" style="margin-top:8px;min-height:120px"></div>`
           : '';
@@ -163,6 +166,7 @@ export class SupplyChainPanel extends Panel {
             ${riskRow}
             <div class="trade-description">${escapeHtml(cp.description)}</div>
             <div class="trade-affected">${escapeHtml(cp.affectedRoutes.join(', '))}</div>
+            ${actionRow}
             ${chartPlaceholder}
           </div>
         </div>`;
