@@ -10208,19 +10208,36 @@ a.prediction-link:hover {
   border-left-color: var(--accent);
 }
 
-/* Flash highlight animation (for search results) */
-.flash-highlight {
-  animation: flash-highlight 1.5s ease-out;
+/* Search result highlight — glowing border pulse */
+.search-highlight {
+  animation: search-glow-pulse 3s ease-in-out forwards;
 }
 
-@keyframes flash-highlight {
-  0% {
-    background: var(--overlay-heavy);
+@keyframes search-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    border-color: var(--border);
   }
 
-  100% {
-    background: transparent;
+  15%,
+  45%,
+  75% {
+    box-shadow: 0 0 20px 4px #3b82f6, inset 0 0 12px 0 rgba(59, 130, 246, 0.15);
+    border-color: #3b82f6;
   }
+
+  30%,
+  60%,
+  90% {
+    box-shadow: 0 0 6px 1px rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+}
+
+/* Legacy alias */
+.flash-highlight {
+  animation: search-glow-pulse 3s ease-in-out forwards;
 }
 
 /* Panel flash when new items arrive */
