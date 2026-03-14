@@ -69,6 +69,23 @@ async function fetchRegion(bounds, regionName) {
     });
 
     if (!resp.ok) {
+      if (resp.status === 400 && offset > 0) {
+        console.warn(`  [${regionName}] API limit reached at offset ${offset}, splitting into quadrants...`);
+        const midLat = (S + N) / 2;
+        const midLon = (W + E) / 2;
+        const quadrants = [
+          [[S, W, midLat, midLon], `${regionName} SW`],
+          [[S, midLon, midLat, E], `${regionName} SE`],
+          [[midLat, W, N, midLon], `${regionName} NW`],
+          [[midLat, midLon, N, E], `${regionName} NE`],
+        ];
+        cameras.length = 0;
+        for (const [qBounds, qName] of quadrants) {
+          const qCameras = await fetchRegion(qBounds, qName);
+          cameras.push(...qCameras);
+        }
+        return cameras;
+      }
       console.warn(`  [${regionName}] API error at offset ${offset}: ${resp.status}`);
       break;
     }
@@ -205,8 +222,8 @@ async function main() {
   }
 
   const seedMetaKey = `${PREFIX}seed-meta:webcam:cameras:geo`;
-  const seedMeta = JSON.stringify({ fetchedAt: Date.now(), recordCount: unique.length });
-  await pipelineRequest([['SET', seedMetaKey, seedMeta, 'EX', '604800']]);
+  const seedMetaVal = JSON.stringify({ fetchedAt: Date.now(), recordCount: unique.length });
+  await pipelineRequest([['SET', seedMetaKey, seedMetaVal, 'EX', '604800']]);
 
   console.log(`seed-webcams: done (${unique.length} cameras seeded)`);
 }
