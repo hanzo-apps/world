@@ -287,6 +287,12 @@ export class InsightsPanel extends Panel {
     const totalSteps = 2;
 
     try {
+      // Clear stale ML-detected stories when clusters are empty (e.g. clustering
+      // failed) so unrelated missed stories don't render next to server insights
+      if (clusters.length === 0) {
+        this.lastMissedStories = [];
+      }
+
       // Step 1: Signal aggregation (client-side, depends on real-time map data)
       this.setProgress(1, totalSteps, 'Loading server insights...');
 
@@ -842,13 +848,9 @@ export class InsightsPanel extends Panel {
       return;
     }
 
-    if (this.lastClusters.length > 0) {
-      void this.updateInsights(this.lastClusters);
-      return;
-    }
-
-    this.setDataBadge('unavailable');
-    this.setContent(`<div class="insights-empty">${t('components.insights.waitingForData')}</div>`);
+    // Re-run full updateInsights which checks server insights first,
+    // then falls back to client-side clustering
+    void this.updateInsights(this.lastClusters);
   }
 
   public override destroy(): void {
