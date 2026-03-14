@@ -82,9 +82,9 @@ export class TransitChart {
   private colors() {
     return {
       text: getCSSColor('--text-dim') || '#888',
-      grid: getCSSColor('--border-subtle') || '#333',
-      tanker: getCSSColor('--accent-primary') || '#4fc3f7',
-      cargo: '#ff9800',
+      grid: getCSSColor('--border') || '#2a2a2a',
+      tanker: getCSSColor('--semantic-info') || '#3b82f6',
+      cargo: getCSSColor('--semantic-high') || '#ff8800',
       bg: 'transparent',
     };
   }
@@ -164,7 +164,7 @@ export class TransitChart {
       ctx.arc(x(data.length - 1), y(last[key]), 3.5, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
-      ctx.strokeStyle = getCSSColor('--bg-primary') || '#1a1a2e';
+      ctx.strokeStyle = getCSSColor('--panel-bg') || '#141414';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     };
