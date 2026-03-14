@@ -46,8 +46,8 @@ describe('CorridorRisk relay seed loop', () => {
     assert.match(relaySrc, /function startCorridorRiskSeedLoop/);
   });
 
-  it('uses 10s timeout', () => {
-    assert.match(relaySrc, /AbortSignal\.timeout\(10000\)/);
+  it('uses 15s timeout', () => {
+    assert.match(relaySrc, /AbortSignal\.timeout\(15000\)/);
   });
 
   it('logs only status code on HTTP error', () => {
