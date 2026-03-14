@@ -20,7 +20,7 @@ export class PinnedWebcamsPanel extends Panel {
   private unsubscribe: (() => void) | null = null;
 
   constructor() {
-    super({ id: 'pinned-webcams', title: t('panels.pinnedWebcams'), className: 'panel-wide', closable: false });
+    super({ id: 'windy-webcams', title: t('panels.windyWebcams'), className: 'panel-wide', closable: true });
     this.unsubscribe = onPinnedChange(() => this.render());
     this.render();
   }
