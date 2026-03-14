@@ -463,7 +463,7 @@ function flushBatch(): void {
               delay = 120_000;
             } else if (err.statusCode === 429) {
               consecutive429s++;
-              delay = Math.min(BASE_PAUSE_MS * Math.pow(2, consecutive429s - 1), MAX_PAUSE_MS);
+              delay = Math.min(BASE_PAUSE_MS * 2 ** (consecutive429s - 1), MAX_PAUSE_MS);
             } else {
               delay = 30_000;
             }

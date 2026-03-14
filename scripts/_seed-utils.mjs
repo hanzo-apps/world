@@ -170,7 +170,7 @@ export async function withRetry(fn, maxRetries = 3, delayMs = 1000) {
     } catch (err) {
       lastErr = err;
       if (attempt < maxRetries) {
-        const wait = delayMs * Math.pow(2, attempt);
+        const wait = delayMs * 2 ** attempt;
         console.warn(`  Retry ${attempt + 1}/${maxRetries} in ${wait}ms: ${err.message || err}`);
         await new Promise(r => setTimeout(r, wait));
       }
