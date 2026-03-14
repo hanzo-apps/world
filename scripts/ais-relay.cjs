@@ -3819,8 +3819,9 @@ let corridorRiskSeedInFlight = false;
 let latestCorridorRiskData = null;
 
 async function seedCorridorRisk() {
-  if (corridorRiskSeedInFlight) return;
+  if (corridorRiskSeedInFlight) { console.log('[CorridorRisk] Skipped (already in-flight)'); return; }
   corridorRiskSeedInFlight = true;
+  console.log('[CorridorRisk] Fetching...');
   const t0 = Date.now();
   try {
     const resp = await fetch(CORRIDOR_RISK_BASE_URL, {
@@ -3829,13 +3830,19 @@ async function seedCorridorRisk() {
         'User-Agent': CHROME_UA,
         Referer: 'https://corridorrisk.io/dashboard.html',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     });
     if (!resp.ok) {
-      console.warn(`[CorridorRisk] HTTP ${resp.status}`);
+      const body = await resp.text().catch(() => '');
+      console.warn(`[CorridorRisk] HTTP ${resp.status} (${resp.headers.get('content-type') || 'unknown'}) — ${body.slice(0, 200)}`);
       return;
     }
-    const corridors = await resp.json();
+    const text = await resp.text();
+    if (text.startsWith('<')) {
+      console.warn(`[CorridorRisk] Got HTML instead of JSON (Cloudflare challenge?) — ${text.slice(0, 150)}`);
+      return;
+    }
+    const corridors = JSON.parse(text);
     if (!Array.isArray(corridors) || !corridors.length) {
       console.warn('[CorridorRisk] No corridors returned — skipping');
       return;
