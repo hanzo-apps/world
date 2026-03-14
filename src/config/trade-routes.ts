@@ -126,7 +126,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     category: 'energy',
     status: 'active',
     volumeDesc: '140M+ tonnes/year',
-    waypoints: ['bosphorus', 'dardanelles'],
+    waypoints: ['bosphorus'],
   },
   {
     id: 'intra-asia-container',
