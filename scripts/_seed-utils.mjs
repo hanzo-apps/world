@@ -205,8 +205,27 @@ export async function writeExtraKey(key, data, ttl) {
     body: JSON.stringify(['SET', key, payload, 'EX', ttl]),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!resp.ok) console.warn(`  Extra key ${key}: write failed (HTTP ${resp.status})`);
-  else console.log(`  Extra key ${key}: written`);
+  if (!resp.ok) {
+    console.warn(`  Extra key ${key}: write failed (HTTP ${resp.status})`);
+    return false;
+  }
+  console.log(`  Extra key ${key}: written`);
+  return true;
+}
+
+export async function writeExtraKeyWithMeta(key, data, ttl, recordCount, metaKeyOverride) {
+  const ok = await writeExtraKey(key, data, ttl);
+  if (!ok) return; // data write failed — do NOT write seed-meta (avoids false-positive health)
+  const { url, token } = getRedisCredentials();
+  const metaKey = metaKeyOverride || `seed-meta:${key.replace(/:v\d+$/, '')}`;
+  const meta = { fetchedAt: Date.now(), recordCount: recordCount ?? 0 };
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(['SET', metaKey, JSON.stringify(meta), 'EX', 86400 * 7]),
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!resp.ok) console.warn(`  seed-meta ${metaKey}: write failed`);
 }
 
 export async function extendExistingTtl(keys, ttlSeconds = 600) {
