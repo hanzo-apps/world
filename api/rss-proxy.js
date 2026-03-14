@@ -165,7 +165,7 @@ export default async function handler(req) {
 
       if (!response.ok && !usedRelay) {
         const relayResponse = await fetchViaRailway(feedUrl, timeout);
-        if (relayResponse && relayResponse.ok) {
+        if (relayResponse?.ok) {
           response = relayResponse;
         }
       }

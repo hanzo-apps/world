@@ -1,6 +1,6 @@
-import type { PanelConfig, MapLayers } from '@/types';
-import type { DataSourceId } from '@/services/data-freshness';
+import type { PanelConfig, MapLayers, DataSourceId } from '@/types';
 import { SITE_VARIANT } from './variant';
+// boundary-ignore: isDesktopRuntime is a pure env probe with no service dependencies
 import { isDesktopRuntime } from '@/services/runtime';
 
 const _desktop = isDesktopRuntime();
@@ -68,13 +68,13 @@ const FULL_PANELS: Record<string, PanelConfig> = {
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
-  iranAttacks: _desktop ? false : true,
+  iranAttacks: !_desktop,
   gpsJamming: false,
   satellites: false,
 
 
   conflicts: true,
-  bases: _desktop ? false : true,
+  bases: !_desktop,
   cables: false,
   pipelines: false,
   hotspots: true,

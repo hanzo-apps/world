@@ -688,7 +688,7 @@ describe('Chokepoint threat level config', () => {
 
   it('THREAT_CONFIG_LAST_REVIEWED is a valid ISO date string', () => {
     assert.ok(THREAT_CONFIG_LAST_REVIEWED, 'THREAT_CONFIG_LAST_REVIEWED should be exported');
-    assert.ok(!isNaN(Date.parse(THREAT_CONFIG_LAST_REVIEWED)),
+    assert.ok(!Number.isNaN(Date.parse(THREAT_CONFIG_LAST_REVIEWED)),
       'THREAT_CONFIG_LAST_REVIEWED should be a valid date');
   });
 });
