@@ -114,7 +114,7 @@ function parseYesPrice(market: GammaMarket): number {
       const prices: string[] = JSON.parse(pricesStr);
       if (prices.length >= 1) {
         const parsed = parseFloat(prices[0]!);
-        if (!isNaN(parsed)) return parsed; // 0-1 scale for proto
+        if (!Number.isNaN(parsed)) return parsed; // 0-1 scale for proto
       }
     }
   } catch {

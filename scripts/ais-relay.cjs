@@ -258,7 +258,7 @@ let upstreamPaused = false;
 let upstreamQueue = [];
 let upstreamQueueReadIndex = 0;
 let upstreamDrainScheduled = false;
-let clients = new Set();
+const clients = new Set();
 let messageCount = 0;
 let droppedMessages = 0;
 const requestRateBuckets = new Map(); // key: route:ip -> { count, resetAt }
@@ -950,7 +950,7 @@ async function orefBootstrapHistoryWithRetry() {
       const msg = redactOrefError(err?.message || String(err));
       console.warn(`[Relay] OREF upstream bootstrap attempt ${attempt}/${MAX_ATTEMPTS} failed: ${msg}`);
       if (attempt < MAX_ATTEMPTS) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1) + Math.random() * 1000;
+        const delay = BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 1000;
         await new Promise(r => setTimeout(r, delay));
       }
     }
@@ -2099,9 +2099,9 @@ function cyberNormCountry(v) { const r = cyberClean(String(v ?? ''), 64); if (!r
 function cyberToMs(v) {
   if (!v) return 0;
   const raw = cyberClean(String(v), 80); if (!raw) return 0;
-  const d1 = new Date(raw); if (!isNaN(d1.getTime())) return d1.getTime();
+  const d1 = new Date(raw); if (!Number.isNaN(d1.getTime())) return d1.getTime();
   const d2 = new Date(raw.replace(' UTC', 'Z').replace(' GMT', 'Z').replace(' ', 'T'));
-  return isNaN(d2.getTime()) ? 0 : d2.getTime();
+  return Number.isNaN(d2.getTime()) ? 0 : d2.getTime();
 }
 function cyberNormTags(input, max) {
   const tags = Array.isArray(input) ? input : typeof input === 'string' ? input.split(/[;,|]/g) : [];
@@ -3187,7 +3187,7 @@ async function seedUsaSpending() {
       recipientName: String(r['Recipient Name'] || 'Unknown'),
       amount: Number(r['Award Amount']) || 0,
       agency: String(r['Awarding Agency'] || 'Unknown'),
-      description: String(r['Description'] || '').slice(0, 200),
+      description: String(r.Description || '').slice(0, 200),
       startDate: String(r['Start Date'] || ''),
       awardType: AWARD_TYPE_MAP[String(r['Award Type'] || '')] || 'other',
     }));
@@ -3292,7 +3292,7 @@ function techEventsParseRSS(rssText) {
     let startDate = null;
     if (dateMatch) {
       const parsed = new Date(dateMatch[1]);
-      if (!isNaN(parsed.getTime())) startDate = parsed.toISOString().split('T')[0];
+      if (!Number.isNaN(parsed.getTime())) startDate = parsed.toISOString().split('T')[0];
     }
     if (!startDate) continue;
     if (new Date(startDate) < new Date(new Date().toISOString().split('T')[0])) continue;
@@ -3557,7 +3557,7 @@ async function wbFetchProgress() {
       const data = raw[1]
         .filter(e => e.value !== null && e.value !== undefined)
         .map(e => ({ year: parseInt(e.date, 10), value: e.value }))
-        .filter(d => !isNaN(d.year))
+        .filter(d => !Number.isNaN(d.year))
         .sort((a, b) => a.year - b.year);
       results.push({ id: ind.id, code: ind.code, data, invertTrend: ind.invertTrend });
     } catch (e) {
@@ -3588,7 +3588,7 @@ async function wbFetchRenewable() {
     }
     for (const arr of Object.values(byRegion)) arr.sort((a, b) => a.year - b.year);
 
-    const worldData = byRegion['WLD'] || byRegion['1W'] || [];
+    const worldData = byRegion.WLD || byRegion['1W'] || [];
     const latest = worldData.length ? worldData[worldData.length - 1] : null;
     const regions = [];
     for (const code of WB_RENEWABLE_REGIONS) {
@@ -4070,7 +4070,7 @@ function getRelayMetricsBucket(nowSec = getMetricsNowSec()) {
 function incrementRelayMetric(field, amount = 1) {
   const bucket = getRelayMetricsBucket();
   bucket[field] = (bucket[field] || 0) + amount;
-  if (Object.prototype.hasOwnProperty.call(relayMetricsLifetime, field)) {
+  if (Object.hasOwn(relayMetricsLifetime, field)) {
     relayMetricsLifetime[field] += amount;
   }
 }
@@ -4921,7 +4921,7 @@ const RSS_CACHE_MAX_ENTRIES = 200; // hard cap — ~20 allowed domains × ~5 pat
 
 function rssRecordFailure(feedUrl) {
   const prev = rssFailureCount.get(feedUrl) || 0;
-  const ttl = Math.min(RSS_NEGATIVE_CACHE_TTL_MS * Math.pow(2, prev), RSS_MAX_NEGATIVE_CACHE_TTL_MS);
+  const ttl = Math.min(RSS_NEGATIVE_CACHE_TTL_MS * 2 ** prev, RSS_MAX_NEGATIVE_CACHE_TTL_MS);
   rssFailureCount.set(feedUrl, prev + 1);
   rssBackoffUntil.set(feedUrl, Date.now() + ttl);
   return { failures: prev + 1, backoffSec: Math.round(ttl / 1000) };
@@ -5543,7 +5543,7 @@ function handleWorldBankRequest(req, res) {
   const country = wbParams.get('country');
   const countries = wbParams.get('countries');
   const years = parseInt(wbParams.get('years') || '5', 10);
-  let countryList = country || (countries ? countries.split(',').join(';') : [
+  const countryList = country || (countries ? countries.split(',').join(';') : [
     'USA','CHN','JPN','DEU','KOR','GBR','IND','ISR','SGP','TWN',
     'FRA','CAN','SWE','NLD','CHE','FIN','IRL','AUS','BRA','IDN',
     'ARE','SAU','QAT','BHR','EGY','TUR','MYS','THA','VNM','PHL',
@@ -5909,7 +5909,7 @@ setInterval(() => {
 // ── Yahoo Finance Chart Proxy ──────────────────────────────────────
 const YAHOO_CHART_CACHE_TTL_MS = 300_000; // 5 min
 const yahooChartCache = new Map(); // key: symbol:range:interval → { json, gzip, ts }
-const YAHOO_SYMBOL_RE = /^[A-Za-z0-9^=\-\.]{1,15}$/;
+const YAHOO_SYMBOL_RE = /^[A-Za-z0-9^=\-.]{1,15}$/;
 
 function handleYahooChartRequest(req, res) {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -6704,7 +6704,7 @@ const server = http.createServer(async (req, res) => {
             }
             rssResponseCache.set(feedUrl, {
               data, contentType: 'application/xml', statusCode: response.statusCode, timestamp: Date.now(),
-              etag: response.headers['etag'] || null,
+              etag: response.headers.etag || null,
               lastModified: response.headers['last-modified'] || null,
             });
             if (response.statusCode >= 200 && response.statusCode < 300) {
