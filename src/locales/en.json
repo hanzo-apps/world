@@ -797,10 +797,16 @@
       "spikeAlert": "Spike detected — rate significantly above 52-week average (weekly)",
       "warnings": "warning(s)",
       "aisDisruptions": "AIS disruption(s)",
+      "transit24h": "24h",
+      "tankers": "tankers",
+      "cargo": "cargo",
+      "wowChange": "WoW change",
+      "vesselTransits": "Vessel Transits (180d)",
+      "riskLevel": "Risk level",
       "mineral": "Mineral",
       "topProducers": "Top Producers",
       "risk": "Risk",
-      "sources": "FRED / NGA / USGS"
+      "sources": "IMF PortWatch / AISStream / CorridorRisk / NGA / USGS"
     },
     "tradePolicy": {
       "restrictions": "Restrictions",

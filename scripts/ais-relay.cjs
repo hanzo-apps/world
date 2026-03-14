@@ -3607,6 +3607,222 @@ async function startWorldBankSeedLoop() {
   }, WB_SEED_INTERVAL_MS).unref?.();
 }
 
+const PORTWATCH_ARCGIS_BASE = 'https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/portal_chokepoint_daily/FeatureServer/0/query';
+const PORTWATCH_PAGE_SIZE = 2000;
+const PORTWATCH_FETCH_TIMEOUT_MS = 30000;
+const PORTWATCH_REDIS_KEY = 'supply_chain:portwatch:v1';
+const PORTWATCH_TTL = 43200;
+const PORTWATCH_SEED_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const PORTWATCH_CHOKEPOINT_NAMES = [
+  { name: 'Suez Canal', id: 'suez' },
+  { name: 'Strait of Malacca', id: 'malacca_strait' },
+  { name: 'Strait of Hormuz', id: 'hormuz_strait' },
+  { name: 'Bab el-Mandeb', id: 'bab_el_mandeb' },
+  { name: 'Panama Canal', id: 'panama' },
+  { name: 'Taiwan Strait', id: 'taiwan_strait' },
+  { name: 'Cape of Good Hope', id: 'cape_of_good_hope' },
+  { name: 'Strait of Gibraltar', id: 'gibraltar' },
+  { name: 'Bosphorus', id: 'bosphorus' },
+  { name: 'Dardanelles', id: 'dardanelles' },
+];
+let portwatchSeedInFlight = false;
+
+function pwClassifyVesselType(name) {
+  const lower = String(name).toLowerCase();
+  if (lower.includes('tanker') || lower.includes('lng') || lower.includes('lpg')) return 'tanker';
+  if (lower.includes('cargo') || lower.includes('container') || lower.includes('bulk')) return 'cargo';
+  return 'other';
+}
+
+function pwFormatDate(ts) {
+  const d = new Date(ts);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function pwComputeWowChangePct(history) {
+  if (history.length < 14) return 0;
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  let thisWeek = 0;
+  let lastWeek = 0;
+  for (let i = 0; i < 7 && i < sorted.length; i++) thisWeek += sorted[i].total;
+  for (let i = 7; i < 14 && i < sorted.length; i++) lastWeek += sorted[i].total;
+  if (lastWeek === 0) return 0;
+  return Math.round(((thisWeek - lastWeek) / lastWeek) * 1000) / 10;
+}
+
+async function pwFetchAllPages(chokepoint, since) {
+  const all = [];
+  let offset = 0;
+  for (;;) {
+    const params = new URLSearchParams({
+      where: `chokepoint='${chokepoint.replace(/'/g, "''")}' AND observation_date >= '${since}'`,
+      outFields: '*',
+      f: 'json',
+      resultOffset: String(offset),
+      resultRecordCount: String(PORTWATCH_PAGE_SIZE),
+    });
+    const resp = await fetch(`${PORTWATCH_ARCGIS_BASE}?${params}`, {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(PORTWATCH_FETCH_TIMEOUT_MS),
+    });
+    if (!resp.ok) return [];
+    const body = await resp.json();
+    if (body.features?.length) all.push(...body.features);
+    if (!body.exceededTransferLimit) break;
+    offset += PORTWATCH_PAGE_SIZE;
+  }
+  return all;
+}
+
+function pwBuildHistory(features) {
+  const dayMap = new Map();
+  for (const f of features) {
+    const attrs = f.attributes;
+    const rawDate = attrs.observation_date;
+    if (!rawDate) continue;
+    const date = typeof rawDate === 'number' ? pwFormatDate(rawDate) : String(rawDate).slice(0, 10);
+    const vesselType = String(attrs.vessel_type ?? attrs.ship_type ?? 'other');
+    const count = Number(attrs.n_vessels ?? attrs.count ?? attrs.total ?? 1);
+    const category = pwClassifyVesselType(vesselType);
+    let day = dayMap.get(date);
+    if (!day) { day = { tanker: 0, cargo: 0, other: 0 }; dayMap.set(date, day); }
+    day[category] += count;
+  }
+  return Array.from(dayMap.entries())
+    .map(([date, counts]) => ({ date, tanker: counts.tanker, cargo: counts.cargo, other: counts.other, total: counts.tanker + counts.cargo + counts.other }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function seedPortWatch() {
+  if (portwatchSeedInFlight) return;
+  portwatchSeedInFlight = true;
+  const t0 = Date.now();
+  try {
+    const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const result = {};
+    const CONCURRENCY = 3;
+    for (let i = 0; i < PORTWATCH_CHOKEPOINT_NAMES.length; i += CONCURRENCY) {
+      const batch = PORTWATCH_CHOKEPOINT_NAMES.slice(i, i + CONCURRENCY);
+      const settled = await Promise.allSettled(batch.map(cp => pwFetchAllPages(cp.name, since)));
+      for (let j = 0; j < batch.length; j++) {
+        const outcome = settled[j];
+        if (outcome.status !== 'fulfilled' || !outcome.value.length) continue;
+        const history = pwBuildHistory(outcome.value);
+        result[batch[j].id] = { history, wowChangePct: pwComputeWowChangePct(history) };
+      }
+    }
+    if (Object.keys(result).length === 0) {
+      console.warn('[PortWatch] No data fetched — skipping');
+      return;
+    }
+    const ok = await upstashSet(PORTWATCH_REDIS_KEY, result, PORTWATCH_TTL);
+    await upstashSet('seed-meta:supply_chain:portwatch', { fetchedAt: Date.now(), recordCount: Object.keys(result).length }, 604800);
+    console.log(`[PortWatch] Seeded ${Object.keys(result).length} chokepoints (redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.warn('[PortWatch] Seed error:', e?.message || e);
+  } finally {
+    portwatchSeedInFlight = false;
+  }
+}
+
+async function startPortWatchSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[PortWatch] Disabled (no Upstash Redis)');
+    return;
+  }
+  console.log(`[PortWatch] Seed loop starting (interval ${PORTWATCH_SEED_INTERVAL_MS / 1000 / 60 / 60}h)`);
+  seedPortWatch().catch(e => console.warn('[PortWatch] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedPortWatch().catch(e => console.warn('[PortWatch] Seed error:', e?.message || e));
+  }, PORTWATCH_SEED_INTERVAL_MS).unref?.();
+}
+
+const CORRIDOR_RISK_API_KEY = process.env.CORRIDOR_RISK_API_KEY || '';
+const CORRIDOR_RISK_BASE_URL = 'https://api.corridorrisk.io/v1/corridors';
+const CORRIDOR_RISK_REDIS_KEY = 'supply_chain:corridorrisk:v1';
+const CORRIDOR_RISK_TTL = 7200;
+const CORRIDOR_RISK_SEED_INTERVAL_MS = 60 * 60 * 1000;
+const CORRIDOR_RISK_NAMES = [
+  { name: 'Suez', id: 'suez' },
+  { name: 'Malacca', id: 'malacca_strait' },
+  { name: 'Hormuz', id: 'hormuz_strait' },
+  { name: 'Bab el-Mandeb', id: 'bab_el_mandeb' },
+  { name: 'Panama', id: 'panama' },
+  { name: 'Taiwan', id: 'taiwan_strait' },
+  { name: 'Cape of Good Hope', id: 'cape_of_good_hope' },
+];
+let corridorRiskSeedInFlight = false;
+
+async function seedCorridorRisk() {
+  if (!CORRIDOR_RISK_API_KEY) return;
+  if (corridorRiskSeedInFlight) return;
+  corridorRiskSeedInFlight = true;
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(CORRIDOR_RISK_BASE_URL, {
+      headers: {
+        Authorization: `Bearer ${CORRIDOR_RISK_API_KEY}`,
+        Accept: 'application/json',
+        'User-Agent': CHROME_UA,
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) {
+      console.warn(`[CorridorRisk] HTTP ${resp.status}`);
+      return;
+    }
+    const body = await resp.json();
+    const corridors = Array.isArray(body) ? body : body.data;
+    if (!corridors?.length) {
+      console.warn('[CorridorRisk] No corridors returned — skipping');
+      return;
+    }
+    const crNameMap = new Map(CORRIDOR_RISK_NAMES.map(c => [c.name.toLowerCase(), c.id]));
+    const result = {};
+    for (const corridor of corridors) {
+      const name = corridor.name;
+      if (!name) continue;
+      const id = crNameMap.get(name.toLowerCase());
+      if (!id) continue;
+      result[id] = {
+        riskLevel: String(corridor.risk_level ?? ''),
+        incidentCount7d: Number(corridor.incident_count_7d ?? 0),
+        disruptionPct: Number(corridor.disruption_pct ?? 0),
+      };
+    }
+    if (Object.keys(result).length === 0) {
+      console.warn('[CorridorRisk] No matching corridors — skipping');
+      return;
+    }
+    const ok = await upstashSet(CORRIDOR_RISK_REDIS_KEY, result, CORRIDOR_RISK_TTL);
+    await upstashSet('seed-meta:supply_chain:corridorrisk', { fetchedAt: Date.now(), recordCount: Object.keys(result).length }, 604800);
+    console.log(`[CorridorRisk] Seeded ${Object.keys(result).length} corridors (redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.warn('[CorridorRisk] Seed error:', e?.message || e);
+  } finally {
+    corridorRiskSeedInFlight = false;
+  }
+}
+
+async function startCorridorRiskSeedLoop() {
+  if (!UPSTASH_ENABLED) {
+    console.log('[CorridorRisk] Disabled (no Upstash Redis)');
+    return;
+  }
+  if (!CORRIDOR_RISK_API_KEY) {
+    console.log('[CorridorRisk] Disabled (no CORRIDOR_RISK_API_KEY)');
+    return;
+  }
+  console.log(`[CorridorRisk] Seed loop starting (interval ${CORRIDOR_RISK_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  seedCorridorRisk().catch(e => console.warn('[CorridorRisk] Initial seed error:', e?.message || e));
+  setInterval(() => {
+    seedCorridorRisk().catch(e => console.warn('[CorridorRisk] Seed error:', e?.message || e));
+  }, CORRIDOR_RISK_SEED_INTERVAL_MS).unref?.();
+}
+
 function gzipSyncBuffer(body) {
   try {
     return zlib.gzipSync(typeof body === 'string' ? Buffer.from(body) : body);
@@ -3895,7 +4111,27 @@ const CHOKEPOINTS = [
   { name: 'Taiwan Strait', lat: 24.5, lon: 119.5, radius: 2 },
   { name: 'South China Sea', lat: 15.0, lon: 115.0, radius: 5 },
   { name: 'Black Sea', lat: 43.5, lon: 34.0, radius: 3 },
+  { name: 'Cape of Good Hope', lat: -34.36, lon: 18.49, radius: 2 },
+  { name: 'Strait of Gibraltar', lat: 35.96, lon: -5.35, radius: 1 },
+  { name: 'Bosphorus Strait', lat: 41.12, lon: 29.05, radius: 0.5 },
+  { name: 'Dardanelles', lat: 40.20, lon: 26.40, radius: 0.5 },
 ];
+
+function classifyVesselType(shipType) {
+  if (shipType >= 80 && shipType <= 89) return 'tanker';
+  if (shipType >= 70 && shipType <= 79) return 'cargo';
+  return 'other';
+}
+
+const chokepointCrossings = new Map();
+const transitCooldowns = new Map();
+const transitPendingEntry = new Map();
+const TRANSIT_COOLDOWN_MS = 30 * 60 * 1000;
+const TRANSIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MIN_DWELL_MS = 5 * 60 * 1000;
+const CHOKEPOINT_TRANSIT_KEY = 'supply_chain:chokepoint_transits:v1';
+const CHOKEPOINT_TRANSIT_TTL = 900;
+const CHOKEPOINT_TRANSIT_INTERVAL_MS = 10 * 60 * 1000;
 
 const NAVAL_PREFIX_RE = /^(USS|USNS|HMS|HMAS|HMCS|INS|JS|ROKS|TCG|FS|BNS|RFS|PLAN|PLA|CGC|PNS|KRI|ITS|SNS|MMSI)/i;
 
@@ -3989,15 +4225,36 @@ function updateVesselChokepoints(mmsi, lat, lon) {
   }
 
   const previous = vesselChokepoints.get(mmsi) || new Set();
+  const now = Date.now();
+
   for (const cpName of previous) {
     if (next.has(cpName)) continue;
     const bucket = chokepointBuckets.get(cpName);
     if (!bucket) continue;
     bucket.delete(mmsi);
     if (bucket.size === 0) chokepointBuckets.delete(cpName);
+
+    const pendingKey = mmsi + ':' + cpName;
+    const entryTs = transitPendingEntry.get(pendingKey);
+    if (entryTs !== undefined && now - entryTs >= MIN_DWELL_MS) {
+      const cooldownKey = mmsi + ':' + cpName;
+      const lastCrossing = transitCooldowns.get(cooldownKey);
+      if (!lastCrossing || now - lastCrossing >= TRANSIT_COOLDOWN_MS) {
+        const vessel = vessels.get(mmsi);
+        const vType = classifyVesselType(vessel?.shipType);
+        let crossings = chokepointCrossings.get(cpName);
+        if (!crossings) { crossings = []; chokepointCrossings.set(cpName, crossings); }
+        crossings.push({ mmsi, type: vType, ts: now });
+        transitCooldowns.set(cooldownKey, now);
+      }
+    }
+    transitPendingEntry.delete(pendingKey);
   }
 
   for (const cpName of next) {
+    if (!previous.has(cpName)) {
+      transitPendingEntry.set(mmsi + ':' + cpName, now);
+    }
     let bucket = chokepointBuckets.get(cpName);
     if (!bucket) {
       bucket = new Set();
@@ -4174,6 +4431,25 @@ function cleanupAggregates() {
     }
     if (bucket.size === 0) chokepointBuckets.delete(cpName);
   }
+
+  for (const [cpName, crossings] of chokepointCrossings) {
+    const filtered = crossings.filter(c => now - c.ts < TRANSIT_WINDOW_MS);
+    if (filtered.length === 0) chokepointCrossings.delete(cpName);
+    else chokepointCrossings.set(cpName, filtered);
+  }
+  for (const [key, ts] of transitCooldowns) {
+    if (now - ts > TRANSIT_COOLDOWN_MS) transitCooldowns.delete(key);
+  }
+  const pendingCutoff = 48 * 60 * 60 * 1000;
+  for (const [key, ts] of transitPendingEntry) {
+    if (now - ts > pendingCutoff) {
+      const sep = key.indexOf(':');
+      const pmsi = key.substring(0, sep);
+      const cpN = key.substring(sep + 1);
+      const memberships = vesselChokepoints.get(pmsi);
+      if (!memberships || !memberships.has(cpN)) transitPendingEntry.delete(key);
+    }
+  }
 }
 
 function detectDisruptions() {
@@ -4332,6 +4608,33 @@ setInterval(() => {
     buildSnapshot();
   }
 }, SNAPSHOT_INTERVAL_MS);
+
+async function seedChokepointTransits() {
+  const now = Date.now();
+  const transits = {};
+  for (const cp of CHOKEPOINTS) {
+    const crossings = chokepointCrossings.get(cp.name) || [];
+    const recent = crossings.filter(c => now - c.ts < TRANSIT_WINDOW_MS);
+    chokepointCrossings.set(cp.name, recent);
+    transits[cp.name] = {
+      tanker: recent.filter(c => c.type === 'tanker').length,
+      cargo: recent.filter(c => c.type === 'cargo').length,
+      other: recent.filter(c => c.type === 'other').length,
+      total: recent.length,
+    };
+  }
+  const payload = { transits, fetchedAt: now };
+  await upstashSet(CHOKEPOINT_TRANSIT_KEY, payload, CHOKEPOINT_TRANSIT_TTL);
+  await upstashSet('seed-meta:supply_chain:chokepoint_transits', { fetchedAt: now, recordCount: Object.keys(transits).length }, 604800);
+  console.log(`[Transit] Seeded ${Object.keys(transits).length} chokepoint transit counts`);
+}
+
+setTimeout(() => {
+  seedChokepointTransits().catch(err => console.error('[Transit] Initial seed error:', err.message));
+}, 30_000);
+setInterval(() => {
+  seedChokepointTransits().catch(err => console.error('[Transit] Seed error:', err.message));
+}, CHOKEPOINT_TRANSIT_INTERVAL_MS).unref?.();
 
 // UCDP GED Events cache (persistent in-memory — Railway advantage)
 const UCDP_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -6537,6 +6840,8 @@ server.listen(PORT, () => {
   startWorldBankSeedLoop();
   startSatelliteSeedLoop();
   startTechEventsSeedLoop();
+  startPortWatchSeedLoop();
+  startCorridorRiskSeedLoop();
 });
 
 wss.on('connection', (ws, req) => {

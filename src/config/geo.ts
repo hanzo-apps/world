@@ -507,6 +507,7 @@ export const STRATEGIC_WATERWAYS: StrategicWaterway[] = [
   { id: 'gibraltar', name: 'STRAIT OF GIBRALTAR', lat: 35.9, lon: -5.6, description: 'Mediterranean access, NATO control' },
   { id: 'bab_el_mandeb', name: 'BAB EL-MANDEB', lat: 12.5, lon: 43.3, description: 'Red Sea chokepoint, Houthi attacks' },
   { id: 'dardanelles', name: 'DARDANELLES', lat: 40.2, lon: 26.4, description: 'Aegean-Marmara link, Turkey control' },
+  { id: 'cape_of_good_hope', name: 'CAPE OF GOOD HOPE', lat: -34.36, lon: 18.49, description: 'Suez bypass route, tanker traffic' },
 ];
 
 export const APT_GROUPS: APTGroup[] = [
