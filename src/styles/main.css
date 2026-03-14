@@ -2626,8 +2626,8 @@ body.live-news-fullscreen-active .panels-grid > *:not(.live-news-fullscreen) {
   display: block;
 }
 
-/* Live YouTube Panel */
-.panel[data-panel="live-youtube"] .panel-content {
+/* Live Webcams Panel */
+.panel[data-panel="live-webcams"] .panel-content {
   padding: 0;
   flex: 1;
   display: flex;
