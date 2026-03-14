@@ -30,6 +30,7 @@ import {
   DEFAULT_PANELS,
 } from '@/config';
 import { VARIANT_META } from '@/config/variant-meta';
+import { isDesktopRuntime } from '@/services/runtime';
 import {
   saveSnapshot,
   initAisStream,
@@ -815,6 +816,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupLlmStatusIndicator(): void {
+    if (!isDesktopRuntime()) return;
     this.ctx.llmStatusIndicator = new LlmStatusIndicator();
     const headerRight = this.ctx.container.querySelector('.header-right');
     if (headerRight) {
