@@ -256,6 +256,19 @@ describe('calibrateWithMarkets', () => {
     assert.equal(pred.calibration, null);
     assert.equal(pred.probability, 0.7);
   });
+
+  it('does not calibrate commodity forecasts from loosely related regional conflict markets', () => {
+    const pred = makePrediction(
+      'market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption',
+      0.668, 0.58, '30d', [],
+    );
+    const markets = {
+      geopolitical: [{ title: 'Will Israel launch a major ground offensive in Lebanon by March 31?', yesPrice: 57, source: 'polymarket', volume: 100000 }],
+    };
+    calibrateWithMarkets([pred], markets);
+    assert.equal(pred.calibration, null);
+    assert.equal(pred.probability, 0.668);
+  });
 });
 
 describe('computeTrends', () => {
@@ -538,7 +551,7 @@ describe('detectMilitaryScenarios', () => {
 // ── Phase 2 Tests ──────────────────────────────────────────
 
 describe('attachNewsContext', () => {
-  it('matches headlines mentioning prediction region', () => {
+  it('matches headlines mentioning prediction region and scenario context', () => {
     const preds = [makePrediction('conflict', 'Iran', 'test', 0.5, 0.5, '7d', [])];
     const news = { topStories: [
       { primaryTitle: 'Iran tensions escalate after military action' },
@@ -546,7 +559,7 @@ describe('attachNewsContext', () => {
       { primaryTitle: 'Iran nuclear deal negotiations resume' },
     ]};
     attachNewsContext(preds, news);
-    assert.equal(preds[0].newsContext.length, 2); // only Iran headlines
+    assert.equal(preds[0].newsContext.length, 1);
     assert.ok(preds[0].newsContext[0].includes('Iran'));
   });
 
@@ -625,6 +638,16 @@ describe('attachNewsContext', () => {
     assert.ok(preds[0].newsContext[0].includes('Red Sea'));
     assert.ok(preds[0].newsContext.every(h => /Red Sea|rerouting/i.test(h)));
   });
+
+  it('rejects domain-only headlines with no geographic grounding', () => {
+    const preds = [makePrediction('military', 'Northern Europe', 'Military posture escalation: Northern Europe', 0.6, 0.4, '7d', [])];
+    const news = { topStories: [
+      { primaryTitle: 'Kenya minister flies to Russia to halt illegal army hiring' },
+      { primaryTitle: 'Army reshuffle rattles coalition government in Nairobi' },
+    ]};
+    attachNewsContext(preds, news);
+    assert.deepEqual(preds[0].newsContext, []);
+  });
 });
 
 describe('headline and market relevance helpers', () => {
@@ -639,7 +662,26 @@ describe('headline and market relevance helpers', () => {
     const pred = makePrediction('conflict', 'Middle East', 'Escalation risk: Iran', 0.7, 0.5, '7d', []);
     const targeted = computeMarketMatchScore(pred, 'Will Iran conflict escalate before July?', ['Iran', 'Middle East']);
     const broad = computeMarketMatchScore(pred, 'Will Netanyahu remain prime minister through 2026?', ['Iran', 'Middle East']);
-    assert.ok(targeted > broad);
+    assert.ok(targeted.score > broad.score);
+  });
+
+  it('penalizes mismatched regional headlines and markets', () => {
+    const terms = ['Northern Europe', 'Baltic'];
+    const headlineScore = computeHeadlineRelevance(
+      'Kenya minister flies to Russia to halt illegal army hiring',
+      terms,
+      'military',
+      { region: 'Northern Europe', requireRegion: true, requireSemantic: true },
+    );
+    assert.equal(headlineScore, 0);
+
+    const pred = makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.66, 0.5, '30d', []);
+    const market = computeMarketMatchScore(
+      pred,
+      'Will Israel launch a major ground offensive in Lebanon by March 31?',
+      ['Middle East', 'Strait of Hormuz', 'Iran'],
+    );
+    assert.ok(market.score < 7);
   });
 });
 
