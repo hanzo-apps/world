@@ -109,6 +109,6 @@ runSeed('intelligence', 'gdelt-intel', CANONICAL_KEY, fetchAllTopics, {
   ttlSeconds: CACHE_TTL,
   sourceVersion: 'gdelt-doc-v2',
 }).catch((err) => {
-  console.error('FATAL:', err.message || err);
+  const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   process.exit(1);
 });

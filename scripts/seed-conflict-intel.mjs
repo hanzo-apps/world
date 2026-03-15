@@ -279,6 +279,6 @@ runSeed('conflict', 'acled-intel', ACLED_CACHE_KEY, fetchAll, {
   ttlSeconds: ACLED_TTL,
   sourceVersion: 'acled-hapi-pizzint',
 }).catch((err) => {
-  console.error('FATAL:', err.message || err);
+  const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   process.exit(1);
 });
