@@ -130,7 +130,7 @@ const BDI_INDEX_MAP = [
 async function fetchBDI() {
   try {
     const resp = await fetch('https://www.handybulk.com/baltic-dry-index/', {
-      headers: { 'User-Agent': CHROME_UA },
+      headers: { 'User-Agent': CHROME_UA, 'Accept-Encoding': 'gzip, deflate' },
       signal: AbortSignal.timeout(10_000),
       redirect: 'manual',
     });
@@ -139,9 +139,9 @@ async function fetchBDI() {
       return [];
     }
     const contentLength = parseInt(resp.headers.get('content-length') || '0', 10);
-    if (contentLength > 500_000) { console.warn('  BDI: response too large'); return []; }
+    if (contentLength > 1_000_000) { console.warn('  BDI: response too large'); return []; }
     const html = await resp.text();
-    if (html.length > 500_000) { console.warn('  BDI: body too large'); return []; }
+    if (html.length > 1_000_000) { console.warn('  BDI: body too large'); return []; }
 
     // Parse article date from heading (e.g., "13-March-2026" or "13-Mar-2026")
     const dateMatch = html.match(/(\d{1,2})-(\w+)-(\d{4})/);
