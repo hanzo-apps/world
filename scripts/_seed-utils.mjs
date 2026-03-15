@@ -266,7 +266,7 @@ export function parseYahooChart(data, symbol) {
 }
 
 export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}) {
-  const { validateFn, ttlSeconds, lockTtlMs = 120_000, extraKeys } = opts;
+  const { validateFn, ttlSeconds, lockTtlMs = 120_000, extraKeys, afterPublish } = opts;
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const startMs = Date.now();
 
@@ -318,6 +318,7 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
       ? (typeof opts.recordCount === 'function' ? opts.recordCount(data) : opts.recordCount)
       : Array.isArray(data) ? data.length
       : (topicArticleCount
+        ?? data?.predictions?.length
         ?? data?.events?.length ?? data?.earthquakes?.length ?? data?.outages?.length
         ?? data?.fireDetections?.length ?? data?.anomalies?.length ?? data?.threats?.length
         ?? data?.quotes?.length ?? data?.stablecoins?.length
@@ -328,6 +329,10 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
       for (const ek of extraKeys) {
         await writeExtraKey(ek.key, ek.transform ? ek.transform(data) : data, ek.ttl || ttlSeconds);
       }
+    }
+
+    if (afterPublish) {
+      await afterPublish(data, { canonicalKey, ttlSeconds, recordCount, runId });
     }
 
     const meta = await writeFreshnessMetadata(domain, resource, recordCount, opts.sourceVersion);
