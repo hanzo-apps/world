@@ -13,7 +13,7 @@ const LIVE_TTL = 600;
 const STALE_TTL = 86400;
 
 const THEATER_POSTURE_LIVE_KEY = 'theater-posture:sebuf:v1';
-const THEATER_POSTURE_STALE_KEY = 'theater-posture:sebuf:stale:v1';
+const THEATER_POSTURE_STALE_KEY = 'theater_posture:sebuf:stale:v1';
 const THEATER_POSTURE_BACKUP_KEY = 'theater-posture:sebuf:backup:v1';
 const THEATER_POSTURE_LIVE_TTL = 900;
 const THEATER_POSTURE_STALE_TTL = 86400;

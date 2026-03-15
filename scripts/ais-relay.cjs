@@ -2390,7 +2390,7 @@ async function startCyberThreatsSeedLoop() {
 const POSITIVE_EVENTS_INTERVAL_MS = 900_000; // 15 min
 const POSITIVE_EVENTS_TTL = 2700; // 3× interval
 const POSITIVE_EVENTS_RPC_KEY = 'positive-events:geo:v1';
-const POSITIVE_EVENTS_BOOTSTRAP_KEY = 'positive-events:geo-bootstrap:v1';
+const POSITIVE_EVENTS_BOOTSTRAP_KEY = 'positive_events:geo-bootstrap:v1';
 const POSITIVE_EVENTS_MAX = 500;
 
 const POSITIVE_QUERIES = [
@@ -2838,7 +2838,7 @@ function startServiceStatusesSeedLoop() {
 // ─────────────────────────────────────────────────────────────
 const THEATER_POSTURE_SEED_INTERVAL_MS = 600_000; // 10 min
 const THEATER_POSTURE_LIVE_KEY = 'theater-posture:sebuf:v1';
-const THEATER_POSTURE_STALE_KEY = 'theater-posture:sebuf:stale:v1';
+const THEATER_POSTURE_STALE_KEY = 'theater_posture:sebuf:stale:v1';
 const THEATER_POSTURE_BACKUP_KEY = 'theater-posture:sebuf:backup:v1';
 const THEATER_POSTURE_LIVE_TTL = 900;    // 15 min
 const THEATER_POSTURE_STALE_TTL = 86400; // 24h
