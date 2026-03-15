@@ -533,7 +533,7 @@ describe('theater posture caching behavior', { concurrency: 1 }, () => {
         if (key === 'theater-posture:sebuf:v1') {
           return jsonResponse({ result: undefined });
         }
-        if (key === 'theater-posture:sebuf:stale:v1') {
+        if (key === 'theater_posture:sebuf:stale:v1') {
           return jsonResponse({ result: JSON.stringify(staleData) });
         }
         return jsonResponse({ result: undefined });
@@ -644,8 +644,8 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
       './_shared': resolve(root, 'server/worldmonitor/intelligence/v1/_shared.ts'),
       '../../../_shared/constants': resolve(root, 'server/_shared/constants.ts'),
       '../../../_shared/redis': resolve(root, 'server/_shared/redis.ts'),
+      '../../../_shared/llm-health': resolve(root, 'tests/helpers/llm-health-stub.ts'),
       '../../../_shared/llm': resolve(root, 'server/_shared/llm.ts'),
-      '../../../_shared/llm-health': resolve(root, 'server/_shared/llm-health.ts'),
     });
   }
 

@@ -1,4 +1,4 @@
-import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
+import { toApiUrl } from '@/services/runtime';
 
 const hydrationCache = new Map<string, unknown>();
 
@@ -28,16 +28,12 @@ async function fetchTier(tier: string, signal: AbortSignal): Promise<void> {
 }
 
 export async function fetchBootstrapData(): Promise<void> {
-  // Each tier gets its own abort controller so a slow response in one
-  // doesn't kill the other. Timeouts are generous — bootstrap data is
-  // critical for instant panel rendering.
+  // Bootstrap is opportunistic; cap the request aggressively so first paint
+  // falls through to panel fetches instead of stalling startup.
   const fastCtrl = new AbortController();
   const slowCtrl = new AbortController();
-  // Desktop needs longer timeouts: fetch patch resolves port + token via IPC,
-  // then sidecar proxies to cloud. The extra hops easily exceed 3s.
-  const desktop = isDesktopRuntime();
-  const fastTimeout = setTimeout(() => fastCtrl.abort(), desktop ? 8_000 : 3_000);
-  const slowTimeout = setTimeout(() => slowCtrl.abort(), desktop ? 12_000 : 5_000);
+  const fastTimeout = setTimeout(() => fastCtrl.abort(), 1200);
+  const slowTimeout = setTimeout(() => slowCtrl.abort(), 1800);
   try {
     await Promise.all([
       fetchTier('slow', slowCtrl.signal),
