@@ -12,6 +12,15 @@ const rateLimitMap = new Map();
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 
+function jsonResponse(body, status, cors) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: cors
+      ? { 'Content-Type': 'application/json', ...cors }
+      : { 'Content-Type': 'application/json' },
+  });
+}
+
 function isRateLimited(ip) {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
@@ -178,10 +187,7 @@ async function sendConfirmationEmail(email, referralCode) {
 
 export default async function handler(req) {
   if (isDisallowedOrigin(req)) {
-    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Origin not allowed' }, 403);
   }
 
   const cors = getCorsHeaders(req, 'POST, OPTIONS');
@@ -191,36 +197,24 @@ export default async function handler(req) {
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Method not allowed' }, 405, cors);
   }
 
   const ip = getClientIp(req);
   if (isRateLimited(ip)) {
-    return new Response(JSON.stringify({ error: 'Too many requests' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Too many requests' }, 429, cors);
   }
 
   let body;
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Invalid JSON' }, 400, cors);
   }
 
   // Honeypot — bots auto-fill this hidden field; real users leave it empty
   if (body.website) {
-    return new Response(JSON.stringify({ status: 'registered' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ status: 'registered' }, 200, cors);
   }
 
   // Cloudflare Turnstile verification — skip for desktop app (no browser captcha available).
@@ -230,10 +224,7 @@ export default async function handler(req) {
   if (isDesktopSource) {
     const entry = rateLimitMap.get(ip);
     if (entry && entry.count > 2) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
-        status: 429,
-        headers: { 'Content-Type': 'application/json', ...cors },
-      });
+      return jsonResponse({ error: 'Rate limit exceeded' }, 429, cors);
     }
   } else {
     const turnstileOk = await verifyTurnstile({
@@ -242,19 +233,13 @@ export default async function handler(req) {
       logPrefix: '[register-interest]',
     });
     if (!turnstileOk) {
-      return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...cors },
-      });
+      return jsonResponse({ error: 'Bot verification failed' }, 403, cors);
     }
   }
 
   const { email, source, appVersion, referredBy } = body;
   if (!email || typeof email !== 'string' || email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) {
-    return new Response(JSON.stringify({ error: 'Invalid email address' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Invalid email address' }, 400, cors);
   }
 
   const safeSource = typeof source === 'string'
@@ -269,10 +254,7 @@ export default async function handler(req) {
 
   const convexUrl = process.env.CONVEX_URL;
   if (!convexUrl) {
-    return new Response(JSON.stringify({ error: 'Registration service unavailable' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Registration service unavailable' }, 503, cors);
   }
 
   try {
@@ -289,15 +271,9 @@ export default async function handler(req) {
       await sendConfirmationEmail(email, result.referralCode);
     }
 
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse(result, 200, cors);
   } catch (err) {
     console.error('[register-interest] Convex error:', err);
-    return new Response(JSON.stringify({ error: 'Registration failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...cors },
-    });
+    return jsonResponse({ error: 'Registration failed' }, 500, cors);
   }
 }
