@@ -71,6 +71,18 @@ const REGION_KEYWORDS = {
   'Northern Europe': ['eu'],
 };
 
+const TEXT_STOPWORDS = new Set([
+  'will', 'what', 'when', 'where', 'which', 'this', 'that', 'these', 'those',
+  'from', 'into', 'onto', 'over', 'under', 'after', 'before', 'through', 'across',
+  'about', 'against', 'near', 'amid', 'during', 'with', 'without', 'between',
+  'price', 'prices', 'impact', 'risk', 'forecast', 'future', 'major', 'minor',
+  'current', 'latest', 'over', 'path', 'case', 'signal', 'signals',
+  'would', 'could', 'should', 'might', 'their', 'there', 'than', 'them',
+  'market', 'markets', 'political', 'military', 'conflict', 'supply', 'chain',
+  'infrastructure', 'cyber', 'active', 'armed', 'instability', 'escalation',
+  'disruption', 'concentration',
+]);
+
 function getRedisCredentials() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -806,39 +818,107 @@ function tokenizeText(text) {
     .filter(token => token.length >= 3);
 }
 
+function uniqueLowerTerms(terms) {
+  return [...new Set((terms || [])
+    .map(term => (term || '').toLowerCase().trim())
+    .filter(Boolean))];
+}
+
+function countTermMatches(text, terms) {
+  const lower = (text || '').toLowerCase();
+  let hits = 0;
+  let score = 0;
+  for (const term of uniqueLowerTerms(terms)) {
+    if (term.length < 3) continue;
+    if (!lower.includes(term)) continue;
+    hits += 1;
+    score += term.length > 8 ? 4 : term.length > 5 ? 3 : 2;
+  }
+  return { hits, score };
+}
+
+function extractMeaningfulTokens(text, exclude = []) {
+  const excluded = new Set(uniqueLowerTerms(exclude)
+    .flatMap(term => term.split(/[^a-z0-9]+/g))
+    .filter(Boolean));
+  return [...new Set(tokenizeText(text).filter(token =>
+    token.length >= 4
+    && !TEXT_STOPWORDS.has(token)
+    && !excluded.has(token)
+  ))];
+}
+
+function buildExpectedRegionTags(regionTerms, region) {
+  return new Set([
+    ...uniqueLowerTerms(regionTerms).flatMap(term => tagRegions(term)),
+    ...(REGION_KEYWORDS[region] || []),
+  ]);
+}
+
 function getDomainTerms(domain) {
   return DOMAIN_HINTS[domain] || [];
 }
 
-function computeHeadlineRelevance(headline, terms, domain) {
+function computeHeadlineRelevance(headline, terms, domain, options = {}) {
   const lower = headline.toLowerCase();
-  let score = 0;
-  for (const term of terms) {
-    const normalized = term.toLowerCase();
-    if (!normalized || normalized.length < 3) continue;
-    if (lower.includes(normalized)) score += normalized.length > 5 ? 3 : 2;
-  }
+  const regionTerms = uniqueLowerTerms(terms);
+  const { hits: regionHits, score: regionScore } = countTermMatches(lower, regionTerms);
+  const expectedTags = options.expectedTags instanceof Set
+    ? options.expectedTags
+    : buildExpectedRegionTags(regionTerms, options.region);
+  const headlineTags = tagRegions(headline);
+  const tagOverlap = headlineTags.some(tag => expectedTags.has(tag));
+  const tagMismatch = headlineTags.length > 0 && expectedTags.size > 0 && !tagOverlap;
+  let score = regionScore + (tagOverlap ? 3 : 0) - (tagMismatch ? 4 : 0);
   for (const hint of getDomainTerms(domain)) {
     if (lower.includes(hint)) score += 1;
   }
-  return score;
+  const titleTokens = options.titleTokens || [];
+  for (const token of titleTokens) {
+    if (lower.includes(token)) score += 2;
+  }
+  if (options.requireRegion && regionHits === 0 && !tagOverlap) return 0;
+  if (options.requireSemantic) {
+    const domainHits = getDomainTerms(domain).filter(hint => lower.includes(hint)).length;
+    const titleHits = titleTokens.filter(token => lower.includes(token)).length;
+    if (domainHits === 0 && titleHits === 0) return 0;
+  }
+  return Math.max(0, score);
 }
 
-function computeMarketMatchScore(pred, marketTitle, regionTerms) {
+function computeMarketMatchScore(pred, marketTitle, regionTerms, options = {}) {
   const lower = marketTitle.toLowerCase();
-  let score = 0;
-  for (const term of regionTerms) {
-    const normalized = term.toLowerCase();
-    if (!normalized || normalized.length < 3) continue;
-    if (lower.includes(normalized)) score += normalized.length > 5 ? 3 : 2;
-  }
+  const { hits: regionHits, score: regionScore } = countTermMatches(lower, regionTerms);
+  const expectedTags = options.expectedTags instanceof Set
+    ? options.expectedTags
+    : buildExpectedRegionTags(regionTerms, pred.region);
+  const marketTags = tagRegions(marketTitle);
+  const tagOverlap = marketTags.some(tag => expectedTags.has(tag));
+  const tagMismatch = marketTags.length > 0 && expectedTags.size > 0 && !tagOverlap;
+  let score = regionScore + (tagOverlap ? 2 : 0) - (tagMismatch ? 5 : 0);
+  let domainHits = 0;
   for (const hint of getDomainTerms(pred.domain)) {
-    if (lower.includes(hint)) score += 1;
+    if (lower.includes(hint)) {
+      domainHits += 1;
+      score += 1;
+    }
   }
-  for (const token of tokenizeText(pred.title)) {
-    if (lower.includes(token)) score += 1;
+  let titleHits = 0;
+  const titleTokens = options.titleTokens || extractMeaningfulTokens(pred.title, regionTerms);
+  for (const token of titleTokens) {
+    if (lower.includes(token)) {
+      titleHits += 1;
+      score += 2;
+    }
   }
-  return score;
+  return {
+    score: Math.max(0, score),
+    regionHits,
+    domainHits,
+    titleHits,
+    tagOverlap,
+    tagMismatch,
+  };
 }
 
 function detectFromPredictionMarkets(inputs) {
@@ -1004,23 +1084,31 @@ function calibrateWithMarkets(predictions, markets) {
   for (const pred of predictions) {
     const keywords = REGION_KEYWORDS[pred.region] || [];
     const regionTerms = [...new Set([...getSearchTermsForRegion(pred.region), pred.region])];
+    const expectedTags = buildExpectedRegionTags(regionTerms, pred.region);
+    const titleTokens = extractMeaningfulTokens(pred.title, regionTerms);
     if (keywords.length === 0 && regionTerms.length === 0) continue;
     const candidates = markets.geopolitical
       .map(m => {
         const mRegions = tagRegions(m.title);
         const sameMacroRegion = keywords.length > 0 && mRegions.some(r => keywords.includes(r));
-        const score = computeMarketMatchScore(pred, m.title, regionTerms);
-        return { market: m, score, sameMacroRegion };
+        const match = computeMarketMatchScore(pred, m.title, regionTerms, { expectedTags, titleTokens });
+        return { market: m, sameMacroRegion, ...match };
       })
-      .filter(item => item.sameMacroRegion || item.score >= 3)
+      .filter(item => {
+        if (item.tagMismatch && item.regionHits === 0) return false;
+        const hasSpecificRegionSignal = item.regionHits > 0 || item.tagOverlap;
+        const hasSemanticOverlap = item.titleHits > 0 || item.domainHits > 0;
+        if (pred.domain === 'market') {
+          return hasSpecificRegionSignal && item.titleHits > 0 && (item.domainHits > 0 || item.score >= 7);
+        }
+        return hasSpecificRegionSignal && (hasSemanticOverlap || item.score >= 6);
+      })
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
         return (b.market.volume || 0) - (a.market.volume || 0);
       });
     const best = candidates[0];
-    const match = best && (best.score >= 4 || (best.sameMacroRegion && best.score >= 2))
-      ? best.market
-      : null;
+    const match = best?.market || null;
     if (match) {
       const marketProb = (match.yesPrice || 50) / 100;
       pred.calibration = {
@@ -1138,9 +1226,20 @@ function attachNewsContext(predictions, newsInsights, newsDigest) {
 
   for (const pred of predictions) {
     const searchTerms = getSearchTermsForRegion(pred.region);
+    const expectedTags = buildExpectedRegionTags(searchTerms, pred.region);
+    const titleTokens = extractMeaningfulTokens(pred.title, searchTerms);
     const matched = allHeadlines
-      .map(headline => ({ headline, score: computeHeadlineRelevance(headline, searchTerms, pred.domain) }))
-      .filter(item => item.score >= 2)
+      .map(headline => ({
+        headline,
+        score: computeHeadlineRelevance(headline, searchTerms, pred.domain, {
+          region: pred.region,
+          expectedTags,
+          titleTokens,
+          requireRegion: true,
+          requireSemantic: true,
+        }),
+      }))
+      .filter(item => item.score >= 4)
       .sort((a, b) => b.score - a.score || a.headline.length - b.headline.length)
       .map(item => item.headline);
 
@@ -1611,9 +1710,11 @@ async function appendHistorySnapshot(data, options = {}) {
   return snapshot;
 }
 
-function getTraceMaxForecasts() {
-  const parsed = Number(process.env.FORECAST_TRACE_MAX_FORECASTS || 12);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.min(50, Math.floor(parsed)) : 12;
+function getTraceMaxForecasts(totalForecasts = 0) {
+  const raw = process.env.FORECAST_TRACE_MAX_FORECASTS;
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0) return Math.min(200, Math.floor(parsed));
+  return totalForecasts > 0 ? totalForecasts : 50;
 }
 
 function applyTraceMeta(pred, patch) {
@@ -1663,7 +1764,7 @@ function buildForecastTraceRecord(pred, rank) {
 function buildForecastTraceArtifacts(data, context = {}, config = {}) {
   const generatedAt = data?.generatedAt || Date.now();
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
-  const maxForecasts = config.maxForecasts || getTraceMaxForecasts();
+  const maxForecasts = config.maxForecasts || getTraceMaxForecasts(predictions.length);
   const tracedPredictions = predictions.slice(0, maxForecasts).map((pred, index) => buildForecastTraceRecord(pred, index + 1));
   const prefix = buildTraceRunPrefix(
     context.runId || `run_${generatedAt}`,
