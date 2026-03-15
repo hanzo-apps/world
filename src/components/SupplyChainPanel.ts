@@ -20,6 +20,7 @@ export class SupplyChainPanel extends Panel {
   private expandedChokepoint: string | null = null;
   private transitChart = new TransitChart();
   private chartObserver: MutationObserver | null = null;
+  private chartMountTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super({ id: 'supply-chain', title: t('panels.supplyChain'), defaultRowSpan: 2, infoTooltip: t('components.supplyChain.infoTooltip') });
@@ -45,6 +46,7 @@ export class SupplyChainPanel extends Panel {
   }
 
   private clearTransitChart(): void {
+    if (this.chartMountTimer) { clearTimeout(this.chartMountTimer); this.chartMountTimer = null; }
     if (this.chartObserver) { this.chartObserver.disconnect(); this.chartObserver = null; }
     this.transitChart.destroy();
   }
@@ -107,17 +109,30 @@ export class SupplyChainPanel extends Panel {
     `);
 
     if (this.activeTab === 'chokepoints' && this.expandedChokepoint) {
-      this.chartObserver = new MutationObserver(() => {
-        this.chartObserver?.disconnect();
-        this.chartObserver = null;
+      const mountTransitChart = (): boolean => {
         const el = this.content.querySelector(`[data-chart-cp="${this.expandedChokepoint}"]`) as HTMLElement | null;
-        if (!el) return;
+        if (!el) return false;
         const cp = this.chokepointData?.chokepoints?.find(c => c.name === this.expandedChokepoint);
         if (cp?.transitSummary?.history?.length) {
           this.transitChart.mount(el, cp.transitSummary.history);
         }
+        return true;
+      };
+
+      this.chartObserver = new MutationObserver(() => {
+        if (!mountTransitChart()) return;
+        if (this.chartMountTimer) { clearTimeout(this.chartMountTimer); this.chartMountTimer = null; }
+        this.chartObserver?.disconnect();
+        this.chartObserver = null;
       });
       this.chartObserver.observe(this.content, { childList: true, subtree: true });
+
+      // Fallback for no-op renders where setContent short-circuits and no mutation fires.
+      this.chartMountTimer = setTimeout(() => {
+        if (!mountTransitChart()) return;
+        if (this.chartObserver) { this.chartObserver.disconnect(); this.chartObserver = null; }
+        this.chartMountTimer = null;
+      }, 220);
     }
   }
 
