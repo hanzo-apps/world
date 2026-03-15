@@ -4,7 +4,7 @@ description: "Monitor the world's critical shipping corridors, freight indices, 
 metaTitle: "Real-Time Trade Route & Chokepoint Monitoring | Freight Index Dashboard | World Monitor"
 keywords: "chokepoint monitoring, Strait of Hormuz shipping, freight index dashboard, BDI Baltic Dry Index, SCFI container rates, supply chain disruption tracker, trade route intelligence"
 audience: "Supply chain professionals, commodity traders, logistics analysts, maritime intelligence, geopolitical risk analysts"
-heroImage: "/images/blog/hormuz-chokepoint-crisis.png"
+heroImage: "/blog/images/blog/hormuz-chokepoint-crisis.png"
 pubDate: "2026-03-15"
 ---
 
@@ -23,8 +23,6 @@ World Monitor's Supply Chain panel shows this in one view:
 - **99% disruption rate** across the corridor
 - **Transit history chart** showing the cliff-edge collapse in late February
 - **AI-generated shipping advisory**: reroute via Suez Canal (adds 8-10 days, $150,000-$220,000 per transit), avoid Dubai anchorage, suspend Iran/Iraq crude exports until confrontations cease
-
-![Strait of Hormuz chokepoint data showing 94.4% traffic collapse](/images/blog/hormuz-chokepoint-crisis.png)
 
 The chart tells the story: tanker and cargo traffic that had been steady at 40-70 vessels daily suddenly dropped to near zero. This is not a gradual decline. It is a sudden shutdown of one of the world's most important trade arteries.
 
