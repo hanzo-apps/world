@@ -118,7 +118,7 @@ Sentry.init({
     /isReCreate is not defined/,
     /reading 'style'.*HTMLImageElement/,
     /can't access property "write", \w+ is undefined/,
-    /AbortError: The user aborted a request/,
+    /(?:AbortError: )?The user aborted a request/,
     /\w+ is not a function.*\/uv\/service\//,
     /__isInQueue__/,
     /^(?:LIDNotify(?:Id)?|onWebViewAppeared|onGetWiFiBSSID) is not defined$/,
@@ -171,7 +171,7 @@ Sentry.init({
     /Failed to construct 'Worker'.*cannot be accessed from origin/,
     /undefined is not an object \(evaluating '(?:this\.)?media(?:Controller)?\.(?:duration|videoTracks|readyState|audioTracks|media)/,
     /\$ is not defined/,
-    /Qt\(\) is not a function/,
+    /Qt\([^)]*\) is not a function/,
     /out of memory/,
     /Could not connect to the server/,
     /shaderSource must be an instance of WebGLShader/,
@@ -233,6 +233,10 @@ Sentry.init({
     /Failed reading data from the file system/,
     /^UnavailableError(:.*)?$/,
     /null is not an object \(evaluating '\w{1,3}\.indexOf'\)/,
+    /export declarations may only appear at top level/,
+    /^SyntaxError: Unexpected keyword/,
+    /ucConfig is not defined/,
+    /getShaderPrecisionFormat/,
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
