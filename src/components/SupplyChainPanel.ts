@@ -258,7 +258,6 @@ export class SupplyChainPanel extends Panel {
   private renderFredIndices(): string {
     if (isDesktopRuntime() && !isFeatureAvailable('supplyChain')) return '';
     if (!this.shippingData?.indices?.length) return '';
-
     const container = new Set(['SCFI', 'CCFI']);
     const bulk = new Set(['BDI', 'BCI', 'BPI', 'BSI', 'BHSI']);
 
