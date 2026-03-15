@@ -128,6 +128,7 @@ export default [
   "it.euronews.com",
   "pt.euronews.com",
   "ru.euronews.com",
+  "gr.euronews.com",
   "www.lemonde.fr",
   "rss.dw.com",
   "www.bild.de",
