@@ -194,7 +194,8 @@ function dataSize(parsed) {
 export default async function handler(req) {
   const headers = {
     'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache, no-store',
+    'Cache-Control': 'private, no-store, max-age=0',
+    'CDN-Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
   };
 
