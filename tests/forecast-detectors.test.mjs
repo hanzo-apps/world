@@ -48,6 +48,7 @@ import {
   scoreForecastReadiness,
   computeAnalysisPriority,
   rankForecastsForAnalysis,
+  filterPublishedForecasts,
   buildFallbackScenario,
   buildFallbackBaseCase,
   buildFallbackEscalatoryCase,
@@ -799,6 +800,16 @@ describe('forecast evaluation and ranking', () => {
     const ranked = [thin, rich];
     rankForecastsForAnalysis(ranked);
     assert.equal(ranked[0].title, rich.title);
+  });
+
+  it('filters non-positive forecasts before publish while keeping positive probabilities', () => {
+    const dropped = makePrediction('market', 'Red Sea', 'Shipping/Oil price impact from Suez Canal disruption', 0, 0.58, '30d', []);
+    const kept = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.12, 0.58, '7d', []);
+    const ranked = [dropped, kept];
+
+    const published = filterPublishedForecasts(ranked);
+    assert.equal(published.length, 1);
+    assert.equal(published[0].id, kept.id);
   });
 });
 
