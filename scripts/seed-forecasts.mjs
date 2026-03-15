@@ -20,6 +20,7 @@ const TRACE_LATEST_KEY = 'forecast:trace:latest:v1';
 const TRACE_RUNS_KEY = 'forecast:trace:runs:v1';
 const TRACE_RUNS_MAX = 50;
 const TRACE_REDIS_TTL_SECONDS = 60 * 24 * 60 * 60;
+const PUBLISH_MIN_PROBABILITY = 0;
 
 const THEATER_IDS = [
   'iran-theater', 'taiwan-theater', 'baltic-theater',
@@ -2024,6 +2025,10 @@ function rankForecastsForAnalysis(predictions) {
   });
 }
 
+function filterPublishedForecasts(predictions, minProbability = PUBLISH_MIN_PROBABILITY) {
+  return predictions.filter(pred => (pred?.probability || 0) > minProbability);
+}
+
 // ── Phase 2: LLM Scenario Enrichment ───────────────────────
 const FORECAST_LLM_PROVIDERS = [
   { name: 'groq', envKey: 'GROQ_API_KEY', apiUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.1-8b-instant', timeout: 20_000 },
@@ -2571,7 +2576,12 @@ async function fetchForecasts() {
   await enrichScenariosWithLLM(predictions);
   populateFallbackNarratives(predictions);
 
-  return { predictions, generatedAt: Date.now() };
+  const publishedPredictions = filterPublishedForecasts(predictions);
+  if (publishedPredictions.length !== predictions.length) {
+    console.log(`  Filtered ${predictions.length - publishedPredictions.length} forecasts at publish floor > ${PUBLISH_MIN_PROBABILITY}`);
+  }
+
+  return { predictions: publishedPredictions, generatedAt: Date.now() };
 }
 
 if (_isDirectRun) {
@@ -2668,6 +2678,7 @@ export {
   scoreForecastReadiness,
   computeAnalysisPriority,
   rankForecastsForAnalysis,
+  filterPublishedForecasts,
   buildFallbackScenario,
   buildFallbackBaseCase,
   buildFallbackEscalatoryCase,
