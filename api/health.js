@@ -135,6 +135,7 @@ const ON_DEMAND_KEYS = new Set([
   'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
   'cyberThreatsRpc', 'militaryBases', 'temporalAnomalies', 'displacement',
   'corridorrisk', // intermediate key; data flows through transit-summaries:v1
+  'riskScores', 'serviceStatuses', // RPC-populated; no seed-meta after PR #1649 removed it from cachedFetchJson
 ]);
 
 // Keys where 0 records is a valid healthy state (e.g. no airports closed).
