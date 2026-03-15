@@ -11,9 +11,8 @@
 
 import { loadEnvFile, CHROME_UA, runSeed, writeExtraKey } from './_seed-utils.mjs';
 import https from 'node:https';
-import http from 'node:http';
-import tls from 'node:tls';
 import zlib from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 
 loadEnvFile(import.meta.url);
 
@@ -25,55 +24,15 @@ const USNI_URL = 'https://news.usni.org/wp-json/wp/v2/posts?categories=4137&per_
 
 // ─── Proxy fetch ───
 
-function parseProxy(auth) {
-  if (!auth) return null;
-  const atIdx = auth.lastIndexOf('@');
-  if (atIdx === -1) return null;
-  const userPass = auth.substring(0, atIdx);
-  const hostPort = auth.substring(atIdx + 1);
-  const [host, portStr] = hostPort.split(':');
-  return { host, port: parseInt(portStr || '80', 10), auth: userPass };
-}
-
-function fetchViaProxy(url, proxy) {
-  return new Promise((resolve, reject) => {
-    const target = new URL(url);
-    const connectReq = http.request({
-      host: proxy.host, port: proxy.port, method: 'CONNECT',
-      path: `${target.hostname}:443`,
-      headers: {
-        'Proxy-Authorization': 'Basic ' + Buffer.from(proxy.auth).toString('base64'),
-        Host: `${target.hostname}:443`,
-      },
-    });
-
-    connectReq.on('connect', (_res, socket) => {
-      const tlsSocket = tls.connect({ host: target.hostname, socket, servername: target.hostname }, () => {
-        const req = https.request({
-          hostname: target.hostname, path: target.pathname + target.search, method: 'GET',
-          socket: tlsSocket, agent: false,
-          headers: { 'User-Agent': CHROME_UA, Accept: 'application/json', 'Accept-Encoding': 'gzip' },
-        }, (resp) => {
-          const chunks = [];
-          const stream = resp.headers['content-encoding'] === 'gzip' ? resp.pipe(zlib.createGunzip()) : resp;
-          stream.on('data', (c) => chunks.push(c));
-          stream.on('end', () => {
-            try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-            catch (e) { reject(new Error(`JSON parse failed: ${e.message}`)); }
-          });
-          stream.on('error', reject);
-        });
-        req.on('error', reject);
-        req.setTimeout(15000, () => { req.destroy(); reject(new Error('Proxy request timeout')); });
-        req.end();
-      });
-      tlsSocket.on('error', reject);
-    });
-
-    connectReq.on('error', reject);
-    connectReq.setTimeout(10000, () => { connectReq.destroy(); reject(new Error('CONNECT timeout')); });
-    connectReq.end();
-  });
+// Use curl for proxy — Node.js TLS fingerprint (JA3) gets blocked,
+// but curl's fingerprint passes. Same pattern as relay's orefCurlFetch.
+function fetchViaCurl(url, proxyAuth) {
+  const args = ['-sS', '--compressed', '--max-time', '15',
+    '-H', 'Accept: application/json', '-H', `User-Agent: ${CHROME_UA}`];
+  if (proxyAuth) args.push('-x', `http://${proxyAuth}`);
+  args.push(url);
+  const result = execFileSync('curl', args, { encoding: 'utf8', timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'] });
+  return JSON.parse(result);
 }
 
 function fetchDirect(url) {
@@ -272,16 +231,29 @@ function parseArticle(html, articleUrl, articleDate, articleTitle) {
 // ─── Main ───
 
 async function fetchAll() {
-  const proxyAuth = process.env.OREF_PROXY_AUTH || '';
-  const proxy = parseProxy(proxyAuth);
-
+  // Try curl direct first (curl's TLS fingerprint often passes Cloudflare where Node.js fails).
+  // Fall back to curl+proxy, then Node.js direct as last resort.
   let wpData;
-  if (proxy) {
-    console.log(`  Using proxy: ${proxy.host}:${proxy.port}`);
-    wpData = await fetchViaProxy(USNI_URL, proxy);
-  } else {
-    console.log('  No proxy configured, trying direct');
-    wpData = await fetchDirect(USNI_URL);
+  try {
+    console.log('  Trying curl direct...');
+    wpData = fetchViaCurl(USNI_URL, null);
+  } catch (e) {
+    console.warn(`  curl direct failed: ${e.message}`);
+    const proxyAuth = process.env.RESIDENTIAL_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
+    if (proxyAuth) {
+      try {
+        const host = proxyAuth.substring(proxyAuth.lastIndexOf('@') + 1);
+        console.log(`  Trying curl via proxy: ${host}`);
+        wpData = fetchViaCurl(USNI_URL, proxyAuth);
+      } catch (e2) {
+        console.warn(`  curl+proxy failed: ${e2.message}`);
+        console.log('  Trying Node.js direct...');
+        wpData = await fetchDirect(USNI_URL);
+      }
+    } else {
+      console.log('  Trying Node.js direct...');
+      wpData = await fetchDirect(USNI_URL);
+    }
   }
 
   if (!Array.isArray(wpData) || !wpData.length) throw new Error('No fleet tracker articles');
