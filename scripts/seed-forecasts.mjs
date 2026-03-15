@@ -2420,14 +2420,16 @@ if (_isDirectRun) {
       }
 
       try {
+        console.log('  [Trace] Starting R2 export...');
         const pointer = await writeForecastTraceArtifacts(data, { runId: meta?.runId || `${Date.now()}` });
         if (pointer) {
-          console.log(`  Trace artifacts written: ${pointer.summaryKey}`);
+          console.log(`  [Trace] Written: ${pointer.summaryKey} (${pointer.tracedForecastCount} forecasts)`);
         } else {
-          console.log('  Trace artifacts skipped: Cloudflare R2 trace storage not configured');
+          console.log('  [Trace] Skipped: R2 storage not configured');
         }
       } catch (err) {
         console.warn(`  [Trace] Export failed: ${err.message}`);
+        if (err.stack) console.warn(`  [Trace] Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
       }
     },
     extraKeys: [
