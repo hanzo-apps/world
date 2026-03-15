@@ -547,6 +547,62 @@ describe('detectMilitaryScenarios', () => {
     assert.equal(result[0].domain, 'military');
     assert.equal(result[0].region, 'Northern Europe');
   });
+
+  it('creates a military forecast from theater surge data even before posture turns elevated', () => {
+    const inputs = {
+      theaterPosture: { theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }] },
+      temporalAnomalies: { anomalies: [] },
+      militarySurges: {
+        fetchedAt: Date.now(),
+        surges: [{
+          theaterId: 'taiwan-theater',
+          surgeType: 'fighter',
+          currentCount: 8,
+          baselineCount: 2,
+          surgeMultiple: 4,
+          postureLevel: 'normal',
+          strikeCapable: true,
+          fighters: 8,
+          tankers: 1,
+          awacs: 1,
+          dominantCountry: 'China',
+          dominantCountryCount: 6,
+        }],
+      },
+    };
+    const result = detectMilitaryScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].title, 'Military air surge: Taiwan Strait');
+    assert.ok(result[0].probability >= 0.7);
+    assert.ok(result[0].signals.some((signal) => signal.type === 'mil_surge'));
+    assert.ok(result[0].signals.some((signal) => signal.type === 'operator'));
+  });
+
+  it('ignores stale military surge payloads', () => {
+    const inputs = {
+      theaterPosture: { theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }] },
+      temporalAnomalies: { anomalies: [] },
+      militarySurges: {
+        fetchedAt: Date.now() - (4 * 60 * 60 * 1000),
+        surges: [{
+          theaterId: 'taiwan-theater',
+          surgeType: 'fighter',
+          currentCount: 8,
+          baselineCount: 2,
+          surgeMultiple: 4,
+          postureLevel: 'normal',
+          strikeCapable: true,
+          fighters: 8,
+          tankers: 1,
+          awacs: 1,
+          dominantCountry: 'China',
+          dominantCountryCount: 6,
+        }],
+      },
+    };
+    const result = detectMilitaryScenarios(inputs);
+    assert.equal(result.length, 0);
+  });
 });
 
 // ── Phase 2 Tests ──────────────────────────────────────────

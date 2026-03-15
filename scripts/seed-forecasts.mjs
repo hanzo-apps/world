@@ -21,6 +21,7 @@ const TRACE_RUNS_KEY = 'forecast:trace:runs:v1';
 const TRACE_RUNS_MAX = 50;
 const TRACE_REDIS_TTL_SECONDS = 60 * 24 * 60 * 60;
 const PUBLISH_MIN_PROBABILITY = 0;
+const MAX_MILITARY_SURGE_AGE_MS = 3 * 60 * 60 * 1000;
 
 const THEATER_IDS = [
   'iran-theater', 'taiwan-theater', 'baltic-theater',
@@ -38,6 +39,18 @@ const THEATER_REGIONS = {
   'east-med-theater': 'Eastern Mediterranean',
   'israel-gaza-theater': 'Israel/Gaza',
   'yemen-redsea-theater': 'Red Sea',
+};
+
+const THEATER_LABELS = {
+  'iran-theater': 'Iran Theater',
+  'taiwan-theater': 'Taiwan Strait',
+  'baltic-theater': 'Baltic Theater',
+  'blacksea-theater': 'Black Sea',
+  'korea-theater': 'Korean Peninsula',
+  'south-china-sea': 'South China Sea',
+  'east-med-theater': 'Eastern Mediterranean',
+  'israel-gaza-theater': 'Israel/Gaza',
+  'yemen-redsea-theater': 'Yemen/Red Sea',
 };
 
 const CHOKEPOINT_COMMODITIES = {
@@ -157,6 +170,7 @@ async function readInputKeys() {
     'risk:scores:sebuf:stale:v1',
     'temporal:anomalies:v1',
     'theater-posture:sebuf:stale:v1',
+    'military:surges:stale:v1',
     'prediction:markets-bootstrap:v1',
     'supply_chain:chokepoints:v4',
     'conflict:iran-events:v1',
@@ -186,16 +200,17 @@ async function readInputKeys() {
     ciiScores: parse(0),
     temporalAnomalies: parse(1),
     theaterPosture: parse(2),
-    predictionMarkets: parse(3),
-    chokepoints: normalizeChokepoints(parse(4)),
-    iranEvents: parse(5),
-    ucdpEvents: parse(6),
-    unrestEvents: parse(7),
-    outages: parse(8),
-    cyberThreats: parse(9),
-    gpsJamming: normalizeGpsJamming(parse(10)),
-    newsInsights: parse(11),
-    newsDigest: parse(12),
+    militarySurges: parse(3),
+    predictionMarkets: parse(4),
+    chokepoints: normalizeChokepoints(parse(5)),
+    iranEvents: parse(6),
+    ucdpEvents: parse(7),
+    unrestEvents: parse(8),
+    outages: parse(9),
+    cyberThreats: parse(10),
+    gpsJamming: normalizeGpsJamming(parse(11)),
+    newsInsights: parse(12),
+    newsDigest: parse(13),
   };
 }
 
@@ -544,22 +559,49 @@ function detectMilitaryScenarios(inputs) {
   const predictions = [];
   const theaters = inputs.theaterPosture?.theaters || [];
   const anomalies = Array.isArray(inputs.temporalAnomalies) ? inputs.temporalAnomalies : inputs.temporalAnomalies?.anomalies || [];
+  const surgeFetchedAt = Number(inputs.militarySurges?.fetchedAt || 0);
+  const surgeIsFresh = surgeFetchedAt > 0 && (Date.now() - surgeFetchedAt) <= MAX_MILITARY_SURGE_AGE_MS;
+  const surgeItems = surgeIsFresh
+    ? (Array.isArray(inputs.militarySurges) ? inputs.militarySurges : inputs.militarySurges?.surges || [])
+    : [];
+  const theatersById = new Map(theaters.map((theater) => [(theater?.id || theater?.theater), theater]).filter(([theaterId]) => !!theaterId));
+  const surgesByTheater = new Map();
 
-  for (const t of theaters) {
-    const theaterId = t?.id || t?.theater;
+  for (const surge of surgeItems) {
+    if (!surge?.theaterId) continue;
+    const list = surgesByTheater.get(surge.theaterId) || [];
+    list.push(surge);
+    surgesByTheater.set(surge.theaterId, list);
+  }
+
+  const theaterIds = new Set([
+    ...Array.from(theatersById.keys()),
+    ...Array.from(surgesByTheater.keys()),
+  ]);
+
+  for (const theaterId of theaterIds) {
+    const t = theatersById.get(theaterId);
+    const theaterSurges = surgesByTheater.get(theaterId) || [];
     if (!theaterId) continue;
-    const posture = t.postureLevel || t.posture || '';
-    if (posture !== 'elevated' && posture !== 'critical') continue;
+    const posture = t?.postureLevel || t?.posture || '';
+    const highestSurge = theaterSurges
+      .slice()
+      .sort((a, b) => (b.surgeMultiple || 0) - (a.surgeMultiple || 0))[0];
+    if (posture !== 'elevated' && posture !== 'critical' && !highestSurge) continue;
 
-    const region = THEATER_REGIONS[theaterId] || t.name || theaterId;
-    const signals = [
-      { type: 'theater', value: `${t.name || theaterId} posture: ${posture}`, weight: 0.5 },
-    ];
-    let sourceCount = 1;
+    const region = THEATER_REGIONS[theaterId] || t?.name || theaterId;
+    const theaterLabel = THEATER_LABELS[theaterId] || t?.name || theaterId;
+    const signals = [];
+    let sourceCount = 0;
+
+    if (posture === 'elevated' || posture === 'critical') {
+      signals.push({ type: 'theater', value: `${theaterLabel} posture: ${posture}`, weight: 0.45 });
+      sourceCount++;
+    }
 
     const milFlights = anomalies.filter(a =>
       (a.type === 'military_flights' || a.type === 'military') &&
-      (a.region || a.theater || '').toLowerCase().includes(region.toLowerCase()),
+      [region, theaterLabel, theaterId].some((part) => part && (a.region || a.theater || '').toLowerCase().includes(part.toLowerCase())),
     );
     if (milFlights.length > 0) {
       const maxZ = Math.max(...milFlights.map(a => a.zScore || a.z_score || 0));
@@ -567,7 +609,32 @@ function detectMilitaryScenarios(inputs) {
       sourceCount++;
     }
 
-    if (t.indicators && Array.isArray(t.indicators)) {
+    if (highestSurge) {
+      signals.push({
+        type: 'mil_surge',
+        value: `${highestSurge.surgeType} surge in ${theaterLabel}: ${highestSurge.currentCount} vs ${highestSurge.baselineCount} baseline (${highestSurge.surgeMultiple}x)`,
+        weight: 0.4,
+      });
+      sourceCount++;
+      if (highestSurge.dominantCountry) {
+        signals.push({
+          type: 'operator',
+          value: `${highestSurge.dominantCountry} accounts for ${highestSurge.dominantCountryCount} flights in ${theaterLabel}`,
+          weight: 0.2,
+        });
+        sourceCount++;
+      }
+      if (highestSurge.awacs > 0 || highestSurge.tankers > 0) {
+        signals.push({
+          type: 'support_aircraft',
+          value: `${highestSurge.tankers} tankers and ${highestSurge.awacs} AWACS active in ${theaterLabel}`,
+          weight: 0.15,
+        });
+        sourceCount++;
+      }
+    }
+
+    if (t?.indicators && Array.isArray(t.indicators)) {
       const activeIndicators = t.indicators.filter(i => i.active || i.triggered);
       if (activeIndicators.length > 0) {
         signals.push({ type: 'indicators', value: `${activeIndicators.length} active posture indicators`, weight: 0.2 });
@@ -575,14 +642,22 @@ function detectMilitaryScenarios(inputs) {
       }
     }
 
-    const baseLine = posture === 'critical' ? 0.6 : 0.35;
+    const baseLine = highestSurge
+      ? Math.min(0.7, 0.35 + Math.max(0, ((highestSurge.surgeMultiple || 1) - 1) * 0.12))
+      : posture === 'critical' ? 0.6 : 0.35;
     const flightBoost = milFlights.length > 0 ? 0.1 : 0;
-    const prob = Math.min(0.85, baseLine + flightBoost);
+    const postureBoost = posture === 'critical' ? 0.12 : posture === 'elevated' ? 0.06 : 0;
+    const supportBoost = highestSurge && (highestSurge.awacs > 0 || highestSurge.tankers > 0) ? 0.05 : 0;
+    const strikeBoost = (t?.activeOperations?.includes?.('strike_capable') || highestSurge?.strikeCapable) ? 0.06 : 0;
+    const prob = Math.min(0.9, baseLine + flightBoost + postureBoost + supportBoost + strikeBoost);
     const confidence = Math.max(0.3, normalize(sourceCount, 0, 4));
+    const title = highestSurge
+      ? `Military air surge: ${theaterLabel}`
+      : `Military posture escalation: ${region}`;
 
     predictions.push(makePrediction(
       'military', region,
-      `Military posture escalation: ${region}`,
+      title,
       prob, confidence, '7d', signals,
     ));
   }
