@@ -99,7 +99,7 @@ const SEED_META = {
   minerals:         { key: 'seed-meta:supply_chain:minerals',     maxStaleMin: 10080 },
   giving:           { key: 'seed-meta:giving:summary',            maxStaleMin: 10080 },
   gpsjam:           { key: 'seed-meta:intelligence:gpsjam',       maxStaleMin: 720 },
-  cableHealth:      { key: 'seed-meta:cable-health',              maxStaleMin: 60 },
+  // cableHealth: removed — RPC-populated, no seed-meta after PR #1649
   positiveGeoEvents:{ key: 'seed-meta:positive-events:geo',       maxStaleMin: 60 },
   // riskScores: removed — RPC-populated, no seed-meta after PR #1649
   iranEvents:       { key: 'seed-meta:conflict:iran-events',      maxStaleMin: 10080 },
