@@ -1717,6 +1717,14 @@ function getTraceMaxForecasts(totalForecasts = 0) {
   return totalForecasts > 0 ? totalForecasts : 50;
 }
 
+function getTraceCapLog(totalForecasts = 0) {
+  return {
+    raw: process.env.FORECAST_TRACE_MAX_FORECASTS || null,
+    resolved: getTraceMaxForecasts(totalForecasts),
+    totalForecasts,
+  };
+}
+
 function applyTraceMeta(pred, patch) {
   pred.traceMeta = {
     ...(pred.traceMeta || {}),
@@ -1838,10 +1846,13 @@ async function writeForecastTracePointer(pointer) {
 async function writeForecastTraceArtifacts(data, context = {}) {
   const storageConfig = resolveR2StorageConfig();
   if (!storageConfig) return null;
+  const predictionCount = Array.isArray(data?.predictions) ? data.predictions.length : 0;
+  const traceCap = getTraceCapLog(predictionCount);
+  console.log(`  Trace cap: raw=${traceCap.raw ?? 'default'} resolved=${traceCap.resolved} total=${traceCap.totalForecasts}`);
 
   const artifacts = buildForecastTraceArtifacts(data, context, {
     basePrefix: storageConfig.basePrefix,
-    maxForecasts: getTraceMaxForecasts(),
+    maxForecasts: getTraceMaxForecasts(predictionCount),
   });
 
   await putR2JsonObject(storageConfig, artifacts.manifestKey, artifacts.manifest, {
@@ -2539,6 +2550,10 @@ async function fetchForecasts() {
   ];
 
   console.log(`  Generated ${predictions.length} predictions`);
+  {
+    const traceCap = getTraceCapLog(predictions.length);
+    console.log(`  Forecast trace config: raw=${traceCap.raw ?? 'default'} resolved=${traceCap.resolved} total=${traceCap.totalForecasts}`);
+  }
 
   attachNewsContext(predictions, inputs.newsInsights, inputs.newsDigest);
   calibrateWithMarkets(predictions, inputs.predictionMarkets);
