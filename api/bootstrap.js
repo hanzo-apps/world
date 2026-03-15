@@ -52,7 +52,7 @@ const BOOTSTRAP_CACHE_KEYS = {
 
 const SLOW_KEYS = new Set([
   'bisPolicy', 'bisExchange', 'bisCredit', 'minerals', 'giving',
-  'sectors', 'etfFlows', 'shippingRates', 'wildfires', 'climateAnomalies',
+  'sectors', 'etfFlows', 'wildfires', 'climateAnomalies',
   'cyberThreats', 'techReadiness', 'progressData', 'renewableEnergy',
   'naturalEvents',
   'cryptoQuotes', 'gulfQuotes', 'stablecoinMarkets', 'unrestEvents', 'ucdpEvents',
@@ -64,7 +64,7 @@ const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints', 'chokepointTransits',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
   'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending', 'theaterPosture', 'gdeltIntel',
-  'correlationCards', 'forecasts',
+  'correlationCards', 'forecasts', 'shippingRates',
 ]);
 
 const TIER_CACHE = {
