@@ -9,8 +9,6 @@ import { hashString, sha256Hex } from '../../../_shared/hash';
 // ========================================================================
 
 export const UPSTREAM_TIMEOUT_MS = 25_000;
-export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-export const GROQ_MODEL = 'llama-3.1-8b-instant';
 const CLASSIFY_CACHE_PREFIX = 'classify:sebuf:v1:';
 
 // ========================================================================

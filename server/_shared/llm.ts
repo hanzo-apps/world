@@ -64,12 +64,27 @@ export function getProviderCredentials(provider: string): ProviderCredentials | 
     if (!apiKey) return null;
     return {
       apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-      model: 'openrouter/free',
+      model: 'google/gemini-2.5-flash',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://worldmonitor.app',
         'X-Title': 'World Monitor',
+      },
+    };
+  }
+
+  // Generic OpenAI-compatible endpoint via LLM_API_URL/LLM_API_KEY/LLM_MODEL
+  if (provider === 'generic') {
+    const apiUrl = process.env.LLM_API_URL;
+    const apiKey = process.env.LLM_API_KEY;
+    if (!apiUrl || !apiKey) return null;
+    return {
+      apiUrl,
+      model: process.env.LLM_MODEL || 'gpt-3.5-turbo',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
     };
   }
@@ -97,7 +112,7 @@ export function stripThinkingTags(text: string): string {
   return s;
 }
 
-const PROVIDER_CHAIN = ['ollama', 'groq', 'openrouter'] as const;
+const PROVIDER_CHAIN = ['ollama', 'groq', 'openrouter', 'generic'] as const;
 
 export interface LlmCallOptions {
   messages: Array<{ role: string; content: string }>;
