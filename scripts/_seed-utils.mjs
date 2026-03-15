@@ -335,12 +335,21 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     const durationMs = Date.now() - startMs;
     logSeedResult(domain, recordCount, durationMs, { payloadBytes });
 
-    // Verify
-    const verified = await verifySeedKey(canonicalKey);
+    // Verify (best-effort: write already succeeded, don't fail the job on transient read issues)
+    let verified = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        verified = !!(await verifySeedKey(canonicalKey));
+        if (verified) break;
+        if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+      } catch {
+        if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+      }
+    }
     if (verified) {
       console.log(`  Verified: data present in Redis`);
     } else {
-      console.warn('  WARNING: verification read returned null');
+      console.warn(`  WARNING: verification read returned null for ${canonicalKey} (write succeeded, may be transient)`);
     }
 
     console.log(`\n=== Done (${Math.round(durationMs)}ms) ===`);

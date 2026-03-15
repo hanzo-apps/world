@@ -2561,7 +2561,42 @@ function classifyCacheKey(title) {
   return `classify:sebuf:v1:${hash}`;
 }
 
-function classifyFetchLlm(titles, apiKey, apiUrl, model) {
+// LLM provider fallback chain — mirrors seed-insights.mjs LLM_PROVIDERS
+// Order: ollama → groq → openrouter (canonical chain, mirrors server/_shared/llm.ts)
+const CLASSIFY_LLM_PROVIDERS = [
+  {
+    name: 'ollama',
+    envKey: 'OLLAMA_API_URL',
+    apiUrlFn: (baseUrl) => new URL('/v1/chat/completions', baseUrl).toString(),
+    model: () => process.env.OLLAMA_MODEL || 'llama3.1:8b',
+    headers: (_key) => {
+      const h = { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA };
+      const apiKey = process.env.OLLAMA_API_KEY;
+      if (apiKey) h.Authorization = `Bearer ${apiKey}`;
+      return h;
+    },
+    extraBody: { think: false },
+    timeout: 30000,
+  },
+  {
+    name: 'groq',
+    envKey: 'GROQ_API_KEY',
+    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.1-8b-instant',
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
+    timeout: 30000,
+  },
+  {
+    name: 'openrouter',
+    envKey: 'OPENROUTER_API_KEY',
+    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'google/gemini-2.5-flash',
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': CHROME_UA }),
+    timeout: 30000,
+  },
+];
+
+function classifyFetchLlmSingle(titles, apiKey, apiUrl, model, headers, extraBody, timeout) {
   return new Promise((resolve) => {
     const sanitized = titles.map((t) => t.replace(/[\n\r]/g, ' ').replace(/\|/g, '/').slice(0, 200).trim());
     const prompt = sanitized.map((t, i) => `${i}|${t}`).join('\n');
@@ -2573,19 +2608,15 @@ function classifyFetchLlm(titles, apiKey, apiUrl, model) {
       ],
       temperature: 0,
       max_tokens: titles.length * 40,
+      ...extraBody,
     });
 
     const parsed = new URL(apiUrl);
     const transport = parsed.protocol === 'http:' ? http : https;
     const req = transport.request(parsed, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': CHROME_UA,
-        'Content-Length': Buffer.byteLength(bodyStr),
-      },
-      timeout: 30000,
+      headers: { ...headers, 'Content-Length': Buffer.byteLength(bodyStr) },
+      timeout,
     }, (resp) => {
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         resp.resume();
@@ -2610,9 +2641,27 @@ function classifyFetchLlm(titles, apiKey, apiUrl, model) {
   });
 }
 
+async function classifyFetchLlm(titles) {
+  for (const provider of CLASSIFY_LLM_PROVIDERS) {
+    const envVal = process.env[provider.envKey];
+    if (!envVal) continue;
+
+    const apiUrl = provider.apiUrlFn ? provider.apiUrlFn(envVal) : provider.apiUrl;
+    const model = typeof provider.model === 'function' ? provider.model() : provider.model;
+    const headers = provider.headers(envVal);
+
+    const result = await classifyFetchLlmSingle(titles, envVal, apiUrl, model, headers, provider.extraBody || {}, provider.timeout);
+    if (result) {
+      return result;
+    }
+    console.warn(`[Classify] ${provider.name} failed, trying next provider...`);
+  }
+  return null;
+}
+
 let classifyInFlight = false;
 
-async function seedClassifyForVariant(variant, apiKey, apiUrl, model) {
+async function seedClassifyForVariant(variant) {
   const digestUrl = `https://api.worldmonitor.app/api/news/v1/list-feed-digest?variant=${variant}&lang=en`;
   let digest;
   try {
@@ -2661,7 +2710,7 @@ async function seedClassifyForVariant(variant, apiKey, apiUrl, model) {
 
   for (let b = 0; b < misses.length; b += CLASSIFY_BATCH_SIZE) {
     const chunk = misses.slice(b, b + CLASSIFY_BATCH_SIZE);
-    const llmResult = await classifyFetchLlm(chunk, apiKey, apiUrl, model);
+    const llmResult = await classifyFetchLlm(chunk);
 
     if (!Array.isArray(llmResult)) {
       for (const title of chunk) {
@@ -2700,16 +2749,9 @@ async function seedClassify() {
   classifyInFlight = true;
   const t0 = Date.now();
   try {
-    const apiKey = process.env.LLM_API_KEY || process.env.GROQ_API_KEY;
-    const apiUrl = process.env.LLM_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
-    const model = process.env.LLM_MODEL || 'llama-3.1-8b-instant';
-    if (!apiKey) {
-      console.log('[Classify] Skipped — no LLM_API_KEY or GROQ_API_KEY');
-      return;
-    }
-    const isProd = process.env.RAILWAY_ENVIRONMENT === 'production';
-    if (isProd && !apiUrl.startsWith('https://') && !apiUrl.startsWith('http://localhost')) {
-      console.warn('[Classify] LLM_API_URL must be HTTPS in production — skipping');
+    const hasAnyProvider = CLASSIFY_LLM_PROVIDERS.some((p) => !!process.env[p.envKey]);
+    if (!hasAnyProvider) {
+      console.log('[Classify] Skipped — no LLM provider keys configured');
       return;
     }
 
@@ -2718,7 +2760,7 @@ async function seedClassify() {
     for (let v = 0; v < CLASSIFY_VARIANTS.length; v++) {
       if (v > 0) await new Promise((r) => setTimeout(r, CLASSIFY_VARIANT_STAGGER_MS));
       try {
-        const stats = await seedClassifyForVariant(CLASSIFY_VARIANTS[v], apiKey, apiUrl, model);
+        const stats = await seedClassifyForVariant(CLASSIFY_VARIANTS[v]);
         totalClassified += stats.classified;
         totalSkipped += stats.skipped;
         console.log(`[Classify] ${CLASSIFY_VARIANTS[v]}: ${stats.total} titles, ${stats.classified} classified, ${stats.skipped} skipped`);
@@ -2741,8 +2783,8 @@ async function startClassifySeedLoop() {
     console.log('[Classify] Disabled (no Upstash Redis)');
     return;
   }
-  const apiKey = process.env.LLM_API_KEY || process.env.GROQ_API_KEY;
-  console.log(`[Classify] Seed loop starting (interval ${CLASSIFY_SEED_INTERVAL_MS / 1000 / 60}min, apiKey:${apiKey ? 'yes' : 'no'})`);
+  const activeProviders = CLASSIFY_LLM_PROVIDERS.filter((p) => !!process.env[p.envKey]).map((p) => p.name);
+  console.log(`[Classify] Seed loop starting (interval ${CLASSIFY_SEED_INTERVAL_MS / 1000 / 60}min, providers:${activeProviders.length ? activeProviders.join(',') : 'none'})`);
   seedClassify().catch((e) => console.warn('[Classify] Initial seed error:', e?.message || e));
   setInterval(() => {
     seedClassify().catch((e) => console.warn('[Classify] Seed error:', e?.message || e));
