@@ -89,7 +89,7 @@ const SEED_META = {
   marketQuotes:     { key: 'seed-meta:market:stocks',         maxStaleMin: 30 },
   commodityQuotes:  { key: 'seed-meta:market:commodities',    maxStaleMin: 30 },
   // RPC-populated keys — auto-tracked by cachedFetchJson seed-meta writes
-  serviceStatuses:  { key: 'seed-meta:infra:service-statuses',    maxStaleMin: 120 },
+  // serviceStatuses: removed — RPC-populated, no seed-meta after PR #1649
   macroSignals:     { key: 'seed-meta:economic:macro-signals',    maxStaleMin: 60 },
   bisPolicy:        { key: 'seed-meta:economic:bis:policy',       maxStaleMin: 2880 },
   bisExchange:      { key: 'seed-meta:economic:bis:eer',          maxStaleMin: 2880 },
@@ -101,7 +101,7 @@ const SEED_META = {
   gpsjam:           { key: 'seed-meta:intelligence:gpsjam',       maxStaleMin: 720 },
   cableHealth:      { key: 'seed-meta:cable-health',              maxStaleMin: 60 },
   positiveGeoEvents:{ key: 'seed-meta:positive-events:geo',       maxStaleMin: 60 },
-  riskScores:       { key: 'seed-meta:risk:scores:sebuf',          maxStaleMin: 30 },
+  // riskScores: removed — RPC-populated, no seed-meta after PR #1649
   iranEvents:       { key: 'seed-meta:conflict:iran-events',      maxStaleMin: 10080 },
   ucdpEvents:       { key: 'seed-meta:conflict:ucdp-events',      maxStaleMin: 420 },
   militaryFlights:  { key: 'seed-meta:military:flights',           maxStaleMin: 15 },
