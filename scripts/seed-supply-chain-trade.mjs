@@ -234,62 +234,85 @@ async function wtoFetch(path, params) {
   return resp.json();
 }
 
-// ─── Trade Flows (WTO) — pre-seed major reporters vs World ───
+// ─── Trade Flows (WTO) — pre-seed major reporters vs World + key bilateral pairs ───
+
+const BILATERAL_PAIRS = [
+  ['840', '156'], // US ↔ China
+  ['840', '276'], // US ↔ Germany
+  ['840', '392'], // US ↔ Japan
+  ['840', '124'], // US ↔ Canada
+  ['840', '484'], // US ↔ Mexico
+  ['156', '840'], // China ↔ US
+  ['156', '276'], // China ↔ Germany
+  ['826', '156'], // UK ↔ China
+  ['000', '156'], // World ↔ China
+  ['000', '840'], // World ↔ US
+];
+
+function parseFlowRows(data, indicator) {
+  const dataset = Array.isArray(data) ? data : data?.Dataset ?? data?.dataset ?? [];
+  return dataset.map(row => {
+    const year = parseInt(row.Year ?? row.year ?? '', 10);
+    const value = parseFloat(row.Value ?? row.value ?? '');
+    return !isNaN(year) && !isNaN(value) ? { year, indicator, value } : null;
+  }).filter(Boolean);
+}
+
+function buildFlowRecords(rows, reporterCode, partnerCode) {
+  const byYear = new Map();
+  for (const row of rows) {
+    if (!byYear.has(row.year)) byYear.set(row.year, { exports: 0, imports: 0 });
+    const e = byYear.get(row.year);
+    if (row.indicator === 'ITS_MTV_AX') e.exports = row.value; else e.imports = row.value;
+  }
+  const sortedYears = [...byYear.keys()].sort((a, b) => a - b);
+  return sortedYears.map((year, i) => {
+    const cur = byYear.get(year);
+    const prev = i > 0 ? byYear.get(sortedYears[i - 1]) : null;
+    return {
+      reportingCountry: WTO_MEMBER_CODES[reporterCode] ?? reporterCode,
+      partnerCountry: partnerCode === '000' ? 'World' : (WTO_MEMBER_CODES[partnerCode] ?? partnerCode),
+      year, exportValueUsd: cur.exports, importValueUsd: cur.imports,
+      yoyExportChange: prev?.exports > 0 ? Math.round(((cur.exports - prev.exports) / prev.exports) * 10000) / 100 : 0,
+      yoyImportChange: prev?.imports > 0 ? Math.round(((cur.imports - prev.imports) / prev.imports) * 10000) / 100 : 0,
+      productSector: 'Total merchandise',
+    };
+  });
+}
+
+async function fetchFlowPair(reporter, partner, years, flows) {
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - years;
+  const base = { r: reporter, p: partner, ps: `${startYear}-${currentYear}`, pc: 'TO', fmt: 'json', mode: 'full', max: '500' };
+  const [exportsResult, importsResult] = await Promise.allSettled([
+    wtoFetch('/data', { ...base, i: 'ITS_MTV_AX' }),
+    wtoFetch('/data', { ...base, i: 'ITS_MTV_AM' }),
+  ]);
+  const exportsData = exportsResult.status === 'fulfilled' ? exportsResult.value : null;
+  const importsData = importsResult.status === 'fulfilled' ? importsResult.value : null;
+  const rows = [...(exportsData ? parseFlowRows(exportsData, 'ITS_MTV_AX') : []), ...(importsData ? parseFlowRows(importsData, 'ITS_MTV_AM') : [])];
+  const records = buildFlowRecords(rows, reporter, partner);
+  const cacheKey = `trade:flows:v1:${reporter}:${partner}:${years}`;
+  if (records.length > 0) {
+    flows[cacheKey] = { flows: records, fetchedAt: new Date().toISOString(), upstreamUnavailable: false };
+  }
+}
 
 async function fetchTradeFlows() {
-  const currentYear = new Date().getFullYear();
   const flows = {};
+  const years = 10;
 
   for (const reporter of MAJOR_REPORTERS) {
-    const partner = '000';
-    const years = 10;
-    const startYear = currentYear - years;
-    const base = { r: reporter, p: partner, ps: `${startYear}-${currentYear}`, pc: 'TO', fmt: 'json', mode: 'full', max: '500' };
-
-    const [exportsResult, importsResult] = await Promise.allSettled([
-      wtoFetch('/data', { ...base, i: 'ITS_MTV_AX' }),
-      wtoFetch('/data', { ...base, i: 'ITS_MTV_AM' }),
-    ]);
-    const exportsData = exportsResult.status === 'fulfilled' ? exportsResult.value : null;
-    const importsData = importsResult.status === 'fulfilled' ? importsResult.value : null;
-
-    const parseRows = (data, indicator) => {
-      const dataset = Array.isArray(data) ? data : data?.Dataset ?? data?.dataset ?? [];
-      return dataset.map(row => {
-        const year = parseInt(row.Year ?? row.year ?? '', 10);
-        const value = parseFloat(row.Value ?? row.value ?? '');
-        return !isNaN(year) && !isNaN(value) ? { year, indicator, value } : null;
-      }).filter(Boolean);
-    };
-
-    const rows = [...(exportsData ? parseRows(exportsData, 'ITS_MTV_AX') : []), ...(importsData ? parseRows(importsData, 'ITS_MTV_AM') : [])];
-    const byYear = new Map();
-    for (const row of rows) {
-      if (!byYear.has(row.year)) byYear.set(row.year, { exports: 0, imports: 0 });
-      const e = byYear.get(row.year);
-      if (row.indicator === 'ITS_MTV_AX') e.exports = row.value; else e.imports = row.value;
-    }
-
-    const sortedYears = [...byYear.keys()].sort((a, b) => a - b);
-    const records = sortedYears.map((year, i) => {
-      const cur = byYear.get(year);
-      const prev = i > 0 ? byYear.get(sortedYears[i - 1]) : null;
-      return {
-        reportingCountry: WTO_MEMBER_CODES[reporter] ?? reporter, partnerCountry: 'World',
-        year, exportValueUsd: cur.exports, importValueUsd: cur.imports,
-        yoyExportChange: prev?.exports > 0 ? Math.round(((cur.exports - prev.exports) / prev.exports) * 10000) / 100 : 0,
-        yoyImportChange: prev?.imports > 0 ? Math.round(((cur.imports - prev.imports) / prev.imports) * 10000) / 100 : 0,
-        productSector: 'Total merchandise',
-      };
-    });
-
-    const cacheKey = `trade:flows:v1:${reporter}:${partner}:${years}`;
-    if (records.length > 0) {
-      flows[cacheKey] = { flows: records, fetchedAt: new Date().toISOString(), upstreamUnavailable: false };
-    }
-    await sleep(500); // WTO rate limit
+    await fetchFlowPair(reporter, '000', years, flows);
+    await sleep(500);
   }
-  console.log(`  Trade flows: ${Object.keys(flows).length} country pairs`);
+
+  for (const [reporter, partner] of BILATERAL_PAIRS) {
+    await fetchFlowPair(reporter, partner, years, flows);
+    await sleep(500);
+  }
+
+  console.log(`  Trade flows: ${Object.keys(flows).length} pairs (${MAJOR_REPORTERS.length} world + ${BILATERAL_PAIRS.length} bilateral)`);
   return flows;
 }
 
