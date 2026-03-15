@@ -171,7 +171,8 @@ export async function withRetry(fn, maxRetries = 3, delayMs = 1000) {
       lastErr = err;
       if (attempt < maxRetries) {
         const wait = delayMs * 2 ** attempt;
-        console.warn(`  Retry ${attempt + 1}/${maxRetries} in ${wait}ms: ${err.message || err}`);
+        const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
+        console.warn(`  Retry ${attempt + 1}/${maxRetries} in ${wait}ms: ${err.message || err}${cause}`);
         await new Promise(r => setTimeout(r, wait));
       }
     }
@@ -287,7 +288,8 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
   } catch (err) {
     await releaseLock(`${domain}:${resource}`, runId);
     const durationMs = Date.now() - startMs;
-    console.error(`  FETCH FAILED: ${err.message || err}`);
+    const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
+    console.error(`  FETCH FAILED: ${err.message || err}${cause}`);
 
     const ttl = ttlSeconds || 600;
     const keys = [canonicalKey];
