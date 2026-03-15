@@ -10,6 +10,7 @@
  */
 
 import { loadEnvFile, CHROME_UA, runSeed, writeExtraKey } from './_seed-utils.mjs';
+import http from 'node:http';
 import https from 'node:https';
 import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
@@ -45,13 +46,64 @@ function fetchDirect(url) {
       const stream = resp.headers['content-encoding'] === 'gzip' ? resp.pipe(zlib.createGunzip()) : resp;
       stream.on('data', (c) => chunks.push(c));
       stream.on('end', () => {
-        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        const body = Buffer.concat(chunks).toString();
+        if (body.trimStart().startsWith('<!DOCTYPE') || body.trimStart().startsWith('<html')) {
+          reject(new Error('Cloudflare block (HTML response)'));
+          return;
+        }
+        try { resolve(JSON.parse(body)); }
         catch (e) { reject(new Error(`JSON parse failed (direct): ${e.message}`)); }
       });
       stream.on('error', reject);
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('Direct fetch timeout')); });
+  });
+}
+
+function fetchViaHttpProxy(url, proxyAuth) {
+  return new Promise((resolve, reject) => {
+    const proxyUrl = new URL(`http://${proxyAuth}`);
+    const targetUrl = new URL(url);
+
+    const connectReq = http.request({
+      host: proxyUrl.hostname,
+      port: proxyUrl.port || 3128,
+      method: 'CONNECT',
+      path: `${targetUrl.hostname}:443`,
+      headers: proxyUrl.username
+        ? { 'Proxy-Authorization': 'Basic ' + Buffer.from(`${decodeURIComponent(proxyUrl.username)}:${decodeURIComponent(proxyUrl.password)}`).toString('base64') }
+        : {},
+      timeout: 15000,
+    });
+
+    connectReq.on('connect', (_res, socket) => {
+      const req = https.get(url, {
+        socket,
+        headers: { 'User-Agent': CHROME_UA, Accept: 'application/json', 'Accept-Encoding': 'gzip' },
+        timeout: 15000,
+      }, (resp) => {
+        const chunks = [];
+        const stream = resp.headers['content-encoding'] === 'gzip' ? resp.pipe(zlib.createGunzip()) : resp;
+        stream.on('data', (c) => chunks.push(c));
+        stream.on('end', () => {
+          const body = Buffer.concat(chunks).toString();
+          if (body.trimStart().startsWith('<!DOCTYPE') || body.trimStart().startsWith('<html')) {
+            reject(new Error('Cloudflare block via proxy (HTML response)'));
+            return;
+          }
+          try { resolve(JSON.parse(body)); }
+          catch (e) { reject(new Error(`JSON parse failed (proxy): ${e.message}`)); }
+        });
+        stream.on('error', reject);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Proxy fetch timeout')); });
+    });
+
+    connectReq.on('error', (e) => reject(new Error(`HTTP CONNECT failed: ${e.message}`)));
+    connectReq.on('timeout', () => { connectReq.destroy(); reject(new Error('Proxy connect timeout')); });
+    connectReq.end();
   });
 }
 
@@ -231,28 +283,48 @@ function parseArticle(html, articleUrl, articleDate, articleTitle) {
 // ─── Main ───
 
 async function fetchAll() {
-  // Try curl direct first (curl's TLS fingerprint often passes Cloudflare where Node.js fails).
-  // Fall back to curl+proxy, then Node.js direct as last resort.
+  // Fallback chain: curl direct -> curl+proxy -> Node.js+proxy -> Node.js direct
   let wpData;
+  const proxyAuth = process.env.RESIDENTIAL_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
+
+  // 1. Try curl direct (best TLS fingerprint for Cloudflare bypass)
   try {
     console.log('  Trying curl direct...');
     wpData = fetchViaCurl(USNI_URL, null);
   } catch (e) {
     console.warn(`  curl direct failed: ${e.message}`);
-    const proxyAuth = process.env.RESIDENTIAL_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
-    if (proxyAuth) {
-      try {
-        const host = proxyAuth.substring(proxyAuth.lastIndexOf('@') + 1);
-        console.log(`  Trying curl via proxy: ${host}`);
-        wpData = fetchViaCurl(USNI_URL, proxyAuth);
-      } catch (e2) {
-        console.warn(`  curl+proxy failed: ${e2.message}`);
-        console.log('  Trying Node.js direct...');
-        wpData = await fetchDirect(USNI_URL);
-      }
-    } else {
+    wpData = null;
+  }
+
+  // 2. Try curl + residential proxy
+  if (!wpData && proxyAuth) {
+    try {
+      const host = proxyAuth.substring(proxyAuth.lastIndexOf('@') + 1);
+      console.log(`  Trying curl via proxy: ${host}`);
+      wpData = fetchViaCurl(USNI_URL, proxyAuth);
+    } catch (e) {
+      console.warn(`  curl+proxy failed: ${e.message}`);
+    }
+  }
+
+  // 3. Try Node.js + HTTP CONNECT proxy (no curl needed)
+  if (!wpData && proxyAuth) {
+    try {
+      const host = proxyAuth.substring(proxyAuth.lastIndexOf('@') + 1);
+      console.log(`  Trying Node.js via proxy: ${host}`);
+      wpData = await fetchViaHttpProxy(USNI_URL, proxyAuth);
+    } catch (e) {
+      console.warn(`  Node.js+proxy failed: ${e.message}`);
+    }
+  }
+
+  // 4. Try Node.js direct (last resort, likely Cloudflare blocked)
+  if (!wpData) {
+    try {
       console.log('  Trying Node.js direct...');
       wpData = await fetchDirect(USNI_URL);
+    } catch (e) {
+      throw new Error(`FETCH FAILED: ${e.message}`);
     }
   }
 
