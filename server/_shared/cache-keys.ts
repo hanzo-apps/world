@@ -53,7 +53,7 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   bisPolicy: 'slow', bisExchange: 'slow', bisCredit: 'slow',
   minerals: 'slow', giving: 'slow', sectors: 'slow',
   progressData: 'slow', renewableEnergy: 'slow',
-  etfFlows: 'slow', shippingRates: 'slow', wildfires: 'slow',
+  etfFlows: 'slow', shippingRates: 'fast', wildfires: 'slow',
   climateAnomalies: 'slow', cyberThreats: 'slow', techReadiness: 'slow',
   theaterPosture: 'fast', naturalEvents: 'slow',
   cryptoQuotes: 'slow', gulfQuotes: 'slow', stablecoinMarkets: 'slow',
