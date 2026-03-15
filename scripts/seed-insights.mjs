@@ -328,7 +328,7 @@ runSeed('news', 'insights', CANONICAL_KEY, fetchInsights, {
   ttlSeconds: CACHE_TTL,
   sourceVersion: 'digest-clustering-v1',
 }).catch((err) => {
-  console.error('FATAL:', err.message || err);
+  const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   // Exit gracefully for cron — health endpoint flags stale data via seed-meta.
   process.exit(0);
 });

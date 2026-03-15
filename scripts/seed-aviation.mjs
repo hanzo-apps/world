@@ -266,6 +266,6 @@ runSeed('aviation', 'ops-news', OPS_CACHE_KEY, fetchAll, {
   ttlSeconds: OPS_TTL,
   sourceVersion: 'aviationstack-rss',
 }).catch((err) => {
-  console.error('FATAL:', err.message || err);
+  const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   process.exit(1);
 });
