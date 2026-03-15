@@ -1365,6 +1365,11 @@ export class DataLoaderManager implements AppModule {
 
   async loadForecasts(): Promise<void> {
     try {
+      const hydrated = getHydratedData('forecasts') as { predictions?: import('@/generated/client/worldmonitor/forecast/v1/service_client').Forecast[] } | undefined;
+      if (hydrated?.predictions?.length) {
+        this.callPanel('forecast', 'updateForecasts', hydrated.predictions);
+        return;
+      }
       const { fetchForecasts } = await import('@/services/forecast');
       const forecasts = await fetchForecasts();
       this.callPanel('forecast', 'updateForecasts', forecasts);
