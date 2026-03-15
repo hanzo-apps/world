@@ -10,7 +10,7 @@ if (_isDirectRun) loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'forecast:predictions:v1';
 const PRIOR_KEY = 'forecast:predictions:prior:v1';
-const TTL_SECONDS = 3600;
+const TTL_SECONDS = 4200; // 70min — covers 1h cron interval + cold start gap
 
 const THEATER_IDS = [
   'iran-theater', 'taiwan-theater', 'baltic-theater',
