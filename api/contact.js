@@ -2,6 +2,7 @@ export const config = { runtime: 'edge' };
 
 import { ConvexHttpClient } from 'convex/browser';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+import { getClientIp, verifyTurnstile } from './_turnstile.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+(]?\d[\d\s()./-]{4,23}\d$/;
@@ -34,29 +35,6 @@ function isRateLimited(ip) {
   }
   entry.count += 1;
   return entry.count > RATE_LIMIT;
-}
-
-async function verifyTurnstile(token, ip) {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    const isLocal = (process.env.VERCEL_ENV ?? 'development') === 'development';
-    if (!isLocal) {
-      console.error('[contact] TURNSTILE_SECRET_KEY not set in production, rejecting');
-      return false;
-    }
-    return true;
-  }
-  try {
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ secret, response: token, remoteip: ip }),
-    });
-    const data = await res.json();
-    return data.success === true;
-  } catch {
-    return false;
-  }
 }
 
 async function sendNotificationEmail(name, email, organization, phone, message) {
@@ -138,11 +116,7 @@ export default async function handler(req) {
     });
   }
 
-  const ip =
-    req.headers.get('cf-connecting-ip') ||
-    req.headers.get('x-real-ip') ||
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown';
+  const ip = getClientIp(req);
 
   if (isRateLimited(ip)) {
     return new Response(JSON.stringify({ error: 'Too many requests' }), {
@@ -168,7 +142,12 @@ export default async function handler(req) {
     });
   }
 
-  const turnstileOk = await verifyTurnstile(body.turnstileToken || '', ip);
+  const turnstileOk = await verifyTurnstile({
+    token: body.turnstileToken || '',
+    ip,
+    logPrefix: '[contact]',
+    missingSecretPolicy: 'allow-in-development',
+  });
   if (!turnstileOk) {
     return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
       status: 403,
