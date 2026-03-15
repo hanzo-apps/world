@@ -839,7 +839,7 @@
       "highTariff": "High",
       "moderateTariff": "Moderate",
       "lowTariff": "Low",
-      "revenue": "Revenue",
+      "revenue": "US Revenue",
       "noRevenueData": "No customs revenue data available",
       "treasuryUnavailable": "Treasury data temporarily unavailable",
       "fytdLabel": "FY{{year}} YTD",

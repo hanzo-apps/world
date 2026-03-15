@@ -8784,6 +8784,66 @@ a.prediction-link:hover {
   border-left-width: 3px;
 }
 
+.trade-revenue-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 80px;
+  padding: 4px 0 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+}
+
+.trade-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  cursor: default;
+}
+
+.trade-chart-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--text-dim, rgba(255,255,255,0.3));
+  border-radius: 2px 2px 0 0;
+  transition: background 0.2s;
+}
+
+.trade-chart-bar.trade-chart-spike {
+  background: var(--red, #ff5252);
+}
+
+.trade-chart-label {
+  font-size: 8px;
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.trade-revenue-summary {
+  margin-bottom: 6px;
+}
+
+.trade-revenue-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.trade-revenue-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-revenue-compare {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .sc-metric-row {
   display: flex;
   flex-wrap: wrap;

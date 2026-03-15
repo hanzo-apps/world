@@ -286,6 +286,20 @@ export class TradePolicyPanel extends Panel {
 
     const priorAvg = priorFyMonths.length > 0 ? priorFytd / priorFyMonths.length : 0;
 
+    const chartMonths = [...months].slice(-12);
+    const maxVal = Math.max(...chartMonths.map(m => m.monthlyAmountBillions), 1);
+    const chartBars = chartMonths.map(m => {
+      const pct = Math.round((m.monthlyAmountBillions / maxVal) * 100);
+      const label = m.recordDate.slice(0, 7);
+      const isSpike = m.monthlyAmountBillions > priorAvg * 1.5;
+      return `<div class="trade-chart-col" title="${label}: $${m.monthlyAmountBillions.toFixed(1)}B">
+        <div class="trade-chart-bar${isSpike ? ' trade-chart-spike' : ''}" style="height:${pct}%"></div>
+        <div class="trade-chart-label">${m.recordDate.slice(5, 7)}</div>
+      </div>`;
+    }).join('');
+
+    const chartHtml = `<div class="trade-revenue-chart">${chartBars}</div>`;
+
     const rows = [...months].reverse().slice(0, 24).map(m => {
       const highlight = m.monthlyAmountBillions > priorAvg * 2 ? ' class="trade-revenue-spike"' : '';
       return `<tr${highlight}>
@@ -296,6 +310,7 @@ export class TradePolicyPanel extends Panel {
     }).join('');
 
     return `${summaryHtml}
+    ${chartHtml}
     <div class="trade-tariffs-table">
       <table>
         <thead>
