@@ -421,6 +421,18 @@ describe('detectMarketScenarios', () => {
     assert.ok(result[0].title.includes('Oil'));
   });
 
+  it('maps live chokepoint names to market-sensitive regions', () => {
+    const inputs = {
+      chokepoints: { chokepoints: [{ name: 'Strait of Hormuz', region: 'Strait of Hormuz', riskLevel: 'critical', riskScore: 80 }] },
+      ciiScores: [],
+    };
+    const result = detectMarketScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].domain, 'market');
+    assert.equal(result[0].region, 'Middle East');
+    assert.match(result[0].title, /Hormuz/);
+  });
+
   it('low-risk chokepoint is ignored', () => {
     const inputs = {
       chokepoints: { routes: [{ region: 'Middle East', riskLevel: 'low', riskScore: 30 }] },
@@ -467,6 +479,59 @@ describe('detectInfraScenarios', () => {
     const cyberResult = detectInfraScenarios(withCyber);
     assert.ok(cyberResult[0].probability > baseResult[0].probability,
       'cyber threats should boost probability');
+  });
+});
+
+describe('detectPoliticalScenarios', () => {
+  it('uses geoConvergence when unrest-specific fields are absent or zero', () => {
+    const inputs = {
+      ciiScores: {
+        ciiScores: [{
+          region: 'IL',
+          combinedScore: 69,
+          trend: 'TREND_DIRECTION_STABLE',
+          components: { ciiContribution: 0, geoConvergence: 63, militaryActivity: 35 },
+        }],
+      },
+      temporalAnomalies: { anomalies: [] },
+      unrestEvents: { events: [] },
+    };
+    const result = detectPoliticalScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].domain, 'political');
+    assert.equal(result[0].region, 'Israel');
+  });
+
+  it('can generate from unrest event counts even when CII unrest is weak', () => {
+    const inputs = {
+      ciiScores: {
+        ciiScores: [{
+          region: 'IN',
+          combinedScore: 62,
+          trend: 'TREND_DIRECTION_STABLE',
+          components: { ciiContribution: 0, geoConvergence: 0 },
+        }],
+      },
+      temporalAnomalies: { anomalies: [] },
+      unrestEvents: { events: [{ country: 'India' }, { country: 'India' }, { country: 'India' }] },
+    };
+    const result = detectPoliticalScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].domain, 'political');
+    assert.equal(result[0].region, 'India');
+  });
+});
+
+describe('detectMilitaryScenarios', () => {
+  it('accepts live theater entries that use theater instead of id', () => {
+    const inputs = {
+      theaterPosture: { theaters: [{ theater: 'baltic-theater', postureLevel: 'critical', activeFlights: 12 }] },
+      temporalAnomalies: { anomalies: [] },
+    };
+    const result = detectMilitaryScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].domain, 'military');
+    assert.equal(result[0].region, 'Northern Europe');
   });
 });
 
@@ -1242,7 +1307,7 @@ describe('detectCyberScenarios', () => {
     const threats = Array.from({ length: 8 }, () => ({ country: 'US', type: 'malware' }));
     const result = detectCyberScenarios({ cyberThreats: { threats } });
     assert.equal(result.length, 1);
-    assert.equal(result[0].domain, 'infrastructure');
+    assert.equal(result[0].domain, 'cyber');
   });
 
   it('skips countries with < 5 threats', () => {

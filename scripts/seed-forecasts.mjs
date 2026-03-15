@@ -49,6 +49,16 @@ const CHOKEPOINT_COMMODITIES = {
   'Black Sea': { commodity: 'Grain/Energy', sensitivity: 0.7 },
 };
 
+const CHOKEPOINT_MARKET_REGIONS = {
+  'Strait of Hormuz': 'Middle East',
+  'Bab el-Mandeb': 'Red Sea',
+  'Suez Canal': 'Red Sea',
+  'Taiwan Strait': 'Western Pacific',
+  'Strait of Malacca': 'South China Sea',
+  'Kerch Strait': 'Black Sea',
+  'Bosporus Strait': 'Black Sea',
+};
+
 const REGION_KEYWORDS = {
   'Middle East': ['mena'],
   'Red Sea': ['mena'],
@@ -228,7 +238,14 @@ function normalizeCiiEntry(c) {
     : rawTrend.includes('falling') ? 'falling'
     : 'stable';
   const level = score >= 81 ? 'critical' : score >= 66 ? 'high' : score >= 51 ? 'elevated' : score >= 31 ? 'normal' : 'low';
-  const unrest = c.components?.unrest ?? c.components?.protest ?? c.components?.ciiContribution ?? c.components?.geoConvergence ?? 0;
+  const unrestCandidates = [
+    c.components?.unrest,
+    c.components?.protest,
+    c.components?.geoConvergence,
+    c.components?.ciiContribution,
+    c.components?.newsActivity,
+  ].filter(value => typeof value === 'number' && Number.isFinite(value));
+  const unrest = unrestCandidates.length > 0 ? Math.max(...unrestCandidates) : 0;
   // Resolve ISO code to full country name (prevents substring false positives: IL matching Chile)
   let name = c.name || '';
   if (!name && code) {
@@ -236,6 +253,13 @@ function normalizeCiiEntry(c) {
     name = codes[code]?.name || code;
   }
   return { code, name, score, level, trend, change24h: c.change24h ?? 0, components: { ...c.components, unrest } };
+}
+
+function resolveChokepointMarketRegion(cp) {
+  const rawRegion = cp.region || cp.name || '';
+  if (!rawRegion) return null;
+  if (CHOKEPOINT_COMMODITIES[rawRegion]) return rawRegion;
+  return CHOKEPOINT_MARKET_REGIONS[rawRegion] || null;
 }
 
 function extractCiiScores(inputs) {
@@ -328,7 +352,7 @@ function detectMarketScenarios(inputs) {
   for (const cp of chokepoints) {
     const risk = cp.riskLevel || cp.risk || '';
     if (risk !== 'high' && risk !== 'critical' && (cp.riskScore || 0) < 60) continue;
-    const region = cp.region || cp.name || '';
+    const region = resolveChokepointMarketRegion(cp);
     if (!region) continue;
 
     const commodity = CHOKEPOINT_COMMODITIES[region];
@@ -342,9 +366,9 @@ function detectMarketScenarios(inputs) {
 
     predictions.push(makePrediction(
       'market', region,
-      `${commodity.commodity} price impact from ${region} disruption`,
+      `${commodity.commodity} price impact from ${(cp.name || cp.region || region)} disruption`,
       prob, 0.6, '30d',
-      [{ type: 'chokepoint', value: `${region} risk: ${risk}`, weight: 0.5 },
+      [{ type: 'chokepoint', value: `${cp.name || region} risk: ${risk}`, weight: 0.5 },
        { type: 'commodity', value: `${commodity.commodity} sensitivity: ${commodity.sensitivity}`, weight: 0.3 }],
     ));
   }
@@ -450,18 +474,32 @@ function detectPoliticalScenarios(inputs) {
   const predictions = [];
   const scores = extractCiiScores(inputs);
   const anomalies = Array.isArray(inputs.temporalAnomalies) ? inputs.temporalAnomalies : inputs.temporalAnomalies?.anomalies || [];
+  const unrestEvents = Array.isArray(inputs.unrestEvents) ? inputs.unrestEvents : inputs.unrestEvents?.events || [];
+  const unrestCounts = new Map();
+
+  for (const event of unrestEvents) {
+    const country = resolveCountryName(event.country || event.country_name || event.region || event.location || '');
+    if (!country) continue;
+    unrestCounts.set(country, (unrestCounts.get(country) || 0) + 1);
+  }
 
   for (const c of scores) {
     if (!c.components) continue;
     const unrestComp = c.components.unrest ?? 0;
-    if (unrestComp <= 50) continue;
+    const unrestCount = unrestCounts.get(c.name) || 0;
+    if (unrestComp <= 50 && unrestCount < 3) continue;
     if (c.score >= 80) continue;
 
     const countryName = c.name.toLowerCase();
     const signals = [
-      { type: 'unrest', value: `${c.name} unrest component: ${unrestComp}`, weight: 0.4 },
+      { type: 'unrest', value: `${c.name} unrest component: ${Math.max(unrestComp, unrestCount * 10)}`, weight: 0.4 },
     ];
     let sourceCount = 1;
+
+    if (unrestCount > 0) {
+      signals.push({ type: 'unrest_events', value: `${unrestCount} unrest events in ${c.name}`, weight: 0.3 });
+      sourceCount++;
+    }
 
     const protestAnomalies = anomalies.filter(a =>
       (a.type === 'protest' || a.type === 'unrest') &&
@@ -473,9 +511,10 @@ function detectPoliticalScenarios(inputs) {
       sourceCount++;
     }
 
-    const unrestNorm = normalize(unrestComp, 30, 100);
+    const unrestNorm = normalize(Math.max(unrestComp, unrestCount * 10), 30, 100);
     const anomalyBoost = protestAnomalies.length > 0 ? 0.1 : 0;
-    const prob = Math.min(0.8, unrestNorm * 0.6 + anomalyBoost);
+    const eventBoost = unrestCount >= 5 ? 0.08 : unrestCount >= 3 ? 0.04 : 0;
+    const prob = Math.min(0.8, unrestNorm * 0.6 + anomalyBoost + eventBoost);
     const confidence = Math.max(0.3, normalize(sourceCount, 0, 4));
 
     predictions.push(makePrediction(
@@ -494,13 +533,14 @@ function detectMilitaryScenarios(inputs) {
   const anomalies = Array.isArray(inputs.temporalAnomalies) ? inputs.temporalAnomalies : inputs.temporalAnomalies?.anomalies || [];
 
   for (const t of theaters) {
-    if (!t?.id) continue;
+    const theaterId = t?.id || t?.theater;
+    if (!theaterId) continue;
     const posture = t.postureLevel || t.posture || '';
     if (posture !== 'elevated' && posture !== 'critical') continue;
 
-    const region = THEATER_REGIONS[t.id] || t.name || t.id;
+    const region = THEATER_REGIONS[theaterId] || t.name || theaterId;
     const signals = [
-      { type: 'theater', value: `${t.name || t.id} posture: ${posture}`, weight: 0.5 },
+      { type: 'theater', value: `${t.name || theaterId} posture: ${posture}`, weight: 0.5 },
     ];
     let sourceCount = 1;
 
@@ -637,7 +677,7 @@ function detectCyberScenarios(inputs) {
     if (items.length < 5) continue;
     const types = new Set(items.map(t => t.type || t.category || 'unknown'));
     predictions.push(makePrediction(
-      'infrastructure', country,
+      'cyber', country,
       `Cyber threat concentration: ${country}`,
       Math.min(0.7, normalize(items.length, 3, 50) * 0.6),
       0.3, '7d',
@@ -691,6 +731,7 @@ const DOMAIN_HINTS = {
   supply_chain: ['shipping', 'supply', 'chokepoint', 'port', 'transit', 'freight', 'logistics', 'gps'],
   political: ['election', 'government', 'parliament', 'protest', 'unrest', 'leadership', 'coalition'],
   military: ['military', 'force', 'deployment', 'exercise', 'missile', 'carrier', 'bomber', 'air defense'],
+  cyber: ['cyber', 'malware', 'ransomware', 'intrusion', 'ddos', 'phishing', 'exploit', 'botnet'],
   infrastructure: ['outage', 'blackout', 'power', 'grid', 'pipeline', 'cyber', 'telecom', 'internet'],
 };
 
@@ -724,6 +765,12 @@ const DOMAIN_ACTOR_BLUEPRINTS = {
     { key: 'allied_observers', name: 'Allied observers', category: 'external', influenceScore: 0.68 },
     { key: 'commercial_carriers', name: 'Commercial carriers', category: 'commercial', influenceScore: 0.51 },
     { key: 'regional_command', name: 'Regional command posts', category: 'security', influenceScore: 0.74 },
+  ],
+  cyber: [
+    { key: 'cert_teams', name: 'National CERT teams', category: 'security', influenceScore: 0.83 },
+    { key: 'critical_it', name: 'Critical IT operators', category: 'infrastructure', influenceScore: 0.74 },
+    { key: 'threat_actors', name: 'Threat actors', category: 'adversarial', influenceScore: 0.69 },
+    { key: 'platform_defenders', name: 'Platform defenders', category: 'commercial', influenceScore: 0.58 },
   ],
   infrastructure: [
     { key: 'grid_operators', name: 'Grid operators', category: 'infrastructure', influenceScore: 0.83 },
@@ -934,6 +981,7 @@ const PROJECTION_CURVES = {
   supply_chain:   { h24: 0.91, d7: 1.0, d30: 0.64 },
   political:      { h24: 0.83, d7: 0.87, d30: 1.0 },
   military:       { h24: 1.0, d7: 0.91, d30: 0.65 },
+  cyber:          { h24: 1.0, d7: 0.78, d30: 0.4 },
   infrastructure: { h24: 1.0, d7: 0.5, d30: 0.25 },
 };
 
@@ -1214,6 +1262,10 @@ function buildForecastActors(pred) {
       objectives.push(`Price whether stress in ${pred.region} becomes durable over the ${pred.timeHorizon}.`);
       objectives.push(`Protect against repricing if ${topSupport} intensifies.`);
       likelyActions.push(`Rebalance positions if the probability path moves away from ${roundPct(pred.probability)}.`);
+    } else if (pred.domain === 'cyber') {
+      objectives.push(`Contain hostile cyber activity affecting ${pred.region} before it spills into core services.`);
+      objectives.push(`Preserve resilience if ${topSupport} broadens into a sustained intrusion pattern.`);
+      likelyActions.push(`Harden exposed systems and triage incident response in ${pred.region}.`);
     } else if (pred.domain === 'infrastructure') {
       objectives.push(`Contain service degradation in ${pred.region} before it becomes cross-system.`);
       objectives.push(`Maintain continuity if ${topSupport} spreads across adjacent systems.`);

@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/services/forecast';
 import type { Forecast } from '@/services/forecast';
 
-const DOMAINS = ['all', 'conflict', 'market', 'supply_chain', 'political', 'military', 'infrastructure'] as const;
+const DOMAINS = ['all', 'conflict', 'market', 'supply_chain', 'political', 'military', 'cyber', 'infrastructure'] as const;
 
 const DOMAIN_LABELS: Record<string, string> = {
   all: 'All',
@@ -11,6 +11,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   supply_chain: 'Supply Chain',
   political: 'Political',
   military: 'Military',
+  cyber: 'Cyber',
   infrastructure: 'Infra',
 };
 
