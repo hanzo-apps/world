@@ -3,6 +3,7 @@ export const config = { runtime: 'edge' };
 import { ConvexHttpClient } from 'convex/browser';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { getClientIp, verifyTurnstile } from './_turnstile.js';
+import { jsonResponse } from './_json-response.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+(]?\d[\d\s()./-]{4,23}\d$/;
@@ -93,15 +94,6 @@ function escapeHtml(str) {
 
 function sanitizeForSubject(str, maxLen = 50) {
   return str.replace(/[\r\n\0]/g, '').slice(0, maxLen);
-}
-
-function jsonResponse(body, status, cors) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: cors
-      ? { 'Content-Type': 'application/json', ...cors }
-      : { 'Content-Type': 'application/json' },
-  });
 }
 
 export default async function handler(req) {
