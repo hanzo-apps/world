@@ -1,3 +1,5 @@
+import { jsonResponse } from './_json-response.js';
+
 export const config = { runtime: 'edge' };
 
 const BOOTSTRAP_KEYS = {
@@ -221,11 +223,11 @@ export default async function handler(req) {
     const commands = allKeys.map(k => ['GET', k]);
     results = await redisPipeline(commands);
   } catch (err) {
-    return new Response(JSON.stringify({
+    return jsonResponse({
       status: 'REDIS_DOWN',
       error: err.message,
       checkedAt: new Date(now).toISOString(),
-    }), { status: 503, headers });
+    }, 503, headers);
   }
 
   const keyValues = new Map();
