@@ -2596,7 +2596,7 @@ const CLASSIFY_LLM_PROVIDERS = [
   },
 ];
 
-function classifyFetchLlmSingle(titles, apiKey, apiUrl, model, headers, extraBody, timeout) {
+function classifyFetchLlmSingle(titles, _apiKey, apiUrl, model, headers, extraBody, timeout) {
   return new Promise((resolve) => {
     const sanitized = titles.map((t) => t.replace(/[\n\r]/g, ' ').replace(/\|/g, '/').slice(0, 200).trim());
     const prompt = sanitized.map((t, i) => `${i}|${t}`).join('\n');
