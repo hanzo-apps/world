@@ -2363,7 +2363,7 @@ async function callForecastLLM(systemPrompt, userPrompt) {
       const text = json.choices?.[0]?.message?.content?.trim();
       if (!text || text.length < 20) continue;
       return { text, model: json.model || provider.model, provider: provider.name };
-    } catch (err) { console.warn(`  [LLM] ${provider.name}: ${err.message}`); continue; }
+    } catch (err) { console.warn(`  [LLM] ${provider.name}: ${err.message}`); }
   }
   return null;
 }
