@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, getRedisCredentials, acquireLock, releaseLock, withRetry, writeFreshnessMetadata, logSeedResult, verifySeedKey, extendExistingTtl } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, getRedisCredentials, acquireLockSafely, releaseLock, withRetry, writeFreshnessMetadata, logSeedResult, verifySeedKey, extendExistingTtl } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -258,8 +258,11 @@ async function main() {
 
   console.log('=== aviation:delays Seed ===');
 
-  const locked = await acquireLock('aviation:delays', runId, 120_000);
-  if (!locked) {
+  const lockResult = await acquireLockSafely('aviation:delays', runId, 120_000, { label: 'aviation:delays' });
+  if (lockResult.skipped) {
+    process.exit(0);
+  }
+  if (!lockResult.locked) {
     console.log('  SKIPPED: another seed run in progress');
     process.exit(0);
   }
