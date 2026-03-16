@@ -2,9 +2,11 @@
 
 import { loadEnvFile, CHROME_UA, getRedisCredentials, acquireLock, releaseLock, withRetry, writeFreshnessMetadata, logSeedResult, verifySeedKey, extendExistingTtl } from './_seed-utils.mjs';
 import { summarizeMilitaryTheaters, buildMilitarySurges, appendMilitaryHistory } from './_military-surges.mjs';
+import { spawn } from 'node:child_process';
 import http from 'node:http';
 import https from 'node:https';
 import tls from 'node:tls';
+import { fileURLToPath } from 'node:url';
 
 loadEnvFile(import.meta.url);
 
@@ -19,6 +21,10 @@ const THEATER_POSTURE_BACKUP_KEY = 'theater-posture:sebuf:backup:v1';
 const THEATER_POSTURE_LIVE_TTL = 900;
 const THEATER_POSTURE_STALE_TTL = 86400;
 const THEATER_POSTURE_BACKUP_TTL = 604800;
+const MILITARY_FORECAST_INPUTS_LIVE_KEY = 'military:forecast-inputs:v1';
+const MILITARY_FORECAST_INPUTS_STALE_KEY = 'military:forecast-inputs:stale:v1';
+const MILITARY_FORECAST_INPUTS_LIVE_TTL = 900;
+const MILITARY_FORECAST_INPUTS_STALE_TTL = 86400;
 const MILITARY_SURGES_LIVE_KEY = 'military:surges:v1';
 const MILITARY_SURGES_STALE_KEY = 'military:surges:stale:v1';
 const MILITARY_SURGES_HISTORY_KEY = 'military:surges:history:v1';
@@ -26,6 +32,7 @@ const MILITARY_SURGES_LIVE_TTL = 900;
 const MILITARY_SURGES_STALE_TTL = 86400;
 const MILITARY_SURGES_HISTORY_TTL = 604800;
 const MILITARY_SURGES_HISTORY_MAX = 72;
+const CHAIN_FORECAST_SEED = process.env.CHAIN_FORECAST_SEED_ON_MILITARY === '1';
 
 // ── Proxy Config ─────────────────────────────────────────
 const OPENSKY_PROXY_AUTH = process.env.OPENSKY_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
@@ -636,11 +643,32 @@ async function redisGet(url, token, key) {
   try { return JSON.parse(data.result); } catch { return null; }
 }
 
+async function triggerForecastSeedIfEnabled() {
+  if (!CHAIN_FORECAST_SEED) return;
+
+  const scriptPath = fileURLToPath(new URL('./seed-forecasts.mjs', import.meta.url));
+  console.log('  Triggering forecast reseed after military publish...');
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [scriptPath], {
+      stdio: 'inherit',
+      env: process.env,
+    });
+
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`forecast reseed exited with code ${code}`));
+    });
+  });
+}
+
 // ── Main ───────────────────────────────────────────────────
 async function main() {
   const startMs = Date.now();
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const { url, token } = getRedisCredentials();
+  let lockReleased = false;
 
   console.log(`=== military:flights Seed (proxy: ${PROXY_ENABLED ? 'enabled' : 'direct'}) ===`);
 
@@ -662,8 +690,8 @@ async function main() {
     await releaseLock('military:flights', runId);
     console.error(`  FETCH FAILED: ${err.message || err}`);
     await extendExistingTtl([LIVE_KEY], LIVE_TTL);
-    await extendExistingTtl([STALE_KEY, THEATER_POSTURE_STALE_KEY, MILITARY_SURGES_STALE_KEY], STALE_TTL);
-    await extendExistingTtl([THEATER_POSTURE_LIVE_KEY], THEATER_POSTURE_LIVE_TTL);
+    await extendExistingTtl([STALE_KEY, THEATER_POSTURE_STALE_KEY, MILITARY_SURGES_STALE_KEY, MILITARY_FORECAST_INPUTS_STALE_KEY], STALE_TTL);
+    await extendExistingTtl([THEATER_POSTURE_LIVE_KEY, MILITARY_FORECAST_INPUTS_LIVE_KEY], THEATER_POSTURE_LIVE_TTL);
     await extendExistingTtl([THEATER_POSTURE_BACKUP_KEY], THEATER_POSTURE_BACKUP_TTL);
     await extendExistingTtl([MILITARY_SURGES_LIVE_KEY], MILITARY_SURGES_LIVE_TTL);
     console.log(`\n=== Failed gracefully (${Math.round(Date.now() - startMs)}ms) ===`);
@@ -673,11 +701,13 @@ async function main() {
   if (flights.length === 0) {
     console.log('  SKIPPED: 0 military flights — preserving stale data');
     await releaseLock('military:flights', runId);
+    lockReleased = true;
     process.exit(0);
   }
 
   try {
-    const payload = { flights, fetchedAt: Date.now(), stats: { total: flights.length, byType } };
+    const assessedAt = Date.now();
+    const payload = { flights, fetchedAt: assessedAt, stats: { total: flights.length, byType } };
 
     await redisSet(url, token, LIVE_KEY, payload, LIVE_TTL);
     await redisSet(url, token, STALE_KEY, payload, STALE_TTL);
@@ -696,44 +726,72 @@ async function main() {
       altitude: f.altitude || 0, heading: f.heading || 0, speed: f.speed || 0,
       aircraftType: f.aircraftType || detectAircraftType(f.callsign),
     }));
-    const theaters = calculateTheaterPostures(theaterFlights);
+    const theaters = calculateTheaterPostures(theaterFlights).map((theater) => ({
+      ...theater,
+      assessedAt,
+    }));
     const posturePayload = { theaters };
     await redisSet(url, token, THEATER_POSTURE_LIVE_KEY, posturePayload, THEATER_POSTURE_LIVE_TTL);
     await redisSet(url, token, THEATER_POSTURE_STALE_KEY, posturePayload, THEATER_POSTURE_STALE_TTL);
     await redisSet(url, token, THEATER_POSTURE_BACKUP_KEY, posturePayload, THEATER_POSTURE_BACKUP_TTL);
-    await redisSet(url, token, 'seed-meta:theater-posture', { fetchedAt: Date.now(), recordCount: theaterFlights.length, sourceVersion: source || '' }, 604800);
+    await redisSet(url, token, 'seed-meta:theater-posture', { fetchedAt: assessedAt, recordCount: theaterFlights.length, sourceVersion: source || '' }, 604800);
     const elevated = theaters.filter((t) => t.postureLevel !== 'normal').length;
     console.log(`  Theater posture: ${theaters.length} theaters (${elevated} elevated)`);
 
     const priorSurgeHistory = ((await redisGet(url, token, MILITARY_SURGES_HISTORY_KEY))?.history || []);
-    const theaterActivity = summarizeMilitaryTheaters(flights, POSTURE_THEATERS);
+    const theaterActivity = summarizeMilitaryTheaters(flights, POSTURE_THEATERS, assessedAt);
     const surges = buildMilitarySurges(theaterActivity, priorSurgeHistory, { sourceVersion: source || '' });
     const surgePayload = {
       surges,
       theaters: theaterActivity,
-      fetchedAt: Date.now(),
+      fetchedAt: assessedAt,
       sourceVersion: source || '',
     };
+    const forecastInputsPayload = {
+      fetchedAt: assessedAt,
+      sourceVersion: source || '',
+      theaters,
+      theaterActivity,
+      surges,
+      stats: {
+        totalFlights: flights.length,
+        elevatedTheaters: elevated,
+      },
+    };
     const surgeHistory = appendMilitaryHistory(priorSurgeHistory, {
-      assessedAt: Date.now(),
+      assessedAt,
       sourceVersion: source || '',
       theaters: theaterActivity,
     }, MILITARY_SURGES_HISTORY_MAX);
+    await redisSet(url, token, MILITARY_FORECAST_INPUTS_LIVE_KEY, forecastInputsPayload, MILITARY_FORECAST_INPUTS_LIVE_TTL);
+    await redisSet(url, token, MILITARY_FORECAST_INPUTS_STALE_KEY, forecastInputsPayload, MILITARY_FORECAST_INPUTS_STALE_TTL);
     await redisSet(url, token, MILITARY_SURGES_LIVE_KEY, surgePayload, MILITARY_SURGES_LIVE_TTL);
     await redisSet(url, token, MILITARY_SURGES_STALE_KEY, surgePayload, MILITARY_SURGES_STALE_TTL);
     await redisSet(url, token, MILITARY_SURGES_HISTORY_KEY, { history: surgeHistory }, MILITARY_SURGES_HISTORY_TTL);
     await redisSet(url, token, 'seed-meta:military-surges', {
-      fetchedAt: Date.now(),
+      fetchedAt: assessedAt,
       recordCount: surges.length,
       sourceVersion: source || '',
     }, 604800);
+    await redisSet(url, token, 'seed-meta:military-forecast-inputs', {
+      fetchedAt: assessedAt,
+      recordCount: theaters.length,
+      sourceVersion: source || '',
+    }, 604800);
     console.log(`  Military surges: ${surges.length} detected (history: ${surgeHistory.length} runs)`);
+    await releaseLock('military:flights', runId);
+    lockReleased = true;
+    try {
+      await triggerForecastSeedIfEnabled();
+    } catch (err) {
+      console.warn(`  Forecast reseed failed after military publish: ${err.message || err}`);
+    }
 
     const durationMs = Date.now() - startMs;
     logSeedResult('military', flights.length, durationMs);
     console.log(`\n=== Done (${Math.round(durationMs)}ms) ===`);
   } finally {
-    await releaseLock('military:flights', runId);
+    if (!lockReleased) await releaseLock('military:flights', runId);
   }
 }
 
