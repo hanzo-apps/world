@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, getRedisCredentials, acquireLock, releaseLock, withRetry, writeFreshnessMetadata, logSeedResult, verifySeedKey, extendExistingTtl } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, getRedisCredentials, acquireLockSafely, releaseLock, withRetry, writeFreshnessMetadata, logSeedResult, verifySeedKey, extendExistingTtl } from './_seed-utils.mjs';
 import { summarizeMilitaryTheaters, buildMilitarySurges, appendMilitaryHistory } from './_military-surges.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
@@ -900,8 +900,11 @@ async function main() {
 
   console.log(`=== military:flights Seed (proxy: ${PROXY_ENABLED ? 'enabled' : 'direct'}) ===`);
 
-  const locked = await acquireLock('military:flights', runId, 120_000);
-  if (!locked) {
+  const lockResult = await acquireLockSafely('military:flights', runId, 120_000, { label: 'military:flights' });
+  if (lockResult.skipped) {
+    process.exit(0);
+  }
+  if (!lockResult.locked) {
     console.log('  SKIPPED: another seed run in progress');
     process.exit(0);
   }
