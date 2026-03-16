@@ -285,6 +285,19 @@ function buildWingbitsSourceMeta(flight) {
   return {
     source: 'wingbits',
     rawKeys: Object.keys(flight || {}),
+    rawPreview: {
+      operator: flight?.operator || '',
+      operatorName: flight?.operatorName || '',
+      airline: flight?.airline || '',
+      owner: flight?.owner || '',
+      type: flight?.type || '',
+      category: flight?.category || '',
+      aircraftType: flight?.aircraftType || '',
+      aircraftTypeCode: flight?.aircraftTypeCode || flight?.icaoType || flight?.aircraftCode || '',
+      description: flight?.description || flight?.aircraftDescription || '',
+      registration: flight?.registration || flight?.reg || flight?.tail || '',
+      originCountry: flight?.co || flight?.originCountry || '',
+    },
     operatorName: flight?.operator || flight?.operatorName || flight?.airline || flight?.owner || flight?.o || '',
     operatorCode: flight?.operatorCode || flight?.airlineCode || flight?.icaoOperator || flight?.iataOperator || '',
     ownerName: flight?.owner || flight?.ownerName || '',
@@ -326,6 +339,90 @@ function summarizeSourceMeta(sourceMeta = {}) {
     registration: sourceMeta.registration || '',
     originCountry: sourceMeta.originCountry || '',
   };
+}
+
+function summarizeRawSourcePreview(sourceMeta = {}) {
+  const preview = sourceMeta.rawPreview || {};
+  return Object.fromEntries(
+    Object.entries(preview).filter(([, value]) => Boolean(value)),
+  );
+}
+
+const SOURCE_META_FIELDS = [
+  'operatorName',
+  'operatorCode',
+  'ownerName',
+  'aircraftModel',
+  'aircraftTypeLabel',
+  'aircraftTypeCode',
+  'aircraftDescription',
+  'registration',
+  'originCountry',
+];
+
+function hasMeaningfulSourceMeta(sourceMeta = {}) {
+  const summary = summarizeSourceMeta(sourceMeta);
+  return SOURCE_META_FIELDS.some((field) => Boolean(summary[field]));
+}
+
+function createClassificationStageCounters() {
+  return {
+    positionEligible: 0,
+    sourceMetaAttached: 0,
+    callsignPresent: 0,
+    callsignMatched: 0,
+    hexMatched: 0,
+    candidateStates: 0,
+    sourceTypeCandidateHits: 0,
+    sourceOperatorCandidateHits: 0,
+    sourceFieldCoverage: Object.fromEntries(SOURCE_META_FIELDS.map((field) => [field, 0])),
+    sourceHintCounts: {
+      militaryHint: 0,
+      militaryOperatorHint: 0,
+      commercialHint: 0,
+    },
+    sourceRawKeyCounts: {},
+    rawKeyOnlyCandidates: 0,
+    rawKeyOnlySamples: [],
+    sourceShapeSamples: [],
+  };
+}
+
+function recordSourceCoverage(stageCounters, sourceMeta = {}, sourceHints = {}, sourceOperator = null, sourceType = 'unknown', callsign = '') {
+  const summary = summarizeSourceMeta(sourceMeta);
+  const rawPreview = summarizeRawSourcePreview(sourceMeta);
+  if (hasMeaningfulSourceMeta(sourceMeta)) {
+    stageCounters.sourceMetaAttached += 1;
+  }
+  if ((sourceMeta.rawKeys || []).length > 0 && !hasMeaningfulSourceMeta(sourceMeta)) {
+    stageCounters.rawKeyOnlyCandidates += 1;
+    if (stageCounters.rawKeyOnlySamples.length < 5) {
+      stageCounters.rawKeyOnlySamples.push({
+        callsign,
+        rawKeys: [...(sourceMeta.rawKeys || [])].slice(0, 20).sort(),
+      });
+    }
+  }
+  for (const field of SOURCE_META_FIELDS) {
+    if (summary[field]) stageCounters.sourceFieldCoverage[field] += 1;
+  }
+  if (sourceHints.militaryHint) stageCounters.sourceHintCounts.militaryHint += 1;
+  if (sourceHints.militaryOperatorHint) stageCounters.sourceHintCounts.militaryOperatorHint += 1;
+  if (sourceHints.commercialHint) stageCounters.sourceHintCounts.commercialHint += 1;
+  if (sourceOperator) stageCounters.sourceOperatorCandidateHits += 1;
+  if (sourceType !== 'unknown') stageCounters.sourceTypeCandidateHits += 1;
+  for (const rawKey of sourceMeta.rawKeys || []) {
+    if (!rawKey) continue;
+    stageCounters.sourceRawKeyCounts[rawKey] = (stageCounters.sourceRawKeyCounts[rawKey] || 0) + 1;
+  }
+  if (stageCounters.sourceShapeSamples.length < 5 && ((sourceMeta.rawKeys || []).length > 0 || Object.keys(rawPreview).length > 0)) {
+    stageCounters.sourceShapeSamples.push({
+      callsign,
+      rawKeys: [...(sourceMeta.rawKeys || [])].slice(0, 20).sort(),
+      normalized: summary,
+      rawPreview,
+    });
+  }
 }
 
 function deriveSourceHints(sourceMeta = {}) {
@@ -664,7 +761,7 @@ async function fetchAllStates() {
 }
 
 // ── Filter & Build Military Flights ────────────────────────
-function summarizeClassificationAudit(rawStates, flights, rejected) {
+function summarizeClassificationAudit(rawStates, flights, rejected, stageCounters) {
   const admittedByReason = {};
   const rejectedByReason = {};
   let typedByCallsign = 0;
@@ -673,6 +770,9 @@ function summarizeClassificationAudit(rawStates, flights, rejected) {
   let unknownType = 0;
   let operatorOther = 0;
   let sourceOperatorInferred = 0;
+  let typedFlights = 0;
+  let operatorResolved = 0;
+  let highConfidenceFlights = 0;
 
   for (const flight of flights) {
     admittedByReason[flight.admissionReason] = (admittedByReason[flight.admissionReason] || 0) + 1;
@@ -681,7 +781,10 @@ function summarizeClassificationAudit(rawStates, flights, rejected) {
     if (flight.operatorInferenceReason === 'source_metadata') sourceOperatorInferred += 1;
     if (flight.admissionReason.startsWith('hex_')) hexOnly += 1;
     if (flight.aircraftType === 'unknown') unknownType += 1;
+    else typedFlights += 1;
     if (flight.operator === 'other') operatorOther += 1;
+    else operatorResolved += 1;
+    if (flight.confidence === 'high') highConfidenceFlights += 1;
   }
 
   for (const row of rejected) {
@@ -700,6 +803,36 @@ function summarizeClassificationAudit(rawStates, flights, rejected) {
     hexOnlyAdmissions: hexOnly,
     operatorOtherRate: flights.length ? Number((operatorOther / flights.length).toFixed(3)) : 0,
     unknownTypeRate: flights.length ? Number((unknownType / flights.length).toFixed(3)) : 0,
+    stageWaterfall: {
+      rawStates,
+      positionEligible: stageCounters.positionEligible,
+      sourceMetaAttached: stageCounters.sourceMetaAttached,
+      callsignPresent: stageCounters.callsignPresent,
+      callsignMatched: stageCounters.callsignMatched,
+      hexMatched: stageCounters.hexMatched,
+      candidateStates: stageCounters.candidateStates,
+      admittedFlights: flights.length,
+      typedFlights,
+      operatorResolved,
+      highConfidenceFlights,
+    },
+    sourceCoverage: {
+      ...Object.fromEntries(
+        Object.entries(stageCounters.sourceFieldCoverage).map(([field, count]) => [`${field}Present`, count]),
+      ),
+      militaryHint: stageCounters.sourceHintCounts.militaryHint,
+      militaryOperatorHint: stageCounters.sourceHintCounts.militaryOperatorHint,
+      commercialHint: stageCounters.sourceHintCounts.commercialHint,
+      sourceOperatorCandidateHits: stageCounters.sourceOperatorCandidateHits,
+      sourceTypeCandidateHits: stageCounters.sourceTypeCandidateHits,
+      rawKeyOnlyCandidates: stageCounters.rawKeyOnlyCandidates,
+      topRawKeys: Object.entries(stageCounters.sourceRawKeyCounts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 10)
+        .map(([key, count]) => ({ key, count })),
+      rawKeyOnlySamples: stageCounters.rawKeyOnlySamples,
+      sourceShapeSamples: stageCounters.sourceShapeSamples,
+    },
     samples: {
       accepted: flights.slice(0, 8).map((flight) => ({
         callsign: flight.callsign,
@@ -842,6 +975,7 @@ function filterMilitaryFlights(allStates) {
   const flights = [];
   const byType = {};
   const rejected = [];
+  const stageCounters = createClassificationStageCounters();
 
   for (const state of allStates) {
     const icao24 = state[0];
@@ -849,13 +983,21 @@ function filterMilitaryFlights(allStates) {
     const lat = state[6];
     const lon = state[5];
     if (lat == null || lon == null) continue;
+    stageCounters.positionEligible += 1;
 
     const originCountry = state[2] || '';
     const sourceMeta = state[15] || {};
     const sourceHints = deriveSourceHints(sourceMeta);
+    const sourceOperator = deriveOperatorFromSourceMeta(sourceMeta);
+    const sourceType = detectAircraftTypeFromSourceMeta(sourceMeta);
+    recordSourceCoverage(stageCounters, sourceMeta, sourceHints, sourceOperator, sourceType, callsign);
+    if (callsign) stageCounters.callsignPresent += 1;
     const csMatch = callsign ? identifyByCallsign(callsign, originCountry) : null;
     const commercialMatch = callsign ? identifyCommercialCallsign(callsign) : null;
     const hexMatch = isKnownHex(icao24);
+    if (csMatch) stageCounters.callsignMatched += 1;
+    if (hexMatch) stageCounters.hexMatched += 1;
+    if (csMatch || hexMatch) stageCounters.candidateStates += 1;
 
     if (!csMatch && commercialMatch && !sourceHints.militaryHint) {
       pushRejectedFlight(rejected, state, 'commercial_callsign_override');
@@ -884,7 +1026,7 @@ function filterMilitaryFlights(allStates) {
   return {
     flights,
     byType,
-    audit: summarizeClassificationAudit(allStates.length, flights, rejected),
+    audit: summarizeClassificationAudit(allStates.length, flights, rejected, stageCounters),
   };
 }
 
@@ -986,6 +1128,15 @@ async function main() {
     console.log(`  Military: ${flights.length} (${Object.entries(byType).map(([t, n]) => `${t}:${n}`).join(', ')})`);
     if (classificationAudit) {
       console.log(`  [Audit] unknownRate=${classificationAudit.unknownTypeRate} hexOnly=${classificationAudit.hexOnlyAdmissions} rejected=${classificationAudit.rejectedFlights}`);
+      console.log(
+        `  [Audit] waterfall raw=${classificationAudit.stageWaterfall.rawStates} pos=${classificationAudit.stageWaterfall.positionEligible} candidate=${classificationAudit.stageWaterfall.candidateStates} admitted=${classificationAudit.stageWaterfall.admittedFlights} typed=${classificationAudit.stageWaterfall.typedFlights}`,
+      );
+      console.log(
+        `  [Audit] source attached=${classificationAudit.stageWaterfall.sourceMetaAttached} operatorHits=${classificationAudit.sourceCoverage.sourceOperatorCandidateHits} typeHits=${classificationAudit.sourceCoverage.sourceTypeCandidateHits} topKeys=${classificationAudit.sourceCoverage.topRawKeys.map((item) => `${item.key}:${item.count}`).join(',') || 'none'}`,
+      );
+      console.log(
+        `  [Audit] rawKeyOnly=${classificationAudit.sourceCoverage.rawKeyOnlyCandidates} samples=${classificationAudit.sourceCoverage.rawKeyOnlySamples.length} sourceShapeSamples=${classificationAudit.sourceCoverage.sourceShapeSamples.length}`,
+      );
     }
   } catch (err) {
     await releaseLock('military:flights', runId);
