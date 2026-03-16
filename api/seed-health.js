@@ -1,5 +1,6 @@
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { validateApiKey } from './_api-key.js';
+import { jsonResponse } from './_json-response.js';
 
 export const config = { runtime: 'edge' };
 
@@ -87,9 +88,7 @@ export default async function handler(req) {
 
   const apiKeyResult = validateApiKey(req);
   if (apiKeyResult.required && !apiKeyResult.valid)
-    return new Response(JSON.stringify({ error: apiKeyResult.error }), {
-      status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: apiKeyResult.error }, 401, cors);
 
   const now = Date.now();
   const entries = Object.entries(SEED_DOMAINS);
@@ -99,9 +98,7 @@ export default async function handler(req) {
   try {
     metaMap = await getMetaBatch(metaKeys);
   } catch {
-    return new Response(JSON.stringify({ error: 'Redis unavailable' }), {
-      status: 503, headers: { ...cors, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Redis unavailable' }, 503, cors);
   }
 
   const seeds = {};
@@ -136,12 +133,8 @@ export default async function handler(req) {
 
   const httpStatus = overall === 'healthy' ? 200 : overall === 'warning' ? 200 : 503;
 
-  return new Response(JSON.stringify({ overall, seeds, checkedAt: now }), {
-    status: httpStatus,
-    headers: {
-      ...cors,
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
-    },
+  return jsonResponse({ overall, seeds, checkedAt: now }, httpStatus, {
+    ...cors,
+    'Cache-Control': 'no-cache',
   });
 }

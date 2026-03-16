@@ -3,6 +3,7 @@ export const config = { runtime: 'edge' };
 import { ConvexHttpClient } from 'convex/browser';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { getClientIp, verifyTurnstile } from './_turnstile.js';
+import { jsonResponse } from './_json-response.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LENGTH = 320;
@@ -11,15 +12,6 @@ const MAX_META_LENGTH = 100;
 const rateLimitMap = new Map();
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
-
-function jsonResponse(body, status, cors) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: cors
-      ? { 'Content-Type': 'application/json', ...cors }
-      : { 'Content-Type': 'application/json' },
-  });
-}
 
 function isRateLimited(ip) {
   const now = Date.now();

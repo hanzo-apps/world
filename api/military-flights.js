@@ -1,4 +1,5 @@
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+import { jsonResponse } from './_json-response.js';
 import { readJsonFromUpstash } from './_upstash-json.js';
 
 export const config = { runtime: 'edge' };
@@ -43,31 +44,25 @@ export default async function handler(req) {
   }
 
   if (isDisallowedOrigin(req)) {
-    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return jsonResponse({ error: 'Origin not allowed' }, 403, corsHeaders);
   }
 
   const data = await fetchMilitaryFlightsData();
 
   if (!data) {
-    return new Response(JSON.stringify({ error: 'Military flight data temporarily unavailable' }), {
-      status: 503,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store',
-        ...corsHeaders,
-      },
-    });
+    return jsonResponse(
+      { error: 'Military flight data temporarily unavailable' },
+      503,
+      { 'Cache-Control': 'no-cache, no-store', ...corsHeaders },
+    );
   }
 
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
+  return jsonResponse(
+    data,
+    200,
+    {
       'Cache-Control': 's-maxage=120, stale-while-revalidate=60, stale-if-error=300',
       ...corsHeaders,
     },
-  });
+  );
 }

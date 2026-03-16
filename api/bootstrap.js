@@ -1,5 +1,6 @@
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { validateApiKey } from './_api-key.js';
+import { jsonResponse } from './_json-response.js';
 
 export const config = { runtime: 'edge' };
 
@@ -121,9 +122,7 @@ export default async function handler(req) {
 
   const apiKeyResult = validateApiKey(req);
   if (apiKeyResult.required && !apiKeyResult.valid)
-    return new Response(JSON.stringify({ error: apiKeyResult.error }), {
-      status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: apiKeyResult.error }, 401, cors);
 
   const url = new URL(req.url);
   const tier = url.searchParams.get('tier');
@@ -145,10 +144,7 @@ export default async function handler(req) {
   try {
     cached = await getCachedJsonBatch(keys);
   } catch {
-    return new Response(JSON.stringify({ data: {}, missing: names }), {
-      status: 200,
-      headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-    });
+    return jsonResponse({ data: {}, missing: names }, 200, { ...cors, 'Cache-Control': 'no-cache' });
   }
 
   const data = {};
@@ -161,13 +157,9 @@ export default async function handler(req) {
 
   const cacheControl = (tier && TIER_CACHE[tier]) || 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900';
 
-  return new Response(JSON.stringify({ data, missing }), {
-    status: 200,
-    headers: {
-      ...cors,
-      'Content-Type': 'application/json',
-      'Cache-Control': cacheControl,
-      'CDN-Cache-Control': (tier && TIER_CDN_CACHE[tier]) || TIER_CDN_CACHE.fast,
-    },
+  return jsonResponse({ data, missing }, 200, {
+    ...cors,
+    'Cache-Control': cacheControl,
+    'CDN-Cache-Control': (tier && TIER_CDN_CACHE[tier]) || TIER_CDN_CACHE.fast,
   });
 }
