@@ -18,6 +18,7 @@ import {
   detectCyberScenarios,
   detectGpsJammingScenarios,
   detectFromPredictionMarkets,
+  getFreshMilitaryForecastInputs,
   normalizeChokepoints,
   normalizeGpsJamming,
   loadEntityGraph,
@@ -421,6 +422,18 @@ describe('detectConflictScenarios', () => {
     assert.ok(result.length >= 1);
     assert.equal(result[0].region, 'Middle East');
   });
+
+  it('accepts theater posture entries that use theater instead of id', () => {
+    const inputs = {
+      ciiScores: [],
+      theaterPosture: { theaters: [{ theater: 'taiwan-theater', name: 'Taiwan Theater', postureLevel: 'elevated' }] },
+      iranEvents: [],
+      ucdpEvents: [],
+    };
+    const result = detectConflictScenarios(inputs);
+    assert.ok(result.length >= 1);
+    assert.equal(result[0].region, 'Western Pacific');
+  });
 });
 
 describe('detectMarketScenarios', () => {
@@ -539,7 +552,7 @@ describe('detectPoliticalScenarios', () => {
 describe('detectMilitaryScenarios', () => {
   it('accepts live theater entries that use theater instead of id', () => {
     const inputs = {
-      theaterPosture: { theaters: [{ theater: 'baltic-theater', postureLevel: 'critical', activeFlights: 12 }] },
+      militaryForecastInputs: { fetchedAt: Date.now(), theaters: [{ theater: 'baltic-theater', postureLevel: 'critical', activeFlights: 12 }] },
       temporalAnomalies: { anomalies: [] },
     };
     const result = detectMilitaryScenarios(inputs);
@@ -550,10 +563,45 @@ describe('detectMilitaryScenarios', () => {
 
   it('creates a military forecast from theater surge data even before posture turns elevated', () => {
     const inputs = {
-      theaterPosture: { theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }] },
       temporalAnomalies: { anomalies: [] },
-      militarySurges: {
+      militaryForecastInputs: {
         fetchedAt: Date.now(),
+        theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }],
+        surges: [{
+          theaterId: 'taiwan-theater',
+          surgeType: 'fighter',
+          currentCount: 8,
+          baselineCount: 2,
+          surgeMultiple: 4,
+          persistent: true,
+          persistenceCount: 2,
+          postureLevel: 'normal',
+          strikeCapable: true,
+          fighters: 8,
+          tankers: 1,
+          awacs: 1,
+          dominantCountry: 'China',
+          dominantCountryCount: 6,
+          dominantOperator: 'plaaf',
+        }],
+      },
+    };
+    const result = detectMilitaryScenarios(inputs);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].title, 'China-linked fighter surge near Taiwan Strait');
+    assert.ok(result[0].probability >= 0.7);
+    assert.ok(result[0].signals.some((signal) => signal.type === 'mil_surge'));
+    assert.ok(result[0].signals.some((signal) => signal.type === 'operator'));
+    assert.ok(result[0].signals.some((signal) => signal.type === 'persistence'));
+    assert.ok(result[0].signals.some((signal) => signal.type === 'theater_actor_fit'));
+  });
+
+  it('ignores stale military surge payloads', () => {
+    const inputs = {
+      temporalAnomalies: { anomalies: [] },
+      militaryForecastInputs: {
+        fetchedAt: Date.now() - (4 * 60 * 60 * 1000),
+        theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }],
         surges: [{
           theaterId: 'taiwan-theater',
           surgeType: 'fighter',
@@ -571,32 +619,42 @@ describe('detectMilitaryScenarios', () => {
       },
     };
     const result = detectMilitaryScenarios(inputs);
-    assert.equal(result.length, 1);
-    assert.equal(result[0].title, 'Military air surge: Taiwan Strait');
-    assert.ok(result[0].probability >= 0.7);
-    assert.ok(result[0].signals.some((signal) => signal.type === 'mil_surge'));
-    assert.ok(result[0].signals.some((signal) => signal.type === 'operator'));
+    assert.equal(result.length, 0);
   });
 
-  it('ignores stale military surge payloads', () => {
+  it('rejects military bundles whose theater timestamps drift from fetchedAt', () => {
+    const bundle = getFreshMilitaryForecastInputs({
+      militaryForecastInputs: {
+        fetchedAt: Date.now(),
+        theaters: [{ theater: 'taiwan-theater', postureLevel: 'elevated', assessedAt: Date.now() - (6 * 60 * 1000) }],
+        surges: [],
+      },
+    });
+    assert.equal(bundle, null);
+  });
+
+  it('suppresses one-off generic air activity when it lacks persistence and theater-relevant actors', () => {
     const inputs = {
-      theaterPosture: { theaters: [{ theater: 'taiwan-theater', postureLevel: 'normal', activeFlights: 5 }] },
       temporalAnomalies: { anomalies: [] },
-      militarySurges: {
-        fetchedAt: Date.now() - (4 * 60 * 60 * 1000),
+      militaryForecastInputs: {
+        fetchedAt: Date.now(),
+        theaters: [{ theater: 'iran-theater', postureLevel: 'normal', activeFlights: 6 }],
         surges: [{
-          theaterId: 'taiwan-theater',
-          surgeType: 'fighter',
-          currentCount: 8,
-          baselineCount: 2,
-          surgeMultiple: 4,
+          theaterId: 'iran-theater',
+          surgeType: 'air_activity',
+          currentCount: 6,
+          baselineCount: 2.7,
+          surgeMultiple: 2.22,
+          persistent: false,
+          persistenceCount: 0,
           postureLevel: 'normal',
-          strikeCapable: true,
-          fighters: 8,
-          tankers: 1,
-          awacs: 1,
-          dominantCountry: 'China',
-          dominantCountryCount: 6,
+          strikeCapable: false,
+          fighters: 0,
+          tankers: 0,
+          awacs: 0,
+          dominantCountry: 'Qatar',
+          dominantCountryCount: 4,
+          dominantOperator: 'other',
         }],
       },
     };
