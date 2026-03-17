@@ -585,6 +585,26 @@ function isOpenSkyUnauthorizedError(error) {
   return /HTTP 401\b/i.test(String(error?.message || error || ''));
 }
 
+function getOpenSkyAuthStatus() {
+  if (!process.env.OPENSKY_CLIENT_ID || !process.env.OPENSKY_CLIENT_SECRET) return 'not_configured';
+  if (Date.now() < openskyAuthCooldownUntil) return 'cooldown';
+  return 'pending';
+}
+
+async function fetchJsonDirect(url, { headers = {}, method = 'GET', body = null, timeout = 15_000 } = {}) {
+  const resp = await fetch(url, {
+    method,
+    headers: { ...headers, 'User-Agent': CHROME_UA, Accept: 'application/json' },
+    body,
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!resp.ok) {
+    const bodyText = await resp.text().catch(() => '');
+    throw new Error(`HTTP ${resp.status}: ${bodyText.substring(0, 200)}`);
+  }
+  return resp.json();
+}
+
 async function getOpenSkyToken() {
   const clientId = process.env.OPENSKY_CLIENT_ID;
   const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
@@ -615,25 +635,24 @@ async function getOpenSkyToken() {
 
       try {
         let data;
-        if (PROXY_ENABLED) {
-          data = await proxyFetchJson(OPENSKY_TOKEN_URL, {
+        try {
+          data = await fetchJsonDirect(OPENSKY_TOKEN_URL, {
             method: 'POST',
             headers,
             body: postData,
-            timeout: 15_000,
           });
-        } else {
-          const resp = await fetch(OPENSKY_TOKEN_URL, {
-            method: 'POST',
-            headers,
-            body: postData,
-            signal: AbortSignal.timeout(15_000),
-          });
-          if (!resp.ok) {
-            const body = await resp.text().catch(() => '');
-            throw new Error(`OpenSky token HTTP ${resp.status}: ${body.substring(0, 200)}`);
+        } catch (directError) {
+          if (!PROXY_ENABLED) throw directError;
+          try {
+            data = await proxyFetchJson(OPENSKY_TOKEN_URL, {
+              method: 'POST',
+              headers,
+              body: postData,
+              timeout: 15_000,
+            });
+          } catch (proxyError) {
+            throw new Error(`direct=${redactProxy(directError.message)} | proxy=${redactProxy(proxyError.message)}`);
           }
-          data = await resp.json();
         }
 
         if (!data?.access_token) {
@@ -666,59 +685,120 @@ async function fetchOpenSkyAuthenticated(region) {
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const token = await getOpenSkyToken();
-    if (!token) return null;
+    if (!token) return { states: null, status: getOpenSkyAuthStatus() };
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      if (PROXY_ENABLED) {
-        const data = await proxyFetchJson(url, { headers });
-        return data.states || [];
-      }
-
-      const resp = await fetch(url, {
-        headers: { ...headers, 'User-Agent': CHROME_UA, Accept: 'application/json' },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!resp.ok) {
-        const body = await resp.text().catch(() => '');
-        if (resp.status === 401) {
+      let data;
+      try {
+        data = await fetchJsonDirect(url, { headers });
+        return { states: data.states || [], status: `success:direct` };
+      } catch (directError) {
+        if (isOpenSkyUnauthorizedError(directError)) {
           clearOpenSkyToken();
+          if (attempt === 0) continue;
         }
-        throw new Error(`OpenSky auth HTTP ${resp.status}: ${body.substring(0, 200)}`);
+        if (!PROXY_ENABLED) throw directError;
+        try {
+          data = await proxyFetchJson(url, { headers });
+          return { states: data.states || [], status: `success:proxy` };
+        } catch (proxyError) {
+          if (isOpenSkyUnauthorizedError(proxyError)) {
+            clearOpenSkyToken();
+            if (attempt === 0) continue;
+          }
+          throw new Error(`direct=${redactProxy(directError.message)} | proxy=${redactProxy(proxyError.message)}`);
+        }
       }
-      const data = await resp.json();
-      return data.states || [];
     } catch (error) {
-      if (isOpenSkyUnauthorizedError(error)) {
-        clearOpenSkyToken();
-        if (attempt === 0) continue;
-      }
-      throw error;
+      return { states: null, status: `error:${redactProxy(error.message)}` };
     }
   }
 
-  return null;
+  return { states: null, status: getOpenSkyAuthStatus() };
 }
 
 async function fetchOpenSkyAnonymous(region) {
   const params = `lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
   const url = `${OPENSKY_BASE}/states/all?${params}`;
 
-  if (PROXY_ENABLED) {
-    const data = await proxyFetchJson(url);
-    return data.states || [];
+  try {
+    const data = await fetchJsonDirect(url);
+    return { states: data.states || [], status: 'success:direct' };
+  } catch (directError) {
+    if (!PROXY_ENABLED) {
+      throw new Error(`error:${redactProxy(directError.message)}`);
+    }
+    try {
+      const data = await proxyFetchJson(url);
+      return { states: data.states || [], status: 'success:proxy' };
+    } catch (proxyError) {
+      throw new Error(`error:direct=${redactProxy(directError.message)} | proxy=${redactProxy(proxyError.message)}`);
+    }
+  }
+}
+
+async function fetchOpenSkyRegion(region, { source, fetchSources, seenIds, allStates }) {
+  let states = null;
+  const regionSource = {
+    name: region.name,
+    authStatus: getOpenSkyAuthStatus(),
+    anonStatus: 'not_needed',
+    statesSeen: 0,
+    statesAdded: 0,
+  };
+
+  try {
+    const authResult = await fetchOpenSkyAuthenticated(region);
+    states = authResult?.states || null;
+    regionSource.authStatus = authResult?.status || regionSource.authStatus;
+    if (states && states.length > 0) {
+      if (source.value === 'none') source.value = 'opensky-auth';
+      fetchSources.openSkyAuthSuccess = true;
+      regionSource.statesSeen = states.length;
+      console.log(`  [OpenSky Auth] ${region.name}: ${states.length} states`);
+    } else if (regionSource.authStatus.startsWith('success:')) {
+      fetchSources.openSkyAuthSuccess = true;
+      regionSource.authStatus = regionSource.authStatus.replace('success:', 'empty:');
+    }
+  } catch (e) {
+    regionSource.authStatus = `error:${redactProxy(e.message)}`;
+    console.warn(`  [OpenSky Auth] ${region.name}: ${redactProxy(e.message)}`);
   }
 
-  const resp = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    throw new Error(`OpenSky anon HTTP ${resp.status}: ${body.substring(0, 200)}`);
+  if (!states || states.length === 0) {
+    try {
+      const anonResult = await fetchOpenSkyAnonymous(region);
+      states = anonResult?.states || null;
+      regionSource.anonStatus = anonResult?.status || regionSource.anonStatus;
+      if (states && states.length > 0) {
+        if (source.value === 'none') source.value = 'opensky-anon';
+        fetchSources.openSkyAnonFallbackUsed = true;
+        regionSource.statesSeen = states.length;
+        console.log(`  [OpenSky Anon] ${region.name}: ${states.length} states`);
+      } else if (regionSource.anonStatus.startsWith('success:')) {
+        regionSource.anonStatus = regionSource.anonStatus.replace('success:', 'empty:');
+      }
+    } catch (e) {
+      regionSource.anonStatus = `error:${redactProxy(e.message)}`;
+      console.warn(`  [OpenSky Anon] ${region.name}: ${redactProxy(e.message)}`);
+    }
   }
-  const data = await resp.json();
-  return data.states || [];
+
+  if (states) {
+    let added = 0;
+    for (const state of states) {
+      const icao24 = state[0];
+      if (seenIds.has(icao24)) continue;
+      seenIds.add(icao24);
+      allStates.push(state);
+      added++;
+    }
+    regionSource.statesAdded = added;
+    if (added > 0) console.log(`  [OpenSky] +${added} new from ${region.name} (total: ${allStates.length})`);
+  }
+
+  fetchSources.regions.push(regionSource);
 }
 
 async function fetchWingbits() {
@@ -805,7 +885,7 @@ async function fetchWingbits() {
 async function fetchAllStates() {
   const seenIds = new Set();
   const allStates = [];
-  let source = 'none';
+  const source = { value: 'none' };
   const oauthConfigured = Boolean(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
   const fetchSources = {
     wingbitsUsed: false,
@@ -826,7 +906,7 @@ async function fetchAllStates() {
       allStates.push(state);
     }
     if (wbStates.length > 0) {
-      source = 'wingbits';
+      source.value = 'wingbits';
       fetchSources.wingbitsUsed = true;
       console.log(`  [Wingbits] ${wbStates.length} unique aircraft loaded`);
     }
@@ -834,69 +914,11 @@ async function fetchAllStates() {
     console.warn(`  [Wingbits] ${e.message}`);
   }
 
-  // Tier 2: OpenSky (auth via proxy) — supplements with aircraft Wingbits may miss
   for (const region of QUERY_REGIONS) {
-    let states = null;
-    const regionSource = {
-      name: region.name,
-      authStatus: oauthConfigured ? 'pending' : 'not_configured',
-      anonStatus: 'not_needed',
-      statesSeen: 0,
-      statesAdded: 0,
-    };
-
-    try {
-      states = await fetchOpenSkyAuthenticated(region);
-      if (states && states.length > 0) {
-        if (source === 'none') source = 'opensky-auth';
-        fetchSources.openSkyAuthSuccess = true;
-        regionSource.authStatus = 'success';
-        regionSource.statesSeen = states.length;
-        console.log(`  [OpenSky Auth] ${region.name}: ${states.length} states`);
-      } else if (oauthConfigured) {
-        regionSource.authStatus = 'empty';
-      }
-    } catch (e) {
-      regionSource.authStatus = `error:${redactProxy(e.message)}`;
-      console.warn(`  [OpenSky Auth] ${region.name}: ${redactProxy(e.message)}`);
-    }
-
-    // Tier 3: OpenSky anonymous (via proxy) — last resort
-    if (!states || states.length === 0) {
-      try {
-        states = await fetchOpenSkyAnonymous(region);
-        if (states && states.length > 0) {
-          if (source === 'none') source = 'opensky-anon';
-          fetchSources.openSkyAnonFallbackUsed = true;
-          regionSource.anonStatus = 'success';
-          regionSource.statesSeen = states.length;
-          console.log(`  [OpenSky Anon] ${region.name}: ${states.length} states`);
-        } else {
-          regionSource.anonStatus = 'empty';
-        }
-      } catch (e) {
-        regionSource.anonStatus = `error:${redactProxy(e.message)}`;
-        console.warn(`  [OpenSky Anon] ${region.name}: ${redactProxy(e.message)}`);
-      }
-    }
-
-    if (states) {
-      let added = 0;
-      for (const state of states) {
-        const icao24 = state[0];
-        if (seenIds.has(icao24)) continue;
-        seenIds.add(icao24);
-        allStates.push(state);
-        added++;
-      }
-      regionSource.statesAdded = added;
-      if (added > 0) console.log(`  [OpenSky] +${added} new from ${region.name} (total: ${allStates.length})`);
-    }
-
-    fetchSources.regions.push(regionSource);
+    await fetchOpenSkyRegion(region, { source, fetchSources, seenIds, allStates });
   }
 
-  return { allStates, source, fetchSources };
+  return { allStates, source: source.value, fetchSources };
 }
 
 // ── Filter & Build Military Flights ────────────────────────
