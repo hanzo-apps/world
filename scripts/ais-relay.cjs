@@ -3697,7 +3697,18 @@ async function seedWorldBank() {
       const priorMeta = await upstashGet(`seed-meta:${WB_BOOTSTRAP_KEY}`);
       if (priorMeta && typeof priorMeta.recordCount === 'number' && priorMeta.recordCount > 0) {
         if (rankings.length < priorMeta.recordCount * 0.5) {
-          console.warn(`[WB] Rankings dropped >50%: ${rankings.length} vs prior ${priorMeta.recordCount} — skipping overwrite`);
+          console.warn(`[WB] Rankings dropped >50%: ${rankings.length} vs prior ${priorMeta.recordCount} — extending TTLs instead of overwriting`);
+          const results = await Promise.all([
+            upstashExpire(WB_BOOTSTRAP_KEY, WB_TTL_SECONDS),
+            upstashExpire(`seed-meta:${WB_BOOTSTRAP_KEY}`, WB_TTL_SECONDS + 3600),
+            upstashExpire(WB_PROGRESS_KEY, WB_TTL_SECONDS),
+            upstashExpire(`seed-meta:${WB_PROGRESS_KEY}`, WB_TTL_SECONDS + 3600),
+            upstashExpire(WB_RENEWABLE_KEY, WB_TTL_SECONDS),
+            upstashExpire(`seed-meta:${WB_RENEWABLE_KEY}`, WB_TTL_SECONDS + 3600),
+          ]);
+          const ok = results.filter(Boolean).length;
+          if (ok === results.length) console.log('[WB] TTLs extended. Exiting without overwriting.');
+          else console.warn(`[WB] TTL extension partial: ${ok}/${results.length} succeeded`);
           return;
         }
       }
