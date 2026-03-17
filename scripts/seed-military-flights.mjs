@@ -1287,7 +1287,7 @@ async function main() {
   } catch (err) {
     await releaseLock('military:flights', runId);
     console.error(`  FETCH FAILED: ${err.message || err}`);
-    await extendExistingTtl([LIVE_KEY], LIVE_TTL);
+    await extendExistingTtl([LIVE_KEY, 'seed-meta:military:flights'], LIVE_TTL);
     await extendExistingTtl([STALE_KEY, THEATER_POSTURE_STALE_KEY, MILITARY_SURGES_STALE_KEY, MILITARY_FORECAST_INPUTS_STALE_KEY, MILITARY_CLASSIFICATION_AUDIT_STALE_KEY], STALE_TTL);
     await extendExistingTtl([THEATER_POSTURE_LIVE_KEY, MILITARY_FORECAST_INPUTS_LIVE_KEY, MILITARY_CLASSIFICATION_AUDIT_LIVE_KEY], THEATER_POSTURE_LIVE_TTL);
     await extendExistingTtl([THEATER_POSTURE_BACKUP_KEY], THEATER_POSTURE_BACKUP_TTL);
