@@ -30,6 +30,7 @@ export type DataSourceId =
   | 'supply_chain'
   | 'security_advisories'
   | 'gpsjam'
+  | 'radiation'
   | 'treasury_revenue';
 
 // AppContext lives in src/app/app-context.ts because it references
@@ -577,6 +578,7 @@ export interface MapLayers {
   ais: boolean;
   nuclear: boolean;
   irradiators: boolean;
+  radiationWatch?: boolean;
   sanctions: boolean;
   weather: boolean;
   economic: boolean;
@@ -1442,6 +1444,7 @@ export interface CountryBriefSignals {
   outages: number;
   aisDisruptions: number;
   satelliteFires: number;
+  radiationAnomalies: number;
   temporalAnomalies: number;
   cyberThreats: number;
   earthquakes: number;
