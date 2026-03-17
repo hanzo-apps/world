@@ -93,8 +93,9 @@ const SEED_META = {
   insights:         { key: 'seed-meta:news:insights',           maxStaleMin: 30 },
   marketQuotes:     { key: 'seed-meta:market:stocks',         maxStaleMin: 30 },
   commodityQuotes:  { key: 'seed-meta:market:commodities',    maxStaleMin: 30 },
-  // RPC-populated keys — auto-tracked by cachedFetchJson seed-meta writes
-  // serviceStatuses: removed — RPC-populated, no seed-meta after PR #1649
+  // RPC/warm-ping keys — seed-meta written by relay loops or handlers
+  serviceStatuses:  { key: 'seed-meta:infra:service-statuses',    maxStaleMin: 30 },
+  cableHealth:      { key: 'seed-meta:cable-health',              maxStaleMin: 60 },
   macroSignals:     { key: 'seed-meta:economic:macro-signals',    maxStaleMin: 60 },
   bisPolicy:        { key: 'seed-meta:economic:bis:policy',       maxStaleMin: 2880 },
   bisExchange:      { key: 'seed-meta:economic:bis:eer',          maxStaleMin: 2880 },
@@ -104,9 +105,8 @@ const SEED_META = {
   minerals:         { key: 'seed-meta:supply_chain:minerals',     maxStaleMin: 10080 },
   giving:           { key: 'seed-meta:giving:summary',            maxStaleMin: 10080 },
   gpsjam:           { key: 'seed-meta:intelligence:gpsjam',       maxStaleMin: 720 },
-  // cableHealth: removed — RPC-populated, no seed-meta after PR #1649
   positiveGeoEvents:{ key: 'seed-meta:positive-events:geo',       maxStaleMin: 60 },
-  // riskScores: removed — RPC-populated, no seed-meta after PR #1649
+  riskScores:       { key: 'seed-meta:intelligence:risk-scores',  maxStaleMin: 15 },
   iranEvents:       { key: 'seed-meta:conflict:iran-events',      maxStaleMin: 10080 },
   ucdpEvents:       { key: 'seed-meta:conflict:ucdp-events',      maxStaleMin: 420 },
   militaryFlights:  { key: 'seed-meta:military:flights',           maxStaleMin: 15 },
@@ -141,12 +141,11 @@ const SEED_META = {
 // Empty = WARN not CRIT since they only exist after first request.
 const ON_DEMAND_KEYS = new Set([
   'riskScoresLive',
-  'usniFleetStale', 'positiveEventsLive', 'cableHealth',
+  'usniFleetStale', 'positiveEventsLive',
   'bisPolicy', 'bisExchange', 'bisCredit',
   'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
   'cyberThreatsRpc', 'militaryBases', 'temporalAnomalies', 'displacement',
   'corridorrisk', // intermediate key; data flows through transit-summaries:v1
-  'riskScores', 'serviceStatuses', // RPC-populated; no seed-meta after PR #1649 removed it from cachedFetchJson
 ]);
 
 // Keys where 0 records is a valid healthy state (e.g. no airports closed).
