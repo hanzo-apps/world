@@ -6,6 +6,7 @@ import {
   buildForecastCase,
   populateFallbackNarratives,
   buildForecastTraceArtifacts,
+  buildForecastRunWorldState,
 } from '../scripts/seed-forecasts.mjs';
 
 import {
@@ -74,6 +75,7 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.manifest.tracedForecastCount, 1);
     assert.match(artifacts.manifestKey, /forecast-runs\/2026\/03\/15\/run-123\/manifest\.json/);
     assert.match(artifacts.summaryKey, /forecast-runs\/2026\/03\/15\/run-123\/summary\.json/);
+    assert.match(artifacts.worldStateKey, /forecast-runs\/2026\/03\/15\/run-123\/world-state\.json/);
     assert.equal(artifacts.forecasts.length, 1);
     assert.equal(artifacts.summary.topForecasts[0].id, a.id);
     assert.deepEqual(artifacts.summary.quality.fullRun.domainCounts, {
@@ -109,6 +111,11 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.quality.traced.enrichedRate, 0);
     assert.ok(artifacts.summary.quality.fullRun.quietDomains.includes('military'));
     assert.equal(artifacts.summary.quality.traced.topPromotionSignals[0].type, 'cii');
+    assert.ok(artifacts.summary.worldStateSummary.summary.includes('active forecasts'));
+    assert.equal(artifacts.summary.worldStateSummary.domainCount, 2);
+    assert.equal(artifacts.summary.worldStateSummary.regionCount, 2);
+    assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
+    assert.ok(artifacts.worldState.actorRegistry.every(actor => actor.name && actor.id));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -174,5 +181,38 @@ describe('forecast trace artifact builder', () => {
     assert.ok(artifacts.summary.quality.traced.topSuppressionSignals.length >= 1);
     assert.equal(artifacts.summary.quality.enrichment.selection.selectedCombinedCount, 1);
     assert.equal(artifacts.summary.quality.enrichment.combined.provider, 'openrouter');
+  });
+});
+
+describe('forecast run world state', () => {
+  it('builds a canonical run-level world state artifact', () => {
+    const a = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.74, 0.64, '7d', [
+      { type: 'cii', value: 'Iran CII 79 (high)', weight: 0.4 },
+      { type: 'news_corroboration', value: 'Regional officials warn of retaliation risk', weight: 0.3 },
+    ]);
+    a.newsContext = ['Regional officials warn of retaliation risk'];
+    a.trend = 'rising';
+    a.priorProbability = 0.61;
+    buildForecastCase(a);
+
+    const b = makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.52, 0.55, '30d', [
+      { type: 'chokepoint', value: 'Strait of Hormuz remains disrupted', weight: 0.5 },
+    ]);
+    b.trend = 'stable';
+    buildForecastCase(b);
+
+    populateFallbackNarratives([a, b]);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T12:00:00Z'),
+      predictions: [a, b],
+    });
+
+    assert.equal(worldState.version, 1);
+    assert.equal(worldState.domainStates.length, 2);
+    assert.ok(worldState.actorRegistry.length > 0);
+    assert.equal(worldState.continuity.risingForecasts, 1);
+    assert.ok(worldState.summary.includes('2 active forecasts'));
+    assert.ok(worldState.evidenceLedger.supporting.length > 0);
   });
 });
