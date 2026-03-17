@@ -21,6 +21,10 @@ const TRACE_RUNS_KEY = 'forecast:trace:runs:v1';
 const TRACE_RUNS_MAX = 50;
 const TRACE_REDIS_TTL_SECONDS = 60 * 24 * 60 * 60;
 const PUBLISH_MIN_PROBABILITY = 0;
+const ENRICHMENT_COMBINED_MAX = 3;
+const ENRICHMENT_SCENARIO_MAX = 3;
+const ENRICHMENT_MAX_PER_DOMAIN = 2;
+const ENRICHMENT_MIN_READINESS = 0.34;
 const MAX_MILITARY_SURGE_AGE_MS = 3 * 60 * 60 * 1000;
 const MAX_MILITARY_BUNDLE_DRIFT_MS = 5 * 60 * 1000;
 
@@ -2193,9 +2197,13 @@ function scoreForecastReadiness(pred) {
 function computeAnalysisPriority(pred) {
   const readiness = scoreForecastReadiness(pred);
   const baseScore = (pred.probability || 0) * (pred.confidence || 0);
-  const readinessMultiplier = 0.85 + (readiness.overall * 0.35);
+  const readinessMultiplier = 0.78 + (readiness.overall * 0.5);
+  const groundingBonus = readiness.groundingScore * 0.025;
+  const evidenceBonus = readiness.evidenceScore * 0.02;
   const trendBonus = pred.trend === 'rising' ? 0.015 : pred.trend === 'falling' ? -0.005 : 0;
-  return +((baseScore * readinessMultiplier) + trendBonus).toFixed(6);
+  const lowGroundingPenalty = readiness.groundingScore < 0.2 ? 0.02 : 0;
+  const lowEvidencePenalty = readiness.evidenceScore < 0.25 ? 0.015 : 0;
+  return +((baseScore * readinessMultiplier) + groundingBonus + evidenceBonus + trendBonus - lowGroundingPenalty - lowEvidencePenalty).toFixed(6);
 }
 
 function rankForecastsForAnalysis(predictions) {
@@ -2208,6 +2216,53 @@ function rankForecastsForAnalysis(predictions) {
 
 function filterPublishedForecasts(predictions, minProbability = PUBLISH_MIN_PROBABILITY) {
   return predictions.filter(pred => (pred?.probability || 0) > minProbability);
+}
+
+function selectForecastsForEnrichment(predictions, options = {}) {
+  const maxCombined = options.maxCombined ?? ENRICHMENT_COMBINED_MAX;
+  const maxScenario = options.maxScenario ?? ENRICHMENT_SCENARIO_MAX;
+  const maxPerDomain = options.maxPerDomain ?? ENRICHMENT_MAX_PER_DOMAIN;
+  const minReadiness = options.minReadiness ?? ENRICHMENT_MIN_READINESS;
+  const maxTotal = maxCombined + maxScenario;
+
+  const ranked = predictions
+    .map((pred, index) => ({
+      pred,
+      index,
+      readiness: scoreForecastReadiness(pred),
+      analysisPriority: computeAnalysisPriority(pred),
+    }))
+    .filter(item => item.readiness.overall >= minReadiness)
+    .sort((a, b) => {
+      if (b.analysisPriority !== a.analysisPriority) return b.analysisPriority - a.analysisPriority;
+      return (b.pred.probability * b.pred.confidence) - (a.pred.probability * a.pred.confidence);
+    });
+
+  const selected = [];
+  const selectedDomains = new Map();
+
+  for (const item of ranked) {
+    if (selected.length >= maxTotal) break;
+    const currentCount = selectedDomains.get(item.pred.domain) || 0;
+    if (currentCount >= maxPerDomain) continue;
+    selected.push(item);
+    selectedDomains.set(item.pred.domain, currentCount + 1);
+  }
+
+  if (selected.length < maxTotal) {
+    const seen = new Set(selected.map(item => item.pred.id));
+    for (const item of ranked) {
+      if (selected.length >= maxTotal) break;
+      if (seen.has(item.pred.id)) continue;
+      selected.push(item);
+      seen.add(item.pred.id);
+    }
+  }
+
+  return {
+    combined: selected.slice(0, maxCombined).map(item => item.pred),
+    scenarioOnly: selected.slice(maxCombined, maxCombined + maxScenario).map(item => item.pred),
+  };
 }
 
 // ── Phase 2: LLM Scenario Enrichment ───────────────────────
@@ -2528,10 +2583,11 @@ function populateFallbackNarratives(predictions) {
 async function enrichScenariosWithLLM(predictions) {
   if (predictions.length === 0) return;
   const { url, token } = getRedisCredentials();
+  const enrichmentTargets = selectForecastsForEnrichment(predictions);
 
-  // Phase 3: Top-2 get combined scenario + perspectives
-  const topWithPerspectives = predictions.slice(0, 2);
-  const scenarioOnly = predictions.slice(2, 4);
+  // Higher-quality top forecasts get richer scenario + perspective treatment.
+  const topWithPerspectives = enrichmentTargets.combined;
+  const scenarioOnly = enrichmentTargets.scenarioOnly;
 
   // Call 1: Combined scenario + perspectives for top-2
   if (topWithPerspectives.length > 0) {
@@ -2860,6 +2916,7 @@ export {
   computeAnalysisPriority,
   rankForecastsForAnalysis,
   filterPublishedForecasts,
+  selectForecastsForEnrichment,
   buildFallbackScenario,
   buildFallbackBaseCase,
   buildFallbackEscalatoryCase,
