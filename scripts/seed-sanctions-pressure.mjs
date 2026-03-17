@@ -321,7 +321,12 @@ async function fetchSanctionsPressure() {
   const previousIds = new Set(Array.isArray(previousState?.entryIds) ? previousState.entryIds.map((id) => String(id)) : []);
   const hasPrevious = previousIds.size > 0;
 
-  const results = await Promise.all(OFAC_SOURCES.map((source) => fetchSource(source)));
+  // Sequential fetch to halve peak heap: SDN (~10MB) then Consolidated (~20MB).
+  // Combined parallel parse can approach 150MB, tight against the 512MB limit.
+  const results = [];
+  for (const source of OFAC_SOURCES) {
+    results.push(await fetchSource(source));
+  }
   const entries = results.flatMap((result) => result.entries);
   const datasetDate = results.reduce((max, result) => Math.max(max, result.datasetDate || 0), 0);
 
