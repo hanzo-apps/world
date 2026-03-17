@@ -1993,6 +1993,229 @@ function buildForecastTraceRecord(pred, rank) {
   };
 }
 
+function buildForecastRunActorRegistry(predictions) {
+  const actors = new Map();
+
+  for (const pred of predictions) {
+    const structuredActors = pred.caseFile?.actors || buildForecastActors(pred);
+    for (const actor of structuredActors) {
+      const key = actor.key || `${actor.name}:${actor.category}`;
+      if (!actors.has(key)) {
+        actors.set(key, {
+          id: key,
+          name: actor.name,
+          category: actor.category || 'general',
+          influenceScore: actor.influenceScore || 0,
+          domains: new Set(),
+          regions: new Set(),
+          objectives: new Set(actor.objectives || []),
+          constraints: new Set(actor.constraints || []),
+          likelyActions: new Set(actor.likelyActions || []),
+          forecastIds: new Set(),
+        });
+      }
+      const entry = actors.get(key);
+      entry.domains.add(pred.domain);
+      entry.regions.add(pred.region);
+      entry.forecastIds.add(pred.id);
+      for (const value of actor.objectives || []) entry.objectives.add(value);
+      for (const value of actor.constraints || []) entry.constraints.add(value);
+      for (const value of actor.likelyActions || []) entry.likelyActions.add(value);
+      entry.influenceScore = Math.max(entry.influenceScore, actor.influenceScore || 0);
+    }
+  }
+
+  return [...actors.values()]
+    .map((actor) => ({
+      id: actor.id,
+      name: actor.name,
+      category: actor.category,
+      influenceScore: +((actor.influenceScore || 0)).toFixed(3),
+      domains: [...actor.domains].sort(),
+      regions: [...actor.regions].sort(),
+      objectives: [...actor.objectives].slice(0, 4),
+      constraints: [...actor.constraints].slice(0, 4),
+      likelyActions: [...actor.likelyActions].slice(0, 4),
+      forecastIds: [...actor.forecastIds].slice(0, 8),
+    }))
+    .sort((a, b) => b.influenceScore - a.influenceScore || a.name.localeCompare(b.name));
+}
+
+function buildForecastDomainStates(predictions) {
+  const states = new Map();
+
+  for (const pred of predictions) {
+    if (!states.has(pred.domain)) {
+      states.set(pred.domain, {
+        domain: pred.domain,
+        forecastCount: 0,
+        highlightedCount: 0,
+        totalProbability: 0,
+        totalConfidence: 0,
+        totalReadiness: 0,
+        regions: new Map(),
+        signals: [],
+        forecastIds: [],
+      });
+    }
+    const entry = states.get(pred.domain);
+    const readiness = pred.readiness?.overall ?? scoreForecastReadiness(pred).overall;
+    entry.forecastCount++;
+    if ((pred.probability || 0) >= PANEL_MIN_PROBABILITY) entry.highlightedCount++;
+    entry.totalProbability += pred.probability || 0;
+    entry.totalConfidence += pred.confidence || 0;
+    entry.totalReadiness += readiness;
+    entry.regions.set(pred.region, (entry.regions.get(pred.region) || 0) + 1);
+    entry.forecastIds.push(pred.id);
+    entry.signals.push(...(pred.signals || []).map(signal => signal.type));
+  }
+
+  return [...states.values()]
+    .map((entry) => ({
+      domain: entry.domain,
+      forecastCount: entry.forecastCount,
+      highlightedCount: entry.highlightedCount,
+      avgProbability: +(entry.totalProbability / entry.forecastCount).toFixed(3),
+      avgConfidence: +(entry.totalConfidence / entry.forecastCount).toFixed(3),
+      avgReadiness: +(entry.totalReadiness / entry.forecastCount).toFixed(3),
+      topRegions: [...entry.regions.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 4)
+        .map(([region, count]) => ({ region, count })),
+      topSignals: pickTopCountEntries(summarizeTypeCounts(entry.signals), 5),
+      forecastIds: entry.forecastIds.slice(0, 10),
+    }))
+    .sort((a, b) => b.forecastCount - a.forecastCount || a.domain.localeCompare(b.domain));
+}
+
+function buildForecastRegionalStates(predictions) {
+  const states = new Map();
+
+  for (const pred of predictions) {
+    if (!states.has(pred.region)) {
+      states.set(pred.region, {
+        region: pred.region,
+        forecastCount: 0,
+        domains: new Map(),
+        totalProbability: 0,
+        totalConfidence: 0,
+      });
+    }
+    const entry = states.get(pred.region);
+    entry.forecastCount++;
+    entry.totalProbability += pred.probability || 0;
+    entry.totalConfidence += pred.confidence || 0;
+    entry.domains.set(pred.domain, (entry.domains.get(pred.domain) || 0) + 1);
+  }
+
+  return [...states.values()]
+    .map((entry) => ({
+      region: entry.region,
+      forecastCount: entry.forecastCount,
+      avgProbability: +(entry.totalProbability / entry.forecastCount).toFixed(3),
+      avgConfidence: +(entry.totalConfidence / entry.forecastCount).toFixed(3),
+      domainMix: Object.fromEntries(
+        [...entry.domains.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      ),
+    }))
+    .sort((a, b) => b.forecastCount - a.forecastCount || a.region.localeCompare(b.region))
+    .slice(0, 15);
+}
+
+function buildForecastEvidenceLedger(predictions) {
+  const supporting = [];
+  const counter = [];
+
+  for (const pred of predictions) {
+    for (const item of pred.caseFile?.supportingEvidence || []) {
+      supporting.push({
+        forecastId: pred.id,
+        domain: pred.domain,
+        region: pred.region,
+        summary: item.summary,
+      });
+    }
+    for (const item of pred.caseFile?.counterEvidence || []) {
+      counter.push({
+        forecastId: pred.id,
+        domain: pred.domain,
+        region: pred.region,
+        type: item.type,
+        summary: item.summary,
+      });
+    }
+  }
+
+  return {
+    supporting: supporting.slice(0, 25),
+    counter: counter.slice(0, 25),
+  };
+}
+
+function buildForecastRunContinuity(predictions) {
+  let newForecasts = 0;
+  let risingForecasts = 0;
+  let fallingForecasts = 0;
+  let stableForecasts = 0;
+  const changed = [];
+
+  for (const pred of predictions) {
+    if (pred.priorProbability == null || pred.caseFile?.changeSummary?.startsWith('This forecast is new')) {
+      newForecasts++;
+    }
+    if (pred.trend === 'rising') risingForecasts++;
+    else if (pred.trend === 'falling') fallingForecasts++;
+    else stableForecasts++;
+
+    const delta = Math.abs((pred.probability || 0) - (pred.priorProbability ?? pred.probability ?? 0));
+    changed.push({
+      id: pred.id,
+      title: pred.title,
+      region: pred.region,
+      domain: pred.domain,
+      trend: pred.trend,
+      delta: +delta.toFixed(3),
+      summary: pred.caseFile?.changeSummary || '',
+    });
+  }
+
+  return {
+    newForecasts,
+    risingForecasts,
+    fallingForecasts,
+    stableForecasts,
+    materiallyChanged: changed
+      .filter((item) => item.delta >= 0.05 || item.summary.startsWith('This forecast is new'))
+      .sort((a, b) => b.delta - a.delta || a.title.localeCompare(b.title))
+      .slice(0, 8),
+  };
+}
+
+function buildForecastRunWorldState(data) {
+  const generatedAt = data?.generatedAt || Date.now();
+  const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
+  const domainStates = buildForecastDomainStates(predictions);
+  const regionalStates = buildForecastRegionalStates(predictions);
+  const actorRegistry = buildForecastRunActorRegistry(predictions);
+  const continuity = buildForecastRunContinuity(predictions);
+  const evidenceLedger = buildForecastEvidenceLedger(predictions);
+  const activeDomains = domainStates.filter((item) => item.forecastCount > 0).map((item) => item.domain);
+  const summary = `${predictions.length} active forecasts are spanning ${activeDomains.length} domains and ${regionalStates.length} key regions in this run, with ${continuity.newForecasts} new forecasts and ${continuity.materiallyChanged.length} materially changed paths.`;
+
+  return {
+    version: 1,
+    generatedAt,
+    generatedAtIso: new Date(generatedAt).toISOString(),
+    summary,
+    domainStates,
+    regionalStates,
+    actorRegistry,
+    continuity,
+    evidenceLedger,
+    uncertainties: evidenceLedger.counter.slice(0, 10),
+  };
+}
+
 function summarizeTypeCounts(items) {
   const counts = new Map();
   for (const item of items) {
@@ -2094,6 +2317,10 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
   const maxForecasts = config.maxForecasts || getTraceMaxForecasts(predictions.length);
   const tracedPredictions = predictions.slice(0, maxForecasts).map((pred, index) => buildForecastTraceRecord(pred, index + 1));
   const quality = summarizeForecastTraceQuality(predictions, tracedPredictions, data?.enrichmentMeta || null);
+  const worldState = buildForecastRunWorldState({
+    generatedAt,
+    predictions,
+  });
   const prefix = buildTraceRunPrefix(
     context.runId || `run_${generatedAt}`,
     generatedAt,
@@ -2101,6 +2328,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
   );
   const manifestKey = `${prefix}/manifest.json`;
   const summaryKey = `${prefix}/summary.json`;
+  const worldStateKey = `${prefix}/world-state.json`;
   const forecastKeys = tracedPredictions.map(item => ({
     id: item.id,
     title: item.title,
@@ -2117,6 +2345,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     tracedForecastCount: tracedPredictions.length,
     manifestKey,
     summaryKey,
+    worldStateKey,
     forecastKeys,
   };
 
@@ -2127,6 +2356,14 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     forecastCount: manifest.forecastCount,
     tracedForecastCount: manifest.tracedForecastCount,
     quality,
+    worldStateSummary: {
+      summary: worldState.summary,
+      domainCount: worldState.domainStates.length,
+      regionCount: worldState.regionalStates.length,
+      actorCount: worldState.actorRegistry.length,
+      newForecasts: worldState.continuity.newForecasts,
+      materiallyChanged: worldState.continuity.materiallyChanged.length,
+    },
     topForecasts: tracedPredictions.map(item => ({
       rank: item.rank,
       id: item.id,
@@ -2149,6 +2386,8 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     summaryKey,
     manifest,
     summary,
+    worldStateKey,
+    worldState,
     forecasts: tracedPredictions.map(item => ({
       key: `${prefix}/forecasts/${item.id}.json`,
       payload: item,
@@ -2184,6 +2423,10 @@ async function writeForecastTraceArtifacts(data, context = {}) {
     runid: String(artifacts.manifest.runId || ''),
     kind: 'summary',
   });
+  await putR2JsonObject(storageConfig, artifacts.worldStateKey, artifacts.worldState, {
+    runid: String(artifacts.manifest.runId || ''),
+    kind: 'world_state',
+  });
   await Promise.all(
     artifacts.forecasts.map((item, index) => putR2JsonObject(storageConfig, item.key, item.payload, {
       runid: String(artifacts.manifest.runId || ''),
@@ -2200,9 +2443,11 @@ async function writeForecastTraceArtifacts(data, context = {}) {
     prefix: artifacts.prefix,
     manifestKey: artifacts.manifestKey,
     summaryKey: artifacts.summaryKey,
+    worldStateKey: artifacts.worldStateKey,
     forecastCount: artifacts.manifest.forecastCount,
     tracedForecastCount: artifacts.manifest.tracedForecastCount,
     quality: artifacts.summary.quality,
+    worldStateSummary: artifacts.summary.worldStateSummary,
   };
   await writeForecastTracePointer(pointer);
   return pointer;
@@ -3247,6 +3492,7 @@ export {
   buildCaseTriggers,
   buildForecastActors,
   buildForecastWorldState,
+  buildForecastRunWorldState,
   buildForecastBranches,
   buildActorLenses,
   scoreForecastReadiness,
