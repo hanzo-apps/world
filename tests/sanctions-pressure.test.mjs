@@ -6,29 +6,45 @@ const handlerSrc = readFileSync('server/worldmonitor/sanctions/v1/list-sanctions
 const seedSrc = readFileSync('scripts/seed-sanctions-pressure.mjs', 'utf8');
 
 // ---------------------------------------------------------------------------
-// P2-1: _state must not leak through trimResponse
+// Gold standard: handler must be Redis-read-only (no XML parsing, no live fetch)
 // ---------------------------------------------------------------------------
-describe('trimResponse: _state stripping', () => {
-  it('handler trimResponse destructures _state before spreading data', () => {
-    assert.match(
-      handlerSrc,
-      /_state.*_discarded.*\.\.\.rest/s,
-      'trimResponse must destructure _state out before spreading to prevent leaking seed internals to API clients',
+describe('handler: gold standard compliance', () => {
+  it('handler does not import XMLParser (no live OFAC fetch at edge)', () => {
+    assert.ok(
+      !handlerSrc.includes('XMLParser'),
+      'handler must not import XMLParser: Vercel reads Redis only, Railway makes all external API calls',
     );
   });
 
-  it('seed does not embed _state in the canonical Redis payload directly', () => {
-    // The canonical payload must go through extraKeys or afterPublish, not inline
-    const fetchFnStart = seedSrc.indexOf('async function fetchSanctionsPressure()');
-    const fetchFnEnd = seedSrc.indexOf('\nfunction validate(');
-    const fetchFnBody = seedSrc.slice(fetchFnStart, fetchFnEnd);
-    // _state must only appear as a separate top-level key, not inside entries/countries/programs
-    assert.match(
-      fetchFnBody,
-      /_state:\s*\{/,
-      'fetchSanctionsPressure must return _state as a top-level key for extraKeys separation',
+  it('handler does not define OFAC_SOURCES (no direct OFAC HTTP from edge)', () => {
+    assert.ok(
+      !handlerSrc.includes('OFAC_SOURCES'),
+      'handler must not define OFAC_SOURCES: all OFAC fetching belongs in the Railway seed script',
     );
-    // Verify extraKeys is wired to write _state to its own Redis key
+  });
+
+  it('handler uses getCachedJson for Redis read', () => {
+    assert.match(
+      handlerSrc,
+      /getCachedJson\(REDIS_CACHE_KEY/,
+      'handler must read from Redis via getCachedJson',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _state must not leak to API clients
+// ---------------------------------------------------------------------------
+describe('handler: _state stripping', () => {
+  it('handler destructures _state before spreading data', () => {
+    assert.match(
+      handlerSrc,
+      /_state.*_discarded/s,
+      'handler must destructure _state out to prevent leaking seed internals to API clients',
+    );
+  });
+
+  it('seed stores _state under STATE_KEY (not canonical key)', () => {
     assert.match(
       seedSrc,
       /extraKeys.*STATE_KEY/s,
@@ -38,40 +54,24 @@ describe('trimResponse: _state stripping', () => {
 });
 
 // ---------------------------------------------------------------------------
-// P2-2: buildLocationMap must sort code/name as aligned pairs
+// Seed: sequential fetch to avoid OOM on Railway 512MB
 // ---------------------------------------------------------------------------
-describe('buildLocationMap: code/name alignment', () => {
-  it('handler buildLocationMap uses paired sort instead of independent uniqueSorted calls', () => {
-    const fnStart = handlerSrc.indexOf('function buildLocationMap(');
-    const fnEnd = handlerSrc.indexOf('\nfunction extractPartyName(');
-    const fnBody = handlerSrc.slice(fnStart, fnEnd);
-
-    assert.match(
-      fnBody,
-      /new Map\(mapped\.map/,
-      'buildLocationMap must deduplicate via Map keyed on code to preserve alignment',
-    );
-    assert.match(
-      fnBody,
-      /pairs\.map\(\(\[code\]\)/,
-      'buildLocationMap must derive codes from sorted pairs array',
-    );
-    assert.match(
-      fnBody,
-      /pairs\.map\(\(\[, name\]\)/,
-      'buildLocationMap must derive names from sorted pairs array',
-    );
-    // Must NOT independently sort codes and names
+describe('seed: memory safety', () => {
+  it('seed fetches OFAC sources sequentially (not Promise.all)', () => {
+    const fnStart = seedSrc.indexOf('async function fetchSanctionsPressure()');
+    const fnEnd = seedSrc.indexOf('\nfunction validate(');
+    const fnBody = seedSrc.slice(fnStart, fnEnd);
     assert.ok(
-      !fnBody.includes('uniqueSorted(mapped.map((item) => item.code))'),
-      'buildLocationMap must not call uniqueSorted on codes independently',
-    );
-    assert.ok(
-      !fnBody.includes('uniqueSorted(mapped.map((item) => item.name))'),
-      'buildLocationMap must not call uniqueSorted on names independently',
+      !fnBody.includes('Promise.all(OFAC_SOURCES'),
+      'seed must not fetch both OFAC XML files concurrently: combined parse can exceed 512MB heap limit',
     );
   });
+});
 
+// ---------------------------------------------------------------------------
+// Seed: buildLocationMap must sort code/name as aligned pairs
+// ---------------------------------------------------------------------------
+describe('seed buildLocationMap: code/name alignment', () => {
   it('seed buildLocationMap uses paired sort instead of independent uniqueSorted calls', () => {
     const fnStart = seedSrc.indexOf('function buildLocationMap(');
     const fnEnd = seedSrc.indexOf('\nfunction extractPartyName(');
@@ -89,26 +89,6 @@ describe('buildLocationMap: code/name alignment', () => {
     assert.ok(
       !fnBody.includes("uniqueSorted(mapped.map((item) => item.name))"),
       'seed buildLocationMap must not sort names independently',
-    );
-  });
-
-  it('handler extractPartyCountries deduplicates via Map instead of independent uniqueSorted', () => {
-    const fnStart = handlerSrc.indexOf('function extractPartyCountries(');
-    const fnEnd = handlerSrc.indexOf('\nfunction buildPartyMap(');
-    const fnBody = handlerSrc.slice(fnStart, fnEnd);
-
-    assert.match(
-      fnBody,
-      /const seen = new Map/,
-      'extractPartyCountries must use a seen Map for deduplication',
-    );
-    assert.ok(
-      !fnBody.includes('uniqueSorted(codes)'),
-      'extractPartyCountries must not sort codes independently via uniqueSorted',
-    );
-    assert.ok(
-      !fnBody.includes('uniqueSorted(names)'),
-      'extractPartyCountries must not sort names independently via uniqueSorted',
     );
   });
 
@@ -130,7 +110,7 @@ describe('buildLocationMap: code/name alignment', () => {
 });
 
 // ---------------------------------------------------------------------------
-// P3: DEFAULT_RECENT_LIMIT must not exceed MAX_ITEMS_LIMIT
+// Seed: DEFAULT_RECENT_LIMIT must not exceed handler MAX_ITEMS_LIMIT
 // ---------------------------------------------------------------------------
 describe('sanctions seed: DEFAULT_RECENT_LIMIT vs MAX_ITEMS_LIMIT', () => {
   it('seed DEFAULT_RECENT_LIMIT does not exceed handler MAX_ITEMS_LIMIT (60)', () => {
