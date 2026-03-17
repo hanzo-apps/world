@@ -2235,6 +2235,68 @@ function buildBranchContinuitySummary(currentBranchStates, priorWorldState = nul
   };
 }
 
+function buildWorldStateReport(worldState) {
+  const leadDomains = (worldState.domainStates || [])
+    .slice(0, 3)
+    .map(item => `${item.domain} (${item.forecastCount})`);
+  const leadRegions = (worldState.regionalStates || [])
+    .slice(0, 4)
+    .map(item => ({
+      region: item.region,
+      summary: `${item.forecastCount} forecasts with ${Math.round((item.avgProbability || 0) * 100)}% average probability and ${Math.round((item.avgConfidence || 0) * 100)}% average confidence.`,
+      domainMix: item.domainMix,
+    }));
+
+  const actorWatchlist = [
+    ...(worldState.actorContinuity?.newlyActivePreview || []).map(actor => ({
+      type: 'new_actor',
+      name: actor.name,
+      summary: `${actor.name} is newly active across ${actor.domains.join(', ')} in ${actor.regions.join(', ')}.`,
+    })),
+    ...(worldState.actorContinuity?.strengthenedPreview || []).map(actor => ({
+      type: 'strengthened_actor',
+      name: actor.name,
+      summary: `${actor.name} strengthened by ${Math.round((actor.influenceDelta || 0) * 100)} points${actor.addedRegions?.length ? ` with new regional exposure in ${actor.addedRegions.join(', ')}` : ''}.`,
+    })),
+  ].slice(0, 6);
+
+  const branchWatchlist = [
+    ...(worldState.branchContinuity?.strengthenedBranchPreview || []).map(branch => ({
+      type: 'strengthened_branch',
+      title: branch.title,
+      summary: `${branch.title} in ${branch.kind} moved from ${roundPct(branch.priorProjectedProbability)} to ${roundPct(branch.projectedProbability)}.`,
+    })),
+    ...(worldState.branchContinuity?.newBranchPreview || []).map(branch => ({
+      type: 'new_branch',
+      title: branch.title,
+      summary: `${branch.title} is newly active with a projected probability near ${roundPct(branch.projectedProbability)}.`,
+    })),
+    ...(worldState.branchContinuity?.resolvedBranchPreview || []).map(branch => ({
+      type: 'resolved_branch',
+      title: branch.title,
+      summary: `${branch.title} is no longer active in the current run.`,
+    })),
+  ].slice(0, 6);
+
+  const continuitySummary = `Actors: ${worldState.actorContinuity?.newlyActiveCount || 0} new, ${worldState.actorContinuity?.strengthenedCount || 0} strengthened. Branches: ${worldState.branchContinuity?.newBranchCount || 0} new, ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened, ${worldState.branchContinuity?.resolvedBranchCount || 0} resolved.`;
+
+  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, and the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches.`;
+
+  return {
+    summary,
+    continuitySummary,
+    domainOverview: {
+      leadDomains,
+      activeDomainCount: worldState.domainStates?.length || 0,
+      activeRegionCount: worldState.regionalStates?.length || 0,
+    },
+    regionalHotspots: leadRegions,
+    actorWatchlist,
+    branchWatchlist,
+    keyUncertainties: (worldState.uncertainties || []).slice(0, 6).map(item => item.summary || item),
+  };
+}
+
 function buildForecastDomainStates(predictions) {
   const states = new Map();
 
@@ -2399,8 +2461,7 @@ function buildForecastRunWorldState(data) {
   const evidenceLedger = buildForecastEvidenceLedger(predictions);
   const activeDomains = domainStates.filter((item) => item.forecastCount > 0).map((item) => item.domain);
   const summary = `${predictions.length} active forecasts are spanning ${activeDomains.length} domains and ${regionalStates.length} key regions in this run, with ${continuity.newForecasts} new forecasts, ${continuity.materiallyChanged.length} materially changed paths, ${actorContinuity.newlyActiveCount} newly active actors, and ${branchContinuity.strengthenedBranchCount} strengthened branches.`;
-
-  return {
+  const worldState = {
     version: 1,
     generatedAt,
     generatedAtIso: new Date(generatedAt).toISOString(),
@@ -2415,6 +2476,8 @@ function buildForecastRunWorldState(data) {
     evidenceLedger,
     uncertainties: evidenceLedger.counter.slice(0, 10),
   };
+  worldState.report = buildWorldStateReport(worldState);
+  return worldState;
 }
 
 function summarizeTypeCounts(items) {
@@ -2560,6 +2623,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     quality,
     worldStateSummary: {
       summary: worldState.summary,
+      reportSummary: worldState.report?.summary || '',
       domainCount: worldState.domainStates.length,
       regionCount: worldState.regionalStates.length,
       actorCount: worldState.actorRegistry.length,
