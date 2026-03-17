@@ -23,6 +23,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   giving:           'giving:summary:v1',
   climateAnomalies: 'climate:anomalies:v1',
   radiationWatch: 'radiation:observations:v1',
+  thermalEscalation: 'thermal:escalation:v1',
   wildfires:        'wildfire:fires:v1',
   cyberThreats:     'cyber:threats-bootstrap:v2',
   techReadiness:    'economic:worldbank-techreadiness:v1',
@@ -56,7 +57,7 @@ const BOOTSTRAP_CACHE_KEYS = {
 const SLOW_KEYS = new Set([
   'bisPolicy', 'bisExchange', 'bisCredit', 'minerals', 'giving',
   'sectors', 'etfFlows', 'wildfires', 'climateAnomalies',
-  'radiationWatch',
+  'radiationWatch', 'thermalEscalation',
   'cyberThreats', 'techReadiness', 'progressData', 'renewableEnergy',
   'naturalEvents',
   'cryptoQuotes', 'gulfQuotes', 'stablecoinMarkets', 'unrestEvents', 'ucdpEvents',
