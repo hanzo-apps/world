@@ -112,6 +112,7 @@ describe('forecast trace artifact builder', () => {
     assert.ok(artifacts.summary.quality.fullRun.quietDomains.includes('military'));
     assert.equal(artifacts.summary.quality.traced.topPromotionSignals[0].type, 'cii');
     assert.ok(artifacts.summary.worldStateSummary.summary.includes('active forecasts'));
+    assert.ok(artifacts.summary.worldStateSummary.reportSummary.includes('leading domains'));
     assert.equal(artifacts.summary.worldStateSummary.domainCount, 2);
     assert.equal(artifacts.summary.worldStateSummary.regionCount, 2);
     assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
@@ -120,6 +121,8 @@ describe('forecast trace artifact builder', () => {
     assert.ok(typeof artifacts.summary.worldStateSummary.newlyActiveActors === 'number');
     assert.equal(artifacts.summary.worldStateSummary.branchCount, 6);
     assert.equal(artifacts.summary.worldStateSummary.newBranches, 6);
+    assert.ok(Array.isArray(artifacts.worldState.report.actorWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -267,6 +270,10 @@ describe('forecast run world state', () => {
     assert.ok(worldState.branchContinuity.newBranchCount >= 1);
     assert.ok(worldState.branchContinuity.strengthenedBranchCount >= 1);
     assert.ok(worldState.branchContinuity.resolvedBranchCount >= 0);
+    assert.ok(worldState.report.summary.includes('leading domains'));
+    assert.ok(worldState.report.continuitySummary.includes('Actors:'));
+    assert.ok(worldState.report.regionalHotspots.length >= 1);
+    assert.ok(worldState.report.branchWatchlist.length >= 1);
   });
 
   it('reports full actor continuity counts even when previews are capped', () => {
