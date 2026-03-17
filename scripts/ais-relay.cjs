@@ -2836,6 +2836,8 @@ async function seedServiceStatuses() {
     const data = await resp.json();
     const count = data?.statuses?.length || 0;
     console.log(`[ServiceStatuses] Seed ping OK — ${count} statuses`);
+    // seed-meta is written by listServiceStatuses handler only when fresh data
+    // is scraped; writing it here would mark fallback responses as fresh.
   } catch (e) {
     console.warn('[ServiceStatuses] Seed ping error:', e?.message || e);
   }
@@ -3113,6 +3115,9 @@ async function seedCiiWarmPing() {
     const data = await resp.json();
     const count = data?.ciiScores?.length || 0;
     console.log(`[CII] Warm-ping OK: ${count} scores`);
+    if (count > 0) {
+      await upstashSet('seed-meta:intelligence:risk-scores', { fetchedAt: Date.now(), recordCount: count }, 604800);
+    }
   } catch (e) {
     console.warn('[CII] Warm-ping error:', e?.message || e);
   }
@@ -3124,6 +3129,83 @@ function startCiiWarmPingLoop() {
   setInterval(() => {
     seedCiiWarmPing().catch((e) => console.warn('[CII] Warm-ping error:', e?.message || e));
   }, CII_WARM_PING_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Chokepoint Status Warm-Ping — keeps supply_chain:chokepoints:v4
+// fresh so health.js does not report STALE_SEED. The RPC handler
+// (get-chokepoint-status.ts) writes seed-meta on every live fetch.
+// Interval matches health.js maxStaleMin (60 min) with a 2× margin.
+// ─────────────────────────────────────────────────────────────
+const CHOKEPOINT_WARM_PING_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+const CHOKEPOINT_RPC_URL = 'https://api.worldmonitor.app/api/supply-chain/v1/get-chokepoint-status';
+
+async function seedChokepointWarmPing() {
+  try {
+    const resp = await fetch(CHOKEPOINT_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA, Origin: 'https://worldmonitor.app' },
+      body: '{}',
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[Chokepoints] Warm-ping failed: HTTP ${resp.status}`);
+      return;
+    }
+    const data = await resp.json();
+    const count = data?.chokepoints?.length || 0;
+    console.log(`[Chokepoints] Warm-ping OK: ${count} chokepoints`);
+    // seed-meta is written by the RPC handler when it fetches fresh data;
+    // no direct write needed here.
+  } catch (e) {
+    console.warn('[Chokepoints] Warm-ping error:', e?.message || e);
+  }
+}
+
+function startChokepointWarmPingLoop() {
+  console.log(`[Chokepoints] Warm-ping loop starting (interval ${CHOKEPOINT_WARM_PING_INTERVAL_MS / 1000 / 60}min)`);
+  seedChokepointWarmPing().catch((e) => console.warn('[Chokepoints] Initial warm-ping error:', e?.message || e));
+  setInterval(() => {
+    seedChokepointWarmPing().catch((e) => console.warn('[Chokepoints] Warm-ping error:', e?.message || e));
+  }, CHOKEPOINT_WARM_PING_INTERVAL_MS).unref?.();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cable Health Warm-Ping — keeps cable-health-v1 fresh so
+// health.js does not report STALE_SEED. The RPC handler writes
+// seed-meta on every live fetch; we just need to call it regularly.
+// ─────────────────────────────────────────────────────────────
+const CABLE_HEALTH_WARM_PING_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+const CABLE_HEALTH_RPC_URL = 'https://api.worldmonitor.app/api/infrastructure/v1/get-cable-health';
+
+async function seedCableHealthWarmPing() {
+  try {
+    const resp = await fetch(CABLE_HEALTH_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA, Origin: 'https://worldmonitor.app' },
+      body: '{}',
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[CableHealth] Warm-ping failed: HTTP ${resp.status}`);
+      return;
+    }
+    const data = await resp.json();
+    const count = data?.cables ? Object.keys(data.cables).length : 0;
+    console.log(`[CableHealth] Warm-ping OK: ${count} cables`);
+    // seed-meta is written by getCableHealth handler only when source === 'fresh';
+    // writing it here would mark stale/cached responses as fresh.
+  } catch (e) {
+    console.warn('[CableHealth] Warm-ping error:', e?.message || e);
+  }
+}
+
+function startCableHealthWarmPingLoop() {
+  console.log(`[CableHealth] Warm-ping loop starting (interval ${CABLE_HEALTH_WARM_PING_INTERVAL_MS / 1000 / 60}min)`);
+  seedCableHealthWarmPing().catch((e) => console.warn('[CableHealth] Initial warm-ping error:', e?.message || e));
+  setInterval(() => {
+    seedCableHealthWarmPing().catch((e) => console.warn('[CableHealth] Warm-ping error:', e?.message || e));
+  }, CABLE_HEALTH_WARM_PING_INTERVAL_MS).unref?.();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -7785,6 +7867,8 @@ server.listen(PORT, () => {
   // Cyber seed disabled — standalone cron seed-cyber-threats.mjs handles this
   // (avoids burning 12 extra AbuseIPDB calls/day from duplicate relay loop)
   startCiiWarmPingLoop();
+  startChokepointWarmPingLoop();
+  startCableHealthWarmPingLoop();
   startPositiveEventsSeedLoop();
   startClassifySeedLoop();
   startServiceStatusesSeedLoop();
