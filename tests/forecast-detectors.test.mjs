@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import {
   forecastId,
@@ -51,6 +51,9 @@ import {
   rankForecastsForAnalysis,
   filterPublishedForecasts,
   selectForecastsForEnrichment,
+  parseForecastProviderOrder,
+  getForecastLlmCallOptions,
+  resolveForecastLlmProviders,
   buildFallbackScenario,
   buildFallbackBaseCase,
   buildFallbackEscalatoryCase,
@@ -65,6 +68,20 @@ import {
   DEFAULT_CASCADE_RULES,
   PROJECTION_CURVES,
 } from '../scripts/seed-forecasts.mjs';
+
+const originalForecastEnv = {
+  FORECAST_LLM_PROVIDER_ORDER: process.env.FORECAST_LLM_PROVIDER_ORDER,
+  FORECAST_LLM_COMBINED_PROVIDER_ORDER: process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER,
+  FORECAST_LLM_MODEL_OPENROUTER: process.env.FORECAST_LLM_MODEL_OPENROUTER,
+  FORECAST_LLM_COMBINED_MODEL_OPENROUTER: process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER,
+};
+
+afterEach(() => {
+  for (const [key, value] of Object.entries(originalForecastEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
 
 describe('forecastId', () => {
   it('same inputs produce same ID', () => {
@@ -1072,6 +1089,61 @@ describe('forecast change tracking', () => {
     const summary = buildChangeSummary(pred, null, items);
     assert.match(summary, /new in the current run/i);
     assert.ok(items[0].includes('New forecast surfaced'));
+  });
+});
+
+describe('forecast llm overrides', () => {
+  it('parses provider order safely', () => {
+    assert.equal(parseForecastProviderOrder(''), null);
+    assert.deepEqual(parseForecastProviderOrder('openrouter, groq, openrouter, invalid'), ['openrouter', 'groq']);
+  });
+
+  it('keeps default provider order when no override is set', () => {
+    delete process.env.FORECAST_LLM_PROVIDER_ORDER;
+    delete process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER;
+    delete process.env.FORECAST_LLM_MODEL_OPENROUTER;
+    delete process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER;
+
+    const options = getForecastLlmCallOptions('combined');
+    const providers = resolveForecastLlmProviders(options);
+
+    assert.deepEqual(options.providerOrder, ['groq', 'openrouter']);
+    assert.equal(providers[0]?.name, 'groq');
+    assert.equal(providers[0]?.model, 'llama-3.1-8b-instant');
+    assert.equal(providers[1]?.name, 'openrouter');
+    assert.equal(providers[1]?.model, 'google/gemini-2.5-flash');
+  });
+
+  it('supports a stronger combined-model override without changing scenario defaults', () => {
+    process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER = 'openrouter';
+    process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER = 'google/gemini-2.5-pro';
+
+    const combinedOptions = getForecastLlmCallOptions('combined');
+    const combinedProviders = resolveForecastLlmProviders(combinedOptions);
+    const scenarioOptions = getForecastLlmCallOptions('scenario');
+    const scenarioProviders = resolveForecastLlmProviders(scenarioOptions);
+
+    assert.deepEqual(combinedOptions.providerOrder, ['openrouter']);
+    assert.equal(combinedProviders.length, 1);
+    assert.equal(combinedProviders[0]?.name, 'openrouter');
+    assert.equal(combinedProviders[0]?.model, 'google/gemini-2.5-pro');
+
+    assert.deepEqual(scenarioOptions.providerOrder, ['groq', 'openrouter']);
+    assert.equal(scenarioProviders[0]?.name, 'groq');
+    assert.equal(scenarioProviders[1]?.model, 'google/gemini-2.5-flash');
+  });
+
+  it('lets a global provider order and openrouter model apply to non-combined stages', () => {
+    process.env.FORECAST_LLM_PROVIDER_ORDER = 'openrouter';
+    process.env.FORECAST_LLM_MODEL_OPENROUTER = 'google/gemini-2.5-flash-lite-preview';
+
+    const options = getForecastLlmCallOptions('scenario');
+    const providers = resolveForecastLlmProviders(options);
+
+    assert.deepEqual(options.providerOrder, ['openrouter']);
+    assert.equal(providers.length, 1);
+    assert.equal(providers[0]?.name, 'openrouter');
+    assert.equal(providers[0]?.model, 'google/gemini-2.5-flash-lite-preview');
   });
 });
 
