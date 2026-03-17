@@ -115,12 +115,16 @@ describe('forecast trace artifact builder', () => {
     assert.ok(artifacts.summary.worldStateSummary.reportSummary.includes('leading domains'));
     assert.equal(artifacts.summary.worldStateSummary.domainCount, 2);
     assert.equal(artifacts.summary.worldStateSummary.regionCount, 2);
+    assert.ok(typeof artifacts.summary.worldStateSummary.situationCount === 'number');
+    assert.ok(artifacts.summary.worldStateSummary.situationCount >= 1);
     assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
     assert.ok(artifacts.worldState.actorRegistry.every(actor => actor.name && actor.id));
     assert.equal(artifacts.summary.worldStateSummary.persistentActorCount, 0);
     assert.ok(typeof artifacts.summary.worldStateSummary.newlyActiveActors === 'number');
     assert.equal(artifacts.summary.worldStateSummary.branchCount, 6);
     assert.equal(artifacts.summary.worldStateSummary.newBranches, 6);
+    assert.ok(Array.isArray(artifacts.worldState.situationClusters));
+    assert.ok(Array.isArray(artifacts.worldState.report.situationWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.actorWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
@@ -270,10 +274,14 @@ describe('forecast run world state', () => {
     assert.ok(worldState.branchContinuity.newBranchCount >= 1);
     assert.ok(worldState.branchContinuity.strengthenedBranchCount >= 1);
     assert.ok(worldState.branchContinuity.resolvedBranchCount >= 0);
+    assert.ok(worldState.situationClusters.length >= 1);
+    assert.ok(worldState.situationSummary.summary.includes('clustered situations'));
+    assert.ok(typeof worldState.situationContinuity.newSituationCount === 'number');
     assert.ok(worldState.report.summary.includes('leading domains'));
     assert.ok(worldState.report.continuitySummary.includes('Actors:'));
     assert.ok(worldState.report.regionalHotspots.length >= 1);
     assert.ok(worldState.report.branchWatchlist.length >= 1);
+    assert.ok(Array.isArray(worldState.report.situationWatchlist));
   });
 
   it('reports full actor continuity counts even when previews are capped', () => {
@@ -302,5 +310,100 @@ describe('forecast run world state', () => {
 
     assert.ok(worldState.actorContinuity.newlyActiveCount > 8);
     assert.equal(worldState.actorContinuity.newlyActivePreview.length, 8);
+  });
+
+  it('tracks situation continuity across runs', () => {
+    const a = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.72, 0.63, '7d', [
+      { type: 'cii', value: 'Iran CII 79 (high)', weight: 0.4 },
+      { type: 'ucdp', value: '3 UCDP conflict events', weight: 0.3 },
+    ]);
+    a.newsContext = ['Regional officials warn of retaliation risk'];
+    a.trend = 'rising';
+    buildForecastCase(a);
+
+    const b = makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.55, 0.57, '30d', [
+      { type: 'prediction_market', value: 'Oil contracts reprice on Strait of Hormuz risk', weight: 0.4 },
+      { type: 'chokepoint', value: 'Strait of Hormuz remains disrupted', weight: 0.3 },
+    ]);
+    b.trend = 'rising';
+    buildForecastCase(b);
+
+    const currentWorldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T14:00:00Z'),
+      predictions: [a, b],
+      priorWorldState: {
+        situationClusters: [
+          {
+            id: 'sit-legacy',
+            label: 'Legacy: resolved pressure',
+            forecastCount: 1,
+            avgProbability: 0.22,
+            regions: ['Elsewhere'],
+            domains: ['political'],
+            actors: ['legacy:actor'],
+          },
+        ],
+      },
+    });
+
+    const priorWorldState = {
+      situationClusters: currentWorldState.situationClusters.map((cluster) => ({
+        ...cluster,
+        avgProbability: +(cluster.avgProbability - 0.12).toFixed(3),
+        forecastCount: Math.max(1, cluster.forecastCount - 1),
+      })),
+    };
+
+    const nextWorldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T15:00:00Z'),
+      predictions: [a, b],
+      priorWorldState,
+    });
+
+    assert.ok(nextWorldState.situationContinuity.persistentSituationCount >= 1);
+    assert.ok(nextWorldState.situationContinuity.strengthenedSituationCount >= 1);
+    assert.ok(nextWorldState.report.continuitySummary.includes('Situations:'));
+    assert.ok(nextWorldState.report.situationWatchlist.length >= 1);
+  });
+
+  it('keeps situation continuity stable when a cluster expands with a new earlier-sorting actor', () => {
+    const a = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.72, 0.63, '7d', [
+      { type: 'cii', value: 'Iran CII 79 (high)', weight: 0.4 },
+    ]);
+    a.newsContext = ['Regional officials warn of retaliation risk'];
+    a.trend = 'rising';
+    buildForecastCase(a);
+
+    const priorWorldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T14:00:00Z'),
+      predictions: [a],
+    });
+
+    const currentPrediction = structuredClone(a);
+    currentPrediction.caseFile = structuredClone(a.caseFile);
+    currentPrediction.caseFile.actors = [
+      {
+        id: 'aaa-new-actor:state',
+        name: 'AAA New Actor',
+        category: 'state',
+        influenceScore: 0.7,
+        domains: ['conflict'],
+        regions: ['Iran'],
+        role: 'AAA New Actor is a primary state actor.',
+        objectives: ['Shape the conflict path.'],
+        constraints: ['Public escalation is costly.'],
+        likelyActions: ['Increase visible coordination.'],
+      },
+      ...(currentPrediction.caseFile.actors || []),
+    ];
+
+    const nextWorldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T15:00:00Z'),
+      predictions: [currentPrediction],
+      priorWorldState,
+    });
+
+    assert.equal(nextWorldState.situationContinuity.newSituationCount, 0);
+    assert.ok(nextWorldState.situationContinuity.persistentSituationCount >= 1);
   });
 });
