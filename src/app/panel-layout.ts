@@ -707,6 +707,14 @@ export class PanelLayoutManager implements AppModule {
       }),
     );
 
+    this.lazyPanel('thermal-escalation', () =>
+      import('@/components/ThermalEscalationPanel').then(m => {
+        const p = new m.ThermalEscalationPanel();
+        p.setLocationClickHandler((lat: number, lon: number) => { this.ctx.map?.setCenter(lat, lon, 4); });
+        return p;
+      }),
+    );
+
     const _wmKeyPresent = getSecretState('WORLDMONITOR_API_KEY').present;
     const _lockPanels = this.ctx.isDesktopApp && !_wmKeyPresent;
 

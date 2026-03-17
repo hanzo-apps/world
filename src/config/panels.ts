@@ -64,6 +64,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'security-advisories': { name: 'Security Advisories', enabled: true, priority: 2 },
   'sanctions-pressure': { name: 'Sanctions Pressure', enabled: true, priority: 2 },
   'radiation-watch': { name: 'Radiation Watch', enabled: true, priority: 2 },
+  'thermal-escalation': { name: 'Thermal Escalation', enabled: true, priority: 2 },
   'oref-sirens': { name: 'Israel Sirens', enabled: true, priority: 2, ...(_desktop && { premium: 'locked' as const }) },
   'telegram-intel': { name: 'Telegram Intel', enabled: true, priority: 2, ...(_desktop && { premium: 'locked' as const }) },
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
