@@ -1081,6 +1081,8 @@
         "militaryBases": "Military Bases",
         "nuclearSites": "Nuclear Sites",
         "gammaIrradiators": "Gamma Irradiators",
+        "radiationSpike": "Radiation spike",
+        "radiationElevated": "Elevated radiation",
         "spaceports": "Spaceports",
         "satellites": "Orbital Surveillance",
         "pipelines": "Pipelines",

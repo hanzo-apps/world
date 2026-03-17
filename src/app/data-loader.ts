@@ -60,6 +60,7 @@ import {
   fetchShippingRates,
   fetchChokepointStatus,
   fetchCriticalMinerals,
+  fetchRadiationWatch,
 } from '@/services';
 import { getMarketWatchlistEntries } from '@/services/market-watchlist';
 import { fetchStockAnalysesForTargets, getStockAnalysisTargets } from '@/services/stock-analysis';
@@ -473,6 +474,9 @@ export class DataLoaderManager implements AppModule {
     if (SITE_VARIANT !== 'happy' && (this.ctx.mapLayers.techEvents || SITE_VARIANT === 'tech')) tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.satellites && this.ctx.map?.isGlobeMode?.()) tasks.push({ name: 'satellites', task: runGuarded('satellites', () => this.loadSatellites()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.webcams) tasks.push({ name: 'webcams', task: runGuarded('webcams', () => this.loadWebcams()) });
+    if (SITE_VARIANT !== 'happy' && (this.ctx.panels['radiation-watch'] || this.ctx.mapLayers.radiationWatch)) {
+      tasks.push({ name: 'radiation', task: runGuarded('radiation', () => this.loadRadiationWatch()) });
+    }
 
     if (SITE_VARIANT !== 'happy') {
       tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.ctx.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
@@ -574,6 +578,9 @@ export class DataLoaderManager implements AppModule {
         }
         case 'webcams':
           await this.loadWebcams();
+          break;
+        case 'radiationWatch':
+          await this.loadRadiationWatch();
           break;
         case 'ucdpEvents':
         case 'displacement':
@@ -2663,6 +2670,25 @@ export class DataLoaderManager implements AppModule {
       }
     } catch (error) {
       console.error('[App] Security advisories fetch failed:', error);
+    }
+  }
+
+  async loadRadiationWatch(): Promise<void> {
+    try {
+      const result = await fetchRadiationWatch();
+      const anomalies = result.observations.filter((observation) => observation.severity !== 'normal');
+      this.callPanel('radiation-watch', 'setData', result);
+      this.ctx.intelligenceCache.radiation = result;
+      signalAggregator.ingestRadiationObservations(result.observations);
+      this.ctx.map?.setRadiationObservations(anomalies);
+      this.ctx.map?.setLayerReady('radiationWatch', anomalies.length > 0);
+      if (result.observations.length > 0) {
+        dataFreshness.recordUpdate('radiation', result.observations.length);
+      }
+    } catch (error) {
+      console.error('[App] Radiation watch fetch failed:', error);
+      this.ctx.map?.setLayerReady('radiationWatch', false);
+      dataFreshness.recordError('radiation', String(error));
     }
   }
 
