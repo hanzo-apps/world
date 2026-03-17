@@ -94,12 +94,12 @@ const SEED_META = {
   marketQuotes:     { key: 'seed-meta:market:stocks',         maxStaleMin: 30 },
   commodityQuotes:  { key: 'seed-meta:market:commodities',    maxStaleMin: 30 },
   // RPC/warm-ping keys — seed-meta written by relay loops or handlers
-  serviceStatuses:  { key: 'seed-meta:infra:service-statuses',    maxStaleMin: 30 },
+  // serviceStatuses: moved to ON_DEMAND — RPC-populated, no dedicated seed, goes stale when no users visit
   cableHealth:      { key: 'seed-meta:cable-health',              maxStaleMin: 60 },
   macroSignals:     { key: 'seed-meta:economic:macro-signals',    maxStaleMin: 60 },
-  bisPolicy:        { key: 'seed-meta:economic:bis:policy',       maxStaleMin: 2880 },
-  bisExchange:      { key: 'seed-meta:economic:bis:eer',          maxStaleMin: 2880 },
-  bisCredit:        { key: 'seed-meta:economic:bis:credit',       maxStaleMin: 2880 },
+  bisPolicy:        { key: 'seed-meta:economic:bis:policy',       maxStaleMin: 10080 },
+  bisExchange:      { key: 'seed-meta:economic:bis:eer',          maxStaleMin: 10080 },
+  bisCredit:        { key: 'seed-meta:economic:bis:credit',       maxStaleMin: 10080 },
   shippingRates:    { key: 'seed-meta:supply_chain:shipping',     maxStaleMin: 420 },
   chokepoints:      { key: 'seed-meta:supply_chain:chokepoints',  maxStaleMin: 60 },
   minerals:         { key: 'seed-meta:supply_chain:minerals',     maxStaleMin: 10080 },
@@ -146,6 +146,7 @@ const ON_DEMAND_KEYS = new Set([
   'macroSignals', 'shippingRates', 'chokepoints', 'minerals', 'giving',
   'cyberThreatsRpc', 'militaryBases', 'temporalAnomalies', 'displacement',
   'corridorrisk', // intermediate key; data flows through transit-summaries:v1
+  'serviceStatuses', // RPC-populated; seed-meta written on fresh fetch only, goes stale between visits
 ]);
 
 // Keys where 0 records is a valid healthy state (e.g. no airports closed).
