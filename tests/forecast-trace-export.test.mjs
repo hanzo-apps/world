@@ -116,6 +116,10 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.worldStateSummary.regionCount, 2);
     assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
     assert.ok(artifacts.worldState.actorRegistry.every(actor => actor.name && actor.id));
+    assert.equal(artifacts.summary.worldStateSummary.persistentActorCount, 0);
+    assert.ok(typeof artifacts.summary.worldStateSummary.newlyActiveActors === 'number');
+    assert.equal(artifacts.summary.worldStateSummary.branchCount, 6);
+    assert.equal(artifacts.summary.worldStateSummary.newBranches, 6);
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -206,13 +210,90 @@ describe('forecast run world state', () => {
     const worldState = buildForecastRunWorldState({
       generatedAt: Date.parse('2026-03-17T12:00:00Z'),
       predictions: [a, b],
+      priorWorldState: {
+        actorRegistry: [
+          {
+            id: 'Regional command authority:state',
+            name: 'Regional command authority',
+            category: 'state',
+            influenceScore: 0.3,
+            domains: ['conflict'],
+            regions: ['Iran'],
+          },
+          {
+            id: 'legacy:state',
+            name: 'Legacy Actor',
+            category: 'state',
+            influenceScore: 0.2,
+            domains: ['market'],
+            regions: ['Middle East'],
+          },
+        ],
+        branchStates: [
+          {
+            id: `${a.id}:base`,
+            forecastId: a.id,
+            kind: 'base',
+            title: 'Base Branch',
+            projectedProbability: 0.62,
+            actorIds: ['Regional command authority:state'],
+            triggerSample: ['Old trigger'],
+          },
+          {
+            id: `${a.id}:contrarian`,
+            forecastId: a.id,
+            kind: 'contrarian',
+            title: 'Contrarian Branch',
+            projectedProbability: 0.55,
+            actorIds: ['Regional command authority:state'],
+            triggerSample: [],
+          },
+        ],
+      },
     });
 
     assert.equal(worldState.version, 1);
     assert.equal(worldState.domainStates.length, 2);
     assert.ok(worldState.actorRegistry.length > 0);
+    assert.equal(worldState.branchStates.length, 6);
     assert.equal(worldState.continuity.risingForecasts, 1);
     assert.ok(worldState.summary.includes('2 active forecasts'));
     assert.ok(worldState.evidenceLedger.supporting.length > 0);
+    assert.ok(worldState.actorContinuity.persistentCount >= 1);
+    assert.ok(worldState.actorContinuity.newlyActiveCount >= 1);
+    assert.ok(worldState.actorContinuity.newlyActivePreview.length >= 1);
+    assert.ok(worldState.actorContinuity.noLongerActivePreview.some(actor => actor.id === 'legacy:state'));
+    assert.ok(worldState.branchContinuity.persistentBranchCount >= 2);
+    assert.ok(worldState.branchContinuity.newBranchCount >= 1);
+    assert.ok(worldState.branchContinuity.strengthenedBranchCount >= 1);
+    assert.ok(worldState.branchContinuity.resolvedBranchCount >= 0);
+  });
+
+  it('reports full actor continuity counts even when previews are capped', () => {
+    const predictions = [
+      makePrediction('conflict', 'Region A', 'Escalation risk: Region A', 0.6, 0.6, '7d', [
+        { type: 'cii', value: 'Conflict signal', weight: 0.4 },
+      ]),
+      makePrediction('market', 'Region B', 'Oil price impact: Region B', 0.6, 0.6, '7d', [
+        { type: 'prediction_market', value: 'Market stress', weight: 0.4 },
+      ]),
+      makePrediction('cyber', 'Region C', 'Cyber threat concentration: Region C', 0.6, 0.6, '7d', [
+        { type: 'cyber', value: 'Cyber signal', weight: 0.4 },
+      ]),
+    ];
+    for (const pred of predictions) buildForecastCase(pred);
+
+    const priorWorldState = {
+      actorRegistry: [],
+    };
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-17T12:00:00Z'),
+      predictions,
+      priorWorldState,
+    });
+
+    assert.ok(worldState.actorContinuity.newlyActiveCount > 8);
+    assert.equal(worldState.actorContinuity.newlyActivePreview.length, 8);
   });
 });
