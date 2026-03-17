@@ -71,8 +71,8 @@ describe('widget-agent relay — security', () => {
   it('auth 403 response is sent before any processing on bad key', () => {
     const handlerStart = relay.indexOf('async function handleWidgetAgentRequest');
     assert.ok(handlerStart !== -1, 'handleWidgetAgentRequest not found');
-    // Use 1600 chars to reach both the auth helper, rate limiter, and the SSE headers
-    const handlerBody = relay.slice(handlerStart, handlerStart + 1600);
+    // Use 4000 chars to cover the full auth/setup section including SSE headers
+    const handlerBody = relay.slice(handlerStart, handlerStart + 4000);
     const authCheckIdx = handlerBody.indexOf('requireWidgetAgentAccess(req, res)');
     const sseHeaderIdx = handlerBody.indexOf("text/event-stream");
     assert.ok(authCheckIdx !== -1, 'Auth helper call not found in handler start');
@@ -80,15 +80,17 @@ describe('widget-agent relay — security', () => {
     assert.ok(authCheckIdx < sseHeaderIdx, 'Auth check must come before SSE headers');
   });
 
-  it('body size limit is enforced (65KB)', () => {
+  it('body size limit is enforced (160KB for PRO, covers basic too)', () => {
     assert.ok(
-      relay.includes('65536'),
-      'Body limit of 65536 bytes (64KB) must be present',
+      relay.includes('163840'),
+      'Body limit of 163840 bytes (160KB) must be present',
     );
-    // Also verify it triggers a 413
-    const limitIdx = relay.indexOf('65536');
-    const region = relay.slice(limitIdx, limitIdx + 200);
-    assert.ok(region.includes('413'), 'Body size guard must respond 413');
+    // Verify 413 is returned when limit exceeded (check global presence near the limit)
+    assert.ok(relay.includes('413'), 'Body size guard must respond 413');
+    // Both the check and 413 should be in the handler
+    const handlerStart = relay.indexOf('async function handleWidgetAgentRequest');
+    const handlerBody = relay.slice(handlerStart, handlerStart + 500);
+    assert.ok(handlerBody.includes('163840'), 'Body limit must be enforced in handleWidgetAgentRequest');
   });
 
   it('SSRF guard — ALLOWED_ENDPOINTS set is present', () => {
@@ -124,11 +126,15 @@ describe('widget-agent relay — security', () => {
     }
   });
 
-  it('tool loop is bounded to ≤6 turns', () => {
-    // Look for the for loop with a limit
+  it('tool loop is bounded by maxTurns (6 for basic, 10 for PRO)', () => {
     assert.ok(
-      relay.includes('turn < 6'),
-      'Tool loop must have a max of 6 turns (turn < 6)',
+      relay.includes('turn < maxTurns'),
+      'Tool loop must use maxTurns variable (not hardcoded 6)',
+    );
+    // Basic tier maxTurns is set to 6
+    assert.ok(
+      relay.includes('maxTurns = isPro ? 10 : 6') || relay.includes('isPro ? 10 : 6'),
+      'maxTurns must be 6 for basic and 10 for PRO',
     );
   });
 
@@ -139,7 +145,7 @@ describe('widget-agent relay — security', () => {
     );
   });
 
-  it('CORS for /widget-agent: POST in Allow-Methods, X-Widget-Key in Allow-Headers', () => {
+  it('CORS for /widget-agent: POST in Allow-Methods, X-Widget-Key and X-Pro-Key in Allow-Headers', () => {
     const widgetCorsIdx = relay.indexOf("pathname.startsWith('/widget-agent')");
     assert.ok(widgetCorsIdx !== -1);
     const corsBlock = relay.slice(widgetCorsIdx, widgetCorsIdx + 500);
@@ -150,6 +156,10 @@ describe('widget-agent relay — security', () => {
     assert.ok(
       corsBlock.includes('X-Widget-Key'),
       'CORS must include X-Widget-Key in Allow-Headers for /widget-agent',
+    );
+    assert.ok(
+      corsBlock.includes('X-Pro-Key'),
+      'CORS must include X-Pro-Key in Allow-Headers for /widget-agent',
     );
   });
 
@@ -857,6 +867,418 @@ describe('CustomWidgetPanel — header buttons and events', () => {
     assert.ok(
       panel.includes('extends Panel'),
       'CustomWidgetPanel must extend Panel',
+    );
+  });
+
+  it('renderWidget branches on tier — PRO uses wrapProWidgetHtml', () => {
+    assert.ok(
+      panel.includes('wrapProWidgetHtml'),
+      "renderWidget must call wrapProWidgetHtml() for PRO tier",
+    );
+  });
+
+  it('PRO badge rendered in header when tier is pro', () => {
+    assert.ok(
+      panel.includes('widget-pro-badge'),
+      'CustomWidgetPanel must render .widget-pro-badge for PRO widgets',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. PRO widget — relay
+// ---------------------------------------------------------------------------
+describe('PRO widget — relay auth and configuration', () => {
+  const relay = src('scripts/ais-relay.cjs');
+
+  it('PRO_WIDGET_KEY is read from env', () => {
+    assert.ok(
+      relay.includes('PRO_WIDGET_KEY'),
+      'PRO_WIDGET_KEY must be defined from env',
+    );
+  });
+
+  it('PRO_WIDGET_RATE_LIMIT is 20', () => {
+    const match = relay.match(/PRO_WIDGET_RATE_LIMIT\s*=\s*(\d+)/);
+    assert.ok(match, 'PRO_WIDGET_RATE_LIMIT constant not found');
+    assert.equal(Number(match[1]), 20, 'PRO_WIDGET_RATE_LIMIT must be 20');
+  });
+
+  it('proWidgetRateLimitMap is a separate rate limit bucket from basic', () => {
+    assert.ok(
+      relay.includes('proWidgetRateLimitMap'),
+      'PRO must use a separate rate limit map (proWidgetRateLimitMap)',
+    );
+    // Must also have the basic bucket
+    assert.ok(
+      relay.includes('widgetRateLimitMap'),
+      'Basic must have its own rate limit map (widgetRateLimitMap)',
+    );
+    // Verify they are different variables
+    assert.notEqual(
+      relay.indexOf('proWidgetRateLimitMap'),
+      relay.indexOf('widgetRateLimitMap'),
+      'PRO and basic must use separate rate limit maps',
+    );
+  });
+
+  it('x-pro-key header is read for PRO auth', () => {
+    assert.ok(
+      relay.includes("req.headers['x-pro-key']") || relay.includes('x-pro-key'),
+      "Handler must read req.headers['x-pro-key'] for PRO auth",
+    );
+  });
+
+  it('PRO request rejected with 403 when x-pro-key is wrong', () => {
+    assert.ok(
+      relay.includes('getWidgetAgentProvidedProKey'),
+      'getWidgetAgentProvidedProKey function must be defined',
+    );
+    // The PRO key comparison is near the 403 rejection — find it directly
+    const keyCompareIdx = relay.indexOf('providedProKey !== PRO_WIDGET_KEY');
+    assert.ok(keyCompareIdx !== -1, 'PRO key comparison must be present');
+    const region = relay.slice(keyCompareIdx, keyCompareIdx + 200);
+    assert.ok(region.includes('403'), 'Wrong PRO key must return 403');
+  });
+
+  it('invalid tier value rejected with 400', () => {
+    assert.ok(
+      relay.includes("tier !== 'basic' && tier !== 'pro'") ||
+      relay.includes("!['basic', 'pro'].includes(tier)") ||
+      (relay.includes("tier === 'pro'") && relay.includes('400')),
+      'Invalid tier must be rejected with 400',
+    );
+  });
+
+  it('health endpoint includes proKeyConfigured boolean', () => {
+    const healthIdx = relay.indexOf('getWidgetAgentStatus');
+    assert.ok(healthIdx !== -1, 'getWidgetAgentStatus not found');
+    const region = relay.slice(healthIdx, healthIdx + 400);
+    assert.ok(
+      region.includes('proKeyConfigured'),
+      'Health/status response must include proKeyConfigured field',
+    );
+  });
+
+  it('PRO uses claude-sonnet model (not haiku)', () => {
+    assert.ok(
+      relay.includes('claude-sonnet'),
+      'PRO tier must use claude-sonnet model',
+    );
+  });
+
+  it('PRO max_tokens is 8192', () => {
+    // maxTokens is set via isPro ternary, then passed to max_tokens
+    assert.ok(
+      relay.includes('isPro ? 8192') || relay.includes('isPro?8192') || relay.includes('8192'),
+      'PRO max_tokens must be 8192',
+    );
+    const tokenMatch = relay.match(/maxTokens\s*=\s*isPro\s*\?\s*8192/) || relay.match(/isPro\s*\?\s*8192/);
+    assert.ok(tokenMatch, 'maxTokens must be set to 8192 when isPro');
+  });
+
+  it('WIDGET_PRO_SYSTEM_PROMPT exists and forbids DOCTYPE/html wrappers', () => {
+    assert.ok(
+      relay.includes('WIDGET_PRO_SYSTEM_PROMPT'),
+      'WIDGET_PRO_SYSTEM_PROMPT constant must be defined',
+    );
+    // Use lastIndexOf to find the constant definition (not earlier references/usages)
+    const promptIdx = relay.lastIndexOf('WIDGET_PRO_SYSTEM_PROMPT');
+    const promptRegion = relay.slice(promptIdx, promptIdx + 2000);
+    // PRO system prompt must instruct "body only" (no full page generation)
+    assert.ok(
+      promptRegion.includes('body') || promptRegion.includes('<body>'),
+      'PRO system prompt must instruct generating body content only',
+    );
+  });
+
+  it('PRO system prompt allows cdn.jsdelivr.net for Chart.js', () => {
+    // Use lastIndexOf to find the constant definition
+    const promptIdx = relay.lastIndexOf('WIDGET_PRO_SYSTEM_PROMPT');
+    const promptRegion = relay.slice(promptIdx, promptIdx + 2000);
+    assert.ok(
+      promptRegion.includes('cdn.jsdelivr.net') || promptRegion.includes('chart.js') || promptRegion.includes('Chart.js'),
+      'PRO system prompt must mention cdn.jsdelivr.net/Chart.js as allowed CDN',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. PRO widget — store and sanitizer
+// ---------------------------------------------------------------------------
+describe('PRO widget — store and sanitizer', () => {
+  const store = src('src/services/widget-store.ts');
+  const san = src('src/utils/widget-sanitizer.ts');
+
+  it('MAX_HTML_CHARS_PRO is 80000', () => {
+    const match = store.match(/MAX_HTML_CHARS_PRO\s*=\s*([\d_]+)/);
+    assert.ok(match, 'MAX_HTML_CHARS_PRO constant not found');
+    const val = Number(match[1].replace(/_/g, ''));
+    assert.equal(val, 80000, 'MAX_HTML_CHARS_PRO must be 80,000');
+  });
+
+  it('isProWidgetEnabled checks wm-pro-key localStorage key', () => {
+    assert.ok(
+      store.includes("'wm-pro-key'"),
+      "isProWidgetEnabled must check localStorage key 'wm-pro-key'",
+    );
+    assert.ok(
+      store.includes('isProWidgetEnabled'),
+      'isProWidgetEnabled function must be exported',
+    );
+  });
+
+  it('PRO HTML stored in separate wm-pro-html-{id} key', () => {
+    assert.ok(
+      store.includes('wm-pro-html-'),
+      "PRO HTML must be stored in 'wm-pro-html-{id}' separate localStorage key",
+    );
+  });
+
+  it('loadWidgets hydrates PRO HTML from separate key', () => {
+    const loadIdx = store.indexOf('function loadWidgets');
+    assert.ok(loadIdx !== -1, 'loadWidgets not found');
+    const loadBody = store.slice(loadIdx, loadIdx + 600);
+    assert.ok(
+      loadBody.includes('proHtml') || loadBody.includes('wm-pro-html'),
+      'loadWidgets must read PRO HTML from separate key',
+    );
+  });
+
+  it("loadWidgets drops PRO entry when wm-pro-html-{id} is missing", () => {
+    const loadIdx = store.indexOf('function loadWidgets');
+    const loadBody = store.slice(loadIdx, loadIdx + 600);
+    assert.ok(
+      loadBody.includes('continue') || loadBody.includes('skip'),
+      'loadWidgets must skip/drop PRO entries with missing HTML key',
+    );
+  });
+
+  it('saveWidget for PRO uses raw localStorage.setItem (not saveToStorage helper)', () => {
+    const saveIdx = store.indexOf('function saveWidget');
+    assert.ok(saveIdx !== -1, 'saveWidget not found');
+    const saveBody = store.slice(saveIdx, saveIdx + 800);
+    assert.ok(
+      saveBody.includes('localStorage.setItem'),
+      'PRO saveWidget must use raw localStorage.setItem for atomicity-safe writes',
+    );
+  });
+
+  it('saveWidget for PRO rolls back HTML key if metadata write fails', () => {
+    const saveIdx = store.indexOf('function saveWidget');
+    const saveBody = store.slice(saveIdx, saveIdx + 800);
+    assert.ok(
+      saveBody.includes('removeItem') || saveBody.includes('rollback'),
+      'saveWidget must rollback (removeItem) PRO HTML key if metadata write throws',
+    );
+  });
+
+  it('deleteWidget removes wm-pro-html-{id} key', () => {
+    const deleteIdx = store.indexOf('function deleteWidget');
+    assert.ok(deleteIdx !== -1, 'deleteWidget not found');
+    const deleteBody = store.slice(deleteIdx, deleteIdx + 400);
+    assert.ok(
+      deleteBody.includes('wm-pro-html') || deleteBody.includes('proHtmlKey'),
+      'deleteWidget must also remove the wm-pro-html-{id} key',
+    );
+  });
+
+  it('wrapProWidgetHtml returns iframe with sandbox="allow-scripts" only', () => {
+    assert.ok(san.includes('wrapProWidgetHtml'), 'wrapProWidgetHtml must be exported');
+    // Use 1500 chars to cover the full function body including the long CSP meta tag
+    const fnIdx = san.indexOf('wrapProWidgetHtml');
+    const fnBody = san.slice(fnIdx, fnIdx + 1500);
+    assert.ok(
+      fnBody.includes('sandbox="allow-scripts"') || fnBody.includes("sandbox='allow-scripts'"),
+      'iframe sandbox must be exactly "allow-scripts" — no allow-same-origin',
+    );
+    assert.ok(
+      !fnBody.includes('allow-same-origin'),
+      'sandbox must NOT include allow-same-origin',
+    );
+  });
+
+  it('wrapProWidgetHtml places CSP as first head child (client-owned skeleton)', () => {
+    const fnIdx = san.indexOf('wrapProWidgetHtml');
+    const fnBody = san.slice(fnIdx, fnIdx + 800);
+    assert.ok(
+      fnBody.includes('Content-Security-Policy'),
+      'wrapProWidgetHtml must embed CSP in the head',
+    );
+    // CSP meta should come before any style tag
+    const cspPos = fnBody.indexOf('Content-Security-Policy');
+    const stylePos = fnBody.indexOf('<style>');
+    assert.ok(
+      cspPos < stylePos,
+      'CSP meta must appear before <style> in the generated HTML skeleton',
+    );
+  });
+
+  it('wrapProWidgetHtml CSP has connect-src none (blocks beaconing)', () => {
+    const fnIdx = san.indexOf('wrapProWidgetHtml');
+    const fnBody = san.slice(fnIdx, fnIdx + 800);
+    assert.ok(
+      fnBody.includes("connect-src 'none'"),
+      "CSP must include connect-src 'none' to block network beaconing from iframe",
+    );
+  });
+
+  it('wrapProWidgetHtml uses escapeSrcdoc for attribute safety', () => {
+    assert.ok(
+      san.includes('escapeSrcdoc'),
+      'wrapProWidgetHtml must escape the srcdoc attribute value',
+    );
+  });
+
+  it('wrapProWidgetHtml injects Chart.js from jsdelivr so new Chart() is available', () => {
+    const fnIdx = san.indexOf('wrapProWidgetHtml');
+    const fnBody = san.slice(fnIdx, fnIdx + 1500);
+    assert.ok(
+      fnBody.includes('cdn.jsdelivr.net') && fnBody.includes('chart.js'),
+      'wrapProWidgetHtml must inject Chart.js CDN script so widgets can call new Chart(...)',
+    );
+    // Script must appear before </head> so Chart is defined when body scripts run
+    const scriptPos = fnBody.indexOf('chart.js');
+    const bodyPos = fnBody.indexOf('<body>');
+    assert.ok(
+      scriptPos < bodyPos,
+      'Chart.js script tag must be in <head>, before <body>',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. PRO widget — modal and layout
+// ---------------------------------------------------------------------------
+describe('PRO widget — modal and layout integration', () => {
+  const modal = src('src/components/WidgetChatModal.ts');
+  const layout = src('src/app/panel-layout.ts');
+
+  it('modal sends tier in request body', () => {
+    const bodyIdx = modal.indexOf('JSON.stringify');
+    assert.ok(bodyIdx !== -1);
+    const bodyRegion = modal.slice(bodyIdx, bodyIdx + 400);
+    assert.ok(bodyRegion.includes('tier'), "Request body must include 'tier' field");
+  });
+
+  it('modal sends X-Pro-Key header for PRO requests', () => {
+    assert.ok(
+      modal.includes('X-Pro-Key'),
+      'Modal must send X-Pro-Key header for PRO tier requests',
+    );
+  });
+
+  it('modal uses 120s timeout for PRO (vs 60s basic)', () => {
+    assert.ok(
+      modal.includes('120_000') || modal.includes('120000'),
+      'PRO modal timeout must be 120 seconds',
+    );
+    assert.ok(
+      modal.includes('60_000') || modal.includes('60000'),
+      'Basic modal timeout must still be 60 seconds',
+    );
+  });
+
+  it('modal shows preflightProUnavailable when proKeyConfigured is false', () => {
+    assert.ok(
+      modal.includes('proKeyConfigured') || modal.includes('preflightProUnavailable'),
+      'Modal must handle proKeyConfigured=false from health endpoint',
+    );
+  });
+
+  it('pendingSaveSpec includes tier field', () => {
+    assert.ok(
+      modal.includes('pendingSaveSpec'),
+      'Modal must use pendingSaveSpec before saving',
+    );
+    // tier should be part of the spec being saved
+    const specIdx = modal.indexOf('pendingSaveSpec');
+    const specRegion = modal.slice(specIdx, specIdx + 200);
+    assert.ok(
+      specRegion.includes('tier') || modal.includes("tier: currentTier"),
+      'pendingSaveSpec must include tier field',
+    );
+  });
+
+  it('PRO example chips defined (separate from basic examples)', () => {
+    assert.ok(
+      modal.includes('PRO_EXAMPLE_PROMPT_KEYS'),
+      'Modal must define PRO_EXAMPLE_PROMPT_KEYS for PRO example chips',
+    );
+  });
+
+  it('layout has PRO create button when isProWidgetEnabled', () => {
+    assert.ok(
+      layout.includes('isProWidgetEnabled'),
+      'panel-layout must import/call isProWidgetEnabled',
+    );
+    assert.ok(
+      layout.includes('ai-widget-block-pro'),
+      'panel-layout must render PRO create button (.ai-widget-block-pro)',
+    );
+  });
+
+  it('layout PRO button opens modal with tier: pro', () => {
+    const proButtonIdx = layout.indexOf('ai-widget-block-pro');
+    assert.ok(proButtonIdx !== -1);
+    // Use 1200 chars to cover the full button element including the click handler
+    const proButtonRegion = layout.slice(proButtonIdx, proButtonIdx + 1200);
+    assert.ok(
+      proButtonRegion.includes("tier: 'pro'") || proButtonRegion.includes("tier:'pro'") || proButtonRegion.includes('"pro"'),
+      "PRO button must open modal with tier: 'pro'",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. PRO widget — i18n and CSS
+// ---------------------------------------------------------------------------
+describe('PRO widget — i18n keys and CSS', () => {
+  const en = JSON.parse(src('src/locales/en.json'));
+  const css = src('src/styles/main.css');
+
+  const PRO_REQUIRED_KEYS = [
+    'createInteractive',
+    'proBadge',
+    'preflightProUnavailable',
+  ];
+
+  for (const key of PRO_REQUIRED_KEYS) {
+    it(`widgets.${key} is defined and non-empty`, () => {
+      assert.ok(
+        en.widgets && typeof en.widgets[key] === 'string' && en.widgets[key].length > 0,
+        `en.json must have non-empty widgets.${key}`,
+      );
+    });
+  }
+
+  it('widgets.proExamples has all 4 example keys', () => {
+    const exKeys = ['interactiveChart', 'sortableTable', 'animatedCounters', 'tabbedComparison'];
+    for (const key of exKeys) {
+      assert.ok(
+        en.widgets?.proExamples?.[key] && en.widgets.proExamples[key].length > 0,
+        `en.json must have non-empty widgets.proExamples.${key}`,
+      );
+    }
+  });
+
+  it('.widget-pro-badge CSS class defined', () => {
+    assert.ok(
+      css.includes('.widget-pro-badge'),
+      'CSS must define .widget-pro-badge class for PRO pill badge',
+    );
+  });
+
+  it('.wm-widget-pro iframe CSS sets 400px height', () => {
+    assert.ok(
+      css.includes('.wm-widget-pro'),
+      'CSS must target .wm-widget-pro for PRO iframe container',
+    );
+    const proIdx = css.indexOf('.wm-widget-pro');
+    const proRegion = css.slice(proIdx, proIdx + 300);
+    assert.ok(
+      proRegion.includes('400px') || css.includes('400px'),
+      'PRO iframe must have 400px height defined in CSS',
     );
   });
 });

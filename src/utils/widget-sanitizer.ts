@@ -40,3 +40,27 @@ export function wrapWidgetHtml(html: string, extraClass = ''): string {
     </div>
   `;
 }
+
+function escapeSrcdoc(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+
+export function wrapProWidgetHtml(bodyContent: string): string {
+  const doc = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src data:; connect-src 'none';">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+body{margin:0;padding:12px;background:#0a0e14;color:#e0e0e0;font-family:system-ui,sans-serif;overflow-y:auto;box-sizing:border-box}
+*{box-sizing:inherit}
+</style>
+</head>
+<body>${bodyContent}</body>
+</html>`;
+
+  return `<div class="wm-widget-shell wm-widget-pro"><iframe srcdoc="${escapeSrcdoc(doc)}" sandbox="allow-scripts" style="width:100%;height:400px;border:none;display:block;" title="Interactive widget"></iframe></div>`;
+}
