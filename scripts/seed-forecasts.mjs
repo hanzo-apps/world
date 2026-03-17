@@ -2378,6 +2378,58 @@ const FORECAST_LLM_PROVIDERS = [
   { name: 'groq', envKey: 'GROQ_API_KEY', apiUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.1-8b-instant', timeout: 20_000 },
   { name: 'openrouter', envKey: 'OPENROUTER_API_KEY', apiUrl: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemini-2.5-flash', timeout: 25_000 },
 ];
+const FORECAST_LLM_PROVIDER_NAMES = new Set(FORECAST_LLM_PROVIDERS.map(provider => provider.name));
+
+function parseForecastProviderOrder(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const seen = new Set();
+  const providers = [];
+  for (const item of raw.split(',')) {
+    const provider = item.trim().toLowerCase();
+    if (!FORECAST_LLM_PROVIDER_NAMES.has(provider) || seen.has(provider)) continue;
+    seen.add(provider);
+    providers.push(provider);
+  }
+  return providers.length > 0 ? providers : null;
+}
+
+function getForecastLlmCallOptions(stage = 'default') {
+  const defaultProviderOrder = FORECAST_LLM_PROVIDERS.map(provider => provider.name);
+  const globalProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_PROVIDER_ORDER);
+  const combinedProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER);
+  const providerOrder = stage === 'combined'
+    ? (combinedProviderOrder || globalProviderOrder || defaultProviderOrder)
+    : (globalProviderOrder || defaultProviderOrder);
+
+  const openrouterModel = stage === 'combined'
+    ? (process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
+    : process.env.FORECAST_LLM_MODEL_OPENROUTER;
+
+  return {
+    providerOrder,
+    modelOverrides: openrouterModel ? { openrouter: openrouterModel } : {},
+  };
+}
+
+function resolveForecastLlmProviders(options = {}) {
+  const requestedOrder = Array.isArray(options.providerOrder) && options.providerOrder.length > 0
+    ? options.providerOrder
+    : FORECAST_LLM_PROVIDERS.map(provider => provider.name);
+
+  const seen = new Set();
+  const providers = [];
+  for (const providerName of requestedOrder) {
+    if (seen.has(providerName)) continue;
+    const provider = FORECAST_LLM_PROVIDERS.find(item => item.name === providerName);
+    if (!provider) continue;
+    seen.add(providerName);
+    providers.push({
+      ...provider,
+      model: options.modelOverrides?.[provider.name] || provider.model,
+    });
+  }
+  return providers.length > 0 ? providers : FORECAST_LLM_PROVIDERS;
+}
 
 const SCENARIO_SYSTEM_PROMPT = `You are a senior geopolitical intelligence analyst writing scenario briefs.
 
@@ -2497,8 +2549,8 @@ function validateScenarios(scenarios, predictions) {
   });
 }
 
-async function callForecastLLM(systemPrompt, userPrompt) {
-  for (const provider of FORECAST_LLM_PROVIDERS) {
+async function callForecastLLM(systemPrompt, userPrompt, options = {}) {
+  for (const provider of resolveForecastLlmProviders(options)) {
     const apiKey = process.env[provider.envKey];
     if (!apiKey) continue;
     try {
@@ -2692,6 +2744,8 @@ async function enrichScenariosWithLLM(predictions) {
   if (predictions.length === 0) return;
   const { url, token } = getRedisCredentials();
   const enrichmentTargets = selectForecastsForEnrichment(predictions);
+  const combinedLlmOptions = getForecastLlmCallOptions('combined');
+  const scenarioLlmOptions = getForecastLlmCallOptions('scenario');
 
   // Higher-quality top forecasts get richer scenario + perspective treatment.
   const topWithPerspectives = enrichmentTargets.combined;
@@ -2728,7 +2782,7 @@ async function enrichScenariosWithLLM(predictions) {
       console.log(JSON.stringify({ event: 'llm_combined', cached: true, count: cached.items.length, hash }));
     } else {
       const t0 = Date.now();
-      const result = await callForecastLLM(COMBINED_SYSTEM_PROMPT, buildUserPrompt(topWithPerspectives));
+      const result = await callForecastLLM(COMBINED_SYSTEM_PROMPT, buildUserPrompt(topWithPerspectives), combinedLlmOptions);
       if (result) {
         const raw = parseLLMScenarios(result.text);
         const validScenarios = validateScenarios(raw, topWithPerspectives);
@@ -2816,7 +2870,7 @@ async function enrichScenariosWithLLM(predictions) {
       console.log(JSON.stringify({ event: 'llm_scenario', cached: true, count: cached.scenarios.length, hash }));
     } else {
       const t0 = Date.now();
-      const result = await callForecastLLM(SCENARIO_SYSTEM_PROMPT, buildUserPrompt(scenarioOnly));
+      const result = await callForecastLLM(SCENARIO_SYSTEM_PROMPT, buildUserPrompt(scenarioOnly), scenarioLlmOptions);
       if (result) {
         const raw = parseLLMScenarios(result.text);
         const valid = validateScenarios(raw, scenarioOnly);
@@ -3025,6 +3079,9 @@ export {
   rankForecastsForAnalysis,
   filterPublishedForecasts,
   selectForecastsForEnrichment,
+  parseForecastProviderOrder,
+  getForecastLlmCallOptions,
+  resolveForecastLlmProviders,
   buildFallbackScenario,
   buildFallbackBaseCase,
   buildFallbackEscalatoryCase,
