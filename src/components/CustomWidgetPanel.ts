@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import type { CustomWidgetSpec } from '@/services/widget-store';
 import { saveWidget } from '@/services/widget-store';
 import { t } from '@/services/i18n';
-import { wrapWidgetHtml } from '@/utils/widget-sanitizer';
+import { wrapWidgetHtml, wrapProWidgetHtml } from '@/utils/widget-sanitizer';
 import { h } from '@/utils/dom-utils';
 
 const ACCENT_COLORS: Array<string | null> = [
@@ -53,6 +53,15 @@ export class CustomWidgetPanel extends Panel {
       }));
     });
 
+    if (this.spec.tier === 'pro') {
+      const badge = h('span', { className: 'widget-pro-badge' }, t('widgets.proBadge'));
+      if (closeBtn) {
+        this.header.insertBefore(badge, closeBtn);
+      } else {
+        this.header.appendChild(badge);
+      }
+    }
+
     if (closeBtn) {
       this.header.insertBefore(colorBtn, closeBtn);
       this.header.insertBefore(chatBtn, closeBtn);
@@ -73,7 +82,11 @@ export class CustomWidgetPanel extends Panel {
   }
 
   renderWidget(): void {
-    this.setContent(wrapWidgetHtml(this.spec.html));
+    if (this.spec.tier === 'pro') {
+      this.setContent(wrapProWidgetHtml(this.spec.html));
+    } else {
+      this.setContent(wrapWidgetHtml(this.spec.html));
+    }
     this.applyAccentColor();
   }
 
