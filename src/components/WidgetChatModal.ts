@@ -1,12 +1,13 @@
 import type { CustomWidgetSpec } from '@/services/widget-store';
-import { getWidgetAgentKey } from '@/services/widget-store';
+import { getWidgetAgentKey, getProWidgetKey } from '@/services/widget-store';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
 import { widgetAgentHealthUrl, widgetAgentUrl } from '@/utils/proxy';
-import { wrapWidgetHtml } from '@/utils/widget-sanitizer';
+import { wrapWidgetHtml, wrapProWidgetHtml } from '@/utils/widget-sanitizer';
 
 interface WidgetChatOptions {
   mode: 'create' | 'modify';
+  tier?: 'basic' | 'pro';
   existingSpec?: CustomWidgetSpec;
   onComplete: (spec: CustomWidgetSpec) => void;
 }
@@ -17,6 +18,7 @@ type WidgetAgentHealth = {
   agentEnabled?: boolean;
   widgetKeyConfigured?: boolean;
   anthropicConfigured?: boolean;
+  proKeyConfigured?: boolean;
   error?: string;
 };
 
@@ -27,12 +29,22 @@ const EXAMPLE_PROMPT_KEYS = [
   'widgets.examples.conflictHotspots',
 ] as const;
 
+const PRO_EXAMPLE_PROMPT_KEYS = [
+  'widgets.proExamples.interactiveChart',
+  'widgets.proExamples.sortableTable',
+  'widgets.proExamples.animatedCounters',
+  'widgets.proExamples.tabbedComparison',
+] as const;
+
 let overlay: HTMLElement | null = null;
 let abortController: AbortController | null = null;
 let clientTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function openWidgetChatModal(options: WidgetChatOptions): void {
   closeWidgetChatModal();
+
+  const currentTier: 'basic' | 'pro' = options.tier ?? options.existingSpec?.tier ?? 'basic';
+  const isPro = currentTier === 'pro';
 
   overlay = document.createElement('div');
   overlay.className = 'modal-overlay active';
@@ -42,10 +54,11 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
 
   const isModify = options.mode === 'modify';
   const titleText = isModify ? t('widgets.modifyTitle') : t('widgets.chatTitle');
+  const proBadgeHtml = isPro ? `<span class="widget-pro-badge">${escapeHtml(t('widgets.proBadge'))}</span>` : '';
 
   modal.innerHTML = `
     <div class="modal-header">
-      <span class="modal-title">${escapeHtml(titleText)}</span>
+      <span class="modal-title">${escapeHtml(titleText)}${proBadgeHtml}</span>
       <button class="modal-close" aria-label="${escapeHtml(t('common.close'))}">\u2715</button>
     </div>
     <div class="widget-chat-layout">
@@ -95,7 +108,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
       appendMessage(messagesEl, msg.role, msg.content);
     }
     if (currentSessionHtml) {
-      renderPreviewHtml(previewEl, currentSessionHtml, options.existingSpec.title, t('widgets.phaseReadyToPrompt'), t('widgets.modifyHint'));
+      renderPreviewHtml(previewEl, currentSessionHtml, options.existingSpec.title, t('widgets.phaseReadyToPrompt'), t('widgets.modifyHint'), isPro);
     }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     setFooterStatus(footerStatusEl, t('widgets.modifyHint'));
@@ -104,7 +117,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
     setFooterStatus(footerStatusEl, t('widgets.checkingConnection'));
   }
 
-  renderExampleChips(examplesEl, inputEl);
+  renderExampleChips(examplesEl, inputEl, isPro);
   syncComposerState();
   void runPreflight();
 
@@ -123,14 +136,24 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
   async function runPreflight(): Promise<void> {
     setReadinessState(readinessEl, 'checking', t('widgets.checkingConnection'));
     try {
-      const res = await fetch(widgetAgentHealthUrl(), {
-        headers: { 'X-Widget-Key': getWidgetAgentKey() },
-      });
+      const headers: Record<string, string> = { 'X-Widget-Key': getWidgetAgentKey() };
+      if (isPro) headers['X-Pro-Key'] = getProWidgetKey();
+      const res = await fetch(widgetAgentHealthUrl(), { headers });
       let payload: WidgetAgentHealth | null = null;
       try { payload = await res.json() as WidgetAgentHealth; } catch { /* ignore */ }
 
       if (!res.ok) {
-        const message = resolvePreflightMessage(res.status, payload);
+        const message = resolvePreflightMessage(res.status, payload, isPro);
+        preflightReady = false;
+        setReadinessState(readinessEl, 'error', message);
+        setFooterStatus(footerStatusEl, message, 'error');
+        if (!currentSessionHtml) renderPreviewState(previewEl, 'error', message);
+        syncComposerState();
+        return;
+      }
+
+      if (isPro && payload?.proKeyConfigured === false) {
+        const message = t('widgets.preflightProUnavailable');
         preflightReady = false;
         setReadinessState(readinessEl, 'error', message);
         setFooterStatus(footerStatusEl, message, 'error');
@@ -176,12 +199,14 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
     const body = JSON.stringify({
       prompt: prompt.slice(0, 2000),
       mode: options.mode,
+      tier: currentTier,
       currentHtml: currentSessionHtml,
       conversationHistory: sessionHistory
         .map((m) => ({ role: m.role, content: m.content.slice(0, 500) })),
     });
 
     abortController = new AbortController();
+    const timeoutMs = isPro ? 120_000 : 60_000;
     clientTimeout = setTimeout(() => {
       abortController?.abort();
       appendMessage(messagesEl, 'assistant', t('widgets.requestTimedOut'));
@@ -189,16 +214,19 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
       setFooterStatus(footerStatusEl, t('widgets.requestTimedOut'), 'error');
       requestInFlight = false;
       syncComposerState();
-    }, 60_000);
+    }, timeoutMs);
 
     try {
+      const reqHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Widget-Key': getWidgetAgentKey(),
+      };
+      if (isPro) reqHeaders['X-Pro-Key'] = getProWidgetKey();
+
       const res = await fetch(widgetAgentUrl(), {
         method: 'POST',
         signal: abortController.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Widget-Key': getWidgetAgentKey(),
-        },
+        headers: reqHeaders,
         body,
       });
 
@@ -243,7 +271,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
           } else if (event.type === 'html_complete') {
             resultHtml = String(event.html ?? '');
             currentSessionHtml = resultHtml;
-            renderPreviewHtml(previewEl, resultHtml, resultTitle, t('widgets.phaseComposing'), t('widgets.previewComposingCopy'));
+            renderPreviewHtml(previewEl, resultHtml, resultTitle, t('widgets.phaseComposing'), t('widgets.previewComposingCopy'), isPro);
             setFooterStatus(footerStatusEl, t('widgets.previewComposingCopy'));
           } else if (event.type === 'done') {
             resultTitle = String(event.title ?? 'Custom Widget');
@@ -261,6 +289,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
               title: resultTitle,
               html: resultHtml,
               prompt,
+              tier: currentTier,
               accentColor: existing?.accentColor ?? null,
               conversationHistory: [...sessionHistory],
               createdAt: existing?.createdAt ?? Date.now(),
@@ -268,7 +297,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
             };
             statusEl.textContent = t('widgets.ready', { title: resultTitle });
             if (toolBadgeEl) toolBadgeEl.remove();
-            renderPreviewHtml(previewEl, resultHtml, resultTitle, t('widgets.phaseComplete'), t('widgets.previewReadyCopy'));
+            renderPreviewHtml(previewEl, resultHtml, resultTitle, t('widgets.phaseComplete'), t('widgets.previewReadyCopy'), isPro);
             setFooterStatus(footerStatusEl, t('widgets.readyToApply', { title: resultTitle }));
             actionBtn.textContent = isModify ? t('widgets.applyChanges') : t('widgets.addToDashboard');
             requestInFlight = false;
@@ -318,9 +347,10 @@ export function closeWidgetChatModal(): void {
   }
 }
 
-function renderExampleChips(container: HTMLElement, inputEl: HTMLTextAreaElement): void {
+function renderExampleChips(container: HTMLElement, inputEl: HTMLTextAreaElement, isPro: boolean): void {
   container.innerHTML = '';
-  for (const key of EXAMPLE_PROMPT_KEYS) {
+  const keys = isPro ? PRO_EXAMPLE_PROMPT_KEYS : EXAMPLE_PROMPT_KEYS;
+  for (const key of keys) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'widget-chat-example-chip';
@@ -333,8 +363,9 @@ function renderExampleChips(container: HTMLElement, inputEl: HTMLTextAreaElement
   }
 }
 
-function resolvePreflightMessage(status: number, payload: WidgetAgentHealth | null): string {
-  if (status === 403) return t('widgets.preflightInvalidKey');
+function resolvePreflightMessage(status: number, payload: WidgetAgentHealth | null, isPro: boolean): string {
+  if (status === 403) return isPro ? t('widgets.preflightInvalidProKey') : t('widgets.preflightInvalidKey');
+  if (status === 503 && payload?.proKeyConfigured === false) return t('widgets.preflightProUnavailable');
   if (payload?.anthropicConfigured === false) return t('widgets.preflightAiUnavailable');
   return t('widgets.preflightUnavailable');
 }
@@ -388,7 +419,12 @@ function renderPreviewHtml(
   title: string,
   phaseLabel: string,
   description = '',
+  isPro = false,
 ): void {
+  const rendered = isPro
+    ? wrapProWidgetHtml(html)
+    : wrapWidgetHtml(html, 'wm-widget-shell-preview');
+
   container.innerHTML = `
     <div class="widget-chat-preview-frame">
       <div class="widget-chat-preview-head">
@@ -400,7 +436,7 @@ function renderPreviewHtml(
       </div>
       ${description ? `<p class="widget-chat-preview-copy">${escapeHtml(description)}</p>` : ''}
       <div class="widget-chat-preview-render">
-        ${wrapWidgetHtml(html, 'wm-widget-shell-preview')}
+        ${rendered}
       </div>
     </div>
   `;

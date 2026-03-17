@@ -74,6 +74,7 @@ async function installWidgetAgentMocks(
         agentEnabled: true,
         widgetKeyConfigured: true,
         anthropicConfigured: true,
+        proKeyConfigured: false,
       }),
     });
   });
@@ -105,6 +106,65 @@ async function installWidgetAgentMocks(
         'cache-control': 'no-cache',
         connection: 'keep-alive',
       },
+      body: buildWidgetSseResponse(response),
+    });
+  });
+}
+
+const proWidgetKey = 'test-pro-widget-key';
+
+function buildProWidgetBody(title: string, markerClass: string): string {
+  return `<div class="${markerClass}" data-widget-marker="${markerClass}">
+  <h2 style="color:#e0e0e0;margin:0 0 12px">${title}</h2>
+  <canvas id="myChart" style="max-height:300px"></canvas>
+  <script>
+    const DATA = { labels: ['Jan','Feb','Mar'], values: [10,20,30] };
+    const ctx = document.getElementById('myChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels: DATA.labels, datasets: [{ label: '${title}', data: DATA.values }] }
+    });
+  </script>
+</div>`;
+}
+
+async function installProWidgetAgentMocks(
+  page: Parameters<typeof test>[0]['page'],
+  responses: MockWidgetResponse[],
+  requestBodies: unknown[] = [],
+  proKeyConfigured = true,
+): Promise<void> {
+  await page.route('**/widget-agent/health', async (route) => {
+    expect(route.request().headers()['x-widget-key']).toBe(widgetKey);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        agentEnabled: true,
+        widgetKeyConfigured: true,
+        anthropicConfigured: true,
+        proKeyConfigured,
+      }),
+    });
+  });
+
+  let responseIndex = 0;
+  await page.route('**/widget-agent', async (route) => {
+    const body = route.request().postDataJSON();
+    requestBodies.push(body);
+
+    const response = responses[responseIndex];
+    if (!response) {
+      await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Unexpected call"}' });
+      return;
+    }
+    responseIndex += 1;
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      headers: { 'cache-control': 'no-cache', connection: 'keep-alive' },
       body: buildWidgetSseResponse(response),
     });
   });
@@ -353,5 +413,219 @@ test.describe('AI widget builder', () => {
 
     await page.reload();
     await expect(page.locator('.custom-widget-panel')).toHaveCount(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRO tier widget tests
+// ---------------------------------------------------------------------------
+test.describe('AI widget builder — PRO tier', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(
+      ({ wKey, pKey }: { wKey: string; pKey: string }) => {
+        if (!sessionStorage.getItem('__widget_pro_e2e_init__')) {
+          localStorage.clear();
+          sessionStorage.clear();
+          localStorage.setItem('worldmonitor-variant', 'happy');
+          localStorage.setItem('wm-widget-key', wKey);
+          localStorage.setItem('wm-pro-key', pKey);
+          sessionStorage.setItem('__widget_pro_e2e_init__', '1');
+          return;
+        }
+        if (!localStorage.getItem('wm-widget-key')) localStorage.setItem('wm-widget-key', wKey);
+        if (!localStorage.getItem('wm-pro-key')) localStorage.setItem('wm-pro-key', pKey);
+      },
+      { wKey: widgetKey, pKey: proWidgetKey },
+    );
+  });
+
+  test('creates a PRO widget: iframe renders with allow-scripts sandbox and PRO badge visible', async ({
+    page,
+  }) => {
+    const proHtml = buildProWidgetBody('Oil vs Gold Interactive', 'pro-oil-gold');
+    await installProWidgetAgentMocks(page, [
+      {
+        endpoint: '/rpc/worldmonitor.markets.v1.MarketsService/GetCommodities',
+        title: 'Oil vs Gold Interactive',
+        html: proHtml,
+      },
+    ]);
+
+    await page.goto('/');
+    await expect(page.locator('#panelsGrid .ai-widget-block-pro')).toBeVisible({ timeout: 30000 });
+    await page.locator('#panelsGrid .ai-widget-block-pro').click();
+
+    const modal = page.locator('.widget-chat-modal');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.widget-pro-badge')).toBeVisible();
+
+    await expect(modal.locator('.widget-chat-readiness')).toContainText('Connected', { timeout: 15000 });
+    await modal.locator('.widget-chat-input').fill('Interactive chart comparing oil and gold prices');
+    await modal.locator('.widget-chat-send').click();
+
+    await expect(modal.locator('.widget-chat-action-btn')).toBeEnabled({ timeout: 30000 });
+    await expect(modal.locator('.widget-chat-preview')).toContainText('Oil vs Gold Interactive');
+
+    // PRO preview shows iframe (not basic .wm-widget-generated)
+    const previewIframe = modal.locator('.widget-chat-preview iframe');
+    await expect(previewIframe).toBeVisible();
+    const sandboxAttr = await previewIframe.getAttribute('sandbox');
+    expect(sandboxAttr).toBe('allow-scripts');
+    expect(sandboxAttr).not.toContain('allow-same-origin');
+
+    await modal.locator('.widget-chat-action-btn').click();
+
+    const widgetPanel = page.locator('.custom-widget-panel', {
+      has: page.locator('.panel-title', { hasText: 'Oil vs Gold Interactive' }),
+    });
+    await expect(widgetPanel).toBeVisible({ timeout: 20000 });
+    await expect(widgetPanel.locator('.widget-pro-badge')).toBeVisible();
+
+    const panelIframe = widgetPanel.locator('iframe[sandbox="allow-scripts"]');
+    await expect(panelIframe).toBeVisible();
+    const iframeHeight = await panelIframe.evaluate((el) => el.getBoundingClientRect().height);
+    expect(iframeHeight).toBeGreaterThanOrEqual(390);
+  });
+
+  test('PRO widget stores HTML in wm-pro-html-{id} key and tier:pro in main array', async ({
+    page,
+  }) => {
+    const proHtml = buildProWidgetBody('Crypto Table', 'pro-crypto');
+    await installProWidgetAgentMocks(page, [
+      {
+        endpoint: '/rpc/worldmonitor.markets.v1.MarketsService/GetCommodities',
+        title: 'Crypto Table',
+        html: proHtml,
+      },
+    ]);
+
+    await page.goto('/');
+    await expect(page.locator('#panelsGrid .ai-widget-block-pro')).toBeVisible({ timeout: 30000 });
+    await page.locator('#panelsGrid .ai-widget-block-pro').click();
+
+    const modal = page.locator('.widget-chat-modal');
+    await expect(modal.locator('.widget-chat-readiness')).toContainText('Connected', { timeout: 15000 });
+    await modal.locator('.widget-chat-input').fill('Sortable crypto price table');
+    await modal.locator('.widget-chat-send').click();
+    await expect(modal.locator('.widget-chat-action-btn')).toBeEnabled({ timeout: 30000 });
+    await modal.locator('.widget-chat-action-btn').click();
+
+    await expect(page.locator('.custom-widget-panel', {
+      has: page.locator('.panel-title', { hasText: 'Crypto Table' }),
+    })).toBeVisible({ timeout: 20000 });
+
+    const storage = await page.evaluate(() => {
+      const widgets = JSON.parse(localStorage.getItem('wm-custom-widgets') || '[]') as Array<{
+        id: string;
+        title: string;
+        tier?: string;
+        html?: string;
+      }>;
+      const entry = widgets.find((w) => w.title === 'Crypto Table');
+      if (!entry) return null;
+      const proHtmlStored = localStorage.getItem(`wm-pro-html-${entry.id}`);
+      return { entry, proHtmlStored };
+    });
+
+    expect(storage).not.toBeNull();
+    // Main array must have tier: 'pro' but NO html field
+    expect(storage!.entry.tier).toBe('pro');
+    expect(storage!.entry.html).toBeUndefined();
+    // HTML must be in the separate key
+    expect(storage!.proHtmlStored).toContain('pro-crypto');
+  });
+
+  test('modify PRO widget: tier preserved, history passed to server', async ({ page }) => {
+    const requestBodies: unknown[] = [];
+    await installProWidgetAgentMocks(
+      page,
+      [
+        {
+          endpoint: '/rpc/worldmonitor.markets.v1.MarketsService/GetCommodities',
+          title: 'Oil vs Gold Interactive',
+          html: buildProWidgetBody('Oil vs Gold Interactive', 'pro-oil-gold'),
+        },
+        {
+          endpoint: '/rpc/worldmonitor.aviation.v1.AviationService/GetAirportDelays',
+          title: 'Flight Interactive',
+          html: buildProWidgetBody('Flight Interactive', 'pro-flight'),
+        },
+      ],
+      requestBodies,
+    );
+
+    await page.goto('/');
+    await expect(page.locator('#panelsGrid .ai-widget-block-pro')).toBeVisible({ timeout: 30000 });
+    await page.locator('#panelsGrid .ai-widget-block-pro').click();
+
+    const modal = page.locator('.widget-chat-modal');
+    await expect(modal.locator('.widget-chat-readiness')).toContainText('Connected', { timeout: 15000 });
+    await modal.locator('.widget-chat-input').fill('Interactive oil gold chart');
+    await modal.locator('.widget-chat-send').click();
+    await expect(modal.locator('.widget-chat-action-btn')).toBeEnabled({ timeout: 30000 });
+    await modal.locator('.widget-chat-action-btn').click();
+
+    const widgetPanel = page.locator('.custom-widget-panel', {
+      has: page.locator('.panel-title', { hasText: 'Oil vs Gold Interactive' }),
+    });
+    await expect(widgetPanel).toBeVisible({ timeout: 20000 });
+
+    await widgetPanel.locator('.panel-widget-chat-btn').click();
+    const modifyModal = page.locator('.widget-chat-modal');
+    await expect(modifyModal).toBeVisible();
+    await expect(modifyModal.locator('.widget-pro-badge')).toBeVisible();
+
+    await modifyModal.locator('.widget-chat-input').fill('Turn into flight delay interactive chart');
+    await modifyModal.locator('.widget-chat-send').click();
+    await expect(modifyModal.locator('.widget-chat-action-btn')).toBeEnabled({ timeout: 30000 });
+    await modifyModal.locator('.widget-chat-action-btn').click();
+
+    await expect(page.locator('.custom-widget-panel', {
+      has: page.locator('.panel-title', { hasText: 'Flight Interactive' }),
+    })).toBeVisible({ timeout: 20000 });
+
+    const secondRequest = requestBodies[1] as {
+      tier?: string;
+      conversationHistory?: Array<{ role: string; content: string }>;
+    } | undefined;
+    expect(secondRequest?.tier).toBe('pro');
+    expect(secondRequest?.conversationHistory?.some((e) => e.content.includes('Interactive oil gold chart'))).toBe(true);
+
+    // Verify stored widget still has tier: 'pro'
+    const storedTier = await page.evaluate(() => {
+      const widgets = JSON.parse(localStorage.getItem('wm-custom-widgets') || '[]') as Array<{
+        title: string;
+        tier?: string;
+      }>;
+      return widgets.find((w) => w.title === 'Flight Interactive')?.tier;
+    });
+    expect(storedTier).toBe('pro');
+  });
+
+  test('proKeyConfigured: false in health response → modal shows PRO unavailable error, button still visible', async ({
+    page,
+  }) => {
+    await installProWidgetAgentMocks(page, [], [], false);
+
+    await page.goto('/');
+    await expect(page.locator('#panelsGrid .ai-widget-block-pro')).toBeVisible({ timeout: 30000 });
+    await page.locator('#panelsGrid .ai-widget-block-pro').click();
+
+    const modal = page.locator('.widget-chat-modal');
+    await expect(modal).toBeVisible();
+
+    // Modal preflight should show a PRO unavailable error message
+    await expect(modal.locator('.widget-chat-readiness')).toContainText(
+      /unavailable|not configured|PRO/i,
+      { timeout: 15000 },
+    );
+
+    // Send button should be disabled (can't generate without PRO key on server)
+    await expect(modal.locator('.widget-chat-send')).toBeDisabled();
+
+    // Close modal — PRO button must still be visible
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+    await expect(page.locator('#panelsGrid .ai-widget-block-pro')).toBeVisible();
   });
 });
