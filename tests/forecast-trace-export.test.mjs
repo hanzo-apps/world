@@ -153,6 +153,8 @@ describe('forecast trace artifact builder', () => {
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationSituationCount === 'number');
     assert.equal(artifacts.summary.worldStateSummary.simulationRoundCount, 3);
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationSummary === 'string');
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationInputSummary === 'string');
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationEffectCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.historyRuns === 'number');
     assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
     assert.ok(artifacts.worldState.actorRegistry.every(actor => actor.name && actor.id));
@@ -168,6 +170,8 @@ describe('forecast trace artifact builder', () => {
     assert.ok(Array.isArray(artifacts.worldState.report.actorWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.simulationWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.simulationOutcomeSummaries));
+    assert.ok(Array.isArray(artifacts.worldState.report.crossSituationEffects));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -328,10 +332,13 @@ describe('forecast run world state', () => {
     assert.ok(worldState.report.summary.includes('leading domains'));
     assert.ok(worldState.report.continuitySummary.includes('Actors:'));
     assert.ok(worldState.report.simulationSummary.includes('deterministic rounds'));
+    assert.ok(worldState.report.simulationInputSummary.includes('simulation report inputs'));
     assert.ok(worldState.report.regionalHotspots.length >= 1);
     assert.ok(worldState.report.branchWatchlist.length >= 1);
     assert.ok(Array.isArray(worldState.report.situationWatchlist));
     assert.ok(Array.isArray(worldState.report.simulationWatchlist));
+    assert.ok(Array.isArray(worldState.report.simulationOutcomeSummaries));
+    assert.ok(Array.isArray(worldState.report.crossSituationEffects));
   });
 
   it('reports full actor continuity counts even when previews are capped', () => {
@@ -674,5 +681,32 @@ describe('forecast run world state', () => {
     assert.ok(worldState.simulationState.roundTransitions.every((round) => round.situationCount >= 1));
     assert.ok(worldState.simulationState.situationSimulations.every((unit) => ['escalatory', 'contested', 'constrained'].includes(unit.posture)));
     assert.ok(worldState.simulationState.situationSimulations.every((unit) => unit.rounds.every((round) => typeof round.netPressure === 'number')));
+  });
+
+  it('builds report outputs from simulation outcomes and cross-situation effects', () => {
+    const conflict = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.79, 0.67, '7d', [
+      { type: 'ucdp', value: 'Conflict intensity remains elevated in Iran', weight: 0.4 },
+      { type: 'news_corroboration', value: 'Regional actors prepare for reprisals', weight: 0.3 },
+    ]);
+    conflict.newsContext = ['Regional actors prepare for reprisals'];
+    buildForecastCase(conflict);
+
+    const market = makePrediction('market', 'Middle East', 'Oil price impact: Middle East', 0.61, 0.57, '30d', [
+      { type: 'prediction_market', value: 'Oil contracts reprice on Middle East conflict risk', weight: 0.4 },
+      { type: 'chokepoint', value: 'Strait of Hormuz remains exposed', weight: 0.2 },
+    ]);
+    market.newsContext = ['Oil traders price escalation risk across the Middle East'];
+    buildForecastCase(market);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T10:00:00Z'),
+      predictions: [conflict, market],
+    });
+
+    assert.ok(worldState.report.simulationOutcomeSummaries.length >= 2);
+    assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => item.rounds.length === 3));
+    assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => ['escalatory', 'contested', 'constrained'].includes(item.posture)));
+    assert.ok(worldState.report.crossSituationEffects.length >= 1);
+    assert.ok(worldState.report.crossSituationEffects.some((item) => item.summary.includes('Middle East')));
   });
 });
