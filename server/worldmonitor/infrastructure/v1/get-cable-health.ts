@@ -16,7 +16,7 @@ import { CHROME_UA } from '../../../_shared/constants';
 // ========================================================================
 
 const CACHE_KEY = 'cable-health-v1';
-const CACHE_TTL = 600; // 10 min — cable health not time-critical
+const CACHE_TTL = 3600; // 1h — must outlive the 30-min warm-ping interval in ais-relay
 
 // In-memory fallback: serves stale data when both Redis and NGA are down
 let fallbackCache: GetCableHealthResponse | null = null;
