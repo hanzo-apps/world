@@ -2375,6 +2375,8 @@ function shouldMergeSituationCandidate(candidate, cluster, score) {
 function finalizeSituationCluster(cluster) {
   const avgProbability = cluster._probabilityTotal / Math.max(1, cluster.forecastCount);
   const avgConfidence = cluster._confidenceTotal / Math.max(1, cluster.forecastCount);
+  const dominantRegion = pickDominantSituationValue(cluster._regionCounts, cluster.regions);
+  const dominantDomain = pickDominantSituationValue(cluster._domainCounts, cluster.domains);
   const topSignals = Object.entries(cluster._signalCounts)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, 6)
@@ -2391,6 +2393,8 @@ function finalizeSituationCluster(cluster) {
     label: formatSituationLabel(cluster),
     forecastCount: cluster.forecastCount,
     forecastIds: cluster.forecastIds.slice(0, 12),
+    dominantRegion,
+    dominantDomain,
     regions: cluster.regions,
     domains: cluster.domains,
     actors: cluster.actors,
@@ -2686,8 +2690,8 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     return {
       situationId: situation.id,
       label: situation.label,
-      dominantRegion: situation.regions?.[0] || '',
-      dominantDomain: situation.domains?.[0] || '',
+      dominantRegion: situation.dominantRegion || situation.regions?.[0] || '',
+      dominantDomain: situation.dominantDomain || situation.domains?.[0] || '',
       regions: situation.regions || [],
       domains: situation.domains || [],
       forecastIds: forecastIds.slice(0, 12),
@@ -2843,7 +2847,12 @@ function buildCrossSituationEffects(simulationState) {
 
       const regionOverlap = intersectCount(source.regions || [], target.regions || []);
       const actorOverlap = intersectCount(source.actorIds || [], target.actorIds || []);
-      const labelTokenOverlap = intersectCount(normalizeSituationText(source.label), normalizeSituationText(target.label));
+      const labelTokenOverlap = intersectCount(
+        normalizeSituationText(source.label).filter((token) => !['situation', 'conflict', 'political', 'market', 'supply', 'chain', 'infrastructure', 'cyber'].includes(token)),
+        normalizeSituationText(target.label).filter((token) => !['situation', 'conflict', 'political', 'market', 'supply', 'chain', 'infrastructure', 'cyber'].includes(token)),
+      );
+      const hasObservableLink = regionOverlap > 0 || actorOverlap > 0 || labelTokenOverlap > 0;
+      if (!hasObservableLink) continue;
       const score = (source.posture === 'escalatory' ? 2 : source.posture === 'contested' ? 1 : 0)
         + (regionOverlap * 2)
         + (actorOverlap * 1.5)
