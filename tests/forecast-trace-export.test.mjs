@@ -479,7 +479,7 @@ describe('forecast run world state', () => {
 
     assert.ok(worldState.reportContinuity.history.length >= 2);
     assert.ok(worldState.reportContinuity.persistentPressureCount >= 1);
-    assert.ok(worldState.reportContinuity.repeatedStrengtheningCount >= 1);
+    assert.equal(worldState.reportContinuity.repeatedStrengtheningCount, 0);
     assert.ok(Array.isArray(worldState.report.continuityWatchlist));
   });
 
@@ -568,5 +568,74 @@ describe('forecast run world state', () => {
       (s) => typeof s.avgProbability === 'number' && typeof s.forecastCount === 'number',
     ));
     assert.ok(worldState.reportContinuity.persistentPressureCount >= 1);
+  });
+
+  it('does not collapse unrelated cross-country conflict and political forecasts into one giant situation', () => {
+    const conflictIran = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.74, 0.64, '7d', [
+      { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.4 },
+    ]);
+    conflictIran.newsContext = ['Regional officials warn of retaliation risk'];
+    buildForecastCase(conflictIran);
+
+    const conflictBrazil = makePrediction('conflict', 'Brazil', 'Active armed conflict: Brazil', 0.68, 0.44, '7d', [
+      { type: 'ucdp', value: '18 conflict events in Brazil', weight: 0.35 },
+    ]);
+    conflictBrazil.newsContext = ['Security operations intensify in Brazil'];
+    buildForecastCase(conflictBrazil);
+
+    const politicalTurkey = makePrediction('political', 'Turkey', 'Political instability: Turkey', 0.43, 0.52, '14d', [
+      { type: 'news_corroboration', value: 'Cabinet tensions intensify in Turkey', weight: 0.3 },
+    ]);
+    politicalTurkey.newsContext = ['Opposition parties escalate criticism in Turkey'];
+    buildForecastCase(politicalTurkey);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-18T22:00:00Z'),
+      predictions: [conflictIran, conflictBrazil, politicalTurkey],
+    });
+
+    assert.ok(worldState.situationClusters.length >= 2);
+    assert.ok(worldState.situationClusters.every((cluster) => cluster.forecastCount <= 2));
+    assert.ok(worldState.situationClusters.every((cluster) => cluster.label.endsWith('situation')));
+  });
+
+  it('does not describe a lower-probability situation as strengthened just because it expanded', () => {
+    const prediction = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.74, 0.64, '7d', [
+      { type: 'cii', value: 'Iran CII 79 (high)', weight: 0.4 },
+    ]);
+    prediction.newsContext = ['Regional officials warn of retaliation risk'];
+    buildForecastCase(prediction);
+
+    const priorWorldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-18T10:00:00Z'),
+      predictions: [prediction],
+    });
+
+    const currentPrediction = structuredClone(prediction);
+    currentPrediction.caseFile = structuredClone(prediction.caseFile);
+    currentPrediction.probability = 0.62;
+    currentPrediction.caseFile.actors = [
+      {
+        id: 'new-actor:state',
+        name: 'New Actor',
+        category: 'state',
+        influenceScore: 0.7,
+        role: 'New Actor is newly engaged.',
+        objectives: ['Shape the path.'],
+        constraints: ['Public escalation is costly.'],
+        likelyActions: ['Increase visible coordination.'],
+      },
+      ...(currentPrediction.caseFile.actors || []),
+    ];
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-18T11:00:00Z'),
+      predictions: [currentPrediction],
+      priorWorldState,
+      priorWorldStates: [priorWorldState],
+    });
+
+    assert.equal(worldState.situationContinuity.strengthenedSituationCount, 0);
+    assert.ok(worldState.report.situationWatchlist.every((item) => item.type !== 'strengthened_situation'));
   });
 });
