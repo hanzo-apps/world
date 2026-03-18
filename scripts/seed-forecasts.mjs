@@ -2275,8 +2275,9 @@ function formatSituationDomainLabel(domains = []) {
 }
 
 function formatSituationLabel(cluster) {
-  const leadRegion = cluster.regions[0] || 'Cross-regional';
-  const domainLabel = formatSituationDomainLabel(cluster.domains);
+  const leadRegion = pickDominantSituationValue(cluster._regionCounts, cluster.regions) || cluster.regions[0] || 'Cross-regional';
+  const topDomains = pickDominantSituationValues(cluster._domainCounts, cluster.domains, 2);
+  const domainLabel = formatSituationDomainLabel(topDomains.length ? topDomains : cluster.domains);
   return `${leadRegion} ${domainLabel} situation`;
 }
 
@@ -2289,6 +2290,32 @@ function hashSituationKey(parts) {
   return crypto.createHash('sha256').update(parts.filter(Boolean).join('|')).digest('hex').slice(0, 10);
 }
 
+function incrementSituationCounts(target, values = []) {
+  for (const value of values || []) {
+    const key = String(value || '');
+    if (!key) continue;
+    target[key] = (target[key] || 0) + 1;
+  }
+}
+
+function pickDominantSituationValue(counts = {}, fallback = []) {
+  const entries = Object.entries(counts || {});
+  if (!entries.length) return (fallback || [])[0] || '';
+  entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return entries[0]?.[0] || (fallback || [])[0] || '';
+}
+
+function pickDominantSituationValues(counts = {}, fallback = [], maxValues = 2) {
+  const entries = Object.entries(counts || {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!entries.length) return (fallback || []).slice(0, maxValues);
+  const leadCount = entries[0]?.[1] || 0;
+  return entries
+    .filter(([, count], index) => index === 0 || count >= Math.max(1, Math.ceil(leadCount * 0.5)))
+    .slice(0, maxValues)
+    .map(([value]) => value);
+}
+
 function buildSituationCandidate(prediction) {
   return {
     prediction,
@@ -2299,20 +2326,23 @@ function buildSituationCandidate(prediction) {
     tokens: uniqueSortedStrings([
       ...normalizeSituationText(prediction.title),
       ...normalizeSituationText(prediction.feedSummary),
+      ...(prediction.caseFile?.supportingEvidence || []).flatMap((item) => normalizeSituationText(item?.summary)),
       ...(prediction.signals || []).flatMap((signal) => normalizeSituationText(signal?.value)),
       ...(prediction.newsContext || []).flatMap((headline) => normalizeSituationText(headline)),
     ]).slice(0, 24),
+    signalTypes: uniqueSortedStrings((prediction.signals || []).map((signal) => signal?.type).filter(Boolean)),
   };
 }
 
 function computeSituationOverlap(candidate, cluster) {
   const overlapCount = (left, right) => left.filter((item) => right.includes(item)).length;
   return (
-    overlapCount(candidate.regions, cluster.regions) * 3 +
-    overlapCount(candidate.actors, cluster.actors) * 2 +
-    overlapCount(candidate.domains, cluster.domains) * 1.5 +
-    overlapCount(candidate.branchKinds, cluster.branchKinds) * 1 +
-    overlapCount(candidate.tokens, cluster.tokens) * 0.25
+    overlapCount(candidate.regions, cluster.regions) * 4 +
+    overlapCount(candidate.domains, cluster.domains) * 2 +
+    overlapCount(candidate.signalTypes, cluster.signalTypes) * 1.5 +
+    overlapCount(candidate.tokens, cluster.tokens) * 0.4 +
+    overlapCount(candidate.actors, cluster.actors) * 0.5 +
+    overlapCount(candidate.branchKinds, cluster.branchKinds) * 0.25
   );
 }
 
@@ -2324,10 +2354,21 @@ function shouldMergeSituationCandidate(candidate, cluster, score) {
   const domainOverlap = intersectCount(candidate.domains, cluster.domains);
   const branchOverlap = intersectCount(candidate.branchKinds, cluster.branchKinds);
   const tokenOverlap = intersectCount(candidate.tokens, cluster.tokens);
+  const signalOverlap = intersectCount(candidate.signalTypes, cluster.signalTypes);
+  const dominantDomain = pickDominantSituationValue(cluster._domainCounts, cluster.domains);
+  const candidateDomain = candidate.prediction?.domain || candidate.domains[0] || '';
+  const sameDomain = domainOverlap > 0 && (!dominantDomain || dominantDomain === candidateDomain);
+  const isRegionalLogistics = ['market', 'supply_chain'].includes(candidateDomain);
 
-  if (regionOverlap > 0 || actorOverlap > 0) return true;
-  if (domainOverlap > 0 && (tokenOverlap >= 2 || branchOverlap > 0)) return true;
-  if (domainOverlap > 0 && tokenOverlap >= 4) return true;
+  if (regionOverlap > 0) {
+    if (signalOverlap > 0 || tokenOverlap >= 2 || sameDomain) return true;
+    return false;
+  }
+  if (!sameDomain) return false;
+  if (!isRegionalLogistics) return false;
+  if (signalOverlap >= 2 && tokenOverlap >= 4) return true;
+  if (signalOverlap >= 1 && tokenOverlap >= 5 && actorOverlap > 0) return true;
+  if (branchOverlap > 0 && signalOverlap >= 2 && tokenOverlap >= 4) return true;
   return false;
 }
 
@@ -2394,12 +2435,15 @@ function buildSituationClusters(predictions) {
         actors: [],
         branchKinds: [],
         tokens: [],
+        signalTypes: [],
         forecastIds: [],
         sampleTitles: [],
         forecastCount: 0,
         _probabilityTotal: 0,
         _confidenceTotal: 0,
         _signalCounts: {},
+        _regionCounts: {},
+        _domainCounts: {},
       };
       clusters.push(bestCluster);
     }
@@ -2409,11 +2453,14 @@ function buildSituationClusters(predictions) {
     bestCluster.actors = uniqueSortedStrings([...bestCluster.actors, ...candidate.actors]);
     bestCluster.branchKinds = uniqueSortedStrings([...bestCluster.branchKinds, ...candidate.branchKinds]);
     bestCluster.tokens = uniqueSortedStrings([...bestCluster.tokens, ...candidate.tokens]).slice(0, 28);
+    bestCluster.signalTypes = uniqueSortedStrings([...bestCluster.signalTypes, ...candidate.signalTypes]);
     bestCluster.forecastIds.push(prediction.id);
     bestCluster.sampleTitles.push(prediction.title);
     bestCluster.forecastCount += 1;
     bestCluster._probabilityTotal += Number(prediction.probability || 0);
     bestCluster._confidenceTotal += Number(prediction.confidence || 0);
+    incrementSituationCounts(bestCluster._regionCounts, candidate.regions);
+    incrementSituationCounts(bestCluster._domainCounts, candidate.domains);
 
     for (const signal of prediction.signals || []) {
       const type = signal?.type || 'unknown';
@@ -2474,7 +2521,11 @@ function buildSituationContinuitySummary(currentSituationClusters, priorWorldSta
       addedRegions: addedRegions.slice(0, 4),
     };
 
-    if (probabilityDelta >= 0.08 || countDelta >= 2 || addedActors.length > 0 || addedRegions.length > 0) {
+    if (
+      probabilityDelta >= 0.08 ||
+      (countDelta >= 2 && probabilityDelta >= 0) ||
+      ((addedActors.length > 0 || addedRegions.length > 0) && probabilityDelta >= 0)
+    ) {
       strengthened.push(record);
     } else if (probabilityDelta <= -0.08 || countDelta <= -2) {
       weakened.push(record);
@@ -2640,11 +2691,11 @@ function buildReportContinuity(current, priorWorldStates = []) {
     // priorMatches is ordered most-recent-first (mirrors priorWorldStates order from LRANGE)
     const lastMatch = priorMatches[0];
     const earliestMatch = priorMatches[priorMatches.length - 1];
-    // "strengthening" means current is >= both the most-recent and oldest prior snapshots,
-    // catching recoveries (V-shapes) as well as monotonic increases intentionally
+    // Repeated strengthening should reflect a monotonic strengthening path,
+    // not a V-shaped recovery after a weaker intermediate run.
     if (
+      (lastMatch?.avgProbability || 0) >= (earliestMatch?.avgProbability || 0) &&
       cluster.avgProbability >= (lastMatch?.avgProbability || 0) &&
-      cluster.avgProbability >= (earliestMatch?.avgProbability || 0) &&
       cluster.forecastCount >= (lastMatch?.forecastCount || 0)
     ) {
       repeatedStrengthening.push({
