@@ -690,13 +690,41 @@ describe('forecast run world state', () => {
     ]);
     conflict.newsContext = ['Regional actors prepare for reprisals'];
     buildForecastCase(conflict);
+    conflict.caseFile.actors = [
+      {
+        id: 'shared-energy-actor',
+        name: 'Shared Energy Actor',
+        category: 'market_participant',
+        influenceScore: 0.7,
+        domains: ['conflict', 'market'],
+        regions: ['Iran', 'Japan'],
+        objectives: ['Preserve energy flows'],
+        constraints: ['Cannot absorb prolonged disruption'],
+        likelyActions: ['Reprice energy exposure'],
+      },
+      ...(conflict.caseFile.actors || []),
+    ];
 
-    const market = makePrediction('market', 'Middle East', 'Oil price impact: Middle East', 0.61, 0.57, '30d', [
-      { type: 'prediction_market', value: 'Oil contracts reprice on Middle East conflict risk', weight: 0.4 },
+    const market = makePrediction('market', 'Japan', 'Oil price impact: Japan', 0.61, 0.57, '30d', [
+      { type: 'prediction_market', value: 'Oil contracts reprice on Japan energy risk', weight: 0.4 },
       { type: 'chokepoint', value: 'Strait of Hormuz remains exposed', weight: 0.2 },
     ]);
-    market.newsContext = ['Oil traders price escalation risk across the Middle East'];
+    market.newsContext = ['Oil traders price escalation risk across Japan'];
     buildForecastCase(market);
+    market.caseFile.actors = [
+      {
+        id: 'shared-energy-actor',
+        name: 'Shared Energy Actor',
+        category: 'market_participant',
+        influenceScore: 0.7,
+        domains: ['conflict', 'market'],
+        regions: ['Iran', 'Japan'],
+        objectives: ['Preserve energy flows'],
+        constraints: ['Cannot absorb prolonged disruption'],
+        likelyActions: ['Reprice energy exposure'],
+      },
+      ...(market.caseFile.actors || []),
+    ];
 
     const worldState = buildForecastRunWorldState({
       generatedAt: Date.parse('2026-03-19T10:00:00Z'),
@@ -707,6 +735,55 @@ describe('forecast run world state', () => {
     assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => item.rounds.length === 3));
     assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => ['escalatory', 'contested', 'constrained'].includes(item.posture)));
     assert.ok(worldState.report.crossSituationEffects.length >= 1);
-    assert.ok(worldState.report.crossSituationEffects.some((item) => item.summary.includes('Middle East')));
+    assert.ok(worldState.report.crossSituationEffects.some((item) => item.summary.includes('Japan')));
+  });
+
+  it('does not synthesize cross-situation effects for unrelated theaters with no overlap', () => {
+    const brazilConflict = makePrediction('conflict', 'Brazil', 'Active armed conflict: Brazil', 0.77, 0.65, '7d', [
+      { type: 'ucdp', value: 'Brazil conflict intensity remains elevated', weight: 0.4 },
+    ]);
+    buildForecastCase(brazilConflict);
+
+    const japanMarket = makePrediction('market', 'Japan', 'Market repricing: Japan', 0.58, 0.54, '30d', [
+      { type: 'prediction_market', value: 'Japanese markets price regional risk', weight: 0.4 },
+    ]);
+    buildForecastCase(japanMarket);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T11:00:00Z'),
+      predictions: [brazilConflict, japanMarket],
+    });
+
+    assert.equal(worldState.report.crossSituationEffects.length, 0);
+  });
+
+  it('uses the true dominant domain when deriving simulation report inputs and effects', () => {
+    const supplyA = makePrediction('supply_chain', 'Middle East', 'Shipping disruption: Middle East', 0.66, 0.57, '14d', [
+      { type: 'chokepoint', value: 'Regional shipping remains disrupted', weight: 0.4 },
+    ]);
+    supplyA.newsContext = ['Middle East shipping disruption expands'];
+    buildForecastCase(supplyA);
+
+    const supplyB = makePrediction('supply_chain', 'Middle East', 'Logistics delay: Middle East', 0.62, 0.55, '14d', [
+      { type: 'chokepoint', value: 'Logistics routes remain congested', weight: 0.35 },
+    ]);
+    supplyB.newsContext = ['Middle East shipping disruption expands'];
+    buildForecastCase(supplyB);
+
+    const market = makePrediction('market', 'Middle East', 'Oil price impact: Middle East', 0.57, 0.53, '30d', [
+      { type: 'prediction_market', value: 'Oil contracts reprice on logistics risk', weight: 0.3 },
+    ]);
+    market.newsContext = ['Middle East shipping disruption expands'];
+    buildForecastCase(market);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T12:00:00Z'),
+      predictions: [supplyA, supplyB, market],
+    });
+
+    const dominantInput = worldState.report.simulationOutcomeSummaries.find((item) => item.label.includes('Middle East'));
+    const dominantSimulation = worldState.simulationState.situationSimulations.find((item) => item.label.includes('Middle East'));
+    assert.equal(dominantSimulation?.dominantDomain, 'supply_chain');
+    assert.ok(dominantInput);
   });
 });
