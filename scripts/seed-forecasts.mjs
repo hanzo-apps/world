@@ -3547,6 +3547,11 @@ function summarizePublishFiltering(predictions) {
       .map((pred) => pred.situationContext?.id)
       .filter(Boolean),
   );
+  const cappedSituationIds = new Set(
+    predictions
+      .filter((pred) => pred.publishDiagnostics?.reason === 'situation_cap' && pred.publishDiagnostics?.situationId)
+      .map((pred) => pred.publishDiagnostics.situationId),
+  );
 
   return {
     suppressedWeakFallback: reasonCounts.weak_fallback || 0,
@@ -3558,7 +3563,7 @@ function summarizePublishFiltering(predictions) {
     situationClusterCount: Object.keys(situationCounts).length,
     maxForecastsPerSituation: Math.max(0, ...Object.values(situationCounts)),
     multiForecastSituations: Object.values(situationCounts).filter((count) => count > 1).length,
-    cappedSituations: Object.values(situationCounts).filter((count) => count >= MAX_PUBLISHED_FORECASTS_PER_SITUATION).length,
+    cappedSituations: cappedSituationIds.size,
   };
 }
 
@@ -4203,8 +4208,6 @@ async function enrichScenariosWithLLM(predictions) {
   // Higher-quality top forecasts get richer scenario + perspective treatment.
   const topWithPerspectives = enrichmentTargets.combined;
   const scenarioOnly = enrichmentTargets.scenarioOnly;
-  console.log(`  [LLM] selected combined=${topWithPerspectives.length} scenario=${scenarioOnly.length}`);
-
   console.log(`  [LLM] selected combined=${topWithPerspectives.length} scenario=${scenarioOnly.length}`);
 
   // Call 1: Combined scenario + perspectives for top-2

@@ -1916,7 +1916,42 @@ describe('forecast quality gating', () => {
 
     const telemetry = summarizePublishFiltering([conflictA, conflictB, conflictC, consequence]);
     assert.equal(telemetry.suppressedSituationDomainCap, 1);
-    assert.equal(telemetry.cappedSituations, 1);
+    assert.equal(telemetry.cappedSituations, 0);
+  });
+
+  it('does not report capped situations when a situation only reaches the cap without dropping anything', () => {
+    const preds = [
+      makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.66, 0.6, '7d', [
+        { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.5 },
+      ]),
+      makePrediction('political', 'Iran', 'Political instability: Iran', 0.55, 0.54, '14d', [
+        { type: 'news_corroboration', value: 'Emergency cabinet meetings continue', weight: 0.35 },
+      ]),
+      makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.48, 0.52, '30d', [
+        { type: 'news_corroboration', value: 'Oil traders react to Hormuz risk', weight: 0.4 },
+      ]),
+    ];
+
+    buildForecastCases(preds);
+    for (const [index, pred] of preds.entries()) {
+      pred.traceMeta = { narrativeSource: 'fallback' };
+      pred.situationContext = {
+        id: 'sit-iran-gulf',
+        label: 'Iran Gulf pressure',
+        forecastCount: 3,
+        topSignals: [{ type: 'news_corroboration', count: 2 }],
+      };
+      pred.caseFile.situationContext = pred.situationContext;
+      pred.readiness = { overall: 0.65 - (index * 0.05) };
+      pred.analysisPriority = 0.22 - (index * 0.03);
+    }
+
+    const published = filterPublishedForecasts(preds);
+    assert.equal(published.length, 3);
+
+    const telemetry = summarizePublishFiltering(preds);
+    assert.equal(telemetry.suppressedSituationCap, 0);
+    assert.equal(telemetry.cappedSituations, 0);
   });
 
   it('keeps unrelated forecasts in separate situations instead of token-only over-merging', () => {
@@ -1933,5 +1968,40 @@ describe('forecast quality gating', () => {
     assert.equal(worldState.situationClusters.length, 2);
     assert.ok(worldState.situationClusters.every((cluster) => cluster.label.endsWith('situation')));
     assert.ok(worldState.situationClusters.every((cluster) => !/fc-[a-z]+-[0-9a-f]{8}/.test(cluster.label)));
+  });
+
+  it('does not report capped situations when a situation only reaches the cap without dropping anything', () => {
+    const preds = [
+      makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.66, 0.6, '7d', [
+        { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.5 },
+      ]),
+      makePrediction('political', 'Iran', 'Political instability: Iran', 0.55, 0.54, '14d', [
+        { type: 'news_corroboration', value: 'Emergency cabinet meetings continue', weight: 0.35 },
+      ]),
+      makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.48, 0.52, '30d', [
+        { type: 'news_corroboration', value: 'Oil traders react to Hormuz risk', weight: 0.4 },
+      ]),
+    ];
+
+    buildForecastCases(preds);
+    for (const [index, pred] of preds.entries()) {
+      pred.traceMeta = { narrativeSource: 'fallback' };
+      pred.situationContext = {
+        id: 'sit-iran-gulf',
+        label: 'Iran Gulf pressure',
+        forecastCount: 3,
+        topSignals: [{ type: 'news_corroboration', count: 2 }],
+      };
+      pred.caseFile.situationContext = pred.situationContext;
+      pred.readiness = { overall: 0.65 - (index * 0.05) };
+      pred.analysisPriority = 0.22 - (index * 0.03);
+    }
+
+    const published = filterPublishedForecasts(preds);
+    assert.equal(published.length, 3);
+
+    const telemetry = summarizePublishFiltering(preds);
+    assert.equal(telemetry.suppressedSituationCap, 0);
+    assert.equal(telemetry.cappedSituations, 0);
   });
 });
