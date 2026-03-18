@@ -114,6 +114,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/supply-chain/v1/get-critical-minerals': 'daily',
   '/api/military/v1/get-aircraft-details': 'static',
   '/api/military/v1/get-wingbits-status': 'static',
+  '/api/military/v1/get-wingbits-live-flight': 'no-store',
 
   '/api/military/v1/list-military-flights': 'slow',
   '/api/market/v1/list-etf-flows': 'slow',
