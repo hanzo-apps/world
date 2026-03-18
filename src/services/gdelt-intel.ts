@@ -56,20 +56,6 @@ export const INTEL_TOPICS: IntelTopic[] = [
     description: 'Nuclear programs, IAEA inspections, proliferation',
   },
   {
-    id: 'sanctions',
-    name: 'Sanctions',
-    query: '(sanctions OR embargo OR "trade war" OR tariff OR "economic pressure") sourcelang:eng',
-    icon: '🚫',
-    description: 'Economic sanctions and trade restrictions',
-  },
-  {
-    id: 'intelligence',
-    name: 'Intelligence',
-    query: '(espionage OR spy OR intelligence agency OR covert OR surveillance) sourcelang:eng',
-    icon: '🕵️',
-    description: 'Espionage, intelligence operations, surveillance',
-  },
-  {
     id: 'maritime',
     name: 'Maritime Security',
     query: '(naval blockade OR piracy OR "strait of hormuz" OR "south china sea" OR warship) sourcelang:eng',
