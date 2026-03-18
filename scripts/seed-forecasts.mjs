@@ -2688,6 +2688,8 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
       label: situation.label,
       dominantRegion: situation.regions?.[0] || '',
       dominantDomain: situation.domains?.[0] || '',
+      regions: situation.regions || [],
+      domains: situation.domains || [],
       forecastIds: forecastIds.slice(0, 12),
       actorIds: actors.map((actor) => actor.id).slice(0, 8),
       branchIds: branches.map((branch) => branch.id).slice(0, 10),
@@ -2744,6 +2746,125 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     roundTransitions,
     situationSimulations,
   };
+}
+
+function describeSimulationPosture(posture) {
+  if (posture === 'escalatory') return 'escalatory';
+  if (posture === 'constrained') return 'constrained';
+  return 'contested';
+}
+
+function buildSituationOutcomeSummaries(simulationState) {
+  const simulations = Array.isArray(simulationState?.situationSimulations) ? simulationState.situationSimulations : [];
+  return simulations
+    .slice()
+    .sort((a, b) => (b.postureScore || 0) - (a.postureScore || 0) || a.label.localeCompare(b.label))
+    .map((item) => {
+      const [r1, r2, r3] = item.rounds || [];
+      return {
+        situationId: item.situationId,
+        label: item.label,
+        posture: item.posture,
+        postureScore: item.postureScore,
+        summary: `${item.label} moved through ${r1?.lead || 'initial interpretation'}, ${r2?.lead || 'interaction responses'}, and ${r3?.lead || 'regional effects'} before resolving to a ${describeSimulationPosture(item.posture)} posture at ${roundPct(item.postureScore)}.`,
+        rounds: (item.rounds || []).map((round) => ({
+          stage: round.stage,
+          lead: round.lead,
+          netPressure: round.netPressure,
+          actions: round.actions || [],
+        })),
+      };
+    });
+}
+
+function buildSimulationReportInputs(worldState) {
+  const simulations = Array.isArray(worldState?.simulationState?.situationSimulations)
+    ? worldState.simulationState.situationSimulations
+    : [];
+  const reportInputs = simulations.map((item) => ({
+    situationId: item.situationId,
+    label: item.label,
+    posture: item.posture,
+    postureScore: item.postureScore,
+    dominantRegion: item.dominantRegion,
+    dominantDomain: item.dominantDomain,
+    actorCount: (item.actorIds || []).length,
+    branchCount: (item.branchIds || []).length,
+    pressureSignals: (item.pressureSignals || []).map((signal) => signal.type),
+    stabilizers: item.stabilizers || [],
+    constraints: item.constraints || [],
+    rounds: (item.rounds || []).map((round) => ({
+      stage: round.stage,
+      lead: round.lead,
+      netPressure: round.netPressure,
+      pressureDelta: round.pressureDelta,
+      stabilizationDelta: round.stabilizationDelta,
+      actions: round.actions || [],
+    })),
+  }));
+
+  return {
+    summary: reportInputs.length
+      ? `${reportInputs.length} simulation report inputs are available from round-based situation evolution.`
+      : 'No simulation report inputs are available.',
+    inputs: reportInputs,
+  };
+}
+
+function inferSystemEffectRelation(sourceDomain, targetDomain) {
+  const key = `${sourceDomain}->${targetDomain}`;
+  const relationMap = {
+    'conflict->market': 'commodity pricing pressure',
+    'conflict->supply_chain': 'logistics disruption',
+    'conflict->infrastructure': 'service disruption',
+    'political->market': 'policy repricing',
+    'political->conflict': 'escalation risk',
+    'political->supply_chain': 'trade friction',
+    'cyber->infrastructure': 'service degradation',
+    'cyber->market': 'risk repricing',
+    'infrastructure->market': 'capacity shock',
+    'infrastructure->supply_chain': 'throughput disruption',
+    'supply_chain->market': 'cost pass-through',
+  };
+  return relationMap[key] || '';
+}
+
+function buildCrossSituationEffects(simulationState) {
+  const simulations = Array.isArray(simulationState?.situationSimulations) ? simulationState.situationSimulations : [];
+  const effects = [];
+
+  for (let i = 0; i < simulations.length; i++) {
+    const source = simulations[i];
+    for (let j = 0; j < simulations.length; j++) {
+      if (i === j) continue;
+      const target = simulations[j];
+      const relation = inferSystemEffectRelation(source.dominantDomain, target.dominantDomain);
+      if (!relation) continue;
+
+      const regionOverlap = intersectCount(source.regions || [], target.regions || []);
+      const actorOverlap = intersectCount(source.actorIds || [], target.actorIds || []);
+      const labelTokenOverlap = intersectCount(normalizeSituationText(source.label), normalizeSituationText(target.label));
+      const score = (source.posture === 'escalatory' ? 2 : source.posture === 'contested' ? 1 : 0)
+        + (regionOverlap * 2)
+        + (actorOverlap * 1.5)
+        + (labelTokenOverlap * 0.5);
+      if (score < 2) continue;
+
+      effects.push({
+        sourceSituationId: source.situationId,
+        sourceLabel: source.label,
+        targetSituationId: target.situationId,
+        targetLabel: target.label,
+        relation,
+        score: +score.toFixed(3),
+        summary: `${source.label} is likely to feed ${relation} into ${target.label}, given a ${describeSimulationPosture(source.posture)} posture and ${roundPct(source.postureScore)} final pressure.`,
+      });
+    }
+  }
+
+  return effects
+    .sort((a, b) => b.score - a.score || a.sourceLabel.localeCompare(b.sourceLabel) || a.targetLabel.localeCompare(b.targetLabel))
+    .slice(0, 8);
 }
 
 function attachSituationContext(predictions, situationClusters = buildSituationClusters(predictions)) {
@@ -2988,6 +3109,9 @@ function buildWorldStateReport(worldState) {
   const continuitySummary = `Actors: ${worldState.actorContinuity?.newlyActiveCount || 0} new, ${worldState.actorContinuity?.strengthenedCount || 0} strengthened. Branches: ${worldState.branchContinuity?.newBranchCount || 0} new, ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened, ${worldState.branchContinuity?.resolvedBranchCount || 0} resolved. Situations: ${worldState.situationContinuity?.newSituationCount || 0} new, ${worldState.situationContinuity?.strengthenedSituationCount || 0} strengthened, ${worldState.situationContinuity?.resolvedSituationCount || 0} resolved.`;
 
   const simulationSummary = worldState.simulationState?.summary || 'No simulation-state summary is available.';
+  const simulationReportInputs = buildSimulationReportInputs(worldState);
+  const simulationOutcomeSummaries = buildSituationOutcomeSummaries(worldState.simulationState);
+  const crossSituationEffects = buildCrossSituationEffects(worldState.simulationState);
   const simulationWatchlist = (worldState.simulationState?.situationSimulations || [])
     .slice()
     .sort((a, b) => (b.postureScore || 0) - (a.postureScore || 0) || a.label.localeCompare(b.label))
@@ -2998,12 +3122,13 @@ function buildWorldStateReport(worldState) {
       summary: `${item.label} resolved to a ${item.posture} posture after 3 rounds, with ${Math.round((item.postureScore || 0) * 100)}% final pressure and ${item.actorIds.length} active actors.`,
     }));
 
-  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters, and the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units.`;
+  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units, and ${crossSituationEffects.length} cross-situation system effects are active in the report view.`;
 
   return {
     summary,
     continuitySummary,
     simulationSummary,
+    simulationInputSummary: simulationReportInputs.summary,
     domainOverview: {
       leadDomains,
       activeDomainCount: worldState.domainStates?.length || 0,
@@ -3015,6 +3140,8 @@ function buildWorldStateReport(worldState) {
     situationWatchlist,
     continuityWatchlist,
     simulationWatchlist,
+    simulationOutcomeSummaries,
+    crossSituationEffects,
     keyUncertainties: (worldState.uncertainties || []).slice(0, 6).map(item => item.summary || item),
   };
 }
@@ -3365,11 +3492,13 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       reportSummary: worldState.report?.summary || '',
       reportContinuitySummary: worldState.reportContinuity?.summary || '',
       simulationSummary: worldState.simulationState?.summary || '',
+      simulationInputSummary: worldState.report?.simulationInputSummary || '',
       domainCount: worldState.domainStates.length,
       regionCount: worldState.regionalStates.length,
       situationCount: worldState.situationClusters.length,
       simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
       simulationRoundCount: worldState.simulationState?.totalRounds || 0,
+      simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
       persistentSituations: worldState.situationContinuity.persistentSituationCount,
       newSituations: worldState.situationContinuity.newSituationCount,
       strengthenedSituations: worldState.situationContinuity.strengthenedSituationCount,
