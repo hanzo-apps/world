@@ -129,7 +129,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/prediction/v1/list-prediction-markets': 'medium',
   '/api/forecast/v1/get-forecasts': 'medium',
   '/api/supply-chain/v1/get-chokepoint-status': 'medium',
-  '/api/news/v1/list-feed-digest': 'slow-browser',
+  '/api/news/v1/list-feed-digest': 'slow',
   '/api/intelligence/v1/classify-event': 'static',
   '/api/intelligence/v1/get-country-facts': 'daily',
   '/api/intelligence/v1/list-security-advisories': 'slow',
@@ -283,6 +283,11 @@ export function createDomainGateway(
         const cdnCache = TIER_CDN_CACHE[tier];
         if (cdnCache) mergedHeaders.set('CDN-Cache-Control', cdnCache);
         mergedHeaders.set('X-Cache-Tier', tier);
+
+        // Keep per-origin ACAO (already set from corsHeaders above) and preserve Vary: Origin.
+        // ACAO: * with no Vary would collapse all origins into one cache entry, bypassing
+        // isDisallowedOrigin() for cache hits — Vercel CDN serves s-maxage responses without
+        // re-invoking the function, so a disallowed origin could read a cached ACAO: * response.
       }
       mergedHeaders.delete('X-No-Cache');
       if (!new URL(request.url).searchParams.has('_debug')) {
