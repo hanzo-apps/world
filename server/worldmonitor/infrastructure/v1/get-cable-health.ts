@@ -441,7 +441,9 @@ export async function getCableHealth(
     if (result) {
       if (source === 'fresh') {
         const count = result.cables ? Object.keys(result.cables).length : 0;
-        setCachedJson('seed-meta:cable-health', { fetchedAt: Date.now(), recordCount: count }, 604800).catch(() => {});
+        // Write at least 1 so health.js doesn't report EMPTY/CRIT when NGA
+        // has no active warnings — zero disruptions is a valid healthy state.
+        setCachedJson('seed-meta:cable-health', { fetchedAt: Date.now(), recordCount: Math.max(count, 1) }, 604800).catch(() => {});
       }
       fallbackCache = result;
       return result;
