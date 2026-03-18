@@ -6,7 +6,7 @@ import type {
   NewsItem as ProtoNewsItem,
   ThreatLevel as ProtoThreatLevel,
 } from '../../../../src/generated/server/worldmonitor/news/v1/service_server';
-import { cachedFetchJson, getCachedJson, setCachedJson, getCachedJsonBatch } from '../../../_shared/redis';
+import { cachedFetchJson, getCachedJsonBatch } from '../../../_shared/redis';
 import { markNoCacheResponse } from '../../../_shared/response-headers';
 import { sha256Hex } from '../../../_shared/hash';
 import { CHROME_UA } from '../../../_shared/constants';
@@ -284,28 +284,27 @@ export async function listFeedDigest(
   const empty = (): ListFeedDigestResponse => ({ categories: {}, feedStatuses: {}, generatedAt: new Date().toISOString() });
 
   try {
-    // Check Redis first — warm path returns immediately
-    const cached = await getCachedJson(digestCacheKey) as ListFeedDigestResponse | null;
-    if (cached) {
-      if (fallbackDigestCache.size > 50) fallbackDigestCache.clear();
-      fallbackDigestCache.set(fallbackKey, { data: cached, ts: Date.now() });
-      return cached;
-    }
+    // cachedFetchJson coalesces concurrent cold-path calls: concurrent requests
+    // for the same key share a single buildDigest() run instead of fanning out
+    // across all RSS feeds. Returning null skips the Redis write and caches a
+    // neg-sentinel (120s) to absorb the request storm during degraded periods.
+    const fresh = await cachedFetchJson<ListFeedDigestResponse>(
+      digestCacheKey,
+      900,
+      async () => {
+        const result = await buildDigest(variant, lang);
+        const totalItems = Object.values(result.categories).reduce((sum, b) => sum + b.items.length, 0);
+        return totalItems > 0 ? result : null;
+      },
+    );
 
-    // Cold path — build fresh digest
-    const fresh = await buildDigest(variant, lang);
-    const totalItems = Object.values(fresh.categories).reduce((sum, b) => sum + b.items.length, 0);
-
-    if (totalItems > 0) {
-      // Good response: cache in Redis and update in-memory fallback
-      await setCachedJson(digestCacheKey, fresh, 900);
-      if (fallbackDigestCache.size > 50) fallbackDigestCache.clear();
-      fallbackDigestCache.set(fallbackKey, { data: fresh, ts: Date.now() });
-    } else {
-      // Degraded response: skip Redis write; prevent gateway/CDN from caching
+    if (fresh === null) {
       markNoCacheResponse(ctx.request);
+      return fallbackDigestCache.get(fallbackKey)?.data ?? empty();
     }
 
+    if (fallbackDigestCache.size > 50) fallbackDigestCache.clear();
+    fallbackDigestCache.set(fallbackKey, { data: fresh, ts: Date.now() });
     return fresh;
   } catch {
     markNoCacheResponse(ctx.request);
@@ -339,6 +338,9 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     }
 
     const results = new Map<string, ParsedItem[]>();
+    // Track feeds that actually completed (with or without items) so we can
+    // distinguish a genuine timeout (never ran) from a successful empty fetch.
+    const completedFeeds = new Set<string>();
 
     for (let i = 0; i < allEntries.length; i += BATCH_CONCURRENCY) {
       if (deadlineController.signal.aborted) break;
@@ -347,6 +349,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
       const settled = await Promise.allSettled(
         batch.map(async ({ category, feed }) => {
           const items = await fetchAndParseRss(feed, variant, deadlineController.signal);
+          completedFeeds.add(feed.name);
           if (items.length === 0) feedStatuses[feed.name] = 'empty';
           return { category, items };
         }),
@@ -363,7 +366,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     }
 
     for (const entry of allEntries) {
-      if (!(entry.feed.name in feedStatuses)) {
+      if (!completedFeeds.has(entry.feed.name)) {
         feedStatuses[entry.feed.name] = 'timeout';
       }
     }
