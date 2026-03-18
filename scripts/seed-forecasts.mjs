@@ -12,7 +12,7 @@ if (_isDirectRun) loadEnvFile(import.meta.url);
 const CANONICAL_KEY = 'forecast:predictions:v2';
 const PRIOR_KEY = 'forecast:predictions:prior:v2';
 const HISTORY_KEY = 'forecast:predictions:history:v1';
-const TTL_SECONDS = 4800; // 80min (cron runs hourly, 20min buffer for cold start + LLM latency)
+const TTL_SECONDS = 6300; // 105min (cron runs hourly; outlives maxStaleMin:90 with 15min buffer)
 const HISTORY_MAX_RUNS = 200;
 const HISTORY_MAX_FORECASTS = 25;
 const HISTORY_TTL_SECONDS = 45 * 24 * 60 * 60;
