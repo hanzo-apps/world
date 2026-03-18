@@ -58,7 +58,7 @@ export function openMcpConnectModal(options: McpConnectOptions): void {
       <div class="mcp-form-group">
         <label class="mcp-label">${escapeHtml(t('mcp.authHeader'))} <span class="mcp-optional">(${t('mcp.optional')})</span></label>
         <input class="mcp-input mcp-auth-header" type="text"
-          placeholder="Authorization: Bearer token123"
+          placeholder="Authorization: Bearer token123; x-api-key: key456"
           value="${escapeHtml(existing ? _headersToLine(existing.customHeaders) : '')}" />
       </div>
       <div class="mcp-connect-actions">
@@ -136,7 +136,7 @@ export function openMcpConnectModal(options: McpConnectOptions): void {
       if (presetTool) {
         selectedTool = { name: presetTool, description: '' };
         argsInput.value = presetArgs || '{}';
-        if (presetTitle && !titleInput.value) titleInput.value = presetTitle;
+        if (presetTitle) titleInput.value = presetTitle;
         toolConfig.style.display = '';
         addBtn.disabled = false;
         // Show a placeholder in tool list
@@ -157,16 +157,21 @@ export function openMcpConnectModal(options: McpConnectOptions): void {
     addBtn.disabled = false;
   }
 
-  // Parse auth header input into Record<string,string>
+  // Parse auth header input into Record<string,string>.
+  // Supports multiple headers separated by "; " (matching _headersToLine serialization).
+  // Example: "x-smithery-api-key: abc; Authorization: Bearer xyz"
   function parseAuthHeader(raw: string): Record<string, string> {
     const trimmed = raw.trim();
     if (!trimmed) return {};
-    const colon = trimmed.indexOf(':');
-    if (colon === -1) return {};
-    const key = trimmed.slice(0, colon).trim();
-    const val = trimmed.slice(colon + 1).trim();
-    if (!key) return {};
-    return { [key]: val };
+    const result: Record<string, string> = {};
+    for (const part of trimmed.split(/;\s+(?=[A-Za-z0-9_-]+\s*:)/)) {
+      const colon = part.indexOf(':');
+      if (colon === -1) continue;
+      const key = part.slice(0, colon).trim();
+      const val = part.slice(colon + 1).trim();
+      if (key) result[key] = val;
+    }
+    return result;
   }
 
   function renderTools(list: McpToolDef[]): void {
