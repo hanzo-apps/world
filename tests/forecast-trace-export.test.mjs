@@ -150,6 +150,9 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.worldStateSummary.regionCount, 2);
     assert.ok(typeof artifacts.summary.worldStateSummary.situationCount === 'number');
     assert.ok(artifacts.summary.worldStateSummary.situationCount >= 1);
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationSituationCount === 'number');
+    assert.equal(artifacts.summary.worldStateSummary.simulationRoundCount, 3);
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationSummary === 'string');
     assert.ok(typeof artifacts.summary.worldStateSummary.historyRuns === 'number');
     assert.ok(Array.isArray(artifacts.worldState.actorRegistry));
     assert.ok(artifacts.worldState.actorRegistry.every(actor => actor.name && actor.id));
@@ -159,9 +162,12 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.worldStateSummary.newBranches, 6);
     assert.equal(artifacts.summary.triggerContext.triggerRequest.requester, 'seed-military-flights');
     assert.ok(Array.isArray(artifacts.worldState.situationClusters));
+    assert.ok(Array.isArray(artifacts.worldState.simulationState?.situationSimulations));
+    assert.equal(artifacts.worldState.simulationState?.roundTransitions?.length, 3);
     assert.ok(Array.isArray(artifacts.worldState.report.situationWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.actorWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.simulationWatchlist));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -315,11 +321,17 @@ describe('forecast run world state', () => {
     assert.ok(worldState.situationClusters.length >= 1);
     assert.ok(worldState.situationSummary.summary.includes('clustered situations'));
     assert.ok(typeof worldState.situationContinuity.newSituationCount === 'number');
+    assert.ok(worldState.simulationState.summary.includes('deterministic rounds'));
+    assert.equal(worldState.simulationState.roundTransitions.length, 3);
+    assert.ok(worldState.simulationState.situationSimulations.length >= 1);
+    assert.ok(worldState.simulationState.situationSimulations.every((unit) => unit.rounds.length === 3));
     assert.ok(worldState.report.summary.includes('leading domains'));
     assert.ok(worldState.report.continuitySummary.includes('Actors:'));
+    assert.ok(worldState.report.simulationSummary.includes('deterministic rounds'));
     assert.ok(worldState.report.regionalHotspots.length >= 1);
     assert.ok(worldState.report.branchWatchlist.length >= 1);
     assert.ok(Array.isArray(worldState.report.situationWatchlist));
+    assert.ok(Array.isArray(worldState.report.simulationWatchlist));
   });
 
   it('reports full actor continuity counts even when previews are capped', () => {
@@ -637,5 +649,30 @@ describe('forecast run world state', () => {
 
     assert.equal(worldState.situationContinuity.strengthenedSituationCount, 0);
     assert.ok(worldState.report.situationWatchlist.every((item) => item.type !== 'strengthened_situation'));
+  });
+
+  it('builds deterministic simulation units and round transitions from clustered situations', () => {
+    const conflict = makePrediction('conflict', 'Israel', 'Active armed conflict: Israel', 0.76, 0.66, '7d', [
+      { type: 'ucdp', value: 'Israeli theater remains active', weight: 0.4 },
+      { type: 'news_corroboration', value: 'Regional actors prepare responses', weight: 0.2 },
+    ]);
+    conflict.newsContext = ['Regional actors prepare responses'];
+    buildForecastCase(conflict);
+
+    const supply = makePrediction('supply_chain', 'Eastern Mediterranean', 'Shipping disruption: Eastern Mediterranean', 0.59, 0.55, '14d', [
+      { type: 'chokepoint', value: 'Shipping reroutes through the Eastern Mediterranean', weight: 0.4 },
+    ]);
+    buildForecastCase(supply);
+
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T08:00:00Z'),
+      predictions: [conflict, supply],
+    });
+
+    assert.ok(worldState.simulationState.totalSituationSimulations >= 2);
+    assert.equal(worldState.simulationState.totalRounds, 3);
+    assert.ok(worldState.simulationState.roundTransitions.every((round) => round.situationCount >= 1));
+    assert.ok(worldState.simulationState.situationSimulations.every((unit) => ['escalatory', 'contested', 'constrained'].includes(unit.posture)));
+    assert.ok(worldState.simulationState.situationSimulations.every((unit) => unit.rounds.every((round) => typeof round.netPressure === 'number')));
   });
 });
