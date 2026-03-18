@@ -68,6 +68,15 @@ describe('forecast trace artifact builder', () => {
       {
         generatedAt: Date.parse('2026-03-15T08:00:00Z'),
         predictions: [a, b],
+        publishTelemetry: {
+          suppressedWeakFallback: 1,
+          suppressedSituationOverlap: 2,
+          suppressedTotal: 3,
+          reasonCounts: { weak_fallback: 1, situation_overlap: 2 },
+          situationClusterCount: 2,
+          maxForecastsPerSituation: 2,
+          multiForecastSituations: 1,
+        },
         triggerContext: {
           triggerSource: 'military_chain',
           triggerService: 'seed-forecasts',
@@ -125,6 +134,7 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.quality.traced.enrichedCount, 0);
     assert.equal(artifacts.summary.quality.traced.fallbackRate, 1);
     assert.equal(artifacts.summary.quality.traced.enrichedRate, 0);
+    assert.equal(artifacts.summary.quality.publish.suppressedSituationOverlap, 2);
     assert.ok(artifacts.summary.quality.fullRun.quietDomains.includes('military'));
     assert.equal(artifacts.summary.quality.traced.topPromotionSignals[0].type, 'cii');
     assert.ok(artifacts.summary.worldStateSummary.summary.includes('active forecasts'));

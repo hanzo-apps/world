@@ -63,6 +63,7 @@ import {
   populateFallbackNarratives,
   loadCascadeRules,
   evaluateRuleConditions,
+  summarizePublishFiltering,
   SIGNAL_TO_SOURCE,
   PREDICATE_EVALUATORS,
   DEFAULT_CASCADE_RULES,
@@ -1222,6 +1223,28 @@ describe('forecast narrative fallbacks', () => {
     assert.ok(contrarianCase.length <= 500);
   });
 
+  it('fallback narratives reference broader situation context when available', () => {
+    const pred = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.63, 0.48, '7d', [
+      { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.5 },
+    ]);
+    buildForecastCase(pred);
+    pred.caseFile.situationContext = {
+      id: 'sit-1',
+      label: 'Iran conflict pressure',
+      forecastCount: 4,
+      topSignals: [{ type: 'ucdp', count: 4 }],
+    };
+    pred.situationContext = pred.caseFile.situationContext;
+
+    const scenario = buildFallbackScenario(pred);
+    const baseCase = buildFallbackBaseCase(pred);
+    const summary = buildFeedSummary(pred);
+
+    assert.match(baseCase, /broader|cluster/i);
+    assert.match(scenario, /broader|cluster/i);
+    assert.match(summary, /broader|cluster/i);
+  });
+
   it('buildFeedSummary stays compact and distinct from the deeper case output', () => {
     const pred = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.7, 0.6, '7d', [
       { type: 'cii', value: 'Iran CII 87 (critical)', weight: 0.4 },
@@ -1801,5 +1824,53 @@ describe('forecast quality gating', () => {
     const published = filterPublishedForecasts([weak, strong]);
     assert.equal(published.length, 1);
     assert.equal(published[0].id, strong.id);
+  });
+
+  it('suppresses weaker duplicate-like conflict forecasts while preserving distinct consequences', () => {
+    const primary = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.64, 0.58, '7d', [
+      { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.5 },
+      { type: 'news_corroboration', value: 'Iran strike exchange intensifies', weight: 0.3 },
+    ]);
+    const duplicate = makePrediction('conflict', 'Iran', 'Active armed conflict: Iran', 0.52, 0.42, '7d', [
+      { type: 'ucdp', value: '27 conflict events in Iran', weight: 0.5 },
+      { type: 'news_corroboration', value: 'Iran strike exchange intensifies', weight: 0.3 },
+    ]);
+    const consequence = makePrediction('market', 'Middle East', 'Oil price impact from Strait of Hormuz disruption', 0.41, 0.51, '30d', [
+      { type: 'news_corroboration', value: 'Oil traders react to Hormuz risk', weight: 0.4 },
+    ]);
+    const distinctConflict = makePrediction('conflict', 'Gulf', 'Spillover conflict risk: Gulf shipping corridor', 0.47, 0.53, '14d', [
+      { type: 'news_corroboration', value: 'Gulf states prepare for possible spillover', weight: 0.35 },
+    ]);
+
+    buildForecastCases([primary, duplicate, consequence, distinctConflict]);
+    for (const pred of [primary, duplicate, consequence, distinctConflict]) {
+      pred.traceMeta = { narrativeSource: 'fallback' };
+    }
+    primary.caseFile.situationContext = { id: 'sit-1', label: 'Iran conflict pressure', forecastCount: 3, topSignals: [{ type: 'ucdp', count: 2 }] };
+    duplicate.caseFile.situationContext = { id: 'sit-1', label: 'Iran conflict pressure', forecastCount: 3, topSignals: [{ type: 'ucdp', count: 2 }] };
+    consequence.caseFile.situationContext = { id: 'sit-1', label: 'Iran conflict pressure', forecastCount: 3, topSignals: [{ type: 'ucdp', count: 2 }] };
+    distinctConflict.caseFile.situationContext = { id: 'sit-2', label: 'Gulf spillover pressure', forecastCount: 1, topSignals: [{ type: 'news_corroboration', count: 1 }] };
+    primary.situationContext = primary.caseFile.situationContext;
+    duplicate.situationContext = duplicate.caseFile.situationContext;
+    consequence.situationContext = consequence.caseFile.situationContext;
+    distinctConflict.situationContext = distinctConflict.caseFile.situationContext;
+    primary.readiness = { overall: 0.63 };
+    duplicate.readiness = { overall: 0.44 };
+    consequence.readiness = { overall: 0.54 };
+    distinctConflict.readiness = { overall: 0.49 };
+    primary.analysisPriority = 0.19;
+    duplicate.analysisPriority = 0.09;
+    consequence.analysisPriority = 0.12;
+    distinctConflict.analysisPriority = 0.11;
+
+    const published = filterPublishedForecasts([primary, duplicate, consequence, distinctConflict]);
+    assert.equal(published.length, 3);
+    assert.ok(published.some((item) => item.id === primary.id));
+    assert.ok(!published.some((item) => item.id === duplicate.id));
+    assert.ok(published.some((item) => item.id === consequence.id));
+    assert.ok(published.some((item) => item.id === distinctConflict.id));
+
+    const telemetry = summarizePublishFiltering([primary, duplicate, consequence, distinctConflict]);
+    assert.equal(telemetry.suppressedSituationOverlap, 1);
   });
 });

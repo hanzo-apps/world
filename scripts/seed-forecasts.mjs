@@ -29,6 +29,9 @@ const ENRICHMENT_SCENARIO_MAX = 3;
 const ENRICHMENT_MAX_PER_DOMAIN = 2;
 const ENRICHMENT_MIN_READINESS = 0.34;
 const ENRICHMENT_PRIORITY_DOMAINS = ['market', 'military'];
+// Situation-overlap suppression should require more than a same-cluster/same-region match.
+// We only suppress when overlap is strong enough to look like the same forecast expressed twice.
+const DUPLICATE_SCORE_THRESHOLD = 6;
 const CYBER_MIN_THREATS_PER_COUNTRY = 5;
 const CYBER_MAX_FORECASTS = 12;
 const CYBER_SCORE_TYPE_MULTIPLIER = 1.5;    // bonus per distinct threat type
@@ -2492,6 +2495,44 @@ function buildSituationSummary(situationClusters, situationContinuity) {
   };
 }
 
+function attachSituationContext(predictions, situationClusters = buildSituationClusters(predictions)) {
+  const situationIndex = buildSituationForecastIndex(situationClusters);
+  for (const pred of predictions) {
+    const cluster = situationIndex.get(pred.id);
+    if (!cluster) continue;
+    const situationContext = {
+      id: cluster.id,
+      label: cluster.label,
+      forecastCount: cluster.forecastCount,
+      regions: cluster.regions,
+      domains: cluster.domains,
+      actors: cluster.actors,
+      branchKinds: cluster.branchKinds,
+      avgProbability: cluster.avgProbability,
+      avgConfidence: cluster.avgConfidence,
+      topSignals: cluster.topSignals,
+      sampleTitles: cluster.sampleTitles,
+    };
+    pred.situationContext = situationContext;
+    pred.caseFile = pred.caseFile || buildForecastCase(pred);
+    // Keep caseFile access convenient for prompt/fallback builders, but treat
+    // pred.situationContext as the canonical per-forecast reference.
+    pred.caseFile.situationContext = situationContext;
+  }
+  return situationClusters;
+}
+
+function buildSituationForecastIndex(situationClusters) {
+  const index = new Map();
+  for (const cluster of situationClusters || []) {
+    for (const forecastId of cluster.forecastIds || []) {
+      if (index.has(forecastId)) continue;
+      index.set(forecastId, cluster);
+    }
+  }
+  return index;
+}
+
 function summarizeWorldStateHistory(priorWorldStates = []) {
   return priorWorldStates
     .filter(Boolean)
@@ -2874,7 +2915,7 @@ function buildForecastRunWorldState(data) {
   const actorContinuity = buildActorContinuitySummary(actorRegistry, priorWorldState);
   const branchStates = buildForecastBranchStates(predictions);
   const branchContinuity = buildBranchContinuitySummary(branchStates, priorWorldState);
-  const situationClusters = buildSituationClusters(predictions);
+  const situationClusters = data?.situationClusters || buildSituationClusters(predictions);
   const situationContinuity = buildSituationContinuitySummary(situationClusters, priorWorldState);
   const situationSummary = buildSituationSummary(situationClusters, situationContinuity);
   const reportContinuity = buildReportContinuity({
@@ -2945,7 +2986,7 @@ function summarizeForecastPopulation(predictions) {
   };
 }
 
-function summarizeForecastTraceQuality(predictions, tracedPredictions, enrichmentMeta = null) {
+function summarizeForecastTraceQuality(predictions, tracedPredictions, enrichmentMeta = null, publishTelemetry = null) {
   const fullRun = summarizeForecastPopulation(predictions);
   const traced = summarizeForecastPopulation(tracedPredictions);
 
@@ -2999,6 +3040,7 @@ function summarizeForecastTraceQuality(predictions, tracedPredictions, enrichmen
       topSuppressionSignals: pickTopCountEntries(suppressionSignalCounts, 5),
     },
     enrichment: enrichmentMeta,
+    publish: publishTelemetry,
   };
 }
 
@@ -3007,12 +3049,14 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
   const maxForecasts = config.maxForecasts || getTraceMaxForecasts(predictions.length);
   const tracedPredictions = predictions.slice(0, maxForecasts).map((pred, index) => buildForecastTraceRecord(pred, index + 1));
-  const quality = summarizeForecastTraceQuality(predictions, tracedPredictions, data?.enrichmentMeta || null);
+  const quality = summarizeForecastTraceQuality(predictions, tracedPredictions, data?.enrichmentMeta || null, data?.publishTelemetry || null);
   const worldState = buildForecastRunWorldState({
     generatedAt,
     predictions,
     priorWorldState: data?.priorWorldState || null,
     priorWorldStates: data?.priorWorldStates || [],
+    situationClusters: data?.situationClusters || undefined,
+    publishTelemetry: data?.publishTelemetry || null,
   });
   const prefix = buildTraceRunPrefix(
     context.runId || `run_${generatedAt}`,
@@ -3383,7 +3427,10 @@ function computeAnalysisPriority(pred) {
 }
 
 function rankForecastsForAnalysis(predictions) {
-  const priorities = new Map(predictions.map(p => [p, computeAnalysisPriority(p)]));
+  const priorities = new Map(predictions.map((p) => [
+    p,
+    typeof p.analysisPriority === 'number' ? p.analysisPriority : computeAnalysisPriority(p),
+  ]));
   predictions.sort((a, b) => {
     const delta = priorities.get(b) - priorities.get(a);
     if (Math.abs(delta) > 1e-6) return delta;
@@ -3391,30 +3438,143 @@ function rankForecastsForAnalysis(predictions) {
   });
 }
 
+function prepareForecastMetrics(predictions) {
+  for (const pred of predictions) {
+    pred.readiness = pred.readiness || scoreForecastReadiness(pred);
+    pred.analysisPriority = typeof pred.analysisPriority === 'number'
+      ? pred.analysisPriority
+      : computeAnalysisPriority(pred);
+  }
+}
+
+function intersectCount(left = [], right = []) {
+  if (!left.length || !right.length) return 0;
+  const rightSet = new Set(right);
+  let count = 0;
+  for (const item of left) {
+    if (rightSet.has(item)) count++;
+  }
+  return count;
+}
+
+function getForecastSituationTokens(pred) {
+  return uniqueSortedStrings([
+    ...extractMeaningfulTokens(pred.title, [pred.region]),
+    ...extractMeaningfulTokens(pred.feedSummary, [pred.region]),
+    ...(pred.caseFile?.supportingEvidence || []).flatMap((item) => extractMeaningfulTokens(item.summary, [pred.region])),
+  ]).slice(0, 12);
+}
+
+function computeSituationDuplicateScore(current, kept) {
+  const currentActors = uniqueSortedStrings((current.caseFile?.actors || []).map((actor) => actor.id || actor.name));
+  const keptActors = uniqueSortedStrings((kept.caseFile?.actors || []).map((actor) => actor.id || actor.name));
+  const currentBranches = uniqueSortedStrings((current.caseFile?.branches || []).map((branch) => branch.kind));
+  const keptBranches = uniqueSortedStrings((kept.caseFile?.branches || []).map((branch) => branch.kind));
+  const currentSignals = uniqueSortedStrings((current.situationContext?.topSignals || []).map((signal) => signal.type));
+  const keptSignals = uniqueSortedStrings((kept.situationContext?.topSignals || []).map((signal) => signal.type));
+  const currentTokens = current.publishTokens || getForecastSituationTokens(current);
+  const keptTokens = kept.publishTokens || getForecastSituationTokens(kept);
+
+  let score = 0;
+  if ((current.situationContext?.id || '') && current.situationContext?.id === kept.situationContext?.id) score += 2;
+  if ((current.region || '') === (kept.region || '')) score += 1.5;
+  score += intersectCount(currentActors, keptActors) * 1.4;
+  score += intersectCount(currentBranches, keptBranches) * 0.75;
+  score += intersectCount(currentSignals, keptSignals) * 0.5;
+  score += intersectCount(currentTokens, keptTokens) * 0.35;
+  return +score.toFixed(3);
+}
+
+function summarizePublishFiltering(predictions) {
+  // Must be called after filterPublishedForecasts() has populated pred.publishDiagnostics.
+  const reasonCounts = summarizeTypeCounts(
+    predictions
+      .map((pred) => pred.publishDiagnostics?.reason)
+      .filter(Boolean),
+  );
+  const situationCounts = summarizeTypeCounts(
+    predictions
+      .map((pred) => pred.situationContext?.id)
+      .filter(Boolean),
+  );
+
+  return {
+    suppressedWeakFallback: reasonCounts.weak_fallback || 0,
+    suppressedSituationOverlap: reasonCounts.situation_overlap || 0,
+    suppressedTotal: Object.values(reasonCounts).reduce((sum, count) => sum + count, 0),
+    reasonCounts,
+    situationClusterCount: Object.keys(situationCounts).length,
+    maxForecastsPerSituation: Math.max(0, ...Object.values(situationCounts)),
+    multiForecastSituations: Object.values(situationCounts).filter((count) => count > 1).length,
+  };
+}
+
 function filterPublishedForecasts(predictions, minProbability = PUBLISH_MIN_PROBABILITY) {
   let weakFallbackCount = 0;
-  const result = predictions.filter((pred) => {
-    if ((pred?.probability || 0) <= minProbability) return false;
+  let overlapSuppressedCount = 0;
+  const kept = [];
+
+  for (const pred of predictions) {
+    pred.publishDiagnostics = null;
+    pred.publishTokens = pred.publishTokens || getForecastSituationTokens(pred);
+    if ((pred?.probability || 0) <= minProbability) continue;
     const narrativeSource = pred?.traceMeta?.narrativeSource || 'fallback';
-    if (narrativeSource !== 'fallback') return true;
     const readiness = pred?.readiness?.overall ?? scoreForecastReadiness(pred).overall;
     const priority = typeof pred?.analysisPriority === 'number' ? pred.analysisPriority : computeAnalysisPriority(pred);
     const counterEvidenceTypes = new Set((pred?.caseFile?.counterEvidence || []).map(item => item.type));
-    const weakFallback = (
-      readiness < 0.4 &&
-      priority < 0.08 &&
-      (pred?.confidence || 0) < 0.45 &&
-      (pred?.probability || 0) < 0.12 &&
-      counterEvidenceTypes.has('coverage_gap') &&
-      counterEvidenceTypes.has('confidence')
-    );
-    if (weakFallback) weakFallbackCount++;
-    return !weakFallback;
-  });
+    if (narrativeSource === 'fallback') {
+      const weakFallback = (
+        readiness < 0.4 &&
+        priority < 0.08 &&
+        (pred?.confidence || 0) < 0.45 &&
+        (pred?.probability || 0) < 0.12 &&
+        counterEvidenceTypes.has('coverage_gap') &&
+        counterEvidenceTypes.has('confidence')
+      );
+      if (weakFallback) {
+        weakFallbackCount++;
+        pred.publishDiagnostics = { reason: 'weak_fallback' };
+        continue;
+      }
+    }
+
+    const bestDuplicate = kept.find((item) => {
+      if (item.domain !== pred.domain) return false;
+      const duplicateScore = computeSituationDuplicateScore(pred, item);
+      if (duplicateScore < DUPLICATE_SCORE_THRESHOLD) return false;
+
+      const priorityGap = (item.analysisPriority || 0) - priority;
+      const confidenceGap = (item.confidence || 0) - (pred.confidence || 0);
+      const readinessGap = (item.readiness?.overall || 0) - readiness;
+      const probabilityGap = (item.probability || 0) - (pred.probability || 0);
+
+      return (
+        priorityGap >= 0.02 ||
+        confidenceGap >= 0.08 ||
+        readinessGap >= 0.08 ||
+        probabilityGap >= 0.08
+      );
+    });
+
+    if (bestDuplicate) {
+      overlapSuppressedCount++;
+      pred.publishDiagnostics = {
+        reason: 'situation_overlap',
+        keptForecastId: bestDuplicate.id,
+        situationId: pred.situationContext?.id || '',
+      };
+      continue;
+    }
+
+    kept.push(pred);
+  }
   if (weakFallbackCount > 0) {
     console.log(`  [filterPublished] Suppressed ${weakFallbackCount} weak fallback forecast(s)`);
   }
-  return result;
+  if (overlapSuppressedCount > 0) {
+    console.log(`  [filterPublished] Suppressed ${overlapSuppressedCount} situation-overlap forecast(s)`);
+  }
+  return kept;
 }
 
 function selectForecastsForEnrichment(predictions, options = {}) {
@@ -3793,13 +3953,20 @@ function buildUserPrompt(preds) {
 }
 
 function buildFallbackBaseCase(pred) {
+  const situation = pred.caseFile?.situationContext || pred.situationContext;
   const branch = pred.caseFile?.branches?.find(item => item.kind === 'base');
   if (branch?.summary && branch?.outcome) {
-    return `${branch.summary} ${branch.outcome}`.slice(0, 500);
+    const branchText = `${branch.summary} ${branch.outcome}`;
+    if (situation?.forecastCount > 1 && !/broader|cluster/i.test(branchText)) {
+      return `${branchText} This path sits inside the broader ${situation.label.toLowerCase()} cluster.`.slice(0, 500);
+    }
+    return branchText.slice(0, 500);
   }
   const support = pred.caseFile?.supportingEvidence?.[0]?.summary || pred.signals?.[0]?.value || pred.title;
   const secondary = pred.caseFile?.supportingEvidence?.[1]?.summary || pred.signals?.[1]?.value;
-  const lead = `${support} is the clearest active driver behind this ${pred.domain} forecast in ${pred.region}.`;
+  const lead = situation?.forecastCount > 1
+    ? `${support} is one of the clearest active drivers inside the broader ${situation.label.toLowerCase()} across ${situation.forecastCount} related forecasts.`
+    : `${support} is the clearest active driver behind this ${pred.domain} forecast in ${pred.region}.`;
   const follow = secondary
     ? `${secondary} keeps the base case anchored near ${roundPct(pred.probability)} over the ${pred.timeHorizon}.`
     : `The most likely path remains near ${roundPct(pred.probability)} over the ${pred.timeHorizon}, with ${pred.trend} momentum.`;
@@ -3836,15 +4003,28 @@ function buildFallbackContrarianCase(pred) {
 }
 
 function buildFallbackScenario(pred) {
+  const situation = pred.caseFile?.situationContext || pred.situationContext;
   const baseCase = pred.caseFile?.baseCase || buildFallbackBaseCase(pred);
+  if (situation?.forecastCount > 1) {
+    const leadSignal = situation.topSignals?.[0]?.type ? ` The broader cluster is still being shaped by ${situation.topSignals[0].type.replace(/_/g, ' ')} signals.` : '';
+    return `${baseCase}${leadSignal}`.slice(0, 500);
+  }
   return baseCase.slice(0, 500);
 }
 
 function buildFeedSummary(pred) {
+  const situation = pred.caseFile?.situationContext || pred.situationContext;
   const lead = pred.caseFile?.baseCase || pred.scenario || buildFallbackScenario(pred);
   const compact = lead.replace(/\s+/g, ' ').trim();
   const summary = compact.length > 180 ? `${compact.slice(0, 177).trimEnd()}...` : compact;
-  if (summary) return summary;
+  if (summary) {
+    if (situation?.forecastCount > 1 && !summary.toLowerCase().includes('broader')) {
+      const suffix = ` It sits inside a broader ${situation.label.toLowerCase()} cluster.`;
+      const combined = `${summary}${suffix}`;
+      return combined.length > 220 ? `${combined.slice(0, 217).trimEnd()}...` : combined;
+    }
+    return summary;
+  }
   return `${pred.title} remains live at ${roundPct(pred.probability)} over the ${pred.timeHorizon}.`;
 }
 
@@ -4196,6 +4376,8 @@ async function fetchForecasts() {
   computeTrends(predictions, prior);
   buildForecastCases(predictions);
   annotateForecastChanges(predictions, prior);
+  const situationClusters = attachSituationContext(predictions);
+  prepareForecastMetrics(predictions);
 
   rankForecastsForAnalysis(predictions);
 
@@ -4203,11 +4385,12 @@ async function fetchForecasts() {
   populateFallbackNarratives(predictions);
 
   const publishedPredictions = filterPublishedForecasts(predictions);
+  const publishTelemetry = summarizePublishFiltering(predictions);
   if (publishedPredictions.length !== predictions.length) {
     console.log(`  Filtered ${predictions.length - publishedPredictions.length} forecasts at publish floor > ${PUBLISH_MIN_PROBABILITY}`);
   }
 
-  return { predictions: publishedPredictions, generatedAt: Date.now(), enrichmentMeta };
+  return { predictions: publishedPredictions, generatedAt: Date.now(), enrichmentMeta, publishTelemetry, situationClusters };
 }
 
 async function readForecastRefreshRequest() {
@@ -4379,6 +4562,7 @@ export {
   computeAnalysisPriority,
   rankForecastsForAnalysis,
   filterPublishedForecasts,
+  summarizePublishFiltering,
   selectForecastsForEnrichment,
   parseForecastProviderOrder,
   getForecastLlmCallOptions,
