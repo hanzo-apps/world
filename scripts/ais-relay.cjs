@@ -1685,7 +1685,7 @@ async function startMarketDataSeedLoop() {
 // ─────────────────────────────────────────────────────────────
 const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
 const AVIATION_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
-const AVIATION_SEED_TTL = 3600; // 1h — survives 1 missed cycle
+const AVIATION_SEED_TTL = 10800; // 3h — 6x interval; survives ~5 consecutive missed pings
 const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
 const AVIATION_BATCH_CONCURRENCY = 10;
 const AVIATION_MIN_FLIGHTS_FOR_CLOSURE = 10;
@@ -1954,7 +1954,7 @@ async function startAviationSeedLoop() {
 // so Vercel handler and map layer serve from cache (ICAO API times out from edge)
 // ─────────────────────────────────────────────────────────────
 const NOTAM_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
-const NOTAM_SEED_TTL = 3600; // 1h — survives 1 missed cycle
+const NOTAM_SEED_TTL = 10800; // 3h — 6x interval; survives ~5 consecutive missed pings
 const NOTAM_REDIS_KEY = 'aviation:notam:closures:v2';
 const NOTAM_CLOSURE_QCODES = new Set(['FA', 'AH', 'AL', 'AW', 'AC', 'AM']);
 const NOTAM_MONITORED_ICAO = [
@@ -3349,7 +3349,7 @@ function startCableHealthWarmPingLoop() {
 // ─────────────────────────────────────────────────────────────
 const WEATHER_SEED_INTERVAL_MS = 15 * 60 * 1000; // 15 min
 const WEATHER_REDIS_KEY = 'weather:alerts:v1';
-const WEATHER_CACHE_TTL = 1800; // 30m — must outlive the 15-min seed interval
+const WEATHER_CACHE_TTL = 5400; // 1.5h — 6x interval; survives ~5 consecutive missed pings
 let weatherSeedInFlight = false;
 
 async function seedWeatherAlerts() {
@@ -4763,7 +4763,7 @@ const TRANSIT_COOLDOWN_MS = 30 * 60 * 1000;
 const TRANSIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MIN_DWELL_MS = 5 * 60 * 1000;
 const CHOKEPOINT_TRANSIT_KEY = 'supply_chain:chokepoint_transits:v1';
-const CHOKEPOINT_TRANSIT_TTL = 1200; // 20 min — must outlive the 10-min seed interval (2x)
+const CHOKEPOINT_TRANSIT_TTL = 3600; // 1h — 6x interval; survives ~5 consecutive missed pings
 const CHOKEPOINT_TRANSIT_INTERVAL_MS = 10 * 60 * 1000;
 
 const NAVAL_PREFIX_RE = /^(USS|USNS|HMS|HMAS|HMCS|INS|JS|ROKS|TCG|FS|BNS|RFS|PLAN|PLA|CGC|PNS|KRI|ITS|SNS|MMSI)/i;
@@ -5271,7 +5271,7 @@ setInterval(() => {
 
 // --- Pre-assembled Transit Summaries (Railway advantage: avoids large Redis reads on Vercel) ---
 const TRANSIT_SUMMARY_REDIS_KEY = 'supply_chain:transit-summaries:v1';
-const TRANSIT_SUMMARY_TTL = 1200; // 20 min — must outlive the 10-min seed interval (2x)
+const TRANSIT_SUMMARY_TTL = 3600; // 1h — 6x interval; survives ~5 consecutive missed pings
 const TRANSIT_SUMMARY_INTERVAL_MS = 10 * 60 * 1000;
 
 // Threat levels for anomaly detection.
