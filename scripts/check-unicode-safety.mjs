@@ -47,6 +47,8 @@ const EXCLUDED_PREFIXES = [
   'docs/',
   'blog-site/',
   'public/blog/',
+  'scripts/data/',
+  'scripts/node_modules/',
 ];
 
 const ZERO_WIDTH = new Set([0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF]);
