@@ -194,6 +194,15 @@ describe('forecast trace artifact builder', () => {
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
+    // simulation linkage: per-forecast worldState must carry simulation fields from the global simulation state
+    const forecastWorldState = artifacts.forecasts[0].payload.caseFile.worldState;
+    const simulations = artifacts.worldState.simulationState?.situationSimulations || [];
+    if (simulations.length > 0) {
+      assert.ok(typeof forecastWorldState.situationId === 'string' && forecastWorldState.situationId.length > 0, 'worldState.situationId should be set from simulation');
+      assert.ok(typeof forecastWorldState.simulationSummary === 'string' && forecastWorldState.simulationSummary.length > 0, 'worldState.simulationSummary should be set from simulation');
+      assert.ok(['escalatory', 'contested', 'constrained'].includes(forecastWorldState.simulationPosture), 'worldState.simulationPosture should be a valid posture');
+      assert.ok(typeof forecastWorldState.simulationPostureScore === 'number', 'worldState.simulationPostureScore should be a number');
+    }
   });
 
   it('stores all forecasts by default when no explicit max is configured', () => {
