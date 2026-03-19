@@ -171,6 +171,8 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.worldStateSummary.simulationRoundCount, 3);
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationSummary === 'string');
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationInputSummary === 'string');
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationActionCount === 'number');
+    assert.ok(typeof artifacts.summary.worldStateSummary.simulationInteractionCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationEffectCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.historyRuns === 'number');
     assert.equal(artifacts.summary.worldStateSummary.candidateStateSummary.forecastCount, 3);
@@ -185,12 +187,18 @@ describe('forecast trace artifact builder', () => {
     assert.ok(Array.isArray(artifacts.worldState.situationClusters));
     assert.ok(Array.isArray(artifacts.worldState.simulationState?.situationSimulations));
     assert.equal(artifacts.worldState.simulationState?.roundTransitions?.length, 3);
+    assert.ok(Array.isArray(artifacts.worldState.simulationState?.actionLedger));
+    assert.ok(Array.isArray(artifacts.worldState.simulationState?.interactionLedger));
+    assert.ok(Array.isArray(artifacts.worldState.simulationState?.replayTimeline));
     assert.ok(Array.isArray(artifacts.worldState.report.situationWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.actorWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.simulationWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.interactionWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.replayWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.simulationOutcomeSummaries));
     assert.ok(Array.isArray(artifacts.worldState.report.crossSituationEffects));
+    assert.ok(Array.isArray(artifacts.worldState.report.replayTimeline));
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -763,6 +771,10 @@ describe('forecast run world state', () => {
     assert.ok(worldState.simulationState.totalSituationSimulations >= 2);
     assert.equal(worldState.simulationState.totalRounds, 3);
     assert.ok(worldState.simulationState.roundTransitions.every((round) => round.situationCount >= 1));
+    assert.ok(Array.isArray(worldState.simulationState.actionLedger));
+    assert.ok(worldState.simulationState.actionLedger.length >= 2);
+    assert.ok(Array.isArray(worldState.simulationState.replayTimeline));
+    assert.equal(worldState.simulationState.replayTimeline.length, 3);
     assert.ok(worldState.simulationState.situationSimulations.every((unit) => ['escalatory', 'contested', 'constrained'].includes(unit.posture)));
     assert.ok(worldState.simulationState.situationSimulations.every((unit) => unit.rounds.every((round) => typeof round.netPressure === 'number')));
     assert.ok(worldState.simulationState.situationSimulations.every((unit) => Array.isArray(unit.actionPlan) && unit.actionPlan.length === 3));
@@ -880,9 +892,13 @@ describe('forecast run world state', () => {
     assert.ok(worldState.report.simulationOutcomeSummaries.length >= 2);
     assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => item.rounds.length === 3));
     assert.ok(worldState.report.simulationOutcomeSummaries.every((item) => ['escalatory', 'contested', 'constrained'].includes(item.posture)));
+    assert.ok(worldState.simulationState.interactionLedger.length >= 1);
+    assert.ok(worldState.simulationState.replayTimeline.some((item) => item.interactionCount >= 1));
     assert.ok(worldState.report.crossSituationEffects.length >= 1);
     assert.ok(worldState.report.crossSituationEffects.some((item) => item.summary.includes('Japan')));
     assert.ok(worldState.report.crossSituationEffects.every((item) => item.channel));
+    assert.ok(worldState.report.interactionWatchlist.length >= 1);
+    assert.ok(worldState.report.replayWatchlist.length === 3);
     assert.ok(worldState.simulationState.situationSimulations.every((item) => item.familyId));
   });
 
@@ -1153,6 +1169,110 @@ describe('forecast run world state', () => {
 
     const effects = buildCrossSituationEffects(patchedSimulationState);
     assert.ok(effects.some((item) => item.channel === 'regional_spillover' && item.relation === 'regional pressure transfer'));
+  });
+
+  it('emits reverse-direction effects when only the later-listed situation can drive the target', () => {
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T14:05:00Z'),
+      predictions: [
+        makePrediction('infrastructure', 'Romania', 'Infrastructure pressure: Romania', 0.34, 0.48, '14d', [
+          { type: 'outage', value: 'Romania infrastructure remains contained', weight: 0.24 },
+        ]),
+        makePrediction('market', 'Black Sea', 'Market repricing: Black Sea', 0.57, 0.56, '14d', [
+          { type: 'prediction_market', value: 'Black Sea pricing reacts to service disruption risk', weight: 0.36 },
+        ]),
+      ],
+    });
+
+    const patchedSimulationState = structuredClone(worldState.simulationState);
+    const infraUnit = patchedSimulationState.situationSimulations.find((item) => item.dominantDomain === 'infrastructure');
+    const marketUnit = patchedSimulationState.situationSimulations.find((item) => item.dominantDomain === 'market');
+    assert.ok(infraUnit);
+    assert.ok(marketUnit);
+
+    infraUnit.posture = 'constrained';
+    infraUnit.postureScore = 0.19;
+    infraUnit.effectChannels = [{ type: 'service_disruption', count: 1 }];
+
+    marketUnit.posture = 'contested';
+    marketUnit.postureScore = 0.49;
+    marketUnit.totalPressure = 0.67;
+    marketUnit.totalStabilization = 0.24;
+    marketUnit.effectChannels = [{ type: 'service_disruption', count: 2 }];
+
+    patchedSimulationState.interactionLedger = [
+      {
+        id: 'reverse-only',
+        stage: 'round_2',
+        sourceSituationId: infraUnit.situationId,
+        targetSituationId: marketUnit.situationId,
+        strongestChannel: 'service_disruption',
+        score: 5,
+        sourceActorName: 'Port Operator',
+        targetActorName: 'Market Desk',
+        interactionType: 'spillover',
+      },
+      {
+        id: 'reverse-emitter',
+        stage: 'round_2',
+        sourceSituationId: marketUnit.situationId,
+        targetSituationId: infraUnit.situationId,
+        strongestChannel: 'service_disruption',
+        score: 5,
+        sourceActorName: 'Market Desk',
+        targetActorName: 'Port Operator',
+        interactionType: 'spillover',
+      },
+    ];
+
+    const effects = buildCrossSituationEffects(patchedSimulationState);
+    assert.ok(effects.some((item) => item.sourceSituationId === marketUnit.situationId && item.targetSituationId === infraUnit.situationId));
+  });
+
+  it('prefers a usable shared channel over the alphabetically first shared channel', () => {
+    const worldState = buildForecastRunWorldState({
+      generatedAt: Date.parse('2026-03-19T14:10:00Z'),
+      predictions: [
+        makePrediction('market', 'Black Sea', 'Market repricing: Black Sea', 0.56, 0.55, '14d', [
+          { type: 'prediction_market', value: 'Black Sea pricing reflects service disruption risk', weight: 0.36 },
+        ]),
+        makePrediction('infrastructure', 'Romania', 'Infrastructure pressure: Romania', 0.45, 0.52, '14d', [
+          { type: 'outage', value: 'Romania infrastructure remains exposed to service disruption', weight: 0.3 },
+        ]),
+      ],
+    });
+
+    const patchedSimulationState = structuredClone(worldState.simulationState);
+    const marketUnit = patchedSimulationState.situationSimulations.find((item) => item.dominantDomain === 'market');
+    const infraUnit = patchedSimulationState.situationSimulations.find((item) => item.dominantDomain === 'infrastructure');
+    assert.ok(marketUnit);
+    assert.ok(infraUnit);
+
+    marketUnit.posture = 'contested';
+    marketUnit.postureScore = 0.5;
+    marketUnit.totalPressure = 0.65;
+    marketUnit.totalStabilization = 0.25;
+    marketUnit.effectChannels = [
+      { type: 'containment', count: 3 },
+      { type: 'service_disruption', count: 2 },
+    ];
+
+    patchedSimulationState.interactionLedger = [
+      {
+        id: 'shared-channel-choice',
+        stage: 'round_2',
+        sourceSituationId: marketUnit.situationId,
+        targetSituationId: infraUnit.situationId,
+        strongestChannel: 'service_disruption',
+        score: 5.5,
+        sourceActorName: 'Shipping Desk',
+        targetActorName: 'Port Operator',
+        interactionType: 'spillover',
+      },
+    ];
+
+    const effects = buildCrossSituationEffects(patchedSimulationState);
+    assert.ok(effects.some((item) => item.channel === 'service_disruption'));
   });
 
   it('uses a cross-regional family label when no single region clearly dominates a family', () => {
