@@ -2340,6 +2340,79 @@ function pickDominantSituationValues(counts = {}, fallback = [], maxValues = 2) 
     .map(([value]) => value);
 }
 
+const FAMILY_GENERIC_TOKENS = new Set([
+  'situation',
+  'family',
+  'pressure',
+  'risk',
+  'active',
+  'broader',
+  'regional',
+  'global',
+  'world',
+  'forecast',
+  'forecasts',
+  'driver',
+  'drivers',
+  'impact',
+  'effects',
+  'effect',
+  'outlook',
+  'path',
+  'paths',
+  'signal',
+  'signals',
+  'repricing',
+  'price',
+  'pricing',
+  'disruption',
+  'disruptions',
+  'conflict',
+  'political',
+  'market',
+  'supply',
+  'chain',
+  'infrastructure',
+  'cyber',
+  'military',
+]);
+
+const REGION_LINK_NOISE_TOKENS = new Set([
+  'north',
+  'northern',
+  'south',
+  'southern',
+  'east',
+  'eastern',
+  'west',
+  'western',
+  'central',
+  'upper',
+  'lower',
+  'region',
+  'regional',
+  'area',
+  'areas',
+  'zone',
+  'zones',
+  'coast',
+  'coastal',
+]);
+
+function filterSpecificSituationTokens(tokens = []) {
+  return uniqueSortedStrings((tokens || []).filter((token) => (
+    token
+    && token.length >= 4
+    && !FAMILY_GENERIC_TOKENS.has(token)
+  )));
+}
+
+function extractRegionLinkTokens(values = []) {
+  return uniqueSortedStrings((values || [])
+    .flatMap((value) => normalizeSituationText(value))
+    .filter((token) => token.length >= 3 && !REGION_LINK_NOISE_TOKENS.has(token)));
+}
+
 function buildSituationCandidate(prediction) {
   return {
     prediction,
@@ -2502,24 +2575,33 @@ function buildSituationClusters(predictions) {
 }
 
 function formatSituationFamilyLabel(family) {
-  const leadRegion = family.dominantRegion || family.regions?.[0] || 'Cross-regional';
+  const regionEntries = Object.entries(family._regionCounts || {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const leadCount = regionEntries[0]?.[1] || 0;
+  const secondCount = regionEntries[1]?.[1] || 0;
+  const totalSituations = Math.max(1, family.situationIds?.length || 0);
+  const hasClearLeadRegion = leadCount > 0 && leadCount >= Math.ceil(totalSituations * 0.5) && leadCount > secondCount;
+  const leadRegion = hasClearLeadRegion
+    ? (family.dominantRegion || family.regions?.[0] || 'Cross-regional')
+    : 'Cross-regional';
   const topDomains = pickDominantSituationValues(family._domainCounts, family.domains, 2);
   const domainLabel = formatSituationDomainLabel(topDomains.length ? topDomains : family.domains);
   return `${leadRegion} ${domainLabel} pressure family`;
 }
 
 function buildSituationFamilyCandidate(cluster) {
+  const tokens = uniqueSortedStrings([
+    ...normalizeSituationText(cluster.label),
+    ...((cluster.sampleTitles || []).flatMap((title) => normalizeSituationText(title))),
+  ]);
   return {
     cluster,
     regions: uniqueSortedStrings([cluster.dominantRegion, ...(cluster.regions || [])].filter(Boolean)),
     domains: uniqueSortedStrings([cluster.dominantDomain, ...(cluster.domains || [])].filter(Boolean)),
     actors: uniqueSortedStrings(cluster.actors || []),
-    tokens: uniqueSortedStrings([
-      ...normalizeSituationText(cluster.label),
-      ...((cluster.sampleTitles || []).flatMap((title) => normalizeSituationText(title))),
-    ])
-      .filter((token) => !['situation', 'family', 'pressure'].includes(token))
-      .slice(0, 28),
+    tokens: tokens.filter((token) => !['situation', 'family', 'pressure'].includes(token)).slice(0, 28),
+    specificTokens: filterSpecificSituationTokens(tokens).slice(0, 20),
+    regionTokens: extractRegionLinkTokens([cluster.dominantRegion, ...(cluster.regions || [])]).slice(0, 8),
     signalTypes: uniqueSortedStrings((cluster.topSignals || []).map((signal) => signal.type).filter(Boolean)),
   };
 }
@@ -2530,22 +2612,25 @@ function computeSituationFamilyOverlap(candidate, family) {
     intersectCount(candidate.actors, family.actors) * 2 +
     intersectCount(candidate.domains, family.domains) * 1.5 +
     intersectCount(candidate.signalTypes, family.signalTypes) * 1.2 +
-    intersectCount(candidate.tokens, family.tokens) * 0.5
+    intersectCount(candidate.specificTokens, family.specificTokens) * 1.1 +
+    intersectCount(candidate.regionTokens, family.regionTokens) * 0.8 +
+    intersectCount(candidate.tokens, family.tokens) * 0.25
   );
 }
 
 function shouldMergeSituationFamilyCandidate(candidate, family, score) {
-  if (score < 3) return false;
+  if (score < 4) return false;
 
   const regionOverlap = intersectCount(candidate.regions, family.regions);
   const actorOverlap = intersectCount(candidate.actors, family.actors);
   const domainOverlap = intersectCount(candidate.domains, family.domains);
   const signalOverlap = intersectCount(candidate.signalTypes, family.signalTypes);
-  const tokenOverlap = intersectCount(candidate.tokens, family.tokens);
+  const specificTokenOverlap = intersectCount(candidate.specificTokens, family.specificTokens);
+  const regionTokenOverlap = intersectCount(candidate.regionTokens, family.regionTokens);
 
-  if (regionOverlap > 0 && (domainOverlap > 0 || signalOverlap > 0 || tokenOverlap >= 2)) return true;
-  if (actorOverlap > 0 && (domainOverlap > 0 || tokenOverlap >= 2)) return true;
-  if (domainOverlap > 0 && signalOverlap > 0 && tokenOverlap >= 3) return true;
+  if (regionOverlap > 0 && (domainOverlap > 0 || signalOverlap > 0 || specificTokenOverlap > 0)) return true;
+  if (actorOverlap > 0 && (domainOverlap > 0 || specificTokenOverlap > 0)) return true;
+  if (domainOverlap > 0 && signalOverlap >= 2 && specificTokenOverlap >= 2 && regionTokenOverlap > 0) return true;
   return false;
 }
 
@@ -2608,6 +2693,8 @@ function buildSituationFamilies(situationClusters = []) {
         actors: [],
         signalTypes: [],
         tokens: [],
+        specificTokens: [],
+        regionTokens: [],
         situationIds: [],
         forecastCount: 0,
         _probabilityTotal: 0,
@@ -2622,6 +2709,8 @@ function buildSituationFamilies(situationClusters = []) {
     bestFamily.actors = uniqueSortedStrings([...bestFamily.actors, ...candidate.actors]);
     bestFamily.signalTypes = uniqueSortedStrings([...bestFamily.signalTypes, ...candidate.signalTypes]);
     bestFamily.tokens = uniqueSortedStrings([...bestFamily.tokens, ...candidate.tokens]).slice(0, 32);
+    bestFamily.specificTokens = uniqueSortedStrings([...bestFamily.specificTokens, ...(candidate.specificTokens || [])]).slice(0, 24);
+    bestFamily.regionTokens = uniqueSortedStrings([...bestFamily.regionTokens, ...(candidate.regionTokens || [])]).slice(0, 12);
     bestFamily.situationIds.push(cluster.id);
     bestFamily.forecastCount += cluster.forecastCount || 0;
     bestFamily._probabilityTotal += Number(cluster.avgProbability || 0);
@@ -3318,6 +3407,22 @@ function inferSystemEffectRelation(sourceDomain, targetDomain) {
   return relationMap[key] || '';
 }
 
+function canEmitCrossSituationEffect(source, strongestChannel, strongestChannelWeight, hasDirectStructuralLink = false) {
+  if (!strongestChannel) return false;
+  const profile = getSimulationDomainProfile(source?.dominantDomain || '');
+  const constrainedThreshold = profile.constrainedThreshold ?? 0.36;
+  if ((source?.posture || '') === 'constrained') return false;
+  if ((source?.postureScore || 0) <= constrainedThreshold) return false;
+  if (
+    (source?.posture || '') === 'contested'
+    && (source?.postureScore || 0) < Math.max(constrainedThreshold + 0.08, 0.46)
+    && strongestChannelWeight < 2
+    && !hasDirectStructuralLink
+  ) return false;
+  if ((source?.posture || '') !== 'escalatory' && (source?.totalPressure || 0) <= (source?.totalStabilization || 0)) return false;
+  return true;
+}
+
 function buildCrossSituationEffects(simulationState) {
   const simulations = Array.isArray(simulationState?.situationSimulations) ? simulationState.situationSimulations : [];
   const effects = [];
@@ -3341,17 +3446,22 @@ function buildCrossSituationEffects(simulationState) {
       if (channelOverlap === 0) continue;
       if (!hasDirectObservableLink) continue;
 
-      const strongestChannel = (source.effectChannels || [])
+      const strongestChannelEntry = (source.effectChannels || [])
         .slice()
         .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type))
         .find((item) => targetSensitivity.includes(item.type))
-        ?.type || '';
+        || null;
+      const strongestChannel = strongestChannelEntry?.type || '';
+      const strongestChannelWeight = strongestChannelEntry?.count || 0;
+      const hasDirectStructuralLink = regionOverlap > 0 || actorOverlap > 0;
+      if (!canEmitCrossSituationEffect(source, strongestChannel, strongestChannelWeight, hasDirectStructuralLink)) continue;
+      if (strongestChannelWeight < 2 && actorOverlap === 0 && regionOverlap === 0) continue;
       const relation = inferSystemEffectRelationFromChannel(strongestChannel, target.dominantDomain);
       if (!relation) continue;
 
       const score = (source.posture === 'escalatory' ? 2 : source.posture === 'contested' ? 1 : 0)
         + (channelOverlap * 2.5)
-        + (familyLink ? 1.5 : 0)
+        + (familyLink ? 0.5 : 0)
         + (regionOverlap * 2)
         + (actorOverlap * 1.5)
         + (labelTokenOverlap * 0.5);
