@@ -1987,7 +1987,25 @@ function buildTraceRunPrefix(runId, generatedAt, basePrefix) {
   return `${basePrefix}/${year}/${month}/${day}/${runId}`;
 }
 
-function buildForecastTraceRecord(pred, rank) {
+function buildForecastTraceRecord(pred, rank, simulationByForecastId = null) {
+  const caseFile = pred.caseFile || null;
+  let worldState = caseFile?.worldState || null;
+  if (worldState && simulationByForecastId) {
+    const sim = simulationByForecastId.get(pred.id);
+    if (sim) {
+      const [r1, r2, r3] = sim.rounds || [];
+      const simulationSummary = `${sim.label} moved through ${r1?.lead || 'initial interpretation'}, ${r2?.lead || 'interaction responses'}, and ${r3?.lead || 'regional effects'} before resolving to a ${describeSimulationPosture(sim.posture)} posture at ${roundPct(sim.postureScore)}.`;
+      worldState = {
+        ...worldState,
+        situationId: sim.situationId,
+        familyId: sim.familyId,
+        familyLabel: sim.familyLabel,
+        simulationSummary,
+        simulationPosture: sim.posture,
+        simulationPostureScore: sim.postureScore,
+      };
+    }
+  }
   return {
     rank,
     id: pred.id,
@@ -2007,7 +2025,7 @@ function buildForecastTraceRecord(pred, rank) {
     signals: pred.signals || [],
     newsContext: pred.newsContext || [],
     perspectives: pred.perspectives || null,
-    caseFile: pred.caseFile || null,
+    caseFile: caseFile ? { ...caseFile, worldState } : null,
     readiness: scoreForecastReadiness(pred),
     analysisPriority: computeAnalysisPriority(pred),
     traceMeta: pred.traceMeta || {
@@ -4055,14 +4073,6 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
   const fullRunPredictions = Array.isArray(data?.fullRunPredictions) ? data.fullRunPredictions : predictions;
   const maxForecasts = config.maxForecasts || getTraceMaxForecasts(predictions.length);
-  const tracedPredictions = predictions.slice(0, maxForecasts).map((pred, index) => buildForecastTraceRecord(pred, index + 1));
-  const quality = summarizeForecastTraceQuality(
-    predictions,
-    tracedPredictions,
-    data?.enrichmentMeta || null,
-    data?.publishTelemetry || null,
-    fullRunPredictions
-  );
   const worldState = buildForecastRunWorldState({
     generatedAt,
     predictions,
@@ -4072,6 +4082,20 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     situationFamilies: data?.situationFamilies || undefined,
     publishTelemetry: data?.publishTelemetry || null,
   });
+  const simulationByForecastId = new Map();
+  for (const sim of (worldState.simulationState?.situationSimulations || [])) {
+    for (const forecastId of (sim.forecastIds || [])) {
+      simulationByForecastId.set(forecastId, sim);
+    }
+  }
+  const tracedPredictions = predictions.slice(0, maxForecasts).map((pred, index) => buildForecastTraceRecord(pred, index + 1, simulationByForecastId));
+  const quality = summarizeForecastTraceQuality(
+    predictions,
+    tracedPredictions,
+    data?.enrichmentMeta || null,
+    data?.publishTelemetry || null,
+    fullRunPredictions
+  );
   const candidateWorldState = fullRunPredictions !== predictions || data?.fullRunSituationClusters
     ? buildForecastRunWorldState({
       generatedAt,
