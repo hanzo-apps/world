@@ -73,9 +73,12 @@ const FAST_KEYS = new Set([
   'correlationCards', 'forecasts', 'shippingRates',
 ]);
 
+// No public/s-maxage: CF (in front of api.worldmonitor.app) ignores Vary: Origin and would
+// pin ACAO: worldmonitor.app on cached responses, breaking CORS for preview deployments.
+// Vercel CDN caching is handled by TIER_CDN_CACHE via CDN-Cache-Control below.
 const TIER_CACHE = {
-  slow: 'public, s-maxage=3600, stale-while-revalidate=600, stale-if-error=3600',
-  fast: 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900',
+  slow: 'max-age=300, stale-while-revalidate=600, stale-if-error=3600',
+  fast: 'max-age=60, stale-while-revalidate=120, stale-if-error=900',
 };
 const TIER_CDN_CACHE = {
   slow: 'public, s-maxage=7200, stale-while-revalidate=1800, stale-if-error=7200',
