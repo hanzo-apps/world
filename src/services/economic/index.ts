@@ -80,6 +80,7 @@ export interface FredSeries {
   changePercent: number | null;
   date: string;
   unit: string;
+  observations: Array<{ date: string; value: number }>;
 }
 
 interface FredConfig {
@@ -163,6 +164,7 @@ export async function fetchFredData(): Promise<FredSeries[]> {
         change: roundValue(change, config.precision),
         changePercent: changePercent !== null ? Number(changePercent.toFixed(2)) : null,
         date: latest.date, unit: config.unit,
+        observations: obs.slice(-30).map(o => ({ date: o.date, value: toDisplayValue(o.value, config) })),
       });
     } else {
       const latest = obs[0]!;
@@ -172,6 +174,7 @@ export async function fetchFredData(): Promise<FredSeries[]> {
         value: roundValue(displayValue, config.precision),
         previousValue: null, change: null, changePercent: null,
         date: latest.date, unit: config.unit,
+        observations: obs.map(o => ({ date: o.date, value: toDisplayValue(o.value, config) })),
       });
     }
   }
