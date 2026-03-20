@@ -40,6 +40,8 @@ import {
   SupplyChainPanel,
   SanctionsPressurePanel,
   GulfEconomiesPanel,
+  GroceryBasketPanel,
+  BigMacPanel,
   WorldClockPanel,
   AirlineIntelPanel,
   AviationCommandBar,
@@ -773,6 +775,14 @@ export class PanelLayoutManager implements AppModule {
 
     if (this.shouldCreatePanel('gulf-economies') && !this.ctx.panels['gulf-economies']) {
       this.ctx.panels['gulf-economies'] = new GulfEconomiesPanel();
+    }
+
+    if (this.shouldCreatePanel('grocery-basket') && !this.ctx.panels['grocery-basket']) {
+      this.ctx.panels['grocery-basket'] = new GroceryBasketPanel();
+    }
+
+    if (this.shouldCreatePanel('bigmac') && !this.ctx.panels['bigmac']) {
+      this.ctx.panels['bigmac'] = new BigMacPanel();
     }
 
     if (this.shouldCreatePanel('live-news')) {
