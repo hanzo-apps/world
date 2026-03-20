@@ -167,7 +167,7 @@ async function fetchGdeltEvents() {
 
   const resp = await fetch(`${GDELT_GKG_URL}?${params}`, {
     headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!resp.ok) throw new Error(`GDELT API error: ${resp.status}`);
