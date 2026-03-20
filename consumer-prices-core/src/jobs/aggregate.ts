@@ -193,6 +193,23 @@ export async function aggregateBasket(basketSlug: string, marketCode: string) {
   await writeComputedIndex(basketId, null, null, 'value_index', valueIndex);
   await writeComputedIndex(basketId, null, null, 'coverage_pct', coveragePct);
 
+  // Per-category indices for buildTopCategories snapshot
+  const byCategory = new Map<string, BasketRow[]>();
+  for (const r of rows) {
+    if (!byCategory.has(r.category)) byCategory.set(r.category, []);
+    byCategory.get(r.category)!.push(r);
+  }
+
+  for (const [category, catRows] of byCategory) {
+    const catEssentials = computeFixedIndex(catRows, baselines);
+    const catCoverage =
+      (new Set(catRows.map((r) => r.basketItemId)).size /
+        Math.max(1, basketConfig.items.filter((i) => i.category === category).length)) *
+      100;
+    await writeComputedIndex(basketId, null, category, 'essentials_index', catEssentials);
+    await writeComputedIndex(basketId, null, category, 'coverage_pct', catCoverage);
+  }
+
   logger.info(`${basketSlug}:${marketCode} essentials=${essentialsIndex.toFixed(2)} value=${valueIndex.toFixed(2)} coverage=${coveragePct.toFixed(1)}%`);
 }
 

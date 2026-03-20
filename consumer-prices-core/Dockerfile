@@ -33,6 +33,7 @@ RUN npm ci --omit=dev
 COPY tsconfig.json ./
 COPY src ./src
 COPY configs ./configs
+COPY migrations ./migrations
 RUN npm run build
 
 # Runtime

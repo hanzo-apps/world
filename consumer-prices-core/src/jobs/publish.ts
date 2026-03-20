@@ -46,6 +46,9 @@ async function writeSnapshot(
   logger.info(`  wrote ${key} (${json.length} bytes, ttl=${ttlSeconds}s)`);
 }
 
+// 26h TTL — longer than the 24h cron cadence to survive scheduling drift
+const TTL = 93600;
+
 export async function publishAll() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) throw new Error('REDIS_URL is not set');
@@ -63,7 +66,7 @@ export async function publishAll() {
 
       try {
         const overview = await buildOverviewSnapshot(marketCode);
-        await writeSnapshot(redis, makeKey(['consumer-prices', 'overview', marketCode]), overview, 1800);
+        await writeSnapshot(redis, makeKey(['consumer-prices', 'overview', marketCode]), overview, TTL);
       } catch (err) {
         logger.error(`overview:${marketCode} failed: ${err}`);
       }
@@ -71,7 +74,7 @@ export async function publishAll() {
       for (const days of [7, 30]) {
         try {
           const movers = await buildMoversSnapshot(marketCode, days);
-          await writeSnapshot(redis, makeKey(['consumer-prices', 'movers', marketCode, `${days}d`]), movers, 1800);
+          await writeSnapshot(redis, makeKey(['consumer-prices', 'movers', marketCode, `${days}d`]), movers, TTL);
         } catch (err) {
           logger.error(`movers:${marketCode}:${days}d failed: ${err}`);
         }
@@ -79,7 +82,7 @@ export async function publishAll() {
 
       try {
         const freshness = await buildFreshnessSnapshot(marketCode);
-        await writeSnapshot(redis, makeKey(['consumer-prices', 'freshness', marketCode]), freshness, 600);
+        await writeSnapshot(redis, makeKey(['consumer-prices', 'freshness', marketCode]), freshness, TTL);
       } catch (err) {
         logger.error(`freshness:${marketCode} failed: ${err}`);
       }
@@ -87,7 +90,7 @@ export async function publishAll() {
       for (const range of ['7d', '30d', '90d']) {
         try {
           const categories = await buildCategoriesSnapshot(marketCode, range);
-          await writeSnapshot(redis, makeKey(['consumer-prices', 'categories', marketCode, range]), categories, 1800);
+          await writeSnapshot(redis, makeKey(['consumer-prices', 'categories', marketCode, range]), categories, TTL);
         } catch (err) {
           logger.error(`categories:${marketCode}:${range} failed: ${err}`);
         }
@@ -100,7 +103,7 @@ export async function publishAll() {
             redis,
             makeKey(['consumer-prices', 'retailer-spread', marketCode, basket.slug]),
             spread,
-            1800,
+            TTL,
           );
         } catch (err) {
           logger.error(`spread:${marketCode}:${basket.slug} failed: ${err}`);
@@ -113,7 +116,7 @@ export async function publishAll() {
               redis,
               makeKey(['consumer-prices', 'basket-series', marketCode, basket.slug, range]),
               series,
-              3600,
+              TTL,
             );
           } catch (err) {
             logger.error(`basket-series:${marketCode}:${basket.slug}:${range} failed: ${err}`);
