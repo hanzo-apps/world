@@ -24,7 +24,7 @@ const WORLD_STATE_HISTORY_LIMIT = 6;
 const FORECAST_REFRESH_REQUEST_KEY = 'forecast:refresh-request:v1';
 const PUBLISH_MIN_PROBABILITY = 0;
 const PANEL_MIN_PROBABILITY = 0.1;
-const ENRICHMENT_COMBINED_MAX = 3;
+const ENRICHMENT_COMBINED_MAX = 5;
 const ENRICHMENT_SCENARIO_MAX = 3;
 const ENRICHMENT_MAX_PER_DOMAIN = 2;
 const ENRICHMENT_MIN_READINESS = 0.34;
@@ -3477,7 +3477,11 @@ function buildSimulationInteractionLedger(actionLedger = [], situationSimulation
   function pushInteraction(source, target, stage) {
     if (source.situationId === target.situationId) return;
 
-    const sharedActor = source.actorId && target.actorId && source.actorId === target.actorId;
+    const sourceSpecificity = scoreActorSpecificity(source);
+    const targetSpecificity = scoreActorSpecificity(target);
+    const avgSpecificity = (sourceSpecificity + targetSpecificity) / 2;
+    const sharedActor = source.actorId && target.actorId && source.actorId === target.actorId
+      && avgSpecificity >= 0.75;
     const sharedChannels = uniqueSortedStrings((source.channels || []).filter((channel) => (target.channels || []).includes(channel)));
     const familyLink = source.familyId && target.familyId && source.familyId === target.familyId;
     const regionLink = intersectCount(source.regions || [], target.regions || []) > 0;
@@ -3486,9 +3490,6 @@ function buildSimulationInteractionLedger(actionLedger = [], situationSimulation
       (source.intent === 'pressure' && target.intent === 'stabilizing')
       || (source.intent === 'stabilizing' && target.intent === 'pressure')
     );
-    const sourceSpecificity = scoreActorSpecificity(source);
-    const targetSpecificity = scoreActorSpecificity(target);
-    const avgSpecificity = (sourceSpecificity + targetSpecificity) / 2;
 
     const score = (sharedActor ? 4 : 0)
       + (sharedChannels.length * 2)
@@ -3829,6 +3830,42 @@ function inferSystemEffectRelation(sourceDomain, targetDomain) {
   return relationMap[key] || '';
 }
 
+const MACRO_REGION_MAP = {
+  'Israel': 'MENA', 'Iran': 'MENA', 'Syria': 'MENA', 'Iraq': 'MENA', 'Lebanon': 'MENA',
+  'Gaza': 'MENA', 'Egypt': 'MENA', 'Saudi Arabia': 'MENA', 'Yemen': 'MENA', 'Jordan': 'MENA',
+  'Turkey': 'MENA', 'Libya': 'MENA', 'Middle East': 'MENA', 'Persian Gulf': 'MENA',
+  'Red Sea': 'MENA', 'Strait of Hormuz': 'MENA', 'Eastern Mediterranean': 'MENA',
+  'Taiwan': 'EAST_ASIA', 'China': 'EAST_ASIA', 'Japan': 'EAST_ASIA', 'South Korea': 'EAST_ASIA',
+  'North Korea': 'EAST_ASIA', 'Western Pacific': 'EAST_ASIA', 'South China Sea': 'EAST_ASIA',
+  'United States': 'AMERICAS', 'Brazil': 'AMERICAS', 'Mexico': 'AMERICAS', 'Cuba': 'AMERICAS',
+  'Canada': 'AMERICAS', 'Colombia': 'AMERICAS', 'Venezuela': 'AMERICAS', 'Argentina': 'AMERICAS',
+  'Peru': 'AMERICAS', 'Chile': 'AMERICAS',
+  'Russia': 'EUROPE', 'Ukraine': 'EUROPE', 'Germany': 'EUROPE', 'France': 'EUROPE',
+  'United Kingdom': 'EUROPE', 'Poland': 'EUROPE', 'Baltic Sea': 'EUROPE', 'Black Sea': 'EUROPE',
+  'Kerch Strait': 'EUROPE', 'Sweden': 'EUROPE', 'Finland': 'EUROPE', 'Norway': 'EUROPE',
+  'Romania': 'EUROPE', 'Bulgaria': 'EUROPE',
+  'India': 'SOUTH_ASIA', 'Pakistan': 'SOUTH_ASIA', 'Afghanistan': 'SOUTH_ASIA',
+  'Bangladesh': 'SOUTH_ASIA', 'Myanmar': 'SOUTH_ASIA',
+  'Congo': 'AFRICA', 'Sudan': 'AFRICA', 'Ethiopia': 'AFRICA', 'Nigeria': 'AFRICA',
+  'Somalia': 'AFRICA', 'Mali': 'AFRICA', 'Mozambique': 'AFRICA', 'Sahel': 'AFRICA',
+};
+
+const CROSS_THEATER_EXEMPT_CHANNELS = new Set(['cyber_disruption', 'market_repricing']);
+const CROSS_THEATER_ACTOR_SPECIFICITY_MIN = 0.90;
+
+function getMacroRegion(regions = []) {
+  for (const region of regions) {
+    if (MACRO_REGION_MAP[region]) return MACRO_REGION_MAP[region];
+  }
+  return null;
+}
+
+function isCrossTheaterPair(sourceRegions, targetRegions) {
+  const src = getMacroRegion(sourceRegions);
+  const tgt = getMacroRegion(targetRegions);
+  return !!(src && tgt && src !== tgt);
+}
+
 function canEmitCrossSituationEffect(source, strongestChannel, strongestChannelWeight, hasDirectStructuralLink = false) {
   if (!strongestChannel) return false;
   const profile = getSimulationDomainProfile(source?.dominantDomain || '');
@@ -3880,6 +3917,11 @@ function buildCrossSituationEffects(simulationState) {
       const hasDirectStructuralLink = hasRegionLink || hasSharedActor;
       if (!canEmitCrossSituationEffect(source, group.strongestChannel, strongestChannelWeight, hasDirectStructuralLink)) continue;
       if (strongestChannelWeight < 2 && !hasDirectStructuralLink) continue;
+      if (
+        isCrossTheaterPair(source.regions || [], target.regions || [])
+        && !CROSS_THEATER_EXEMPT_CHANNELS.has(group.strongestChannel)
+        && (!hasSharedActor || Number(group.avgActorSpecificity || 0) < CROSS_THEATER_ACTOR_SPECIFICITY_MIN)
+      ) continue;
       if (
         group.strongestChannel === 'political_pressure'
         && !hasRegionLink
@@ -6623,6 +6665,8 @@ export {
   buildCrossSituationEffects,
   buildReportableInteractionLedger,
   buildInteractionWatchlist,
+  isCrossTheaterPair,
+  getMacroRegion,
   attachSituationContext,
   projectSituationClusters,
   refreshPublishedNarratives,
