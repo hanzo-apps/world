@@ -831,7 +831,14 @@ export class EventHandlerManager implements AppModule {
     }
 
     const target = options.href || VARIANT_META[variant]?.url;
-    if (target) window.location.href = target;
+    if (!target) return;
+    try {
+      const parsed = new URL(target, window.location.href);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+      window.location.href = parsed.toString();
+    } catch {
+      return;
+    }
   }
 
   toggleFullscreen(): void {
