@@ -33,7 +33,6 @@ import {
   LAYER_TO_SOURCE,
   FEEDS,
   INTEL_SOURCES,
-  DEFAULT_PANELS,
 } from '@/config';
 import { VARIANT_META } from '@/config/variant-meta';
 import { isDesktopRuntime } from '@/services/runtime';
@@ -168,7 +167,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   private toggleTvMode(): void {
-    const panelKeys = Object.keys(DEFAULT_PANELS).filter(
+    const panelKeys = Object.keys(this.ctx.panelSettings).filter(
       key => this.ctx.panelSettings[key]?.enabled !== false
     );
     if (!this.ctx.tvMode) {

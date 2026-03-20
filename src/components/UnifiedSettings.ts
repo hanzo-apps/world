@@ -1,5 +1,5 @@
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
-import { PANEL_CATEGORY_MAP } from '@/config/panels';
+import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig, isPanelEntitled } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '@/services/i18n';
 import type { MapProvider } from '@/config/basemap';
@@ -282,16 +282,14 @@ export class UnifiedSettings {
   }
 
   private getAvailablePanelCategories(): Array<{ key: string; label: string }> {
-    const panelKeys = new Set(Object.keys(this.config.getPanelSettings()));
-    const variant = SITE_VARIANT || 'full';
+    const settings = this.config.getPanelSettings();
     const categories: Array<{ key: string; label: string }> = [
       { key: 'all', label: t('header.sourceRegionAll') }
     ];
 
     for (const [catKey, catDef] of Object.entries(PANEL_CATEGORY_MAP)) {
-      if (catDef.variants && !catDef.variants.includes(variant)) continue;
-      const hasPanel = catDef.panelKeys.some(pk => panelKeys.has(pk));
-      if (hasPanel) {
+      const hasEnabledPanel = catDef.panelKeys.some(pk => settings[pk]?.enabled);
+      if (hasEnabledPanel) {
         categories.push({ key: catKey, label: t(catDef.labelKey) });
       }
     }
@@ -301,14 +299,13 @@ export class UnifiedSettings {
 
   private getVisiblePanelEntries(): Array<[string, PanelConfig]> {
     const panelSettings = this.draftPanelSettings;
-    const variant = SITE_VARIANT || 'full';
     let entries = Object.entries(panelSettings)
       .filter(([key]) => key !== 'runtime-config' || this.config.isDesktopApp)
       .filter(([key]) => !key.startsWith('cw-'));
 
     if (this.activePanelCategory !== 'all') {
       const catDef = PANEL_CATEGORY_MAP[this.activePanelCategory];
-      if (catDef && (!catDef.variants || catDef.variants.includes(variant))) {
+      if (catDef) {
         const allowed = new Set(catDef.panelKeys);
         entries = entries.filter(([key]) => allowed.has(key));
       }
@@ -344,10 +341,11 @@ export class UnifiedSettings {
     const entries = this.getVisiblePanelEntries();
     container.innerHTML = entries.map(([key, panel]) => {
       const changed = savedSettings[key]?.enabled !== panel.enabled;
+      const displayName = this.config.getLocalizedPanelName(key, getEffectivePanelConfig(key, SITE_VARIANT).name ?? panel.name);
       return `
         <div class="panel-toggle-item ${panel.enabled ? 'active' : ''}${changed ? ' changed' : ''}" data-panel="${escapeHtml(key)}" aria-pressed="${panel.enabled}">
           <div class="panel-toggle-checkbox">${panel.enabled ? '\u2713' : ''}</div>
-          <span class="panel-toggle-label">${escapeHtml(this.config.getLocalizedPanelName(key, panel.name))}</span>
+          <span class="panel-toggle-label">${escapeHtml(displayName)}</span>
         </div>
       `;
     }).join('');
@@ -356,9 +354,16 @@ export class UnifiedSettings {
   }
 
   private clonePanelSettings(source: Record<string, PanelConfig> = this.config.getPanelSettings()): Record<string, PanelConfig> {
-    return Object.fromEntries(
+    const cloned: Record<string, PanelConfig> = Object.fromEntries(
       Object.entries(source).map(([key, panel]) => [key, { ...panel }]),
     );
+    const variantDefaults = new Set(VARIANT_DEFAULTS[SITE_VARIANT] ?? []);
+    for (const key of Object.keys(ALL_PANELS)) {
+      if (!(key in cloned)) {
+        cloned[key] = { ...getEffectivePanelConfig(key, SITE_VARIANT), enabled: variantDefaults.has(key) };
+      }
+    }
+    return cloned;
   }
 
   private resetPanelDraft(): void {
@@ -374,6 +379,7 @@ export class UnifiedSettings {
   private toggleDraftPanel(key: string): void {
     const panel = this.draftPanelSettings[key];
     if (!panel) return;
+    if (!panel.enabled && !isPanelEntitled(key, ALL_PANELS[key] ?? panel)) return;
     panel.enabled = !panel.enabled;
     this.panelsJustSaved = false;
     this.renderPanelsTab();
@@ -381,7 +387,7 @@ export class UnifiedSettings {
 
   private savePanelChanges(): void {
     if (!this.hasPendingPanelChanges()) return;
-    this.config.savePanelSettings(this.clonePanelSettings(this.draftPanelSettings));
+    this.config.savePanelSettings(Object.fromEntries(Object.entries(this.draftPanelSettings).map(([k, v]) => [k, { ...v }])));
     this.draftPanelSettings = this.clonePanelSettings();
     this.panelsJustSaved = true;
     this.renderPanelsTab();
