@@ -184,6 +184,18 @@ export class NationalDebtPanel extends Panel {
     this.filteredEntries = sortEntries(base, this.sortMode);
   }
 
+  private get deficitCount(): number {
+    return this.entries.filter(e => e.perSecondRate > 0).length;
+  }
+
+  private get surplusCount(): number {
+    return this.entries.filter(e => e.perSecondRate === 0).length;
+  }
+
+  private getGlobalDebt(): number {
+    return this.entries.reduce((sum, e) => sum + getCurrentDebt(e), 0);
+  }
+
   private render(): void {
     if (this.entries.length === 0) {
       this.showError('No data available');
@@ -192,6 +204,20 @@ export class NationalDebtPanel extends Panel {
 
     const html = `
       <div class="debt-panel-container">
+        <div class="debt-summary">
+          <div class="debt-summary-card debt-summary-card-deficit debt-summary-card-world">
+            <span class="debt-summary-label">World Debt</span>
+            <span class="debt-summary-value debt-global-ticker">${escapeHtml(formatDebt(this.getGlobalDebt()))}</span>
+          </div>
+          <div class="debt-summary-card debt-summary-card-warning">
+            <span class="debt-summary-label">In Deficit</span>
+            <span class="debt-summary-value">${this.deficitCount}</span>
+          </div>
+          <div class="debt-summary-card debt-summary-card-surplus">
+            <span class="debt-summary-label">Running Surplus</span>
+            <span class="debt-summary-value">${this.surplusCount}</span>
+          </div>
+        </div>
         <div class="debt-controls">
           <div class="debt-sort-tabs">
             <button class="debt-tab${this.sortMode === 'total' ? ' active' : ''}" data-sort="total">Total Debt</button>
@@ -247,6 +273,10 @@ export class NationalDebtPanel extends Panel {
     if (this.filteredEntries.length === 0) return;
 
     this.tickerInterval = setInterval(() => {
+      const globalEl = this.content.querySelector<HTMLElement>('.debt-global-ticker');
+      if (globalEl) {
+        globalEl.textContent = formatDebt(this.getGlobalDebt());
+      }
       const container = this.content.querySelector('.debt-list');
       if (!container) return;
       for (const entry of this.filteredEntries.slice(0, 100)) {
