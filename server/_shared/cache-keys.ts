@@ -54,6 +54,7 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   defiTokens:       'market:defi-tokens:v1',
   aiTokens:         'market:ai-tokens:v1',
   otherTokens:      'market:other-tokens:v1',
+  nationalDebt:     'economic:national-debt:v1',
 };
 
 export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
@@ -78,4 +79,5 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   defiTokens: 'slow',
   aiTokens: 'slow',
   otherTokens: 'slow',
+  nationalDebt: 'slow',
 };

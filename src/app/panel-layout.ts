@@ -798,6 +798,14 @@ export class PanelLayoutManager implements AppModule {
       }),
     );
 
+    this.lazyPanel('national-debt', () =>
+      import('@/components/NationalDebtPanel').then(m => {
+        const p = new m.NationalDebtPanel();
+        void p.refresh();
+        return p;
+      }),
+    );
+
     this.createPanel('macro-signals', () => new MacroSignalsPanel());
     this.createPanel('etf-flows', () => new ETFFlowsPanel());
     this.createPanel('stablecoins', () => new StablecoinPanel());

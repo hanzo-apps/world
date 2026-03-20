@@ -221,6 +221,27 @@ export interface GetFredSeriesBatchResponse {
   requested: number;
 }
 
+export interface GetNationalDebtRequest {
+}
+
+export interface GetNationalDebtResponse {
+  entries: NationalDebtEntry[];
+  seededAt: string;
+  unavailable: boolean;
+}
+
+export interface NationalDebtEntry {
+  iso3: string;
+  debtUsd: number;
+  gdpUsd: number;
+  debtToGdp: number;
+  annualGrowth: number;
+  perSecondRate: number;
+  perDayRate: number;
+  baselineTs: string;
+  source: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -489,6 +510,29 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetFredSeriesBatchResponse;
+  }
+
+  async getNationalDebt(req: GetNationalDebtRequest, options?: EconomicServiceCallOptions): Promise<GetNationalDebtResponse> {
+    let path = "/api/economic/v1/get-national-debt";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetNationalDebtResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {
