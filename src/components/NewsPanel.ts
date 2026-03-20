@@ -8,6 +8,7 @@ import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, MAX_DISTA
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 import { SITE_VARIANT } from '@/config';
 import { t, getCurrentLanguage } from '@/services/i18n';
+import { track } from '@/services/analytics';
 
 type SortMode = 'relevance' | 'newest';
 
@@ -144,7 +145,7 @@ export class NewsPanel extends Panel {
     this.updateSortButtonLabel();
     this.sortBtn.addEventListener('click', () => {
       this.sortMode = this.sortMode === 'relevance' ? 'newest' : 'relevance';
-      window.umami?.track('news-sort-toggle', { mode: this.sortMode });
+      track('news-sort-toggle', { mode: this.sortMode });
       this.saveSortMode();
       this.updateSortButtonLabel();
       // Re-render with cached data
@@ -199,7 +200,7 @@ export class NewsPanel extends Panel {
     this.summaryBtn.innerHTML = '✨';
     this.summaryBtn.title = t('components.newsPanel.summarize');
     this.summaryBtn.addEventListener('click', () => {
-      window.umami?.track('news-summarize', { panelId: this.panelId });
+      track('news-summarize', { panelId: this.panelId });
       this.handleSummarize();
     });
 

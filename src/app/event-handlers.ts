@@ -42,6 +42,7 @@ import {
   disconnectAisStream,
 } from '@/services';
 import {
+  track,
   trackPanelView,
   trackVariantSwitch,
   trackThemeChanged,
@@ -290,15 +291,15 @@ export class EventHandlerManager implements AppModule {
       this.ctx.searchModal?.open();
     };
     document.getElementById('searchBtn')?.addEventListener('click', () => {
-      window.umami?.track('search-open', { source: 'desktop' });
+      track('search-open', { source: 'desktop' });
       openSearch();
     });
     document.getElementById('mobileSearchBtn')?.addEventListener('click', () => {
-      window.umami?.track('search-open', { source: 'mobile' });
+      track('search-open', { source: 'mobile' });
       openSearch();
     });
     document.getElementById('searchMobileFab')?.addEventListener('click', () => {
-      window.umami?.track('search-open', { source: 'fab' });
+      track('search-open', { source: 'fab' });
       openSearch();
     });
 
