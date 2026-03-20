@@ -2892,7 +2892,7 @@ function summarizeSituationPressure(cluster, actors, branches) {
   return clampUnitInterval(((cluster.avgProbability || 0) * 0.5) + (signalWeight * 0.2) + (actorWeight * 0.15) + (branchWeight * 0.15));
 }
 
-const SIMULATION_STATE_VERSION = 2;
+const SIMULATION_STATE_VERSION = 3;
 
 const SIMULATION_DOMAIN_PROFILES = {
   conflict: {
@@ -3277,6 +3277,277 @@ function summarizeSimulationOutcome(rounds = [], dominantDomain = '') {
   };
 }
 
+function inferSimulationActorRole(actor = {}) {
+  const domains = new Set(actor.domains || []);
+  const likelyActions = (actor.likelyActions || []).join(' ').toLowerCase();
+  const name = String(actor.name || '').toLowerCase();
+
+  if (domains.has('military') || /\bbrigade|army|navy|air force|command\b/.test(name)) return 'military_actor';
+  if (domains.has('cyber') || likelyActions.includes('cyber')) return 'cyber_operator';
+  if (domains.has('supply_chain') || likelyActions.includes('reroute') || likelyActions.includes('shipping')) return 'logistics_actor';
+  if (domains.has('infrastructure') || likelyActions.includes('repair') || likelyActions.includes('harden')) return 'infrastructure_operator';
+  if (domains.has('market') || likelyActions.includes('hedge') || likelyActions.includes('reprice')) return 'market_actor';
+  if (domains.has('political') || likelyActions.includes('sanction') || likelyActions.includes('negotiate')) return 'political_actor';
+  if (domains.has('conflict')) return 'state_actor';
+  return 'general_actor';
+}
+
+function inferSimulationEnvironmentArchetype(simulation = {}) {
+  const domain = simulation.dominantDomain || '';
+  const topChannels = new Set((simulation.effectChannels || []).map((item) => item.type));
+  if (domain === 'conflict' || domain === 'military') return 'security_theater';
+  if (domain === 'supply_chain' || topChannels.has('logistics_disruption')) return 'logistics_corridor';
+  if (domain === 'cyber' || topChannels.has('cyber_disruption')) return 'cyber_pressure_network';
+  if (domain === 'infrastructure' || topChannels.has('service_disruption')) return 'infrastructure_fragility';
+  if (domain === 'market' || topChannels.has('market_repricing')) return 'market_repricing_zone';
+  if (domain === 'political' || topChannels.has('political_pressure')) return 'political_pressure_complex';
+  return 'mixed_pressure_zone';
+}
+
+function buildSimulationEnvironmentSpec(_worldState, situationSimulations = [], priorWorldState = null) {
+  const priorEnvironment = priorWorldState?.simulationState?.environmentSpec;
+  const priorBySituation = new Map((priorEnvironment?.situations || []).map((item) => [item.situationId, item]));
+  const situations = (situationSimulations || []).map((simulation) => {
+    const actionCount = (simulation.actionPlan || []).reduce((sum, round) => sum + ((round.actions || []).length), 0);
+    const triggerSignals = uniqueSortedStrings([
+      ...(simulation.pressureSignals || []).map((signal) => signal.type || signal),
+      ...(simulation.branchSeeds || []).map((branch) => branch.kind),
+    ]).slice(0, 6);
+    const propagationRules = uniqueSortedStrings([
+      ...(simulation.effectChannels || []).map((item) => item.type),
+      simulation.dominantDomain === 'conflict' ? 'security_escalation' : '',
+      simulation.dominantDomain === 'supply_chain' ? 'logistics_pass_through' : '',
+      simulation.dominantDomain === 'cyber' ? 'cyber_service_spillover' : '',
+    ].filter(Boolean)).slice(0, 5);
+    const actorRoles = summarizeTypeCounts((simulation.actorPostures || []).map((actor) => inferSimulationActorRole(actor)));
+    const activityIntensity = +clampUnitInterval(
+      ((simulation.postureScore || 0) * 0.42) +
+      (Math.min(1, actionCount / 18) * 0.26) +
+      (Math.min(1, (simulation.actorIds || []).length / 8) * 0.18) +
+      (Math.min(1, triggerSignals.length / 6) * 0.14)
+    ).toFixed(3);
+    const prior = priorBySituation.get(simulation.situationId) || null;
+    return {
+      situationId: simulation.situationId,
+      label: simulation.label,
+      familyId: simulation.familyId,
+      familyLabel: simulation.familyLabel,
+      archetype: inferSimulationEnvironmentArchetype(simulation),
+      dominantRegion: simulation.dominantRegion,
+      dominantDomain: simulation.dominantDomain,
+      regions: simulation.regions || [],
+      actorRoles,
+      actorCount: (simulation.actorIds || []).length,
+      branchCount: (simulation.branchIds || []).length,
+      triggerSignals,
+      constraints: simulation.constraints || [],
+      stabilizers: simulation.stabilizers || [],
+      propagationRules,
+      activityIntensity,
+      continuityMode: prior ? 'persistent' : 'new',
+      priorActivityIntensity: prior?.activityIntensity ?? null,
+    };
+  });
+
+  const familyArchetypes = summarizeTypeCounts(situations.map((item) => item.archetype));
+  const summary = situations.length
+    ? `${situations.length} simulation environments were configured with ${Object.keys(familyArchetypes).length} archetype classes and ${pickTopCountEntries(familyArchetypes, 2).map((item) => item.type).join(', ') || 'mixed'} as the leading environment patterns.`
+    : 'No simulation environments were configured.';
+
+  return {
+    version: SIMULATION_STATE_VERSION,
+    summary,
+    situations,
+    familyArchetypes,
+    globalTriggers: pickTopCountEntries(
+      summarizeTypeCounts(situations.flatMap((item) => item.triggerSignals || [])),
+      6,
+    ),
+  };
+}
+
+function buildSimulationMemoryMutations(_worldState, simulationState, priorWorldState = null) {
+  const priorMemory = priorWorldState?.simulationState?.memoryMutations;
+  const priorSituationMemory = new Map((priorMemory?.situations || []).map((item) => [item.situationId, item]));
+  const priorActorMemory = new Map((priorMemory?.actors || []).map((item) => [item.actorId || item.actorName, item]));
+
+  const situations = (simulationState?.situationSimulations || []).map((simulation) => {
+    const prior = priorSituationMemory.get(simulation.situationId) || null;
+    const persistentChannels = uniqueSortedStrings([
+      ...(simulation.effectChannels || []).map((item) => item.type),
+      ...((simulationState?.reportableInteractionLedger || [])
+        .filter((item) => item.sourceSituationId === simulation.situationId || item.targetSituationId === simulation.situationId)
+        .map((item) => item.strongestChannel)),
+    ]).slice(0, 6);
+    const pressureMemory = +((
+      ((simulation.totalPressure || 0) * 0.45) +
+      ((simulation.postureScore || 0) * 0.4) +
+      (((simulation.rounds || []).reduce((sum, round) => sum + (round.netPressure || 0), 0) / Math.max((simulation.rounds || []).length, 1)) * 0.15)
+    )).toFixed(3);
+    const memoryDelta = +(pressureMemory - Number(prior?.pressureMemory || 0)).toFixed(3);
+    const mutationType = !prior
+      ? 'new_memory'
+      : memoryDelta >= 0.08
+        ? 'intensified'
+        : memoryDelta <= -0.08
+          ? 'relaxed'
+          : 'stable';
+    return {
+      situationId: simulation.situationId,
+      label: simulation.label,
+      posture: simulation.posture,
+      postureScore: simulation.postureScore,
+      pressureMemory,
+      memoryDelta,
+      mutationType,
+      persistentChannels,
+      actorCount: (simulation.actorIds || []).length,
+      branchCount: (simulation.branchIds || []).length,
+    };
+  });
+
+  const actorGroups = new Map();
+  for (const action of (simulationState?.actionLedger || [])) {
+    const key = action.actorId || action.actorName;
+    if (!key) continue;
+    const group = actorGroups.get(key) || {
+      actorId: action.actorId || '',
+      actorName: action.actorName || '',
+      roles: new Set(),
+      channels: new Set(),
+      situations: new Set(),
+      actionCount: 0,
+      pressure: 0,
+      stabilization: 0,
+    };
+    group.roles.add(action.category || inferSimulationActorRole({ domains: [action.dominantDomain], likelyActions: [action.summary] }));
+    for (const channel of action.channels || []) group.channels.add(channel);
+    group.situations.add(action.situationId);
+    group.actionCount += 1;
+    group.pressure += Number(action.pressureContribution || 0);
+    group.stabilization += Number(action.stabilizationContribution || 0);
+    actorGroups.set(key, group);
+  }
+
+  const actors = [...actorGroups.values()].map((group) => {
+    const prior = priorActorMemory.get(group.actorId || group.actorName) || null;
+    const netPressure = +(group.pressure - group.stabilization).toFixed(3);
+    const memoryDelta = +(netPressure - Number(prior?.netPressure || 0)).toFixed(3);
+    return {
+      actorId: group.actorId,
+      actorName: group.actorName,
+      actionCount: group.actionCount,
+      netPressure,
+      memoryDelta,
+      roles: [...group.roles].sort(),
+      channels: [...group.channels].sort(),
+      situationCount: group.situations.size,
+      mutationType: !prior ? 'new_actor_memory' : memoryDelta >= 0.08 ? 'strengthened_actor' : memoryDelta <= -0.08 ? 'softened_actor' : 'stable_actor',
+    };
+  }).sort((a, b) => Math.abs(b.netPressure) - Math.abs(a.netPressure) || b.actionCount - a.actionCount || a.actorName.localeCompare(b.actorName));
+
+  const links = buildInteractionGroups(simulationState?.reportableInteractionLedger || []).map((group) => ({
+    sourceSituationId: group.sourceSituationId,
+    targetSituationId: group.targetSituationId,
+    strongestChannel: group.strongestChannel,
+    memoryStrength: +(((group.avgConfidence || 0) * 0.55) + clamp01((group.score || 0) / 10) * 0.45).toFixed(3),
+    stageCount: group.stages?.size || 0,
+    directLinkCount: group.directLinkCount || 0,
+  })).sort((a, b) => b.memoryStrength - a.memoryStrength || b.stageCount - a.stageCount);
+
+  const summary = situations.length
+    ? `${situations.length} situation memories, ${actors.length} actor memories, and ${links.length} link memories were mutated from the latest simulation output.`
+    : 'No simulation memory mutations were derived.';
+
+  return {
+    version: SIMULATION_STATE_VERSION,
+    summary,
+    situations,
+    actors: actors.slice(0, 24),
+    links: links.slice(0, 24),
+  };
+}
+
+function buildSimulationCausalReplayChains(simulationState) {
+  const simulationsById = new Map((simulationState?.situationSimulations || []).map((item) => [item.situationId, item]));
+  const actionLedger = simulationState?.actionLedger || [];
+  const interactionGroups = buildInteractionGroups(simulationState?.reportableInteractionLedger || []);
+  const reportableEffects = Array.isArray(simulationState?.reportableEffects) ? simulationState.reportableEffects : [];
+  const chains = [];
+
+  for (const effect of reportableEffects) {
+    const source = simulationsById.get(effect.sourceSituationId);
+    const target = simulationsById.get(effect.targetSituationId);
+    const interactionGroup = interactionGroups.find((group) => (
+      group.sourceSituationId === effect.sourceSituationId
+      && group.targetSituationId === effect.targetSituationId
+      && group.strongestChannel === effect.channel
+    )) || null;
+    const trigger = (source?.pressureSignals || [])[0]?.type
+      || source?.branchSeeds?.[0]?.kind
+      || source?.dominantDomain
+      || 'pressure';
+    const leadAction = actionLedger.find((action) => (
+      action.situationId === effect.sourceSituationId
+      && (action.channels || []).includes(effect.channel)
+    )) || actionLedger.find((action) => action.situationId === effect.sourceSituationId) || null;
+    const stages = interactionGroup ? [...(interactionGroup.stages || [])].sort() : ['round_1', 'round_2', 'round_3'];
+    chains.push({
+      chainId: `chain-${hashSituationKey([effect.sourceSituationId, effect.targetSituationId, effect.channel])}`,
+      kind: 'cross_situation_effect',
+      sourceSituationId: effect.sourceSituationId,
+      sourceLabel: effect.sourceLabel,
+      targetSituationId: effect.targetSituationId,
+      targetLabel: effect.targetLabel,
+      trigger,
+      stages,
+      actionSummary: leadAction?.summary || '',
+      interactionSummary: interactionGroup
+        ? `${interactionGroup.sourceLabel} -> ${interactionGroup.targetLabel} via ${interactionGroup.strongestChannel.replace(/_/g, ' ')}`
+        : '',
+      outcomeSummary: effect.summary,
+      confidence: effect.confidence || interactionGroup?.avgConfidence || 0,
+      strongestChannel: effect.channel,
+    });
+  }
+
+  for (const simulation of (simulationState?.situationSimulations || []).slice(0, 6)) {
+    if (chains.some((item) => item.sourceSituationId === simulation.situationId && item.kind === 'situation_resolution')) continue;
+    const trigger = (simulation.pressureSignals || [])[0]?.type
+      || simulation.branchSeeds?.[0]?.kind
+      || simulation.dominantDomain
+      || 'pressure';
+    const leadAction = actionLedger.find((action) => action.situationId === simulation.situationId) || null;
+    chains.push({
+      chainId: `chain-${hashSituationKey([simulation.situationId, simulation.posture, 'resolution'])}`,
+      kind: 'situation_resolution',
+      sourceSituationId: simulation.situationId,
+      sourceLabel: simulation.label,
+      targetSituationId: '',
+      targetLabel: '',
+      trigger,
+      stages: (simulation.rounds || []).map((round) => round.stage),
+      actionSummary: leadAction?.summary || '',
+      interactionSummary: '',
+      outcomeSummary: `${simulation.label} resolved to a ${simulation.posture} posture at ${roundPct(simulation.postureScore)}.`,
+      confidence: simulation.postureScore || 0,
+      strongestChannel: (simulation.effectChannels || [])[0]?.type || '',
+    });
+  }
+
+  const summary = chains.length
+    ? `${chains.length} causal replay chains are available to explain trigger-to-outcome transitions across situations and rounds.`
+    : 'No causal replay chains are available.';
+
+  return {
+    version: SIMULATION_STATE_VERSION,
+    summary,
+    chains: chains
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0) || a.sourceLabel.localeCompare(b.sourceLabel))
+      .slice(0, 12),
+  };
+}
+
 function buildSituationSimulationState(worldState, priorWorldState = null) {
   const actorRegistry = Array.isArray(worldState?.actorRegistry) ? worldState.actorRegistry : [];
   const branchStates = Array.isArray(worldState?.branchStates) ? worldState.branchStates : [];
@@ -3381,6 +3652,20 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     mode: 'reportable',
   });
   const blockedEffects = Array.isArray(reportableEffects.blocked) ? reportableEffects.blocked : [];
+  const environmentSpec = buildSimulationEnvironmentSpec(worldState, situationSimulations, priorWorldState);
+  const memoryMutations = buildSimulationMemoryMutations(worldState, {
+    situationSimulations,
+    actionLedger,
+    interactionLedger,
+    reportableInteractionLedger,
+    reportableEffects,
+  }, priorWorldState);
+  const causalReplay = buildSimulationCausalReplayChains({
+    situationSimulations,
+    actionLedger,
+    reportableInteractionLedger,
+    reportableEffects,
+  });
 
   const postureCounts = summarizeTypeCounts(situationSimulations.map((item) => item.posture));
   const summary = situationSimulations.length
@@ -3416,6 +3701,9 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     blockedEffects,
     blockedEffectSummary: summarizeBlockedEffects(blockedEffects),
     replayTimeline,
+    environmentSpec,
+    memoryMutations,
+    causalReplay,
     situationSimulations,
   };
 }
@@ -4586,6 +4874,31 @@ function buildWorldStateReport(worldState) {
       label: round.stage.replace('_', ' '),
       summary: `${round.stage.replace('_', ' ')} carried ${round.actionCount} actions, ${round.interactionCount} cross-situation interactions, and ${round.situationCount} active situations at ${Math.round((round.avgNetPressure || 0) * 100)}% average net pressure.`,
     }));
+  const environmentWatchlist = (worldState.simulationState?.environmentSpec?.situations || [])
+    .slice()
+    .sort((a, b) => (b.activityIntensity || 0) - (a.activityIntensity || 0) || a.label.localeCompare(b.label))
+    .slice(0, 6)
+    .map((item) => ({
+      type: `environment_${item.archetype}`,
+      label: item.label,
+      summary: `${item.label} is configured as a ${item.archetype.replace(/_/g, ' ')} with ${Math.round((item.activityIntensity || 0) * 100)}% activity intensity and ${item.actorCount} active actors.`,
+    }));
+  const memoryWatchlist = (worldState.simulationState?.memoryMutations?.situations || [])
+    .slice()
+    .sort((a, b) => Math.abs(b.memoryDelta || 0) - Math.abs(a.memoryDelta || 0) || a.label.localeCompare(b.label))
+    .slice(0, 6)
+    .map((item) => ({
+      type: `memory_${item.mutationType}`,
+      label: item.label,
+      summary: `${item.label} carries a ${item.mutationType.replace(/_/g, ' ')} memory shift of ${Math.round(Math.abs(item.memoryDelta || 0) * 100)} points, with ${Math.round((item.pressureMemory || 0) * 100)}% retained pressure memory.`,
+    }));
+  const causalReplayWatchlist = (worldState.simulationState?.causalReplay?.chains || [])
+    .slice(0, 6)
+    .map((chain) => ({
+      type: `causal_${chain.kind}`,
+      label: chain.targetLabel ? `${chain.sourceLabel} -> ${chain.targetLabel}` : chain.sourceLabel,
+      summary: `${chain.sourceLabel}${chain.targetLabel ? ` flowed into ${chain.targetLabel}` : ''} through ${chain.stages.length} stage(s), triggered by ${String(chain.trigger || 'pressure').replace(/_/g, ' ')}, ending in ${chain.outcomeSummary}`,
+    }));
   const blockedEffectWatchlist = (worldState.simulationState?.blockedEffectSummary?.preview || []).slice(0, 4).map((item) => ({
     type: `blocked_effect_${item.reason}`,
     label: `${item.sourceLabel} -> ${item.targetLabel}`,
@@ -4600,13 +4913,16 @@ function buildWorldStateReport(worldState) {
       summary: `${family.label} currently groups ${family.situationCount} situations across ${family.forecastCount} forecasts.`,
     }));
 
-  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} reportable interaction links, ${worldState.simulationState?.internalEffects?.length || 0} internal effects, and ${crossSituationEffects.length} cross-situation system effects in the report view.`;
+  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} reportable interaction links, ${worldState.simulationState?.internalEffects?.length || 0} internal effects, ${crossSituationEffects.length} cross-situation system effects, ${(worldState.simulationState?.memoryMutations?.situations || []).length} mutated situation memories, and ${(worldState.simulationState?.causalReplay?.chains || []).length} causal replay chains in the report view.`;
 
   return {
     summary,
     continuitySummary,
     simulationSummary,
     simulationInputSummary: simulationReportInputs.summary,
+    simulationEnvironmentSummary: worldState.simulationState?.environmentSpec?.summary || '',
+    memoryMutationSummary: worldState.simulationState?.memoryMutations?.summary || '',
+    causalReplaySummary: worldState.simulationState?.causalReplay?.summary || '',
     domainOverview: {
       leadDomains,
       activeDomainCount: worldState.domainStates?.length || 0,
@@ -4621,9 +4937,13 @@ function buildWorldStateReport(worldState) {
     simulationWatchlist,
     interactionWatchlist,
     replayWatchlist,
+    environmentWatchlist,
+    memoryWatchlist,
+    causalReplayWatchlist,
     blockedEffectWatchlist,
     simulationOutcomeSummaries,
     crossSituationEffects,
+    causalReplayChains: worldState.simulationState?.causalReplay?.chains || [],
     replayTimeline,
     keyUncertainties: (worldState.uncertainties || []).slice(0, 6).map(item => item.summary || item),
   };
@@ -4840,6 +5160,9 @@ function summarizeWorldStateSurface(worldState) {
     internalEffectCount: worldState.simulationState?.internalEffects?.length || 0,
     simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
     blockedEffectCount: worldState.simulationState?.blockedEffects?.length || 0,
+    simulationEnvironmentCount: worldState.simulationState?.environmentSpec?.situations?.length || 0,
+    memoryMutationCount: worldState.simulationState?.memoryMutations?.situations?.length || 0,
+    causalReplayCount: worldState.simulationState?.causalReplay?.chains?.length || 0,
   };
 }
 
@@ -5037,6 +5360,12 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       internalEffectCount: worldState.simulationState?.internalEffects?.length || 0,
       simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
       blockedEffectCount: worldState.simulationState?.blockedEffects?.length || 0,
+      simulationEnvironmentSummary: worldState.simulationState?.environmentSpec?.summary || '',
+      simulationEnvironmentCount: worldState.simulationState?.environmentSpec?.situations?.length || 0,
+      memoryMutationSummary: worldState.simulationState?.memoryMutations?.summary || '',
+      memoryMutationCount: worldState.simulationState?.memoryMutations?.situations?.length || 0,
+      causalReplaySummary: worldState.simulationState?.causalReplay?.summary || '',
+      causalReplayCount: worldState.simulationState?.causalReplay?.chains?.length || 0,
       persistentSituations: worldState.situationContinuity.persistentSituationCount,
       newSituations: worldState.situationContinuity.newSituationCount,
       strengthenedSituations: worldState.situationContinuity.strengthenedSituationCount,
