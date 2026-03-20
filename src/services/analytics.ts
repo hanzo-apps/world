@@ -46,6 +46,11 @@ const EVENTS = {
   'mcp-connect-attempt': true,
   'mcp-connect-success': true,
   'mcp-panel-add': true,
+  // Auth (wired in PR #1812 — do not remove)
+  'sign-in': true,
+  'sign-up': true,
+  'sign-out': true,
+  'gate-hit': true,
 } as const;
 
 export type UmamiEvent = keyof typeof EVENTS;
@@ -57,6 +62,65 @@ export function track(event: UmamiEvent, data?: Record<string, unknown>): void {
 
 export async function initAnalytics(): Promise<void> {
   // No-op: Umami initialises itself via the script tag in index.html.
+}
+
+// ---------------------------------------------------------------------------
+// User identity — call after auth state resolves so Umami can segment events
+// by user/plan. Safe to call before Umami script loads.
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach user context to all subsequent Umami events for this session.
+ * Call this once after a successful sign-in or on app boot when the user
+ * is already authenticated.
+ *
+ * PR #1812: call from subscribeAuthState() when user is non-null.
+ * Pass user.id and the plan string from the session/subscription object.
+ */
+export function identifyUser(userId: string, plan: string): void {
+  window.umami?.identify({ userId, plan });
+}
+
+/**
+ * Clear user identity (call on sign-out so subsequent events are anonymous).
+ *
+ * PR #1812: call from subscribeAuthState() when user becomes null.
+ */
+export function clearIdentity(): void {
+  window.umami?.identify({});
+}
+
+/**
+ * Stub — wire this in PR #1812.
+ *
+ * Instructions for PR #1812:
+ *   1. Import { identifyUser, clearIdentity, track } from '@/services/analytics'
+ *   2. Replace this body with:
+ *
+ *      subscribeAuthState((user) => {
+ *        if (user) {
+ *          identifyUser(user.id, user.plan ?? 'free');
+ *        } else {
+ *          clearIdentity();
+ *        }
+ *      });
+ *
+ *   3. Call initAuthAnalytics() from main.ts after initAnalytics().
+ *
+ *   4. At the sign-in callsite (success callback):
+ *        track('sign-in', { method: 'email' });   // or 'google', 'github'
+ *
+ *   5. At the sign-up callsite (success callback):
+ *        track('sign-up', { method: 'email' });
+ *
+ *   6. At the sign-out callsite:
+ *        track('sign-out');
+ *
+ *   7. Wherever a feature is gated behind auth/pro and the user is blocked:
+ *        track('gate-hit', { feature: 'pro-widget' });  // or 'mcp', 'pro-brief', etc.
+ */
+export function initAuthAnalytics(): void {
+  // No-op until PR #1812.
 }
 
 // ---------------------------------------------------------------------------
