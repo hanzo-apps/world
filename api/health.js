@@ -149,9 +149,9 @@ const SEED_META = {
   nationalDebt:        { key: 'seed-meta:economic:national-debt',              maxStaleMin: 10080 }, // 7 days — monthly seed
   tariffTrendsUs:      { key: 'seed-meta:trade:tariffs:v1:840:all:10',        maxStaleMin: 900 },
   consumerPricesOverview:   { key: 'seed-meta:consumer-prices:overview:ae',     maxStaleMin: 2880 }, // daily cron × 2
-  consumerPricesCategories: { key: 'seed-meta:consumer-prices:categories:ae',   maxStaleMin: 2880 },
-  consumerPricesMovers:     { key: 'seed-meta:consumer-prices:movers:ae:30d',   maxStaleMin: 2880 },
-  consumerPricesSpread:     { key: 'seed-meta:consumer-prices:spread:ae',       maxStaleMin: 2880 },
+  consumerPricesCategories: { key: 'seed-meta:consumer-prices:categories:ae:30d',            maxStaleMin: 2880 },
+  consumerPricesMovers:     { key: 'seed-meta:consumer-prices:movers:ae:30d',               maxStaleMin: 2880 },
+  consumerPricesSpread:     { key: 'seed-meta:consumer-prices:retailer-spread:ae:essentials-ae', maxStaleMin: 2880 },
   consumerPricesFreshness:  { key: 'seed-meta:consumer-prices:freshness:ae',    maxStaleMin: 2880 },
 };
 
