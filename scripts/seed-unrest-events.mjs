@@ -8,7 +8,7 @@ loadEnvFile(import.meta.url);
 const GDELT_GKG_URL = 'https://api.gdeltproject.org/api/v1/gkg_geojson';
 const ACLED_API_URL = 'https://acleddata.com/api/acled/read';
 const CANONICAL_KEY = 'unrest:events:v1';
-const CACHE_TTL = 3600;
+const CACHE_TTL = 16200; // 4.5h — 6x the 45 min cron interval (was 1.3x)
 
 // ---------- ACLED Event Type Mapping (from _shared.ts) ----------
 
