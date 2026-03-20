@@ -18,6 +18,7 @@ import {
   PredictionPanel,
   MonitorPanel,
   EconomicPanel,
+  ConsumerPricesPanel,
   EnergyComplexPanel,
   GdeltIntelPanel,
   LiveNewsPanel,
@@ -581,6 +582,7 @@ export class PanelLayoutManager implements AppModule {
     this.createNewsPanel('ipo', 'panels.ipo');
     this.createNewsPanel('thinktanks', 'panels.thinktanks');
     this.createPanel('economic', () => new EconomicPanel());
+    this.createPanel('consumer-prices', () => new ConsumerPricesPanel());
 
     this.createPanel('trade-policy', () => new TradePolicyPanel());
     this.createPanel('sanctions-pressure', () => new SanctionsPressurePanel());

@@ -56,6 +56,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'satellite-fires': { name: 'Fires', enabled: true, priority: 2 },
   'macro-signals': { name: 'Market Regime', enabled: true, priority: 2 },
   'gulf-economies': { name: 'Gulf Economies', enabled: false, priority: 2 },
+  'consumer-prices': { name: 'Consumer Prices', enabled: false, priority: 2 },
   'grocery-basket': { name: 'Grocery Index', enabled: false, priority: 2 },
   'bigmac': { name: 'Big Mac Index', enabled: false, priority: 2 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
@@ -410,6 +411,7 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'gcc-investments': { name: 'GCC Investments', enabled: true, priority: 2 },
   gccNews: { name: 'GCC Business News', enabled: true, priority: 2 },
   'gulf-economies': { name: 'Gulf Economies', enabled: true, priority: 1 },
+  'consumer-prices': { name: 'Consumer Prices', enabled: true, priority: 1 },
   polymarket: { name: 'Predictions', enabled: true, priority: 2 },
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
@@ -702,6 +704,7 @@ const COMMODITY_PANELS: Record<string, PanelConfig> = {
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
   'gulf-economies': { name: 'Gulf & OPEC Economies', enabled: true, priority: 1 },
   'gcc-investments': { name: 'GCC Resource Investments', enabled: true, priority: 2 },
+  'consumer-prices': { name: 'Consumer Prices', enabled: true, priority: 2 },
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
   polymarket: { name: 'Commodity Predictions', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
@@ -954,7 +957,7 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
 // ============================================
 // Maps category keys to panel keys. Only categories with at least one
 // matching panel in the user's active panel settings are shown.
-export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[] }> = {
+export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[]; variants?: string[] }> = {
   // All variants — essential panels
   core: {
     labelKey: 'header.panelCatCore',
@@ -1032,7 +1035,8 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   gulfMena: {
     labelKey: 'header.panelCatGulfMena',
-    panelKeys: ['gulf-economies', 'gcc-investments', 'gccNews', 'monitors', 'world-clock'],
+    panelKeys: ['gulf-economies', 'gcc-investments', 'gccNews', 'consumer-prices', 'monitors', 'world-clock'],
+    variants: ['finance'],
   },
 
   // Commodity variant
@@ -1046,7 +1050,8 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   commodityEcon: {
     labelKey: 'header.panelCatCommodityEcon',
-    panelKeys: ['trade-policy', 'sanctions-pressure', 'economic', 'gulf-economies', 'gcc-investments', 'finance', 'polymarket', 'airline-intel', 'world-clock', 'monitors'],
+    panelKeys: ['trade-policy', 'sanctions-pressure', 'economic', 'gulf-economies', 'gcc-investments', 'consumer-prices', 'finance', 'polymarket', 'airline-intel', 'world-clock', 'monitors'],
+    variants: ['commodity'],
   },
 
   // Happy variant
