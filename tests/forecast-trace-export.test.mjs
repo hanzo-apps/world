@@ -10,6 +10,8 @@ import {
   buildCrossSituationEffects,
   buildReportableInteractionLedger,
   buildInteractionWatchlist,
+  isCrossTheaterPair,
+  getMacroRegion,
   attachSituationContext,
   projectSituationClusters,
   refreshPublishedNarratives,
@@ -1660,7 +1662,9 @@ describe('forecast run world state', () => {
     assert.equal(reportable.length, 1);
   });
 
-  it('allows strong two-round shared-actor political effects without regional overlap', () => {
+  it('blocks cross-theater political effects even with shared-actor when actorSpec below 0.90', () => {
+    // US (AMERICAS) → Japan (EAST_ASIA) via political_pressure with actorSpec 0.87 is cross-theater.
+    // The gate requires actorSpec >= 0.90 for non-exempt channels across theater boundaries.
     const effects = buildCrossSituationEffects({
       situationSimulations: [
         {
@@ -1730,11 +1734,7 @@ describe('forecast run world state', () => {
       ],
     });
 
-    assert.ok(effects.some((item) => (
-      item.sourceSituationId === 'sit-cyber'
-      && item.targetSituationId === 'sit-market'
-      && item.channel === 'political_pressure'
-    )));
+    assert.equal(effects.length, 0, 'US → Japan cross-theater political_pressure at actorSpec 0.87 should be blocked');
   });
 
   it('allows logistics effects with strong confidence while filtering weaker political ones', () => {
@@ -1907,5 +1907,153 @@ describe('forecast run world state', () => {
 
     assert.equal(worldState.simulationState.version, 2);
     assert.ok((worldState.simulationState.situationSimulations || []).every((item) => item.postureScore < 0.99));
+  });
+});
+
+describe('cross-theater gate', () => {
+  it('identifies cross-theater pairs correctly', () => {
+    assert.equal(isCrossTheaterPair(['Israel'], ['Taiwan']), true);
+    assert.equal(isCrossTheaterPair(['Israel'], ['Iran']), false);
+    assert.equal(isCrossTheaterPair(['Brazil'], ['Mexico']), false);
+    assert.equal(isCrossTheaterPair(['Cuba'], ['Iran']), true);
+    assert.equal(isCrossTheaterPair(['China'], ['United States']), true);
+    assert.equal(isCrossTheaterPair(['Baltic Sea'], ['Black Sea']), false);
+    assert.equal(isCrossTheaterPair(['Israel'], ['unknown-region']), false);
+    assert.equal(isCrossTheaterPair(['unknown-a'], ['unknown-b']), false);
+  });
+
+  it('maps regions to macro-regions', () => {
+    assert.equal(getMacroRegion(['Israel', 'Gaza']), 'MENA');
+    assert.equal(getMacroRegion(['Taiwan', 'Western Pacific']), 'EAST_ASIA');
+    assert.equal(getMacroRegion(['Brazil']), 'AMERICAS');
+    assert.equal(getMacroRegion(['Baltic Sea', 'Black Sea']), 'EUROPE');
+    assert.equal(getMacroRegion(['unknown-region']), null);
+    assert.equal(getMacroRegion([]), null);
+  });
+
+  function makeSimulation(situationId, label, domain, regions, posture, postureScore, effectChannels = []) {
+    return {
+      situationId,
+      label,
+      dominantDomain: domain,
+      familyId: `fam-${situationId}`,
+      familyLabel: `${label} family`,
+      regions,
+      actorIds: [`actor-${situationId}`],
+      effectChannels,
+      posture,
+      postureScore,
+      totalPressure: posture === 'escalatory' ? 0.88 : 0.55,
+      totalStabilization: posture === 'escalatory' ? 0.22 : 0.38,
+    };
+  }
+
+  function makeInteraction(srcId, srcLabel, tgtId, tgtLabel, channel, stage, score, conf, spec, sharedActor, regionLink) {
+    return {
+      sourceSituationId: srcId,
+      targetSituationId: tgtId,
+      sourceLabel: srcLabel,
+      targetLabel: tgtLabel,
+      strongestChannel: channel,
+      interactionType: sharedActor ? 'actor_carryover' : 'spillover',
+      stage,
+      score,
+      confidence: conf,
+      actorSpecificity: spec,
+      directLinkCount: (sharedActor ? 1 : 0) + (regionLink ? 1 : 0) + 1,
+      sharedActor,
+      regionLink,
+      sourceActorName: 'Test actor',
+      targetActorName: 'Test actor',
+    };
+  }
+
+  it('blocks Israel → Taiwan via generic Incumbent Leadership (regional_spillover, spec 0.68)', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        makeSimulation('sit-israel', 'Israel conflict situation', 'conflict', ['Israel'], 'escalatory', 0.88,
+          [{ type: 'regional_spillover', count: 3 }]),
+        makeSimulation('sit-taiwan', 'Taiwan political situation', 'political', ['Taiwan'], 'contested', 0.54),
+      ],
+      reportableInteractionLedger: [
+        makeInteraction('sit-israel', 'Israel conflict situation', 'sit-taiwan', 'Taiwan political situation',
+          'regional_spillover', 'round_1', 5.2, 0.77, 0.68, true, false),
+        makeInteraction('sit-israel', 'Israel conflict situation', 'sit-taiwan', 'Taiwan political situation',
+          'regional_spillover', 'round_2', 5.1, 0.77, 0.68, true, false),
+      ],
+    });
+    assert.equal(effects.length, 0, 'Israel → Taiwan via generic actor should be blocked by cross-theater gate');
+  });
+
+  it('allows China → US via Threat Actors (cyber_disruption, exempt channel)', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        makeSimulation('sit-china', 'China cyber situation', 'cyber', ['China'], 'escalatory', 0.88,
+          [{ type: 'cyber_disruption', count: 3 }]),
+        // target must be infrastructure for cyber_disruption:infrastructure relation to exist
+        makeSimulation('sit-us', 'United States infrastructure situation', 'infrastructure', ['United States'], 'contested', 0.62),
+      ],
+      reportableInteractionLedger: [
+        makeInteraction('sit-china', 'China cyber situation', 'sit-us', 'United States infrastructure situation',
+          'cyber_disruption', 'round_1', 6.5, 0.91, 0.95, true, false),
+        makeInteraction('sit-china', 'China cyber situation', 'sit-us', 'United States infrastructure situation',
+          'cyber_disruption', 'round_2', 6.3, 0.90, 0.95, true, false),
+      ],
+    });
+    assert.equal(effects.length, 1, 'China (EAST_ASIA) → US (AMERICAS) via cyber_disruption should pass (exempt channel)');
+    assert.equal(effects[0].channel, 'cyber_disruption');
+  });
+
+  it('blocks Brazil → Israel conflict via External Power Broker (security_escalation, spec 0.85 < 0.90)', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        makeSimulation('sit-brazil', 'Brazil conflict situation', 'conflict', ['Brazil'], 'escalatory', 0.84,
+          [{ type: 'security_escalation', count: 3 }]),
+        makeSimulation('sit-israel', 'Israel conflict situation', 'conflict', ['Israel'], 'escalatory', 0.88),
+      ],
+      reportableInteractionLedger: [
+        makeInteraction('sit-brazil', 'Brazil conflict situation', 'sit-israel', 'Israel conflict situation',
+          'security_escalation', 'round_1', 5.8, 0.87, 0.85, true, false),
+        makeInteraction('sit-brazil', 'Brazil conflict situation', 'sit-israel', 'Israel conflict situation',
+          'security_escalation', 'round_2', 5.7, 0.86, 0.85, true, false),
+      ],
+    });
+    assert.equal(effects.length, 0, 'Brazil → Israel via generic external actor should be blocked (actorSpec 0.85 < 0.90)');
+  });
+
+  it('allows Brazil → Mexico (same macro-region, security_escalation → infrastructure)', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        makeSimulation('sit-brazil', 'Brazil conflict situation', 'conflict', ['Brazil'], 'escalatory', 0.84,
+          [{ type: 'security_escalation', count: 3 }]),
+        // target must be infrastructure for security_escalation:infrastructure relation to exist
+        makeSimulation('sit-mexico', 'Mexico infrastructure situation', 'infrastructure', ['Mexico'], 'escalatory', 0.72),
+      ],
+      reportableInteractionLedger: [
+        makeInteraction('sit-brazil', 'Brazil conflict situation', 'sit-mexico', 'Mexico infrastructure situation',
+          'security_escalation', 'round_1', 5.8, 0.87, 0.85, true, false),
+        makeInteraction('sit-brazil', 'Brazil conflict situation', 'sit-mexico', 'Mexico infrastructure situation',
+          'security_escalation', 'round_2', 5.7, 0.86, 0.85, true, false),
+      ],
+    });
+    assert.equal(effects.length, 1, 'Brazil → Mexico should pass (both AMERICAS, cross-theater gate does not apply)');
+    assert.equal(effects[0].channel, 'security_escalation');
+  });
+
+  it('blocks Cuba → Iran infrastructure (cross-theater, service_disruption, spec 0.73 < 0.90)', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        makeSimulation('sit-cuba', 'Cuba infrastructure situation', 'infrastructure', ['Cuba'], 'contested', 0.62,
+          [{ type: 'service_disruption', count: 3 }]),
+        makeSimulation('sit-iran', 'Iran infrastructure situation', 'infrastructure', ['Iran'], 'contested', 0.58),
+      ],
+      reportableInteractionLedger: [
+        makeInteraction('sit-cuba', 'Cuba infrastructure situation', 'sit-iran', 'Iran infrastructure situation',
+          'service_disruption', 'round_1', 5.5, 0.84, 0.73, true, false),
+        makeInteraction('sit-cuba', 'Cuba infrastructure situation', 'sit-iran', 'Iran infrastructure situation',
+          'service_disruption', 'round_2', 5.4, 0.83, 0.73, true, false),
+      ],
+    });
+    assert.equal(effects.length, 0, 'Cuba → Iran via generic civil-protection actor should be blocked');
   });
 });
