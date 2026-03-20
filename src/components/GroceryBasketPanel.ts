@@ -46,14 +46,22 @@ export class GroceryBasketPanel extends Panel {
 
     const rows = itemIds.map(itemId => {
       const firstItem = countries[0]?.items?.find(i => i.itemId === itemId);
+      // Compute per-item min/max USD across countries that have data
+      const available = countries
+        .map(c => ({ code: c.code, usd: c.items?.find(i => i.itemId === itemId)?.usdPrice }))
+        .filter(x => x.usd);
+      const prices = available.map(x => x.usd as number);
+      const rowMin = prices.length ? Math.min(...prices) : null;
+      const rowMax = prices.length ? Math.max(...prices) : null;
+
       const cells = countries.map(country => {
         const item = country.items?.find(i => i.itemId === itemId);
-        const isHigh = country.code === data.mostExpensiveCountry;
-        const isLow = country.code === data.cheapestCountry;
-        const cls = isLow ? 'gb-cheapest' : isHigh ? 'gb-priciest' : '';
         if (!item?.available || !item.usdPrice || !item.localPrice) {
           return `<td class="gb-cell gb-na">—</td>`;
         }
+        const isHigh = rowMax !== null && item.usdPrice === rowMax && prices.length > 1;
+        const isLow = rowMin !== null && item.usdPrice === rowMin && prices.length > 1;
+        const cls = isLow ? 'gb-cheapest' : isHigh ? 'gb-priciest' : '';
         return `<td class="gb-cell ${cls}">$${item.usdPrice.toFixed(2)}<span class="gb-local">${item.localPrice.toFixed(2)} ${escapeHtml(country.currency)}</span></td>`;
       }).join('');
       return `<tr><td class="gb-item-name">${escapeHtml(firstItem?.itemName ?? itemId)}<span class="gb-unit">${escapeHtml(firstItem?.unit ?? '')}</span></td>${cells}</tr>`;

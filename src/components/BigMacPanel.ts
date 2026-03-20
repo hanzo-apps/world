@@ -37,18 +37,17 @@ export class BigMacPanel extends Panel {
       return;
     }
 
-    const sorted = [...data.countries].sort((a, b) => (b.usdPrice ?? 0) - (a.usdPrice ?? 0));
+    const sorted = [...data.countries]
+      .filter(c => c.usdPrice)
+      .sort((a, b) => (b.usdPrice ?? 0) - (a.usdPrice ?? 0));
 
     const rows = sorted.map(c => {
       const isHigh = c.code === data.mostExpensiveCountry;
       const isLow = c.code === data.cheapestCountry;
       const cls = isLow ? 'gb-cheapest' : isHigh ? 'gb-priciest' : '';
-      const local = c.localPrice ? `${c.localPrice.toFixed(2)} ${escapeHtml(c.currency)}` : '—';
-      const usd = c.usdPrice ? `$${c.usdPrice.toFixed(2)}` : '—';
       return `<tr>
         <td class="gb-item-name">${escapeHtml(c.flag)} ${escapeHtml(c.name)}</td>
-        <td class="gb-cell ${cls}">${usd}</td>
-        <td class="gb-cell gb-local-col">${local}</td>
+        <td class="gb-cell ${cls}">$${(c.usdPrice ?? 0).toFixed(2)}</td>
       </tr>`;
     }).join('');
 
@@ -61,7 +60,6 @@ export class BigMacPanel extends Panel {
             <thead><tr>
               <th class="gb-item-col">Country</th>
               <th class="gb-cell">USD</th>
-              <th class="gb-cell">Local</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
