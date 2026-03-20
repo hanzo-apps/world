@@ -87,7 +87,7 @@ const SEED_META = {
   etfFlows:         { key: 'seed-meta:market:etf-flows',        maxStaleMin: 60 },
   gulfQuotes:       { key: 'seed-meta:market:gulf-quotes',      maxStaleMin: 30 },
   stablecoinMarkets:{ key: 'seed-meta:market:stablecoins',      maxStaleMin: 60 },
-  naturalEvents:    { key: 'seed-meta:natural:events',          maxStaleMin: 120 },
+  naturalEvents:    { key: 'seed-meta:natural:events',          maxStaleMin: 360 }, // 2h cron; 3x interval; was 120 (TTL was 60min — panel went dark before health alarmed)
   flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 60 },
   notamClosures:    { key: 'seed-meta:aviation:notam',          maxStaleMin: 90 },
   predictions:      { key: 'seed-meta:prediction:markets',      maxStaleMin: 90 },
