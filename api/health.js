@@ -37,6 +37,7 @@ const BOOTSTRAP_KEYS = {
   customsRevenue:    'trade:customs-revenue:v1',
   sanctionsPressure: 'sanctions:pressure:v1',
   radiationWatch:    'radiation:observations:v1',
+  nationalDebt:      'economic:national-debt:v1',
 };
 
 const STANDALONE_KEYS = {
@@ -136,6 +137,7 @@ const SEED_META = {
   sanctionsPressure:   { key: 'seed-meta:sanctions:pressure',                 maxStaleMin: 720 },
   radiationWatch:      { key: 'seed-meta:radiation:observations',             maxStaleMin: 30 },
   thermalEscalation:   { key: 'seed-meta:thermal:escalation',                 maxStaleMin: 240 },
+  nationalDebt:        { key: 'seed-meta:economic:national-debt',              maxStaleMin: 10080 }, // 7 days — monthly seed
   tariffTrendsUs:      { key: 'seed-meta:trade:tariffs:v1:840:all:10',        maxStaleMin: 900 },
 };
 

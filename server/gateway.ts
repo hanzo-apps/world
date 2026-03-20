@@ -136,6 +136,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
 
   '/api/military/v1/list-military-bases': 'static',
   '/api/economic/v1/get-macro-signals': 'medium',
+  '/api/economic/v1/get-national-debt': 'daily',
   '/api/prediction/v1/list-prediction-markets': 'medium',
   '/api/forecast/v1/get-forecasts': 'medium',
   '/api/supply-chain/v1/get-chokepoint-status': 'medium',
