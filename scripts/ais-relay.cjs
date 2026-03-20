@@ -4389,12 +4389,23 @@ async function seedUsniFleet() {
   console.log('[USNI] Fetching fleet tracker...');
   const t0 = Date.now();
   try {
-    const res = await fetch(USNI_URL, {
-      headers: { 'User-Agent': CHROME_UA, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const wpData = await res.json();
+    // USNI (WordPress) returns 403 from Railway datacenter IPs via Cloudflare.
+    // Route through the residential proxy when available; fall back to direct for dev.
+    const proxyAuth = process.env.OREF_PROXY_AUTH || OREF_PROXY_AUTH;
+    let wpData;
+    if (proxyAuth) {
+      const proxy = parseProxyUrl(`http://${proxyAuth}`);
+      const result = proxy ? await ytFetchViaProxy(USNI_URL, proxy) : null;
+      if (!result || !result.ok) throw new Error(`proxy HTTP ${result?.status ?? 'unavailable'}`);
+      wpData = JSON.parse(result.body);
+    } else {
+      const res = await fetch(USNI_URL, {
+        headers: { 'User-Agent': CHROME_UA, 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      wpData = await res.json();
+    }
     if (!Array.isArray(wpData) || !wpData.length) throw new Error('No fleet tracker articles');
 
     const post = wpData[0];
