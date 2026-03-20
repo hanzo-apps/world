@@ -10752,6 +10752,31 @@ a.prediction-link:hover {
   text-align: right;
 }
 
+.flight-photo {
+  position: relative;
+  margin: 8px 0 4px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.flight-photo img {
+  width: 100%;
+  display: block;
+  border-radius: 4px;
+}
+
+.flight-photo-credit {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 1px 5px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
 /* ============================================
    Activity Indicators & New Item Badges
    ============================================ */
