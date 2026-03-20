@@ -382,6 +382,10 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'commodities-news': { name: 'Commodities News', enabled: true, priority: 2 },
   crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
   'crypto-news': { name: 'Crypto News', enabled: true, priority: 2 },
+  'crypto-heatmap': { name: 'Crypto Sectors', enabled: true, priority: 1 },
+  'defi-tokens': { name: 'DeFi Tokens', enabled: true, priority: 2 },
+  'ai-tokens': { name: 'AI Tokens', enabled: true, priority: 2 },
+  'other-tokens': { name: 'Alt Tokens', enabled: true, priority: 2 },
   centralbanks: { name: 'Central Bank Watch', enabled: true, priority: 1 },
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
   'trade-policy': { name: 'Trade Policy', enabled: true, priority: 1 },
@@ -956,7 +960,7 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   cryptoDigital: {
     labelKey: 'header.panelCatCryptoDigital',
-    panelKeys: ['crypto', 'crypto-news', 'etf-flows', 'stablecoins', 'fintech'],
+    panelKeys: ['crypto', 'crypto-heatmap', 'defi-tokens', 'ai-tokens', 'other-tokens', 'crypto-news', 'etf-flows', 'stablecoins', 'fintech'],
     variants: ['finance'],
   },
   centralBanksEcon: {
