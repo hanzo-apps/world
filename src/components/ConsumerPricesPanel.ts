@@ -142,6 +142,10 @@ export class ConsumerPricesPanel extends Panel {
     }
   }
 
+  public fetchData(): Promise<void> {
+    return this.loadData();
+  }
+
   public async loadData(): Promise<void> {
     if (this.loading) return;
     this.loading = true;
