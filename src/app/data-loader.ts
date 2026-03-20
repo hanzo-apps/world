@@ -21,6 +21,10 @@ import {
   getFeedFailures,
   fetchMultipleStocks,
   fetchCrypto,
+  fetchCryptoSectors,
+  fetchDefiTokens,
+  fetchAiTokens,
+  fetchOtherTokens,
   fetchPredictions,
   fetchEarthquakes,
   fetchWeatherAlerts,
@@ -118,6 +122,10 @@ import {
   HeatmapPanel,
   CommoditiesPanel,
   CryptoPanel,
+  CryptoHeatmapPanel,
+  DefiTokensPanel,
+  AiTokensPanel,
+  OtherTokensPanel,
   PredictionPanel,
   MonitorPanel,
   InsightsPanel,
@@ -363,7 +371,7 @@ export class DataLoaderManager implements AppModule {
 
     // Happy variant only loads news data -- skip all geopolitical/financial/military data
     if (SITE_VARIANT !== 'happy') {
-      if (shouldLoadAny(['markets', 'heatmap', 'commodities', 'crypto', 'energy-complex'])) {
+      if (shouldLoadAny(['markets', 'heatmap', 'commodities', 'crypto', 'energy-complex', 'crypto-heatmap', 'defi-tokens', 'ai-tokens', 'other-tokens'])) {
         tasks.push({ name: 'markets', task: runGuarded('markets', () => this.loadMarkets()) });
       }
       if (SITE_VARIANT === 'finance' && getSecretState('WORLDMONITOR_API_KEY').present && shouldLoad('stock-analysis')) {
@@ -1325,6 +1333,32 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
     } catch {
       this.ctx.statusPanel?.updateApi('CoinGecko', { status: 'error' });
+    }
+
+    const cryptoHeatmapPanel = this.ctx.panels['crypto-heatmap'] as CryptoHeatmapPanel | undefined;
+    const defiPanel = this.ctx.panels['defi-tokens'] as DefiTokensPanel | undefined;
+    const aiPanel = this.ctx.panels['ai-tokens'] as AiTokensPanel | undefined;
+    const otherPanel = this.ctx.panels['other-tokens'] as OtherTokensPanel | undefined;
+
+    if (cryptoHeatmapPanel || defiPanel || aiPanel || otherPanel) {
+      try {
+        const [sectors, defi, ai, other] = await Promise.all([
+          cryptoHeatmapPanel ? fetchCryptoSectors() : Promise.resolve([]),
+          defiPanel ? fetchDefiTokens() : Promise.resolve([]),
+          aiPanel ? fetchAiTokens() : Promise.resolve([]),
+          otherPanel ? fetchOtherTokens() : Promise.resolve([]),
+        ]);
+        cryptoHeatmapPanel?.renderSectors(sectors);
+        defiPanel?.renderTokens(defi);
+        aiPanel?.renderTokens(ai);
+        otherPanel?.renderTokens(other);
+      } catch (err) {
+        console.warn('[DataLoader] Token panel load failed:', err);
+        cryptoHeatmapPanel?.showRetrying(t('common.failedCryptoData'));
+        defiPanel?.showRetrying(t('common.failedCryptoData'));
+        aiPanel?.showRetrying(t('common.failedCryptoData'));
+        otherPanel?.showRetrying(t('common.failedCryptoData'));
+      }
     }
   }
 

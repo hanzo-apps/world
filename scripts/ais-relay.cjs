@@ -1659,6 +1659,94 @@ async function seedStablecoinMarkets() {
   return stablecoins.length;
 }
 
+// Crypto Sectors Heatmap — CoinGecko sector averages
+const _sectorsCfg = requireShared('crypto-sectors.json');
+const SECTORS_LIST = _sectorsCfg.sectors;
+const SECTORS_SEED_TTL = 3600; // 1h
+
+async function seedCryptoSectors() {
+  const allIds = [...new Set(SECTORS_LIST.flatMap((s) => s.tokens))];
+  let data;
+  try {
+    const apiKey = process.env.COINGECKO_API_KEY;
+    const base = apiKey ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
+    const headers = { Accept: 'application/json' };
+    if (apiKey) headers['x-cg-pro-api-key'] = apiKey;
+    const url = `${base}/coins/markets?vs_currency=usd&ids=${allIds.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h`;
+    data = await cyberHttpGetJson(url, headers, 15000);
+    if (!Array.isArray(data) || data.length === 0) throw new Error('CoinGecko returned no data');
+  } catch (err) {
+    console.warn(`[CryptoSectors] CoinGecko failed: ${err.message} — skipping`);
+    return 0;
+  }
+  const byId = new Map(data.map((c) => [c.id, c.price_change_percentage_24h]));
+  const sectors = SECTORS_LIST.map((sector) => {
+    const changes = sector.tokens.map((id) => byId.get(id)).filter((v) => typeof v === 'number' && isFinite(v));
+    const change = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+    return { id: sector.id, name: sector.name, change };
+  });
+  const ok1 = await upstashSet('market:crypto-sectors:v1', { sectors }, SECTORS_SEED_TTL);
+  const ok2 = await upstashSet('seed-meta:market:crypto-sectors', { fetchedAt: Date.now(), recordCount: sectors.length }, 604800);
+  console.log(`[CryptoSectors] Seeded ${sectors.length} sectors (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'})`);
+  return sectors.length;
+}
+
+// Token Panels — DeFi, AI, Other — single CoinGecko call writing 3 Redis keys
+const _defiCfg = requireShared('defi-tokens.json');
+const _aiCfg = requireShared('ai-tokens.json');
+const _otherCfg = requireShared('other-tokens.json');
+const TOKEN_PANELS_SEED_TTL = 3600; // 1h
+
+function _mapTokens(ids, meta, byId) {
+  const tokens = [];
+  for (const id of ids) {
+    const coin = byId.get(id);
+    if (!coin) continue;
+    const m = meta[id];
+    tokens.push({
+      name: m?.name || coin.name || id,
+      symbol: m?.symbol || (coin.symbol || id).toUpperCase(),
+      price: coin.current_price ?? 0,
+      change24h: coin.price_change_percentage_24h ?? 0,
+      change7d: coin.price_change_percentage_7d_in_currency ?? 0,
+    });
+  }
+  return tokens;
+}
+
+async function seedTokenPanels() {
+  const allIds = [...new Set([..._defiCfg.ids, ..._aiCfg.ids, ..._otherCfg.ids])];
+  let data;
+  try {
+    const apiKey = process.env.COINGECKO_API_KEY;
+    const base = apiKey ? 'https://pro-api.coingecko.com/api/v3' : 'https://api.coingecko.com/api/v3';
+    const headers = { Accept: 'application/json' };
+    if (apiKey) headers['x-cg-pro-api-key'] = apiKey;
+    const url = `${base}/coins/markets?vs_currency=usd&ids=${allIds.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h,7d`;
+    data = await cyberHttpGetJson(url, headers, 15000);
+    if (!Array.isArray(data) || data.length === 0) throw new Error('CoinGecko returned no data');
+  } catch (err) {
+    console.warn(`[TokenPanels] CoinGecko failed: ${err.message} — skipping`);
+    return 0;
+  }
+  const byId = new Map(data.map((c) => [c.id, c]));
+  const defi = { tokens: _mapTokens(_defiCfg.ids, _defiCfg.meta, byId) };
+  const ai = { tokens: _mapTokens(_aiCfg.ids, _aiCfg.meta, byId) };
+  const other = { tokens: _mapTokens(_otherCfg.ids, _otherCfg.meta, byId) };
+  if (defi.tokens.length === 0 && ai.tokens.length === 0 && other.tokens.length === 0) {
+    console.warn('[TokenPanels] All panels empty after mapping — skipping Redis write to preserve cached data');
+    return 0;
+  }
+  const ok1 = await upstashSet('market:defi-tokens:v1', defi, TOKEN_PANELS_SEED_TTL);
+  const ok2 = await upstashSet('market:ai-tokens:v1', ai, TOKEN_PANELS_SEED_TTL);
+  const ok3 = await upstashSet('market:other-tokens:v1', other, TOKEN_PANELS_SEED_TTL);
+  await upstashSet('seed-meta:market:token-panels', { fetchedAt: Date.now(), recordCount: defi.tokens.length + ai.tokens.length + other.tokens.length }, 604800);
+  const total = defi.tokens.length + ai.tokens.length + other.tokens.length;
+  const allOk = ok1 && ok2 && ok3;
+  console.log(`[TokenPanels] Seeded ${defi.tokens.length} DeFi, ${ai.tokens.length} AI, ${other.tokens.length} Other (${total} total, redis: ${allOk ? 'OK' : 'PARTIAL'})`);
+  return total;
+}
+
 async function seedAllMarketData() {
   const t0 = Date.now();
   const q = await seedMarketQuotes();
@@ -1668,7 +1756,9 @@ async function seedAllMarketData() {
   const e = await seedEtfFlows();
   const cr = await seedCryptoQuotes();
   const sc = await seedStablecoinMarkets();
-  console.log(`[Market] Seed complete: ${q} quotes, ${c} commodities, ${s} sectors, ${g} gulf, ${e} etf, ${cr} crypto, ${sc} stablecoins (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+  const cs = await seedCryptoSectors();
+  const tp = await seedTokenPanels();
+  console.log(`[Market] Seed complete: ${q} quotes, ${c} commodities, ${s} sectors, ${g} gulf, ${e} etf, ${cr} crypto, ${sc} stablecoins, ${cs} crypto-sectors, ${tp} token-panels (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 }
 
 async function startMarketDataSeedLoop() {

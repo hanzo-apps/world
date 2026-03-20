@@ -11,6 +11,10 @@ import {
   HeatmapPanel,
   CommoditiesPanel,
   CryptoPanel,
+  CryptoHeatmapPanel,
+  DefiTokensPanel,
+  AiTokensPanel,
+  OtherTokensPanel,
   PredictionPanel,
   MonitorPanel,
   EconomicPanel,
@@ -551,6 +555,10 @@ export class PanelLayoutManager implements AppModule {
     this.createNewsPanel('intel', 'panels.intel');
 
     this.createPanel('crypto', () => new CryptoPanel());
+    this.createPanel('crypto-heatmap', () => new CryptoHeatmapPanel());
+    this.createPanel('defi-tokens', () => new DefiTokensPanel());
+    this.createPanel('ai-tokens', () => new AiTokensPanel());
+    this.createPanel('other-tokens', () => new OtherTokensPanel());
     this.createNewsPanel('middleeast', 'panels.middleeast');
     this.createNewsPanel('layoffs', 'panels.layoffs');
     this.createNewsPanel('ai', 'panels.ai');
