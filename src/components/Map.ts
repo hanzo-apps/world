@@ -224,6 +224,11 @@ export class MapComponent {
       this.render();
     };
     window.addEventListener('theme-changed', this.handleThemeChange);
+
+    // Kick off lazy APT load if cyberThreats is already on at init (e.g. from URL/localStorage)
+    if (this.state.layers.cyberThreats && SITE_VARIANT !== 'tech' && SITE_VARIANT !== 'happy') {
+      this.loadAptGroups();
+    }
   }
 
   private setupResizeObserver(): void {

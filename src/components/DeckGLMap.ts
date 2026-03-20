@@ -510,6 +510,10 @@ export class DeckGLMap {
     if (this.state.layers.weatherRadar) {
       this.startWeatherRadar();
     }
+    // Kick off lazy APT load if cyberThreats is already on at init (e.g. from URL/localStorage)
+    if (this.state.layers.cyberThreats && SITE_VARIANT !== 'tech' && SITE_VARIANT !== 'happy') {
+      this.loadAptGroups();
+    }
   }
 
   private startDayNightTimer(): void {
