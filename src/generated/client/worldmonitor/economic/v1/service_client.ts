@@ -221,6 +221,60 @@ export interface GetFredSeriesBatchResponse {
   requested: number;
 }
 
+export interface ListGroceryBasketPricesRequest {
+}
+
+export interface ListGroceryBasketPricesResponse {
+  countries: CountryBasket[];
+  fetchedAt: string;
+  cheapestCountry: string;
+  mostExpensiveCountry: string;
+  upstreamUnavailable: boolean;
+}
+
+export interface CountryBasket {
+  code: string;
+  name: string;
+  currency: string;
+  flag: string;
+  totalUsd: number;
+  fxRate: number;
+  items: GroceryItemPrice[];
+}
+
+export interface GroceryItemPrice {
+  itemId: string;
+  itemName: string;
+  unit: string;
+  localPrice: number;
+  usdPrice: number;
+  currency: string;
+  sourceSite: string;
+  available: boolean;
+}
+
+export interface ListBigMacPricesRequest {
+}
+
+export interface ListBigMacPricesResponse {
+  countries: BigMacCountryPrice[];
+  fetchedAt: string;
+  cheapestCountry: string;
+  mostExpensiveCountry: string;
+}
+
+export interface BigMacCountryPrice {
+  code: string;
+  name: string;
+  currency: string;
+  flag: string;
+  localPrice: number;
+  usdPrice: number;
+  fxRate: number;
+  sourceSite: string;
+  available: boolean;
+}
+
 export interface GetNationalDebtRequest {
 }
 
@@ -510,6 +564,52 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetFredSeriesBatchResponse;
+  }
+
+  async listGroceryBasketPrices(req: ListGroceryBasketPricesRequest, options?: EconomicServiceCallOptions): Promise<ListGroceryBasketPricesResponse> {
+    let path = "/api/economic/v1/list-grocery-basket-prices";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as ListGroceryBasketPricesResponse;
+  }
+
+  async listBigMacPrices(req: ListBigMacPricesRequest, options?: EconomicServiceCallOptions): Promise<ListBigMacPricesResponse> {
+    let path = "/api/economic/v1/list-bigmac-prices";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as ListBigMacPricesResponse;
   }
 
   async getNationalDebt(req: GetNationalDebtRequest, options?: EconomicServiceCallOptions): Promise<GetNationalDebtResponse> {

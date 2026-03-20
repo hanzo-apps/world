@@ -313,6 +313,58 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/list-grocery-basket-prices:
+        get:
+            tags:
+                - EconomicService
+            summary: ListGroceryBasketPrices
+            description: ListGroceryBasketPrices retrieves grocery basket price comparison across 24 countries worldwide.
+            operationId: ListGroceryBasketPrices
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListGroceryBasketPricesResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+    /api/economic/v1/list-bigmac-prices:
+        get:
+            tags:
+                - EconomicService
+            summary: ListBigMacPrices
+            description: ListBigMacPrices retrieves Big Mac Index prices across Middle East countries.
+            operationId: ListBigMacPrices
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListBigMacPricesResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
     /api/economic/v1/get-national-debt:
         get:
             tags:
@@ -912,6 +964,104 @@ components:
                     type: string
                 value:
                     $ref: '#/components/schemas/FredSeries'
+        ListGroceryBasketPricesRequest:
+            type: object
+        ListGroceryBasketPricesResponse:
+            type: object
+            properties:
+                countries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CountryBasket'
+                fetchedAt:
+                    type: string
+                cheapestCountry:
+                    type: string
+                mostExpensiveCountry:
+                    type: string
+                upstreamUnavailable:
+                    type: boolean
+        CountryBasket:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
+                    type: string
+                currency:
+                    type: string
+                flag:
+                    type: string
+                totalUsd:
+                    type: number
+                    format: double
+                fxRate:
+                    type: number
+                    format: double
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GroceryItemPrice'
+        GroceryItemPrice:
+            type: object
+            properties:
+                itemId:
+                    type: string
+                itemName:
+                    type: string
+                unit:
+                    type: string
+                localPrice:
+                    type: number
+                    format: double
+                usdPrice:
+                    type: number
+                    format: double
+                currency:
+                    type: string
+                sourceSite:
+                    type: string
+                available:
+                    type: boolean
+        ListBigMacPricesRequest:
+            type: object
+        ListBigMacPricesResponse:
+            type: object
+            properties:
+                countries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/BigMacCountryPrice'
+                fetchedAt:
+                    type: string
+                cheapestCountry:
+                    type: string
+                mostExpensiveCountry:
+                    type: string
+        BigMacCountryPrice:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
+                    type: string
+                currency:
+                    type: string
+                flag:
+                    type: string
+                localPrice:
+                    type: number
+                    format: double
+                usdPrice:
+                    type: number
+                    format: double
+                fxRate:
+                    type: number
+                    format: double
+                sourceSite:
+                    type: string
+                available:
+                    type: boolean
         GetNationalDebtRequest:
             type: object
             description: GetNationalDebtRequest requests national debt data for all countries.
