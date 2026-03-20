@@ -1909,6 +1909,149 @@ describe('forecast run world state', () => {
     assert.equal(worldState.simulationState.version, 2);
     assert.ok((worldState.simulationState.situationSimulations || []).every((item) => item.postureScore < 0.99));
   });
+
+  it('promotes same-macro repeated security spillover into the reportable layer', () => {
+    const effects = buildCrossSituationEffects({
+      situationSimulations: [
+        {
+          situationId: 'sit-brazil',
+          label: 'Brazil conflict situation',
+          dominantDomain: 'conflict',
+          familyId: 'fam-americas-war',
+          familyLabel: 'Americas war theater family',
+          regions: ['Brazil'],
+          actorIds: ['actor-brazil', 'actor-shared'],
+          effectChannels: [{ type: 'security_escalation', count: 3 }],
+          posture: 'escalatory',
+          postureScore: 0.88,
+          totalPressure: 0.92,
+          totalStabilization: 0.18,
+        },
+        {
+          situationId: 'sit-mexico',
+          label: 'Mexico conflict situation',
+          dominantDomain: 'conflict',
+          familyId: 'fam-americas-war',
+          familyLabel: 'Americas war theater family',
+          regions: ['Mexico'],
+          actorIds: ['actor-mexico', 'actor-shared'],
+          effectChannels: [],
+          posture: 'contested',
+          postureScore: 0.46,
+          totalPressure: 0.57,
+          totalStabilization: 0.31,
+        },
+      ],
+      reportableInteractionLedger: [
+        {
+          sourceSituationId: 'sit-brazil',
+          targetSituationId: 'sit-mexico',
+          sourceLabel: 'Brazil conflict situation',
+          targetLabel: 'Mexico conflict situation',
+          strongestChannel: 'security_escalation',
+          interactionType: 'actor_carryover',
+          stage: 'round_1',
+          score: 4.3,
+          confidence: 0.67,
+          actorSpecificity: 0.91,
+          directLinkCount: 1,
+          sharedActor: true,
+          regionLink: false,
+          sourceActorName: 'Named brigade command',
+          targetActorName: 'Named brigade command',
+        },
+        {
+          sourceSituationId: 'sit-brazil',
+          targetSituationId: 'sit-mexico',
+          sourceLabel: 'Brazil conflict situation',
+          targetLabel: 'Mexico conflict situation',
+          strongestChannel: 'security_escalation',
+          interactionType: 'actor_carryover',
+          stage: 'round_2',
+          score: 4.3,
+          confidence: 0.68,
+          actorSpecificity: 0.91,
+          directLinkCount: 1,
+          sharedActor: true,
+          regionLink: false,
+          sourceActorName: 'Named brigade command',
+          targetActorName: 'Named brigade command',
+        },
+      ],
+    });
+
+    assert.equal(effects.length, 1);
+    assert.equal(effects[0].effectClass, 'security_spillover');
+    assert.equal(effects[0].channel, 'security_escalation');
+  });
+
+  it('records blocked effect telemetry on the world state', () => {
+    const worldState = buildForecastRunWorldState({
+      predictions: [
+        makePrediction('political', 'Israel', 'Political instability: Israel', 0.61, 0.5, '30d', []),
+        makePrediction('political', 'Taiwan', 'Political instability: Taiwan', 0.53, 0.45, '30d', []),
+      ],
+      situationClusters: [
+        {
+          id: 'sit-israel',
+          label: 'Israel political situation',
+          forecastIds: ['fc-political-a'],
+          domains: ['political'],
+          regions: ['Israel'],
+          actors: ['Incumbent leadership'],
+          topSignals: [{ type: 'unrest', count: 2 }],
+          forecastCount: 1,
+          avgProbability: 0.61,
+          avgConfidence: 0.5,
+          dominantDomain: 'political',
+          dominantRegion: 'Israel',
+          branchKinds: ['base'],
+          sampleTitles: ['Political instability: Israel'],
+        },
+        {
+          id: 'sit-taiwan',
+          label: 'Taiwan political situation',
+          forecastIds: ['fc-political-b'],
+          domains: ['political'],
+          regions: ['Taiwan'],
+          actors: ['Incumbent leadership'],
+          topSignals: [{ type: 'unrest', count: 2 }],
+          forecastCount: 1,
+          avgProbability: 0.53,
+          avgConfidence: 0.45,
+          dominantDomain: 'political',
+          dominantRegion: 'Taiwan',
+          branchKinds: ['base'],
+          sampleTitles: ['Political instability: Taiwan'],
+        },
+      ],
+      situationFamilies: [
+        {
+          id: 'fam-israel',
+          label: 'Israel political instability family',
+          archetype: 'political_instability',
+          situationIds: ['sit-israel'],
+          dominantDomain: 'political',
+          dominantRegion: 'Israel',
+          forecastCount: 1,
+          situationCount: 1,
+        },
+        {
+          id: 'fam-taiwan',
+          label: 'Taiwan political instability family',
+          archetype: 'political_instability',
+          situationIds: ['sit-taiwan'],
+          dominantDomain: 'political',
+          dominantRegion: 'Taiwan',
+          forecastCount: 1,
+          situationCount: 1,
+        },
+      ],
+    });
+
+    assert.ok(typeof worldState.simulationState.blockedEffectSummary.totalBlocked === 'number');
+    assert.ok(Array.isArray(worldState.report.blockedEffectWatchlist));
+  });
 });
 
 describe('cross-theater gate', () => {

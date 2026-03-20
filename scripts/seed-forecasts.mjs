@@ -3107,6 +3107,7 @@ function getTargetSensitivityChannels(domain) {
 
 function inferSystemEffectRelationFromChannel(channel, targetDomain) {
   const relationMap = {
+    'security_escalation:conflict': 'regional escalation pressure',
     'security_escalation:market': 'risk repricing',
     'security_escalation:supply_chain': 'route disruption',
     'security_escalation:infrastructure': 'service disruption',
@@ -3365,6 +3366,21 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
   const interactionLedger = buildSimulationInteractionLedger(actionLedger, situationSimulations);
   const reportableInteractionLedger = buildReportableInteractionLedger(interactionLedger, situationSimulations);
   const replayTimeline = buildSimulationReplayTimeline(situationSimulations, actionLedger, interactionLedger);
+  const internalEffects = buildCrossSituationEffects({
+    situationSimulations,
+    interactionLedger,
+    reportableInteractionLedger,
+  }, {
+    mode: 'internal',
+  });
+  const reportableEffects = buildCrossSituationEffects({
+    situationSimulations,
+    interactionLedger,
+    reportableInteractionLedger,
+  }, {
+    mode: 'reportable',
+  });
+  const blockedEffects = Array.isArray(reportableEffects.blocked) ? reportableEffects.blocked : [];
 
   const postureCounts = summarizeTypeCounts(situationSimulations.map((item) => item.posture));
   const summary = situationSimulations.length
@@ -3395,6 +3411,10 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     actionLedger,
     interactionLedger,
     reportableInteractionLedger,
+    internalEffects,
+    reportableEffects,
+    blockedEffects,
+    blockedEffectSummary: summarizeBlockedEffects(blockedEffects),
     replayTimeline,
     situationSimulations,
   };
@@ -3852,6 +3872,14 @@ const MACRO_REGION_MAP = {
 
 const CROSS_THEATER_EXEMPT_CHANNELS = new Set(['cyber_disruption', 'market_repricing']);
 const CROSS_THEATER_ACTOR_SPECIFICITY_MIN = 0.90;
+const EFFECT_CLASS_PRIORITY = {
+  security_spillover: 5,
+  cyber_spillover: 4,
+  logistics_spillover: 4,
+  market_spillover: 3,
+  political_spillover: 2,
+  general_spillover: 1,
+};
 
 function getMacroRegion(regions = []) {
   for (const region of regions) {
@@ -3864,6 +3892,68 @@ function isCrossTheaterPair(sourceRegions, targetRegions) {
   const src = getMacroRegion(sourceRegions);
   const tgt = getMacroRegion(targetRegions);
   return !!(src && tgt && src !== tgt);
+}
+
+function classifyEffectClass(channel, relation = '') {
+  if (channel === 'security_escalation') return 'security_spillover';
+  if (channel === 'cyber_disruption') return 'cyber_spillover';
+  if (channel === 'logistics_disruption' || channel === 'service_disruption') return 'logistics_spillover';
+  if (channel === 'market_repricing') return 'market_spillover';
+  if (channel === 'political_pressure' || relation === 'regional pressure transfer') return 'political_spillover';
+  return 'general_spillover';
+}
+
+function getEffectClassThreshold(effectClass, context = {}) {
+  const { crossTheater = false, sameMacroRegion = false, directStructuralLink = false } = context;
+  if (effectClass === 'political_spillover') {
+    if (crossTheater) return 0.74;
+    if (sameMacroRegion) return 0.62;
+    return 0.66;
+  }
+  if (effectClass === 'security_spillover') {
+    if (sameMacroRegion && directStructuralLink) return 0.46;
+    return crossTheater ? 0.6 : 0.52;
+  }
+  if (effectClass === 'cyber_spillover') {
+    return crossTheater ? 0.54 : 0.5;
+  }
+  if (effectClass === 'logistics_spillover') {
+    return crossTheater ? 0.56 : 0.5;
+  }
+  if (effectClass === 'market_spillover') {
+    return crossTheater ? 0.58 : 0.52;
+  }
+  return crossTheater ? 0.58 : 0.5;
+}
+
+function getEffectClassScoreThreshold(effectClass, context = {}) {
+  const { crossTheater = false, sameMacroRegion = false, repeatedStages = 1 } = context;
+  if (effectClass === 'political_spillover') return crossTheater ? 5.4 : 4.8;
+  if (effectClass === 'security_spillover') return sameMacroRegion && repeatedStages >= 2 ? 4.2 : 4.8;
+  if (effectClass === 'cyber_spillover') return repeatedStages >= 2 ? 4.2 : 4.8;
+  if (effectClass === 'logistics_spillover') return repeatedStages >= 2 ? 4.2 : 4.8;
+  return crossTheater ? 5 : 4.8;
+}
+
+function summarizeBlockedEffects(blockedEffects = []) {
+  const reasonCounts = summarizeTypeCounts((blockedEffects || []).map((item) => item.reason));
+  return {
+    totalBlocked: blockedEffects.length,
+    byReason: reasonCounts,
+    preview: blockedEffects
+      .slice()
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0) || (b.score || 0) - (a.score || 0))
+      .slice(0, 6)
+      .map((item) => ({
+        sourceLabel: item.sourceLabel,
+        targetLabel: item.targetLabel,
+        channel: item.channel,
+        effectClass: item.effectClass,
+        reason: item.reason,
+        confidence: item.confidence,
+        score: item.score,
+      })),
+  };
 }
 
 function canEmitCrossSituationEffect(source, strongestChannel, strongestChannelWeight, hasDirectStructuralLink = false) {
@@ -3893,13 +3983,19 @@ function buildInteractionWatchlist(interactions = []) {
     }));
 }
 
-function buildCrossSituationEffects(simulationState) {
+function buildCrossSituationEffects(simulationState, options = {}) {
+  const mode = options.mode || 'reportable';
   const simulations = Array.isArray(simulationState?.situationSimulations) ? simulationState.situationSimulations : [];
-  const interactions = Array.isArray(simulationState?.reportableInteractionLedger)
-    ? simulationState.reportableInteractionLedger
+  const interactions = mode === 'reportable'
+    ? (
+      Array.isArray(simulationState?.reportableInteractionLedger)
+        ? simulationState.reportableInteractionLedger
+        : (Array.isArray(simulationState?.interactionLedger) ? simulationState.interactionLedger : [])
+    )
     : (Array.isArray(simulationState?.interactionLedger) ? simulationState.interactionLedger : []);
   const simulationIndex = new Map(simulations.map((item) => [item.situationId, item]));
   const interactionGroups = buildInteractionGroups(interactions);
+  const blockedEffects = [];
 
   if (interactionGroups.length > 0) {
     const effects = [];
@@ -3915,28 +4011,131 @@ function buildCrossSituationEffects(simulationState) {
       const hasRegionLink = group.regionLink || intersectCount(source.regions || [], target.regions || []) > 0;
       const hasSharedActor = group.sharedActor || intersectCount(source.actorIds || [], target.actorIds || []) > 0;
       const hasDirectStructuralLink = hasRegionLink || hasSharedActor;
-      if (!canEmitCrossSituationEffect(source, group.strongestChannel, strongestChannelWeight, hasDirectStructuralLink)) continue;
-      if (strongestChannelWeight < 2 && !hasDirectStructuralLink) continue;
+      const sourceMacro = getMacroRegion(source.regions || []);
+      const targetMacro = getMacroRegion(target.regions || []);
+      const crossTheater = !!(sourceMacro && targetMacro && sourceMacro !== targetMacro);
+      const sameMacroRegion = !!(sourceMacro && targetMacro && sourceMacro === targetMacro);
+      const repeatedStages = group.stages?.size || 0;
+      const effectClass = classifyEffectClass(group.strongestChannel, relation);
+
+      if (!canEmitCrossSituationEffect(source, group.strongestChannel, strongestChannelWeight, hasDirectStructuralLink)) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'source_posture_gate',
+          confidence: 0,
+          score: Number(group.score || 0),
+        });
+        continue;
+      }
+      if (strongestChannelWeight < 2 && !hasDirectStructuralLink) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'weak_channel_without_structure',
+          confidence: 0,
+          score: Number(group.score || 0),
+        });
+        continue;
+      }
       if (
-        isCrossTheaterPair(source.regions || [], target.regions || [])
+        crossTheater
         && !CROSS_THEATER_EXEMPT_CHANNELS.has(group.strongestChannel)
         && (!hasSharedActor || Number(group.avgActorSpecificity || 0) < CROSS_THEATER_ACTOR_SPECIFICITY_MIN)
-      ) continue;
+      ) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'cross_theater_generic_actor',
+          confidence: Number(group.avgConfidence || 0),
+          score: Number(group.score || 0),
+        });
+        continue;
+      }
+      const confidence = computeReportableEffectConfidence(group, source, target, strongestChannelWeight);
       if (
-        group.strongestChannel === 'political_pressure'
+        effectClass === 'political_spillover'
         && !hasRegionLink
-        && (!hasSharedActor || computeReportableEffectConfidence(group, source, target, strongestChannelWeight) < 0.72 || (group.stages?.size || 0) < 2)
-      ) continue;
+        && (!hasSharedActor || confidence < 0.72 || repeatedStages < 2)
+      ) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'political_without_strong_carryover',
+          confidence,
+          score: Number(group.score || 0),
+        });
+        continue;
+      }
 
       const score = +(
         group.score
-        + (group.stages.size * 0.5)
+        + (repeatedStages * 0.5)
         + (group.interactionTypes.has('actor_carryover') ? 1.5 : 0)
+        + (sameMacroRegion && effectClass === 'security_spillover' ? 0.5 : 0)
+        + (repeatedStages >= 2 && ['cyber_spillover', 'logistics_spillover'].includes(effectClass) ? 0.4 : 0)
       ).toFixed(3);
-      if (score < 4.8) continue;
-      const confidence = computeReportableEffectConfidence(group, source, target, strongestChannelWeight);
-      if (confidence < 0.5) continue;
-      if (group.strongestChannel === 'political_pressure' && confidence < 0.72) continue;
+      const scoreThreshold = getEffectClassScoreThreshold(effectClass, {
+        crossTheater,
+        sameMacroRegion,
+        repeatedStages,
+      });
+      if (score < scoreThreshold) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'score_below_threshold',
+          confidence,
+          score,
+        });
+        continue;
+      }
+
+      const confidenceThreshold = mode === 'internal'
+        ? Math.max(0.4, getEffectClassThreshold(effectClass, {
+          crossTheater,
+          sameMacroRegion,
+          directStructuralLink: hasDirectStructuralLink,
+        }) - 0.08)
+        : getEffectClassThreshold(effectClass, {
+          crossTheater,
+          sameMacroRegion,
+          directStructuralLink: hasDirectStructuralLink,
+        });
+      if (confidence < confidenceThreshold) {
+        blockedEffects.push({
+          sourceSituationId: source.situationId,
+          sourceLabel: source.label,
+          targetSituationId: target.situationId,
+          targetLabel: target.label,
+          channel: group.strongestChannel,
+          effectClass,
+          reason: 'confidence_below_threshold',
+          confidence,
+          score,
+        });
+        continue;
+      }
 
       effects.push({
         sourceSituationId: source.situationId,
@@ -3948,16 +4147,18 @@ function buildCrossSituationEffects(simulationState) {
         targetFamilyId: target.familyId,
         targetFamilyLabel: target.familyLabel,
         channel: group.strongestChannel,
+        effectClass,
         relation,
         score,
         confidence,
-        summary: `${source.label} is likely to feed ${relation} into ${target.label}, reinforced by ${group.stages.size} round(s) of ${group.strongestChannel.replace(/_/g, ' ')} interactions, ${(confidence * 100).toFixed(0)}% effect confidence, and a ${describeSimulationPosture(source.posture)} posture at ${roundPct(source.postureScore)}.`,
+        summary: `${source.label} is likely to feed ${relation} into ${target.label}, reinforced by ${repeatedStages} round(s) of ${group.strongestChannel.replace(/_/g, ' ')} interactions, ${(confidence * 100).toFixed(0)}% effect confidence, and a ${describeSimulationPosture(source.posture)} posture at ${roundPct(source.postureScore)}.`,
       });
     }
-
-    return effects
+    const sorted = effects
       .sort((a, b) => b.confidence - a.confidence || b.score - a.score || a.sourceLabel.localeCompare(b.sourceLabel) || a.targetLabel.localeCompare(b.targetLabel))
-      .slice(0, 6);
+      .slice(0, mode === 'internal' ? 10 : 6);
+    sorted.blocked = blockedEffects;
+    return sorted;
   }
 
   const effects = [];
@@ -4361,7 +4562,9 @@ function buildWorldStateReport(worldState) {
   const simulationSummary = worldState.simulationState?.summary || 'No simulation-state summary is available.';
   const simulationReportInputs = buildSimulationReportInputs(worldState);
   const simulationOutcomeSummaries = buildSituationOutcomeSummaries(worldState.simulationState);
-  const crossSituationEffects = buildCrossSituationEffects(worldState.simulationState);
+  const crossSituationEffects = Array.isArray(worldState.simulationState?.reportableEffects)
+    ? worldState.simulationState.reportableEffects
+    : buildCrossSituationEffects(worldState.simulationState, { mode: 'reportable' });
   const interactionLedger = Array.isArray(worldState.simulationState?.reportableInteractionLedger)
     ? worldState.simulationState.reportableInteractionLedger
     : (Array.isArray(worldState.simulationState?.interactionLedger) ? worldState.simulationState.interactionLedger : []);
@@ -4383,6 +4586,11 @@ function buildWorldStateReport(worldState) {
       label: round.stage.replace('_', ' '),
       summary: `${round.stage.replace('_', ' ')} carried ${round.actionCount} actions, ${round.interactionCount} cross-situation interactions, and ${round.situationCount} active situations at ${Math.round((round.avgNetPressure || 0) * 100)}% average net pressure.`,
     }));
+  const blockedEffectWatchlist = (worldState.simulationState?.blockedEffectSummary?.preview || []).slice(0, 4).map((item) => ({
+    type: `blocked_effect_${item.reason}`,
+    label: `${item.sourceLabel} -> ${item.targetLabel}`,
+    summary: `${item.sourceLabel} did not promote into ${item.targetLabel} via ${String(item.channel || '').replace(/_/g, ' ')} because of ${item.reason.replace(/_/g, ' ')}, despite ${(Number(item.confidence || 0) * 100).toFixed(0)}% candidate confidence.`,
+  }));
 
   const familyWatchlist = (worldState.situationFamilies || [])
     .slice(0, 6)
@@ -4392,7 +4600,7 @@ function buildWorldStateReport(worldState) {
       summary: `${family.label} currently groups ${family.situationCount} situations across ${family.forecastCount} forecasts.`,
     }));
 
-  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} interaction links, and ${crossSituationEffects.length} cross-situation system effects are active in the report view.`;
+  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} reportable interaction links, ${worldState.simulationState?.internalEffects?.length || 0} internal effects, and ${crossSituationEffects.length} cross-situation system effects in the report view.`;
 
   return {
     summary,
@@ -4413,6 +4621,7 @@ function buildWorldStateReport(worldState) {
     simulationWatchlist,
     interactionWatchlist,
     replayWatchlist,
+    blockedEffectWatchlist,
     simulationOutcomeSummaries,
     crossSituationEffects,
     replayTimeline,
@@ -4627,7 +4836,10 @@ function summarizeWorldStateSurface(worldState) {
     simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
     simulationActionCount: worldState.simulationState?.actionLedger?.length || 0,
     simulationInteractionCount: worldState.simulationState?.interactionLedger?.length || 0,
+    reportableInteractionCount: worldState.simulationState?.reportableInteractionLedger?.length || 0,
+    internalEffectCount: worldState.simulationState?.internalEffects?.length || 0,
     simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
+    blockedEffectCount: worldState.simulationState?.blockedEffects?.length || 0,
   };
 }
 
@@ -4821,7 +5033,10 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       simulationRoundCount: worldState.simulationState?.totalRounds || 0,
       simulationActionCount: worldState.simulationState?.actionLedger?.length || 0,
       simulationInteractionCount: worldState.simulationState?.interactionLedger?.length || 0,
+      reportableInteractionCount: worldState.simulationState?.reportableInteractionLedger?.length || 0,
+      internalEffectCount: worldState.simulationState?.internalEffects?.length || 0,
       simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
+      blockedEffectCount: worldState.simulationState?.blockedEffects?.length || 0,
       persistentSituations: worldState.situationContinuity.persistentSituationCount,
       newSituations: worldState.situationContinuity.newSituationCount,
       strengthenedSituations: worldState.situationContinuity.strengthenedSituationCount,
@@ -4847,6 +5062,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       escalatorySimulations: worldState.simulationState?.postureCounts?.escalatory || 0,
       contestedSimulations: worldState.simulationState?.postureCounts?.contested || 0,
       constrainedSimulations: worldState.simulationState?.postureCounts?.constrained || 0,
+      blockedEffectReasons: worldState.simulationState?.blockedEffectSummary?.byReason || {},
       newForecasts: worldState.continuity.newForecasts,
       materiallyChanged: worldState.continuity.materiallyChanged.length,
       candidateStateSummary: summarizeWorldStateSurface(candidateWorldState),
@@ -6455,7 +6671,7 @@ async function fetchForecasts() {
   populateFallbackNarratives(predictions);
 
   const publishSelectionPool = selectPublishedForecastPool(predictions);
-  let finalSelectionPool = [...publishSelectionPool];
+  const finalSelectionPool = [...publishSelectionPool];
   finalSelectionPool.targetCount = publishSelectionPool.targetCount || finalSelectionPool.length;
   const deferredCandidates = [...(publishSelectionPool.deferredCandidates || [])];
   let publishArtifacts = buildPublishedForecastArtifacts(finalSelectionPool, fullRunSituationClusters);
