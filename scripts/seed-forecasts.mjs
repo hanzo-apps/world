@@ -5391,6 +5391,17 @@ function selectPublishedForecastPool(predictions, options = {}) {
     if (canSelect(pred, 'fill')) take(pred);
   }
 
+  // Domain guarantee: data-driven detectors (military) structurally can't match LLM-enriched
+  // readiness scores, so they get buried in ranking. If no military forecast was selected
+  // and we have room below the hard cap, inject the best-scoring eligible one.
+  if (selected.length < MAX_TARGET_PUBLISHED_FORECASTS) {
+    for (const guaranteedDomain of ['military']) {
+      if (selected.some((p) => p.domain === guaranteedDomain)) continue;
+      const candidate = ranked.find((p) => p.domain === guaranteedDomain && canSelect(p, 'fill'));
+      if (candidate) take(candidate);
+    }
+  }
+
   const deferredCandidates = ranked.filter((pred) => !selectedIds.has(pred.id));
   if (deferredCandidates.length > 0) {
     console.log(`  [filterPublished] Deferred ${deferredCandidates.length} forecast(s) in family selection`);
