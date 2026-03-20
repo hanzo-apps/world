@@ -1338,7 +1338,15 @@ export class LiveNewsPanel extends Panel {
     const storageObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLIFrameElement && node.src.includes('youtube.com')) {
+          if (node instanceof HTMLIFrameElement) {
+            let isYouTube = false;
+            try {
+              const parsed = new URL(node.src);
+              isYouTube = parsed.hostname === 'youtube.com' || parsed.hostname.endsWith('.youtube.com');
+            } catch {
+              isYouTube = false;
+            }
+            if (!isYouTube) continue;
             const cur = node.getAttribute('allow') || '';
             if (!cur.includes('storage-access')) {
               node.setAttribute('allow', cur ? `${cur}; storage-access` : 'storage-access');

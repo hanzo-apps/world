@@ -5742,7 +5742,7 @@ function validatePerspectives(items, predictions) {
     if (typeof item.index !== 'number' || item.index < 0 || item.index >= predictions.length) return false;
     for (const key of ['strategic', 'regional', 'contrarian']) {
       if (typeof item[key] !== 'string') return false;
-      item[key] = item[key].replace(/<[^>]*>/g, '').trim().slice(0, 300);
+      item[key] = sanitizeForPrompt(item[key]).slice(0, 300);
       if (item[key].length < 20) return false;
     }
     return true;
@@ -5755,7 +5755,7 @@ function validateCaseNarratives(items, predictions) {
     if (typeof item.index !== 'number' || item.index < 0 || item.index >= predictions.length) return false;
     for (const key of ['baseCase', 'escalatoryCase', 'contrarianCase']) {
       if (typeof item[key] !== 'string') return false;
-      item[key] = item[key].replace(/<[^>]*>/g, '').trim().slice(0, 500);
+      item[key] = sanitizeForPrompt(item[key]).slice(0, 500);
       if (item[key].length < 20) return false;
     }
     return true;
@@ -5814,7 +5814,7 @@ function validateScenarios(scenarios, predictions) {
       console.warn(`  [LLM] Scenario ${s.index} rejected: no evidence reference`);
       return false;
     }
-    s.scenario = s.scenario.replace(/<[^>]*>/g, '').slice(0, 500);
+    s.scenario = sanitizeForPrompt(s.scenario).slice(0, 500);
     return true;
   });
 }
