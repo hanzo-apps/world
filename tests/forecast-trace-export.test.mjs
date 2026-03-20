@@ -15,6 +15,7 @@ import {
   attachSituationContext,
   projectSituationClusters,
   refreshPublishedNarratives,
+  selectPublishedForecastPool,
 } from '../scripts/seed-forecasts.mjs';
 
 import {
@@ -2055,5 +2056,45 @@ describe('cross-theater gate', () => {
       ],
     });
     assert.equal(effects.length, 0, 'Cuba → Iran via generic civil-protection actor should be blocked');
+  });
+});
+
+describe('military domain guarantee in publish selection', () => {
+  function makeMinimalPred(id, domain, prob, confidence = 0.5) {
+    const pred = makePrediction(domain, 'Test Region', `Test ${domain} forecast ${id}`, prob, confidence, '30d', []);
+    pred.id = id;
+    return pred;
+  }
+
+  it('injects military forecast when buried below high-scoring non-military forecasts', () => {
+    // 14 well-scored conflict forecasts would fill the pool, leaving military out
+    const nonMilitary = Array.from({ length: 14 }, (_, i) =>
+      makeMinimalPred(`conflict-${i}`, 'conflict', 0.7 + (i * 0.001), 0.75),
+    );
+    const military = makeMinimalPred('mil-baltic', 'military', 0.41, 0.30);
+    const pool = selectPublishedForecastPool([...nonMilitary, military]);
+    const hasMilitary = pool.some((p) => p.domain === 'military');
+    assert.equal(hasMilitary, true, 'military forecast should be included via domain guarantee');
+  });
+
+  it('does not inject military when none are eligible (prob = 0)', () => {
+    const nonMilitary = Array.from({ length: 5 }, (_, i) =>
+      makeMinimalPred(`conflict-${i}`, 'conflict', 0.6, 0.6),
+    );
+    const pool = selectPublishedForecastPool(nonMilitary);
+    const hasMilitary = pool.some((p) => p.domain === 'military');
+    assert.equal(hasMilitary, false, 'no military forecast should appear when none were input');
+  });
+
+  it('does not double-inject military when it already ranks into selection naturally', () => {
+    const forecasts = [
+      makeMinimalPred('mil-1', 'military', 0.80, 0.75),
+      makeMinimalPred('conflict-1', 'conflict', 0.60, 0.60),
+      makeMinimalPred('conflict-2', 'conflict', 0.55, 0.55),
+    ];
+    const pool = selectPublishedForecastPool(forecasts);
+    const militaryCount = pool.filter((p) => p.domain === 'military').length;
+    assert.equal(militaryCount, 1, 'only one military forecast should appear, no duplication');
+
   });
 });
