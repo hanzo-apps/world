@@ -1105,6 +1105,9 @@
       "strike": "STRIKE",
       "staleWarning": "Using cached data - live feed temporarily unavailable",
       "updated": "Updated:",
+      "emojiKeyLabel": "Emoji Key",
+      "emojiKeyAir": "Air Assets",
+      "emojiKeyNaval": "Naval Assets",
       "theaters": {
         "iran-theater": "Iran Theater",
         "taiwan-theater": "Taiwan Strait",
