@@ -25,9 +25,9 @@ RUN apt-get update && apt-get install -y \
 
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Install dependencies
+# Install all dependencies (including devDeps for tsc)
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Build
 COPY tsconfig.json ./
@@ -35,6 +35,9 @@ COPY src ./src
 COPY configs ./configs
 COPY migrations ./migrations
 RUN npm run build
+
+# Prune dev dependencies after build
+RUN npm prune --omit=dev
 
 # Runtime
 ENV NODE_ENV=production
