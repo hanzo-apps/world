@@ -51,8 +51,8 @@ export function trackMapLayerToggle(layerId: string, enabled: boolean, source: '
   window.umami?.track('map-layer-toggle', { layerId, enabled });
 }
 
-export function trackMapViewChange(view: string): void {
-  window.umami?.track('map-view-change', { view });
+export function trackMapViewChange(_view: string): void {
+  // No-op: low analytical value.
 }
 
 // ---------------------------------------------------------------------------
@@ -63,8 +63,8 @@ export function trackPanelToggled(panelId: string, enabled: boolean): void {
   window.umami?.track('panel-toggle', { panelId, enabled });
 }
 
-export function trackPanelResized(panelId: string, newSpan: number): void {
-  window.umami?.track('panel-resized', { panelId, span: newSpan });
+export function trackPanelResized(_panelId: string, _newSpan: number): void {
+  // No-op: fires on every drag step, too noisy for analytics.
 }
 
 // ---------------------------------------------------------------------------
@@ -91,12 +91,12 @@ export function trackFeatureToggle(featureId: string, enabled: boolean): void {
 // AI / LLM
 // ---------------------------------------------------------------------------
 
-export function trackLLMUsage(provider: string, model: string, cached: boolean): void {
-  window.umami?.track('llm-used', { provider, model, cached });
+export function trackLLMUsage(_provider: string, _model: string, _cached: boolean): void {
+  // No-op: per-request noise, not a meaningful user action for analytics.
 }
 
-export function trackLLMFailure(lastProvider: string): void {
-  window.umami?.track('llm-failed', { provider: lastProvider });
+export function trackLLMFailure(_lastProvider: string): void {
+  // No-op: per-request noise, not a meaningful user action for analytics.
 }
 
 // ---------------------------------------------------------------------------
@@ -123,10 +123,10 @@ export function trackCriticalBannerAction(action: string, theaterId: string): vo
   window.umami?.track('critical-banner', { action, theaterId });
 }
 
-export function trackFindingClicked(id: string, source: string, type: string, priority: string): void {
-  window.umami?.track('finding-clicked', { id, source, type, priority });
+export function trackFindingClicked(_id: string, _source: string, _type: string, _priority: string): void {
+  // No-op: niche feature, low analytical value.
 }
 
-export function trackDeeplinkOpened(type: string, target: string): void {
-  window.umami?.track('deeplink-opened', { type, target });
+export function trackDeeplinkOpened(_type: string, _target: string): void {
+  // No-op: not useful for analytics.
 }
