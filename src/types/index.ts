@@ -1475,4 +1475,5 @@ export interface CountryBriefSignals {
   travelAdvisoryMaxLevel: string | null;
   gpsJammingHexes: number;
   isTier1: boolean;
+  thermalEscalations: number;
 }
