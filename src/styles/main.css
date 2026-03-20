@@ -20329,9 +20329,9 @@ body.has-breaking-alert .panels-grid {
 }
 
 .debt-tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
 }
 
 .debt-search {
