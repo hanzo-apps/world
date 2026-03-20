@@ -70,7 +70,8 @@ interface EcsFlightRaw {
 }
 
 function mapEcsFlight(icao24: string, raw: EcsFlightRaw): WingbitsLiveFlight {
-  const lastSeenTs = raw.lastSeen ?? raw.last_seen ?? (raw.ra ? Math.floor(new Date(raw.ra).getTime() / 1000) : 0);
+  const raTsMs = raw.ra ? new Date(raw.ra).getTime() : Number.NaN;
+  const lastSeenTs = raw.lastSeen ?? raw.last_seen ?? (Number.isFinite(raTsMs) ? Math.floor(raTsMs / 1000) : 0);
   return {
     icao24: raw.icao24 ?? raw.h ?? icao24,
     callsign: raw.callsign ?? raw.f ?? '',
