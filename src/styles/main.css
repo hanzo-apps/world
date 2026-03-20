@@ -16734,6 +16734,78 @@ body.has-breaking-alert .panels-grid {
   padding: 12px;
 }
 
+/* Emoji Key Legend */
+.posture-emoji-key {
+  border: 1px solid var(--overlay-medium);
+  border-radius: 6px;
+  background: var(--overlay-subtle);
+  font-size: 11px;
+  overflow: hidden;
+}
+
+.posture-emoji-key summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-dim);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.posture-emoji-key summary::-webkit-details-marker { display: none; }
+
+.posture-emoji-key summary::after {
+  content: '▸';
+  margin-left: auto;
+  transition: transform 0.2s;
+  font-size: 10px;
+}
+
+.posture-emoji-key[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.posture-emoji-key summary:hover {
+  color: var(--accent);
+}
+
+.posture-emoji-key-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+  padding: 4px 10px 8px;
+}
+
+.posture-emoji-key-section {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 4px 0 2px;
+  grid-column: 1 / -1;
+}
+
+.posture-emoji-key-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.posture-emoji-key-item span:first-child {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .posture-theater {
   border-radius: 8px;
   cursor: pointer;
