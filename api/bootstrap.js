@@ -56,6 +56,8 @@ const BOOTSTRAP_CACHE_KEYS = {
   securityAdvisories: 'intelligence:advisories-bootstrap:v1',
   customsRevenue:    'trade:customs-revenue:v1',
   sanctionsPressure: 'sanctions:pressure:v1',
+  groceryBasket: 'economic:grocery-basket:v1',
+  bigmac:        'economic:bigmac:v1',
   nationalDebt:      'economic:national-debt:v1',
 };
 
@@ -71,6 +73,8 @@ const SLOW_KEYS = new Set([
   'securityAdvisories',
   'customsRevenue',
   'sanctionsPressure',
+  'groceryBasket',
+  'bigmac',
   'nationalDebt',
 ]);
 const FAST_KEYS = new Set([

@@ -12,6 +12,8 @@ import "worldmonitor/economic/v1/get_bis_policy_rates.proto";
 import "worldmonitor/economic/v1/get_bis_exchange_rates.proto";
 import "worldmonitor/economic/v1/get_bis_credit.proto";
 import "worldmonitor/economic/v1/get_fred_series_batch.proto";
+import "worldmonitor/economic/v1/list_grocery_basket_prices.proto";
+import "worldmonitor/economic/v1/list_bigmac_prices.proto";
 import "worldmonitor/economic/v1/get_national_debt.proto";
 
 // EconomicService provides APIs for macroeconomic data from FRED, World Bank, and EIA.
@@ -61,6 +63,16 @@ service EconomicService {
   // GetFredSeriesBatch retrieves multiple FRED series in a single call.
   rpc GetFredSeriesBatch(GetFredSeriesBatchRequest) returns (GetFredSeriesBatchResponse) {
     option (sebuf.http.config) = {path: "/get-fred-series-batch", method: HTTP_METHOD_POST};
+  }
+
+  // ListGroceryBasketPrices retrieves grocery basket price comparison across 24 countries worldwide.
+  rpc ListGroceryBasketPrices(ListGroceryBasketPricesRequest) returns (ListGroceryBasketPricesResponse) {
+    option (sebuf.http.config) = {path: "/list-grocery-basket-prices", method: HTTP_METHOD_GET};
+  }
+
+  // ListBigMacPrices retrieves Big Mac Index prices across Middle East countries.
+  rpc ListBigMacPrices(ListBigMacPricesRequest) returns (ListBigMacPricesResponse) {
+    option (sebuf.http.config) = {path: "/list-bigmac-prices", method: HTTP_METHOD_GET};
   }
 
   // GetNationalDebt retrieves national debt clock data for all countries.
