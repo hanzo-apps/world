@@ -5,6 +5,56 @@
  * even if the Umami script has not loaded yet (e.g. ad blockers, SSR).
  */
 
+// ---------------------------------------------------------------------------
+// Type-safe event catalog — every event name lives here.
+// Typo in an event string = compile error.
+// ---------------------------------------------------------------------------
+
+const EVENTS = {
+  // Search
+  'search-open': true,
+  'search-used': true,
+  'search-result-selected': true,
+  // Country / map
+  'country-selected': true,
+  'country-brief-opened': true,
+  'map-layer-toggle': true,
+  // Panels
+  'panel-toggle': true,
+  // Settings
+  'settings-open': true,
+  'variant-switch': true,
+  'theme-changed': true,
+  'language-change': true,
+  'feature-toggle': true,
+  // News
+  'news-sort-toggle': true,
+  'news-summarize': true,
+  'live-news-fullscreen': true,
+  // Webcams
+  'webcam-selected': true,
+  'webcam-region-filter': true,
+  'webcam-fullscreen': true,
+  // Downloads / banners
+  'download-clicked': true,
+  'critical-banner': true,
+  // AI widget
+  'widget-ai-open': true,
+  'widget-ai-generate': true,
+  'widget-ai-success': true,
+  // MCP
+  'mcp-connect-attempt': true,
+  'mcp-connect-success': true,
+  'mcp-panel-add': true,
+} as const;
+
+export type UmamiEvent = keyof typeof EVENTS;
+
+/** Type-safe Umami wrapper. Safe to call even if the script hasn't loaded. */
+export function track(event: UmamiEvent, data?: Record<string, unknown>): void {
+  window.umami?.track(event, data);
+}
+
 export async function initAnalytics(): Promise<void> {
   // No-op: Umami initialises itself via the script tag in index.html.
 }
@@ -27,11 +77,11 @@ export function trackDownloadBannerDismissed(): void {}
 // ---------------------------------------------------------------------------
 
 export function trackSearchUsed(queryLength: number, resultCount: number): void {
-  window.umami?.track('search-used', { queryLength, resultCount });
+  track('search-used', { queryLength, resultCount });
 }
 
 export function trackSearchResultSelected(resultType: string): void {
-  window.umami?.track('search-result-selected', { type: resultType });
+  track('search-result-selected', { type: resultType });
 }
 
 // ---------------------------------------------------------------------------
@@ -39,16 +89,16 @@ export function trackSearchResultSelected(resultType: string): void {
 // ---------------------------------------------------------------------------
 
 export function trackCountrySelected(code: string, name: string, source: string): void {
-  window.umami?.track('country-selected', { code, name, source });
+  track('country-selected', { code, name, source });
 }
 
 export function trackCountryBriefOpened(countryCode: string): void {
-  window.umami?.track('country-brief-opened', { code: countryCode });
+  track('country-brief-opened', { code: countryCode });
 }
 
 export function trackMapLayerToggle(layerId: string, enabled: boolean, source: 'user' | 'programmatic'): void {
   if (source !== 'user') return;
-  window.umami?.track('map-layer-toggle', { layerId, enabled });
+  track('map-layer-toggle', { layerId, enabled });
 }
 
 export function trackMapViewChange(_view: string): void {
@@ -60,7 +110,7 @@ export function trackMapViewChange(_view: string): void {
 // ---------------------------------------------------------------------------
 
 export function trackPanelToggled(panelId: string, enabled: boolean): void {
-  window.umami?.track('panel-toggle', { panelId, enabled });
+  track('panel-toggle', { panelId, enabled });
 }
 
 export function trackPanelResized(_panelId: string, _newSpan: number): void {
@@ -72,19 +122,19 @@ export function trackPanelResized(_panelId: string, _newSpan: number): void {
 // ---------------------------------------------------------------------------
 
 export function trackVariantSwitch(from: string, to: string): void {
-  window.umami?.track('variant-switch', { from, to });
+  track('variant-switch', { from, to });
 }
 
 export function trackThemeChanged(theme: string): void {
-  window.umami?.track('theme-changed', { theme });
+  track('theme-changed', { theme });
 }
 
 export function trackLanguageChange(language: string): void {
-  window.umami?.track('language-change', { language });
+  track('language-change', { language });
 }
 
 export function trackFeatureToggle(featureId: string, enabled: boolean): void {
-  window.umami?.track('feature-toggle', { featureId, enabled });
+  track('feature-toggle', { featureId, enabled });
 }
 
 // ---------------------------------------------------------------------------
@@ -104,11 +154,11 @@ export function trackLLMFailure(_lastProvider: string): void {
 // ---------------------------------------------------------------------------
 
 export function trackWebcamSelected(webcamId: string, city: string, viewMode: string): void {
-  window.umami?.track('webcam-selected', { webcamId, city, viewMode });
+  track('webcam-selected', { webcamId, city, viewMode });
 }
 
 export function trackWebcamRegionFiltered(region: string): void {
-  window.umami?.track('webcam-region-filter', { region });
+  track('webcam-region-filter', { region });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,11 +166,11 @@ export function trackWebcamRegionFiltered(region: string): void {
 // ---------------------------------------------------------------------------
 
 export function trackDownloadClicked(platform: string): void {
-  window.umami?.track('download-clicked', { platform });
+  track('download-clicked', { platform });
 }
 
 export function trackCriticalBannerAction(action: string, theaterId: string): void {
-  window.umami?.track('critical-banner', { action, theaterId });
+  track('critical-banner', { action, theaterId });
 }
 
 export function trackFindingClicked(_id: string, _source: string, _type: string, _priority: string): void {
