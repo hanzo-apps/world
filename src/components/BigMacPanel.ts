@@ -38,16 +38,17 @@ export class BigMacPanel extends Panel {
     }
 
     const sorted = [...data.countries]
-      .filter(c => c.usdPrice)
-      .sort((a, b) => (b.usdPrice ?? 0) - (a.usdPrice ?? 0));
+      .filter((c): c is typeof c & { usdPrice: number } => c.usdPrice != null && c.usdPrice > 0)
+      .sort((a, b) => b.usdPrice - a.usdPrice);
+
+    const maxCode = sorted[0]?.code;
+    const minCode = sorted[sorted.length - 1]?.code;
 
     const rows = sorted.map(c => {
-      const isHigh = c.code === data.mostExpensiveCountry;
-      const isLow = c.code === data.cheapestCountry;
-      const cls = isLow ? 'gb-cheapest' : isHigh ? 'gb-priciest' : '';
+      const cls = c.code === minCode ? 'gb-cheapest' : c.code === maxCode ? 'gb-priciest' : '';
       return `<tr>
         <td class="gb-item-name">${escapeHtml(c.flag)} ${escapeHtml(c.name)}</td>
-        <td class="gb-cell ${cls}">$${(c.usdPrice ?? 0).toFixed(2)}</td>
+        <td class="gb-cell ${cls}">$${c.usdPrice.toFixed(2)}</td>
       </tr>`;
     }).join('');
 

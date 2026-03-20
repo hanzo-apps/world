@@ -130,7 +130,7 @@ export class ConsumerPricesPanel extends Panel {
     if (rangeBtn?.dataset.range) {
       this.settings.range = rangeBtn.dataset.range as PanelSettings['range'];
       saveSettings(this.settings);
-      this.loadData();
+      void this.fetchData();
       return;
     }
 
@@ -142,11 +142,7 @@ export class ConsumerPricesPanel extends Panel {
     }
   }
 
-  public fetchData(): Promise<void> {
-    return this.loadData();
-  }
-
-  public async loadData(): Promise<void> {
+  public async fetchData(): Promise<void> {
     if (this.loading) return;
     this.loading = true;
     this.showLoading();
@@ -160,6 +156,8 @@ export class ConsumerPricesPanel extends Panel {
       fetchRetailerPriceSpreads(market, basket),
       fetchConsumerPriceFreshness(market),
     ]);
+
+    if (!this.element?.isConnected) { this.loading = false; return; }
 
     this.overview = overview;
     this.categories = categories;
