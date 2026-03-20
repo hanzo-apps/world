@@ -19,6 +19,28 @@ import { getCableHealthRecord } from '@/services/cable-health';
 import { nameToCountryCode } from '@/services/country-geometry';
 import { sparkline } from '@/utils/sparkline';
 
+function formatPositionSource(source: string): string {
+  if (source === 'POSITION_SOURCE_WINGBITS') {
+    return '<a href="https://wingbits.com" target="_blank" rel="noopener" style="color:inherit">wingbits.com</a>';
+  }
+  if (source === 'POSITION_SOURCE_OPENSKY') {
+    return '<a href="https://opensky-network.org" target="_blank" rel="noopener" style="color:inherit">opensky-network.org</a>';
+  }
+  if (source === 'POSITION_SOURCE_SIMULATED') return 'Simulated';
+  return escapeHtml(source);
+}
+
+function fmtUtcTime(utc: string | undefined): string {
+  if (!utc) return '\u2014';
+  const d = new Date(utc.includes('T') ? utc : utc.replace(' ', 'T') + 'Z');
+  return isNaN(d.getTime()) ? '\u2014' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDelayMin(min: number | undefined): string {
+  if (min === undefined || min === 0) return '';
+  return `<span style="color:${min > 0 ? '#f97316' : '#22c55e'};font-size:10px;margin-left:3px">${min > 0 ? '+' : ''}${min}m</span>`;
+}
+
 export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'aircraft' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity' | 'stockExchange' | 'financialCenter' | 'centralBank' | 'commodityHub' | 'iranEvent' | 'gpsJamming' | 'radiation';
 
 interface TechEventPopupData {
@@ -860,20 +882,68 @@ export class MapPopup {
         return;
       }
 
+      const parts: string[] = [];
+
+      // Photo — sanitizeUrl validates scheme, preventing javascript: injection in img src
+      if (live.photoUrl) {
+        const photoSrc = sanitizeUrl(live.photoUrl);
+        if (photoSrc) {
+          const photoLink = live.photoLink ? sanitizeUrl(live.photoLink) : '#';
+          const credit = live.photoCredit ? `<span class="flight-photo-credit">\u00a9 ${escapeHtml(live.photoCredit)}</span>` : '';
+          parts.push(`<div class="flight-photo"><a href="${photoLink}" target="_blank" rel="noopener"><img src="${photoSrc}" alt="${escapeHtml(live.callsign)}" loading="lazy" style="width:100%;border-radius:4px;display:block"></a>${credit}</div>`);
+        }
+      }
+
+      // Route (FROM → TO)
+      if (live.depIata && live.arrIata) {
+        const terminal = live.arrTerminal ? `<span style="font-size:10px;opacity:0.5;margin-left:4px">T${escapeHtml(live.arrTerminal)}</span>` : '';
+        const duration = live.flightDurationMin ? `<span style="font-size:11px;opacity:0.6">${Math.floor(live.flightDurationMin / 60)}h${live.flightDurationMin % 60 > 0 ? ` ${live.flightDurationMin % 60}m` : ''}</span>` : '';
+        parts.push(`
+          <div class="flight-route" style="display:flex;align-items:center;gap:6px;margin:8px 0 4px;font-weight:700;font-size:18px">
+            <span>${escapeHtml(live.depIata)}</span>
+            <span style="font-size:12px;opacity:0.4;font-weight:400">&#9992;</span>
+            <span>${escapeHtml(live.arrIata)}${terminal}</span>
+            <span style="flex:1;text-align:right">${duration}</span>
+          </div>`);
+
+        const depSched = fmtUtcTime(live.depTimeUtc);
+        const arrSched = fmtUtcTime(live.arrTimeUtc);
+        const depEst = fmtUtcTime(live.depEstimatedUtc);
+        const arrEst = fmtUtcTime(live.arrEstimatedUtc);
+        const hasDelay = live.depDelayedMin !== 0 || live.arrDelayedMin !== 0;
+
+        parts.push(`
+          <div class="flight-times" style="font-size:11px;display:grid;grid-template-columns:1fr auto 1fr;gap:2px 8px;margin-bottom:6px;opacity:0.85">
+            <span style="opacity:0.5;font-size:10px;text-transform:uppercase">DEP</span>
+            <span></span>
+            <span style="opacity:0.5;font-size:10px;text-transform:uppercase;text-align:right">ARR</span>
+            <span style="opacity:0.5;font-size:10px">${t('popups.flight.scheduled') || 'Sched'}</span><span></span><span style="opacity:0.5;font-size:10px;text-align:right">${t('popups.flight.scheduled') || 'Sched'}</span>
+            <span>${depSched}</span><span style="opacity:0.3;text-align:center">\u2194</span><span style="text-align:right">${arrSched}</span>
+            ${hasDelay ? `
+            <span style="opacity:0.5;font-size:10px">${t('popups.flight.estimated') || 'Est'}</span><span></span><span style="opacity:0.5;font-size:10px;text-align:right">${t('popups.flight.estimated') || 'Est'}</span>
+            <span>${depEst}${fmtDelayMin(live.depDelayedMin)}</span><span style="opacity:0.3;text-align:center">\u2194</span><span style="text-align:right">${arrEst}${fmtDelayMin(live.arrDelayedMin)}</span>` : ''}
+          </div>`);
+      }
+
+      // Enrichment stats row
       const rows: string[] = [];
       if (live.registration) rows.push(`<div class="popup-stat"><span class="stat-label">Reg</span><span class="stat-value">${escapeHtml(live.registration)}</span></div>`);
       if (live.model) rows.push(`<div class="popup-stat"><span class="stat-label">Model</span><span class="stat-value">${escapeHtml(live.model)}</span></div>`);
       if (live.operator) rows.push(`<div class="popup-stat"><span class="stat-label">Operator</span><span class="stat-value">${escapeHtml(live.operator)}</span></div>`);
       if (live.verticalRate !== 0) rows.push(`<div class="popup-stat"><span class="stat-label">Climb</span><span class="stat-value">${live.verticalRate > 0 ? '+' : ''}${Math.round(live.verticalRate)} fpm</span></div>`);
 
-      if (rows.length === 0) {
+      if (parts.length === 0 && rows.length === 0) {
         section.innerHTML = '';
         return;
       }
 
+      const statsHtml = rows.length > 0 ? `<div class="popup-stats">${rows.join('')}</div>` : '';
       section.innerHTML = `
-        <div class="popup-section-label" style="font-size:10px;opacity:0.5;text-transform:uppercase;letter-spacing:.05em;margin-top:8px">Wingbits Live</div>
-        <div class="popup-stats">${rows.join('')}</div>
+        <div class="popup-section-label" style="font-size:10px;opacity:0.5;text-transform:uppercase;letter-spacing:.05em;margin-top:8px">
+          <a href="https://wingbits.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">wingbits.com</a>
+        </div>
+        ${parts.join('')}
+        ${statsHtml}
       `;
     } catch {
       if (section.isConnected) {
@@ -1287,7 +1357,7 @@ export class MapPopup {
           </div>
           <div class="popup-stat">
             <span class="stat-label">${t('popups.source')}</span>
-            <span class="stat-value">${escapeHtml(pos.source)}</span>
+            <span class="stat-value">${formatPositionSource(pos.source)}</span>
           </div>
           <div class="popup-stat">
             <span class="stat-label">${t('popups.updated')}</span>
