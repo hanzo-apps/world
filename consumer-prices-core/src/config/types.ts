@@ -75,7 +75,7 @@ export const RetailerConfigSchema = z.object({
           currencySymbols: z.array(z.string()).default([]),
         })
         .optional(),
-    }),
+    }).optional(),
     enabled: z.boolean().default(true),
   }),
 });
@@ -91,7 +91,7 @@ export const BasketItemSchema = z.object({
   substitutionGroup: z.string().optional(),
   minBaseQty: z.number().optional(),
   maxBaseQty: z.number().optional(),
-  qualificationRules: z.record(z.unknown()).optional(),
+  qualificationRules: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const BasketConfigSchema = z.object({

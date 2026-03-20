@@ -148,11 +148,11 @@ const SEED_META = {
   thermalEscalation:   { key: 'seed-meta:thermal:escalation',                 maxStaleMin: 240 },
   nationalDebt:        { key: 'seed-meta:economic:national-debt',              maxStaleMin: 10080 }, // 7 days — monthly seed
   tariffTrendsUs:      { key: 'seed-meta:trade:tariffs:v1:840:all:10',        maxStaleMin: 900 },
-  consumerPricesOverview:   { key: 'seed-meta:consumer-prices:overview:ae',     maxStaleMin: 240 },
-  consumerPricesCategories: { key: 'seed-meta:consumer-prices:categories:ae',   maxStaleMin: 240 },
-  consumerPricesMovers:     { key: 'seed-meta:consumer-prices:movers:ae:30d',   maxStaleMin: 240 },
-  consumerPricesSpread:     { key: 'seed-meta:consumer-prices:spread:ae',       maxStaleMin: 720 },
-  consumerPricesFreshness:  { key: 'seed-meta:consumer-prices:freshness:ae',    maxStaleMin: 30  },
+  consumerPricesOverview:   { key: 'seed-meta:consumer-prices:overview:ae',     maxStaleMin: 2880 }, // daily cron × 2
+  consumerPricesCategories: { key: 'seed-meta:consumer-prices:categories:ae',   maxStaleMin: 2880 },
+  consumerPricesMovers:     { key: 'seed-meta:consumer-prices:movers:ae:30d',   maxStaleMin: 2880 },
+  consumerPricesSpread:     { key: 'seed-meta:consumer-prices:spread:ae',       maxStaleMin: 2880 },
+  consumerPricesFreshness:  { key: 'seed-meta:consumer-prices:freshness:ae',    maxStaleMin: 2880 },
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).

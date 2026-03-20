@@ -26,13 +26,14 @@ export async function upsertProductMatch(input: {
   );
 }
 
-export async function getBasketItemId(basketSlug: string, category: string): Promise<string | null> {
+export async function getBasketItemId(basketSlug: string, canonicalName: string): Promise<string | null> {
   const result = await query<{ id: string }>(
     `SELECT bi.id FROM basket_items bi
      JOIN baskets b ON b.id = bi.basket_id
-     WHERE b.slug = $1 AND bi.category = $2 AND bi.active = true
+     JOIN canonical_products cp ON cp.id = bi.canonical_product_id
+     WHERE b.slug = $1 AND cp.canonical_name = $2 AND bi.active = true
      LIMIT 1`,
-    [basketSlug, category],
+    [basketSlug, canonicalName],
   );
   return result.rows[0]?.id ?? null;
 }
