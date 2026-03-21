@@ -12,6 +12,7 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 import { ValidationError } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 import { fetchJson } from '../../../_shared/fetch-json';
+import { cachedFetchJson } from '../../../_shared/redis';
 
 interface HNAlgoliaSignalHit {
   title?: string;
@@ -85,95 +86,117 @@ function slugFromDomain(domain: string): string {
   return domain.replace(/\.(com|io|co|org|net|ai|dev|app)$/, '').split('.').pop() || domain;
 }
 
-async function fetchHNSignals(companyName: string): Promise<CompanySignal[]> {
-  const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
-  const data = await fetchJson<HNAlgoliaSignalResponse>(
-    `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(companyName)}&tags=story&hitsPerPage=20&numericFilters=created_at_i>${thirtyDaysAgo}`,
-  );
-  if (!data?.hits) return [];
-
-  const now = Date.now();
-  return data.hits.map((h) => {
-    const ts = toEventTimeMs(h.created_at);
-    const recencyDays = (now - ts) / 86400000;
-    return {
-      type: classifySignal(h.title || ''),
-      title: h.title || '',
-      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID || ''}`,
-      source: 'Hacker News',
-      sourceTier: 2,
-      timestampMs: ts,
-      strength: scoreSignalStrength(h.points || 0, h.num_comments || 0, recencyDays),
-      engagement: {
-        points: h.points || 0,
-        comments: h.num_comments || 0,
-        stars: 0,
-        forks: 0,
-        mentions: 0,
-      },
-    };
-  });
+function hourBucket(): number {
+  return Math.floor(Date.now() / 3_600_000);
 }
 
-async function fetchGitHubSignals(orgName: string): Promise<CompanySignal[]> {
-  const repos = await fetchJson<GitHubSignalRepo[]>(`https://api.github.com/orgs/${encodeURIComponent(orgName)}/repos?sort=created&per_page=10`);
-  if (!Array.isArray(repos)) return [];
+async function fetchHNSignals(companyName: string): Promise<CompanySignal[] | null> {
+  return cachedFetchJson<CompanySignal[]>(
+    `intel:signals:hn:${encodeURIComponent(companyName.toLowerCase())}:${hourBucket()}`,
+    1800,
+    async () => {
+      const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
+      const data = await fetchJson<HNAlgoliaSignalResponse>(
+        `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(companyName)}&tags=story&hitsPerPage=20&numericFilters=created_at_i>${thirtyDaysAgo}`,
+      );
+      if (data === null || !data.hits) return null;
 
-  const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 86400000;
-
-  return repos
-    .filter((r) => toEventTimeMs(r.created_at) > thirtyDaysAgo)
-    .map((r) => ({
-      type: 'technology_adoption',
-      title: `New repository: ${r.full_name || 'unknown'} - ${r.description || 'No description'}`,
-      url: r.html_url || '',
-      source: 'GitHub',
-      sourceTier: 2,
-      timestampMs: toEventTimeMs(r.created_at),
-      strength: (r.stargazers_count || 0) > 50 ? 'high' : (r.stargazers_count || 0) > 10 ? 'medium' : 'low',
-      engagement: {
-        points: 0,
-        comments: 0,
-        stars: r.stargazers_count || 0,
-        forks: r.forks_count || 0,
-        mentions: 0,
-      },
-    }));
-}
-
-async function fetchJobSignals(companyName: string): Promise<CompanySignal[]> {
-  const sixtyDaysAgo = Math.floor(Date.now() / 1000) - 60 * 86400;
-  const data = await fetchJson<HNAlgoliaSignalResponse>(
-    `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(companyName)}&tags=comment,ask_hn&hitsPerPage=10&numericFilters=created_at_i>${sixtyDaysAgo}`,
-  );
-  if (!data?.hits) return [];
-
-  const hiringComments = data.hits.filter((h) => {
-    const text = (h.comment_text || '').toLowerCase();
-    return text.includes('hiring') || text.includes('job') || text.includes('apply');
-  });
-
-  if (hiringComments.length === 0) return [];
-  const firstComment = hiringComments[0];
-  if (!firstComment) return [];
-
-  return [{
-    type: 'hiring_surge',
-    title: `${companyName} hiring activity (${hiringComments.length} mentions in HN hiring threads)`,
-    url: `https://news.ycombinator.com/item?id=${firstComment.story_id || ''}`,
-    source: 'HN Hiring Threads',
-    sourceTier: 3,
-    timestampMs: toEventTimeMs(firstComment.created_at),
-    strength: hiringComments.length >= 3 ? 'high' : 'medium',
-    engagement: {
-      points: 0,
-      comments: 0,
-      stars: 0,
-      forks: 0,
-      mentions: hiringComments.length,
+      const now = Date.now();
+      return data.hits.map((h) => {
+        const ts = toEventTimeMs(h.created_at);
+        const recencyDays = (now - ts) / 86400000;
+        return {
+          type: classifySignal(h.title || ''),
+          title: h.title || '',
+          url: h.url || `https://news.ycombinator.com/item?id=${h.objectID || ''}`,
+          source: 'Hacker News',
+          sourceTier: 2,
+          timestampMs: ts,
+          strength: scoreSignalStrength(h.points || 0, h.num_comments || 0, recencyDays),
+          engagement: {
+            points: h.points || 0,
+            comments: h.num_comments || 0,
+            stars: 0,
+            forks: 0,
+            mentions: 0,
+          },
+        };
+      });
     },
-  }];
+  );
+}
+
+async function fetchGitHubSignals(orgName: string): Promise<CompanySignal[] | null> {
+  return cachedFetchJson<CompanySignal[]>(
+    `intel:signals:gh:${encodeURIComponent(orgName.toLowerCase())}:${hourBucket()}`,
+    3600,
+    async () => {
+      const repos = await fetchJson<GitHubSignalRepo[]>(`https://api.github.com/orgs/${encodeURIComponent(orgName)}/repos?sort=created&per_page=10`);
+      if (!Array.isArray(repos)) return null;
+
+      const now = Date.now();
+      const thirtyDaysAgo = now - 30 * 86400000;
+
+      return repos
+        .filter((r) => toEventTimeMs(r.created_at) > thirtyDaysAgo)
+        .map((r) => ({
+          type: 'technology_adoption',
+          title: `New repository: ${r.full_name || 'unknown'} - ${r.description || 'No description'}`,
+          url: r.html_url || '',
+          source: 'GitHub',
+          sourceTier: 2,
+          timestampMs: toEventTimeMs(r.created_at),
+          strength: (r.stargazers_count || 0) > 50 ? 'high' : (r.stargazers_count || 0) > 10 ? 'medium' : 'low',
+          engagement: {
+            points: 0,
+            comments: 0,
+            stars: r.stargazers_count || 0,
+            forks: r.forks_count || 0,
+            mentions: 0,
+          },
+        }));
+    },
+  );
+}
+
+async function fetchJobSignals(companyName: string): Promise<CompanySignal[] | null> {
+  return cachedFetchJson<CompanySignal[]>(
+    `intel:signals:jobs:${encodeURIComponent(companyName.toLowerCase())}:${hourBucket()}`,
+    1800,
+    async () => {
+      const sixtyDaysAgo = Math.floor(Date.now() / 1000) - 60 * 86400;
+      const data = await fetchJson<HNAlgoliaSignalResponse>(
+        `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(companyName)}&tags=comment,ask_hn&hitsPerPage=10&numericFilters=created_at_i>${sixtyDaysAgo}`,
+      );
+      if (data === null || !data.hits) return null;
+
+      const hiringComments = data.hits.filter((h) => {
+        const text = (h.comment_text || '').toLowerCase();
+        return text.includes('hiring') || text.includes('job') || text.includes('apply');
+      });
+
+      if (hiringComments.length === 0) return [];
+      const firstComment = hiringComments[0];
+      if (!firstComment) return [];
+
+      return [{
+        type: 'hiring_surge',
+        title: `${companyName} hiring activity (${hiringComments.length} mentions in HN hiring threads)`,
+        url: `https://news.ycombinator.com/item?id=${firstComment.story_id || ''}`,
+        source: 'HN Hiring Threads',
+        sourceTier: 3,
+        timestampMs: toEventTimeMs(firstComment.created_at),
+        strength: hiringComments.length >= 3 ? 'high' : 'medium',
+        engagement: {
+          points: 0,
+          comments: 0,
+          stars: 0,
+          forks: 0,
+          mentions: hiringComments.length,
+        },
+      }];
+    },
+  );
 }
 
 export async function listCompanySignals(
@@ -195,7 +218,7 @@ export async function listCompanySignals(
     fetchJobSignals(company),
   ]);
 
-  const allSignals = [...hnSignals, ...githubSignals, ...jobSignals]
+  const allSignals = [...(hnSignals ?? []), ...(githubSignals ?? []), ...(jobSignals ?? [])]
     .sort((a, b) => b.timestampMs - a.timestampMs);
 
   const signalTypeCounts: Record<string, number> = {};
