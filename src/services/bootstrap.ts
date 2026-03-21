@@ -144,8 +144,7 @@ async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<Bo
         }
       }
       if (filledAny) {
-        tierState = { source: 'mixed', updatedAt: cached.updatedAt };
-        saveUpdatedAt = cached.updatedAt; // preserve staleness: don't let cache write reset the age clock
+        tierState = { source: 'mixed', updatedAt: Date.now() };
       }
     }
   }
