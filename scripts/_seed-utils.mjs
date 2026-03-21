@@ -297,7 +297,14 @@ export function parseYahooChart(data, symbol) {
 }
 
 export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}) {
-  const { validateFn, ttlSeconds, lockTtlMs = 120_000, extraKeys, afterPublish } = opts;
+  const {
+    validateFn,
+    ttlSeconds,
+    lockTtlMs = 120_000,
+    extraKeys,
+    afterPublish,
+    publishTransform,
+  } = opts;
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const startMs = Date.now();
 
@@ -338,7 +345,8 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
 
   // Phase 2: Publish to Redis (rethrow on failure — data was fetched but not stored)
   try {
-    const publishResult = await atomicPublish(canonicalKey, data, validateFn, ttlSeconds);
+    const publishData = publishTransform ? publishTransform(data) : data;
+    const publishResult = await atomicPublish(canonicalKey, publishData, validateFn, ttlSeconds);
     if (publishResult.skipped) {
       const durationMs = Date.now() - startMs;
       const keys = [canonicalKey, `seed-meta:${domain}:${resource}`];
