@@ -155,8 +155,11 @@ const SEED_META = {
   consumerPricesCategories: { key: 'seed-meta:consumer-prices:categories:ae:30d',            maxStaleMin: 90 },
   consumerPricesMovers:     { key: 'seed-meta:consumer-prices:movers:ae:30d',               maxStaleMin: 90 },
   consumerPricesSpread:     { key: 'seed-meta:consumer-prices:retailer-spread:ae:essentials-ae', maxStaleMin: 120 }, // TTL=60min; 2× interval
-  consumerPricesFreshness:  { key: 'seed-meta:consumer-prices:freshness:ae',    maxStaleMin: 30  }, // TTL=10min; 3× interval
-  tokenPanels:       { key: 'seed-meta:market:token-panels',                   maxStaleMin: 90 }, // cron every 30min; 3× interval
+  consumerPricesFreshness:  { key: 'seed-meta:consumer-prices:freshness:ae',    maxStaleMin: 90 }, // publish.ts runs independently; align with other consumer-prices keys
+  // defiTokens/aiTokens/otherTokens all share one seed run (seed-token-panels cron, every 30min)
+  defiTokens:        { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
+  aiTokens:          { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
+  otherTokens:       { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
