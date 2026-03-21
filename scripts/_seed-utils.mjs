@@ -282,6 +282,140 @@ export function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ---------------------------------------------------------------------------
+// Learned Routes — persist successful scrape URLs across seed runs
+// ---------------------------------------------------------------------------
+
+// Validate a URL's hostname against a list of allowed domains (same list used
+// for EXA includeDomains). Prevents stored-SSRF from Redis-persisted URLs.
+export function isAllowedRouteHost(url, allowedHosts) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    return allowedHosts.some(h => hostname === h || hostname.endsWith('.' + h));
+  } catch {
+    return false;
+  }
+}
+
+// Batch-read all learned routes for a scope via single Upstash pipeline request.
+// Returns Map<key → routeData>. Non-fatal: throws on HTTP error (caller catches).
+export async function bulkReadLearnedRoutes(scope, keys) {
+  if (!keys.length) return new Map();
+  const { url, token } = getRedisCredentials();
+  const pipeline = keys.map(k => ['GET', `seed-routes:${scope}:${k}`]);
+  const resp = await fetch(`${url}/pipeline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(pipeline),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!resp.ok) throw new Error(`bulkReadLearnedRoutes HTTP ${resp.status}`);
+  const results = await resp.json();
+  const map = new Map();
+  for (let i = 0; i < keys.length; i++) {
+    const raw = results[i]?.result;
+    if (!raw) continue;
+    try { map.set(keys[i], JSON.parse(raw)); }
+    catch { console.warn(`  [routes] malformed JSON for ${keys[i]} — skipping`); }
+  }
+  return map;
+}
+
+// Batch-write route updates and hard-delete evicted routes via single pipeline.
+// Keys in updates always win over deletes (SET/DEL conflict resolution).
+// DELs are sent before SETs to ensure correct ordering.
+export async function bulkWriteLearnedRoutes(scope, updates, deletes = new Set()) {
+  const { url, token } = getRedisCredentials();
+  const ROUTE_TTL = 14 * 24 * 3600; // 14 days
+  const effectiveDeletes = [...deletes].filter(k => !updates.has(k));
+  const pipeline = [];
+  for (const k of effectiveDeletes)
+    pipeline.push(['DEL', `seed-routes:${scope}:${k}`]);
+  for (const [k, v] of updates)
+    pipeline.push(['SET', `seed-routes:${scope}:${k}`, JSON.stringify(v), 'EX', ROUTE_TTL]);
+  if (!pipeline.length) return;
+  const resp = await fetch(`${url}/pipeline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(pipeline),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!resp.ok) throw new Error(`bulkWriteLearnedRoutes HTTP ${resp.status}`);
+  console.log(`  [routes] written: ${updates.size} updated, ${effectiveDeletes.length} deleted`);
+}
+
+// Decision tree for a single seed item: try learned route first, fall back to EXA.
+// All external I/O is injected so this function can be unit-tested without Redis or HTTP.
+//
+// Returns: { localPrice, sourceSite, routeUpdate, routeDelete }
+//   routeUpdate — route object to persist (null = nothing to write)
+//   routeDelete — true if the Redis key should be hard-deleted
+export async function processItemRoute({
+  learned,           // route object from Redis, or undefined/null on first run
+  allowedHosts,      // string[] — normalised (no www.), same as EXA includeDomains
+  currency,          // e.g. 'AED'
+  itemId,            // e.g. 'sugar' — used only for log messages
+  fxRate,            // number | null
+  itemUsdMax = null, // per-item bulk cap in USD (ITEM_USD_MAX[itemId])
+  tryDirectFetch,    // async (url, currency, itemId, fxRate) => number | null
+  scrapeFirecrawl,   // async (url, currency) => { price, source } | null
+  fetchViaExa,       // async () => { localPrice, sourceSite } | null  (caller owns EXA+FC logic)
+  sleep: sleepFn,    // async ms => void
+  firecrawlDelayMs = 0,
+}) {
+  let localPrice = null;
+  let sourceSite = '';
+  let routeUpdate = null;
+  let routeDelete = false;
+
+  if (learned) {
+    if (learned.failsSinceSuccess >= 2 || !isAllowedRouteHost(learned.url, allowedHosts)) {
+      routeDelete = true;
+      console.log(`    [learned✗] ${itemId}: evicting (${learned.failsSinceSuccess >= 2 ? '2 failures' : 'invalid host'})`);
+    } else {
+      localPrice = await tryDirectFetch(learned.url, currency, itemId, fxRate);
+      if (localPrice !== null) {
+        sourceSite = learned.url;
+        routeUpdate = { ...learned, hits: learned.hits + 1, failsSinceSuccess: 0, lastSuccessAt: Date.now() };
+        console.log(`    [learned✓] ${itemId}: ${localPrice} ${currency}`);
+      } else {
+        await sleepFn(firecrawlDelayMs);
+        const fc = await scrapeFirecrawl(learned.url, currency);
+        const fcSkip = fc && fxRate && itemUsdMax && (fc.price * fxRate) > itemUsdMax;
+        if (fc && !fcSkip) {
+          localPrice = fc.price;
+          sourceSite = fc.source;
+          routeUpdate = { ...learned, hits: learned.hits + 1, failsSinceSuccess: 0, lastSuccessAt: Date.now() };
+          console.log(`    [learned-FC✓] ${itemId}: ${localPrice} ${currency}`);
+        } else {
+          const newFails = learned.failsSinceSuccess + 1;
+          if (newFails >= 2) {
+            routeDelete = true;
+            console.log(`    [learned✗→EXA] ${itemId}: 2 failures — evicting, retrying via EXA`);
+          } else {
+            routeUpdate = { ...learned, failsSinceSuccess: newFails };
+            console.log(`    [learned✗→EXA] ${itemId}: failed (${newFails}/2), retrying via EXA`);
+          }
+        }
+      }
+    }
+  }
+
+  if (localPrice === null) {
+    const exaResult = await fetchViaExa();
+    if (exaResult?.localPrice != null) {
+      localPrice = exaResult.localPrice;
+      sourceSite = exaResult.sourceSite || '';
+      if (sourceSite && isAllowedRouteHost(sourceSite, allowedHosts)) {
+        routeUpdate = { url: sourceSite, lastSuccessAt: Date.now(), hits: 1, failsSinceSuccess: 0, currency };
+        console.log(`    [EXA->learned] ${itemId}: saved ${sourceSite.slice(0, 55)}`);
+      }
+    }
+  }
+
+  return { localPrice, sourceSite, routeUpdate, routeDelete };
+}
+
 /**
  * Read the current canonical snapshot from Redis before a seed run overwrites it.
  * Used by seed scripts that compute WoW deltas (bigmac, grocery-basket).
