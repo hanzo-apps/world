@@ -626,6 +626,7 @@ export class App {
       refreshOpenCountryBrief: () => this.countryIntel.refreshOpenBrief(),
       stopLayerActivity: (layer) => this.dataLoader.stopLayerActivity(layer),
       mountLiveNewsIfReady: () => this.panelLayout.mountLiveNewsIfReady(),
+      updateFlightSource: (adsb, military) => this.searchManager.updateFlightSource(adsb, military),
     });
 
     // Wire cross-module callback: DataLoader → SearchManager
