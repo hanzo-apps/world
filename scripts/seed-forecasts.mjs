@@ -24,6 +24,7 @@ const WORLD_STATE_HISTORY_LIMIT = 6;
 const FORECAST_REFRESH_REQUEST_KEY = 'forecast:refresh-request:v1';
 const PUBLISH_MIN_PROBABILITY = 0;
 const PANEL_MIN_PROBABILITY = 0.1;
+const CANONICAL_PAYLOAD_SOFT_LIMIT_BYTES = 4 * 1024 * 1024;
 const ENRICHMENT_COMBINED_MAX = 5;
 const ENRICHMENT_SCENARIO_MAX = 3;
 const ENRICHMENT_MAX_PER_DOMAIN = 2;
@@ -107,6 +108,48 @@ const CHOKEPOINT_MARKET_REGIONS = {
   'Strait of Malacca': 'South China Sea',
   'Kerch Strait': 'Black Sea',
   'Bosporus Strait': 'Black Sea',
+};
+
+const MARKET_INPUT_KEYS = {
+  stocks: 'market:stocks-bootstrap:v1',
+  commodities: 'market:commodities-bootstrap:v1',
+  sectors: 'market:sectors:v1',
+  gulfQuotes: 'market:gulf-quotes:v1',
+  etfFlows: 'market:etf-flows:v1',
+  crypto: 'market:crypto:v1',
+  stablecoins: 'market:stablecoins:v1',
+  bisExchange: 'economic:bis:eer:v1',
+  bisPolicy: 'economic:bis:policy:v1',
+  shippingRates: 'supply_chain:shipping:v2',
+  correlationCards: 'correlation:cards-bootstrap:v1',
+};
+
+const MARKET_BUCKET_CONFIG = [
+  { id: 'energy', label: 'Energy', signalTypes: ['energy_supply_shock', 'commodity_repricing', 'inflation_impulse'] },
+  { id: 'freight', label: 'Freight', signalTypes: ['shipping_cost_shock', 'inflation_impulse'] },
+  { id: 'defense', label: 'Defense', signalTypes: ['security_escalation', 'defense_repricing'] },
+  { id: 'semis', label: 'Semiconductors', signalTypes: ['shipping_cost_shock', 'cyber_cost_repricing', 'infrastructure_capacity_loss'] },
+  { id: 'sovereign_risk', label: 'Sovereign Risk', signalTypes: ['security_escalation', 'sovereign_stress', 'risk_off_rotation'] },
+  { id: 'fx_stress', label: 'FX Stress', signalTypes: ['fx_stress', 'sovereign_stress', 'risk_off_rotation'] },
+  { id: 'rates_inflation', label: 'Rates and Inflation', signalTypes: ['policy_rate_pressure', 'inflation_impulse', 'energy_supply_shock', 'shipping_cost_shock'] },
+  { id: 'crypto_stablecoins', label: 'Crypto and Stablecoins', signalTypes: ['risk_off_rotation', 'fx_stress'] },
+];
+
+const REGION_MACRO_BUCKETS = {
+  'Middle East': 'EMEA',
+  'Red Sea': 'EMEA',
+  'Israel/Gaza': 'EMEA',
+  'Eastern Mediterranean': 'EMEA',
+  'Black Sea': 'EMEA',
+  'Northern Europe': 'EMEA',
+  'Europe': 'EMEA',
+  'Western Pacific': 'APAC',
+  'South China Sea': 'APAC',
+  'Korean Peninsula': 'APAC',
+  'Asia-Pacific': 'APAC',
+  'Latin America': 'Americas',
+  'Americas': 'Americas',
+  'United States': 'Americas',
 };
 
 const REGION_KEYWORDS = {
@@ -238,6 +281,17 @@ async function readInputKeys() {
     'intelligence:gpsjam:v2',
     'news:insights:v1',
     'news:digest:v1:full:en',
+    MARKET_INPUT_KEYS.stocks,
+    MARKET_INPUT_KEYS.commodities,
+    MARKET_INPUT_KEYS.sectors,
+    MARKET_INPUT_KEYS.gulfQuotes,
+    MARKET_INPUT_KEYS.etfFlows,
+    MARKET_INPUT_KEYS.crypto,
+    MARKET_INPUT_KEYS.stablecoins,
+    MARKET_INPUT_KEYS.bisExchange,
+    MARKET_INPUT_KEYS.bisPolicy,
+    MARKET_INPUT_KEYS.shippingRates,
+    MARKET_INPUT_KEYS.correlationCards,
   ];
   const pipeline = keys.map(k => ['GET', k]);
   const resp = await fetch(`${url}/pipeline`, {
@@ -268,6 +322,17 @@ async function readInputKeys() {
     gpsJamming: normalizeGpsJamming(parse(11)),
     newsInsights: parse(12),
     newsDigest: parse(13),
+    marketQuotes: parse(14),
+    commodityQuotes: parse(15),
+    sectorSummary: parse(16),
+    gulfQuotes: parse(17),
+    etfFlows: parse(18),
+    cryptoQuotes: parse(19),
+    stablecoinMarkets: parse(20),
+    bisExchangeRates: parse(21),
+    bisPolicyRates: parse(22),
+    shippingRates: parse(23),
+    correlationCards: parse(24),
   };
 }
 
@@ -2032,6 +2097,130 @@ function buildForecastTraceRecord(pred, rank, simulationByForecastId = null) {
       narrativeSource: 'fallback',
       branchSource: 'deterministic',
     },
+  };
+}
+
+function slimForecastCaseForPublish(caseFile = null) {
+  if (!caseFile) return null;
+  return {
+    supportingEvidence: (caseFile.supportingEvidence || []).slice(0, 4).map((item) => ({
+      type: item.type || '',
+      summary: item.summary || '',
+      weight: Number(item.weight || 0),
+    })),
+    counterEvidence: (caseFile.counterEvidence || []).slice(0, 3).map((item) => ({
+      type: item.type || '',
+      summary: item.summary || '',
+      weight: Number(item.weight || 0),
+    })),
+    triggers: (caseFile.triggers || []).slice(0, 3),
+    actorLenses: (caseFile.actorLenses || []).slice(0, 3),
+    baseCase: caseFile.baseCase || '',
+    escalatoryCase: caseFile.escalatoryCase || '',
+    contrarianCase: caseFile.contrarianCase || '',
+    changeSummary: caseFile.changeSummary || '',
+    changeItems: (caseFile.changeItems || []).slice(0, 4),
+    actors: (caseFile.actors || []).slice(0, 4).map((actor) => ({
+      id: actor.id || '',
+      name: actor.name || '',
+      category: actor.category || '',
+      role: actor.role || '',
+      objectives: (actor.objectives || []).slice(0, 2),
+      constraints: (actor.constraints || []).slice(0, 2),
+      likelyActions: (actor.likelyActions || []).slice(0, 2),
+      influenceScore: Number(actor.influenceScore || 0),
+    })),
+    worldState: caseFile.worldState ? {
+      summary: caseFile.worldState.summary || '',
+      activePressures: (caseFile.worldState.activePressures || []).slice(0, 3),
+      stabilizers: (caseFile.worldState.stabilizers || []).slice(0, 3),
+      keyUnknowns: (caseFile.worldState.keyUnknowns || []).slice(0, 3),
+    } : null,
+    branches: (caseFile.branches || []).slice(0, 3).map((branch) => ({
+      kind: branch.kind || '',
+      title: branch.title || '',
+      summary: branch.summary || '',
+      outcome: branch.outcome || '',
+      projectedProbability: Number(branch.projectedProbability || 0),
+      rounds: (branch.rounds || []).slice(0, 3).map((round) => ({
+        round: Number(round.round || 0),
+        focus: round.focus || '',
+        developments: (round.developments || []).slice(0, 2),
+        actorMoves: (round.actorMoves || []).slice(0, 2),
+        probabilityShift: Number(round.probabilityShift || 0),
+      })),
+    })),
+  };
+}
+
+function buildPublishedForecastPayload(pred) {
+  return {
+    id: pred.id,
+    domain: pred.domain,
+    region: pred.region,
+    title: pred.title,
+    scenario: pred.scenario || '',
+    feedSummary: pred.feedSummary || '',
+    probability: Number(pred.probability || 0),
+    confidence: Number(pred.confidence || 0),
+    timeHorizon: pred.timeHorizon || '',
+    signals: (pred.signals || []).slice(0, 6).map((signal) => ({
+      type: signal.type || '',
+      value: signal.value || '',
+      weight: Number(signal.weight || 0),
+    })),
+    cascades: (pred.cascades || []).slice(0, 3).map((cascade) => ({
+      domain: cascade.domain || '',
+      effect: cascade.effect || '',
+      probability: Number(cascade.probability || 0),
+    })),
+    trend: pred.trend || '',
+    priorProbability: pred.priorProbability == null ? 0 : Number(pred.priorProbability),
+    calibration: pred.calibration ? {
+      marketTitle: pred.calibration.marketTitle || '',
+      marketPrice: Number(pred.calibration.marketPrice || 0),
+      drift: Number(pred.calibration.drift || 0),
+      source: pred.calibration.source || '',
+    } : null,
+    createdAt: Number(pred.createdAt || 0),
+    updatedAt: Number(pred.updatedAt || 0),
+    perspectives: pred.perspectives ? {
+      strategic: pred.perspectives.strategic || '',
+      regional: pred.perspectives.regional || '',
+      contrarian: pred.perspectives.contrarian || '',
+    } : null,
+    projections: pred.projections ? {
+      h24: Number(pred.projections.h24 || 0),
+      d7: Number(pred.projections.d7 || 0),
+      d30: Number(pred.projections.d30 || 0),
+    } : null,
+    caseFile: slimForecastCaseForPublish(pred.caseFile),
+  };
+}
+
+function logCanonicalPayloadDiagnostics(predictions) {
+  const entries = predictions.map((pred) => {
+    const payload = buildPublishedForecastPayload(pred);
+    return {
+      id: pred.id,
+      bytes: Buffer.byteLength(JSON.stringify(payload), 'utf8'),
+    };
+  }).sort((a, b) => b.bytes - a.bytes || a.id.localeCompare(b.id));
+  const totalBytes = entries.reduce((sum, item) => sum + item.bytes, 0);
+  const avgBytes = entries.length ? Math.round(totalBytes / entries.length) : 0;
+  console.log(`  [Publish] Canonical payload ${(totalBytes / 1024 / 1024).toFixed(2)}MB total (${avgBytes}B avg per forecast)`);
+  if (totalBytes > CANONICAL_PAYLOAD_SOFT_LIMIT_BYTES) {
+    const topHeaviest = entries.slice(0, 3).map((item) => `${item.id}:${(item.bytes / 1024).toFixed(1)}KB`).join(', ');
+    console.warn(`  [Publish] Canonical payload above soft limit ${Math.round(CANONICAL_PAYLOAD_SOFT_LIMIT_BYTES / 1024 / 1024)}MB; heaviest forecasts: ${topHeaviest}`);
+  }
+}
+
+function buildPublishedSeedPayload(data) {
+  const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
+  logCanonicalPayloadDiagnostics(predictions);
+  return {
+    generatedAt: data?.generatedAt || Date.now(),
+    predictions: predictions.map(buildPublishedForecastPayload),
   };
 }
 
@@ -5101,6 +5290,26 @@ function buildWorldStateReport(worldState) {
     label: `${item.sourceLabel} -> ${item.targetLabel}`,
     summary: `${item.sourceLabel} did not promote into ${item.targetLabel} via ${String(item.channel || '').replace(/_/g, ' ')} because of ${item.reason.replace(/_/g, ' ')}, despite ${(Number(item.confidence || 0) * 100).toFixed(0)}% candidate confidence.`,
   }));
+  const marketBuckets = Array.isArray(worldState.marketState?.buckets) ? worldState.marketState.buckets : [];
+  const transmissionEdges = Array.isArray(worldState.marketTransmission?.edges) ? worldState.marketTransmission.edges : [];
+  const marketWatchlist = marketBuckets
+    .slice()
+    .sort((a, b) => (b.pressureScore || 0) - (a.pressureScore || 0) || a.label.localeCompare(b.label))
+    .slice(0, 6)
+    .map((bucket) => ({
+      type: `market_bucket_${bucket.id}`,
+      label: bucket.label,
+      summary: `${bucket.label} is ${bucket.direction} at ${roundPct(bucket.pressureScore || 0)} pressure with ${bucket.topSignals.length} leading signals and ${bucket.topSituations.length} linked situations.`,
+    }));
+  const transmissionWatchlist = transmissionEdges
+    .slice()
+    .sort((a, b) => (b.strength + b.confidence) - (a.strength + a.confidence) || a.sourceLabel.localeCompare(b.sourceLabel))
+    .slice(0, 6)
+    .map((edge) => ({
+      type: `market_transmission_${edge.targetBucketId}`,
+      label: `${edge.sourceLabel} -> ${edge.targetLabel}`,
+      summary: `${edge.sourceLabel} is feeding ${edge.targetLabel} via ${String(edge.channel || 'derived_transmission').replace(/_/g, ' ')} at ${(edge.confidence * 100).toFixed(0)}% confidence.`,
+    }));
 
   const familyWatchlist = (worldState.situationFamilies || [])
     .slice(0, 6)
@@ -5110,12 +5319,13 @@ function buildWorldStateReport(worldState) {
       summary: `${family.label} currently groups ${family.situationCount} situations across ${family.forecastCount} forecasts.`,
     }));
 
-  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} reportable interaction links, ${worldState.simulationState?.internalEffects?.length || 0} internal effects, ${crossSituationEffects.length} cross-situation system effects, ${(worldState.simulationState?.memoryMutations?.situations || []).length} mutated situation memories, and ${(worldState.simulationState?.causalReplay?.chains || []).length} causal replay chains in the report view.`;
+  const summary = `${worldState.summary} The leading domains in this run are ${leadDomains.join(', ') || 'none'}, the main continuity changes are captured through ${worldState.actorContinuity?.newlyActiveCount || 0} newly active actors and ${worldState.branchContinuity?.strengthenedBranchCount || 0} strengthened branches, the situation layer currently carries ${worldState.situationClusters?.length || 0} active clusters inside ${worldState.situationFamilies?.length || 0} broader families, the market layer carries ${marketBuckets.length} active buckets and ${transmissionEdges.length} transmission edges, and the simulation layer reports ${worldState.simulationState?.totalSituationSimulations || 0} executable units with ${(worldState.simulationState?.actionLedger || []).length} logged actions and ${interactionLedger.length} reportable interaction links, ${worldState.simulationState?.internalEffects?.length || 0} internal effects, ${crossSituationEffects.length} cross-situation system effects, ${(worldState.simulationState?.memoryMutations?.situations || []).length} mutated situation memories, and ${(worldState.simulationState?.causalReplay?.chains || []).length} causal replay chains in the report view.`;
 
   return {
     summary,
     continuitySummary,
     simulationSummary,
+    marketSummary: worldState.marketState?.summary || '',
     simulationInputSummary: simulationReportInputs.summary,
     simulationEnvironmentSummary: worldState.simulationState?.environmentSpec?.summary || '',
     memoryMutationSummary: worldState.simulationState?.memoryMutations?.summary || '',
@@ -5130,6 +5340,8 @@ function buildWorldStateReport(worldState) {
     branchWatchlist,
     situationWatchlist,
     familyWatchlist,
+    marketWatchlist,
+    transmissionWatchlist,
     continuityWatchlist,
     simulationWatchlist,
     interactionWatchlist,
@@ -5297,9 +5509,451 @@ function buildForecastRunContinuity(predictions) {
   };
 }
 
+function createStableHash(value) {
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 10);
+}
+
+function extractQuoteItems(payload) {
+  return Array.isArray(payload?.quotes) ? payload.quotes : [];
+}
+
+function extractSectorItems(payload) {
+  return Array.isArray(payload?.sectors) ? payload.sectors : [];
+}
+
+function extractEtfItems(payload) {
+  return Array.isArray(payload?.etfs) ? payload.etfs : [];
+}
+
+function extractRateItems(payload) {
+  return Array.isArray(payload?.rates) ? payload.rates : [];
+}
+
+function extractShippingIndices(payload) {
+  return Array.isArray(payload?.indices) ? payload.indices : [];
+}
+
+function extractCorrelationCards(payload) {
+  if (Array.isArray(payload?.cards)) return payload.cards;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function normalizeSignalStrength(value, min = 0, max = 1) {
+  return +Math.max(0, Math.min(1, normalize(value, min, max))).toFixed(3);
+}
+
+function buildWorldSignal(type, sourceType, label, patch = {}) {
+  return {
+    id: `sig-${createStableHash(`${type}:${sourceType}:${label}:${patch.region || ''}:${patch.sourceKey || ''}`)}`,
+    type,
+    sourceType,
+    sourceKey: patch.sourceKey || '',
+    label,
+    region: patch.region || '',
+    macroRegion: patch.macroRegion || getMacroRegion([patch.region || '']) || '',
+    countries: uniqueSortedStrings(patch.countries || []),
+    actors: uniqueSortedStrings(patch.actors || []),
+    domains: uniqueSortedStrings(patch.domains || []),
+    strength: normalizeSignalStrength(patch.strength ?? 0, 0, 1),
+    confidence: normalizeSignalStrength(patch.confidence ?? 0, 0, 1),
+    supportingEvidence: (patch.supportingEvidence || []).slice(0, 3),
+  };
+}
+
+function summarizeWorldSignals(signals = []) {
+  const typeCounts = summarizeTypeCounts(signals.map((item) => item.type));
+  const regionCounts = summarizeTypeCounts(signals.map((item) => item.region).filter(Boolean));
+  const leadTypes = pickTopCountEntries(typeCounts, 4).map((item) => item.type.replace(/_/g, ' '));
+  const leadRegions = pickTopCountEntries(regionCounts, 3).map((item) => item.type);
+  return `${signals.length} normalized world signals are currently active, led by ${leadTypes.join(', ') || 'none'} across ${leadRegions.join(', ') || 'global'} contexts.`;
+}
+
+function buildWorldSignals(inputs, predictions = [], _situationClusters = []) {
+  const signals = [];
+  const chokepoints = inputs?.chokepoints?.routes || inputs?.chokepoints?.chokepoints || [];
+  const shippingIndices = extractShippingIndices(inputs?.shippingRates);
+  const commodityQuotes = extractQuoteItems(inputs?.commodityQuotes);
+  const marketQuotes = extractQuoteItems(inputs?.marketQuotes);
+  const sectorItems = extractSectorItems(inputs?.sectorSummary);
+  const gulfQuotes = extractQuoteItems(inputs?.gulfQuotes);
+  const etfItems = extractEtfItems(inputs?.etfFlows);
+  const cryptoQuotes = extractQuoteItems(inputs?.cryptoQuotes);
+  const stablecoins = Array.isArray(inputs?.stablecoinMarkets?.stablecoins) ? inputs.stablecoinMarkets.stablecoins : [];
+  const bisExchange = extractRateItems(inputs?.bisExchangeRates);
+  const bisPolicy = extractRateItems(inputs?.bisPolicyRates);
+  const correlationCards = extractCorrelationCards(inputs?.correlationCards);
+
+  for (const cp of chokepoints) {
+    const region = resolveChokepointMarketRegion(cp) || cp.region || cp.name || '';
+    const commodity = CHOKEPOINT_COMMODITIES[region];
+    const riskScore = Number(cp.riskScore || cp.disruptionScore || (cp.riskLevel === 'critical' ? 85 : 70));
+    if (riskScore < 60) continue;
+    signals.push(buildWorldSignal('shipping_cost_shock', 'chokepoint', `${cp.name || region} disruption pressure`, {
+      sourceKey: cp.id || cp.name || region,
+      region,
+      strength: normalize(riskScore, 55, 100),
+      confidence: commodity ? 0.72 : 0.64,
+      domains: ['supply_chain', 'market'],
+      supportingEvidence: [`${cp.name || region} risk score ${riskScore}`],
+    }));
+    if (commodity && /oil|gas|energy/i.test(commodity.commodity)) {
+      signals.push(buildWorldSignal('energy_supply_shock', 'chokepoint', `${cp.name || region} energy exposure`, {
+        sourceKey: cp.id || cp.name || region,
+        region,
+        strength: normalize(riskScore * commodity.sensitivity, 35, 85),
+        confidence: 0.76,
+        domains: ['market', 'supply_chain'],
+        supportingEvidence: [`${commodity.commodity} sensitivity ${commodity.sensitivity}`],
+      }));
+    }
+    if (commodity) {
+      signals.push(buildWorldSignal('commodity_repricing', 'chokepoint', `${commodity.commodity} repricing risk from ${cp.name || region}`, {
+        sourceKey: cp.id || cp.name || region,
+        region,
+        strength: normalize(riskScore * commodity.sensitivity, 30, 90),
+        confidence: 0.68,
+        domains: ['market'],
+        supportingEvidence: [`${commodity.commodity} exposure through ${cp.name || region}`],
+      }));
+    }
+  }
+
+  for (const index of shippingIndices) {
+    const changePct = Math.abs(Number(index.changePct || 0));
+    if (!index.spikeAlert && changePct < 5) continue;
+    signals.push(buildWorldSignal('shipping_cost_shock', 'shipping_rates', `${index.name} freight repricing`, {
+      sourceKey: index.indexId || index.name,
+      region: /baltic/i.test(index.name) ? 'Northern Europe' : 'Global',
+      strength: normalize(changePct, 4, 25),
+      confidence: index.spikeAlert ? 0.82 : 0.7,
+      domains: ['supply_chain', 'market'],
+      supportingEvidence: [`${index.name} ${Number(index.changePct || 0).toFixed(1)}%`],
+    }));
+  }
+
+  for (const quote of commodityQuotes) {
+    const change = Math.abs(Number(quote.change || 0));
+    if (change < 1.8) continue;
+    const isEnergy = /cl=f|bz=f|ng=f|oil|crude|gas/i.test(`${quote.symbol || ''} ${quote.name || ''}`);
+    const type = isEnergy ? 'energy_supply_shock' : 'commodity_repricing';
+    signals.push(buildWorldSignal(type, 'commodity_quotes', `${quote.name || quote.symbol} moved ${Number(quote.change || 0).toFixed(1)}%`, {
+      sourceKey: quote.symbol || quote.name,
+      region: isEnergy ? 'Middle East' : 'Global',
+      strength: normalize(change, 1.5, 7),
+      confidence: 0.66,
+      domains: ['market'],
+      supportingEvidence: [`${quote.symbol || quote.name} price ${quote.price || 0}`],
+    }));
+  }
+
+  const negativeStocks = marketQuotes.filter((quote) => Number(quote.change || 0) <= -1.5).length;
+  if (negativeStocks >= 4) {
+    signals.push(buildWorldSignal('risk_off_rotation', 'market_quotes', 'Broad equity risk-off rotation', {
+      sourceKey: 'market:stocks-bootstrap:v1',
+      region: 'Global',
+      strength: normalize(negativeStocks, 4, 12),
+      confidence: 0.64,
+      domains: ['market'],
+      supportingEvidence: [`${negativeStocks} stock benchmarks fell more than 1.5%`],
+    }));
+  }
+
+  const energySector = sectorItems.find((item) => /xle|energy/i.test(`${item.symbol || ''} ${item.name || ''}`));
+  if (energySector && Number(energySector.change || 0) >= 1.5) {
+    signals.push(buildWorldSignal('commodity_repricing', 'sector_summary', 'Energy sector repricing', {
+      sourceKey: energySector.symbol || energySector.name,
+      region: 'Global',
+      strength: normalize(Math.abs(Number(energySector.change || 0)), 1.5, 5),
+      confidence: 0.58,
+      domains: ['market'],
+      supportingEvidence: [`${energySector.symbol || energySector.name} ${Number(energySector.change || 0).toFixed(1)}%`],
+    }));
+  }
+
+  for (const quote of gulfQuotes) {
+    if (quote.type === 'oil' && Math.abs(Number(quote.change || 0)) >= 1.5) {
+      signals.push(buildWorldSignal('energy_supply_shock', 'gulf_quotes', `${quote.name} moved ${Number(quote.change || 0).toFixed(1)}%`, {
+        sourceKey: quote.symbol || quote.name,
+        region: 'Middle East',
+        strength: normalize(Math.abs(Number(quote.change || 0)), 1.5, 6),
+        confidence: 0.68,
+        domains: ['market'],
+        supportingEvidence: [`${quote.name} ${Number(quote.change || 0).toFixed(1)}%`],
+      }));
+    }
+  }
+
+  const totalEtfFlow = Number(inputs?.etfFlows?.summary?.totalEstFlow || 0);
+  if (Math.abs(totalEtfFlow) > 100_000_000) {
+    signals.push(buildWorldSignal('risk_off_rotation', 'etf_flows', totalEtfFlow > 0 ? 'ETF inflow impulse' : 'ETF outflow impulse', {
+      sourceKey: 'market:etf-flows:v1',
+      region: 'Global',
+      strength: normalize(Math.abs(totalEtfFlow), 100_000_000, 1_000_000_000),
+      confidence: 0.56,
+      domains: ['market'],
+      supportingEvidence: [`Net estimated ETF flow ${Math.round(totalEtfFlow / 1_000_000)}m`],
+    }));
+  }
+  if (etfItems.filter((item) => item.direction === 'outflow').length >= 5) {
+    signals.push(buildWorldSignal('risk_off_rotation', 'etf_flows', 'ETF outflow breadth', {
+      sourceKey: 'market:etf-flows:v1',
+      region: 'Global',
+      strength: normalize(etfItems.filter((item) => item.direction === 'outflow').length, 4, 10),
+      confidence: 0.54,
+      domains: ['market', 'crypto'],
+      supportingEvidence: ['Broad ETF outflow bias across tracked products'],
+    }));
+  }
+
+  const cryptoWeakness = cryptoQuotes.filter((item) => Number(item.change || 0) <= -3.5).length;
+  if (cryptoWeakness >= 2) {
+    signals.push(buildWorldSignal('risk_off_rotation', 'crypto_quotes', 'Crypto risk reduction', {
+      sourceKey: 'market:crypto:v1',
+      region: 'Global',
+      strength: normalize(cryptoWeakness, 2, 6),
+      confidence: 0.52,
+      domains: ['market', 'cyber'],
+      supportingEvidence: [`${cryptoWeakness} tracked crypto assets fell more than 3.5%`],
+    }));
+  }
+
+  if (stablecoins.some((coin) => Number(coin.deviation || 0) >= 0.5 || /warning|depegged/i.test(coin.pegStatus || ''))) {
+    const stressed = stablecoins.filter((coin) => Number(coin.deviation || 0) >= 0.5 || /warning|depegged/i.test(coin.pegStatus || ''));
+    signals.push(buildWorldSignal('fx_stress', 'stablecoins', 'Stablecoin peg stress', {
+      sourceKey: 'market:stablecoins:v1',
+      region: 'Global',
+      strength: normalize(Math.max(...stressed.map((coin) => Number(coin.deviation || 0))), 0.5, 3),
+      confidence: 0.62,
+      domains: ['market', 'cyber'],
+      supportingEvidence: stressed.slice(0, 2).map((coin) => `${coin.symbol} deviation ${coin.deviation}%`),
+    }));
+  }
+
+  for (const rate of bisExchange) {
+    const realChange = Math.abs(Number(rate.realChange || 0));
+    if (realChange < 2) continue;
+    signals.push(buildWorldSignal('fx_stress', 'bis_exchange', `${rate.countryName} exchange-rate stress`, {
+      sourceKey: rate.countryCode || rate.countryName,
+      region: rate.countryName || '',
+      strength: normalize(realChange, 2, 8),
+      confidence: 0.7,
+      domains: ['market', 'political'],
+      supportingEvidence: [`Real EER change ${Number(rate.realChange || 0).toFixed(1)}`],
+    }));
+  }
+
+  for (const rate of bisPolicy) {
+    const delta = Math.abs(Number(rate.rate || 0) - Number(rate.previousRate || 0));
+    if (delta < 0.25) continue;
+    signals.push(buildWorldSignal('policy_rate_pressure', 'bis_policy', `${rate.countryName} policy-rate shift`, {
+      sourceKey: rate.countryCode || rate.countryName,
+      region: rate.countryName || '',
+      strength: normalize(delta, 0.25, 1.5),
+      confidence: 0.72,
+      domains: ['market', 'political'],
+      supportingEvidence: [`Policy rate moved ${delta.toFixed(2)} points`],
+    }));
+  }
+
+  const economicCards = correlationCards.filter((item) => /economic|market|sanctions/i.test(`${item.domain || ''} ${item.title || ''}`));
+  if (economicCards.length > 0) {
+    signals.push(buildWorldSignal('risk_off_rotation', 'correlation_cards', 'Economic stress correlations are active', {
+      sourceKey: 'correlation:cards-bootstrap:v1',
+      region: 'Global',
+      strength: normalize(economicCards.length, 1, 6),
+      confidence: 0.48,
+      domains: ['market'],
+      supportingEvidence: economicCards.slice(0, 2).map((item) => item.title || item.summary || item.label || 'economic correlation'),
+    }));
+  }
+
+  for (const pred of predictions) {
+    if ((pred.domain === 'conflict' || pred.domain === 'military') && (pred.probability || 0) >= 0.55) {
+      signals.push(buildWorldSignal('security_escalation', 'forecast', pred.title, {
+        sourceKey: pred.id,
+        region: pred.region,
+        strength: pred.probability || 0,
+        confidence: pred.confidence || 0,
+        domains: [pred.domain],
+        supportingEvidence: (pred.signals || []).slice(0, 2).map((item) => item.value),
+      }));
+    }
+    if (pred.domain === 'cyber' && (pred.probability || 0) >= 0.45) {
+      signals.push(buildWorldSignal('cyber_cost_repricing', 'forecast', pred.title, {
+        sourceKey: pred.id,
+        region: pred.region,
+        strength: pred.probability || 0,
+        confidence: pred.confidence || 0,
+        domains: [pred.domain, 'market'],
+        supportingEvidence: (pred.signals || []).slice(0, 2).map((item) => item.value),
+      }));
+    }
+    if (pred.domain === 'infrastructure' && (pred.probability || 0) >= 0.45) {
+      signals.push(buildWorldSignal('infrastructure_capacity_loss', 'forecast', pred.title, {
+        sourceKey: pred.id,
+        region: pred.region,
+        strength: pred.probability || 0,
+        confidence: pred.confidence || 0,
+        domains: [pred.domain, 'market'],
+        supportingEvidence: (pred.signals || []).slice(0, 2).map((item) => item.value),
+      }));
+    }
+  }
+
+  const dedupedSignals = [];
+  const seen = new Set();
+  for (const signal of signals) {
+    const key = `${signal.type}:${signal.sourceKey}:${signal.region}:${signal.label}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedupedSignals.push(signal);
+  }
+
+  const signalTypeCounts = summarizeTypeCounts(dedupedSignals.map((item) => item.type));
+  return {
+    summary: summarizeWorldSignals(dedupedSignals),
+    typeCounts: signalTypeCounts,
+    signals: dedupedSignals
+      .sort((a, b) => (b.strength + b.confidence) - (a.strength + a.confidence) || a.label.localeCompare(b.label))
+      .slice(0, 80),
+  };
+}
+
+function inferSituationMarketBuckets(situation) {
+  const buckets = new Set();
+  const domains = uniqueSortedStrings([situation?.dominantDomain, ...(situation?.domains || [])].filter(Boolean));
+  const region = situation?.dominantRegion || situation?.regions?.[0] || '';
+  const label = (situation?.label || '').toLowerCase();
+
+  if (domains.includes('conflict') || domains.includes('military')) {
+    buckets.add('sovereign_risk');
+    buckets.add('defense');
+    if (/middle east|red sea|black sea|eastern mediterranean|israel|gaza/i.test(region)) buckets.add('energy');
+    if (/red sea|black sea|eastern mediterranean|south china sea|western pacific/i.test(region)) buckets.add('freight');
+  }
+  if (domains.includes('supply_chain')) {
+    buckets.add('freight');
+    buckets.add('rates_inflation');
+    if (/middle east|red sea|black sea/i.test(region) || /oil|gas|grain|shipping|freight/i.test(label)) buckets.add('energy');
+    if (/western pacific|south china sea|taiwan/i.test(region) || /semiconductor|chip/i.test(label)) buckets.add('semis');
+  }
+  if (domains.includes('political')) {
+    buckets.add('sovereign_risk');
+    buckets.add('fx_stress');
+  }
+  if (domains.includes('cyber')) {
+    buckets.add('semis');
+    buckets.add('crypto_stablecoins');
+  }
+  if (domains.includes('infrastructure')) {
+    buckets.add('rates_inflation');
+    if (/power|grid|pipeline|energy/i.test(label)) buckets.add('energy');
+  }
+  if (domains.includes('market')) {
+    if (/oil|gas|energy|crude/i.test(label)) buckets.add('energy');
+    if (/shipping|freight|port|strait|canal/i.test(label)) buckets.add('freight');
+    if (/fx|currency|exchange/i.test(label)) buckets.add('fx_stress');
+    if (/inflation|rates|yield|pricing/i.test(label)) buckets.add('rates_inflation');
+    if (buckets.size === 0) buckets.add('sovereign_risk');
+  }
+
+  return [...buckets];
+}
+
+function buildMarketTransmissionGraph(worldSignals, situationClusters = []) {
+  const signals = Array.isArray(worldSignals?.signals) ? worldSignals.signals : [];
+  const edges = [];
+
+  for (const situation of situationClusters) {
+    const bucketIds = inferSituationMarketBuckets(situation);
+    if (bucketIds.length === 0) continue;
+    const regionSet = new Set(uniqueSortedStrings([situation.dominantRegion, ...(situation.regions || [])].filter(Boolean)));
+    const supportingSignals = signals.filter((signal) =>
+      (signal.region && regionSet.has(signal.region))
+      || (signal.macroRegion && signal.macroRegion === getMacroRegion([...regionSet]))
+      || intersectCount(signal.domains || [], situation.domains || []) > 0
+    );
+
+    for (const bucketId of bucketIds) {
+      const bucketConfig = MARKET_BUCKET_CONFIG.find((item) => item.id === bucketId);
+      const bucketSignals = supportingSignals.filter((signal) => bucketConfig?.signalTypes.includes(signal.type));
+      const baseStrength = Number(situation.avgProbability || 0) * 0.55
+        + Math.min(0.3, (bucketSignals.length || 0) * 0.06)
+        + (intersectCount(situation.domains || [], ['market', 'supply_chain']) > 0 ? 0.05 : 0);
+      edges.push({
+        edgeId: `tx-${createStableHash(`${situation.id}:${bucketId}`)}`,
+        sourceSituationId: situation.id,
+        sourceLabel: situation.label,
+        targetBucketId: bucketId,
+        targetLabel: bucketConfig?.label || bucketId,
+        channel: bucketSignals[0]?.type || 'derived_transmission',
+        strength: normalizeSignalStrength(baseStrength, 0, 1),
+        confidence: normalizeSignalStrength((situation.avgConfidence || 0) * 0.6 + Math.min(0.35, bucketSignals.length * 0.08), 0, 1),
+        supportingSignalIds: bucketSignals.slice(0, 4).map((signal) => signal.id),
+        supportingSignals: bucketSignals.slice(0, 3).map((signal) => signal.label),
+        summary: `${situation.label} is feeding ${bucketConfig?.label || bucketId} pressure through ${(bucketSignals[0]?.type || 'derived transmission').replace(/_/g, ' ')}.`,
+      });
+    }
+  }
+
+  return {
+    summary: `${edges.length} situation-to-market transmission edges are currently active across ${MARKET_BUCKET_CONFIG.length} tracked market buckets.`,
+    edges: edges
+      .sort((a, b) => (b.strength + b.confidence) - (a.strength + a.confidence) || a.sourceLabel.localeCompare(b.sourceLabel))
+      .slice(0, 80),
+  };
+}
+
+function buildMarketState(worldSignals, transmissionGraph) {
+  const signals = Array.isArray(worldSignals?.signals) ? worldSignals.signals : [];
+  const transmissionEdges = Array.isArray(transmissionGraph?.edges) ? transmissionGraph.edges : [];
+  const buckets = MARKET_BUCKET_CONFIG.map((config) => {
+    const bucketSignals = signals.filter((signal) => config.signalTypes.includes(signal.type));
+    const bucketEdges = transmissionEdges.filter((edge) => edge.targetBucketId === config.id);
+    const pressureNumerator = bucketSignals.reduce((sum, signal) => sum + signal.strength, 0)
+      + bucketEdges.reduce((sum, edge) => sum + edge.strength, 0);
+    const confidenceNumerator = bucketSignals.reduce((sum, signal) => sum + signal.confidence, 0)
+      + bucketEdges.reduce((sum, edge) => sum + edge.confidence, 0);
+    const divisor = Math.max(1, bucketSignals.length + bucketEdges.length);
+    const pressureScore = +Math.min(1, pressureNumerator / divisor).toFixed(3);
+    const confidence = +Math.min(1, confidenceNumerator / divisor).toFixed(3);
+    return {
+      id: config.id,
+      label: config.label,
+      pressureScore,
+      confidence,
+      direction: pressureScore >= 0.6 ? 'elevated' : pressureScore >= 0.4 ? 'active' : 'contained',
+      topSignals: bucketSignals.slice(0, 3).map((signal) => ({
+        id: signal.id,
+        type: signal.type,
+        label: signal.label,
+        strength: signal.strength,
+      })),
+      topSituations: bucketEdges.slice(0, 3).map((edge) => ({
+        situationId: edge.sourceSituationId,
+        label: edge.sourceLabel,
+        strength: edge.strength,
+      })),
+      summary: `${config.label} pressure is ${pressureScore >= 0.6 ? 'elevated' : pressureScore >= 0.4 ? 'active' : 'contained'}, led by ${bucketSignals[0]?.label || bucketEdges[0]?.sourceLabel || 'no major driver'}.`,
+    };
+  }).filter((bucket) => bucket.pressureScore > 0 || bucket.topSignals.length > 0 || bucket.topSituations.length > 0);
+
+  const topBucket = buckets
+    .slice()
+    .sort((a, b) => b.pressureScore - a.pressureScore || b.confidence - a.confidence || a.label.localeCompare(b.label))[0];
+  return {
+    summary: `${buckets.length} market-state buckets are active, led by ${topBucket ? `${topBucket.label} at ${roundPct(topBucket.pressureScore)}` : 'no significant market pressure'}.`,
+    buckets,
+    topBucketId: topBucket?.id || '',
+    topBucketLabel: topBucket?.label || '',
+  };
+}
+
 function buildForecastRunWorldState(data) {
   const generatedAt = data?.generatedAt || Date.now();
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
+  const inputs = data?.inputs || {};
   const priorWorldState = data?.priorWorldState || null;
   const domainStates = buildForecastDomainStates(predictions);
   const regionalStates = buildForecastRegionalStates(predictions);
@@ -5316,8 +5970,11 @@ function buildForecastRunWorldState(data) {
   }, data?.priorWorldStates || []);
   const continuity = buildForecastRunContinuity(predictions);
   const evidenceLedger = buildForecastEvidenceLedger(predictions);
+  const worldSignals = buildWorldSignals(inputs, predictions, situationClusters);
+  const marketTransmission = buildMarketTransmissionGraph(worldSignals, situationClusters);
+  const marketState = buildMarketState(worldSignals, marketTransmission);
   const activeDomains = domainStates.filter((item) => item.forecastCount > 0).map((item) => item.domain);
-  const summary = `${predictions.length} active forecasts are spanning ${activeDomains.length} domains, ${regionalStates.length} key regions, ${situationClusters.length} clustered situations, and ${situationFamilies.length} broader situation families in this run, with ${continuity.newForecasts} new forecasts, ${continuity.materiallyChanged.length} materially changed paths, ${actorContinuity.newlyActiveCount} newly active actors, and ${branchContinuity.strengthenedBranchCount} strengthened branches.`;
+  const summary = `${predictions.length} active forecasts are spanning ${activeDomains.length} domains, ${regionalStates.length} key regions, ${situationClusters.length} clustered situations, and ${situationFamilies.length} broader situation families in this run, with ${continuity.newForecasts} new forecasts, ${continuity.materiallyChanged.length} materially changed paths, ${actorContinuity.newlyActiveCount} newly active actors, ${branchContinuity.strengthenedBranchCount} strengthened branches, and ${marketState.buckets.length} active market-state buckets.`;
   const worldState = {
     version: 1,
     generatedAt,
@@ -5336,6 +5993,9 @@ function buildForecastRunWorldState(data) {
     reportContinuity,
     continuity,
     evidenceLedger,
+    worldSignals,
+    marketState,
+    marketTransmission,
     uncertainties: evidenceLedger.counter.slice(0, 10),
   };
   worldState.simulationState = buildSituationSimulationState(worldState, priorWorldState);
@@ -5351,6 +6011,9 @@ function summarizeWorldStateSurface(worldState) {
     regionCount: worldState.regionalStates?.length || 0,
     situationCount: worldState.situationClusters?.length || 0,
     familyCount: worldState.situationFamilies?.length || 0,
+    worldSignalCount: worldState.worldSignals?.signals?.length || 0,
+    marketBucketCount: worldState.marketState?.buckets?.length || 0,
+    transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
     simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
     simulationActionCount: worldState.simulationState?.actionLedger?.length || 0,
     simulationInteractionCount: worldState.simulationState?.interactionLedger?.length || 0,
@@ -5545,11 +6208,16 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       reportSummary: worldState.report?.summary || '',
       reportContinuitySummary: worldState.reportContinuity?.summary || '',
       simulationSummary: worldState.simulationState?.summary || '',
+      marketSummary: worldState.marketState?.summary || '',
       simulationInputSummary: worldState.report?.simulationInputSummary || '',
       domainCount: worldState.domainStates.length,
       regionCount: worldState.regionalStates.length,
       situationCount: worldState.situationClusters.length,
       familyCount: worldState.situationFamilies?.length || 0,
+      worldSignalCount: worldState.worldSignals?.signals?.length || 0,
+      marketBucketCount: worldState.marketState?.buckets?.length || 0,
+      transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
+      topMarketBucket: worldState.marketState?.topBucketLabel || '',
       simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
       simulationRoundCount: worldState.simulationState?.totalRounds || 0,
       simulationActionCount: worldState.simulationState?.actionLedger?.length || 0,
@@ -7395,6 +8063,7 @@ async function fetchForecasts() {
   return {
     predictions: publishedPredictions,
     fullRunPredictions,
+    inputs,
     generatedAt: Date.now(),
     enrichmentMeta,
     publishTelemetry,
@@ -7483,6 +8152,7 @@ if (_isDirectRun) {
     ttlSeconds: TTL_SECONDS,
     lockTtlMs: 180_000,
     validateFn: (data) => Array.isArray(data?.predictions) && data.predictions.length > 0,
+    publishTransform: buildPublishedSeedPayload,
     afterPublish: async (data, meta) => {
       if (triggerContext.triggerRequest) {
         await clearForecastRefreshRequestIfUnchanged(triggerContext.triggerRequest);
@@ -7558,6 +8228,8 @@ export {
   buildHistoryForecastEntry,
   buildHistorySnapshot,
   appendHistorySnapshot,
+  buildPublishedForecastPayload,
+  buildPublishedSeedPayload,
   getTraceMaxForecasts,
   buildTraceRunPrefix,
   buildForecastTraceRecord,
