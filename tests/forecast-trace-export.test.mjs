@@ -180,6 +180,7 @@ describe('forecast trace artifact builder', () => {
     assert.ok(typeof artifacts.summary.worldStateSummary.worldSignalCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.marketBucketCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.transmissionEdgeCount === 'number');
+    assert.ok(typeof artifacts.summary.worldStateSummary.marketConsequenceCount === 'number');
     assert.ok(typeof artifacts.summary.worldStateSummary.topMarketBucket === 'string');
     assert.ok(typeof artifacts.summary.worldStateSummary.simulationEnvironmentSummary === 'string');
     assert.ok(typeof artifacts.summary.worldStateSummary.memoryMutationSummary === 'string');
@@ -215,6 +216,7 @@ describe('forecast trace artifact builder', () => {
     assert.ok(Array.isArray(artifacts.worldState.report.branchWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.marketWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.transmissionWatchlist));
+    assert.ok(Array.isArray(artifacts.worldState.report.marketConsequenceWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.simulationWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.interactionWatchlist));
     assert.ok(Array.isArray(artifacts.worldState.report.replayWatchlist));
@@ -229,6 +231,8 @@ describe('forecast trace artifact builder', () => {
     assert.ok(Array.isArray(artifacts.worldState.worldSignals?.signals));
     assert.ok(Array.isArray(artifacts.worldState.marketState?.buckets));
     assert.ok(Array.isArray(artifacts.worldState.marketTransmission?.edges));
+    assert.ok(Array.isArray(artifacts.worldState.simulationState?.marketConsequences?.items));
+    assert.ok(typeof artifacts.summary.worldStateSummary.marketInputCoverage?.loadedSourceCount === 'number');
     assert.ok(artifacts.forecasts[0].payload.caseFile.worldState.summary.includes('Iran'));
     assert.equal(artifacts.forecasts[0].payload.caseFile.branches.length, 3);
     assert.equal(artifacts.forecasts[0].payload.traceMeta.narrativeSource, 'fallback');
@@ -869,6 +873,10 @@ describe('forecast run world state', () => {
     assert.equal(supplyUnit?.posture, 'contested');
     assert.ok((marketUnit?.postureScore || 0) < 0.77);
     assert.ok((supplyUnit?.postureScore || 0) < 0.77);
+    assert.ok((marketUnit?.marketContext?.confirmationScore || 0) > 0);
+    assert.ok((supplyUnit?.marketContext?.linkedBucketIds || []).length >= 1);
+    assert.ok((worldState.simulationState.marketConsequences?.items || []).length >= 1);
+    assert.ok((worldState.report.marketConsequenceWatchlist || []).length >= 1);
   });
 
   it('builds report outputs from simulation outcomes and cross-situation effects', () => {
