@@ -10,6 +10,10 @@ import { CHROME_UA } from '../../../_shared/constants';
 
 // 120s for anonymous OpenSky tier (~10 req/min limit); TODO: reduce to 10s on commercial tier
 const CACHE_TTL = 120;
+// Callsign searches hit the relay's in-memory index (5min TTL); cache positive hits 60s,
+// negative hits 10s so a retry after panning into view returns fresh data quickly.
+const CALLSIGN_CACHE_TTL = 60;
+const CALLSIGN_NEGATIVE_TTL = 10;
 
 interface OpenSkyResponse {
     states?: unknown[][];
@@ -64,8 +68,9 @@ async function fetchOpenSkyAnonymous(req: TrackAircraftRequest): Promise<Positio
 function buildCacheKey(req: TrackAircraftRequest): string {
     if (req.icao24) return `aviation:track:icao:${req.icao24}:v1`;
     if (req.swLat != null && req.neLat != null) {
-        return `aviation:track:${Math.floor(req.swLat)}:${Math.floor(req.swLon)}:${Math.ceil(req.neLat)}:${Math.ceil(req.neLon)}:v1`;
+        return `aviation:track:bbox:${Math.floor(req.swLat)}:${Math.floor(req.swLon)}:${Math.ceil(req.neLat)}:${Math.ceil(req.neLon)}:v1`;
     }
+    if (req.callsign) return `aviation:track:callsign:${req.callsign.toUpperCase()}:v1`;
     return 'aviation:track:all:v1';
 }
 
@@ -82,8 +87,10 @@ export async function trackAircraft(
 
     let result: { positions: PositionSample[]; source: string } | null = null;
     try {
+        const positiveTtl = req.callsign ? CALLSIGN_CACHE_TTL : CACHE_TTL;
+        const negativeTtl = req.callsign ? CALLSIGN_NEGATIVE_TTL : CACHE_TTL;
         result = await cachedFetchJson<{ positions: PositionSample[]; source: string }>(
-            cacheKey, CACHE_TTL, async () => {
+            cacheKey, positiveTtl, async () => {
                 const relayBase = getRelayBaseUrl();
 
                 // Try relay first if configured
@@ -154,7 +161,7 @@ export async function trackAircraft(
                 }
 
                 return null; // negative-cached briefly
-            }, CACHE_TTL, // negative TTL same as positive — retry quickly
+            }, negativeTtl,
         );
     } catch {
         /* Redis unavailable — fall through to simulated */
