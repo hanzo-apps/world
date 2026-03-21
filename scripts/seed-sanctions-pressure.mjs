@@ -312,9 +312,19 @@ async function fetchSource(source) {
   if (!response.ok) {
     throw new Error(`OFAC ${source.label} HTTP ${response.status}`);
   }
-  const xml = await response.text();
-  console.log(`  ${source.label}: ${(xml.length / 1024).toFixed(0)}KB downloaded (${Date.now() - t0}ms)`);
-  const parsed = XML_PARSER.parse(xml)?.Sanctions;
+
+  // Block-scope xml so the ~120MB string is eligible for GC as soon as
+  // XML_PARSER.parse() returns, before buildEntriesForDocument allocates
+  // the entry objects. Without this, both coexist and OOM the 512MB limit.
+  let parsed;
+  {
+    const xml = await response.text();
+    console.log(`  ${source.label}: ${(xml.length / 1024).toFixed(0)}KB downloaded (${Date.now() - t0}ms)`);
+    parsed = XML_PARSER.parse(xml)?.Sanctions;
+  }
+  // Yield to let GC reclaim the xml string before the build phase
+  await new Promise((resolve) => setImmediate(resolve));
+
   if (!parsed) throw new Error(`OFAC ${source.label} parse returned no Sanctions root`);
   const result = buildEntriesForDocument(parsed, source.label);
   console.log(`  ${source.label}: ${result.entries.length} entries parsed`);
@@ -327,8 +337,8 @@ async function fetchSanctionsPressure() {
   const hasPrevious = previousIds.size > 0;
   console.log(`  Previous state: ${hasPrevious ? `${previousIds.size} known IDs` : 'none (first run or expired)'}`);
 
-  // Sequential fetch to halve peak heap: SDN (~10MB) then Consolidated (~20MB).
-  // Combined parallel parse can approach 150MB, tight against the 512MB limit.
+  // Sequential fetch to reduce peak heap: SDN (~120MB XML) then Consolidated.
+  // Parallel parse would double peak memory and OOM on 512MB Railway containers.
   const results = [];
   for (const source of OFAC_SOURCES) {
     results.push(await fetchSource(source));
