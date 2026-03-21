@@ -20840,3 +20840,16 @@ body.has-breaking-alert .panels-grid {
   text-align: right;
   flex-shrink: 0;
 }
+
+.bm-wow-up   { color: #f87171; } /* red = more expensive */
+.bm-wow-down { color: #4ade80; } /* green = cheaper */
+.bm-wow-summary {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+  padding: 6px 12px 2px;
+  text-align: right;
+}
+.gb-wow {
+  font-size: 0.7rem;
+  margin-left: 4px;
+}

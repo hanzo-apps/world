@@ -71,13 +71,28 @@ export class GroceryBasketPanel extends Panel {
       const isLow = c.code === data.cheapestCountry;
       const isHigh = c.code === data.mostExpensiveCountry;
       const cls = isLow ? 'gb-cheapest' : isHigh ? 'gb-priciest' : '';
-      return `<td class="gb-cell gb-total ${cls}"><strong>$${c.totalUsd.toFixed(2)}</strong></td>`;
+      let wowBadge = '';
+      if (c.wowPct != null) {
+        const sign = c.wowPct >= 0 ? '▲' : '▼';
+        const wowCls = c.wowPct >= 0 ? 'bm-wow-up' : 'bm-wow-down';
+        wowBadge = `<span class="gb-wow ${wowCls}">${sign}${Math.abs(c.wowPct).toFixed(1)}%</span>`;
+      }
+      return `<td class="gb-cell gb-total ${cls}"><strong>$${c.totalUsd.toFixed(2)}</strong>${wowBadge}</td>`;
     }).join('')}</tr>`;
+
+    let wowSummary = '';
+    if (data.wowAvailable && data.wowAvgPct !== undefined) {
+      const avg = data.wowAvgPct;
+      const sign = avg >= 0 ? '▲' : '▼';
+      const cls = avg >= 0 ? 'bm-wow-up' : 'bm-wow-down';
+      wowSummary = `<div class="bm-wow-summary">Basket avg: <span class="${cls}">${sign}${Math.abs(avg).toFixed(1)}% WoW</span></div>`;
+    }
 
     const updatedAt = data.fetchedAt ? new Date(data.fetchedAt).toLocaleDateString() : '';
 
     const html = `
       <div class="gb-wrapper">
+        ${wowSummary}
         <div class="gb-scroll">
           <table class="gb-table">
             <thead><tr><th class="gb-item-col">${t('panels.groceryItem')}</th>${headerCells}</tr></thead>
