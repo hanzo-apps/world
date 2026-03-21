@@ -118,7 +118,7 @@ export class App {
 
   private getCachedBootstrapUpdatedAt(): number | null {
     const cachedTierTimestamps = Object.values(this.bootstrapHydrationState.tiers)
-      .filter((tier) => tier.source === 'cached' || tier.source === 'mixed')
+      .filter((tier) => tier.source === 'cached')
       .map((tier) => tier.updatedAt)
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 
@@ -130,16 +130,26 @@ export class App {
     const statusIndicator = this.state.container.querySelector('.status-indicator');
     const statusLabel = statusIndicator?.querySelector('span:last-child');
     const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
-    const usingCachedBootstrap = this.bootstrapHydrationState.source === 'cached' || this.bootstrapHydrationState.source === 'mixed';
+    // Only treat a complete cache fallback (no live data at all) as "cached" for UI purposes.
+    // 'mixed' means live data was partially fetched — showing "Live data unavailable" would be misleading.
+    const usingCachedBootstrap = this.bootstrapHydrationState.source === 'cached';
     const cachedUpdatedAt = this.getCachedBootstrapUpdatedAt();
 
     let statusMode: 'live' | 'cached' | 'unavailable' = 'live';
     let bannerMessage: string | null = null;
 
     if (!online) {
-      if (usingCachedBootstrap) {
+      // Offline: show banner regardless of mixed/cached (any cached data is better than nothing)
+      const hasAnyCached = this.bootstrapHydrationState.source === 'cached' || this.bootstrapHydrationState.source === 'mixed';
+      if (hasAnyCached) {
         statusMode = 'cached';
-        const freshness = cachedUpdatedAt ? describeFreshness(cachedUpdatedAt) : t('common.cached').toLowerCase();
+        const offlineCachedAt = this.bootstrapHydrationState.tiers
+          ? Math.min(...Object.values(this.bootstrapHydrationState.tiers)
+              .filter((tier) => tier.source === 'cached' || tier.source === 'mixed')
+              .map((tier) => tier.updatedAt)
+              .filter((v): v is number => typeof v === 'number' && Number.isFinite(v)))
+          : NaN;
+        const freshness = Number.isFinite(offlineCachedAt) ? describeFreshness(offlineCachedAt) : t('common.cached').toLowerCase();
         bannerMessage = t('connectivity.offlineCached', { freshness });
       } else {
         statusMode = 'unavailable';
