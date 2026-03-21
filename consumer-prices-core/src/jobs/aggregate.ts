@@ -2,7 +2,7 @@
  * Aggregate job: computes basket indices from latest price observations.
  * Produces Fixed Basket Index and Value Basket Index per methodology.
  */
-import { query } from '../db/client.js';
+import { query, closePool } from '../db/client.js';
 import { loadAllBasketConfigs } from '../config/loader.js';
 
 const logger = {
@@ -232,5 +232,5 @@ export async function aggregateAll() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  aggregateAll().catch(console.error);
+  aggregateAll().finally(() => closePool()).catch(console.error);
 }
