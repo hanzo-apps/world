@@ -2443,7 +2443,7 @@ export class GlobeMap {
 
   private enforceLayerLimit(): void {
     if (!this.layerTogglesEl) return;
-    const WARN_THRESHOLD = 6;
+    const WARN_THRESHOLD = 13;
     const activeCount = Array.from(this.layerTogglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
       .filter(i => i.checked).length;
     const increasing = activeCount > this.lastActiveLayerCount;
