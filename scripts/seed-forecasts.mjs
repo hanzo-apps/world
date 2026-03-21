@@ -198,6 +198,48 @@ const MARKET_BUCKET_CONFIG = [
   },
 ];
 
+const CORE_MARKET_BUCKET_IDS = ['energy', 'freight', 'sovereign_risk', 'rates_inflation', 'fx_stress'];
+const MARKET_BUCKET_NEIGHBORS = {
+  energy: ['freight', 'rates_inflation', 'sovereign_risk'],
+  freight: ['rates_inflation', 'energy', 'sovereign_risk'],
+  sovereign_risk: ['fx_stress', 'rates_inflation'],
+  rates_inflation: ['fx_stress', 'sovereign_risk'],
+  fx_stress: ['sovereign_risk', 'rates_inflation'],
+  semis: ['freight', 'fx_stress'],
+  crypto_stablecoins: ['fx_stress', 'sovereign_risk'],
+  defense: ['sovereign_risk'],
+};
+const MARKET_BUCKET_REPORTABLE_SCORE_FLOORS = {
+  energy: 0.42,
+  freight: 0.4,
+  sovereign_risk: 0.43,
+  rates_inflation: 0.48,
+  fx_stress: 0.48,
+  semis: 0.52,
+  crypto_stablecoins: 0.55,
+  defense: 0.62,
+};
+const MARKET_BUCKET_SIMULATION_BIAS = {
+  energy: { confirmation: 0.2, pressure: 0.12, edge: 0.1, contradiction: 0.14 },
+  freight: { confirmation: 0.18, pressure: 0.12, edge: 0.1, contradiction: 0.14 },
+  sovereign_risk: { confirmation: 0.17, pressure: 0.11, edge: 0.09, contradiction: 0.15 },
+  rates_inflation: { confirmation: 0.16, pressure: 0.1, edge: 0.08, contradiction: 0.16 },
+  fx_stress: { confirmation: 0.15, pressure: 0.09, edge: 0.08, contradiction: 0.14 },
+  semis: { confirmation: 0.13, pressure: 0.08, edge: 0.09, contradiction: 0.12 },
+  crypto_stablecoins: { confirmation: 0.11, pressure: 0.07, edge: 0.08, contradiction: 0.12 },
+  defense: { confirmation: 0.08, pressure: 0.04, edge: 0.05, contradiction: 0.1 },
+};
+const MARKET_BUCKET_STATE_CALIBRATION = {
+  energy: { edgeLift: 0.08, macroLift: 0.14, confidenceLift: 0.05 },
+  freight: { edgeLift: 0.09, macroLift: 0.12, confidenceLift: 0.04 },
+  sovereign_risk: { edgeLift: 0.07, macroLift: 0.1, confidenceLift: 0.04 },
+  rates_inflation: { edgeLift: 0.06, macroLift: 0.12, confidenceLift: 0.05 },
+  fx_stress: { edgeLift: 0.05, macroLift: 0.1, confidenceLift: 0.04 },
+  semis: { edgeLift: 0.04, macroLift: 0.04, confidenceLift: 0.02 },
+  crypto_stablecoins: { edgeLift: 0.03, macroLift: 0.05, confidenceLift: 0.02 },
+  defense: { edgeLift: -0.03, macroLift: 0, confidenceLift: -0.03, dampener: 0.12 },
+};
+
 const REGION_MACRO_BUCKETS = {
   'Middle East': 'EMEA',
   'Red Sea': 'EMEA',
@@ -3433,6 +3475,15 @@ function buildSimulationRound(stage, situation, context) {
   const marketContradiction = Number(marketContext?.contradictionScore || 0);
   const marketPressure = Number(marketContext?.topBucketPressure || 0);
   const marketEdgeStrength = Number(marketContext?.topTransmissionStrength || 0);
+  const marketBias = MARKET_BUCKET_SIMULATION_BIAS[marketContext?.topBucketId || ''] || MARKET_BUCKET_SIMULATION_BIAS.sovereign_risk;
+  const marketSupport = clampUnitInterval(
+    (marketConfirmation * marketBias.confirmation) +
+    (marketPressure * marketBias.pressure) +
+    (marketEdgeStrength * marketBias.edge),
+  );
+  const marketResistance = clampUnitInterval(
+    marketContradiction * marketBias.contradiction,
+  );
 
   let pressureDelta = 0;
   let stabilizationDelta = 0;
@@ -3445,14 +3496,13 @@ function buildSimulationRound(stage, situation, context) {
       (supportWeight * 0.14) +
       (actionPressure * 0.28) +
       (priorMomentum * 0.08) +
-      (marketConfirmation * 0.12) +
-      (marketPressure * 0.08)
+      marketSupport
     );
     stabilizationDelta = clampUnitInterval(
       (counterWeight * 0.18) +
       (branchDynamics.contrarianWeight * 0.18) +
       (actionStabilization * 0.26) +
-      (marketContradiction * 0.16)
+      marketResistance
     );
     lead = marketContext?.topBucketLabel
       ? `${marketContext.topBucketLabel} confirmation`
@@ -3464,15 +3514,14 @@ function buildSimulationRound(stage, situation, context) {
       (actionPressure * 0.26) +
       (actors.length ? 0.08 : 0) +
       ((priorSimulation?.rounds?.[0]?.pressureDelta || 0) * 0.12) +
-      (marketConfirmation * 0.16) +
-      (marketEdgeStrength * 0.08)
+      (marketSupport * 1.12)
     );
     stabilizationDelta = clampUnitInterval(
       (counterWeight * 0.16) +
       (branchDynamics.contrarianWeight * 0.2) +
       (actionStabilization * 0.28) +
       ((priorSimulation?.rounds?.[0]?.stabilizationDelta || 0) * 0.12) +
-      (marketContradiction * 0.18)
+      (marketResistance * 1.05)
     );
     lead = marketContext?.topChannel
       ? `${String(marketContext.topChannel).replace(/_/g, ' ')} transmission`
@@ -3484,7 +3533,7 @@ function buildSimulationRound(stage, situation, context) {
       (domainSpread * (profile.round3SpreadWeight || 0.1)) +
       (actionPressure * 0.18) +
       ((priorSimulation?.rounds?.[1]?.pressureDelta || 0) * 0.18) +
-      (marketConfirmation * 0.14)
+      (marketSupport * 0.96)
     );
     stabilizationDelta = clampUnitInterval(
       (counterWeight * 0.18) +
@@ -3492,7 +3541,7 @@ function buildSimulationRound(stage, situation, context) {
       (supportWeight * 0.08) +
       (actionStabilization * 0.24) +
       ((priorSimulation?.rounds?.[1]?.stabilizationDelta || 0) * 0.18) +
-      (marketContradiction * 0.16)
+      (marketResistance * 0.96)
     );
     lead = marketContext?.topBucketLabel
       ? `${marketContext.topBucketLabel} spillover`
@@ -3522,6 +3571,8 @@ function buildSimulationRound(stage, situation, context) {
     netPressure,
     marketConfirmation: +marketConfirmation.toFixed(3),
     marketContradiction: +marketContradiction.toFixed(3),
+    marketSupport: +marketSupport.toFixed(3),
+    marketResistance: +marketResistance.toFixed(3),
     topMarketBucketId: marketContext?.topBucketId || '',
     topMarketBucketLabel: marketContext?.topBucketLabel || '',
   };
@@ -3539,11 +3590,11 @@ function summarizeSimulationOutcome(rounds = [], dominantDomain = '') {
   const totalStabilization = rounds.length
     ? +rounds.reduce((sum, round) => sum + (round.stabilizationDelta || 0), 0).toFixed(3)
     : 0;
-  const postureScore = clampUnitInterval(
+  const postureScore = Math.min(0.985, clampUnitInterval(
     (profile.postureBaseline || 0.12) +
     ((finalRound?.netPressure || 0) * (profile.finalPressureWeight || 0.3)) +
     (netPressureDelta * (profile.deltaWeight || 0.34))
-  );
+  ));
   let posture = 'contested';
   if (postureScore >= (profile.escalatoryThreshold || 0.74)) posture = 'escalatory';
   else if (postureScore <= (profile.constrainedThreshold || 0.4)) posture = 'constrained';
@@ -3836,48 +3887,65 @@ function buildSimulationMarketConsequences(simulationState, marketState) {
   const simulations = Array.isArray(simulationState?.situationSimulations) ? simulationState.situationSimulations : [];
   const bucketMap = new Map((marketState?.buckets || []).map((bucket) => [bucket.id, bucket]));
   const consequences = [];
+  const blocked = [];
 
   for (const simulation of simulations) {
     const linkedBuckets = simulation.marketContext?.linkedBucketIds || [];
-    for (const bucketId of linkedBuckets.slice(0, 2)) {
-      const bucket = bucketMap.get(bucketId);
-      if (!bucket) continue;
-      const strength = clampUnitInterval(
-        ((simulation.marketContext?.confirmationScore || 0) * 0.35) +
-        ((simulation.marketContext?.topTransmissionStrength || 0) * 0.2) +
-        ((bucket.pressureScore || 0) * 0.3) +
-        ((simulation.postureScore || 0) * 0.15)
-      );
-      if (strength < 0.26) continue;
-      const confidence = clampUnitInterval(
-        ((simulation.marketContext?.topTransmissionConfidence || 0) * 0.4) +
-        ((bucket.confidence || 0) * 0.3) +
-        ((bucket.macroConfirmation || 0) * 0.15) +
-        ((simulation.avgConfidence || 0) * 0.15)
-      );
-      const reportableScore = clampUnitInterval(
-        (strength * 0.42) +
-        (confidence * 0.34) +
-        ((bucket.macroConfirmation || 0) * 0.16) +
-        Math.min(0.08, (simulation.marketContext?.linkedBucketIds || []).length * 0.04)
-      );
-      consequences.push({
-        id: `mktc-${hashSituationKey([simulation.situationId, bucketId])}`,
-        situationId: simulation.situationId,
-        situationLabel: simulation.label,
-        familyId: simulation.familyId,
-        familyLabel: simulation.familyLabel,
-        dominantDomain: simulation.dominantDomain,
-        dominantRegion: simulation.dominantRegion,
-        targetBucketId: bucket.id,
-        targetBucketLabel: bucket.label,
-        channel: simulation.marketContext?.topChannel || 'derived_transmission',
-        strength: +strength.toFixed(3),
-        confidence: +confidence.toFixed(3),
-        reportableScore: +reportableScore.toFixed(3),
-        macroConfirmation: Number(bucket.macroConfirmation || 0),
-        summary: `${simulation.label} is exerting ${roundPct(strength)} pressure on ${bucket.label} via ${String(simulation.marketContext?.topChannel || 'derived transmission').replace(/_/g, ' ')}.`,
-      });
+    const primaryBucketIds = linkedBuckets.slice(0, 2);
+    for (const bucketId of primaryBucketIds) {
+      const candidateBucketIds = [
+        bucketId,
+        ...((MARKET_BUCKET_NEIGHBORS[bucketId] || []).slice(0, 2)),
+      ];
+      for (const [depth, candidateBucketId] of candidateBucketIds.entries()) {
+        const bucket = bucketMap.get(candidateBucketId);
+        if (!bucket) continue;
+        const direct = depth === 0;
+        const adjacencyPenalty = direct ? 0 : 0.18 + ((depth - 1) * 0.05);
+        const strength = clampUnitInterval(
+          ((simulation.marketContext?.confirmationScore || 0) * (direct ? 0.34 : 0.22)) +
+          ((simulation.marketContext?.topTransmissionStrength || 0) * (direct ? 0.24 : 0.18)) +
+          ((bucket.pressureScore || 0) * (direct ? 0.28 : 0.24)) +
+          ((simulation.postureScore || 0) * 0.14) -
+          adjacencyPenalty
+        );
+        if (strength < (direct ? 0.26 : 0.3)) continue;
+        const confidence = clampUnitInterval(
+          ((simulation.marketContext?.topTransmissionConfidence || 0) * 0.34) +
+          ((bucket.confidence || 0) * 0.3) +
+          ((bucket.macroConfirmation || 0) * (direct ? 0.18 : 0.22)) +
+          ((simulation.avgConfidence || 0) * 0.12) -
+          (direct ? 0 : 0.05)
+        );
+        const reportableScore = clampUnitInterval(
+          (strength * 0.4) +
+          (confidence * 0.32) +
+          ((bucket.macroConfirmation || 0) * 0.18) +
+          Math.min(0.08, (simulation.marketContext?.linkedBucketIds || []).length * 0.04) -
+          (direct ? 0 : 0.06)
+        );
+        consequences.push({
+          id: `mktc-${hashSituationKey([simulation.situationId, candidateBucketId, depth])}`,
+          situationId: simulation.situationId,
+          situationLabel: simulation.label,
+          familyId: simulation.familyId,
+          familyLabel: simulation.familyLabel,
+          dominantDomain: simulation.dominantDomain,
+          dominantRegion: simulation.dominantRegion,
+          targetBucketId: bucket.id,
+          targetBucketLabel: bucket.label,
+          sourceBucketId: bucketId,
+          consequenceType: direct ? 'direct' : 'adjacent',
+          channel: simulation.marketContext?.topChannel || 'derived_transmission',
+          strength: +strength.toFixed(3),
+          confidence: +confidence.toFixed(3),
+          reportableScore: +reportableScore.toFixed(3),
+          macroConfirmation: Number(bucket.macroConfirmation || 0),
+          summary: direct
+            ? `${simulation.label} is exerting ${roundPct(strength)} pressure on ${bucket.label} via ${String(simulation.marketContext?.topChannel || 'derived transmission').replace(/_/g, ' ')}.`
+            : `${simulation.label} is spilling ${roundPct(strength)} follow-on pressure from ${bucketMap.get(bucketId)?.label || bucketId} into ${bucket.label}.`,
+        });
+      }
     }
   }
 
@@ -3891,39 +3959,69 @@ function buildSimulationMarketConsequences(simulationState, marketState) {
     deduped.push(item);
   }
 
-  const internalItems = deduped.slice(0, 32);
+  const internalItems = deduped.slice(0, 40);
   const reportableItems = [];
   const usedBuckets = new Map();
   const usedSituations = new Set();
   for (const item of internalItems) {
     const bucketCount = usedBuckets.get(item.targetBucketId) || 0;
-    const minScore = item.targetBucketId === 'energy' || item.targetBucketId === 'freight' || item.targetBucketId === 'sovereign_risk'
-      ? 0.4
-      : 0.52;
-    if ((item.reportableScore || 0) < minScore) continue;
+    const minScore = MARKET_BUCKET_REPORTABLE_SCORE_FLOORS[item.targetBucketId] || 0.52;
+    if ((item.reportableScore || 0) < minScore) {
+      blocked.push({ ...item, reason: 'low_reportable_score' });
+      continue;
+    }
     if (
       (item.macroConfirmation || 0) < 0.14
-      && ['energy', 'freight', 'sovereign_risk', 'rates_inflation', 'fx_stress'].includes(item.targetBucketId)
+      && CORE_MARKET_BUCKET_IDS.includes(item.targetBucketId)
       && !(
         ['market', 'supply_chain'].includes(item.dominantDomain)
-        && (item.strength || 0) >= 0.4
-        && (item.confidence || 0) >= 0.4
+        && (item.strength || 0) >= 0.46
+        && (item.confidence || 0) >= 0.46
       )
-    ) continue;
-    if (usedSituations.has(item.situationId) && bucketCount >= 1) continue;
-    if (bucketCount >= 2) continue;
+    ) {
+      blocked.push({ ...item, reason: 'low_macro_confirmation' });
+      continue;
+    }
+    if (item.targetBucketId === 'defense') {
+      const defenseEligible = (
+        item.channel === 'defense_repricing'
+        || ((item.strength || 0) >= 0.58 && (item.confidence || 0) >= 0.5 && ['conflict', 'military'].includes(item.dominantDomain))
+      );
+      if (!defenseEligible) {
+        blocked.push({ ...item, reason: 'weak_defense_confirmation' });
+        continue;
+      }
+    }
+    if (item.consequenceType === 'adjacent' && (item.reportableScore || 0) < (minScore + 0.06)) {
+      blocked.push({ ...item, reason: 'adjacent_path_not_strong_enough' });
+      continue;
+    }
+    if (usedSituations.has(item.situationId) && bucketCount >= 1) {
+      blocked.push({ ...item, reason: 'situation_reportable_cap' });
+      continue;
+    }
+    if (bucketCount >= (CORE_MARKET_BUCKET_IDS.includes(item.targetBucketId) ? 2 : 1)) {
+      blocked.push({ ...item, reason: 'bucket_reportable_cap' });
+      continue;
+    }
     reportableItems.push(item);
     usedSituations.add(item.situationId);
     usedBuckets.set(item.targetBucketId, bucketCount + 1);
-    if (reportableItems.length >= 8) break;
+    if (reportableItems.length >= 6) break;
   }
 
   if (reportableItems.length === 0) {
-    const fallback = internalItems.find((item) =>
+    const fallback = internalItems.find((item) => (
       ['market', 'supply_chain'].includes(item.dominantDomain)
-      && ['energy', 'freight', 'sovereign_risk', 'rates_inflation'].includes(item.targetBucketId)
-      && (item.reportableScore || 0) >= 0.3,
-    );
+      && CORE_MARKET_BUCKET_IDS.includes(item.targetBucketId)
+      && (item.reportableScore || 0) >= 0.3
+      && (item.confidence || 0) >= 0.25
+      && (
+        (item.macroConfirmation || 0) >= 0.1
+        || (item.strength || 0) >= 0.46
+        || (item.consequenceType === 'direct' && (item.reportableScore || 0) >= 0.3)
+      )
+    ));
     if (fallback) reportableItems.push(fallback);
   }
 
@@ -3933,7 +4031,19 @@ function buildSimulationMarketConsequences(simulationState, marketState) {
       : 'No market consequences were derived from the current transmission graph.',
     internalCount: internalItems.length,
     reportableCount: reportableItems.length,
+    blockedCount: blocked.length,
+    blockedSummary: {
+      byReason: summarizeTypeCounts(blocked.map((item) => item.reason)),
+      preview: blocked.slice(0, 6).map((item) => ({
+        situationLabel: item.situationLabel,
+        targetBucketLabel: item.targetBucketLabel,
+        channel: item.channel,
+        reason: item.reason,
+        reportableScore: item.reportableScore,
+      })),
+    },
     internalItems,
+    blocked,
     items: reportableItems,
   };
 }
@@ -4349,11 +4459,31 @@ function buildReportableInteractionLedger(interactionLedger = [], situationSimul
       const politicalChannel = item.strongestChannel === 'political_pressure';
       const sharedActor = Boolean(item.sharedActor) || intersectCount(source.actorIds || [], target.actorIds || []) > 0;
       const regionLink = Boolean(item.regionLink) || intersectCount(source.regions || [], target.regions || []) > 0;
+      const crossTheater = isCrossTheaterPair(source.regions || [], target.regions || []);
+      const bucketOverlap = intersectCount(source.marketContext?.linkedBucketIds || [], target.marketContext?.linkedBucketIds || []);
+      const macroSupport = Math.max(
+        Number(source.marketContext?.confirmationScore || 0),
+        Number(target.marketContext?.confirmationScore || 0),
+      );
+      const purelyPoliticalPair = source.dominantDomain === 'political' && target.dominantDomain === 'political';
       if (item.interactionType === 'actor_carryover' && specificity < 0.62) return false;
       if (politicalChannel) {
         if (!regionLink && !sharedActor) return false;
-        if (!regionLink && (!sharedActor || specificity < 0.82 || confidence < 0.68 || score < 5.4)) return false;
-        if (regionLink && confidence < 0.62 && score < 4.9) return false;
+        if (crossTheater) {
+          const structuralPoliticalCarryover = purelyPoliticalPair
+            && sharedActor
+            && specificity >= 0.82
+            && confidence >= 0.7
+            && score >= 5.4;
+          if (!structuralPoliticalCarryover) {
+            if (!sharedActor || specificity < 0.88 || confidence < 0.72 || score < 5.7) return false;
+            if (!regionLink && macroSupport < 0.5 && bucketOverlap === 0) return false;
+            if (!regionLink && specificity < 0.9) return false;
+          }
+        } else {
+          if (!regionLink && (!sharedActor || specificity < 0.82 || confidence < 0.68 || score < 5.4)) return false;
+          if (regionLink && confidence < 0.62 && score < 4.9) return false;
+        }
       }
       if (confidence >= 0.72 && score >= 5) return true;
       if (directOverlap && confidence >= 0.58 && score >= 4.5) return true;
@@ -5531,6 +5661,13 @@ function buildWorldStateReport(worldState) {
       label: `${item.situationLabel} -> ${item.targetBucketLabel}`,
       summary: item.summary,
     }));
+  const blockedMarketConsequenceWatchlist = (worldState.simulationState?.marketConsequences?.blockedSummary?.preview || [])
+    .slice(0, 4)
+    .map((item) => ({
+      type: `blocked_market_consequence_${item.reason}`,
+      label: `${item.situationLabel} -> ${item.targetBucketLabel}`,
+      summary: `${item.situationLabel} did not promote into ${item.targetBucketLabel} because of ${String(item.reason || 'quality gating').replace(/_/g, ' ')}, despite ${(Number(item.reportableScore || 0) * 100).toFixed(0)}% reportable score.`,
+    }));
 
   const familyWatchlist = (worldState.situationFamilies || [])
     .slice(0, 6)
@@ -5564,6 +5701,7 @@ function buildWorldStateReport(worldState) {
     marketWatchlist,
     transmissionWatchlist,
     marketConsequenceWatchlist,
+    blockedMarketConsequenceWatchlist,
     continuityWatchlist,
     simulationWatchlist,
     interactionWatchlist,
@@ -5930,6 +6068,18 @@ function buildWorldSignals(inputs, predictions = [], _situationClusters = []) {
       confidence: 0.58,
       domains: ['market'],
       supportingEvidence: [`${energySector.symbol || energySector.name} ${Number(energySector.change || 0).toFixed(1)}%`],
+    }));
+  }
+
+  const defenseSector = sectorItems.find((item) => /ita|xar|defen|aerospace/i.test(`${item.symbol || ''} ${item.name || ''}`));
+  if (defenseSector && Number(defenseSector.change || 0) >= 1.2) {
+    signals.push(buildWorldSignal('defense_repricing', 'sector_summary', 'Defense sector repricing', {
+      sourceKey: defenseSector.symbol || defenseSector.name,
+      region: 'Global',
+      strength: normalize(Math.abs(Number(defenseSector.change || 0)), 1.2, 4.5),
+      confidence: 0.62,
+      domains: ['market', 'conflict'],
+      supportingEvidence: [`${defenseSector.symbol || defenseSector.name} ${Number(defenseSector.change || 0).toFixed(1)}%`],
     }));
   }
 
@@ -6347,14 +6497,36 @@ function buildMarketState(worldSignals, transmissionGraph) {
     const macroConfirmation = macroSignals.length
       ? clampUnitInterval(macroSignals.reduce((sum, signal) => sum + signal.strength, 0) / macroSignals.length)
       : 0;
-    const pressureScore = +Math.min(1, (pressureNumerator / divisor) + (macroConfirmation * 0.12)).toFixed(3);
-    const confidence = +Math.min(1, (confidenceNumerator / divisor) + Math.min(0.08, macroSignals.length * 0.02)).toFixed(3);
+    const calibration = MARKET_BUCKET_STATE_CALIBRATION[config.id] || {};
+    const defenseSignalConfirmation = config.id === 'defense' && bucketSignals.length
+      ? clampUnitInterval(
+        bucketSignals
+          .filter((signal) => signal.type === 'defense_repricing')
+          .reduce((sum, signal) => sum + Number(signal.strength || 0), 0),
+      )
+      : 0;
+    const edgeDensity = bucketEdges.length
+      ? clampUnitInterval(bucketEdges.reduce((sum, edge) => sum + Number(edge.strength || 0), 0) / bucketEdges.length)
+      : 0;
+    const calibratedPressure = (pressureNumerator / divisor)
+      + (macroConfirmation * Number(calibration.macroLift || 0))
+      + (edgeDensity * Number(calibration.edgeLift || 0))
+      + (defenseSignalConfirmation * 0.12)
+      - (!defenseSignalConfirmation && config.id === 'defense' ? Number(calibration.dampener || 0) : 0);
+    const calibratedConfidence = (confidenceNumerator / divisor)
+      + Math.min(0.08, macroSignals.length * 0.02)
+      + (edgeDensity * Number(calibration.confidenceLift || 0))
+      + (defenseSignalConfirmation * 0.08)
+      - (!defenseSignalConfirmation && config.id === 'defense' ? 0.04 : 0);
+    const pressureScore = +clampUnitInterval(calibratedPressure).toFixed(3);
+    const confidence = +clampUnitInterval(calibratedConfidence).toFixed(3);
     return {
       id: config.id,
       label: config.label,
       pressureScore,
       confidence,
       macroConfirmation: +macroConfirmation.toFixed(3),
+      defenseConfirmation: +defenseSignalConfirmation.toFixed(3),
       direction: pressureScore >= 0.6 ? 'elevated' : pressureScore >= 0.4 ? 'active' : 'contained',
       topSignals: weightedSignals
         .slice()
@@ -6376,7 +6548,7 @@ function buildMarketState(worldSignals, transmissionGraph) {
         label: edge.sourceLabel,
         strength: edge.strength,
       })),
-      summary: `${config.label} pressure is ${pressureScore >= 0.6 ? 'elevated' : pressureScore >= 0.4 ? 'active' : 'contained'}, led by ${weightedSignals[0]?.label || bucketEdges[0]?.sourceLabel || 'no major driver'}${macroSignals.length ? ` with ${roundPct(macroConfirmation)} macro confirmation` : ''}.`,
+      summary: `${config.label} pressure is ${pressureScore >= 0.6 ? 'elevated' : pressureScore >= 0.4 ? 'active' : 'contained'}, led by ${weightedSignals[0]?.label || bucketEdges[0]?.sourceLabel || 'no major driver'}${macroSignals.length ? ` with ${roundPct(macroConfirmation)} macro confirmation` : ''}${config.id === 'defense' && defenseSignalConfirmation > 0 ? ` and ${roundPct(defenseSignalConfirmation)} defense confirmation` : ''}.`,
     };
   }).filter((bucket) => bucket.pressureScore > 0 || bucket.topSignals.length > 0 || bucket.topSituations.length > 0);
 
@@ -6575,6 +6747,7 @@ function summarizeWorldStateSurface(worldState) {
     marketBucketCount: worldState.marketState?.buckets?.length || 0,
     transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
     marketConsequenceCount: worldState.simulationState?.marketConsequences?.items?.length || 0,
+    blockedMarketConsequenceCount: worldState.simulationState?.marketConsequences?.blockedCount || 0,
     simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
     simulationActionCount: worldState.simulationState?.actionLedger?.length || 0,
     simulationInteractionCount: worldState.simulationState?.interactionLedger?.length || 0,
@@ -6781,6 +6954,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       marketBucketCount: worldState.marketState?.buckets?.length || 0,
       transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
       marketConsequenceCount: worldState.simulationState?.marketConsequences?.items?.length || 0,
+      blockedMarketConsequenceCount: worldState.simulationState?.marketConsequences?.blockedCount || 0,
       topMarketBucket: worldState.marketState?.topBucketLabel || '',
       simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
       simulationRoundCount: worldState.simulationState?.totalRounds || 0,
@@ -6790,6 +6964,7 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       internalEffectCount: worldState.simulationState?.internalEffects?.length || 0,
       simulationEffectCount: worldState.report?.crossSituationEffects?.length || 0,
       blockedEffectCount: worldState.simulationState?.blockedEffects?.length || 0,
+      blockedMarketConsequenceReasons: worldState.simulationState?.marketConsequences?.blockedSummary?.byReason || {},
       simulationEnvironmentSummary: worldState.simulationState?.environmentSpec?.summary || '',
       simulationEnvironmentCount: worldState.simulationState?.environmentSpec?.situations?.length || 0,
       memoryMutationSummary: worldState.simulationState?.memoryMutations?.summary || '',
@@ -7331,12 +7506,19 @@ function computePublishSelectionScore(pred, memoryIndex = null) {
     : 0;
   const marketConfirmation = Number(pred.marketSelectionContext?.confirmationScore || 0);
   const marketContradiction = Number(pred.marketSelectionContext?.contradictionScore || 0);
+  const topBucketId = pred.marketSelectionContext?.topBucketId || '';
   const marketTransmissionLift = Math.min(0.07,
     (marketConfirmation * 0.06) +
     Math.min(0.02, Number(pred.marketSelectionContext?.transmissionEdgeCount || 0) * 0.005) +
     Math.min(0.02, Number(pred.marketSelectionContext?.topBucketPressure || 0) * 0.03)
   );
   const marketPenalty = Math.min(0.04, marketContradiction * 0.05);
+  const coreBucketLift = CORE_MARKET_BUCKET_IDS.includes(topBucketId)
+    ? Math.min(0.035, (marketConfirmation * 0.025) + (Number(pred.marketSelectionContext?.topBucketPressure || 0) * 0.02))
+    : 0;
+  const defensePenalty = topBucketId === 'defense' && pred.marketSelectionContext?.topChannel !== 'defense_repricing'
+    ? 0.018
+    : 0;
   pred.publishSelectionMemory = memoryHint ? {
     matchedBy: memoryHint.matchedBy,
     situationId: memoryHint.memory?.situationId || '',
@@ -7363,7 +7545,9 @@ function computePublishSelectionScore(pred, memoryIndex = null) {
     enrichedLift +
     memoryLift +
     marketTransmissionLift -
-    marketPenalty
+    marketPenalty +
+    coreBucketLift -
+    defensePenalty
   ).toFixed(6);
 }
 
@@ -7444,6 +7628,20 @@ function selectPublishedForecastPool(predictions, options = {}) {
       && Number(pred.marketSelectionContext?.transmissionEdgeCount || 0) >= 1
     )
   ));
+  const transmissionAnchors = ranked.filter((pred) => (
+    CORE_MARKET_BUCKET_IDS.includes(pred.marketSelectionContext?.topBucketId || '')
+    && (
+      Number(pred.marketSelectionContext?.confirmationScore || 0) >= 0.46
+      || (
+        Number(pred.marketSelectionContext?.topTransmissionStrength || 0) >= 0.48
+        && Number(pred.marketSelectionContext?.topBucketPressure || 0) >= 0.42
+      )
+    )
+  ));
+  for (const pred of transmissionAnchors) {
+    if (selected.length >= Math.min(targetCount, 2)) break;
+    if (canSelect(pred, 'fill')) take(pred);
+  }
   for (const pred of marketAnchors) {
     if (selected.length >= Math.min(targetCount, 2)) break;
     if (canSelect(pred, 'fill')) take(pred);
@@ -7469,6 +7667,11 @@ function selectPublishedForecastPool(predictions, options = {}) {
   }
 
   for (const pred of memoryAnchors) {
+    if (selected.length >= targetCount) break;
+    if (canSelect(pred, 'fill')) take(pred);
+  }
+
+  for (const pred of transmissionAnchors) {
     if (selected.length >= targetCount) break;
     if (canSelect(pred, 'fill')) take(pred);
   }
