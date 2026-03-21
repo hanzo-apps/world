@@ -883,14 +883,15 @@ export class MapPopup {
       }
 
       const parts: string[] = [];
+      let photoHtml = '';
 
-      // Photo — sanitizeUrl validates scheme, preventing javascript: injection in img src
+      // Photo — built separately so it renders at the bottom after route/times/stats
       if (live.photoUrl) {
         const photoSrc = sanitizeUrl(live.photoUrl);
         if (photoSrc) {
           const photoLink = live.photoLink ? sanitizeUrl(live.photoLink) : '#';
           const credit = live.photoCredit ? `<span class="flight-photo-credit">\u00a9 ${escapeHtml(live.photoCredit)}</span>` : '';
-          parts.push(`<div class="flight-photo"><a href="${photoLink}" target="_blank" rel="noopener"><img src="${photoSrc}" alt="${escapeHtml(live.callsign)}" loading="lazy" style="width:100%;border-radius:4px;display:block"></a>${credit}</div>`);
+          photoHtml = `<div class="flight-photo"><a href="${photoLink}" target="_blank" rel="noopener"><img src="${photoSrc}" alt="${escapeHtml(live.callsign)}" loading="lazy" style="width:100%;border-radius:4px;display:block"></a>${credit}</div>`;
         }
       }
 
@@ -932,7 +933,7 @@ export class MapPopup {
       if (live.operator) rows.push(`<div class="popup-stat"><span class="stat-label">Operator</span><span class="stat-value">${escapeHtml(live.operator)}</span></div>`);
       if (live.verticalRate !== 0) rows.push(`<div class="popup-stat"><span class="stat-label">Climb</span><span class="stat-value">${live.verticalRate > 0 ? '+' : ''}${Math.round(live.verticalRate)} fpm</span></div>`);
 
-      if (parts.length === 0 && rows.length === 0) {
+      if (parts.length === 0 && rows.length === 0 && !photoHtml) {
         section.innerHTML = '';
         return;
       }
@@ -942,6 +943,7 @@ export class MapPopup {
         <div class="popup-section-label" style="font-size:10px;opacity:0.5;text-transform:uppercase;letter-spacing:.05em;margin-top:8px">Live Data</div>
         ${parts.join('')}
         ${statsHtml}
+        ${photoHtml}
       `;
     } catch {
       if (section.isConnected) {

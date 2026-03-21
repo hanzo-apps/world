@@ -1986,6 +1986,8 @@
       "h3Hex": "H3 Hex"
     },
     "flight": {
+      "scheduled": "Sched",
+      "estimated": "Est",
       "groundStop": "GROUND STOP",
       "groundDelay": "GROUND DELAY PROGRAM",
       "departureDelay": "DEPARTURE DELAYS",
