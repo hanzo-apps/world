@@ -138,18 +138,29 @@ export async function trackAircraft(
                     console.warn(`[Aviation] Direct OpenSky anonymous failed: ${err instanceof Error ? err.message : err}`);
                 }
 
-                // Try Wingbits relay (bbox only — no global fallback)
-                if (relayBase && req.swLat != null && req.neLat != null) {
+                // Try Wingbits relay. Supports bbox queries and, for callsign-only searches,
+                // a global bbox so we can find the aircraft regardless of position.
+                if (relayBase) {
                     try {
-                        const wbUrl = `${relayBase}/wingbits/track?lamin=${req.swLat}&lomin=${req.swLon}&lamax=${req.neLat}&lomax=${req.neLon}`;
-                        const wbResp = await fetch(wbUrl, {
-                            headers: getRelayHeaders({}),
-                            signal: AbortSignal.timeout(15_000),
-                        });
-                        if (wbResp.ok) {
-                            const wbData = await wbResp.json() as WingbitsRelayResponse;
-                            if (wbData.positions && wbData.positions.length > 0) {
-                                return { positions: wbData.positions, source: 'wingbits' };
+                        let wbUrl: string;
+                        if (req.swLat != null && req.neLat != null) {
+                            wbUrl = `${relayBase}/wingbits/track?lamin=${req.swLat}&lomin=${req.swLon}&lamax=${req.neLat}&lomax=${req.neLon}`;
+                        } else if (req.callsign) {
+                            // Global search — relay uses a worldwide box and filters by callsign.
+                            wbUrl = `${relayBase}/wingbits/track?callsign=${encodeURIComponent(req.callsign)}`;
+                        } else {
+                            wbUrl = '';
+                        }
+                        if (wbUrl) {
+                            const wbResp = await fetch(wbUrl, {
+                                headers: getRelayHeaders({}),
+                                signal: AbortSignal.timeout(15_000),
+                            });
+                            if (wbResp.ok) {
+                                const wbData = await wbResp.json() as WingbitsRelayResponse;
+                                if (wbData.positions && wbData.positions.length > 0) {
+                                    return { positions: wbData.positions, source: 'wingbits' };
+                                }
                             }
                         }
                     } catch (err) {
@@ -171,7 +182,14 @@ export async function trackAircraft(
         return { positions, source: result.source, updatedAt: Date.now() };
     }
 
-    // Fallback to simulated data (not cached — random each time)
+    // For explicit callsign/icao24 lookups (search modal), return empty rather than fake planes.
+    // Simulated fallback only makes sense for viewport display — scattering random planes near (0,0)
+    // with the searched callsign produces misleading results in the Gulf of Guinea.
+    if (req.callsign || req.icao24) {
+        return { positions: [], source: 'none', updatedAt: Date.now() };
+    }
+
+    // Fallback to simulated data for viewport display when all real sources are down.
     const positions = buildSimulatedPositions(req.icao24, req.callsign, req.swLat, req.swLon, req.neLat, req.neLon);
     return { positions, source: 'simulated', updatedAt: Date.now() };
 }
