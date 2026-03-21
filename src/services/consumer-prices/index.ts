@@ -135,7 +135,7 @@ export async function fetchConsumerPriceOverview(
   basketSlug = DEFAULT_BASKET,
 ): Promise<GetConsumerPriceOverviewResponse> {
   const hydrated = getHydratedData('consumerPricesOverview') as GetConsumerPriceOverviewResponse | undefined;
-  if (hydrated?.asOf) return hydrated;
+  if (hydrated?.asOf && !hydrated.upstreamUnavailable) return hydrated;
 
   try {
     return await overviewBreaker.execute(
