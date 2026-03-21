@@ -400,6 +400,7 @@ export class LiveNewsPanel extends Panel {
 
   // Native HLS <video> element for direct stream playback (bypasses iframe/cookie issues)
   private nativeVideoElement: HTMLVideoElement | null = null;
+  private hlsInstance: import('hls.js').default | null = null;
   private hlsFailureCooldown = new Map<string, number>();
   private readonly HLS_COOLDOWN_MS = 5 * 60 * 1000;
 
@@ -664,6 +665,11 @@ export class LiveNewsPanel extends Panel {
     if (this.player) {
       if (typeof this.player.destroy === 'function') this.player.destroy();
       this.player = null;
+    }
+
+    if (this.hlsInstance) {
+      this.hlsInstance.destroy();
+      this.hlsInstance = null;
     }
 
     if (this.nativeVideoElement) {
@@ -1014,7 +1020,7 @@ export class LiveNewsPanel extends Panel {
     });
 
     if (this.getDirectHlsUrl(channel.id) || this.getProxiedHlsUrl(channel.id) || channel.hlsUrl) {
-      this.renderNativeHlsPlayer();
+      void this.renderNativeHlsPlayer();
       return;
     }
 
@@ -1169,7 +1175,7 @@ export class LiveNewsPanel extends Panel {
     this.startBotCheckTimeout();
   }
 
-  private renderNativeHlsPlayer(): void {
+  private async renderNativeHlsPlayer(): Promise<void> {
     const hlsUrl = this.getDirectHlsUrl(this.activeChannel.id) || this.getProxiedHlsUrl(this.activeChannel.id) || this.activeChannel.hlsUrl;
     if (!hlsUrl || !(hlsUrl.startsWith('https://') || hlsUrl.startsWith('http://127.0.0.1'))) return;
 
@@ -1180,7 +1186,6 @@ export class LiveNewsPanel extends Panel {
 
     const video = document.createElement('video');
     video.className = 'live-news-native-video';
-    video.src = hlsUrl;
     video.autoplay = this.isPlaying;
     video.muted = this.isMuted;
     video.playsInline = true;
@@ -1190,8 +1195,12 @@ export class LiveNewsPanel extends Panel {
 
     const failedChannel = this.activeChannel;
 
-    video.addEventListener('error', () => {
-      console.warn('[LiveNews] HLS error:', video.error?.code, video.error?.message, failedChannel.id, hlsUrl);
+    let hlsErrorFired = false;
+    const onHlsFatalError = () => {
+      if (hlsErrorFired) return;
+      hlsErrorFired = true;
+      console.warn('[LiveNews] HLS fatal error for', failedChannel.id, hlsUrl);
+      if (this.hlsInstance) { this.hlsInstance.destroy(); this.hlsInstance = null; }
       video.pause();
       video.removeAttribute('src');
       this.nativeVideoElement = null;
@@ -1202,7 +1211,32 @@ export class LiveNewsPanel extends Panel {
         this.ensurePlayerContainer();
         void this.initializePlayer();
       }
-    });
+    };
+
+    const nativeHls = video.canPlayType('application/vnd.apple.mpegurl');
+    if (nativeHls) {
+      // Safari / WKWebView: native HLS support
+      video.src = hlsUrl;
+      video.addEventListener('error', onHlsFatalError);
+    } else {
+      // Chrome / Firefox: lazy-load hls.js only when needed
+      const { default: Hls } = await import('hls.js');
+      if (this.activeChannel.id !== failedChannel.id || !this.element?.isConnected) return;
+      if (!Hls.isSupported()) {
+        // No HLS support at all — fall through to YouTube
+        onHlsFatalError();
+        return;
+      }
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+      this.hlsInstance = hls;
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      // Monitor both hls.js fatal events and raw media element errors (e.g. decode failures).
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) onHlsFatalError();
+      });
+      video.addEventListener('error', onHlsFatalError);
+    }
 
     video.addEventListener('volumechange', () => {
       if (!this.nativeVideoElement) return;
@@ -1313,7 +1347,7 @@ export class LiveNewsPanel extends Panel {
     if (!this.element?.isConnected) return;
 
     if (this.getDirectHlsUrl(this.activeChannel.id) || this.getProxiedHlsUrl(this.activeChannel.id) || this.activeChannel.hlsUrl) {
-      this.renderNativeHlsPlayer();
+      void this.renderNativeHlsPlayer();
       return;
     }
 
