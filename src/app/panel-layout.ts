@@ -22,6 +22,8 @@ import {
   EnergyComplexPanel,
   GdeltIntelPanel,
   LiveNewsPanel,
+  getDefaultLiveChannels,
+  loadChannelsFromStorage,
   LiveWebcamsPanel,
   PinnedWebcamsPanel,
   CIIPanel,
@@ -485,6 +487,28 @@ export class PanelLayoutManager implements AppModule {
     });
   }
 
+  /**
+   * Lazily instantiates and mounts LiveNewsPanel when channels become available
+   * mid-session (e.g. user adds channels via the standalone manager on a variant
+   * whose defaults are empty). No-op if the panel already exists or still has no
+   * channels. Called from the liveChannels storage event handler.
+   */
+  mountLiveNewsIfReady(): void {
+    if (this.ctx.panels['live-news']) return;
+    if (getDefaultLiveChannels().length === 0 && loadChannelsFromStorage().length === 0) return;
+    const panel = new LiveNewsPanel();
+    this.ctx.panels['live-news'] = panel;
+    const el = panel.getElement();
+    this.makeDraggable(el, 'live-news');
+    const grid = document.getElementById('panelsGrid');
+    if (grid) {
+      const addBlock = grid.querySelector('.add-panel-block');
+      if (addBlock) grid.insertBefore(el, addBlock);
+      else grid.appendChild(el);
+    }
+    this.applyPanelSettings();
+  }
+
   private shouldCreatePanel(key: string): boolean {
     return Object.prototype.hasOwnProperty.call(this.ctx.panelSettings, key);
   }
@@ -787,7 +811,8 @@ export class PanelLayoutManager implements AppModule {
       this.ctx.panels['bigmac'] = new BigMacPanel();
     }
 
-    if (this.shouldCreatePanel('live-news')) {
+    if (this.shouldCreatePanel('live-news') &&
+        (getDefaultLiveChannels().length > 0 || loadChannelsFromStorage().length > 0)) {
       this.ctx.panels['live-news'] = new LiveNewsPanel();
     }
 
