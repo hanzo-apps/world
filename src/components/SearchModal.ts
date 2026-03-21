@@ -285,6 +285,26 @@ export class SearchModal {
 
     const byType = new Map<SearchResultType, (SearchResult & { _score: number })[]>();
 
+    // "flight {callsign}" prefix: route the callsign fragment directly to the flight source.
+    if (query.startsWith('flight ')) {
+      const callsign = query.slice(7).trim();
+      if (callsign.length > 0) {
+        const flightSource = this.sources.find(s => s.type === 'flight');
+        if (flightSource) {
+          byType.set('flight', flightSource.items
+            .filter(item => item.title.toLowerCase().includes(callsign))
+            .map(item => ({
+              type: 'flight' as SearchResultType,
+              id: item.id,
+              title: item.title,
+              subtitle: item.subtitle,
+              data: item.data,
+              _score: item.title.toLowerCase().startsWith(callsign) ? 2 : 1,
+            })) as (SearchResult & { _score: number })[]);
+        }
+      }
+    }
+
     for (const source of this.sources) {
       for (const item of source.items) {
         const titleLower = item.title.toLowerCase();
