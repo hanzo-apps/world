@@ -2,7 +2,7 @@
  * Scrape job: discovers targets and writes price observations to Postgres.
  * Respects per-retailer rate limits and acquisition provider config.
  */
-import { query } from '../db/client.js';
+import { query, closePool } from '../db/client.js';
 import { insertObservation } from '../db/queries/observations.js';
 import { upsertRetailerProduct } from '../db/queries/products.js';
 import { parseSize, unitPrice as calcUnitPrice } from '../normalizers/size.js';
@@ -197,7 +197,7 @@ export async function scrapeAll() {
 }
 
 if (process.argv[2]) {
-  scrapeRetailer(process.argv[2]).catch(console.error);
+  scrapeRetailer(process.argv[2]).finally(() => closePool()).catch(console.error);
 } else {
-  scrapeAll().catch(console.error);
+  scrapeAll().finally(() => closePool()).catch(console.error);
 }
