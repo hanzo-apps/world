@@ -6725,7 +6725,7 @@ a.prediction-link:hover {
 .map-popup {
   position: fixed;
   width: 360px;
-  max-height: 380px;
+  max-height: min(560px, 80vh);
   background: var(--bg);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
@@ -11989,7 +11989,7 @@ a.prediction-link:hover {
   /* Map popup positioning for mobile - ensure it's visible */
   .map-popup {
     max-width: calc(100vw - 32px);
-    max-height: 60vh;
+    max-height: 75vh;
     overflow-y: auto;
   }
 
