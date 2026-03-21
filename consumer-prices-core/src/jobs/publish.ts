@@ -11,6 +11,7 @@ import {
   buildRetailerSpreadSnapshot,
 } from '../snapshots/worldmonitor.js';
 import { loadAllBasketConfigs, loadAllRetailerConfigs } from '../config/loader.js';
+import { closePool } from '../db/client.js';
 
 const logger = {
   info: (msg: string, ...args: unknown[]) => console.log(`[publish] ${msg}`, ...args),
@@ -164,5 +165,5 @@ export async function publishAll() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  publishAll().catch(console.error);
+  publishAll().finally(() => closePool()).catch(console.error);
 }
