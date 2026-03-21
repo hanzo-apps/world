@@ -9,6 +9,9 @@
 
 FROM node:22-alpine
 
+# curl required by OREF polling (Node.js JA3 fingerprint blocked by Akamai; curl passes)
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
 # Install scripts/ runtime dependencies (telegram, ws, fast-xml-parser, etc.)
