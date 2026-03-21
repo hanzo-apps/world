@@ -302,20 +302,29 @@ export class App {
     let mapLayers: MapLayers;
     let panelSettings: Record<string, PanelConfig>;
 
+    // Panels that must survive variant switches: desktop config, user-created widgets, MCP panels.
+    const isDynamicPanel = (k: string) => k === 'runtime-config' || k.startsWith('cw-') || k.startsWith('mcp-');
+
     // Check if variant changed - reset all settings to variant defaults
     const storedVariant = localStorage.getItem('worldmonitor-variant');
     const currentVariant = SITE_VARIANT;
     console.log(`[App] Variant check: stored="${storedVariant}", current="${currentVariant}"`);
     if (storedVariant !== currentVariant) {
-      // Variant changed — seed new variant's panels but preserve existing user choices
-      console.log('[App] Variant changed - seeding new defaults, preserving user choices');
+      // Variant changed — seed new variant's panels, disable panels not in the new variant
+      console.log('[App] Variant changed - seeding new defaults, disabling cross-variant panels');
       localStorage.setItem('worldmonitor-variant', currentVariant);
       // Reset map layers for the new variant (map layers are not user-personalized the same way)
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
       mapLayers = sanitizeLayersForVariant({ ...defaultLayers }, currentVariant as MapVariant);
-      // Load existing panel prefs (if any) and seed new variant's panels
+      // Load existing panel prefs (if any), disable panels not belonging to the new variant
       panelSettings = loadFromStorage<Record<string, PanelConfig>>(STORAGE_KEYS.panels, {});
-      for (const key of (VARIANT_DEFAULTS[currentVariant] ?? [])) {
+      const newVariantKeys = new Set(VARIANT_DEFAULTS[currentVariant] ?? []);
+      for (const key of Object.keys(panelSettings)) {
+        if (!newVariantKeys.has(key) && !isDynamicPanel(key) && panelSettings[key]) {
+          panelSettings[key] = { ...panelSettings[key]!, enabled: false };
+        }
+      }
+      for (const key of newVariantKeys) {
         if (!(key in panelSettings)) {
           panelSettings[key] = { ...getEffectivePanelConfig(key, currentVariant), enabled: true };
         }
@@ -372,6 +381,23 @@ export class App {
         saveToStorage(STORAGE_KEYS.panels, panelSettings);
         localStorage.setItem(UNIFIED_MIGRATION_KEY, 'done');
       }
+
+      // One-time migration: fix happy variant sessions that got cross-variant panels enabled
+      // (regression from #1911 unified panel registry which failed to disable non-variant panels on variant switch)
+      const HAPPY_PANEL_FIX_KEY = 'worldmonitor-happy-panel-fix-v1';
+      if (SITE_VARIANT === 'happy' && !localStorage.getItem(HAPPY_PANEL_FIX_KEY)) {
+        const happyKeys = new Set(VARIANT_DEFAULTS['happy'] ?? []);
+        let fixed = false;
+        for (const key of Object.keys(panelSettings)) {
+          if (!happyKeys.has(key) && !isDynamicPanel(key) && panelSettings[key]?.enabled) {
+            panelSettings[key] = { ...panelSettings[key]!, enabled: false };
+            fixed = true;
+          }
+        }
+        if (fixed) saveToStorage(STORAGE_KEYS.panels, panelSettings);
+        localStorage.setItem(HAPPY_PANEL_FIX_KEY, 'done');
+      }
+
       console.log('[App] Loaded panel settings from storage:', Object.entries(panelSettings).filter(([_, v]) => !v.enabled).map(([k]) => k));
 
       // One-time migration: reorder panels for existing users (v1.9 panel layout)
@@ -462,11 +488,12 @@ export class App {
 
     // Desktop key management panel must always remain accessible in Tauri.
     if (isDesktopApp) {
-      if (!panelSettings['runtime-config']) {
+      if (!panelSettings['runtime-config'] || !panelSettings['runtime-config'].enabled) {
         panelSettings['runtime-config'] = {
-          name: 'Desktop Configuration',
+          ...panelSettings['runtime-config'],
+          name: panelSettings['runtime-config']?.name ?? 'Desktop Configuration',
           enabled: true,
-          priority: 2,
+          priority: panelSettings['runtime-config']?.priority ?? 2,
         };
         saveToStorage(STORAGE_KEYS.panels, panelSettings);
       }
