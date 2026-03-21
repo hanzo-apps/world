@@ -196,8 +196,22 @@ export async function scrapeAll() {
   }
 }
 
-if (process.argv[2]) {
-  scrapeRetailer(process.argv[2]).finally(() => closePool()).catch(console.error);
-} else {
-  scrapeAll().finally(() => closePool()).catch(console.error);
+async function main() {
+  try {
+    if (process.argv[2]) {
+      await scrapeRetailer(process.argv[2]);
+    } else {
+      await scrapeAll();
+    }
+  } catch (err) {
+    console.error('[scrape] fatal:', err);
+    process.exitCode = 1;
+  } finally {
+    await closePool().catch(() => {});
+  }
 }
+
+// process.exit() is required to flush lingering Playwright/Chromium handles
+// that would otherwise prevent the process from exiting naturally.
+// process.exitCode preserves failure signaling set in the catch block above.
+main().catch(() => { process.exitCode = 1; }).then(() => process.exit(process.exitCode ?? 0));
