@@ -625,6 +625,7 @@ export class App {
       ensureCorrectZones: () => this.panelLayout.ensureCorrectZones(),
       refreshOpenCountryBrief: () => this.countryIntel.refreshOpenBrief(),
       stopLayerActivity: (layer) => this.dataLoader.stopLayerActivity(layer),
+      mountLiveNewsIfReady: () => this.panelLayout.mountLiveNewsIfReady(),
     });
 
     // Wire cross-module callback: DataLoader → SearchManager
