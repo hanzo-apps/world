@@ -3085,20 +3085,25 @@ async function handleWingbitsTrackRequest(req, res) {
 
   const url = new URL(req.url, 'http://localhost');
   const params = url.searchParams;
+  const callsignFilter = (params.get('callsign') || '').trim().toUpperCase();
   const laminStr = params.get('lamin');
   const lominStr = params.get('lomin');
   const lamaxStr = params.get('lamax');
   const lomaxStr = params.get('lomax');
 
-  if (!laminStr || !lominStr || !lamaxStr || !lomaxStr) {
+  // For callsign-only searches (no bbox), use a global area so Wingbits can find the aircraft
+  // regardless of where it currently is.
+  const isGlobalSearch = callsignFilter && (!laminStr || !lominStr || !lamaxStr || !lomaxStr);
+
+  if (!isGlobalSearch && (!laminStr || !lominStr || !lamaxStr || !lomaxStr)) {
     return safeEnd(res, 400, { 'Content-Type': 'application/json' },
       JSON.stringify({ error: 'Missing bbox params: lamin, lomin, lamax, lomax', positions: [] }));
   }
 
-  const lamin = Number(laminStr);
-  const lomin = Number(lominStr);
-  const lamax = Number(lamaxStr);
-  const lomax = Number(lomaxStr);
+  const lamin = isGlobalSearch ? -80 : Number(laminStr);
+  const lomin = isGlobalSearch ? -180 : Number(lominStr);
+  const lamax = isGlobalSearch ? 80 : Number(lamaxStr);
+  const lomax = isGlobalSearch ? 180 : Number(lomaxStr);
 
   if (!Number.isFinite(lamin) || !Number.isFinite(lomin) || !Number.isFinite(lamax) || !Number.isFinite(lomax)) {
     return safeEnd(res, 400, { 'Content-Type': 'application/json' },
@@ -3109,7 +3114,8 @@ async function handleWingbitsTrackRequest(req, res) {
   const centerLon = (lomin + lomax) / 2;
   const widthNm = Math.abs(lomax - lomin) * 60 * Math.cos(centerLat * Math.PI / 180);
   const heightNm = Math.abs(lamax - lamin) * 60;
-  const areas = [{ alias: 'viewport', by: 'box', la: centerLat, lo: centerLon, w: widthNm, h: heightNm, unit: 'nm' }];
+  const alias = isGlobalSearch ? `callsign-search-${callsignFilter}` : 'viewport';
+  const areas = [{ alias, by: 'box', la: centerLat, lo: centerLon, w: widthNm, h: heightNm, unit: 'nm' }];
 
   try {
     const resp = await fetch('https://customer-api.wingbits.com/v1/flights', {
@@ -3142,6 +3148,11 @@ async function handleWingbitsTrackRequest(req, res) {
       for (const f of flightList) {
         const icao24 = f.h || f.icao24 || f.id || '';
         if (!icao24 || seenIds.has(icao24)) continue;
+        // For callsign searches, skip non-matching flights early to keep response small.
+        if (callsignFilter) {
+          const cs = (f.f || f.callsign || f.flight || '').trim().toUpperCase();
+          if (!cs.includes(callsignFilter)) continue;
+        }
         seenIds.add(icao24);
         const lat = f.la ?? f.latitude ?? f.lat ?? 0;
         const lon = f.lo ?? f.longitude ?? f.lon ?? f.lng ?? 0;
