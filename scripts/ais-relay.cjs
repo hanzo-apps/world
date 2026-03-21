@@ -4355,6 +4355,7 @@ const USNI_REGION_COORDS = {
   'Diego Garcia': { lat: -7.32, lon: 72.42 }, Djibouti: { lat: 11.55, lon: 43.15 },
   Singapore: { lat: 1.35, lon: 103.82 }, 'Souda Bay': { lat: 35.49, lon: 24.08 },
   Naples: { lat: 40.84, lon: 14.25 },
+  'Tasman Sea': { lat: -40.0, lon: 160.0 }, 'Eastern Atlantic': { lat: 40.0, lon: -15.0 },
 };
 
 function usniStripHtml(html) {
