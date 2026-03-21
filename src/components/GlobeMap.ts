@@ -2093,105 +2093,154 @@ export class GlobeMap {
   }
 
   private initStaticLayers(): void {
-    this.milBaseMarkers = (MILITARY_BASES as MilitaryBase[]).map(b => ({
-      _kind: 'milbase' as const,
-      _lat: b.lat,
-      _lng: b.lon,
-      id: b.id,
-      name: b.name,
-      type: b.type,
-      country: b.country ?? '',
-    }));
-    this.nuclearSiteMarkers = NUCLEAR_FACILITIES
-      .filter(f => f.status !== 'decommissioned')
-      .map(f => ({
-        _kind: 'nuclearSite' as const,
-        _lat: f.lat,
-        _lng: f.lon,
-        id: f.id,
-        name: f.name,
-        type: f.type,
-        status: f.status,
-      }));
-    this.irradiatorSiteMarkers = (GAMMA_IRRADIATORS as GammaIrradiator[]).map(g => ({
-      _kind: 'irradiator' as const,
-      _lat: g.lat,
-      _lng: g.lon,
-      id: g.id,
-      city: g.city,
-      country: g.country,
-    }));
-    this.spaceportSiteMarkers = (SPACEPORTS as Spaceport[])
-      .filter(s => s.status === 'active')
-      .map(s => ({
-        _kind: 'spaceport' as const,
-        _lat: s.lat,
-        _lng: s.lon,
-        id: s.id,
-        name: s.name,
-        country: s.country,
-        operator: s.operator,
-        launches: s.launches,
-      }));
-    this.economicMarkers = (ECONOMIC_CENTERS as EconomicCenter[]).map(c => ({
-      _kind: 'economic' as const,
-      _lat: c.lat,
-      _lng: c.lon,
-      id: c.id,
-      name: c.name,
-      type: c.type,
-      country: c.country,
-      description: c.description ?? '',
-    }));
-    this.datacenterMarkers = (AI_DATA_CENTERS as AIDataCenter[])
-      .filter(d => d.status !== 'decommissioned')
-      .map(d => ({
-        _kind: 'datacenter' as const,
-        _lat: d.lat,
-        _lng: d.lon,
-        id: d.id,
-        name: d.name,
-        owner: d.owner,
-        country: d.country,
-        chipType: d.chipType,
-      }));
-    this.waterwayMarkers = (STRATEGIC_WATERWAYS as StrategicWaterway[]).map(w => ({
-      _kind: 'waterway' as const,
-      _lat: w.lat,
-      _lng: w.lon,
-      id: w.id,
-      name: w.name,
-      description: w.description ?? '',
-    }));
-    this.mineralMarkers = (CRITICAL_MINERALS as CriticalMineralProject[])
-      .filter(m => m.status === 'producing' || m.status === 'development')
-      .map(m => ({
-        _kind: 'mineral' as const,
-        _lat: m.lat,
-        _lng: m.lon,
-        id: m.id,
-        name: m.name,
-        mineral: m.mineral,
-        country: m.country,
-        status: m.status,
-      }));
-    this.tradeRouteSegments = resolveTradeRouteSegments();
-    this.globePaths = [
-      ...(UNDERSEA_CABLES as UnderseaCable[]).map(c => ({
-        id: c.id,
-        name: c.name,
-        points: c.points,
-        pathType: 'cable' as const,
-        status: 'ok',
-      })),
-      ...(PIPELINES as Pipeline[]).map(p => ({
-        id: p.id,
-        name: p.name,
-        points: p.points,
-        pathType: p.type,
-        status: p.status,
-      })),
-    ];
+    for (const k of Object.keys(this.layers) as (keyof MapLayers)[]) {
+      if (this.layers[k]) this.ensureStaticDataForLayer(k);
+    }
+  }
+
+  private ensureStaticDataForLayer(layer: keyof MapLayers): void {
+    switch (layer) {
+      case 'bases':
+        if (!this.milBaseMarkers.length) {
+          this.milBaseMarkers = (MILITARY_BASES as MilitaryBase[]).map(b => ({
+            _kind: 'milbase' as const,
+            _lat: b.lat,
+            _lng: b.lon,
+            id: b.id,
+            name: b.name,
+            type: b.type,
+            country: b.country ?? '',
+          }));
+        }
+        break;
+      case 'nuclear':
+        if (!this.nuclearSiteMarkers.length) {
+          this.nuclearSiteMarkers = NUCLEAR_FACILITIES
+            .filter(f => f.status !== 'decommissioned')
+            .map(f => ({
+              _kind: 'nuclearSite' as const,
+              _lat: f.lat,
+              _lng: f.lon,
+              id: f.id,
+              name: f.name,
+              type: f.type,
+              status: f.status,
+            }));
+        }
+        break;
+      case 'irradiators':
+        if (!this.irradiatorSiteMarkers.length) {
+          this.irradiatorSiteMarkers = (GAMMA_IRRADIATORS as GammaIrradiator[]).map(g => ({
+            _kind: 'irradiator' as const,
+            _lat: g.lat,
+            _lng: g.lon,
+            id: g.id,
+            city: g.city,
+            country: g.country,
+          }));
+        }
+        break;
+      case 'spaceports':
+        if (!this.spaceportSiteMarkers.length) {
+          this.spaceportSiteMarkers = (SPACEPORTS as Spaceport[])
+            .filter(s => s.status === 'active')
+            .map(s => ({
+              _kind: 'spaceport' as const,
+              _lat: s.lat,
+              _lng: s.lon,
+              id: s.id,
+              name: s.name,
+              country: s.country,
+              operator: s.operator,
+              launches: s.launches,
+            }));
+        }
+        break;
+      case 'economic':
+        if (!this.economicMarkers.length) {
+          this.economicMarkers = (ECONOMIC_CENTERS as EconomicCenter[]).map(c => ({
+            _kind: 'economic' as const,
+            _lat: c.lat,
+            _lng: c.lon,
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            country: c.country,
+            description: c.description ?? '',
+          }));
+        }
+        break;
+      case 'datacenters':
+        if (!this.datacenterMarkers.length) {
+          this.datacenterMarkers = (AI_DATA_CENTERS as AIDataCenter[])
+            .filter(d => d.status !== 'decommissioned')
+            .map(d => ({
+              _kind: 'datacenter' as const,
+              _lat: d.lat,
+              _lng: d.lon,
+              id: d.id,
+              name: d.name,
+              owner: d.owner,
+              country: d.country,
+              chipType: d.chipType,
+            }));
+        }
+        break;
+      case 'waterways':
+        if (!this.waterwayMarkers.length) {
+          this.waterwayMarkers = (STRATEGIC_WATERWAYS as StrategicWaterway[]).map(w => ({
+            _kind: 'waterway' as const,
+            _lat: w.lat,
+            _lng: w.lon,
+            id: w.id,
+            name: w.name,
+            description: w.description ?? '',
+          }));
+        }
+        break;
+      case 'minerals':
+        if (!this.mineralMarkers.length) {
+          this.mineralMarkers = (CRITICAL_MINERALS as CriticalMineralProject[])
+            .filter(m => m.status === 'producing' || m.status === 'development')
+            .map(m => ({
+              _kind: 'mineral' as const,
+              _lat: m.lat,
+              _lng: m.lon,
+              id: m.id,
+              name: m.name,
+              mineral: m.mineral,
+              country: m.country,
+              status: m.status,
+            }));
+        }
+        break;
+      case 'tradeRoutes':
+        if (!this.tradeRouteSegments.length) {
+          this.tradeRouteSegments = resolveTradeRouteSegments();
+        }
+        break;
+      case 'cables':
+      case 'pipelines':
+        if (!this.globePaths.length) {
+          this.globePaths = [
+            ...(UNDERSEA_CABLES as UnderseaCable[]).map(c => ({
+              id: c.id,
+              name: c.name,
+              points: c.points,
+              pathType: 'cable' as const,
+              status: 'ok',
+            })),
+            ...(PIPELINES as Pipeline[]).map(p => ({
+              id: p.id,
+              name: p.name,
+              points: p.points,
+              pathType: p.type,
+              status: p.status,
+            })),
+          ];
+        }
+        break;
+    }
   }
 
   public setMilitaryFlights(flights: MilitaryFlight[]): void {
@@ -2402,6 +2451,7 @@ export class GlobeMap {
     this.layers = { ...layers, dayNight: false };
     let needMarkers = false, needArcs = false, needPaths = false, needPolygons = false;
     for (const k of Object.keys(layers) as (keyof MapLayers)[]) {
+      if (!prev[k] && layers[k]) this.ensureStaticDataForLayer(k);
       if (prev[k] === layers[k]) continue;
       const ch = GlobeMap.LAYER_CHANNELS.get(k);
       if (!ch) { needMarkers = true; continue; }
@@ -2432,6 +2482,7 @@ export class GlobeMap {
     if (layer === 'dayNight') return;
     if (this.layers[layer]) return;
     (this.layers as any)[layer] = true;
+    this.ensureStaticDataForLayer(layer);
     const toggle = this.layerTogglesEl?.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement | null;
     if (toggle) toggle.checked = true;
     this.flushLayerChannels(layer);

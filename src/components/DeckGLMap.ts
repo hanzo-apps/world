@@ -490,8 +490,6 @@ export class DeckGLMap {
 
     this.maplibreMap?.on('load', () => {
       localizeMapLabels(this.maplibreMap);
-      this.rebuildTechHQSupercluster();
-      this.rebuildDatacenterSupercluster();
       this.initDeck();
       this.loadCountryBoundaries();
       this.fetchServerBases();
@@ -687,8 +685,6 @@ export class DeckGLMap {
       });
       this.maplibreMap.on('load', () => {
         localizeMapLabels(this.maplibreMap);
-        this.rebuildTechHQSupercluster();
-        this.rebuildDatacenterSupercluster();
         this.initDeck();
         this.loadCountryBoundaries();
         this.fetchServerBases();
@@ -880,6 +876,41 @@ export class DeckGLMap {
       const ts = this.parseTime(getTime(item));
       return ts == null ? true : ts >= cutoff;
     });
+  }
+
+  private _timeFilterCache = new WeakMap<object, { min: number; range: TimeRange; result: unknown[] }>();
+
+  private filterByTimeCached<T>(
+    items: T[],
+    getTime: (item: T) => Date | string | number | undefined | null
+  ): T[] {
+    const min = Math.floor(Date.now() / 60000);
+    const range = this.state.timeRange;
+    const cached = this._timeFilterCache.get(items as object);
+    if (cached && cached.min === min && cached.range === range) return cached.result as T[];
+    const result = this.filterByTime(items, getTime);
+    this._timeFilterCache.set(items as object, { min, range, result });
+    return result;
+  }
+
+  private filterMilitaryFlightClustersByTimeCached(clusters: MilitaryFlightCluster[]): MilitaryFlightCluster[] {
+    const min = Math.floor(Date.now() / 60000);
+    const range = this.state.timeRange;
+    const cached = this._timeFilterCache.get(clusters as object);
+    if (cached && cached.min === min && cached.range === range) return cached.result as MilitaryFlightCluster[];
+    const result = this.filterMilitaryFlightClustersByTime(clusters);
+    this._timeFilterCache.set(clusters as object, { min, range, result });
+    return result;
+  }
+
+  private filterMilitaryVesselClustersByTimeCached(clusters: MilitaryVesselCluster[]): MilitaryVesselCluster[] {
+    const min = Math.floor(Date.now() / 60000);
+    const range = this.state.timeRange;
+    const cached = this._timeFilterCache.get(clusters as object);
+    if (cached && cached.min === min && cached.range === range) return cached.result as MilitaryVesselCluster[];
+    const result = this.filterMilitaryVesselClustersByTime(clusters);
+    this._timeFilterCache.set(clusters as object, { min, range, result });
+    return result;
   }
 
   private getFilteredProtests(): SocialUnrestEvent[] {
@@ -1087,6 +1118,9 @@ export class DeckGLMap {
     this.lastSCBoundsKey = boundsKey;
     this.lastSCMask = layerMask;
 
+    if (useTechHQ && !this.techHQSC) this.rebuildTechHQSupercluster();
+    if (useDatacenterClusters && !this.datacenterSC) this.rebuildDatacenterSupercluster();
+
     if (useProtests && this.protestSC) {
       this.protestClusters = this.protestSC.getClusters(bbox, zoom).map(f => {
         const coords = f.geometry.coordinates as [number, number];
@@ -1274,16 +1308,16 @@ export class DeckGLMap {
     COLORS = getOverlayColors();
     const layers: (Layer | null | false)[] = [];
     const { layers: mapLayers } = this.state;
-    const filteredEarthquakes = mapLayers.natural ? this.filterByTime(this.earthquakes, (eq) => eq.occurredAt) : [];
-    const filteredNaturalEvents = mapLayers.natural ? this.filterByTime(this.naturalEvents, (event) => event.date) : [];
-    const filteredWeatherAlerts = mapLayers.weather ? this.filterByTime(this.weatherAlerts, (alert) => alert.onset) : [];
-    const filteredOutages = mapLayers.outages ? this.filterByTime(this.outages, (outage) => outage.pubDate) : [];
-    const filteredCableAdvisories = mapLayers.cables ? this.filterByTime(this.cableAdvisories, (advisory) => advisory.reported) : [];
-    const filteredFlightDelays = mapLayers.flights ? this.filterByTime(this.flightDelays, (delay) => delay.updatedAt) : [];
-    const filteredMilitaryFlights = mapLayers.military ? this.filterByTime(this.militaryFlights, (flight) => flight.lastSeen) : [];
-    const filteredMilitaryVessels = mapLayers.military ? this.filterByTime(this.militaryVessels, (vessel) => vessel.lastAisUpdate) : [];
-    const filteredMilitaryFlightClusters = mapLayers.military ? this.filterMilitaryFlightClustersByTime(this.militaryFlightClusters) : [];
-    const filteredMilitaryVesselClusters = mapLayers.military ? this.filterMilitaryVesselClustersByTime(this.militaryVesselClusters) : [];
+    const filteredEarthquakes = mapLayers.natural ? this.filterByTimeCached(this.earthquakes, (eq) => eq.occurredAt) : [];
+    const filteredNaturalEvents = mapLayers.natural ? this.filterByTimeCached(this.naturalEvents, (event) => event.date) : [];
+    const filteredWeatherAlerts = mapLayers.weather ? this.filterByTimeCached(this.weatherAlerts, (alert) => alert.onset) : [];
+    const filteredOutages = mapLayers.outages ? this.filterByTimeCached(this.outages, (outage) => outage.pubDate) : [];
+    const filteredCableAdvisories = mapLayers.cables ? this.filterByTimeCached(this.cableAdvisories, (advisory) => advisory.reported) : [];
+    const filteredFlightDelays = mapLayers.flights ? this.filterByTimeCached(this.flightDelays, (delay) => delay.updatedAt) : [];
+    const filteredMilitaryFlights = mapLayers.military ? this.filterByTimeCached(this.militaryFlights, (flight) => flight.lastSeen) : [];
+    const filteredMilitaryVessels = mapLayers.military ? this.filterByTimeCached(this.militaryVessels, (vessel) => vessel.lastAisUpdate) : [];
+    const filteredMilitaryFlightClusters = mapLayers.military ? this.filterMilitaryFlightClustersByTimeCached(this.militaryFlightClusters) : [];
+    const filteredMilitaryVesselClusters = mapLayers.military ? this.filterMilitaryVesselClustersByTimeCached(this.militaryVesselClusters) : [];
     // UCDP is a historical dataset (events aged months); time-range filter always zeroes it out
     const filteredUcdpEvents = mapLayers.ucdpEvents ? this.ucdpEvents : [];
 
