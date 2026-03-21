@@ -37,6 +37,8 @@ import {
   buildForecastCase,
   buildForecastCases,
   buildPriorForecastSnapshot,
+  buildPublishedForecastPayload,
+  buildPublishedSeedPayload,
   buildChangeItems,
   buildChangeSummary,
   annotateForecastChanges,
@@ -1054,6 +1056,41 @@ describe('forecast change tracking', () => {
     assert.deepEqual(snapshot.signals, ['Iran CII 87 (critical)']);
     assert.deepEqual(snapshot.newsContext, ['Iran military drills intensify after border incident']);
     assert.equal(snapshot.calibration.marketTitle, 'Will Iran conflict escalate before July?');
+  });
+
+  it('buildPublishedSeedPayload strips simulation-only forecast bulk from the canonical payload', () => {
+    const pred = makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.72, 0.6, '7d', [
+      { type: 'cii', value: 'Iran CII 87 (critical)', weight: 0.4 },
+    ]);
+    buildForecastCase(pred);
+    pred.caseFile.situationContext = { id: 'sit-1', label: 'Iran conflict situation', forecastCount: 3 };
+    pred.caseFile.familyContext = { id: 'fam-1', label: 'War theater family', forecastCount: 6 };
+    pred.caseFile.worldState = {
+      ...pred.caseFile.worldState,
+      situationId: 'sit-1',
+      familyId: 'fam-1',
+      familyLabel: 'War theater family',
+      simulationSummary: 'Heavy simulation linkage that should stay out of the canonical Redis payload.',
+      simulationPosture: 'escalatory',
+      simulationPostureScore: 0.88,
+    };
+    pred.readiness = { overall: 0.82, explanation: 'heavy' };
+    pred.analysisPriority = 42;
+    pred.traceMeta = { narrativeSource: 'llm_combined', llmProvider: 'openrouter' };
+
+    const slimForecast = buildPublishedForecastPayload(pred);
+    assert.equal(slimForecast.caseFile.worldState.summary, pred.caseFile.worldState.summary);
+    assert.equal(slimForecast.caseFile.worldState.situationId, undefined);
+    assert.equal(slimForecast.caseFile.situationContext, undefined);
+    assert.equal(slimForecast.caseFile.familyContext, undefined);
+    assert.equal(slimForecast.readiness, undefined);
+    assert.equal(slimForecast.analysisPriority, undefined);
+    assert.equal(slimForecast.traceMeta, undefined);
+
+    const payload = buildPublishedSeedPayload({ generatedAt: 123, predictions: [pred] });
+    assert.equal(payload.generatedAt, 123);
+    assert.equal(payload.predictions.length, 1);
+    assert.equal(payload.predictions[0].caseFile.worldState.familyId, undefined);
   });
 
   it('annotates what changed versus the prior run', () => {
