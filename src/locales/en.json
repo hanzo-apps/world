@@ -503,7 +503,8 @@
       "flightAirborne": "FL{{fl}} · {{kts}} kts",
       "flightMilitary": "Military · {{type}} · FL{{fl}}",
       "flightMilitaryOnGround": "Military · {{type}} · on ground",
-      "flightSearchHint": "Press Enter or click to look up live position"
+      "flightSearchHint": "Press Enter or click to look up live position",
+      "flightNotFound": "No live position found for {{callsign}}"
     },
     "signal": {
       "title": "INTELLIGENCE FINDING",
