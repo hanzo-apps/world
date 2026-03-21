@@ -9,30 +9,84 @@ const CACHE_TTL = 86400; // 24h — Big Mac prices change rarely
 const EXA_DELAY_MS = 150;
 
 const FX_FALLBACKS = {
+  // Middle East
   AED: 0.2723, SAR: 0.2666, QAR: 0.2747, KWD: 3.2520,
   BHD: 2.6525, OMR: 2.5974, JOD: 1.4104, EGP: 0.0204, LBP: 0.0000112,
+  // Major currencies
+  USD: 1.0000, GBP: 1.2700, EUR: 1.0850, JPY: 0.0067, CHF: 1.1300,
+  CNY: 0.1380, INR: 0.0120, AUD: 0.6500, CAD: 0.7400, NZD: 0.5900,
+  BRL: 0.1900, MXN: 0.0490, ZAR: 0.0540, TRY: 0.0290, KRW: 0.0007,
+  SGD: 0.7400, HKD: 0.1280, TWD: 0.0310, THB: 0.0280, IDR: 0.000063,
+  NOK: 0.0920, SEK: 0.0930, DKK: 0.1450, PLN: 0.2450, CZK: 0.0430,
+  HUF: 0.0028, RON: 0.2200, PHP: 0.0173, VND: 0.000040, MYR: 0.2250,
+  PKR: 0.0036, ILS: 0.2750, ARS: 0.00084, COP: 0.000240, CLP: 0.00108,
+  UAH: 0.0240, NGN: 0.00062, KES: 0.0077,
 };
 
 const COUNTRIES = [
-  { code: 'AE', name: 'UAE',          currency: 'AED', flag: '🇦🇪' },
-  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR', flag: '🇸🇦' },
-  { code: 'QA', name: 'Qatar',        currency: 'QAR', flag: '🇶🇦' },
-  { code: 'KW', name: 'Kuwait',       currency: 'KWD', flag: '🇰🇼' },
-  { code: 'BH', name: 'Bahrain',      currency: 'BHD', flag: '🇧🇭' },
-  { code: 'OM', name: 'Oman',         currency: 'OMR', flag: '🇴🇲' },
-  { code: 'EG', name: 'Egypt',        currency: 'EGP', flag: '🇪🇬' },
-  { code: 'JO', name: 'Jordan',       currency: 'JOD', flag: '🇯🇴' },
-  { code: 'LB', name: 'Lebanon',      currency: 'LBP', flag: '🇱🇧' },
+  // Americas
+  { code: 'US', name: 'United States', currency: 'USD', flag: '🇺🇸' },
+  { code: 'CA', name: 'Canada',        currency: 'CAD', flag: '🇨🇦' },
+  { code: 'MX', name: 'Mexico',        currency: 'MXN', flag: '🇲🇽' },
+  { code: 'BR', name: 'Brazil',        currency: 'BRL', flag: '🇧🇷' },
+  { code: 'AR', name: 'Argentina',     currency: 'ARS', flag: '🇦🇷' },
+  { code: 'CO', name: 'Colombia',      currency: 'COP', flag: '🇨🇴' },
+  { code: 'CL', name: 'Chile',         currency: 'CLP', flag: '🇨🇱' },
+  // Europe
+  { code: 'GB', name: 'UK',            currency: 'GBP', flag: '🇬🇧' },
+  { code: 'DE', name: 'Germany',       currency: 'EUR', flag: '🇩🇪' },
+  { code: 'FR', name: 'France',        currency: 'EUR', flag: '🇫🇷' },
+  { code: 'IT', name: 'Italy',         currency: 'EUR', flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain',         currency: 'EUR', flag: '🇪🇸' },
+  { code: 'CH', name: 'Switzerland',   currency: 'CHF', flag: '🇨🇭' },
+  { code: 'NO', name: 'Norway',        currency: 'NOK', flag: '🇳🇴' },
+  { code: 'SE', name: 'Sweden',        currency: 'SEK', flag: '🇸🇪' },
+  { code: 'DK', name: 'Denmark',       currency: 'DKK', flag: '🇩🇰' },
+  { code: 'PL', name: 'Poland',        currency: 'PLN', flag: '🇵🇱' },
+  { code: 'CZ', name: 'Czechia',       currency: 'CZK', flag: '🇨🇿' },
+  { code: 'HU', name: 'Hungary',       currency: 'HUF', flag: '🇭🇺' },
+  { code: 'RO', name: 'Romania',       currency: 'RON', flag: '🇷🇴' },
+  { code: 'UA', name: 'Ukraine',       currency: 'UAH', flag: '🇺🇦' },
+  // Asia-Pacific
+  { code: 'CN', name: 'China',         currency: 'CNY', flag: '🇨🇳' },
+  { code: 'JP', name: 'Japan',         currency: 'JPY', flag: '🇯🇵' },
+  { code: 'KR', name: 'South Korea',   currency: 'KRW', flag: '🇰🇷' },
+  { code: 'AU', name: 'Australia',     currency: 'AUD', flag: '🇦🇺' },
+  { code: 'NZ', name: 'New Zealand',   currency: 'NZD', flag: '🇳🇿' },
+  { code: 'SG', name: 'Singapore',     currency: 'SGD', flag: '🇸🇬' },
+  { code: 'HK', name: 'Hong Kong',     currency: 'HKD', flag: '🇭🇰' },
+  { code: 'TW', name: 'Taiwan',        currency: 'TWD', flag: '🇹🇼' },
+  { code: 'TH', name: 'Thailand',      currency: 'THB', flag: '🇹🇭' },
+  { code: 'MY', name: 'Malaysia',      currency: 'MYR', flag: '🇲🇾' },
+  { code: 'ID', name: 'Indonesia',     currency: 'IDR', flag: '🇮🇩' },
+  { code: 'PH', name: 'Philippines',   currency: 'PHP', flag: '🇵🇭' },
+  { code: 'VN', name: 'Vietnam',       currency: 'VND', flag: '🇻🇳' },
+  { code: 'IN', name: 'India',         currency: 'INR', flag: '🇮🇳' },
+  { code: 'PK', name: 'Pakistan',      currency: 'PKR', flag: '🇵🇰' },
+  // Middle East
+  { code: 'AE', name: 'UAE',           currency: 'AED', flag: '🇦🇪' },
+  { code: 'SA', name: 'Saudi Arabia',  currency: 'SAR', flag: '🇸🇦' },
+  { code: 'QA', name: 'Qatar',         currency: 'QAR', flag: '🇶🇦' },
+  { code: 'KW', name: 'Kuwait',        currency: 'KWD', flag: '🇰🇼' },
+  { code: 'BH', name: 'Bahrain',       currency: 'BHD', flag: '🇧🇭' },
+  { code: 'OM', name: 'Oman',          currency: 'OMR', flag: '🇴🇲' },
+  { code: 'EG', name: 'Egypt',         currency: 'EGP', flag: '🇪🇬' },
+  { code: 'JO', name: 'Jordan',        currency: 'JOD', flag: '🇯🇴' },
+  { code: 'LB', name: 'Lebanon',       currency: 'LBP', flag: '🇱🇧' },
+  { code: 'IL', name: 'Israel',        currency: 'ILS', flag: '🇮🇱' },
+  // Africa
+  { code: 'ZA', name: 'South Africa',  currency: 'ZAR', flag: '🇿🇦' },
+  { code: 'NG', name: 'Nigeria',       currency: 'NGN', flag: '🇳🇬' },
+  { code: 'KE', name: 'Kenya',         currency: 'KES', flag: '🇰🇪' },
 ];
 
-const FX_SYMBOLS = {
-  AED: 'AEDUSD=X', SAR: 'SARUSD=X', QAR: 'QARUSD=X', KWD: 'KWDUSD=X',
-  BHD: 'BHDUSD=X', OMR: 'OMRUSD=X', EGP: 'EGPUSD=X', JOD: 'JODUSD=X', LBP: 'LBPUSD=X',
-};
+const FX_SYMBOLS = Object.fromEntries(
+  [...new Set(COUNTRIES.map(c => c.currency))].map(ccy => [ccy, `${ccy}USD=X`])
+);
 
-// Handle both plain numbers and thousands-separated (480,000 LBP)
+// Handle both plain numbers and thousands-separated (480,000 LBP or 12,000 KRW)
 const NUM = '\\d{1,3}(?:[,\\s]\\d{3})*(?:\\.\\d{1,3})?';
-const CCY = 'AED|SAR|QAR|KWD|BHD|OMR|EGP|JOD|LBP|USD';
+const CCY = 'USD|GBP|EUR|JPY|CHF|CNY|INR|AUD|CAD|NZD|BRL|MXN|ZAR|TRY|KRW|SGD|HKD|TWD|THB|IDR|NOK|SEK|DKK|PLN|CZK|HUF|RON|PHP|VND|MYR|PKR|ILS|ARS|COP|CLP|UAH|NGN|KES|AED|SAR|QAR|KWD|BHD|OMR|EGP|JOD|LBP';
 const PRICE_PATTERNS = [
   new RegExp(`(${NUM})\\s*(${CCY})`, 'i'),
   new RegExp(`(${CCY})\\s*(${NUM})`, 'i'),
