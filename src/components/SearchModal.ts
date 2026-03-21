@@ -302,17 +302,18 @@ export class SearchModal {
       return;
     }
 
-    this.commandResults = this.matchCommands(query);
     this.onQueryChange?.(rawInput);
 
     const byType = new Map<SearchResultType, (SearchResult & { _score: number })[]>();
 
-    // "flight {callsign}" prefix: use rawInput so a trailing space after "flight" is detected.
+    // "flight {callsign}" prefix: bypass command matching entirely — "flight ek36" contains
+    // substrings like "light" that spuriously match unrelated commands (e.g. "Switch to light mode").
     this.currentFlightCallsign = null;
-    if (rawInput.startsWith('flight ')) {
+    if (rawInput.startsWith('flight ') && this.onFlightSearch) {
       const callsign = rawInput.slice(7).trim().toUpperCase();
       if (callsign.length > 0) {
         this.currentFlightCallsign = callsign;
+        this.commandResults = [];
         const flightSource = this.sources.find(s => s.type === 'flight');
         if (flightSource?.items.length) {
           byType.set('flight', flightSource.items
@@ -327,6 +328,8 @@ export class SearchModal {
             })) as (SearchResult & { _score: number })[]);
         }
       }
+    } else {
+      this.commandResults = this.matchCommands(query);
     }
 
     for (const source of this.sources) {
