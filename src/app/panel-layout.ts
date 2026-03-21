@@ -1023,28 +1023,6 @@ export class PanelLayoutManager implements AppModule {
     panelsGrid.appendChild(addPanelBlock);
 
     if (isProUser()) {
-      const aiBlock = document.createElement('button');
-      aiBlock.className = 'add-panel-block ai-widget-block';
-      aiBlock.setAttribute('aria-label', t('widgets.createWithAi'));
-      const aiIcon = document.createElement('span');
-      aiIcon.className = 'add-panel-block-icon';
-      aiIcon.textContent = '\u2728';
-      const aiLabel = document.createElement('span');
-      aiLabel.className = 'add-panel-block-label';
-      aiLabel.textContent = t('widgets.createWithAi');
-      aiBlock.appendChild(aiIcon);
-      aiBlock.appendChild(aiLabel);
-      aiBlock.addEventListener('click', () => {
-        openWidgetChatModal({
-          mode: 'create',
-          tier: 'basic',
-          onComplete: (spec) => this.addCustomWidget(spec),
-        });
-      });
-      panelsGrid.appendChild(aiBlock);
-    }
-
-    if (isProUser()) {
       const proBlock = document.createElement('button');
       proBlock.className = 'add-panel-block ai-widget-block ai-widget-block-pro';
       proBlock.setAttribute('aria-label', t('widgets.createInteractive'));
@@ -1070,7 +1048,7 @@ export class PanelLayoutManager implements AppModule {
       panelsGrid.appendChild(proBlock);
     }
 
-    {
+    if (isProUser()) {
       const mcpBlock = document.createElement('button');
       mcpBlock.className = 'add-panel-block mcp-panel-block';
       mcpBlock.setAttribute('aria-label', t('mcp.connectPanel'));
