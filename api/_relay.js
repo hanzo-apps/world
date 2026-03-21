@@ -1,3 +1,4 @@
+// Edge function copy — canonical version at server/_shared/relay.ts
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { validateApiKey } from './_api-key.js';
 import { checkRateLimit } from './_rate-limit.js';
