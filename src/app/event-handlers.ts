@@ -71,6 +71,7 @@ export interface EventHandlerCallbacks {
   ensureCorrectZones: () => void;
   refreshOpenCountryBrief?: () => void;
   stopLayerActivity?: (layer: keyof MapLayers) => void;
+  mountLiveNewsIfReady?: () => void;
 }
 
 export class EventHandlerManager implements AppModule {
@@ -328,8 +329,12 @@ export class EventHandlerManager implements AppModule {
       }
       if (e.key === STORAGE_KEYS.liveChannels && e.newValue) {
         const panel = this.ctx.panels['live-news'];
-        if (panel && typeof (panel as unknown as { refreshChannelsFromStorage?: () => void }).refreshChannelsFromStorage === 'function') {
-          (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
+        if (panel) {
+          if (typeof (panel as unknown as { refreshChannelsFromStorage?: () => void }).refreshChannelsFromStorage === 'function') {
+            (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
+          }
+        } else {
+          this.callbacks.mountLiveNewsIfReady?.();
         }
       }
     };
