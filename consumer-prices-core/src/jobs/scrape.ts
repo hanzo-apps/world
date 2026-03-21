@@ -207,7 +207,11 @@ async function main() {
     console.error('[scrape] fatal:', err);
     process.exitCode = 1;
   } finally {
-    await closePool().catch(() => {});
+    // Race closePool against a 5s timeout — mirrors the teardown() fix in playwright.ts.
+    // Without a bound, a hung pg pool would keep main() pending indefinitely,
+    // delaying process.exit() and stalling the && chain (aggregate, publish).
+    const poolTimeout = new Promise<void>(r => setTimeout(r, 5000));
+    await Promise.race([closePool().catch(() => {}), poolTimeout]);
   }
 }
 
