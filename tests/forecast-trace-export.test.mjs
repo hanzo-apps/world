@@ -449,10 +449,12 @@ describe('market transmission macro state', () => {
     assert.ok((buckets.get('freight')?.pressureScore || 0) > 0.35);
     assert.ok((buckets.get('sovereign_risk')?.pressureScore || 0) > 0.25);
     assert.ok((buckets.get('rates_inflation')?.macroConfirmation || 0) > 0);
+    assert.ok((buckets.get('energy')?.pressureScore || 0) >= (buckets.get('defense')?.pressureScore || 0));
 
     const marketConsequences = worldState.simulationState?.marketConsequences;
     assert.ok((marketConsequences?.internalCount || 0) >= (marketConsequences?.items?.length || 0));
-    assert.ok((marketConsequences?.items?.length || 0) <= 8);
+    assert.ok((marketConsequences?.items?.length || 0) <= 6);
+    assert.ok((marketConsequences?.blockedCount || 0) >= 1);
   });
 });
 
@@ -1781,6 +1783,49 @@ describe('forecast run world state', () => {
     ], [source, target]);
 
     assert.equal(reportable.length, 1);
+  });
+
+  it('blocks cross-theater political reportable interactions without market or regional support', () => {
+    const source = {
+      situationId: 'sit-politics-a',
+      label: 'India political situation',
+      dominantDomain: 'political',
+      regions: ['India'],
+      actorIds: ['shared-actor', 'actor-india'],
+      marketContext: {
+        confirmationScore: 0.34,
+        linkedBucketIds: ['sovereign_risk'],
+      },
+    };
+    const target = {
+      situationId: 'sit-politics-b',
+      label: 'Israel conflict and political situation',
+      dominantDomain: 'conflict',
+      regions: ['Israel'],
+      actorIds: ['shared-actor', 'actor-israel'],
+      marketContext: {
+        confirmationScore: 0.31,
+        linkedBucketIds: ['energy'],
+      },
+    };
+
+    const reportable = buildReportableInteractionLedger([
+      {
+        sourceSituationId: source.situationId,
+        targetSituationId: target.situationId,
+        sourceLabel: source.label,
+        targetLabel: target.label,
+        strongestChannel: 'political_pressure',
+        interactionType: 'spillover',
+        score: 5.8,
+        confidence: 0.75,
+        actorSpecificity: 0.91,
+        sharedActor: false,
+        regionLink: false,
+      },
+    ], [source, target]);
+
+    assert.equal(reportable.length, 0);
   });
 
   it('blocks cross-theater political effects even with shared-actor when actorSpec below 0.90', () => {
