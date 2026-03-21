@@ -16,7 +16,9 @@ export function getRelayHeaders(baseHeaders = {}) {
   if (relaySecret) {
     const relayHeader = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
     headers[relayHeader] = relaySecret;
-    headers.Authorization = `Bearer ${relaySecret}`;
+    if (relayHeader !== 'authorization') {
+      headers.Authorization = `Bearer ${relaySecret}`;
+    }
   }
   return headers;
 }

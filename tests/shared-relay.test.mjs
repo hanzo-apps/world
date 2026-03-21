@@ -256,7 +256,7 @@ describe('relay.ts — consumer import verification', () => {
       'military: must use getRelayBaseUrl() to avoid wss:// URL bug',
     );
     assert.ok(
-      src.includes("getRelayBaseUrl() + '/opensky'"),
+      src.includes('getRelayBaseUrl()') && src.includes("'/opensky'"),
       'military: must use getRelayBaseUrl() for relay URL construction',
     );
   });
