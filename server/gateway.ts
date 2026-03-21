@@ -163,11 +163,11 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/webcam/v1/get-webcam-image': 'no-store',
   '/api/webcam/v1/list-webcams': 'no-store',
 
-  '/api/consumer-prices/v1/get-consumer-price-overview': 'static',
+  '/api/consumer-prices/v1/get-consumer-price-overview': 'slow',
   '/api/consumer-prices/v1/get-consumer-price-basket-series': 'slow',
-  '/api/consumer-prices/v1/list-consumer-price-categories': 'static',
-  '/api/consumer-prices/v1/list-consumer-price-movers': 'static',
-  '/api/consumer-prices/v1/list-retailer-price-spreads': 'static',
+  '/api/consumer-prices/v1/list-consumer-price-categories': 'slow',
+  '/api/consumer-prices/v1/list-consumer-price-movers': 'slow',
+  '/api/consumer-prices/v1/list-retailer-price-spreads': 'slow',
   '/api/consumer-prices/v1/get-consumer-price-freshness': 'slow',
 
   '/api/aviation/v1/get-youtube-live-stream-info': 'fast',
