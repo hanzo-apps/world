@@ -2193,6 +2193,54 @@ describe('forecast quality gating', () => {
     assert.equal(pool[0].publishSelectionMemory?.matchedBy, 'label');
   });
 
+  it('boosts market-confirmed situations during publish selection', () => {
+    const confirmed = makePrediction('market', 'Middle East', 'Oil repricing: Strait of Hormuz', 0.51, 0.48, '30d', [
+      { type: 'prediction_market', value: 'Oil contracts reprice on Hormuz stress', weight: 0.3 },
+    ]);
+    const unconfirmed = makePrediction('political', 'India', 'Political pressure: India', 0.54, 0.49, '14d', [
+      { type: 'news_corroboration', value: 'Coalition bargaining remains active', weight: 0.32 },
+    ]);
+
+    buildForecastCases([confirmed, unconfirmed]);
+    for (const pred of [confirmed, unconfirmed]) {
+      pred.traceMeta = { narrativeSource: 'fallback' };
+      pred.readiness = { overall: 0.55 };
+      pred.analysisPriority = 0.12;
+      pred.situationContext = { id: `sit-${pred.region}`, label: `${pred.region} situation`, forecastCount: 1, topSignals: [{ type: 'news_corroboration', count: 1 }] };
+      pred.familyContext = { id: `fam-${pred.region}`, label: `${pred.region} family`, forecastCount: 1, situationCount: 1, situationIds: [pred.situationContext.id] };
+      pred.caseFile.situationContext = pred.situationContext;
+      pred.caseFile.familyContext = pred.familyContext;
+    }
+
+    confirmed.marketSelectionContext = {
+      confirmationScore: 0.74,
+      contradictionScore: 0.04,
+      topBucketId: 'energy',
+      topBucketLabel: 'Energy',
+      topBucketPressure: 0.66,
+      transmissionEdgeCount: 2,
+      topTransmissionStrength: 0.63,
+      topTransmissionConfidence: 0.68,
+      consequenceSummary: 'Hormuz risk is transmitting into Energy.',
+    };
+    unconfirmed.marketSelectionContext = {
+      confirmationScore: 0.08,
+      contradictionScore: 0.22,
+      topBucketId: '',
+      topBucketLabel: '',
+      topBucketPressure: 0,
+      transmissionEdgeCount: 0,
+      topTransmissionStrength: 0,
+      topTransmissionConfidence: 0,
+      consequenceSummary: '',
+    };
+
+    const pool = selectPublishedForecastPool([unconfirmed, confirmed], { targetCount: 1 });
+    assert.equal(pool.length, 1);
+    assert.equal(pool[0].id, confirmed.id);
+    assert.ok((pool[0].publishSelectionMarket?.confirmationScore || 0) > 0.7);
+  });
+
   it('does not report capped situations when a situation only reaches the cap without dropping anything', () => {
     const preds = [
       makePrediction('conflict', 'Iran', 'Escalation risk: Iran', 0.66, 0.6, '7d', [
