@@ -39,26 +39,6 @@ function parseOpenSkyStates(states: unknown[][]): PositionSample[] {
         }));
 }
 
-function buildSimulatedPositions(icao24: string, callsign: string, swLat: number, swLon: number, neLat: number, neLon: number): PositionSample[] {
-    const now = Date.now();
-    const latSpan = neLat - swLat;
-    const lonSpan = neLon - swLon;
-    const count = latSpan > 0 && lonSpan > 0 ? Math.floor(Math.random() * 16) + 15 : 10;
-
-    return Array.from({ length: count }, (_, i) => ({
-        icao24: icao24 || `3c${(0x6543 + i).toString(16)}`,
-        callsign: callsign || `SIM${100 + i}`,
-        lat: swLat + Math.random() * (latSpan || 5),
-        lon: swLon + Math.random() * (lonSpan || 5),
-        altitudeM: 8000 + Math.random() * 3000,
-        groundSpeedKts: 400 + Math.random() * 100,
-        trackDeg: Math.random() * 360,
-        verticalRate: (Math.random() - 0.5) * 5,
-        onGround: false,
-        source: 'POSITION_SOURCE_SIMULATED' as const,
-        observedAt: now,
-    }));
-}
 
 const OPENSKY_PUBLIC_BASE = 'https://opensky-network.org/api';
 
@@ -89,6 +69,11 @@ function buildCacheKey(req: TrackAircraftRequest): string {
     return 'aviation:track:all:v1';
 }
 
+// Response-level source values (TrackAircraftResponse.source):
+//   'opensky'           — data from OpenSky via relay
+//   'opensky-anonymous' — data from OpenSky public API (no auth, rate-limited)
+//   'wingbits'          — data from Wingbits via relay
+//   'none'              — all real sources returned empty or failed; positions = []
 export async function trackAircraft(
     _ctx: ServerContext,
     req: TrackAircraftRequest,
@@ -182,14 +167,5 @@ export async function trackAircraft(
         return { positions, source: result.source, updatedAt: Date.now() };
     }
 
-    // For explicit callsign/icao24 lookups (search modal), return empty rather than fake planes.
-    // Simulated fallback only makes sense for viewport display — scattering random planes near (0,0)
-    // with the searched callsign produces misleading results in the Gulf of Guinea.
-    if (req.callsign || req.icao24) {
-        return { positions: [], source: 'none', updatedAt: Date.now() };
-    }
-
-    // Fallback to simulated data for viewport display when all real sources are down.
-    const positions = buildSimulatedPositions(req.icao24, req.callsign, req.swLat, req.swLon, req.neLat, req.neLon);
-    return { positions, source: 'simulated', updatedAt: Date.now() };
+    return { positions: [], source: 'none', updatedAt: Date.now() };
 }
