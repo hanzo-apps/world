@@ -78,9 +78,8 @@ export async function listMilitaryFlights(
       REDIS_CACHE_TTL,
       async () => {
         const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
-        const baseUrl = isSidecar
-          ? 'https://opensky-network.org/api/states/all'
-          : getRelayBaseUrl() ? getRelayBaseUrl() + '/opensky' : null;
+        const relayBase = isSidecar ? null : getRelayBaseUrl();
+        const baseUrl = isSidecar ? 'https://opensky-network.org/api/states/all' : relayBase ? relayBase + '/opensky' : null;
 
         if (!baseUrl) return null;
 
