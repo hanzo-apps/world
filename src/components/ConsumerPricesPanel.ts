@@ -415,7 +415,7 @@ export class ConsumerPricesPanel extends Panel {
           <div class="cp-health-row">
             <span class="cp-health-name">${escapeHtml(r.name)}</span>
             <span class="cp-health-status cp-health-status--${r.status}">${r.status}</span>
-            <span class="cp-health-rate">${r.parseSuccessRate > 0 ? `${(r.parseSuccessRate * 100).toFixed(0)}% parse` : '—'}</span>
+            <span class="cp-health-rate">${r.parseSuccessRate > 0 ? `${r.parseSuccessRate.toFixed(0)}% parse` : '—'}</span>
             <span class="cp-health-fresh ${freshnessClass(r.freshnessMin)}">${freshnessLabel(r.freshnessMin)}</span>
           </div>
         `).join('')}
