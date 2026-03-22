@@ -280,7 +280,8 @@
     "gulfEconomies": "Οικονομίες Κόλπου",
     "gulfIndices": "Δείκτες Κόλπου",
     "gulfCurrencies": "Νομίσματα Κόλπου",
-    "gulfOil": "Πετρέλαιο Κόλπου"
+    "gulfOil": "Πετρέλαιο Κόλπου",
+    "bigmac": "Updated Big Mac Index"
   },
   "commands": {
     "prefixes": {
@@ -836,7 +837,8 @@
       "token": "Token",
       "mcap": "Κεφ/ποίηση",
       "vol24h": "Όγκος 24ω",
-      "chg24h": "Μεταβ. 24ω"
+      "chg24h": "Μεταβ. 24ω",
+      "infoTooltip": "<strong>Stablecoins</strong> Peg health, market cap, and 24h volume for major USD-pegged tokens (USDT, USDC, DAI, BUSD). A broken peg signals systemic risk."
     },
     "status": {
       "dataFeeds": "Ροές Δεδομένων",
@@ -1713,6 +1715,24 @@
     "map": {
       "showMap": "Εμφάνιση χάρτη",
       "hideMap": "Απόκρυψη χάρτη"
+    },
+    "internetDisruptions": {
+      "infoTooltip": "<strong>Internet Disruptions</strong> Real-time internet outages, DDoS attacks, and traffic anomalies from global network monitoring:<ul><li><strong>Outages</strong>: BGP-detected connectivity failures by country</li><li><strong>DDoS</strong>: Volumetric attack reports by protocol and vector</li><li><strong>Anomalies</strong>: Unusual traffic patterns from Cloudflare Radar</li></ul>"
+    },
+    "commodities": {
+      "infoTooltip": "<strong>Commodities</strong> Tradeable non-energy commodity tape focused on metals and materials. Energy prices live in Energy Complex; macro stress indicators live in Macro Stress."
+    },
+    "crypto": {
+      "infoTooltip": "<strong>Crypto</strong> Live prices, 24h changes, and volume for major cryptocurrencies. Data sourced from CoinGecko."
+    },
+    "gulfEconomies": {
+      "infoTooltip": "<strong>Gulf Economies</strong> Real-time Gulf stock indices, currency rates, and oil prices for GCC economies (Saudi Arabia, UAE, Kuwait, Qatar, Bahrain, Oman)."
+    },
+    "groceryBasket": {
+      "infoTooltip": "<strong>Grocery Index</strong> Global grocery basket price comparison across 24 countries — tracks real-world consumer goods inflation beyond headline CPI."
+    },
+    "bigmac": {
+      "infoTooltip": "<strong>Updated Big Mac Index</strong> The Economist's Big Mac Index measures purchasing power parity by comparing McDonald's burger prices across countries. Updated when new data is published (quarterly/annually)."
     }
   },
   "popups": {

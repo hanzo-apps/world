@@ -200,7 +200,7 @@ export class CommoditiesPanel extends Panel {
 
 export class CryptoPanel extends Panel {
   constructor() {
-    super({ id: 'crypto', title: t('panels.crypto') });
+    super({ id: 'crypto', title: t('panels.crypto'), infoTooltip: t('components.crypto.infoTooltip') });
   }
 
   public renderCrypto(data: CryptoData[]): void {
