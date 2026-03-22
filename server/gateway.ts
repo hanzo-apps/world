@@ -73,6 +73,8 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/infrastructure/v1/list-service-statuses': 'slow',
   '/api/seismology/v1/list-earthquakes': 'slow',
   '/api/infrastructure/v1/list-internet-outages': 'slow',
+  '/api/infrastructure/v1/list-internet-ddos-attacks': 'slow',
+  '/api/infrastructure/v1/list-internet-traffic-anomalies': 'slow',
 
   '/api/unrest/v1/list-unrest-events': 'slow',
   '/api/cyber/v1/list-cyber-threats': 'slow',
