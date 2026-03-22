@@ -1,16 +1,15 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: tamimi_sa
+  name: Tamimi Markets Saudi Arabia
+  marketCode: sa
+  currencyCode: SAR
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://tamimimarkets.com
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    queryTemplate: "{canonicalName} grocery {market} {currency} price"
 
   rateLimit:
     requestsPerMinute: 10

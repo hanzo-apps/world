@@ -1,14 +1,16 @@
 retailer:
-  slug: spinneys_ae
-  name: Spinneys UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: kroger_us
+  name: Kroger USA
+  marketCode: us
+  currencyCode: USD
   adapter: search
-  baseUrl: https://www.spinneys.com
+  baseUrl: https://www.kroger.com
   enabled: true
 
   searchConfig:
     numResults: 5
+    urlPathContains: /p/
+    queryTemplate: "{canonicalName} grocery {market} price"
 
   rateLimit:
     requestsPerMinute: 15

@@ -1,16 +1,16 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: fairprice_sg
+  name: FairPrice Singapore
+  marketCode: sg
+  currencyCode: SGD
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://www.fairprice.com.sg
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    urlPathContains: /product/
+    queryTemplate: "{canonicalName} grocery {market} {currency} price"
 
   rateLimit:
     requestsPerMinute: 10
