@@ -20586,8 +20586,10 @@ body.has-breaking-alert .panels-grid {
   padding: 2px 8px;
   background: none;
   border: 1px solid var(--border);
+  border-radius: 4px;
   color: var(--text-dim);
   cursor: pointer;
+  font-family: inherit;
 }
 
 .cp-range-btn.active {
@@ -20613,6 +20615,7 @@ body.has-breaking-alert .panels-grid {
 .cp-stat-card {
   padding: 8px;
   border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--overlay-subtle);
 }
 
@@ -20774,7 +20777,14 @@ body.has-breaking-alert .panels-grid {
 .cp-range-bar {
   display: flex;
   gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
 }
+
+.cp-fresh--ok      { color: #4ade80; }
+.cp-fresh--warn    { color: #fbbf24; }
+.cp-fresh--stale   { color: #f87171; }
+.cp-fresh--unknown { color: var(--text-muted); }
 
 /* ── Grocery Basket Panel ──────────────────────────────────────────────── */
 .gb-wrapper {
