@@ -5,6 +5,7 @@
  */
 import { query, closePool } from '../db/client.js';
 import { loadAllBasketConfigs } from '../config/loader.js';
+import { validateAll } from './validate.js';
 
 const logger = {
   info: (msg: string, ...args: unknown[]) => console.log(`[aggregate] ${msg}`, ...args),
@@ -275,6 +276,11 @@ export async function aggregateAll() {
   if (failed > 0) throw new Error(`${failed}/${configs.length} basket(s) failed`);
 }
 
+export async function validateAndAggregateAll() {
+  await validateAll();
+  await aggregateAll();
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  aggregateAll().finally(() => closePool()).catch(console.error);
+  validateAndAggregateAll().finally(() => closePool()).catch(console.error);
 }
