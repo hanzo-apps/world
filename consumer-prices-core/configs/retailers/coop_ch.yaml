@@ -1,16 +1,16 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: coop_ch
+  name: Coop Switzerland
+  marketCode: ch
+  currencyCode: CHF
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://www.coop.ch
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    urlPathContains: /de/food/
+    queryTemplate: "{canonicalName} Lebensmittel {market} {currency} Preis"
 
   rateLimit:
     requestsPerMinute: 10

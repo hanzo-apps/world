@@ -1,16 +1,16 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: naivas_ke
+  name: Naivas Supermarket Kenya
+  marketCode: ke
+  currencyCode: KES
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://www.naivas.online
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    urlPathContains: /product/
+    queryTemplate: "{canonicalName} grocery Kenya {currency} price"
 
   rateLimit:
     requestsPerMinute: 10

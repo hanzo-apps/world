@@ -1,16 +1,16 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: bigbasket_in
+  name: BigBasket India
+  marketCode: in
+  currencyCode: INR
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://www.bigbasket.com
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    urlPathContains: /pd/
+    queryTemplate: "{canonicalName} grocery {market} {currency} price"
 
   rateLimit:
     requestsPerMinute: 10

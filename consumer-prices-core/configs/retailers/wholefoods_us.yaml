@@ -1,16 +1,16 @@
 retailer:
-  slug: noon_grocery_ae
-  name: Noon Grocery UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: wholefoods_us
+  name: Whole Foods Market USA
+  marketCode: us
+  currencyCode: USD
   adapter: search
-  baseUrl: https://www.noon.com
+  baseUrl: https://www.wholefoodsmarket.com
   enabled: true
 
   searchConfig:
     numResults: 5
-    urlPathContains: /p/
-    queryTemplate: "{canonicalName} grocery fresh food {currency} {market}"
+    urlPathContains: /product/
+    queryTemplate: "{canonicalName} grocery organic {market} price"
 
   rateLimit:
     requestsPerMinute: 10

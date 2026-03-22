@@ -1,14 +1,16 @@
 retailer:
-  slug: spinneys_ae
-  name: Spinneys UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: sainsburys_gb
+  name: Sainsbury's UK
+  marketCode: gb
+  currencyCode: GBP
   adapter: search
-  baseUrl: https://www.spinneys.com
+  baseUrl: https://www.sainsburys.co.uk
   enabled: true
 
   searchConfig:
     numResults: 5
+    urlPathContains: /shop/gb/groceries/
+    queryTemplate: "{canonicalName} grocery {market} {currency} price"
 
   rateLimit:
     requestsPerMinute: 15
