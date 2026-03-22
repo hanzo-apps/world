@@ -30,6 +30,7 @@ export * from './StrategicPosturePanel';
 export * from './IntelligenceGapBadge';
 export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
+export * from './InternetDisruptionsPanel';
 export * from './RuntimeConfigPanel';
 export * from './InsightsPanel';
 export * from './TechReadinessPanel';

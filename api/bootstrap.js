@@ -8,6 +8,8 @@ const BOOTSTRAP_CACHE_KEYS = {
   earthquakes:      'seismology:earthquakes:v1',
   outages:          'infra:outages:v1',
   serviceStatuses:  'infra:service-statuses:v1',
+  ddosAttacks:      'cf:radar:ddos:v1',
+  trafficAnomalies: 'cf:radar:traffic-anomalies:v1',
   marketQuotes:     'market:stocks-bootstrap:v1',
   commodityQuotes:  'market:commodities-bootstrap:v1',
   sectors:          'market:sectors:v1',
@@ -83,7 +85,7 @@ const SLOW_KEYS = new Set([
   'nationalDebt',
 ]);
 const FAST_KEYS = new Set([
-  'earthquakes', 'outages', 'serviceStatuses', 'macroSignals', 'chokepoints', 'chokepointTransits',
+  'earthquakes', 'outages', 'serviceStatuses', 'ddosAttacks', 'trafficAnomalies', 'macroSignals', 'chokepoints', 'chokepointTransits',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
   'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending', 'theaterPosture', 'gdeltIntel',
   'correlationCards', 'forecasts', 'shippingRates',

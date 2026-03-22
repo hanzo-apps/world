@@ -174,6 +174,53 @@ export interface TemporalAnomaly {
   message: string;
 }
 
+export interface ListInternetDdosAttacksRequest {
+}
+
+export interface ListInternetDdosAttacksResponse {
+  protocol: DdosAttackSummaryEntry[];
+  vector: DdosAttackSummaryEntry[];
+  dateRangeStart: string;
+  dateRangeEnd: string;
+  topTargetLocations: DdosLocationHit[];
+}
+
+export interface DdosAttackSummaryEntry {
+  label: string;
+  percentage: number;
+}
+
+export interface DdosLocationHit {
+  countryCode: string;
+  countryName: string;
+  percentage: number;
+  latitude: number;
+  longitude: number;
+}
+
+export interface ListInternetTrafficAnomaliesRequest {
+  country: string;
+}
+
+export interface ListInternetTrafficAnomaliesResponse {
+  anomalies: TrafficAnomaly[];
+  totalCount: number;
+}
+
+export interface TrafficAnomaly {
+  uuid: string;
+  type: string;
+  status: string;
+  startDate: number;
+  endDate: number;
+  asn: string;
+  asnName: string;
+  locationCode: string;
+  locationName: string;
+  latitude: number;
+  longitude: number;
+}
+
 export type CableHealthStatus = "CABLE_HEALTH_STATUS_UNSPECIFIED" | "CABLE_HEALTH_STATUS_OK" | "CABLE_HEALTH_STATUS_DEGRADED" | "CABLE_HEALTH_STATUS_FAULT";
 
 export type OutageSeverity = "OUTAGE_SEVERITY_UNSPECIFIED" | "OUTAGE_SEVERITY_PARTIAL" | "OUTAGE_SEVERITY_MAJOR" | "OUTAGE_SEVERITY_TOTAL";
@@ -452,6 +499,54 @@ export class InfrastructureServiceClient {
     }
 
     return await resp.json() as ListTemporalAnomaliesResponse;
+  }
+
+  async listInternetDdosAttacks(req: ListInternetDdosAttacksRequest, options?: InfrastructureServiceCallOptions): Promise<ListInternetDdosAttacksResponse> {
+    let path = "/api/infrastructure/v1/list-internet-ddos-attacks";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as ListInternetDdosAttacksResponse;
+  }
+
+  async listInternetTrafficAnomalies(req: ListInternetTrafficAnomaliesRequest, options?: InfrastructureServiceCallOptions): Promise<ListInternetTrafficAnomaliesResponse> {
+    let path = "/api/infrastructure/v1/list-internet-traffic-anomalies";
+    const params = new URLSearchParams();
+    if (req.country != null && req.country !== "") params.set("country", String(req.country));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as ListInternetTrafficAnomaliesResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

@@ -32,6 +32,7 @@ import {
   StrategicPosturePanel,
   TechEventsPanel,
   ServiceStatusPanel,
+  InternetDisruptionsPanel,
   RuntimeConfigPanel,
   InsightsPanel,
   MacroSignalsPanel,
@@ -825,6 +826,7 @@ export class PanelLayoutManager implements AppModule {
     }
 
     this.createPanel('events', () => new TechEventsPanel('events', () => this.ctx.allNews));
+    this.createPanel('internet-disruptions', () => new InternetDisruptionsPanel());
     this.createPanel('service-status', () => new ServiceStatusPanel());
 
     this.lazyPanel('tech-readiness', () =>

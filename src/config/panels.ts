@@ -234,6 +234,7 @@ const TECH_PANELS: Record<string, PanelConfig> = {
   funding: { name: 'Funding & VC', enabled: true, priority: 1 },
   producthunt: { name: 'Product Hunt', enabled: true, priority: 1 },
   events: { name: 'Tech Events', enabled: true, priority: 1 },
+  'internet-disruptions': { name: 'Internet Disruptions', enabled: true, priority: 2 },
   'service-status': { name: 'Service Status', enabled: true, priority: 2 },
   economic: { name: 'Macro Stress', enabled: true, priority: 2 },
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 1 },
