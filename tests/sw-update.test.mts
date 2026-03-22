@@ -43,11 +43,14 @@ interface FakeEnv {
   reloadCalls: number[];
   appendedToasts: FakeElement[];
   visibilityListeners: Array<() => void>;
+  /** Pending dwell-timer callbacks. Each entry is the cb passed to setTimer (or a no-op if cleared). */
+  pendingTimers: Array<() => void>;
 }
 
 function makeEnv(): FakeEnv {
   const visibilityListeners: Array<() => void> = [];
   const appendedToasts: FakeElement[] = [];
+  const pendingTimers: Array<() => void> = [];
   let _visibilityState = 'visible';
 
   const doc: FakeEnv['doc'] = {
@@ -121,7 +124,7 @@ function makeEnv(): FakeEnv {
   const reloadCalls: number[] = [];
   const reload = () => reloadCalls.push(Date.now());
 
-  return { doc, swContainer, reload, reloadCalls, appendedToasts, visibilityListeners };
+  return { doc, swContainer, reload, reloadCalls, appendedToasts, visibilityListeners, pendingTimers };
 }
 
 function install(env: FakeEnv) {
@@ -129,13 +132,34 @@ function install(env: FakeEnv) {
     swContainer: env.swContainer,
     document: env.doc,
     reload: env.reload,
-    raf: (cb) => cb(), // synchronous in tests — skips real rAF
+    raf: (cb) => cb(), // synchronous — skips real rAF
+    setTimer: (cb, _ms) => {
+      const idx = env.pendingTimers.length;
+      env.pendingTimers.push(cb);
+      return idx as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimer: (_id) => {
+      const idx = _id as unknown as number;
+      if (idx !== null && idx >= 0 && idx < env.pendingTimers.length) {
+        env.pendingTimers.splice(idx, 1);
+      }
+    },
   });
 }
 
 /** Simulate tab visibility change (e.g. going to background). */
 function fireVisibility(env: FakeEnv) {
   for (const cb of [...env.visibilityListeners]) cb();
+}
+
+/**
+ * Fire the next pending dwell timer (simulates VISIBLE_DWELL_MS elapsing).
+ * If the timer was cleared (dismiss/reload), the no-op is harmless.
+ */
+function fireDwellTimer(env: FakeEnv) {
+  const cb = env.pendingTimers.shift();
+  assert.ok(cb !== undefined, 'No pending dwell timer to fire');
+  cb();
 }
 
 /** Simulate a button click inside the latest toast. */
@@ -206,15 +230,26 @@ describe('installSwUpdateHandler', () => {
     assert.equal(env.visibilityListeners.length, 0);
   });
 
-  // --- hidden-tab auto-reload -------------------------------------------------
+  // --- hidden-tab auto-reload (requires dwell) --------------------------------
 
-  it('calls reload when tab goes hidden with an active toast', () => {
+  it('calls reload when tab goes hidden after dwell timer elapses', () => {
     env.swContainer._controller = {};
     install(env);
-    env.swContainer.fireControllerChange();
+    env.swContainer.fireControllerChange(); // visible → dwell timer starts
+    fireDwellTimer(env);                    // 5 s elapsed → autoReloadAllowed = true
     env.doc.setVisibilityState('hidden');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 1);
+  });
+
+  it('does NOT call reload when tab goes hidden before dwell timer fires', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.swContainer.fireControllerChange(); // visible → dwell timer pending
+    // Do NOT call fireDwellTimer — autoReloadAllowed stays false
+    env.doc.setVisibilityState('hidden');
+    fireVisibility(env);
+    assert.equal(env.reloadCalls.length, 0, 'no reload before dwell elapses');
   });
 
   it('does NOT call reload when tab goes hidden after dismiss', () => {
@@ -225,6 +260,35 @@ describe('installSwUpdateHandler', () => {
     env.doc.setVisibilityState('hidden');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 0);
+  });
+
+  // --- dwell timer start/cancel mechanics -------------------------------------
+
+  it('starts dwell timer when toast appears while tab is visible', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.swContainer.fireControllerChange();
+    assert.equal(env.pendingTimers.length, 1, 'dwell timer queued on visible toast');
+  });
+
+  it('does NOT start dwell timer when toast appears while tab is hidden', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.doc.setVisibilityState('hidden');
+    env.swContainer.fireControllerChange();
+    assert.equal(env.pendingTimers.length, 0, 'no dwell timer when tab already hidden');
+  });
+
+  it('starts dwell timer when tab returns to visible after a hidden-tab toast', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.doc.setVisibilityState('hidden');
+    env.swContainer.fireControllerChange();
+    assert.equal(env.pendingTimers.length, 0, 'no timer while hidden');
+
+    env.doc.setVisibilityState('visible');
+    fireVisibility(env); // onHidden sees visible → startDwellTimer
+    assert.equal(env.pendingTimers.length, 1, 'dwell timer started on return to visible');
   });
 
   // --- PRIMARY: multi-deploy same-tab scenario --------------------------------
@@ -250,15 +314,16 @@ describe('installSwUpdateHandler', () => {
     env.swContainer._controller = {};
     install(env);
 
-    // Deploy N — dismiss
+    // Deploy N — dismiss (dwell timer cleared)
     env.swContainer.fireControllerChange();
     clickToastButton(env, 'dismiss');
     assert.equal(env.reloadCalls.length, 0);
 
-    // Deploy N+1 — do nothing, then hide tab
+    // Deploy N+1 — dwell then hide
     env.swContainer.fireControllerChange();
     assert.equal(env.appendedToasts.length, 2, 'new toast shown for N+1');
 
+    fireDwellTimer(env); // 5 s visible → autoReloadAllowed
     env.doc.setVisibilityState('hidden');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 1, 'reload fires on hidden after N+1 toast');
@@ -279,12 +344,69 @@ describe('installSwUpdateHandler', () => {
     assert.equal(env.reloadCalls.length, 0, 'no reload — both toasts dismissed');
   });
 
+  // --- P1 regression: hidden time must not count toward dwell ----------------
+
+  it('does NOT reload when dwell timer fires after the tab went hidden (background tick)', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.swContainer.fireControllerChange(); // visible → dwell starts
+
+    // Tab hides before dwell completes — timer should be cancelled
+    env.doc.setVisibilityState('hidden');
+    fireVisibility(env);
+    assert.equal(env.pendingTimers.length, 0, 'dwell timer cancelled on hide');
+
+    // Tab stays hidden — no reload
+    fireVisibility(env);
+    assert.equal(env.reloadCalls.length, 0, 'no reload — dwell never completed');
+  });
+
+  it('requires a full fresh dwell after hide/show cycle before auto-reload', () => {
+    env.swContainer._controller = {};
+    install(env);
+    env.swContainer.fireControllerChange(); // visible → dwell starts
+
+    // Hide at "1 s" — cancels dwell
+    env.doc.setVisibilityState('hidden');
+    fireVisibility(env);
+    assert.equal(env.pendingTimers.length, 0, 'dwell cancelled on hide');
+
+    // Return to visible — new dwell starts
+    env.doc.setVisibilityState('visible');
+    fireVisibility(env);
+    assert.equal(env.pendingTimers.length, 1, 'fresh dwell timer started on return');
+
+    // Complete the new dwell → autoReloadAllowed
+    fireDwellTimer(env);
+
+    // Hide → auto-reload fires
+    env.doc.setVisibilityState('hidden');
+    fireVisibility(env);
+    assert.equal(env.reloadCalls.length, 1, 'reload fires only after full dwell completes');
+  });
+
+  // --- P2 regression: stale dwell timer cleared when newer deploy supersedes --
+
+  it('cancels the previous dwell timer when a newer deploy supersedes the toast', () => {
+    env.swContainer._controller = {};
+    install(env);
+
+    // Deploy N: visible → dwell timer starts
+    env.swContainer.fireControllerChange();
+    assert.equal(env.pendingTimers.length, 1, 'N dwell timer queued');
+
+    // Deploy N+1: supersedes toast → old dwell must be cancelled
+    env.swContainer.fireControllerChange();
+    assert.equal(env.pendingTimers.length, 1, 'exactly one dwell timer active (N+1 only)');
+  });
+
   // --- visible-transition must NOT reload (P1 regression guard) ---------------
 
   it('does NOT reload when visibilitychange fires while state is still visible', () => {
     env.swContainer._controller = {};
     install(env);
     env.swContainer.fireControllerChange();
+    fireDwellTimer(env);
     // tab stays visible — fire visibilitychange anyway (e.g. focus events on some browsers)
     env.doc.setVisibilityState('visible');
     fireVisibility(env);
@@ -295,13 +417,14 @@ describe('installSwUpdateHandler', () => {
     env.swContainer._controller = {};
     install(env);
     env.swContainer.fireControllerChange();
+    fireDwellTimer(env); // dwell elapsed → autoReloadAllowed
 
     // go hidden → should reload
     env.doc.setVisibilityState('hidden');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 1);
 
-    // just confirming the first hidden fired; now visible would not add a second reload
+    // now visible would not add a second reload
     env.doc.setVisibilityState('visible');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 1, 'no second reload on visible transition');
@@ -332,10 +455,13 @@ describe('installSwUpdateHandler', () => {
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 0, 'no reload yet — tab still hidden');
 
-    // User returns to the tab — now they can see the toast
+    // User returns to the tab — dwell timer starts
     env.doc.setVisibilityState('visible');
     fireVisibility(env);
     assert.equal(env.reloadCalls.length, 0, 'no reload on becoming visible');
+
+    // Dwell elapses → autoReloadAllowed = true
+    fireDwellTimer(env);
 
     // User switches away — auto-reload is now allowed
     env.doc.setVisibilityState('hidden');
