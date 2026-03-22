@@ -2106,7 +2106,7 @@ describe('forecast run world state', () => {
       priorWorldStates: [priorWorldState],
     });
 
-    assert.equal(worldState.simulationState.version, 4);
+    assert.equal(worldState.simulationState.version, 5);
     assert.ok((worldState.simulationState.situationSimulations || []).every((item) => item.postureScore < 0.99));
   });
 
