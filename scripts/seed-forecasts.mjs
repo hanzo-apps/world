@@ -9124,6 +9124,8 @@ function selectPublishedForecastPool(predictions, options = {}) {
     if (selected.length >= Math.min(targetCount, stateAnchors.length)) break;
     if (canSelect(pred, 'state_anchor')) take(pred);
   }
+  // These anchor passes intentionally stay in state-anchor mode, so once a state is already
+  // represented they only help with uncovered states or state-less fallback forecasts.
   for (const pred of transmissionAnchors) {
     if (selected.length >= Math.min(targetCount, 2)) break;
     if (canSelect(pred, 'state_anchor')) take(pred);
@@ -9172,6 +9174,8 @@ function selectPublishedForecastPool(predictions, options = {}) {
     if (canSelect(pred, 'fill')) take(pred);
   }
 
+  // Backfill is weaker than fill: it can take a second same-state forecast without the
+  // leverage gate, but it still respects the hard per-state cap.
   for (const pred of ranked) {
     if (selected.length >= targetCount) break;
     if (canSelect(pred, 'backfill')) take(pred);
@@ -10347,11 +10351,13 @@ async function fetchForecasts() {
   const selectionWorldSignals = buildWorldSignals(inputs, predictions, fullRunSituationClusters);
   const selectionMarketTransmission = buildMarketTransmissionGraph(selectionWorldSignals, fullRunSituationClusters);
   const selectionMarketState = buildMarketState(selectionWorldSignals, selectionMarketTransmission);
+  const selectionMarketInputCoverage = summarizeMarketInputCoverage(inputs);
   const marketSelectionIndex = buildSituationMarketContextIndex(
     selectionWorldSignals,
     selectionMarketTransmission,
     selectionMarketState,
     fullRunStateUnits,
+    selectionMarketInputCoverage,
   );
   attachMarketSelectionContext(predictions, marketSelectionIndex);
   prepareForecastMetrics(predictions);
