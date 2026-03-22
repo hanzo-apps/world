@@ -10,7 +10,7 @@ const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Par
 
 export class GroceryBasketPanel extends Panel {
   constructor() {
-    super({ id: 'grocery-basket', title: t('panels.groceryBasket') });
+    super({ id: 'grocery-basket', title: t('panels.groceryBasket'), infoTooltip: t('components.groceryBasket.infoTooltip') });
   }
 
   public async fetchData(): Promise<void> {

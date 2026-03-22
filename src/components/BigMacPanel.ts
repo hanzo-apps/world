@@ -10,7 +10,7 @@ const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Par
 
 export class BigMacPanel extends Panel {
   constructor() {
-    super({ id: 'bigmac', title: t('panels.bigmac') });
+    super({ id: 'bigmac', title: t('panels.bigmac'), infoTooltip: t('components.bigmac.infoTooltip') });
   }
 
   public async fetchData(): Promise<void> {

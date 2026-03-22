@@ -32,7 +32,7 @@ export class StablecoinPanel extends Panel {
   private loading = true;
   private error: string | null = null;
   constructor() {
-    super({ id: 'stablecoins', title: t('panels.stablecoins'), showCount: false });
+    super({ id: 'stablecoins', title: t('panels.stablecoins'), showCount: false, infoTooltip: t('components.stablecoins.infoTooltip') });
   }
 
   public async fetchData(): Promise<void> {

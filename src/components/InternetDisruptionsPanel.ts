@@ -22,6 +22,7 @@ export class InternetDisruptionsPanel extends Panel {
       showCount: true,
       trackActivity: true,
       defaultRowSpan: 2,
+      infoTooltip: t('components.internetDisruptions.infoTooltip'),
     });
     this.content.addEventListener('click', (e: Event) => {
       const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]');
