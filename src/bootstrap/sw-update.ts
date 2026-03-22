@@ -18,18 +18,49 @@ export interface SwUpdateHandlerOptions {
   reload?: () => void;
   /** Override requestAnimationFrame for testing (defaults to global rAF). */
   raf?: (cb: () => void) => void;
+  /** Override setTimeout for testing. */
+  setTimer?: (cb: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  /** Override clearTimeout for testing. */
+  clearTimer?: (id: ReturnType<typeof setTimeout> | null) => void;
+  /** Enable debug logging. Defaults to localStorage.getItem('wm-debug-sw') === '1'. */
+  debug?: boolean;
+  /** App version string included in debug log entries. */
+  version?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Debug logging (opt-in via localStorage.setItem('wm-debug-sw', '1'))
+// Persists a rolling 30-entry log in sessionStorage so it survives page reloads.
+// Copy with: JSON.parse(sessionStorage.getItem('wm-sw-debug-log'))
+// ---------------------------------------------------------------------------
+
+export const SW_DEBUG_LOG_KEY = 'wm-sw-debug-log';
+const SW_DEBUG_LOG_MAX = 30;
+
+function appendDebugLog(entry: Record<string, unknown>): void {
+  try {
+    const raw = sessionStorage.getItem(SW_DEBUG_LOG_KEY);
+    const log = (raw ? JSON.parse(raw) : []) as unknown[];
+    log.push(entry);
+    if (log.length > SW_DEBUG_LOG_MAX) log.splice(0, log.length - SW_DEBUG_LOG_MAX);
+    sessionStorage.setItem(SW_DEBUG_LOG_KEY, JSON.stringify(log));
+  } catch {}
 }
 
 /**
  * Wires up the SW update toast.
  *
  * On each controllerchange after the first (first = initial claim on a new session),
- * shows a dismissible "Update Available" toast. If the user dismisses the toast,
- * the tab auto-reloads the next time it goes to background — but only after the tab
- * has been visible at least once since the toast appeared. This prevents an infinite
- * reload loop when an update is detected while the tab is already in the background:
- * without this guard, onHidden would fire immediately, reload the hidden page, the
- * new page would detect the same update, fire again, and loop forever.
+ * shows a dismissible "Update Available" toast.
+ *
+ * Auto-reload on tab-hide requires the tab to have been visible for at least
+ * VISIBLE_DWELL_MS continuously since the toast appeared. This prevents two failure modes:
+ *
+ * 1. Background infinite loop: update detected in a hidden tab → onHidden fires
+ *    immediately → reload → new page → same → loop forever.
+ *
+ * 2. Session-restore ghost reload: session-restore briefly marks tabs visible for
+ *    one animation frame, which would allow a hidden-tab auto-reload prematurely.
  *
  * Dismissing one version never suppresses toasts for future deploys.
  */
@@ -38,13 +69,45 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
   const doc = options.document ?? (document as unknown as DocumentLike);
   const reload = options.reload ?? (() => window.location.reload());
   const raf = options.raf ?? ((cb: () => void) => requestAnimationFrame(() => requestAnimationFrame(cb)));
+  const setTimer = options.setTimer ?? ((cb: () => void, ms: number) => setTimeout(cb, ms));
+  const clearTimer = options.clearTimer ?? ((id: ReturnType<typeof setTimeout> | null) => { if (id !== null) clearTimeout(id); });
+
+  const debugEnabled = options.debug ?? (() => {
+    try { return localStorage.getItem('wm-debug-sw') === '1'; } catch { return false; }
+  })();
+  const version = options.version;
+
+  function logSw(event: string, extra: Record<string, unknown> = {}): void {
+    if (!debugEnabled) return;
+    const entry: Record<string, unknown> = {
+      event,
+      ts: new Date().toISOString(),
+      visibility: doc.visibilityState,
+      hasController: !!swContainer.controller,
+      ...extra,
+    };
+    if (version !== undefined) entry.version = version;
+    console.log('[SWDEBUG]', entry);
+    appendDebugLog(entry);
+  }
+
+  // Minimum time the tab must remain visible after the toast appears before
+  // auto-reload on tab-hide is enabled.
+  const VISIBLE_DWELL_MS = 5_000;
 
   let currentOnHidden: (() => void) | null = null;
+  let currentDwellCancel: (() => void) | null = null;
 
   const showToast = (): void => {
     if (currentOnHidden) {
       doc.removeEventListener('visibilitychange', currentOnHidden);
       currentOnHidden = null;
+    }
+    // P2: cancel stale dwell timer from the superseded toast so it cannot
+    // fire after the toast is gone (prevents debug log pollution).
+    if (currentDwellCancel) {
+      currentDwellCancel();
+      currentDwellCancel = null;
     }
     doc.querySelector('.update-toast')?.remove();
 
@@ -66,19 +129,41 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
     `;
 
     let dismissed = false;
-    // Auto-reload on tab-hide is only allowed after the tab has been visible at least
-    // once since the toast appeared. If the update fires while the tab is already hidden,
-    // this starts false and becomes true when the user returns — preventing the immediate
-    // onHidden → reload → new page → onHidden → reload infinite background loop.
-    let autoReloadAllowed = doc.visibilityState === 'visible';
+    let autoReloadAllowed = false;
+    let dwellTimerId: ReturnType<typeof setTimer> | null = null;
+
+    const startDwellTimer = (): void => {
+      if (dwellTimerId !== null || dismissed || autoReloadAllowed) return;
+      logSw('dwell-timer-started', { delayMs: VISIBLE_DWELL_MS });
+      dwellTimerId = setTimer(() => {
+        dwellTimerId = null;
+        autoReloadAllowed = true;
+        logSw('dwell-timer-expired', { autoReloadAllowed: true });
+      }, VISIBLE_DWELL_MS);
+    };
+
+    // If already visible when the toast appears, start the dwell timer immediately.
+    if (doc.visibilityState === 'visible') startDwellTimer();
+
+    logSw('toast-shown', { wasVisible: doc.visibilityState === 'visible' });
 
     const onHidden = (): void => {
       if (doc.visibilityState === 'visible') {
-        // Tab returned to foreground — user has now seen the toast, allow auto-reload.
-        autoReloadAllowed = true;
+        // Tab returned to foreground — start dwell timer if not already running.
+        logSw('visibility-visible');
+        startDwellTimer();
         return;
       }
+      // P1: hidden time must not count toward the dwell window — cancel the
+      // in-flight timer so the full VISIBLE_DWELL_MS restarts on next foreground.
+      if (!autoReloadAllowed && dwellTimerId !== null) {
+        clearTimer(dwellTimerId);
+        dwellTimerId = null;
+        logSw('dwell-timer-cancelled-on-hide');
+      }
+      logSw('visibility-hidden', { autoReloadAllowed, dismissed });
       if (!dismissed && autoReloadAllowed && doc.body.contains(toast)) {
+        logSw('auto-reload-triggered');
         reload();
       }
     };
@@ -86,9 +171,17 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
     toast.addEventListener('click', (e) => {
       const action = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action;
       if (action === 'reload') {
+        clearTimer(dwellTimerId);
+        dwellTimerId = null;
+        currentDwellCancel = null;
+        logSw('reload-clicked');
         reload();
       } else if (action === 'dismiss') {
+        clearTimer(dwellTimerId);
+        dwellTimerId = null;
+        currentDwellCancel = null;
         dismissed = true;
+        logSw('dismiss-clicked');
         doc.removeEventListener('visibilitychange', onHidden);
         currentOnHidden = null;
         toast.classList.remove('visible');
@@ -97,13 +190,16 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
     });
 
     currentOnHidden = onHidden;
+    currentDwellCancel = () => { clearTimer(dwellTimerId); dwellTimerId = null; };
     doc.addEventListener('visibilitychange', onHidden);
     doc.body.appendChild(toast);
     raf(() => toast.classList.add('visible'));
   };
 
   let hadController = !!swContainer.controller;
+  logSw('handler-installed', { hadController });
   swContainer.addEventListener('controllerchange', () => {
+    logSw('controllerchange', { hadController });
     if (!hadController) {
       hadController = true;
       return;
