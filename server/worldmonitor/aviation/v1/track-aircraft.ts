@@ -92,9 +92,31 @@ export async function trackAircraft(
         result = await cachedFetchJson<{ positions: PositionSample[]; source: string }>(
             cacheKey, positiveTtl, async () => {
                 const relayBase = getRelayBaseUrl();
+                const isCallsignOnly = !!req.callsign && req.swLat == null && req.icao24 == null;
 
-                // Try relay first if configured
-                if (relayBase) {
+                // For callsign-only searches, try Wingbits first — commercial flights like UAE20
+                // are Wingbits-exclusive and not visible in OpenSky. Trying OpenSky first wastes
+                // time and may return an early hit with no callsign match.
+                if (isCallsignOnly && relayBase) {
+                    try {
+                        const wbUrl = `${relayBase}/wingbits/track?callsign=${encodeURIComponent(req.callsign)}`;
+                        const wbResp = await fetch(wbUrl, {
+                            headers: getRelayHeaders({}),
+                            signal: AbortSignal.timeout(20_000),
+                        });
+                        if (wbResp.ok) {
+                            const wbData = await wbResp.json() as WingbitsRelayResponse;
+                            if (wbData.positions && wbData.positions.length > 0) {
+                                return { positions: wbData.positions, source: 'wingbits' };
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`[Aviation] Wingbits callsign relay failed: ${err instanceof Error ? err.message : err}`);
+                    }
+                }
+
+                // For bbox/icao24 queries, try OpenSky via relay first
+                if (!isCallsignOnly && relayBase) {
                     try {
                         let osUrl: string;
                         if (req.swLat != null && req.neLat != null) {
@@ -121,25 +143,25 @@ export async function trackAircraft(
                 }
 
                 // Try direct OpenSky anonymous API (no auth needed, ~10 req/min limit)
-                try {
-                    const directPositions = await fetchOpenSkyAnonymous(req);
-                    if (directPositions.length > 0) {
-                        return { positions: directPositions, source: 'opensky-anonymous' };
+                // Skip for callsign-only: OpenSky global states/all returns all aircraft with no
+                // callsign filter, so it hits rate limits and returns nothing useful for this case.
+                if (!isCallsignOnly) {
+                    try {
+                        const directPositions = await fetchOpenSkyAnonymous(req);
+                        if (directPositions.length > 0) {
+                            return { positions: directPositions, source: 'opensky-anonymous' };
+                        }
+                    } catch (err) {
+                        console.warn(`[Aviation] Direct OpenSky anonymous failed: ${err instanceof Error ? err.message : err}`);
                     }
-                } catch (err) {
-                    console.warn(`[Aviation] Direct OpenSky anonymous failed: ${err instanceof Error ? err.message : err}`);
                 }
 
-                // Try Wingbits relay. Supports bbox queries and, for callsign-only searches,
-                // a global bbox so we can find the aircraft regardless of position.
-                if (relayBase) {
+                // For bbox queries, also try Wingbits relay as fallback
+                if (!isCallsignOnly && relayBase) {
                     try {
                         let wbUrl: string;
                         if (req.swLat != null && req.neLat != null) {
                             wbUrl = `${relayBase}/wingbits/track?lamin=${req.swLat}&lomin=${req.swLon}&lamax=${req.neLat}&lomax=${req.neLon}`;
-                        } else if (req.callsign) {
-                            // Global search — relay uses a worldwide box and filters by callsign.
-                            wbUrl = `${relayBase}/wingbits/track?callsign=${encodeURIComponent(req.callsign)}`;
                         } else {
                             wbUrl = '';
                         }
