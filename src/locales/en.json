@@ -178,7 +178,7 @@
       "protestsDetected": "{{count}} active protests detected",
       "aircraftTracked": "{{count}} military aircraft tracked",
       "vesselsTracked": "{{count}} military vessels tracked",
-      "internetOutages": "{{count}} internet outages",
+      "internetOutages": "{{count}} internet disruptions",
       "recentEarthquakes": "{{count}} recent earthquakes",
       "stockIndex": "Stock index: {{value}}",
       "recentHeadlines": "**Recent headlines:**",
@@ -343,6 +343,12 @@
     "producthunt": "Product Hunt",
     "events": "Tech Events",
     "serviceStatus": "Service Status",
+    "internetDisruptions": "Internet Disruptions",
+    "internetDisruptionsTabs": {
+      "outages": "Outages",
+      "ddos": "DDoS",
+      "anomalies": "Anomalies"
+    },
     "techReadiness": "Tech Readiness Index",
     "gccInvestments": "GCC Investments",
     "geoHubs": "Geopolitical Hubs",
@@ -751,7 +757,7 @@
         "aircraftTracked": "{{count}} military aircraft tracked",
         "vesselsTracked": "{{count}} military vessels tracked",
         "activeStrikes": "{{count}} active strikes detected",
-        "internetOutages": "{{count}} internet outages",
+        "internetOutages": "{{count}} internet disruptions",
         "recentEarthquakes": "{{count}} recent earthquakes",
         "stockIndex": "Stock index: {{value}}",
         "recentHeadlines": "**Recent headlines:**"
@@ -1213,7 +1219,7 @@
         "cloudRegions": "Cloud Regions",
         "aiDataCenters": "AI Data Centers",
         "underseaCables": "Undersea Cables",
-        "internetOutages": "Internet Outages",
+        "internetOutages": "Internet Disruptions",
         "cyberThreats": "Cyber Threats",
         "techEvents": "Tech Events",
         "naturalEvents": "Natural Events",
@@ -1276,7 +1282,7 @@
         "disruption": "Disruption",
         "advisory": "Advisory",
         "repairShip": "Repair Ship",
-        "internetOutage": "Internet Outage",
+        "internetOutage": "Internet Disruption",
         "medium": "medium",
         "news": "News",
         "undisclosed": "Undisclosed",
@@ -1851,6 +1857,14 @@
     "languageSelector": {
       "selectLanguage": "Select Language",
       "mapLabelsFallbackVi": "Map labels currently fall back to English for Vietnamese."
+    },
+    "internetDisruptions": {
+      "noOutages": "No active outages detected",
+      "noDdos": "No DDoS data available",
+      "noAnomalies": "No traffic anomalies detected",
+      "byProtocol": "Attack Protocol",
+      "byVector": "Attack Vector",
+      "topTargets": "Top Target Countries"
     },
     "serviceStatus": {
       "checkingServices": "Checking services...",

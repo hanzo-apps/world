@@ -29,6 +29,8 @@ import {
   fetchWeatherAlerts,
   fetchFredData,
   fetchInternetOutages,
+  fetchTrafficAnomalies,
+  fetchDdosAttacks,
   isOutagesConfigured,
   fetchAisSignals,
   getAisStatus,
@@ -129,6 +131,7 @@ import {
   MonitorPanel,
   InsightsPanel,
   CIIPanel,
+  InternetDisruptionsPanel,
   StrategicPosturePanel,
   EconomicPanel,
   EnergyComplexPanel,
@@ -1580,6 +1583,15 @@ export class DataLoaderManager implements AppModule {
           this.ctx.map?.setLayerReady('outages', outages.length > 0);
           this.ctx.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
         }
+        (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setOutages(outages);
+        fetchTrafficAnomalies().then(r => {
+          this.ctx.map?.setTrafficAnomalies(r.anomalies);
+          (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setAnomalies(r.anomalies);
+        }).catch(() => {});
+        fetchDdosAttacks().then(r => {
+          this.ctx.map?.setDdosLocations(r.topTargetLocations ?? []);
+          (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setDdos(r);
+        }).catch(() => {});
       } catch (error) {
         console.error('[Intelligence] Outages fetch failed:', error);
         dataFreshness.recordError('outages', String(error));
@@ -1887,6 +1899,15 @@ export class DataLoaderManager implements AppModule {
       signalAggregator.ingestOutages(outages);
       this.ctx.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
       dataFreshness.recordUpdate('outages', outages.length);
+      (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setOutages(outages);
+      fetchTrafficAnomalies().then(r => {
+        this.ctx.map?.setTrafficAnomalies(r.anomalies);
+        (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setAnomalies(r.anomalies);
+      }).catch(() => {});
+      fetchDdosAttacks().then(r => {
+        this.ctx.map?.setDdosLocations(r.topTargetLocations ?? []);
+        (this.ctx.panels['internet-disruptions'] as InternetDisruptionsPanel)?.setDdos(r);
+      }).catch(() => {});
     } catch (error) {
       this.ctx.map?.setLayerReady('outages', false);
       this.ctx.statusPanel?.updateFeed('NetBlocks', { status: 'error' });
