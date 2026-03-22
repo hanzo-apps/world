@@ -1,14 +1,16 @@
 retailer:
-  slug: spinneys_ae
-  name: Spinneys UAE
-  marketCode: ae
-  currencyCode: AED
+  slug: tesco_gb
+  name: Tesco UK
+  marketCode: gb
+  currencyCode: GBP
   adapter: search
-  baseUrl: https://www.spinneys.com
+  baseUrl: https://www.tesco.com
   enabled: true
 
   searchConfig:
     numResults: 5
+    urlPathContains: /groceries/en-GB/products/
+    queryTemplate: "{canonicalName} grocery {market} {currency} price"
 
   rateLimit:
     requestsPerMinute: 15
