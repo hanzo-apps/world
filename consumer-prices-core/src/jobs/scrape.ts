@@ -63,19 +63,14 @@ async function updateScrapeRun(
 }
 
 export async function scrapeRetailer(slug: string) {
-  initProviders(process.env as Record<string, string>);
-
   const config = loadRetailerConfig(slug);
   if (!config.enabled) {
     logger.info(`${slug} is disabled, skipping`);
     return;
   }
 
-  const retailerId = await getOrCreateRetailer(slug, config);
-  const runId = await createScrapeRun(retailerId);
-
-  logger.info(`Run ${runId} started for ${slug}`);
-
+  // Validate API keys before opening a scrape_run row — an early throw here
+  // would otherwise leave the run stuck in status='running' forever.
   const exaKey = (process.env.EXA_API_KEYS || process.env.EXA_API_KEY || '').split(/[\n,]+/)[0].trim();
   const fcKey = process.env.FIRECRAWL_API_KEY ?? '';
 
@@ -83,6 +78,11 @@ export async function scrapeRetailer(slug: string) {
     if (!exaKey) throw new Error(`search adapter requires EXA_API_KEY / EXA_API_KEYS (retailer: ${slug})`);
     if (!fcKey) throw new Error(`search adapter requires FIRECRAWL_API_KEY (retailer: ${slug})`);
   }
+
+  const retailerId = await getOrCreateRetailer(slug, config);
+  const runId = await createScrapeRun(retailerId);
+
+  logger.info(`Run ${runId} started for ${slug}`);
 
   const adapter =
     config.adapter === 'search'
@@ -202,22 +202,44 @@ export async function scrapeRetailer(slug: string) {
     [retailerId, isSuccess ? new Date() : null, status, Math.round(parseSuccessRate * 100) / 100],
   );
 
-  await teardownAll();
 }
 
 export async function scrapeAll() {
+  // initProviders is required for GenericPlaywrightAdapter (playwright/p0 adapters use the
+  // registry via fetchWithFallback). SearchAdapter and ExaSearchAdapter construct their own
+  // provider instances directly from env vars and bypass the registry.
   initProviders(process.env as Record<string, string>);
   const configs = loadAllRetailerConfigs().filter((c) => c.enabled);
   logger.info(`Scraping ${configs.length} retailers`);
-  for (const c of configs) {
-    await scrapeRetailer(c.slug);
-  }
+
+  // Run retailers in parallel: each hits a different domain so rate limits don't conflict.
+  // Cap at 5 concurrent to avoid saturating Firecrawl's global request limits.
+  const CONCURRENCY = 5;
+  const queue = [...configs];
+  const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const cfg = queue.shift()!;
+      try {
+        await scrapeRetailer(cfg.slug);
+      } catch (err) {
+        logger.warn(`scrapeRetailer ${cfg.slug} failed: ${err}`);
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  await teardownAll();
 }
 
 async function main() {
   try {
     if (process.argv[2]) {
-      await scrapeRetailer(process.argv[2]);
+      initProviders(process.env as Record<string, string>);
+      try {
+        await scrapeRetailer(process.argv[2]);
+      } finally {
+        await teardownAll();
+      }
     } else {
       await scrapeAll();
     }
