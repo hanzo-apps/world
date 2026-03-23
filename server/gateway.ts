@@ -103,6 +103,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/intelligence/v1/get-country-intel-brief': 'static',
   '/api/climate/v1/list-climate-anomalies': 'static',
   '/api/sanctions/v1/list-sanctions-pressure': 'static',
+  '/api/sanctions/v1/lookup-sanction-entity': 'no-store',
   '/api/radiation/v1/list-radiation-observations': 'slow',
   '/api/thermal/v1/list-thermal-escalations': 'slow',
   '/api/research/v1/list-tech-events': 'static',
