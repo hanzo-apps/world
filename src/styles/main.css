@@ -12195,6 +12195,39 @@ a.prediction-link:hover {
   overflow: hidden;
 }
 
+.gdelt-topic-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gdelt-trend-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gdelt-trend-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.gdelt-trend-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.gdelt-trend-value.positive { color: var(--success); }
+.gdelt-trend-value.negative { color: var(--danger); }
+
 /* Hotspot GDELT Context */
 .hotspot-gdelt-context {
   margin-top: 12px;
