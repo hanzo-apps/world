@@ -160,10 +160,7 @@ const SEED_META = {
   defiTokens:        { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
   aiTokens:          { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
   otherTokens:       { key: 'seed-meta:market:token-panels', maxStaleMin: 90 },
-  // FRED seeded by seed-economy.mjs (Railway cron every 15min); FRED_TTL=3600s; 90min = 6x cron interval
-  fredBatch:         { key: 'seed-meta:economic:fred:v1:FEDFUNDS:0', maxStaleMin: 90 },
-  // militaryForecastInputs written by seed-military-flights.mjs; read by seed-forecasts.mjs
-  militaryForecastInputs: { key: 'seed-meta:military-forecast-inputs', maxStaleMin: 30 },
+  fredBatch:         { key: 'seed-meta:economic:fred:v1:FEDFUNDS:0', maxStaleMin: 1500 }, // daily cron
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
