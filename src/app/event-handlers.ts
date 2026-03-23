@@ -136,7 +136,7 @@ export class EventHandlerManager implements AppModule {
     const config = this.ctx.panelSettings[panelId];
     if (!config) return;
     if (!isProUser()) {
-      const enabledCount = Object.values(this.ctx.panelSettings).filter(p => p.enabled).length;
+      const enabledCount = Object.entries(this.ctx.panelSettings).filter(([k, p]) => p.enabled && !k.startsWith('cw-')).length;
       if (enabledCount >= FREE_MAX_PANELS) return;
     }
     config.enabled = true;
