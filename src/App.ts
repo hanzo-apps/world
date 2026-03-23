@@ -515,18 +515,27 @@ export class App {
 
     // Enforce free-tier panel limit on every launch (handles legacy/downgraded users).
     if (!isProUser()) {
+      // cw-* (custom widget) panels are not loaded for free users — disable them so they
+      // don't silently consume quota slots that count against visible standard panels.
+      let cwDisabled = false;
+      for (const key of Object.keys(panelSettings)) {
+        if (key.startsWith('cw-') && panelSettings[key]?.enabled) {
+          panelSettings[key] = { ...panelSettings[key]!, enabled: false };
+          cwDisabled = true;
+        }
+      }
       const enabledKeys = Object.entries(panelSettings)
-        .filter(([, v]) => v.enabled)
+        .filter(([k, v]) => v.enabled && !k.startsWith('cw-'))
         .sort(([ka, a], [kb, b]) => (a.priority ?? 99) - (b.priority ?? 99) || ka.localeCompare(kb))
         .map(([k]) => k);
-      if (enabledKeys.length > FREE_MAX_PANELS) {
-        const excess = enabledKeys.slice(FREE_MAX_PANELS);
-        for (const key of excess) {
+      const needsTrim = enabledKeys.length > FREE_MAX_PANELS;
+      if (needsTrim) {
+        for (const key of enabledKeys.slice(FREE_MAX_PANELS)) {
           panelSettings[key] = { ...panelSettings[key]!, enabled: false };
         }
-        saveToStorage(STORAGE_KEYS.panels, panelSettings);
-        console.log(`[App] Free tier: trimmed ${excess.length} panel(s) to enforce ${FREE_MAX_PANELS}-panel limit`);
+        console.log(`[App] Free tier: trimmed ${enabledKeys.length - FREE_MAX_PANELS} panel(s) to enforce ${FREE_MAX_PANELS}-panel limit`);
       }
+      if (cwDisabled || needsTrim) saveToStorage(STORAGE_KEYS.panels, panelSettings);
     }
 
     const initialUrlState: ParsedMapUrlState | null = parseMapUrlState(window.location.search, mapLayers);

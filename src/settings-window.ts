@@ -43,7 +43,7 @@ export function initSettingsWindow(): void {
 
   function render(): void {
     const panelEntries = Object.entries(panelSettings).filter(
-      ([key]) => key !== 'runtime-config' || isDesktopApp
+      ([key]) => (key !== 'runtime-config' || isDesktopApp) && (!key.startsWith('cw-') || isProUser())
     );
     const panelHtml = panelEntries
       .map(
@@ -66,7 +66,7 @@ export function initSettingsWindow(): void {
           if (config) {
             if (!config.enabled && !isPanelEntitled(panelKey, ALL_PANELS[panelKey] ?? config, isProUser())) return;
             if (!config.enabled && !isProUser()) {
-              const enabledCount = Object.values(panelSettings).filter(p => p.enabled).length;
+              const enabledCount = Object.entries(panelSettings).filter(([k, p]) => p.enabled && !k.startsWith('cw-')).length;
               if (enabledCount >= FREE_MAX_PANELS) return;
             }
             config.enabled = !config.enabled;
