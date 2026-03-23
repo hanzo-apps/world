@@ -175,12 +175,14 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/aviation/v1/get-youtube-live-stream-info': 'fast',
 };
 
-const PREMIUM_RPC_PATHS = new Set([
-  '/api/market/v1/analyze-stock',
-  '/api/market/v1/get-stock-analysis-history',
-  '/api/market/v1/backtest-stock',
-  '/api/market/v1/list-stored-stock-backtests',
-]);
+// TODO(payment-pr): PREMIUM_RPC_PATHS is intentionally empty until the payment/pro-user
+// system is implemented. The original set of stock analysis paths used forceKey=true,
+// which broke web pro users because isTrustedBrowserOrigin() is header-only (Origin can be
+// spoofed) and the web client has no mechanism to forward a server-validated entitlement.
+// When the payment PR lands, re-populate this set and have the web client send a
+// server-validated pro token (e.g. X-WorldMonitor-Key) so the entitlement check is
+// meaningful. Until then, access is gated client-side by isProUser() + WORLDMONITOR_API_KEY.
+const PREMIUM_RPC_PATHS = new Set<string>();
 
 /**
  * Creates a Vercel Edge handler for a single domain's routes.
