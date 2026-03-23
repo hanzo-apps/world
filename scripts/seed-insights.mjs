@@ -7,6 +7,23 @@ loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'news:insights:v1';
 const DIGEST_KEY = 'news:digest:v1:full:en';
+
+// Digest items store proto enum strings (THREAT_LEVEL_HIGH etc.) from toProtoItem().
+// Normalize to client-side lowercase values before propagating into insights output.
+const PROTO_TO_LEVEL = {
+  THREAT_LEVEL_CRITICAL: 'critical',
+  THREAT_LEVEL_HIGH: 'high',
+  THREAT_LEVEL_MEDIUM: 'medium',
+  THREAT_LEVEL_LOW: 'low',
+  THREAT_LEVEL_UNSPECIFIED: 'info',
+};
+
+function normalizeThreat(threat) {
+  if (!threat) return undefined;
+  const level = PROTO_TO_LEVEL[threat.level] ?? threat.level;
+  return { ...threat, level };
+}
+
 const CACHE_TTL = 10800; // 3h — 6x the 30 min cron interval (was 1x = key expired on any missed run)
 const MAX_HEADLINES = 10;
 const MAX_HEADLINE_LEN = 500;
@@ -246,6 +263,7 @@ async function fetchInsights() {
     pubDate: item.pubDate || item.publishedAt || item.date || new Date().toISOString(),
     isAlert: item.isAlert || false,
     tier: item.tier,
+    threat: normalizeThreat(item.threat),
   })).filter(item => item.title.length > 10);
 
   const clusters = clusterItems(normalizedItems);
@@ -280,7 +298,12 @@ async function fetchInsights() {
   const fastMovingCount = 0; // velocity not available in digest items
 
   const enrichedStories = topStories.map(story => {
-    const { category, threatLevel } = categorizeStory(story.primaryTitle);
+    // Use digest threat when present and not keyword-sourced (keyword threat uses old taxonomy).
+    // Fall back to categorizeStory() for legacy/incomplete payloads.
+    const hasDigestThreat = story.threat?.level && story.threat?.source !== 'keyword';
+    const { category, threatLevel } = hasDigestThreat
+      ? { category: story.threat.category ?? 'general', threatLevel: story.threat.level }
+      : categorizeStory(story.primaryTitle);
     return {
       primaryTitle: story.primaryTitle,
       primarySource: story.primarySource,
