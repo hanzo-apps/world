@@ -1823,6 +1823,7 @@ async function startMarketDataSeedLoop() {
 const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
 const AVIATION_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
 const AVIATION_SEED_TTL = 10800; // 3h — 6x interval; survives ~5 consecutive missed pings
+const AVIATION_RETRY_MS = 20 * 60 * 1000;
 const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
 const AVIATION_BATCH_CONCURRENCY = 10;
 const AVIATION_MIN_FLIGHTS_FOR_CLOSURE = 10;
@@ -2029,45 +2030,61 @@ function aviationAggregateFlights(iata, flights) {
   };
 }
 
+let aviationSeedInFlight = false;
+let aviationRetryTimer = null;
+
 async function seedAviationDelays() {
   if (!AVIATIONSTACK_API_KEY) {
     console.log('[Aviation] No AVIATIONSTACK_API key — skipping seed');
     return;
   }
+  if (aviationSeedInFlight) return;
+  aviationSeedInFlight = true;
+  if (aviationRetryTimer) { clearTimeout(aviationRetryTimer); aviationRetryTimer = null; }
 
   const t0 = Date.now();
   const alerts = [];
   let succeeded = 0, failed = 0;
   const deadline = Date.now() + 50_000;
 
-  for (let i = 0; i < AVIATIONSTACK_AIRPORTS.length; i += AVIATION_BATCH_CONCURRENCY) {
-    if (Date.now() >= deadline) {
-      console.warn(`[Aviation] Deadline hit after ${succeeded + failed}/${AVIATIONSTACK_AIRPORTS.length} airports`);
-      break;
-    }
-    const chunk = AVIATIONSTACK_AIRPORTS.slice(i, i + AVIATION_BATCH_CONCURRENCY);
-    const results = await Promise.allSettled(
-      chunk.map((iata) => fetchAviationStackSingle(AVIATIONSTACK_API_KEY, iata))
-    );
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        if (r.value.ok) { succeeded++; if (r.value.alert) alerts.push(r.value.alert); }
-        else failed++;
-      } else {
-        failed++;
+  try {
+    for (let i = 0; i < AVIATIONSTACK_AIRPORTS.length; i += AVIATION_BATCH_CONCURRENCY) {
+      if (Date.now() >= deadline) {
+        console.warn(`[Aviation] Deadline hit after ${succeeded + failed}/${AVIATIONSTACK_AIRPORTS.length} airports`);
+        break;
+      }
+      const chunk = AVIATIONSTACK_AIRPORTS.slice(i, i + AVIATION_BATCH_CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map((iata) => fetchAviationStackSingle(AVIATIONSTACK_API_KEY, iata))
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          if (r.value.ok) { succeeded++; if (r.value.alert) alerts.push(r.value.alert); }
+          else failed++;
+        } else {
+          failed++;
+        }
       }
     }
-  }
 
-  const healthy = AVIATIONSTACK_AIRPORTS.length < 5 || failed <= succeeded;
-  if (!healthy) {
-    console.warn(`[Aviation] Systemic failure: ${failed}/${failed + succeeded} airports failed — preserving existing cache`);
-    return;
-  }
+    const healthy = AVIATIONSTACK_AIRPORTS.length < 5 || failed <= succeeded;
+    if (!healthy) {
+      console.warn(`[Aviation] Systemic failure: ${failed}/${failed + succeeded} airports failed — extending TTL, retrying in 20min`);
+      try { await upstashExpire(AVIATION_REDIS_KEY, AVIATION_SEED_TTL); } catch {}
+      aviationRetryTimer = setTimeout(() => { seedAviationDelays().catch(() => {}); }, AVIATION_RETRY_MS);
+      return;
+    }
 
-  const ok = await upstashSet(AVIATION_REDIS_KEY, { alerts }, AVIATION_SEED_TTL);
-  await upstashSet('seed-meta:aviation:intl', { fetchedAt: Date.now(), recordCount: alerts.length }, 604800);
-  console.log(`[Aviation] Seeded ${alerts.length} alerts (${succeeded} ok, ${failed} failed, redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    const ok = await upstashSet(AVIATION_REDIS_KEY, { alerts }, AVIATION_SEED_TTL);
+    await upstashSet('seed-meta:aviation:intl', { fetchedAt: Date.now(), recordCount: alerts.length }, 604800);
+    console.log(`[Aviation] Seeded ${alerts.length} alerts (${succeeded} ok, ${failed} failed, redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  } catch (e) {
+    console.warn('[Aviation] Seed error:', e?.message || e, '— extending TTL, retrying in 20min');
+    try { await upstashExpire(AVIATION_REDIS_KEY, AVIATION_SEED_TTL); } catch {}
+    aviationRetryTimer = setTimeout(() => { seedAviationDelays().catch(() => {}); }, AVIATION_RETRY_MS);
+  } finally {
+    aviationSeedInFlight = false;
+  }
 }
 
 async function startAviationSeedLoop() {
@@ -2092,6 +2109,7 @@ async function startAviationSeedLoop() {
 // ─────────────────────────────────────────────────────────────
 const NOTAM_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
 const NOTAM_SEED_TTL = 10800; // 3h — 6x interval; survives ~5 consecutive missed pings
+const NOTAM_RETRY_MS = 20 * 60 * 1000;
 const NOTAM_REDIS_KEY = 'aviation:notam:closures:v2';
 const NOTAM_CLOSURE_QCODES = new Set(['FA', 'AH', 'AL', 'AW', 'AC', 'AM']);
 const NOTAM_MONITORED_ICAO = [
@@ -2150,18 +2168,25 @@ function fetchIcaoNotams() {
   });
 }
 
+let notamSeedInFlight = false;
+let notamRetryTimer = null;
+
 async function seedNotamClosures() {
   if (!ICAO_API_KEY) {
     console.log('[NOTAM-Seed] No ICAO_API_KEY — skipping');
     return;
   }
+  if (notamSeedInFlight) return;
+  notamSeedInFlight = true;
+  if (notamRetryTimer) { clearTimeout(notamRetryTimer); notamRetryTimer = null; }
 
   const t0 = Date.now();
+  try {
   const notams = await fetchIcaoNotams();
   if (notams.length === 0) {
-    await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL);
-    await upstashSet('seed-meta:aviation:notam', { fetchedAt: Date.now(), recordCount: 0 }, 604800);
-    console.log('[NOTAM-Seed] No NOTAMs received — refreshed data key TTL, preserving existing cache');
+    try { await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL); } catch {}
+    console.log('[NOTAM-Seed] No NOTAMs received — refreshed data key TTL, retrying in 20min');
+    notamRetryTimer = setTimeout(() => { seedNotamClosures().catch(() => {}); }, NOTAM_RETRY_MS);
     return;
   }
 
@@ -2193,6 +2218,13 @@ async function seedNotamClosures() {
   await upstashSet('seed-meta:aviation:notam', { fetchedAt: Date.now(), recordCount: closedIcaos.length }, 604800);
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`[NOTAM-Seed] ${notams.length} raw NOTAMs, ${closedIcaos.length} closures (redis: ${ok ? 'OK' : 'FAIL'}) in ${elapsed}s`);
+  } catch (e) {
+    console.warn('[NOTAM-Seed] Seed error:', e?.message || e, '— extending TTL, retrying in 20min');
+    try { await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL); } catch {}
+    notamRetryTimer = setTimeout(() => { seedNotamClosures().catch(() => {}); }, NOTAM_RETRY_MS);
+  } finally {
+    notamSeedInFlight = false;
+  }
 }
 
 function startNotamSeedLoop() {
@@ -2219,7 +2251,8 @@ const URLHAUS_AUTH_KEY = process.env.URLHAUS_AUTH_KEY || '';
 const OTX_API_KEY = process.env.OTX_API_KEY || '';
 const ABUSEIPDB_API_KEY = process.env.ABUSEIPDB_API_KEY || '';
 const CYBER_SEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h — matches IOC feed update cadence
-const CYBER_SEED_TTL = 14400; // 4h — must outlive the 2h seed interval (2x)
+const CYBER_SEED_TTL = 21600; // 6h — 3x interval; survives 2 missed cycles before expiry
+const CYBER_RETRY_MS = 20 * 60 * 1000;
 const CYBER_RPC_KEY = 'cyber:threats:v2'; // must match handler REDIS_CACHE_KEY in list-cyber-threats.ts
 const CYBER_BOOTSTRAP_KEY = 'cyber:threats-bootstrap:v2';
 const CYBER_MAX_CACHED = 2000;
@@ -2491,51 +2524,70 @@ async function cyberFetchAbuseIpDb(limit) {
   } catch (e) { console.warn('[Cyber] AbuseIPDB fetch failed:', e?.message || e); return []; }
 }
 
+let cyberSeedInFlight = false;
+let cyberRetryTimer = null;
+
 async function seedCyberThreats() {
+  if (cyberSeedInFlight) return 0;
+  cyberSeedInFlight = true;
+  if (cyberRetryTimer) { clearTimeout(cyberRetryTimer); cyberRetryTimer = null; }
+
   const t0 = Date.now();
-  const days = 14;
-  const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
-  const MAX_LIMIT = 1000;
+  try {
+    const days = 14;
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+    const MAX_LIMIT = 1000;
 
-  const [feodo, urlhaus, c2intel, otx, abuseipdb] = await Promise.all([
-    cyberFetchFeodo(MAX_LIMIT, cutoffMs),
-    cyberFetchUrlhaus(MAX_LIMIT, cutoffMs),
-    cyberFetchC2Intel(MAX_LIMIT),
-    cyberFetchOtx(MAX_LIMIT, days),
-    cyberFetchAbuseIpDb(MAX_LIMIT),
-  ]);
+    const [feodo, urlhaus, c2intel, otx, abuseipdb] = await Promise.all([
+      cyberFetchFeodo(MAX_LIMIT, cutoffMs),
+      cyberFetchUrlhaus(MAX_LIMIT, cutoffMs),
+      cyberFetchC2Intel(MAX_LIMIT),
+      cyberFetchOtx(MAX_LIMIT, days),
+      cyberFetchAbuseIpDb(MAX_LIMIT),
+    ]);
 
-  if (feodo.length + urlhaus.length + c2intel.length + otx.length + abuseipdb.length === 0) {
-    console.warn('[Cyber] All sources returned 0 threats — skipping Redis write');
+    if (feodo.length + urlhaus.length + c2intel.length + otx.length + abuseipdb.length === 0) {
+      console.warn('[Cyber] All sources returned 0 threats — extending TTL, retrying in 20min');
+      try { await upstashExpire(CYBER_RPC_KEY, CYBER_SEED_TTL); await upstashExpire(CYBER_BOOTSTRAP_KEY, CYBER_SEED_TTL); } catch {}
+      cyberRetryTimer = setTimeout(() => { seedCyberThreats().catch(() => {}); }, CYBER_RETRY_MS);
+      return 0;
+    }
+
+    const combined = cyberDedupe([...feodo, ...urlhaus, ...c2intel, ...otx, ...abuseipdb]);
+    const hydrated = await cyberHydrateGeo(combined);
+    const geoCount = hydrated.filter((t) => cyberValidCoords(t.lat, t.lon)).length;
+    console.log(`[Cyber] Geo resolved: ${geoCount}/${hydrated.length}`);
+
+    hydrated.sort((a, b) => {
+      const aGeo = cyberValidCoords(a.lat, a.lon) ? 0 : 1;
+      const bGeo = cyberValidCoords(b.lat, b.lon) ? 0 : 1;
+      if (aGeo !== bGeo) return aGeo - bGeo;
+      const bySev = (CYBER_SEVERITY_RANK[CYBER_SEVERITY_MAP[b.severity]||'']||0) - (CYBER_SEVERITY_RANK[CYBER_SEVERITY_MAP[a.severity]||'']||0);
+      return bySev !== 0 ? bySev : (b.lastSeen || b.firstSeen) - (a.lastSeen || a.firstSeen);
+    });
+
+    const threats = hydrated.slice(0, CYBER_MAX_CACHED).map(cyberToProto);
+    if (threats.length === 0) {
+      console.warn('[Cyber] No threats after processing — extending TTL, retrying in 20min');
+      try { await upstashExpire(CYBER_RPC_KEY, CYBER_SEED_TTL); await upstashExpire(CYBER_BOOTSTRAP_KEY, CYBER_SEED_TTL); } catch {}
+      cyberRetryTimer = setTimeout(() => { seedCyberThreats().catch(() => {}); }, CYBER_RETRY_MS);
+      return 0;
+    }
+
+    const payload = { threats };
+    const ok1 = await upstashSet(CYBER_RPC_KEY, payload, CYBER_SEED_TTL);
+    const ok2 = await upstashSet(CYBER_BOOTSTRAP_KEY, payload, CYBER_SEED_TTL);
+    const ok3 = await upstashSet('seed-meta:cyber:threats', { fetchedAt: Date.now(), recordCount: threats.length }, 604800);
+    console.log(`[Cyber] Seeded ${threats.length} threats (feodo:${feodo.length} urlhaus:${urlhaus.length} c2intel:${c2intel.length} otx:${otx.length} abuseipdb:${abuseipdb.length} redis:${ok1 && ok2 && ok3 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    return threats.length;
+  } catch (e) {
+    console.warn('[Cyber] Seed error:', e?.message || e, '— extending TTL, retrying in 20min');
+    try { await upstashExpire(CYBER_RPC_KEY, CYBER_SEED_TTL); await upstashExpire(CYBER_BOOTSTRAP_KEY, CYBER_SEED_TTL); } catch {}
+    cyberRetryTimer = setTimeout(() => { seedCyberThreats().catch(() => {}); }, CYBER_RETRY_MS);
     return 0;
+  } finally {
+    cyberSeedInFlight = false;
   }
-
-  const combined = cyberDedupe([...feodo, ...urlhaus, ...c2intel, ...otx, ...abuseipdb]);
-  const hydrated = await cyberHydrateGeo(combined);
-  const geoCount = hydrated.filter((t) => cyberValidCoords(t.lat, t.lon)).length;
-  console.log(`[Cyber] Geo resolved: ${geoCount}/${hydrated.length}`);
-
-  // Sort geo-resolved first, then by severity/recency
-  hydrated.sort((a, b) => {
-    const aGeo = cyberValidCoords(a.lat, a.lon) ? 0 : 1;
-    const bGeo = cyberValidCoords(b.lat, b.lon) ? 0 : 1;
-    if (aGeo !== bGeo) return aGeo - bGeo;
-    const bySev = (CYBER_SEVERITY_RANK[CYBER_SEVERITY_MAP[b.severity]||'']||0) - (CYBER_SEVERITY_RANK[CYBER_SEVERITY_MAP[a.severity]||'']||0);
-    return bySev !== 0 ? bySev : (b.lastSeen || b.firstSeen) - (a.lastSeen || a.firstSeen);
-  });
-
-  const threats = hydrated.slice(0, CYBER_MAX_CACHED).map(cyberToProto);
-  if (threats.length === 0) {
-    console.warn('[Cyber] No threats from any source — skipping Redis write');
-    return 0;
-  }
-
-  const payload = { threats };
-  const ok1 = await upstashSet(CYBER_RPC_KEY, payload, CYBER_SEED_TTL);
-  const ok2 = await upstashSet(CYBER_BOOTSTRAP_KEY, payload, CYBER_SEED_TTL);
-  const ok3 = await upstashSet('seed-meta:cyber:threats', { fetchedAt: Date.now(), recordCount: threats.length }, 604800);
-  console.log(`[Cyber] Seeded ${threats.length} threats (feodo:${feodo.length} urlhaus:${urlhaus.length} c2intel:${c2intel.length} otx:${otx.length} abuseipdb:${abuseipdb.length} redis:${ok1 && ok2 && ok3 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-  return threats.length;
 }
 
 async function startCyberThreatsSeedLoop() {
@@ -2556,6 +2608,7 @@ async function startCyberThreatsSeedLoop() {
 // ─────────────────────────────────────────────────────────────
 const POSITIVE_EVENTS_INTERVAL_MS = 900_000; // 15 min
 const POSITIVE_EVENTS_TTL = 2700; // 3× interval
+const POSITIVE_EVENTS_RETRY_MS = 5 * 60 * 1000; // retry 5min after failure (short interval seeder)
 const POSITIVE_EVENTS_RPC_KEY = 'positive-events:geo:v1';
 const POSITIVE_EVENTS_BOOTSTRAP_KEY = 'positive_events:geo-bootstrap:v1';
 const POSITIVE_EVENTS_MAX = 500;
@@ -2641,10 +2694,12 @@ function fetchGdeltGeoPositive(query) {
 }
 
 let positiveEventsInFlight = false;
+let positiveEventsRetryTimer = null;
 
 async function seedPositiveEvents() {
   if (positiveEventsInFlight) return;
   positiveEventsInFlight = true;
+  if (positiveEventsRetryTimer) { clearTimeout(positiveEventsRetryTimer); positiveEventsRetryTimer = null; }
   const t0 = Date.now();
   try {
     const allEvents = [];
@@ -2666,7 +2721,9 @@ async function seedPositiveEvents() {
     }
 
     if (!anyQuerySucceeded) {
-      console.warn('[PositiveEvents] All queries failed — preserving last good data');
+      console.warn('[PositiveEvents] All queries failed — extending TTL, retrying in 5min');
+      try { await upstashExpire(POSITIVE_EVENTS_RPC_KEY, POSITIVE_EVENTS_TTL); await upstashExpire(POSITIVE_EVENTS_BOOTSTRAP_KEY, POSITIVE_EVENTS_TTL); } catch {}
+      positiveEventsRetryTimer = setTimeout(() => { seedPositiveEvents().catch(() => {}); }, POSITIVE_EVENTS_RETRY_MS);
       return;
     }
 
@@ -2677,7 +2734,9 @@ async function seedPositiveEvents() {
     const ok3 = await upstashSet('seed-meta:positive-events:geo', { fetchedAt: Date.now(), recordCount: capped.length }, 604800);
     console.log(`[PositiveEvents] Seeded ${capped.length} events (redis: ${ok1 && ok2 && ok3 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (e) {
-    console.warn('[PositiveEvents] Seed error:', e?.message || e);
+    console.warn('[PositiveEvents] Seed error:', e?.message || e, '— extending TTL, retrying in 5min');
+    try { await upstashExpire(POSITIVE_EVENTS_RPC_KEY, POSITIVE_EVENTS_TTL); await upstashExpire(POSITIVE_EVENTS_BOOTSTRAP_KEY, POSITIVE_EVENTS_TTL); } catch {}
+    positiveEventsRetryTimer = setTimeout(() => { seedPositiveEvents().catch(() => {}); }, POSITIVE_EVENTS_RETRY_MS);
   } finally {
     positiveEventsInFlight = false;
   }
