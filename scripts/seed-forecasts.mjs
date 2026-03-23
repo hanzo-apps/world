@@ -4292,6 +4292,202 @@ function buildTraceRunPrefix(runId, generatedAt, basePrefix) {
   return `${basePrefix}/${year}/${month}/${day}/${runId}`;
 }
 
+function parseForecastRunGeneratedAt(runId = '', fallback = Date.now()) {
+  const match = String(runId || '').match(/^(\d{10,})/);
+  if (!match) return fallback;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function buildForecastTraceArtifactKeys(runId, generatedAt, basePrefix) {
+  const prefix = buildTraceRunPrefix(runId, generatedAt, basePrefix);
+  return {
+    prefix,
+    manifestKey: `${prefix}/manifest.json`,
+    summaryKey: `${prefix}/summary.json`,
+    worldStateKey: `${prefix}/world-state.json`,
+    fastSummaryKey: `${prefix}/fast-summary.json`,
+    fastWorldStateKey: `${prefix}/fast-world-state.json`,
+    deepSummaryKey: `${prefix}/deep-summary.json`,
+    deepWorldStateKey: `${prefix}/deep-world-state.json`,
+    runStatusKey: `${prefix}/run-status.json`,
+    forecastEvalKey: `${prefix}/forecast-eval.json`,
+    impactExpansionDebugKey: `${prefix}/impact-expansion-debug.json`,
+    pathScorecardsKey: `${prefix}/path-scorecards.json`,
+  };
+}
+
+function buildForecastRunStatusPayload({
+  runId = '',
+  generatedAt = Date.now(),
+  forecastDepth = 'fast',
+  deepForecast = null,
+  worldState = null,
+  context = {},
+} = {}) {
+  const mode = forecastDepth || worldState?.forecastDepth || 'fast';
+  const statusSource = context.status || deepForecast?.status || (mode === 'deep' ? 'running' : 'completed');
+  let stage = context.stage || '';
+  let progressPercent = Number.isFinite(context.progressPercent) ? context.progressPercent : null;
+  if (!stage) {
+    if (mode === 'fast') {
+      stage = statusSource === 'failed' ? 'fast_failed' : 'fast_published';
+    } else if (statusSource === 'running') {
+      stage = 'deep_running';
+    } else if (statusSource === 'failed') {
+      stage = 'deep_failed';
+    } else {
+      stage = 'deep_completed';
+    }
+  }
+  if (progressPercent == null) {
+    if (statusSource === 'running') progressPercent = 35;
+    else if (statusSource === 'queued') progressPercent = 0;
+    else progressPercent = 100;
+  }
+  const startedAt = context.startedAt
+    || worldState?.deepForecast?.startedAt
+    || deepForecast?.startedAt
+    || new Date(generatedAt).toISOString();
+  const updatedAt = context.updatedAt || new Date().toISOString();
+  const completedAt = context.completedAt
+    || deepForecast?.completedAt
+    || (['completed', 'completed_no_material_change', 'failed', 'skipped'].includes(statusSource)
+      ? new Date(generatedAt).toISOString()
+      : '');
+  return {
+    forecastRunId: runId,
+    mode,
+    status: statusSource,
+    stage,
+    progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+    startedAt,
+    updatedAt,
+    completedAt,
+    eligibleStateIds: Array.isArray(deepForecast?.selectedStateIds) ? deepForecast.selectedStateIds : [],
+    processedCandidateCount: Number(context.processedCandidateCount ?? worldState?.impactExpansion?.successfulCandidateCount ?? 0),
+    acceptedPathCount: Number(context.acceptedPathCount ?? deepForecast?.selectedPathCount ?? 0),
+    failureReason: context.failureReason || deepForecast?.failureReason || worldState?.impactExpansion?.failureReason || '',
+    selectedDeepStateIds: Array.isArray(deepForecast?.selectedStateIds) ? deepForecast.selectedStateIds : [],
+    providerMode: context.providerMode || '',
+    replaySourceRunId: context.replaySourceRunId || '',
+  };
+}
+
+function summarizeImpactPathScore(path = null) {
+  if (!path) return null;
+  return {
+    pathId: path.pathId || '',
+    type: path.type || '',
+    candidateStateId: path.candidateStateId || '',
+    directVariableKey: path.direct?.variableKey || '',
+    secondVariableKey: path.second?.variableKey || '',
+    thirdVariableKey: path.third?.variableKey || '',
+    pathScore: Number(path.pathScore || 0),
+    acceptanceScore: Number(path.acceptanceScore || 0),
+    reportableQualityScore: Number(path.reportableQualityScore || 0),
+    marketCoherenceScore: Number(path.marketCoherenceScore || 0),
+  };
+}
+
+function buildDeepPathScorecardsPayload(data = {}, runId = '') {
+  const evaluation = data?.deepPathEvaluation || null;
+  if (!evaluation) return null;
+  return {
+    runId,
+    generatedAt: data?.generatedAt || Date.now(),
+    generatedAtIso: new Date(data?.generatedAt || Date.now()).toISOString(),
+    forecastDepth: data?.forecastDepth || 'fast',
+    status: evaluation.status || '',
+    selectedPaths: (evaluation.selectedPaths || []).map(summarizeImpactPathScore).filter(Boolean),
+    rejectedPaths: (evaluation.rejectedPaths || []).map(summarizeImpactPathScore).filter(Boolean),
+  };
+}
+
+function buildImpactExpansionDebugPayload(data = {}, worldState = null, runId = '') {
+  const bundle = data?.impactExpansionBundle || null;
+  const candidates = data?.impactExpansionCandidates || bundle?.candidatePackets || [];
+  if (!bundle && (!Array.isArray(candidates) || candidates.length === 0)) return null;
+  return {
+    runId,
+    generatedAt: data?.generatedAt || Date.now(),
+    generatedAtIso: new Date(data?.generatedAt || Date.now()).toISOString(),
+    forecastDepth: data?.forecastDepth || worldState?.forecastDepth || 'fast',
+    deepForecast: data?.deepForecast || worldState?.deepForecast || null,
+    impactExpansionBundle: bundle,
+    candidatePackets: candidates,
+    impactExpansionSummary: worldState?.impactExpansion || null,
+    selectedPaths: (data?.deepPathEvaluation?.selectedPaths || []).map(summarizeImpactPathScore).filter(Boolean),
+    rejectedPaths: (data?.deepPathEvaluation?.rejectedPaths || []).map(summarizeImpactPathScore).filter(Boolean),
+  };
+}
+
+async function writeForecastRunStatusArtifact({
+  runId = '',
+  generatedAt = Date.now(),
+  statusPayload = null,
+  storageConfig = null,
+} = {}) {
+  if (!storageConfig || !runId || !statusPayload) return null;
+  const keys = buildForecastTraceArtifactKeys(runId, generatedAt, storageConfig.basePrefix || FORECAST_DEEP_RUN_PREFIX);
+  await putR2JsonObject(storageConfig, keys.runStatusKey, statusPayload, {
+    runid: String(runId || ''),
+    kind: 'run_status',
+  });
+  return keys.runStatusKey;
+}
+
+async function readForecastTraceArtifactsForRun(runId, options = {}) {
+  const storageConfig = options.storageConfig || resolveR2StorageConfig(options.env || process.env);
+  if (!storageConfig) throw new Error('R2 storage is not configured');
+  if (!runId) throw new Error('Missing runId');
+  const generatedAt = Number(options.generatedAt || parseForecastRunGeneratedAt(runId));
+  const keys = buildForecastTraceArtifactKeys(runId, generatedAt, storageConfig.basePrefix || FORECAST_DEEP_RUN_PREFIX);
+  const snapshotKey = buildDeepForecastSnapshotKey(runId, generatedAt, storageConfig.basePrefix || FORECAST_DEEP_RUN_PREFIX);
+  const [
+    manifest,
+    summary,
+    worldState,
+    fastSummary,
+    fastWorldState,
+    deepSummary,
+    deepWorldState,
+    runStatus,
+    impactExpansionDebug,
+    pathScorecards,
+    snapshot,
+  ] = await Promise.all([
+    getR2JsonObject(storageConfig, keys.manifestKey),
+    getR2JsonObject(storageConfig, keys.summaryKey),
+    getR2JsonObject(storageConfig, keys.worldStateKey),
+    getR2JsonObject(storageConfig, keys.fastSummaryKey),
+    getR2JsonObject(storageConfig, keys.fastWorldStateKey),
+    getR2JsonObject(storageConfig, keys.deepSummaryKey),
+    getR2JsonObject(storageConfig, keys.deepWorldStateKey),
+    getR2JsonObject(storageConfig, keys.runStatusKey),
+    getR2JsonObject(storageConfig, keys.impactExpansionDebugKey),
+    getR2JsonObject(storageConfig, keys.pathScorecardsKey),
+    getR2JsonObject(storageConfig, snapshotKey),
+  ]);
+  return {
+    storageConfig,
+    generatedAt,
+    keys,
+    snapshotKey,
+    manifest,
+    summary,
+    worldState,
+    fastSummary,
+    fastWorldState,
+    deepSummary,
+    deepWorldState,
+    runStatus,
+    impactExpansionDebug,
+    pathScorecards,
+    snapshot,
+  };
+}
+
 function buildForecastTraceRecord(pred, rank, simulationByForecastId = null) {
   const caseFile = pred.caseFile || null;
   let worldState = caseFile?.worldState || null;
@@ -9865,6 +10061,23 @@ function summarizeMarketInputCoverage(inputs = {}) {
   return coverage;
 }
 
+function serializeSituationMarketContextIndex(index = null) {
+  if (!index || typeof index !== 'object') return null;
+  const bySituationId = index.bySituationId;
+  let serializedBySituationId = {};
+  if (bySituationId instanceof Map) {
+    serializedBySituationId = Object.fromEntries(bySituationId.entries());
+  } else if (Array.isArray(bySituationId)) {
+    serializedBySituationId = Object.fromEntries(bySituationId);
+  } else if (bySituationId && typeof bySituationId === 'object') {
+    serializedBySituationId = bySituationId;
+  }
+  return {
+    ...index,
+    bySituationId: serializedBySituationId,
+  };
+}
+
 function flattenImpactExpansionHypotheses(bundle = null) {
   const candidatePackets = Array.isArray(bundle?.candidatePackets) ? bundle.candidatePackets : [];
   const extractedCandidates = Array.isArray(bundle?.extractedCandidates) ? bundle.extractedCandidates : [];
@@ -10697,6 +10910,35 @@ function annotateDeepForecastOrigins(worldState, acceptedPaths = []) {
   return worldState;
 }
 
+function findDuplicateStateUnitLabels(stateUnits = []) {
+  const counts = new Map();
+  for (const unit of stateUnits || []) {
+    const label = String(unit?.label || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!label) continue;
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([label, count]) => ({ label, count }));
+}
+
+function validateDeepForecastSnapshot(snapshot = {}) {
+  const fullRunStateUnits = Array.isArray(snapshot?.fullRunStateUnits) ? snapshot.fullRunStateUnits : [];
+  const stateIds = new Set(fullRunStateUnits.map((unit) => unit?.id).filter(Boolean));
+  const selectedStateIds = Array.isArray(snapshot?.deepForecast?.selectedStateIds)
+    ? snapshot.deepForecast.selectedStateIds.filter(Boolean)
+    : [];
+  const unresolvedSelectedStateIds = selectedStateIds.filter((id) => !stateIds.has(id));
+  const duplicateStateLabels = findDuplicateStateUnitLabels(fullRunStateUnits);
+  return {
+    pass: unresolvedSelectedStateIds.length === 0 && duplicateStateLabels.length === 0,
+    unresolvedSelectedStateIds,
+    duplicateStateLabels,
+  };
+}
+
 function buildDeepWorldStateFromSnapshot(snapshot, priorWorldState, impactExpansionBundle, deepForecastMeta = {}) {
   return buildForecastRunWorldState({
     generatedAt: snapshot.generatedAt,
@@ -10963,14 +11205,25 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       impactExpansionBundle: data?.impactExpansionBundle || null,
     })
     : null);
-  const prefix = buildTraceRunPrefix(
+  const artifactKeys = buildForecastTraceArtifactKeys(
     context.runId || `run_${generatedAt}`,
     generatedAt,
-    config.basePrefix || 'seed-data/forecast-traces'
+    config.basePrefix || 'seed-data/forecast-traces',
   );
-  const manifestKey = `${prefix}/manifest.json`;
-  const summaryKey = `${prefix}/summary.json`;
-  const worldStateKey = `${prefix}/world-state.json`;
+  const {
+    prefix,
+    manifestKey,
+    summaryKey,
+    worldStateKey,
+    fastSummaryKey,
+    fastWorldStateKey,
+    deepSummaryKey,
+    deepWorldStateKey,
+    runStatusKey,
+    forecastEvalKey,
+    impactExpansionDebugKey,
+    pathScorecardsKey,
+  } = artifactKeys;
   const forecastKeys = tracedPredictions.map(item => ({
     id: item.id,
     title: item.title,
@@ -10989,6 +11242,14 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     manifestKey,
     summaryKey,
     worldStateKey,
+    fastSummaryKey,
+    fastWorldStateKey,
+    deepSummaryKey,
+    deepWorldStateKey,
+    runStatusKey,
+    forecastEvalKey: artifactKeys.forecastEvalKey,
+    impactExpansionDebugKey,
+    pathScorecardsKey,
     forecastKeys,
   };
 
@@ -11099,6 +11360,21 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     })),
   };
 
+  const runStatus = buildForecastRunStatusPayload({
+    runId: manifest.runId,
+    generatedAt: manifest.generatedAt,
+    forecastDepth: worldState.forecastDepth || data?.forecastDepth || 'fast',
+    deepForecast: worldState.deepForecast || data?.deepForecast || null,
+    worldState,
+    context: data?.runStatusContext || {},
+  });
+  const impactExpansionDebug = buildImpactExpansionDebugPayload(
+    data,
+    worldState,
+    manifest.runId,
+  );
+  const pathScorecards = buildDeepPathScorecardsPayload(data, manifest.runId);
+
   return {
     prefix,
     manifestKey,
@@ -11107,6 +11383,17 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
     summary,
     worldStateKey,
     worldState,
+    fastSummaryKey,
+    fastWorldStateKey,
+    deepSummaryKey,
+    deepWorldStateKey,
+    runStatusKey,
+    forecastEvalKey: artifactKeys.forecastEvalKey,
+    runStatus,
+    impactExpansionDebugKey,
+    impactExpansionDebug,
+    pathScorecardsKey,
+    pathScorecards,
     forecasts: tracedPredictions.map(item => ({
       key: `${prefix}/forecasts/${item.id}.json`,
       payload: item,
@@ -11211,6 +11498,41 @@ async function writeForecastTraceArtifacts(data, context = {}) {
     runid: String(artifacts.manifest.runId || ''),
     kind: 'world_state',
   });
+  if ((artifacts.summary.forecastDepth || 'fast') === 'deep') {
+    await putR2JsonObject(storageConfig, artifacts.deepSummaryKey, artifacts.summary, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'deep_summary',
+    });
+    await putR2JsonObject(storageConfig, artifacts.deepWorldStateKey, artifacts.worldState, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'deep_world_state',
+    });
+  } else {
+    await putR2JsonObject(storageConfig, artifacts.fastSummaryKey, artifacts.summary, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'fast_summary',
+    });
+    await putR2JsonObject(storageConfig, artifacts.fastWorldStateKey, artifacts.worldState, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'fast_world_state',
+    });
+  }
+  await putR2JsonObject(storageConfig, artifacts.runStatusKey, artifacts.runStatus, {
+    runid: String(artifacts.manifest.runId || ''),
+    kind: 'run_status',
+  });
+  if (artifacts.impactExpansionDebug) {
+    await putR2JsonObject(storageConfig, artifacts.impactExpansionDebugKey, artifacts.impactExpansionDebug, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'impact_expansion_debug',
+    });
+  }
+  if (artifacts.pathScorecards) {
+    await putR2JsonObject(storageConfig, artifacts.pathScorecardsKey, artifacts.pathScorecards, {
+      runid: String(artifacts.manifest.runId || ''),
+      kind: 'path_scorecards',
+    });
+  }
   await Promise.all(
     artifacts.forecasts.map((item, index) => putR2JsonObject(storageConfig, item.key, item.payload, {
       runid: String(artifacts.manifest.runId || ''),
@@ -11230,6 +11552,7 @@ async function writeForecastTraceArtifacts(data, context = {}) {
     manifestKey: artifacts.manifestKey,
     summaryKey: artifacts.summaryKey,
     worldStateKey: artifacts.worldStateKey,
+    runStatusKey: artifacts.runStatusKey,
     forecastCount: artifacts.manifest.forecastCount,
     tracedForecastCount: artifacts.manifest.tracedForecastCount,
     triggerContext: artifacts.manifest.triggerContext,
@@ -11349,9 +11672,15 @@ function buildDeepForecastSnapshotPayload(data = {}, context = {}) {
     fullRunSituationClusters: data.fullRunSituationClusters || [],
     fullRunSituationFamilies: data.fullRunSituationFamilies || [],
     fullRunStateUnits: data.fullRunStateUnits || [],
+    selectionWorldSignals: data.selectionWorldSignals || null,
+    selectionMarketTransmission: data.selectionMarketTransmission || null,
+    selectionMarketState: data.selectionMarketState || null,
+    selectionMarketInputCoverage: data.selectionMarketInputCoverage || null,
+    marketSelectionIndex: serializeSituationMarketContextIndex(data.marketSelectionIndex),
     triggerContext: data.triggerContext || null,
     enrichmentMeta: data.enrichmentMeta || null,
     publishTelemetry: data.publishTelemetry || null,
+    forecastDepth: data.forecastDepth || 'fast',
     deepForecast: data.deepForecast || null,
     impactExpansionCandidates: data.impactExpansionCandidates || [],
     priorWorldStateKey: data.priorWorldStateKey || '',
@@ -13402,6 +13731,11 @@ async function fetchForecasts() {
     fullRunSituationClusters,
     fullRunSituationFamilies,
     fullRunStateUnits,
+    selectionWorldSignals,
+    selectionMarketTransmission,
+    selectionMarketState,
+    selectionMarketInputCoverage,
+    marketSelectionIndex,
     impactExpansionCandidates,
     deepForecast,
     priorWorldStateKey: priorTracePointer?.worldStateKey || '',
@@ -13491,6 +13825,33 @@ async function processDeepForecastTask(task = {}) {
   if (!storageConfig) return { status: 'skipped', reason: 'storage_not_configured' };
   const snapshot = await getR2JsonObject(storageConfig, task.snapshotKey);
   if (!snapshot?.runId) return { status: 'skipped', reason: 'missing_snapshot' };
+  const snapshotValidation = validateDeepForecastSnapshot(snapshot);
+  if (!snapshotValidation.pass) {
+    const errors = [];
+    if (snapshotValidation.unresolvedSelectedStateIds.length > 0) {
+      errors.push(`unresolved_selected_state_ids:${snapshotValidation.unresolvedSelectedStateIds.join(',')}`);
+    }
+    if (snapshotValidation.duplicateStateLabels.length > 0) {
+      errors.push(`duplicate_canonical_state_labels:${snapshotValidation.duplicateStateLabels.map((item) => item.label).join(',')}`);
+    }
+    throw new Error(errors.join(';'));
+  }
+  await writeForecastRunStatusArtifact({
+    runId: snapshot.runId,
+    generatedAt: snapshot.generatedAt,
+    storageConfig,
+    statusPayload: buildForecastRunStatusPayload({
+      runId: snapshot.runId,
+      generatedAt: snapshot.generatedAt,
+      forecastDepth: 'deep',
+      deepForecast: snapshot.deepForecast || null,
+      context: {
+        status: 'running',
+        stage: 'deep_running',
+        progressPercent: 15,
+      },
+    }),
+  });
   const priorWorldState = task.priorWorldStateKey
     ? await getR2JsonObject(storageConfig, task.priorWorldStateKey).catch(() => null)
     : null;
@@ -13521,6 +13882,7 @@ async function processDeepForecastTask(task = {}) {
     priorWorldState,
     priorWorldStates: priorWorldState ? [priorWorldState] : [],
     impactExpansionBundle: evaluation.impactExpansionBundle || null,
+    deepPathEvaluation: evaluation,
   };
 
   if (evaluation.status === 'completed') {
@@ -13535,6 +13897,14 @@ async function processDeepForecastTask(task = {}) {
       deepForecast,
       worldStateOverride: evaluation.deepWorldState,
       candidateWorldStateOverride: evaluation.deepWorldState,
+      runStatusContext: {
+        status: 'completed',
+        stage: 'deep_completed',
+        progressPercent: 100,
+        processedCandidateCount: evaluation.impactExpansionBundle?.successfulCandidateCount || 0,
+        acceptedPathCount: deepForecast.selectedPathCount || 0,
+        completedAt: deepForecast.completedAt,
+      },
     }, { runId: snapshot.runId });
     return { status: 'completed', deepForecast };
   }
@@ -13548,6 +13918,14 @@ async function processDeepForecastTask(task = {}) {
     ...dataForWrite,
     forecastDepth: 'deep',
     deepForecast,
+    runStatusContext: {
+      status: deepForecast.status,
+      stage: 'deep_completed',
+      progressPercent: 100,
+      processedCandidateCount: evaluation.impactExpansionBundle?.successfulCandidateCount || 0,
+      acceptedPathCount: deepForecast.selectedPathCount || 0,
+      completedAt: deepForecast.completedAt,
+    },
   }, { runId: snapshot.runId });
   return { status: deepForecast.status, deepForecast };
 }
@@ -13570,12 +13948,19 @@ async function writeFailedDeepForecastArtifacts(task = {}, failureReason = '') {
     ...snapshot,
     forecastDepth: 'fast',
     deepForecast,
+    runStatusContext: {
+      status: 'failed',
+      stage: 'deep_failed',
+      progressPercent: 100,
+      failureReason: deepForecast.failureReason,
+      completedAt: deepForecast.completedAt,
+    },
   }, { runId: snapshot.runId });
 }
 
 async function processNextDeepForecastTask(options = {}) {
   const workerId = options.workerId || `worker-${process.pid}-${Date.now()}`;
-  const queuedRunIds = await listQueuedDeepForecastTasks(10);
+  const queuedRunIds = options.runId ? [options.runId] : await listQueuedDeepForecastTasks(10);
   for (const runId of queuedRunIds) {
     const task = await claimDeepForecastTask(runId, workerId);
     if (!task) continue;
@@ -13595,9 +13980,9 @@ async function processNextDeepForecastTask(options = {}) {
   return { status: 'idle' };
 }
 
-async function runDeepForecastWorker({ once = false } = {}) {
+async function runDeepForecastWorker({ once = false, runId = '' } = {}) {
   for (;;) {
-    const result = await processNextDeepForecastTask();
+    const result = await processNextDeepForecastTask({ runId });
     if (once) return result;
     if (result?.status === 'idle') {
       await sleep(FORECAST_DEEP_POLL_INTERVAL_MS);
@@ -13645,12 +14030,13 @@ if (_isDirectRun) {
           replacedFastRun: false,
           rejectedPathsPreview: [],
         };
+        const snapshotPayload = buildDeepForecastSnapshotPayload({
+          ...data,
+          triggerContext,
+          forecastDepth: 'fast',
+        }, { runId });
+        const snapshotWrite = await writeDeepForecastSnapshot(snapshotPayload, { runId });
         if (deepForecast.status === 'queued' && (data.impactExpansionCandidates || []).length > 0) {
-          const snapshotPayload = buildDeepForecastSnapshotPayload({
-            ...data,
-            triggerContext,
-          }, { runId });
-          const snapshotWrite = await writeDeepForecastSnapshot(snapshotPayload, { runId });
           if (snapshotWrite?.snapshotKey) {
             const queueResult = await enqueueDeepForecastTask({
               runId,
@@ -13675,6 +14061,8 @@ if (_isDirectRun) {
               failureReason: 'snapshot_write_failed',
             };
           }
+        } else if (!snapshotWrite?.snapshotKey) {
+          console.warn('  [DeepForecast] Snapshot write skipped or failed; replay will not be available for this run');
         }
         console.log('  [Trace] Starting R2 export...');
         const pointer = await writeForecastTraceArtifacts({
@@ -13682,6 +14070,13 @@ if (_isDirectRun) {
           triggerContext,
           forecastDepth: 'fast',
           deepForecast,
+          runStatusContext: {
+            status: deepForecast.status,
+            stage: 'fast_published',
+            progressPercent: 100,
+            completedAt: deepForecast.completedAt || '',
+            failureReason: deepForecast.failureReason || '',
+          },
         }, { runId });
         if (pointer) {
           console.log(`  [Trace] Written: ${pointer.summaryKey} (${pointer.tracedForecastCount} forecasts)`);
@@ -13751,6 +14146,11 @@ export {
   buildForecastTraceRecord,
   buildForecastTraceArtifacts,
   writeForecastTraceArtifacts,
+  buildForecastTraceArtifactKeys,
+  parseForecastRunGeneratedAt,
+  readForecastTraceArtifactsForRun,
+  buildForecastRunStatusPayload,
+  writeForecastRunStatusArtifact,
   buildChangeItems,
   buildChangeSummary,
   annotateForecastChanges,
@@ -13828,8 +14228,12 @@ export {
   computeDeepMarketCoherenceScore,
   computeDeepPathAcceptanceScore,
   evaluateDeepForecastPaths,
+  findDuplicateStateUnitLabels,
+  validateDeepForecastSnapshot,
   validateImpactHypotheses,
   materializeImpactExpansion,
+  serializeSituationMarketContextIndex,
+  buildDeepForecastSnapshotKey,
   buildDeepForecastSnapshotPayload,
   writeDeepForecastSnapshot,
   enqueueDeepForecastTask,

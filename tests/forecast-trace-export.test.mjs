@@ -6,6 +6,7 @@ import {
   buildForecastCase,
   populateFallbackNarratives,
   buildForecastTraceArtifacts,
+  buildForecastTraceArtifactKeys,
   buildForecastRunWorldState,
   buildCrossSituationEffects,
   buildSimulationMarketConsequences,
@@ -30,13 +31,22 @@ import {
   computeDeepMarketCoherenceScore,
   computeDeepPathAcceptanceScore,
   selectDeepForecastCandidates,
+  serializeSituationMarketContextIndex,
+  buildDeepForecastSnapshotPayload,
   validateImpactHypotheses,
   evaluateDeepForecastPaths,
+  validateDeepForecastSnapshot,
 } from '../scripts/seed-forecasts.mjs';
 
 import {
   resolveR2StorageConfig,
 } from '../scripts/_r2-storage.mjs';
+import {
+  evaluateForecastRunArtifacts,
+} from '../scripts/evaluate-forecast-run.mjs';
+import {
+  diffForecastRuns,
+} from '../scripts/diff-forecast-runs.mjs';
 
 describe('forecast trace storage config', () => {
   it('resolves Cloudflare R2 trace env vars and derives the endpoint from account id', () => {
@@ -179,6 +189,11 @@ describe('forecast trace artifact builder', () => {
     assert.equal(artifacts.summary.quality.publish.suppressedSituationCap, 1);
     assert.equal(artifacts.summary.quality.publish.suppressedSituationDomainCap, 1);
     assert.equal(artifacts.summary.quality.publish.cappedSituations, 1);
+    assert.match(artifacts.fastSummaryKey, /forecast-runs\/2026\/03\/15\/run-123\/fast-summary\.json/);
+    assert.match(artifacts.fastWorldStateKey, /forecast-runs\/2026\/03\/15\/run-123\/fast-world-state\.json/);
+    assert.match(artifacts.runStatusKey, /forecast-runs\/2026\/03\/15\/run-123\/run-status\.json/);
+    assert.equal(artifacts.runStatus.mode, 'fast');
+    assert.equal(artifacts.runStatus.status, 'completed');
     assert.equal(artifacts.summary.quality.candidateRun.domainCounts.cyber, 1);
     assert.deepEqual(artifacts.summary.quality.candidateRun.generationOriginCounts, {
       legacy_detector: 3,
@@ -268,6 +283,16 @@ describe('forecast trace artifact builder', () => {
       assert.ok(['escalatory', 'contested', 'constrained'].includes(forecastWorldState.simulationPosture), 'worldState.simulationPosture should be a valid posture');
       assert.ok(typeof forecastWorldState.simulationPostureScore === 'number', 'worldState.simulationPostureScore should be a number');
     }
+  });
+
+  it('derives sidecar artifact keys for fast and deep lifecycle files', () => {
+    const keys = buildForecastTraceArtifactKeys('1774288939672-9bvvqa', Date.parse('2026-03-23T18:02:19.672Z'), 'seed-data/forecast-traces');
+    assert.match(keys.summaryKey, /seed-data\/forecast-traces\/2026\/03\/23\/1774288939672-9bvvqa\/summary\.json/);
+    assert.match(keys.fastSummaryKey, /fast-summary\.json$/);
+    assert.match(keys.deepSummaryKey, /deep-summary\.json$/);
+    assert.match(keys.runStatusKey, /run-status\.json$/);
+    assert.match(keys.impactExpansionDebugKey, /impact-expansion-debug\.json$/);
+    assert.match(keys.pathScorecardsKey, /path-scorecards\.json$/);
   });
 
   it('stores full canonical narrative fields alongside compact short fields in trace artifacts', () => {
@@ -4423,5 +4448,183 @@ describe('military domain guarantee in publish selection', () => {
     const militaryCount = pool.filter((p) => p.domain === 'military').length;
     assert.equal(militaryCount, 1, 'only one military forecast should appear, no duplication');
 
+  });
+});
+
+describe('forecast replay lifecycle helpers', () => {
+  it('serializes situation market context maps before writing deep snapshots', () => {
+    const marketSelectionIndex = {
+      bySituationId: new Map([
+        ['state-1', {
+          situationId: 'state-1',
+          topBucketId: 'energy',
+          topChannel: 'shipping_cost_shock',
+          confirmationScore: 0.71,
+        }],
+      ]),
+      summary: '1 state-aware market context was derived.',
+    };
+
+    const serialized = serializeSituationMarketContextIndex(marketSelectionIndex);
+    assert.deepEqual(serialized.bySituationId, {
+      'state-1': {
+        situationId: 'state-1',
+        topBucketId: 'energy',
+        topChannel: 'shipping_cost_shock',
+        confirmationScore: 0.71,
+      },
+    });
+
+    const snapshot = buildDeepForecastSnapshotPayload({
+      generatedAt: Date.parse('2026-03-23T18:25:20.121Z'),
+      marketSelectionIndex,
+    }, { runId: 'run-123' });
+
+    assert.deepEqual(snapshot.marketSelectionIndex.bySituationId, serialized.bySituationId);
+    assert.equal(snapshot.marketSelectionIndex.summary, marketSelectionIndex.summary);
+  });
+
+  it('flags invalid deep snapshots with unresolved selected state ids and duplicate labels', () => {
+    const validation = validateDeepForecastSnapshot({
+      fullRunStateUnits: [
+        { id: 'state-1', label: 'Red Sea maritime disruption state' },
+        { id: 'state-2', label: 'Red Sea maritime disruption state' },
+      ],
+      deepForecast: {
+        selectedStateIds: ['state-1', 'missing-state'],
+      },
+    });
+
+    assert.equal(validation.pass, false);
+    assert.deepEqual(validation.unresolvedSelectedStateIds, ['missing-state']);
+    assert.deepEqual(validation.duplicateStateLabels, [
+      { label: 'Red Sea maritime disruption state', count: 2 },
+    ]);
+  });
+
+  it('evaluates a run artifact set against deep lifecycle checks', () => {
+    const evaluation = evaluateForecastRunArtifacts({
+      generatedAt: Date.parse('2026-03-23T18:25:20.121Z'),
+      summary: {
+        runId: '1774288939672-9bvvqa',
+        forecastDepth: 'deep',
+        deepForecast: {
+          status: 'completed_no_material_change',
+          eligibleStateCount: 2,
+          selectedStateIds: ['state-1'],
+        },
+        quality: {
+          candidateRun: {
+            domainCounts: {
+              supply_chain: 3,
+            },
+          },
+          traced: {
+            domainCounts: {
+              supply_chain: 0,
+            },
+          },
+        },
+        worldStateSummary: {
+          impactExpansionMappedSignalCount: 0,
+          simulationInteractionCount: 80,
+          reportableInteractionCount: 80,
+        },
+      },
+      worldState: {
+        impactExpansion: {
+          mappedSignalCount: 0,
+        },
+        simulationState: {
+          interactionLedger: Array.from({ length: 80 }, (_, i) => ({ id: i + 1 })),
+          reportableInteractionLedger: Array.from({ length: 80 }, (_, i) => ({ id: i + 1 })),
+        },
+      },
+      runStatus: {
+        forecastRunId: '1774288939672-9bvvqa',
+        selectedDeepStateIds: ['state-1'],
+      },
+      snapshot: {
+        fullRunStateUnits: [
+          { id: 'state-1', label: 'Strait of Hormuz maritime disruption state' },
+        ],
+        impactExpansionCandidates: [
+          {
+            candidateStateId: 'state-1',
+            stateKind: 'maritime_disruption',
+            routeFacilityKey: 'strait_of_hormuz',
+            commodityKey: 'crude_oil',
+            marketContext: {
+              topBucketId: 'energy',
+            },
+          },
+        ],
+      },
+    });
+
+    assert.equal(evaluation.pass, false);
+    assert.equal(evaluation.status, 'fail');
+    assert.equal(evaluation.metrics.mappedSignalCount, 0);
+    assert.ok(evaluation.checks.some((check) => check.name === 'reportable_interactions_are_subset' && check.pass === false));
+    assert.ok(evaluation.checks.some((check) => check.name === 'eligible_high_value_deep_run_materializes_mapped_signals' && check.pass === false));
+  });
+
+  it('diffs two forecast runs by lifecycle and publication metrics', () => {
+    const diff = diffForecastRuns(
+      {
+        summary: {
+          runId: 'baseline',
+          forecastDepth: 'fast',
+          deepForecast: { status: 'queued' },
+          tracedForecastCount: 12,
+          topForecasts: [{ title: 'FX stress from Germany cyber pressure state' }],
+          worldStateSummary: {
+            impactExpansionCandidateCount: 3,
+            impactExpansionMappedSignalCount: 0,
+            simulationInteractionCount: 80,
+            reportableInteractionCount: 80,
+          },
+          quality: {
+            traced: {
+              domainCounts: { market: 10, supply_chain: 0 },
+            },
+          },
+        },
+        snapshot: {
+          fullRunStateUnits: [{ label: 'Germany cyber pressure state' }],
+        },
+      },
+      {
+        summary: {
+          runId: 'candidate',
+          forecastDepth: 'deep',
+          deepForecast: { status: 'completed' },
+          tracedForecastCount: 14,
+          topForecasts: [{ title: 'Supply chain stress from Strait of Hormuz disruption state' }],
+          worldStateSummary: {
+            impactExpansionCandidateCount: 3,
+            impactExpansionMappedSignalCount: 4,
+            simulationInteractionCount: 80,
+            reportableInteractionCount: 42,
+          },
+          quality: {
+            traced: {
+              domainCounts: { market: 10, supply_chain: 3 },
+            },
+          },
+        },
+        snapshot: {
+          fullRunStateUnits: [{ label: 'Strait of Hormuz maritime disruption state' }],
+        },
+      },
+    );
+
+    assert.equal(diff.forecastDepth.baseline, 'fast');
+    assert.equal(diff.forecastDepth.candidate, 'deep');
+    assert.equal(diff.impactExpansionDelta.mappedSignalCount, 4);
+    assert.equal(diff.interactionDelta.reportable, -38);
+    assert.equal(diff.publishedDomainDelta.supply_chain, 3);
+    assert.ok(diff.addedTopForecastTitles.includes('Supply chain stress from Strait of Hormuz disruption state'));
+    assert.ok(diff.removedTopForecastTitles.includes('FX stress from Germany cyber pressure state'));
   });
 });
