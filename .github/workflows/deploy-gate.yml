@@ -2,7 +2,7 @@ name: Deploy Gate
 
 # Runs whenever Test or Typecheck completes on a PR/push.
 # Checks whether BOTH workflows have passed for the same commit SHA.
-# Vercel Required Checks must include "gate" so it waits for this before promoting.
+# Posts a commit status on the PR's head SHA so branch protection can see it.
 
 on:
   workflow_run:
@@ -10,7 +10,6 @@ on:
     types: [completed]
 
 permissions:
-  checks: write
   statuses: write
 
 jobs:
@@ -46,13 +45,22 @@ jobs:
           echo "unit=$unit  typecheck=$typecheck"
 
           if [ "$unit" = "pending" ] || [ "$typecheck" = "pending" ]; then
-            echo "One or more checks still pending — not failing yet, let the next trigger decide"
+            gh api "repos/$REPO/statuses/$SHA" --method POST \
+              --field state="pending" \
+              --field context="gate" \
+              --field description="Waiting for unit + typecheck to complete"
             exit 0
           fi
 
           if [ "$unit" != "success" ] || [ "$typecheck" != "success" ]; then
-            echo "Required checks did not pass — blocking deployment"
-            exit 1
+            gh api "repos/$REPO/statuses/$SHA" --method POST \
+              --field state="failure" \
+              --field context="gate" \
+              --field description="Required checks did not pass (unit=$unit typecheck=$typecheck)"
+            exit 0
           fi
 
-          echo "All required checks passed — deployment allowed"
+          gh api "repos/$REPO/statuses/$SHA" --method POST \
+            --field state="success" \
+            --field context="gate" \
+            --field description="unit + typecheck both passed"
