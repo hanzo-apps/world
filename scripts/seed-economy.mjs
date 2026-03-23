@@ -12,7 +12,7 @@ const KEYS = {
 };
 
 const FRED_KEY_PREFIX = 'economic:fred:v1';
-const FRED_TTL = 3600;
+const FRED_TTL = 93600; // 26h — survive daily cron scheduling drift
 const ENERGY_TTL = 3600;
 const CAPACITY_TTL = 86400;
 const MACRO_TTL = 21600; // 6h — survive extended Yahoo outages
