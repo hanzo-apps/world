@@ -304,6 +304,42 @@ export interface NationalDebtEntry {
   source: string;
 }
 
+export interface ListFuelPricesRequest {
+}
+
+export interface ListFuelPricesResponse {
+  countries: FuelCountryPrice[];
+  fetchedAt: string;
+  cheapestGasoline: string;
+  cheapestDiesel: string;
+  mostExpensiveGasoline: string;
+  mostExpensiveDiesel: string;
+  wowAvailable: boolean;
+  prevFetchedAt: string;
+  sourceCount: number;
+  countryCount: number;
+}
+
+export interface FuelCountryPrice {
+  code: string;
+  name: string;
+  currency: string;
+  flag: string;
+  gasoline?: FuelPrice;
+  diesel?: FuelPrice;
+  fxRate: number;
+}
+
+export interface FuelPrice {
+  usdPrice: number;
+  localPrice: number;
+  grade: string;
+  source: string;
+  available: boolean;
+  wowPct: number;
+  observedAt: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -361,6 +397,7 @@ export interface EconomicServiceHandler {
   listGroceryBasketPrices(ctx: ServerContext, req: ListGroceryBasketPricesRequest): Promise<ListGroceryBasketPricesResponse>;
   listBigMacPrices(ctx: ServerContext, req: ListBigMacPricesRequest): Promise<ListBigMacPricesResponse>;
   getNationalDebt(ctx: ServerContext, req: GetNationalDebtRequest): Promise<GetNationalDebtResponse>;
+  listFuelPrices(ctx: ServerContext, req: ListFuelPricesRequest): Promise<ListFuelPricesResponse>;
 }
 
 export function createEconomicServiceRoutes(
@@ -843,6 +880,43 @@ export function createEconomicServiceRoutes(
 
           const result = await handler.getNationalDebt(ctx, body);
           return new Response(JSON.stringify(result as GetNationalDebtResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/economic/v1/list-fuel-prices",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = {} as ListFuelPricesRequest;
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.listFuelPrices(ctx, body);
+          return new Response(JSON.stringify(result as ListFuelPricesResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
