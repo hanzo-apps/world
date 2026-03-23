@@ -1289,6 +1289,7 @@ const MARKET_SYMBOLS = [
 
 const _commodityCfg = requireShared('commodities.json');
 const COMMODITY_SYMBOLS = _commodityCfg.commodities.map(c => c.symbol);
+const COMMODITY_META = new Map(_commodityCfg.commodities.map(c => [c.symbol, { name: c.name, display: c.display }]));
 
 const SECTOR_SYMBOLS = ['XLK', 'XLF', 'XLE', 'XLV', 'XLY', 'XLI', 'XLP', 'XLU', 'XLB', 'XLRE', 'XLC', 'SMH'];
 
@@ -1409,8 +1410,9 @@ async function seedCommodityQuotes() {
   const quotes = [];
   const missing = [];
   for (const s of COMMODITY_SYMBOLS) {
+    const meta = COMMODITY_META.get(s) || { name: s, display: s };
     const yahoo = await fetchYahooChartDirect(s);
-    if (yahoo) quotes.push({ symbol: s, name: s, display: s, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
+    if (yahoo) quotes.push({ symbol: s, name: meta.name, display: meta.display, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
     else missing.push(s);
     await sleep(150);
   }
@@ -1418,14 +1420,16 @@ async function seedCommodityQuotes() {
   if (missing.length > 0) {
     await sleep(3000);
     for (const s of missing) {
+      const meta = COMMODITY_META.get(s);
       const yahoo = await fetchYahooChartDirect(s);
-      if (yahoo) quotes.push({ symbol: s, name: s, display: s, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
+      if (yahoo) quotes.push({ symbol: s, name: meta.name, display: meta.display, price: yahoo.price, change: yahoo.change, sparkline: yahoo.sparkline });
       await sleep(200);
     }
   }
 
   if (quotes.length === 0) {
-    console.warn('[Market] No commodity quotes fetched — skipping Redis write');
+    console.warn('[Market] No commodity quotes fetched — extending existing key TTL, skipping write');
+    try { await upstashExpire('market:commodities-bootstrap:v1', MARKET_SEED_TTL); } catch {}
     return 0;
   }
 
