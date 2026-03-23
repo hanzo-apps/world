@@ -67,6 +67,7 @@ import {
   buildFeedSummary,
   buildFallbackPerspectives,
   populateFallbackNarratives,
+  refreshPublishedNarratives,
   loadCascadeRules,
   evaluateRuleConditions,
   summarizePublishFiltering,
@@ -1297,6 +1298,27 @@ describe('forecast narrative fallbacks', () => {
     assert.ok(summary.length > 180);
     assert.ok(!summary.endsWith('...'));
     assert.match(summary, /Iran CII 87/);
+  });
+
+  it('refreshPublishedNarratives preserves validated llm narratives and only fills gaps', () => {
+    const pred = makePrediction('market', 'Strait of Hormuz', 'Inflation and rates pressure from Strait of Hormuz maritime disruption state', 0.69, 0.64, '30d', [
+      { type: 'shipping_cost_shock', value: 'Strait of Hormuz shipping costs remain elevated', weight: 0.42 },
+    ]);
+    buildForecastCase(pred);
+    pred.traceMeta = { narrativeSource: 'llm_combined', llmProvider: 'openrouter' };
+    pred.caseFile.baseCase = 'LLM base case keeps Hormuz freight and energy repricing tied to persistent shipping disruption over the next 30d.';
+    pred.caseFile.escalatoryCase = 'LLM escalatory case sees a sharper repricing if maritime insurance and rerouting costs jump again.';
+    pred.caseFile.contrarianCase = 'LLM contrarian case assumes corridor access stabilizes before the freight shock spreads further.';
+    pred.scenario = 'LLM scenario keeps Hormuz inflation pressure elevated while the corridor remains contested.';
+    pred.feedSummary = '';
+
+    refreshPublishedNarratives([pred]);
+
+    assert.equal(pred.caseFile.baseCase, 'LLM base case keeps Hormuz freight and energy repricing tied to persistent shipping disruption over the next 30d.');
+    assert.equal(pred.caseFile.escalatoryCase, 'LLM escalatory case sees a sharper repricing if maritime insurance and rerouting costs jump again.');
+    assert.equal(pred.caseFile.contrarianCase, 'LLM contrarian case assumes corridor access stabilizes before the freight shock spreads further.');
+    assert.equal(pred.scenario, 'LLM scenario keeps Hormuz inflation pressure elevated while the corridor remains contested.');
+    assert.equal(pred.feedSummary, 'LLM base case keeps Hormuz freight and energy repricing tied to persistent shipping disruption over the next 30d.');
   });
 });
 

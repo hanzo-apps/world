@@ -10725,6 +10725,10 @@ function buildFeedSummary(pred) {
   return `Base case for ${pred.title} remains live at ${roundPct(pred.probability)} over the ${pred.timeHorizon}.`;
 }
 
+function isLlmNarrativeSource(source = '') {
+  return /^llm_/.test(String(source || ''));
+}
+
 function buildFallbackPerspectives(pred) {
   const firstSignal = pred.caseFile?.supportingEvidence?.[0]?.summary || pred.signals?.[0]?.value || pred.title;
   const contrarian = pred.caseFile?.contrarianCase || buildFallbackContrarianCase(pred);
@@ -10769,14 +10773,25 @@ function populateFallbackNarratives(predictions) {
 function refreshPublishedNarratives(predictions) {
   for (const pred of predictions || []) {
     if (!pred.caseFile) buildForecastCase(pred);
-    pred.caseFile.baseCase = buildFallbackBaseCase(pred);
-    pred.caseFile.escalatoryCase = buildFallbackEscalatoryCase(pred);
-    pred.caseFile.contrarianCase = buildFallbackContrarianCase(pred);
-    if ((pred?.traceMeta?.narrativeSource || 'fallback') === 'fallback') {
+    const preserveNarratives = isLlmNarrativeSource(pred?.traceMeta?.narrativeSource || '');
+    if (!preserveNarratives || !pred.caseFile.baseCase) {
+      pred.caseFile.baseCase = buildFallbackBaseCase(pred);
+    }
+    if (!preserveNarratives || !pred.caseFile.escalatoryCase) {
+      pred.caseFile.escalatoryCase = buildFallbackEscalatoryCase(pred);
+    }
+    if (!preserveNarratives || !pred.caseFile.contrarianCase) {
+      pred.caseFile.contrarianCase = buildFallbackContrarianCase(pred);
+    }
+    if (!preserveNarratives || !pred.scenario) {
       pred.scenario = buildFallbackScenario(pred);
+    }
+    if (!preserveNarratives || !pred.perspectives) {
       pred.perspectives = buildFallbackPerspectives(pred);
     }
-    pred.feedSummary = buildFeedSummary(pred);
+    if (!preserveNarratives || !pred.feedSummary) {
+      pred.feedSummary = buildFeedSummary(pred);
+    }
   }
 }
 
