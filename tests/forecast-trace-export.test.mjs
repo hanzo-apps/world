@@ -381,6 +381,37 @@ describe('forecast trace artifact builder', () => {
     assert.ok(!a.scenario.includes('broader cluster'));
     assert.ok(!a.feedSummary.includes('broader'));
   });
+
+  it('preserves llm narratives after projected situation context refresh', () => {
+    const a = makePrediction('market', 'Strait of Hormuz', 'Inflation and rates pressure from Strait of Hormuz maritime disruption state', 0.72, 0.66, '30d', [
+      { type: 'shipping_cost_shock', value: 'Hormuz shipping costs are feeding inflation pressure', weight: 0.42 },
+    ]);
+    const b = makePrediction('market', 'Strait of Hormuz', 'Oil price impact from Strait of Hormuz disruption', 0.67, 0.58, '30d', [
+      { type: 'commodity_price', value: 'Oil pricing remains sensitive to Strait of Hormuz disruption', weight: 0.38 },
+    ]);
+
+    buildForecastCase(a);
+    buildForecastCase(b);
+    populateFallbackNarratives([a, b]);
+
+    a.traceMeta = { narrativeSource: 'llm_combined', llmProvider: 'openrouter' };
+    a.caseFile.baseCase = 'LLM base case keeps Hormuz inflation pressure elevated while freight rerouting and insurance costs remain sticky.';
+    a.caseFile.escalatoryCase = 'LLM escalatory case sees a broader price shock if corridor access worsens again.';
+    a.caseFile.contrarianCase = 'LLM contrarian case assumes shipping normalization starts before downstream pass-through broadens.';
+    a.scenario = 'LLM scenario keeps Hormuz repricing elevated without a full break in corridor access.';
+    a.feedSummary = 'LLM base case keeps Hormuz inflation pressure elevated while freight rerouting and insurance costs remain sticky.';
+
+    const fullRunSituationClusters = attachSituationContext([a, b]);
+    const publishedPredictions = [a];
+    const projectedClusters = projectSituationClusters(fullRunSituationClusters, publishedPredictions);
+    attachSituationContext(publishedPredictions, projectedClusters);
+    refreshPublishedNarratives(publishedPredictions);
+
+    assert.equal(a.caseFile.situationContext.forecastCount, 1);
+    assert.equal(a.caseFile.baseCase, 'LLM base case keeps Hormuz inflation pressure elevated while freight rerouting and insurance costs remain sticky.');
+    assert.equal(a.scenario, 'LLM scenario keeps Hormuz repricing elevated without a full break in corridor access.');
+    assert.equal(a.feedSummary, 'LLM base case keeps Hormuz inflation pressure elevated while freight rerouting and insurance costs remain sticky.');
+  });
 });
 
 describe('market transmission macro state', () => {
