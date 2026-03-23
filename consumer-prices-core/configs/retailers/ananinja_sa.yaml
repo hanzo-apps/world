@@ -10,6 +10,7 @@ retailer:
   searchConfig:
     numResults: 5
     queryTemplate: "{canonicalName} ananinja saudi"
+    inStockFromPrice: true  # ananinja.com is a price aggregator; Firecrawl misreads availability
 
   rateLimit:
     requestsPerMinute: 10
