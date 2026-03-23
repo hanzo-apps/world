@@ -79,7 +79,7 @@ export class DailyMarketBriefPanel extends Panel {
                 </div>
                 <div style="text-align:right">
                   <div style="font-size:12px;font-weight:600">${escapeHtml(formatPrice(item.price))}</div>
-                  <div class="${getChangeClass(item.change ?? 0)}" style="font-size:11px">${escapeHtml(formatChange(item.change))}</div>
+                  <div class="market-change ${getChangeClass(item.change ?? 0)}" style="font-size:11px">${escapeHtml(formatChange(item.change))}</div>
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
