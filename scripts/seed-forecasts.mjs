@@ -359,6 +359,113 @@ const FORECAST_DOMAINS = [
   'infrastructure',
 ];
 const MARKET_CLUSTER_DOMAINS = new Set(['market', 'supply_chain']);
+const IMPACT_EXPANSION_REGISTRY_VERSION = 'v1';
+const IMPACT_EXPANSION_MAX_CANDIDATES = 6;
+const IMPACT_EXPANSION_CACHE_TTL_SECONDS = 30 * 60;
+const IMPACT_EXPANSION_ORDERS = ['direct', 'second_order', 'third_order'];
+const IMPACT_EXPANSION_TARGET_BUCKETS = new Set(MARKET_BUCKET_CONFIG.map((bucket) => bucket.id));
+const IMPACT_EXPANSION_ANALOG_TAGS = [
+  'energy_corridor_blockage',
+  'lng_export_disruption',
+  'refinery_outage',
+  'shipping_insurance_spike',
+  'commodity_supply_squeeze',
+  'sanctions_trade_restriction',
+  'importer_balance_stress',
+  'inflation_pass_through',
+  'risk_off_flight_to_safety',
+  'sovereign_funding_stress',
+];
+const IMPACT_ANALOG_PRIORS = {
+  energy_corridor_blockage: { confidenceMultiplier: 1.18 },
+  lng_export_disruption: { confidenceMultiplier: 1.16 },
+  refinery_outage: { confidenceMultiplier: 1.12 },
+  shipping_insurance_spike: { confidenceMultiplier: 1.08 },
+  commodity_supply_squeeze: { confidenceMultiplier: 1.1 },
+  sanctions_trade_restriction: { confidenceMultiplier: 1.07 },
+  importer_balance_stress: { confidenceMultiplier: 1.06 },
+  inflation_pass_through: { confidenceMultiplier: 1.05 },
+  risk_off_flight_to_safety: { confidenceMultiplier: 1.05 },
+  sovereign_funding_stress: { confidenceMultiplier: 1.08 },
+};
+const IMPACT_COMMODITY_LEXICON = [
+  { key: 'crude_oil', pattern: /\b(crude|oil|brent|wti|tanker)\b/i },
+  { key: 'lng', pattern: /\b(lng|liquefied natural gas|ras laffan|north field|south pars)\b/i },
+  { key: 'natural_gas', pattern: /\b(gas|natgas|pipeline gas)\b/i },
+  { key: 'refined_products', pattern: /\b(refined products|diesel|gasoline|jet fuel|fuel oil|naphtha|petrol)\b/i },
+  { key: 'fertilizer', pattern: /\b(fertilizer|ammonia|urea|potash)\b/i },
+  { key: 'petrochemicals', pattern: /\b(petrochemical|petrochemicals|ethylene|propylene|methanol)\b/i },
+];
+const IMPACT_FACILITY_RE = /\b(lng|terminal|refinery|pipeline|port|field|depot)\b/i;
+const IMPACT_VARIABLE_REGISTRY = {
+  route_disruption: {
+    category: 'shipping',
+    allowedChannels: ['shipping_cost_shock', 'energy_supply_shock', 'gas_supply_stress'],
+    targetBuckets: ['freight', 'energy'],
+    orderAllowed: ['direct', 'second_order'],
+    defaultDomains: ['supply_chain', 'market'],
+  },
+  energy_export_stress: {
+    category: 'energy',
+    allowedChannels: ['energy_supply_shock', 'oil_macro_shock', 'global_crude_spread_stress'],
+    targetBuckets: ['energy', 'rates_inflation'],
+    orderAllowed: ['direct', 'second_order'],
+    defaultDomains: ['market', 'supply_chain'],
+  },
+  lng_export_stress: {
+    category: 'energy',
+    allowedChannels: ['gas_supply_stress', 'energy_supply_shock', 'shipping_cost_shock'],
+    targetBuckets: ['energy', 'freight', 'rates_inflation'],
+    orderAllowed: ['direct', 'second_order'],
+    defaultDomains: ['market', 'supply_chain'],
+  },
+  refined_product_stress: {
+    category: 'industry_input',
+    allowedChannels: ['commodity_repricing', 'global_crude_spread_stress', 'oil_macro_shock'],
+    targetBuckets: ['energy', 'rates_inflation'],
+    orderAllowed: ['direct', 'second_order'],
+    defaultDomains: ['market'],
+  },
+  industry_input_stress: {
+    category: 'industry_input',
+    allowedChannels: ['commodity_repricing', 'shipping_cost_shock', 'energy_supply_shock'],
+    targetBuckets: ['freight', 'rates_inflation', 'semis'],
+    orderAllowed: ['second_order', 'third_order'],
+    defaultDomains: ['market', 'supply_chain'],
+  },
+  importer_balance_stress: {
+    category: 'macro',
+    allowedChannels: ['sovereign_stress', 'fx_stress', 'risk_off_rotation'],
+    targetBuckets: ['fx_stress', 'sovereign_risk'],
+    orderAllowed: ['second_order', 'third_order'],
+    defaultDomains: ['market', 'political'],
+  },
+  inflation_pass_through: {
+    category: 'macro',
+    allowedChannels: ['inflation_impulse', 'policy_rate_pressure', 'energy_supply_shock', 'shipping_cost_shock'],
+    targetBuckets: ['rates_inflation'],
+    orderAllowed: ['second_order', 'third_order'],
+    defaultDomains: ['market'],
+  },
+  risk_off_rotation: {
+    category: 'credit',
+    allowedChannels: ['risk_off_rotation', 'safe_haven_bid', 'volatility_shock', 'sovereign_stress'],
+    targetBuckets: ['sovereign_risk', 'fx_stress', 'crypto_stablecoins'],
+    orderAllowed: ['second_order', 'third_order'],
+    defaultDomains: ['market'],
+  },
+  sovereign_funding_stress: {
+    category: 'credit',
+    allowedChannels: ['sovereign_stress', 'yield_curve_stress', 'policy_rate_pressure'],
+    targetBuckets: ['sovereign_risk', 'fx_stress'],
+    orderAllowed: ['second_order', 'third_order'],
+    defaultDomains: ['market', 'political'],
+  },
+};
+const IMPACT_VARIABLE_KEYS = Object.keys(IMPACT_VARIABLE_REGISTRY);
+const IMPACT_VARIABLE_CHANNELS = Object.fromEntries(
+  Object.entries(IMPACT_VARIABLE_REGISTRY).map(([key, value]) => [key, value.allowedChannels || []]),
+);
 
 function getRedisCredentials() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -2107,6 +2214,57 @@ const CRITICAL_NEWS_POWER_RE = /\b(power station|power plant|grid|substation|ele
 const CRITICAL_NEWS_SOURCE_TYPES = new Set(['critical_news', 'critical_news_llm', 'iran_events', 'sanctions_pressure', 'thermal_escalation']);
 const CRITICAL_SIGNAL_LLM_MAX_ITEMS = 8;
 const CRITICAL_SIGNAL_CACHE_TTL_SECONDS = 20 * 60;
+const IMPACT_EXPANSION_SOURCE_TYPE = 'impact_expansion';
+
+function buildImpactExpansionSystemPrompt() {
+  return `You are a consequence-expansion engine for a state-based geopolitical and market simulation model.
+
+Return ONLY a JSON object with this shape:
+{
+  "candidates": [
+    {
+      "candidateIndex": number,
+      "candidateStateId": string,
+      "directHypotheses": ImpactHypothesis[],
+      "secondOrderHypotheses": ImpactHypothesis[],
+      "thirdOrderHypotheses": ImpactHypothesis[]
+    }
+  ]
+}
+
+ImpactHypothesis:
+{
+  "variableKey": string,
+  "channel": string,
+  "targetBucket": string,
+  "region": string,
+  "macroRegion": string,
+  "countries": string[],
+  "assetsOrSectors": string[],
+  "commodity": string,
+  "dependsOnKey": string,
+  "strength": number,
+  "confidence": number,
+  "analogTag": string,
+  "summary": string,
+  "evidenceRefs": string[]
+}
+
+Rules:
+- Use ONLY these variableKey values: ${IMPACT_VARIABLE_KEYS.join(', ')}.
+- Use ONLY these channel values: ${uniqueSortedStrings(IMPACT_VARIABLE_KEYS.flatMap((key) => IMPACT_VARIABLE_CHANNELS[key] || [])).join(', ')}.
+- Use ONLY these targetBucket values: ${[...IMPACT_EXPANSION_TARGET_BUCKETS].join(', ')}.
+- Use ONLY these analogTag values: ${IMPACT_EXPANSION_ANALOG_TAGS.join(', ')}.
+- Cite evidence ONLY with exact E# keys from the candidate packet.
+- Never invent events, routes, facilities, commodities, or countries beyond the candidate packet.
+- direct hypotheses are immediate consequences.
+- second_order hypotheses must depend on a direct hypothesis via dependsOnKey.
+- third_order hypotheses must depend on a second_order hypothesis via dependsOnKey.
+- Prefer omission over weak guesses.
+- Keep strength and confidence between 0 and 1.
+- Keep summaries concise and evidence-grounded.
+- Return no prose outside the JSON object.`;
+}
 const CRITICAL_SIGNAL_PRIMARY_KINDS = new Set([
   'route_blockage',
   'facility_attack',
@@ -2860,6 +3018,515 @@ async function extractCriticalSignalBundle(inputs) {
 
   applyFrames(validFrames);
   await redisSet(url, token, cacheKey, { frames: validFrames }, CRITICAL_SIGNAL_CACHE_TTL_SECONDS);
+  return bundle;
+}
+
+function extractFirstJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) return '';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return text.slice(start);
+}
+
+function tryParseImpactExpansionCandidate(candidate) {
+  try {
+    const parsed = JSON.parse(candidate);
+    if (Array.isArray(parsed?.candidates)) return { candidates: parsed.candidates, stage: 'object_candidates' };
+    if (Array.isArray(parsed)) return { candidates: parsed, stage: 'direct_array' };
+  } catch {
+    // continue
+  }
+  return { candidates: null, stage: 'unparsed' };
+}
+
+function extractImpactExpansionPayload(text) {
+  const cleaned = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<\|thinking\|>[\s\S]*?<\|\/thinking\|>/gi, '')
+    .replace(/```json\s*/gi, '```')
+    .trim();
+  const candidates = [];
+  const fencedBlocks = [...cleaned.matchAll(/```([\s\S]*?)```/g)].map((match) => match[1].trim());
+  candidates.push(...fencedBlocks);
+  candidates.push(cleaned);
+
+  for (const candidate of candidates) {
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+    const direct = tryParseImpactExpansionCandidate(trimmed);
+    if (direct.candidates) {
+      return {
+        candidates: direct.candidates,
+        diagnostics: {
+          stage: direct.stage,
+          preview: sanitizeForPrompt(trimmed).slice(0, 220),
+        },
+      };
+    }
+    const firstObject = extractFirstJsonObject(trimmed);
+    if (firstObject) {
+      const objectParsed = tryParseImpactExpansionCandidate(firstObject);
+      if (objectParsed.candidates) {
+        return {
+          candidates: objectParsed.candidates,
+          diagnostics: {
+            stage: objectParsed.stage,
+            preview: sanitizeForPrompt(firstObject).slice(0, 220),
+          },
+        };
+      }
+    }
+  }
+
+  return {
+    candidates: null,
+    diagnostics: {
+      stage: 'no_json_object',
+      preview: sanitizeForPrompt(cleaned).slice(0, 220),
+    },
+  };
+}
+
+function normalizeImpactHypothesisDraft(item = {}) {
+  return {
+    variableKey: String(item?.variableKey || '').trim().toLowerCase(),
+    channel: String(item?.channel || '').trim().toLowerCase(),
+    targetBucket: String(item?.targetBucket || '').trim().toLowerCase(),
+    region: String(item?.region || '').trim(),
+    macroRegion: String(item?.macroRegion || '').trim(),
+    countries: uniqueSortedStrings((Array.isArray(item?.countries) ? item.countries : []).map((value) => String(value || '').trim()).filter(Boolean)).slice(0, 6),
+    assetsOrSectors: uniqueSortedStrings((Array.isArray(item?.assetsOrSectors) ? item.assetsOrSectors : []).map((value) => String(value || '').trim()).filter(Boolean)).slice(0, 6),
+    commodity: String(item?.commodity || '').trim(),
+    dependsOnKey: String(item?.dependsOnKey || '').trim().toLowerCase(),
+    strength: clampUnitInterval(Number(item?.strength ?? 0)),
+    confidence: clampUnitInterval(Number(item?.confidence ?? 0)),
+    analogTag: String(item?.analogTag || '').trim().toLowerCase(),
+    summary: sanitizeForPrompt(String(item?.summary || '')).slice(0, 260),
+    evidenceRefs: uniqueSortedStrings((Array.isArray(item?.evidenceRefs) ? item.evidenceRefs : []).map((value) => String(value || '').trim().toUpperCase()).filter(Boolean)).slice(0, 4),
+  };
+}
+
+function sanitizeImpactExpansionDrafts(items, candidatePackets = []) {
+  if (!Array.isArray(items)) return [];
+  const candidateMap = new Map(candidatePackets.map((packet) => [packet.candidateIndex, packet]));
+  const seen = new Set();
+  const valid = [];
+  for (const item of items) {
+    const candidateIndex = Number(item?.candidateIndex);
+    const packet = candidateMap.get(candidateIndex);
+    if (!Number.isInteger(candidateIndex) || !packet || seen.has(candidateIndex)) continue;
+    const directHypotheses = (Array.isArray(item?.directHypotheses) ? item.directHypotheses : []).map(normalizeImpactHypothesisDraft).slice(0, 3);
+    const secondOrderHypotheses = (Array.isArray(item?.secondOrderHypotheses) ? item.secondOrderHypotheses : []).map(normalizeImpactHypothesisDraft).slice(0, 3);
+    const thirdOrderHypotheses = (Array.isArray(item?.thirdOrderHypotheses) ? item.thirdOrderHypotheses : []).map(normalizeImpactHypothesisDraft).slice(0, 2);
+    valid.push({
+      candidateIndex,
+      candidateStateId: packet.candidateStateId,
+      directHypotheses,
+      secondOrderHypotheses,
+      thirdOrderHypotheses,
+    });
+    seen.add(candidateIndex);
+  }
+  return valid;
+}
+
+function buildImpactExpansionContinuityRecord(stateUnit, priorStateUnits = []) {
+  const priorUnits = Array.isArray(priorStateUnits) ? priorStateUnits : [];
+  let prior = priorUnits.find((item) => item.id === stateUnit.id) || null;
+  if (!prior) {
+    let bestMatch = null;
+    let bestScore = 0;
+    for (const priorUnit of priorUnits) {
+      const score = computeSituationSimilarity(stateUnit, priorUnit);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = priorUnit;
+      }
+    }
+    if (bestMatch && bestScore >= 4) prior = bestMatch;
+  }
+  if (!prior) {
+    return {
+      continuityMode: 'new',
+      continuityScore: 0,
+      summary: `${stateUnit.label} is a newly active state unit in the current run.`,
+    };
+  }
+  const probabilityDelta = Number(stateUnit.avgProbability || 0) - Number(prior.avgProbability || 0);
+  const continuityMode = probabilityDelta >= 0.08 ? 'persistent_strengthened' : 'persistent';
+  return {
+    continuityMode,
+    continuityScore: continuityMode === 'persistent_strengthened' ? 1 : 0.5,
+    summary: continuityMode === 'persistent_strengthened'
+      ? `${stateUnit.label} persisted from the prior run and strengthened by ${roundPct(Math.max(0, probabilityDelta))}.`
+      : `${stateUnit.label} persisted from the prior run with broadly similar pressure.`,
+  };
+}
+
+function extractImpactRouteFacilityKey(texts = [], dominantRegion = '') {
+  const joined = texts.filter(Boolean).join(' ');
+  const knownRoutes = Object.keys(CHOKEPOINT_MARKET_REGIONS).sort((a, b) => b.length - a.length);
+  for (const route of knownRoutes) {
+    const pattern = new RegExp(`\\b${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (pattern.test(joined)) return route;
+  }
+  const facilityMatch = joined.match(IMPACT_FACILITY_RE);
+  if (!facilityMatch) return '';
+  const normalizedRegion = dominantRegion || 'global';
+  return `${normalizedRegion}:${facilityMatch[0].toLowerCase()}`;
+}
+
+function extractImpactCommodityKey(texts = []) {
+  const joined = texts.filter(Boolean).join(' ');
+  for (const entry of IMPACT_COMMODITY_LEXICON) {
+    if (entry.pattern.test(joined)) return entry.key;
+  }
+  return '';
+}
+
+function buildImpactExpansionEvidenceTable(stateUnit, marketContext, continuityRecord) {
+  const evidence = [];
+  const pushEvidence = (kind, text) => {
+    const value = sanitizeForPrompt(text).slice(0, 220);
+    if (!value) return;
+    evidence.push({
+      key: `E${evidence.length + 1}`,
+      kind,
+      text: value,
+    });
+  };
+
+  pushEvidence('state_summary', `${stateUnit.label} (${stateUnit.stateKind || 'state'}) is centered on ${stateUnit.dominantRegion || stateUnit.regions?.[0] || 'the current theater'}.`);
+  for (const title of (stateUnit.sampleTitles || []).slice(0, 2)) pushEvidence('headline', title);
+  for (const signal of (stateUnit.topSignals || []).slice(0, 2)) {
+    pushEvidence('signal', `${String(signal.type || '').replace(/_/g, ' ')} is active across ${signal.count || 0} linked forecasts.`);
+  }
+  if (marketContext?.topBucketLabel) {
+    pushEvidence('market_context', `${marketContext.topBucketLabel} is the top linked bucket at ${roundPct(marketContext.topBucketPressure || 0)} pressure.`);
+  }
+  if (marketContext?.consequenceSummary) pushEvidence('market_context', marketContext.consequenceSummary);
+  if (continuityRecord?.summary) pushEvidence('continuity', continuityRecord.summary);
+  if ((stateUnit.actors || []).length > 0) pushEvidence('actor', `${stateUnit.actors.slice(0, 4).join(', ')} remain the lead actors in this state.`);
+
+  return evidence.slice(0, 8);
+}
+
+function buildImpactExpansionSpecificity(stateUnit, marketContext) {
+  const dominantRegion = stateUnit.dominantRegion || stateUnit.regions?.[0] || '';
+  const texts = [
+    stateUnit.label,
+    ...(stateUnit.sampleTitles || []),
+    (marketContext.consequenceSummary || ''),
+    `${(marketContext.criticalSignalTypes || []).join(' ')}`,
+    `${(stateUnit.signalTypes || []).join(' ')}`,
+  ].filter(Boolean);
+  const routeFacilityKey = extractImpactRouteFacilityKey(texts, dominantRegion);
+  const commodityKey = extractImpactCommodityKey(texts);
+  const regionMacro = getMacroRegion([dominantRegion]) || '';
+  const geoCoherent = Boolean(regionMacro)
+    && ((stateUnit.macroRegions || []).length === 0 || (stateUnit.macroRegions || []).includes(regionMacro));
+  return {
+    dominantRegion,
+    routeFacilityKey,
+    commodityKey,
+    specificityScore: +clampUnitInterval(
+      (routeFacilityKey ? 0.5 : 0) +
+      (commodityKey ? 0.3 : 0) +
+      (geoCoherent ? 0.2 : 0),
+    ).toFixed(3),
+  };
+}
+
+function isImpactExpansionCandidateEligible(stateUnit, marketContext, continuityRecord, specificity) {
+  return (
+    Number(marketContext.criticalSignalLift || 0) >= 0.14
+    || Number(marketContext.topBucketPressure || 0) >= 0.52
+    || Number(marketContext.transmissionEdgeCount || 0) >= 2
+    || Boolean(specificity.routeFacilityKey || specificity.commodityKey)
+    || (continuityRecord.continuityScore > 0 && Number(stateUnit.avgProbability || 0) >= 0.45)
+  );
+}
+
+function computeImpactExpansionRankingScore(marketContext, continuityRecord, specificityScore) {
+  const criticalSignalLift = Number(marketContext.criticalSignalLift || 0);
+  const topBucketPressure = Number(marketContext.topBucketPressure || 0);
+  const topTransmissionStrength = Number(marketContext.topTransmissionStrength || 0);
+  const confirmationScore = Number(marketContext.confirmationScore || 0);
+  const contradictionScore = clampUnitInterval(Number(marketContext.contradictionScore || 0));
+  const transmissionEdgeScore = clampUnitInterval(Number(marketContext.transmissionEdgeCount || 0) / 4);
+  return +clampUnitInterval(
+    // Positive weights intentionally sum to 0.96. Relative ordering matters more than absolute ceiling here.
+    (criticalSignalLift * 0.24) +
+    (topBucketPressure * 0.2) +
+    (topTransmissionStrength * 0.16) +
+    (confirmationScore * 0.12) +
+    (transmissionEdgeScore * 0.08) +
+    (specificityScore * 0.1) +
+    (continuityRecord.continuityScore * 0.06) -
+    (contradictionScore * 0.04),
+  ).toFixed(3);
+}
+
+function buildImpactExpansionCandidate(stateUnit, marketContext, priorStateUnits = []) {
+  if (!stateUnit || !marketContext) return null;
+  const continuityRecord = buildImpactExpansionContinuityRecord(stateUnit, priorStateUnits);
+  const specificity = buildImpactExpansionSpecificity(stateUnit, marketContext);
+  if (!isImpactExpansionCandidateEligible(stateUnit, marketContext, continuityRecord, specificity)) return null;
+  return {
+    candidateStateId: stateUnit.id,
+    candidateStateLabel: stateUnit.label,
+    stateKind: stateUnit.stateKind || '',
+    dominantRegion: specificity.dominantRegion,
+    macroRegions: uniqueSortedStrings(stateUnit.macroRegions || []),
+    countries: uniqueSortedStrings(stateUnit.regions || []).slice(0, 6),
+    marketBucketIds: uniqueSortedStrings(marketContext.linkedBucketIds || stateUnit.marketBucketIds || []),
+    transmissionChannels: uniqueSortedStrings([
+      marketContext.topChannel || '',
+      ...Object.values(marketContext.bucketContexts || {}).map((context) => context.topChannel || ''),
+      ...(stateUnit.transmissionChannels || []),
+    ].filter(Boolean)),
+    topSignalTypes: uniqueSortedStrings((stateUnit.topSignals || []).map((signal) => signal.type).filter(Boolean)),
+    criticalSignalTypes: uniqueSortedStrings(marketContext.criticalSignalTypes || []),
+    sourceSituationIds: uniqueSortedStrings(stateUnit.sourceSituationIds || []),
+    routeFacilityKey: specificity.routeFacilityKey,
+    commodityKey: specificity.commodityKey,
+    specificityScore: specificity.specificityScore,
+    continuityMode: continuityRecord.continuityMode,
+    continuityScore: +continuityRecord.continuityScore.toFixed(3),
+    rankingScore: computeImpactExpansionRankingScore(marketContext, continuityRecord, specificity.specificityScore),
+    evidenceTable: buildImpactExpansionEvidenceTable(stateUnit, marketContext, continuityRecord),
+    marketContext: {
+      topBucketId: marketContext.topBucketId || '',
+      topBucketLabel: marketContext.topBucketLabel || '',
+      topBucketPressure: Number(marketContext.topBucketPressure || 0),
+      confirmationScore: Number(marketContext.confirmationScore || 0),
+      contradictionScore: clampUnitInterval(Number(marketContext.contradictionScore || 0)),
+      topChannel: marketContext.topChannel || '',
+      topTransmissionStrength: Number(marketContext.topTransmissionStrength || 0),
+      topTransmissionConfidence: Number(marketContext.topTransmissionConfidence || 0),
+      transmissionEdgeCount: Number(marketContext.transmissionEdgeCount || 0),
+      criticalSignalLift: Number(marketContext.criticalSignalLift || 0),
+      criticalSignalTypes: uniqueSortedStrings(marketContext.criticalSignalTypes || []),
+      linkedBucketIds: uniqueSortedStrings(marketContext.linkedBucketIds || []),
+      consequenceSummary: marketContext.consequenceSummary || '',
+    },
+    stateSummary: {
+      avgProbability: Number(stateUnit.avgProbability || 0),
+      avgConfidence: Number(stateUnit.avgConfidence || 0),
+      situationCount: Number(stateUnit.situationCount || 0),
+      forecastCount: Number(stateUnit.forecastCount || 0),
+      sampleTitles: (stateUnit.sampleTitles || []).slice(0, 4),
+      actors: (stateUnit.actors || []).slice(0, 6),
+      signalTypes: uniqueSortedStrings(stateUnit.signalTypes || []),
+    },
+  };
+}
+
+function selectImpactExpansionCandidates({
+  stateUnits = [],
+  worldSignals = null,
+  marketTransmission = null,
+  marketState = null,
+  marketInputCoverage = null,
+  priorStateUnits = [],
+  limit = IMPACT_EXPANSION_MAX_CANDIDATES,
+} = {}) {
+  if (!Array.isArray(stateUnits) || stateUnits.length === 0) return [];
+  const marketIndex = buildSituationMarketContextIndex(
+    worldSignals,
+    marketTransmission,
+    marketState,
+    stateUnits,
+    marketInputCoverage,
+  );
+  return stateUnits
+    .map((stateUnit) => buildImpactExpansionCandidate(
+      stateUnit,
+      marketIndex.bySituationId.get(stateUnit.id) || null,
+      priorStateUnits,
+    ))
+    .filter(Boolean)
+    .sort((left, right) => (
+      Number(right.rankingScore || 0) - Number(left.rankingScore || 0)
+      || Number(right.marketContext?.criticalSignalLift || 0) - Number(left.marketContext?.criticalSignalLift || 0)
+      || Number(right.marketContext?.topTransmissionStrength || 0) - Number(left.marketContext?.topTransmissionStrength || 0)
+      || left.candidateStateLabel.localeCompare(right.candidateStateLabel)
+    ))
+    .slice(0, limit)
+    .map((packet, index) => ({
+      ...packet,
+      candidateIndex: index,
+    }));
+}
+
+function buildImpactExpansionCandidateHash(candidatePackets = []) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(candidatePackets.map((packet) => ({
+      stateKind: packet.stateKind,
+      dominantRegion: packet.dominantRegion,
+      macroRegions: packet.macroRegions || [],
+      marketBucketIds: packet.marketBucketIds || [],
+      transmissionChannels: packet.transmissionChannels || [],
+      topSignalTypes: packet.topSignalTypes || [],
+      criticalSignalTypes: packet.criticalSignalTypes || [],
+      routeFacilityKey: packet.routeFacilityKey || '',
+      commodityKey: packet.commodityKey || '',
+      version: IMPACT_EXPANSION_REGISTRY_VERSION,
+    }))))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+function buildImpactExpansionUserPrompt(candidatePackets = []) {
+  return `State candidates for structured consequence expansion:
+
+${candidatePackets.map((packet) => [
+    `Candidate [${packet.candidateIndex}] stateId=${packet.candidateStateId} label=${sanitizeForPrompt(packet.candidateStateLabel)}`,
+    `stateKind=${packet.stateKind} dominantRegion=${packet.dominantRegion || 'unknown'} macroRegions=${(packet.macroRegions || []).join(',') || 'none'}`,
+    `rankingScore=${packet.rankingScore} topBucket=${packet.marketContext?.topBucketLabel || 'none'} topChannel=${packet.marketContext?.topChannel || 'none'} transmissionEdges=${packet.marketContext?.transmissionEdgeCount || 0}`,
+    `routeFacilityKey=${packet.routeFacilityKey || 'none'} commodityKey=${packet.commodityKey || 'none'}`,
+    `marketBuckets=${(packet.marketBucketIds || []).join(',') || 'none'} transmissionChannels=${(packet.transmissionChannels || []).join(',') || 'none'}`,
+    `criticalSignalTypes=${(packet.criticalSignalTypes || []).join(',') || 'none'}`,
+    'Evidence:',
+    ...(packet.evidenceTable || []).map((entry) => `- ${entry.key} [${entry.kind}] ${sanitizeForPrompt(entry.text)}`),
+  ].join('\n')).join('\n\n')}`;
+}
+
+async function extractImpactExpansionBundle({
+  stateUnits = [],
+  worldSignals = null,
+  marketTransmission = null,
+  marketState = null,
+  marketInputCoverage = null,
+  priorWorldState = null,
+} = {}) {
+  const priorStateUnits = Array.isArray(priorWorldState?.stateUnits) ? priorWorldState.stateUnits : [];
+  const candidatePackets = selectImpactExpansionCandidates({
+    stateUnits,
+    worldSignals,
+    marketTransmission,
+    marketState,
+    marketInputCoverage,
+    priorStateUnits,
+  });
+  const bundle = {
+    source: 'none',
+    provider: '',
+    model: '',
+    parseStage: '',
+    rawPreview: '',
+    failureReason: candidatePackets.length ? '' : 'no_candidates',
+    candidateCount: candidatePackets.length,
+    extractedCandidateCount: 0,
+    extractedHypothesisCount: 0,
+    candidates: candidatePackets.map((packet) => ({
+      candidateIndex: packet.candidateIndex,
+      candidateStateId: packet.candidateStateId,
+      label: packet.candidateStateLabel,
+      stateKind: packet.stateKind,
+      dominantRegion: packet.dominantRegion,
+      rankingScore: packet.rankingScore,
+      topBucketId: packet.marketContext?.topBucketId || '',
+      topBucketLabel: packet.marketContext?.topBucketLabel || '',
+      topChannel: packet.marketContext?.topChannel || '',
+      transmissionEdgeCount: packet.marketContext?.transmissionEdgeCount || 0,
+      routeFacilityKey: packet.routeFacilityKey || '',
+      commodityKey: packet.commodityKey || '',
+    })),
+    candidatePackets,
+    extractedCandidates: [],
+  };
+
+  if (candidatePackets.length === 0) return bundle;
+
+  const { url, token } = getRedisCredentials();
+  const cacheKey = `forecast:impact-expansion:llm:${buildImpactExpansionCandidateHash(candidatePackets)}`;
+  const cached = await redisGet(url, token, cacheKey);
+  if (Array.isArray(cached?.candidates)) {
+    const extractedCandidates = sanitizeImpactExpansionDrafts(cached.candidates, candidatePackets);
+    if (extractedCandidates.length > 0) {
+      bundle.source = 'cache';
+      bundle.provider = 'cache';
+      bundle.model = 'cache';
+      bundle.parseStage = 'cache_candidates';
+      bundle.extractedCandidates = extractedCandidates;
+      bundle.extractedCandidateCount = extractedCandidates.length;
+      bundle.extractedHypothesisCount = extractedCandidates.reduce((sum, item) => sum
+        + (item.directHypotheses?.length || 0)
+        + (item.secondOrderHypotheses?.length || 0)
+        + (item.thirdOrderHypotheses?.length || 0), 0);
+      return bundle;
+    }
+  }
+
+  const llmOptions = {
+    ...getForecastLlmCallOptions('impact_expansion'),
+    stage: 'impact_expansion',
+    maxTokens: 1800,
+    temperature: 0.1,
+  };
+  const result = await callForecastLLM(
+    buildImpactExpansionSystemPrompt(),
+    buildImpactExpansionUserPrompt(candidatePackets),
+    llmOptions,
+  );
+
+  if (!result) {
+    bundle.source = 'failed';
+    bundle.failureReason = 'call_failed';
+    return bundle;
+  }
+
+  const parsed = extractImpactExpansionPayload(result.text);
+  const extractedCandidates = sanitizeImpactExpansionDrafts(parsed.candidates, candidatePackets);
+  bundle.source = 'live';
+  bundle.provider = result.provider;
+  bundle.model = result.model;
+  bundle.parseStage = parsed.diagnostics?.stage || '';
+  bundle.rawPreview = parsed.diagnostics?.preview || '';
+
+  if (extractedCandidates.length === 0) {
+    bundle.failureReason = parsed.candidates == null ? 'parse_failed' : 'validation_failed';
+    return bundle;
+  }
+
+  bundle.extractedCandidates = extractedCandidates;
+  bundle.extractedCandidateCount = extractedCandidates.length;
+  bundle.extractedHypothesisCount = extractedCandidates.reduce((sum, item) => sum
+    + (item.directHypotheses?.length || 0)
+    + (item.secondOrderHypotheses?.length || 0)
+    + (item.thirdOrderHypotheses?.length || 0), 0);
+
+  await redisSet(
+    url,
+    token,
+    cacheKey,
+    { candidates: extractedCandidates },
+    IMPACT_EXPANSION_CACHE_TTL_SECONDS,
+  );
   return bundle;
 }
 
@@ -5828,7 +6495,9 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
   const simulationSources = Array.isArray(worldState?.stateUnits) && worldState.stateUnits.length
     ? worldState.stateUnits
     : (worldState?.situationClusters || []);
-  const marketContextIndex = buildSituationMarketContextIndex(
+  const expansionLayers = worldState?.impactExpansion?.simulationLayers || null;
+  const marketContextByRound = expansionLayers?.marketContextByRound || null;
+  const observedMarketContextIndex = marketContextByRound?.observed || buildSituationMarketContextIndex(
     worldState?.worldSignals,
     worldState?.marketTransmission,
     worldState?.marketState,
@@ -5852,11 +6521,17 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     const family = source.familyId
       ? { id: source.familyId, label: source.familyLabel || '' }
       : (familyIndex.get(source.id) || null);
-    const marketContext = marketContextIndex.bySituationId.get(source.id) || null;
+    const observedMarketContext = observedMarketContextIndex.bySituationId.get(source.id) || null;
+    const roundContexts = {
+      round_1: (marketContextByRound?.round_1 || observedMarketContextIndex).bySituationId.get(source.id) || observedMarketContext,
+      round_2: (marketContextByRound?.round_2 || marketContextByRound?.round_1 || observedMarketContextIndex).bySituationId.get(source.id) || observedMarketContext,
+      round_3: (marketContextByRound?.round_3 || marketContextByRound?.round_2 || observedMarketContextIndex).bySituationId.get(source.id) || observedMarketContext,
+    };
+    const marketContext = roundContexts.round_3 || observedMarketContext || null;
     const rounds = [
-      buildSimulationRound('round_1', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext }),
-      buildSimulationRound('round_2', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext }),
-      buildSimulationRound('round_3', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext }),
+      buildSimulationRound('round_1', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext: roundContexts.round_1 }),
+      buildSimulationRound('round_2', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext: roundContexts.round_2 }),
+      buildSimulationRound('round_3', source, { actors, branches, counterEvidence, supportiveEvidence: supportingEvidence, priorSimulation, marketContext: roundContexts.round_3 }),
     ];
     const outcome = summarizeSimulationOutcome(rounds, source.dominantDomain || source.domains?.[0] || '');
     const effectChannelWeights = {};
@@ -5905,6 +6580,7 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
         probabilityDelta: branch.probabilityDelta,
       })),
       marketContext,
+      marketContextsByRound: roundContexts,
       effectChannels: effectChannelCounts,
       actionPlan: rounds.map((round) => ({
         stage: round.stage,
@@ -5994,6 +6670,7 @@ function buildSituationSimulationState(worldState, priorWorldState = null) {
     summary,
     totalSituationSimulations: situationSimulations.length,
     totalRounds: roundTransitions.length,
+    expandedSignalUsageByRound: expansionLayers?.simulationExpandedSignalUsageByRound || {},
     postureCounts,
     roundTransitions,
     actionLedger,
@@ -7965,6 +8642,11 @@ function buildWorldSignal(type, sourceType, label, patch = {}) {
     strength: normalizeSignalStrength(patch.strength ?? 0, 0, 1),
     confidence: normalizeSignalStrength(patch.confidence ?? 0, 0, 1),
     supportingEvidence: (patch.supportingEvidence || []).slice(0, 3),
+    impactOrder: patch.impactOrder || '',
+    impactVariableKey: patch.impactVariableKey || '',
+    impactCandidateStateId: patch.impactCandidateStateId || '',
+    impactAnalogTag: patch.impactAnalogTag || '',
+    dependsOnKey: patch.dependsOnKey || '',
   };
 }
 
@@ -8849,6 +9531,424 @@ function summarizeMarketInputCoverage(inputs = {}) {
   return coverage;
 }
 
+function flattenImpactExpansionHypotheses(bundle = null) {
+  const candidatePackets = Array.isArray(bundle?.candidatePackets) ? bundle.candidatePackets : [];
+  const extractedCandidates = Array.isArray(bundle?.extractedCandidates) ? bundle.extractedCandidates : [];
+  const candidateMap = new Map(candidatePackets.map((packet) => [packet.candidateIndex, packet]));
+  const hypotheses = [];
+
+  for (const extracted of extractedCandidates) {
+    const candidate = candidateMap.get(extracted.candidateIndex);
+    if (!candidate) continue;
+    for (const [order, items] of [
+      ['direct', extracted.directHypotheses || []],
+      ['second_order', extracted.secondOrderHypotheses || []],
+      ['third_order', extracted.thirdOrderHypotheses || []],
+    ]) {
+      for (const item of items) {
+        hypotheses.push({
+          candidateIndex: extracted.candidateIndex,
+          candidateStateId: candidate.candidateStateId,
+          candidateStateLabel: candidate.candidateStateLabel,
+          candidate,
+          order,
+          ...item,
+        });
+      }
+    }
+  }
+
+  return hypotheses;
+}
+
+function getImpactValidationFloors(order = 'direct') {
+  if (order === 'third_order') {
+    return { internal: 0.66, mapped: 0.74, multiplier: 0.72 };
+  }
+  if (order === 'second_order') {
+    return { internal: 0.58, mapped: 0.66, multiplier: 0.85 };
+  }
+  return { internal: 0.5, mapped: 0.58, multiplier: 1 };
+}
+
+function evaluateImpactHypothesisRejection(hypothesis, context = {}) {
+  const {
+    candidate,
+    evidenceKeys = new Set(),
+    duplicateKeys = new Set(),
+    lowerOrderKeys = new Set(),
+  } = context;
+  const registry = IMPACT_VARIABLE_REGISTRY[hypothesis.variableKey];
+  const invalidEvidenceRefs = !Array.isArray(hypothesis.evidenceRefs)
+    || hypothesis.evidenceRefs.length === 0
+    || hypothesis.evidenceRefs.some((ref) => !evidenceKeys.has(ref));
+  if (invalidEvidenceRefs) return 'no_valid_evidence_refs';
+
+  const duplicateKey = `${hypothesis.order}:${hypothesis.variableKey}:${hypothesis.targetBucket}`;
+  if (duplicateKeys.has(duplicateKey)) return 'duplicate_hypothesis';
+
+  if (!registry || !(registry.allowedChannels || []).includes(hypothesis.channel)) return 'unsupported_variable_channel';
+
+  const targetBucketAllowed = (registry.targetBuckets || []).includes(hypothesis.targetBucket);
+  const bucketSignalTypes = MARKET_BUCKET_ALLOWED_CHANNELS[hypothesis.targetBucket] || [];
+  if (!targetBucketAllowed || !bucketSignalTypes.includes(hypothesis.channel)) return 'weak_bucket_coherence';
+
+  if (hypothesis.order !== 'direct' && !lowerOrderKeys.has(hypothesis.dependsOnKey)) return 'missing_dependency';
+
+  if (!(registry.orderAllowed || []).includes(hypothesis.order)) return 'over_speculative_order';
+
+  const candidateSalience = Number(candidate?.rankingScore || 0);
+  const transmissionEdgeCount = Number(candidate?.marketContext?.transmissionEdgeCount || 0);
+  if (hypothesis.order === 'third_order' && (candidateSalience < 0.58 || transmissionEdgeCount < 2)) {
+    return 'over_speculative_order';
+  }
+
+  const contradictionScore = clampUnitInterval(Number(candidate?.marketContext?.contradictionScore || 0));
+  const linkedBucketIds = new Set(candidate?.marketContext?.linkedBucketIds || []);
+  const confirmationScore = Number(candidate?.marketContext?.confirmationScore || 0);
+  if (
+    contradictionScore >= 0.65
+    || (!linkedBucketIds.has(hypothesis.targetBucket) && confirmationScore < 0.35)
+  ) {
+    return 'contradicted_by_current_state';
+  }
+
+  return '';
+}
+
+function validateImpactHypotheses(bundle = null) {
+  const candidatePackets = Array.isArray(bundle?.candidatePackets) ? bundle.candidatePackets : [];
+  const candidateMap = new Map(candidatePackets.map((packet) => [packet.candidateIndex, packet]));
+  const flattened = flattenImpactExpansionHypotheses(bundle);
+  const byCandidate = new Map();
+  for (const hypothesis of flattened) {
+    const group = byCandidate.get(hypothesis.candidateIndex) || [];
+    group.push(hypothesis);
+    byCandidate.set(hypothesis.candidateIndex, group);
+  }
+
+  const results = [];
+  for (const [candidateIndex, items] of byCandidate.entries()) {
+    const candidate = candidateMap.get(candidateIndex);
+    if (!candidate) continue;
+    const evidenceKeys = new Set((candidate.evidenceTable || []).map((entry) => entry.key));
+    const duplicateKeys = new Set();
+    const validatedDirectKeys = new Set();
+    const validatedSecondOrderKeys = new Set();
+
+    const ordered = items.slice().sort((left, right) => (
+      IMPACT_EXPANSION_ORDERS.indexOf(left.order) - IMPACT_EXPANSION_ORDERS.indexOf(right.order)
+      || left.variableKey.localeCompare(right.variableKey)
+      || left.targetBucket.localeCompare(right.targetBucket)
+    ));
+
+    for (const hypothesis of ordered) {
+      const lowerOrderKeys = hypothesis.order === 'second_order'
+        ? validatedDirectKeys
+        : hypothesis.order === 'third_order'
+          ? validatedSecondOrderKeys
+          : new Set();
+      const rejectionReason = evaluateImpactHypothesisRejection(hypothesis, {
+        candidate,
+        evidenceKeys,
+        duplicateKeys,
+        lowerOrderKeys,
+      });
+      const floors = getImpactValidationFloors(hypothesis.order);
+      const analogAdjustedSupport = hypothesis.analogTag && IMPACT_ANALOG_PRIORS[hypothesis.analogTag]
+        ? clampUnitInterval(IMPACT_ANALOG_PRIORS[hypothesis.analogTag].confidenceMultiplier - 1.0)
+        : 0;
+      const candidateSalience = clampUnitInterval(Number(candidate.rankingScore || 0));
+      const evidenceSupport = clampUnitInterval((hypothesis.evidenceRefs || []).length / 2);
+      const specificitySupport = clampUnitInterval(Number(candidate.specificityScore || 0));
+      const continuitySupport = clampUnitInterval(Number(candidate.continuityScore || 0));
+      const contradictionPenalty = clampUnitInterval(Number(candidate.marketContext?.contradictionScore || 0));
+      const channelCoherence = rejectionReason ? 0 : 1;
+      const bucketCoherence = rejectionReason ? 0 : 1;
+      // These two terms are a deliberate 0.22 baseline for any passing hypothesis.
+      // The mapping floors below are calibrated with that constant included.
+      const baseScore = clampUnitInterval(
+        (candidateSalience * 0.12) +
+        (clampUnitInterval(hypothesis.strength) * 0.16) +
+        (clampUnitInterval(hypothesis.confidence) * 0.14) +
+        (evidenceSupport * 0.14) +
+        (channelCoherence * 0.12) +
+        (bucketCoherence * 0.10) +
+        (analogAdjustedSupport * 0.06) +
+        (specificitySupport * 0.08) +
+        (continuitySupport * 0.05) -
+        (contradictionPenalty * 0.03)
+      );
+      const validationScore = clampUnitInterval(baseScore * floors.multiplier);
+      let validationStatus = 'rejected';
+      if (!rejectionReason && validationScore >= floors.mapped) validationStatus = 'mapped';
+      else if (!rejectionReason && validationScore >= floors.internal) validationStatus = 'trace_only';
+
+      results.push({
+        ...hypothesis,
+        variableCategory: IMPACT_VARIABLE_REGISTRY[hypothesis.variableKey]?.category || '',
+        targetBucketLabel: MARKET_BUCKET_CONFIG.find((bucket) => bucket.id === hypothesis.targetBucket)?.label || hypothesis.targetBucket,
+        candidateSalience,
+        evidenceSupport,
+        analogAdjustedSupport,
+        specificitySupport,
+        continuitySupport,
+        contradictionPenalty,
+        validationScore: +validationScore.toFixed(3),
+        validationStatus,
+        rejectionReason: rejectionReason || '',
+      });
+
+      duplicateKeys.add(`${hypothesis.order}:${hypothesis.variableKey}:${hypothesis.targetBucket}`);
+      if (validationStatus !== 'rejected' && hypothesis.variableKey) {
+        if (hypothesis.order === 'direct') validatedDirectKeys.add(hypothesis.variableKey);
+        if (hypothesis.order === 'second_order') validatedSecondOrderKeys.add(hypothesis.variableKey);
+      }
+    }
+  }
+
+  const mapped = results.filter((item) => item.validationStatus === 'mapped');
+  const validated = results.filter((item) => item.validationStatus === 'mapped' || item.validationStatus === 'trace_only');
+  return {
+    hypotheses: results,
+    validated,
+    mapped,
+    orderCounts: summarizeTypeCounts(validated.map((item) => item.order)),
+    rejectionReasonCounts: summarizeTypeCounts(results.filter((item) => item.rejectionReason).map((item) => item.rejectionReason)),
+    analogTagCounts: summarizeTypeCounts(validated.map((item) => item.analogTag).filter(Boolean)),
+  };
+}
+
+function mapImpactHypothesesToWorldSignals(validation = null) {
+  const mappedSignals = [];
+  const seen = new Set();
+  for (const hypothesis of validation?.mapped || []) {
+    const key = [
+      hypothesis.candidateStateId,
+      hypothesis.order,
+      hypothesis.variableKey,
+      hypothesis.targetBucket,
+      hypothesis.channel,
+    ].join(':');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const registry = IMPACT_VARIABLE_REGISTRY[hypothesis.variableKey];
+    const candidate = hypothesis.candidate || {};
+    const evidenceTextByKey = new Map((candidate.evidenceTable || []).map((entry) => [entry.key, entry.text]));
+    const bucketLabel = MARKET_BUCKET_CONFIG.find((bucket) => bucket.id === hypothesis.targetBucket)?.label || hypothesis.targetBucket;
+    mappedSignals.push(buildWorldSignal(
+      hypothesis.channel,
+      IMPACT_EXPANSION_SOURCE_TYPE,
+      hypothesis.summary || `${candidate.candidateStateLabel || 'State'} -> ${bucketLabel}`,
+      {
+        sourceKey: `${candidate.candidateStateId || 'state'}:${hypothesis.order}:${hypothesis.variableKey}:${hypothesis.targetBucket}`,
+        region: hypothesis.region || candidate.dominantRegion || '',
+        macroRegion: hypothesis.macroRegion || candidate.macroRegions?.[0] || '',
+        countries: hypothesis.countries?.length ? hypothesis.countries : (candidate.countries || []),
+        domains: registry?.defaultDomains || ['market'],
+        strength: hypothesis.validationScore,
+        confidence: clampUnitInterval((Number(hypothesis.confidence || 0) * 0.64) + (Number(hypothesis.validationScore || 0) * 0.36)),
+        supportingEvidence: (hypothesis.evidenceRefs || []).map((ref) => evidenceTextByKey.get(ref)).filter(Boolean).slice(0, 3),
+        impactOrder: hypothesis.order,
+        impactVariableKey: hypothesis.variableKey,
+        impactCandidateStateId: candidate.candidateStateId || '',
+        impactAnalogTag: hypothesis.analogTag || '',
+        dependsOnKey: hypothesis.dependsOnKey || '',
+      },
+    ));
+  }
+  return mappedSignals;
+}
+
+function buildWorldSignalLayer(observedWorldSignals, extraSignals = []) {
+  const baseSignals = Array.isArray(observedWorldSignals?.signals) ? observedWorldSignals.signals : [];
+  const signals = [...baseSignals, ...extraSignals];
+  const criticalSignals = signals
+    .filter((signal) => CRITICAL_NEWS_SOURCE_TYPES.has(signal.sourceType))
+    .sort((a, b) => (b.strength + b.confidence) - (a.strength + a.confidence) || a.label.localeCompare(b.label));
+  return {
+    summary: summarizeWorldSignals(signals),
+    typeCounts: summarizeTypeCounts(signals.map((signal) => signal.type)),
+    criticalSignalCount: criticalSignals.length,
+    criticalSignals: criticalSignals.slice(0, 16),
+    criticalExtraction: observedWorldSignals?.criticalExtraction || null,
+    signals,
+  };
+}
+
+function buildImpactExpansionSimulationLayers({
+  observedWorldSignals,
+  situationClusters = [],
+  stateUnits = [],
+  marketInputCoverage = null,
+  mappedSignals = [],
+} = {}) {
+  const mappedDirect = mappedSignals.filter((signal) => signal.impactOrder === 'direct');
+  const mappedSecond = mappedSignals.filter((signal) => signal.impactOrder === 'second_order');
+  const mappedThird = mappedSignals.filter((signal) => signal.impactOrder === 'third_order');
+
+  const layer0 = observedWorldSignals;
+  const layer1 = mappedDirect.length > 0 ? buildWorldSignalLayer(observedWorldSignals, mappedDirect) : layer0;
+  const layer2 = mappedSecond.length > 0 ? buildWorldSignalLayer(layer1, mappedSecond) : layer1;
+  const layer3 = mappedThird.length > 0 ? buildWorldSignalLayer(layer2, mappedThird) : layer2;
+
+  const transmissionObserved = buildMarketTransmissionGraph(layer0, situationClusters);
+  const stateObserved = buildMarketState(layer0, transmissionObserved);
+  const contextObserved = buildSituationMarketContextIndex(layer0, transmissionObserved, stateObserved, stateUnits, marketInputCoverage);
+
+  const transmissionRound1 = layer1 === layer0 ? transmissionObserved : buildMarketTransmissionGraph(layer1, situationClusters);
+  const stateRound1 = layer1 === layer0 ? stateObserved : buildMarketState(layer1, transmissionRound1);
+  const contextRound1 = layer1 === layer0 ? contextObserved : buildSituationMarketContextIndex(layer1, transmissionRound1, stateRound1, stateUnits, marketInputCoverage);
+
+  const transmissionRound2 = layer2 === layer1 ? transmissionRound1 : buildMarketTransmissionGraph(layer2, situationClusters);
+  const stateRound2 = layer2 === layer1 ? stateRound1 : buildMarketState(layer2, transmissionRound2);
+  const contextRound2 = layer2 === layer1 ? contextRound1 : buildSituationMarketContextIndex(layer2, transmissionRound2, stateRound2, stateUnits, marketInputCoverage);
+
+  const transmissionRound3 = layer3 === layer2 ? transmissionRound2 : buildMarketTransmissionGraph(layer3, situationClusters);
+  const stateRound3 = layer3 === layer2 ? stateRound2 : buildMarketState(layer3, transmissionRound3);
+  const contextRound3 = layer3 === layer2 ? contextRound2 : buildSituationMarketContextIndex(layer3, transmissionRound3, stateRound3, stateUnits, marketInputCoverage);
+
+  return {
+    layers: {
+      observed: layer0,
+      round_1: layer1,
+      round_2: layer2,
+      round_3: layer3,
+    },
+    marketTransmissionByRound: {
+      observed: transmissionObserved,
+      round_1: transmissionRound1,
+      round_2: transmissionRound2,
+      round_3: transmissionRound3,
+    },
+    marketStateByRound: {
+      observed: stateObserved,
+      round_1: stateRound1,
+      round_2: stateRound2,
+      round_3: stateRound3,
+    },
+    marketContextByRound: {
+      observed: contextObserved,
+      round_1: contextRound1,
+      round_2: contextRound2,
+      round_3: contextRound3,
+    },
+    observedWorldSignalCount: layer0?.signals?.length || 0,
+    expandedWorldSignalCount: layer3?.signals?.length || 0,
+    expandedTransmissionEdgeCount: transmissionRound3?.edges?.length || 0,
+    simulationExpandedSignalUsageByRound: {
+      round_1: {
+        mappedCount: mappedDirect.length,
+        totalSignalCount: layer1?.signals?.length || 0,
+      },
+      round_2: {
+        mappedCount: mappedDirect.length + mappedSecond.length,
+        totalSignalCount: layer2?.signals?.length || 0,
+      },
+      round_3: {
+        mappedCount: mappedDirect.length + mappedSecond.length + mappedThird.length,
+        totalSignalCount: layer3?.signals?.length || 0,
+      },
+    },
+  };
+}
+
+function materializeImpactExpansion({
+  bundle = null,
+  observedWorldSignals = null,
+  situationClusters = [],
+  stateUnits = [],
+  marketInputCoverage = null,
+} = {}) {
+  const allowedStateIds = new Set((stateUnits || []).map((unit) => unit.id));
+  const filteredBundle = bundle ? {
+    ...bundle,
+    candidatePackets: (Array.isArray(bundle?.candidatePackets) ? bundle.candidatePackets : [])
+      .filter((packet) => allowedStateIds.has(packet.candidateStateId)),
+  } : null;
+  if (filteredBundle) {
+    const allowedIndexes = new Set(filteredBundle.candidatePackets.map((packet) => packet.candidateIndex));
+    filteredBundle.candidates = (Array.isArray(bundle?.candidates) ? bundle.candidates : [])
+      .filter((packet) => allowedIndexes.has(packet.candidateIndex));
+    filteredBundle.extractedCandidates = (Array.isArray(bundle?.extractedCandidates) ? bundle.extractedCandidates : [])
+      .filter((item) => allowedIndexes.has(item.candidateIndex));
+    filteredBundle.candidateCount = filteredBundle.candidatePackets.length;
+    filteredBundle.extractedCandidateCount = filteredBundle.extractedCandidates.length;
+  }
+
+  const validation = validateImpactHypotheses(filteredBundle);
+  const mappedSignals = mapImpactHypothesesToWorldSignals(validation);
+  const simulationLayers = buildImpactExpansionSimulationLayers({
+    observedWorldSignals,
+    situationClusters,
+    stateUnits,
+    marketInputCoverage,
+    mappedSignals,
+  });
+  const topHypotheses = validation.validated
+    .slice()
+    .sort((left, right) => (
+      Number(right.validationScore || 0) - Number(left.validationScore || 0)
+      || left.candidateStateLabel.localeCompare(right.candidateStateLabel)
+    ))
+    .slice(0, 8)
+    .map((item) => ({
+      candidateStateId: item.candidateStateId,
+      candidateStateLabel: item.candidateStateLabel,
+      order: item.order,
+      variableKey: item.variableKey,
+      channel: item.channel,
+      targetBucket: item.targetBucket,
+      validationScore: item.validationScore,
+      validationStatus: item.validationStatus,
+      summary: item.summary,
+    }));
+
+  return {
+    source: filteredBundle?.source || bundle?.source || 'none',
+    provider: filteredBundle?.provider || bundle?.provider || '',
+    model: filteredBundle?.model || bundle?.model || '',
+    parseStage: filteredBundle?.parseStage || bundle?.parseStage || '',
+    rawPreview: filteredBundle?.rawPreview || bundle?.rawPreview || '',
+    failureReason: filteredBundle?.failureReason || bundle?.failureReason || '',
+    candidateCount: Number(filteredBundle?.candidateCount || 0),
+    extractedCandidateCount: Number(filteredBundle?.extractedCandidateCount || 0),
+    hypothesisCount: flattenImpactExpansionHypotheses(filteredBundle).length,
+    validatedHypothesisCount: validation.validated.length,
+    mappedSignalCount: mappedSignals.length,
+    orderCounts: validation.orderCounts,
+    rejectionReasonCounts: validation.rejectionReasonCounts,
+    analogTagCounts: validation.analogTagCounts,
+    topHypotheses,
+    candidatePreview: Array.isArray(filteredBundle?.candidates) ? filteredBundle.candidates.slice(0, 6) : [],
+    candidatePackets: Array.isArray(filteredBundle?.candidatePackets) ? filteredBundle.candidatePackets : [],
+    hypotheses: validation.hypotheses.map((item) => ({
+      candidateIndex: item.candidateIndex,
+      candidateStateId: item.candidateStateId,
+      candidateStateLabel: item.candidateStateLabel,
+      order: item.order,
+      variableKey: item.variableKey,
+      variableCategory: item.variableCategory,
+      channel: item.channel,
+      targetBucket: item.targetBucket,
+      strength: item.strength,
+      confidence: item.confidence,
+      analogTag: item.analogTag,
+      summary: item.summary,
+      evidenceRefs: item.evidenceRefs,
+      validationScore: item.validationScore,
+      validationStatus: item.validationStatus,
+      rejectionReason: item.rejectionReason,
+    })),
+    mappedSignals,
+    observedWorldSignalCount: simulationLayers.observedWorldSignalCount,
+    expandedWorldSignalCount: simulationLayers.expandedWorldSignalCount,
+    expandedTransmissionEdgeCount: simulationLayers.expandedTransmissionEdgeCount,
+    simulationExpandedSignalUsageByRound: simulationLayers.simulationExpandedSignalUsageByRound,
+    simulationLayers,
+  };
+}
+
 function buildForecastRunWorldState(data) {
   const generatedAt = data?.generatedAt || Date.now();
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
@@ -8878,6 +9978,14 @@ function buildForecastRunWorldState(data) {
   const worldSignals = buildWorldSignals(inputs, predictions, situationClusters);
   const marketTransmission = buildMarketTransmissionGraph(worldSignals, situationClusters);
   const marketState = buildMarketState(worldSignals, marketTransmission);
+  const impactExpansionBundle = data?.impactExpansionBundle || inputs?.impactExpansionBundle || null;
+  const impactExpansion = materializeImpactExpansion({
+    bundle: impactExpansionBundle,
+    observedWorldSignals: worldSignals,
+    situationClusters,
+    stateUnits,
+    marketInputCoverage,
+  });
   const activeDomains = domainStates.filter((item) => item.forecastCount > 0).map((item) => item.domain);
   const summary = `${predictions.length} active forecasts are spanning ${activeDomains.length} domains, ${regionalStates.length} key regions, ${situationClusters.length} clustered situations compressed into ${stateUnits.length} canonical state units, and ${situationFamilies.length} broader situation families in this run, with ${continuity.newForecasts} new forecasts, ${continuity.materiallyChanged.length} materially changed paths, ${actorContinuity.newlyActiveCount} newly active actors, ${branchContinuity.strengthenedBranchCount} strengthened branches, and ${marketState.buckets.length} active market-state buckets.`;
   const worldState = {
@@ -8905,6 +10013,7 @@ function buildForecastRunWorldState(data) {
     marketState,
     marketTransmission,
     marketInputCoverage,
+    impactExpansion,
     uncertainties: evidenceLedger.counter.slice(0, 10),
   };
   worldState.simulationState = buildSituationSimulationState(worldState, priorWorldState);
@@ -8922,11 +10031,18 @@ function summarizeWorldStateSurface(worldState) {
     stateUnitCount: worldState.stateUnits?.length || 0,
     familyCount: worldState.situationFamilies?.length || 0,
     worldSignalCount: worldState.worldSignals?.signals?.length || 0,
+    observedWorldSignalCount: worldState.impactExpansion?.observedWorldSignalCount || worldState.worldSignals?.signals?.length || 0,
+    expandedWorldSignalCount: worldState.impactExpansion?.expandedWorldSignalCount || worldState.worldSignals?.signals?.length || 0,
     criticalSignalCount: worldState.worldSignals?.criticalSignalCount || 0,
     criticalSignalCandidateCount: worldState.worldSignals?.criticalExtraction?.candidateCount || 0,
     criticalSignalFrameCount: worldState.worldSignals?.criticalExtraction?.extractedFrameCount || 0,
+    impactExpansionCandidateCount: worldState.impactExpansion?.candidateCount || 0,
+    impactExpansionHypothesisCount: worldState.impactExpansion?.hypothesisCount || 0,
+    impactExpansionValidatedHypothesisCount: worldState.impactExpansion?.validatedHypothesisCount || 0,
+    impactExpansionMappedSignalCount: worldState.impactExpansion?.mappedSignalCount || 0,
     marketBucketCount: worldState.marketState?.buckets?.length || 0,
     transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
+    expandedTransmissionEdgeCount: worldState.impactExpansion?.expandedTransmissionEdgeCount || worldState.marketTransmission?.edges?.length || 0,
     marketConsequenceCount: worldState.simulationState?.marketConsequences?.items?.length || 0,
     blockedMarketConsequenceCount: worldState.simulationState?.marketConsequences?.blockedCount || 0,
     simulationSituationCount: worldState.simulationState?.totalSituationSimulations || 0,
@@ -9149,14 +10265,23 @@ function buildForecastTraceArtifacts(data, context = {}, config = {}) {
       situationCount: worldState.situationClusters.length,
       familyCount: worldState.situationFamilies?.length || 0,
       worldSignalCount: worldState.worldSignals?.signals?.length || 0,
+      observedWorldSignalCount: worldState.impactExpansion?.observedWorldSignalCount || worldState.worldSignals?.signals?.length || 0,
+      expandedWorldSignalCount: worldState.impactExpansion?.expandedWorldSignalCount || worldState.worldSignals?.signals?.length || 0,
       criticalSignalCount: worldState.worldSignals?.criticalSignalCount || 0,
       criticalSignalSource: worldState.worldSignals?.criticalExtraction?.source || '',
       criticalSignalCandidateCount: worldState.worldSignals?.criticalExtraction?.candidateCount || 0,
       criticalSignalFrameCount: worldState.worldSignals?.criticalExtraction?.extractedFrameCount || 0,
       criticalSignalFallbackCount: worldState.worldSignals?.criticalExtraction?.fallbackNewsSignalCount || 0,
       criticalSignalFailureReason: worldState.worldSignals?.criticalExtraction?.failureReason || '',
+      impactExpansionSource: worldState.impactExpansion?.source || '',
+      impactExpansionCandidateCount: worldState.impactExpansion?.candidateCount || 0,
+      impactExpansionHypothesisCount: worldState.impactExpansion?.hypothesisCount || 0,
+      impactExpansionValidatedHypothesisCount: worldState.impactExpansion?.validatedHypothesisCount || 0,
+      impactExpansionMappedSignalCount: worldState.impactExpansion?.mappedSignalCount || 0,
+      impactExpansionFailureReason: worldState.impactExpansion?.failureReason || '',
       marketBucketCount: worldState.marketState?.buckets?.length || 0,
       transmissionEdgeCount: worldState.marketTransmission?.edges?.length || 0,
+      expandedTransmissionEdgeCount: worldState.impactExpansion?.expandedTransmissionEdgeCount || worldState.marketTransmission?.edges?.length || 0,
       marketConsequenceCount: worldState.simulationState?.marketConsequences?.items?.length || 0,
       blockedMarketConsequenceCount: worldState.simulationState?.marketConsequences?.blockedCount || 0,
       topMarketBucket: worldState.marketState?.topBucketLabel || '',
@@ -10285,16 +11410,21 @@ function getForecastLlmCallOptions(stage = 'default') {
   const globalProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_PROVIDER_ORDER);
   const combinedProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER);
   const criticalProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_CRITICAL_PROVIDER_ORDER);
+  const impactProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_IMPACT_PROVIDER_ORDER);
   const providerOrder = stage === 'combined'
     ? (combinedProviderOrder || globalProviderOrder || defaultProviderOrder)
     : stage === 'critical_signals'
       ? (criticalProviderOrder || globalProviderOrder || defaultProviderOrder)
+      : stage === 'impact_expansion'
+        ? (impactProviderOrder || globalProviderOrder || defaultProviderOrder)
       : (globalProviderOrder || defaultProviderOrder);
 
   const openrouterModel = stage === 'combined'
     ? (process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
     : stage === 'critical_signals'
       ? (process.env.FORECAST_LLM_CRITICAL_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
+      : stage === 'impact_expansion'
+        ? (process.env.FORECAST_LLM_IMPACT_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
       : process.env.FORECAST_LLM_MODEL_OPENROUTER;
 
   return {
@@ -11222,6 +12352,17 @@ async function fetchForecasts() {
     selectionMarketTransmission = buildMarketTransmissionGraph(selectionWorldSignals, fullRunSituationClusters);
     selectionMarketState = buildMarketState(selectionWorldSignals, selectionMarketTransmission);
   }
+  console.log('  Expanding state consequences for simulation...');
+  inputs.impactExpansionBundle = await extractImpactExpansionBundle({
+    inputs,
+    stateUnits: fullRunStateUnits,
+    worldSignals: selectionWorldSignals,
+    marketTransmission: selectionMarketTransmission,
+    marketState: selectionMarketState,
+    marketInputCoverage: selectionMarketInputCoverage,
+    priorWorldState,
+  });
+  console.log(`  [ImpactExpansion] source=${inputs.impactExpansionBundle.source} candidates=${inputs.impactExpansionBundle.candidateCount} extracted=${inputs.impactExpansionBundle.extractedCandidateCount} hypotheses=${inputs.impactExpansionBundle.extractedHypothesisCount}${inputs.impactExpansionBundle.failureReason ? ` failure=${inputs.impactExpansionBundle.failureReason}` : ''}`);
   const marketSelectionIndex = buildSituationMarketContextIndex(
     selectionWorldSignals,
     selectionMarketTransmission,
@@ -11504,4 +12645,8 @@ export {
   mapCriticalSignalFrameToSignals,
   extractCriticalSignalBundle,
   extractCriticalNewsSignals,
+  selectImpactExpansionCandidates,
+  buildImpactExpansionCandidateHash,
+  validateImpactHypotheses,
+  materializeImpactExpansion,
 };
