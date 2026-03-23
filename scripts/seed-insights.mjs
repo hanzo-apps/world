@@ -2,6 +2,7 @@
 
 import { loadEnvFile, CHROME_UA, getRedisCredentials, runSeed } from './_seed-utils.mjs';
 import { clusterItems, selectTopStories } from './_clustering.mjs';
+import { extractCountryCode } from './shared/geo-extract.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -304,6 +305,7 @@ async function fetchInsights() {
     const { category, threatLevel } = hasDigestThreat
       ? { category: story.threat.category ?? 'general', threatLevel: story.threat.level }
       : categorizeStory(story.primaryTitle);
+    const countryCode = extractCountryCode(story.primaryTitle) ?? null;
     return {
       primaryTitle: story.primaryTitle,
       primarySource: story.primarySource,
@@ -315,6 +317,7 @@ async function fetchInsights() {
       isAlert: story.isAlert,
       category,
       threatLevel,
+      countryCode,
     };
   });
 
