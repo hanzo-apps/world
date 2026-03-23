@@ -304,6 +304,42 @@ export interface NationalDebtEntry {
   source: string;
 }
 
+export interface ListFuelPricesRequest {
+}
+
+export interface ListFuelPricesResponse {
+  countries: FuelCountryPrice[];
+  fetchedAt: string;
+  cheapestGasoline: string;
+  cheapestDiesel: string;
+  mostExpensiveGasoline: string;
+  mostExpensiveDiesel: string;
+  wowAvailable: boolean;
+  prevFetchedAt: string;
+  sourceCount: number;
+  countryCount: number;
+}
+
+export interface FuelCountryPrice {
+  code: string;
+  name: string;
+  currency: string;
+  flag: string;
+  gasoline?: FuelPrice;
+  diesel?: FuelPrice;
+  fxRate: number;
+}
+
+export interface FuelPrice {
+  usdPrice: number;
+  localPrice: number;
+  grade: string;
+  source: string;
+  available: boolean;
+  wowPct: number;
+  observedAt: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -641,6 +677,29 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetNationalDebtResponse;
+  }
+
+  async listFuelPrices(req: ListFuelPricesRequest, options?: EconomicServiceCallOptions): Promise<ListFuelPricesResponse> {
+    let path = "/api/economic/v1/list-fuel-prices";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as ListFuelPricesResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {
