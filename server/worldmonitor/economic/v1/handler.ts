@@ -12,6 +12,7 @@ import { getBisCredit } from './get-bis-credit';
 import { listGroceryBasketPrices } from './list-grocery-basket-prices';
 import { listBigMacPrices } from './list-bigmac-prices';
 import { getNationalDebt } from './get-national-debt';
+import { listFuelPrices } from './list-fuel-prices';
 
 export const economicHandler: EconomicServiceHandler = {
   getFredSeries,
@@ -26,4 +27,5 @@ export const economicHandler: EconomicServiceHandler = {
   listGroceryBasketPrices,
   listBigMacPrices,
   getNationalDebt,
+  listFuelPrices,
 };

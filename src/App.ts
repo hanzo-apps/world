@@ -32,6 +32,7 @@ import type { StrategicRiskPanel } from '@/components/StrategicRiskPanel';
 import type { GulfEconomiesPanel } from '@/components/GulfEconomiesPanel';
 import type { GroceryBasketPanel } from '@/components/GroceryBasketPanel';
 import type { BigMacPanel } from '@/components/BigMacPanel';
+import type { FuelPricesPanel } from '@/components/FuelPricesPanel';
 import type { ConsumerPricesPanel } from '@/components/ConsumerPricesPanel';
 import { isDesktopRuntime, waitForSidecarReady } from '@/services/runtime';
 import { getSecretState } from '@/services/runtime-config';
@@ -256,6 +257,10 @@ export class App {
     if (shouldPrime('bigmac')) {
       const panel = this.state.panels['bigmac'] as BigMacPanel | undefined;
       if (panel) primeTask('bigmac', () => panel.fetchData());
+    }
+    if (shouldPrime('fuel-prices')) {
+      const panel = this.state.panels['fuel-prices'] as FuelPricesPanel | undefined;
+      if (panel) primeTask('fuel-prices', () => panel.fetchData());
     }
     if (shouldPrime('consumer-prices')) {
       const panel = this.state.panels['consumer-prices'] as ConsumerPricesPanel | undefined;
@@ -1114,6 +1119,13 @@ export class App {
       () => (this.state.panels['bigmac'] as BigMacPanel).fetchData(),
       REFRESH_INTERVALS.groceryBasket,
       () => this.isPanelNearViewport('bigmac')
+    );
+
+    this.refreshScheduler.scheduleRefresh(
+      'fuel-prices',
+      () => (this.state.panels['fuel-prices'] as FuelPricesPanel).fetchData(),
+      REFRESH_INTERVALS.fuelPrices,
+      () => this.isPanelNearViewport('fuel-prices')
     );
 
     // Refresh intelligence signals for CII (geopolitical variant only)

@@ -391,6 +391,32 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/list-fuel-prices:
+        get:
+            tags:
+                - EconomicService
+            summary: ListFuelPrices
+            description: ListFuelPrices retrieves retail gasoline and diesel prices across 30+ countries.
+            operationId: ListFuelPrices
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListFuelPricesResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -1137,3 +1163,70 @@ components:
                     type: string
                     description: Human-readable source string.
             description: NationalDebtEntry holds debt data for a single country.
+        ListFuelPricesRequest:
+            type: object
+        ListFuelPricesResponse:
+            type: object
+            properties:
+                countries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/FuelCountryPrice'
+                fetchedAt:
+                    type: string
+                cheapestGasoline:
+                    type: string
+                cheapestDiesel:
+                    type: string
+                mostExpensiveGasoline:
+                    type: string
+                mostExpensiveDiesel:
+                    type: string
+                wowAvailable:
+                    type: boolean
+                prevFetchedAt:
+                    type: string
+                sourceCount:
+                    type: integer
+                    format: int32
+                countryCount:
+                    type: integer
+                    format: int32
+        FuelCountryPrice:
+            type: object
+            properties:
+                code:
+                    type: string
+                name:
+                    type: string
+                currency:
+                    type: string
+                flag:
+                    type: string
+                gasoline:
+                    $ref: '#/components/schemas/FuelPrice'
+                diesel:
+                    $ref: '#/components/schemas/FuelPrice'
+                fxRate:
+                    type: number
+                    format: double
+        FuelPrice:
+            type: object
+            properties:
+                usdPrice:
+                    type: number
+                    format: double
+                localPrice:
+                    type: number
+                    format: double
+                grade:
+                    type: string
+                source:
+                    type: string
+                available:
+                    type: boolean
+                wowPct:
+                    type: number
+                    format: double
+                observedAt:
+                    type: string

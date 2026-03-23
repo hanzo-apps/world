@@ -44,6 +44,7 @@ export const REFRESH_INTERVALS = {
   telegramIntel: 60 * 1000,
   gulfEconomies: 10 * 60 * 1000,
   groceryBasket: 6 * 60 * 60 * 1000,
+  fuelPrices: 6 * 60 * 60 * 1000,
   intelligence: 15 * 60 * 1000,
   correlationEngine: 5 * 60 * 1000,
 };
