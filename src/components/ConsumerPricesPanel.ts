@@ -8,6 +8,7 @@ import {
   fetchConsumerPriceMovers,
   fetchRetailerPriceSpreads,
   fetchConsumerPriceFreshness,
+  MARKETS,
   DEFAULT_MARKET,
   DEFAULT_BASKET,
   type GetConsumerPriceOverviewResponse,
@@ -109,6 +110,16 @@ export class ConsumerPricesPanel extends Panel {
   private handleClick(e: Event): void {
     const target = e.target as HTMLElement;
 
+    const marketBtn = target.closest('[data-market]') as HTMLElement | null;
+    if (marketBtn?.dataset.market) {
+      const code = marketBtn.dataset.market;
+      this.settings.market = code;
+      this.settings.basket = `essentials-${code}`;
+      saveSettings(this.settings);
+      void this.fetchData();
+      return;
+    }
+
     const tab = target.closest('.panel-tab') as HTMLElement | null;
     if (tab?.dataset.tab) {
       this.settings.tab = tab.dataset.tab as TabId;
@@ -169,7 +180,7 @@ export class ConsumerPricesPanel extends Panel {
   }
 
   private render(): void {
-    const { tab, range, categoryFilter } = this.settings;
+    const { tab, range, categoryFilter, market } = this.settings;
 
     const tabs: Array<{ id: TabId; label: string }> = [
       { id: 'overview', label: t('components.consumerPrices.tabs.overview') },
@@ -189,6 +200,14 @@ export class ConsumerPricesPanel extends Panel {
       </div>
     `;
 
+    const marketBarHtml = `
+      <div class="cp-market-bar">
+        ${MARKETS.map((m) => `
+          <button class="cp-market-btn${market === m.code ? ' active' : ''}" data-market="${m.code}">${m.label}</button>
+        `).join('')}
+      </div>
+    `;
+
     const rangeHtml = `
       <div class="cp-range-bar">
         ${(['7d', '30d', '90d'] as const).map((r) => `
@@ -204,6 +223,7 @@ export class ConsumerPricesPanel extends Panel {
     if (noData) {
       this.setContent(`
         <div class="consumer-prices-panel">
+          ${marketBarHtml}
           ${tabsHtml}
           <div class="cp-body cp-seeding-state">
             <div class="cp-seeding-icon">📊</div>
@@ -238,6 +258,7 @@ export class ConsumerPricesPanel extends Panel {
 
     this.setContent(`
       <div class="consumer-prices-panel">
+        ${marketBarHtml}
         ${tabsHtml}
         <div class="cp-body">${bodyHtml}</div>
       </div>
