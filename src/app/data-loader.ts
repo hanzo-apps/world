@@ -61,6 +61,7 @@ import {
   fetchTradeRestrictions,
   fetchTariffTrends,
   fetchTradeFlows,
+  fetchComtradeFlows,
   fetchTradeBarriers,
   fetchCustomsRevenue,
   fetchShippingRates,
@@ -2409,12 +2410,13 @@ export class DataLoaderManager implements AppModule {
     if (!tradePanel) return;
 
     try {
-      const [restrictions, tariffs, flows, barriers, revenue] = await Promise.allSettled([
+      const [restrictions, tariffs, flows, barriers, revenue, comtrade] = await Promise.allSettled([
         fetchTradeRestrictions([], 50),
         fetchTariffTrends('840', '156', '', 10),
         fetchTradeFlows('840', '156', 10),
         fetchTradeBarriers([], '', 50),
         fetchCustomsRevenue(),
+        fetchComtradeFlows(),
       ]);
 
       const r = restrictions.status === 'fulfilled' ? restrictions.value : null;
@@ -2422,12 +2424,14 @@ export class DataLoaderManager implements AppModule {
       const fl = flows.status === 'fulfilled' ? flows.value : null;
       const ba = barriers.status === 'fulfilled' ? barriers.value : null;
       const rev = revenue.status === 'fulfilled' ? revenue.value : null;
+      const ct = comtrade.status === 'fulfilled' ? comtrade.value : null;
 
       if (r) tradePanel.updateRestrictions(r);
       if (ta) tradePanel.updateTariffs(ta);
       if (fl) tradePanel.updateFlows(fl);
       if (ba) tradePanel.updateBarriers(ba);
       if (rev) tradePanel.updateRevenue(rev);
+      if (ct) tradePanel.updateComtradeFlows(ct);
 
       const wtoItems = (r?.restrictions?.length ?? 0) + (ta?.datapoints?.length ?? 0) + (fl?.flows?.length ?? 0) + (ba?.barriers?.length ?? 0);
       const anyUnavailable = r?.upstreamUnavailable || ta?.upstreamUnavailable || fl?.upstreamUnavailable || ba?.upstreamUnavailable;
