@@ -537,7 +537,7 @@ async function fetchUK_ModeA() {
   }];
 }
 
-const prevSnapshot = await readSeedSnapshot(CANONICAL_KEY);
+const prevSnapshot = await readSeedSnapshot(`${CANONICAL_KEY}:prev`);
 
 const fxSymbols = {};
 for (const ccy of ['MYR', 'EUR', 'MXN', 'PLN', 'CZK', 'DKK', 'HUF', 'RON', 'SEK', 'BGN', 'BRL', 'NZD', 'GBP']) {
@@ -693,9 +693,9 @@ await runSeed('economic', 'fuel-prices', CANONICAL_KEY, async () => data, {
   ttlSeconds: CACHE_TTL,
   validateFn: (d) => d?.countries?.length >= 1,
   recordCount: (d) => d?.countries?.length || 0,
-  extraKeys: prevSnapshot ? [{
+  extraKeys: [{
     key: `${CANONICAL_KEY}:prev`,
-    transform: () => prevSnapshot,
+    transform: () => data,
     ttl: CACHE_TTL * 2,
-  }] : undefined,
+  }],
 });
