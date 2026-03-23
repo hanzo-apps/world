@@ -19,6 +19,7 @@ import type { FirecrawlProvider } from '../acquisition/firecrawl.js';
 import type { RetailerConfig } from '../config/types.js';
 import type { AdapterContext, FetchResult, ParsedProduct, RetailerAdapter, Target } from './types.js';
 import { MARKET_NAMES } from './market-names.js';
+import { parseSize } from '../normalizers/size.js';
 
 /** Packaging/container words that are not product identity tokens. */
 const PACKAGING_WORDS = new Set(['pack', 'box', 'bag', 'container', 'bottle', 'can', 'jar', 'tin', 'set', 'kit', 'bundle']);
@@ -58,6 +59,20 @@ export function isTitlePlausible(canonicalName: string, productName: string | un
 }
 
 /**
+ * Build a size constraint hint from the canonical name for use in the Firecrawl prompt.
+ * Returns a human-readable string like "1 gallon (approx. 3785ml)" or null if no size found.
+ */
+export function extractSizeHint(canonicalName: string): string | null {
+  const parsed = parseSize(canonicalName);
+  if (!parsed) return null;
+  const { packCount, sizeValue, sizeUnit, baseQuantity, baseUnit } = parsed;
+  if (packCount > 1) {
+    return `${packCount} × ${sizeValue}${sizeUnit} (approx. ${Math.round(baseQuantity)}${baseUnit} total)`;
+  }
+  return `${sizeValue}${sizeUnit} (approx. ${Math.round(baseQuantity)}${baseUnit})`;
+}
+
+/**
  * Safe host boundary check. Prevents evilluluhypermarket.com from passing
  * when allowedHost is luluhypermarket.com.
  */
@@ -75,6 +90,7 @@ interface ExtractedProduct {
   price?: number;
   currency?: string;
   inStock?: boolean;
+  sizeText?: string;
 }
 
 interface SearchPayload {
@@ -156,13 +172,19 @@ export class SearchAdapter implements RetailerAdapter {
     canonicalName: string,
     currency: string,
   ): Promise<ExtractedProduct | null> {
+    const sizeHint = extractSizeHint(canonicalName);
+    const sizeClause = sizeHint
+      ? ` You are looking for "${canonicalName}". The product MUST be ${sizeHint}. If the page shows a different size, pack count, or bulk case, return null for price.`
+      : ` You are looking for "${canonicalName}".`;
+
     const extractSchema = {
-      prompt: `Extract the retail price of THIS specific product from the main product section of the page. The price may be displayed as two parts split across lines — like "3" and ".95" next to "${currency}" — combine them to get 3.95. ONLY extract the price shown for the main product itself. If the page shows "Out of Stock" and no price is displayed for the main product, return null for price — do NOT use prices from related products, recommendations, or carousels. Return the product name, the numeric price in ${currency} (null if not shown), the currency code, and whether it is in stock.`,
+      prompt: `Extract the retail price of THIS specific product from the main product section of the page.${sizeClause} The price may be displayed as two parts split across lines — like "3" and ".95" next to "${currency}" — combine them to get 3.95. ONLY extract the price shown for the main product itself. If the page shows "Out of Stock" and no price is displayed for the main product, return null for price — do NOT use prices from related products, recommendations, or carousels. Return the product name, the numeric price in ${currency} (null if not shown), the currency code, whether it is in stock, and the size or quantity shown on the page.`,
       fields: {
         productName: { type: 'string' as const, description: 'Name or title of the product' },
         price: { type: 'number' as const, description: `Retail price in ${currency} as a single number (e.g. 4.69)` },
         currency: { type: 'string' as const, description: `Currency code, should be ${currency}` },
         inStock: { type: 'boolean' as const, description: 'Whether the product is currently in stock and purchasable' },
+        sizeText: { type: 'string' as const, description: 'Size or quantity shown on the page (e.g. "32 oz", "1 gallon", "24 pack")' },
       },
     };
 
@@ -331,7 +353,7 @@ export class SearchAdapter implements RetailerAdapter {
         sourceUrl: productUrl,
         rawTitle: extracted.productName ?? canonicalName,
         rawBrand: null,
-        rawSizeText: null,
+        rawSizeText: extracted.sizeText ?? null,
         imageUrl: null,
         categoryText: itemCategory,
         retailerSku: null,
