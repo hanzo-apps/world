@@ -34,6 +34,19 @@ if [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; the
   fi
 fi
 
+echo "Checking scripts/package-lock.json sync..."
+if git diff --name-only origin/main -- scripts/package.json | grep -q .; then
+  if ! git diff --name-only origin/main -- scripts/package-lock.json | grep -q .; then
+    echo ""
+    echo "============================================================"
+    echo "ERROR: scripts/package.json was modified but scripts/package-lock.json was not committed."
+    echo "Run: cd scripts && npm install && cd .."
+    echo "Then: git add scripts/package-lock.json && git commit --amend --no-edit"
+    echo "============================================================"
+    exit 1
+  fi
+fi
+
 echo "Running type check..."
 npm run typecheck || exit 1
 
