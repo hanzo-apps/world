@@ -157,7 +157,7 @@ export class SearchAdapter implements RetailerAdapter {
     currency: string,
   ): Promise<ExtractedProduct | null> {
     const extractSchema = {
-      prompt: `Find the listed retail price of this product in ${currency}. The price may be displayed as two parts split across lines — like "3" and ".95" next to "${currency}" — combine them to get 3.95. Return the listed price even if the product is currently out of stock. Return the product name, the numeric price in ${currency}, the currency code, and whether it is in stock.`,
+      prompt: `Extract the retail price of THIS specific product from the main product section of the page. The price may be displayed as two parts split across lines — like "3" and ".95" next to "${currency}" — combine them to get 3.95. ONLY extract the price shown for the main product itself. If the page shows "Out of Stock" and no price is displayed for the main product, return null for price — do NOT use prices from related products, recommendations, or carousels. Return the product name, the numeric price in ${currency} (null if not shown), the currency code, and whether it is in stock.`,
       fields: {
         productName: { type: 'string' as const, description: 'Name or title of the product' },
         price: { type: 'number' as const, description: `Retail price in ${currency} as a single number (e.g. 4.69)` },
