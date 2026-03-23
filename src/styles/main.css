@@ -20994,6 +20994,36 @@ body.has-breaking-alert .panels-grid {
 .cp-health-status--stale   { background: rgba(245,158,11,0.15); color: #fbbf24; }
 .cp-health-status--missing { background: rgba(239,68,68,0.15);  color: #f87171; }
 
+.cp-market-bar {
+  display: flex;
+  gap: 3px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.cp-market-bar::-webkit-scrollbar { display: none; }
+
+.cp-market-btn {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cp-market-btn.active {
+  background: var(--overlay-subtle);
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--text-dim);
+}
+
 .cp-range-bar {
   display: flex;
   gap: 4px;
