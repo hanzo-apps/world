@@ -40,7 +40,6 @@ export const MARKETS: Array<{ code: string; label: string }> = [
   { code: 'br', label: '🇧🇷 BR' },
   { code: 'gb', label: '🇬🇧 UK' },
   { code: 'in', label: '🇮🇳 IN' },
-  { code: 'ke', label: '🇰🇪 KE' },
   { code: 'sa', label: '🇸🇦 SA' },
   { code: 'sg', label: '🇸🇬 SG' },
   { code: 'us', label: '🇺🇸 US' },

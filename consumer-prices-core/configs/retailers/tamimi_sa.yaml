@@ -9,7 +9,8 @@ retailer:
 
   searchConfig:
     numResults: 5
-    queryTemplate: "{canonicalName} grocery {market} {currency} price"
+    queryTemplate: "{canonicalName} tamimi markets"
+    urlPathContains: /product
 
   rateLimit:
     requestsPerMinute: 10
