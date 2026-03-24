@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 
 import { loadEnvFile, CHROME_UA, runSeed, readSeedSnapshot, sleep } from './_seed-utils.mjs';
+import { ProxyAgent, fetch as undiciF } from 'undici';
 
 loadEnvFile(import.meta.url);
+
+const _proxyAuth = process.env.OREF_PROXY_AUTH || '';
+const _proxyAgent = _proxyAuth ? new ProxyAgent(`http://${_proxyAuth}`) : null;
+const fetchViaProxy = _proxyAgent
+  ? (url, opts = {}) => undiciF(url, { ...opts, dispatcher: _proxyAgent })
+  : fetch;
 
 const FEAR_GREED_KEY = 'market:fear-greed:v1';
 const FEAR_GREED_TTL = 64800; // 18h = 3x 6h interval
@@ -44,18 +51,20 @@ async function fetchAllYahoo() {
 
 // --- CBOE P/C ratios ---
 async function fetchCBOE() {
+  const headers = { 'User-Agent': CHROME_UA, Referer: 'https://www.cboe.com/' };
   const [totalResp, equityResp] = await Promise.allSettled([
-    fetch('https://cdn.cboe.com/api/global/us_indices/daily_prices/totalpc.csv', { headers: { 'User-Agent': CHROME_UA }, signal: AbortSignal.timeout(10_000) }),
-    fetch('https://cdn.cboe.com/api/global/us_indices/daily_prices/equitypc.csv', { headers: { 'User-Agent': CHROME_UA }, signal: AbortSignal.timeout(10_000) }),
+    fetchViaProxy('https://cdn.cboe.com/api/global/us_indices/daily_prices/totalpc.csv', { headers, signal: AbortSignal.timeout(10_000) }),
+    fetchViaProxy('https://cdn.cboe.com/api/global/us_indices/daily_prices/equitypc.csv', { headers, signal: AbortSignal.timeout(10_000) }),
   ]);
-  const parseLastValue = async (resp) => {
-    if (resp.status !== 'fulfilled' || !resp.value.ok) return null;
+  const parseLastValue = async (resp, name) => {
+    if (resp.status !== 'fulfilled') return null;
+    if (!resp.value.ok) { console.warn(`  CBOE ${name}: HTTP ${resp.value.status}`); return null; }
     const text = await resp.value.text();
     const lines = text.trim().split('\n').filter(l => l.trim());
     const last = lines.at(-1)?.split(',');
     return last?.length >= 2 ? parseFloat(last[1]) : null;
   };
-  const [totalPc, equityPc] = await Promise.all([parseLastValue(totalResp), parseLastValue(equityResp)]);
+  const [totalPc, equityPc] = await Promise.all([parseLastValue(totalResp, 'totalpc'), parseLastValue(equityResp, 'equitypc')]);
   return { totalPc, equityPc };
 }
 
@@ -79,16 +88,16 @@ async function fetchBarchartS5TH() {
 async function fetchCNN() {
   try {
     const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
-    const resp = await fetch(`https://production.dataviz.cnn.io/index/fearandgreed/graphdata/${date}`, {
-      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
+    const resp = await fetchViaProxy(`https://production.dataviz.cnn.io/index/fearandgreed/graphdata/${date}`, {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json', Referer: 'https://www.cnn.com/markets/fear-and-greed' },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) { console.warn(`  CNN F&G: HTTP ${resp.status}`); return null; }
     const data = await resp.json();
     const score = data?.fear_and_greed?.score;
     const rating = data?.fear_and_greed?.rating;
     return score != null ? { score: Math.round(score), label: rating ?? labelFromScore(Math.round(score)) } : null;
-  } catch { return null; }
+  } catch (e) { console.warn(`  CNN F&G: ${e.message}`); return null; }
 }
 
 // --- AAII Sentiment (LOW reliability, always wrapped, non-blocking) ---
