@@ -431,6 +431,21 @@ export default async function handler(req) {
 
   const httpStatus = overall === 'HEALTHY' || overall === 'WARNING' ? 200 : 503;
 
+  if (httpStatus === 503) {
+    const problemKeys = Object.entries(checks)
+      .filter(([, c]) => c.status === 'EMPTY' || c.status === 'EMPTY_DATA' || c.status === 'STALE_SEED')
+      .map(([k, c]) => `${k}:${c.status}${c.seedAgeMin != null ? `(${c.seedAgeMin}min)` : ''}`);
+    console.log('[health] %s crits=[%s]', overall, problemKeys.join(', '));
+    // Persist last failure snapshot to Redis (TTL 24h) for post-mortem inspection.
+    // Fire-and-forget — must not block or add latency to the health response.
+    void redisPipeline([['SET', 'health:last-failure', JSON.stringify({
+      at: new Date(now).toISOString(),
+      status: overall,
+      critCount,
+      crits: problemKeys,
+    }), 'EX', 86400]]).catch(() => {});
+  }
+
   const url = new URL(req.url);
   const compact = url.searchParams.get('compact') === '1';
 
