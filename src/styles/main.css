@@ -5798,16 +5798,20 @@ body.playback-mode .status-dot {
 /* Heatmap */
 .heatmap {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 4px;
 }
 
 .heatmap-cell {
-  padding: 8px 4px;
+  padding: 10px 6px;
   text-align: center;
   border-radius: 2px;
   background: var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .heatmap-cell.up-3 {
@@ -5835,23 +5839,22 @@ body.playback-mode .status-dot {
 }
 
 .sector-ticker {
-  font-size: 8px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-dim);
-  letter-spacing: 0.03em;
-  opacity: 0.6;
-  margin-bottom: 1px;
+  letter-spacing: 0.05em;
 }
 
 .sector-name {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-muted);
-  margin-bottom: 2px;
+  margin-top: 1px;
 }
 
 .sector-change {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: bold;
+  line-height: 1;
 }
 
 .sector-change.up {
