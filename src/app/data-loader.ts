@@ -21,6 +21,8 @@ import {
   fetchMultipleStocks,
   fetchCommodityQuotes,
   fetchSectors,
+  warmCommodityCache,
+  warmSectorCache,
   fetchCrypto,
   fetchCryptoSectors,
   fetchDefiTokens,
@@ -118,7 +120,7 @@ import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
 import { ingestHeadlines } from '@/services/trending-keywords';
 import type { ListFeedDigestResponse } from '@/generated/client/worldmonitor/news/v1/service_client';
-import type { GetSectorSummaryResponse, ListMarketQuotesResponse } from '@/generated/client/worldmonitor/market/v1/service_client';
+import type { GetSectorSummaryResponse, ListMarketQuotesResponse, ListCommodityQuotesResponse } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { mountCommunityWidget } from '@/components/CommunityWidget';
 import { ResearchServiceClient } from '@/generated/client/worldmonitor/research/v1/service_client';
 import {
@@ -1263,6 +1265,7 @@ export class DataLoaderManager implements AppModule {
         change: s.change,
       });
       if (hydratedSectors?.sectors?.length) {
+        warmSectorCache(hydratedSectors);
         heatmapPanel?.renderHeatmap(hydratedSectors.sectors.map(toHeatmapItem));
       } else {
         const sectorsResp = await fetchSectors();
@@ -1282,12 +1285,15 @@ export class DataLoaderManager implements AppModule {
 
       if (commoditiesPanel || energyPanel) {
         // Hydrate commodities from bootstrap (same pattern as sectors/markets)
-        const hydratedCommodities = getHydratedData('commodityQuotes') as ListMarketQuotesResponse | undefined;
+        const hydratedCommodities = getHydratedData('commodityQuotes') as ListCommodityQuotesResponse | undefined;
         const skipFetch = stocksResult.rateLimited && stocksResult.data.length === 0;
         let metalsLoaded = skipFetch;
         let energyLoaded = skipFetch;
 
         if (!(metalsLoaded && energyLoaded) && hydratedCommodities?.quotes?.length) {
+          // Warm the circuit-breaker cache so SWR serves stale data if the
+          // first scheduled live call fails (bootstrap hydration bypasses the RPC).
+          warmCommodityCache(hydratedCommodities);
           const symbolMetaMap = new Map(COMMODITIES.map((s) => [s.symbol, s]));
           const data = hydratedCommodities.quotes.map((q) => ({
             symbol: q.symbol,
