@@ -158,6 +158,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/intelligence/v1/list-security-advisories': 'slow',
   '/api/intelligence/v1/list-satellites': 'slow',
   '/api/intelligence/v1/list-gps-interference': 'slow',
+  '/api/intelligence/v1/list-cross-source-signals': 'medium',
   '/api/intelligence/v1/list-oref-alerts': 'fast',
   '/api/intelligence/v1/list-telegram-feed': 'fast',
   '/api/intelligence/v1/get-company-enrichment': 'slow',
