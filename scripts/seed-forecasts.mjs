@@ -5827,7 +5827,8 @@ function buildCanonicalStateUnits(situationClusters = [], situationFamilies = []
 
   return units
     .map(finalizeStateUnit)
-    .sort((a, b) => b.forecastCount - a.forecastCount || b.avgProbability - a.avgProbability || a.label.localeCompare(b.label));
+    .sort((a, b) => b.forecastCount - a.forecastCount || b.avgProbability - a.avgProbability || a.label.localeCompare(b.label))
+    .filter(((seen) => (unit) => !seen.has(unit.label) && seen.add(unit.label))(new Set()));
 }
 
 function buildSituationContinuitySummary(currentSituationClusters, priorWorldState = null) {
@@ -12679,12 +12680,15 @@ function getForecastLlmCallOptions(stage = 'default') {
   const combinedProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_COMBINED_PROVIDER_ORDER);
   const criticalProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_CRITICAL_PROVIDER_ORDER);
   const impactProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_IMPACT_PROVIDER_ORDER);
+  const marketImplicationsProviderOrder = parseForecastProviderOrder(process.env.FORECAST_LLM_MARKET_IMPLICATIONS_PROVIDER_ORDER);
   const providerOrder = stage === 'combined'
     ? (combinedProviderOrder || globalProviderOrder || defaultProviderOrder)
     : stage === 'critical_signals'
       ? (criticalProviderOrder || globalProviderOrder || defaultProviderOrder)
       : stage === 'impact_expansion'
         ? (impactProviderOrder || globalProviderOrder || defaultProviderOrder)
+      : stage === 'market_implications'
+        ? (marketImplicationsProviderOrder || globalProviderOrder || defaultProviderOrder)
       : (globalProviderOrder || defaultProviderOrder);
 
   const openrouterModel = stage === 'combined'
@@ -12693,6 +12697,8 @@ function getForecastLlmCallOptions(stage = 'default') {
       ? (process.env.FORECAST_LLM_CRITICAL_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
       : stage === 'impact_expansion'
         ? (process.env.FORECAST_LLM_IMPACT_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
+      : stage === 'market_implications'
+        ? (process.env.FORECAST_LLM_MARKET_IMPLICATIONS_MODEL_OPENROUTER || process.env.FORECAST_LLM_MODEL_OPENROUTER)
       : process.env.FORECAST_LLM_MODEL_OPENROUTER;
 
   return {
@@ -13990,6 +13996,193 @@ async function runDeepForecastWorker({ once = false, runId = '' } = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Market Implications Stage
+// ---------------------------------------------------------------------------
+
+const MARKET_IMPLICATIONS_KEY = 'intelligence:market-implications:v1';
+const MARKET_IMPLICATIONS_TTL = 75 * 60; // 75 minutes
+
+const ALLOWED_INSTRUMENTS = {
+  equities: ['SPY', 'QQQ', 'DIA', 'IWM', 'EEM', 'VWO', 'EFA', 'GLD', 'SLV', 'USO', 'UNG', 'TLT', 'HYG', 'LQD',
+    'XLE', 'XLF', 'XLI', 'XLK', 'XLU', 'XLV', 'XLP', 'XLY', 'XLB', 'XLRE', 'HACK', 'CIBR', 'ARKK',
+    'NVDA', 'MSFT', 'AAPL', 'GOOGL', 'META', 'AMZN', 'TSLA', 'JPM', 'BAC', 'XOM', 'CVX', 'RTX', 'LMT', 'NOC'],
+  commodities: ['CL', 'BZ', 'NG', 'GC', 'SI', 'HG', 'ALI', 'ZW', 'ZC', 'ZS', 'KC', 'CT', 'SB', 'CC'],
+  forex: ['DXY', 'EURUSD', 'USDJPY', 'GBPUSD', 'USDCNY', 'USDCHF', 'AUDUSD', 'USDTRY', 'USDRUB'],
+  crypto: ['BTC', 'ETH', 'SOL', 'BNB'],
+  rates: ['US10Y', 'US2Y', 'US30Y', 'DE10Y', 'JP10Y'],
+};
+
+const ALL_ALLOWED_TICKERS = new Set([
+  ...ALLOWED_INSTRUMENTS.equities,
+  ...ALLOWED_INSTRUMENTS.commodities,
+  ...ALLOWED_INSTRUMENTS.forex,
+  ...ALLOWED_INSTRUMENTS.crypto,
+  ...ALLOWED_INSTRUMENTS.rates,
+]);
+
+const MARKET_IMPLICATIONS_SYSTEM_PROMPT = `You are a senior macro strategist generating structured trade-implication cards from live world intelligence.
+
+RULES:
+- Generate 3 to 7 trade-implication cards based ONLY on the provided world-state context.
+- Each card must reference a specific ticker from the ALLOWED TICKERS list.
+- direction must be exactly one of: LONG, SHORT, HEDGE
+- timeframe must be one of: 1W, 2W, 1M, 3M
+- confidence must be one of: HIGH, MEDIUM, LOW
+- title: 1 short sentence (max 12 words) summarising the trade thesis
+- narrative: 2–3 sentences grounding the thesis in the provided context (cite specific signals)
+- risk_caveat: 1 sentence on the primary counter-thesis or risk
+- driver: 1–3 words naming the core geopolitical/macro driver (e.g. "Hormuz closure risk", "Fed pivot", "Taiwan tension")
+- NEVER use tickers not in the ALLOWED TICKERS list
+- NEVER invent data — use only what is provided
+- Do NOT include duplicate tickers across cards
+
+Respond with ONLY a JSON array:
+[{"ticker":"","name":"","direction":"","timeframe":"","confidence":"","title":"","narrative":"","risk_caveat":"","driver":""},...]`;
+
+function buildMarketImplicationsContext(inputs) {
+  const parts = [];
+
+  const commodities = inputs.commodityQuotes?.quotes;
+  if (Array.isArray(commodities) && commodities.length > 0) {
+    const top = commodities.slice(0, 8).map(q => `${q.display || q.symbol}: ${q.price != null ? q.price.toFixed(2) : 'N/A'} (${q.change != null ? (q.change >= 0 ? '+' : '') + q.change.toFixed(2) + '%' : 'N/A'})`);
+    parts.push(`[COMMODITIES]\n${top.join('\n')}`);
+  }
+
+  const stocks = inputs.marketQuotes?.quotes;
+  if (Array.isArray(stocks) && stocks.length > 0) {
+    const top = stocks.slice(0, 10).map(q => `${q.display || q.symbol}: ${q.price != null ? q.price.toFixed(2) : 'N/A'} (${q.change != null ? (q.change >= 0 ? '+' : '') + q.change.toFixed(2) + '%' : 'N/A'})`);
+    parts.push(`[EQUITIES]\n${top.join('\n')}`);
+  }
+
+  const sectors = inputs.sectorSummary?.sectors;
+  if (Array.isArray(sectors) && sectors.length > 0) {
+    const top = sectors.slice(0, 8).map(s => `${s.name}: ${s.change != null ? (s.change >= 0 ? '+' : '') + s.change.toFixed(2) + '%' : 'N/A'}`);
+    parts.push(`[SECTORS]\n${top.join('\n')}`);
+  }
+
+  const theaters = inputs.theaterPosture?.theaters;
+  if (Array.isArray(theaters) && theaters.length > 0) {
+    const active = theaters.filter(t => t.alertLevel && t.alertLevel !== 'NONE').slice(0, 5);
+    if (active.length > 0) {
+      parts.push(`[ACTIVE THEATERS]\n${active.map(t => `${t.id || t.theaterId}: alert=${t.alertLevel} escalation=${t.escalationScore ?? 'N/A'}`).join('\n')}`);
+    }
+  }
+
+  const chokepoints = inputs.chokepoints;
+  if (Array.isArray(chokepoints) && chokepoints.length > 0) {
+    const atRisk = chokepoints.filter(c => c.riskLevel === 'HIGH' || c.riskLevel === 'CRITICAL').slice(0, 4);
+    if (atRisk.length > 0) {
+      parts.push(`[AT-RISK CHOKEPOINTS]\n${atRisk.map(c => `${c.name}: risk=${c.riskLevel} commodity=${c.commodity || 'N/A'}`).join('\n')}`);
+    }
+  }
+
+  const shipping = inputs.shippingRates;
+  if (shipping?.routes && typeof shipping.routes === 'object') {
+    const routes = Object.entries(shipping.routes).slice(0, 4).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v).slice(0, 60) : v}`);
+    if (routes.length > 0) parts.push(`[SHIPPING RATES]\n${routes.join('\n')}`);
+  }
+
+  const fredSeries = inputs.fredSeries;
+  if (fredSeries && typeof fredSeries === 'object') {
+    const fredParts = [];
+    if (fredSeries.VIXCLS?.value != null) fredParts.push(`VIX: ${fredSeries.VIXCLS.value}`);
+    if (fredSeries.T10Y2Y?.value != null) fredParts.push(`10Y-2Y Spread: ${fredSeries.T10Y2Y.value}`);
+    if (fredSeries.FEDFUNDS?.value != null) fredParts.push(`Fed Funds: ${fredSeries.FEDFUNDS.value}`);
+    if (fredSeries.DCOILWTICO?.value != null) fredParts.push(`WTI Crude: ${fredSeries.DCOILWTICO.value}`);
+    if (fredParts.length > 0) parts.push(`[MACRO INDICATORS]\n${fredParts.join('\n')}`);
+  }
+
+  const insights = inputs.newsInsights?.signals;
+  if (Array.isArray(insights) && insights.length > 0) {
+    const top = insights.slice(0, 5).map(s => `- ${sanitizeForPrompt(s.title || s.summary || '')}`);
+    parts.push(`[KEY INTELLIGENCE SIGNALS]\n${top.join('\n')}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : 'No live world state available.';
+}
+
+function validateMarketImplications(cards) {
+  if (!Array.isArray(cards)) return [];
+  const seen = new Set();
+  const valid = [];
+  for (const card of cards) {
+    if (!card || typeof card !== 'object') continue;
+    const ticker = typeof card.ticker === 'string' ? card.ticker.trim().toUpperCase() : '';
+    if (!ticker || !ALL_ALLOWED_TICKERS.has(ticker)) continue;
+    if (seen.has(ticker)) continue;
+    const direction = typeof card.direction === 'string' ? card.direction.trim().toUpperCase() : '';
+    if (!['LONG', 'SHORT', 'HEDGE'].includes(direction)) continue;
+    const timeframe = typeof card.timeframe === 'string' ? card.timeframe.trim().toUpperCase() : '';
+    if (!['1W', '2W', '1M', '3M'].includes(timeframe)) continue;
+    const confidence = typeof card.confidence === 'string' ? card.confidence.trim().toUpperCase() : '';
+    if (!['HIGH', 'MEDIUM', 'LOW'].includes(confidence)) continue;
+    const title = typeof card.title === 'string' ? card.title.trim().slice(0, 120) : '';
+    if (title.length < 5) continue;
+    const narrative = typeof card.narrative === 'string' ? card.narrative.trim().slice(0, 600) : '';
+    if (narrative.length < 20) continue;
+    seen.add(ticker);
+    valid.push({
+      ticker,
+      name: typeof card.name === 'string' ? card.name.trim().slice(0, 60) : ticker,
+      direction,
+      timeframe,
+      confidence,
+      title,
+      narrative,
+      risk_caveat: typeof card.risk_caveat === 'string' ? card.risk_caveat.trim().slice(0, 300) : '',
+      driver: typeof card.driver === 'string' ? card.driver.trim().slice(0, 60) : '',
+    });
+    if (valid.length >= 5) break;
+  }
+  return valid;
+}
+
+async function buildAndSeedMarketImplications(inputs) {
+  const startMs = Date.now();
+  console.log('  [MarketImplications] Building world-state context...');
+  const context = buildMarketImplicationsContext(inputs);
+  const userPrompt = `World state as of ${new Date().toISOString()}:\n\n${context}\n\nAllowed tickers: ${[...ALL_ALLOWED_TICKERS].join(', ')}`;
+
+  const llmOptions = getForecastLlmCallOptions('market_implications');
+  const result = await callForecastLLM(MARKET_IMPLICATIONS_SYSTEM_PROMPT, userPrompt, {
+    ...llmOptions,
+    stage: 'market_implications',
+    maxTokens: 2000,
+    temperature: 0.25,
+  });
+
+  if (!result?.text) {
+    console.warn('  [MarketImplications] LLM returned no response — skipping write');
+    return;
+  }
+
+  const parsed = extractStructuredLlmPayload(result.text);
+  const rawCards = parsed.items;
+
+  if (!Array.isArray(rawCards) || rawCards.length === 0) {
+    console.warn(`  [MarketImplications] No parseable cards in LLM response (diagnostics: ${JSON.stringify(parsed.diagnostics)})`);
+    return;
+  }
+
+  const cards = validateMarketImplications(rawCards);
+  if (cards.length === 0) {
+    console.warn('  [MarketImplications] All cards failed validation — skipping write');
+    return;
+  }
+
+  const { url, token } = getRedisCredentials();
+  const payload = { cards, generatedAt: new Date().toISOString(), model: result.model || '' };
+  await redisSet(url, token, MARKET_IMPLICATIONS_KEY, payload, MARKET_IMPLICATIONS_TTL);
+
+  const metaKey = 'seed-meta:intelligence:market-implications';
+  const meta = { fetchedAt: Date.now(), recordCount: cards.length };
+  await redisSet(url, token, metaKey, meta, 86400 * 7);
+
+  const durationMs = Date.now() - startMs;
+  console.log(`  [MarketImplications] Published ${cards.length} cards to ${MARKET_IMPLICATIONS_KEY} (${Math.round(durationMs)}ms, model=${result.model || 'unknown'})`);
+}
+
 if (_isDirectRun) {
   const refreshRequest = await readForecastRefreshRequest();
   const triggerContext = buildForecastTriggerContext(refreshRequest);
@@ -14086,6 +14279,12 @@ if (_isDirectRun) {
       } catch (err) {
         console.warn(`  [Trace] Export failed: ${err.message}`);
         if (err.stack) console.warn(`  [Trace] Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
+      }
+
+      try {
+        await buildAndSeedMarketImplications(data.inputs || {});
+      } catch (err) {
+        console.warn(`  [MarketImplications] Stage failed: ${err.message}`);
       }
     },
     extraKeys: [
