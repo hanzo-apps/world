@@ -123,7 +123,7 @@ Sentry.init({
     /(?:AbortError: )?The user aborted a request/,
     /\w+ is not a function.*\/uv\/service\//,
     /__isInQueue__/,
-    /^(?:LIDNotify(?:Id)?|onWebViewAppeared|onGetWiFiBSSID) is not defined$/,
+    /^(?:LIDNotify(?:Id)?|onWebViewAppeared|onGetWiFiBSSID|onHide|onShow|onReady|tapAt|removeHighlight) is not defined$/,
     /signal timed out/,
     /Se requiere plan premium/,
     /hybridExecute is not defined/,
