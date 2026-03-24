@@ -159,6 +159,20 @@ export async function fetchStockQuote(
 // Commodities -- uses listCommodityQuotes (reads market:commodities-bootstrap:v1)
 // ========================================================================
 
+/** Pre-warm the commodity circuit-breaker cache from bootstrap hydration data.
+ *  Called from data-loader when bootstrap quotes are consumed so the SWR path
+ *  has stale data to serve if the first live RPC call fails. */
+export function warmCommodityCache(quotes: ListCommodityQuotesResponse): void {
+  const symbols = quotes.quotes.map((q) => q.symbol);
+  const cacheKey = [...symbols].sort().join(',');
+  commodityBreaker.recordSuccess(quotes, cacheKey);
+}
+
+/** Pre-warm the sector circuit-breaker cache from bootstrap hydration data. */
+export function warmSectorCache(resp: GetSectorSummaryResponse): void {
+  sectorBreaker.recordSuccess(resp);
+}
+
 export async function fetchCommodityQuotes(
   commodities: Array<{ symbol: string; name: string; display: string }>,
   options: { onBatch?: (results: MarketData[]) => void } = {},
