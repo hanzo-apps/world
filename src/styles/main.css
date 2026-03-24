@@ -5834,9 +5834,18 @@ body.playback-mode .status-dot {
   background: var(--surface);
 }
 
-.sector-name {
-  font-size: 9px;
+.sector-ticker {
+  font-size: 8px;
+  font-weight: 600;
   color: var(--text-dim);
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+  margin-bottom: 1px;
+}
+
+.sector-name {
+  font-size: 8px;
+  color: var(--text-muted);
   margin-bottom: 2px;
 }
 
