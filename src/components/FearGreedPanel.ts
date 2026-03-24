@@ -117,30 +117,37 @@ export class FearGreedPanel extends Panel {
 
   public async fetchData(): Promise<boolean> {
     const hydrated = getHydratedData('fearGreedIndex') as Record<string, unknown> | undefined;
-    if (hydrated && !hydrated.unavailable) {
+    const hasBootstrap = hydrated && !hydrated.unavailable;
+    if (hasBootstrap) {
       const mapped = mapSeedPayload(hydrated);
       if (mapped && mapped.compositeScore > 0) {
         this.data = mapped;
         this.renderPanel();
+        // Always refresh from RPC to pick up complete data (bootstrap may have partial fields)
+        void this.refreshFromRpc();
         return true;
       }
     }
 
     this.showLoading();
+    return this.refreshFromRpc();
+  }
+
+  private async refreshFromRpc(): Promise<boolean> {
     try {
       const { MarketServiceClient } = await import('@/generated/client/worldmonitor/market/v1/service_client');
       const { getRpcBaseUrl } = await import('@/services/rpc-client');
       const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
       const resp = await client.getFearGreedIndex({});
       if (resp.unavailable) {
-        this.showError(t('common.noDataShort'), () => void this.fetchData());
+        if (!this.data) this.showError(t('common.noDataShort'), () => void this.fetchData());
         return false;
       }
       this.data = resp as FearGreedData;
       this.renderPanel();
       return true;
     } catch (e) {
-      this.showError(e instanceof Error ? e.message : t('common.failedToLoad'), () => void this.fetchData());
+      if (!this.data) this.showError(e instanceof Error ? e.message : t('common.failedToLoad'), () => void this.fetchData());
       return false;
     }
   }
