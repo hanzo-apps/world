@@ -9,8 +9,8 @@ const FEAR_GREED_TTL = 64800; // 18h = 3x 6h interval
 
 const FRED_PREFIX = 'economic:fred:v1';
 
-// --- Yahoo Finance fetching (16 symbols, 150ms gaps) ---
-const YAHOO_SYMBOLS = ['^GSPC','^VIX','^VIX9D','^VIX3M','^SKEW','^MMTH','C:ISSU','GLD','TLT','SPY','RSP','DX-Y.NYB','XLK','XLF','XLE','XLV'];
+// --- Yahoo Finance fetching (15 symbols, 150ms gaps) ---
+const YAHOO_SYMBOLS = ['^GSPC','^VIX','^VIX9D','^VIX3M','^SKEW','C:ISSU','GLD','TLT','SPY','RSP','DX-Y.NYB','XLK','XLF','XLE','XLV'];
 
 async function fetchYahooSymbol(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo`;
@@ -57,6 +57,22 @@ async function fetchCBOE() {
   };
   const [totalPc, equityPc] = await Promise.all([parseLastValue(totalResp), parseLastValue(equityResp)]);
   return { totalPc, equityPc };
+}
+
+// --- Barchart $S5TH: % of S&P 500 above 200d MA ---
+async function fetchBarchartS5TH() {
+  try {
+    const resp = await fetch('https://www.barchart.com/stocks/quotes/%24S5TH', {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) { console.warn(`  Barchart $S5TH: HTTP ${resp.status}`); return null; }
+    const html = await resp.text();
+    const block = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? html;
+    const m = block.match(/"lastPrice"\s*:\s*"?([\d.]+)"?/);
+    const val = m ? parseFloat(m[1]) : NaN;
+    return Number.isFinite(val) ? val : null;
+  } catch (e) { console.warn('  Barchart $S5TH fetch failed:', e.message); return null; }
 }
 
 // --- CNN Fear & Greed ---
@@ -234,7 +250,7 @@ function scoreCategory(name, inputs) {
       const hasAd = advDecRatio != null;
       const w = hasAd ? [0.4, 0.3, 0.3] : [0.57, 0, 0.43];
       const score = breadthScore * w[0] + adScore * w[1] + rspScore * w[2];
-      return { score: Math.round(clamp(score, 0, 100)), inputs: { pctAbove200d: mmthPrice, rspSpyRatio: rspRoc, advDecRatio: advDecRatio ?? null } };
+      return { score: Math.round(clamp(score, 0, 100)), degraded: mmthPrice == null, inputs: { pctAbove200d: mmthPrice, rspSpyRatio: rspRoc, advDecRatio: advDecRatio ?? null } };
     }
     case 'momentum': {
       const { spxCloses, sectorCloses } = inputs;
@@ -295,12 +311,13 @@ async function fetchAll() {
   const prevSnapshot = await readSeedSnapshot(FEAR_GREED_KEY).catch(() => null);
   const previousScore = prevSnapshot?.composite?.score ?? null;
 
-  const [yahooResults, cboeResult, cnnResult, aaiiResult, macroSignals] = await Promise.allSettled([
+  const [yahooResults, cboeResult, cnnResult, aaiiResult, macroSignals, barchartResult] = await Promise.allSettled([
     fetchAllYahoo(),
     fetchCBOE(),
     fetchCNN(),
     fetchAAII(),
     readMacroSignals(),
+    fetchBarchartS5TH(),
   ]);
 
   const yahoo = yahooResults.status === 'fulfilled' ? yahooResults.value : {};
@@ -313,6 +330,7 @@ async function fetchAll() {
   if (cboeResult.status === 'rejected') console.warn('  CBOE failed:', cboeResult.reason?.message);
   if (cnnResult.status === 'rejected') console.warn('  CNN failed:', cnnResult.reason?.message);
   if (aaiiResult.status === 'rejected') console.warn('  AAII failed:', aaiiResult.reason?.message);
+  if (barchartResult.status === 'fulfilled' && barchartResult.value == null) console.warn('  Barchart $S5TH: unavailable (using RSP/SPY proxy if possible)');
 
   const [hyObs, igObs, m2Obs, walclObs, sofrObs, fedObs, curveObs, unrateObs, vixObs, dgs10Obs] = await Promise.all([
     readFred('BAMLH0A0HYM2'), readFred('BAMLC0A0CM'), readFred('M2SL'), readFred('WALCL'),
@@ -324,7 +342,6 @@ async function fetchAll() {
   const vix9d = yahoo['^VIX9D'];
   const vix3m = yahoo['^VIX3M'];
   const skew = yahoo['^SKEW'];
-  const mmth = yahoo['^MMTH'];
   const cissu = yahoo['C:ISSU'];
   const gld = yahoo['GLD'], tlt = yahoo['TLT'], spy = yahoo['SPY'], rsp = yahoo['RSP'];
   const dxy = yahoo['DX-Y.NYB'];
@@ -334,8 +351,12 @@ async function fetchAll() {
   const vix9dPrice = vix9d?.price ?? null;
   const vix3mPrice = vix3m?.price ?? null;
   const skewPrice = skew?.price ?? null;
-  const mmthPrice = mmth?.price ?? null;
   const sofrRate = fredLatest(sofrObs);
+
+  // Barchart $S5TH: exact % of S&P 500 above 200d MA.
+  // Used for both breadth scoring and header display. Null → header shows N/A, breadth
+  // defaults to neutral 50 (rspScore still captures RSP/SPY signal independently).
+  const pctAbove200d = barchartResult.status === 'fulfilled' ? barchartResult.value : null;
   const cryptoFg = macro?.fearGreed?.score ?? macro?.signals?.fearGreed?.value ?? null;
 
   let advDecRatio = null;
@@ -348,7 +369,7 @@ async function fetchAll() {
     volatility: scoreCategory('volatility', { vix: vixLive, vix9d: vix9dPrice, vix3m: vix3mPrice }),
     positioning: scoreCategory('positioning', { totalPc: cboe.totalPc, equityPc: cboe.equityPc, skew: skewPrice }),
     trend: scoreCategory('trend', { prices: gspc?.closes ?? [] }),
-    breadth: scoreCategory('breadth', { mmthPrice, rspCloses: rsp?.closes, spyCloses: spy?.closes, advDecRatio }),
+    breadth: scoreCategory('breadth', { mmthPrice: pctAbove200d, rspCloses: rsp?.closes, spyCloses: spy?.closes, advDecRatio }),
     momentum: scoreCategory('momentum', { spxCloses: gspc?.closes, sectorCloses: { XLK: xlk?.closes, XLF: xlf?.closes, XLE: xle?.closes, XLV: xlv?.closes } }),
     liquidity: scoreCategory('liquidity', { m2Obs, walclObs, sofr: sofrRate }),
     credit: scoreCategory('credit', { hyObs, igObs }),
@@ -373,7 +394,7 @@ async function fetchAll() {
       volatility:  { score: cats.volatility.score, weight: WEIGHTS.volatility, contribution: Math.round(cats.volatility.score * WEIGHTS.volatility * 10)/10, inputs: cats.volatility.inputs },
       positioning: { score: cats.positioning.score, weight: WEIGHTS.positioning, contribution: Math.round(cats.positioning.score * WEIGHTS.positioning * 10)/10, inputs: cats.positioning.inputs },
       trend:       { score: cats.trend.score, weight: WEIGHTS.trend, contribution: Math.round(cats.trend.score * WEIGHTS.trend * 10)/10, inputs: cats.trend.inputs },
-      breadth:     { score: cats.breadth.score, weight: WEIGHTS.breadth, contribution: Math.round(cats.breadth.score * WEIGHTS.breadth * 10)/10, inputs: cats.breadth.inputs },
+      breadth:     { score: cats.breadth.score, weight: WEIGHTS.breadth, contribution: Math.round(cats.breadth.score * WEIGHTS.breadth * 10)/10, inputs: cats.breadth.inputs, degraded: cats.breadth.degraded ?? false },
       momentum:    { score: cats.momentum.score, weight: WEIGHTS.momentum, contribution: Math.round(cats.momentum.score * WEIGHTS.momentum * 10)/10, inputs: cats.momentum.inputs },
       liquidity:   { score: cats.liquidity.score, weight: WEIGHTS.liquidity, contribution: Math.round(cats.liquidity.score * WEIGHTS.liquidity * 10)/10, inputs: cats.liquidity.inputs },
       credit:      { score: cats.credit.score, weight: WEIGHTS.credit, contribution: Math.round(cats.credit.score * WEIGHTS.credit * 10)/10, inputs: cats.credit.inputs },
@@ -387,7 +408,7 @@ async function fetchAll() {
       putCall:  cboe.totalPc != null ? { value: cboe.totalPc } : null,
       vix:      vixLive != null ? { value: vixLive } : null,
       hySpread: hySpreadVal != null ? { value: hySpreadVal } : null,
-      pctAbove200d: mmthPrice != null ? { value: mmthPrice } : null,
+      pctAbove200d: pctAbove200d != null ? { value: pctAbove200d } : null,
       yield10y: fredLatest(dgs10Obs) != null ? { value: fredLatest(dgs10Obs) } : null,
       fedRate:  fedRateStr ? { value: fedRateStr } : null,
     },
