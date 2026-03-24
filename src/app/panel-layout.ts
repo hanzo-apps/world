@@ -36,6 +36,7 @@ import {
   RuntimeConfigPanel,
   InsightsPanel,
   MacroSignalsPanel,
+  FearGreedPanel,
   ETFFlowsPanel,
   StablecoinPanel,
   UcdpEventsPanel,
@@ -866,6 +867,7 @@ export class PanelLayoutManager implements AppModule {
     );
 
     this.createPanel('macro-signals', () => new MacroSignalsPanel());
+    this.createPanel('fear-greed', () => new FearGreedPanel());
     this.createPanel('etf-flows', () => new ETFFlowsPanel());
     this.createPanel('stablecoins', () => new StablecoinPanel());
 

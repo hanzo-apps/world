@@ -70,3 +70,4 @@ export * from './EconomicCorrelationPanel';
 export * from './DisasterCorrelationPanel';
 export * from './ConsumerPricesPanel';
 export { NationalDebtPanel } from './NationalDebtPanel';
+export * from './FearGreedPanel';
