@@ -1,27 +1,7 @@
 #!/usr/bin/env node
 
 import { loadEnvFile, CHROME_UA, runSeed, readSeedSnapshot, sleep } from './_seed-utils.mjs';
-import { execFileSync } from 'child_process';
-
 loadEnvFile(import.meta.url);
-
-const _proxyAuth = process.env.OREF_PROXY_AUTH || '';
-
-// Use curl instead of Node.js fetch for proxy requests — Node.js TLS fingerprint (JA3)
-// is blocked by CBOE CDN and CNN dataviz even through a residential proxy, but curl's
-// fingerprint passes. Same pattern as orefCurlFetch() in ais-relay.cjs.
-function curlGet(url, headers = {}) {
-  const args = ['-sS', '--compressed', '--max-time', '15', '-L'];
-  if (_proxyAuth) args.push('-x', `http://${_proxyAuth}`);
-  for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
-  args.push('-w', '\n%{http_code}');
-  args.push(url);
-  const raw = execFileSync('curl', args, { encoding: 'utf8', timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'] });
-  const nl = raw.lastIndexOf('\n');
-  const status = parseInt(raw.slice(nl + 1).trim(), 10);
-  if (status < 200 || status >= 300) throw Object.assign(new Error(`HTTP ${status}`), { status });
-  return raw.slice(0, nl);
-}
 
 const FEAR_GREED_KEY = 'market:fear-greed:v1';
 const FEAR_GREED_TTL = 64800; // 18h = 3x 6h interval
@@ -61,26 +41,22 @@ async function fetchAllYahoo() {
   return results;
 }
 
-// --- CBOE P/C ratios ---
+// --- Put/Call ratio via Barchart $CPC (replaces direct CBOE CDN which is Cloudflare-blocked) ---
 async function fetchCBOE() {
-  const headers = { 'User-Agent': CHROME_UA, Referer: 'https://www.cboe.com/' };
-  const parseLastValue = (text, name) => {
-    try {
-      const lines = text.trim().split('\n').filter(l => l.trim());
-      const last = lines.at(-1)?.split(',');
-      return last?.length >= 2 ? parseFloat(last[1]) : null;
-    } catch { console.warn(`  CBOE ${name}: parse error`); return null; }
-  };
-  let totalPc = null, equityPc = null;
   try {
-    const text = curlGet('https://cdn.cboe.com/api/global/us_indices/daily_prices/totalpc.csv', headers);
-    totalPc = parseLastValue(text, 'totalpc');
-  } catch (e) { console.warn(`  CBOE totalpc: ${e.message}`); }
-  try {
-    const text = curlGet('https://cdn.cboe.com/api/global/us_indices/daily_prices/equitypc.csv', headers);
-    equityPc = parseLastValue(text, 'equitypc');
-  } catch (e) { console.warn(`  CBOE equitypc: ${e.message}`); }
-  return { totalPc, equityPc };
+    const resp = await fetch('https://www.barchart.com/stocks/quotes/%24CPC', {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) { console.warn(`  Barchart $CPC: HTTP ${resp.status}`); return {}; }
+    const html = await resp.text();
+    const block = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? html;
+    const m = block.match(/"lastPrice"\s*:\s*"?([\d.]+)"?/);
+    const val = m ? parseFloat(m[1]) : NaN;
+    const totalPc = Number.isFinite(val) ? val : null;
+    if (totalPc == null) console.warn('  Barchart $CPC: price not found in page');
+    return { totalPc, equityPc: null };
+  } catch (e) { console.warn(`  Barchart $CPC: ${e.message}`); return {}; }
 }
 
 // --- Barchart $S5TH: % of S&P 500 above 200d MA ---
@@ -100,17 +76,21 @@ async function fetchBarchartS5TH() {
 }
 
 // --- CNN Fear & Greed ---
+// /current endpoint works without proxy; requires Mac UA (Windows UA returns 418 bot-block).
 async function fetchCNN() {
   try {
-    const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
-    const text = curlGet(`https://production.dataviz.cnn.io/index/fearandgreed/graphdata/${date}`, {
-      'User-Agent': CHROME_UA,
-      Accept: 'application/json',
-      Referer: 'https://www.cnn.com/markets/fear-and-greed',
+    const resp = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/current', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        Accept: 'application/json',
+        Referer: 'https://www.cnn.com/markets/fear-and-greed',
+      },
+      signal: AbortSignal.timeout(10_000),
     });
-    const data = JSON.parse(text);
-    const score = data?.fear_and_greed?.score;
-    const rating = data?.fear_and_greed?.rating;
+    if (!resp.ok) { console.warn(`  CNN F&G: HTTP ${resp.status}`); return null; }
+    const data = await resp.json();
+    const score = data?.score ?? data?.fear_and_greed?.score;
+    const rating = data?.rating ?? data?.fear_and_greed?.rating;
     return score != null ? { score: Math.round(score), label: rating ?? labelFromScore(Math.round(score)) } : null;
   } catch (e) { console.warn(`  CNN F&G: ${e.message}`); return null; }
 }
@@ -352,7 +332,7 @@ async function fetchAll() {
 
   // Source status summary — visible in Railway container logs
   const yahooCount = Object.values(yahoo).filter(Boolean).length;
-  console.log(`  Sources: Yahoo=${yahooCount}/${YAHOO_SYMBOLS.length} | CBOE totalPc=${cboe.totalPc ?? 'null'} equityPc=${cboe.equityPc ?? 'null'} | CNN=${cnn ? cnn.score : 'null'} | AAII bull=${aaii ? aaii.bull : 'null'} | Barchart=${barchartResult.status === 'fulfilled' ? (barchartResult.value ?? 'null') : 'err'} | proxy=${_proxyAuth ? 'yes' : 'no'}`);
+  console.log(`  Sources: Yahoo=${yahooCount}/${YAHOO_SYMBOLS.length} | putCall=${cboe.totalPc ?? 'null'} | CNN=${cnn ? cnn.score : 'null'} | AAII bull=${aaii ? aaii.bull : 'null'} | Barchart=$S5TH=${barchartResult.status === 'fulfilled' ? (barchartResult.value ?? 'null') : 'err'}`);
 
   if (yahooResults.status === 'rejected') console.warn('  Yahoo batch failed:', yahooResults.reason?.message);
   if (cboeResult.status === 'rejected') console.warn('  CBOE failed:', cboeResult.reason?.message);
