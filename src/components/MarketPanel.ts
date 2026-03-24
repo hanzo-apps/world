@@ -155,8 +155,8 @@ export class HeatmapPanel extends Panel {
           return `
         <div class="heatmap-cell ${getHeatmapClass(change)}">
           ${tickerHtml}
-          <div class="sector-name">${escapeHtml(sector.name)}</div>
           <div class="sector-change ${getChangeClass(change)}">${formatChange(change)}</div>
+          <div class="sector-name">${escapeHtml(sector.name)}</div>
         </div>
       `;
         })
