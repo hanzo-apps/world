@@ -14145,15 +14145,17 @@ const ALL_ALLOWED_TICKERS = new Set([
 const MARKET_IMPLICATIONS_SYSTEM_PROMPT = `You are a senior macro strategist generating structured trade-implication cards from live world intelligence.
 
 RULES:
-- Generate 3 to 7 trade-implication cards based ONLY on the provided world-state context.
+- Generate 3 to 5 trade-implication cards based ONLY on the provided world-state context.
 - Each card must reference a specific ticker from the ALLOWED TICKERS list.
 - direction must be exactly one of: LONG, SHORT, HEDGE
 - timeframe must be one of: 1W, 2W, 1M, 3M
 - confidence must be one of: HIGH, MEDIUM, LOW
 - title: 1 short sentence (max 12 words) summarising the trade thesis
-- narrative: 2–3 sentences grounding the thesis in the provided context (cite specific signals)
+- narrative: 2–3 sentences grounding the thesis in the provided context. Cite specific signals by name (e.g. "Hormuz at CRITICAL risk", "VIX at 28", "Polymarket: 74% Iran conflict"). When prediction market odds are provided, weave them into the thesis.
 - risk_caveat: 1 sentence on the primary counter-thesis or risk
 - driver: 1–3 words naming the core geopolitical/macro driver (e.g. "Hormuz closure risk", "Fed pivot", "Taiwan tension")
+- Cross-reference signals: if geopolitical escalation coincides with a commodity move in the opposite direction, flag the divergence and consider a HEDGE rather than directional call.
+- Prioritise cards by signal strength — lead with the highest-conviction setup.
 - NEVER use tickers not in the ALLOWED TICKERS list
 - NEVER invent data — use only what is provided
 - Do NOT include duplicate tickers across cards
@@ -14163,6 +14165,20 @@ Respond with ONLY a JSON array:
 
 function buildMarketImplicationsContext(inputs) {
   const parts = [];
+
+  // Pre-synthesised critical signals (highest-value input — already ranked by strength)
+  const criticalSignals = inputs.criticalSignalBundle?.signals;
+  if (Array.isArray(criticalSignals) && criticalSignals.length > 0) {
+    const top = criticalSignals.slice(0, 8).map(s => {
+      const strength = s.strength != null ? ` strength=${(s.strength * 100).toFixed(0)}%` : '';
+      const conf = s.confidence != null ? ` conf=${(s.confidence * 100).toFixed(0)}%` : '';
+      const domains = Array.isArray(s.domains) && s.domains.length ? ` [${s.domains.join(',')}]` : '';
+      const evidence = Array.isArray(s.supportingEvidence) && s.supportingEvidence.length
+        ? ` — ${s.supportingEvidence.slice(0, 2).join('; ')}` : '';
+      return `- ${sanitizeForPrompt(s.title || s.type || '')}${strength}${conf}${domains}${evidence}`;
+    });
+    parts.push(`[CRITICAL INTELLIGENCE SIGNALS]\n${top.join('\n')}`);
+  }
 
   const commodities = inputs.commodityQuotes?.quotes;
   if (Array.isArray(commodities) && commodities.length > 0) {
@@ -14182,42 +14198,98 @@ function buildMarketImplicationsContext(inputs) {
     parts.push(`[SECTORS]\n${top.join('\n')}`);
   }
 
+  // ETF flows — sector rotation signal
+  const etfItems = extractEtfItems(inputs.etfFlows);
+  if (etfItems.length > 0) {
+    const sorted = [...etfItems].sort((a, b) => Math.abs(b.flowPct ?? b.changePct ?? 0) - Math.abs(a.flowPct ?? a.changePct ?? 0));
+    const top = sorted.slice(0, 6).map(e => {
+      const flow = e.flowPct ?? e.changePct;
+      return `${e.name || e.symbol}: ${flow != null ? (flow >= 0 ? '+' : '') + flow.toFixed(1) + '% flow' : 'N/A'}`;
+    });
+    parts.push(`[ETF FLOWS]\n${top.join('\n')}`);
+  }
+
+  // Central bank policy rates — essential for forex/rates cards
+  const policyRates = extractRateItems(inputs.bisPolicyRates);
+  if (policyRates.length > 0) {
+    const rateLines = policyRates.slice(0, 8).map(r => `${r.country || r.code || r.name}: ${r.rate != null ? r.rate.toFixed(2) + '%' : 'N/A'}`);
+    parts.push(`[CENTRAL BANK POLICY RATES]\n${rateLines.join('\n')}`);
+  }
+
   const theaters = inputs.theaterPosture?.theaters;
   if (Array.isArray(theaters) && theaters.length > 0) {
     const active = theaters.filter(t => t.alertLevel && t.alertLevel !== 'NONE').slice(0, 5);
     if (active.length > 0) {
-      parts.push(`[ACTIVE THEATERS]\n${active.map(t => `${t.id || t.theaterId}: alert=${t.alertLevel} escalation=${t.escalationScore ?? 'N/A'}`).join('\n')}`);
+      const lines = active.map(t => {
+        const region = t.region || t.name || t.id || t.theaterId || '';
+        const commodity = t.commodity ? ` commodity=${t.commodity}` : '';
+        return `${region}: alert=${t.alertLevel} escalation=${t.escalationScore ?? 'N/A'}${commodity}`;
+      });
+      parts.push(`[ACTIVE THEATERS]\n${lines.join('\n')}`);
     }
   }
 
   const chokepoints = inputs.chokepoints;
-  if (Array.isArray(chokepoints) && chokepoints.length > 0) {
-    const atRisk = chokepoints.filter(c => c.riskLevel === 'HIGH' || c.riskLevel === 'CRITICAL').slice(0, 4);
+  const chokepointList = Array.isArray(chokepoints) ? chokepoints
+    : Array.isArray(chokepoints?.routes) ? chokepoints.routes
+    : Array.isArray(chokepoints?.chokepoints) ? chokepoints.chokepoints : [];
+  if (chokepointList.length > 0) {
+    const atRisk = chokepointList.filter(c => c.riskLevel === 'HIGH' || c.riskLevel === 'CRITICAL').slice(0, 4);
     if (atRisk.length > 0) {
       parts.push(`[AT-RISK CHOKEPOINTS]\n${atRisk.map(c => `${c.name}: risk=${c.riskLevel} commodity=${c.commodity || 'N/A'}`).join('\n')}`);
     }
   }
 
-  const shipping = inputs.shippingRates;
-  if (shipping?.routes && typeof shipping.routes === 'object') {
-    const routes = Object.entries(shipping.routes).slice(0, 4).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v).slice(0, 60) : v}`);
-    if (routes.length > 0) parts.push(`[SHIPPING RATES]\n${routes.join('\n')}`);
+  // Shipping — formatted cleanly
+  const shippingIndices = extractShippingIndices(inputs.shippingRates);
+  if (shippingIndices.length > 0) {
+    const top = shippingIndices.slice(0, 5).map(idx => {
+      const change = idx.changePct != null ? ` (${idx.changePct >= 0 ? '+' : ''}${idx.changePct.toFixed(1)}%)` : '';
+      const val = idx.value != null ? ` ${idx.value}${idx.unit ? ' ' + idx.unit : ''}` : '';
+      return `${idx.name || idx.route || idx.id}:${val}${change}`;
+    });
+    parts.push(`[SHIPPING INDICES]\n${top.join('\n')}`);
   }
 
+  // FRED macro indicators
   const fredSeries = inputs.fredSeries;
   if (fredSeries && typeof fredSeries === 'object') {
     const fredParts = [];
     if (fredSeries.VIXCLS?.value != null) fredParts.push(`VIX: ${fredSeries.VIXCLS.value}`);
     if (fredSeries.T10Y2Y?.value != null) fredParts.push(`10Y-2Y Spread: ${fredSeries.T10Y2Y.value}`);
     if (fredSeries.FEDFUNDS?.value != null) fredParts.push(`Fed Funds: ${fredSeries.FEDFUNDS.value}`);
-    if (fredSeries.DCOILWTICO?.value != null) fredParts.push(`WTI Crude: ${fredSeries.DCOILWTICO.value}`);
+    if (fredSeries.DCOILWTICO?.value != null) fredParts.push(`WTI Crude (FRED): ${fredSeries.DCOILWTICO.value}`);
+    if (fredSeries.UNRATE?.value != null) fredParts.push(`Unemployment Rate: ${fredSeries.UNRATE.value}%`);
+    if (fredSeries.CPIAUCSL?.value != null) fredParts.push(`CPI YoY: ${fredSeries.CPIAUCSL.value}`);
     if (fredParts.length > 0) parts.push(`[MACRO INDICATORS]\n${fredParts.join('\n')}`);
   }
 
+  // Prediction markets — forward-looking probability anchors
+  const geoMarkets = inputs.predictionMarkets?.geopolitical;
+  if (Array.isArray(geoMarkets) && geoMarkets.length > 0) {
+    const top = geoMarkets
+      .filter(m => m.title && m.yesPrice != null)
+      .sort((a, b) => Math.abs(b.yesPrice - 50) - Math.abs(a.yesPrice - 50)) // most decisive first
+      .slice(0, 6)
+      .map(m => `- ${sanitizeForPrompt(m.title.slice(0, 100))}: ${Math.round(m.yesPrice)}% YES (${m.source || 'Polymarket'})`);
+    if (top.length > 0) parts.push(`[PREDICTION MARKETS — GEOPOLITICAL]\n${top.join('\n')}`);
+  }
+
+  // Sanctions — affects USDRUB, USDTRY, USDCNY, relevant commodity flows
+  const sanctionedCountries = inputs.sanctionsPressure?.countries;
+  if (Array.isArray(sanctionedCountries) && sanctionedCountries.length > 0) {
+    const high = sanctionedCountries
+      .filter(c => (c.score ?? c.pressureScore ?? 0) > 60)
+      .slice(0, 5)
+      .map(c => `${c.name || c.country || c.code}: pressure=${c.score ?? c.pressureScore ?? 'N/A'}`);
+    if (high.length > 0) parts.push(`[HIGH-PRESSURE SANCTIONS]\n${high.join('\n')}`);
+  }
+
+  // News signals (fallback / supplementary)
   const insights = inputs.newsInsights?.signals;
   if (Array.isArray(insights) && insights.length > 0) {
     const top = insights.slice(0, 5).map(s => `- ${sanitizeForPrompt(s.title || s.summary || '')}`);
-    parts.push(`[KEY INTELLIGENCE SIGNALS]\n${top.join('\n')}`);
+    parts.push(`[NEWS SIGNALS]\n${top.join('\n')}`);
   }
 
   return parts.length > 0 ? parts.join('\n\n') : 'No live world state available.';
@@ -14269,7 +14341,7 @@ async function buildAndSeedMarketImplications(inputs) {
   const result = await callForecastLLM(MARKET_IMPLICATIONS_SYSTEM_PROMPT, userPrompt, {
     ...llmOptions,
     stage: 'market_implications',
-    maxTokens: 2000,
+    maxTokens: 2500,
     temperature: 0.25,
   });
 
