@@ -759,7 +759,11 @@ async function aggregateCrossSourceSignals() {
   console.log('  Reading source keys...');
   const sourceData = await readAllSourceKeys();
   const foundKeys = Object.keys(sourceData);
+  const missingKeys = SOURCE_KEYS.filter(k => !foundKeys.includes(k));
   console.log(`  Found ${foundKeys.length}/${SOURCE_KEYS.length} source keys populated`);
+  if (missingKeys.length > 0) {
+    console.log(`  Missing keys (${missingKeys.length}): ${missingKeys.join(', ')}`);
+  }
 
   const allSignals = [];
 

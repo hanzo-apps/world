@@ -2886,6 +2886,7 @@ export class DataLoaderManager implements AppModule {
       dataFreshness.recordUpdate('cross-source-signals' as DataSourceId, result.signals?.length ?? 0);
     } catch (error) {
       console.error('[App] Cross-source signals fetch failed:', error);
+      this.callPanel('cross-source-signals', 'showFetchError');
     }
   }
 }
