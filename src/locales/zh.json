@@ -281,7 +281,9 @@
     "gulfIndices": "海湾指数",
     "gulfCurrencies": "海湾货币",
     "gulfOil": "海湾石油",
-    "bigmac": "Real Big Mac Index"
+
+    "bigmac": "Real Big Mac Index",
+    "fearGreed": "Fear & Greed"
   },
   "commands": {
     "prefixes": {
