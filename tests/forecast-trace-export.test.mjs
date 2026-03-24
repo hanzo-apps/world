@@ -44,6 +44,10 @@ import {
   extractImpactCommodityKey,
   IMPACT_VARIABLE_REGISTRY,
   MARKET_BUCKET_ALLOWED_CHANNELS,
+  scoreImpactExpansionQuality,
+  buildImpactExpansionDebugPayload,
+  filterNewsHeadlinesByState,
+  buildImpactExpansionEvidenceTable,
 } from '../scripts/seed-forecasts.mjs';
 
 import {
@@ -3949,7 +3953,7 @@ describe('impact expansion layer', () => {
     assert.equal(scoring.acceptanceScore, 0.636);
   });
 
-  it('keeps the base path when deep path evaluation cannot clear the acceptance floor', async () => {
+  it('accepts expanded path and builds deep world state when acceptance score clears 0.50 floor', async () => {
     const prediction = makePrediction('supply_chain', 'Red Sea', 'Shipping disruption: Strait of Hormuz', 0.68, 0.6, '7d', [
       { type: 'shipping_cost_shock', value: 'Shipping costs are rising around Strait of Hormuz rerouting.', weight: 0.5 },
       { type: 'energy_supply_shock', value: 'Energy transit pressure is building around Qatar LNG flows.', weight: 0.32 },
@@ -3981,13 +3985,12 @@ describe('impact expansion layer', () => {
       inputs: {},
     }, null, bundle.candidatePackets, bundle);
 
-    assert.equal(evaluation.status, 'completed_no_material_change');
-    assert.equal(evaluation.selectedPaths.length, 1);
-    assert.equal(evaluation.selectedPaths[0].type, 'base');
-    assert.equal(evaluation.rejectedPaths.length, 1);
-    assert.equal(evaluation.rejectedPaths[0].type, 'expanded');
-    assert.ok(evaluation.rejectedPaths[0].acceptanceScore < 0.6);
-    assert.equal(evaluation.deepWorldState, null);
+    assert.equal(evaluation.status, 'completed',
+      'strong hypotheses (strength=0.95/0.92) should clear the 0.50 acceptance floor');
+    assert.ok(evaluation.selectedPaths.length > 0);
+    const acceptedExpanded = evaluation.selectedPaths.filter((p) => p.type === 'expanded');
+    assert.ok(acceptedExpanded.length > 0, 'at least one expanded path must be selected');
+    assert.ok(evaluation.deepWorldState != null, 'deep world state must be built when expanded path accepted');
   });
 
   it('threads mapped expansion signals into simulation rounds without mutating observed world signals', () => {
@@ -5193,14 +5196,14 @@ describe('phase 2 scoring recalibration + prompt excellence', () => {
     assert.equal(gd.secondOrderMappedFloor, 0.58);
     assert.equal(gd.secondOrderMultiplier, 0.88);
     assert.equal(gd.pathScoreThreshold, 0.50);
-    assert.equal(gd.acceptanceThreshold, 0.60);
+    assert.equal(gd.acceptanceThreshold, 0.50);
   });
 
-  it('T7: prompt v3 contains all required guidance strings', () => {
+  it('T7: prompt v4 contains all required guidance strings', () => {
     const prompt = buildImpactExpansionSystemPrompt();
     assert.ok(prompt.includes('at least 2 evidence keys'),
       'prompt must mention 2-evidence requirement');
-    assert.ok(prompt.includes('MUST be the exact variableKey string'),
+    assert.ok(prompt.includes('MUST be the exact hypothesisKey of one of your direct'),
       'prompt must have dependsOnKey exactness rule');
     assert.ok(prompt.includes('strength 0.82-0.95'),
       'prompt must include confidence calibration guidance');
@@ -5218,5 +5221,217 @@ describe('phase 2 scoring recalibration + prompt excellence', () => {
     // Original chokepoints must still work
     assert.equal(extractImpactRouteFacilityKey(['Strait of Hormuz tanker attack']), 'Strait of Hormuz');
     assert.equal(extractImpactRouteFacilityKey(['Suez Canal blockage ongoing']), 'Suez Canal');
+    // Region-level names now resolve (candidate titles use region, not facility name)
+    assert.equal(extractImpactRouteFacilityKey(['Red Sea maritime disruption']), 'Red Sea');
+    assert.equal(extractImpactRouteFacilityKey(['Persian Gulf shipping pressure']), 'Persian Gulf');
+    assert.equal(extractImpactRouteFacilityKey(['South China Sea naval tensions']), 'South China Sea');
+  });
+
+  it('T9: scoreImpactExpansionQuality — high commodity rate + chain coverage yields high composite', () => {
+    const candidatePackets = [{ candidateIndex: 0 }, { candidateIndex: 1 }];
+    const validation = {
+      hypotheses: [
+        { order: 'direct', variableKey: 'route_disruption', targetBucket: 'energy', validationStatus: 'mapped', commodity: 'LNG', candidateIndex: 0 },
+        { order: 'second_order', variableKey: 'inflation_pass_through', targetBucket: 'commodities', validationStatus: 'mapped', commodity: 'LNG', candidateIndex: 0 },
+        { order: 'direct', variableKey: 'supply_constraint', targetBucket: 'commodities', validationStatus: 'mapped', commodity: 'crude_oil', candidateIndex: 1 },
+        { order: 'second_order', variableKey: 'shipping_cost_spike', targetBucket: 'equity', validationStatus: 'mapped', commodity: 'crude_oil', candidateIndex: 1 },
+      ],
+      mapped: [],
+    };
+    validation.mapped = validation.hypotheses.filter(h => h.validationStatus === 'mapped');
+
+    const result = scoreImpactExpansionQuality(validation, candidatePackets);
+
+    assert.ok(result.commodityRate === 1.0, 'all mapped have commodity → commodityRate 1.0');
+    assert.ok(result.directCommodityDiversity === 1.0, '2 candidates × 2 unique direct commodities (LNG, crude_oil) → directCommodityDiversity 1.0');
+    assert.ok(result.candidateSpreadScore === 1.0, '2 candidates × 2 hypotheses each → perfectly even spread');
+    assert.ok(result.chainCoverage === 1.0, 'both candidates have direct+second → chainCoverage 1.0');
+    assert.ok(result.composite > 0.7, `composite should be high (got ${result.composite})`);
+    assert.equal(result.mappedCount, 4);
+  });
+
+  it('T10: scoreImpactExpansionQuality — no commodity + no chain coverage yields low composite', () => {
+    const candidatePackets = [{ candidateIndex: 0 }, { candidateIndex: 1 }];
+    const validation = {
+      hypotheses: [
+        { order: 'direct', variableKey: 'route_disruption', targetBucket: 'energy', validationStatus: 'mapped', commodity: '', candidateIndex: 0 },
+        { order: 'direct', variableKey: 'supply_constraint', targetBucket: 'commodities', validationStatus: 'mapped', commodity: '', candidateIndex: 1 },
+      ],
+      mapped: [],
+    };
+    validation.mapped = validation.hypotheses.filter(h => h.validationStatus === 'mapped');
+
+    const result = scoreImpactExpansionQuality(validation, candidatePackets);
+
+    assert.equal(result.commodityRate, 0, 'no commodity keys → commodityRate 0');
+    assert.equal(result.chainCoverage, 0, 'no second_order → chainCoverage 0');
+    assert.ok(result.composite < 0.4, `composite should be low (got ${result.composite})`);
+  });
+
+  // Shared fixture builder for T-conv tests
+  function makeConvTestData(mapped, candidatePackets) {
+    const validation = { hypotheses: mapped, mapped, validated: mapped, orderCounts: {}, rejectionReasonCounts: {}, analogTagCounts: {} };
+    return {
+      impactExpansionBundle: { candidatePackets },
+      impactExpansionCandidates: candidatePackets,
+      deepPathEvaluation: { validation, selectedPaths: [], rejectedPaths: [] },
+    };
+  }
+
+  it('T-conv-1: buildImpactExpansionDebugPayload — converged=true when composite >= 0.80', () => {
+    const candidatePackets = [{ candidateIndex: 0 }, { candidateIndex: 1 }];
+    const mapped = [
+      { order: 'direct', hypothesisKey: 'hormuz_crude_disruption', commodity: 'crude_oil', geography: 'Persian Gulf', affectedAssets: ['USO'], candidateStateId: 'state-A', candidateIndex: 0, validationStatus: 'mapped' },
+      { order: 'second_order', hypothesisKey: 'crude_inflation_pass_through', commodity: 'crude_oil', geography: 'United States', affectedAssets: ['TIP'], candidateStateId: 'state-A', candidateIndex: 0, validationStatus: 'mapped' },
+      { order: 'direct', hypothesisKey: 'baltic_shipping_cost_spike', commodity: 'LNG', geography: 'Baltic Sea', affectedAssets: ['HMM'], candidateStateId: 'state-B', candidateIndex: 1, validationStatus: 'mapped' },
+      { order: 'second_order', hypothesisKey: 'lng_inflation_europe', commodity: 'LNG', geography: 'Northern Europe', affectedAssets: ['TTF'], candidateStateId: 'state-B', candidateIndex: 1, validationStatus: 'mapped' },
+    ];
+
+    const payload = buildImpactExpansionDebugPayload(makeConvTestData(mapped, candidatePackets), null, 'run-conv-test');
+
+    assert.ok(payload?.convergence, 'convergence object present');
+    assert.ok(payload.convergence.converged === true, `converged should be true (composite=${payload.convergence.finalComposite})`);
+    assert.equal(payload.convergence.predictedCritiqueIterations, 0, 'no predicted critique iterations when quality good');
+    assert.ok(typeof payload.convergence.finalComposite === 'number');
+    assert.ok(payload.convergence.finalComposite >= 0.80, `finalComposite should be >= 0.80 (got ${payload.convergence.finalComposite})`);
+  });
+
+  it('T-conv-2: buildImpactExpansionDebugPayload — converged=false when composite < 0.80, predictedCritiqueIterations=1', () => {
+    const candidatePackets = [{ candidateIndex: 0 }, { candidateIndex: 1 }];
+    const mapped = [
+      { order: 'direct', hypothesisKey: 'route_disruption', commodity: '', geography: '', affectedAssets: [], candidateStateId: 'state-A', candidateIndex: 0, validationStatus: 'mapped' },
+    ];
+
+    const payload = buildImpactExpansionDebugPayload(makeConvTestData(mapped, candidatePackets), null, 'run-conv-test-2');
+
+    assert.ok(payload?.convergence, 'convergence object present');
+    assert.ok(payload.convergence.converged === false, `converged should be false (composite=${payload.convergence.finalComposite})`);
+    // predictedCritiqueIterations is derived from quality score (refinement is fire-and-forget)
+    assert.equal(payload.convergence.predictedCritiqueIterations, 1, 'predictedCritiqueIterations=1 when composite < 0.80');
+    assert.ok(payload.convergence.finalComposite < 0.80, `finalComposite should be < 0.80 (got ${payload.convergence.finalComposite})`);
+  });
+
+  it('T-conv-3: buildImpactExpansionDebugPayload — perCandidateMappedCount groups correctly by candidateStateId', () => {
+    const candidatePackets = [{ candidateIndex: 0 }, { candidateIndex: 1 }, { candidateIndex: 2 }];
+    const mapped = [
+      { order: 'direct', hypothesisKey: 'h1', commodity: 'crude_oil', geography: 'Middle East', affectedAssets: ['USO'], candidateStateId: 'state-A', candidateIndex: 0, validationStatus: 'mapped' },
+      { order: 'second_order', hypothesisKey: 'h2', commodity: 'crude_oil', geography: 'United States', affectedAssets: [], candidateStateId: 'state-A', candidateIndex: 0, validationStatus: 'mapped' },
+      { order: 'direct', hypothesisKey: 'h3', commodity: 'LNG', geography: 'Baltic Sea', affectedAssets: ['HMM'], candidateStateId: 'state-B', candidateIndex: 1, validationStatus: 'mapped' },
+    ];
+
+    const payload = buildImpactExpansionDebugPayload(makeConvTestData(mapped, candidatePackets), null, 'run-conv-test-3');
+    const counts = payload.convergence.perCandidateMappedCount;
+
+    assert.equal(counts['state-A'], 2, 'state-A has 2 mapped hypotheses');
+    assert.equal(counts['state-B'], 1, 'state-B has 1 mapped hypothesis');
+    assert.ok(!counts['state-C'], 'state-C not present (0 mapped)');
+  });
+});
+
+// ─── Live News Evidence Injection ────────────────────────────────────────────
+
+describe('filterNewsHeadlinesByState', () => {
+  const makeState = (overrides = {}) => ({
+    id: 'test-state',
+    label: 'Hormuz Strait Closure',
+    stateKind: 'escalation',
+    dominantRegion: 'Iran',
+    sampleTitles: ['Iran threatens Hormuz closure'],
+    signalTypes: ['route_disruption'],
+    commodityKey: 'crude_oil',
+    ...overrides,
+  });
+
+  const makeInsights = (stories = []) => ({ topStories: stories, generatedAt: '2026-03-24T00:00:00Z' });
+  const makeDigest = (items = []) => ({ categories: { energy: { items } } });
+
+  it('T-news-1: returns empty array when both news inputs are null', () => {
+    const result = filterNewsHeadlinesByState(makeState(), null, null);
+    assert.deepEqual(result, []);
+  });
+
+  it('T-news-2: LNG alert headline scores above threshold and is returned for Hormuz state', () => {
+    const insights = makeInsights([
+      { title: 'Qatar LNG tankers rerouted away from Hormuz strait', isAlert: true, sourceCount: 3 },
+    ]);
+    const result = filterNewsHeadlinesByState(makeState(), insights, null);
+    assert.ok(result.length > 0, 'should return at least one headline');
+    assert.ok(result[0].includes('LNG') || result[0].includes('Qatar'), `expected LNG headline, got: ${result[0]}`);
+  });
+
+  it('T-news-3: non-matching headline (sports) is not returned', () => {
+    const insights = makeInsights([
+      { title: 'Football World Cup final set for next week', isAlert: false, sourceCount: 1 },
+      { title: 'Tennis star wins grand slam championship', isAlert: false, sourceCount: 1 },
+    ]);
+    const result = filterNewsHeadlinesByState(makeState(), insights, null);
+    assert.deepEqual(result, [], 'sports headlines should score below threshold');
+  });
+
+  it('T-news-4: returns at most 3 headlines even when more qualify', () => {
+    const stories = [
+      { title: 'LNG tanker seized in Hormuz strait', isAlert: true, sourceCount: 5 },
+      { title: 'Gas export terminal shut by Iran sanctions embargo', isAlert: true, sourceCount: 4 },
+      { title: 'LNG prices spike as Strait of Hormuz route blocked', isAlert: true, sourceCount: 3 },
+      { title: 'Crude oil tanker attack in Hormuz shipping lane', isAlert: true, sourceCount: 6 },
+    ];
+    const result = filterNewsHeadlinesByState(makeState(), makeInsights(stories), null);
+    assert.ok(result.length <= 3, `should return at most 3 headlines, got ${result.length}`);
+    assert.ok(result.length > 0, 'should return at least one headline');
+  });
+});
+
+describe('buildImpactExpansionEvidenceTable — live_news injection', () => {
+  const makeMinimalState = () => ({
+    id: 's1',
+    label: 'Red Sea Disruption',
+    stateKind: 'escalation',
+    dominantRegion: 'Yemen',
+    sampleTitles: ['Houthi attacks Red Sea shipping'],
+    topSignals: [{ type: 'shipping_cost_shock', count: 3 }],
+    actors: ['Houthi'],
+  });
+  const makeMarket = () => ({
+    topBucketLabel: 'Freight',
+    topBucketPressure: 0.7,
+    consequenceSummary: 'Shipping costs rising sharply.',
+  });
+  const makeContinuity = () => ({ summary: 'Disruption ongoing for 4 weeks.', continuityScore: 0.5, continuityMode: 'sustained' });
+
+  it('T-news-4b: with 3 newsItems, evidence table has 11 entries and last 3 have kind=live_news', () => {
+    const newsItems = ['Dire fertiliser shortage worsens', 'LNG tankers rerouted via Cape', 'Wheat prices hit 2-year high'];
+    const table = buildImpactExpansionEvidenceTable(makeMinimalState(), makeMarket(), makeContinuity(), newsItems);
+    assert.ok(table.length <= 11, `cap is 11, got ${table.length}`);
+    const liveEntries = table.filter((e) => e.kind === 'live_news');
+    assert.equal(liveEntries.length, 3, 'should have 3 live_news entries');
+    assert.ok(table.every((e, i) => e.key === `E${i + 1}`), 'keys should be E1..EN sequentially');
+  });
+
+  it('T-news-4c: with no newsItems, evidence table behaves identically to before (cap 8)', () => {
+    const table = buildImpactExpansionEvidenceTable(makeMinimalState(), makeMarket(), makeContinuity(), []);
+    assert.ok(table.length <= 8, `no-news cap should be ≤8, got ${table.length}`);
+    assert.ok(table.every((e) => e.kind !== 'live_news'), 'no live_news entries when newsItems is empty');
+  });
+});
+
+describe('IMPACT_COMMODITY_LEXICON — extended entries', () => {
+  it('T-lex-1: extractImpactCommodityKey returns lng for LNG-specific text', () => {
+    // "tanker" matches crude_oil first, so use LNG-specific terms (ras laffan, north field, liquefied natural gas)
+    assert.equal(extractImpactCommodityKey(['Qatar LNG exports halted from Ras Laffan']), 'lng');
+    assert.equal(extractImpactCommodityKey(['liquefied natural gas shipments disrupted']), 'lng');
+    assert.equal(extractImpactCommodityKey(['North Field expansion project at risk']), 'lng');
+  });
+
+  it('T-lex-2: extractImpactCommodityKey returns food_grains for wheat shortage text', () => {
+    const result = extractImpactCommodityKey(['wheat shortage threatening food security in Egypt']);
+    assert.equal(result, 'food_grains');
+  });
+
+  it('T-lex-3: extractImpactCommodityKey returns fertilizer for fertiliser/nitrogen/ammonia text', () => {
+    assert.equal(extractImpactCommodityKey(['fertiliser shortage due to Hormuz crisis']), 'fertilizer');
+    assert.equal(extractImpactCommodityKey(['nitrogen fertilizer prices spike']), 'fertilizer');
+    assert.equal(extractImpactCommodityKey(['ammonia plant shutting down']), 'fertilizer');
+    assert.equal(extractImpactCommodityKey(['phosphate exports halted']), 'fertilizer');
+    assert.equal(extractImpactCommodityKey(['NPK supply disrupted']), 'fertilizer');
   });
 });
