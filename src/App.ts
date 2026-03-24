@@ -28,6 +28,7 @@ import type { StablecoinPanel } from '@/components/StablecoinPanel';
 import type { ETFFlowsPanel } from '@/components/ETFFlowsPanel';
 import type { MacroSignalsPanel } from '@/components/MacroSignalsPanel';
 import type { FearGreedPanel } from '@/components/FearGreedPanel';
+import type { HormuzPanel } from '@/components/HormuzPanel';
 import type { StrategicPosturePanel } from '@/components/StrategicPosturePanel';
 import type { StrategicRiskPanel } from '@/components/StrategicRiskPanel';
 import type { GulfEconomiesPanel } from '@/components/GulfEconomiesPanel';
@@ -239,6 +240,10 @@ export class App {
     if (shouldPrime('fear-greed')) {
       const panel = this.state.panels['fear-greed'] as FearGreedPanel | undefined;
       if (panel) primeTask('fear-greed', () => panel.fetchData());
+    }
+    if (shouldPrime('hormuz-tracker')) {
+      const panel = this.state.panels['hormuz-tracker'] as HormuzPanel | undefined;
+      if (panel) primeTask('hormuz-tracker', () => panel.fetchData());
     }
     if (shouldPrime('etf-flows')) {
       const panel = this.state.panels['etf-flows'] as ETFFlowsPanel | undefined;
@@ -1087,6 +1092,12 @@ export class App {
       () => (this.state.panels['fear-greed'] as FearGreedPanel).fetchData(),
       REFRESH_INTERVALS.fearGreed,
       () => this.isPanelNearViewport('fear-greed')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'hormuz-tracker',
+      () => (this.state.panels['hormuz-tracker'] as HormuzPanel).fetchData(),
+      REFRESH_INTERVALS.hormuzTracker,
+      () => this.isPanelNearViewport('hormuz-tracker')
     );
     this.refreshScheduler.scheduleRefresh(
       'strategic-posture',
