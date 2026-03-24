@@ -132,6 +132,11 @@ async function fetchCNN() {
 }
 
 // --- AAII Sentiment (LOW reliability, always wrapped, non-blocking) ---
+// Table layout: Reported Date | Bullish | Neutral | Bearish
+// Extract the 3 percentage cells from the first (most recent) data row
+// using class="tableTxt" cells — positional, not label-based.
+// Label-based regexes fail because "Bearish" header precedes the Bullish
+// data cell (30.4%) in the DOM before the actual Bearish cell (52.0%).
 async function fetchAAII() {
   try {
     const resp = await fetch('https://www.aaii.com/sentimentsurvey/sent_results', {
@@ -140,10 +145,11 @@ async function fetchAAII() {
     });
     if (!resp.ok) return null;
     const html = await resp.text();
-    const bullMatch = html.match(/Bullish[^%]*?([\d.]+)%/i);
-    const bearMatch = html.match(/Bearish[^%]*?([\d.]+)%/i);
-    if (!bullMatch || !bearMatch) return null;
-    return { bull: parseFloat(bullMatch[1]), bear: parseFloat(bearMatch[1]) };
+    // Columns 1,2,3 of first data row = Bullish%, Neutral%, Bearish%
+    const pcts = [...html.matchAll(/<td[^>]*class="tableTxt"[^>]*>([\d.]+)%/g)]
+      .map(m => parseFloat(m[1]));
+    if (pcts.length < 3) return null;
+    return { bull: pcts[0], bear: pcts[2] };
   } catch (e) {
     console.warn('  AAII: fetch failed:', e.message, '(using degraded Sentiment)');
     return null;
