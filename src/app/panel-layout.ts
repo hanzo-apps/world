@@ -772,6 +772,16 @@ export class PanelLayoutManager implements AppModule {
       (!_wmKeyPresent && !isProUser()) ? ['Pre-market watchlist priorities', 'Action plan for the session', 'Risk watch tied to current finance headlines'] : undefined,
     );
 
+    this.lazyPanel('market-implications', () =>
+      import('@/components/MarketImplicationsPanel').then(m => new m.MarketImplicationsPanel()),
+      undefined,
+      (!_wmKeyPresent && !isProUser()) ? [
+        'AI-generated trade signals from live geopolitical world state',
+        'Direction badges (LONG/SHORT/HEDGE) with confidence ratings',
+        'Updated each forecast cycle with fresh market context',
+      ] : undefined,
+    );
+
     this.lazyPanel('forecast', () =>
       import('@/components/ForecastPanel').then(m => new m.ForecastPanel()),
       undefined,

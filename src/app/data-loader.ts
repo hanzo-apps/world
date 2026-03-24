@@ -167,6 +167,7 @@ import {
 import { fetchCachedRiskScores } from '@/services/cached-risk-scores';
 import type { ThreatLevel as ClientThreatLevel } from '@/types';
 import type { NewsItem as ProtoNewsItem, ThreatLevel as ProtoThreatLevel } from '@/generated/client/worldmonitor/news/v1/service_client';
+import { fetchMarketImplications } from '@/services/market-implications';
 
 const PROTO_TO_CLIENT_LEVEL: Record<ProtoThreatLevel, ClientThreatLevel> = {
   THREAT_LEVEL_UNSPECIFIED: 'info',
@@ -530,6 +531,7 @@ export class DataLoaderManager implements AppModule {
 
     if (getSecretState('WORLDMONITOR_API_KEY').present || isProUser()) {
       await this.loadDailyMarketBrief();
+      await this.loadMarketImplications();
     }
 
     const bootstrapTemporal = consumeServerAnomalies();
@@ -1418,6 +1420,28 @@ export class DataLoaderManager implements AppModule {
       this.callPanel('daily-market-brief', 'showError', 'Failed to build daily market brief. Retrying later.');
     } finally {
       this.ctx.inFlight.delete('dailyMarketBrief');
+    }
+  }
+
+  async loadMarketImplications(): Promise<void> {
+    if (!getSecretState('WORLDMONITOR_API_KEY').present && !isProUser()) return;
+    if (this.ctx.isDestroyed || this.ctx.inFlight.has('marketImplications')) return;
+    this.ctx.inFlight.add('marketImplications');
+    try {
+      const data = await fetchMarketImplications();
+      if (!data) {
+        this.callPanel('market-implications', 'showUnavailable');
+        return;
+      }
+      if (data.degraded || data.cards.length === 0) {
+        this.callPanel('market-implications', 'showUnavailable');
+        return;
+      }
+      this.callPanel('market-implications', 'renderImplications', data, 'live');
+    } catch {
+      this.callPanel('market-implications', 'showUnavailable');
+    } finally {
+      this.ctx.inFlight.delete('marketImplications');
     }
   }
 
