@@ -226,6 +226,14 @@ function fredNMonthsAgo(obs, months) {
   const v = parseFloat(obs[idx]?.value ?? 'NaN');
   return Number.isFinite(v) ? v : null;
 }
+// For daily FRED series, 1 "month" ≈ 20 trading days — use this for trend comparisons
+function fredNTradingDaysAgo(obs, days) {
+  if (!obs) return null;
+  const idx = obs.length - 1 - days;
+  if (idx < 0) return null;
+  const v = parseFloat(obs[idx]?.value ?? 'NaN');
+  return Number.isFinite(v) ? v : null;
+}
 function labelFromScore(s) {
   if (s <= 20) return 'Extreme Fear';
   if (s <= 40) return 'Fear';
@@ -313,7 +321,8 @@ function scoreCategory(name, inputs) {
       const m2Yoy = (m2Latest && m2Ago && m2Ago !== 0) ? ((m2Latest - m2Ago) / m2Ago) * 100 : null;
       const walclLatest = fredLatest(walclObs), walclAgo = fredNMonthsAgo(walclObs, 1);
       const fedBsMom = (walclLatest && walclAgo && walclAgo !== 0) ? ((walclLatest - walclAgo) / walclAgo) * 100 : null;
-      const m2Score = m2Yoy != null ? clamp(m2Yoy * 10 + 50, 0, 100) : 50;
+      // M2 YoY: normal annual growth is 4-6%; use 5x multiplier so 5% YoY ≈ 75 (not pegged at 100 like 10x was)
+      const m2Score = m2Yoy != null ? clamp(m2Yoy * 5 + 50, 0, 100) : 50;
       const fedScore = fedBsMom != null ? clamp(fedBsMom * 20 + 50, 0, 100) : 50;
       const sofrScore = sofr != null ? clamp(100 - sofr * 15, 0, 100) : 50;
       return { score: Math.round(m2Score * 0.4 + fedScore * 0.3 + sofrScore * 0.3), inputs: { m2Yoy, fedBsMom, sofr } };
@@ -321,9 +330,14 @@ function scoreCategory(name, inputs) {
     case 'credit': {
       const { hyObs, igObs } = inputs;
       const hySpread = fredLatest(hyObs), igSpread = fredLatest(igObs);
-      const hyScore = hySpread != null ? clamp(100 - ((hySpread - 3.0) / 5.0) * 100, 0, 100) : 50;
-      const igScore = igSpread != null ? clamp(100 - ((igSpread - 0.8) / 2.0) * 100, 0, 100) : 50;
-      const hyPrev = fredNMonthsAgo(hyObs, 1);
+      // HY OAS: historical range 2.0% (all-time tights) to 10.0% (crisis). Long-run avg ~5%.
+      // Old baseline was 3.0% (near tights), causing scores near 100 in normal conditions.
+      const hyScore = hySpread != null ? clamp(100 - ((hySpread - 2.0) / 8.0) * 100, 0, 100) : 50;
+      // IG OAS: historical range 0.4% (tights) to 3.0% (stressed). Long-run avg ~1.3%.
+      const igScore = igSpread != null ? clamp(100 - ((igSpread - 0.4) / 2.6) * 100, 0, 100) : 50;
+      // Use ~20 trading days (1 calendar month) for trend — fredNMonthsAgo(obs,1) only steps back
+      // 1 observation on daily data (= yesterday), which is noise not a trend signal.
+      const hyPrev = fredNTradingDaysAgo(hyObs, 20);
       const hyTrend = (hySpread != null && hyPrev != null) ? (hySpread < hyPrev ? 'narrowing' : hySpread > hyPrev ? 'widening' : 'stable') : 'stable';
       const trendScore = hyTrend === 'narrowing' ? 70 : hyTrend === 'widening' ? 30 : 50;
       return { score: Math.round(hyScore * 0.4 + igScore * 0.3 + trendScore * 0.3), inputs: { hySpread, igSpread, hyTrend30d: hyTrend } };
