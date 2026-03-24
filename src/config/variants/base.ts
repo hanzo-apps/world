@@ -36,6 +36,7 @@ export const REFRESH_INTERVALS = {
   stablecoins: 15 * 60 * 1000,
   etfFlows: 15 * 60 * 1000,
   macroSignals: 15 * 60 * 1000,
+  fearGreed: 30 * 60 * 1000,
   strategicPosture: 15 * 60 * 1000,
   strategicRisk: 5 * 60 * 1000,
   temporalBaseline: 10 * 60 * 1000,

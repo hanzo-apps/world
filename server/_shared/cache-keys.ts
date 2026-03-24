@@ -61,6 +61,7 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   otherTokens:      'market:other-tokens:v1',
   nationalDebt:     'economic:national-debt:v1',
   marketImplications: 'intelligence:market-implications:v1',
+  fearGreedIndex:   'market:fear-greed:v1',
 };
 
 export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
@@ -92,4 +93,5 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   otherTokens: 'slow',
   nationalDebt: 'slow',
   marketImplications: 'slow',
+  fearGreedIndex: 'slow',
 };
