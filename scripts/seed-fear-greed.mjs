@@ -1,7 +1,39 @@
 #!/usr/bin/env node
 
 import { loadEnvFile, CHROME_UA, runSeed, readSeedSnapshot, sleep } from './_seed-utils.mjs';
+import { execFileSync } from 'child_process';
 loadEnvFile(import.meta.url);
+
+// Proxy for Yahoo Finance — Railway container IPs get blocked by Yahoo after restarts.
+// Supports PROXY_URL="host:port:user:pass" (Decodo) or OREF_PROXY_AUTH="user:pass@host:port" (Froxy).
+function resolveProxy() {
+  const raw = process.env.PROXY_URL || '';
+  if (raw) {
+    const parts = raw.split(':');
+    if (parts.length === 4) {
+      const [host, port, user, pass] = parts;
+      return `${user}:${pass}@${host.replace(/^gate\./, 'us.')}:${port}`;
+    }
+    return raw;
+  }
+  return process.env.OREF_PROXY_AUTH || '';
+}
+const _proxyAuth = resolveProxy();
+
+// curl-based fetch for sources that block Railway IPs (Yahoo Finance).
+// Returns response body as string; throws on non-2xx.
+function curlFetch(url, headers = {}) {
+  const args = ['-sS', '--compressed', '--max-time', '15', '-L'];
+  if (_proxyAuth) args.push('-x', `http://${_proxyAuth}`);
+  for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
+  args.push('-w', '\n%{http_code}');
+  args.push(url);
+  const raw = execFileSync('curl', args, { encoding: 'utf8', timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'] });
+  const nl = raw.lastIndexOf('\n');
+  const status = parseInt(raw.slice(nl + 1).trim(), 10);
+  if (status < 200 || status >= 300) throw Object.assign(new Error(`HTTP ${status}`), { status });
+  return raw.slice(0, nl);
+}
 
 const FEAR_GREED_KEY = 'market:fear-greed:v1';
 const FEAR_GREED_TTL = 64800; // 18h = 3x 6h interval
@@ -13,13 +45,16 @@ const YAHOO_SYMBOLS = ['^GSPC','^VIX','^VIX9D','^VIX3M','^SKEW','C:ISSU','GLD','
 
 async function fetchYahooSymbol(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo`;
+  const headers = { 'User-Agent': CHROME_UA, Accept: 'application/json' };
   try {
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!resp.ok) { console.warn(`  Yahoo ${symbol}: HTTP ${resp.status}`); return null; }
-    const data = await resp.json();
+    // Use curl+proxy when available — Railway container IPs are periodically blocked by Yahoo.
+    const text = _proxyAuth
+      ? curlFetch(url, headers)
+      : await fetch(url, { headers, signal: AbortSignal.timeout(10_000) }).then(r => {
+          if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status });
+          return r.text();
+        });
+    const data = JSON.parse(text);
     const result = data?.chart?.result?.[0];
     if (!result) return null;
     const closes = result.indicators?.quote?.[0]?.close ?? [];
@@ -27,7 +62,8 @@ async function fetchYahooSymbol(symbol) {
     const price = result.meta?.regularMarketPrice ?? validCloses.at(-1) ?? null;
     return { symbol, price, closes: validCloses };
   } catch (e) {
-    console.warn(`  Yahoo ${symbol}: ${e.message}`);
+    const cause = e.cause?.message ?? e.cause?.code ?? '';
+    console.warn(`  Yahoo ${symbol}: ${e.message}${cause ? ` [${cause}]` : ''}`);
     return null;
   }
 }
@@ -332,7 +368,7 @@ async function fetchAll() {
 
   // Source status summary — visible in Railway container logs
   const yahooCount = Object.values(yahoo).filter(Boolean).length;
-  console.log(`  Sources: Yahoo=${yahooCount}/${YAHOO_SYMBOLS.length} | putCall=${cboe.totalPc ?? 'null'} | CNN=${cnn ? cnn.score : 'null'} | AAII bull=${aaii ? aaii.bull : 'null'} | Barchart=$S5TH=${barchartResult.status === 'fulfilled' ? (barchartResult.value ?? 'null') : 'err'}`);
+  console.log(`  Sources: Yahoo=${yahooCount}/${YAHOO_SYMBOLS.length} | putCall=${cboe.totalPc ?? 'null'} | CNN=${cnn ? cnn.score : 'null'} | AAII bull=${aaii ? aaii.bull : 'null'} | Barchart=$S5TH=${barchartResult.status === 'fulfilled' ? (barchartResult.value ?? 'null') : 'err'} | proxy=${_proxyAuth ? 'yes' : 'no'}`);
 
   if (yahooResults.status === 'rejected') console.warn('  Yahoo batch failed:', yahooResults.reason?.message);
   if (cboeResult.status === 'rejected') console.warn('  CBOE failed:', cboeResult.reason?.message);
