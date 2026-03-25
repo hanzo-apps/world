@@ -38,6 +38,7 @@ const SIMULATION_RUNNER_VERSION = 'v1';
 const SIMULATION_TASK_KEY_PREFIX = 'forecast:simulation-task:v1';
 const SIMULATION_TASK_QUEUE_KEY = 'forecast:simulation-task-queue:v1';
 const SIMULATION_LOCK_KEY_PREFIX = 'forecast:simulation-lock:v1';
+const VALID_RUN_ID_RE = /^\d{13,}-[a-z0-9-]{1,64}$/i;
 const SIMULATION_ROUND1_MAX_TOKENS = 2200;
 const SIMULATION_ROUND2_MAX_TOKENS = 2500;
 const SIMULATION_LOCK_TTL_SECONDS = 20 * 60;
@@ -15685,7 +15686,6 @@ async function writeSimulationOutcome(pkg, outcome, { storageConfig } = {}) {
   return { outcomeKey };
 }
 
-const VALID_RUN_ID_RE = /^\d{13,}-[a-z0-9-]{1,64}$/i;
 function validateRunId(runId) { return typeof runId === 'string' && VALID_RUN_ID_RE.test(runId); }
 
 function buildSimulationTaskKey(runId) { return `${SIMULATION_TASK_KEY_PREFIX}:${runId}`; }
