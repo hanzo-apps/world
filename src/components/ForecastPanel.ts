@@ -87,10 +87,10 @@ function injectStyles(): void {
     .fc-theater-card {
       background: var(--panel-bg, #161b22);
       border: 1px solid var(--border-color, #30363d);
-      border-radius: 5px;
-      padding: 10px;
+      border-radius: 8px;
+      padding: 18px 16px;
       cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
+      transition: all 0.2s;
       position: relative;
       overflow: hidden;
     }
@@ -99,13 +99,12 @@ function injectStyles(): void {
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 2px;
-      /* color comes from --fc-theater-color set inline on each card */
       background: var(--fc-theater-color, #58a6ff);
     }
-    .fc-theater-card:hover { border-color: #40464f; }
+    .fc-theater-card:hover { border-color: #40464f; transform: translateY(-1px); }
     .fc-theater-card.fc-theater-selected { border-color: var(--accent-color, #58a6ff); background: rgba(88,166,255,0.04); }
-    .fc-theater-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-    .fc-theater-name { font-size: 10px; font-weight: 700; line-height: 1.4; color: var(--text-primary, #e6edf3); flex: 1; padding-right: 6px; }
+    .fc-theater-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+    .fc-theater-name { font-size: 11px; font-weight: 700; line-height: 1.3; color: var(--text-primary, #e6edf3); flex: 1; padding-right: 8px; }
     .fc-gauge-wrap { position: relative; width: 38px; height: 38px; flex-shrink: 0; }
     .fc-gauge-svg { width: 38px; height: 38px; transform: rotate(-90deg); }
     .fc-gauge-bg { fill: none; stroke: var(--border-color, #30363d); stroke-width: 4; }
@@ -145,23 +144,32 @@ function injectStyles(): void {
     .fc-inval-item::before { color: #e05252; }
     .fc-react-item::before { color: #58a6ff; }
 
+    /* ── Section label ───────────────────────────────────────────────────── */
+    .fc-section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary, #7d8590); padding: 6px 8px 4px; }
+
     /* ── Forecast probability table ──────────────────────────────────────── */
     .fc-prob-table { border: 1px solid var(--border-color, #30363d); border-radius: 4px; overflow: hidden; margin: 0 8px 8px; }
-    .fc-prob-row { display: grid; grid-template-columns: 1fr 38px 90px 30px; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border-color, #30363d); cursor: pointer; transition: background 0.1s; }
-    .fc-prob-row:last-child { border-bottom: none; }
-    .fc-prob-row:hover { background: rgba(255,255,255,0.02); }
+    .fc-prob-hdr { display: grid; grid-template-columns: 1fr 80px 100px 60px; padding: 8px 14px; border-bottom: 1px solid var(--border-color, #30363d); }
+    .fc-prob-hdr span { font-size: 9px; color: var(--text-secondary, #7d8590); text-transform: uppercase; letter-spacing: 0.08em; }
+    .fc-prob-item { border-bottom: 1px solid var(--border-color, #30363d); }
+    .fc-prob-item:last-child { border-bottom: none; }
+    .fc-prob-row { display: grid; grid-template-columns: 1fr 80px 100px 60px; align-items: center; padding: 9px 14px; cursor: pointer; transition: background 0.1s; }
+    .fc-prob-item:hover .fc-prob-row { background: rgba(255,255,255,0.02); }
     .fc-prob-label { font-size: 10px; color: var(--text-secondary, #7d8590); line-height: 1.4; }
-    .fc-prob-pct { font-size: 11px; font-weight: 700; text-align: right; }
-    .fc-prob-bar-track { height: 3px; background: var(--border-color, #30363d); border-radius: 2px; overflow: hidden; }
+    .fc-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .fc-prob-bar-track { flex: 1; height: 4px; background: var(--border-color, #30363d); border-radius: 2px; overflow: hidden; min-width: 40px; }
     .fc-prob-bar-fill { height: 100%; border-radius: 2px; }
-    .fc-trend-sm { font-size: 10px; text-align: center; }
+    .fc-prob-pct { font-size: 11px; font-weight: 700; min-width: 30px; text-align: right; }
+    .fc-trend-text { font-size: 10px; }
+    .fc-domain-tag { font-size: 9px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ── Detail toggle ───────────────────────────────────────────────────── */
+    /* ── Detail toggle (hidden by default; shown on item hover) ──────────── */
     .fc-hidden { display: none; }
-    .fc-toggle-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 10px 8px; }
+    .fc-toggle-row { display: none; flex-wrap: wrap; gap: 8px; padding: 0 14px 8px; }
+    .fc-prob-item:hover .fc-toggle-row { display: flex; }
     .fc-toggle { cursor: pointer; color: var(--text-secondary, #7d8590); font-size: 11px; }
     .fc-toggle:hover { color: var(--text-primary, #e6edf3); }
-    .fc-detail { padding: 8px 10px 2px; border-top: 1px solid var(--border-color, #2a2a2a); }
+    .fc-detail { padding: 8px 14px 4px; border-top: 1px solid var(--border-color, #2a2a2a); }
     .fc-detail-grid { display: grid; gap: 8px; }
     .fc-section { display: grid; gap: 4px; }
     .fc-section-title { color: var(--text-secondary, #888); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -178,10 +186,7 @@ function injectStyles(): void {
     .fc-signals { margin-top: 2px; }
     .fc-signal { color: var(--text-secondary, #999); font-size: 11px; padding: 1px 0; }
     .fc-signal::before { content: ''; display: inline-block; width: 6px; height: 1px; background: var(--text-secondary, #666); margin-right: 6px; vertical-align: middle; }
-    .fc-cascade { font-size: 11px; color: var(--accent-color, #3b82f6); margin-top: 3px; padding: 0 10px; }
-    .fc-calibration { font-size: 10px; color: var(--text-secondary, #777); padding: 0 10px 4px; }
     .fc-empty { padding: 20px; text-align: center; color: var(--text-secondary, #888); }
-    .fc-section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #7d8590); padding: 6px 8px 2px; }
   `;
   document.head.appendChild(style);
 }
@@ -215,10 +220,19 @@ export class ForecastPanel extends Panel {
 
       const toggle = target.closest('[data-fc-toggle]') as HTMLElement | null;
       if (toggle) {
-        const row = toggle.closest('.fc-prob-row');
+        const item = toggle.closest('.fc-prob-item');
         const panelId = toggle.dataset.fcToggle;
-        const detail = panelId ? row?.querySelector(`[data-fc-panel="${panelId}"]`) as HTMLElement | null : null;
+        const detail = panelId ? item?.querySelector(`[data-fc-panel="${panelId}"]`) as HTMLElement | null : null;
         if (detail) detail.classList.toggle('fc-hidden');
+        return;
+      }
+
+      // Touch/click on the prob row itself: show the toggle row so Analysis is reachable on touch devices
+      const probRow = target.closest('.fc-prob-row') as HTMLElement | null;
+      if (probRow) {
+        const item = probRow.closest('.fc-prob-item') as HTMLElement | null;
+        const toggleRow = item?.querySelector('.fc-toggle-row') as HTMLElement | null;
+        if (toggleRow) toggleRow.style.display = toggleRow.style.display === 'flex' ? '' : 'flex';
         return;
       }
     });
@@ -259,17 +273,15 @@ export class ForecastPanel extends Panel {
       `<button class="fc-filter${d === this.activeDomain ? ' fc-active' : ''}" data-fc-domain="${d}">${DOMAIN_LABELS[d]}</button>`
     ).join('');
 
-    const nexusHtml = this.theaters.length > 0 ? this.renderNexus() : '';
-    const forecastsLabel = this.theaters.length > 0
-      ? `<div class="fc-section-label">Probability Bets</div>`
+    const nexusHtml = this.theaters.length > 0
+      ? `<div class="fc-nexus">${this.renderNexus()}</div><div class="fc-section-label">Probability Bets</div>`
       : '';
     const tableHtml = this.renderProbTable(filtered);
 
     this.setContent(`
       <div class="fc-panel">
         <div class="fc-filters">${filtersHtml}</div>
-        <div class="fc-nexus">${nexusHtml}</div>
-        ${forecastsLabel}
+        ${nexusHtml}
         ${tableHtml}
       </div>
     `);
@@ -390,41 +402,52 @@ export class ForecastPanel extends Panel {
     if (forecasts.length === 0) {
       return '<div class="fc-empty">No forecasts for this filter</div>';
     }
+    const header = `<div class="fc-prob-hdr">
+      <span>Forecast</span><span>Probability</span><span>Trend</span><span>Domain</span>
+    </div>`;
     const rows = forecasts.map(f => this.renderProbRow(f)).join('');
-    return `<div class="fc-prob-table">${rows}</div>`;
+    return `<div class="fc-prob-table">${header}${rows}</div>`;
   }
 
   private renderProbRow(f: Forecast): string {
-    const pct    = Math.round((f.probability || 0) * 100);
-    const domain = f.domain || 'conflict';
+    const pct      = Math.round((f.probability || 0) * 100);
+    const domain   = f.domain || 'conflict';
     const catColor = DOMAIN_COLORS[domain] || '#7d8590';
+    const catLabel = DOMAIN_LABELS[domain] || domain;
     const probColor = pct >= 60 ? '#3fb950' : pct >= 40 ? '#d29922' : '#e05252';
-    const trendSymbol = f.trend === 'rising' ? '↑' : f.trend === 'falling' ? '↓' : '→';
-    const trendColor  = f.trend === 'rising' ? '#3fb950' : f.trend === 'falling' ? '#e05252' : '#7d8590';
+    const trendText  = f.trend === 'rising' ? '↑ rising' : f.trend === 'falling' ? '↓ falling' : '→ stable';
+    const trendColor = f.trend === 'rising' ? '#3fb950' : f.trend === 'falling' ? '#e05252' : '#7d8590';
 
     const signalsHtml = (f.signals || []).map(s =>
       `<div class="fc-signal">${escapeHtml(s.value)}</div>`
     ).join('');
 
     return `
-      <div class="fc-prob-row">
-        <span class="fc-prob-label"
-              style="border-left:2px solid ${catColor}47;padding-left:6px">
-          ${escapeHtml(f.title)}
-        </span>
-        <span class="fc-prob-pct" style="color:${probColor}">${pct}%</span>
-        <div class="fc-prob-bar-track">
-          <div class="fc-prob-bar-fill" style="background:${probColor};width:${pct}%"></div>
+      <div class="fc-prob-item">
+        <div class="fc-prob-row">
+          <span class="fc-prob-label"
+                style="border-left:2px solid ${catColor}47;padding-left:6px">
+            ${escapeHtml(f.title)}
+          </span>
+          <div class="fc-bar-wrap">
+            <div class="fc-prob-bar-track">
+              <div class="fc-prob-bar-fill" style="background:${probColor};width:${pct}%"></div>
+            </div>
+            <span class="fc-prob-pct" style="color:${probColor}">${pct}%</span>
+          </div>
+          <span class="fc-trend-text" style="color:${trendColor}">${trendText}</span>
+          <span class="fc-domain-tag"
+                style="background:${catColor}1f;color:${catColor};border:1px solid ${catColor}33">
+            ${escapeHtml(catLabel)}
+          </span>
         </div>
-        <span class="fc-trend-sm" style="color:${trendColor}">${trendSymbol}</span>
+        <div class="fc-toggle-row">
+          <span class="fc-toggle" data-fc-toggle="detail-${escapeHtml(f.id)}">Analysis</span>
+          ${(f.signals || []).length > 0 ? `<span class="fc-toggle" data-fc-toggle="signals-${escapeHtml(f.id)}">Signals (${(f.signals || []).length})</span>` : ''}
+        </div>
+        <div class="fc-detail fc-hidden" data-fc-panel="detail-${escapeHtml(f.id)}">${this.renderDetailBody(f)}</div>
+        ${signalsHtml ? `<div class="fc-signals fc-hidden" data-fc-panel="signals-${escapeHtml(f.id)}">${signalsHtml}</div>` : ''}
       </div>
-      <div class="fc-toggle-row">
-        <span class="fc-toggle" data-fc-toggle="detail-${escapeHtml(f.id)}">Analysis</span>
-        ${(f.signals || []).length > 0 ? `<span class="fc-toggle" data-fc-toggle="signals-${escapeHtml(f.id)}">Signals (${(f.signals || []).length})</span>` : ''}
-      </div>
-      <div class="fc-detail fc-hidden" data-fc-panel="detail-${escapeHtml(f.id)}">${this.renderDetailBody(f)}</div>
-      ${signalsHtml ? `<div class="fc-signals fc-hidden" data-fc-panel="signals-${escapeHtml(f.id)}">${signalsHtml}</div>` : ''}
-      ${f.calibration?.marketTitle ? `<div class="fc-calibration">Market: ${escapeHtml(f.calibration.marketTitle)} (${Math.round((f.calibration.marketPrice || 0) * 100)}%)</div>` : ''}
     `;
   }
 
@@ -540,7 +563,7 @@ export class ForecastPanel extends Panel {
     }
 
     const chips = [
-      f.calibration?.marketTitle ? `Market: ${f.calibration.marketTitle}` : '',
+      f.calibration?.marketTitle ? `Market: ${f.calibration.marketTitle} (${Math.round((f.calibration.marketPrice || 0) * 100)}%)` : '',
       typeof f.priorProbability === 'number' ? `Prior: ${Math.round(f.priorProbability * 100)}%` : '',
       f.cascades?.length ? `Cascades: ${f.cascades.length}` : '',
     ].filter(Boolean);
