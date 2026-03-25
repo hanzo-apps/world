@@ -243,7 +243,8 @@ function dataSize(parsed) {
                       'theaters', 'fleets', 'warnings', 'closures', 'cables',
                       'airports', 'closedIcaos', 'categories', 'regions', 'entries', 'satellites',
                       'sectors', 'statuses', 'scores', 'topics', 'advisories', 'months',
-                      'observations', 'datapoints', 'clusters']) {
+                      'observations', 'datapoints', 'clusters',
+                      'charts']) {
       if (Array.isArray(parsed[k])) return parsed[k].length;
     }
     return Object.keys(parsed).length;
