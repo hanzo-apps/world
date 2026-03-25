@@ -296,5 +296,5 @@ async function buildPayload() {
 
 await runSeed('supply_chain', 'hormuz_tracker', CANONICAL_KEY, buildPayload, {
   ttlSeconds: CACHE_TTL,
-  validateFn: (d) => !!(d?.updatedDate || d?.summary || d?.title),
+  validateFn: (d) => !!(d?.updatedDate || d?.summary || d?.title) && d?.charts?.some(c => (c.series?.length ?? 0) > 0),
 });
