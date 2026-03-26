@@ -253,7 +253,7 @@ export async function fetchBlsData(): Promise<FredSeries[]> {
       });
     }
     return out;
-  }, [] as FredSeries[]);
+  }, [] as FredSeries[], { shouldCache: (r) => r.length > 0 });
 }
 
 export function getChangeClass(change: number | null): string {
@@ -712,9 +712,9 @@ export async function fetchBisData(): Promise<BisData> {
 
   try {
     const [policy, eer, credit] = await Promise.all([
-      hPolicy?.rates?.length ? Promise.resolve(hPolicy) : bisPolicyBreaker.execute(() => client.getBisPolicyRates({}, { signal: AbortSignal.timeout(20_000) }), emptyBisPolicyFallback),
-      hEer?.rates?.length ? Promise.resolve(hEer) : bisEerBreaker.execute(() => client.getBisExchangeRates({}, { signal: AbortSignal.timeout(20_000) }), emptyBisEerFallback),
-      hCredit?.entries?.length ? Promise.resolve(hCredit) : bisCreditBreaker.execute(() => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }), emptyBisCreditFallback),
+      hPolicy?.rates?.length ? Promise.resolve(hPolicy) : bisPolicyBreaker.execute(() => client.getBisPolicyRates({}, { signal: AbortSignal.timeout(20_000) }), emptyBisPolicyFallback, { shouldCache: (r) => (r.rates?.length ?? 0) > 0 }),
+      hEer?.rates?.length ? Promise.resolve(hEer) : bisEerBreaker.execute(() => client.getBisExchangeRates({}, { signal: AbortSignal.timeout(20_000) }), emptyBisEerFallback, { shouldCache: (r) => (r.rates?.length ?? 0) > 0 }),
+      hCredit?.entries?.length ? Promise.resolve(hCredit) : bisCreditBreaker.execute(() => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }), emptyBisCreditFallback, { shouldCache: (r) => (r.entries?.length ?? 0) > 0 }),
     ]);
     return {
       policyRates: policy.rates ?? [],
