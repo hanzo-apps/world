@@ -36,6 +36,12 @@ import type { GroceryBasketPanel } from '@/components/GroceryBasketPanel';
 import type { BigMacPanel } from '@/components/BigMacPanel';
 import type { FuelPricesPanel } from '@/components/FuelPricesPanel';
 import type { ConsumerPricesPanel } from '@/components/ConsumerPricesPanel';
+import type { MacroTilesPanel } from '@/components/MacroTilesPanel';
+import type { FSIPanel } from '@/components/FSIPanel';
+import type { YieldCurvePanel } from '@/components/YieldCurvePanel';
+import type { EarningsCalendarPanel } from '@/components/EarningsCalendarPanel';
+import type { EconomicCalendarPanel } from '@/components/EconomicCalendarPanel';
+import type { CotPositioningPanel } from '@/components/CotPositioningPanel';
 import { isDesktopRuntime, waitForSidecarReady } from '@/services/runtime';
 import { getSecretState } from '@/services/runtime-config';
 import { isProUser } from '@/services/widget-store';
@@ -275,6 +281,30 @@ export class App {
     if (shouldPrime('consumer-prices')) {
       const panel = this.state.panels['consumer-prices'] as ConsumerPricesPanel | undefined;
       if (panel) primeTask('consumer-prices', () => panel.fetchData());
+    }
+    if (shouldPrime('macro-tiles')) {
+      const panel = this.state.panels['macro-tiles'] as MacroTilesPanel | undefined;
+      if (panel) primeTask('macro-tiles', () => panel.fetchData());
+    }
+    if (shouldPrime('fsi')) {
+      const panel = this.state.panels['fsi'] as FSIPanel | undefined;
+      if (panel) primeTask('fsi', () => panel.fetchData());
+    }
+    if (shouldPrime('yield-curve')) {
+      const panel = this.state.panels['yield-curve'] as YieldCurvePanel | undefined;
+      if (panel) primeTask('yield-curve', () => panel.fetchData());
+    }
+    if (shouldPrime('earnings-calendar')) {
+      const panel = this.state.panels['earnings-calendar'] as EarningsCalendarPanel | undefined;
+      if (panel) primeTask('earnings-calendar', () => panel.fetchData());
+    }
+    if (shouldPrime('economic-calendar')) {
+      const panel = this.state.panels['economic-calendar'] as EconomicCalendarPanel | undefined;
+      if (panel) primeTask('economic-calendar', () => panel.fetchData());
+    }
+    if (shouldPrime('cot-positioning')) {
+      const panel = this.state.panels['cot-positioning'] as CotPositioningPanel | undefined;
+      if (panel) primeTask('cot-positioning', () => panel.fetchData());
     }
     if (shouldPrimeAny(['markets', 'heatmap', 'commodities', 'crypto', 'energy-complex'])) {
       primeTask('markets', () => this.dataLoader.loadMarkets());
@@ -1168,6 +1198,43 @@ export class App {
       () => (this.state.panels['fuel-prices'] as FuelPricesPanel).fetchData(),
       REFRESH_INTERVALS.fuelPrices,
       () => this.isPanelNearViewport('fuel-prices')
+    );
+
+    this.refreshScheduler.scheduleRefresh(
+      'macro-tiles',
+      () => (this.state.panels['macro-tiles'] as MacroTilesPanel).fetchData(),
+      30 * 60 * 1000,
+      () => this.isPanelNearViewport('macro-tiles')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'fsi',
+      () => (this.state.panels['fsi'] as FSIPanel).fetchData(),
+      30 * 60 * 1000,
+      () => this.isPanelNearViewport('fsi')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'yield-curve',
+      () => (this.state.panels['yield-curve'] as YieldCurvePanel).fetchData(),
+      30 * 60 * 1000,
+      () => this.isPanelNearViewport('yield-curve')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'earnings-calendar',
+      () => (this.state.panels['earnings-calendar'] as EarningsCalendarPanel).fetchData(),
+      60 * 60 * 1000,
+      () => this.isPanelNearViewport('earnings-calendar')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'economic-calendar',
+      () => (this.state.panels['economic-calendar'] as EconomicCalendarPanel).fetchData(),
+      60 * 60 * 1000,
+      () => this.isPanelNearViewport('economic-calendar')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'cot-positioning',
+      () => (this.state.panels['cot-positioning'] as CotPositioningPanel).fetchData(),
+      60 * 60 * 1000,
+      () => this.isPanelNearViewport('cot-positioning')
     );
 
     // Refresh intelligence signals for CII (geopolitical variant only)
