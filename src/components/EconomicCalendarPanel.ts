@@ -65,6 +65,19 @@ function fmtVal(val: string, unit: string): string {
   return unit ? `${val} ${unit}` : val;
 }
 
+function countdown(dateStr: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days < 0) return Math.abs(days) < 14 ? `${Math.abs(days)}d ago` : `${Math.round(Math.abs(days) / 7)}w ago`;
+  if (days < 14) return `in ${days}d`;
+  return `in ${Math.round(days / 7)}w`;
+}
+
 export class EconomicCalendarPanel extends Panel {
   private _hasData = false;
   private _events: EconomicEvent[] = [];
@@ -113,7 +126,7 @@ export class EconomicCalendarPanel extends Panel {
       isFirstGroup = false;
 
       bodyRows += `<tr>
-        <td colspan="5" style="
+        <td colspan="3" style="
           padding:10px 0 3px;
           font-size:10px;font-weight:600;
           color:rgba(255,255,255,0.35);
@@ -127,12 +140,17 @@ export class EconomicCalendarPanel extends Panel {
         const impactColor = IMPACT_COLORS[impact] ?? IMPACT_COLORS.low;
         const flag = COUNTRY_FLAGS[ev.country] ?? escapeHtml(ev.country);
         const isHigh = impact === 'high';
-        const actual = escapeHtml(fmtVal(ev.actual, ev.unit));
-        const estimate = escapeHtml(fmtVal(ev.estimate, ev.unit));
-        const previous = escapeHtml(fmtVal(ev.previous, ev.unit));
-        const actualColor = ev.actual ? 'color:var(--text)' : 'color:rgba(255,255,255,0.2)';
-        const estColor = ev.estimate ? 'color:rgba(255,255,255,0.5)' : 'color:rgba(255,255,255,0.2)';
-        const prevColor = ev.previous ? 'color:rgba(255,255,255,0.35)' : 'color:rgba(255,255,255,0.15)';
+
+        // Right column: actual value when released, countdown otherwise
+        let rightLabel: string;
+        let rightStyle: string;
+        if (ev.actual) {
+          rightLabel = escapeHtml(fmtVal(ev.actual, ev.unit));
+          rightStyle = 'color:var(--text);font-weight:600';
+        } else {
+          rightLabel = escapeHtml(countdown(ev.date));
+          rightStyle = 'color:rgba(255,255,255,0.35);font-style:italic';
+        }
 
         bodyRows += `<tr style="font-size:12px;line-height:1.2">
           <td style="padding:4px 8px 4px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0">
@@ -141,9 +159,7 @@ export class EconomicCalendarPanel extends Panel {
           <td style="padding:4px 6px;text-align:center;vertical-align:middle">
             <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${impactColor};vertical-align:middle"></span>
           </td>
-          <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;${actualColor};white-space:nowrap">${actual}</td>
-          <td style="padding:4px 0 4px 6px;text-align:right;font-variant-numeric:tabular-nums;${estColor};white-space:nowrap">${estimate}</td>
-          <td style="padding:4px 0 4px 6px;text-align:right;font-variant-numeric:tabular-nums;${prevColor};white-space:nowrap">${previous}</td>
+          <td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums;${rightStyle};white-space:nowrap">${rightLabel}</td>
         </tr>`;
       }
     }
@@ -153,17 +169,13 @@ export class EconomicCalendarPanel extends Panel {
         <colgroup>
           <col style="width:auto">
           <col style="width:20px">
-          <col style="width:52px">
-          <col style="width:52px">
-          <col style="width:52px">
+          <col style="width:64px">
         </colgroup>
         <thead>
           <tr style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.06em">
             <th style="text-align:left;padding:0 8px 8px 0;font-weight:600">EVENT</th>
             <th style="padding:0 0 8px;font-weight:600"></th>
-            <th style="text-align:right;padding:0 4px 8px;font-weight:600">ACT</th>
-            <th style="text-align:right;padding:0 4px 8px;font-weight:600">EST</th>
-            <th style="text-align:right;padding:0 0 8px 6px;font-weight:600">PREV</th>
+            <th style="text-align:right;padding:0 0 8px;font-weight:600"></th>
           </tr>
         </thead>
         <tbody>${bodyRows}</tbody>
