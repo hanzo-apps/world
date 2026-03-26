@@ -69,14 +69,16 @@ export default async function handler(req: Request): Promise<Response> {
     isPro = hasProKey;
   }
 
-  if (!WIDGET_AGENT_KEY) {
+  // Mirror the relay P2 fix: allow PRO-only deployments (no basic key, but PRO key present)
+  if (!WIDGET_AGENT_KEY && !PRO_WIDGET_KEY) {
     return json({ error: 'Widget agent unavailable', ok: false, widgetKeyConfigured: false }, 503, corsHeaders);
   }
 
   // ── Build relay headers (server-side keys, never exposed to browser) ──────
   const relayHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Widget-Key': WIDGET_AGENT_KEY,
+    'User-Agent': 'worldmonitor-widget-edge/1.0',
+    ...(WIDGET_AGENT_KEY ? { 'X-Widget-Key': WIDGET_AGENT_KEY } : {}),
   };
   if (isPro && PRO_WIDGET_KEY) {
     relayHeaders['X-Pro-Key'] = PRO_WIDGET_KEY;
