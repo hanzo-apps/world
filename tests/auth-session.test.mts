@@ -8,7 +8,7 @@
  *  - Missing plan claim → defaults to 'free'
  *  - Expired token → { valid: false }
  *  - Invalid signature → { valid: false }
- *  - Wrong audience → { valid: false }
+ *  - Any audience → accepted (audience check removed; issuer check prevents cross-app reuse)
  *  - JWKS resolver is reused across calls (module-scoped, not per-request)
  */
 
@@ -183,18 +183,22 @@ describe('validateBearerToken (with JWKS)', () => {
     assert.equal(result.valid, false);
   });
 
-  it('rejects a token with wrong audience', async () => {
-    const token = await new SignJWT({ sub: 'user_wrongaud', plan: 'pro' })
+  it('accepts a token with any audience (audience check removed, issuer is sufficient)', async () => {
+    // We deliberately removed the audience:'convex' restriction so that both
+    // the 'convex' template tokens and standard Clerk session tokens are accepted.
+    // The issuer check prevents cross-app token reuse.
+    const token = await new SignJWT({ sub: 'user_anyaud', plan: 'pro' })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key-1' })
       .setIssuer(`http://127.0.0.1:${jwksPort}`)
-      .setAudience('wrong-audience')
-      .setSubject('user_wrongaud')
+      .setAudience('some-other-audience')
+      .setSubject('user_anyaud')
       .setIssuedAt()
       .setExpirationTime('1h')
       .sign(privateKey);
 
     const result = await validateBearerToken(token);
-    assert.equal(result.valid, false);
+    assert.equal(result.valid, true);
+    assert.equal(result.role, 'pro');
   });
 
   it('rejects a token with wrong issuer', async () => {
