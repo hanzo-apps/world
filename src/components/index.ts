@@ -51,6 +51,7 @@ export * from './TradePolicyPanel';
 export * from './SupplyChainPanel';
 export * from './SecurityAdvisoriesPanel';
 export * from './SanctionsPressurePanel';
+export * from './DefensePatentsPanel';
 export * from './RadiationWatchPanel';
 export * from './ThermalEscalationPanel';
 export * from './OrefSirensPanel';

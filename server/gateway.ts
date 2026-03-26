@@ -112,6 +112,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/thermal/v1/list-thermal-escalations': 'slow',
   '/api/research/v1/list-tech-events': 'static',
   '/api/military/v1/get-usni-fleet-report': 'static',
+  '/api/military/v1/list-defense-patents': 'daily',
   '/api/conflict/v1/list-ucdp-events': 'static',
   '/api/conflict/v1/get-humanitarian-summary': 'static',
   '/api/conflict/v1/list-iran-events': 'slow',
