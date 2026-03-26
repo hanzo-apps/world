@@ -2723,6 +2723,12 @@
     "pro": "PRO",
     "lockedDesc": "Requires a World Monitor license key",
     "joinWaitlist": "Join Waitlist",
+    "signInToUnlock": "Sign in to unlock premium features",
+    "signIn": "Sign In to Unlock",
+    "verifyEmailToUnlock": "Verify your email to access premium features",
+    "resendVerification": "Resend Verification",
+    "upgradeDesc": "Upgrade to Pro for full access to premium analytics",
+    "upgradeToPro": "Upgrade to Pro",
     "features": {
       "orefSirens1": "Real-time Israel missile & rocket alerts",
       "orefSirens2": "Siren zone mapping with threat classification",

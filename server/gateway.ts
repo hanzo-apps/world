@@ -189,14 +189,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/economic/v1/get-economic-calendar': 'slow',
 };
 
-// TODO(payment-pr): PREMIUM_RPC_PATHS is intentionally empty until the payment/pro-user
-// system is implemented. The original set of stock analysis paths used forceKey=true,
-// which broke web pro users because isTrustedBrowserOrigin() is header-only (Origin can be
-// spoofed) and the web client has no mechanism to forward a server-validated entitlement.
-// When the payment PR lands, re-populate this set and have the web client send a
-// server-validated pro token (e.g. X-WorldMonitor-Key) so the entitlement check is
-// meaningful. Until then, access is gated client-side by isProUser() + WORLDMONITOR_API_KEY.
-const PREMIUM_RPC_PATHS = new Set<string>();
+import { PREMIUM_RPC_PATHS } from '../src/shared/premium-paths';
 
 /**
  * Creates a Vercel Edge handler for a single domain's routes.
@@ -234,15 +227,41 @@ export function createDomainGateway(
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // API key validation (origin-aware)
+    // API key validation
     const keyCheck = validateApiKey(request, {
       forceKey: PREMIUM_RPC_PATHS.has(pathname),
     });
     if (keyCheck.required && !keyCheck.valid) {
-      return new Response(JSON.stringify({ error: keyCheck.error }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      if (PREMIUM_RPC_PATHS.has(pathname)) {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader?.startsWith('Bearer ')) {
+          const { validateBearerToken } = await import('./auth-session');
+          const session = await validateBearerToken(authHeader.slice(7));
+          if (!session.valid) {
+            return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+          if (session.role !== 'pro') {
+            return new Response(JSON.stringify({ error: 'Pro subscription required' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+          }
+          // Valid pro session — fall through to route handling
+        } else {
+          return new Response(JSON.stringify({ error: keyCheck.error }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
+      } else {
+        return new Response(JSON.stringify({ error: keyCheck.error }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
     }
 
     // IP-based rate limiting — two-phase: endpoint-specific first, then global fallback

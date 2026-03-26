@@ -1,4 +1,5 @@
 import { SITE_VARIANT } from '@/config/variant';
+import { getClerkToken } from '@/services/clerk';
 
 const ENV = (() => {
   try {
@@ -732,6 +733,8 @@ export function installRuntimeFetchPatch(): void {
   (window as unknown as Record<string, unknown>).__wmFetchPatched = true;
 }
 
+import { PREMIUM_RPC_PATHS as WEB_PREMIUM_API_PATHS } from '@/shared/premium-paths';
+
 const ALLOWED_REDIRECT_HOSTS = /^https:\/\/([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*worldmonitor\.app(:\d+)?$/;
 
 function isAllowedRedirectTarget(url: string): boolean {
@@ -777,20 +780,42 @@ export function installWebApiRedirect(): void {
     }
   };
 
+  /**
+   * For premium API paths, inject an Authorization: Bearer header when the
+   * user has an active session and no existing auth header is present.
+   * Returns the original init unchanged for non-premium paths (zero overhead).
+   */
+  const enrichInitForPremium = async (pathWithQuery: string, init?: RequestInit): Promise<RequestInit | undefined> => {
+    const path = pathWithQuery.split('?')[0] ?? pathWithQuery;
+    if (!WEB_PREMIUM_API_PATHS.has(path)) return init;
+    const token = await getClerkToken();
+    if (!token) return init;
+    const headers = new Headers(init?.headers);
+    // Don't overwrite existing auth headers (API key users keep their flow)
+    if (headers.has('Authorization') || headers.has('X-WorldMonitor-Key')) return init;
+    headers.set('Authorization', `Bearer ${token}`);
+    return { ...init, headers };
+  };
+
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (typeof input === 'string' && shouldRedirectPath(input)) {
-      return fetchWithRedirectFallback(`${API_BASE}${input}`, input, init);
+      const enriched = await enrichInitForPremium(input, init);
+      return fetchWithRedirectFallback(`${API_BASE}${input}`, input, enriched);
     }
     if (input instanceof URL && input.origin === window.location.origin && shouldRedirectPath(`${input.pathname}${input.search}`)) {
-      return fetchWithRedirectFallback(new URL(`${API_BASE}${input.pathname}${input.search}`), input, init);
+      const pathAndSearch = `${input.pathname}${input.search}`;
+      const enriched = await enrichInitForPremium(pathAndSearch, init);
+      return fetchWithRedirectFallback(new URL(`${API_BASE}${pathAndSearch}`), input, enriched);
     }
     if (input instanceof Request) {
       const u = new URL(input.url);
       if (u.origin === window.location.origin && shouldRedirectPath(`${u.pathname}${u.search}`)) {
+        const pathAndSearch = `${u.pathname}${u.search}`;
+        const enriched = await enrichInitForPremium(pathAndSearch, init);
         return fetchWithRedirectFallback(
-          new Request(`${API_BASE}${u.pathname}${u.search}`, input),
+          new Request(`${API_BASE}${pathAndSearch}`, input),
           input.clone(),
-          init,
+          enriched,
         );
       }
     }
