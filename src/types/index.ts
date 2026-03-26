@@ -1477,4 +1477,6 @@ export interface CountryBriefSignals {
   gpsJammingHexes: number;
   isTier1: boolean;
   thermalEscalations: number;
+  sanctionsDesignations: number;
+  sanctionsNewDesignations: number;
 }

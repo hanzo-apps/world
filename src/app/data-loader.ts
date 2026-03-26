@@ -98,7 +98,7 @@ import { updateAndCheck, consumeServerAnomalies, fetchLiveAnomalies } from '@/se
 import { fetchAllFires, flattenFires, computeRegionStats, toMapFires } from '@/services/wildfires';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
-import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, ingestStrikesForCII, ingestOrefForCII, ingestAviationForCII, ingestAdvisoriesForCII, ingestGpsJammingForCII, ingestAisDisruptionsForCII, ingestSatelliteFiresForCII, ingestCyberThreatsForCII, ingestTemporalAnomaliesForCII, isInLearningMode, resetHotspotActivity, setIntelligenceSignalsLoaded, hasAnyIntelligenceData, calculateCII } from '@/services/country-instability';
+import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, ingestStrikesForCII, ingestOrefForCII, ingestAviationForCII, ingestAdvisoriesForCII, ingestGpsJammingForCII, ingestAisDisruptionsForCII, ingestSatelliteFiresForCII, ingestCyberThreatsForCII, ingestTemporalAnomaliesForCII, ingestEarthquakesForCII, ingestSanctionsForCII, isInLearningMode, resetHotspotActivity, setIntelligenceSignalsLoaded, hasAnyIntelligenceData, calculateCII } from '@/services/country-instability';
 import { fetchGpsInterference } from '@/services/gps-interference';
 import { fetchSatelliteTLEs, initSatRecs, propagatePositions, startPropagationLoop } from '@/services/satellites';
 import type { SatRecEntry } from '@/services/satellites';
@@ -1608,6 +1608,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.intelligenceCache.earthquakes = earthquakeResult.value;
       this.ctx.map?.setEarthquakes(earthquakeResult.value);
       ingestEarthquakes(earthquakeResult.value);
+      ingestEarthquakesForCII(earthquakeResult.value);
       this.ctx.statusPanel?.updateApi('USGS', { status: 'ok' });
       dataFreshness.recordUpdate('usgs', earthquakeResult.value.length);
     } else {
@@ -2943,6 +2944,7 @@ export class DataLoaderManager implements AppModule {
       this.callPanel('sanctions-pressure', 'setData', result);
       this.ctx.intelligenceCache.sanctions = result;
       signalAggregator.ingestSanctionsPressure(result.countries);
+      ingestSanctionsForCII(result.countries);
       if (result.totalCount > 0) {
         dataFreshness.recordUpdate('sanctions_pressure', result.totalCount);
         this.ctx.statusPanel?.updateApi('OFAC', { status: result.newEntryCount > 0 ? 'warning' : 'ok' });
