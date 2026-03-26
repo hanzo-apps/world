@@ -8330,7 +8330,10 @@ function requireWidgetAgentAccess(req, res) {
   }
 
   const providedKey = getWidgetAgentProvidedKey(req);
-  if (!providedKey || providedKey !== WIDGET_AGENT_KEY) {
+  const providedProKey = getWidgetAgentProvidedProKey(req);
+  const hasValidWidgetKey = providedKey && providedKey === WIDGET_AGENT_KEY;
+  const hasValidProKey = PRO_WIDGET_KEY && providedProKey && providedProKey === PRO_WIDGET_KEY;
+  if (!hasValidWidgetKey && !hasValidProKey) {
     safeEnd(res, 403, { 'Content-Type': 'application/json' }, JSON.stringify({ ...status, error: 'Forbidden' }));
     return null;
   }
