@@ -138,7 +138,10 @@ export async function getClerkToken(): Promise<string | null> {
     const session = clerkInstance?.session;
     if (!session) return null;
     try {
-      const token = await session.getToken({ template: 'convex' });
+      // Try the 'convex' template first (includes plan claim for faster server-side checks).
+      // Fall back to the standard session token if the template isn't configured in Clerk.
+      const token = (await session.getToken({ template: 'convex' }).catch(() => null))
+        ?? await session.getToken().catch(() => null);
       if (token) {
         _cachedToken = token;
         _cachedTokenAt = Date.now();
