@@ -88,6 +88,17 @@ import { McpDataPanel } from '@/components/McpDataPanel';
 import { openMcpConnectModal } from '@/components/McpConnectModal';
 import { loadMcpPanels, saveMcpPanel } from '@/services/mcp-store';
 import type { McpPanelSpec } from '@/services/mcp-store';
+import { getAuthState, subscribeAuthState } from '@/services/auth-state';
+import type { AuthSession } from '@/services/auth-state';
+import { PanelGateReason, getPanelGateReason } from '@/services/panel-gating';
+import type { Panel } from '@/components/Panel';
+
+/** Panels that require premium access on the web. Auth-based gating applies to these. */
+const WEB_PREMIUM_PANELS = new Set([
+  'stock-analysis',
+  'stock-backtest',
+  'daily-market-brief',
+]);
 
 export interface PanelLayoutManagerCallbacks {
   openCountryStory: (code: string, name: string) => void;
@@ -106,6 +117,8 @@ export class PanelLayoutManager implements AppModule {
   private criticalBannerEl: HTMLElement | null = null;
   private aviationCommandBar: AviationCommandBar | null = null;
   private readonly applyTimeRangeFilterDebounced: (() => void) & { cancel(): void };
+  private unsubscribeAuth: (() => void) | null = null;
+  private proBlockUnsubscribe: (() => void) | null = null;
 
   constructor(ctx: AppContext, callbacks: PanelLayoutManagerCallbacks) {
     this.ctx = ctx;
@@ -117,12 +130,21 @@ export class PanelLayoutManager implements AppModule {
 
   init(): void {
     this.renderLayout();
+
+    // Subscribe to auth state for reactive panel gating on web
+    this.unsubscribeAuth = subscribeAuthState((state) => {
+      this.updatePanelGating(state);
+    });
     this.fetchGitHubStars();
   }
 
   destroy(): void {
     clearAllPendingCalls();
     this.applyTimeRangeFilterDebounced.cancel();
+    this.unsubscribeAuth?.();
+    this.unsubscribeAuth = null;
+    this.proBlockUnsubscribe?.();
+    this.proBlockUnsubscribe = null;
     this.panelDragCleanupHandlers.forEach((cleanup) => cleanup());
     this.panelDragCleanupHandlers = [];
     if (this.criticalBannerEl) {
@@ -146,6 +168,35 @@ export class PanelLayoutManager implements AppModule {
     this.ctx.panels['airline-intel']?.destroy();
 
     window.removeEventListener('resize', this.ensureCorrectZones);
+  }
+
+  /** Reactively update premium panel gating based on auth state. */
+  private updatePanelGating(state: AuthSession): void {
+    for (const [key, panel] of Object.entries(this.ctx.panels)) {
+      const isPremium = WEB_PREMIUM_PANELS.has(key);
+      const reason = getPanelGateReason(state, isPremium);
+
+      if (reason === PanelGateReason.NONE) {
+        // User has access -- unlock if previously locked
+        (panel as Panel).unlockPanel();
+      } else {
+        // User does NOT have access -- show appropriate CTA
+        const onAction = this.getGateAction(reason);
+        (panel as Panel).showGatedCta(reason, onAction);
+      }
+    }
+  }
+
+  /** Return the action callback for a given gate reason. */
+  private getGateAction(reason: PanelGateReason): () => void {
+    switch (reason) {
+      case PanelGateReason.ANONYMOUS:
+        return () => this.ctx.authModal?.open();
+      case PanelGateReason.FREE_TIER:
+        return () => window.open('https://worldmonitor.app/pro', '_blank');
+      default:
+        return () => {};
+    }
   }
 
   private async fetchGitHubStars(): Promise<void> {
@@ -256,18 +307,12 @@ export class PanelLayoutManager implements AppModule {
           </button>
         </div>
         <div class="header-right">
-          ${this.ctx.isDesktopApp ? '' : `<div class="download-wrapper" id="downloadWrapper">
-            <button class="download-btn" id="downloadBtn" title="${t('header.downloadApp')}">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span id="downloadBtnLabel">${t('header.downloadApp')}</span>
-            </button>
-            <div class="download-dropdown" id="downloadDropdown"></div>
-          </div>`}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
           ${SITE_VARIANT === 'happy' ? `<button class="tv-mode-btn" id="tvModeBtn" title="TV Mode (Shift+T)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></button>` : ''}
           <span id="unifiedSettingsMount"></span>
+          <span id="authWidgetMount"></span>
         </div>
       </div>
       <div class="mobile-menu-overlay" id="mobileMenuOverlay"></div>
@@ -378,7 +423,7 @@ export class PanelLayoutManager implements AppModule {
           <img src="/favico/favicon-32x32.png" alt="" width="28" height="28" class="site-footer-icon" />
           <div class="site-footer-brand-text">
             <span class="site-footer-name">WORLD MONITOR</span>
-            <span class="site-footer-sub">by Someone.ceo</span>
+            <span class="site-footer-sub">v${__APP_VERSION__} &middot; <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="site-footer-credit">@eliehabib</a></span>
           </div>
         </div>
         <nav>
@@ -389,6 +434,7 @@ export class PanelLayoutManager implements AppModule {
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener">GitHub</a>
           <a href="https://discord.gg/re63kWKxaz" target="_blank" rel="noopener">Discord</a>
           <a href="https://x.com/worldmonitorai" target="_blank" rel="noopener">X</a>
+          ${this.ctx.isDesktopApp ? '' : `<span id="footerDownloadMount"></span>`}
         </nav>
         <span class="site-footer-copy">&copy; ${new Date().getFullYear()} World Monitor</span>
       </footer>
@@ -583,22 +629,10 @@ export class PanelLayoutManager implements AppModule {
 
     this.createPanel('heatmap', () => new HeatmapPanel());
     this.createPanel('markets', () => new MarketPanel());
-    const stockAnalysisPanel = this.createPanel('stock-analysis', () => new StockAnalysisPanel());
-    if (stockAnalysisPanel && !getSecretState('WORLDMONITOR_API_KEY').present && !isProUser()) {
-      stockAnalysisPanel.showLocked([
-        'AI stock briefs with technical + news synthesis',
-        'Trend scoring from MA, MACD, RSI, and volume structure',
-        'Actionable watchlist monitoring for your premium workspace',
-      ]);
-    }
-    const stockBacktestPanel = this.createPanel('stock-backtest', () => new StockBacktestPanel());
-    if (stockBacktestPanel && !getSecretState('WORLDMONITOR_API_KEY').present && !isProUser()) {
-      stockBacktestPanel.showLocked([
-        'Historical replay of premium stock-analysis signals',
-        'Win-rate, accuracy, and simulated-return metrics',
-        'Recent evaluation samples for your tracked symbols',
-      ]);
-    }
+    this.createPanel('stock-analysis', () => new StockAnalysisPanel());
+    this.createPanel('stock-backtest', () => new StockBacktestPanel());
+    // Web premium gating for stock-analysis and stock-backtest is handled
+    // reactively by updatePanelGating() via auth state subscription.
 
     const monitorPanel = this.createPanel('monitors', () => new MonitorPanel(this.ctx.monitors));
     monitorPanel?.onChanged((monitors) => {
@@ -794,9 +828,9 @@ export class PanelLayoutManager implements AppModule {
 
     this.lazyPanel('daily-market-brief', () =>
       import('@/components/DailyMarketBriefPanel').then(m => new m.DailyMarketBriefPanel()),
-      undefined,
-      (!_wmKeyPresent && !isProUser()) ? ['Pre-market watchlist priorities', 'Action plan for the session', 'Risk watch tied to current finance headlines'] : undefined,
     );
+    // Web premium gating for daily-market-brief is handled reactively
+    // by updatePanelGating() via auth state subscription.
 
     this.lazyPanel('market-implications', () =>
       import('@/components/MarketImplicationsPanel').then(m => new m.MarketImplicationsPanel()),
@@ -991,13 +1025,12 @@ export class PanelLayoutManager implements AppModule {
       );
     }
 
-    if (isProUser()) {
-      for (const spec of loadWidgets()) {
-        const panel = new CustomWidgetPanel(spec);
-        this.ctx.panels[spec.id] = panel;
-        if (!this.ctx.panelSettings[spec.id]) {
-          this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
-        }
+    // Always load custom widgets — Pro gating is handled reactively by auth state.
+    for (const spec of loadWidgets()) {
+      const panel = new CustomWidgetPanel(spec);
+      this.ctx.panels[spec.id] = panel;
+      if (!this.ctx.panelSettings[spec.id]) {
+        this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
       }
     }
 
@@ -1107,51 +1140,62 @@ export class PanelLayoutManager implements AppModule {
     });
     panelsGrid.appendChild(addPanelBlock);
 
-    if (isProUser()) {
-      const proBlock = document.createElement('button');
-      proBlock.className = 'add-panel-block ai-widget-block ai-widget-block-pro';
-      proBlock.setAttribute('aria-label', t('widgets.createInteractive'));
-      const proIcon = document.createElement('span');
-      proIcon.className = 'add-panel-block-icon';
-      proIcon.textContent = '\u26a1';
-      const proLabel = document.createElement('span');
-      proLabel.className = 'add-panel-block-label';
-      proLabel.textContent = t('widgets.createInteractive');
-      const proBadge = document.createElement('span');
-      proBadge.className = 'widget-pro-badge';
-      proBadge.textContent = t('widgets.proBadge');
-      proBlock.appendChild(proIcon);
-      proBlock.appendChild(proLabel);
-      proBlock.appendChild(proBadge);
-      proBlock.addEventListener('click', () => {
-        openWidgetChatModal({
-          mode: 'create',
-          tier: 'pro',
-          onComplete: (spec) => this.addCustomWidget(spec),
-        });
+    // Always create Pro and MCP add-panel blocks — show/hide reactively via auth state.
+    const proBlock = document.createElement('button');
+    proBlock.className = 'add-panel-block ai-widget-block ai-widget-block-pro';
+    proBlock.setAttribute('aria-label', t('widgets.createInteractive'));
+    const proIcon = document.createElement('span');
+    proIcon.className = 'add-panel-block-icon';
+    proIcon.textContent = '\u26a1';
+    const proLabel = document.createElement('span');
+    proLabel.className = 'add-panel-block-label';
+    proLabel.textContent = t('widgets.createInteractive');
+    const proBadge = document.createElement('span');
+    proBadge.className = 'widget-pro-badge';
+    proBadge.textContent = t('widgets.proBadge');
+    proBlock.appendChild(proIcon);
+    proBlock.appendChild(proLabel);
+    proBlock.appendChild(proBadge);
+    proBlock.addEventListener('click', () => {
+      openWidgetChatModal({
+        mode: 'create',
+        tier: 'pro',
+        onComplete: (spec) => this.addCustomWidget(spec),
       });
-      panelsGrid.appendChild(proBlock);
-    }
+    });
+    panelsGrid.appendChild(proBlock);
 
-    if (isProUser()) {
-      const mcpBlock = document.createElement('button');
-      mcpBlock.className = 'add-panel-block mcp-panel-block';
-      mcpBlock.setAttribute('aria-label', t('mcp.connectPanel'));
-      const mcpIcon = document.createElement('span');
-      mcpIcon.className = 'add-panel-block-icon';
-      mcpIcon.textContent = '\u26a1';
-      const mcpLabel = document.createElement('span');
-      mcpLabel.className = 'add-panel-block-label';
-      mcpLabel.textContent = t('mcp.connectPanel');
-      mcpBlock.appendChild(mcpIcon);
-      mcpBlock.appendChild(mcpLabel);
-      mcpBlock.addEventListener('click', () => {
-        openMcpConnectModal({
-          onComplete: (spec) => this.addMcpPanel(spec),
-        });
+    const mcpBlock = document.createElement('button');
+    mcpBlock.className = 'add-panel-block mcp-panel-block';
+    mcpBlock.setAttribute('aria-label', t('mcp.connectPanel'));
+    const mcpIcon = document.createElement('span');
+    mcpIcon.className = 'add-panel-block-icon';
+    mcpIcon.textContent = '\u26a1';
+    const mcpLabel = document.createElement('span');
+    mcpLabel.className = 'add-panel-block-label';
+    mcpLabel.textContent = t('mcp.connectPanel');
+    mcpBlock.appendChild(mcpIcon);
+    mcpBlock.appendChild(mcpLabel);
+    mcpBlock.addEventListener('click', () => {
+      openMcpConnectModal({
+        onComplete: (spec) => this.addMcpPanel(spec),
       });
-      panelsGrid.appendChild(mcpBlock);
-    }
+    });
+    panelsGrid.appendChild(mcpBlock);
+
+    // Reactively show/hide Pro-only UI blocks based on auth state
+    const proBlocks = [proBlock, mcpBlock];
+    const applyProBlockGating = (isPro: boolean) => {
+      for (const block of proBlocks) {
+        block.style.display = isPro ? '' : 'none';
+      }
+    };
+    applyProBlockGating(
+      isProUser() || getAuthState().user?.role === 'pro'
+    );
+    this.proBlockUnsubscribe = subscribeAuthState((state) => {
+      applyProBlockGating(isProUser() || state.user?.role === 'pro');
+    });
 
     const bottomGrid = document.getElementById('mapBottomGrid');
     if (bottomGrid) {
