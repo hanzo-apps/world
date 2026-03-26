@@ -439,6 +439,21 @@ export class CountryIntelManager implements AppModule {
       lines.push(`Travel advisory max level: ${signals.travelAdvisoryMaxLevel}`);
     }
 
+    if (signals.sanctionsDesignations > 0) {
+      const newPart = signals.sanctionsNewDesignations > 0 ? `, +${signals.sanctionsNewDesignations} new` : '';
+      lines.push(`Sanctions: ${signals.sanctionsDesignations} active designations${newPart}`);
+    }
+
+    if (signals.displacementOutflow > 0) {
+      lines.push(`Displacement outflow: ${signals.displacementOutflow.toLocaleString()} persons`);
+    }
+    if (signals.climateStress > 0) {
+      lines.push(`Climate stress: ${Math.round(signals.climateStress)}/100`);
+    }
+    if (signals.isTier1) {
+      lines.push(`Major power: yes`);
+    }
+
     const stockIndex = typeof context.stockIndex === 'string' ? context.stockIndex : '';
     if (stockIndex) lines.push(`Stock index: ${stockIndex}`);
 
@@ -665,6 +680,12 @@ export class CountryIntelManager implements AppModule {
       ).length;
     }
 
+    const sanctionsCountry = this.ctx.intelligenceCache.sanctions?.countries.find(
+      (c) => c.countryCode.toUpperCase() === code,
+    );
+    const sanctionsDesignations = sanctionsCountry?.entryCount ?? 0;
+    const sanctionsNewDesignations = sanctionsCountry?.newEntryCount ?? 0;
+
     return {
       criticalNews,
       protests,
@@ -689,6 +710,8 @@ export class CountryIntelManager implements AppModule {
       gpsJammingHexes: (ciiData?.gpsJammingHighCount ?? 0) + (ciiData?.gpsJammingMediumCount ?? 0),
       isTier1,
       thermalEscalations,
+      sanctionsDesignations,
+      sanctionsNewDesignations,
     };
   }
 
