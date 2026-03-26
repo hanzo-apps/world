@@ -824,19 +824,36 @@ export function installWebApiRedirect(): void {
     };
 
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      if (typeof input === 'string' && shouldRedirectPath(input)) {
-        const enriched = await enrichInitForPremium(input, init);
-        return fetchWithRedirectFallback(`${API_BASE}${input}`, input, enriched);
+      if (typeof input === 'string') {
+        if (shouldRedirectPath(input)) {
+          // Relative /api/... path — redirect to API base and inject auth.
+          const enriched = await enrichInitForPremium(input, init);
+          return fetchWithRedirectFallback(`${API_BASE}${input}`, input, enriched);
+        }
+        // Absolute URL already targeting the API base (generated clients call fetch
+        // with full URLs like https://api.worldmonitor.app/api/...) — just inject auth.
+        if (input.startsWith(`${API_BASE}/api/`)) {
+          const pathAndSearch = input.slice(API_BASE.length);
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          return nativeFetch(input, enriched ?? init);
+        }
       }
-      if (input instanceof URL && input.origin === window.location.origin && shouldRedirectPath(`${input.pathname}${input.search}`)) {
+      if (input instanceof URL) {
         const pathAndSearch = `${input.pathname}${input.search}`;
-        const enriched = await enrichInitForPremium(pathAndSearch, init);
-        return fetchWithRedirectFallback(new URL(`${API_BASE}${pathAndSearch}`), input, enriched);
+        if (input.origin === window.location.origin && shouldRedirectPath(pathAndSearch)) {
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          return fetchWithRedirectFallback(new URL(`${API_BASE}${pathAndSearch}`), input, enriched);
+        }
+        // URL object already targeting the API base.
+        if (input.origin === API_BASE && pathAndSearch.startsWith('/api/')) {
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          return nativeFetch(input, enriched ?? init);
+        }
       }
       if (input instanceof Request) {
         const u = new URL(input.url);
-        if (u.origin === window.location.origin && shouldRedirectPath(`${u.pathname}${u.search}`)) {
-          const pathAndSearch = `${u.pathname}${u.search}`;
+        const pathAndSearch = `${u.pathname}${u.search}`;
+        if (u.origin === window.location.origin && shouldRedirectPath(pathAndSearch)) {
           const enriched = await enrichInitForPremium(pathAndSearch, init);
           return fetchWithRedirectFallback(
             new Request(`${API_BASE}${pathAndSearch}`, input),
@@ -844,24 +861,42 @@ export function installWebApiRedirect(): void {
             enriched,
           );
         }
+        // Request object already targeting the API base.
+        if (u.origin === API_BASE && pathAndSearch.startsWith('/api/')) {
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          if (enriched) return nativeFetch(new Request(input, enriched));
+        }
       }
       return nativeFetch(input, init);
     };
   } else {
     // No API base redirect — only inject auth headers for premium paths.
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      if (typeof input === 'string' && shouldRedirectPath(input)) {
-        const enriched = await enrichInitForPremium(input, init);
-        return nativeFetch(input, enriched ?? init);
+      if (typeof input === 'string') {
+        if (shouldRedirectPath(input)) {
+          const enriched = await enrichInitForPremium(input, init);
+          return nativeFetch(input, enriched ?? init);
+        }
+        if (input.startsWith(`${DEFAULT_WEB_API_URL}/api/`)) {
+          const pathAndSearch = input.slice(DEFAULT_WEB_API_URL.length);
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          return nativeFetch(input, enriched ?? init);
+        }
       }
-      if (input instanceof URL && input.origin === window.location.origin && shouldRedirectPath(`${input.pathname}${input.search}`)) {
-        const enriched = await enrichInitForPremium(`${input.pathname}${input.search}`, init);
-        return nativeFetch(input, enriched ?? init);
+      if (input instanceof URL) {
+        const pathAndSearch = `${input.pathname}${input.search}`;
+        if ((input.origin === window.location.origin || input.origin === DEFAULT_WEB_API_URL)
+            && (shouldRedirectPath(pathAndSearch) || pathAndSearch.startsWith('/api/'))) {
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
+          return nativeFetch(input, enriched ?? init);
+        }
       }
       if (input instanceof Request) {
         const u = new URL(input.url);
-        if (u.origin === window.location.origin && shouldRedirectPath(`${u.pathname}${u.search}`)) {
-          const enriched = await enrichInitForPremium(`${u.pathname}${u.search}`, init);
+        const pathAndSearch = `${u.pathname}${u.search}`;
+        if ((u.origin === window.location.origin || u.origin === DEFAULT_WEB_API_URL)
+            && (shouldRedirectPath(pathAndSearch) || pathAndSearch.startsWith('/api/'))) {
+          const enriched = await enrichInitForPremium(pathAndSearch, init);
           if (enriched) return nativeFetch(new Request(input, enriched));
         }
       }
