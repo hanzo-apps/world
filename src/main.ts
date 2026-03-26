@@ -249,9 +249,11 @@ Sentry.init({
     /start offset of Int16Array should be a multiple of 2/,
     /Cannot read properties of undefined \(reading 'then'\)/,
     /^(?:Error: )?uncaught exception: undefined$/,
-    /Can't find variable: ss_bootstrap_config/,
+    /ss_bootstrap_config/, // Surfly proxy — "Can't find variable: ss_bootstrap_config" (Safari) or "ss_bootstrap_config is not defined" (Chrome)
     /undefined is not an object \(evaluating '[a-z]\.includes'\)/,
     /^"use strict" is not a function$/,
+    /Can only call Window\.setTimeout on instances of Window/, // iOS Safari cross-frame setTimeout from 3rd-party injected script
+    /^Can't find variable: _G$/, // browser extension/userscript injecting _G global
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
