@@ -53,6 +53,10 @@ export async function getFearGreedIndex(
       aaiiBull: Number(hdr?.aaiBull?.value ?? 0),
       aaiiBear: Number(hdr?.aaiBear?.value ?? 0),
       fedRate: String(hdr?.fedRate?.value ?? ''),
+      fsiValue: Number(hdr?.fsi?.value ?? 0),
+      fsiLabel: String(hdr?.fsi?.label ?? ''),
+      hygPrice: Number(hdr?.fsi?.hygPrice ?? 0),
+      tltPrice: Number(hdr?.fsi?.tltPrice ?? 0),
       unavailable: false,
     };
   } catch {

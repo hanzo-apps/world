@@ -14,6 +14,7 @@ import { listBigMacPrices } from './list-bigmac-prices';
 import { getNationalDebt } from './get-national-debt';
 import { listFuelPrices } from './list-fuel-prices';
 import { getBlsSeries } from './get-bls-series';
+import { getEconomicCalendar } from './get-economic-calendar';
 
 export const economicHandler: EconomicServiceHandler = {
   getFredSeries,
@@ -30,4 +31,5 @@ export const economicHandler: EconomicServiceHandler = {
   getNationalDebt,
   listFuelPrices,
   getBlsSeries,
+  getEconomicCalendar,
 };
