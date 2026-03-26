@@ -204,9 +204,13 @@ const ON_DEMAND_KEYS = new Set([
   'simulationOutcomeLatest', // written by writeSimulationOutcome after simulation runs; only present after first successful simulation
 ]);
 
-// Keys where 0 records is a valid healthy state (e.g. no airports closed).
+// Keys where 0 records is a valid healthy state (e.g. no airports closed,
+// no earnings events this week, econ calendar quiet between seasons).
 // The key must still exist in Redis; only the record count can be 0.
-const EMPTY_DATA_OK_KEYS = new Set(['notamClosures', 'faaDelays', 'gpsjam', 'positiveGeoEvents', 'weatherAlerts']);
+const EMPTY_DATA_OK_KEYS = new Set([
+  'notamClosures', 'faaDelays', 'gpsjam', 'positiveGeoEvents', 'weatherAlerts',
+  'earningsCalendar', 'econCalendar', 'cotPositioning',
+]);
 
 // Cascade groups: if any key in the group has data, all empty siblings are OK.
 // Theater posture uses live → stale → backup fallback chain.
@@ -327,11 +331,31 @@ export default async function handler(req) {
 
     let status;
     if (!parsed || raw === NEG_SENTINEL) {
-      status = 'EMPTY';
-      critCount++;
+      if (EMPTY_DATA_OK_KEYS.has(name)) {
+        if (seedStale === true) {
+          status = 'STALE_SEED';
+          warnCount++;
+        } else {
+          status = 'OK';
+          okCount++;
+        }
+      } else {
+        status = 'EMPTY';
+        critCount++;
+      }
     } else if (size === 0) {
-      status = 'EMPTY_DATA';
-      critCount++;
+      if (EMPTY_DATA_OK_KEYS.has(name)) {
+        if (seedStale === true) {
+          status = 'STALE_SEED';
+          warnCount++;
+        } else {
+          status = 'OK';
+          okCount++;
+        }
+      } else {
+        status = 'EMPTY_DATA';
+        critCount++;
+      }
     } else if (seedStale === true) {
       status = 'STALE_SEED';
       warnCount++;
