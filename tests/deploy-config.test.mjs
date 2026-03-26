@@ -155,6 +155,24 @@ describe('security header guardrails', () => {
     assert.ok(scriptSrc.includes("'self'"), 'CSP script-src must include self');
   });
 
+  it('CSP script-src includes Clerk origin for auth UI', () => {
+    const csp = getHeaderValue('Content-Security-Policy');
+    const scriptSrc = csp.match(/script-src\s+([^;]+)/)?.[1] ?? '';
+    assert.ok(
+      scriptSrc.includes('clerk.accounts.dev') || scriptSrc.includes('clerk.worldmonitor.app'),
+      'CSP script-src must include Clerk origin for auth UI to load'
+    );
+  });
+
+  it('CSP frame-src includes Clerk origin for auth modals', () => {
+    const csp = getHeaderValue('Content-Security-Policy');
+    const frameSrc = csp.match(/frame-src\s+([^;]+)/)?.[1] ?? '';
+    assert.ok(
+      frameSrc.includes('clerk.accounts.dev') || frameSrc.includes('clerk.worldmonitor.app'),
+      'CSP frame-src must include Clerk origin for sign-in modal'
+    );
+  });
+
   it('security.txt exists in public/.well-known/', () => {
     const secTxt = readFileSync(resolve(__dirname, '../public/.well-known/security.txt'), 'utf-8');
     assert.match(secTxt, /^Contact:/m, 'security.txt must have a Contact field');
