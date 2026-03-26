@@ -40,4 +40,8 @@ message GetFearGreedIndexResponse {
   double aaii_bear = 23;
   string fed_rate = 24;
   bool unavailable = 25;
+  double fsi_value = 26;
+  string fsi_label = 27;
+  double hyg_price = 28;
+  double tlt_price = 29;
 }

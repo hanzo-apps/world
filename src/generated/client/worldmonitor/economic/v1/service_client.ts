@@ -363,6 +363,30 @@ export interface BlsObservation {
   value: string;
 }
 
+export interface GetEconomicCalendarRequest {
+  fromDate: string;
+  toDate: string;
+}
+
+export interface GetEconomicCalendarResponse {
+  events: EconomicEvent[];
+  fromDate: string;
+  toDate: string;
+  total: number;
+  unavailable: boolean;
+}
+
+export interface EconomicEvent {
+  event: string;
+  country: string;
+  date: string;
+  impact: string;
+  actual: string;
+  estimate: string;
+  previous: string;
+  unit: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -749,6 +773,32 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetBlsSeriesResponse;
+  }
+
+  async getEconomicCalendar(req: GetEconomicCalendarRequest, options?: EconomicServiceCallOptions): Promise<GetEconomicCalendarResponse> {
+    let path = "/api/economic/v1/get-economic-calendar";
+    const params = new URLSearchParams();
+    if (req.fromDate != null && req.fromDate !== "") params.set("fromDate", String(req.fromDate));
+    if (req.toDate != null && req.toDate !== "") params.set("toDate", String(req.toDate));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetEconomicCalendarResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

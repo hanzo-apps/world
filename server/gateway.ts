@@ -183,6 +183,10 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/consumer-prices/v1/get-consumer-price-freshness': 'slow',
 
   '/api/aviation/v1/get-youtube-live-stream-info': 'fast',
+
+  '/api/market/v1/list-earnings-calendar': 'slow',
+  '/api/market/v1/get-cot-positioning': 'slow',
+  '/api/economic/v1/get-economic-calendar': 'slow',
 };
 
 // TODO(payment-pr): PREMIUM_RPC_PATHS is intentionally empty until the payment/pro-user
