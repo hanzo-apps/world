@@ -55,6 +55,7 @@ import {
   EscalationCorrelationPanel,
   EconomicCorrelationPanel,
   DisasterCorrelationPanel,
+  DefensePatentsPanel,
   HormuzPanel,
   MacroTilesPanel,
   FSIPanel,
@@ -731,6 +732,8 @@ export class PanelLayoutManager implements AppModule {
 
     this.createPanel('cascade', () => new CascadePanel());
     this.createPanel('satellite-fires', () => new SatelliteFiresPanel());
+
+    this.createPanel('defense-patents', () => new DefensePatentsPanel());
 
     // Correlation engine panels
     if (this.shouldCreatePanel('military-correlation')) {
