@@ -5632,14 +5632,15 @@ describe('simulation package export', () => {
     assert.ok(admissibility.statement.includes('energy'));
   });
 
-  it('evaluationTargets has required escalation, containment, spillover paths and timing markers', () => {
+  it('evaluationTargets has required escalation, containment, market_cascade paths and timing markers', () => {
     const pkg = buildSimulationPackageFromDeepSnapshot(makeSnapshot());
     const target = pkg.evaluationTargets[0];
     assert.equal(target.theaterId, 'theater-1');
     const pathTypes = target.requiredPaths.map((p) => p.pathType);
     assert.ok(pathTypes.includes('escalation'));
     assert.ok(pathTypes.includes('containment'));
-    assert.ok(pathTypes.includes('spillover'));
+    assert.ok(pathTypes.includes('market_cascade'));
+    assert.ok(!pathTypes.includes('spillover'), 'spillover must be replaced by market_cascade');
     assert.deepEqual(target.requiredOutputs, ['key_invalidators', 'timing_markers', 'actor_response_summary']);
     assert.equal(target.timingMarkers.length, 3);
     assert.equal(target.timingMarkers[0].label, 'T+24h');
@@ -5664,11 +5665,58 @@ describe('simulation package export', () => {
     const candidates = Array.from({ length: 5 }, (_, i) => makeCandidate({
       candidateStateId: `state-${i}`,
       candidateStateLabel: `Theater ${i}`,
+      routeFacilityKey: ['Strait of Hormuz', 'Red Sea', 'Black Sea', 'Panama Canal', 'Strait of Malacca'][i],
       rankingScore: 0.9 - i * 0.05,
     }));
     const pkg = buildSimulationPackageFromDeepSnapshot(makeSnapshot(candidates));
     assert.ok(pkg);
     assert.ok(pkg.selectedTheaters.length <= 3);
+  });
+
+  it('geo-dedup: selects at most 1 theater per macro-region group when 2 MENA candidates are present', () => {
+    const hormuz = makeCandidate({
+      candidateStateId: 'state-hormuz',
+      candidateStateLabel: 'Strait of Hormuz disruption',
+      routeFacilityKey: 'Strait of Hormuz',
+      dominantRegion: 'Middle East',
+      rankingScore: 0.90,
+    });
+    const redsea = makeCandidate({
+      candidateStateId: 'state-redsea',
+      candidateStateLabel: 'Red Sea blockade',
+      routeFacilityKey: 'Red Sea',
+      dominantRegion: 'Red Sea',
+      rankingScore: 0.85,
+    });
+    const malacca = makeCandidate({
+      candidateStateId: 'state-malacca',
+      candidateStateLabel: 'Strait of Malacca closure',
+      routeFacilityKey: 'Strait of Malacca',
+      dominantRegion: 'South China Sea',
+      marketBucketIds: ['energy', 'freight'],
+      rankingScore: 0.80,
+    });
+    const pkg = buildSimulationPackageFromDeepSnapshot(makeSnapshot([hormuz, redsea, malacca]));
+    assert.ok(pkg, 'package should not be null');
+    assert.equal(pkg.selectedTheaters.length, 2, 'should select exactly 2 theaters (1 MENA + 1 AsiaPacific)');
+    const routeKeys = pkg.selectedTheaters.map((t) => t.routeFacilityKey);
+    assert.ok(routeKeys.includes('Strait of Hormuz'), 'should pick the higher-ranked MENA candidate');
+    assert.ok(!routeKeys.includes('Red Sea'), 'should skip the 2nd MENA candidate');
+    assert.ok(routeKeys.includes('Strait of Malacca'), 'should include the AsiaPacific candidate');
+  });
+
+  it('label cleanup: (stateKind) suffix is stripped from theater label', () => {
+    const candidate = makeCandidate({
+      candidateStateId: 'state-blacksea',
+      candidateStateLabel: 'Black Sea maritime disruption state (supply_chain)',
+      routeFacilityKey: 'Black Sea',
+      dominantRegion: 'Black Sea',
+    });
+    const pkg = buildSimulationPackageFromDeepSnapshot(makeSnapshot([candidate]));
+    assert.ok(pkg, 'package should not be null');
+    const label = pkg.selectedTheaters[0].label;
+    assert.ok(!label.includes('(supply_chain)'), `label must not contain stateKind suffix, got: "${label}"`);
+    assert.equal(label, 'Black Sea maritime disruption state', `label should be stripped, got: "${label}"`);
   });
 
   // P1 #010: inferEntityClassFromName — word-boundary fix
@@ -5686,14 +5734,15 @@ describe('simulation package export', () => {
     assert.notEqual(cls, 'military_or_security_actor', `"workforce solutions" must not be military — got ${cls}`);
   });
 
-  // P1 #011: entity key collision — same dominantRegion, different candidateStateId
-  it('entities from two candidates with same dominantRegion but different candidateStateId are both present', () => {
-    const candidateA = makeCandidate({ candidateStateId: 'state-hormuz-1', dominantRegion: 'Middle East' });
-    const candidateB = makeCandidate({ candidateStateId: 'state-hormuz-2', dominantRegion: 'Middle East', rankingScore: 0.78 });
+  // P1 #011: entity key collision — different geo-groups, different candidateStateId
+  it('entities from two candidates from different geo-groups but same actor name are both present', () => {
+    const candidateA = makeCandidate({ candidateStateId: 'state-hormuz-1', dominantRegion: 'Middle East', routeFacilityKey: 'Strait of Hormuz', rankingScore: 0.85 });
+    const candidateB = makeCandidate({ candidateStateId: 'state-malacca-1', dominantRegion: 'South China Sea', routeFacilityKey: 'Strait of Malacca', rankingScore: 0.78 });
     candidateA.stateSummary = { actors: ['IRGC Naval Forces'] };
     candidateB.stateSummary = { actors: ['IRGC Naval Forces'] };
     const pkg = buildSimulationPackageFromDeepSnapshot(makeSnapshot([candidateA, candidateB]));
     assert.ok(pkg);
+    assert.equal(pkg.selectedTheaters.length, 2, 'both theaters from different geo-groups should be selected');
     const irgcEntities = pkg.entities.filter((e) => e.name === 'IRGC Naval Forces');
     assert.ok(irgcEntities.length >= 2, `Expected 2 IRGC entities (one per candidate), got ${irgcEntities.length}`);
   });
@@ -5772,11 +5821,12 @@ describe('simulation runner — prompt builders', () => {
     assert.ok(prompt.includes('Red Sea'), 'should include theater region');
   });
 
-  it('Round 1 prompt contains all 3 required path IDs', () => {
+  it('Round 1 prompt contains all 3 required path IDs including market_cascade', () => {
     const prompt = buildSimulationRound1SystemPrompt(minimalTheater, minimalPkg);
     assert.ok(prompt.includes('"escalation"'), 'should mention escalation path');
     assert.ok(prompt.includes('"containment"'), 'should mention containment path');
-    assert.ok(prompt.includes('"spillover"'), 'should mention spillover path');
+    assert.ok(prompt.includes('"market_cascade"'), 'should mention market_cascade path');
+    assert.ok(!prompt.includes('"spillover"'), 'spillover must be replaced by market_cascade');
   });
 
   it('Round 1 prompt lists entity IDs', () => {
@@ -5796,12 +5846,19 @@ describe('simulation runner — prompt builders', () => {
     assert.ok(prompt.includes('Red Sea disruption'), 'should include simulationRequirement text');
   });
 
+  it('Round 1 prompt: market_cascade path includes 2nd/3rd order economic framing', () => {
+    const prompt = buildSimulationRound1SystemPrompt(minimalTheater, minimalPkg);
+    assert.ok(prompt.includes('market_cascade'), 'should include market_cascade path name');
+    assert.ok(prompt.includes('$/bbl') || prompt.includes('freight rate'), 'should include economic cascade language ($/bbl or freight rate)');
+    assert.ok(!prompt.includes('"spillover"'), 'spillover must not appear as a path ID');
+  });
+
   it('Round 2 prompt contains Round 1 path summaries', () => {
     const round1 = {
       paths: [
         { pathId: 'escalation', summary: 'Escalation path summary', initialReactions: [{ actorId: 'houthi-forces' }] },
         { pathId: 'containment', summary: 'Containment path summary', initialReactions: [] },
-        { pathId: 'spillover', summary: 'Spillover path summary', initialReactions: [] },
+        { pathId: 'market_cascade', summary: 'Market cascade path summary', initialReactions: [] },
       ],
     };
     const prompt = buildSimulationRound2SystemPrompt(minimalTheater, minimalPkg, round1);
@@ -5822,7 +5879,7 @@ describe('simulation runner — extractSimulationRoundPayload', () => {
     paths: [
       { pathId: 'escalation', label: 'Escalate', summary: 'Forces escalate', initialReactions: [] },
       { pathId: 'containment', label: 'Contain', summary: 'Forces contained', initialReactions: [] },
-      { pathId: 'spillover', label: 'Spill', summary: 'Spillover effect', initialReactions: [] },
+      { pathId: 'market_cascade', label: 'Cascade', summary: 'Oil +$18/bbl, freight +22%, Asian importers face FX stress', initialReactions: [] },
     ],
     dominantReactions: ['Actor A: escalates'],
     note: 'Three divergent paths',
@@ -5832,7 +5889,7 @@ describe('simulation runner — extractSimulationRoundPayload', () => {
     paths: [
       { pathId: 'escalation', label: 'Full Escalation', summary: 'Escalated 72h', keyActors: ['houthi-forces'], roundByRoundEvolution: [{ round: 1, summary: 'Round 1' }, { round: 2, summary: 'Round 2' }], confidence: 0.75, timingMarkers: [{ event: 'First strike', timing: 'T+6h' }] },
       { pathId: 'containment', label: 'Contained', summary: 'Contained 72h', keyActors: [], roundByRoundEvolution: [], confidence: 0.6, timingMarkers: [] },
-      { pathId: 'spillover', label: 'Spilled', summary: 'Spillover 72h', keyActors: [], roundByRoundEvolution: [], confidence: 0.4, timingMarkers: [] },
+      { pathId: 'market_cascade', label: 'Economic Cascade', summary: 'Energy repricing 72h', keyActors: [], roundByRoundEvolution: [], confidence: 0.4, timingMarkers: [] },
     ],
     stabilizers: ['International pressure'],
     invalidators: ['New attack'],
@@ -5886,6 +5943,20 @@ describe('simulation runner — extractSimulationRoundPayload', () => {
     const badPaths = JSON.stringify({ paths: [{ pathId: 'unknown', summary: 'x' }] });
     const result = extractSimulationRoundPayload(badPaths, 1);
     assert.equal(result.paths, null);
+  });
+
+  it('rejects spillover pathId (replaced by market_cascade)', () => {
+    const spilloverPayload = JSON.stringify({
+      paths: [
+        { pathId: 'escalation', label: 'Escalate', summary: 'Forces escalate', initialReactions: [] },
+        { pathId: 'containment', label: 'Contain', summary: 'Forces contained', initialReactions: [] },
+        { pathId: 'spillover', label: 'Spill', summary: 'Old spillover path', initialReactions: [] },
+      ],
+    });
+    const result = extractSimulationRoundPayload(spilloverPayload, 1);
+    assert.ok(result.paths !== null, 'escalation and containment still valid');
+    assert.equal(result.paths.length, 2, 'spillover path should be filtered out, only 2 valid paths remain');
+    assert.ok(!result.paths.some((p) => p.pathId === 'spillover'), 'spillover must not appear in parsed paths');
   });
 
   it('uses extractFirstJsonObject fallback for prefix text', () => {

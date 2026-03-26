@@ -155,6 +155,24 @@ const CHOKEPOINT_MARKET_REGIONS = {
   'Cape of Good Hope': 'Southern Africa',
 };
 
+const THEATER_GEO_GROUPS = {
+  'Middle East': 'MENA',
+  'Red Sea': 'MENA',
+  'Persian Gulf': 'MENA',
+  'South China Sea': 'AsiaPacific',
+  'Western Pacific': 'AsiaPacific',
+  'Southeast Asia': 'AsiaPacific',
+  'Black Sea': 'EastEurope',
+  'Northern Europe': 'NorthernEurope',
+  'Mediterranean': 'Mediterranean',
+  'Central America': 'LatinAmerica',
+  'Southern Africa': 'SouthernAfrica',
+};
+
+function getTheaterGeoGroup(marketRegion) {
+  return THEATER_GEO_GROUPS[marketRegion] || marketRegion || 'unknown';
+}
+
 const MARKET_INPUT_KEYS = {
   stocks: 'market:stocks-bootstrap:v1',
   commodities: 'market:commodities-bootstrap:v1',
@@ -12194,8 +12212,8 @@ function buildSimulationPackageEvaluationTargets(selectedTheaters, candidates) {
           question: `What specific conditions contain the ${route} disruption before it crosses into ${bucket} repricing?`,
         },
         {
-          pathType: 'spillover',
-          question: `How does stress at ${route} spill from ${macroRegion} into adjacent markets or political theaters via ${channel}?`,
+          pathType: 'market_cascade',
+          question: `What are the 2nd and 3rd order economic consequences of disruption at ${route}? Model energy price direction ($/bbl or %), freight rate delta on affected trade lanes, downstream sector impacts (manufacturing, agriculture, consumer prices), and FX stress on import-dependent economies in ${macroRegion}.`,
         },
       ],
       requiredOutputs: ['key_invalidators', 'timing_markers', 'actor_response_summary'],
@@ -12243,12 +12261,23 @@ function buildSimulationStructuralWorld(selectedTheaters, { stateUnits, worldSig
 function buildSimulationPackageFromDeepSnapshot(snapshot, priorWorldState = null) {
   const candidates = (snapshot.impactExpansionCandidates || []).filter(isMaritimeChokeEnergyCandidate);
   if (candidates.length === 0) return null;
-  const top = candidates.slice(0, 3);
+  const usedGroups = new Set();
+  const top = [];
+  for (const c of candidates) {
+    const marketRegion = CHOKEPOINT_MARKET_REGIONS[c.routeFacilityKey] || c.dominantRegion || '';
+    const group = getTheaterGeoGroup(marketRegion);
+    if (!usedGroups.has(group)) {
+      usedGroups.add(group);
+      top.push(c);
+      if (top.length === 3) break;
+    }
+  }
+  if (top.length === 0) return null;
 
   const selectedTheaters = top.map((c, i) => ({
     theaterId: `theater-${i + 1}`,
     candidateStateId: c.candidateStateId,
-    label: c.candidateStateLabel || c.dominantRegion || 'unknown theater',
+    label: (c.candidateStateLabel || c.dominantRegion || 'unknown theater').replace(/\s*\([^)]+\)\s*$/, '').trim(),
     stateKind: c.stateKind,
     dominantRegion: c.dominantRegion,
     macroRegions: c.macroRegions,
@@ -15490,7 +15519,7 @@ EVALUATION TARGETS:
 ${evalTargets}
 
 INSTRUCTIONS:
-Generate EXACTLY 3 divergent paths named "escalation", "containment", and "spillover". For each path, model the initial actor reactions in the first 24 hours.
+Generate EXACTLY 3 divergent paths named "escalation", "containment", and "market_cascade". For each path, model the initial actor reactions in the first 24 hours.
 
 - Actors MUST be from the list above (use their exact entityId)
 - Cite event seeds (seedId) in reactions where applicable
@@ -15498,6 +15527,7 @@ Generate EXACTLY 3 divergent paths named "escalation", "containment", and "spill
 - timing format: "T+0h", "T+6h", "T+12h", "T+24h"
 - Maximum 3 initialReactions per path
 - note: A brief (≤200 char) meta-observation on the divergence logic
+- market_cascade path: model 2nd and 3rd order economic consequences — energy price direction ($/bbl or %), freight rate delta on affected trade lanes, downstream sector impacts (manufacturing, agriculture, consumer prices), FX stress on import-dependent economies
 
 Return ONLY a JSON object with no markdown fences:
 {
@@ -15511,7 +15541,7 @@ Return ONLY a JSON object with no markdown fences:
       ]
     },
     { "pathId": "containment", "label": "...", "summary": "...", "initialReactions": [] },
-    { "pathId": "spillover", "label": "...", "summary": "...", "initialReactions": [] }
+    { "pathId": "market_cascade", "label": "...", "summary": "...", "initialReactions": [] }
   ],
   "dominantReactions": ["<actor name>: <action summary>"],
   "note": "<meta-observation>"
@@ -15545,7 +15575,7 @@ EVALUATION TARGETS:
 ${evalTargets}
 
 INSTRUCTIONS:
-For each of the 3 paths from Round 1 (escalation, containment, spillover), generate the EVOLVED outcome after 72 hours.
+For each of the 3 paths from Round 1 (escalation, containment, market_cascade), generate the EVOLVED outcome after 72 hours.
 
 - keyActors: 2-4 actor IDs that drive this path
 - roundByRoundEvolution: 2 entries (round 1 summary, round 2 evolution)
@@ -15570,7 +15600,7 @@ Return ONLY a JSON object with no markdown fences:
       "timingMarkers": [{ "event": "<≤80 char>", "timing": "T+Nh" }]
     },
     { "pathId": "containment", "label": "...", "summary": "...", "keyActors": [], "roundByRoundEvolution": [], "confidence": 0.0, "timingMarkers": [] },
-    { "pathId": "spillover", "label": "...", "summary": "...", "keyActors": [], "roundByRoundEvolution": [], "confidence": 0.0, "timingMarkers": [] }
+    { "pathId": "market_cascade", "label": "...", "summary": "...", "keyActors": [], "roundByRoundEvolution": [], "confidence": 0.0, "timingMarkers": [] }
   ],
   "stabilizers": ["<≤100 char>"],
   "invalidators": ["<≤100 char>"],
@@ -15583,7 +15613,7 @@ function tryParseSimulationRoundPayload(text, round) {
   try {
     const parsed = JSON.parse(text);
     if (!Array.isArray(parsed?.paths)) return { paths: null };
-    const expectedIds = new Set(['escalation', 'containment', 'spillover']);
+    const expectedIds = new Set(['escalation', 'containment', 'market_cascade']);
     const paths = parsed.paths.filter((p) => p && expectedIds.has(p.pathId));
     if (paths.length === 0) return { paths: null };
     if (round === 2) {
