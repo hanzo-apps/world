@@ -139,7 +139,9 @@ const SYMBOL_MAP = { '£': 'GBP', '€': 'EUR', '¥': 'JPY', '₩': 'KRW', '₹'
 
 // Minimum plausible local price per currency — prevents matching product codes / IDs
 // e.g. IDR 4 = $0.0003 (nonsense), NGN 20 = $0.01 (nonsense), KRW 5 = $0.004 (nonsense)
-const CURRENCY_MIN = { NGN: 50, IDR: 500, ARS: 50, KRW: 1000, ZAR: 2, PKR: 20, LBP: 1000 };
+// JPY: even the cheapest grocery item in Japan (instant noodles) costs 100+ yen; anything
+// under 50 is a product code, portion weight, or sub-unit price, never a 1kg/1L shelf price.
+const CURRENCY_MIN = { NGN: 50, IDR: 500, ARS: 50, KRW: 1000, ZAR: 2, PKR: 20, LBP: 1000, JPY: 50 };
 
 // Maximum plausible USD price per item — catches bulk/wholesale/specialty products.
 // Set to ~2× the most expensive legitimate retail price globally for each item.
@@ -346,10 +348,10 @@ async function fetchGroceryBasketPrices(prevSnapshot) {
     console.warn(`  [routes] write failed (non-fatal): ${err.message}`)
   );
 
-  // Cross-country outlier gate — reject per-item prices > 4× the median USD price
-  // across all countries for that item. Prevents bad scrapes (bulk/wholesale/specialty)
-  // from distorting per-row colouring and basket totals.
-  // Also evicts the learned route from Redis so the bad URL isn't replayed next seed.
+  // Cross-country outlier gate — bilateral: rejects per-item prices that are either
+  //   > 4× the median (bulk/wholesale/specialty scrape error)
+  //   < ¼ the median (sub-unit price, product code, stale scraped value)
+  // Both directions evict the learned route so the bad URL isn't replayed next seed.
   const itemIds = config.items.map(i => i.id);
   const outlierEvictions = new Set();
   for (const itemId of itemIds) {
@@ -360,10 +362,17 @@ async function fetchGroceryBasketPrices(prevSnapshot) {
     pricePoints.sort((a, b) => a - b);
     const median = pricePoints[Math.floor(pricePoints.length / 2)];
     const ceiling = median * 4;
+    const floor = median / 4;
     for (const country of countriesResult) {
       const item = country.items.find(i => i.itemId === itemId);
-      if (!item?.usdPrice || item.usdPrice <= ceiling) continue;
-      console.warn(`  [outlier] ${country.code}/${itemId}: $${item.usdPrice.toFixed(2)} > 4× median $${median.toFixed(2)} — clearing + evicting learned route`);
+      if (!item?.usdPrice || item.usdPrice <= 0) continue;
+      const isHigh = item.usdPrice > ceiling;
+      const isLow  = item.usdPrice < floor;
+      if (!isHigh && !isLow) continue;
+      const reason = isHigh
+        ? `$${item.usdPrice.toFixed(4)} > 4× median $${median.toFixed(2)}`
+        : `$${item.usdPrice.toFixed(4)} < ¼ median $${median.toFixed(2)}`;
+      console.warn(`  [outlier] ${country.code}/${itemId}: ${reason} — clearing + evicting learned route`);
       item.available = false;
       item.localPrice = null;
       item.usdPrice = null;
