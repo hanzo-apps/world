@@ -15704,7 +15704,7 @@ async function writeSimulationOutcome(pkg, outcome, { storageConfig } = {}) {
     theaterId: tr.theaterId,
     theaterLabel: tr.theaterLabel || tr.theaterId,
     stateKind: tr.stateKind || '',
-    topPaths: (tr.topPaths || []).slice(0, 2).map((p) => ({
+    topPaths: (tr.topPaths || []).slice(0, 3).map((p) => ({
       label: p.label,
       summary: p.summary,
       confidence: p.confidence,
