@@ -17,6 +17,7 @@ import "worldmonitor/economic/v1/list_bigmac_prices.proto";
 import "worldmonitor/economic/v1/get_national_debt.proto";
 import "worldmonitor/economic/v1/list_fuel_prices.proto";
 import "worldmonitor/economic/v1/get_bls_series.proto";
+import "worldmonitor/economic/v1/get_economic_calendar.proto";
 
 // EconomicService provides APIs for macroeconomic data from FRED, World Bank, and EIA.
 service EconomicService {
@@ -90,5 +91,10 @@ service EconomicService {
   // GetBlsSeries retrieves BLS-only series not available on FRED (CES, LAUMT, CIU).
   rpc GetBlsSeries(GetBlsSeriesRequest) returns (GetBlsSeriesResponse) {
     option (sebuf.http.config) = {path: "/get-bls-series", method: HTTP_METHOD_GET};
+  }
+
+  // GetEconomicCalendar retrieves upcoming major economic events (FOMC, CPI, NFP, etc).
+  rpc GetEconomicCalendar(GetEconomicCalendarRequest) returns (GetEconomicCalendarResponse) {
+    option (sebuf.http.config) = {path: "/get-economic-calendar", method: HTTP_METHOD_GET};
   }
 }

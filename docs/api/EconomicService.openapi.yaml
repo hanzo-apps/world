@@ -457,6 +457,43 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/get-economic-calendar:
+        get:
+            tags:
+                - EconomicService
+            summary: GetEconomicCalendar
+            description: GetEconomicCalendar retrieves upcoming major economic events (FOMC, CPI, NFP, etc).
+            operationId: GetEconomicCalendar
+            parameters:
+                - name: fromDate
+                  in: query
+                  required: false
+                  schema:
+                    type: string
+                - name: toDate
+                  in: query
+                  required: false
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetEconomicCalendarResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -1320,3 +1357,45 @@ components:
                     type: string
                     description: Observed value.
             description: BlsObservation is a single BLS data point.
+        GetEconomicCalendarRequest:
+            type: object
+            properties:
+                fromDate:
+                    type: string
+                toDate:
+                    type: string
+        GetEconomicCalendarResponse:
+            type: object
+            properties:
+                events:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EconomicEvent'
+                fromDate:
+                    type: string
+                toDate:
+                    type: string
+                total:
+                    type: integer
+                    format: int32
+                unavailable:
+                    type: boolean
+        EconomicEvent:
+            type: object
+            properties:
+                event:
+                    type: string
+                country:
+                    type: string
+                date:
+                    type: string
+                impact:
+                    type: string
+                actual:
+                    type: string
+                estimate:
+                    type: string
+                previous:
+                    type: string
+                unit:
+                    type: string

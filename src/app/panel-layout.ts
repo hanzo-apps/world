@@ -56,6 +56,12 @@ import {
   EconomicCorrelationPanel,
   DisasterCorrelationPanel,
   HormuzPanel,
+  MacroTilesPanel,
+  FSIPanel,
+  YieldCurvePanel,
+  EarningsCalendarPanel,
+  EconomicCalendarPanel,
+  CotPositioningPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
@@ -891,6 +897,12 @@ export class PanelLayoutManager implements AppModule {
 
     this.createPanel('macro-signals', () => new MacroSignalsPanel());
     this.createPanel('fear-greed', () => new FearGreedPanel());
+    this.createPanel('macro-tiles', () => new MacroTilesPanel());
+    this.createPanel('fsi', () => new FSIPanel());
+    this.createPanel('yield-curve', () => new YieldCurvePanel());
+    this.createPanel('earnings-calendar', () => new EarningsCalendarPanel());
+    this.createPanel('economic-calendar', () => new EconomicCalendarPanel());
+    this.createPanel('cot-positioning', () => new CotPositioningPanel());
     this.createPanel('hormuz-tracker', () => new HormuzPanel());
     this.createPanel('etf-flows', () => new ETFFlowsPanel());
     this.createPanel('stablecoins', () => new StablecoinPanel());

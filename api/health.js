@@ -55,6 +55,9 @@ const BOOTSTRAP_KEYS = {
   otherTokens:       'market:other-tokens:v1',
   fredBatch:         'economic:fred:v1:FEDFUNDS:0',
   fearGreedIndex:    'market:fear-greed:v1',
+  earningsCalendar:  'market:earnings-calendar:v1',
+  econCalendar:      'economic:econ-calendar:v1',
+  cotPositioning:    'market:cot:v1',
 };
 
 const STANDALONE_KEYS = {
@@ -180,6 +183,9 @@ const SEED_META = {
   gscpi:             { key: 'seed-meta:economic:gscpi',               maxStaleMin: 2880 }, // 24h interval; 2880min = 48h = 2x interval
   fearGreedIndex:    { key: 'seed-meta:market:fear-greed',            maxStaleMin: 720 }, // 6h cron; 720min = 12h = 2x interval
   hormuzTracker:     { key: 'seed-meta:supply_chain:hormuz_tracker',  maxStaleMin: 2880 }, // daily cron; 2880min = 48h = 2x interval
+  earningsCalendar:  { key: 'seed-meta:market:earnings-calendar',     maxStaleMin: 1440 }, // 12h cron; 1440min = 24h = 2x interval
+  econCalendar:      { key: 'seed-meta:economic:econ-calendar',       maxStaleMin: 1440 }, // 12h cron; 1440min = 24h = 2x interval
+  cotPositioning:    { key: 'seed-meta:market:cot',                   maxStaleMin: 14400 }, // weekly CFTC release; 14400min = 10d = 1.4x interval (weekend + delay buffer)
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
@@ -246,6 +252,7 @@ function dataSize(parsed) {
                       'airports', 'closedIcaos', 'categories', 'regions', 'entries', 'satellites',
                       'sectors', 'statuses', 'scores', 'topics', 'advisories', 'months',
                       'observations', 'datapoints', 'clusters',
+                      'earnings', 'instruments',
                       'charts']) {
       if (Array.isArray(parsed[k])) return parsed[k].length;
     }
