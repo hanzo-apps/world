@@ -3145,6 +3145,8 @@ function theaterDetectAircraftType(callsign) {
   return 'unknown';
 }
 
+const WINGBITS_MAX_BOX_NM = 2000;
+
 const POSTURE_THEATERS = [
   { id: 'iran-theater', bounds: { north: 42, south: 20, east: 65, west: 30 }, thresholds: { elevated: 8, critical: 20 }, strikeIndicators: { minTankers: 2, minAwacs: 1, minFighters: 5 } },
   { id: 'taiwan-theater', bounds: { north: 30, south: 18, east: 130, west: 115 }, thresholds: { elevated: 6, critical: 15 }, strikeIndicators: { minTankers: 1, minAwacs: 1, minFighters: 4 } },
@@ -3218,13 +3220,19 @@ async function handleWingbitsTrackRequest(req, res) {
         { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
         JSON.stringify({ positions: hits, source: 'wingbits' }));
     }
-    // Index miss — flight not in any recent viewport. Try a global Wingbits API call.
+    // Index miss — flight not in any recent viewport. Try regional Wingbits API calls.
+    // The v1 API rejects boxes larger than ~2000 nm, so we use a set of regional areas
+    // that together cover high-traffic airspace without exceeding the size limit.
     try {
-      const globalAreas = [{ alias: 'global', by: 'box', la: 0, lo: 0, w: 21600, h: 10800, unit: 'nm' }];
+      const regionalAreas = [
+        { alias: 'europe-mideast', by: 'box', la: 40, lo: 35, w: 2000, h: 2000, unit: 'nm' },
+        { alias: 'asia-pacific',   by: 'box', la: 25, lo: 120, w: 2000, h: 2000, unit: 'nm' },
+        { alias: 'americas',       by: 'box', la: 35, lo: -95, w: 2000, h: 2000, unit: 'nm' },
+      ];
       const gbResp = await fetch('https://customer-api.wingbits.com/v1/flights', {
         method: 'POST',
         headers: { 'x-api-key': apiKey, Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': CHROME_UA },
-        body: JSON.stringify(globalAreas),
+        body: JSON.stringify(regionalAreas),
         signal: AbortSignal.timeout(15_000),
       });
       if (gbResp.ok) {
@@ -3264,6 +3272,9 @@ async function handleWingbitsTrackRequest(req, res) {
             { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
             JSON.stringify({ positions, source: 'wingbits' }));
         }
+      } else {
+        const errBody = await gbResp.text().catch(() => '');
+        console.warn(`[Wingbits Track] Regional callsign fallback error: ${gbResp.status} — ${errBody.slice(0, 200)}`);
       }
     } catch (err) {
       console.warn(`[Wingbits Track] Global callsign fallback failed: ${err?.message || err}`);
@@ -3290,8 +3301,8 @@ async function handleWingbitsTrackRequest(req, res) {
 
   const centerLat = (lamin + lamax) / 2;
   const centerLon = (lomin + lomax) / 2;
-  const widthNm = Math.abs(lomax - lomin) * 60 * Math.cos(centerLat * Math.PI / 180);
-  const heightNm = Math.abs(lamax - lamin) * 60;
+  const widthNm = Math.min(Math.abs(lomax - lomin) * 60 * Math.cos(centerLat * Math.PI / 180), WINGBITS_MAX_BOX_NM);
+  const heightNm = Math.min(Math.abs(lamax - lamin) * 60, WINGBITS_MAX_BOX_NM);
   const areas = [{ alias: 'viewport', by: 'box', la: centerLat, lo: centerLon, w: widthNm, h: heightNm, unit: 'nm' }];
 
   try {
@@ -3303,7 +3314,8 @@ async function handleWingbitsTrackRequest(req, res) {
     });
 
     if (!resp.ok) {
-      console.warn(`[Wingbits Track] API error: ${resp.status}`);
+      const errBody = await resp.text().catch(() => '');
+      console.warn(`[Wingbits Track] API error: ${resp.status} — ${errBody.slice(0, 200)}`);
       return safeEnd(res, 502, { 'Content-Type': 'application/json' },
         JSON.stringify({ error: `Wingbits API ${resp.status}`, positions: [] }));
     }
@@ -3405,8 +3417,8 @@ async function fetchTheaterFlightsFromWingbits() {
     by: 'box',
     la: (t.bounds.north + t.bounds.south) / 2,
     lo: (t.bounds.east + t.bounds.west) / 2,
-    w: Math.abs(t.bounds.east - t.bounds.west) * 60,
-    h: Math.abs(t.bounds.north - t.bounds.south) * 60,
+    w: Math.min(Math.abs(t.bounds.east - t.bounds.west) * 60, WINGBITS_MAX_BOX_NM),
+    h: Math.min(Math.abs(t.bounds.north - t.bounds.south) * 60, WINGBITS_MAX_BOX_NM),
     unit: 'nm',
   }));
   try {
@@ -3417,7 +3429,8 @@ async function fetchTheaterFlightsFromWingbits() {
       signal: AbortSignal.timeout(15_000),
     });
     if (!resp.ok) {
-      console.warn(`[Wingbits] API error: ${resp.status} ${resp.statusText}`);
+      const errBody = await resp.text().catch(() => '');
+      console.warn(`[Wingbits] API error: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
       return null;
     }
     const data = await resp.json();
