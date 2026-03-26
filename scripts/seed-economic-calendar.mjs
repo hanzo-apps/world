@@ -1,121 +1,104 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
+import { loadEnvFile, runSeed, CHROME_UA } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'economic:econ-calendar:v1';
 const CACHE_TTL = 129600; // 36h — 3× a 12h cron interval
 
-const HIGH_PRIORITY_TERMS = [
-  'fomc', 'fed funds', 'federal funds', 'nonfarm', 'non-farm',
-  'cpi', 'pce', 'gdp', 'unemployment', 'payroll', 'retail sales', 'pmi', 'ism',
+// FRED release IDs for major US macro events
+// https://api.stlouisfed.org/fred/releases
+const FRED_RELEASES = [
+  { id: 10,  event: 'CPI',              unit: '%' },
+  { id: 50,  event: 'Nonfarm Payrolls', unit: 'K' },
+  { id: 53,  event: 'GDP',              unit: '%' },
+  { id: 54,  event: 'PCE',              unit: '%' },
+  { id: 9,   event: 'Retail Sales',     unit: '%' },
 ];
 
-const ALLOWED_COUNTRIES = new Set(['US', 'UK', 'EUR', 'EU', 'DE', 'FR', 'JP', 'CN']);
+// FOMC rate decision dates — Fed publishes full year schedule in advance.
+// Source: federalreserve.gov/monetarypolicy/fomccalendars.htm
+// Add next year's dates before Dec 31 of the current year to avoid a gap.
+const FOMC_DATES_BY_YEAR = {
+  2026: ['2026-01-29', '2026-03-19', '2026-05-07', '2026-06-18', '2026-07-30', '2026-09-17', '2026-11-05', '2026-12-17'],
+  // 2027: [...] — update when Fed releases the 2027 calendar (typically Nov of prior year)
+};
 
-function isHighPriority(eventName) {
-  const lower = (eventName || '').toLowerCase();
-  return HIGH_PRIORITY_TERMS.some((term) => lower.includes(term));
+function buildFomcEvents(today) {
+  const thisYear = new Date(today).getFullYear();
+  const dates = [
+    ...(FOMC_DATES_BY_YEAR[thisYear] ?? []),
+    ...(FOMC_DATES_BY_YEAR[thisYear + 1] ?? []),
+  ];
+  return dates
+    .filter((d) => d >= today)
+    .map((date) => ({
+      event: 'FOMC Rate Decision',
+      country: 'US',
+      date,
+      impact: 'high',
+      actual: '',
+      estimate: '',
+      previous: '',
+      unit: '',
+    }));
 }
 
-function normalizeImpact(raw) {
-  if (raw === null || raw === undefined) return 'low';
-  const s = String(raw).toLowerCase();
-  if (s === '3' || s === 'high') return 'high';
-  if (s === '2' || s === 'medium' || s === 'moderate') return 'medium';
-  return 'low';
-}
+async function fetchFredReleaseDates(releaseId, apiKey, today, toDate) {
+  const url =
+    `https://api.stlouisfed.org/fred/release/dates` +
+    `?release_id=${releaseId}` +
+    `&sort_order=asc` +
+    `&limit=1000` +
+    `&include_release_dates_with_no_data=true` +
+    `&api_key=${apiKey}` +
+    `&file_type=json`;
 
-function toDateString(timeStr) {
-  if (!timeStr) return '';
-  const d = new Date(timeStr);
-  if (!Number.isNaN(d.getTime())) {
-    return d.toISOString().slice(0, 10);
-  }
-  if (/^\d{4}-\d{2}-\d{2}/.test(timeStr)) return timeStr.slice(0, 10);
-  return '';
-}
+  const resp = await fetch(url, {
+    headers: { 'User-Agent': CHROME_UA },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!resp.ok) throw new Error(`FRED release/dates HTTP ${resp.status} (release_id=${releaseId})`);
 
-function formatValue(v) {
-  if (v === null || v === undefined) return '';
-  return String(v);
-}
-
-function buildFallbackEvents() {
-  const year = new Date().getFullYear();
-  return [
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-01-29`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-03-19`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-05-07`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-06-18`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-07-30`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-09-17`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-11-05`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-    { event: 'FOMC Rate Decision', country: 'US', date: `${year}-12-17`, impact: 'high', actual: '', estimate: '', previous: '', unit: '' },
-  ].filter((e) => e.date >= new Date().toISOString().slice(0, 10));
+  const data = await resp.json();
+  return (data.release_dates ?? [])
+    .map((e) => e.date)
+    .filter((d) => d >= today && d <= toDate);
 }
 
 async function fetchEconomicCalendar() {
-  const apiKey = process.env.FINNHUB_API_KEY;
+  const apiKey = process.env.FRED_API_KEY;
+  const today = new Date().toISOString().slice(0, 10);
+  const toDate = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+
+  const fomcEvents = buildFomcEvents(today);
 
   if (!apiKey) {
-    console.warn('  FINNHUB_API_KEY missing — returning hardcoded FOMC dates');
-    const events = buildFallbackEvents();
-    const today = new Date().toISOString().slice(0, 10);
-    const future = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
-    return { events, fromDate: today, toDate: future, total: events.length };
+    console.warn('  FRED_API_KEY missing — returning FOMC dates only');
+    const events = fomcEvents;
+    return { events, fromDate: today, toDate, total: events.length };
   }
 
-  const today = new Date();
-  const from = today.toISOString().slice(0, 10);
-  const to = new Date(today.getTime() + 30 * 86400_000).toISOString().slice(0, 10);
+  console.log(`  Fetching FRED economic release calendar ${today} → ${toDate}`);
 
-  const url = `https://finnhub.io/api/v1/calendar/economic?from=${from}&to=${to}`;
+  const events = [...fomcEvents];
 
-  console.log(`  Fetching Finnhub economic calendar ${from} → ${to}`);
+  await Promise.all(
+    FRED_RELEASES.map(async ({ id, event, unit }) => {
+      const dates = await fetchFredReleaseDates(id, apiKey, today, toDate);
+      console.log(`  ${event} (release_id=${id}): ${dates.length} upcoming date(s)`);
+      for (const date of dates) {
+        events.push({ event, country: 'US', date, impact: 'high', actual: '', estimate: '', previous: '', unit });
+      }
+    }),
+  );
 
-  const resp = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA, 'X-Finnhub-Token': apiKey },
-    signal: AbortSignal.timeout(20_000),
-  });
+  events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  if (!resp.ok) {
-    throw new Error(`Finnhub HTTP ${resp.status}`);
-  }
+  console.log(`  Total events: ${events.length}`);
 
-  const data = await resp.json();
-  const raw = data?.economicCalendar ?? [];
-
-  console.log(`  Raw events from Finnhub: ${raw.length}`);
-
-  const filtered = raw.filter((item) => {
-    const country = (item.country || '').toUpperCase();
-    if (!ALLOWED_COUNTRIES.has(country)) return false;
-    const impact = normalizeImpact(item.impact);
-    if (impact === 'high') return true;
-    if (isHighPriority(item.event)) return true;
-    return false;
-  });
-
-  const transformed = filtered.map((item) => ({
-    event: item.event || '',
-    country: (item.country || '').toUpperCase(),
-    date: toDateString(item.time || item.date || ''),
-    impact: normalizeImpact(item.impact),
-    actual: formatValue(item.actual),
-    estimate: formatValue(item.estimate),
-    previous: formatValue(item.prev),
-    unit: formatValue(item.unit),
-  }));
-
-  transformed.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
-  const events = transformed.slice(0, 60);
-
-  console.log(`  Filtered to ${events.length} events`);
-
-  return { events, fromDate: from, toDate: to, total: events.length };
+  return { events, fromDate: today, toDate, total: events.length };
 }
 
 function validate(data) {
@@ -126,7 +109,7 @@ if (process.argv[1]?.endsWith('seed-economic-calendar.mjs')) {
   runSeed('economic', 'econ-calendar', CANONICAL_KEY, fetchEconomicCalendar, {
     validateFn: validate,
     ttlSeconds: CACHE_TTL,
-    sourceVersion: 'finnhub-v1',
+    sourceVersion: 'fred-v1',
   }).catch((err) => {
     const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
     console.error('FATAL:', (err.message || err) + _cause);
