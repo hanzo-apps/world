@@ -237,6 +237,9 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult | nul
         }
       }
 
+      // Strip markdown code fences (e.g. ```json ... ```) that some models add
+      content = content.replace(/^```(?:\w+)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+
       if (validate && !validate(content)) {
         console.warn(`[llm:${providerName}] validate() rejected response, trying next`);
         if (forcedProvider) return null;
