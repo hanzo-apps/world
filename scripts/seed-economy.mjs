@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed, writeExtraKeyWithMeta, sleep } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, runSeed, writeExtraKeyWithMeta, sleep, resolveProxy, fredFetchJson } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
+
+const _proxyAuth = resolveProxy();
 
 // ─── Keys (must match handler cache keys exactly) ───
 const KEYS = {
@@ -160,29 +162,24 @@ async function fetchFredSeries() {
       });
 
       const [obsResp, metaResp] = await Promise.allSettled([
-        fetch(`https://api.stlouisfed.org/fred/series/observations?${obsParams}`, {
-          headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000),
-        }),
-        fetch(`https://api.stlouisfed.org/fred/series?${metaParams}`, {
-          headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000),
-        }),
+        fredFetchJson(`https://api.stlouisfed.org/fred/series/observations?${obsParams}`, _proxyAuth),
+        fredFetchJson(`https://api.stlouisfed.org/fred/series?${metaParams}`, _proxyAuth),
       ]);
 
-      if (obsResp.status === 'rejected' || !obsResp.value.ok) {
+      if (obsResp.status === 'rejected') {
         console.warn(`  FRED ${seriesId}: fetch failed`);
         continue;
       }
 
-      const obsData = await obsResp.value.json();
+      const obsData = obsResp.value;
       const observations = (obsData.observations || [])
         .map((o) => { const v = parseFloat(o.value); return Number.isNaN(v) || o.value === '.' ? null : { date: o.date, value: v }; })
         .filter(Boolean)
         .reverse();
 
       let title = seriesId, units = '', frequency = '';
-      if (metaResp.status === 'fulfilled' && metaResp.value.ok) {
-        const metaData = await metaResp.value.json();
-        const meta = metaData.seriess?.[0];
+      if (metaResp.status === 'fulfilled') {
+        const meta = metaResp.value.seriess?.[0];
         if (meta) { title = meta.title || seriesId; units = meta.units || ''; frequency = meta.frequency || ''; }
       }
 
@@ -254,7 +251,7 @@ async function fetchFredJpyFallback() {
   if (!apiKey) return [];
   try {
     const params = new URLSearchParams({ series_id: 'DEXJPUS', api_key: apiKey, file_type: 'json', sort_order: 'desc', limit: '250' });
-    const data = await fetchJsonSafe(`https://api.stlouisfed.org/fred/series/observations?${params}`, 10_000);
+    const data = await fredFetchJson(`https://api.stlouisfed.org/fred/series/observations?${params}`, _proxyAuth);
     return (data.observations || [])
       .map((o) => { const v = parseFloat(o.value); return Number.isNaN(v) || o.value === '.' ? null : v; })
       .filter(Boolean)
