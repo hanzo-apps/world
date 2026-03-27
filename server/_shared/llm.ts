@@ -1,5 +1,6 @@
 import { CHROME_UA } from './constants';
 import { isProviderAvailable } from './llm-health';
+import { sanitizeForPrompt } from './llm-sanitize.js';
 
 export interface ProviderCredentials {
   apiUrl: string;
@@ -110,6 +111,7 @@ export function stripThinkingTags(text: string): string {
     .replace(/<\|begin_of_thought\|>[\s\S]*?<\|end_of_thought\|>/gi, '')
     .trim();
 
+  // Strip unterminated opening tags (no closing tag present)
   s = s
     .replace(/<think>[\s\S]*/gi, '')
     .replace(/<\|thinking\|>[\s\S]*/gi, '')
@@ -120,6 +122,7 @@ export function stripThinkingTags(text: string): string {
 
   return s;
 }
+
 
 const PROVIDER_CHAIN = ['ollama', 'groq', 'openrouter', 'generic'] as const;
 const PROVIDER_SET = new Set<string>(PROVIDER_CHAIN);
@@ -184,10 +187,13 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult | nul
   let messages = rawMessages;
   const firstMsg = messages[0];
   if (systemAppend && firstMsg && firstMsg.role === 'system') {
-    messages = [
-      { role: 'system', content: `${firstMsg.content}\n\n---\n\n${systemAppend}` },
-      ...messages.slice(1),
-    ];
+    const sanitized = sanitizeForPrompt(systemAppend);
+    if (sanitized) {
+      messages = [
+        { role: 'system', content: `${firstMsg.content}\n\n---\n\n${sanitized}` },
+        ...messages.slice(1),
+      ];
+    }
   }
 
   const providers = resolveProviderChain({ forcedProvider, providerOrder });
