@@ -3,6 +3,7 @@ import type {
   GetFearGreedIndexRequest,
   GetFearGreedIndexResponse,
   FearGreedCategory,
+  FearGreedSectorPerformance,
 } from '../../../../src/generated/server/worldmonitor/market/v1/service_server';
 import { getCachedJson } from '../../../_shared/redis';
 
@@ -26,6 +27,16 @@ export async function getFearGreedIndex(
       contribution: Number(c?.contribution ?? 0),
       degraded: Boolean(c?.degraded),
       inputsJson: JSON.stringify(c?.inputs ?? {}),
+    });
+
+    const rawSectors = (raw.sectorPerformance ?? []) as Array<Record<string, unknown>>;
+    const sectorPerformance: FearGreedSectorPerformance[] = rawSectors.map((s) => {
+      const c = Number(s.change1d ?? 0);
+      return {
+        symbol: String(s.symbol ?? ''),
+        name: String(s.name ?? ''),
+        change1d: Number.isFinite(c) ? c : 0,
+      };
     });
 
     return {
@@ -57,6 +68,7 @@ export async function getFearGreedIndex(
       fsiLabel: String(hdr?.fsi?.label ?? ''),
       hygPrice: Number(hdr?.fsi?.hygPrice ?? 0),
       tltPrice: Number(hdr?.fsi?.tltPrice ?? 0),
+      sectorPerformance,
       unavailable: false,
     };
   } catch {
