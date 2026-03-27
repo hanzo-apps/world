@@ -1096,48 +1096,48 @@ describe('PRO widget — store and sanitizer', () => {
     );
   });
 
-  it('wrapProWidgetHtml places CSP as first head child (client-owned skeleton)', () => {
-    const fnIdx = san.indexOf('wrapProWidgetHtml');
-    const fnBody = san.slice(fnIdx, fnIdx + 800);
+  it('widget document builder places CSP as first head child (client-owned skeleton)', () => {
     assert.ok(
-      fnBody.includes('Content-Security-Policy'),
-      'wrapProWidgetHtml must embed CSP in the head',
+      san.includes('Content-Security-Policy'),
+      'widget sanitizer must embed CSP in the document head',
     );
     // CSP meta should come before any style tag
-    const cspPos = fnBody.indexOf('Content-Security-Policy');
-    const stylePos = fnBody.indexOf('<style>');
+    const cspPos = san.indexOf('Content-Security-Policy');
+    const stylePos = san.indexOf('<style>');
     assert.ok(
       cspPos < stylePos,
       'CSP meta must appear before <style> in the generated HTML skeleton',
     );
   });
 
-  it('wrapProWidgetHtml CSP has connect-src none (blocks beaconing)', () => {
-    const fnIdx = san.indexOf('wrapProWidgetHtml');
-    const fnBody = san.slice(fnIdx, fnIdx + 800);
+  it('widget document builder CSP has connect-src none (blocks beaconing)', () => {
     assert.ok(
-      fnBody.includes("connect-src 'none'"),
+      san.includes("connect-src 'none'"),
       "CSP must include connect-src 'none' to block network beaconing from iframe",
     );
   });
 
-  it('wrapProWidgetHtml uses escapeSrcdoc for attribute safety', () => {
+  it('wrapProWidgetHtml uses sandbox page src (not srcdoc) for CSP isolation', () => {
+    const fnIdx = san.indexOf('wrapProWidgetHtml');
+    const fnBody = san.slice(fnIdx, fnIdx + 500);
     assert.ok(
-      san.includes('escapeSrcdoc'),
-      'wrapProWidgetHtml must escape the srcdoc attribute value',
+      fnBody.includes('wm-widget-sandbox.html'),
+      'wrapProWidgetHtml must load the dedicated sandbox page (not srcdoc) to get its own CSP',
+    );
+    assert.ok(
+      !fnBody.includes('srcdoc'),
+      'wrapProWidgetHtml must NOT use srcdoc — srcdoc inherits parent CSP',
     );
   });
 
-  it('wrapProWidgetHtml injects Chart.js from jsdelivr so new Chart() is available', () => {
-    const fnIdx = san.indexOf('wrapProWidgetHtml');
-    const fnBody = san.slice(fnIdx, fnIdx + 1500);
+  it('widget document builder injects Chart.js from jsdelivr so new Chart() is available', () => {
     assert.ok(
-      fnBody.includes('cdn.jsdelivr.net') && fnBody.includes('chart.js'),
-      'wrapProWidgetHtml must inject Chart.js CDN script so widgets can call new Chart(...)',
+      san.includes('cdn.jsdelivr.net') && san.includes('chart.js'),
+      'widget sanitizer must inject Chart.js CDN script so widgets can call new Chart(...)',
     );
-    // Script must appear before </head> so Chart is defined when body scripts run
-    const scriptPos = fnBody.indexOf('chart.js');
-    const bodyPos = fnBody.indexOf('<body>');
+    // Script must appear before <body> so Chart is defined when body scripts run
+    const scriptPos = san.indexOf('chart.js');
+    const bodyPos = san.indexOf('<body>');
     assert.ok(
       scriptPos < bodyPos,
       'Chart.js script tag must be in <head>, before <body>',
