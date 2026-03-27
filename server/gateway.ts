@@ -104,7 +104,6 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/giving/v1/get-giving-summary': 'static',
   '/api/intelligence/v1/get-country-intel-brief': 'static',
   '/api/intelligence/v1/get-gdelt-topic-timeline': 'medium',
-  '/api/intelligence/v1/list-market-implications': 'static',
   '/api/climate/v1/list-climate-anomalies': 'static',
   '/api/sanctions/v1/list-sanctions-pressure': 'static',
   '/api/sanctions/v1/lookup-sanction-entity': 'no-store',
@@ -132,6 +131,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/economic/v1/list-grocery-basket-prices': 'static',
   '/api/economic/v1/list-bigmac-prices': 'static',
   '/api/economic/v1/list-fuel-prices': 'static',
+  '/api/economic/v1/get-crude-inventories': 'static',
   '/api/supply-chain/v1/get-critical-minerals': 'daily',
   '/api/military/v1/get-aircraft-details': 'static',
   '/api/military/v1/get-wingbits-status': 'static',
@@ -188,6 +188,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/market/v1/list-earnings-calendar': 'slow',
   '/api/market/v1/get-cot-positioning': 'slow',
   '/api/economic/v1/get-economic-calendar': 'slow',
+  '/api/intelligence/v1/list-market-implications': 'slow',
 };
 
 import { PREMIUM_RPC_PATHS } from '../src/shared/premium-paths';
