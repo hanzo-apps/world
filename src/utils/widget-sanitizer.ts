@@ -30,18 +30,29 @@ export function sanitizeWidgetHtml(html: string): string {
   return DOMPurify.sanitize(html, PURIFY_CONFIG) as unknown as string;
 }
 
+// Strip a leading .panel-header that the agent may generate — the outer
+// CustomWidgetPanel frame already displays the title, so a second one is
+// always a duplicate. Only the very first element is removed.
+function stripLeadingPanelHeader(html: string): string {
+  return html.replace(/^\s*<div[^>]*\bclass="panel-header"[^>]*>[\s\S]*?<\/div>\s*/i, '');
+}
+
 export function wrapWidgetHtml(html: string, extraClass = ''): string {
   const shellClass = ['wm-widget-shell', extraClass].filter(Boolean).join(' ');
   return `
     <div class="${shellClass}">
       <div class="wm-widget-body">
-        <div class="wm-widget-generated">${sanitizeWidgetHtml(html)}</div>
+        <div class="wm-widget-generated">${sanitizeWidgetHtml(stripLeadingPanelHeader(html))}</div>
       </div>
     </div>
   `;
 }
 
 const widgetBodyStore = new Map<string, string>();
+
+// Keyed by iframe element — persists HTML across DOM moves so the load listener
+// can re-post whenever the browser re-navigates the iframe after a drag.
+const iframeHtmlStore = new WeakMap<HTMLIFrameElement, string>();
 
 function buildWidgetDoc(bodyContent: string): string {
   return `<!DOCTYPE html>
@@ -52,7 +63,8 @@ function buildWidgetDoc(bodyContent: string): string {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0a0a0a;--surface:#141414;--text:#e8e8e8;--text-secondary:#ccc;--text-dim:#888;--text-muted:#666;--border:#2a2a2a;--border-subtle:#1a1a1a;--overlay-subtle:rgba(255,255,255,0.03);--green:#44ff88;--red:#ff4444;--yellow:#ffaa00;--accent:#44ff88}
-body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:'SF Mono','Monaco','Cascadia Code','Fira Code','DejaVu Sans Mono','Liberation Mono',monospace;font-size:12px;line-height:1.5;overflow-y:auto;box-sizing:border-box}
+html,body{font-family:'SF Mono','Monaco','Cascadia Code','Fira Code','DejaVu Sans Mono','Liberation Mono',monospace!important}
+body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-size:12px;line-height:1.5;overflow-y:auto;box-sizing:border-box}
 *{box-sizing:inherit;font-family:inherit!important}
 table{border-collapse:collapse;width:100%}
 th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);padding:4px 8px;border-bottom:1px solid var(--border);font-weight:600}
@@ -78,17 +90,23 @@ td{padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:var(--text
 function mountProWidget(iframe: HTMLIFrameElement): void {
   const id = iframe.dataset.wmId;
   if (!id) return;
+
+  // Already wired up — the persistent load listener will re-post on every
+  // navigation (including after the panel is dragged to a new position).
+  if (iframeHtmlStore.has(iframe)) return;
+
   const body = widgetBodyStore.get(id);
   if (!body) return;
-  // Delete immediately — new ID is generated on every render, so no re-use
   widgetBodyStore.delete(id);
   const html = buildWidgetDoc(body);
-  // Always use load event: when MutationObserver fires, iframe.contentDocument is
-  // still about:blank (readyState 'complete'), not the sandbox page. Sending here
-  // would target the wrong window. Wait for the real load instead.
+  iframeHtmlStore.set(iframe, html);
+
+  // Persistent (no { once }) — fires on initial load AND whenever the browser
+  // re-navigates the iframe after its DOM position changes (drag/drop).
   iframe.addEventListener('load', () => {
-    iframe.contentWindow?.postMessage({ type: 'wm-html', html }, '*');
-  }, { once: true });
+    const storedHtml = iframeHtmlStore.get(iframe);
+    if (storedHtml) iframe.contentWindow?.postMessage({ type: 'wm-html', html: storedHtml }, '*');
+  });
 }
 
 if (typeof document !== 'undefined') {
@@ -116,6 +134,6 @@ if (typeof document !== 'undefined') {
 
 export function wrapProWidgetHtml(bodyContent: string): string {
   const id = `wm-${Math.random().toString(36).slice(2)}`;
-  widgetBodyStore.set(id, bodyContent);
+  widgetBodyStore.set(id, stripLeadingPanelHeader(bodyContent));
   return `<div class="wm-widget-shell wm-widget-pro"><iframe src="/wm-widget-sandbox.html" data-wm-id="${id}" sandbox="allow-scripts" style="width:100%;height:400px;border:none;display:block;" title="Interactive widget"></iframe></div>`;
 }

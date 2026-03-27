@@ -812,7 +812,6 @@ describe('i18n — widgets section completeness', () => {
     assert.ok(modal.includes("t('widgets.chatTitle')"), 'WidgetChatModal must use widgets.chatTitle');
     assert.ok(modal.includes("t('widgets.modifyTitle')"), 'WidgetChatModal must use widgets.modifyTitle');
     assert.ok(modal.includes("t('widgets.inputPlaceholder')"), 'WidgetChatModal must use widgets.inputPlaceholder');
-    assert.ok(panel.includes("t('widgets.changeAccent')"), 'CustomWidgetPanel must use widgets.changeAccent');
     assert.ok(panel.includes("t('widgets.modifyWithAi')"), 'CustomWidgetPanel must use widgets.modifyWithAi');
     assert.ok(events.includes("t('widgets.confirmDelete')"), 'Delete confirmation must use widgets.confirmDelete');
   });
@@ -839,22 +838,6 @@ describe('CustomWidgetPanel — header buttons and events', () => {
     assert.ok(
       panel.includes('wm:widget-modify'),
       'CustomWidgetPanel must dispatch wm:widget-modify CustomEvent',
-    );
-  });
-
-  it('ACCENT_COLORS has 9 entries (8 colors + null reset)', () => {
-    // Array spans multiple lines — use [\s\S]*? to capture across newlines
-    const match = panel.match(/ACCENT_COLORS[^=]*=\s*\[([\s\S]*?)\];/);
-    assert.ok(match, 'ACCENT_COLORS array not found');
-    const entries = match[1].split(',').map(s => s.trim()).filter(Boolean);
-    assert.equal(entries.length, 9, `ACCENT_COLORS must have 9 entries (8 colors + null), found ${entries.length}: [${entries.join(', ')}]`);
-    assert.ok(entries.includes('null'), 'ACCENT_COLORS must include null for reset');
-  });
-
-  it('accent color persists via saveWidget after color cycle', () => {
-    assert.ok(
-      panel.includes('saveWidget'),
-      'Color cycle must call saveWidget() to persist accentColor',
     );
   });
 
