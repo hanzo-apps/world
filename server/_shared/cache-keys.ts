@@ -72,6 +72,7 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   marketImplications: 'intelligence:market-implications:v1',
   fearGreedIndex:   'market:fear-greed:v1',
   crudeInventories: 'economic:crude-inventories:v1',
+  ecbFxRates:       'economic:ecb-fx-rates:v1',
 };
 
 export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
@@ -105,4 +106,5 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   marketImplications: 'slow',
   fearGreedIndex: 'slow',
   crudeInventories: 'slow',
+  ecbFxRates: 'slow',
 };

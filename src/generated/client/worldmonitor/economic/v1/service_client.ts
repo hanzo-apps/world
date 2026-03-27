@@ -401,6 +401,23 @@ export interface CrudeInventoryWeek {
   weeklyChangeMb?: number;
 }
 
+export interface GetEcbFxRatesRequest {
+}
+
+export interface GetEcbFxRatesResponse {
+  rates: EcbFxRate[];
+  updatedAt: string;
+  seededAt: string;
+  unavailable: boolean;
+}
+
+export interface EcbFxRate {
+  pair: string;
+  rate: number;
+  date: string;
+  change1d: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -836,6 +853,29 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetCrudeInventoriesResponse;
+  }
+
+  async getEcbFxRates(req: GetEcbFxRatesRequest, options?: EconomicServiceCallOptions): Promise<GetEcbFxRatesResponse> {
+    let path = "/api/economic/v1/get-ecb-fx-rates";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetEcbFxRatesResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

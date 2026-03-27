@@ -29,6 +29,8 @@ import {
   type GetBlsSeriesResponse,
   type GetCrudeInventoriesResponse,
   type CrudeInventoryWeek,
+  type GetEcbFxRatesResponse,
+  type EcbFxRate,
 } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getCSSColor } from '@/utils';
@@ -735,5 +737,29 @@ export async function fetchBisData(): Promise<BisData> {
     };
   } catch {
     return empty;
+  }
+}
+
+// ========================================================================
+// ECB Reference FX Rates
+// ========================================================================
+
+export type { GetEcbFxRatesResponse, EcbFxRate };
+
+const ecbFxRatesBreaker = createCircuitBreaker<GetEcbFxRatesResponse>({ name: 'ECB FX Rates', cacheTtlMs: 4 * 60 * 60 * 1000 });
+const emptyEcbFxRatesFallback: GetEcbFxRatesResponse = { rates: [], updatedAt: '', seededAt: '0', unavailable: true };
+
+export async function getEcbFxRatesData(): Promise<GetEcbFxRatesResponse> {
+  const hydrated = getHydratedData('ecbFxRates') as GetEcbFxRatesResponse | undefined;
+  if (hydrated?.rates?.length) return hydrated;
+
+  try {
+    return await ecbFxRatesBreaker.execute(
+      () => client.getEcbFxRates({}, { signal: AbortSignal.timeout(12_000) }),
+      emptyEcbFxRatesFallback,
+      { shouldCache: (r) => (r.rates?.length ?? 0) > 0 },
+    );
+  } catch {
+    return emptyEcbFxRatesFallback;
   }
 }

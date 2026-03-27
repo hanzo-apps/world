@@ -401,6 +401,23 @@ export interface CrudeInventoryWeek {
   weeklyChangeMb?: number;
 }
 
+export interface GetEcbFxRatesRequest {
+}
+
+export interface GetEcbFxRatesResponse {
+  rates: EcbFxRate[];
+  updatedAt: string;
+  seededAt: string;
+  unavailable: boolean;
+}
+
+export interface EcbFxRate {
+  pair: string;
+  rate: number;
+  date: string;
+  change1d: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -462,6 +479,7 @@ export interface EconomicServiceHandler {
   getBlsSeries(ctx: ServerContext, req: GetBlsSeriesRequest): Promise<GetBlsSeriesResponse>;
   getEconomicCalendar(ctx: ServerContext, req: GetEconomicCalendarRequest): Promise<GetEconomicCalendarResponse>;
   getCrudeInventories(ctx: ServerContext, req: GetCrudeInventoriesRequest): Promise<GetCrudeInventoriesResponse>;
+  getEcbFxRates(ctx: ServerContext, req: GetEcbFxRatesRequest): Promise<GetEcbFxRatesResponse>;
 }
 
 export function createEconomicServiceRoutes(
@@ -1114,6 +1132,43 @@ export function createEconomicServiceRoutes(
 
           const result = await handler.getCrudeInventories(ctx, body);
           return new Response(JSON.stringify(result as GetCrudeInventoriesResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/economic/v1/get-ecb-fx-rates",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = {} as GetEcbFxRatesRequest;
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getEcbFxRates(ctx, body);
+          return new Response(JSON.stringify(result as GetEcbFxRatesResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
