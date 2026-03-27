@@ -233,6 +233,7 @@ const ON_DEMAND_KEYS = new Set([
 const EMPTY_DATA_OK_KEYS = new Set([
   'notamClosures', 'faaDelays', 'gpsjam', 'positiveGeoEvents', 'weatherAlerts',
   'earningsCalendar', 'econCalendar', 'cotPositioning',
+  'usniFleet', // usniFleetStale covers the fallback; relay outages → WARN not CRIT
 ]);
 
 // Cascade groups: if any key in the group has data, all empty siblings are OK.
