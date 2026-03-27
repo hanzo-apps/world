@@ -86,6 +86,8 @@ const ALLOW_VERCEL_PREVIEW_ORIGINS = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS ==
 const OPENSKY_PROXY_AUTH = process.env.OPENSKY_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
 const OPENSKY_PROXY_ENABLED = !!OPENSKY_PROXY_AUTH;
 
+const PROXY_URL = process.env.PROXY_URL || ''; // generic residential proxy (US exit) — user:pass@host:port or http://...
+
 // OREF (Israel Home Front Command) siren alerts — fetched via HTTP proxy (Israel exit)
 const OREF_PROXY_AUTH = process.env.OREF_PROXY_AUTH || ''; // format: user:pass@host:port
 const OREF_ALERTS_URL = 'https://www.oref.org.il/WarningMessages/alert/alerts.json';
@@ -4939,15 +4941,21 @@ async function seedUsniFleet() {
   const t0 = Date.now();
   try {
     // USNI (WordPress) returns 403 from Railway datacenter IPs via Cloudflare.
-    // Route through the residential proxy when available; fall back to direct for dev.
-    const proxyAuth = process.env.OREF_PROXY_AUTH || OREF_PROXY_AUTH;
+    // Use PROXY_URL (US-targeted proxy). OREF_PROXY_AUTH is IL-only and must NOT be used here.
     let wpData;
-    if (proxyAuth) {
-      const proxy = parseProxyUrl(`http://${proxyAuth}`);
-      const result = proxy ? await ytFetchViaProxy(USNI_URL, proxy) : null;
-      if (!result || !result.ok) throw new Error(`proxy HTTP ${result?.status ?? 'unavailable'}`);
-      wpData = JSON.parse(result.body);
-    } else {
+    const proxiesToTry = [
+      PROXY_URL ? parseProxyUrl(PROXY_URL) : null,
+    ].filter(Boolean);
+    let fetched = false;
+    for (const proxy of proxiesToTry) {
+      try {
+        const result = await ytFetchViaProxy(USNI_URL, proxy);
+        if (!result?.ok) { console.warn(`[USNI] Proxy ${proxy.host} returned HTTP ${result?.status ?? 'unavailable'}`); continue; }
+        try { wpData = JSON.parse(result.body); fetched = true; break; }
+        catch (parseErr) { console.warn(`[USNI] Proxy ${proxy.host} returned non-JSON (CF challenge?):`, parseErr?.message); }
+      } catch (proxyErr) { console.warn(`[USNI] Proxy ${proxy.host} error:`, proxyErr?.message); }
+    }
+    if (!fetched) {
       const res = await fetch(USNI_URL, {
         headers: { 'User-Agent': CHROME_UA, 'Accept': 'application/json' },
         signal: AbortSignal.timeout(15000),
