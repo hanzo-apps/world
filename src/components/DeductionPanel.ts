@@ -6,6 +6,9 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { NewsItem, DeductContextDetail } from '@/types';
 import { buildNewsContext } from '@/utils/news-context';
+import { getActiveFrameworkForPanel } from '@/services/analysis-framework-store';
+import { hasPremiumAccess } from '@/services/panel-gating';
+import { FrameworkSelector } from './FrameworkSelector';
 
 const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 
@@ -20,6 +23,7 @@ export class DeductionPanel extends Panel {
     private isSubmitting = false;
     private getLatestNews?: () => NewsItem[];
     private contextHandler: EventListener;
+    private fwSelector: FrameworkSelector;
 
     constructor(getLatestNews?: () => NewsItem[]) {
         super({
@@ -89,10 +93,14 @@ export class DeductionPanel extends Panel {
             }
         }) as EventListener;
         document.addEventListener('wm:deduct-context', this.contextHandler);
+
+        this.fwSelector = new FrameworkSelector({ panelId: 'deduction', isPremium: hasPremiumAccess(), panel: this });
+        this.header.appendChild(this.fwSelector.el);
     }
 
     public override destroy(): void {
         document.removeEventListener('wm:deduct-context', this.contextHandler);
+        this.fwSelector.destroy();
         super.destroy();
     }
 
@@ -112,6 +120,11 @@ export class DeductionPanel extends Panel {
             }
         }
 
+        const fw = getActiveFrameworkForPanel('deduction');
+        if (fw) {
+            geoContext = `${geoContext}\n\n---\nAnalytical Framework:\n${fw.systemPromptAppend}`;
+        }
+
         this.isSubmitting = true;
         this.submitBtn.disabled = true;
 
@@ -122,6 +135,7 @@ export class DeductionPanel extends Panel {
             const resp = await client.deductSituation({
                 query,
                 geoContext,
+                framework: '',
             });
             if (!this.element?.isConnected) return;
 
