@@ -41,14 +41,10 @@ export function wrapWidgetHtml(html: string, extraClass = ''): string {
   `;
 }
 
-function escapeSrcdoc(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;');
-}
+const widgetBodyStore = new Map<string, string>();
 
-export function wrapProWidgetHtml(bodyContent: string): string {
-  const doc = `<!DOCTYPE html>
+function buildWidgetDoc(bodyContent: string): string {
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -67,6 +63,49 @@ td{padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:var(--text
 </head>
 <body>${bodyContent}</body>
 </html>`;
+}
 
-  return `<div class="wm-widget-shell wm-widget-pro"><iframe srcdoc="${escapeSrcdoc(doc)}" sandbox="allow-scripts" style="width:100%;height:400px;border:none;display:block;" title="Interactive widget"></iframe></div>`;
+function mountProWidget(iframe: HTMLIFrameElement): void {
+  const id = iframe.dataset.wmId;
+  if (!id) return;
+  const body = widgetBodyStore.get(id);
+  if (!body) return;
+  // Delete immediately — new ID is generated on every render, so no re-use
+  widgetBodyStore.delete(id);
+  const html = buildWidgetDoc(body);
+  // Always use load event: when MutationObserver fires, iframe.contentDocument is
+  // still about:blank (readyState 'complete'), not the sandbox page. Sending here
+  // would target the wrong window. Wait for the real load instead.
+  iframe.addEventListener('load', () => {
+    iframe.contentWindow?.postMessage({ type: 'wm-html', html }, '*');
+  }, { once: true });
+}
+
+if (typeof document !== 'undefined') {
+  const observer = new MutationObserver((mutations) => {
+    for (const mut of mutations) {
+      for (const node of mut.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (node instanceof HTMLIFrameElement && node.dataset.wmId) {
+          mountProWidget(node);
+        } else {
+          node.querySelectorAll<HTMLIFrameElement>('iframe[data-wm-id]').forEach(mountProWidget);
+        }
+      }
+    }
+  });
+  const startObserving = (): void => {
+    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startObserving);
+  } else {
+    startObserving();
+  }
+}
+
+export function wrapProWidgetHtml(bodyContent: string): string {
+  const id = `wm-${Math.random().toString(36).slice(2)}`;
+  widgetBodyStore.set(id, bodyContent);
+  return `<div class="wm-widget-shell wm-widget-pro"><iframe src="/wm-widget-sandbox.html" data-wm-id="${id}" sandbox="allow-scripts" style="width:100%;height:400px;border:none;display:block;" title="Interactive widget"></iframe></div>`;
 }
