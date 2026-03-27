@@ -40,6 +40,7 @@ import type { StrategicPosturePanel } from '@/components/StrategicPosturePanel';
 import type { NewsItem } from '@/types';
 import { getNearbyInfrastructure } from '@/services/related-assets';
 import { toFlagEmoji } from '@/utils/country-flag';
+import { buildDependencyGraph } from '@/services/infrastructure-cascade';
 
 type IntlDisplayNamesCtor = new (
   locales: string | string[],
@@ -402,7 +403,8 @@ export class CountryIntelManager implements AppModule {
     const params = new URLSearchParams({ country_code: code, lang });
     const trimmed = contextSnapshot.trim();
     if (trimmed.length > 0) {
-      params.set('context', trimmed.slice(0, 2200));
+      // 3800 chars ≈ ~950 tokens; raised from 2200 to include infra context. Monitor p95 LLM latency if timeouts increase.
+      params.set('context', trimmed.slice(0, 3800));
     }
 
     const resp = await fetch(toApiUrl(`/api/intelligence/v1/get-country-intel-brief?${params.toString()}`), {
@@ -425,6 +427,10 @@ export class CountryIntelManager implements AppModule {
   ): string {
     const lines: string[] = [];
     lines.push(`Country: ${country} (${code})`);
+
+    // Infrastructure grounding must appear early so it survives the context char limit
+    const infraContext = this.buildInfrastructureContext(code);
+    if (infraContext) lines.push(infraContext);
 
     if (score) {
       lines.push(`CII: ${score.score}/100 (${score.level}), trend=${score.trend}, 24h_change=${score.change24h}`);
@@ -474,6 +480,63 @@ export class CountryIntelManager implements AppModule {
     }
 
     return lines.join('\n');
+  }
+
+  private buildInfrastructureContext(code: string): string {
+    try {
+      const graph = buildDependencyGraph();
+      const countryId = `country:${code}`;
+      const incomingEdges = graph.incoming.get(countryId) || [];
+      const parts: string[] = [];
+
+      const cables = incomingEdges
+        .filter(e => (e.type === 'serves' || e.type === 'lands_at') && e.from.startsWith('cable:'))
+        .sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))
+        .slice(0, 3)
+        .map(e => {
+          const node = graph.nodes.get(e.from);
+          const share = e.strength ? ` (${Math.round(e.strength * 100)}% capacity)` : '';
+          return node ? `${node.name}${share}` : '';
+        }).filter(Boolean);
+      if (cables.length) parts.push(`Cables: ${cables.join(', ')}`);
+
+      const pipes = incomingEdges
+        .filter(e => e.type === 'serves' && e.from.startsWith('pipeline:'))
+        .sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))
+        .slice(0, 3)
+        .map(e => {
+          const node = graph.nodes.get(e.from);
+          const status = typeof node?.metadata?.status === 'string' ? node.metadata.status : undefined;
+          return node ? `${node.name}${status ? ` (${status})` : ''}` : '';
+        }).filter(Boolean);
+      if (pipes.length) parts.push(`Pipelines: ${pipes.join(', ')}`);
+
+      const ports = incomingEdges
+        .filter(e => e.type === 'serves' && e.from.startsWith('port:'))
+        .sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))
+        .slice(0, 3)
+        .map(e => {
+          const node = graph.nodes.get(e.from);
+          const rank = node?.metadata?.rank as number | undefined;
+          const type = node?.metadata?.type as string | undefined;
+          return node ? `${node.name}${rank ? ` (rank #${rank}${type ? ', ' + type : ''})` : ''}` : '';
+        }).filter(Boolean);
+      if (ports.length) parts.push(`Ports: ${ports.join(', ')}`);
+
+      const chokepoints = incomingEdges
+        .filter(e => e.type === 'trade_dependency' && e.from.startsWith('chokepoint:'))
+        .map(e => {
+          const node = graph.nodes.get(e.from);
+          const reason = e.metadata?.relationship as string | undefined;
+          return node ? `${node.name}${reason ? ` (${reason})` : ''}` : '';
+        }).filter(Boolean)
+        .slice(0, 2);
+      if (chokepoints.length) parts.push(`Waterways: ${chokepoints.join(', ')}`);
+
+      return parts.length > 0 ? `Infrastructure exposure: ${parts.join(' | ')}` : '';
+    } catch {
+      return '';
+    }
   }
 
   private mountCountryTimeline(code: string, country: string): void {
