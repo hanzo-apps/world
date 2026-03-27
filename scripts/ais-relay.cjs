@@ -8165,22 +8165,17 @@ const server = http.createServer(async (req, res) => {
 
 // ─── Widget Agent ────────────────────────────────────────────────────────────
 
-const WIDGET_ALLOWED_ENDPOINTS = new Set([
-  '/api/economic/v1/list-world-bank-indicators',
-  '/api/economic/v1/get-macro-signals',
-  '/api/trade/v1/get-customs-revenue',
-  '/api/trade/v1/get-trade-restrictions',
-  '/api/trade/v1/get-tariff-trends',
-  '/api/trade/v1/get-trade-flows',
-  '/api/trade/v1/get-trade-barriers',
-  '/api/market/v1/list-market-quotes',
-  '/api/market/v1/get-sector-summary',
-  '/api/market/v1/list-commodity-quotes',
-  '/api/market/v1/list-crypto-quotes',
-  '/api/aviation/v1/list-airport-delays',
-  '/api/intelligence/v1/get-risk-scores',
-  '/api/conflict/v1/list-ucdp-events',
-]);
+function isWidgetEndpointAllowed(endpoint) {
+  // Allow any /api/ path — the allowlist is enforced by the system prompt.
+  // Exclude write/inference/streaming paths that are not data endpoints.
+  if (!endpoint.startsWith('/api/')) return false;
+  const blocked = [
+    'analyze-stock', 'backtest-stock', 'summarize-article', 'classify-event',
+    'deduce-situation', 'track-aircraft', 'search-flight-prices', 'get-youtube',
+    'get-vessel-snapshot', 'lookup-sanction', 'get-ip-geo', 'get-simulation',
+  ];
+  return !blocked.some(b => endpoint.includes(b));
+}
 
 const WIDGET_FETCH_TOOL = {
   name: 'fetch_worldmonitor_data',
@@ -8199,24 +8194,49 @@ const WIDGET_SYSTEM_PROMPT = `You are a WorldMonitor widget builder. Your job is
 
 ## Available data tools
 
-### fetch_worldmonitor_data — WorldMonitor structured data (preferred for these topics)
-- /api/market/v1/list-market-quotes — market quotes (stocks, indices)
-- /api/market/v1/list-commodity-quotes — commodity prices (oil, gold, silver, etc.)
-- /api/market/v1/list-crypto-quotes — crypto prices
-- /api/market/v1/get-sector-summary — sector performance
-- /api/economic/v1/list-world-bank-indicators — economic indicators (GDP, inflation, unemployment, etc.)
-- /api/economic/v1/get-macro-signals — macro signals (policy rates, yields, CPI trend)
-- /api/trade/v1/get-customs-revenue — US customs/tariff revenue by month
-- /api/trade/v1/get-trade-restrictions — WTO trade restrictions
-- /api/trade/v1/get-tariff-trends — tariff rate history
-- /api/trade/v1/get-trade-flows — import/export flows
-- /api/trade/v1/get-trade-barriers — SPS/TBT barriers
-- /api/aviation/v1/list-airport-delays — international flight delays by airport/region
-- /api/intelligence/v1/get-risk-scores — country instability/risk scores
-- /api/conflict/v1/list-ucdp-events — conflict events (UCDP data)
+### fetch_worldmonitor_data — ALWAYS use first. Only fall back to search_web if no matching service below exists.
+URL pattern: /api/<service>/v1/<method> (kebab-case method names)
 
-### search_web — Live internet search for ANY topic (use when topic not covered above)
-Use search_web for: breaking news, weather, sports, elections, specific events, company news, scientific reports, geopolitical updates, sanctions, disasters, or any real-time topic.
+market: list-market-quotes, list-commodity-quotes, list-crypto-quotes, list-gulf-quotes,
+  get-sector-summary, list-etf-flows, get-fear-greed-index, list-earnings-calendar,
+  get-cot-positioning, list-stablecoin-markets, list-ai-tokens, list-defi-tokens,
+  list-crypto-sectors, get-country-stock-index (params: country_code)
+
+economic: list-world-bank-indicators (params: indicator, country_code),
+  get-macro-signals, get-national-debt, get-bis-policy-rates, get-bis-exchange-rates,
+  get-ecb-fx-rates, get-eu-fsi, get-economic-calendar, list-big-mac-prices,
+  get-eu-yield-curve, get-energy-prices, get-crude-inventories, get-nat-gas-storage,
+  get-eu-gas-storage, list-fuel-prices, list-grocery-basket-prices,
+  get-fred-series (params: series_id — e.g. UNRATE, CPIAUCSL, DGS10, GDP),
+  get-eurostat-country-data (params: country_code)
+
+trade: get-trade-flows, get-trade-restrictions, get-tariff-trends,
+  get-trade-barriers, get-customs-revenue, list-comtrade-flows
+
+consumer-prices: get-consumer-price-overview, list-consumer-price-movers,
+  list-consumer-price-categories, list-retailer-price-spreads
+
+aviation: list-airport-delays, list-aviation-news,
+  get-airport-ops-summary (params: airport_code), get-carrier-ops (params: carrier_code)
+
+intelligence: get-risk-scores, get-country-intel-brief (params: country_code),
+  get-country-facts (params: country_code), list-gps-interference,
+  list-cross-source-signals, list-security-advisories, list-satellites
+
+conflict: list-ucdp-events, list-acled-events, list-iran-events,
+  get-humanitarian-summary (params: country_code)
+
+unrest: list-unrest-events
+seismology: list-earthquakes
+wildfire: list-fire-detections
+natural: list-natural-events
+maritime: list-navigational-warnings
+supply-chain: get-shipping-rates, get-chokepoint-status, get-critical-minerals
+cyber: list-cyber-threats
+sanctions: list-sanctions-pressure
+news: list-feed-digest
+
+### search_web — Use ONLY when no matching WorldMonitor service exists above
 Results include: title, url, snippet, publishedDate. Embed this data directly into the widget HTML.
 
 ## Visual design — CRITICAL (match the dashboard exactly)
@@ -8646,7 +8666,7 @@ async function handleWidgetAgentRequest(req, res) {
           const { endpoint, params = {} } = block.input;
           sendWidgetSSE(res, 'tool_call', { endpoint });
 
-          if (!WIDGET_ALLOWED_ENDPOINTS.has(endpoint)) {
+          if (!isWidgetEndpointAllowed(endpoint)) {
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: 'Endpoint not allowed.' });
             continue;
           }
@@ -8691,24 +8711,49 @@ const WIDGET_PRO_SYSTEM_PROMPT = `You are a WorldMonitor PRO widget builder. You
 
 ## Available data tools
 
-### fetch_worldmonitor_data — WorldMonitor structured data (preferred for these topics)
-- /api/market/v1/list-market-quotes — market quotes (stocks, indices)
-- /api/market/v1/list-commodity-quotes — commodity prices (oil, gold, silver, etc.)
-- /api/market/v1/list-crypto-quotes — crypto prices
-- /api/market/v1/get-sector-summary — sector performance
-- /api/economic/v1/list-world-bank-indicators — economic indicators (GDP, inflation, unemployment, etc.)
-- /api/economic/v1/get-macro-signals — macro signals (policy rates, yields, CPI trend)
-- /api/trade/v1/get-customs-revenue — US customs/tariff revenue by month
-- /api/trade/v1/get-trade-restrictions — WTO trade restrictions
-- /api/trade/v1/get-tariff-trends — tariff rate history
-- /api/trade/v1/get-trade-flows — import/export flows
-- /api/trade/v1/get-trade-barriers — SPS/TBT barriers
-- /api/aviation/v1/list-airport-delays — international flight delays by airport/region
-- /api/intelligence/v1/get-risk-scores — country instability/risk scores
-- /api/conflict/v1/list-ucdp-events — conflict events (UCDP data)
+### fetch_worldmonitor_data — ALWAYS use first. Only fall back to search_web if no matching service below exists.
+URL pattern: /api/<service>/v1/<method> (kebab-case method names)
 
-### search_web — Live internet search for ANY topic (use when topic not covered above)
-Use search_web for: breaking news, weather, sports, elections, specific events, company news, scientific reports, geopolitical updates, sanctions, disasters, or any real-time topic.
+market: list-market-quotes, list-commodity-quotes, list-crypto-quotes, list-gulf-quotes,
+  get-sector-summary, list-etf-flows, get-fear-greed-index, list-earnings-calendar,
+  get-cot-positioning, list-stablecoin-markets, list-ai-tokens, list-defi-tokens,
+  list-crypto-sectors, get-country-stock-index (params: country_code)
+
+economic: list-world-bank-indicators (params: indicator, country_code),
+  get-macro-signals, get-national-debt, get-bis-policy-rates, get-bis-exchange-rates,
+  get-ecb-fx-rates, get-eu-fsi, get-economic-calendar, list-big-mac-prices,
+  get-eu-yield-curve, get-energy-prices, get-crude-inventories, get-nat-gas-storage,
+  get-eu-gas-storage, list-fuel-prices, list-grocery-basket-prices,
+  get-fred-series (params: series_id — e.g. UNRATE, CPIAUCSL, DGS10, GDP),
+  get-eurostat-country-data (params: country_code)
+
+trade: get-trade-flows, get-trade-restrictions, get-tariff-trends,
+  get-trade-barriers, get-customs-revenue, list-comtrade-flows
+
+consumer-prices: get-consumer-price-overview, list-consumer-price-movers,
+  list-consumer-price-categories, list-retailer-price-spreads
+
+aviation: list-airport-delays, list-aviation-news,
+  get-airport-ops-summary (params: airport_code), get-carrier-ops (params: carrier_code)
+
+intelligence: get-risk-scores, get-country-intel-brief (params: country_code),
+  get-country-facts (params: country_code), list-gps-interference,
+  list-cross-source-signals, list-security-advisories, list-satellites
+
+conflict: list-ucdp-events, list-acled-events, list-iran-events,
+  get-humanitarian-summary (params: country_code)
+
+unrest: list-unrest-events
+seismology: list-earthquakes
+wildfire: list-fire-detections
+natural: list-natural-events
+maritime: list-navigational-warnings
+supply-chain: get-shipping-rates, get-chokepoint-status, get-critical-minerals
+cyber: list-cyber-threats
+sanctions: list-sanctions-pressure
+news: list-feed-digest
+
+### search_web — Use ONLY when no matching WorldMonitor service exists above
 Results include: title, url, snippet, publishedDate. Embed as const DATA = [...] in your inline script.
 
 ## Output: body content + inline scripts ONLY
@@ -8723,18 +8768,65 @@ Generate ONLY the <body> content — NO <!DOCTYPE>, NO <html>, NO <head> wrapper
 
 ## Design — match the dashboard (CRITICAL)
 The iframe host page already applies: background #0a0a0a, color #e8e8e8, monospace font stack, font-size 12px.
-CSS variables are pre-defined in the iframe: --bg, --surface, --text, --text-secondary, --text-dim, --text-muted, --border, --border-subtle, --green (#44ff88), --red (#ff4444), --overlay-subtle.
+CSS variables are pre-defined in the iframe: --bg, --surface, --text, --text-secondary, --text-dim, --text-muted, --border, --border-subtle, --green (#44ff88), --red (#ff4444), --accent (#44ff88), --overlay-subtle.
 
-- ALWAYS use these CSS variables for colors — never hardcode hex values like #3b82f6, #1a1a2e, etc.
-- NEVER override font-family (the monospace stack is already set — do not change it)
-- NEVER use border-radius > 4px (no large rounded cards)
+- ALWAYS use CSS variables for colors — never hardcode hex values like #3b82f6, #1a1a2e, etc.
+- NEVER override font-family (already set — do not change it)
+- NEVER use border-radius > 4px
+- NEVER use large bold titles (h1/h2/h3) — use .panel-title or section labels only
 - Keep row padding tight: 5–8px vertical, 8px horizontal
-- Labels: text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; color: var(--text-muted)
 - Numbers/prices: font-variant-numeric: tabular-nums
 - Positive values: color: var(--green) | Negative values: color: var(--red)
 - Design for 400px height with overflow-y: auto for larger content
-- Use inline styles referencing CSS variables only — NEVER add a <style> block (it loads after the head CSS and will override the monospace font and dark palette)
-- Always include a source footer
+- NEVER add a <style> block — use the pre-defined classes below and inline styles only
+- Always include a source footer: <div style="font-size:10px;color:var(--text-muted);padding:6px 8px">Source: WorldMonitor</div>
+
+## Pre-defined CSS classes — use these, do NOT reinvent them
+
+Panel structure (copy exactly):
+<div class="panel-header"><span class="panel-title">SECTION TITLE</span><span style="color:var(--text-muted);font-size:10px">LIVE</span></div>
+<div class="panel-tabs">
+  <button class="panel-tab active" onclick="switchTab(this,'line')">LINE</button>
+  <button class="panel-tab" onclick="switchTab(this,'bar')">BAR</button>
+</div>
+
+Stat boxes (for key metrics):
+<div class="disp-stats-grid">
+  <div class="disp-stat-box">
+    <span class="disp-stat-value">$64.51</span>
+    <span class="disp-stat-label">WTI CRUDE</span>
+    <span class="change-negative">▼ vs prior yr</span>
+  </div>
+  <div class="disp-stat-box">
+    <span class="disp-stat-value change-positive">+2.3%</span>
+    <span class="disp-stat-label">GROWTH</span>
+  </div>
+</div>
+
+Chart.js (always read colors from CSS variables, not hardcoded hex):
+<canvas id="chart" style="width:100%;height:200px;margin-top:8px"></canvas>
+<script>
+const s = getComputedStyle(document.documentElement);
+const green = s.getPropertyValue('--green').trim();
+const red = s.getPropertyValue('--red').trim();
+const muted = s.getPropertyValue('--text-muted').trim();
+new Chart(document.getElementById('chart'), {
+  type: 'line',
+  data: { labels: DATA.labels, datasets: [{ label: 'Oil', data: DATA.oil, borderColor: red, tension: 0.3, pointRadius: 2, fill: false }] },
+  options: { responsive: true, plugins: { legend: { labels: { color: muted, font: { size: 10 } } } },
+    scales: { x: { ticks: { color: muted, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+              y: { ticks: { color: muted, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } } } }
+});
+</script>
+
+Tab switching (standard pattern):
+<script>
+function switchTab(btn, key) {
+  btn.closest('.panel-tabs').querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('[data-tab]').forEach(el => el.style.display = el.dataset.tab === key ? '' : 'none');
+}
+</script>
 
 ## Output format
 1. First line MUST be: <!-- title: Your Widget Title -->
