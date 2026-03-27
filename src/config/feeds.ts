@@ -988,7 +988,7 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
     { name: 'Blockworks', url: rss('https://blockworks.co/feed') },
     { name: 'The Defiant', url: rss('https://thedefiant.io/feed') },
     { name: 'Bitcoin Magazine', url: rss('https://bitcoinmagazine.com/feed') },
-    { name: 'DL News', url: rss('https://www.dlnews.com/feed/') },
+    { name: 'DL News', url: rss('https://news.google.com/rss/search?q=site:dlnews.com+when:3d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'CryptoSlate', url: rss('https://cryptoslate.com/feed/') },
     { name: 'Unchained', url: rss('https://unchainedcrypto.com/feed/') },
     { name: 'Wu Blockchain', url: rss('https://news.google.com/rss/search?q=site:wublockchain.com+when:7d&hl=en-US&gl=US&ceid=US:en') },
