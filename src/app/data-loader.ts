@@ -252,6 +252,7 @@ export class DataLoaderManager implements AppModule {
   private satellitePropagationCleanup: (() => void) | null = null;
   private dailyBriefGeneration = 0;
   private dailyBriefFrameworkUnsubscribe: (() => void) | null = null;
+  private marketImplicationsFrameworkUnsubscribe: (() => void) | null = null;
   private cachedSatRecs: SatRecEntry[] | null = null;
 
   private digestBreaker = { state: 'closed' as 'closed' | 'open' | 'half-open', failures: 0, cooldownUntil: 0 };
@@ -283,6 +284,9 @@ export class DataLoaderManager implements AppModule {
     this.dailyBriefFrameworkUnsubscribe = subscribeFrameworkChange('daily-market-brief', () => {
       void this.loadDailyMarketBrief(true);
     });
+    this.marketImplicationsFrameworkUnsubscribe = subscribeFrameworkChange('market-implications', () => {
+      void this.loadMarketImplications();
+    });
   }
 
   destroy(): void {
@@ -296,6 +300,8 @@ export class DataLoaderManager implements AppModule {
     }
     this.dailyBriefFrameworkUnsubscribe?.();
     this.dailyBriefFrameworkUnsubscribe = null;
+    this.marketImplicationsFrameworkUnsubscribe?.();
+    this.marketImplicationsFrameworkUnsubscribe = null;
   }
 
   private refreshCiiAndBrief(forceLocal = false): void {
@@ -1604,7 +1610,7 @@ export class DataLoaderManager implements AppModule {
     if (this.ctx.isDestroyed || this.ctx.inFlight.has('marketImplications')) return;
     this.ctx.inFlight.add('marketImplications');
     try {
-      const data = await fetchMarketImplications();
+      const data = await fetchMarketImplications(getActiveFrameworkForPanel('market-implications')?.id ?? '');
       if (!data) {
         this.callPanel('market-implications', 'showUnavailable');
         return;
