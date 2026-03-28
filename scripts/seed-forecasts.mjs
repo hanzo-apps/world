@@ -8,6 +8,7 @@ import { loadEnvFile, runSeed, CHROME_UA } from './_seed-utils.mjs';
 import { tagRegions } from './_prediction-scoring.mjs';
 import { resolveR2StorageConfig, putR2JsonObject, getR2JsonObject } from './_r2-storage.mjs';
 import { extractFirstJsonObject, extractFirstJsonArray, cleanJsonText } from './_llm-json.mjs';
+import { loadTickerSet } from './_ticker-validation.mjs';
 
 const _isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
 if (_isDirectRun) loadEnvFile(import.meta.url);
@@ -15640,14 +15641,14 @@ function buildMarketImplicationsContext(inputs) {
   return parts.length > 0 ? parts.join('\n\n') : 'No live world state available.';
 }
 
-function validateMarketImplications(cards) {
+function validateMarketImplications(cards, allowedTickers = ALL_ALLOWED_TICKERS) {
   if (!Array.isArray(cards)) return [];
   const seen = new Set();
   const valid = [];
   for (const card of cards) {
     if (!card || typeof card !== 'object') continue;
     const ticker = typeof card.ticker === 'string' ? card.ticker.trim().toUpperCase() : '';
-    if (!ticker || !ALL_ALLOWED_TICKERS.has(ticker)) continue;
+    if (!ticker || !allowedTickers.has(ticker)) continue;
     if (seen.has(ticker)) continue;
     const direction = typeof card.direction === 'string' ? card.direction.trim().toUpperCase() : '';
     if (!['LONG', 'SHORT', 'HEDGE'].includes(direction)) continue;
@@ -15703,13 +15704,36 @@ async function buildAndSeedMarketImplications(inputs) {
     return;
   }
 
-  const cards = validateMarketImplications(rawCards);
+  const { url, token } = getRedisCredentials();
+
+  // Extend the curated static allowlist with tradeable equity symbols from Redis.
+  // ALL_ALLOWED_TICKERS is always preserved (ETFs, defense, commodities, forex, rates, crypto).
+  // The live set adds stocks we have live price data for (e.g. NFLX, WMT) that are not in
+  // the static list, but only after stripping non-tradeable entries: index symbols (^GSPC,
+  // ^DJI) and foreign-exchange suffixes (RELIANCE.NS) are in the bootstrap for display only
+  // and must not be accepted as valid card tickers.
+  const liveTickerSet = await loadTickerSet(url, token);
+  let effectiveTickers;
+  if (liveTickerSet.size > 0) {
+    const tradeableLive = new Set(
+      [...liveTickerSet].filter(s => /^[A-Z]{1,6}(-[A-Z])?$/.test(s)),
+    );
+    effectiveTickers = new Set([...ALL_ALLOWED_TICKERS, ...tradeableLive]);
+    console.log(`  [MarketImplications] Extended allowlist: ${ALL_ALLOWED_TICKERS.size} static + ${tradeableLive.size} live equity symbols`);
+  } else {
+    effectiveTickers = ALL_ALLOWED_TICKERS;
+    console.warn('  [MarketImplications] Redis ticker set empty — using static allowlist only');
+  }
+
+  const cards = validateMarketImplications(rawCards, effectiveTickers);
   if (cards.length === 0) {
     console.warn('  [MarketImplications] All cards failed validation — skipping write');
     return;
   }
+  if (cards.length < rawCards.length) {
+    console.log(`  [MarketImplications] Validation: kept ${cards.length}/${rawCards.length} cards`);
+  }
 
-  const { url, token } = getRedisCredentials();
   const payload = { cards, generatedAt: new Date().toISOString(), model: result.model || '' };
   await redisSet(url, token, MARKET_IMPLICATIONS_KEY, payload, MARKET_IMPLICATIONS_TTL);
 
