@@ -124,7 +124,7 @@ export class LiveWebcamsPanel extends Panel {
   private boundEmbedMessageHandler: (e: MessageEvent) => void;
 
   constructor() {
-    super({ id: 'live-webcams', title: t('panels.liveWebcams'), className: 'panel-wide', closable: true });
+    super({ id: 'live-webcams', title: t('panels.liveWebcams'), className: 'panel-wide', closable: true, collapsible: true });
     this.insertLiveCountBadge(WEBCAM_FEEDS.length);
 
     const prefs = loadWebcamPrefs(this.forceSingleView);
