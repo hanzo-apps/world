@@ -5,9 +5,11 @@ import { getPublicCorsHeaders } from './_cors.js';
 // @ts-expect-error — JS module, no declaration file
 import { jsonResponse } from './_json-response.js';
 // @ts-expect-error — JS module, no declaration file
-import { validateApiKey } from './_api-key.js';
-// @ts-expect-error — JS module, no declaration file
 import { readJsonFromUpstash } from './_upstash-json.js';
+// @ts-expect-error — JS module, no declaration file
+import { resolveApiKeyFromBearer } from './_oauth-token.js';
+// @ts-expect-error — JS module, no declaration file
+import { timingSafeIncludes } from './_crypto.js';
 
 export const config = { runtime: 'edge' };
 
@@ -424,13 +426,47 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // Auth — always require API key (MCP clients are never same-origin browser requests)
-  const auth = validateApiKey(req, { forceKey: true });
-  if (!auth.valid) {
-    return rpcError(null, -32001, auth.error ?? 'API key required');
+  // Auth chain (in priority order):
+  //   1. Authorization: Bearer <oauth_token> — issued by /oauth/token (spec-compliant OAuth 2.0)
+  //   2. X-WorldMonitor-Key header — direct API key (curl, custom integrations)
+  let apiKey = '';
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    let bearerApiKey: string | null;
+    try {
+      bearerApiKey = await resolveApiKeyFromBearer(token);
+    } catch {
+      // Redis/network error — return 503 so clients know to retry, not re-authenticate
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'Auth service temporarily unavailable. Try again.' } }),
+        { status: 503, headers: { 'Content-Type': 'application/json', 'Retry-After': '5', ...corsHeaders } }
+      );
+    }
+    if (bearerApiKey) {
+      apiKey = bearerApiKey;
+    } else {
+      // Bearer token present but unresolvable — expired or invalid UUID
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Invalid or expired OAuth token. Re-authenticate via /oauth/token.' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor", error="invalid_token"', ...corsHeaders } }
+      );
+    }
+  } else {
+    const candidateKey = req.headers.get('X-WorldMonitor-Key') ?? '';
+    if (!candidateKey) {
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Authentication required. Use OAuth (/oauth/token) or pass your API key via X-WorldMonitor-Key header.' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor"', ...corsHeaders } }
+      );
+    }
+    const validKeys = (process.env.WORLDMONITOR_VALID_KEYS || '').split(',').filter(Boolean);
+    if (!await timingSafeIncludes(candidateKey, validKeys)) {
+      return rpcError(null, -32001, 'Invalid API key');
+    }
+    apiKey = candidateKey;
   }
 
-  const apiKey = req.headers.get('X-WorldMonitor-Key') ?? '';
 
   // Per-key rate limit
   const rl = getMcpRatelimit();
@@ -496,9 +532,9 @@ export default async function handler(req: Request): Promise<Response> {
         return rpcOk(id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         }, corsHeaders);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'data fetch failed';
-        return rpcError(id, -32603, `Internal error: ${msg}`);
+      } catch (err: unknown) {
+        console.error('[mcp] tool execution error:', err);
+        return rpcError(id, -32603, 'Internal error: data fetch failed');
       }
     }
 
