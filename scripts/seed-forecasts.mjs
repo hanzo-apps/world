@@ -11361,7 +11361,7 @@ function negatesDisruption(stabilizer, candidatePacket) {
   }
   // Non-maritime: match on stateKind and bucket keywords.
   const stateKind = candidatePacket?.stateKind || '';
-  const bucket = candidatePacket?.topBucketId || '';
+  const bucket = candidatePacket?.marketContext?.topBucketId || candidatePacket?.topBucketId || '';
   const subjectKeywords = [...stateKind.toLowerCase().split('_'), ...bucket.toLowerCase().split('_')]
     .filter((w) => w.length >= 4);
   return subjectKeywords.some((kw) => text.includes(kw));
@@ -11372,8 +11372,8 @@ function computeSimulationAdjustment(expandedPath, simTheaterResult, candidatePa
   const details = { bucketChannelMatch: false, actorOverlapCount: 0, invalidatorHit: false, stabilizerHit: false };
 
   const { topPaths = [], invalidators = [], stabilizers = [] } = simTheaterResult || {};
-  const pathBucket = expandedPath?.direct?.targetBucket || candidatePacket?.topBucketId || '';
-  const pathChannel = expandedPath?.direct?.channel || candidatePacket?.topChannel || '';
+  const pathBucket = expandedPath?.direct?.targetBucket || candidatePacket?.marketContext?.topBucketId || candidatePacket?.topBucketId || '';
+  const pathChannel = expandedPath?.direct?.channel || candidatePacket?.marketContext?.topChannel || candidatePacket?.topChannel || '';
   const pathActors = extractPathActors(expandedPath);
 
   const bucketChannelMatch = topPaths.find(
