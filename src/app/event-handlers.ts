@@ -152,8 +152,8 @@ export class EventHandlerManager implements AppModule {
 
     // Ensure restored panel fetches fresh data (otherwise it may show no content)
     const panel = this.ctx.panels[panelId];
-    if (panel && 'fetchData' in panel) {
-      (panel as any).fetchData();
+    if (panel && 'fetchData' in panel && typeof (panel as { fetchData: unknown }).fetchData === 'function') {
+      (panel as { fetchData: () => void }).fetchData();
     }
   }
 
@@ -430,8 +430,8 @@ export class EventHandlerManager implements AppModule {
     // undo via Ctrl/Cmd+Z
     this.boundUndoHandler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+        const tag = (e.target as HTMLElement)?.tagName ?? '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
         e.preventDefault();
         this.performUndo();
       }
