@@ -170,6 +170,34 @@ function resolveProviderChain(opts: {
   return providers.length > 0 ? providers : [...PROVIDER_CHAIN];
 }
 
+function callLlmProfile(
+  opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>,
+  providerEnv: string,
+  modelEnv: string,
+  defaultProvider: LlmProviderName,
+): Promise<LlmCallResult | null> {
+  const envProvider = process.env[providerEnv];
+  const provider = (envProvider && PROVIDER_SET.has(envProvider) ? envProvider : (() => {
+    if (envProvider) console.warn(`[llm] ${providerEnv}="${envProvider}" is not a known provider; falling back to "${defaultProvider}"`);
+    return defaultProvider;
+  })()) as LlmProviderName;
+  const model = process.env[modelEnv];
+  const remaining = PROVIDER_CHAIN.filter((p) => p !== provider);
+  return callLlm({
+    ...opts,
+    providerOrder: [provider, ...remaining],
+    modelOverrides: model ? { [provider]: model } as Partial<Record<LlmProviderName, string>> : undefined,
+  });
+}
+
+/** Cheap/fast model for extraction and parsing tasks. Configurable via LLM_TOOL_PROVIDER / LLM_TOOL_MODEL. */
+export const callLlmTool = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>) =>
+  callLlmProfile(opts, 'LLM_TOOL_PROVIDER', 'LLM_TOOL_MODEL', 'groq');
+
+/** Powerful model for synthesis and reasoning tasks. Configurable via LLM_REASONING_PROVIDER / LLM_REASONING_MODEL. */
+export const callLlmReasoning = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>) =>
+  callLlmProfile(opts, 'LLM_REASONING_PROVIDER', 'LLM_REASONING_MODEL', 'openrouter');
+
 export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult | null> {
   const {
     messages: rawMessages,
