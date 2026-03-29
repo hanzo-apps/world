@@ -80,6 +80,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   shippingStress:    'supply_chain:shipping_stress:v1',
   socialVelocity:    'intelligence:social:reddit:v1',
   diseaseOutbreaks:  'health:disease-outbreaks:v1',
+  economicStress:    'economic:stress-index:v1',
 };
 
 const SLOW_KEYS = new Set([
@@ -108,6 +109,7 @@ const SLOW_KEYS = new Set([
   'ecbFxRates',
   'euFsi',
   'diseaseOutbreaks',
+  'economicStress',
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'ddosAttacks', 'trafficAnomalies', 'macroSignals', 'chokepoints', 'chokepointTransits',
