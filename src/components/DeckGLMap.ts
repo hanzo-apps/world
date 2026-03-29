@@ -691,6 +691,7 @@ export class DeckGLMap {
       renderWorldCopies: false,
       attributionControl: false,
       interactive: true,
+      canvasContextAttributes: { powerPreference: 'high-performance' },
       ...(MAP_INTERACTION_MODE === 'flat'
         ? {
           maxPitch: 0,
@@ -719,6 +720,7 @@ export class DeckGLMap {
         renderWorldCopies: false,
         attributionControl: false,
         interactive: true,
+        canvasContextAttributes: { powerPreference: 'high-performance' },
         ...(MAP_INTERACTION_MODE === 'flat'
           ? {
             maxPitch: 0,
