@@ -22135,38 +22135,56 @@ body.map-width-resizing {
   margin-right: 4px;
 }
 
-.framework-selector {
-  font-size: 11px;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 3px;
-  color: inherit;
-  padding: 1px 4px;
-  cursor: pointer;
-  max-width: 150px;
+.framework-settings-btn {
+  font-size: 12px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.framework-selector--locked {
-  opacity: 0.5;
-  cursor: not-allowed;
+.framework-settings-btn:hover,
+.framework-settings-btn[aria-expanded="true"] {
+  opacity: 1;
 }
-.framework-selector-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.framework-settings-btn--locked {
+  opacity: 0.35;
 }
-.framework-selector-pro-badge {
-  font-size: 9px;
-  font-weight: 700;
-  background: var(--color-accent, #7c3aed);
-  color: #fff;
-  border-radius: 3px;
-  padding: 1px 4px;
-  letter-spacing: 0.05em;
+
+.framework-settings-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-panel, #0f1117);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 190px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
-.framework-selector-note {
+.framework-settings-label {
   font-size: 10px;
-  opacity: 0.5;
-  cursor: help;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.framework-popup-select {
+  font-size: 12px;
+  background: var(--overlay-subtle, rgba(255,255,255,0.05));
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 4px 6px;
+  cursor: pointer;
+  width: 100%;
+}
+.framework-popup-select:focus {
+  outline: 1px solid var(--accent);
+}
+.framework-settings-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  opacity: 0.7;
 }
 
 /* ── WM Analyst Chat Panel ──────────────────────────────────────── */
