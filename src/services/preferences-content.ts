@@ -908,7 +908,16 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
 
         // Listen for OAuth popup completion
         const onMessage = (e: MessageEvent): void => {
-          if (e.origin !== window.location.origin) return;
+          // Bind trust to both: (1) a WM-owned origin (callback is always on worldmonitor.app,
+          // but settings may be open on a different *.worldmonitor.app subdomain) and
+          // (2) the exact popup window we opened — prevents any sibling subdomain from
+          // forging wm:slack_connected and triggering saveRuleWithNewChannel.
+          const trustedOrigin = e.origin === window.location.origin ||
+            e.origin === 'https://worldmonitor.app' ||
+            e.origin === 'https://www.worldmonitor.app' ||
+            e.origin.endsWith('.worldmonitor.app');
+          const trustedSource = slackOAuthPopup !== null && e.source === slackOAuthPopup;
+          if (!trustedOrigin || !trustedSource) return;
           if (e.data?.type === 'wm:slack_connected') {
             if (!signal.aborted) { saveRuleWithNewChannel('slack'); reloadNotifSection(); }
           } else if (e.data?.type === 'wm:slack_error') {
