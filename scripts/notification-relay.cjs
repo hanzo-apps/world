@@ -82,6 +82,10 @@ function isPrivateIP(ip) {
 // ── Delivery: Telegram ────────────────────────────────────────────────────────
 
 async function sendTelegram(userId, chatId, text) {
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.warn('[relay] Telegram: TELEGRAM_BOT_TOKEN not set — skipping');
+    return;
+  }
   const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'worldmonitor-relay/1.0' },
@@ -90,8 +94,9 @@ async function sendTelegram(userId, chatId, text) {
   });
   if (res.status === 403 || res.status === 400) {
     const body = await res.json().catch(() => ({}));
+    console.warn(`[relay] Telegram ${res.status} for ${userId}: ${body.description ?? '(no description)'}`);
     if (res.status === 403 || body.description?.includes('chat not found')) {
-      console.warn(`[relay] Telegram 403/400 for ${userId} — deactivating channel`);
+      console.warn(`[relay] Telegram deactivating channel for ${userId}`);
       await deactivateChannel(userId, 'telegram');
     }
     return;
@@ -102,7 +107,15 @@ async function sendTelegram(userId, chatId, text) {
     await new Promise(r => setTimeout(r, wait));
     return sendTelegram(userId, chatId, text); // single retry
   }
-  if (!res.ok) console.warn(`[relay] Telegram send failed: ${res.status}`);
+  if (res.status === 401) {
+    console.error('[relay] Telegram 401 Unauthorized — TELEGRAM_BOT_TOKEN is invalid or belongs to a different bot; correct the Railway env var to restore Telegram delivery');
+    return;
+  }
+  if (!res.ok) {
+    console.warn(`[relay] Telegram send failed: ${res.status}`);
+    return;
+  }
+  console.log(`[relay] Telegram delivered to ${userId} (chatId: ${chatId})`);
 }
 
 // ── Delivery: Slack ───────────────────────────────────────────────────────────
@@ -255,12 +268,16 @@ async function processEvent(event) {
     const verifiedChannels = channels.filter(c => c.verified && rule.channels.includes(c.channelType));
 
     for (const ch of verifiedChannels) {
-      if (ch.channelType === 'telegram' && ch.chatId) {
-        await sendTelegram(rule.userId, ch.chatId, text);
-      } else if (ch.channelType === 'slack' && ch.webhookEnvelope) {
-        await sendSlack(rule.userId, ch.webhookEnvelope, text);
-      } else if (ch.channelType === 'email' && ch.email) {
-        await sendEmail(ch.email, subject, text);
+      try {
+        if (ch.channelType === 'telegram' && ch.chatId) {
+          await sendTelegram(rule.userId, ch.chatId, text);
+        } else if (ch.channelType === 'slack' && ch.webhookEnvelope) {
+          await sendSlack(rule.userId, ch.webhookEnvelope, text);
+        } else if (ch.channelType === 'email' && ch.email) {
+          await sendEmail(ch.email, subject, text);
+        }
+      } catch (err) {
+        console.warn(`[relay] Delivery error for ${rule.userId}/${ch.channelType}:`, err instanceof Error ? err.message : String(err));
       }
     }
   }
