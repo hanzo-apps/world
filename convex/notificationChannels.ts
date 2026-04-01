@@ -332,6 +332,19 @@ export const claimPairingToken = mutation({
       await ctx.db.insert("notificationChannels", doc);
     }
 
+    // Add 'telegram' to all existing alert rules for this user so alerts
+    // are delivered immediately without requiring a manual rule edit.
+    // Mirrors the reverse logic in deleteChannelForUser which removes the channel.
+    const rules = await ctx.db
+      .query("alertRules")
+      .withIndex("by_user", (q) => q.eq("userId", record.userId))
+      .collect();
+    for (const rule of rules) {
+      if (!rule.channels.includes("telegram")) {
+        await ctx.db.patch(rule._id, { channels: [...rule.channels, "telegram"] });
+      }
+    }
+
     return { ok: true, reason: null };
   },
 });
