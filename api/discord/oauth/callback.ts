@@ -1,8 +1,8 @@
 /**
- * GET /api/slack/oauth/callback
+ * GET /api/discord/oauth/callback
  *
- * Unauthenticated — browser popup arrives here after Slack redirects.
- * Validates state → exchanges code → encrypts webhook → stores in Convex.
+ * Unauthenticated — browser popup arrives here after Discord redirects.
+ * Validates state → exchanges code → encrypts webhook.url → stores in Convex.
  *
  * Returns a minimal HTML page that posts a message to the opener and
  * closes itself. Falls back to a plain text success/error page if the
@@ -11,17 +11,14 @@
 
 export const config = { runtime: 'edge' };
 
-const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID ?? '';
-const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET ?? '';
-const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI ?? '';
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? '';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET ?? '';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? '';
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL ?? '';
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN ?? '';
 const CONVEX_SITE_URL = process.env.CONVEX_SITE_URL ?? (process.env.CONVEX_URL ?? '').replace('.convex.cloud', '.convex.site');
 const RELAY_SHARED_SECRET = process.env.RELAY_SHARED_SECRET ?? '';
 const NOTIFICATION_ENCRYPTION_KEY = process.env.NOTIFICATION_ENCRYPTION_KEY ?? '';
-// Use '*' targetOrigin so the message is delivered regardless of which WM subdomain or
-// preview URL the opener is running on. There are no secrets in the payload (channelName,
-// teamName are not sensitive), and the frontend listener already validates e.origin.
 const APP_ORIGIN = '*';
 
 // AES-256-GCM: matches crypto.cjs decrypt format
@@ -62,29 +59,19 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-async function publishWelcome(userId: string, channelType: string): Promise<void> {
-  if (!UPSTASH_URL || !UPSTASH_TOKEN) {
-    console.error('[slack-oauth] publishWelcome: UPSTASH env vars missing — welcome not queued');
-    return;
-  }
-  console.log(`[slack-oauth] publishWelcome: queuing ${channelType} for ${userId}`);
-  const msg = JSON.stringify({ eventType: 'channel_welcome', userId, channelType });
-  try {
-    const res = await fetch(`${UPSTASH_URL}/lpush/wm:events:queue/${encodeURIComponent(msg)}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'User-Agent': 'worldmonitor-edge/1.0' },
-      signal: AbortSignal.timeout(5000),
-    });
-    const data = await res.json().catch(() => null) as { result?: unknown } | null;
-    console.log(`[slack-oauth] publishWelcome LPUSH: status=${res.status} result=${JSON.stringify(data?.result)}`);
-  } catch (err) {
-    console.error('[slack-oauth] publishWelcome LPUSH failed:', (err as Error).message);
-  }
+async function publishWelcome(userId: string): Promise<void> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return;
+  const msg = JSON.stringify({ eventType: 'channel_welcome', userId, channelType: 'discord' });
+  await fetch(`${UPSTASH_URL}/lpush/wm:events:queue/${encodeURIComponent(msg)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'User-Agent': 'worldmonitor-edge/1.0' },
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => {});
 }
 
 function htmlResponse(script: string, body: string): Response {
   return new Response(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Slack OAuth</title></head><body>
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Discord OAuth</title></head><body>
 <p style="font-family:system-ui;padding:20px">${body}</p>
 <script>
 (function(){try{${script}}catch(e){}})();
@@ -104,15 +91,15 @@ function postAndClose(data: Record<string, unknown>): Response {
   const msg = safeJsonInScript(data);
   return htmlResponse(
     `window.opener&&window.opener.postMessage(${msg},'${APP_ORIGIN}');window.close();`,
-    'Connected to Slack. You can close this window.',
+    'Connected to Discord. You can close this window.',
   );
 }
 
 function errorAndClose(error: string): Response {
-  const msg = safeJsonInScript({ type: 'wm:slack_error', error });
+  const msg = safeJsonInScript({ type: 'wm:discord_error', error });
   return htmlResponse(
     `window.opener&&window.opener.postMessage(${msg},'${APP_ORIGIN}');window.close();`,
-    `Slack connection failed: ${escapeHtml(error)}. You can close this window.`,
+    `Discord connection failed: ${escapeHtml(error)}. You can close this window.`,
   );
 }
 
@@ -125,25 +112,26 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
   if (errorParam) return errorAndClose(errorParam);
   if (!code || !state) return errorAndClose('missing_params');
 
-  if (!UPSTASH_URL || !SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET || !CONVEX_SITE_URL || !RELAY_SHARED_SECRET || !NOTIFICATION_ENCRYPTION_KEY) {
+  if (!UPSTASH_URL || !DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET || !CONVEX_SITE_URL || !RELAY_SHARED_SECRET || !NOTIFICATION_ENCRYPTION_KEY) {
     return errorAndClose('misconfigured');
   }
 
   // Validate and consume state
-  const stateKey = `wm:slack:oauth:${state}`;
+  const stateKey = `wm:discord:oauth:${state}`;
   const userId = await upstashGet(stateKey);
   if (!userId) return errorAndClose('invalid_state');
   await upstashDel(stateKey); // consume — prevents replay
 
   // Exchange code for token
-  const tokenRes = await fetch('https://slack.com/api/oauth.v2.access', {
+  const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: SLACK_CLIENT_ID,
-      client_secret: SLACK_CLIENT_SECRET,
+      client_id: DISCORD_CLIENT_ID,
+      client_secret: DISCORD_CLIENT_SECRET,
+      grant_type: 'authorization_code',
       code,
-      redirect_uri: SLACK_REDIRECT_URI,
+      redirect_uri: DISCORD_REDIRECT_URI,
     }),
     signal: AbortSignal.timeout(10000),
   }).catch(() => null);
@@ -151,24 +139,19 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
   if (!tokenRes?.ok) return errorAndClose('token_exchange_failed');
 
   const tokenData = await tokenRes.json() as {
-    ok: boolean;
-    error?: string;
-    incoming_webhook?: {
+    webhook?: {
       url: string;
-      channel: string;
-      channel_id: string;
-      configuration_url: string;
+      guild_id?: string;
+      channel_id?: string;
     };
-    team?: { id: string; name: string };
   };
 
-  if (!tokenData.ok) return errorAndClose(tokenData.error ?? 'slack_error');
-  if (!tokenData.incoming_webhook?.url) return errorAndClose('no_webhook');
+  if (!tokenData.webhook?.url) return errorAndClose('no_webhook');
 
-  // Encrypt webhook URL
+  // Encrypt webhook URL — discard access token
   let webhookEnvelope: string;
   try {
-    webhookEnvelope = await encryptWebhook(tokenData.incoming_webhook.url);
+    webhookEnvelope = await encryptWebhook(tokenData.webhook.url);
   } catch {
     return errorAndClose('encryption_failed');
   }
@@ -178,12 +161,11 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RELAY_SHARED_SECRET}` },
     body: JSON.stringify({
-      action: 'set-slack-oauth',
+      action: 'set-discord-oauth',
       userId,
       webhookEnvelope,
-      slackChannelName: tokenData.incoming_webhook.channel,
-      slackTeamName: tokenData.team?.name,
-      slackConfigurationUrl: tokenData.incoming_webhook.configuration_url,
+      discordGuildId: tokenData.webhook.guild_id,
+      discordChannelId: tokenData.webhook.channel_id,
     }),
     signal: AbortSignal.timeout(10000),
   }).catch(() => null);
@@ -191,12 +173,11 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
   if (!convexRes?.ok) return errorAndClose('storage_failed');
 
   const stored = await convexRes.json() as { ok: boolean; isNew?: boolean };
-  console.log(`[slack-oauth] Convex set-slack-oauth: isNew=${stored.isNew}`);
-  if (stored.isNew) ctx.waitUntil(publishWelcome(userId, 'slack'));
+  if (stored.isNew) ctx.waitUntil(publishWelcome(userId));
 
   return postAndClose({
-    type: 'wm:slack_connected',
-    channelName: tokenData.incoming_webhook.channel,
-    teamName: tokenData.team?.name ?? '',
+    type: 'wm:discord_connected',
+    guildId: tokenData.webhook.guild_id ?? '',
+    channelId: tokenData.webhook.channel_id ?? '',
   });
 }
