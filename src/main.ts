@@ -314,6 +314,9 @@ Sentry.init({
     if (frames.some(f => /www-widgetapi\.js/.test(f.filename ?? ''))) return null;
     // Suppress Sentry beacon XHR transport errors (readyState on aborted XHR — not our code)
     if (frames.some(f => /beacon\.min\.js/.test(f.filename ?? ''))) return null;
+    // Suppress "options is not defined" from browser extension overriding Navigator getter (WORLDMONITOR-JN).
+    // Only suppress when stack has no first-party frames (filename=<anonymous> is the extension getter).
+    if (/^options is not defined$/.test(msg) && frames.every(f => !f.filename || f.filename === '<anonymous>' || f.filename === '[native code]')) return null;
     // Suppress TransactionInactiveError only when no first-party frames are present
     // (Safari kills open IDB transactions in background tabs — not actionable noise)
     // First-party paths in storage.ts / persistent-cache.ts / vector-db.ts must still surface.
