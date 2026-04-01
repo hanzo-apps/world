@@ -42,6 +42,8 @@ export const setChannelForUser = internalMutation({
       if (!email) throw new ConvexError("email required for email channel");
       const doc = { userId, channelType: "email" as const, email, verified: true, linkedAt: now };
       if (existing) { await ctx.db.replace(existing._id, doc); } else { await ctx.db.insert("notificationChannels", doc); }
+    } else {
+      throw new ConvexError("discord channel must be set via set-discord-oauth");
     }
     return { isNew };
   },
@@ -72,6 +74,39 @@ export const setSlackOAuthChannelForUser = internalMutation({
       slackChannelName: args.slackChannelName,
       slackTeamName: args.slackTeamName,
       slackConfigurationUrl: args.slackConfigurationUrl,
+    };
+    if (existing) {
+      await ctx.db.replace(existing._id, doc);
+    } else {
+      await ctx.db.insert("notificationChannels", doc);
+    }
+    return { isNew };
+  },
+});
+
+export const setDiscordOAuthChannelForUser = internalMutation({
+  args: {
+    userId: v.string(),
+    webhookEnvelope: v.string(),
+    discordGuildId: v.optional(v.string()),
+    discordChannelId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("notificationChannels")
+      .withIndex("by_user_channel", (q) =>
+        q.eq("userId", args.userId).eq("channelType", "discord"),
+      )
+      .unique();
+    const isNew = !existing;
+    const doc = {
+      userId: args.userId,
+      channelType: "discord" as const,
+      webhookEnvelope: args.webhookEnvelope,
+      verified: true,
+      linkedAt: Date.now(),
+      discordGuildId: args.discordGuildId,
+      discordChannelId: args.discordChannelId,
     };
     if (existing) {
       await ctx.db.replace(existing._id, doc);
@@ -186,6 +221,8 @@ export const setChannel = mutation({
       } else {
         await ctx.db.insert("notificationChannels", doc);
       }
+    } else {
+      throw new ConvexError("discord channel must be set via set-discord-oauth");
     }
   },
 });
