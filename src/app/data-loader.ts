@@ -117,7 +117,7 @@ import { fetchTelegramFeed } from '@/services/telegram-intel';
 import { fetchOrefAlerts, startOrefPolling, stopOrefPolling, onOrefAlertsUpdate } from '@/services/oref-alerts';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
-import { getSecretState, isFeatureAvailable, isFeatureEnabled } from '@/services/runtime-config';
+import { isFeatureAvailable, isFeatureEnabled } from '@/services/runtime-config';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
@@ -1811,7 +1811,7 @@ export class DataLoaderManager implements AppModule {
 
   async loadIntelligenceSignals(): Promise<void> {
     resetHotspotActivity();
-    const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
+    const _desktopLocked = isDesktopRuntime() && !hasPremiumAccess();
     const tasks: Promise<void>[] = [];
 
     tasks.push((async () => {
@@ -3148,7 +3148,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadTelegramIntel(): Promise<void> {
-    if (isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present) return;
+    if (isDesktopRuntime() && !hasPremiumAccess()) return;
     try {
       const result = await fetchTelegramFeed();
       this.callPanel('telegram-intel', 'setData', result);
