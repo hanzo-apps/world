@@ -141,6 +141,9 @@ export async function getClerkToken(): Promise<string | null> {
   if (_tokenInflight) return _tokenInflight;
 
   _tokenInflight = (async () => {
+    if (!clerkInstance && PUBLISHABLE_KEY) {
+      try { await initClerk(); } catch { /* Clerk load failed, proceed with null */ }
+    }
     const session = clerkInstance?.session;
     if (!session) {
       console.warn(`[clerk] getClerkToken: no session (clerkInstance=${!!clerkInstance}, user=${!!clerkInstance?.user})`);
