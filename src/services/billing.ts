@@ -54,6 +54,13 @@ export async function initSubscriptionWatch(_userId?: string): Promise<void> {
         subscriptionLoaded = true;
         for (const cb of listeners) cb(result);
       },
+      (err: Error) => {
+        console.warn('[billing] Subscription query error:', err.message);
+        // Clear stale cached value so getSubscription() returns null (not old plan).
+        currentSubscription = null;
+        subscriptionLoaded = true;
+        for (const cb of listeners) cb(null);
+      },
     );
 
     initialized = true;
