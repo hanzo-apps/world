@@ -244,15 +244,20 @@ export async function startCheckout(
       return;
     }
 
-    if (getCurrentClerkUser()) {
-      const authReady = await waitForConvexAuth(10_000);
-      if (!authReady) {
-        console.warn('[checkout] Convex auth not ready after 10s, falling back');
-        if (fallbackToPricingPage) {
-          window.open('https://worldmonitor.app/pro', '_blank');
-        }
-        return;
+    if (!getCurrentClerkUser()?.id) {
+      if (fallbackToPricingPage) {
+        window.open('https://worldmonitor.app/pro', '_blank');
       }
+      return;
+    }
+
+    const authReady = await waitForConvexAuth(10_000);
+    if (!authReady) {
+      console.warn('[checkout] Convex auth not ready after 10s, falling back');
+      if (fallbackToPricingPage) {
+        window.open('https://worldmonitor.app/pro', '_blank');
+      }
+      return;
     }
 
     const result = await client.action(api.payments.checkout.createCheckout, {
