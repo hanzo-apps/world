@@ -235,34 +235,33 @@ export default async function handler(req) {
     return json({ error: 'Method not allowed' }, 405, cors);
   }
 
-  // Try cache first
+  // Read from Redis (populated by Railway ais-relay seed loop)
   const cached = await getFromCache();
   if (cached) {
     return json(cached, 200, cors, 'public, max-age=300, s-maxage=600, stale-while-revalidate=300');
   }
 
-  // Fetch from Dodo
-  if (!DODO_API_KEY) {
-    return json({ error: 'DODO_API_KEY not configured' }, 503, cors);
+  // Redis empty (purged or seed hasn't run). Try Dodo directly as backup.
+  // May fail from Vercel IPs (401) — falls back to static prices.
+  if (DODO_API_KEY) {
+    const dodoPrices = await fetchPricesFromDodo();
+    const pricedPublicIds = Object.entries(CATALOG)
+      .filter(([, v]) => PUBLIC_TIER_GROUPS.includes(v.tierGroup) && v.tierGroup !== 'free' && v.tierGroup !== 'enterprise')
+      .map(([id]) => id);
+    const dodoPriceCount = pricedPublicIds.filter(id => dodoPrices[id]).length;
+    if (dodoPriceCount > 0) {
+      const priceSource = dodoPriceCount === pricedPublicIds.length ? 'dodo' : 'partial';
+      const tiers = buildTiers(dodoPrices);
+      const now = Date.now();
+      const result = { tiers, fetchedAt: now, cachedUntil: now + CACHE_TTL * 1000, priceSource };
+      // Don't write to Redis — let the Railway seed own that key with its longer TTL.
+      // Just return the result with short cache so the next Railway cycle repopulates properly.
+      return json(result, 200, cors, 'public, max-age=60, s-maxage=60');
+    }
   }
 
-  const dodoPrices = await fetchPricesFromDodo();
-  // Count only public priced products that buildTiers actually renders
-  const pricedPublicIds = Object.entries(CATALOG)
-    .filter(([, v]) => PUBLIC_TIER_GROUPS.includes(v.tierGroup) && v.tierGroup !== 'free' && v.tierGroup !== 'enterprise')
-    .map(([id]) => id);
-  const dodoPriceCount = pricedPublicIds.filter(id => dodoPrices[id]).length;
-  const expectedCount = pricedPublicIds.length;
-  const priceSource = dodoPriceCount === expectedCount ? 'dodo' : dodoPriceCount > 0 ? 'partial' : 'fallback';
-  if (priceSource !== 'dodo') {
-    console.warn(`[product-catalog] priceSource=${priceSource}: got ${dodoPriceCount}/${expectedCount} prices from Dodo`);
-  }
-  const tiers = buildTiers(dodoPrices);
+  // All sources failed. Return fallback with short cache.
+  const tiers = buildTiers({});
   const now = Date.now();
-  const result = { tiers, fetchedAt: now, cachedUntil: now + CACHE_TTL * 1000, priceSource };
-
-  // Cache the result
-  await setCache(result);
-
-  return json(result, 200, cors, 'public, max-age=300, s-maxage=600, stale-while-revalidate=300');
+  return json({ tiers, fetchedAt: now, cachedUntil: now + 60_000, priceSource: 'fallback' }, 200, cors, 'public, max-age=60, s-maxage=60');
 }
