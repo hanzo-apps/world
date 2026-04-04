@@ -155,6 +155,7 @@ const FULL_MAP_LAYERS: MapLayers = {
   renewableInstallations: false,
   tradeRoutes: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in full variant)
   miningSites: false,
@@ -217,6 +218,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   renewableInstallations: false,
   tradeRoutes: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in full variant)
   miningSites: false,
@@ -324,6 +326,7 @@ const TECH_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in tech variant)
   miningSites: false,
@@ -385,6 +388,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in tech variant)
   miningSites: false,
@@ -504,6 +508,7 @@ const FINANCE_MAP_LAYERS: MapLayers = {
   tradeRoutes: true,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in finance variant)
   miningSites: false,
@@ -565,6 +570,7 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled in finance variant)
   miningSites: false,
@@ -642,6 +648,7 @@ const HAPPY_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled)
   miningSites: false,
@@ -703,6 +710,7 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (disabled)
   miningSites: false,
@@ -797,6 +805,7 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
   tradeRoutes: true,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (enabled)
   miningSites: true,
@@ -858,6 +867,7 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
   tradeRoutes: false,
   iranAttacks: false,
   ciiChoropleth: false,
+  resilienceScore: false,
   dayNight: false,
   // Commodity layers (limited on mobile)
   miningSites: true,
