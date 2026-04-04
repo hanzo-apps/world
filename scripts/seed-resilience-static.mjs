@@ -5,12 +5,14 @@ import {
   CHROME_UA,
   extendExistingTtl,
   getRedisCredentials,
+  httpsProxyFetchRaw,
   loadEnvFile,
   logSeedResult,
   releaseLock,
   verifySeedKey,
   withRetry,
 } from './_seed-utils.mjs';
+import { resolveProxyStringConnect } from './_proxy-utils.cjs';
 import {
   createCountryResolvers,
   isIso2,
@@ -84,19 +86,25 @@ function roundMetric(value, digits = 3) {
   return Math.round(numeric * factor) / factor;
 }
 
-async function fetchText(url, { accept = 'text/plain, text/html, application/json', timeoutMs = 30_000 } = {}) {
+async function fetchTextDirect(url, accept, timeoutMs) {
   const response = await fetch(url, {
-    headers: {
-      Accept: accept,
-      'User-Agent': CHROME_UA,
-    },
+    headers: { Accept: accept, 'User-Agent': CHROME_UA },
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return {
-    text: await response.text(),
-    contentType: response.headers.get('content-type') || '',
-  };
+  return { text: await response.text(), contentType: response.headers.get('content-type') || '' };
+}
+
+async function fetchText(url, { accept = 'text/plain, text/html, application/json', timeoutMs = 30_000 } = {}) {
+  try {
+    return await fetchTextDirect(url, accept, timeoutMs);
+  } catch (directErr) {
+    const proxyAuth = resolveProxyStringConnect();
+    if (!proxyAuth) throw directErr;
+    console.warn(`  [fetchText] direct failed (${directErr.message}) — retrying via proxy`);
+    const { buffer, contentType } = await httpsProxyFetchRaw(url, proxyAuth, { accept, timeoutMs });
+    return { text: buffer.toString('utf8'), contentType };
+  }
 }
 
 async function fetchJson(url, { timeoutMs = 30_000, accept = 'application/json' } = {}) {
