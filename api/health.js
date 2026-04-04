@@ -10,6 +10,7 @@ const BOOTSTRAP_KEYS = {
   sectors:           'market:sectors:v1',
   etfFlows:          'market:etf-flows:v1',
   climateAnomalies:  'climate:anomalies:v2',
+  climateDisasters:  'climate:disasters:v1',
   climateAirQuality: 'climate:air-quality:v1',
   co2Monitoring:     'climate:co2-monitoring:v1',
   oceanIce:          'climate:ocean-ice:v1',
@@ -138,6 +139,7 @@ const SEED_META = {
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },
   climateAnomalies: { key: 'seed-meta:climate:anomalies',       maxStaleMin: 240 }, // runs as independent Railway cron (0 */2 * * *); 240 = 2x interval
+  climateDisasters: { key: 'seed-meta:climate:disasters',       maxStaleMin: 720 }, // runs every 6h; 720min = 2x interval
   climateAirQuality:{ key: 'seed-meta:health:air-quality',      maxStaleMin: 180 }, // hourly cron; 180 = 3x interval — shares meta key with healthAirQuality (same seeder run)
   climateZoneNormals: { key: 'seed-meta:climate:zone-normals',  maxStaleMin: 89280 }, // monthly cron on the 1st; 62d = 2x 31-day cadence
   co2Monitoring:    { key: 'seed-meta:climate:co2-monitoring',  maxStaleMin: 4320 }, // daily cron at 06:00 UTC; 72h tolerates two missed runs
