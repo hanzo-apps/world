@@ -12,6 +12,7 @@ const SEED_DOMAINS = {
   'wildfire:fires':           { key: 'seed-meta:wildfire:fires',           intervalMin: 60 },
   'infra:outages':            { key: 'seed-meta:infra:outages',            intervalMin: 15 },
   'climate:anomalies':        { key: 'seed-meta:climate:anomalies',        intervalMin: 120 },
+  'climate:disasters':        { key: 'seed-meta:climate:disasters',        intervalMin: 360 },
   'climate:zone-normals':     { key: 'seed-meta:climate:zone-normals',     intervalMin: 44640 },
   'climate:co2-monitoring':   { key: 'seed-meta:climate:co2-monitoring',   intervalMin: 1440 }, // daily cron; health.js maxStaleMin:4320 (3x) is intentionally higher — it's an alarm threshold, not the cron cadence
   'climate:ocean-ice':        { key: 'seed-meta:climate:ocean-ice',        intervalMin: 1440 }, // daily cron; health.js maxStaleMin:2880 (2x) tolerates one missed run

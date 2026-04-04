@@ -187,13 +187,14 @@ const TOOL_REGISTRY: ToolDef[] = [
   },
   {
     name: 'get_climate_data',
-    description: 'Climate intelligence: temperature/precipitation anomalies (vs 30-year WMO normals), atmospheric CO2 trend (NOAA Mauna Loa), air quality (OpenAQ/WAQI PM2.5 stations), Arctic sea ice extent and ocean heat indicators (NSIDC/NOAA), weather alerts, and climate news.',
+    description: 'Climate intelligence: temperature/precipitation anomalies (vs 30-year WMO normals), climate-relevant disaster alerts (ReliefWeb/GDACS/FIRMS), atmospheric CO2 trend (NOAA Mauna Loa), air quality (OpenAQ/WAQI PM2.5 stations), Arctic sea ice extent and ocean heat indicators (NSIDC/NOAA), weather alerts, and climate news.',
     inputSchema: { type: 'object', properties: {}, required: [] },
-    _cacheKeys: ['climate:anomalies:v2', 'climate:co2-monitoring:v1', 'climate:air-quality:v1', 'climate:ocean-ice:v1', 'climate:news-intelligence:v1', 'weather:alerts:v1'],
+    _cacheKeys: ['climate:anomalies:v2', 'climate:disasters:v1', 'climate:co2-monitoring:v1', 'climate:air-quality:v1', 'climate:ocean-ice:v1', 'climate:news-intelligence:v1', 'weather:alerts:v1'],
     _seedMetaKey: 'seed-meta:climate:co2-monitoring',
     _maxStaleMin: 2880,
     _freshnessChecks: [
       { key: 'seed-meta:climate:anomalies', maxStaleMin: 120 },
+      { key: 'seed-meta:climate:disasters', maxStaleMin: 720 },
       { key: 'seed-meta:climate:co2-monitoring', maxStaleMin: 2880 },
       { key: 'seed-meta:health:air-quality', maxStaleMin: 180 },
       { key: 'seed-meta:climate:ocean-ice', maxStaleMin: 1440 },
