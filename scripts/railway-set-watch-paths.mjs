@@ -27,6 +27,7 @@ const API = 'https://backboard.railway.app/graphql/v2';
 const USES_SHARED_CONFIG = new Set([
   'seed-commodity-quotes', 'seed-crypto-quotes', 'seed-etf-flows',
   'seed-gulf-quotes', 'seed-market-quotes', 'seed-stablecoin-markets',
+  'seed-climate-disasters',
 ]);
 
 const SERVICE_OVERRIDES = {
@@ -80,6 +81,10 @@ export function buildExpectedServiceConfig(serviceName) {
 
   if (serviceName === 'seed-iran-events') {
     config.watchPatterns.push('scripts/data/iran-events-latest.json');
+  }
+
+  if (serviceName === 'seed-climate-disasters') {
+    config.watchPatterns.push('public/data/countries.geojson');
   }
 
   return config;
