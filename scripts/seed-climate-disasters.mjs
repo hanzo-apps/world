@@ -99,15 +99,19 @@ function getNaturalSourceMeta(event) {
   const id = String(event?.id || '');
   if (name === 'nasa firms' || name.startsWith('firms') || url.includes('firms.modaps.')) return { source: 'NASA FIRMS' };
   if (name === 'gdacs' || name.startsWith('gdacs') || url.includes('gdacs.org') || id.startsWith('gdacs-')) return { source: 'GDACS' };
+  if (url.includes('eonet.') || id.startsWith('EONET_') || name.startsWith('eonet')) return { source: 'EONET' };
+  if (name || url) return { source: 'OTHER' };
   return null;
 }
+
+const CLIMATE_CATEGORIES = new Set(['floods', 'wildfires', 'volcanoes', 'drought']);
 
 function isClimateNaturalEvent(event) {
   if (!event || typeof event !== 'object') return false;
   const sourceMeta = getNaturalSourceMeta(event);
   if (!sourceMeta) return false;
 
-  if (event.category === 'floods' || event.category === 'wildfires') return true;
+  if (CLIMATE_CATEGORIES.has(event.category)) return true;
   if (event.category !== 'severeStorms') return false;
   if (sourceMeta.source !== 'GDACS') return false;
 
@@ -120,6 +124,8 @@ function mapNaturalType(event) {
   if (event.category === 'floods') return 'flood';
   if (event.category === 'wildfires') return 'wildfire';
   if (event.category === 'severeStorms') return 'cyclone';
+  if (event.category === 'volcanoes') return 'volcano';
+  if (event.category === 'drought') return 'drought';
   return '';
 }
 
@@ -333,7 +339,7 @@ function mapNaturalEvent(event) {
   if (!type) return null;
 
   const source = mapNaturalSource(event);
-  if (source !== 'GDACS' && source !== 'NASA FIRMS') return null;
+  if (!source) return null;
   const severity = mapNaturalSeverity(event, source);
   const status = mapNaturalStatus(event, severity);
   const lat = Number(event.lat);
