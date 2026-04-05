@@ -1051,7 +1051,7 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   securityPolicy: {
     labelKey: 'header.panelCatSecurityPolicy',
-    panelKeys: ['security', 'policy', 'regulation'],
+    panelKeys: ['security', 'policy', 'ai-regulation'],
   },
   techMarkets: {
     labelKey: 'header.panelCatMarkets',
