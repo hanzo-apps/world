@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed, getRedisCredentials } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -29,7 +29,7 @@ export function parseRecord(record, seededAt) {
   if (!iso2) return null;
 
   const ym = String(record.yearMonth);
-  const dataMonth = `${ym.slice(0, 4)}-${ym.slice(4).padStart(2, '0')}`;
+  const dataMonth = `${ym.slice(0, 4)}-${ym.slice(4)}`;
   const ts = seededAt || new Date().toISOString();
 
   if (record.total === 'Net Exporter') {
@@ -124,38 +124,29 @@ async function fetchIeaOilStocks() {
   const firstRecord = records.find(r => !r.countryName?.startsWith('Total'));
   const ym = String(firstRecord?.yearMonth || '');
   const dataMonth = ym.length >= 6
-    ? `${ym.slice(0, 4)}-${ym.slice(4).padStart(2, '0')}`
+    ? `${ym.slice(0, 4)}-${ym.slice(4)}`
     : `${year}-${String(month).padStart(2, '0')}`;
 
-  return { index: buildIndex(members, dataMonth, seededAt), members };
+  return { members, dataMonth, seededAt };
 }
 
-async function writeCountryKeys(members) {
-  const { url, token } = getRedisCredentials();
-  for (const member of members) {
-    const key = `energy:iea-oil-stocks:v1:${member.iso2}`;
-    const payload = JSON.stringify(member);
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(['SET', key, payload, 'EX', TTL_SECONDS]),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!resp.ok) throw new Error(`Redis SET ${key} failed HTTP ${resp.status}`);
-    console.log(`  Written: ${key} (${member.daysOfCover ?? 'null'} days)`);
-  }
-}
+// Declared up front so runSeed can extend their TTL on fetch failure or
+// validation skip — keeps country keys alive as long as the index lives.
+const COUNTRY_EXTRA_KEYS = Object.values(COUNTRY_MAP).map(iso2 => ({
+  key: `energy:iea-oil-stocks:v1:${iso2}`,
+  ttl: TTL_SECONDS,
+  transform: (data) => data.members?.find(m => m.iso2 === iso2) ?? null,
+}));
 
 const isMain = process.argv[1]?.endsWith('seed-iea-oil-stocks.mjs');
 if (isMain) {
   runSeed('energy', 'iea-oil-stocks', CANONICAL_KEY, fetchIeaOilStocks, {
-    publishTransform: (data) => data.index,
     validateFn: (data) => Array.isArray(data?.members) && data.members.length > 0,
-    afterPublish: (data) => writeCountryKeys(data.members),
     ttlSeconds: TTL_SECONDS,
-    metaTtlSeconds: TTL_SECONDS,
     sourceVersion: 'iea-oil-stocks-v1',
     recordCount: (data) => data?.members?.length || 0,
+    publishTransform: (data) => buildIndex(data.members, data.dataMonth, data.seededAt),
+    extraKeys: COUNTRY_EXTRA_KEYS,
   }).catch((err) => {
     const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
     console.error('FATAL:', (err.message || err) + cause);
