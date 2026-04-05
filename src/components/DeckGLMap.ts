@@ -5537,9 +5537,15 @@ export class DeckGLMap {
       this.setLayerReady('resilienceScore', false);
       this.onLayerChange?.('resilienceScore', false, 'programmatic');
     }
+    const prevRadar = this.state.layers.weatherRadar;
+    const prevCyber = this.state.layers.cyberThreats;
     this.state.layers[layer] = !this.state.layers[layer];
     const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement;
     if (toggle) toggle.checked = this.state.layers[layer];
+    if (this.state.layers.weatherRadar && !prevRadar) this.startWeatherRadar();
+    else if (!this.state.layers.weatherRadar && prevRadar) this.stopWeatherRadar();
+    if (this.state.layers.cyberThreats && !prevCyber && !this.aptGroupsLoaded) this.loadAptGroups();
+    if (layer === 'flights') this.manageAircraftTimer(this.state.layers.flights);
     this.render();
     this.updateLegend();
     this.onLayerChange?.(layer, this.state.layers[layer], 'programmatic');
