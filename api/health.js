@@ -137,6 +137,7 @@ const STANDALONE_KEYS = {
   productCatalog:           'product-catalog:v2',
   energyExposure:           'energy:exposure:v1:index',
   regulatoryActions:        'regulatory:actions:v1',
+  energyIntelligence:       'energy:intelligence:feed:v1',
 };
 
 const SEED_META = {
@@ -256,6 +257,7 @@ const SEED_META = {
   regulatoryActions:    { key: 'seed-meta:regulatory:actions',          maxStaleMin: 360 }, // 2h cron; 360min = 3x interval
   electricityPrices:    { key: 'seed-meta:energy:electricity-prices',   maxStaleMin: 2880 }, // daily cron (14:00 UTC); 2880min = 48h = 2x interval
   gasStorageCountries:  { key: 'seed-meta:energy:gas-storage-countries', maxStaleMin: 2880 }, // daily cron at 10:30 UTC; 2880min = 48h = 2x interval
+  energyIntelligence:   { key: 'seed-meta:energy:intelligence',          maxStaleMin: 720 }, // 6h cron; 720min = 2x interval
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
