@@ -84,6 +84,7 @@ const BOOTSTRAP_KEYS = {
   socialVelocity:    'intelligence:social:reddit:v1',
   vpdTrackerRealtime:   'health:vpd-tracker:realtime:v1',
   vpdTrackerHistorical: 'health:vpd-tracker:historical:v1',
+  electricityPrices:    'energy:electricity:v1:index',
   gasStorageCountries: 'energy:gas-storage:v1:_countries',
 };
 
@@ -253,6 +254,7 @@ const SEED_META = {
   resilienceStaticIndex: { key: 'seed-meta:resilience:static',         maxStaleMin: 576000 }, // annual October snapshot; 400d threshold matches TTL and preserves prior-year data on source outages
   energyExposure:       { key: 'seed-meta:economic:owid-energy-mix',   maxStaleMin: 50400 }, // monthly cron on 1st; 50400min = 35d = TTL matches cron cadence + 5d buffer
   regulatoryActions:    { key: 'seed-meta:regulatory:actions',          maxStaleMin: 360 }, // 2h cron; 360min = 3x interval
+  electricityPrices:    { key: 'seed-meta:energy:electricity-prices',   maxStaleMin: 2880 }, // daily cron (14:00 UTC); 2880min = 48h = 2x interval
   gasStorageCountries:  { key: 'seed-meta:energy:gas-storage-countries', maxStaleMin: 2880 }, // daily cron at 10:30 UTC; 2880min = 48h = 2x interval
 };
 
