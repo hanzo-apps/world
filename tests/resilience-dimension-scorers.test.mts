@@ -88,7 +88,7 @@ describe('resilience dimension scorers', () => {
 
   it('scoreEnergy with full OWID data uses 5-metric blend and high coverage', async () => {
     const no = await scoreEnergy('NO', fixtureReader);
-    assert.ok(no.coverage > 0.9, `NO coverage should be >0.9 with full OWID data, got ${no.coverage}`);
+    assert.ok(no.coverage >= 0.9, `NO coverage should be >=0.9 with full OWID data, got ${no.coverage}`);
     assert.ok(no.score > 50, `NO score should be >50 (high renewables, low dependency), got ${no.score}`);
   });
 

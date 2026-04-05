@@ -2,6 +2,14 @@ import { getCachedJson } from '../../../_shared/redis';
 import { sanitizeForPrompt, sanitizeHeadline } from '../../../_shared/llm-sanitize.js';
 import { CHROME_UA } from '../../../_shared/constants';
 import { tokenizeForMatch, findMatchingKeywords } from '../../../../src/utils/keyword-match';
+import {
+  GAS_STORAGE_COUNTRIES_KEY,
+  GAS_STORAGE_KEY_PREFIX,
+  ELECTRICITY_INDEX_KEY,
+  ENERGY_INTELLIGENCE_KEY,
+  SPR_KEY,
+  REFINERY_UTIL_KEY,
+} from '../../../_shared/cache-keys';
 
 // TODO: multi-language digest search — currently only queries news:digest:v1:full:en.
 // When multi-language digests are available, fan out to news:digest:v1:full:<lang>
@@ -32,6 +40,11 @@ export interface AnalystContext {
   gasSpotTtf: string;
   activeSources: string[];
   degraded: boolean;
+  gasStorage?: string;
+  electricityPrices?: string;
+  energyIntelligence?: string;
+  sprLevel?: string;
+  refineryUtil?: string;
 }
 
 function safeStr(v: unknown): string {
@@ -253,6 +266,109 @@ function buildSpotCommodityLine(commodities: unknown, symbol: string, label: str
   return `${label}: ${unit}${price.toFixed(2)}${denominator} (${sign}${change.toFixed(2)}% today)`;
 }
 
+async function buildGasStorage(): Promise<string | undefined> {
+  try {
+    const countries = await getCachedJson(GAS_STORAGE_COUNTRIES_KEY, true);
+    if (!Array.isArray(countries) || countries.length === 0) return undefined;
+    const entries: Array<{ iso2: string; fillPct: number; trend?: string }> = [];
+    await Promise.allSettled(
+      (countries as string[]).map(async (iso2) => {
+        try {
+          const data = await getCachedJson(`${GAS_STORAGE_KEY_PREFIX}${iso2}`, true);
+          if (data && typeof data === 'object') {
+            const d = data as Record<string, unknown>;
+            if (typeof d.fillPct === 'number') {
+              entries.push({ iso2: safeStr(d.iso2) || iso2, fillPct: d.fillPct, trend: safeStr(d.trend) || undefined });
+            }
+          }
+        } catch {
+          // skip missing country
+        }
+      }),
+    );
+    if (entries.length === 0) return undefined;
+    const sorted = entries.sort((a, b) => a.fillPct - b.fillPct).slice(0, 5);
+    const parts = sorted.map((e) => `${e.iso2}: ${e.fillPct.toFixed(1)}%${e.trend ? ` (${e.trend})` : ''}`);
+    return parts.join(' | ');
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildElectricityPrices(): Promise<string | undefined> {
+  try {
+    const data = await getCachedJson(ELECTRICITY_INDEX_KEY, true);
+    if (!Array.isArray(data) || data.length === 0) return undefined;
+    const entries = (data as Array<Record<string, unknown>>)
+      .filter((e) => typeof e.price === 'number')
+      .sort((a, b) => (b.price as number) - (a.price as number))
+      .slice(0, 5);
+    if (entries.length === 0) return undefined;
+    const parts = entries.map((e) => {
+      const region = safeStr(e.region);
+      const price = (e.price as number).toFixed(1);
+      const currency = safeStr(e.currency);
+      const unit = safeStr(e.unit) || 'MWh';
+      const sym = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
+      return `${region}: ${sym}${price}/${unit}`;
+    });
+    return parts.join(' | ');
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildEnergyIntelligence(): Promise<string | undefined> {
+  try {
+    const data = await getCachedJson(ENERGY_INTELLIGENCE_KEY, true);
+    if (!data || typeof data !== 'object') return undefined;
+    const d = data as Record<string, unknown>;
+    const items = Array.isArray(d.items) ? (d.items as Array<Record<string, unknown>>) : [];
+    if (items.length === 0) return undefined;
+    const recent = items
+      .filter((item) => safeStr(item.title))
+      .slice(0, 3);
+    if (recent.length === 0) return undefined;
+    return recent.map((item) => {
+      const source = safeStr(item.source);
+      const title = sanitizeHeadline(safeStr(item.title));
+      return source ? `${source}: ${title}` : title;
+    }).join(' · ');
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildSprLevel(): Promise<string | undefined> {
+  try {
+    const data = await getCachedJson(SPR_KEY, true);
+    if (!data || typeof data !== 'object') return undefined;
+    const d = data as Record<string, unknown>;
+    if (typeof d.barrels !== 'number') return undefined;
+    const bbl = (d.barrels as number).toFixed(1);
+    const wow = typeof d.changeWoW === 'number' ? d.changeWoW as number : null;
+    const wowStr = wow != null ? ` (${wow >= 0 ? '+' : ''}${wow.toFixed(1)}M WoW)` : '';
+    return `US SPR: ${bbl}M bbl${wowStr}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildRefineryUtil(): Promise<string | undefined> {
+  try {
+    const data = await getCachedJson(REFINERY_UTIL_KEY, true);
+    if (!data || typeof data !== 'object') return undefined;
+    const d = data as Record<string, unknown>;
+    if (typeof d.inputsMbblpd !== 'number') return undefined;
+    const inputs = (d.inputsMbblpd as number).toLocaleString();
+    const wow = typeof d.changeWoW === 'number' ? d.changeWoW as number : null;
+    const wowStr = wow != null ? ` (${wow >= 0 ? '+' : ''}${wow} WoW)` : '';
+    return `US refinery inputs: ${inputs} MBBL/D${wowStr}`;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildCountryBrief(data: unknown): string {
   if (!data || typeof data !== 'object') return '';
   const d = data as Record<string, unknown>;
@@ -446,6 +562,11 @@ const SOURCE_LABELS: Array<[keyof Omit<AnalystContext, 'timestamp' | 'degraded' 
   ['predictionMarkets', 'Prediction'],
   ['countryBrief', 'Country'],
   ['liveHeadlines', 'Live'],
+  ['gasStorage', 'GasStorage'],
+  ['electricityPrices', 'Electricity'],
+  ['energyIntelligence', 'EnergyIntel'],
+  ['sprLevel', 'SPR'],
+  ['refineryUtil', 'Refinery'],
 ];
 
 export async function assembleAnalystContext(
@@ -472,13 +593,17 @@ export async function assembleAnalystContext(
   const resolvedDomain = domainFocus ?? 'all';
   const keywords = userQuery ? extractKeywords(userQuery) : [];
 
-  // Only fetch energy exposure for domains that actually use it (geo + economic).
-  // For market/military the data would be fetched and immediately discarded.
   const ENERGY_EXPOSURE_DOMAINS = new Set(['geo', 'economic', 'all']);
   const needsEnergyExposure = ENERGY_EXPOSURE_DOMAINS.has(resolvedDomain);
 
   const SPOT_ENERGY_DOMAINS = new Set(['economic', 'geo', 'all']);
   const needsSpotEnergy = SPOT_ENERGY_DOMAINS.has(resolvedDomain);
+
+  const needsGasStorage = new Set(['geo', 'economic', 'all']).has(resolvedDomain);
+  const needsElectricity = new Set(['economic', 'all']).has(resolvedDomain);
+  const needsEnergyIntel = new Set(['economic', 'geo', 'all']).has(resolvedDomain);
+  const needsSpr = new Set(['economic', 'all']).has(resolvedDomain);
+  const needsRefinery = new Set(['economic', 'all']).has(resolvedDomain);
 
   const [
     insightsResult,
@@ -493,6 +618,11 @@ export async function assembleAnalystContext(
     countryResult,
     headlinesResult,
     relevantArticlesResult,
+    gasStorageResult,
+    electricityResult,
+    energyIntelResult,
+    sprResult,
+    refineryResult,
   ] = await Promise.allSettled([
     getCachedJson(keys.insights, true),
     getCachedJson(keys.riskScores, true),
@@ -506,6 +636,11 @@ export async function assembleAnalystContext(
     countryKey ? getCachedJson(countryKey, true) : Promise.resolve(null),
     buildLiveHeadlines(resolvedDomain, keywords),
     keywords.length > 0 ? searchDigestByKeywords(keywords) : Promise.resolve(''),
+    needsGasStorage ? buildGasStorage() : Promise.resolve(undefined),
+    needsElectricity ? buildElectricityPrices() : Promise.resolve(undefined),
+    needsEnergyIntel ? buildEnergyIntelligence() : Promise.resolve(undefined),
+    needsSpr ? buildSprLevel() : Promise.resolve(undefined),
+    needsRefinery ? buildRefineryUtil() : Promise.resolve(undefined),
   ]);
 
   const get = (r: PromiseSettledResult<unknown>) =>
@@ -514,7 +649,11 @@ export async function assembleAnalystContext(
   const getStr = (r: PromiseSettledResult<unknown>): string =>
     r.status === 'fulfilled' && typeof r.value === 'string' ? r.value : '';
 
-  // energyExposure only counts toward degraded when it was actually fetched.
+  const getOptStr = (r: PromiseSettledResult<unknown>): string | undefined => {
+    if (r.status !== 'fulfilled') return undefined;
+    return typeof r.value === 'string' ? r.value : undefined;
+  };
+
   const coreResults: PromiseSettledResult<unknown>[] = [
     insightsResult, riskResult, marketImplResult, forecastsResult,
     stocksResult, commoditiesResult, macroResult, predResult,
@@ -522,13 +661,15 @@ export async function assembleAnalystContext(
   if (needsEnergyExposure) coreResults.push(energyExposureResult);
   const failCount = coreResults.filter((r) => r.status === 'rejected' || !r.value).length;
 
+  const commoditiesData = get(commoditiesResult);
+
   const ctx: AnalystContext = {
     timestamp: new Date().toUTCString(),
     worldBrief: buildWorldBrief(get(insightsResult)),
     riskScores: buildRiskScores(get(riskResult)),
     marketImplications: buildMarketImplications(get(marketImplResult)),
     forecasts: buildForecasts(get(forecastsResult)),
-    marketData: buildMarketData(get(stocksResult), get(commoditiesResult)),
+    marketData: buildMarketData(get(stocksResult), commoditiesData),
     macroSignals: buildMacroSignals(get(macroResult)),
     energyExposure: buildEnergyExposure(get(energyExposureResult)),
     coalSpotPrice: needsSpotEnergy ? buildSpotCommodityLine(get(commoditiesResult), 'MTF=F', 'Newcastle coal', '$', '/t') : '',
@@ -539,6 +680,11 @@ export async function assembleAnalystContext(
     relevantArticles: getStr(relevantArticlesResult),
     activeSources: [],
     degraded: failCount > 4,
+    gasStorage: getOptStr(gasStorageResult),
+    electricityPrices: getOptStr(electricityResult),
+    energyIntelligence: getOptStr(energyIntelResult),
+    sprLevel: getOptStr(sprResult),
+    refineryUtil: getOptStr(refineryResult),
   };
 
   ctx.activeSources = SOURCE_LABELS
