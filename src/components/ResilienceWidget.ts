@@ -14,6 +14,7 @@ import {
   getResilienceTrendArrow,
   getResilienceVisualLevel,
 } from './resilience-widget-utils';
+import type { CountryEnergyProfileData } from './CountryBriefPanel';
 
 const LOCKED_PREVIEW: ResilienceScoreResponse = {
   countryCode: 'US',
@@ -51,6 +52,7 @@ export class ResilienceWidget {
   private loading = false;
   private errorMessage: string | null = null;
   private requestVersion = 0;
+  private energyMixData: CountryEnergyProfileData | null = null;
 
   constructor(countryCode?: string | null) {
     this.element = document.createElement('section');
@@ -78,6 +80,7 @@ export class ResilienceWidget {
 
     this.currentCountryCode = normalized;
     this.currentData = null;
+    this.energyMixData = null;
     this.errorMessage = null;
     this.loading = false;
     this.requestVersion += 1;
@@ -120,6 +123,11 @@ export class ResilienceWidget {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to load resilience score.';
       this.render();
     }
+  }
+
+  public setEnergyMix(data: CountryEnergyProfileData | null): void {
+    this.energyMixData = data;
+    this.render();
   }
 
   public destroy(): void {
@@ -257,7 +265,7 @@ export class ResilienceWidget {
       h(
         'div',
         { className: 'resilience-widget__domains' },
-        ...data.domains.map((domain) => this.renderDomainRow(domain)),
+        ...data.domains.map((domain) => this.renderDomainRow(domain, preview)),
       ),
       h(
         'div',
@@ -275,13 +283,27 @@ export class ResilienceWidget {
     );
   }
 
-  private renderDomainRow(domain: ResilienceDomain): HTMLElement {
+  private renderDomainRow(domain: ResilienceDomain, preview = false): HTMLElement {
     const score = clampScore(domain.score);
     const levelColor = RESILIENCE_VISUAL_LEVEL_COLORS[getResilienceVisualLevel(score)];
 
+    const attrs: Record<string, string> = { className: 'resilience-widget__domain-row' };
+
+    if (!preview && domain.id === 'energy' && this.energyMixData?.mixAvailable) {
+      const d = this.energyMixData;
+      const parts = [
+        `Import dep: ${d.importShare.toFixed(1)}%`,
+        `Gas: ${d.gasShare.toFixed(1)}%`,
+        `Coal: ${d.coalShare.toFixed(1)}%`,
+        `Renew: ${d.renewShare.toFixed(1)}%`,
+      ];
+      if (d.gasStorageAvailable) parts.push(`EU storage: ${d.gasStorageFillPct.toFixed(1)}%`);
+      attrs['title'] = parts.join(' | ');
+    }
+
     return h(
       'div',
-      { className: 'resilience-widget__domain-row' },
+      attrs,
       h('span', { className: 'resilience-widget__domain-label' }, getResilienceDomainLabel(domain.id)),
       this.renderBarBlock(score, levelColor),
       h('span', { className: 'resilience-widget__domain-score' }, String(Math.round(score))),
