@@ -5,7 +5,7 @@ import { loadEnvFile, CHROME_UA, runSeed, loadSharedConfig } from './_seed-utils
 loadEnvFile(import.meta.url);
 
 const IMF_BASE = 'https://www.imf.org/external/datamapper/api/v1';
-const CANONICAL_KEY = 'economic:imf:macro:v1';
+const CANONICAL_KEY = 'economic:imf:macro:v2';
 const CACHE_TTL = 35 * 24 * 3600; // 35 days — monthly IMF WEO release
 
 // Invert iso2→iso3 map to convert IMF's ISO3 codes to our ISO2 keys.
@@ -52,13 +52,18 @@ function latestValue(byYear) {
 }
 
 async function fetchImfMacro() {
-  const [inflationData, currentAccountData] = await Promise.all([
-    fetchImfIndicator('PCPIPCH'),   // CPI inflation, annual % change
-    fetchImfIndicator('BCA_NGDPD'), // Current account balance, % of GDP
+  const [inflationData, currentAccountData, govRevenueData] = await Promise.all([
+    fetchImfIndicator('PCPIPCH'),        // CPI inflation, annual % change
+    fetchImfIndicator('BCA_NGDPD'),      // Current account balance, % of GDP
+    fetchImfIndicator('GGR_G01_GDP_PT'), // General government revenue, % of GDP (Fiscal Monitor)
   ]);
 
   const countries = {};
-  const allIso3 = new Set([...Object.keys(inflationData), ...Object.keys(currentAccountData)]);
+  const allIso3 = new Set([
+    ...Object.keys(inflationData),
+    ...Object.keys(currentAccountData),
+    ...Object.keys(govRevenueData),
+  ]);
 
   for (const iso3 of allIso3) {
     if (isAggregate(iso3)) continue;
@@ -66,13 +71,15 @@ async function fetchImfMacro() {
     if (!iso2) continue;
 
     const infl = latestValue(inflationData[iso3]);
-    const ca = latestValue(currentAccountData[iso3]);
-    if (!infl && !ca) continue;
+    const ca   = latestValue(currentAccountData[iso3]);
+    const rev  = latestValue(govRevenueData[iso3]);
+    if (!infl && !ca && !rev) continue;
 
     countries[iso2] = {
-      inflationPct: infl?.value ?? null,
+      inflationPct:    infl?.value ?? null,
       currentAccountPct: ca?.value ?? null,
-      year: infl?.year ?? ca?.year ?? null,
+      govRevenuePct:   rev?.value  ?? null,
+      year: infl?.year ?? ca?.year ?? rev?.year ?? null,
     };
   }
 
