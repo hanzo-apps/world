@@ -7,6 +7,7 @@ import type {
 
 import { getCachedJson, runRedisPipeline } from '../../../_shared/redis';
 import {
+  GREY_OUT_COVERAGE_THRESHOLD,
   RESILIENCE_RANKING_CACHE_KEY,
   RESILIENCE_RANKING_CACHE_TTL_SECONDS,
   buildRankingItem,
@@ -33,10 +34,10 @@ export const getResilienceRanking: ResilienceServiceHandler['getResilienceRankin
   _req: GetResilienceRankingRequest,
 ): Promise<GetResilienceRankingResponse> => {
   const cached = await getCachedJson(RESILIENCE_RANKING_CACHE_KEY) as GetResilienceRankingResponse | null;
-  if (cached?.items?.length) return cached;
+  if (cached != null && (cached.items.length > 0 || (cached.greyedOut?.length ?? 0) > 0)) return cached;
 
   const countryCodes = await listScorableCountries();
-  if (countryCodes.length === 0) return { items: [] };
+  if (countryCodes.length === 0) return { items: [], greyedOut: [] };
 
   let cachedScores = await getCachedResilienceScores(countryCodes);
   const missing = countryCodes.filter((countryCode) => !cachedScores.has(countryCode));
@@ -49,17 +50,17 @@ export const getResilienceRanking: ResilienceServiceHandler['getResilienceRankin
     }
   }
 
+  const allItems = countryCodes.map((countryCode) => buildRankingItem(countryCode, cachedScores.get(countryCode)));
   const response: GetResilienceRankingResponse = {
-    items: sortRankingItems(
-      countryCodes.map((countryCode) => buildRankingItem(countryCode, cachedScores.get(countryCode))),
-    ),
+    items: sortRankingItems(allItems.filter((item) => item.overallCoverage >= GREY_OUT_COVERAGE_THRESHOLD)),
+    greyedOut: allItems.filter((item) => item.overallCoverage < GREY_OUT_COVERAGE_THRESHOLD),
   };
 
   const stillMissing = countryCodes.filter((countryCode) => !cachedScores.has(countryCode));
   if (stillMissing.length === 0) {
     await runRedisPipeline([
       ['SET', RESILIENCE_RANKING_CACHE_KEY, JSON.stringify(response), 'EX', RESILIENCE_RANKING_CACHE_TTL_SECONDS],
-      ['SET', RESILIENCE_RANKING_META_KEY, JSON.stringify({ fetchedAt: Date.now(), count: response.items.length }), 'EX', RESILIENCE_RANKING_META_TTL_SECONDS],
+      ['SET', RESILIENCE_RANKING_META_KEY, JSON.stringify({ fetchedAt: Date.now(), count: response.items.length + response.greyedOut.length }), 'EX', RESILIENCE_RANKING_META_TTL_SECONDS],
     ]);
   }
 
