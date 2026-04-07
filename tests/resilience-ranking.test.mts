@@ -51,7 +51,7 @@ describe('resilience ranking contracts', () => {
     const response = await getResilienceRanking({ request: new Request('https://example.com') } as never, {});
 
     assert.deepEqual(response, cached);
-    assert.equal(redis.has('resilience:score:YE'), false, 'cache hit must not trigger score warmup');
+    assert.equal(redis.has('resilience:score:v2:YE'), false, 'cache hit must not trigger score warmup');
   });
 
   it('returns all-greyed-out cached payload without rewarming (items=[], greyedOut non-empty)', async () => {
@@ -70,38 +70,38 @@ describe('resilience ranking contracts', () => {
     const response = await getResilienceRanking({ request: new Request('https://example.com') } as never, {});
 
     assert.deepEqual(response, cached);
-    assert.equal(redis.has('resilience:score:SS'), false, 'all-greyed-out cache hit must not trigger score warmup');
+    assert.equal(redis.has('resilience:score:v2:SS'), false, 'all-greyed-out cache hit must not trigger score warmup');
   });
 
   it('warms missing scores synchronously and returns complete ranking on first call', async () => {
     const { redis } = installRedis(RESILIENCE_FIXTURES);
     const domainWithCoverage = [{ name: 'political', dimensions: [{ name: 'd1', coverage: 0.9 }] }];
-    redis.set('resilience:score:NO', JSON.stringify({
+    redis.set('resilience:score:v2:NO', JSON.stringify({
       countryCode: 'NO',
       overallScore: 82,
       level: 'high',
       domains: domainWithCoverage,
-      cronbachAlpha: 0.82,
       trend: 'stable',
       change30d: 1.2,
       lowConfidence: false,
+      imputationShare: 0.05,
     }));
-    redis.set('resilience:score:US', JSON.stringify({
+    redis.set('resilience:score:v2:US', JSON.stringify({
       countryCode: 'US',
       overallScore: 61,
       level: 'medium',
       domains: domainWithCoverage,
-      cronbachAlpha: 0.67,
       trend: 'rising',
       change30d: 4.3,
       lowConfidence: false,
+      imputationShare: 0.1,
     }));
 
     const response = await getResilienceRanking({ request: new Request('https://example.com') } as never, {});
 
     const totalItems = response.items.length + (response.greyedOut?.length ?? 0);
     assert.equal(totalItems, 3, `expected 3 total items across ranked + greyedOut, got ${totalItems}`);
-    assert.ok(redis.has('resilience:score:YE'), 'missing country should be warmed during first call');
+    assert.ok(redis.has('resilience:score:v2:YE'), 'missing country should be warmed during first call');
     assert.ok(response.items.every((item) => item.overallScore >= 0), 'ranked items should all have computed scores');
     assert.ok(redis.has('resilience:ranking:v2'), 'fully scored ranking should be cached');
   });
