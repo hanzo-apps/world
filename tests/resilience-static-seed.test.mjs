@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 import {
   RESILIENCE_STATIC_INDEX_KEY,
   RESILIENCE_STATIC_META_KEY,
+  RESILIENCE_STATIC_SOURCE_VERSION,
   buildFailureRefreshKeys,
   buildManifest,
+  buildTradeToGdpMap,
   countryRedisKey,
   createCountryResolvers,
   finalizeCountryPayloads,
@@ -210,6 +212,28 @@ describe('resilience static seed CSV parsers', () => {
       assert.ok(result.get('DE')?.indicator?.includes('stress'), 'indicator must include "stress" to route correctly in scoreAquastatValue()');
     });
   });
+
+  describe('buildTradeToGdpMap', () => {
+    it('produces { source, tradeToGdpPct, year } shape for known countries', () => {
+      const input = new Map([
+        ['NO', { value: 70.5, year: 2023 }],
+        ['US', { value: 25.3, year: 2023 }],
+        ['SG', { value: 318.2, year: 2023 }],
+      ]);
+      const result = buildTradeToGdpMap(input);
+      assert.equal(result.size, 3);
+      const no = result.get('NO');
+      assert.ok(no != null);
+      assert.equal(no.source, 'worldbank');
+      assert.equal(no.tradeToGdpPct, 70.5);
+      assert.equal(no.year, 2023);
+      assert.equal(result.get('SG')?.tradeToGdpPct, 318.2);
+    });
+
+    it('throws when input map is empty', () => {
+      assert.throws(() => buildTradeToGdpMap(new Map()), /no usable rows/);
+    });
+  });
 });
 
 describe('resilience static seed parsers', () => {
@@ -290,6 +314,9 @@ describe('resilience static seed payload assembly', () => {
       iea: new Map([
         ['NO', { source: 'eurostat-nrg_ind_id', energyImportDependency: { value: -13.3, year: 2024, source: 'eurostat' } }],
       ]),
+      tradeToGdp: new Map([
+        ['NO', { source: 'worldbank', tradeToGdpPct: 70.5, year: 2023 }],
+      ]),
     }, 2026, '2026-04-03T12:00:00.000Z');
 
     assert.deepEqual([...payloads.keys()].sort(), ['NO', 'US', 'YE']);
@@ -303,7 +330,8 @@ describe('resilience static seed payload assembly', () => {
       fao: null,
       aquastat: null,
       iea: { source: 'eurostat-nrg_ind_id', energyImportDependency: { value: -13.3, year: 2024, source: 'eurostat' } },
-      coverage: { availableDatasets: 3, totalDatasets: 8, ratio: 0.375 },
+      tradeToGdp: { source: 'worldbank', tradeToGdpPct: 70.5, year: 2023 },
+      coverage: { availableDatasets: 4, totalDatasets: 9, ratio: 0.444 },
       seedYear: 2026,
       seededAt: '2026-04-03T12:00:00.000Z',
     });
@@ -326,7 +354,7 @@ describe('resilience static seed payload assembly', () => {
       failedDatasets: ['aquastat', 'gpi'],
       seedYear: 2026,
       seededAt: '2026-04-03T12:00:00.000Z',
-      sourceVersion: 'resilience-static-v1',
+      sourceVersion: RESILIENCE_STATIC_SOURCE_VERSION,
     });
 
     assert.deepEqual(buildFailureRefreshKeys(manifest), [
@@ -338,10 +366,13 @@ describe('resilience static seed payload assembly', () => {
     ]);
   });
 
-  it('skips reruns only after a successful snapshot for the same seed year', () => {
-    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150 }, 2026), true);
-    assert.equal(shouldSkipSeedYear({ status: 'error', seedYear: 2026, recordCount: 150 }, 2026), false);
-    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2025, recordCount: 150 }, 2026), false);
+  it('skips reruns only after a successful snapshot for the same seed year and source version', () => {
+    const v = RESILIENCE_STATIC_SOURCE_VERSION;
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: v }, 2026), true);
+    assert.equal(shouldSkipSeedYear({ status: 'error', seedYear: 2026, recordCount: 150, sourceVersion: v }, 2026), false);
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2025, recordCount: 150, sourceVersion: v }, 2026), false);
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: 'resilience-static-v1' }, 2026), false);
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150 }, 2026), false);
   });
 });
 
@@ -358,6 +389,7 @@ describe('recoverFailedDatasets', () => {
       wgi: new Map([['YE', { source: 'worldbank-wgi' }]]),
       infrastructure: new Map(), gpi: new Map(), rsf: new Map(),
       who: new Map(), fao: faoOverride, aquastat: new Map(), iea: new Map(),
+      tradeToGdp: new Map(),
     };
   }
 
