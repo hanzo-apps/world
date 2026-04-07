@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 
 import { getCachedJson } from '../../../_shared/redis';
+import { ENERGY_SPINE_KEY_PREFIX } from '../../../_shared/cache-keys';
 
 interface OwidMix {
   year?: number | null;
@@ -62,6 +63,54 @@ interface IeaStocks {
   anomaly?: boolean | null;
 }
 
+interface EnergySpine {
+  countryCode?: string;
+  updatedAt?: string;
+  sources?: {
+    mixYear?: number | null;
+    jodiOilMonth?: string | null;
+    jodiGasMonth?: string | null;
+    ieaStocksMonth?: string | null;
+  };
+  coverage?: {
+    hasMix?: boolean;
+    hasJodiOil?: boolean;
+    hasJodiGas?: boolean;
+    hasIeaStocks?: boolean;
+  };
+  oil?: {
+    crudeImportsKbd?: number;
+    gasolineDemandKbd?: number;
+    gasolineImportsKbd?: number;
+    dieselDemandKbd?: number;
+    dieselImportsKbd?: number;
+    jetDemandKbd?: number;
+    jetImportsKbd?: number;
+    lpgDemandKbd?: number;
+    lpgImportsKbd?: number;
+    daysOfCover?: number;
+    netExporter?: boolean;
+    belowObligation?: boolean;
+  };
+  gas?: {
+    lngImportsTj?: number;
+    pipeImportsTj?: number;
+    totalDemandTj?: number;
+    lngShareOfImports?: number;
+  };
+  mix?: {
+    coalShare?: number;
+    gasShare?: number;
+    oilShare?: number;
+    nuclearShare?: number;
+    renewShare?: number;
+    windShare?: number;
+    solarShare?: number;
+    hydroShare?: number;
+    importShare?: number;
+  };
+}
+
 const EMPTY: GetCountryEnergyProfileResponse = {
   mixAvailable: false,
   mixYear: 0,
@@ -115,6 +164,70 @@ function s(v: string | null | undefined): string {
   return typeof v === 'string' ? v : '';
 }
 
+function buildResponseFromSpine(
+  spine: EnergySpine,
+  gasStorage: GasStorage | null,
+  electricity: ElectricityEntry | null,
+): GetCountryEnergyProfileResponse {
+  const cov = spine.coverage ?? {};
+  const src = spine.sources ?? {};
+  const oil = spine.oil ?? {};
+  const gas = spine.gas ?? {};
+  const mix = spine.mix ?? {};
+
+  const electricityAvailable = electricity != null && electricity.priceMwhEur != null;
+
+  return {
+    mixAvailable: cov.hasMix === true,
+    mixYear: n(src.mixYear),
+    coalShare: n(mix.coalShare),
+    gasShare: n(mix.gasShare),
+    oilShare: n(mix.oilShare),
+    nuclearShare: n(mix.nuclearShare),
+    renewShare: n(mix.renewShare),
+    windShare: n(mix.windShare),
+    solarShare: n(mix.solarShare),
+    hydroShare: n(mix.hydroShare),
+    importShare: n(mix.importShare),
+
+    gasStorageAvailable: gasStorage != null,
+    gasStorageFillPct: n(gasStorage?.fillPct),
+    gasStorageChange1d: n(gasStorage?.fillPctChange1d),
+    gasStorageTrend: s(gasStorage?.trend),
+    gasStorageDate: s(gasStorage?.date),
+
+    electricityAvailable,
+    electricityPriceMwh: n(electricity?.priceMwhEur),
+    electricitySource: electricityAvailable ? s(electricity?.source) : '',
+    electricityDate: electricityAvailable ? s(electricity?.date) : '',
+
+    jodiOilAvailable: cov.hasJodiOil === true,
+    jodiOilDataMonth: s(src.jodiOilMonth),
+    gasolineDemandKbd: n(oil.gasolineDemandKbd),
+    gasolineImportsKbd: n(oil.gasolineImportsKbd),
+    dieselDemandKbd: n(oil.dieselDemandKbd),
+    dieselImportsKbd: n(oil.dieselImportsKbd),
+    jetDemandKbd: n(oil.jetDemandKbd),
+    jetImportsKbd: n(oil.jetImportsKbd),
+    lpgDemandKbd: n(oil.lpgDemandKbd),
+    lpgImportsKbd: n(oil.lpgImportsKbd),
+    crudeImportsKbd: n(oil.crudeImportsKbd),
+
+    jodiGasAvailable: cov.hasJodiGas === true,
+    jodiGasDataMonth: s(src.jodiGasMonth),
+    gasTotalDemandTj: n(gas.totalDemandTj),
+    gasLngImportsTj: n(gas.lngImportsTj),
+    gasPipeImportsTj: n(gas.pipeImportsTj),
+    gasLngShare: n(gas.lngShareOfImports != null ? gas.lngShareOfImports * 100 : null),
+
+    ieaStocksAvailable: cov.hasIeaStocks === true,
+    ieaStocksDataMonth: s(src.ieaStocksMonth),
+    ieaDaysOfCover: n(oil.daysOfCover),
+    ieaNetExporter: oil.netExporter === true,
+    ieaBelowObligation: oil.belowObligation === true,
+  };
+}
+
 export async function getCountryEnergyProfile(
   _ctx: ServerContext,
   req: GetCountryEnergyProfileRequest,
@@ -122,22 +235,38 @@ export async function getCountryEnergyProfile(
   const code = req.countryCode?.trim().toUpperCase() ?? '';
   if (!code || code.length !== 2) return EMPTY;
 
-  const [mixResult, gasStorageResult, electricityResult, jodiOilResult, jodiGasResult, ieaStocksResult] =
+  // Always read gas-storage and electricity directly — both update sub-daily
+  // (gas storage ~10:30 UTC, electricity ~14:00 UTC) while the spine seeds once
+  // at 06:00 UTC. Serving them from the spine would return stale data for up to 8h.
+  const [spineResult, gasStorageResult, electricityResult] = await Promise.allSettled([
+    getCachedJson(`${ENERGY_SPINE_KEY_PREFIX}${code}`, true),
+    getCachedJson(`energy:gas-storage:v1:${code}`, true),
+    getCachedJson(`energy:electricity:v1:${code}`, true),
+  ]);
+
+  const spine = spineResult.status === 'fulfilled' ? (spineResult.value as EnergySpine | null) : null;
+  const gasStorage = gasStorageResult.status === 'fulfilled' ? (gasStorageResult.value as GasStorage | null) : null;
+  const electricity = electricityResult.status === 'fulfilled' ? (electricityResult.value as ElectricityEntry | null) : null;
+
+  if (spine != null && typeof spine === 'object' && spine.coverage != null) {
+    return buildResponseFromSpine(spine, gasStorage, electricity);
+  }
+
+  // Fallback: 4-key direct join (cold cache or countries not yet in spine)
+  const [mixResult, jodiOilResult, jodiGasResult, ieaStocksResult] =
     await Promise.allSettled([
       getCachedJson(`energy:mix:v1:${code}`, true),
-      getCachedJson(`energy:gas-storage:v1:${code}`, true),
-      getCachedJson(`energy:electricity:v1:${code}`, true),
       getCachedJson(`energy:jodi-oil:v1:${code}`, true),
       getCachedJson(`energy:jodi-gas:v1:${code}`, true),
       getCachedJson(`energy:iea-oil-stocks:v1:${code}`, true),
     ]);
 
   const mix = mixResult.status === 'fulfilled' ? (mixResult.value as OwidMix | null) : null;
-  const gasStorage = gasStorageResult.status === 'fulfilled' ? (gasStorageResult.value as GasStorage | null) : null;
-  const electricity = electricityResult.status === 'fulfilled' ? (electricityResult.value as ElectricityEntry | null) : null;
   const jodiOil = jodiOilResult.status === 'fulfilled' ? (jodiOilResult.value as JodiOil | null) : null;
   const jodiGas = jodiGasResult.status === 'fulfilled' ? (jodiGasResult.value as JodiGas | null) : null;
   const ieaStocks = ieaStocksResult.status === 'fulfilled' ? (ieaStocksResult.value as IeaStocks | null) : null;
+
+  const electricityAvailable = electricity != null && electricity.priceMwhEur != null;
 
   return {
     mixAvailable: mix != null,
@@ -158,10 +287,10 @@ export async function getCountryEnergyProfile(
     gasStorageTrend: s(gasStorage?.trend),
     gasStorageDate: s(gasStorage?.date),
 
-    electricityAvailable: electricity != null && electricity.priceMwhEur != null,
+    electricityAvailable,
     electricityPriceMwh: n(electricity?.priceMwhEur),
-    electricitySource: electricity?.priceMwhEur != null ? s(electricity?.source) : '',
-    electricityDate: electricity?.priceMwhEur != null ? s(electricity?.date) : '',
+    electricitySource: electricityAvailable ? s(electricity?.source) : '',
+    electricityDate: electricityAvailable ? s(electricity?.date) : '',
 
     jodiOilAvailable: jodiOil != null,
     jodiOilDataMonth: s(jodiOil?.dataMonth),
