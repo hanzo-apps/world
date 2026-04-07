@@ -35,13 +35,13 @@ const ENTSO_E_REGIONS = [
   { region: 'SE', eic: '10Y1001A1001A46L', name: 'Sweden (Stockholm)' }, // SE3 bidding zone
 ];
 
-const EIA_REGIONS = [
-  { region: 'CISO',  name: 'California' },
-  { region: 'MISO',  name: 'Midwest' },
-  { region: 'PJM',   name: 'Mid-Atlantic' },
-  { region: 'NYISO', name: 'New York' },
-  { region: 'ERCO',  name: 'Texas (ERCOT)' },
-  { region: 'SPP',   name: 'Southwest' },
+export const EIA_REGIONS = [
+  { region: 'CISO',  respondent: 'CISO',  name: 'California' },
+  { region: 'MISO',  respondent: 'MISO',  name: 'Midwest' },
+  { region: 'PJM',   respondent: 'PJM',   name: 'Mid-Atlantic' },
+  { region: 'NYISO', respondent: 'NYIS',  name: 'New York' },
+  { region: 'ERCO',  respondent: 'ERCO',  name: 'Texas (ERCOT)' },
+  { region: 'SPP',   respondent: 'SWPP',  name: 'Southwest' },
 ];
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ async function fetchEiaRegion(region, apiKey, today) {
   const dateStr = isoDate(today);
   const params = new URLSearchParams({
     'data[]': 'value',
-    'facets[respondent][]': region.region,
+    'facets[respondent][]': region.respondent,
     start: isoDate(new Date(Date.now() - 2 * 24 * 3600 * 1000)),
     end: dateStr,
     'sort[0][column]': 'period',
