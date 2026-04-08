@@ -73,6 +73,7 @@ const SEED_DOMAINS = {
   'supply_chain:portwatch-ports': { key: 'seed-meta:supply_chain:portwatch-ports', intervalMin: 720 }, // 12h cron (0 */12 * * *); intervalMin = maxStaleMin / 3 (2160 / 3)
   'energy:chokepoint-flows': { key: 'seed-meta:energy:chokepoint-flows', intervalMin: 360 }, // 6h relay loop; intervalMin = maxStaleMin / 2 (720 / 2)
   'energy:spine':                 { key: 'seed-meta:energy:spine',                 intervalMin: 1440 }, // daily cron (0 6 * * *); intervalMin = maxStaleMin / 2 (2880 / 2)
+  'energy:ember': { key: 'seed-meta:energy:ember', intervalMin: 1440 }, // daily cron (0 8 * * *); intervalMin = maxStaleMin / 2 (2880 / 2)
 };
 
 async function getMetaBatch(keys) {
@@ -128,11 +129,12 @@ export default async function handler(req) {
     }
 
     const ageMs = now - (meta.fetchedAt || 0);
-    const stale = ageMs > maxStalenessMs;
+    const isError = meta.status === 'error';
+    const stale = ageMs > maxStalenessMs || isError;
     if (stale) staleCount++;
 
     seeds[domain] = {
-      status: stale ? 'stale' : 'ok',
+      status: stale ? (isError ? 'error' : 'stale') : 'ok',
       fetchedAt: meta.fetchedAt,
       recordCount: meta.recordCount ?? null,
       sourceVersion: meta.sourceVersion || null,

@@ -58,6 +58,8 @@ export const ENERGY_INTELLIGENCE_KEY = 'energy:intelligence:v1:feed';
 export const CHOKEPOINT_FLOWS_KEY = 'energy:chokepoint-flows:v1';
 export const ENERGY_SPINE_KEY_PREFIX = 'energy:spine:v1:';
 export const ENERGY_SPINE_COUNTRIES_KEY = 'energy:spine:v1:_countries';
+export const EMBER_ELECTRICITY_KEY_PREFIX = 'energy:ember:v1:';
+export const EMBER_ELECTRICITY_ALL_KEY = 'energy:ember:v1:_all';
 export const SPR_KEY = 'economic:spr:v1';
 export const REFINERY_UTIL_KEY = 'economic:refinery-util:v1';
 
