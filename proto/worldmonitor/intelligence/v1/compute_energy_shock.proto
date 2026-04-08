@@ -25,5 +25,19 @@ message ComputeEnergyShockScenarioResponse {
   repeated ProductImpact products = 6;
   int32  effective_cover_days = 7;
   string assessment           = 8;
-  bool   data_available       = 9;
+  bool   data_available       = 9;  // backward compat: equals jodi_oil_coverage
+
+  // field 10 reserved for future use
+
+  // v2 fields
+  bool   jodi_oil_coverage     = 11;  // JODI oil data present for this country
+  bool   comtrade_coverage     = 12;  // Comtrade crude flows data present
+  bool   iea_stocks_coverage   = 13;  // IEA strategic stocks data present
+  bool   portwatch_coverage    = 14;  // PortWatch live flow data present
+  string coverage_level        = 15;  // "full" | "partial" | "unsupported"
+  repeated string limitations  = 16;  // model assumption strings
+  bool   degraded              = 17;  // true when PortWatch absent/stale
+  string chokepoint_confidence = 18;  // "high" | "low" | "none"
+  optional double live_flow_ratio = 19;  // from energy:chokepoint-flows:v1, 0-1.5; absent when portwatch_coverage=false
+  // field 20 reserved for gas_impact (PR4)
 }

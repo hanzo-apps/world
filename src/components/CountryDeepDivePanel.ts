@@ -741,7 +741,10 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     computeBtn.textContent = 'Compute';
     computeBtn.style.cssText += ';font-size:11px;padding:3px 8px';
 
-    controls.append(chokepointSelect, disruptionSelect, computeBtn);
+    const coverageBadge = this.el('span', '');
+    coverageBadge.style.cssText = 'display:none;font-size:10px;padding:2px 5px;border-radius:3px;font-weight:600';
+
+    controls.append(chokepointSelect, disruptionSelect, computeBtn, coverageBadge);
     wrapper.append(controls);
 
     const resultArea = this.el('div', '');
@@ -758,6 +761,8 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
       const loading = this.el('div', 'cdp-economic-source', 'Computing\u2026');
       resultArea.append(loading);
       computeBtn.disabled = true;
+      coverageBadge.style.display = 'none';
+      coverageBadge.textContent = '';
 
       const url = toApiUrl(`/api/intelligence/v1/compute-energy-shock?country_code=${encodeURIComponent(code)}&chokepoint_id=${encodeURIComponent(chokepoint)}&disruption_pct=${disruption}`);
       globalThis.fetch(url)
@@ -765,6 +770,18 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         .then((result) => {
           resultArea.replaceChildren();
           resultArea.append(this.renderShockResult(result));
+          const lvl = result.coverageLevel ?? '';
+          if (lvl) {
+            const colors: Record<string, string> = {
+              full: 'background:#15803d;color:#dcfce7',
+              partial: 'background:#b45309;color:#fef3c7',
+              unsupported: 'background:#b91c1c;color:#fee2e2',
+            };
+            coverageBadge.style.cssText = `display:inline-block;font-size:10px;padding:2px 5px;border-radius:3px;font-weight:600;${colors[lvl] ?? ''}`;
+            coverageBadge.textContent = lvl;
+          } else {
+            coverageBadge.style.display = 'none';
+          }
         })
         .catch(() => {
           resultArea.replaceChildren();
@@ -786,12 +803,21 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
       return container;
     }
 
+    if (result.degraded) {
+      const warn = this.el('div', '');
+      warn.style.cssText = 'font-size:10px;color:#f59e0b;margin-bottom:6px;padding:3px 6px;background:#1c1400;border-radius:3px';
+      warn.textContent = 'Live flow data unavailable — using historical baseline';
+      container.append(warn);
+    }
+
     if (result.products.length > 0) {
       const table = this.el('table', '');
       table.style.cssText = 'width:100%;font-size:11px;border-collapse:collapse;margin-bottom:6px';
       const thead = this.el('thead', '');
       const hr = this.el('tr', '');
-      for (const h of ['Product', 'Demand', 'Loss', 'Deficit']) {
+      const headers = ['Product', 'Demand', 'Loss', 'Deficit'];
+      if (result.portwatchCoverage && result.liveFlowRatio != null) headers.push('Flow');
+      for (const h of headers) {
         const th = this.el('th', '');
         th.textContent = h;
         th.style.cssText = 'text-align:left;color:#aaa;padding:2px 4px';
@@ -810,6 +836,9 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
           `${p.outputLossKbd} kbd`,
           `${p.deficitPct.toFixed(1)}%`,
         ];
+        if (result.portwatchCoverage && result.liveFlowRatio != null) {
+          cells.push(`${Math.round(result.liveFlowRatio * 100)}%`);
+        }
         cells.forEach((val, i) => {
           const td = this.el('td', '');
           td.textContent = val;
@@ -822,10 +851,18 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
       container.append(table);
     }
 
-    if (result.effectiveCoverDays > 0) {
+    if (result.ieaStocksCoverage) {
       const coverRow = this.el('div', 'cdp-economic-source');
       coverRow.style.cssText += ';margin-bottom:4px';
-      coverRow.textContent = `IEA cover: ~${result.effectiveCoverDays} days under this scenario`;
+      let coverText: string;
+      if (result.effectiveCoverDays < 0) {
+        coverText = 'Net oil exporter — strategic reserve cover not applicable';
+      } else if (result.effectiveCoverDays > 0) {
+        coverText = `IEA cover: ~${result.effectiveCoverDays} days under this scenario`;
+      } else {
+        coverText = 'IEA cover: 0 days (reserves exhausted under this scenario)';
+      }
+      coverRow.textContent = coverText;
       container.append(coverRow);
     }
 
@@ -833,6 +870,24 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     assessmentEl.style.cssText = 'font-size:11px;color:#d1d5db;line-height:1.4;margin-top:4px';
     assessmentEl.textContent = result.assessment;
     container.append(assessmentEl);
+
+    if (result.limitations && result.limitations.length > 0) {
+      const details = this.el('details', '') as HTMLDetailsElement;
+      details.style.cssText = 'margin-top:6px;font-size:10px;color:#9ca3af';
+      const summary = this.el('summary', '');
+      summary.style.cssText = 'cursor:pointer;color:#6b7280';
+      summary.textContent = 'Model assumptions';
+      details.append(summary);
+      const ul = this.el('ul', '');
+      ul.style.cssText = 'margin:4px 0 0 12px;padding:0;list-style:disc';
+      for (const lim of result.limitations) {
+        const li = this.el('li', '');
+        li.textContent = lim;
+        ul.append(li);
+      }
+      details.append(ul);
+      container.append(details);
+    }
 
     return container;
   }
