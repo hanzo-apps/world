@@ -100,6 +100,7 @@ import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVarian
 import { getAuthState, subscribeAuthState } from '@/services/auth-state';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { MapPopup, type PopupType } from './MapPopup';
+import type { GetChokepointStatusResponse } from '@/services/supply-chain';
 import {
   updateHotspotEscalation,
   getHotspotEscalation,
@@ -5288,6 +5289,10 @@ export class DeckGLMap {
     this.kindnessPoints = points;
     this.syncPulseAnimation();
     this.render();
+  }
+
+  public setChokepointData(data: GetChokepointStatusResponse | null): void {
+    this.popup.setChokepointData(data);
   }
 
   public setHappinessScores(data: HappinessData): void {
