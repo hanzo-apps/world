@@ -25,6 +25,7 @@ import type * as payments_billing from "../payments/billing.js";
 import type * as payments_cacheActions from "../payments/cacheActions.js";
 import type * as payments_checkout from "../payments/checkout.js";
 import type * as payments_seedProductPlans from "../payments/seedProductPlans.js";
+import type * as payments_subscriptionEmails from "../payments/subscriptionEmails.js";
 import type * as payments_subscriptionHelpers from "../payments/subscriptionHelpers.js";
 import type * as payments_webhookHandlers from "../payments/webhookHandlers.js";
 import type * as payments_webhookMutations from "../payments/webhookMutations.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   "payments/cacheActions": typeof payments_cacheActions;
   "payments/checkout": typeof payments_checkout;
   "payments/seedProductPlans": typeof payments_seedProductPlans;
+  "payments/subscriptionEmails": typeof payments_subscriptionEmails;
   "payments/subscriptionHelpers": typeof payments_subscriptionHelpers;
   "payments/webhookHandlers": typeof payments_webhookHandlers;
   "payments/webhookMutations": typeof payments_webhookMutations;
