@@ -150,6 +150,7 @@ const STANDALONE_KEYS = {
   chokepointBaselines:      'energy:chokepoint-baselines:v1',
   portwatchChokepointsRef:  'portwatch:chokepoints:ref:v1',
   chokepointFlows:          'energy:chokepoint-flows:v1',
+  emberElectricity:         'energy:ember:v1:_all',
 };
 
 const SEED_META = {
@@ -283,6 +284,7 @@ const SEED_META = {
   chokepointBaselines:  { key: 'seed-meta:energy:chokepoint-baselines', maxStaleMin: 60 * 24 * 400 }, // 400 days
   portwatchChokepointsRef: { key: 'seed-meta:portwatch:chokepoints-ref', maxStaleMin: 60 * 24 * 2 }, // daily cron; 2d = 2× interval
   chokepointFlows:      { key: 'seed-meta:energy:chokepoint-flows',     maxStaleMin: 720 }, // 6h cron; 720min = 2x interval
+  emberElectricity:     { key: 'seed-meta:energy:ember',                maxStaleMin: 2880 }, // daily cron (08:00 UTC); 2880min = 48h = 2x interval
 };
 
 // Standalone keys that are populated on-demand by RPC handlers (not seeds).
@@ -398,12 +400,14 @@ export default async function handler(req) {
 
     let seedAge = null;
     let seedStale = null;
+    let seedError = false;
     let metaCount = null;
     if (seedCfg) {
       const metaRaw = keyMetaValues.get(seedCfg.key);
       const meta = parseRedisValue(metaRaw);
       if (meta?.status === 'error') {
         seedStale = true;
+        seedError = true;
       } else if (meta?.fetchedAt) {
         seedAge = Math.round((now - meta.fetchedAt) / 60_000);
         seedStale = seedAge > seedCfg.maxStaleMin;
@@ -411,12 +415,16 @@ export default async function handler(req) {
         seedStale = true;
       }
       if (meta?.count != null) metaCount = meta.count;
+      else if (meta?.recordCount != null) metaCount = meta.recordCount;
     }
 
     const size = metaCount ?? (hasData ? 1 : 0);
 
     let status;
-    if (!hasData) {
+    if (seedError === true) {
+      status = 'SEED_ERROR';
+      warnCount++;
+    } else if (!hasData) {
       if (EMPTY_DATA_OK_KEYS.has(name)) {
         if (seedStale === true) {
           status = 'STALE_SEED';
@@ -466,12 +474,14 @@ export default async function handler(req) {
     // Freshness tracking for standalone keys (same logic as bootstrap keys)
     let seedAge = null;
     let seedStale = null;
+    let seedError = false;
     let metaCount = null;
     if (seedCfg) {
       const metaRaw = keyMetaValues.get(seedCfg.key);
       const meta = parseRedisValue(metaRaw);
       if (meta?.status === 'error') {
         seedStale = true;
+        seedError = true;
       } else if (meta?.fetchedAt) {
         seedAge = Math.round((now - meta.fetchedAt) / 60_000);
         seedStale = seedAge > seedCfg.maxStaleMin;
@@ -480,6 +490,7 @@ export default async function handler(req) {
         seedStale = true;
       }
       if (meta?.count != null) metaCount = meta.count;
+      else if (meta?.recordCount != null) metaCount = meta.recordCount;
     }
 
     const size = metaCount ?? (hasData ? 1 : 0);
@@ -500,7 +511,10 @@ export default async function handler(req) {
     }
 
     let status;
-    if (!hasData) {
+    if (seedError === true) {
+      status = 'SEED_ERROR';
+      warnCount++;
+    } else if (!hasData) {
       if (cascadeCovered) {
         status = 'OK_CASCADE';
         okCount++;
@@ -566,7 +580,7 @@ export default async function handler(req) {
 
   if (overall !== 'HEALTHY' && overall !== 'WARNING') {
     const problemKeys = Object.entries(checks)
-      .filter(([, c]) => c.status === 'EMPTY' || c.status === 'EMPTY_DATA' || c.status === 'STALE_SEED')
+      .filter(([, c]) => c.status === 'EMPTY' || c.status === 'EMPTY_DATA' || c.status === 'STALE_SEED' || c.status === 'SEED_ERROR')
       .map(([k, c]) => `${k}:${c.status}${c.seedAgeMin != null ? `(${c.seedAgeMin}min)` : ''}`);
     console.log('[health] %s crits=[%s]', overall, problemKeys.join(', '));
     // Persist last failure snapshot to Redis (TTL 24h) for post-mortem inspection.
