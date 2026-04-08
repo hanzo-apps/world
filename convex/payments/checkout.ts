@@ -79,14 +79,9 @@ async function _createCheckoutSession(
       payload: {
         product_cart: [{ product_id: args.productId, quantity: 1 }],
         return_url: returnUrl,
-        ...(user.email
-          ? {
-              customer: {
-                email: user.email,
-                ...(user.name ? { name: user.name } : {}),
-              },
-            }
-          : {}),
+        // Note: deliberately not passing `customer` block — Dodo locks
+        // those fields as read-only. User identity is tracked via
+        // metadata.wm_user_id + HMAC signature instead.
         ...(args.discountCode ? { discount_code: args.discountCode } : {}),
         ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
         feature_flags: {
