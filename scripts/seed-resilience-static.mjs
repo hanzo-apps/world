@@ -29,7 +29,7 @@ export const RESILIENCE_STATIC_INDEX_KEY = 'resilience:static:index:v1';
 export const RESILIENCE_STATIC_META_KEY = 'seed-meta:resilience:static';
 export const RESILIENCE_STATIC_PREFIX = 'resilience:static:';
 export const RESILIENCE_STATIC_TTL_SECONDS = 400 * 24 * 60 * 60;
-export const RESILIENCE_STATIC_SOURCE_VERSION = 'resilience-static-v2';
+export const RESILIENCE_STATIC_SOURCE_VERSION = 'resilience-static-v4';
 export const RESILIENCE_STATIC_WINDOW_CRON = '0 */4 1-3 10 *';
 
 const LOCK_DOMAIN = 'resilience:static';
@@ -43,6 +43,8 @@ const WHO_INDICATORS = {
   uhcIndex: 'UHC_INDEX_REPORTED',
   // WHS4_100 from the issue body no longer resolves; WHO currently exposes MCV1 coverage on WHS8_110.
   measlesCoverage: process.env.RESILIENCE_WHO_MEASLES_INDICATOR || 'WHS8_110',
+  physiciansPer10k: 'HWF_0001',
+  healthExpPerCapitaUsd: 'GHED_CHE_pc_US_SHA2011',
 };
 const WORLD_BANK_BASE = 'https://api.worldbank.org/v2';
 const WHO_BASE = 'https://ghoapi.azureedge.net/api';
@@ -260,7 +262,7 @@ async function fetchWhoIndicatorRows(indicatorCode) {
   const params = new URLSearchParams({
     '$select': 'SpatialDim,TimeDim,NumericValue,Value',
     '$filter': "SpatialDimType eq 'COUNTRY'",
-    '$top': '1000',
+    '$top': '10000',
   });
   let nextUrl = `${WHO_BASE}/${encodeURIComponent(indicatorCode)}?${params}`;
   let pageCount = 0;
@@ -328,7 +330,23 @@ export async function fetchWhoDataset() {
     throw new Error('WHO: all indicator fetches failed');
   }
 
+  transformWhoPhysicianDensity(merged);
+
   return merged;
+}
+
+export function transformWhoPhysicianDensity(merged) {
+  for (const [, record] of merged) {
+    const per10k = record.indicators.physiciansPer10k;
+    if (per10k && per10k.value != null) {
+      record.indicators.physiciansPer1k = {
+        indicator: per10k.indicator,
+        value: roundMetric(per10k.value / 10),
+        year: per10k.year,
+      };
+    }
+    delete record.indicators.physiciansPer10k;
+  }
 }
 
 function parseDecimal(value) {
