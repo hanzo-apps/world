@@ -548,6 +548,15 @@ export interface ComputeEnergyShockScenarioResponse {
   effectiveCoverDays: number;
   assessment: string;
   dataAvailable: boolean;
+  jodiOilCoverage: boolean;
+  comtradeCoverage: boolean;
+  ieaStocksCoverage: boolean;
+  portwatchCoverage: boolean;
+  coverageLevel: string;
+  limitations: string[];
+  degraded: boolean;
+  chokepointConfidence: string;
+  liveFlowRatio?: number;
 }
 
 export interface ProductImpact {

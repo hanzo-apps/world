@@ -22,7 +22,7 @@ export function computeGulfShare(flows: ComtradeFlowLike[]): { share: number; ha
   let totalImports = 0;
   let gulfImports = 0;
   for (const flow of flows) {
-    const val = typeof flow.tradeValueUsd === 'number' ? flow.tradeValueUsd : 0;
+    const val = Number.isFinite(flow.tradeValueUsd) ? flow.tradeValueUsd : 0;
     if (val <= 0) continue;
     totalImports += val;
     if (GULF_PARTNER_CODES.has(String(flow.partnerCode))) {
@@ -46,6 +46,26 @@ export function computeEffectiveCoverDays(
   return daysOfCover;
 }
 
+export function deriveCoverageLevel(
+  jodiOil: boolean,
+  comtrade: boolean,
+  ieaStocksCoverage?: boolean,
+  degraded?: boolean,
+): 'full' | 'partial' | 'unsupported' {
+  if (!jodiOil) return 'unsupported';
+  if (!comtrade) return 'partial';
+  if (ieaStocksCoverage === false || degraded) return 'partial';
+  return 'full';
+}
+
+export function deriveChokepointConfidence(
+  liveFlowRatio: number | null,
+  degraded: boolean,
+): 'high' | 'low' | 'none' {
+  if (degraded || liveFlowRatio === null || !Number.isFinite(liveFlowRatio)) return 'none';
+  return 'high';
+}
+
 export function buildAssessment(
   code: string,
   chokepointId: string,
@@ -55,8 +75,12 @@ export function buildAssessment(
   daysOfCover: number,
   disruptionPct: number,
   products: Array<{ product: string; deficitPct: number }>,
+  coverageLevel?: 'full' | 'partial' | 'unsupported',
+  degraded?: boolean,
+  ieaStocksCoverage?: boolean,
+  comtradeCoverage?: boolean,
 ): string {
-  if (!dataAvailable) {
+  if (coverageLevel === 'unsupported' || !dataAvailable) {
     return `Insufficient import data for ${code} to model ${chokepointId} exposure.`;
   }
   if (effectiveCoverDays === -1) {
@@ -65,11 +89,14 @@ export function buildAssessment(
   if (gulfCrudeShare < 0.1) {
     return `${code} has low Gulf crude dependence (${Math.round(gulfCrudeShare * 100)}%); ${chokepointId} disruption has limited direct impact.`;
   }
+  const degradedNote = degraded ? ' (live flow data unavailable, using historical baseline)' : '';
+  const ieaCoverText = ieaStocksCoverage === false ? 'unknown' : `${daysOfCover} days`;
   if (effectiveCoverDays > 90) {
-    return `With ${daysOfCover} days IEA cover, ${code} can bridge a ${disruptionPct}% ${chokepointId} disruption for ~${effectiveCoverDays} days.`;
+    return `With ${daysOfCover} days IEA cover, ${code} can bridge a ${disruptionPct}% ${chokepointId} disruption for ~${effectiveCoverDays} days${degradedNote}.`;
   }
   const dieselDeficit = products.find((p) => p.product === 'Diesel')?.deficitPct ?? 0;
   const jetDeficit = products.find((p) => p.product === 'Jet fuel')?.deficitPct ?? 0;
   const worstDeficit = Math.max(dieselDeficit, jetDeficit);
-  return `${code} faces ${worstDeficit.toFixed(1)}% diesel/jet deficit under ${disruptionPct}% ${chokepointId} disruption; IEA cover: ${daysOfCover} days.`;
+  const proxyNote = comtradeCoverage === false ? '. Gulf share proxied at 40%' : '';
+  return `${code} faces ${worstDeficit.toFixed(1)}% diesel/jet deficit under ${disruptionPct}% ${chokepointId} disruption; IEA cover: ${ieaCoverText}${proxyNote}${degradedNote}.`;
 }
