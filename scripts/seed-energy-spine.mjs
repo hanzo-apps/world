@@ -96,9 +96,10 @@ async function redisMget(keys) {
 // ── Country list assembly ─────────────────────────────────────────────────────
 
 async function assembleCountryList() {
-  const [jodiOilCountries, owidCountries] = await Promise.allSettled([
+  const [jodiOilCountries, owidCountries, emberAll] = await Promise.allSettled([
     redisGet('energy:jodi-oil:v1:_countries'),
     redisGet('energy:mix:v1:_countries'),
+    redisGet('energy:ember:v1:_all'),
   ]);
 
   const jodiList = jodiOilCountries.status === 'fulfilled' && Array.isArray(jodiOilCountries.value)
@@ -107,10 +108,13 @@ async function assembleCountryList() {
   const owidList = owidCountries.status === 'fulfilled' && Array.isArray(owidCountries.value)
     ? owidCountries.value
     : [];
+  const emberList = emberAll.status === 'fulfilled' && emberAll.value && typeof emberAll.value === 'object'
+    ? Object.keys(emberAll.value)
+    : [];
 
-  // Union both lists — JODI oil is most complete for energy countries
-  const union = new Set([...jodiList, ...owidList]);
-  return [...union].filter(iso2 => typeof iso2 === 'string' && iso2.length === 2);
+  const union = new Set([...jodiList, ...owidList, ...emberList]);
+  const countries = [...union].filter(iso2 => typeof iso2 === 'string' && iso2.length === 2);
+  return { countries, jodiCount: jodiList.length, owidCount: owidList.length };
 }
 
 // ── Spine assembly for a single country ──────────────────────────────────────
@@ -163,12 +167,13 @@ function buildMixFields(mix) {
   };
 }
 
-function buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks) {
+function buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks, ember) {
   return {
     mixYear: mix ? (mix.year ?? null) : null,
     jodiOilMonth: jodiOil ? (jodiOil.dataMonth ?? null) : null,
     jodiGasMonth: jodiGas ? (jodiGas.dataMonth ?? null) : null,
     ieaStocksMonth: ieaStocks ? (ieaStocks.dataMonth ?? null) : null,
+    emberMonth: ember ? (ember.dataMonth ?? null) : null,
   };
 }
 
@@ -177,11 +182,10 @@ function buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks) {
  * All domain values are validated for required fields before writing.
  * Throws on schema sentinel violation (e.g., OWID mix missing coalShare).
  */
-// electricity and gasStorage are intentionally excluded from the spine.
-// Both update sub-daily (gas storage ~10:30 UTC, electricity ~14:00 UTC) while
-// the spine seeds once at 06:00 UTC. Including them would serve stale prices for
-// up to 8h. Handlers read those two keys directly alongside the spine read.
-export function buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks }) {
+// electricity prices and gasStorage are intentionally excluded from the spine
+// (they update sub-daily; the spine seeds once at 06:00 UTC). However, Ember
+// monthly generation mix IS included — it updates at most twice monthly.
+export function buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks, ember = null }) {
   // Schema sentinel: OWID mix must have coalShare field if data is present
   if (mix != null && !('coalShare' in mix)) {
     throw new Error(`OWID mix schema changed for ${iso2} — missing coalShare field`);
@@ -191,17 +195,26 @@ export function buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks }) {
   const hasJodiOil = jodiOil != null;
   const hasJodiGas = jodiGas != null;
   const hasIeaStocks = checkIeaAvailability(ieaStocks);
+  const hasEmber = ember != null && typeof ember.fossilShare === 'number';
 
   const comtradeCode = ISO2_TO_COMTRADE[iso2] ?? null;
 
   return {
     countryCode: iso2,
     updatedAt: new Date().toISOString(),
-    sources: buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks),
-    coverage: { hasMix, hasJodiOil, hasJodiGas, hasIeaStocks },
+    sources: buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks, ember),
+    coverage: { hasMix, hasJodiOil, hasJodiGas, hasIeaStocks, hasEmber },
     oil: buildOilFields(jodiOil, ieaStocks, hasIeaStocks),
     gas: buildGasFields(jodiGas),
     mix: buildMixFields(hasMix ? mix : null),
+    electricity: hasEmber ? {
+      fossilShare: ember.fossilShare,
+      renewShare: ember.renewShare ?? null,
+      nuclearShare: ember.nuclearShare ?? null,
+      coalShare: ember.coalShare ?? null,
+      gasShare: ember.gasShare ?? null,
+      demandTwh: ember.demandTwh ?? null,
+    } : null,
     shockInputs: {
       comtradeReporterCode: comtradeCode,
       supportedChokepoints: comtradeCode ? SHOCK_CHOKEPOINTS : [],
@@ -232,12 +245,24 @@ export async function main() {
   try {
     // Step 1: Collect country list (union of JODI oil + OWID mix countries)
     console.log('[energy-spine] Assembling country list...');
-    const countries = await assembleCountryList();
+    const { countries, jodiCount, owidCount } = await assembleCountryList();
     if (countries.length === 0) {
       console.error('[energy-spine] No countries found in source keys — aborting');
       await writeMeta(0, 'empty');
       return;
     }
+
+    if (jodiCount === 0 && owidCount === 0) {
+      console.error('[energy-spine] Both JODI oil and OWID mix returned zero countries — aborting to preserve snapshot');
+      const prevCountries = await redisGet(SPINE_COUNTRIES_KEY).catch(() => null);
+      if (Array.isArray(prevCountries) && prevCountries.length > 0) {
+        const prevKeys = prevCountries.map(iso2 => `${SPINE_KEY_PREFIX}${iso2}`);
+        await extendExistingTtl([...prevKeys, SPINE_COUNTRIES_KEY, SPINE_META_KEY], SPINE_TTL_SECONDS);
+      }
+      await writeMeta(0, 'core_sources_empty');
+      return;
+    }
+
     console.log(`[energy-spine] ${countries.length} countries to process`);
 
     // Step 2: Count-drop guard — check against previous _countries count
@@ -265,7 +290,7 @@ export async function main() {
     // Order: mix, jodiOil, jodiGas, ieaStocks (electricity + gasStorage excluded — they
     // update sub-daily and are always read directly by handlers, not from the spine)
     console.log('[energy-spine] Reading domain keys in batches...');
-    const BATCH_SIZE = 75; // 4 keys * 75 countries = 300 commands per pipeline call
+    const BATCH_SIZE = 60; // 5 keys * 60 countries = 300 commands per pipeline call
     const spineEntries = new Map();
 
     for (let i = 0; i < countries.length; i += BATCH_SIZE) {
@@ -277,6 +302,7 @@ export async function main() {
           `energy:jodi-oil:v1:${iso2}`,
           `energy:jodi-gas:v1:${iso2}`,
           `energy:iea-oil-stocks:v1:${iso2}`,
+          `energy:ember:v1:${iso2}`,
         );
       }
 
@@ -284,17 +310,17 @@ export async function main() {
 
       for (let j = 0; j < batch.length; j++) {
         const iso2 = batch[j];
-        const base = j * 4;
+        const base = j * 5;
         const mix = values[base];
         const jodiOil = values[base + 1];
         const jodiGas = values[base + 2];
         const ieaStocks = values[base + 3];
+        const ember = values[base + 4];
 
         try {
-          const spine = buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks });
+          const spine = buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks, ember });
           spineEntries.set(iso2, spine);
         } catch (err) {
-          // Schema sentinel or unexpected error — propagate to abort entire run
           throw new Error(`Schema validation failed for ${iso2}: ${err.message}`);
         }
       }

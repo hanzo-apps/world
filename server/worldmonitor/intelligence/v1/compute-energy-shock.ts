@@ -151,10 +151,11 @@ export async function computeEnergyShockScenario(
   const cached = await getCachedJson(cacheKey);
   if (cached) return cached as ComputeEnergyShockScenarioResponse;
 
-  const [jodiOilResult, ieaStocksResult, gulfShareResult] = await Promise.allSettled([
+  const [jodiOilResult, ieaStocksResult, gulfShareResult, emberResult] = await Promise.allSettled([
     getCachedJson(`energy:jodi-oil:v1:${code}`, true),
     getCachedJson(`energy:iea-oil-stocks:v1:${code}`, true),
     getGulfCrudeShare(code),
+    getCachedJson(`energy:ember:v1:${code}`, true),
   ]);
 
   const jodiOil = jodiOilResult.status === 'fulfilled' ? (jodiOilResult.value as JodiOil | null) : null;
@@ -163,7 +164,10 @@ export async function computeEnergyShockScenario(
     ? gulfShareResult.value
     : { share: 0, hasData: false };
 
-  const exposureMult = liveFlowRatio !== null ? liveFlowRatio : (CHOKEPOINT_EXPOSURE[chokepointId] ?? 1.0);
+  const emberData = emberResult.status === 'fulfilled' ? (emberResult.value as { fossilShare?: number } | null) : null;
+
+  const baseExposure = CHOKEPOINT_EXPOSURE[chokepointId] ?? 1.0;
+  const exposureMult = liveFlowRatio !== null ? baseExposure * liveFlowRatio : baseExposure;
 
   const jodiOilCoverage = jodiOil != null;
   const comtradeCoverage = comtradeHasData;
@@ -183,6 +187,11 @@ export async function computeEnergyShockScenario(
   limitations.push('refinery yield: 80% crude-to-product heuristic');
   if (degraded) {
     limitations.push('PortWatch flow data unavailable, using historical baseline multipliers');
+  }
+
+  const fossilShare = typeof emberData?.fossilShare === 'number' ? emberData.fossilShare : null;
+  if (fossilShare !== null && fossilShare > 70) {
+    limitations.push('high fossil grid dependency: limited electricity substitution capacity');
   }
 
   const effectiveGulfShare = !comtradeCoverage ? PROXIED_GULF_SHARE : rawGulfShare;
