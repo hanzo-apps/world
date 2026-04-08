@@ -617,4 +617,42 @@ describe('resilience dimension scorers', () => {
     assert.ok(withStatic.score > 0, `Static bundle present should produce non-zero score (got ${withStatic.score})`);
     assert.ok(withStatic.coverage > result.coverage, 'Coverage should be higher with static bundle present');
   });
+
+  it('scoreHealthPublicService: physician density contributes to score', async () => {
+    const makeReader = (physiciansPer1k: number) => async (key: string): Promise<unknown | null> => {
+      if (key === 'resilience:static:XX') return {
+        who: { indicators: {
+          uhcIndex: { value: 75, year: 2024 },
+          measlesCoverage: { value: 90, year: 2024 },
+          hospitalBeds: { value: 3, year: 2024 },
+          physiciansPer1k: { value: physiciansPer1k, year: 2024 },
+          healthExpPerCapitaUsd: { value: 2000, year: 2024 },
+        } },
+      };
+      return null;
+    };
+    const highDoc = await scoreHealthPublicService('XX', makeReader(4.5));
+    const lowDoc = await scoreHealthPublicService('XX', makeReader(0.3));
+    assert.ok(highDoc.score > lowDoc.score,
+      `High physician density (${highDoc.score}) should score better than low (${lowDoc.score})`);
+  });
+
+  it('scoreHealthPublicService: health expenditure contributes to score', async () => {
+    const makeReader = (healthExp: number) => async (key: string): Promise<unknown | null> => {
+      if (key === 'resilience:static:XX') return {
+        who: { indicators: {
+          uhcIndex: { value: 75, year: 2024 },
+          measlesCoverage: { value: 90, year: 2024 },
+          hospitalBeds: { value: 3, year: 2024 },
+          physiciansPer1k: { value: 2.0, year: 2024 },
+          healthExpPerCapitaUsd: { value: healthExp, year: 2024 },
+        } },
+      };
+      return null;
+    };
+    const highExp = await scoreHealthPublicService('XX', makeReader(6000));
+    const lowExp = await scoreHealthPublicService('XX', makeReader(100));
+    assert.ok(highExp.score > lowExp.score,
+      `High health expenditure (${highExp.score}) should score better than low (${lowExp.score})`);
+  });
 });
