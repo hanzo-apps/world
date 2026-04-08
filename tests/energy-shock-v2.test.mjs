@@ -19,6 +19,8 @@ import {
   computeGasDisruption,
   computeGasBufferDays,
   buildGasAssessment,
+  REFINERY_YIELD,
+  REFINERY_YIELD_BASIS,
 } from '../server/worldmonitor/intelligence/v1/_shock-compute.js';
 
 import { ISO2_TO_COMTRADE } from '../server/worldmonitor/intelligence/v1/_comtrade-reporters.js';
@@ -180,7 +182,7 @@ describe('mock: partial coverage limitations', () => {
     if (coverageLevel === 'partial') {
       limitations.push('Gulf crude share proxied at 40% (no Comtrade data)');
     }
-    limitations.push('refinery yield: 80% crude-to-product heuristic');
+    limitations.push(REFINERY_YIELD_BASIS);
 
     assert.ok(limitations.some((l) => l.includes('proxied at 40%')));
     assert.ok(limitations.some((l) => l.includes('refinery yield')));
@@ -192,7 +194,7 @@ describe('mock: partial coverage limitations', () => {
     if (coverageLevel === 'partial') {
       limitations.push('Gulf crude share proxied at 40% (no Comtrade data)');
     }
-    limitations.push('refinery yield: 80% crude-to-product heuristic');
+    limitations.push(REFINERY_YIELD_BASIS);
     assert.ok(!limitations.some((l) => l.includes('proxied at 40%')));
   });
 });
@@ -843,7 +845,7 @@ describe('gas-only mode coverage override', () => {
 
   it('gas-only limitations exclude oil-specific strings', () => {
     const limitations = [
-      'refinery yield: 80% crude-to-product heuristic',
+      REFINERY_YIELD_BASIS,
       'Gulf crude share proxied at 40% (no Comtrade data)',
       'IEA strategic stock data unavailable',
       'LNG chokepoint exposure estimates based on global trade route shares',
@@ -922,5 +924,95 @@ describe('gas-only mode zeros oil fields', () => {
     assert.equal(response.jodiOilCoverage, false);
     assert.equal(response.comtradeCoverage, false);
     assert.equal(response.ieaStocksCoverage, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFINERY_YIELD coefficients
+// ---------------------------------------------------------------------------
+
+describe('REFINERY_YIELD coefficients', () => {
+  it('has entries for all four products', () => {
+    for (const p of ['Gasoline', 'Diesel', 'Jet fuel', 'LPG']) {
+      assert.ok(p in REFINERY_YIELD, `missing ${p}`);
+      assert.ok(REFINERY_YIELD[p] > 0 && REFINERY_YIELD[p] < 1, `${p} yield out of range`);
+    }
+  });
+
+  it('yields sum to < 1.0 (crude has residuals)', () => {
+    const total = Object.values(REFINERY_YIELD).reduce((s, v) => s + v, 0);
+    assert.ok(total < 1.0, `total yield ${total} should be < 1.0`);
+    assert.ok(total > 0.8, `total yield ${total} should be > 0.8 (sanity check)`);
+  });
+
+  it('gasoline has highest yield', () => {
+    assert.ok(REFINERY_YIELD['Gasoline'] > REFINERY_YIELD['Diesel']);
+    assert.ok(REFINERY_YIELD['Gasoline'] > REFINERY_YIELD['Jet fuel']);
+    assert.ok(REFINERY_YIELD['Gasoline'] > REFINERY_YIELD['LPG']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// per-product deficit divergence with named yields
+// ---------------------------------------------------------------------------
+
+describe('per-product deficit with correct yield formula', () => {
+  it('outputLossKbd = crudeLossKbd * yieldFactor (not demand * ratio * yield)', () => {
+    const crudeLossKbd = 100;
+    const gasolineLoss = crudeLossKbd * REFINERY_YIELD['Gasoline']; // 100 * 0.44 = 44
+    const dieselLoss = crudeLossKbd * REFINERY_YIELD['Diesel'];     // 100 * 0.30 = 30
+    assert.equal(gasolineLoss, 44);
+    assert.equal(dieselLoss, 30);
+  });
+
+  it('deficit depends on demand, not on yield alone', () => {
+    const crudeLossKbd = 100;
+    const gasolineDemand = 500;
+    const jetDemand = 20;
+    const gasolineLoss = crudeLossKbd * REFINERY_YIELD['Gasoline']; // 44
+    const jetLoss = crudeLossKbd * REFINERY_YIELD['Jet fuel'];       // 10
+    const gasolineDeficit = (gasolineLoss / gasolineDemand) * 100;   // 8.8%
+    const jetDeficit = (jetLoss / jetDemand) * 100;                  // 50%
+    assert.ok(jetDeficit > gasolineDeficit, 'low-demand product has higher deficit even with lower yield');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REFINERY_YIELD_BASIS string
+// ---------------------------------------------------------------------------
+
+describe('REFINERY_YIELD_BASIS string', () => {
+  it('mentions all four products with percentages', () => {
+    assert.ok(REFINERY_YIELD_BASIS.includes('gasoline 44%'));
+    assert.ok(REFINERY_YIELD_BASIS.includes('diesel 30%'));
+    assert.ok(REFINERY_YIELD_BASIS.includes('jet 10%'));
+    assert.ok(REFINERY_YIELD_BASIS.includes('LPG 5%'));
+    assert.ok(REFINERY_YIELD_BASIS.includes('EIA'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAssessment picks actual worst product
+// ---------------------------------------------------------------------------
+
+describe('buildAssessment picks actual worst product', () => {
+  it('names gasoline when it has highest deficit', () => {
+    const products = [
+      { product: 'Gasoline', deficitPct: 25.0 },
+      { product: 'Diesel', deficitPct: 15.0 },
+      { product: 'Jet fuel', deficitPct: 10.0 },
+    ];
+    const msg = buildAssessment('US', 'hormuz', true, 0.4, 60, 30, 50, products, 'full', false, true, true);
+    assert.ok(msg.includes('25.0% gasoline deficit'), `expected gasoline deficit in: ${msg}`);
+  });
+
+  it('names jet fuel when it has highest deficit', () => {
+    const products = [
+      { product: 'Gasoline', deficitPct: 5.0 },
+      { product: 'Diesel', deficitPct: 8.0 },
+      { product: 'Jet fuel', deficitPct: 40.0 },
+    ];
+    const msg = buildAssessment('JP', 'malacca', true, 0.5, 60, 30, 50, products, 'full', false, true, true);
+    assert.ok(msg.includes('40.0% jet fuel deficit'), `expected jet fuel deficit in: ${msg}`);
   });
 });
