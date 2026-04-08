@@ -2239,6 +2239,28 @@ components:
                     type: string
                 dataAvailable:
                     type: boolean
+                jodiOilCoverage:
+                    type: boolean
+                    description: v2 fields
+                comtradeCoverage:
+                    type: boolean
+                ieaStocksCoverage:
+                    type: boolean
+                portwatchCoverage:
+                    type: boolean
+                coverageLevel:
+                    type: string
+                limitations:
+                    type: array
+                    items:
+                        type: string
+                degraded:
+                    type: boolean
+                chokepointConfidence:
+                    type: string
+                liveFlowRatio:
+                    type: number
+                    format: double
         ProductImpact:
             type: object
             properties:
