@@ -383,7 +383,8 @@ describe('resilience static seed payload assembly', () => {
       aquastat: null,
       iea: { source: 'eurostat-nrg_ind_id', energyImportDependency: { value: -13.3, year: 2024, source: 'eurostat' } },
       tradeToGdp: { source: 'worldbank', tradeToGdpPct: 70.5, year: 2023 },
-      coverage: { availableDatasets: 4, totalDatasets: 9, ratio: 0.444 },
+      fxReservesMonths: null,
+      coverage: { availableDatasets: 4, totalDatasets: 10, ratio: 0.4 },
       seedYear: 2026,
       seededAt: '2026-04-03T12:00:00.000Z',
     });
@@ -421,10 +422,17 @@ describe('resilience static seed payload assembly', () => {
   it('skips reruns only after a successful snapshot for the same seed year and source version', () => {
     const v = RESILIENCE_STATIC_SOURCE_VERSION;
     assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: v }, 2026), true);
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: v, failedDatasets: [] }, 2026), true);
     assert.equal(shouldSkipSeedYear({ status: 'error', seedYear: 2026, recordCount: 150, sourceVersion: v }, 2026), false);
     assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2025, recordCount: 150, sourceVersion: v }, 2026), false);
     assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: 'resilience-static-v1' }, 2026), false);
     assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150 }, 2026), false);
+  });
+
+  it('shouldSkipSeedYear returns false when failedDatasets is non-empty (partial success must retry)', () => {
+    const v = RESILIENCE_STATIC_SOURCE_VERSION;
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: v, failedDatasets: ['fxReservesMonths'] }, 2026), false);
+    assert.equal(shouldSkipSeedYear({ status: 'ok', seedYear: 2026, recordCount: 150, sourceVersion: v, failedDatasets: ['aquastat', 'fao'] }, 2026), false);
   });
 });
 
