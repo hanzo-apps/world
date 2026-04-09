@@ -19,6 +19,7 @@ export interface GetResilienceScoreResponse {
   stressScore: number;
   stressFactor: number;
   dataVersion: string;
+  scoreInterval?: ScoreInterval;
 }
 
 export interface ResilienceDomain {
@@ -34,6 +35,11 @@ export interface ResilienceDimension {
   coverage: number;
   observedWeight: number;
   imputedWeight: number;
+}
+
+export interface ScoreInterval {
+  p05: number;
+  p95: number;
 }
 
 export interface GetResilienceRankingRequest {
