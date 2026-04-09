@@ -19,9 +19,10 @@ export const setChannelForUser = internalMutation({
     chatId: v.optional(v.string()),
     webhookEnvelope: v.optional(v.string()),
     email: v.optional(v.string()),
+    webhookLabel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, channelType, chatId, webhookEnvelope, email } = args;
+    const { userId, channelType, chatId, webhookEnvelope, email, webhookLabel } = args;
     const existing = await ctx.db
       .query("notificationChannels")
       .withIndex("by_user_channel", (q) =>
@@ -41,6 +42,10 @@ export const setChannelForUser = internalMutation({
     } else if (channelType === "email") {
       if (!email) throw new ConvexError("email required for email channel");
       const doc = { userId, channelType: "email" as const, email, verified: true, linkedAt: now };
+      if (existing) { await ctx.db.replace(existing._id, doc); } else { await ctx.db.insert("notificationChannels", doc); }
+    } else if (channelType === "webhook") {
+      if (!webhookEnvelope) throw new ConvexError("webhookEnvelope required for webhook channel");
+      const doc = { userId, channelType: "webhook" as const, webhookEnvelope, verified: true, linkedAt: now, webhookLabel };
       if (existing) { await ctx.db.replace(existing._id, doc); } else { await ctx.db.insert("notificationChannels", doc); }
     } else {
       throw new ConvexError("discord channel must be set via set-discord-oauth");
@@ -182,6 +187,7 @@ export const setChannel = mutation({
     chatId: v.optional(v.string()),
     webhookEnvelope: v.optional(v.string()),
     email: v.optional(v.string()),
+    webhookLabel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -216,6 +222,14 @@ export const setChannel = mutation({
     } else if (args.channelType === "email") {
       if (!args.email) throw new ConvexError("email required for email channel");
       const doc = { userId, channelType: "email" as const, email: args.email, verified: true, linkedAt: now };
+      if (existing) {
+        await ctx.db.replace(existing._id, doc);
+      } else {
+        await ctx.db.insert("notificationChannels", doc);
+      }
+    } else if (args.channelType === "webhook") {
+      if (!args.webhookEnvelope) throw new ConvexError("webhookEnvelope required for webhook channel");
+      const doc = { userId, channelType: "webhook" as const, webhookEnvelope: args.webhookEnvelope, verified: true, linkedAt: now, webhookLabel: args.webhookLabel };
       if (existing) {
         await ctx.db.replace(existing._id, doc);
       } else {
