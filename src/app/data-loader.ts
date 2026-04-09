@@ -2591,13 +2591,12 @@ export class DataLoaderManager implements AppModule {
   async loadOilAnalytics(): Promise<void> {
     const energyPanel = this.ctx.panels['energy-complex'] as EnergyComplexPanel | undefined;
     try {
-      const [data, crudeResp, natGasResp, euGasResp, oilStocksResp, lngResp] = await Promise.allSettled([
+      const [data, crudeResp, natGasResp, euGasResp, oilStocksResp] = await Promise.allSettled([
         fetchOilAnalytics(),
         fetchCrudeInventoriesRpc(),
         fetchNatGasStorageRpc(),
         getEuGasStorageData(),
         getOilStocksAnalysisData(),
-        fetchLngVulnerability(),
       ]);
       if (data.status === 'fulfilled') {
         energyPanel?.updateAnalytics(data.value);
@@ -2628,9 +2627,13 @@ export class DataLoaderManager implements AppModule {
       if (oilStocksResp.status === 'fulfilled' && !oilStocksResp.value.unavailable) {
         energyPanel?.setOilStocksAnalysis(oilStocksResp.value);
       }
-      if (lngResp.status === 'fulfilled' && lngResp.value) {
-        energyPanel?.updateLngVulnerability(lngResp.value);
-      }
+      // Fire-and-forget: LNG vulnerability is hydration-only today (no network fallback).
+      // Decoupled so a future fetch path does not delay core energy panel rendering.
+      fetchLngVulnerability().then(lngData => {
+        energyPanel?.updateLngVulnerability(lngData);
+      }).catch(() => {
+        energyPanel?.updateLngVulnerability(null);
+      });
     } catch (e) {
       console.error('[App] Oil analytics failed:', e);
       this.callPanel('energy-complex', 'showError', undefined, () => void this.loadOilAnalytics());

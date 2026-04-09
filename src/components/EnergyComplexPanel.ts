@@ -59,8 +59,8 @@ export class EnergyComplexPanel extends Panel {
     this.render();
   }
 
-  public updateLngVulnerability(data: LngVulnerabilityData): void {
-    this.lngVulnerability = data.top20LngDependent?.length ? data : null;
+  public updateLngVulnerability(data: LngVulnerabilityData | null): void {
+    this.lngVulnerability = data?.top20LngDependent?.length ? data : null;
     this.render();
   }
 
