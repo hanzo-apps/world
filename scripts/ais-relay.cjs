@@ -91,12 +91,40 @@ const OPENSKY_PROXY_ENABLED = !!OPENSKY_PROXY_AUTH;
 
 const PROXY_URL = process.env.PROXY_URL || ''; // generic residential proxy (US exit) — http://user:pass@host:port or host:port:user:pass (Decodo)
 
-// OREF (Israel Home Front Command) siren alerts — fetched via HTTP proxy (Israel exit)
+// Tzeva Adom (primary) + OREF (fallback) siren alerts
+const TZEVA_ADOM_URL = 'https://api.tzevaadom.co.il/notifications';
 const OREF_PROXY_AUTH = process.env.OREF_PROXY_AUTH || ''; // format: user:pass@host:port
 const OREF_ALERTS_URL = 'https://www.oref.org.il/WarningMessages/alert/alerts.json';
 const OREF_HISTORY_URL = 'https://www.oref.org.il/WarningMessages/alert/History/AlertsHistory.json';
 const OREF_POLL_INTERVAL_MS = Math.max(30_000, Number(process.env.OREF_POLL_INTERVAL_MS || 300_000));
-const OREF_ENABLED = !!OREF_PROXY_AUTH;
+const OREF_PROXY_AVAILABLE = !!OREF_PROXY_AUTH;
+const SIREN_ALERTS_ENABLED = true; // Tzeva Adom is free, no proxy needed
+
+// Hebrew→English translation dictionaries for siren alerts
+const OREF_THREAT_TRANSLATIONS = (() => {
+  try { return JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'data', 'oref-threat-translations-he-en.json'), 'utf8')); }
+  catch { return {}; }
+})();
+const OREF_CITY_TRANSLATIONS = (() => {
+  try { return JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'data', 'israeli-localities-he-en.json'), 'utf8')); }
+  catch { return {}; }
+})();
+
+function translateHebrew(text) {
+  if (!text) return text;
+  if (OREF_THREAT_TRANSLATIONS[text]) return OREF_THREAT_TRANSLATIONS[text];
+  if (OREF_CITY_TRANSLATIONS[text]) return OREF_CITY_TRANSLATIONS[text];
+  let result = text;
+  for (const [heb, eng] of Object.entries(OREF_THREAT_TRANSLATIONS)) {
+    if (result.includes(heb)) result = result.replace(heb, eng);
+  }
+  return result;
+}
+
+function translateCity(city) {
+  if (!city) return city;
+  return OREF_CITY_TRANSLATIONS[city] || city;
+}
 const OREF_DATA_DIR = process.env.OREF_DATA_DIR || '';
 const OREF_LOCAL_FILE = (() => {
   if (!OREF_DATA_DIR) return '';
@@ -805,19 +833,102 @@ function orefCurlFetch(proxyAuth, url, { toFile } = {}) {
   return result;
 }
 
-async function orefFetchAlerts() {
-  if (!OREF_ENABLED) return;
-  try {
-    const raw = orefCurlFetch(OREF_PROXY_AUTH, OREF_ALERTS_URL);
-    const cleaned = stripBom(raw).trim();
+function categorizeOrefThreat(threat) {
+  const t = (threat || '').toLowerCase();
+  if (t.includes('missile') || t.includes('טיל') || t.includes('ballistic')) return 'MISSILE';
+  if (t.includes('rocket') || t.includes('רקט')) return 'ROCKET';
+  if (t.includes('drone') || t.includes('uav') || t.includes('כטב') || t.includes('hostile aircraft') || t.includes('כלי טיס')) return 'DRONE';
+  if (t.includes('mortar')) return 'MORTAR';
+  if (t.includes('infiltration') || t.includes('חדיר') || t.includes('מחבל')) return 'INFILTRATION';
+  if (t.includes('earthquake') || t.includes('רעידת')) return 'EARTHQUAKE';
+  if (t.includes('tsunami') || t.includes('צונמי')) return 'TSUNAMI';
+  if (t.includes('chemical') || t.includes('hazmat') || t.includes('חומרים מסוכנים') || t.includes('רדיולוגי')) return 'HAZMAT';
+  return 'ALERT';
+}
 
-    let alerts = [];
-    if (cleaned && cleaned !== '[]' && cleaned !== 'null') {
-      try {
-        const parsed = JSON.parse(cleaned);
-        alerts = Array.isArray(parsed) ? parsed : [parsed];
-      } catch { alerts = []; }
+async function tzevaAdomFetchAlerts() {
+  try {
+    const resp = await fetch(TZEVA_ADOM_URL, {
+      headers: { 'User-Agent': 'WorldMonitor/1.0', Accept: 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return data.map((alert) => {
+      const rawThreat = alert.threat || alert.title || '';
+      const rawCities = Array.isArray(alert.cities) ? alert.cities : (alert.data ? [alert.data] : []);
+      let translatedThreat = translateHebrew(rawThreat);
+      const translatedLocations = rawCities.map(translateCity);
+      // API sometimes puts city name in threat field; detect and move to locations
+      if (OREF_CITY_TRANSLATIONS[rawThreat]) {
+        if (!rawCities.includes(rawThreat)) {
+          translatedLocations.push(OREF_CITY_TRANSLATIONS[rawThreat]);
+        }
+        translatedThreat = 'Rocket/Missile Alert';
+      }
+      return {
+        id: alert.notificationId || String(Date.now()),
+        cat: categorizeOrefThreat(rawThreat),
+        title: translatedThreat,
+        titleHe: rawThreat,
+        data: translatedLocations,
+        dataHe: rawCities,
+        desc: alert.desc || '',
+        date: alert.date || new Date().toISOString(),
+        source: 'tzeva-adom',
+      };
+    });
+  } catch (err) {
+    console.warn(`[TzevaAdom] Fetch failed: ${err?.message || err}`);
+    return null;
+  }
+}
+
+async function orefFetchAlerts() {
+  let alerts = [];
+  let source = 'none';
+
+  // Primary: Tzeva Adom (free, no proxy needed)
+  const tzevaAlerts = await tzevaAdomFetchAlerts();
+  if (tzevaAlerts !== null) {
+    alerts = tzevaAlerts;
+    source = 'tzeva-adom';
+  } else if (OREF_PROXY_AVAILABLE) {
+    // Fallback: OREF direct (requires Israeli proxy)
+    try {
+      const raw = orefCurlFetch(OREF_PROXY_AUTH, OREF_ALERTS_URL);
+      const cleaned = stripBom(raw).trim();
+      if (cleaned && cleaned !== '[]' && cleaned !== 'null') {
+        try {
+          const parsed = JSON.parse(cleaned);
+          const orefArr = Array.isArray(parsed) ? parsed : [parsed];
+          alerts = orefArr.map((a) => ({
+            ...a,
+            title: translateHebrew(a.title || ''),
+            titleHe: a.title || '',
+            data: Array.isArray(a.data) ? a.data.map(translateCity) : a.data ? [translateCity(a.data)] : [],
+            dataHe: Array.isArray(a.data) ? a.data : a.data ? [a.data] : [],
+            source: 'oref-direct',
+          }));
+          source = 'oref-direct';
+        } catch { alerts = []; }
+      }
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString().trim() : '';
+      orefState.lastError = redactOrefError(stderr || err.message);
+      console.warn('[Relay] OREF fallback poll error:', orefState.lastError);
     }
+  }
+  if (source === 'none') {
+    orefState.lastError = orefState.lastError || 'All siren sources unavailable';
+    orefState.lastPollAt = Date.now();
+    console.warn('[Relay] Siren poll: both Tzeva Adom and OREF failed');
+    orefPreSerializeResponses();
+    return;
+  }
+
+  try {
 
     const newJson = JSON.stringify(alerts);
     const changed = newJson !== orefState.lastAlertsJson;
@@ -843,7 +954,7 @@ async function orefFetchAlerts() {
         : '';
       publishNotificationEvent({
         eventType: 'oref_siren',
-        payload: { title: orefTitle + orefLocationSuffix, source: 'OREF Pikud HaOref' },
+        payload: { title: orefTitle + orefLocationSuffix, source: source === 'tzeva-adom' ? 'Tzeva Adom / Pikud HaOref' : 'OREF Pikud HaOref' },
         severity: 'critical',
         variant: undefined,
       }).catch(e => console.warn('[Notify] OREF publish error:', e?.message));
@@ -876,7 +987,7 @@ async function orefFetchAlerts() {
 function orefPreSerializeResponses() {
   const ts = orefState.lastPollAt ? new Date(orefState.lastPollAt).toISOString() : new Date().toISOString();
   const alertsJson = JSON.stringify({
-    configured: OREF_ENABLED,
+    configured: SIREN_ALERTS_ENABLED,
     alerts: orefState.lastAlerts || [],
     historyCount24h: orefState.historyCount24h,
     totalHistoryCount: orefState.totalHistoryCount,
@@ -886,7 +997,7 @@ function orefPreSerializeResponses() {
   orefState._alertsCache = { json: alertsJson, gzip: gzipSyncBuffer(alertsJson), brotli: brotliSyncBuffer(alertsJson) };
 
   const historyJson = JSON.stringify({
-    configured: OREF_ENABLED,
+    configured: SIREN_ALERTS_ENABLED,
     history: orefState.history || [],
     historyCount24h: orefState.historyCount24h,
     totalHistoryCount: orefState.totalHistoryCount,
@@ -1110,10 +1221,11 @@ async function orefBootstrapHistoryWithRetry() {
 }
 
 async function startOrefPollLoop() {
-  if (!OREF_ENABLED) {
-    console.log('[Relay] OREF disabled (no OREF_PROXY_AUTH)');
+  if (!SIREN_ALERTS_ENABLED) {
+    console.log('[Relay] Siren alerts disabled');
     return;
   }
+  console.log(`[Relay] Siren alerts: primary=Tzeva Adom, fallback=${OREF_PROXY_AVAILABLE ? 'OREF (proxy)' : 'none'}`);
   await orefBootstrapHistoryWithRetry();
   console.log(`[Relay] OREF bootstrap complete (source: ${orefState.bootstrapSource || 'none'}, redis: ${UPSTASH_ENABLED})`);
   orefFetchAlerts().catch(e => console.warn('[Relay] OREF initial poll error:', e?.message || e));
@@ -8493,7 +8605,7 @@ const server = http.createServer(async (req, res) => {
         pollInFlightSince: telegramPollInFlight && telegramPollStartedAt ? new Date(telegramPollStartedAt).toISOString() : null,
       },
       oref: {
-        enabled: OREF_ENABLED,
+        enabled: SIREN_ALERTS_ENABLED,
         alertCount: orefState.lastAlerts?.length || 0,
         historyCount24h: orefState.historyCount24h,
         totalHistoryCount: orefState.totalHistoryCount,
@@ -8915,7 +9027,7 @@ const server = http.createServer(async (req, res) => {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=5, s-maxage=5, stale-while-revalidate=3',
       }, JSON.stringify({
-        configured: OREF_ENABLED,
+        configured: SIREN_ALERTS_ENABLED,
         alerts: orefState.lastAlerts || [],
         historyCount24h: orefState.historyCount24h,
         totalHistoryCount: orefState.totalHistoryCount,
@@ -8935,7 +9047,7 @@ const server = http.createServer(async (req, res) => {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=30, s-maxage=30, stale-while-revalidate=10',
       }, JSON.stringify({
-        configured: OREF_ENABLED,
+        configured: SIREN_ALERTS_ENABLED,
         history: orefState.history || [],
         historyCount24h: orefState.historyCount24h,
         totalHistoryCount: orefState.totalHistoryCount,
