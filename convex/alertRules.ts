@@ -21,6 +21,7 @@ export const setAlertRules = mutation({
     eventTypes: v.array(v.string()),
     sensitivity: sensitivityValidator,
     channels: v.array(channelTypeValidator),
+    aiDigestEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -37,13 +38,15 @@ export const setAlertRules = mutation({
     const now = Date.now();
 
     if (existing) {
-      await ctx.db.patch(existing._id, {
+      const patch: Record<string, unknown> = {
         enabled: args.enabled,
         eventTypes: args.eventTypes,
         sensitivity: args.sensitivity,
         channels: args.channels,
         updatedAt: now,
-      });
+      };
+      if (args.aiDigestEnabled !== undefined) patch.aiDigestEnabled = args.aiDigestEnabled;
+      await ctx.db.patch(existing._id, patch);
     } else {
       await ctx.db.insert("alertRules", {
         userId,
@@ -52,6 +55,7 @@ export const setAlertRules = mutation({
         eventTypes: args.eventTypes,
         sensitivity: args.sensitivity,
         channels: args.channels,
+        aiDigestEnabled: args.aiDigestEnabled ?? true,
         updatedAt: now,
       });
     }
@@ -130,6 +134,7 @@ export const setAlertRulesForUser = internalMutation({
     eventTypes: v.array(v.string()),
     sensitivity: sensitivityValidator,
     channels: v.array(channelTypeValidator),
+    aiDigestEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { userId, ...rest } = args;
@@ -141,13 +146,15 @@ export const setAlertRulesForUser = internalMutation({
       .unique();
     const now = Date.now();
     if (existing) {
-      await ctx.db.patch(existing._id, {
+      const patch: Record<string, unknown> = {
         enabled: rest.enabled,
         eventTypes: rest.eventTypes,
         sensitivity: rest.sensitivity,
         channels: rest.channels,
         updatedAt: now,
-      });
+      };
+      if (rest.aiDigestEnabled !== undefined) patch.aiDigestEnabled = rest.aiDigestEnabled;
+      await ctx.db.patch(existing._id, patch);
     } else {
       await ctx.db.insert("alertRules", { userId, ...rest, updatedAt: now });
     }

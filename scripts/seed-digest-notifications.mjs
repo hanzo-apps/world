@@ -12,10 +12,13 @@
  *   7. Updates digest:last-sent:v1:${userId}:${variant}
  */
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import dns from 'node:dns/promises';
 
 const require = createRequire(import.meta.url);
 const { decrypt } = require('./lib/crypto.cjs');
+const { callLLM } = require('./lib/llm-chain.cjs');
+const { fetchUserPreferences, extractUserContext, formatUserProfile } = require('./lib/user-context.cjs');
 const { Resend } = require('resend');
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -51,6 +54,8 @@ const DIGEST_LOOKBACK_MS = 24 * 60 * 60 * 1000; // 24h default lookback on first
 const DIGEST_CRITICAL_LIMIT = Infinity;
 const DIGEST_HIGH_LIMIT = 15;
 const DIGEST_MEDIUM_LIMIT = 10;
+const AI_SUMMARY_CACHE_TTL = 3600; // 1h
+const AI_DIGEST_ENABLED = process.env.AI_DIGEST_ENABLED !== '0';
 
 // ── Redis helpers ──────────────────────────────────────────────────────────────
 
@@ -429,6 +434,75 @@ function formatDigestHtml(stories, nowMs) {
 </div>`;
 }
 
+// ── AI summary generation ────────────────────────────────────────────────────
+
+function hashShort(str) {
+  return createHash('sha256').update(str).digest('hex').slice(0, 16);
+}
+
+async function generateAISummary(stories, rule) {
+  if (!AI_DIGEST_ENABLED) return null;
+  if (!stories || stories.length === 0) return null;
+
+  const prefs = await fetchUserPreferences(rule.userId, rule.variant ?? 'full');
+  if (!prefs) {
+    console.log(`[digest] No preferences for ${rule.userId} — skipping AI summary`);
+    return null;
+  }
+  const ctx = extractUserContext(prefs);
+  const profile = formatUserProfile(ctx, rule.variant ?? 'full');
+
+  const variant = rule.variant ?? 'full';
+  const storiesHash = hashShort(stories.map(s =>
+    `${s.titleHash ?? s.title}:${s.severity ?? ''}:${s.phase ?? ''}:${(s.sources ?? []).slice(0, 3).join(',')}`
+  ).sort().join('|'));
+  const ctxHash = hashShort(JSON.stringify(ctx));
+  const cacheKey = `digest:ai-summary:v1:${variant}:${storiesHash}:${ctxHash}`;
+
+  try {
+    const cached = await upstashRest('GET', cacheKey);
+    if (cached) {
+      console.log(`[digest] AI summary cache hit for ${rule.userId}`);
+      return cached;
+    }
+  } catch { /* miss */ }
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  const storyList = stories.slice(0, 20).map((s, i) => {
+    const phase = s.phase ? ` [${s.phase}]` : '';
+    const src = s.sources?.length > 0 ? ` (${s.sources.slice(0, 2).join(', ')})` : '';
+    return `${i + 1}. [${(s.severity ?? 'high').toUpperCase()}]${phase} ${s.title}${src}`;
+  }).join('\n');
+
+  const systemPrompt = `You are WorldMonitor's intelligence analyst. Today is ${dateStr} UTC.
+Write a personalized daily brief for a user focused on ${rule.variant ?? 'full'} intelligence.
+
+User profile:
+${profile}
+
+Rules:
+- Lead with the single most impactful development for this user
+- Connect events to watched assets/regions where relevant
+- 3-5 bullet points, 1-2 sentences each
+- Flag anything directly affecting watched assets
+- Separate facts from assessment
+- End with "Signals to watch:" (1-2 items)
+- Under 250 words`;
+
+  const summary = await callLLM(systemPrompt, storyList, { maxTokens: 600, temperature: 0.3, timeoutMs: 15_000 });
+  if (!summary) {
+    console.warn(`[digest] AI summary generation failed for ${rule.userId}`);
+    return null;
+  }
+
+  try {
+    await upstashRest('SET', cacheKey, summary, 'EX', String(AI_SUMMARY_CACHE_TTL));
+  } catch { /* best-effort cache write */ }
+
+  console.log(`[digest] AI summary generated for ${rule.userId} (${summary.length} chars)`);
+  return summary;
+}
+
 // ── Channel deactivation ──────────────────────────────────────────────────────
 
 async function deactivateChannel(userId, channelType) {
@@ -614,13 +688,6 @@ async function main() {
       continue;
     }
 
-    const text = formatDigest(stories, nowMs);
-    if (!text) continue;
-    const html = formatDigestHtml(stories, nowMs);
-
-    const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(nowMs));
-    const subject = `WorldMonitor Digest — ${shortDate}`;
-
     let channels = [];
     try {
       const chRes = await fetch(`${CONVEX_SITE_URL}/relay/channels`, {
@@ -639,10 +706,41 @@ async function main() {
     }
 
     const ruleChannelSet = new Set(rule.channels ?? []);
+    const deliverableChannels = channels.filter(ch => ruleChannelSet.has(ch.channelType) && ch.verified);
+    if (deliverableChannels.length === 0) {
+      console.log(`[digest] No deliverable channels for ${rule.userId} — skipping`);
+      continue;
+    }
+
+    let aiSummary = null;
+    if (AI_DIGEST_ENABLED && rule.aiDigestEnabled !== false) {
+      aiSummary = await generateAISummary(stories, rule);
+    }
+
+    let text = formatDigest(stories, nowMs);
+    if (!text) continue;
+    let html = formatDigestHtml(stories, nowMs);
+
+    if (aiSummary) {
+      text = `EXECUTIVE SUMMARY\n\n${aiSummary}\n\n${'─'.repeat(40)}\n\n${text}`;
+      if (html) {
+        const summaryHtml = `<div style="background:#111;border-left:3px solid #4ade80;padding:16px 20px;margin:0 0 24px 0;border-radius:4px;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#4ade80;margin-bottom:12px;">Executive Summary</div>
+<div style="font-size:14px;line-height:1.7;color:#d4d4d4;white-space:pre-wrap;">${escapeHtml(aiSummary)}</div>
+</div>`;
+        html = html.replace(
+          /(<div style="padding: 40px 32px 0;">)/,
+          (_, p1) => `${p1}\n${summaryHtml}`,
+        );
+      }
+    }
+
+    const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(nowMs));
+    const subject = aiSummary ? `WorldMonitor Intelligence Brief — ${shortDate}` : `WorldMonitor Digest — ${shortDate}`;
+
     let anyDelivered = false;
 
-    for (const ch of channels) {
-      if (!ruleChannelSet.has(ch.channelType) || !ch.verified) continue;
+    for (const ch of deliverableChannels) {
       let ok = false;
       if (ch.channelType === 'telegram' && ch.chatId) {
         ok = await sendTelegram(rule.userId, ch.chatId, text);
