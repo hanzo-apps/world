@@ -122,6 +122,14 @@ export interface CountryEnergyProfileData {
   ieaDaysOfCover: number;
   ieaNetExporter: boolean;
   ieaBelowObligation: boolean;
+  emberFossilShare: number;
+  emberRenewShare: number;
+  emberNuclearShare: number;
+  emberCoalShare: number;
+  emberGasShare: number;
+  emberDemandTwh: number;
+  emberDataMonth: string;
+  emberAvailable: boolean;
 }
 
 export interface CountryPortActivityData {
