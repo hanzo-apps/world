@@ -180,7 +180,7 @@ describe('get-bypass-options handler source code', () => {
   });
 
   it('reads chokepoint status cache via getCachedJson', () => {
-    assert.match(src, /getCachedJson\('supply_chain:chokepoints:v4'\)/);
+    assert.match(src, /getCachedJson\(CHOKEPOINT_STATUS_KEY\)/);
   });
 
   it('sorts options by liveScore ascending', () => {
@@ -204,12 +204,12 @@ describe('get-country-cost-shock handler source code', () => {
     assert.match(src, /if \(!isPro\) return empty/);
   });
 
-  it('uses threatLevelToInsurancePremiumBps for premium calculation', () => {
-    assert.match(src, /threatLevelToInsurancePremiumBps/);
+  it('uses warRiskTierToInsurancePremiumBps for premium calculation', () => {
+    assert.match(src, /warRiskTierToInsurancePremiumBps/);
   });
 
   it('reads chokepoint status cache via getCachedJson', () => {
-    assert.match(src, /getCachedJson\('supply_chain:chokepoints:v4'\)/);
+    assert.match(src, /getCachedJson\(CHOKEPOINT_STATUS_KEY\)/);
   });
 
   it('returns unavailableReason for non-energy sectors', () => {
@@ -228,6 +228,20 @@ describe('get-country-cost-shock handler source code', () => {
   it('averages deficitPct across all products (no crude product entry)', () => {
     assert.match(src, /productDeficits/);
     assert.doesNotMatch(src, /product.*===.*'crude'/);
+  });
+
+  it('productDeficits must NOT filter before averaging — zero-deficit products must stay in denominator', () => {
+    assert.ok(
+      !src.includes('.filter((d: number) => d > 0)') && !src.includes('.filter((d) => d > 0)'),
+      'productDeficits must NOT filter before averaging — zero-deficit products must stay in denominator'
+    );
+  });
+
+  it('coverageDays must clamp negative sentinel for net exporters', () => {
+    assert.ok(
+      src.includes('Math.max(0, shock?.effectiveCoverDays'),
+      'coverageDays must clamp negative sentinel for net exporters'
+    );
   });
 });
 

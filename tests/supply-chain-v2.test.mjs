@@ -165,6 +165,7 @@ describe('Cache keys bumped to v2', () => {
   });
 
   it('cache-keys.ts chokepoints key is v4', () => {
+    // BOOTSTRAP_CACHE_KEYS must keep the raw string literal (bootstrap.test.mjs enforces string-literal values)
     assert.match(cacheKeysSrc, /chokepoints:\s*'supply_chain:chokepoints:v4'/);
   });
 
@@ -172,8 +173,9 @@ describe('Cache keys bumped to v2', () => {
     assert.match(cacheKeysSrc, /minerals:\s*'supply_chain:minerals:v2'/);
   });
 
-  it('chokepoint handler uses v4 redis key', () => {
-    assert.match(chokepointSrc, /REDIS_CACHE_KEY\s*=\s*'supply_chain:chokepoints:v4'/);
+  it('chokepoint handler uses CHOKEPOINT_STATUS_KEY constant', () => {
+    // Handler now imports CHOKEPOINT_STATUS_KEY from cache-keys.ts instead of defining a local duplicate
+    assert.match(chokepointSrc, /CHOKEPOINT_STATUS_KEY\s+as\s+REDIS_CACHE_KEY/);
   });
 
   it('minerals handler uses v2 redis key', () => {
