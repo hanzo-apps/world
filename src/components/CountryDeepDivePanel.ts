@@ -499,7 +499,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
     const hasAny = data.mixAvailable || data.jodiOilAvailable || data.ieaStocksAvailable
       || data.jodiGasAvailable || data.gasStorageAvailable || data.electricityAvailable
-      || data.emberAvailable;
+      || data.emberAvailable || data.sprAvailable;
 
     if (!hasAny) {
       this.energyBody.append(this.makeEmpty('Energy data unavailable for this country.'));
@@ -679,6 +679,33 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         section.append(barOuter);
       }
       this.energyBody.append(section);
+    }
+
+    if (data.sprAvailable && data.sprRegime === 'government_spr' && !data.sprIeaMember) {
+      const section = this.el('div', '');
+      section.style.cssText = 'margin-top:10px';
+      const row = this.el('div', '');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px';
+      const badge = this.el('span', '');
+      badge.style.cssText = 'background:#3b82f6;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px';
+      const capText = data.sprCapacityMb > 0 ? ` (${data.sprCapacityMb}Mb)` : '';
+      badge.textContent = `Strategic Reserve: ${data.sprOperator || 'Government SPR'}${capText}`;
+      row.append(badge);
+      section.append(row);
+      this.energyBody.append(section);
+    } else if (data.sprAvailable && data.sprRegime === 'spare_capacity') {
+      const section = this.el('div', '');
+      section.style.cssText = 'margin-top:10px';
+      const muted = this.el('div', '');
+      muted.style.cssText = 'color:#6b7280;font-size:11px';
+      muted.textContent = 'Spare capacity producer (no formal SPR)';
+      section.append(muted);
+      this.energyBody.append(section);
+    } else if (data.sprAvailable && data.sprRegime === 'none') {
+      const note = this.el('div', 'cdp-economic-source');
+      note.style.cssText += ';color:#ef4444;opacity:0.7';
+      note.textContent = 'No known strategic petroleum reserve program';
+      this.energyBody.append(note);
     }
 
     const hasLiveSignals = data.gasStorageAvailable || data.electricityAvailable;
