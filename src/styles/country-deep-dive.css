@@ -296,6 +296,10 @@
 }
 
 /* Maritime Activity Table */
+.cdp-maritime-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+}
 .cdp-maritime-table {
   width: 100%;
   border-collapse: separate;
@@ -304,6 +308,10 @@
 }
 
 .cdp-maritime-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-bg, #0a0a0a);
   text-align: left;
   color: var(--text-muted);
   font-weight: 600;
@@ -359,8 +367,8 @@
 
 .cdp-energy-donut {
   position: relative;
-  width: 90px;
-  height: 90px;
+  width: 120px;
+  height: 120px;
   flex-shrink: 0;
 }
 
