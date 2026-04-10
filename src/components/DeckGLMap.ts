@@ -401,6 +401,7 @@ export class DeckGLMap {
   private tradeRouteSegments: TradeRouteSegment[] = resolveTradeRouteSegments();
   private storedChokepointData: GetChokepointStatusResponse | null = null;
   private scenarioState: ScenarioVisualState | null = null;
+  private affectedIso2Set: Set<string> = new Set();
   private positiveEvents: PositiveGeoEvent[] = [];
   private kindnessPoints: KindnessPoint[] = [];
   private imageryScenes: ImageryScene[] = [];
@@ -1744,6 +1745,9 @@ export class DeckGLMap {
       const sanctionsLayer = this.createSanctionsChoroplethLayer();
       if (sanctionsLayer) layers.push(sanctionsLayer);
     }
+    // Scenario heat layer (affected countries tint)
+    const scenarioHeat = this.scenarioState ? this.createScenarioHeatLayer() : null;
+    if (scenarioHeat) layers.push(scenarioHeat);
     // Phase 8: Species recovery zones
     if (mapLayers.speciesRecovery && this.speciesRecoveryZones.length > 0) {
       layers.push(this.createSpeciesRecoveryLayer());
@@ -3523,6 +3527,23 @@ export class DeckGLMap {
         return [0, 0, 0, 0] as [number, number, number, number];
       },
       pickable: false,
+    });
+  }
+
+  private createScenarioHeatLayer(): GeoJsonLayer | null {
+    if (!this.affectedIso2Set.size || !this.countriesGeoJsonData) return null;
+    return new GeoJsonLayer({
+      id: 'scenario-heat-layer',
+      data: this.countriesGeoJsonData,
+      stroked: false,
+      filled: true,
+      extruded: false,
+      pickable: false,
+      getFillColor: (feature: { properties?: Record<string, unknown> }) => {
+        const code = feature.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+        return (code && this.affectedIso2Set.has(code) ? [220, 60, 40, 80] : [0, 0, 0, 0]) as [number, number, number, number];
+      },
+      updateTriggers: { getFillColor: [this.scenarioState?.scenarioId ?? null] },
     });
   }
 
@@ -5434,6 +5455,7 @@ export class DeckGLMap {
    */
   public setScenarioState(state: ScenarioVisualState | null): void {
     this.scenarioState = state;
+    this.affectedIso2Set = new Set(state?.affectedIso2s ?? []);
     this.render();
   }
 
