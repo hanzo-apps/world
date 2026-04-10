@@ -28,6 +28,11 @@ import { renderStoryToCanvas } from '@/services/story-renderer';
 import { openStoryModal } from '@/components/StoryModal';
 import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { IntelligenceServiceClient } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
+import { TradeServiceClient } from '@/generated/client/worldmonitor/trade/v1/service_client';
+import { SupplyChainServiceClient } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
+import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
+import { hasPremiumAccess } from '@/services/panel-gating';
+import { getAuthState } from '@/services/auth-state';
 import { showMapContextMenu } from '@/components/MapContextMenu';
 import { BETA_MODE } from '@/config/beta';
 import { MILITARY_BASES } from '@/config';
@@ -40,6 +45,7 @@ import type { StrategicPosturePanel } from '@/components/StrategicPosturePanel';
 import type { NewsItem } from '@/types';
 import { getNearbyInfrastructure } from '@/services/related-assets';
 import { toFlagEmoji } from '@/utils/country-flag';
+import { iso2ToIso3, iso2ToUnCode } from '@/utils/country-codes';
 import { buildDependencyGraph } from '@/services/infrastructure-cascade';
 import { getActiveFrameworkForPanel, subscribeFrameworkChange } from '@/services/analysis-framework-store';
 import { fetchCountryChokepointIndex } from '@/services/supply-chain';
@@ -408,6 +414,10 @@ export class CountryIntelManager implements AppModule {
         this.ctx.countryBriefPage.updateTradeExposure?.(null);
       });
 
+    if (hasPremiumAccess(getAuthState())) {
+      this.fetchProSections(code);
+    }
+
     this.mountCountryTimeline(code, country);
 
     try {
@@ -522,6 +532,100 @@ export class CountryIntelManager implements AppModule {
       this.ctx.countryBriefPage?.updateBrief({ brief: '', country, code, error: 'Failed to generate brief' });
     }
   }
+
+  private fetchProSections(code: string): void {
+    const rpcBase = getRpcBaseUrl();
+    const fetchFn = (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args);
+    const economicClient = new EconomicServiceClient(rpcBase, { fetch: fetchFn });
+    const intelClientPro = new IntelligenceServiceClient(rpcBase, { fetch: fetchFn });
+    const tradeClient = new TradeServiceClient(rpcBase, { fetch: fetchFn });
+    const supplyChainClient = new SupplyChainServiceClient(rpcBase, { fetch: fetchFn });
+
+    const iso3 = iso2ToIso3(code);
+
+    economicClient.getNationalDebt({}).then(resp => {
+      if (this.ctx.countryBriefPage?.getCode() !== code) return;
+      const entry = iso3 ? resp.entries?.find(e => e.iso3 === iso3) : null;
+      this.ctx.countryBriefPage.updateNationalDebt?.(entry ? {
+        debtToGdp: entry.debtToGdp,
+        debtUsd: entry.debtUsd,
+        annualGrowth: entry.annualGrowth,
+        source: entry.source,
+      } : null);
+    }).catch(() => {
+      if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateNationalDebt?.(null);
+    });
+
+    intelClientPro.getCountryRisk({ countryCode: code }).then(resp => {
+      if (this.ctx.countryBriefPage?.getCode() !== code) return;
+      this.ctx.countryBriefPage.updateSanctionsPressure?.(resp.sanctionsCount > 0 ? {
+        entryCount: resp.sanctionsCount,
+        sanctionsActive: resp.sanctionsActive,
+      } : null);
+    }).catch(() => {
+      if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateSanctionsPressure?.(null);
+    });
+
+    const unCode = iso2ToUnCode(code);
+    if (unCode) {
+      tradeClient.listComtradeFlows({ reporterCode: unCode, cmdCode: '', anomaliesOnly: false }).then(resp => {
+        if (this.ctx.countryBriefPage?.getCode() !== code) return;
+        const topFlows = (resp.flows || [])
+          .sort((a, b) => b.tradeValueUsd - a.tradeValueUsd)
+          .slice(0, 5)
+          .map(f => ({ partnerName: f.partnerName, cmdDesc: f.cmdDesc, tradeValueUsd: f.tradeValueUsd, yoyChange: f.yoyChange }));
+        this.ctx.countryBriefPage.updateComtradeFlows?.(topFlows.length > 0 ? topFlows : null);
+      }).catch(() => {
+        if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateComtradeFlows?.(null);
+      });
+
+      tradeClient.getTariffTrends({ reportingCountry: unCode, productSector: '', years: 10, partnerCountry: '' }).then(resp => {
+        if (this.ctx.countryBriefPage?.getCode() !== code) return;
+        const pts = resp.datapoints || [];
+        const latest = pts[pts.length - 1];
+        this.ctx.countryBriefPage.updateTariffTrends?.(latest ? {
+          currentRate: resp.effectiveTariffRate?.tariffRate ?? latest.tariffRate,
+          trend: pts.length >= 2 && pts[pts.length - 1]!.tariffRate > pts[pts.length - 2]!.tariffRate ? 'rising' : 'falling',
+          datapoints: pts.map(p => ({ year: p.year, tariffRate: p.tariffRate })),
+        } : null);
+      }).catch(() => {
+        if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateTariffTrends?.(null);
+      });
+    } else {
+      this.ctx.countryBriefPage?.updateComtradeFlows?.(null);
+      this.ctx.countryBriefPage?.updateTariffTrends?.(null);
+    }
+
+    supplyChainClient.getCountryChokepointIndex({ iso2: code, hs2: '27' }).then(resp => {
+      if (this.ctx.countryBriefPage?.getCode() !== code) return;
+      const exps = resp.exposures || [];
+      this.ctx.countryBriefPage.updateChokepointExposure?.(exps.length > 0 ? {
+        vulnerabilityIndex: resp.vulnerabilityIndex,
+        exposures: exps.slice(0, 3).map(e => ({ chokepointName: e.chokepointName, exposureScore: e.exposureScore })),
+      } : null);
+
+      if (resp.primaryChokepointId) {
+        supplyChainClient.getCountryCostShock({ iso2: code, chokepointId: resp.primaryChokepointId, hs2: '27' }).then(shock => {
+          if (this.ctx.countryBriefPage?.getCode() !== code) return;
+          this.ctx.countryBriefPage.updateCostShock?.((shock.supplyDeficitPct > 0 || shock.coverageDays > 0) ? {
+            supplyDeficitPct: shock.supplyDeficitPct,
+            coverageDays: shock.coverageDays,
+            warRiskTier: shock.warRiskTier,
+          } : null);
+        }).catch(() => {
+          if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateCostShock?.(null);
+        });
+      } else {
+        this.ctx.countryBriefPage.updateCostShock?.(null);
+      }
+    }).catch(() => {
+      if (this.ctx.countryBriefPage?.getCode() === code) {
+        this.ctx.countryBriefPage.updateChokepointExposure?.(null);
+        this.ctx.countryBriefPage.updateCostShock?.(null);
+      }
+    });
+  }
+
 
   refreshOpenBrief(): void {
     const page = this.ctx.countryBriefPage;
