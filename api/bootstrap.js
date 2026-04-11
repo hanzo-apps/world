@@ -97,6 +97,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   lngVulnerability:     'energy:lng-vulnerability:v1',
   sprPolicies:          'energy:spr-policies:v1',
   aaiiSentiment:        'market:aaii-sentiment:v1',
+  breadthHistory:       'market:breadth-history:v1',
 };
 
 const SLOW_KEYS = new Set([
@@ -137,6 +138,7 @@ const SLOW_KEYS = new Set([
   'lngVulnerability',
   'sprPolicies',
   'aaiiSentiment',
+  'breadthHistory',
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'ddosAttacks', 'trafficAnomalies', 'macroSignals', 'chokepoints',

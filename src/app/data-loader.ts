@@ -162,6 +162,7 @@ import {
   SocialVelocityPanel,
   WsbTickerScannerPanel,
   AAIISentimentPanel,
+  MarketBreadthPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { classifyNewsItem } from '@/services/positive-classifier';
@@ -3329,6 +3330,16 @@ export class DataLoaderManager implements AppModule {
       await panel.fetchData();
     } catch (e) {
       console.error('[App] AAII sentiment load failed:', e);
+    }
+  }
+
+  async loadMarketBreadth(): Promise<void> {
+    const panel = this.ctx.panels['market-breadth'] as MarketBreadthPanel | undefined;
+    if (!panel) return;
+    try {
+      await panel.fetchData();
+    } catch (e) {
+      console.error('[App] Market breadth load failed:', e);
     }
   }
 

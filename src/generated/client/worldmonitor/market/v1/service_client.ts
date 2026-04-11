@@ -484,6 +484,25 @@ export interface InsiderTransaction {
   transactionDate: string;
 }
 
+export interface GetMarketBreadthHistoryRequest {
+}
+
+export interface GetMarketBreadthHistoryResponse {
+  currentPctAbove20d?: number;
+  currentPctAbove50d?: number;
+  currentPctAbove200d?: number;
+  updatedAt: string;
+  history: BreadthSnapshot[];
+  unavailable: boolean;
+}
+
+export interface BreadthSnapshot {
+  date: string;
+  pctAbove20d?: number;
+  pctAbove50d?: number;
+  pctAbove200d?: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -1022,6 +1041,29 @@ export class MarketServiceClient {
     }
 
     return await resp.json() as GetInsiderTransactionsResponse;
+  }
+
+  async getMarketBreadthHistory(req: GetMarketBreadthHistoryRequest, options?: MarketServiceCallOptions): Promise<GetMarketBreadthHistoryResponse> {
+    let path = "/api/market/v1/get-market-breadth-history";
+    const url = this.baseURL + path;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetMarketBreadthHistoryResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {
