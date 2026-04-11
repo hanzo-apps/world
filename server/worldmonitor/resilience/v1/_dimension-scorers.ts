@@ -47,25 +47,70 @@ interface WeightedMetric {
   imputed?: boolean;
 }
 
+// Four-class imputation taxonomy (Phase 1 T1.7 of the country-resilience
+// reference-grade upgrade plan, docs/internal/country-resilience-upgrade-plan.md).
+//
+// Every absence-based imputation is tagged with one of these classes so
+// downstream consumers (widget confidence bar, benchmark per-family gates,
+// methodology changelog) can distinguish:
+//   - stable-absence: the source publishes globally and the country is not
+//     listed, which means the tracked phenomenon is not happening (e.g.,
+//     no IPC Phase 3+ = no food crisis; no UCDP event = no conflict).
+//     Score is a strong positive with high certainty.
+//   - unmonitored: the source is a curated list that may not cover every
+//     country. Absence is ambiguous; we penalize conservatively with
+//     low certainty.
+//   - source-failure: the upstream API was unavailable at seed time.
+//     Should be rare and transient; detected from seed-meta failedDatasets.
+//     (Not currently represented in the tables below; reserved for the
+//     runtime path that consults seed-meta and injects this class when a
+//     dataset is in failedDatasets. Wired in T1.9.)
+//   - not-applicable: the dimension is structurally N/A for this country
+//     (e.g., a landlocked country has no maritime exposure). Score is
+//     neutral with high certainty since the absence is by definition.
+//     (Reserved for future dimensions that need structural N/A handling;
+//     no current scorer branches on it.)
+//
+// This is the foundation-only slice of T1.7. It lands the type, tags the
+// existing imputation tables, and is covered by tests that assert every
+// entry carries a class and the class matches its semantic family. The
+// schema-level propagation (imputationBreakdown field on the response and
+// widget rendering of per-dimension imputation icons) is deliberately
+// deferred to T1.5 / T1.6 so each task has a bounded, reviewable PR.
+export type ImputationClass =
+  | 'stable-absence'
+  | 'unmonitored'
+  | 'source-failure'
+  | 'not-applicable';
+
+export interface ImputationEntry {
+  score: number;
+  certaintyCoverage: number;
+  imputationClass: ImputationClass;
+}
+
 // Absence of a data source is a typed signal, not an unknown gap.
-// Each value is { score, certaintyCoverage } applied when the source is absent.
-const IMPUTATION = {
+// Each value is { score, certaintyCoverage, imputationClass } applied when
+// the source is absent.
+export const IMPUTATION = {
   // Country not in IPC/UNHCR/UCDP because it's stable, not because data is missing.
   // Absence = strong positive signal.
-  crisis_monitoring_absent: { score: 85, certaintyCoverage: 0.7 },
+  crisis_monitoring_absent: { score: 85, certaintyCoverage: 0.7, imputationClass: 'stable-absence' },
   // Country not in BIS/WTO curated list. Data exists but country wasn't selected.
   // Absence = neutral-to-negative (unknown, penalized conservatively).
-  curated_list_absent: { score: 50, certaintyCoverage: 0.3 },
-} as const;
+  curated_list_absent: { score: 50, certaintyCoverage: 0.3, imputationClass: 'unmonitored' },
+} as const satisfies Record<string, ImputationEntry>;
 
 // Per-metric overrides where the generic imputation table values differ.
-const IMPUTE = {
-  ipcFood:      { score: 88, certaintyCoverage: 0.7 },  // crisis_monitoring_absent, food-specific
-  wtoData:      { score: 60, certaintyCoverage: 0.4 },  // curated_list_absent, trade-specific
-  bisEer:       IMPUTATION.curated_list_absent,
-  bisCredit:    IMPUTATION.curated_list_absent,
-  unhcrDisplacement: { score: 85, certaintyCoverage: 0.6 }, // crisis_monitoring_absent, displacement-specific
-} as const;
+// Every override carries its own imputationClass tag so the class is
+// preserved at every call site, not inferred from naming.
+export const IMPUTE = {
+  ipcFood:           { score: 88, certaintyCoverage: 0.7, imputationClass: 'stable-absence' },  // crisis_monitoring_absent, food-specific
+  wtoData:           { score: 60, certaintyCoverage: 0.4, imputationClass: 'unmonitored' },      // curated_list_absent, trade-specific
+  bisEer:            IMPUTATION.curated_list_absent,
+  bisCredit:         IMPUTATION.curated_list_absent,
+  unhcrDisplacement: { score: 85, certaintyCoverage: 0.6, imputationClass: 'stable-absence' },  // crisis_monitoring_absent, displacement-specific
+} as const satisfies Record<string, ImputationEntry>;
 
 interface StaticIndicatorValue {
   value?: number;
