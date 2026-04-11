@@ -319,10 +319,7 @@
     "etfFlows": "BTC ETF Tracker",
     "stablecoins": "Stablecoins",
     "deduction": "Deduct Situation",
-    "wsbTickerScanner": {
-      "title": "WSB Ticker Scanner",
-      "tooltip": "Real-time ticker mentions from r/wallstreetbets, r/stocks, and r/investing ranked by frequency and engagement."
-    },
+    "wsbTickerScanner": "WSB Ticker Scanner",
     "ucdpEvents": "Armed Conflict Events",
     "giving": "Global Giving",
     "displacement": "UNHCR Displacement",

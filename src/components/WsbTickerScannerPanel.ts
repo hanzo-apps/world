@@ -39,8 +39,8 @@ export class WsbTickerScannerPanel extends Panel {
   constructor() {
     super({
       id: 'wsb-ticker-scanner',
-      title: t('panels.wsbTickerScanner.title') || 'WSB Ticker Scanner',
-      infoTooltip: t('components.wsbTickerScanner.infoTooltip') || '<strong>WSB Ticker Scanner</strong> Real-time ticker mentions from r/wallstreetbets, r/stocks, and r/investing. Ranked by mention frequency and engagement.',
+      title: t('panels.wsbTickerScanner'),
+      infoTooltip: t('components.wsbTickerScanner.infoTooltip'),
       showCount: true,
       premium: 'locked',
     });
