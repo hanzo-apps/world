@@ -90,6 +90,9 @@ type YahooChartResponse = {
         previousClose?: number;
         chartPreviousClose?: number;
       };
+      events?: {
+        dividends?: Record<string, { amount?: number; date?: number }>;
+      };
       indicators?: {
         quote?: Array<{
           open?: Array<number | null>;
@@ -146,6 +149,137 @@ export type AnalystData = {
   priceTarget: PriceTarget;
   recentUpgrades: UpgradeDowngrade[];
 };
+
+export type DividendProfile = {
+  dividendYield: number;
+  trailingAnnualDividendRate: number;
+  exDividendDate: number;
+  payoutRatio?: number;
+  dividendFrequency: string;
+  dividendCagr: number;
+};
+
+const EMPTY_DIVIDEND_PROFILE: DividendProfile = {
+  dividendYield: 0,
+  trailingAnnualDividendRate: 0,
+  exDividendDate: 0,
+  dividendFrequency: '',
+  dividendCagr: 0,
+};
+
+type YahooSummaryDetailResponse = {
+  quoteSummary?: {
+    result?: Array<{
+      summaryDetail?: {
+        payoutRatio?: { raw?: number };
+      };
+    }>;
+  };
+};
+
+async function fetchPayoutRatio(symbol: string): Promise<number | undefined> {
+  try {
+    await yahooGate();
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=summaryDetail`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    if (!response.ok) return undefined;
+    const data = await response.json() as YahooSummaryDetailResponse;
+    const raw = data.quoteSummary?.result?.[0]?.summaryDetail?.payoutRatio?.raw;
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return undefined;
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
+
+function inferDividendFrequency(paymentsPerYear: number): string {
+  if (paymentsPerYear >= 10) return 'Monthly';
+  if (paymentsPerYear >= 3) return 'Quarterly';
+  if (paymentsPerYear >= 1.5) return 'Semi-annual';
+  if (paymentsPerYear >= 0.5) return 'Annual';
+  return '';
+}
+
+function computeDividendCagr(annualTotals: Map<number, number>): number {
+  if (annualTotals.size < 2) return 0;
+  const years = [...annualTotals.keys()].sort((a, b) => a - b);
+  const currentYear = new Date().getFullYear();
+
+  // Treat any year strictly earlier than the current calendar year as
+  // complete — all scheduled dividends for that year have been paid.
+  // Exclude the current (in-progress) year since it may be missing
+  // payments that haven't landed yet. Month-count gating (the previous
+  // approach) silently dropped the first/last year for every non-monthly
+  // payer (quarterly = 4 months, semiannual = 2, annual = 1), collapsing
+  // CAGR to 0 for most ordinary dividend stocks.
+  const fullYears = years.filter(y => y < currentYear);
+
+  if (fullYears.length < 2) return 0;
+  const earliest = annualTotals.get(fullYears[0]!) ?? 0;
+  const latest = annualTotals.get(fullYears[fullYears.length - 1]!) ?? 0;
+  if (earliest <= 0 || latest <= 0) return 0;
+  const span = fullYears[fullYears.length - 1]! - fullYears[0]!;
+  if (span < 1) return 0;
+  return (Math.pow(latest / earliest, 1 / span) - 1) * 100;
+}
+
+export async function fetchDividendProfile(symbol: string, currentPrice: number): Promise<DividendProfile> {
+  try {
+    await yahooGate();
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1mo&includePrePost=false&events=div`;
+    const [chartResponse, payoutRatio] = await Promise.all([
+      fetch(url, {
+        headers: { 'User-Agent': CHROME_UA },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      }),
+      fetchPayoutRatio(symbol),
+    ]);
+    if (!chartResponse.ok) return EMPTY_DIVIDEND_PROFILE;
+
+    const data = await chartResponse.json() as YahooChartResponse;
+    const result = data.chart?.result?.[0];
+    const dividendEvents = result?.events?.dividends;
+    if (!dividendEvents || Object.keys(dividendEvents).length === 0) return EMPTY_DIVIDEND_PROFILE;
+
+    const entries = Object.values(dividendEvents)
+      .filter((d) => typeof d.amount === 'number' && d.amount > 0 && typeof d.date === 'number')
+      .sort((a, b) => (a.date ?? 0) - (b.date ?? 0));
+
+    if (entries.length === 0) return EMPTY_DIVIDEND_PROFILE;
+
+    const annualTotals = new Map<number, number>();
+    for (const entry of entries) {
+      const year = new Date((entry.date ?? 0) * 1000).getFullYear();
+      annualTotals.set(year, (annualTotals.get(year) ?? 0) + (entry.amount ?? 0));
+    }
+
+    const now = Date.now();
+    const oneYearAgo = now - 365.25 * 24 * 3600 * 1000;
+    const recentDivs = entries.filter((d) => (d.date ?? 0) * 1000 >= oneYearAgo);
+    const trailingAnnual = recentDivs.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+    const dividendYield = currentPrice > 0 ? (trailingAnnual / currentPrice) * 100 : 0;
+    const paymentsPerYear = recentDivs.length || (entries.length / Math.max(1, annualTotals.size));
+
+    const latestEntry = entries[entries.length - 1]!;
+    const exDividendDate = (latestEntry.date ?? 0) * 1000;
+
+    const cagr = computeDividendCagr(annualTotals);
+
+    return {
+      dividendYield: round(dividendYield),
+      trailingAnnualDividendRate: round(trailingAnnual),
+      exDividendDate,
+      payoutRatio,
+      dividendFrequency: inferDividendFrequency(paymentsPerYear),
+      dividendCagr: round(cagr),
+    };
+  } catch {
+    return EMPTY_DIVIDEND_PROFILE;
+  }
+}
 
 const CACHE_TTL_SECONDS = 900;
 const NEWS_LIMIT = 5;
@@ -815,6 +949,7 @@ export function buildAnalysisResponse(params: {
   analysisAt: number;
   generatedAt: string;
   analysisId?: string;
+  dividend?: DividendProfile;
 }): AnalyzeStockResponse {
   const {
     symbol,
@@ -827,6 +962,7 @@ export function buildAnalysisResponse(params: {
     includeNews,
     analysisAt,
     generatedAt,
+    dividend,
   } = params;
   const analysisId = params.analysisId || `stock:${STOCK_ANALYSIS_ENGINE_VERSION}:${symbol}:${analysisAt}:${includeNews ? 'news' : 'core'}`;
   const { stopLoss, takeProfit } = deriveTradeLevels(
@@ -886,6 +1022,12 @@ export function buildAnalysisResponse(params: {
     analystConsensus: analystData.analystConsensus,
     priceTarget: analystData.priceTarget,
     recentUpgrades: analystData.recentUpgrades,
+    dividendYield: dividend?.dividendYield ?? 0,
+    trailingAnnualDividendRate: dividend?.trailingAnnualDividendRate ?? 0,
+    exDividendDate: dividend?.exDividendDate ?? 0,
+    payoutRatio: dividend?.payoutRatio,
+    dividendFrequency: dividend?.dividendFrequency ?? '',
+    dividendCagr: dividend?.dividendCagr ?? 0,
   };
 }
 
@@ -940,6 +1082,11 @@ function buildEmptyAnalysisResponse(symbol: string, name: string, includeNews: b
     analystConsensus: EMPTY_ANALYST_DATA.analystConsensus,
     priceTarget: EMPTY_ANALYST_DATA.priceTarget,
     recentUpgrades: [],
+    dividendYield: 0,
+    trailingAnnualDividendRate: 0,
+    exDividendDate: 0,
+    dividendFrequency: '',
+    dividendCagr: 0,
   };
 }
 
@@ -955,7 +1102,7 @@ export async function analyzeStock(
   const name = (req.name || symbol).trim().slice(0, 120) || symbol;
   const includeNews = req.includeNews === true;
   const nameSuffix = name !== symbol ? `:${name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 30).toLowerCase()}` : '';
-  const cacheKey = `market:analyze-stock:v2:${symbol}:${includeNews ? 'news' : 'no-news'}${nameSuffix}`;
+  const cacheKey = `market:analyze-stock:v3:${symbol}:${includeNews ? 'news' : 'no-news'}${nameSuffix}`;
 
   const cached = await cachedFetchJson<AnalyzeStockResponse>(cacheKey, CACHE_TTL_SECONDS, async () => {
     const [history, analystData] = await Promise.all([
@@ -966,7 +1113,10 @@ export async function analyzeStock(
 
     const technical = buildTechnicalSnapshot(history.candles);
     technical.currency = history.currency || 'USD';
-    const headlines = includeNews ? (await searchRecentStockHeadlines(symbol, name, NEWS_LIMIT)).headlines : [];
+    const [headlines, dividend] = await Promise.all([
+      includeNews ? searchRecentStockHeadlines(symbol, name, NEWS_LIMIT).then((r) => r.headlines) : Promise.resolve([]),
+      fetchDividendProfile(symbol, technical.currentPrice),
+    ]);
     const overlay = await buildAiOverlay(symbol, name, technical, headlines);
     const analysisAt = history.candles[history.candles.length - 1]?.timestamp || Date.now();
     const response = buildAnalysisResponse({
@@ -980,6 +1130,7 @@ export async function analyzeStock(
       includeNews,
       analysisAt,
       generatedAt: new Date().toISOString(),
+      dividend,
     });
     await storeStockAnalysisSnapshot(response, includeNews);
     return response;
