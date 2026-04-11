@@ -134,6 +134,72 @@ describe('resilience release gate', () => {
     assert.equal(us.lowConfidence, false, `US has full 9/9 dataset coverage in fixtures and should not be flagged low-confidence`);
   });
 
+  // T1.1 regression test (Phase 1 of the country-resilience reference-grade
+  // upgrade plan, docs/internal/country-resilience-upgrade-plan.md).
+  //
+  // The origin review document (docs/internal/upgrading-country-resilience.md)
+  // claims: "Norway and the US both hit 100 under current fixtures, which
+  // broke the intended ordering and exposed a ceiling effect at the top end
+  // of the ranking."
+  //
+  // Investigation outcome (2026-04-11): the claim does NOT reproduce.
+  //
+  // Measured scores under the current release-gate fixtures and the
+  // post-PR-#2847 domain-weighted-average formula:
+  //
+  //     NO (elite tier)   overallScore = 86.58, baseline 86.85, stress 84.36
+  //     US (strong tier)  overallScore = 72.80, baseline 73.15, stress 70.58
+  //     Delta             NO - US = 13.78 points
+  //     Ceiling           neither country approaches 100; all 5 domains stay
+  //                       well inside the [0, 100] clamp range
+  //
+  // The ordering elite > strong > stressed > fragile is preserved. There is
+  // no hard 100 ceiling in the scorer, and nothing in _dimension-scorers.ts
+  // can produce a top-of-ranking tie between NO and US given the 14-point
+  // quality differential wired into the fixtures.
+  //
+  // Conclusion: the origin-doc symptom is misattributed or stale (it likely
+  // predates PR #2847's formula revert or references an older fixture set).
+  // The origin-doc changelog will be updated in a trailing commit after
+  // PR #2938 (the reference-grade plan) merges, since the origin doc is
+  // part of that PR.
+  //
+  // This test pins the current correct behavior so any future regression to
+  // a real top-of-ranking ceiling bug is caught immediately by CI.
+  it('T1.1 regression: Norway and US do not both pin at 100 and preserve elite > strong ordering', async () => {
+    installRedisFixtures();
+
+    const [no, us] = await Promise.all([
+      getResilienceScore({ request: new Request('https://example.com?countryCode=NO') } as never, { countryCode: 'NO' }),
+      getResilienceScore({ request: new Request('https://example.com?countryCode=US') } as never, { countryCode: 'US' }),
+    ]);
+
+    assert.ok(
+      no.overallScore < 100,
+      `Norway should not pin at the ceiling (overallScore=${no.overallScore})`,
+    );
+    assert.ok(
+      us.overallScore < 100,
+      `US should not pin at the ceiling (overallScore=${us.overallScore})`,
+    );
+    assert.ok(
+      no.overallScore > us.overallScore,
+      `Norway (elite fixture, ${no.overallScore}) should score higher than the US (strong fixture, ${us.overallScore})`,
+    );
+    // Guard against a near-tie that would still break meaningful ranking.
+    // Actual measured delta at commit time is 13.78 points; the threshold
+    // of 8 (about 60% of the measured delta) leaves room for fixture
+    // tuning while catching a tier-separation collapse before the ordering
+    // degrades into a near-tie. An earlier version of this test used a
+    // threshold of 3, which would have silently accepted a ~71% erosion
+    // of the elite-strong separation signal. Bumped in response to PR
+    // review feedback on #2941.
+    assert.ok(
+      no.overallScore - us.overallScore >= 8,
+      `Norway should lead the US by at least 8 points (NO=${no.overallScore}, US=${us.overallScore}, delta=${no.overallScore - us.overallScore})`,
+    );
+  });
+
   it('produces complete ranking and choropleth entries for the full G20 + EU27 release set', async () => {
     installRedisFixtures();
 
