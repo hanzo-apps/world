@@ -6,6 +6,7 @@ import type {
   ScoreInterval,
 } from '../../../../src/generated/server/worldmonitor/resilience/v1/service_server';
 
+
 export type { ScoreInterval };
 
 import { cachedFetchJson, getCachedJson, runRedisPipeline } from '../../../_shared/redis';
@@ -18,6 +19,7 @@ import {
   createMemoizedSeedReader,
   getResilienceDomainWeight,
   scoreAllDimensions,
+  type ImputationClass,
   type ResilienceDimensionId,
   type ResilienceDomainId,
   type ResilienceSeedReader,
@@ -25,7 +27,7 @@ import {
 
 export const RESILIENCE_SCORE_CACHE_TTL_SECONDS = 6 * 60 * 60;
 export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 6 * 60 * 60;
-export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v7:';
+export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v8:';
 export const RESILIENCE_HISTORY_KEY_PREFIX = 'resilience:history:v4:';
 export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v8';
 export const RESILIENCE_STATIC_INDEX_KEY = 'resilience:static:index:v1';
@@ -84,7 +86,16 @@ function classifyResilienceLevel(score: number): string {
 }
 
 function buildDimensionList(
-  scores: Record<ResilienceDimensionId, { score: number; coverage: number; observedWeight: number; imputedWeight: number }>,
+  scores: Record<
+    ResilienceDimensionId,
+    {
+      score: number;
+      coverage: number;
+      observedWeight: number;
+      imputedWeight: number;
+      imputationClass: ImputationClass | null;
+    }
+  >,
 ): ResilienceDimension[] {
   return RESILIENCE_DIMENSION_ORDER.map((dimensionId) => ({
     id: dimensionId,
@@ -92,6 +103,8 @@ function buildDimensionList(
     coverage: round(scores[dimensionId].coverage),
     observedWeight: round(scores[dimensionId].observedWeight, 4),
     imputedWeight: round(scores[dimensionId].imputedWeight, 4),
+    // T1.7 schema pass: empty string = dimension has any observed data.
+    imputationClass: scores[dimensionId].imputationClass ?? '',
   }));
 }
 
@@ -278,7 +291,8 @@ export async function getCachedResilienceScores(countryCodes: string[]): Promise
     const raw = results[index]?.result;
     if (typeof raw !== 'string') continue;
     try {
-      scores.set(countryCode, JSON.parse(raw) as GetResilienceScoreResponse);
+      const parsed = JSON.parse(raw) as GetResilienceScoreResponse;
+      scores.set(countryCode, parsed);
     } catch {
       // Ignore malformed cache entries and let the caller decide whether to warm them.
     }
