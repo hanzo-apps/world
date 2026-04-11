@@ -262,3 +262,66 @@ export async function fetchCountryProducts(iso2: string): Promise<CountryProduct
     return { ...emptyProducts, iso2 };
   }
 }
+
+export interface MultiSectorShock {
+  hs2: string;
+  hs2Label: string;
+  importValueAnnual: number;
+  freightAddedPctPerTon: number;
+  warRiskPremiumBps: number;
+  addedTransitDays: number;
+  totalCostShockPerDay: number;
+  totalCostShock30Days: number;
+  totalCostShock90Days: number;
+  /** Cost for the currently-requested closure duration (server-clamped). */
+  totalCostShock: number;
+  closureDays: number;
+}
+
+export interface MultiSectorShockResponse {
+  iso2: string;
+  chokepointId: string;
+  closureDays: number;
+  warRiskTier: string;
+  sectors: MultiSectorShock[];
+  totalAddedCost: number;
+  fetchedAt: string;
+  unavailableReason: string;
+}
+
+const emptyMultiSectorShock: MultiSectorShockResponse = {
+  iso2: '',
+  chokepointId: '',
+  closureDays: 30,
+  warRiskTier: 'WAR_RISK_TIER_UNSPECIFIED',
+  sectors: [],
+  totalAddedCost: 0,
+  fetchedAt: '',
+  unavailableReason: '',
+};
+
+/**
+ * Fetch multi-sector cost shock for a country+chokepoint+closureDays window.
+ * PRO-gated: non-premium callers receive HTTP 403 and this function returns an empty response.
+ */
+export async function fetchMultiSectorCostShock(
+  iso2: string,
+  chokepointId: string,
+  closureDays: number,
+  options?: { signal?: AbortSignal },
+): Promise<MultiSectorShockResponse> {
+  try {
+    const { premiumFetch } = await import('@/services/premium-fetch');
+    const { toApiUrl } = await import('@/services/runtime');
+    const url = toApiUrl(
+      `/api/supply-chain/v1/multi-sector-cost-shock?iso2=${encodeURIComponent(iso2)}`
+      + `&chokepointId=${encodeURIComponent(chokepointId)}`
+      + `&closureDays=${encodeURIComponent(String(closureDays))}`,
+    );
+    const resp = await premiumFetch(url, { signal: options?.signal });
+    if (!resp.ok) return { ...emptyMultiSectorShock, iso2, chokepointId, closureDays };
+    return await resp.json() as MultiSectorShockResponse;
+  } catch {
+    return { ...emptyMultiSectorShock, iso2, chokepointId, closureDays };
+  }
+}

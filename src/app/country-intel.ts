@@ -48,7 +48,7 @@ import { toFlagEmoji } from '@/utils/country-flag';
 import { iso2ToIso3, iso2ToUnCode } from '@/utils/country-codes';
 import { buildDependencyGraph } from '@/services/infrastructure-cascade';
 import { getActiveFrameworkForPanel, subscribeFrameworkChange } from '@/services/analysis-framework-store';
-import { fetchMultiSectorExposure, fetchCountryProducts } from '@/services/supply-chain';
+import { fetchMultiSectorExposure, fetchCountryProducts, fetchMultiSectorCostShock } from '@/services/supply-chain';
 
 type IntlDisplayNamesCtor = new (
   locales: string | string[],
@@ -635,13 +635,23 @@ export class CountryIntelManager implements AppModule {
         }).catch(() => {
           if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateCostShock?.(null);
         });
+
+        // Multi-sector cost shock calculator (Phase 5) — default 30-day closure.
+        fetchMultiSectorCostShock(code, resp.primaryChokepointId, 30).then(multi => {
+          if (this.ctx.countryBriefPage?.getCode() !== code) return;
+          this.ctx.countryBriefPage.updateMultiSectorCostShock?.(multi);
+        }).catch(() => {
+          if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMultiSectorCostShock?.(null);
+        });
       } else {
         this.ctx.countryBriefPage.updateCostShock?.(null);
+        this.ctx.countryBriefPage.updateMultiSectorCostShock?.(null);
       }
     }).catch(() => {
       if (this.ctx.countryBriefPage?.getCode() === code) {
         this.ctx.countryBriefPage.updateChokepointExposure?.(null);
         this.ctx.countryBriefPage.updateCostShock?.(null);
+        this.ctx.countryBriefPage.updateMultiSectorCostShock?.(null);
       }
     });
 
