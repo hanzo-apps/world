@@ -11,6 +11,7 @@ import {
   formatBaselineStress,
   formatResilienceChange30d,
   formatResilienceConfidence,
+  formatResilienceDataVersion,
   getResilienceDomainLabel,
   getResilienceTrendArrow,
   getResilienceVisualLevel,
@@ -298,6 +299,23 @@ export class ResilienceWidget {
           formatResilienceConfidence(data),
         ),
         h('span', { className: 'resilience-widget__delta' }, formatResilienceChange30d(data.change30d)),
+        ...(() => {
+          // Hoisted so the formatter (which runs a regex + Date parse) is
+          // only invoked once per render instead of twice (guard + child).
+          // Raised in review of PR #2943 for consistency with the existing
+          // scoreInterval / baselineScore blocks in this file.
+          const dataVersionLabel = formatResilienceDataVersion(data.dataVersion);
+          return dataVersionLabel
+            ? [h(
+                'span',
+                {
+                  className: 'resilience-widget__data-version',
+                  title: 'Date the underlying source data was last refreshed by the Railway static-seed job.',
+                },
+                dataVersionLabel,
+              )]
+            : [];
+        })(),
       ),
     );
   }
