@@ -454,10 +454,23 @@ async function generateAISummary(stories, rule) {
   if (!AI_DIGEST_ENABLED) return null;
   if (!stories || stories.length === 0) return null;
 
-  const { data: prefs } = await fetchUserPreferences(rule.userId, rule.variant ?? 'full');
+  // rule.aiDigestEnabled (from alertRules) is the user's explicit opt-in for
+  // AI summaries. userPreferences is a SEPARATE table (SPA app settings blob:
+  // watchlist, airports, panels). A user can have alertRules without having
+  // ever saved userPreferences — or under a different variant. Missing prefs
+  // must NOT silently disable the feature the user just enabled; degrade to
+  // a non-personalized summary instead.
+  //   error: true  = transient fetch failure (network, non-OK HTTP, env missing)
+  //   error: false = the (userId, variant) row genuinely does not exist
+  // Both cases degrade to a non-personalized summary, but log them distinctly
+  // so transient fetch failures are visible in observability.
+  const { data: prefs, error: prefsFetchError } = await fetchUserPreferences(rule.userId, rule.variant ?? 'full');
   if (!prefs) {
-    console.log(`[digest] No preferences for ${rule.userId} — skipping AI summary`);
-    return null;
+    console.log(
+      prefsFetchError
+        ? `[digest] Prefs fetch failed for ${rule.userId} — generating non-personalized AI summary`
+        : `[digest] No stored preferences for ${rule.userId} — generating non-personalized AI summary`,
+    );
   }
   const ctx = extractUserContext(prefs);
   const profile = formatUserProfile(ctx, rule.variant ?? 'full');
