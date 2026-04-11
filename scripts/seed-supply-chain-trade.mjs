@@ -14,8 +14,8 @@ const KEYS = {
   customsRevenue: 'trade:customs-revenue:v1',
 };
 
-const SHIPPING_TTL = 3600;
-const TRADE_TTL = 21600;
+const SHIPPING_TTL = 28800; // 8h — 2h buffer over 6h cron cadence (was 1h = 5h expired gap)
+const TRADE_TTL = 28800; // 8h — 2h buffer over 6h cron cadence (was 6h = 0 buffer)
 const TARIFF_TTL = 28800; // 8h — 2h buffer over 6h cron cadence (was TRADE_TTL=6h = 0 buffer)
 const CUSTOMS_TTL = 86400; // 24h — monthly Treasury data, matches maxStaleMin:1440 (was TRADE_TTL=6h = 0 buffer)
 
