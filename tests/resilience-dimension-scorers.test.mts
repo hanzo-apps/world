@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  IMPUTATION,
+  IMPUTE,
+  type ImputationClass,
   RESILIENCE_DIMENSION_ORDER,
   RESILIENCE_DIMENSION_TYPES,
   scoreAllDimensions,
@@ -685,5 +688,114 @@ describe('resilience dimension scorers', () => {
     const lowExp = await scoreHealthPublicService('XX', makeReader(100));
     assert.ok(highExp.score > lowExp.score,
       `High health expenditure (${highExp.score}) should score better than low (${lowExp.score})`);
+  });
+});
+
+// T1.7 Phase 1 of the country-resilience reference-grade upgrade plan.
+// Foundation-only slice: the 4-class imputation taxonomy (stable-absence,
+// unmonitored, source-failure, not-applicable) is defined as an exported
+// type, and every entry in the IMPUTATION and IMPUTE tables carries an
+// imputationClass tag. These tests pin the classification so downstream
+// work (T1.5 source-recency badges, T1.6 widget dimension confidence) can
+// consume the taxonomy without risk of drift.
+describe('resilience imputation taxonomy (T1.7)', () => {
+  const VALID_CLASSES: readonly ImputationClass[] = [
+    'stable-absence',
+    'unmonitored',
+    'source-failure',
+    'not-applicable',
+  ] as const;
+
+  function assertValidClass(label: string, value: string): void {
+    assert.ok(
+      (VALID_CLASSES as readonly string[]).includes(value),
+      `${label} has imputationClass="${value}", expected one of [${VALID_CLASSES.join(', ')}]`,
+    );
+  }
+
+  it('IMPUTATION entries carry the expected semantic classes', () => {
+    // Crisis-monitoring sources (IPC, UCDP, UNHCR) publish globally; absence
+    // means the country is stable, so it is tagged stable-absence.
+    assert.equal(IMPUTATION.crisis_monitoring_absent.imputationClass, 'stable-absence');
+    assert.equal(IMPUTATION.crisis_monitoring_absent.score, 85);
+    assert.equal(IMPUTATION.crisis_monitoring_absent.certaintyCoverage, 0.7);
+
+    // Curated-list sources (BIS, WTO) may not cover every country; absence
+    // is ambiguous, so it is tagged unmonitored.
+    assert.equal(IMPUTATION.curated_list_absent.imputationClass, 'unmonitored');
+    assert.equal(IMPUTATION.curated_list_absent.score, 50);
+    assert.equal(IMPUTATION.curated_list_absent.certaintyCoverage, 0.3);
+  });
+
+  it('every IMPUTATION entry has a valid imputationClass', () => {
+    for (const [key, entry] of Object.entries(IMPUTATION)) {
+      assertValidClass(`IMPUTATION.${key}`, entry.imputationClass);
+    }
+  });
+
+  it('IMPUTE per-metric overrides inherit or override the class consistently', () => {
+    // Food-specific crisis-monitoring override (IPC phase data).
+    assert.equal(IMPUTE.ipcFood.imputationClass, 'stable-absence');
+    // Trade-specific curated-list override (WTO trade restrictions).
+    assert.equal(IMPUTE.wtoData.imputationClass, 'unmonitored');
+    // Displacement-specific crisis-monitoring override (UNHCR flows).
+    assert.equal(IMPUTE.unhcrDisplacement.imputationClass, 'stable-absence');
+
+    // Shared references: bisEer and bisCredit alias IMPUTATION.curated_list_absent
+    // so their class must match exactly (same object reference, same tag).
+    assert.equal(IMPUTE.bisEer.imputationClass, 'unmonitored');
+    assert.equal(IMPUTE.bisCredit.imputationClass, 'unmonitored');
+    assert.equal(IMPUTE.bisEer, IMPUTATION.curated_list_absent);
+    assert.equal(IMPUTE.bisCredit, IMPUTATION.curated_list_absent);
+  });
+
+  it('every IMPUTE entry has a valid imputationClass', () => {
+    for (const [key, entry] of Object.entries(IMPUTE)) {
+      assertValidClass(`IMPUTE.${key}`, entry.imputationClass);
+    }
+  });
+
+  it('stable-absence entries score higher than unmonitored, across BOTH tables (semantic sanity)', () => {
+    // stable-absence = strong positive signal (feed is comprehensive,
+    // nothing happened). unmonitored = we do not know, penalized.
+    // The invariant must hold across every entry in both IMPUTATION and
+    // IMPUTE, otherwise a per-metric override can silently break the
+    // ordering (e.g. a `stable-absence` override with a score lower than
+    // an `unmonitored` entry would pass a tables-only check but violate
+    // the taxonomy's semantic meaning).
+    //
+    // Raised in review of PR #2944: the earlier version of this test
+    // only checked the two base entries in IMPUTATION and would have
+    // missed a regression in an IMPUTE override.
+    const allEntries = [
+      ...Object.entries(IMPUTATION).map(([k, v]) => ({ label: `IMPUTATION.${k}`, entry: v })),
+      ...Object.entries(IMPUTE).map(([k, v]) => ({ label: `IMPUTE.${k}`, entry: v })),
+    ];
+
+    const stableAbsence = allEntries.filter((e) => e.entry.imputationClass === 'stable-absence');
+    const unmonitored = allEntries.filter((e) => e.entry.imputationClass === 'unmonitored');
+
+    assert.ok(stableAbsence.length > 0, 'expected at least one stable-absence entry across both tables');
+    assert.ok(unmonitored.length > 0, 'expected at least one unmonitored entry across both tables');
+
+    const minStableScore = Math.min(...stableAbsence.map((e) => e.entry.score));
+    const maxUnmonitoredScore = Math.max(...unmonitored.map((e) => e.entry.score));
+    assert.ok(
+      minStableScore > maxUnmonitoredScore,
+      `every stable-absence entry must score higher than every unmonitored entry. ` +
+      `min stable-absence score = ${minStableScore}, max unmonitored score = ${maxUnmonitoredScore}. ` +
+      `stable-absence entries: ${stableAbsence.map((e) => `${e.label}=${e.entry.score}`).join(', ')}. ` +
+      `unmonitored entries: ${unmonitored.map((e) => `${e.label}=${e.entry.score}`).join(', ')}.`,
+    );
+
+    const minStableCertainty = Math.min(...stableAbsence.map((e) => e.entry.certaintyCoverage));
+    const maxUnmonitoredCertainty = Math.max(...unmonitored.map((e) => e.entry.certaintyCoverage));
+    assert.ok(
+      minStableCertainty > maxUnmonitoredCertainty,
+      `every stable-absence entry must have higher certaintyCoverage than every unmonitored entry. ` +
+      `min stable-absence certainty = ${minStableCertainty}, max unmonitored certainty = ${maxUnmonitoredCertainty}. ` +
+      `stable-absence entries: ${stableAbsence.map((e) => `${e.label}=${e.entry.certaintyCoverage}`).join(', ')}. ` +
+      `unmonitored entries: ${unmonitored.map((e) => `${e.label}=${e.entry.certaintyCoverage}`).join(', ')}.`,
+    );
   });
 });
