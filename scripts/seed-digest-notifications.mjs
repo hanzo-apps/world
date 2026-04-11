@@ -14,6 +14,15 @@
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import dns from 'node:dns/promises';
+import {
+  escapeHtml,
+  escapeTelegramHtml,
+  escapeSlackMrkdwn,
+  markdownToEmailHtml,
+  markdownToTelegramHtml,
+  markdownToSlackMrkdwn,
+  markdownToDiscord,
+} from './_digest-markdown.mjs';
 
 const require = createRequire(import.meta.url);
 const { decrypt } = require('./lib/crypto.cjs');
@@ -319,14 +328,6 @@ function formatDigest(stories, nowMs) {
   return lines.join('\n');
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function formatDigestHtml(stories, nowMs) {
   if (!stories || stories.length === 0) return null;
   const dateStr = new Intl.DateTimeFormat('en-US', {
@@ -551,7 +552,12 @@ async function sendTelegram(userId, chatId, text) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'worldmonitor-digest/1.0' },
-        body: JSON.stringify({ chat_id: chatId, text }),
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
         signal: AbortSignal.timeout(10000),
       },
     );
@@ -732,6 +738,47 @@ async function isUserPro(userId) {
   }
 }
 
+// ── Per-channel body composition ─────────────────────────────────────────────
+
+const DIVIDER = '─'.repeat(40);
+
+/**
+ * Compose the per-channel message bodies for a single digest rule.
+ * Keeps the per-channel formatting logic out of main() so its cognitive
+ * complexity stays within the lint budget.
+ */
+function buildChannelBodies(storyListPlain, aiSummary) {
+  if (!aiSummary) {
+    return {
+      text: storyListPlain,
+      telegramText: escapeTelegramHtml(storyListPlain),
+      slackText: escapeSlackMrkdwn(storyListPlain),
+      discordText: storyListPlain,
+    };
+  }
+  return {
+    text: `EXECUTIVE SUMMARY\n\n${aiSummary}\n\n${DIVIDER}\n\n${storyListPlain}`,
+    telegramText: `<b>EXECUTIVE SUMMARY</b>\n\n${markdownToTelegramHtml(aiSummary)}\n\n${DIVIDER}\n\n${escapeTelegramHtml(storyListPlain)}`,
+    slackText: `*EXECUTIVE SUMMARY*\n\n${markdownToSlackMrkdwn(aiSummary)}\n\n${DIVIDER}\n\n${escapeSlackMrkdwn(storyListPlain)}`,
+    discordText: `**EXECUTIVE SUMMARY**\n\n${markdownToDiscord(aiSummary)}\n\n${DIVIDER}\n\n${storyListPlain}`,
+  };
+}
+
+/**
+ * Inject the formatted AI summary into the HTML email template's slot,
+ * or strip the slot placeholder when there is no summary.
+ */
+function injectEmailSummary(html, aiSummary) {
+  if (!html) return html;
+  if (!aiSummary) return html.replace('<div data-ai-summary-slot></div>', '');
+  const formattedSummary = markdownToEmailHtml(aiSummary);
+  const summaryHtml = `<div style="background:#161616;border:1px solid #222;border-left:3px solid #4ade80;padding:18px 22px;margin:0 0 24px 0;">
+<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#4ade80;margin-bottom:10px;">Executive Summary</div>
+<div style="font-size:13px;line-height:1.7;color:#ccc;">${formattedSummary}</div>
+</div>`;
+  return html.replace('<div data-ai-summary-slot></div>', summaryHtml);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -822,22 +869,12 @@ async function main() {
       aiSummary = await generateAISummary(stories, rule);
     }
 
-    let text = formatDigest(stories, nowMs);
-    if (!text) continue;
-    let html = formatDigestHtml(stories, nowMs);
+    const storyListPlain = formatDigest(stories, nowMs);
+    if (!storyListPlain) continue;
+    const htmlRaw = formatDigestHtml(stories, nowMs);
 
-    if (aiSummary) {
-      text = `EXECUTIVE SUMMARY\n\n${aiSummary}\n\n${'─'.repeat(40)}\n\n${text}`;
-      if (html) {
-        const summaryHtml = `<div style="background:#161616;border:1px solid #222;border-left:3px solid #4ade80;padding:18px 22px;margin:0 0 24px 0;">
-<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#4ade80;margin-bottom:10px;">Executive Summary</div>
-<div style="font-size:13px;line-height:1.7;color:#ccc;white-space:pre-wrap;">${escapeHtml(aiSummary)}</div>
-</div>`;
-        html = html.replace('<div data-ai-summary-slot></div>', summaryHtml);
-      }
-    } else if (html) {
-      html = html.replace('<div data-ai-summary-slot></div>', '');
-    }
+    const { text, telegramText, slackText, discordText } = buildChannelBodies(storyListPlain, aiSummary);
+    const html = injectEmailSummary(htmlRaw, aiSummary);
 
     const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(nowMs));
     const subject = aiSummary ? `WorldMonitor Intelligence Brief — ${shortDate}` : `WorldMonitor Digest — ${shortDate}`;
@@ -847,11 +884,11 @@ async function main() {
     for (const ch of deliverableChannels) {
       let ok = false;
       if (ch.channelType === 'telegram' && ch.chatId) {
-        ok = await sendTelegram(rule.userId, ch.chatId, text);
+        ok = await sendTelegram(rule.userId, ch.chatId, telegramText);
       } else if (ch.channelType === 'slack' && ch.webhookEnvelope) {
-        ok = await sendSlack(rule.userId, ch.webhookEnvelope, text);
+        ok = await sendSlack(rule.userId, ch.webhookEnvelope, slackText);
       } else if (ch.channelType === 'discord' && ch.webhookEnvelope) {
-        ok = await sendDiscord(rule.userId, ch.webhookEnvelope, text);
+        ok = await sendDiscord(rule.userId, ch.webhookEnvelope, discordText);
       } else if (ch.channelType === 'email' && ch.email) {
         ok = await sendEmail(ch.email, subject, text, html);
       } else if (ch.channelType === 'webhook' && ch.webhookEnvelope) {
