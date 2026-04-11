@@ -644,6 +644,32 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/market/v1/get-market-breadth-history:
+        get:
+            tags:
+                - MarketService
+            summary: GetMarketBreadthHistory
+            description: GetMarketBreadthHistory retrieves historical % of S&P 500 stocks above 20/50/200-day SMAs.
+            operationId: GetMarketBreadthHistory
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetMarketBreadthHistoryResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -1806,3 +1832,43 @@ components:
                     type: string
                 transactionDate:
                     type: string
+        GetMarketBreadthHistoryRequest:
+            type: object
+        GetMarketBreadthHistoryResponse:
+            type: object
+            properties:
+                currentPctAbove20d:
+                    type: number
+                    format: double
+                currentPctAbove50d:
+                    type: number
+                    format: double
+                currentPctAbove200d:
+                    type: number
+                    format: double
+                updatedAt:
+                    type: string
+                history:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/BreadthSnapshot'
+                unavailable:
+                    type: boolean
+        BreadthSnapshot:
+            type: object
+            properties:
+                date:
+                    type: string
+                pctAbove20d:
+                    type: number
+                    format: double
+                    description: |-
+                        Optional so a missing/failed Barchart reading serializes as JSON null
+                         instead of collapsing to 0, which would render identically to a real 0%
+                         reading (severe market dislocation with no S&P stocks above SMA).
+                pctAbove50d:
+                    type: number
+                    format: double
+                pctAbove200d:
+                    type: number
+                    format: double
