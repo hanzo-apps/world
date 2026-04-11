@@ -41,6 +41,12 @@ export const GEOGRAPHY_VERSION = '1.0.0';
  * the existing forecast handler does substring matching against, so the same
  * label flows end-to-end without taxonomy mismatch.
  */
+// `signalAliases` holds broad display labels that cross-source feeds emit
+// which do NOT substring-match any fine-grained theater ID. Example:
+// scripts/seed-cross-source-signals.mjs normalizes raw values to "Middle East"
+// or "Sub-Saharan Africa", and these would silently drop out of region
+// matching if we only checked `theaters`. Kept lowercased so the matching
+// helper can compare directly.
 export const REGIONS = [
   {
     id: 'mena',
@@ -48,6 +54,7 @@ export const REGIONS = [
     forecastLabel: 'Middle East',
     wbCode: 'MEA',
     theaters: ['levant', 'persian-gulf', 'red-sea', 'north-africa'],
+    signalAliases: ['middle east', 'mena'],
     feedRegion: 'middleeast',
     mapView: 'mena',
     keyCountries: ['SA', 'IR', 'IL', 'AE', 'EG', 'IQ', 'TR'],
@@ -58,6 +65,7 @@ export const REGIONS = [
     forecastLabel: 'East Asia',
     wbCode: 'EAS',
     theaters: ['east-asia', 'southeast-asia'],
+    signalAliases: ['asia pacific', 'apac'],
     feedRegion: 'asia',
     mapView: 'asia',
     keyCountries: ['CN', 'JP', 'KR', 'TW', 'AU', 'SG', 'ID'],
@@ -68,6 +76,10 @@ export const REGIONS = [
     forecastLabel: 'Europe',
     wbCode: 'ECS',
     theaters: ['eastern-europe', 'western-europe', 'baltic', 'arctic'],
+    // 'europe' is long enough to avoid substring false-positives; bare 'eu' was
+    // removed because it would match 'fuel', 'neutral zone', etc. under the
+    // substring-includes matching in isSignalInRegion.
+    signalAliases: ['europe', 'european union'],
     feedRegion: 'europe',
     mapView: 'eu',
     keyCountries: ['DE', 'FR', 'GB', 'UA', 'RU', 'PL', 'IT'],
@@ -78,6 +90,7 @@ export const REGIONS = [
     forecastLabel: 'North America',
     wbCode: 'NAC',
     theaters: ['north-america'],
+    signalAliases: [],
     feedRegion: 'us',
     mapView: 'america',
     keyCountries: ['US', 'CA', 'MX'],
@@ -88,6 +101,7 @@ export const REGIONS = [
     forecastLabel: 'South Asia',
     wbCode: 'SAS',
     theaters: ['south-asia'],
+    signalAliases: [],
     feedRegion: 'asia',
     mapView: 'asia',
     keyCountries: ['IN', 'PK', 'BD', 'LK', 'AF'],
@@ -98,6 +112,7 @@ export const REGIONS = [
     forecastLabel: 'Latin America',
     wbCode: 'LCN',
     theaters: ['latin-america', 'caribbean'],
+    signalAliases: ['latam'],
     feedRegion: 'latam',
     mapView: 'latam',
     keyCountries: ['BR', 'AR', 'CO', 'CL', 'VE', 'PE'],
@@ -108,6 +123,7 @@ export const REGIONS = [
     forecastLabel: 'Africa',
     wbCode: 'SSF',
     theaters: ['horn-of-africa', 'sahel', 'southern-africa', 'central-africa'],
+    signalAliases: ['sub-saharan africa', 'subsaharan africa'],
     feedRegion: 'africa',
     mapView: 'africa',
     keyCountries: ['NG', 'ZA', 'KE', 'ET', 'SD', 'CD'],
@@ -118,6 +134,7 @@ export const REGIONS = [
     forecastLabel: '',
     wbCode: '1W',
     theaters: ['global-markets'],
+    signalAliases: ['global'],
     feedRegion: 'worldwide',
     mapView: 'global',
     keyCountries: ['US', 'CN', 'RU', 'DE', 'JP', 'IN', 'GB', 'SA'],
@@ -267,13 +284,72 @@ export function getTheaterCorridors(theaterId) {
   return CORRIDORS.filter((c) => c.theaterId === theaterId);
 }
 
-/** @param {string} regionId */
+/**
+ * Corridors owned by a region. Derived from TWO sources so shared chokepoints
+ * surface for every region they actually touch geographically:
+ *
+ *   1. Direct: corridors whose primary `theaterId` lives in this region.
+ *   2. Indirect: corridors explicitly listed in any of this region's
+ *      `theaters[].corridorIds` — this is how a chokepoint that primarily
+ *      belongs to another region can still be claimed by a secondary region.
+ *
+ * Example: Bab el-Mandeb (`babelm`) has `theaterId: 'red-sea'` (MENA), but
+ * it physically borders Djibouti and Eritrea as well, so the SSA theater
+ * `horn-of-africa` declares `corridorIds: ['babelm']` and picks it up here.
+ * Same for Panama → caribbean (LatAm) alongside its primary north-america
+ * theater (NA).
+ *
+ * De-duplicated by corridor id, so a corridor owned directly + indirectly
+ * (none today, but possible if a theater lists its own primary corridors)
+ * is still returned once.
+ *
+ * @param {string} regionId
+ */
 export function getRegionCorridors(regionId) {
-  const theaterIds = new Set(getRegionTheaters(regionId).map((t) => t.id));
-  return CORRIDORS.filter((c) => theaterIds.has(c.theaterId));
+  const theaters = getRegionTheaters(regionId);
+  const theaterIds = new Set(theaters.map((t) => t.id));
+  const indirectIds = new Set(theaters.flatMap((t) => t.corridorIds ?? []));
+  const seen = new Map();
+  for (const c of CORRIDORS) {
+    if (theaterIds.has(c.theaterId) || indirectIds.has(c.id)) {
+      seen.set(c.id, c);
+    }
+  }
+  return [...seen.values()];
 }
 
 /** @param {string} iso2 */
 export function countryCriticality(iso2) {
   return COUNTRY_CRITICALITY[iso2] ?? DEFAULT_COUNTRY_CRITICALITY;
+}
+
+/**
+ * Tests whether a raw theater label from a cross-source signal belongs to
+ * the given region. Case-insensitive substring match against both the
+ * fine-grained theater IDs (after kebab-to-space transform) and the region's
+ * `signalAliases` for broad labels the seed feeds actually emit.
+ *
+ * Example: `isSignalInRegion('Middle East', 'mena')` returns true via alias;
+ * `isSignalInRegion('persian-gulf', 'mena')` returns true via theater ID.
+ *
+ * @param {string | undefined | null} theater - raw theater label (free-text)
+ * @param {string | { id?: string, theaters?: string[], signalAliases?: string[] }} regionOrId
+ * @returns {boolean}
+ */
+export function isSignalInRegion(theater, regionOrId) {
+  const region = typeof regionOrId === 'string' ? getRegion(regionOrId) : regionOrId;
+  if (!region) return false;
+  // Normalize both sides: lowercase, trim, collapse dashes to spaces so that
+  // 'persian-gulf' and 'Persian Gulf' are treated as the same token.
+  const t = String(theater ?? '').toLowerCase().trim().replace(/-/g, ' ');
+  if (!t) return false;
+  const theaters = Array.isArray(region.theaters) ? region.theaters : [];
+  for (const label of theaters) {
+    if (t.includes(String(label).toLowerCase().replace(/-/g, ' '))) return true;
+  }
+  const aliases = Array.isArray(region.signalAliases) ? region.signalAliases : [];
+  for (const alias of aliases) {
+    if (t.includes(String(alias).toLowerCase().replace(/-/g, ' '))) return true;
+  }
+  return false;
 }
