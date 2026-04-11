@@ -7,7 +7,10 @@ import { isDesktopRuntime } from '@/services/runtime';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { h, replaceChildren } from '@/utils/dom-utils';
 import {
+  type DimensionConfidence,
+  LOCKED_PREVIEW,
   RESILIENCE_VISUAL_LEVEL_COLORS,
+  collectDimensionConfidences,
   formatBaselineStress,
   formatResilienceChange30d,
   formatResilienceConfidence,
@@ -18,26 +21,11 @@ import {
 } from './resilience-widget-utils';
 import type { CountryEnergyProfileData } from './CountryBriefPanel';
 
-const LOCKED_PREVIEW: ResilienceScoreResponse = {
-  countryCode: 'US',
-  overallScore: 73,
-  baselineScore: 82,
-  stressScore: 58,
-  stressFactor: 0.21,
-  level: 'high',
-  domains: [
-    { id: 'economic', score: 82, weight: 0.22, dimensions: [] },
-    { id: 'infrastructure', score: 68, weight: 0.2, dimensions: [] },
-    { id: 'energy', score: 88, weight: 0.15, dimensions: [] },
-    { id: 'social-governance', score: 71, weight: 0.25, dimensions: [] },
-    { id: 'health-food', score: 54, weight: 0.18, dimensions: [] },
-  ],
-  trend: 'rising',
-  change30d: 2.4,
-  lowConfidence: false,
-  imputationShare: 0,
-  dataVersion: '',
-};
+// LOCKED_PREVIEW lives in resilience-widget-utils.ts so tests and
+// other non-Vite consumers can import it without dragging in the
+// full ResilienceWidget class transitive graph (the class indirectly
+// depends on import.meta.env.DEV via proxy.ts, which breaks plain
+// node test runners). Moved in the PR #2949 review round.
 
 function normalizeCountryCode(countryCode: string | null | undefined): string | null {
   const normalized = String(countryCode || '').trim().toUpperCase();
@@ -287,6 +275,13 @@ export class ResilienceWidget {
         { className: 'resilience-widget__domains' },
         ...data.domains.map((domain) => this.renderDomainRow(domain, preview)),
       ),
+      // T1.6 Phase 1 of the country-resilience reference-grade upgrade plan:
+      // per-dimension confidence grid. Uses only the existing `coverage`,
+      // `observedWeight`, `imputedWeight` fields on ResilienceDimension so
+      // this ships without proto changes. Imputation class icons (T1.7)
+      // and freshness badges (T1.5 full pass) land as additional columns
+      // once the schema exposes those fields through the response type.
+      this.renderDimensionConfidenceGrid(data),
       h(
         'div',
         { className: 'resilience-widget__footer' },
@@ -317,6 +312,41 @@ export class ResilienceWidget {
             : [];
         })(),
       ),
+    );
+  }
+
+  private renderDimensionConfidenceGrid(data: ResilienceScoreResponse): HTMLElement {
+    const dimensions = collectDimensionConfidences(data.domains);
+    return h(
+      'div',
+      {
+        className: 'resilience-widget__dimension-grid',
+        title: 'Per-dimension data coverage. Hover a cell for the coverage percentage and observation provenance.',
+      },
+      ...dimensions.map((dim) => this.renderDimensionConfidenceCell(dim)),
+    );
+  }
+
+  private renderDimensionConfidenceCell(dim: DimensionConfidence): HTMLElement {
+    const title = dim.absent
+      ? `${dim.label}: no data`
+      : `${dim.label}: ${dim.coveragePct}% coverage, ${dim.status}`;
+    return h(
+      'div',
+      {
+        className: `resilience-widget__dimension-cell resilience-widget__dimension-cell--${dim.status}`,
+        title,
+      },
+      h('span', { className: 'resilience-widget__dimension-label' }, dim.label),
+      h(
+        'div',
+        { className: 'resilience-widget__dimension-bar-track' },
+        h('div', {
+          className: 'resilience-widget__dimension-bar-fill',
+          style: { width: `${dim.coveragePct}%` },
+        }),
+      ),
+      h('span', { className: 'resilience-widget__dimension-pct' }, dim.absent ? 'n/a' : `${dim.coveragePct}%`),
     );
   }
 
