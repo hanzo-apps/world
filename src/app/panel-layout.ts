@@ -40,6 +40,7 @@ import {
   InsightsPanel,
   MacroSignalsPanel,
   FearGreedPanel,
+  MarketBreadthPanel,
   ETFFlowsPanel,
   StablecoinPanel,
   UcdpEventsPanel,
@@ -1080,6 +1081,7 @@ export class PanelLayoutManager implements AppModule {
     this.createPanel('macro-signals', () => new MacroSignalsPanel());
     this.createPanel('fear-greed', () => new FearGreedPanel());
     this.createPanel('aaii-sentiment', () => new AAIISentimentPanel());
+    this.createPanel('market-breadth', () => new MarketBreadthPanel());
     this.createPanel('macro-tiles', () => new MacroTilesPanel());
     this.createPanel('fsi', () => new FSIPanel());
     this.createPanel('yield-curve', () => new YieldCurvePanel());

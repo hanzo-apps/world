@@ -484,6 +484,25 @@ export interface InsiderTransaction {
   transactionDate: string;
 }
 
+export interface GetMarketBreadthHistoryRequest {
+}
+
+export interface GetMarketBreadthHistoryResponse {
+  currentPctAbove20d?: number;
+  currentPctAbove50d?: number;
+  currentPctAbove200d?: number;
+  updatedAt: string;
+  history: BreadthSnapshot[];
+  unavailable: boolean;
+}
+
+export interface BreadthSnapshot {
+  date: string;
+  pctAbove20d?: number;
+  pctAbove50d?: number;
+  pctAbove200d?: number;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -549,6 +568,7 @@ export interface MarketServiceHandler {
   listEarningsCalendar(ctx: ServerContext, req: ListEarningsCalendarRequest): Promise<ListEarningsCalendarResponse>;
   getCotPositioning(ctx: ServerContext, req: GetCotPositioningRequest): Promise<GetCotPositioningResponse>;
   getInsiderTransactions(ctx: ServerContext, req: GetInsiderTransactionsRequest): Promise<GetInsiderTransactionsResponse>;
+  getMarketBreadthHistory(ctx: ServerContext, req: GetMarketBreadthHistoryRequest): Promise<GetMarketBreadthHistoryResponse>;
 }
 
 export function createMarketServiceRoutes(
@@ -1403,6 +1423,43 @@ export function createMarketServiceRoutes(
 
           const result = await handler.getInsiderTransactions(ctx, body);
           return new Response(JSON.stringify(result as GetInsiderTransactionsResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/market/v1/get-market-breadth-history",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = {} as GetMarketBreadthHistoryRequest;
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getMarketBreadthHistory(ctx, body);
+          return new Response(JSON.stringify(result as GetMarketBreadthHistoryResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

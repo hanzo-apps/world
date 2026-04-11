@@ -332,6 +332,9 @@ export class App {
     if (shouldPrime('aaii-sentiment')) {
       primeTask('aaiiSentiment', () => this.dataLoader.loadAaiiSentiment());
     }
+    if (shouldPrime('market-breadth')) {
+      primeTask('marketBreadth', () => this.dataLoader.loadMarketBreadth());
+    }
     if (shouldPrimeAny(['markets', 'heatmap', 'commodities', 'crypto', 'energy-complex'])) {
       primeTask('markets', () => this.dataLoader.loadMarkets());
     }
@@ -1402,6 +1405,12 @@ export class App {
       () => this.dataLoader.loadAaiiSentiment(),
       REFRESH_INTERVALS.aaiiSentiment,
       () => this.isPanelNearViewport('aaii-sentiment')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'market-breadth',
+      () => this.dataLoader.loadMarketBreadth(),
+      REFRESH_INTERVALS.marketBreadth,
+      () => this.isPanelNearViewport('market-breadth')
     );
 
     // Refresh intelligence signals for CII (geopolitical variant only)
