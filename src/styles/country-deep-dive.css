@@ -1489,3 +1489,111 @@
 .cdp-recommendation-critical {
   color: #ef4444;
 }
+
+/* ── Phase 5: Cost Shock Calculator ───────────────────────────────────── */
+.cdp-cost-shock-calc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.cdp-cost-shock-calc-tier {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent);
+  color: var(--warning, #fb923c);
+  font-weight: 500;
+}
+
+.cdp-cost-shock-calc-slider-wrap {
+  margin: 10px 0 14px;
+}
+
+.cdp-cost-shock-calc-slider-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  margin-bottom: 6px;
+}
+
+.cdp-cost-shock-calc-duration-value {
+  color: var(--text, #e2e8f0);
+  font-weight: 600;
+}
+
+.cdp-cost-shock-calc-slider {
+  width: 100%;
+  accent-color: var(--accent, #60a5fa);
+  cursor: pointer;
+}
+
+.cdp-cost-shock-calc-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted, #64748b);
+  margin-top: 4px;
+}
+
+.cdp-cost-shock-calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cdp-cost-shock-calc-table th {
+  text-align: left;
+  font-weight: 500;
+  padding: 4px 6px;
+  color: var(--text-muted, #94a3b8);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-muted, #475569) 25%, transparent);
+}
+
+.cdp-cost-shock-calc-cost-col {
+  text-align: right;
+}
+
+.cdp-cost-shock-calc-row td {
+  padding: 4px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-muted, #334155) 15%, transparent);
+}
+
+.cdp-cost-shock-calc-sector {
+  color: var(--text, #e2e8f0);
+}
+
+.cdp-cost-shock-calc-cost {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e2e8f0);
+  font-weight: 500;
+}
+
+.cdp-cost-shock-calc-cost--zero {
+  color: var(--text-muted, #64748b);
+  font-weight: 400;
+}
+
+.cdp-cost-shock-calc-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 6px 6px;
+  border-top: 2px solid color-mix(in srgb, var(--accent, #60a5fa) 40%, transparent);
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.cdp-cost-shock-calc-total-label {
+  color: var(--text-muted, #94a3b8);
+}
+
+.cdp-cost-shock-calc-total-value {
+  color: var(--accent, #60a5fa);
+  font-variant-numeric: tabular-nums;
+}
