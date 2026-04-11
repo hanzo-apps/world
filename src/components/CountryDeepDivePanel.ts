@@ -7,6 +7,7 @@ import { getCountryInfrastructure } from '@/services/related-assets';
 import type { PredictionMarket } from '@/services/prediction';
 import type { AssetType, NewsItem, RelatedAsset } from '@/types';
 import { sanitizeUrl, escapeHtml } from '@/utils/sanitize';
+import { computeAlternativeSuppliers, type ChokepointScoreMap, type EnrichedExporter } from '@/utils/supplier-route-risk';
 import { formatIntelBrief } from '@/utils/format-intel-brief';
 import { getCSSColor } from '@/utils';
 import { toFlagEmoji } from '@/utils/country-flag';
@@ -16,7 +17,7 @@ import { STRATEGIC_WATERWAYS } from '@/config/geo';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { getAuthState } from '@/services/auth-state';
 import { trackGateHit } from '@/services/analytics';
-import { fetchBypassOptions } from '@/services/supply-chain';
+import { fetchBypassOptions, fetchChokepointStatus } from '@/services/supply-chain';
 import { haversineDistanceKm } from '@/services/related-assets';
 import type {
   CountryBriefPanel,
@@ -1451,7 +1452,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const waterwayMap = new Map(STRATEGIC_WATERWAYS.map(w => [w.id, w.name]));
 
     const cpName = waterwayMap.get(sector.primaryChokepointId) ?? sector.primaryChokepointName;
-    const routesLabel = this.el('div', 'cdp-bypass-heading', `Routes via ${escapeHtml(cpName)}:`);
+    const routesLabel = this.el('div', 'cdp-bypass-heading', `Routes via ${cpName}:`);
     wrap.append(routesLabel);
 
     for (const route of matchingRoutes) {
@@ -1624,33 +1625,117 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     hr.append(this.el('th', '', 'Supplier'));
     hr.append(this.el('th', '', 'Share'));
     hr.append(this.el('th', '', 'Value'));
+    hr.append(this.el('th', '', 'Route Risk'));
     thead.append(hr);
     table.append(thead);
 
     const tbody = this.el('tbody');
-    for (const exp of product.topExporters) {
-      const tr = this.el('tr');
-      const supplierTd = this.el('td', 'cdp-product-supplier');
-      const flag = exp.partnerIso2 ? CountryDeepDivePanel.toFlagEmoji(exp.partnerIso2) : '';
-      supplierTd.textContent = `${flag} ${exp.partnerIso2 || 'N/A'}`;
-      tr.append(supplierTd);
+    const recsMount = this.el('div', 'cdp-recommendations');
 
-      const shareTd = this.el('td', 'cdp-product-share');
-      const pct = Math.round(exp.share * 100);
-      shareTd.textContent = `${pct}%`;
-      const barWrap = this.el('div', 'cdp-product-share-bar-wrap');
-      const bar = this.el('div', 'cdp-product-share-bar');
-      bar.style.width = `${Math.min(pct, 100)}%`;
-      if (pct >= 50) bar.classList.add('cdp-product-share-high');
-      barWrap.append(bar);
-      shareTd.append(barWrap);
-      tr.append(shareTd);
+    type ExporterRow = { partnerIso2: string; share: number; value: number; risk: EnrichedExporter['risk'] | null };
 
-      tr.append(this.el('td', 'cdp-product-val', this.formatMoney(exp.value)));
-      tbody.append(tr);
-    }
+    const renderRows = (enriched: EnrichedExporter[] | null) => {
+      tbody.replaceChildren();
+      recsMount.replaceChildren();
+
+      const rows: ExporterRow[] = enriched ?? product.topExporters.map(exp => ({
+        partnerIso2: exp.partnerIso2,
+        share: exp.share,
+        value: exp.value,
+        risk: null,
+      }));
+
+      for (const exp of rows) {
+        const tr = this.el('tr');
+        const supplierTd = this.el('td', 'cdp-product-supplier');
+        const flag = exp.partnerIso2 ? CountryDeepDivePanel.toFlagEmoji(exp.partnerIso2) : '';
+        supplierTd.textContent = `${flag} ${exp.partnerIso2 || 'N/A'}`;
+        tr.append(supplierTd);
+
+        const shareTd = this.el('td', 'cdp-product-share');
+        const pct = Math.round(exp.share * 100);
+        shareTd.textContent = `${pct}%`;
+        const barWrap = this.el('div', 'cdp-product-share-bar-wrap');
+        const bar = this.el('div', 'cdp-product-share-bar');
+        bar.style.width = `${Math.min(pct, 100)}%`;
+        if (pct >= 50) bar.classList.add('cdp-product-share-high');
+        barWrap.append(bar);
+        shareTd.append(barWrap);
+        tr.append(shareTd);
+
+        tr.append(this.el('td', 'cdp-product-val', this.formatMoney(exp.value)));
+
+        const riskTd = this.el('td', 'cdp-product-risk');
+        if (exp.risk) {
+          const badgeCls = `cdp-risk-badge cdp-risk-${exp.risk.riskLevel.replace('_', '-')}`;
+          const badgeLabels: Record<string, string> = { safe: 'Safe', at_risk: 'At Risk', critical: 'Critical', unknown: 'Unknown' };
+          const badge = this.el('span', badgeCls, badgeLabels[exp.risk.riskLevel] ?? exp.risk.riskLevel);
+          riskTd.append(badge);
+
+          if (exp.risk.transitChokepoints.length > 0) {
+            const cpNames = exp.risk.transitChokepoints
+              .map(cp => cp.chokepointName)
+              .join(', ');
+            const cpInfo = this.el('div', 'cdp-risk-chokepoints');
+            cpInfo.textContent = cpNames;
+            riskTd.append(cpInfo);
+          }
+        } else {
+          riskTd.textContent = '\u2014';
+        }
+        tr.append(riskTd);
+        tbody.append(tr);
+      }
+
+      if (enriched) {
+        const hasCritical = enriched.some(e => e.risk.riskLevel === 'critical' || e.risk.riskLevel === 'at_risk');
+        if (hasCritical) {
+          for (const exp of enriched) {
+            if (exp.risk.riskLevel === 'safe' || exp.risk.riskLevel === 'unknown') continue;
+            const recCls = exp.risk.riskLevel === 'critical' ? 'cdp-recommendation-critical' : 'cdp-recommendation-warn';
+            const item = this.el('div', `cdp-recommendation-item ${recCls}`);
+            const expPct = Math.round(exp.share * 100);
+            let text = `\u26A0 ${product.description} imports from ${exp.partnerIso2} (${expPct}%) transit`;
+            if (exp.risk.transitChokepoints.length === 0) continue;
+            const worstCp = exp.risk.transitChokepoints.reduce((a, b) => a.disruptionScore > b.disruptionScore ? a : b);
+            text += ` ${worstCp.chokepointName} (disruption ${worstCp.disruptionScore}/100).`;
+            if (exp.safeAlternative) {
+              const alt = enriched.find(e => e.partnerIso2 === exp.safeAlternative);
+              const altPct = alt ? Math.round(alt.share * 100) : 0;
+              const altFlag = CountryDeepDivePanel.toFlagEmoji(exp.safeAlternative);
+              text += ` ${altFlag} ${exp.safeAlternative} supplies ${altPct}% via routes avoiding this chokepoint.`;
+            }
+            item.textContent = text;
+            recsMount.append(item);
+          }
+        } else {
+          const safeItem = this.el('div', 'cdp-recommendation-item cdp-recommendation-safe');
+          safeItem.textContent = '\u2713 All current suppliers use routes that avoid disrupted chokepoints.';
+          recsMount.append(safeItem);
+        }
+      }
+    };
+
+    renderRows(null);
     table.append(tbody);
-    mount.append(table);
+    mount.append(table, recsMount);
+
+    const importerIso2 = this.currentCode;
+    const capturedCode = this.getCode();
+    if (importerIso2) {
+      fetchChokepointStatus().then(resp => {
+        if (this.getCode() !== capturedCode) return;
+        if (!resp.chokepoints.length) return;
+        const scores: ChokepointScoreMap = new Map();
+        for (const cp of resp.chokepoints) {
+          scores.set(cp.id, cp.disruptionScore);
+        }
+        const enriched = computeAlternativeSuppliers(product.topExporters, importerIso2, scores);
+        renderRows(enriched);
+      }).catch(() => {
+        console.warn('[deep-dive] Chokepoint status unavailable for route risk enrichment');
+      });
+    }
 
     const source = this.el('div', 'cdp-card-footer', `Source: UN Comtrade HS4 bilateral \u00B7 ${product.year}`);
     mount.append(source);
