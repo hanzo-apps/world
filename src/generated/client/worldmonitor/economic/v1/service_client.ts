@@ -667,6 +667,30 @@ export interface OilInventoriesRefinery {
   period: string;
 }
 
+export interface GetEnergyCrisisPoliciesRequest {
+  countryCode: string;
+  category: string;
+}
+
+export interface GetEnergyCrisisPoliciesResponse {
+  source: string;
+  sourceUrl: string;
+  context: string;
+  policies: EnergyCrisisPolicy[];
+  updatedAt: string;
+  unavailable: boolean;
+}
+
+export interface EnergyCrisisPolicy {
+  country: string;
+  countryCode: string;
+  category: string;
+  sector: string;
+  measure: string;
+  dateAnnounced: string;
+  status: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -1332,6 +1356,32 @@ export class EconomicServiceClient {
     }
 
     return await resp.json() as GetOilInventoriesResponse;
+  }
+
+  async getEnergyCrisisPolicies(req: GetEnergyCrisisPoliciesRequest, options?: EconomicServiceCallOptions): Promise<GetEnergyCrisisPoliciesResponse> {
+    let path = "/api/economic/v1/get-energy-crisis-policies";
+    const params = new URLSearchParams();
+    if (req.countryCode != null && req.countryCode !== "") params.set("country_code", String(req.countryCode));
+    if (req.category != null && req.category !== "") params.set("category", String(req.category));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetEnergyCrisisPoliciesResponse;
   }
 
   private async handleError(resp: Response): Promise<never> {

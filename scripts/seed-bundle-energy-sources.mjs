@@ -8,4 +8,5 @@ await runBundle('energy-sources', [
   { label: 'JODI-Oil', script: 'seed-jodi-oil.mjs', seedMetaKey: 'energy:jodi-oil', intervalMs: 35 * DAY, timeoutMs: 600_000 },
   { label: 'OWID-Energy-Mix', script: 'seed-owid-energy-mix.mjs', seedMetaKey: 'economic:owid-energy-mix', intervalMs: 35 * DAY, timeoutMs: 600_000 },
   { label: 'IEA-Oil-Stocks', script: 'seed-iea-oil-stocks.mjs', seedMetaKey: 'energy:iea-oil-stocks', intervalMs: 40 * DAY, timeoutMs: 300_000 },
+  { label: 'IEA-Crisis-Policies', script: 'seed-energy-crisis-policies.mjs', seedMetaKey: 'energy:crisis-policies', intervalMs: 7 * DAY, timeoutMs: 120_000 },
 ]);

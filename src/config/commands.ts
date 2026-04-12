@@ -103,6 +103,7 @@ export const COMMANDS: Command[] = [
   { id: 'panel:energy', keywords: ['energy', 'resources', 'oil news'], label: 'Panel: Energy & Resources', icon: '\u26A1', category: 'panels' },
   { id: 'panel:energy-complex', keywords: ['energy complex', 'oil markets', 'gas markets', 'energy prices'], label: 'Panel: Energy Complex', icon: '\u{1F6E2}\uFE0F', category: 'panels' },
   { id: 'panel:oil-inventories', keywords: ['oil inventories', 'crude stocks', 'spr', 'strategic petroleum', 'eia inventories', 'iea stocks', 'days of cover', 'oil reserves', 'gas storage'], label: 'Panel: Oil Inventories', icon: '\u{1F6E2}\uFE0F', category: 'panels' },
+  { id: 'panel:energy-crisis', keywords: ['energy crisis', 'iea policy', 'crisis response', 'hormuz policy', 'fuel rationing', 'conservation measures'], label: 'Panel: Energy Crisis Policies', icon: '\u{26A1}', category: 'panels' },
   { id: 'panel:gov', keywords: ['government', 'gov'], label: 'Panel: Government', icon: '\u{1F3DB}\uFE0F', category: 'panels' },
   { id: 'panel:policy', keywords: ['policy', 'ai policy', 'regulation', 'tech policy'], label: 'Panel: AI Policy & Regulation', icon: '\u{1F4DC}', category: 'panels' },
   { id: 'panel:thinktanks', keywords: ['think tanks', 'thinktanks', 'analysis'], label: 'Panel: Think Tanks', icon: '\u{1F9E0}', category: 'panels' },

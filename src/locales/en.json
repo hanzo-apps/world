@@ -301,6 +301,7 @@
     "energy": "Energy & Resources",
     "energyComplex": "Energy Complex",
     "oilInventories": "Oil Inventories",
+    "energyCrisis": "Energy Crisis Tracker",
     "gov": "Government",
     "thinktanks": "Think Tanks",
     "polymarket": "Predictions",
@@ -2099,6 +2100,9 @@
     },
     "fsi": {
       "infoTooltip": "<strong>Financial Stress Indicator</strong> Kansas City Fed Financial Stress Index (KCFSI): measures stress in US financial markets using 11 indicators including yield spreads, volatility, and cross-correlations. Positive values indicate above-average stress. Source: Federal Reserve Bank of Kansas City."
+    },
+    "energyCrisis": {
+      "infoTooltip": "<strong>Energy Crisis Tracker</strong> IEA 2026 Energy Crisis Policy Response Tracker. Tracks government measures to conserve energy and support consumers in response to the Middle East conflict and Strait of Hormuz supply disruptions. Covers 60+ countries with nearly 200 policy measures."
     },
     "hormuzTracker": {
       "infoTooltip": "<strong>Hormuz Trade Tracker</strong> Live AIS vessel tracking through the Strait of Hormuz, the world's most critical oil chokepoint. Monitors tanker counts, disruption events, and weekly flow changes. Approximately 20% of global oil supply transits here daily."

@@ -72,6 +72,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'economic-calendar': { name: 'Economic Calendar', enabled: false, priority: 2 },
   'cot-positioning': { name: 'COT Positioning', enabled: false, priority: 2 },
   'hormuz-tracker': { name: 'Hormuz Trade Tracker', enabled: true, priority: 2 },
+  'energy-crisis': { name: 'Energy Crisis Tracker', enabled: true, priority: 2 },
   'gulf-economies': { name: 'Gulf Economies', enabled: false, priority: 2 },
   'consumer-prices': { name: 'Consumer Prices', enabled: false, priority: 2 },
   'grocery-basket': { name: 'Grocery Index', enabled: false, priority: 2 },

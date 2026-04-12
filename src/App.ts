@@ -27,6 +27,7 @@ import { SignalModal, IntelligenceGapBadge, BreakingNewsBanner } from '@/compone
 import { initBreakingNewsAlerts, destroyBreakingNewsAlerts } from '@/services/breaking-news-alerts';
 import type { ServiceStatusPanel } from '@/components/ServiceStatusPanel';
 import type { StablecoinPanel } from '@/components/StablecoinPanel';
+import type { EnergyCrisisPanel } from '@/components/EnergyCrisisPanel';
 import type { ETFFlowsPanel } from '@/components/ETFFlowsPanel';
 import type { MacroSignalsPanel } from '@/components/MacroSignalsPanel';
 import type { FearGreedPanel } from '@/components/FearGreedPanel';
@@ -270,6 +271,10 @@ export class App {
     if (shouldPrime('stablecoins')) {
       const panel = this.state.panels.stablecoins as StablecoinPanel | undefined;
       if (panel) primeTask('stablecoins', () => panel.fetchData());
+    }
+    if (shouldPrime('energy-crisis')) {
+      const panel = this.state.panels['energy-crisis'] as EnergyCrisisPanel | undefined;
+      if (panel) primeTask('energy-crisis', () => panel.fetchData());
     }
     if (shouldPrime('telegram-intel')) {
       primeTask('telegram-intel', () => this.dataLoader.loadTelegramIntel());
@@ -1250,6 +1255,12 @@ export class App {
       () => (this.state.panels.stablecoins as StablecoinPanel).fetchData(),
       REFRESH_INTERVALS.stablecoins,
       () => this.isPanelNearViewport('stablecoins')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'energy-crisis',
+      () => (this.state.panels['energy-crisis'] as EnergyCrisisPanel).fetchData(),
+      REFRESH_INTERVALS.energyCrisis,
+      () => this.isPanelNearViewport('energy-crisis')
     );
     this.refreshScheduler.scheduleRefresh(
       'etf-flows',
