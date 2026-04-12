@@ -295,6 +295,38 @@ describe('Comtrade bilateral HS4 seeder (scripts/seed-comtrade-bilateral-hs4.mjs
       'seeder: must call extendExistingTtl when lock is skipped',
     );
   });
+
+  it('defines COMTRADE_REPORTER_OVERRIDES for all countries with non-standard Comtrade codes', () => {
+    assert.ok(
+      src.includes('COMTRADE_REPORTER_OVERRIDES'),
+      'seeder: must define COMTRADE_REPORTER_OVERRIDES to handle non-standard Comtrade reporter codes',
+    );
+    assert.ok(
+      src.includes("FR: '251'"),
+      "seeder: COMTRADE_REPORTER_OVERRIDES must map FR to '251' (Comtrade reporter code, not UN M49 250)",
+    );
+    assert.ok(
+      src.includes("IT: '381'"),
+      "seeder: COMTRADE_REPORTER_OVERRIDES must map IT to '381' (Comtrade reporter code, not UN M49 380)",
+    );
+    assert.ok(
+      src.includes("US: '842'"),
+      "seeder: COMTRADE_REPORTER_OVERRIDES must map US to '842' (Comtrade reporter code, not UN M49 840)",
+    );
+  });
+
+  it('applies COMTRADE_REPORTER_OVERRIDES before falling back to ISO2_TO_UN for reporter code lookup', () => {
+    const overrideIdx = src.indexOf('COMTRADE_REPORTER_OVERRIDES[iso2]');
+    const iso2ToUnIdx = src.indexOf('ISO2_TO_UN[iso2]', overrideIdx);
+    assert.ok(
+      overrideIdx !== -1,
+      'seeder: must use COMTRADE_REPORTER_OVERRIDES when resolving the Comtrade reporter code',
+    );
+    assert.ok(
+      iso2ToUnIdx !== -1 && iso2ToUnIdx > overrideIdx,
+      'seeder: COMTRADE_REPORTER_OVERRIDES must be checked before ISO2_TO_UN (override takes precedence)',
+    );
+  });
 });
 
 // ─── Service function ────────────────────────────────────────────────────────
