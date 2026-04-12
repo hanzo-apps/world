@@ -96,6 +96,7 @@ const BOOTSTRAP_CACHE_KEYS = {
   oilStocksAnalysis:    'energy:oil-stocks-analysis:v1',
   lngVulnerability:     'energy:lng-vulnerability:v1',
   sprPolicies:          'energy:spr-policies:v1',
+  energyCrisisPolicies: 'energy:crisis-policies:v1',
   aaiiSentiment:        'market:aaii-sentiment:v1',
   breadthHistory:       'market:breadth-history:v1',
 };
@@ -137,6 +138,7 @@ const SLOW_KEYS = new Set([
   'oilStocksAnalysis',
   'lngVulnerability',
   'sprPolicies',
+  'energyCrisisPolicies',
   'aaiiSentiment',
   'breadthHistory',
 ]);
