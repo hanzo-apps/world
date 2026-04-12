@@ -670,6 +670,32 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/market/v1/get-gold-intelligence:
+        get:
+            tags:
+                - MarketService
+            summary: GetGoldIntelligence
+            description: GetGoldIntelligence retrieves gold pricing, cross-currency XAU, ratios, and CFTC positioning.
+            operationId: GetGoldIntelligence
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetGoldIntelligenceResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -1870,5 +1896,76 @@ components:
                     type: number
                     format: double
                 pctAbove200d:
+                    type: number
+                    format: double
+        GetGoldIntelligenceRequest:
+            type: object
+        GetGoldIntelligenceResponse:
+            type: object
+            properties:
+                goldPrice:
+                    type: number
+                    format: double
+                goldChangePct:
+                    type: number
+                    format: double
+                goldSparkline:
+                    type: array
+                    items:
+                        type: number
+                        format: double
+                silverPrice:
+                    type: number
+                    format: double
+                platinumPrice:
+                    type: number
+                    format: double
+                palladiumPrice:
+                    type: number
+                    format: double
+                goldSilverRatio:
+                    type: number
+                    format: double
+                goldPlatinumPremiumPct:
+                    type: number
+                    format: double
+                crossCurrencyPrices:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GoldCrossCurrencyPrice'
+                cot:
+                    $ref: '#/components/schemas/GoldCotPositioning'
+                updatedAt:
+                    type: string
+                unavailable:
+                    type: boolean
+        GoldCrossCurrencyPrice:
+            type: object
+            properties:
+                currency:
+                    type: string
+                flag:
+                    type: string
+                price:
+                    type: number
+                    format: double
+        GoldCotPositioning:
+            type: object
+            properties:
+                reportDate:
+                    type: string
+                managedMoneyLong:
+                    type: number
+                    format: double
+                managedMoneyShort:
+                    type: number
+                    format: double
+                netPct:
+                    type: number
+                    format: double
+                dealerLong:
+                    type: number
+                    format: double
+                dealerShort:
                     type: number
                     format: double
