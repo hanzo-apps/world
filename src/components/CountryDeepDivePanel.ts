@@ -39,7 +39,7 @@ import type {
   MultiSectorShockResponse,
   MultiSectorShock,
 } from '@/services/supply-chain';
-import { fetchMultiSectorCostShock } from '@/services/supply-chain';
+import { fetchMultiSectorCostShock, HS2_SHORT_LABELS } from '@/services/supply-chain';
 import type { MapContainer } from './MapContainer';
 import { ResilienceWidget } from './ResilienceWidget';
 
@@ -700,7 +700,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     let total = 0;
     for (const s of sorted) {
       const tr = this.el('tr', 'cdp-cost-shock-calc-row');
-      const labelCell = this.el('td', 'cdp-cost-shock-calc-sector', s.hs2Label || `HS${s.hs2}`);
+      const labelCell = this.el('td', 'cdp-cost-shock-calc-sector', s.hs2Label || HS2_SHORT_LABELS[s.hs2] || `HS${s.hs2}`);
       const costCell = this.el('td', 'cdp-cost-shock-calc-cost', this.formatMoney(s.totalCostShock));
       if (s.totalCostShock === 0) costCell.classList.add('cdp-cost-shock-calc-cost--zero');
       tr.append(labelCell, costCell);
@@ -1763,18 +1763,31 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
       tbody.replaceChildren();
       recsMount.replaceChildren();
 
-      const rows: ExporterRow[] = enriched ?? product.topExporters.map(exp => ({
+      const importerCode = this.currentCode;
+      const rawRows: ExporterRow[] = enriched ?? product.topExporters.map(exp => ({
         partnerIso2: exp.partnerIso2,
         share: exp.share,
         value: exp.value,
         risk: null,
       }));
+      // Drop self-imports (receiver = supplier) and rows with unresolved partner ISO2 codes;
+      // the seeder emits partnerIso2='' when a UN code can't be mapped, which surfaced as "N/A" rows.
+      const isVisible = (iso2: string) => Boolean(iso2) && iso2 !== importerCode;
+      const rows = rawRows.filter(r => isVisible(r.partnerIso2));
+      const visibleEnriched = enriched ? enriched.filter(e => isVisible(e.partnerIso2)) : null;
+
+      if (rows.length === 0) {
+        const empty = this.el('div', 'cdp-recommendation-item');
+        empty.textContent = '\u2139 No external suppliers in available trade data.';
+        recsMount.append(empty);
+        return;
+      }
 
       for (const exp of rows) {
         const tr = this.el('tr');
         const supplierTd = this.el('td', 'cdp-product-supplier');
         const flag = exp.partnerIso2 ? CountryDeepDivePanel.toFlagEmoji(exp.partnerIso2) : '';
-        supplierTd.textContent = `${flag} ${exp.partnerIso2 || 'N/A'}`;
+        supplierTd.textContent = `${flag} ${exp.partnerIso2}`;
         tr.append(supplierTd);
 
         const shareTd = this.el('td', 'cdp-product-share');
@@ -1812,13 +1825,13 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         tbody.append(tr);
       }
 
-      if (enriched) {
-        const hasCritical = enriched.some(e => e.risk.riskLevel === 'critical');
-        const hasAtRisk = enriched.some(e => e.risk.riskLevel === 'at_risk');
-        const hasUnknown = enriched.some(e => e.risk.riskLevel === 'unknown');
-        const hasSafe = enriched.some(e => e.risk.riskLevel === 'safe');
+      if (visibleEnriched) {
+        const hasCritical = visibleEnriched.some(e => e.risk.riskLevel === 'critical');
+        const hasAtRisk = visibleEnriched.some(e => e.risk.riskLevel === 'at_risk');
+        const hasUnknown = visibleEnriched.some(e => e.risk.riskLevel === 'unknown');
+        const hasSafe = visibleEnriched.some(e => e.risk.riskLevel === 'safe');
         if (hasCritical || hasAtRisk) {
-          for (const exp of enriched) {
+          for (const exp of visibleEnriched) {
             if (exp.risk.riskLevel === 'safe' || exp.risk.riskLevel === 'unknown') continue;
             const recCls = exp.risk.riskLevel === 'critical' ? 'cdp-recommendation-critical' : 'cdp-recommendation-warn';
             const item = this.el('div', `cdp-recommendation-item ${recCls}`);
@@ -1827,8 +1840,8 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
             if (exp.risk.transitChokepoints.length === 0) continue;
             const worstCp = exp.risk.transitChokepoints.reduce((a, b) => a.disruptionScore > b.disruptionScore ? a : b);
             text += ` ${worstCp.chokepointName} (disruption ${worstCp.disruptionScore}/100).`;
-            if (exp.safeAlternative) {
-              const alt = enriched.find(e => e.partnerIso2 === exp.safeAlternative);
+            if (exp.safeAlternative && isVisible(exp.safeAlternative)) {
+              const alt = visibleEnriched.find(e => e.partnerIso2 === exp.safeAlternative);
               const altPct = alt ? Math.round(alt.share * 100) : 0;
               const altFlag = CountryDeepDivePanel.toFlagEmoji(exp.safeAlternative);
               text += ` ${altFlag} ${exp.safeAlternative} supplies ${altPct}% via routes avoiding this chokepoint.`;
@@ -1841,8 +1854,8 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
           item.textContent = '\u2139 No modeled maritime route data available for these suppliers. Risk cannot be assessed.';
           recsMount.append(item);
         } else if (hasUnknown && hasSafe) {
-          const safeCount = enriched.filter(e => e.risk.riskLevel === 'safe').length;
-          const unknownCount = enriched.filter(e => e.risk.riskLevel === 'unknown').length;
+          const safeCount = visibleEnriched.filter(e => e.risk.riskLevel === 'safe').length;
+          const unknownCount = visibleEnriched.filter(e => e.risk.riskLevel === 'unknown').length;
           const item = this.el('div', 'cdp-recommendation-item');
           item.textContent = `\u2139 ${safeCount} supplier(s) verified safe. ${unknownCount} supplier(s) have no modeled route data.`;
           recsMount.append(item);
