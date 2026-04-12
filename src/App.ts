@@ -38,6 +38,7 @@ import type { GroceryBasketPanel } from '@/components/GroceryBasketPanel';
 import type { BigMacPanel } from '@/components/BigMacPanel';
 import type { FuelPricesPanel } from '@/components/FuelPricesPanel';
 import type { FaoFoodPriceIndexPanel } from '@/components/FaoFoodPriceIndexPanel';
+import type { OilInventoriesPanel } from '@/components/OilInventoriesPanel';
 import type { ClimateNewsPanel } from '@/components/ClimateNewsPanel';
 import type { ConsumerPricesPanel } from '@/components/ConsumerPricesPanel';
 import type { DefensePatentsPanel } from '@/components/DefensePatentsPanel';
@@ -292,6 +293,10 @@ export class App {
     if (shouldPrime('fao-food-price-index')) {
       const panel = this.state.panels['fao-food-price-index'] as FaoFoodPriceIndexPanel | undefined;
       if (panel) primeTask('fao-food-price-index', () => panel.fetchData());
+    }
+    if (shouldPrime('oil-inventories')) {
+      const panel = this.state.panels['oil-inventories'] as OilInventoriesPanel | undefined;
+      if (panel) primeTask('oil-inventories', () => panel.fetchData());
     }
     if (shouldPrime('climate-news')) {
       const panel = this.state.panels['climate-news'] as ClimateNewsPanel | undefined;
@@ -1355,6 +1360,13 @@ export class App {
       () => (this.state.panels['fao-food-price-index'] as FaoFoodPriceIndexPanel).fetchData(),
       REFRESH_INTERVALS.faoFoodPriceIndex,
       () => this.isPanelNearViewport('fao-food-price-index')
+    );
+
+    this.refreshScheduler.scheduleRefresh(
+      'oil-inventories',
+      () => (this.state.panels['oil-inventories'] as OilInventoriesPanel).fetchData(),
+      REFRESH_INTERVALS.oilInventories,
+      () => this.isPanelNearViewport('oil-inventories')
     );
 
     this.refreshScheduler.scheduleRefresh(

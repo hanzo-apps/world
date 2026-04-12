@@ -300,6 +300,7 @@
     "asia": "Asia-Pacific",
     "energy": "Energy & Resources",
     "energyComplex": "Energy Complex",
+    "oilInventories": "Oil Inventories",
     "gov": "Government",
     "thinktanks": "Think Tanks",
     "polymarket": "Predictions",
@@ -904,6 +905,9 @@
         "steadyDetail": "Macro conditions are stable for now."
       },
       "infoTooltip": "<strong>Macro Stress</strong> Macro gauges, government spending, and central bank data:<ul><li><strong>Indicators</strong>: VIX, rates, yield curve, labor, inflation</li><li><strong>Gov</strong>: Recent US government contract awards</li><li><strong>Central Banks</strong>: BIS policy rates and exchange rate data</li></ul>"
+    },
+    "oilInventories": {
+      "infoTooltip": "<strong>Oil Inventories</strong> US crude oil and SPR stockpiles (EIA weekly), natural gas storage, EU gas fill percentage (GIE AGSI+), and OECD oil stocks days-of-cover (IEA monthly)."
     },
     "energyComplex": {
       "noData": "Energy data temporarily unavailable - will retry",

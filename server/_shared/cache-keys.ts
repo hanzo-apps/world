@@ -62,7 +62,7 @@ export const EMBER_ELECTRICITY_KEY_PREFIX = 'energy:ember:v1:';
 export const EMBER_ELECTRICITY_ALL_KEY = 'energy:ember:v1:_all';
 export const SPR_KEY = 'economic:spr:v1';
 export const SPR_POLICIES_KEY = 'energy:spr-policies:v1';
-export const REFINERY_UTIL_KEY = 'economic:refinery-util:v1';
+export const REFINERY_INPUTS_KEY = 'economic:refinery-inputs:v1';
 
 /**
  * Per-country chokepoint exposure index. Request-varying — excluded from bootstrap.
