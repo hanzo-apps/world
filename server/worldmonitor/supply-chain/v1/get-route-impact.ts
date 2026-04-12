@@ -138,7 +138,7 @@ async function readResilienceScore(iso2: string): Promise<number> {
   }
 }
 
-async function computeImpact(req: GetRouteImpactRequest): Promise<GetRouteImpactResponse> {
+async function computeImpact(req: GetRouteImpactRequest): Promise<GetRouteImpactResponse | null> {
   const fromIso2 = req.fromIso2.trim().toUpperCase();
   const toIso2 = req.toIso2.trim().toUpperCase();
   const hs2 = req.hs2.trim().replace(/\D/g, '') || '27';
@@ -152,11 +152,18 @@ async function computeImpact(req: GetRouteImpactRequest): Promise<GetRouteImpact
 
   if (!rawPayload) {
     const lazyResult = await lazyFetchBilateralHs4(toIso2);
-    if (!lazyResult || lazyResult.products.length === 0) {
-      const source = lazyResult?.comtradeSource ?? 'lazy';
-      const resp = emptyResponse(req, source);
-      if (lazyResult?.rateLimited) (resp as unknown as Record<string, unknown>).meta = { rateLimited: true };
-      return resp;
+    if (!lazyResult) {
+      // null = sentinel exists (permanent negative) or concurrent fetch in-flight (transient).
+      // Return null so cachedFetchJson uses short negative-TTL (120s).
+      return null;
+    }
+    if (lazyResult.products.length === 0) {
+      if (lazyResult.comtradeSource === 'lazy' || lazyResult.rateLimited) {
+        // Transient: fetch error, timeout, or 429. Short-cache via null.
+        return null;
+      }
+      // Permanent empty: country has no bilateral data in Comtrade. Safe to cache long-term.
+      return emptyResponse(req, 'empty');
     }
     rawPayload = { iso2: toIso2, products: lazyResult.products, fetchedAt: new Date().toISOString() };
   }
@@ -234,5 +241,5 @@ export async function getRouteImpact(
     CACHE_TTL_SECONDS,
     async () => computeImpact({ fromIso2, toIso2, hs2 }),
   );
-  return result ?? emptyResponse(req, 'missing');
+  return result ?? emptyResponse(req, 'lazy');
 }
