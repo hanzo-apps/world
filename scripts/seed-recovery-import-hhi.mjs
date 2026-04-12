@@ -32,12 +32,32 @@ const ALL_REPORTERS = Object.values(UN_TO_ISO2).filter(c => c.length === 2);
 function parseRecords(data) {
   const records = data?.data ?? [];
   if (!Array.isArray(records)) return [];
-  return records
-    .filter(r => r && Number(r.primaryValue ?? 0) > 0)
-    .map(r => ({
-      partnerCode: String(r.partnerCode ?? r.partner2Code ?? '000'),
-      primaryValue: Number(r.primaryValue ?? 0),
-    }));
+  const valid = records.filter(r => r && Number(r.primaryValue ?? 0) > 0);
+  if (valid.length === 0) return [];
+  // Group by period, pick the year with the most USABLE partners (excluding
+  // aggregate codes 0/000 that computeHhi discards). Ties break toward newest.
+  const byPeriod = new Map();
+  for (const r of valid) {
+    const p = String(r.period ?? r.refPeriodId ?? '0');
+    if (!byPeriod.has(p)) byPeriod.set(p, []);
+    byPeriod.get(p).push(r);
+  }
+  let bestPeriod = '';
+  let bestCount = 0;
+  for (const [p, rows] of byPeriod) {
+    const usable = rows.filter(r => {
+      const pc = String(r.partnerCode ?? r.partner2Code ?? '000');
+      return pc !== '0' && pc !== '000';
+    }).length;
+    if (usable > bestCount || (usable === bestCount && p > bestPeriod)) {
+      bestCount = usable;
+      bestPeriod = p;
+    }
+  }
+  return byPeriod.get(bestPeriod).map(r => ({
+    partnerCode: String(r.partnerCode ?? r.partner2Code ?? '000'),
+    primaryValue: Number(r.primaryValue ?? 0),
+  }));
 }
 
 async function fetchImportsForReporter(reporterCode) {
@@ -49,7 +69,8 @@ async function fetchImportsForReporter(reporterCode) {
   // Omit partnerCode to get ALL bilateral partners (matching the pattern
   // in seed-comtrade-bilateral-hs4.mjs). Setting partnerCode=0 returns
   // only the world-aggregate row which computeHhi() then discards.
-  url.searchParams.set('period', String(new Date().getFullYear() - 1));
+  // Comtrade annual data lags ~6-12 months; request both years so the API returns whichever has data.
+  url.searchParams.set('period', `${new Date().getFullYear() - 1},${new Date().getFullYear() - 2}`);
   url.searchParams.set('subscription-key', nextKey());
 
   const resp = await fetch(url.toString(), {

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, runSeed, loadSharedConfig } from './_seed-utils.mjs';
+import { loadEnvFile, runSeed, loadSharedConfig, resolveProxyForConnect, imfFetchJson } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
 const IMF_BASE = 'https://www.imf.org/external/datamapper/api/v1';
+const _proxyAuth = resolveProxyForConnect();
 const CANONICAL_KEY = 'economic:imf:macro:v2';
 const CACHE_TTL = 35 * 24 * 3600; // 35 days — monthly IMF WEO release
 
@@ -33,12 +34,7 @@ function weoYears() {
 
 async function fetchImfIndicator(indicator) {
   const url = `${IMF_BASE}/${indicator}?periods=${weoYears().join(',')}`;
-  const resp = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!resp.ok) throw new Error(`IMF ${indicator}: HTTP ${resp.status}`);
-  const data = await resp.json();
+  const data = await imfFetchJson(url, _proxyAuth);
   return data?.values?.[indicator] ?? {};
 }
 
