@@ -476,11 +476,17 @@ async function generateAISummary(stories, rule) {
   const profile = formatUserProfile(ctx, rule.variant ?? 'full');
 
   const variant = rule.variant ?? 'full';
+  const tz = rule.digestTimezone ?? 'UTC';
+  const localHour = toLocalHour(Date.now(), tz);
+  if (localHour === -1) console.warn(`[digest] Bad timezone "${tz}" for ${rule.userId} — defaulting to evening greeting`);
+  const greeting = localHour >= 5 && localHour < 12 ? 'Good morning'
+    : localHour >= 12 && localHour < 17 ? 'Good afternoon'
+    : 'Good evening';
   const storiesHash = hashShort(stories.map(s =>
     `${s.titleHash ?? s.title}:${s.severity ?? ''}:${s.phase ?? ''}:${(s.sources ?? []).slice(0, 3).join(',')}`
   ).sort().join('|'));
   const ctxHash = hashShort(JSON.stringify(ctx));
-  const cacheKey = `digest:ai-summary:v1:${variant}:${storiesHash}:${ctxHash}`;
+  const cacheKey = `digest:ai-summary:v1:${variant}:${greeting}:${storiesHash}:${ctxHash}`;
 
   try {
     const cached = await upstashRest('GET', cacheKey);
@@ -499,11 +505,13 @@ async function generateAISummary(stories, rule) {
 
   const systemPrompt = `You are WorldMonitor's intelligence analyst. Today is ${dateStr} UTC.
 Write a personalized daily brief for a user focused on ${rule.variant ?? 'full'} intelligence.
+The user's local time greeting is "${greeting}" — use this exact greeting to open the brief.
 
 User profile:
 ${profile}
 
 Rules:
+- Open with "${greeting}." followed by the brief
 - Lead with the single most impactful development for this user
 - Connect events to watched assets/regions where relevant
 - 3-5 bullet points, 1-2 sentences each
