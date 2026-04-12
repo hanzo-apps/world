@@ -45,6 +45,7 @@ import { generateSnapshotId } from './regional-snapshot/_helpers.mjs';
 import { generateRegionalNarrative, emptyNarrative } from './regional-snapshot/narrative.mjs';
 import { emitRegionalAlerts } from './regional-snapshot/alert-emitter.mjs';
 import { buildMobilityState } from './regional-snapshot/mobility.mjs';
+import { recordRegimeTransition } from './regional-snapshot/regime-history.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -188,6 +189,15 @@ async function computeSnapshot(regionId, sources, metaSources = {}) {
   const diff = diffRegionalSnapshot(previous, tentativeSnapshot);
   const triggerReason = inferTriggerReason(diff);
 
+  // Backfill the regime's transition_driver now that we have the diff-derived
+  // trigger_reason. Step 11 built the regime object before the diff existed
+  // so the driver was empty; patching here ensures both the persisted snapshot
+  // AND the regime-history entry carry the real driver (PR #2981 review fix).
+  if (diff.regime_changed && triggerReason !== 'scheduled_6h') {
+    regime.transition_driver = triggerReason;
+    tentativeSnapshot.regime = regime;
+  }
+
   // Step 16: final_meta with diff-derived trigger_reason and narrative metadata
   const finalMeta = buildFinalMeta(pre, {
     snapshot_id: snapshotId,
@@ -247,6 +257,19 @@ async function main() {
         } catch (alertErr) {
           const alertMsg = /** @type {any} */ (alertErr)?.message ?? alertErr;
           console.warn(`[${region.id}] alert emitter threw: ${alertMsg}`);
+        }
+
+        // Record a regime drift history entry iff this snapshot actually
+        // changed the regime label. Steady-state snapshots produce no entry.
+        // Best-effort — never blocks persist. See regime-history.mjs.
+        try {
+          const historyResult = await recordRegimeTransition(region, snapshot, diff);
+          if (historyResult.recorded) {
+            console.log(`[${region.id}] regime drift recorded: ${historyResult.entry?.previous_label || 'none'} → ${historyResult.entry?.label}`);
+          }
+        } catch (histErr) {
+          const histMsg = /** @type {any} */ (histErr)?.message ?? histErr;
+          console.warn(`[${region.id}] regime-history threw: ${histMsg}`);
         }
       } else {
         skipped += 1;
