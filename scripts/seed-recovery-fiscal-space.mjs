@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, runSeed, loadSharedConfig, sleep, resolveProxyForConnect, imfFetchJson } from './_seed-utils.mjs';
+import { loadEnvFile, runSeed, loadSharedConfig, imfSdmxFetchIndicator } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
-const IMF_BASE = 'https://www.imf.org/external/datamapper/api/v1';
-const _proxyAuth = resolveProxyForConnect();
 const CANONICAL_KEY = 'resilience:recovery:fiscal-space:v1';
 const CACHE_TTL = 35 * 24 * 3600;
 
@@ -27,12 +25,6 @@ function weoYears() {
   return [`${y}`, `${y - 1}`, `${y - 2}`];
 }
 
-async function fetchImfIndicator(indicator) {
-  const url = `${IMF_BASE}/${indicator}?periods=${weoYears().join(',')}`;
-  const data = await imfFetchJson(url, _proxyAuth);
-  return data?.values?.[indicator] ?? {};
-}
-
 function latestValue(byYear) {
   for (const year of weoYears()) {
     const v = Number(byYear?.[year]);
@@ -42,13 +34,12 @@ function latestValue(byYear) {
 }
 
 async function fetchFiscalSpace() {
-  // Sequential with delays to avoid IMF rate limiter. seed-imf-macro.mjs
-  // may run in the same cron window, so concurrent Promise.all risks 403.
-  const revenueData = await fetchImfIndicator('GGR_G01_GDP_PT');
-  await sleep(1000);
-  const balanceData = await fetchImfIndicator('GGXCNL_G01_GDP_PT');
-  await sleep(1000);
-  const debtData = await fetchImfIndicator('GGXWDG_NGDP_PT');
+  const years = weoYears();
+  const [revenueData, balanceData, debtData] = await Promise.all([
+    imfSdmxFetchIndicator('GGR_NGDP', { years }),
+    imfSdmxFetchIndicator('GGXCNL_NGDP', { years }),
+    imfSdmxFetchIndicator('GGXWDG_NGDP', { years }),
+  ]);
 
   const countries = {};
   const allIso3 = new Set([
@@ -86,7 +77,7 @@ if (process.argv[1]?.endsWith('seed-recovery-fiscal-space.mjs')) {
   runSeed('resilience', 'recovery:fiscal-space', CANONICAL_KEY, fetchFiscalSpace, {
     validateFn: validate,
     ttlSeconds: CACHE_TTL,
-    sourceVersion: `imf-weo-fiscal-${new Date().getFullYear()}`,
+    sourceVersion: `imf-sdmx-weo-fiscal-${new Date().getFullYear()}`,
     recordCount: (data) => Object.keys(data?.countries ?? {}).length,
   }).catch((err) => {
     const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
