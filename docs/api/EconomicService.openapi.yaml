@@ -779,6 +779,45 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/get-energy-crisis-policies:
+        get:
+            tags:
+                - EconomicService
+            summary: GetEnergyCrisisPolicies
+            description: GetEnergyCrisisPolicies retrieves government policy responses to the 2026 energy crisis from the IEA tracker.
+            operationId: GetEnergyCrisisPolicies
+            parameters:
+                - name: country_code
+                  in: query
+                  description: Optional ISO-2 country code filter.
+                  required: false
+                  schema:
+                    type: string
+                - name: category
+                  in: query
+                  description: 'Optional category filter: "conservation" or "consumer_support".'
+                  required: false
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetEnergyCrisisPoliciesResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -2284,3 +2323,61 @@ components:
                     format: double
                 period:
                     type: string
+        GetEnergyCrisisPoliciesRequest:
+            type: object
+            properties:
+                countryCode:
+                    type: string
+                    description: Optional ISO-2 country code filter.
+                category:
+                    type: string
+                    description: 'Optional category filter: "conservation" or "consumer_support".'
+            description: GetEnergyCrisisPoliciesRequest allows optional filtering by country or category.
+        GetEnergyCrisisPoliciesResponse:
+            type: object
+            properties:
+                source:
+                    type: string
+                    description: Source attribution.
+                sourceUrl:
+                    type: string
+                    description: Source URL.
+                context:
+                    type: string
+                    description: Context description.
+                policies:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EnergyCrisisPolicy'
+                updatedAt:
+                    type: string
+                    description: UTC ISO-8601 timestamp when this data was last updated.
+                unavailable:
+                    type: boolean
+                    description: True when upstream seed data is unavailable (fallback result).
+            description: GetEnergyCrisisPoliciesResponse contains energy crisis policy data from the IEA tracker.
+        EnergyCrisisPolicy:
+            type: object
+            properties:
+                country:
+                    type: string
+                    description: Country name.
+                countryCode:
+                    type: string
+                    description: ISO 3166-1 alpha-2 country code.
+                category:
+                    type: string
+                    description: 'Policy category: "conservation" or "consumer_support".'
+                sector:
+                    type: string
+                    description: 'Affected sector: transport, buildings, industry, electricity, agriculture, general.'
+                measure:
+                    type: string
+                    description: Description of the policy measure.
+                dateAnnounced:
+                    type: string
+                    description: Date announced in ISO-8601 (YYYY-MM-DD) format.
+                status:
+                    type: string
+                    description: 'Status of the policy: active, planned, or ended.'
+            description: EnergyCrisisPolicy represents a single government policy response to the 2026 energy crisis.

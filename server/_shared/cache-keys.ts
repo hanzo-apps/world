@@ -199,6 +199,7 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   oilStocksAnalysis:    'energy:oil-stocks-analysis:v1',
   lngVulnerability:     'energy:lng-vulnerability:v1',
   sprPolicies:          'energy:spr-policies:v1',
+  energyCrisisPolicies: 'energy:crisis-policies:v1',
   aaiiSentiment:        'market:aaii-sentiment:v1',
   breadthHistory:       'market:breadth-history:v1',
 };
@@ -257,6 +258,7 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   oilStocksAnalysis: 'slow',
   lngVulnerability: 'slow',
   sprPolicies: 'slow',
+  energyCrisisPolicies: 'slow',
   aaiiSentiment: 'slow',
   breadthHistory: 'slow',
 };

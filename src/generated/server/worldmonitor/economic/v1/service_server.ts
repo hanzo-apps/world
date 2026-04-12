@@ -667,6 +667,30 @@ export interface OilInventoriesRefinery {
   period: string;
 }
 
+export interface GetEnergyCrisisPoliciesRequest {
+  countryCode: string;
+  category: string;
+}
+
+export interface GetEnergyCrisisPoliciesResponse {
+  source: string;
+  sourceUrl: string;
+  context: string;
+  policies: EnergyCrisisPolicy[];
+  updatedAt: string;
+  unavailable: boolean;
+}
+
+export interface EnergyCrisisPolicy {
+  country: string;
+  countryCode: string;
+  category: string;
+  sector: string;
+  measure: string;
+  dateAnnounced: string;
+  status: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -738,6 +762,7 @@ export interface EconomicServiceHandler {
   getFaoFoodPriceIndex(ctx: ServerContext, req: GetFaoFoodPriceIndexRequest): Promise<GetFaoFoodPriceIndexResponse>;
   getOilStocksAnalysis(ctx: ServerContext, req: GetOilStocksAnalysisRequest): Promise<GetOilStocksAnalysisResponse>;
   getOilInventories(ctx: ServerContext, req: GetOilInventoriesRequest): Promise<GetOilInventoriesResponse>;
+  getEnergyCrisisPolicies(ctx: ServerContext, req: GetEnergyCrisisPoliciesRequest): Promise<GetEnergyCrisisPoliciesResponse>;
 }
 
 export function createEconomicServiceRoutes(
@@ -1760,6 +1785,54 @@ export function createEconomicServiceRoutes(
 
           const result = await handler.getOilInventories(ctx, body);
           return new Response(JSON.stringify(result as GetOilInventoriesResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/economic/v1/get-energy-crisis-policies",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: GetEnergyCrisisPoliciesRequest = {
+            countryCode: params.get("country_code") ?? "",
+            category: params.get("category") ?? "",
+          };
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getEnergyCrisisPolicies", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getEnergyCrisisPolicies(ctx, body);
+          return new Response(JSON.stringify(result as GetEnergyCrisisPoliciesResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

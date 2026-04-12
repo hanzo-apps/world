@@ -74,6 +74,7 @@ import {
   SocialVelocityPanel,
   WsbTickerScannerPanel,
   AAIISentimentPanel,
+  EnergyCrisisPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
@@ -753,6 +754,7 @@ export class PanelLayoutManager implements AppModule {
     this.createPanel('commodities', () => new CommoditiesPanel());
     this.createPanel('energy-complex', () => new EnergyComplexPanel());
     this.createPanel('oil-inventories', () => new OilInventoriesPanel());
+    this.createPanel('energy-crisis', () => new EnergyCrisisPanel());
     this.createPanel('polymarket', () => new PredictionPanel());
 
     this.createNewsPanel('gov', 'panels.gov');
