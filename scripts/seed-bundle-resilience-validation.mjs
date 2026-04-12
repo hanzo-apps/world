@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+import { runBundle, WEEK } from './_bundle-runner.mjs';
+
+await runBundle('resilience-validation', [
+  {
+    label: 'External-Benchmark',
+    script: 'benchmark-resilience-external.mjs',
+    intervalMs: WEEK,
+    timeoutMs: 300_000,
+  },
+  {
+    label: 'Outcome-Backtest',
+    script: 'backtest-resilience-outcomes.mjs',
+    intervalMs: WEEK,
+    timeoutMs: 300_000,
+  },
+  {
+    label: 'Sensitivity-Suite',
+    script: 'validate-resilience-sensitivity.mjs',
+    intervalMs: WEEK,
+    timeoutMs: 600_000,
+  },
+]);
