@@ -49,6 +49,7 @@ import type { YieldCurvePanel } from '@/components/YieldCurvePanel';
 import type { EarningsCalendarPanel } from '@/components/EarningsCalendarPanel';
 import type { EconomicCalendarPanel } from '@/components/EconomicCalendarPanel';
 import type { CotPositioningPanel } from '@/components/CotPositioningPanel';
+import type { GoldIntelligencePanel } from '@/components/GoldIntelligencePanel';
 import { isDesktopRuntime, waitForSidecarReady } from '@/services/runtime';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { BETA_MODE } from '@/config/beta';
@@ -338,6 +339,10 @@ export class App {
     if (shouldPrime('cot-positioning')) {
       const panel = this.state.panels['cot-positioning'] as CotPositioningPanel | undefined;
       if (panel) primeTask('cot-positioning', () => panel.fetchData());
+    }
+    if (shouldPrime('gold-intelligence')) {
+      const panel = this.state.panels['gold-intelligence'] as GoldIntelligencePanel | undefined;
+      if (panel) primeTask('gold-intelligence', () => panel.fetchData());
     }
     if (shouldPrime('aaii-sentiment')) {
       primeTask('aaiiSentiment', () => this.dataLoader.loadAaiiSentiment());
@@ -1422,6 +1427,12 @@ export class App {
       () => (this.state.panels['cot-positioning'] as CotPositioningPanel).fetchData(),
       REFRESH_INTERVALS.cotPositioning,
       () => this.isPanelNearViewport('cot-positioning')
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'gold-intelligence',
+      () => (this.state.panels['gold-intelligence'] as GoldIntelligencePanel).fetchData(),
+      REFRESH_INTERVALS.goldIntelligence,
+      () => this.isPanelNearViewport('gold-intelligence')
     );
     this.refreshScheduler.scheduleRefresh(
       'aaii-sentiment',

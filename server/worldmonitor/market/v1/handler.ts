@@ -34,6 +34,7 @@ import { listEarningsCalendar } from './list-earnings-calendar';
 import { getCotPositioning } from './get-cot-positioning';
 import { getInsiderTransactions } from './get-insider-transactions';
 import { getMarketBreadthHistory } from './get-market-breadth-history';
+import { getGoldIntelligence } from './get-gold-intelligence';
 
 export const marketHandler: MarketServiceHandler = {
   listMarketQuotes,
@@ -57,4 +58,5 @@ export const marketHandler: MarketServiceHandler = {
   getCotPositioning,
   getInsiderTransactions,
   getMarketBreadthHistory,
+  getGoldIntelligence,
 };

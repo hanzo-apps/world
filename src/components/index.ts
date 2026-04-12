@@ -82,6 +82,7 @@ export * from './YieldCurvePanel';
 export * from './EarningsCalendarPanel';
 export * from './EconomicCalendarPanel';
 export * from './CotPositioningPanel';
+export * from './GoldIntelligencePanel';
 export { HormuzPanel } from './HormuzPanel';
 export * from './ClimateNewsPanel';
 export * from './DiseaseOutbreaksPanel';

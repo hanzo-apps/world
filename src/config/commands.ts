@@ -216,6 +216,7 @@ export const COMMANDS: Command[] = [
   { id: 'panel:institutional', keywords: ['institutional', 'hedge funds', 'private equity', 'pe funds'], label: 'Hedge Funds & PE', icon: '\u{1F3E6}', category: 'panels' },
   { id: 'panel:fintech', keywords: ['fintech', 'trading tech', 'financial technology', 'payments'], label: 'Fintech & Trading Tech', icon: '\u{1F4F2}', category: 'panels' },
   { id: 'panel:gold-silver', keywords: ['gold', 'silver', 'precious metals', 'xau', 'xag'], label: 'Gold & Silver', icon: '\u{1F947}', category: 'panels' },
+  { id: 'panel:gold-intelligence', keywords: ['gold intelligence', 'gold ratio', 'gold silver ratio', 'xau fx', 'gold positioning', 'gold cot'], label: 'Panel: Gold Intelligence', icon: '\u{1F947}', category: 'panels' },
   { id: 'panel:base-metals', keywords: ['base metals', 'copper', 'aluminum', 'zinc', 'nickel'], label: 'Base Metals', icon: '\u2692\uFE0F', category: 'panels' },
   { id: 'panel:centralbanks', keywords: ['central banks', 'fed', 'ecb', 'boe', 'monetary policy'], label: 'Central Bank Watch', icon: '\u{1F3DB}\uFE0F', category: 'panels' },
   { id: 'panel:markets-news', keywords: ['markets news', 'financial news', 'wall street', 'stock news'], label: 'Markets News', icon: '\u{1F4F0}', category: 'panels' },

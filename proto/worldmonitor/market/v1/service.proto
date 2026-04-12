@@ -24,6 +24,7 @@ import "worldmonitor/market/v1/list_earnings_calendar.proto";
 import "worldmonitor/market/v1/get_cot_positioning.proto";
 import "worldmonitor/market/v1/get_insider_transactions.proto";
 import "worldmonitor/market/v1/get_market_breadth_history.proto";
+import "worldmonitor/market/v1/get_gold_intelligence.proto";
 
 // MarketService provides APIs for financial market data from Finnhub, Yahoo Finance, and CoinGecko.
 service MarketService {
@@ -132,5 +133,10 @@ service MarketService {
   // GetMarketBreadthHistory retrieves historical % of S&P 500 stocks above 20/50/200-day SMAs.
   rpc GetMarketBreadthHistory(GetMarketBreadthHistoryRequest) returns (GetMarketBreadthHistoryResponse) {
     option (sebuf.http.config) = {path: "/get-market-breadth-history", method: HTTP_METHOD_GET};
+  }
+
+  // GetGoldIntelligence retrieves gold pricing, cross-currency XAU, ratios, and CFTC positioning.
+  rpc GetGoldIntelligence(GetGoldIntelligenceRequest) returns (GetGoldIntelligenceResponse) {
+    option (sebuf.http.config) = {path: "/get-gold-intelligence", method: HTTP_METHOD_GET};
   }
 }

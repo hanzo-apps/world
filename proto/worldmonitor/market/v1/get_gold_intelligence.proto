@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package worldmonitor.market.v1;
+
+import "sebuf/http/annotations.proto";
+
+message GoldCrossCurrencyPrice {
+  string currency = 1;
+  string flag = 2;
+  double price = 3;
+}
+
+message GoldCotPositioning {
+  string report_date = 1;
+  double managed_money_long = 2;
+  double managed_money_short = 3;
+  double net_pct = 4;
+  double dealer_long = 5;
+  double dealer_short = 6;
+}
+
+message GetGoldIntelligenceRequest {}
+
+message GetGoldIntelligenceResponse {
+  double gold_price = 1;
+  double gold_change_pct = 2;
+  repeated double gold_sparkline = 3;
+  double silver_price = 4;
+  double platinum_price = 5;
+  double palladium_price = 6;
+  optional double gold_silver_ratio = 7;
+  optional double gold_platinum_premium_pct = 8;
+  repeated GoldCrossCurrencyPrice cross_currency_prices = 9;
+  GoldCotPositioning cot = 10;
+  string updated_at = 11;
+  bool unavailable = 12;
+}
