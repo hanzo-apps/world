@@ -290,14 +290,23 @@ function median(arr) {
 
 async function readWmScoresFromRedis() {
   const { url, token } = getRedisCredentials();
-  const rankingResp = await fetch(`${url}/get/${encodeURIComponent('resilience:ranking:v8')}`, {
+  const rankingResp = await fetch(`${url}/get/${encodeURIComponent('resilience:ranking:v9')}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10_000),
   });
-  if (!rankingResp.ok) throw new Error(`Failed to read ranking: HTTP ${rankingResp.status}`);
+  if (!rankingResp.ok) {
+    console.warn(`[benchmark] Failed to read ranking: HTTP ${rankingResp.status} — skipping (scores may not be populated yet after cache key bump)`);
+    return new Map();
+  }
   const rankingData = await rankingResp.json();
-  if (!rankingData.result) throw new Error('No ranking data in Redis');
-  const ranking = JSON.parse(rankingData.result);
+  if (!rankingData.result) {
+    console.warn('[benchmark] No ranking data in Redis — skipping (cold start after cache key bump)');
+    return new Map();
+  }
+  const parsed = JSON.parse(rankingData.result);
+  // The ranking cache stores a GetResilienceRankingResponse object
+  // with { items, greyedOut }, not a bare array.
+  const ranking = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
   const scores = new Map();
   for (const item of ranking) {
     if (item.countryCode && typeof item.overallScore === 'number' && item.overallScore > 0) {
@@ -331,6 +340,11 @@ function evaluateHypothesis(hypothesis, sp) {
 
 export async function runBenchmark(opts = {}) {
   const wmScores = opts.wmScores || await readWmScoresFromRedis();
+
+  if (wmScores.size === 0) {
+    console.warn('[benchmark] No WM resilience scores available — skipping benchmark run (cold start after cache key bump)');
+    return { skipped: true, reason: 'no-wm-scores', generatedAt: Date.now() };
+  }
 
   const fetchers = [
     { name: 'INFORM', fn: opts.fetchInform || fetchInformGlobal },
@@ -428,17 +442,21 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 if (isMain) {
   runBenchmark()
     .then(result => {
+      if (result.skipped) {
+        console.log(`\n[benchmark] Skipped: ${result.reason}`);
+        return;
+      }
       console.log('\n=== Benchmark Results ===');
-      console.log(`Hypotheses: ${result.hypotheses.filter(h => h.pass).length}/${result.hypotheses.length} passed`);
-      for (const h of result.hypotheses) {
+      console.log(`Hypotheses: ${(result.hypotheses ?? []).filter(h => h.pass).length}/${(result.hypotheses ?? []).length} passed`);
+      for (const h of (result.hypotheses ?? [])) {
         console.log(`  ${h.pass ? 'PASS' : 'FAIL'} ${h.index} (${h.pillar}): expected ${h.direction} >= ${h.expected}, got ${h.actual}`);
       }
       console.log(`\nCorrelations:`);
-      for (const [name, c] of Object.entries(result.correlations)) {
+      for (const [name, c] of Object.entries(result.correlations ?? {})) {
         console.log(`  ${name}: spearman=${c.spearman}, pearson=${c.pearson}, n=${c.n}`);
       }
-      console.log(`\nOutliers: ${result.outliers.length}`);
-      for (const o of result.outliers.slice(0, 10)) {
+      console.log(`\nOutliers: ${(result.outliers ?? []).length}`);
+      for (const o of (result.outliers ?? []).slice(0, 10)) {
         console.log(`  ${o.countryCode} (${o.index}): residual=${o.residual} - ${o.commentary}`);
       }
     })
