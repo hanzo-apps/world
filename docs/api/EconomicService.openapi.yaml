@@ -754,6 +754,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/economic/v1/get-oil-inventories:
+        get:
+            tags:
+                - EconomicService
+            summary: GetOilInventories
+            operationId: GetOilInventories
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetOilInventoriesResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -2123,3 +2148,139 @@ components:
                     format: int32
                     description: Average days of cover for non-exporter North American members (if any).
             description: OilStocksRegionalSummaryNorthAmerica aggregates data for North American IEA members.
+        GetOilInventoriesRequest:
+            type: object
+        GetOilInventoriesResponse:
+            type: object
+            properties:
+                crudeWeeks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CrudeInventoryWeekRef'
+                spr:
+                    $ref: '#/components/schemas/OilInventoriesSprSnapshot'
+                natGasWeeks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/NatGasWeekRef'
+                euGas:
+                    $ref: '#/components/schemas/OilInventoriesEuGas'
+                ieaStocks:
+                    $ref: '#/components/schemas/OilInventoriesIeaStocks'
+                refinery:
+                    $ref: '#/components/schemas/OilInventoriesRefinery'
+                updatedAt:
+                    type: string
+        CrudeInventoryWeekRef:
+            type: object
+            properties:
+                period:
+                    type: string
+                stocksMb:
+                    type: number
+                    format: double
+                weeklyChangeMb:
+                    type: number
+                    format: double
+        OilInventoriesSprSnapshot:
+            type: object
+            properties:
+                latestStocksMb:
+                    type: number
+                    format: double
+                changeWow:
+                    type: number
+                    format: double
+                weeks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/OilInventoriesSprWeek'
+        OilInventoriesSprWeek:
+            type: object
+            properties:
+                period:
+                    type: string
+                stocksMb:
+                    type: number
+                    format: double
+        NatGasWeekRef:
+            type: object
+            properties:
+                period:
+                    type: string
+                storBcf:
+                    type: number
+                    format: double
+                weeklyChangeBcf:
+                    type: number
+                    format: double
+        OilInventoriesEuGas:
+            type: object
+            properties:
+                fillPct:
+                    type: number
+                    format: double
+                fillPctChange1d:
+                    type: number
+                    format: double
+                trend:
+                    type: string
+                history:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/OilInventoriesEuGasDay'
+        OilInventoriesEuGasDay:
+            type: object
+            properties:
+                date:
+                    type: string
+                fillPct:
+                    type: number
+                    format: double
+        OilInventoriesIeaStocks:
+            type: object
+            properties:
+                dataMonth:
+                    type: string
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/OilInventoriesIeaMember'
+                europe:
+                    $ref: '#/components/schemas/OilInventoriesRegionStats'
+                asiaPacific:
+                    $ref: '#/components/schemas/OilInventoriesRegionStats'
+                northAmerica:
+                    $ref: '#/components/schemas/OilInventoriesRegionStats'
+        OilInventoriesIeaMember:
+            type: object
+            properties:
+                iso2:
+                    type: string
+                daysOfCover:
+                    type: number
+                    format: double
+                netExporter:
+                    type: boolean
+                belowObligation:
+                    type: boolean
+        OilInventoriesRegionStats:
+            type: object
+            properties:
+                avgDays:
+                    type: number
+                    format: double
+                minDays:
+                    type: number
+                    format: double
+                countBelowObligation:
+                    type: integer
+                    format: int32
+        OilInventoriesRefinery:
+            type: object
+            properties:
+                inputsMbpd:
+                    type: number
+                    format: double
+                period:
+                    type: string

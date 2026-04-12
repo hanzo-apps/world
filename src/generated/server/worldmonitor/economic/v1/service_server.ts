@@ -593,6 +593,80 @@ export interface OilStocksRegionalSummaryNorthAmerica {
   avgDays?: number;
 }
 
+export interface GetOilInventoriesRequest {
+}
+
+export interface GetOilInventoriesResponse {
+  crudeWeeks: CrudeInventoryWeekRef[];
+  spr?: OilInventoriesSprSnapshot;
+  natGasWeeks: NatGasWeekRef[];
+  euGas?: OilInventoriesEuGas;
+  ieaStocks?: OilInventoriesIeaStocks;
+  refinery?: OilInventoriesRefinery;
+  updatedAt: string;
+}
+
+export interface CrudeInventoryWeekRef {
+  period: string;
+  stocksMb: number;
+  weeklyChangeMb?: number;
+}
+
+export interface OilInventoriesSprSnapshot {
+  latestStocksMb: number;
+  changeWow: number;
+  weeks: OilInventoriesSprWeek[];
+}
+
+export interface OilInventoriesSprWeek {
+  period: string;
+  stocksMb: number;
+}
+
+export interface NatGasWeekRef {
+  period: string;
+  storBcf: number;
+  weeklyChangeBcf?: number;
+}
+
+export interface OilInventoriesEuGas {
+  fillPct: number;
+  fillPctChange1d: number;
+  trend: string;
+  history: OilInventoriesEuGasDay[];
+}
+
+export interface OilInventoriesEuGasDay {
+  date: string;
+  fillPct: number;
+}
+
+export interface OilInventoriesIeaStocks {
+  dataMonth: string;
+  members: OilInventoriesIeaMember[];
+  europe?: OilInventoriesRegionStats;
+  asiaPacific?: OilInventoriesRegionStats;
+  northAmerica?: OilInventoriesRegionStats;
+}
+
+export interface OilInventoriesIeaMember {
+  iso2: string;
+  daysOfCover?: number;
+  netExporter: boolean;
+  belowObligation: boolean;
+}
+
+export interface OilInventoriesRegionStats {
+  avgDays?: number;
+  minDays?: number;
+  countBelowObligation?: number;
+}
+
+export interface OilInventoriesRefinery {
+  inputsMbpd: number;
+  period: string;
+}
+
 export interface FieldViolation {
   field: string;
   description: string;
@@ -663,6 +737,7 @@ export interface EconomicServiceHandler {
   getEconomicStress(ctx: ServerContext, req: GetEconomicStressRequest): Promise<GetEconomicStressResponse>;
   getFaoFoodPriceIndex(ctx: ServerContext, req: GetFaoFoodPriceIndexRequest): Promise<GetFaoFoodPriceIndexResponse>;
   getOilStocksAnalysis(ctx: ServerContext, req: GetOilStocksAnalysisRequest): Promise<GetOilStocksAnalysisResponse>;
+  getOilInventories(ctx: ServerContext, req: GetOilInventoriesRequest): Promise<GetOilInventoriesResponse>;
 }
 
 export function createEconomicServiceRoutes(
@@ -1648,6 +1723,43 @@ export function createEconomicServiceRoutes(
 
           const result = await handler.getOilStocksAnalysis(ctx, body);
           return new Response(JSON.stringify(result as GetOilStocksAnalysisResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/economic/v1/get-oil-inventories",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const body = {} as GetOilInventoriesRequest;
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getOilInventories(ctx, body);
+          return new Response(JSON.stringify(result as GetOilInventoriesResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
