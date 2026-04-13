@@ -327,12 +327,15 @@ describe('resilience dimension scorers', () => {
       if (key === 'economic:national-debt:v1') return { entries: [{ iso3: 'HRV', debtToGdp: 70, annualGrowth: 1.5 }] };
       if (key === 'economic:imf:macro:v2') return { countries: { HR: { inflationPct: 3.0, currentAccountPct: caPct, govRevenuePct: 40, year: 2024 } } };
       if (key === 'economic:imf:labor:v1') return { countries: { HR: { unemploymentPct: 7, populationMillions: 4, year: 2024 } } };
+      if (key === 'economic:bis:dsr:v1') return { entries: [] };
       return null;
     };
     const surplus = await scoreMacroFiscal('HR', makeReader(10));
     const deficit = await scoreMacroFiscal('HR', makeReader(-15));
     assert.ok(surplus.score > deficit.score, `surplus (${surplus.score}) must score higher than deficit (${deficit.score})`);
-    assert.equal(surplus.coverage, 1, 'all real data → coverage=1');
+    // BIS DSR has weight 0.05 and is absent for HR (no BIS coverage); the
+    // remaining 0.95 of weight is observed → coverage=0.95, not 1.0.
+    assert.equal(surplus.coverage, 0.95, 'all non-BIS data → coverage=0.95 (DSR=0.05 absent for HR)');
   });
 
   it('scoreMacroFiscal: IMF macro seed outage does not impute — debt growth still scores', async () => {
@@ -357,14 +360,15 @@ describe('resilience dimension scorers', () => {
     const makeReader = (lur: number) => async (key: string): Promise<unknown | null> => {
       if (key in baseFixtures) return (baseFixtures as Record<string, unknown>)[key];
       if (key === 'economic:imf:labor:v1') return { countries: { HR: { unemploymentPct: lur, populationMillions: 4, year: 2024 } } };
+      if (key === 'economic:bis:dsr:v1') return { entries: [{ countryCode: 'HR', dsrPct: 8, date: '2024-Q4' }] };
       return null;
     };
     const tightLabor = await scoreMacroFiscal('HR', makeReader(3.5));
     const slackLabor = await scoreMacroFiscal('HR', makeReader(20));
     assert.ok(tightLabor.score > slackLabor.score,
       `tight labor (LUR=3.5%, score=${tightLabor.score}) must outrank slack (LUR=20%, score=${slackLabor.score})`);
-    assert.equal(tightLabor.coverage, 1, 'all four sub-metrics observed → coverage=1');
-    assert.equal(slackLabor.coverage, 1, 'all four sub-metrics observed → coverage=1');
+    assert.equal(tightLabor.coverage, 1, 'all five sub-metrics observed → coverage=1');
+    assert.equal(slackLabor.coverage, 1, 'all five sub-metrics observed → coverage=1');
   });
 
   it('scoreFoodWater: country absent from FAO/IPC DB gets crisis_monitoring_absent imputation (not WGI proxy)', async () => {
