@@ -6163,6 +6163,42 @@ body.playback-mode .status-dot {
   color: var(--red);
 }
 
+.liquidity-shifts-panel {
+  padding: 10px 14px;
+}
+
+.liquidity-shifts-panel__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.liquidity-shifts-panel__section-title--gap {
+  margin-top: 10px;
+}
+
+.liquidity-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.liquidity-row__values {
+  text-align: right;
+}
+
+.liquidity-stock-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.liquidity-report-date {
+  margin-top: 8px;
+  text-align: right;
+}
+
 .commodity-item .mini-sparkline {
   display: block;
   margin: 2px 0;

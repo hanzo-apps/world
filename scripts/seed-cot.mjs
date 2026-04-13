@@ -17,6 +17,7 @@ const FINANCIAL_INSTRUMENTS = [
 
 const COMMODITY_INSTRUMENTS = [
   { name: 'Gold',            code: 'GC', contractCode: '088691' },
+  { name: 'Silver',          code: 'SI', contractCode: '084691' },
   { name: 'Crude Oil (WTI)', code: 'CL', contractCode: '067651' },
 ];
 
