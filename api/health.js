@@ -149,6 +149,7 @@ const STANDALONE_KEYS = {
   climateNews:              'climate:news-intelligence:v1',
   pizzint:                  'intelligence:pizzint:seed:v1',
   resilienceStaticIndex:    'resilience:static:index:v1',
+  resilienceStaticFao:      'resilience:static:fao',
   resilienceRanking:        'resilience:ranking:v9',
   productCatalog:           'product-catalog:v2',
   energySpineCountries:     'energy:spine:v1:_countries',
@@ -308,6 +309,7 @@ const SEED_META = {
   vpdTrackerRealtime:   { key: 'seed-meta:health:vpd-tracker',         maxStaleMin: 2880 }, // daily seed (0 2 * * *); 2880min = 48h = 2x interval
   vpdTrackerHistorical: { key: 'seed-meta:health:vpd-tracker',         maxStaleMin: 2880 }, // shares seed-meta key with vpdTrackerRealtime (same run)
   resilienceStaticIndex: { key: 'seed-meta:resilience:static',         maxStaleMin: 576000 }, // annual October snapshot; 400d threshold matches TTL and preserves prior-year data on source outages
+  resilienceStaticFao:   { key: 'seed-meta:resilience:static',         maxStaleMin: 576000 }, // same seeder + same heartbeat as resilienceStaticIndex; required so EMPTY_DATA_OK + missing data degrades to STALE_SEED instead of silent OK
   resilienceRanking:   { key: 'seed-meta:resilience:ranking',          maxStaleMin: 720 }, // on-demand RPC cache (6h TTL); 12h threshold catches stale rankings without paging on cold start
   resilienceIntervals: { key: 'seed-meta:resilience:intervals',        maxStaleMin: 20160 }, // weekly cron; 20160min = 14d = 2x interval
   energyExposure:       { key: 'seed-meta:economic:owid-energy-mix',   maxStaleMin: 50400 }, // monthly cron on 1st; 50400min = 35d = TTL matches cron cadence + 5d buffer
@@ -373,6 +375,7 @@ const EMPTY_DATA_OK_KEYS = new Set([
   'recoveryFiscalSpace',
   'recoveryImportHhi', 'recoveryFuelStocks', // recovery pillar seeds: stub seeders write empty payloads until real sources are wired
   'ddosAttacks', 'trafficAnomalies', // zero events during quiet periods is valid, not critical
+  'resilienceStaticFao', // empty aggregate = no IPC Phase 3+ countries this year (possible in theory); the key must exist but count=0 is fine
 ]);
 
 // Cascade groups: if any key in the group has data, all empty siblings are OK.
