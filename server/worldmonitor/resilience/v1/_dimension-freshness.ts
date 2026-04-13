@@ -75,6 +75,17 @@ const SOURCE_KEY_META_OVERRIDES: Readonly<Record<string, string>> = {
   // seed-meta:economic:bis (the sub-resource 'eer' is only in the data
   // key, not the meta key).
   'economic:bis:eer': 'economic:bis',
+  // seed-bis-extended.mjs writes per-dataset seed-meta keys
+  // (seed-meta:economic:bis-dsr, seed-meta:economic:bis-property-residential,
+  // seed-meta:economic:bis-property-commercial) so a DSR-only outage does
+  // not falsely mark the property datasets as fresh (and vice versa).
+  // These mirror the per-dataset SEED_META entries in api/health.js.
+  // The aggregate seed-meta:economic:bis-extended key still exists as a
+  // "seeder ran" signal read by api/seed-health.js; do not remove it, but
+  // this resilience-freshness map must not collapse to it.
+  'economic:bis:dsr': 'economic:bis-dsr',
+  'economic:bis:property-residential': 'economic:bis-property-residential',
+  'economic:bis:property-commercial': 'economic:bis-property-commercial',
   // seed-economy.mjs: runSeed('economic', 'energy-prices', ...) writes
   // seed-meta:economic:energy-prices for the economic:energy:v1:all key.
   // The :v1:all tail means neither template-strip nor version-strip
