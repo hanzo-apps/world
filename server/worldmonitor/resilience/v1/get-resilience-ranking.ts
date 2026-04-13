@@ -31,6 +31,12 @@ const RESILIENCE_RANKING_META_TTL_SECONDS = 7 * 24 * 60 * 60;
 // 200 covers the full static index (~130-180 countries) in a single cold-cache pass.
 const SYNC_WARM_LIMIT = 200;
 
+// Minimum fraction of scorable countries that must have a cached score before we
+// persist the ranking to Redis. Prevents a cold-start (0% cached) from being
+// locked in, while still allowing partial-state writes (e.g. 90%) to succeed so
+// the next call doesn't re-warm everything.
+const RANKING_CACHE_MIN_COVERAGE = 0.75;
+
 async function fetchIntervals(countryCodes: string[]): Promise<Map<string, ScoreInterval>> {
   if (countryCodes.length === 0) return new Map();
   const results = await runRedisPipeline(countryCodes.map((cc) => ['GET', `${RESILIENCE_INTERVAL_KEY_PREFIX}${cc}`]), true);
@@ -76,12 +82,24 @@ export const getResilienceRanking: ResilienceServiceHandler['getResilienceRankin
     greyedOut: allItems.filter((item) => item.overallCoverage < GREY_OUT_COVERAGE_THRESHOLD),
   };
 
-  const stillMissing = countryCodes.filter((countryCode) => !cachedScores.has(countryCode));
-  if (stillMissing.length === 0) {
+  // Cache the ranking when we have substantive coverage — don't hold out for 100%.
+  // The previous gate (stillMissing === 0) meant a single failing-to-warm country
+  // permanently blocked the write, leaving the cache null for days while the 6h TTL
+  // expired between cron ticks. Countries that fail to warm already land in
+  // `greyedOut` with coverage 0, so the response is correct for partial states.
+  const coverageRatio = cachedScores.size / countryCodes.length;
+  if (coverageRatio >= RANKING_CACHE_MIN_COVERAGE) {
     await runRedisPipeline([
       ['SET', RESILIENCE_RANKING_CACHE_KEY, JSON.stringify(response), 'EX', RESILIENCE_RANKING_CACHE_TTL_SECONDS],
-      ['SET', RESILIENCE_RANKING_META_KEY, JSON.stringify({ fetchedAt: Date.now(), count: response.items.length + response.greyedOut.length }), 'EX', RESILIENCE_RANKING_META_TTL_SECONDS],
+      ['SET', RESILIENCE_RANKING_META_KEY, JSON.stringify({
+        fetchedAt: Date.now(),
+        count: response.items.length + response.greyedOut.length,
+        scored: cachedScores.size,
+        total: countryCodes.length,
+      }), 'EX', RESILIENCE_RANKING_META_TTL_SECONDS],
     ]);
+  } else {
+    console.warn(`[resilience] ranking not cached — coverage ${cachedScores.size}/${countryCodes.length} below ${RANKING_CACHE_MIN_COVERAGE * 100}% threshold`);
   }
 
   return response;
