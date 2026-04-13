@@ -130,6 +130,36 @@ describe('resilience ranking contracts', () => {
     assert.equal(us?.rankStable, false, 'US interval width 22 should be unstable');
   });
 
+  it('caches the ranking when partial coverage meets the 75% threshold (4 countries, 3 scored)', async () => {
+    const { redis } = installRedis(RESILIENCE_FIXTURES);
+    // Override the static index so we have an un-scoreable extra country (ZZ has
+    // no fixture → warm will throw and ZZ stays missing).
+    redis.set('resilience:static:index:v1', JSON.stringify({
+      countries: ['NO', 'US', 'YE', 'ZZ'],
+      recordCount: 4,
+      failedDatasets: [],
+      seedYear: 2025,
+    }));
+    const domainWithCoverage = [{ id: 'political', score: 80, weight: 0.2, dimensions: [{ id: 'd1', score: 80, coverage: 0.9, observedWeight: 1, imputedWeight: 0 }] }];
+    redis.set('resilience:score:v9:NO', JSON.stringify({
+      countryCode: 'NO', overallScore: 82, level: 'high',
+      domains: domainWithCoverage, trend: 'stable', change30d: 1.2,
+      lowConfidence: false, imputationShare: 0.05,
+    }));
+    redis.set('resilience:score:v9:US', JSON.stringify({
+      countryCode: 'US', overallScore: 61, level: 'medium',
+      domains: domainWithCoverage, trend: 'rising', change30d: 4.3,
+      lowConfidence: false, imputationShare: 0.1,
+    }));
+
+    await getResilienceRanking({ request: new Request('https://example.com') } as never, {});
+
+    // 3 of 4 (NO + US pre-cached, YE warmed from fixtures, ZZ can't be warmed)
+    // = 75% which meets the threshold — must cache.
+    assert.ok(redis.has('resilience:ranking:v9'), 'ranking must be cached at exactly 75% coverage');
+    assert.ok(redis.has('seed-meta:resilience:ranking'), 'seed-meta must be written alongside the ranking');
+  });
+
   it('defaults rankStable=false when no interval data exists', () => {
     const item = buildRankingItem('ZZ', {
       countryCode: 'ZZ', overallScore: 50, level: 'medium',

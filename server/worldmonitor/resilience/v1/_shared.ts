@@ -411,5 +411,21 @@ export async function warmMissingResilienceScores(countryCodes: string[]): Promi
   // Share one memoized reader across all countries so global Redis keys (conflict events,
   // sanctions, unrest, etc.) are fetched only once instead of once per country.
   const sharedReader = createMemoizedSeedReader();
-  await Promise.allSettled(uniqueCodes.map((countryCode) => ensureResilienceScoreCached(countryCode, sharedReader)));
+  const results = await Promise.allSettled(
+    uniqueCodes.map((countryCode) => ensureResilienceScoreCached(countryCode, sharedReader)),
+  );
+  const failures: Array<{ countryCode: string; reason: string }> = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result?.status === 'rejected') {
+      failures.push({
+        countryCode: uniqueCodes[i]!,
+        reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+    }
+  }
+  if (failures.length > 0) {
+    const sample = failures.slice(0, 10).map((f) => `${f.countryCode}(${f.reason})`).join(', ');
+    console.warn(`[resilience] warm failed for ${failures.length}/${uniqueCodes.length} countries: ${sample}${failures.length > 10 ? '...' : ''}`);
+  }
 }
