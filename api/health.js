@@ -103,6 +103,7 @@ const STANDALONE_KEYS = {
   macroSignals:          'economic:macro-signals:v1',
   bisPolicy:             'economic:bis:policy:v1',
   bisExchange:           'economic:bis:eer:v1',
+  fxYoy:                 'economic:fx:yoy:v1',
   bisCredit:             'economic:bis:credit:v1',
   bisDsr:                'economic:bis:dsr:v1',
   bisPropertyResidential: 'economic:bis:property-residential:v1',
@@ -232,6 +233,7 @@ const SEED_META = {
   chokepoints:      { key: 'seed-meta:supply_chain:chokepoints',  maxStaleMin: 60 },
   // minerals + giving: on-demand cachedFetchJson only, no seed-meta writer — freshness checked via TTL
   // bisExchange + bisCredit: extras written by same BIS script via writeExtraKey, no dedicated seed-meta
+  fxYoy:            { key: 'seed-meta:economic:fx-yoy',           maxStaleMin: 1500 }, // daily cron; 25h tolerance + 1h drift
   gpsjam:           { key: 'seed-meta:intelligence:gpsjam',       maxStaleMin: 720 },
   positiveGeoEvents:{ key: 'seed-meta:positive-events:geo',       maxStaleMin: 60 },
   riskScores:       { key: 'seed-meta:intelligence:risk-scores',  maxStaleMin: 30 }, // CII warm-ping every 8min; 30min = ~3.5x interval,
@@ -376,6 +378,10 @@ const ON_DEMAND_KEYS = new Set([
   'recoveryFiscalSpace', 'recoveryReserveAdequacy', 'recoveryExternalDebt',
   'recoveryImportHhi', 'recoveryFuelStocks', // recovery pillar: stub seeders not yet deployed, keys may be absent
   'displacementPrev', // covered by cascade onto current-year displacement; empty most of the year
+  'fxYoy', // TRANSITIONAL (PR #3071): seed-fx-yoy Railway cron deployed manually after merge —
+           // gate as on-demand so a deploy-order race or first-cron-run failure doesn't
+           // fire a CRIT health alarm. Remove from this set after ~7 days of clean
+           // production cron runs (verify via `seed-meta:economic:fx-yoy.fetchedAt`).
 ]);
 
 // Keys where 0 records is a valid healthy state (e.g. no airports closed,
