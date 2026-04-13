@@ -3266,14 +3266,50 @@ const CLASSIFY_VARIANT_STAGGER_MS = 3 * 60 * 1000;
 // Relay gates — active only when RELAY_GATES_READY=1 (see Appendix E of docs/internal/news-alerts-enhancements-from-trendradar.md).
 // When the flag is set the relay becomes the sole authoritative source of rss_alert events and
 // the client /api/notify path is suppressed via VITE_RELAY_GATES_READY on the Vercel side.
-// Inline subset of source-tiers.ts — canonical copy in server/_shared/source-tiers.ts; keep in sync.
 const RELAY_GATES_READY = process.env.RELAY_GATES_READY === '1';
-const RELAY_TIER4_SOURCES = new Set([
-  'Hacker News', 'The Verge', 'The Verge AI', 'VentureBeat AI',
-  'Yahoo Finance', 'TechCrunch Layoffs', 'ArXiv AI', 'AI News',
-  'Layoffs News', 'GloNewswire (Taiwan)',
-]);
 const RELAY_RECENCY_MS = 15 * 60 * 1000; // 15 min — matches client-side recency gate
+
+// ── Importance score parity with digest ──────────────────────────────────────
+// Source-tier data loaded via requireShared('source-tiers.json'), which resolves
+// to either repo-root shared/ OR scripts/shared/ depending on packaging root.
+// Both copies are enforced byte-identical by tests/edge-functions.test.mjs
+// ('scripts/shared/ stays in sync with shared/') and cross-checked in
+// tests/importance-score-parity.test.mjs.
+// Formula constants + computeImportanceScore mirror list-feed-digest.ts; parity
+// is enforced by tests/importance-score-parity.test.mjs.
+const RELAY_SOURCE_TIERS = requireShared('source-tiers.json');
+
+function relayGetSourceTier(sourceName) {
+  return RELAY_SOURCE_TIERS[sourceName] ?? 4;
+}
+
+// Derived from the tier map so the tier-4 gate and the tier map stay in lockstep.
+const RELAY_TIER4_SOURCES = new Set(
+  Object.entries(RELAY_SOURCE_TIERS).filter(([, t]) => t === 4).map(([s]) => s),
+);
+
+const RELAY_SCORE_WEIGHTS = { severity: 0.4, sourceTier: 0.2, corroboration: 0.3, recency: 0.1 };
+const RELAY_SEVERITY_SCORES = { critical: 100, high: 75, medium: 50, low: 25, info: 0 };
+
+// Mirrors computeImportanceScore() in list-feed-digest.ts with ONE intentional
+// deviation: the relay defensively returns 0 for unknown severity levels
+// (`?? 0` on the lookup); the TS digest returns NaN. This defensiveness is
+// exercised in tests/importance-score-parity.test.mjs "unknown severity" case.
+// Caller responsibility: pass defined values; relay publish site defaults
+// corroborationCount → 1 and publishedAt → Date.now() when upstream omits them.
+function relayComputeImportanceScore(level, source, corroborationCount, publishedAt) {
+  const tier = relayGetSourceTier(source);
+  const tierScore = tier === 1 ? 100 : tier === 2 ? 75 : tier === 3 ? 50 : 25;
+  const corroborationScore = Math.min(corroborationCount, 5) * 20;
+  const ageMs = Date.now() - publishedAt;
+  const recencyScore = Math.max(0, 1 - ageMs / (24 * 60 * 60 * 1000)) * 100;
+  return Math.round(
+    (RELAY_SEVERITY_SCORES[level] ?? 0) * RELAY_SCORE_WEIGHTS.severity +
+    tierScore * RELAY_SCORE_WEIGHTS.sourceTier +
+    corroborationScore * RELAY_SCORE_WEIGHTS.corroboration +
+    recencyScore * RELAY_SCORE_WEIGHTS.recency,
+  );
+}
 
 const CLASSIFY_VALID_LEVELS = ['critical', 'high', 'medium', 'low', 'info'];
 const CLASSIFY_VALID_CATEGORIES = [
@@ -3510,7 +3546,7 @@ async function seedClassifyForVariant(variant, seenTitles) {
           allTitles.set(item.title, {
             source: item.source ?? variant,
             publishedAt: item.publishedAt ?? Date.now(),
-            importanceScore: item.importanceScore ?? 0,
+            corroborationCount: item.corroborationCount ?? 1,
             link: item.link ?? '',
           });
         }
@@ -3586,7 +3622,12 @@ async function seedClassifyForVariant(variant, seenTitles) {
       // Notifications are outside seenTitles guard — each variant publishes
       // independently, protected by the variant-scoped Redis scan-dedup key.
       if (level === 'critical' || level === 'high') {
-        const meta = allTitles.get(chunk[idx]) ?? { source: variant, publishedAt: Date.now(), importanceScore: 0, link: '' };
+        const meta = allTitles.get(chunk[idx]) ?? {
+          source: variant,
+          publishedAt: Date.now(),
+          corroborationCount: 1,
+          link: '',
+        };
         // Relay gates: when RELAY_GATES_READY is set the relay enforces source tier and
         // recency checks that the client path previously handled.
         if (RELAY_GATES_READY) {
@@ -3594,6 +3635,15 @@ async function seedClassifyForVariant(variant, seenTitles) {
           const ageMs = Date.now() - (meta.publishedAt ?? 0);
           if (meta.publishedAt && ageMs > RELAY_RECENCY_MS) continue;
         }
+        // Recompute importanceScore from the post-LLM level. Publishing the
+        // digest's pre-LLM keyword-based score would leak a stale value —
+        // see docs/internal/scoringDiagnostic.md §2.
+        const importanceScore = relayComputeImportanceScore(
+          level,
+          meta.source,
+          meta.corroborationCount ?? 1,
+          meta.publishedAt ?? Date.now(),
+        );
         publishNotificationEvent({
           eventType: 'rss_alert',
           payload: {
@@ -3601,7 +3651,8 @@ async function seedClassifyForVariant(variant, seenTitles) {
             source: meta.source,
             link: meta.link,
             publishedAt: meta.publishedAt,
-            importanceScore: meta.importanceScore,
+            importanceScore,
+            corroborationCount: meta.corroborationCount ?? 1,
           },
           severity: level,
           variant,
