@@ -215,17 +215,61 @@ async function seedResilienceScores() {
       console.log(`[resilience-scores] Laggards warmed: ${laggardsWarmed}/${stillMissing.length}`);
     }
 
-    // If any laggards were warmed, the ranking cache (written earlier by the
-    // bulk endpoint) no longer reflects them — it froze them as coverage-0
-    // greyedOut entries. DEL the key AND re-call the ranking endpoint to
-    // rebuild from the now-complete per-country cache. Don't stop at DEL:
-    // downstream consumers (benchmark-resilience-external.mjs) read
-    // resilience:ranking:v9 directly from Redis and skip on null, so a
-    // null-until-next-user-RPC window would leave the weekly validation
-    // cron with no ranking to benchmark against.
-    if (laggardsWarmed > 0) {
+    // The ranking cache (resilience:ranking:v9) needs to reflect the
+    // freshly-warmed per-country scores. Two failure modes have to be handled:
+    //
+    //   1. Laggards were warmed individually after the bulk RPC. The ranking
+    //      cache (written earlier) froze those countries as coverage-0
+    //      greyedOut entries. Rebuild needed.
+    //
+    //   2. The bulk RPC's handler hit a read-after-write race: it called
+    //      warmMissingResilienceScores() (writing 222 per-country keys), then
+    //      its own re-read of those same keys returned an empty Map (Upstash
+    //      pipeline visibility lag in the same Vercel invocation). Result:
+    //      cachedScores.size = 0, every item built with `undefined` payload =
+    //      coverage 0 = all 222 in greyedOut, coverage gate (cachedScores.size
+    //      / countryCodes.length) = 0% < 75% → handler skips the SET → ranking
+    //      cache stays null.
+    //
+    //      stillMissing is computed from the seeder's OWN pipeline GET (which
+    //      sees the writes), so it correctly reports 0 laggards. The original
+    //      `if (laggardsWarmed > 0)` gate would skip the rebuild — and we'd
+    //      end up with all per-country scores cached but no ranking key.
+    //
+    // Fix: rebuild whenever (a) we warmed laggards OR (b) the ranking key is
+    // null in Redis after the bulk call. Path (b) catches the race; the
+    // second RPC call sees warm per-country scores in cache and the handler's
+    // re-read succeeds.
+    // Inline GET so we can distinguish "key absent" (rebuild needed) from
+    // "GET failed" (rebuild as a precaution but log it for incident triage).
+    // The shared redisGetJson() collapses both into null, which would silently
+    // mask transient Upstash hiccups in the rebuild trigger reason.
+    let rankingExists = null;
+    let rankingProbeFailed = false;
+    try {
+      const probeResp = await fetch(`${url}/get/${encodeURIComponent(RESILIENCE_RANKING_CACHE_KEY)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!probeResp.ok) {
+        rankingProbeFailed = true;
+        console.warn(`[resilience-scores] Ranking probe HTTP ${probeResp.status}; rebuilding as a precaution`);
+      } else {
+        const data = await probeResp.json();
+        rankingExists = data?.result || null;
+      }
+    } catch (err) {
+      rankingProbeFailed = true;
+      console.warn(`[resilience-scores] Ranking probe failed (${err.message}); rebuilding as a precaution`);
+    }
+    if (laggardsWarmed > 0 || rankingExists == null) {
+      const reason = laggardsWarmed > 0
+        ? `${laggardsWarmed} laggard warms`
+        : (rankingProbeFailed ? 'ranking probe failed (precautionary)' : 'bulk-call race left ranking:v9 null');
       try {
-        await redisPipeline(url, token, [['DEL', RESILIENCE_RANKING_CACHE_KEY]]);
+        if (laggardsWarmed > 0) {
+          await redisPipeline(url, token, [['DEL', RESILIENCE_RANKING_CACHE_KEY]]);
+        }
         const rebuildHeaders = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
         if (WM_KEY) rebuildHeaders['X-WorldMonitor-Key'] = WM_KEY;
         const rebuildResp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking`, {
@@ -235,7 +279,7 @@ async function seedResilienceScores() {
         if (rebuildResp.ok) {
           const rebuilt = await rebuildResp.json();
           const total = (rebuilt.items?.length ?? 0) + (rebuilt.greyedOut?.length ?? 0);
-          console.log(`[resilience-scores] Rebuilt ${RESILIENCE_RANKING_CACHE_KEY} with ${total} countries after ${laggardsWarmed} laggard warms`);
+          console.log(`[resilience-scores] Rebuilt ${RESILIENCE_RANKING_CACHE_KEY} with ${total} countries (${reason})`);
         } else {
           console.warn(`[resilience-scores] Rebuild ranking HTTP ${rebuildResp.status} — ranking cache is null until next RPC call`);
         }
