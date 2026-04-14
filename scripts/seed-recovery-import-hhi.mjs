@@ -81,7 +81,20 @@ function parseRecords(data) {
   }));
 }
 
-async function fetchImportsForReporter(reporterCode, apiKey) {
+// Comtrade transient 5xx (500/502/503/504) must be retried or the reporter
+// silently drops from the HHI calc. The seeder's resume cache picks up
+// still-missing reporters on the next run, so we cap retries to keep the
+// 30-min bundle budget viable.
+export function isTransientComtrade(status) {
+  return status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+// Injectable sleep so unit tests can exercise the classification loop without
+// real 15s/5s/10s waits. Production defaults to the real sleep.
+let _retrySleep = sleep;
+export function __setSleepForTests(fn) { _retrySleep = typeof fn === 'function' ? fn : sleep; }
+
+export async function fetchImportsForReporter(reporterCode, apiKey) {
   const url = new URL(COMTRADE_URL);
   url.searchParams.set('reporterCode', reporterCode);
   url.searchParams.set('flowCode', 'M');
@@ -89,22 +102,37 @@ async function fetchImportsForReporter(reporterCode, apiKey) {
   url.searchParams.set('period', `${new Date().getFullYear() - 1},${new Date().getFullYear() - 2}`);
   url.searchParams.set('subscription-key', apiKey);
 
-  const resp = await fetch(url.toString(), {
-    headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(45_000),
-  });
-
-  if (resp.status === 429) {
-    // Short backoff on 429 — 60s is too long when the overall bundle budget is tight.
-    // We only retry once; subsequent 429s count as a skip and the resume cache picks
-    // them up on the next run.
-    await sleep(15_000);
-    const retry = await fetch(url.toString(), {
+  async function once() {
+    return fetch(url.toString(), {
       headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
       signal: AbortSignal.timeout(45_000),
     });
-    if (!retry.ok) return { records: [], status: retry.status };
-    return { records: parseRecords(await retry.json()), status: retry.status };
+  }
+
+  // Single classification loop: 429 wait (15s — bundle budget is tight), then
+  // up to two transient-5xx retries (5s, 10s). Collapsed from branched retries
+  // so a post-429 5xx still consumes the bounded 5xx retries.
+  let rateLimitedOnce = false;
+  let transientRetries = 0;
+  const MAX_TRANSIENT_RETRIES = 2;
+
+  let resp;
+  while (true) {
+    resp = await once();
+
+    if (resp.status === 429 && !rateLimitedOnce) {
+      await _retrySleep(15_000);
+      rateLimitedOnce = true;
+      continue;
+    }
+
+    if (isTransientComtrade(resp.status) && transientRetries < MAX_TRANSIENT_RETRIES) {
+      await _retrySleep(transientRetries === 0 ? 5_000 : 10_000);
+      transientRetries++;
+      continue;
+    }
+
+    break;
   }
 
   if (!resp.ok) return { records: [], status: resp.status };
