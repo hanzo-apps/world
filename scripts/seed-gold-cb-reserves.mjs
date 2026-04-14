@@ -6,17 +6,26 @@ loadEnvFile(import.meta.url);
 const CB_KEY = 'market:gold-cb-reserves:v1';
 const CB_TTL = 2_592_000; // 30 days — data is monthly, TTL long to survive missed runs
 
-// IMF IFS dataset via SDMX 3.0 — public, no auth. Gold reserves series.
-// Candidate indicator codes, tried in ORDER OF PREFERENCE. Ounces-denominated
-// series come first because USD values conflate real buying with gold-price
-// moves; we only fall back to USD when no ounces series is available (in
-// which case buildReservesPayload emits holders with tonnes=0 and suppresses
-// the 12M buyers/sellers lists — see valueIsOunces handling there).
+// IMF IRFCL (International Reserves and Foreign Currency Liquidity) dataflow
+// via SDMX 3.0 — public, no auth. The original PR (#3038) targeted
+// IMF.STA/IFS which returns HTTP 404 — IFS isn't an exposed dataflow on
+// api.imf.org; gold-reserves data lives under IMF.STA/IRFCL.
+//
+// Dimensions: COUNTRY.INDICATOR.SECTOR.FREQUENCY (4, not 3). Key pattern
+// requires explicit wildcards `*.<indicator>.*.M`; empty segments return
+// HTTP 400 / zero series. Verified against live API: *._FTO.*.M returns
+// 111 series at ~798 KB.
+//
+// Candidate indicators in order of preference. _FTO (fine troy ounces)
+// values convert directly to tonnes — USD suffix is last-resort fallback
+// because price moves contaminate delta calculations.
 const IMF_SDMX_BASE = 'https://api.imf.org/external/sdmx/3.0';
+const IRFCL_DATAFLOW = `${IMF_SDMX_BASE}/data/dataflow/IMF.STA/IRFCL/+`;
 const CANDIDATE_INDICATORS = [
-  'RAFAGOLDV_OZT',  // Reserve assets: gold, fine troy ounces (IFS) — PREFERRED
-  'AFAGOLD',        // Legacy IFS ounces code
-  'RAFAGOLD_USD',   // USD fallback (last resort; price-contaminated deltas)
+  'IRFCLDT1_IRFCL56_FTO',   // Reserve assets: gold, fine troy ounces — PREFERRED
+  'IRFCLDT1_IRFCL56GB_FTO', // Gold bullion only, troy ounces
+  'IRFCLDT1_IRFCL56UG_FTO', // Unallocated gold, troy ounces
+  'IRFCLDT1_IRFCL56_USD',   // USD fallback (last resort; price-contaminated deltas)
 ];
 
 const TROY_OZ_PER_TONNE = 32_150.7;
@@ -44,18 +53,17 @@ const AGGREGATE_CODES = new Set([
   'UMC', 'HIC', 'SSA', 'LAC', 'MEA', 'SAS', 'EAP', 'ECA', 'ADVEC', 'EMDE',
 ]);
 
-async function fetchIfsMonthlySeries(indicator) {
-  // IFS uses frequency .M (monthly). URL pattern mirrors imfSdmxFetchIndicator
-  // in _seed-utils.mjs but we keep it inline here since IFS has a different
-  // dimension layout than WEO.
-  const url = `${IMF_SDMX_BASE}/data/dataflow/IMF.STA/IFS/+/M..${indicator}?dimensionAtObservation=TIME_PERIOD&attributes=dsd&measures=all`;
+async function fetchIrfclMonthlySeries(indicator) {
+  // IRFCL dimensions: COUNTRY.INDICATOR.SECTOR.FREQUENCY. We wildcard COUNTRY
+  // and SECTOR; FREQUENCY=M for monthly.
+  const url = `${IRFCL_DATAFLOW}/*.${indicator}.*.M?dimensionAtObservation=TIME_PERIOD&attributes=dsd&measures=all`;
 
   const json = await withRetry(async () => {
     const r = await fetch(url, {
       headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
       signal: AbortSignal.timeout(90_000),
     });
-    if (!r.ok) throw new Error(`IMF IFS ${indicator}: HTTP ${r.status}`);
+    if (!r.ok) throw new Error(`IMF IRFCL ${indicator}: HTTP ${r.status}`);
     return r.json();
   }, 2, 3000);
 
@@ -98,15 +106,15 @@ async function fetchIfsMonthlySeries(indicator) {
 async function fetchFirstAvailableIndicator() {
   for (const indicator of CANDIDATE_INDICATORS) {
     try {
-      const data = await fetchIfsMonthlySeries(indicator);
+      const data = await fetchIrfclMonthlySeries(indicator);
       const countries = Object.keys(data).length;
       if (countries >= 20) {
-        console.log(`  [IMF IFS] ${indicator}: ${countries} countries`);
+        console.log(`  [IMF IRFCL] ${indicator}: ${countries} countries`);
         return { indicator, data };
       }
-      console.warn(`  [IMF IFS] ${indicator}: only ${countries} countries — trying next`);
+      console.warn(`  [IMF IRFCL] ${indicator}: only ${countries} countries — trying next`);
     } catch (e) {
-      console.warn(`  [IMF IFS] ${indicator} failed: ${e.message} — trying next`);
+      console.warn(`  [IMF IRFCL] ${indicator} failed: ${e.message} — trying next`);
     }
   }
   return null;
@@ -123,7 +131,7 @@ export function monthOffset(period, deltaMonths) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-export function buildReservesPayload(raw, indicator) {
+export function buildReservesPayload(raw, indicator, goldUsdByCountry = {}, totalReservesUsdByCountry = {}) {
   const asOfMonth = (() => {
     const all = new Set();
     for (const c of Object.values(raw)) {
@@ -135,9 +143,27 @@ export function buildReservesPayload(raw, indicator) {
   if (!asOfMonth) return null;
 
   const priorMonth = monthOffset(asOfMonth, -12);
-  const valueIsOunces = indicator.includes('_OZT') || indicator.includes('OUNCE');
+  // IRFCL `_FTO` suffix = Fine Troy Ounces (convertible to tonnes). `_USD`
+  // values are price-contaminated, so we flag non-ounces and skip deltas.
+  // Backward-compat: legacy `_OZT`/`OUNCE` substrings (from pre-merge PR) also
+  // satisfy the check.
+  const valueIsOunces = /_FTO|_OZT|OUNCE/i.test(indicator);
 
   const toTonnes = (v) => valueIsOunces ? v / TROY_OZ_PER_TONNE : null;
+
+  // Find latest month within a country's byMonth map at or before asOfMonth.
+  // IRFCL reporting lags vary per country — use the most recent available
+  // value within the last 3 months to compute pctOfReserves so we don't drop
+  // countries that report one month late.
+  const latestAtOrBefore = (byMonth, cutoff) => {
+    if (!byMonth) return null;
+    for (let back = 0; back < 3; back++) {
+      const m = monthOffset(cutoff, -back);
+      const v = byMonth[m];
+      if (v != null && Number.isFinite(v) && v > 0) return v;
+    }
+    return null;
+  };
 
   const holders = [];
   for (const [iso3, rec] of Object.entries(raw)) {
@@ -160,12 +186,22 @@ export function buildReservesPayload(raw, indicator) {
       tonnes = 0; // mark "unknown in tonnes"
     }
 
+    // pctOfReserves = gold's share of total official reserve assets (both in
+    // USD). Requires the two parallel indicator series — falls back to 0 when
+    // either side is missing for this country (small reporters often publish
+    // only the core ounces series).
+    const goldUsd = latestAtOrBefore(goldUsdByCountry[iso3]?.byMonth, asOfMonth);
+    const totalUsd = latestAtOrBefore(totalReservesUsdByCountry[iso3]?.byMonth, asOfMonth);
+    const pctOfReserves = (goldUsd != null && totalUsd != null && totalUsd > 0)
+      ? +((goldUsd / totalUsd) * 100).toFixed(2)
+      : 0;
+
     holders.push({
       iso3,
       name: ISO3_NAMES[iso3] || rec.name || iso3,
       tonnes: Number.isFinite(tonnes) ? +tonnes.toFixed(2) : 0,
-      pctOfReserves: 0, // IFS doesn't give us total reserves side-by-side in this series
-      valueUsd: valueIsOunces ? 0 : +current.toFixed(0),
+      pctOfReserves,
+      valueUsd: valueIsOunces ? (goldUsd ?? 0) : +current.toFixed(0),
       deltaTonnes12m,
     });
   }
@@ -199,10 +235,33 @@ export function buildReservesPayload(raw, indicator) {
   };
 }
 
+// Indicators used to compute pctOfReserves = gold_usd / total_reserves_usd.
+// Both are IRFCLDT1 USD-denominated; fetched in parallel with the primary
+// tonnage indicator so the share is computed from matched-month values.
+const GOLD_USD_INDICATOR = 'IRFCLDT1_IRFCL56_USD';   // Official reserve assets, gold (USD market value)
+const TOTAL_RESERVES_USD = 'IRFCLDT1_IRFCL65_USD';   // Official reserve assets (total, USD market value)
+
 async function fetchCbReserves() {
-  const res = await fetchFirstAvailableIndicator();
-  if (!res) throw new Error('All IMF IFS candidate indicators returned empty / failed');
-  const payload = buildReservesPayload(res.data, res.indicator);
+  // Fetch the tonnage indicator + the two USD series for pctOfReserves in
+  // parallel. The pct series are optional — on failure we still publish the
+  // tonnage payload with pctOfReserves=0 rather than blocking the seed.
+  const [primary, goldUsdRes, totalUsdRes] = await Promise.allSettled([
+    fetchFirstAvailableIndicator(),
+    fetchIrfclMonthlySeries(GOLD_USD_INDICATOR),
+    fetchIrfclMonthlySeries(TOTAL_RESERVES_USD),
+  ]);
+
+  const res = primary.status === 'fulfilled' ? primary.value : null;
+  if (!res) throw new Error('All IMF IRFCL candidate tonnage indicators returned empty / failed');
+
+  const goldUsd = goldUsdRes.status === 'fulfilled' ? goldUsdRes.value : {};
+  const totalUsd = totalUsdRes.status === 'fulfilled' ? totalUsdRes.value : {};
+  const pctCoverage = Object.keys(goldUsd).length && Object.keys(totalUsd).length
+    ? Math.min(Object.keys(goldUsd).length, Object.keys(totalUsd).length)
+    : 0;
+  console.log(`  [IMF IRFCL] pctOfReserves denominator coverage: ${pctCoverage} countries (gold_usd=${Object.keys(goldUsd).length}, total_usd=${Object.keys(totalUsd).length})`);
+
+  const payload = buildReservesPayload(res.data, res.indicator, goldUsd, totalUsd);
   if (!payload) throw new Error(`buildReservesPayload returned null (indicator=${res.indicator})`);
   return payload;
 }
