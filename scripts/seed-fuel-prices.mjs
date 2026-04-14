@@ -608,6 +608,13 @@ export function parseCREStationPrices(xml) {
   return { regular: collect('regular'), diesel: collect('diesel') };
 }
 
+// Sources whose failure must not gate publish. Brazil ANP (gov.br) is
+// unreachable from Railway IPs both ways: Decodo proxy 403s all .gov.br
+// CONNECTs by policy, and direct fetch fails undici TLS handshake. Until a
+// working route is found, gating publish on Brazil's freshness means every
+// run exits 1 → Railway "Deployment crashed" banner + STALE_SEED flip.
+const TOLERATED_FAILURES = new Set(['Brazil']);
+
 // Publish gate. Exported so tests can lock in the contract.
 //
 // All entries in `countries` are FRESH from this run (no stale-carry-forward —
@@ -620,13 +627,17 @@ export function parseCREStationPrices(xml) {
 // Contract:
 //   - ≥30 countries (EU-CSV alone is 27 + at least 3 of US/GB/MY/BR/MX/NZ).
 //   - US + GB + MY present (each uniquely covers a non-EU region).
-//   - No failed sources — partial failures must not publish as healthy.
+//   - No untolerated failed sources — partial failures of critical regions
+//     must not publish as healthy, but TOLERATED_FAILURES (e.g. structurally
+//     unreachable Brazil ANP) don't gate publish.
 export function validateFuel(d) {
   const codes = new Set((d?.countries ?? []).map(c => c.code));
   const total = d?.countries?.length ?? 0;
   const criticalPresent = ['US', 'GB', 'MY'].every(code => codes.has(code));
-  const allSourcesOk = Array.isArray(d?.failedSources) ? d.failedSources.length === 0 : true;
-  return total >= 30 && criticalPresent && allSourcesOk;
+  const untoleratedFailures = Array.isArray(d?.failedSources)
+    ? d.failedSources.filter(name => !TOLERATED_FAILURES.has(name))
+    : [];
+  return total >= 30 && criticalPresent && untoleratedFailures.length === 0;
 }
 
 async function main() {
@@ -712,7 +723,12 @@ for (let i = 0; i < fetchResults.length; i++) {
 // last healthy snapshot serving the panel, and health flips to STALE_SEED
 // once maxStaleMin is exceeded — a correct, visible failure signal.
 if (failedSources.length > 0) {
-  console.warn(`  [DEGRADED] ${failedSources.length} source(s) failed this run — publish will be rejected by validator, previous snapshot will continue serving until cache TTL`);
+  const untolerated = failedSources.filter(n => !TOLERATED_FAILURES.has(n));
+  if (untolerated.length > 0) {
+    console.warn(`  [DEGRADED] ${failedSources.length} source(s) failed this run (${untolerated.length} untolerated) — publish will be rejected by validator, previous snapshot will continue serving until cache TTL`);
+  } else {
+    console.warn(`  [DEGRADED] ${failedSources.length} tolerated source(s) failed (${failedSources.join(', ')}) — publishing without them`);
+  }
 }
 
 const countries = Array.from(countryMap.values());
@@ -783,8 +799,11 @@ const mostExpensiveDiesel = withDiesel.length
   : '';
 
 const allSourcesFresh = failedSources.length === 0;
+const untoleratedFailures = failedSources.filter(name => !TOLERATED_FAILURES.has(name));
+const publishBlocking = untoleratedFailures.length > 0;
 console.log(`\n  Summary: ${countries.length} countries, ${successfulSources}/${sourceNames.length} sources`);
-if (!allSourcesFresh) console.warn(`  [FRESHNESS] Failed sources this run: ${failedSources.join(', ')} — publish will be rejected, prev snapshot keeps serving`);
+if (publishBlocking) console.warn(`  [FRESHNESS] Failed sources this run: ${failedSources.join(', ')} — publish will be rejected, prev snapshot keeps serving`);
+else if (!allSourcesFresh) console.warn(`  [FRESHNESS] Tolerated failures this run: ${failedSources.join(', ')} — publishing without them; :prev will rotate`);
 console.log(`  Cheapest gasoline: ${cheapestGasoline}, Cheapest diesel: ${cheapestDiesel}`);
 console.log(`  Most expensive gasoline: ${mostExpensiveGasoline}, Most expensive diesel: ${mostExpensiveDiesel}`);
 
@@ -804,10 +823,13 @@ const data = {
   allSourcesFresh,
 };
 
-// Only rotate :prev when EVERY source succeeded this run. A partial rotation
-// poisons next week's WoW for every country the failed source owned (would
-// compare fresh-this-week to stale-carried-last-week = ~0% change forever).
-const rotatePrev = allSourcesFresh;
+// Rotate :prev when no untolerated source failed. Tolerated-only failures
+// (e.g. Brazil ANP unreachable) drop those countries from the published
+// snapshot entirely, so rotating is safe — next week has no prev entry to
+// compare against, so no false ~0% WoW. Blocking failures (untolerated)
+// still freeze :prev to preserve WoW integrity, since the panel would
+// otherwise compare fresh-this-week to stale-carried-last-week = ~0%.
+const rotatePrev = !publishBlocking;
 if (!rotatePrev) console.warn(`  [:prev] Skipping rotation — WoW integrity preserved for next run`);
 
 await runSeed('economic', 'fuel-prices', CANONICAL_KEY, async () => data, {
