@@ -27,7 +27,15 @@ function makeKey(parts: string[]): string {
 function recordCount(data: unknown): number {
   if (!data || typeof data !== 'object') return 1;
   const d = data as Record<string, unknown>;
-  const arr = d.retailers ?? d.risers ?? d.essentialsSeries ?? d.categories;
+  if (Array.isArray(d.risers) || Array.isArray(d.fallers)) {
+    const risers = Array.isArray(d.risers) ? d.risers.length : 0;
+    const fallers = Array.isArray(d.fallers) ? d.fallers.length : 0;
+    // Movers is bipolar and a fully-flat window (risers=0, fallers=0) is still a
+    // valid snapshot. advanceSeedMeta already gates writes on upstream freshness,
+    // so floor at 1 here to prevent health from flagging EMPTY_DATA on quiet markets.
+    return Math.max(1, risers + fallers);
+  }
+  const arr = d.retailers ?? d.essentialsSeries ?? d.categories;
   return Array.isArray(arr) ? arr.length : 1;
 }
 
