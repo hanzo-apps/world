@@ -41,7 +41,13 @@ export const RESILIENCE_SCHEMA_V2_ENABLED =
   (process.env.RESILIENCE_SCHEMA_V2_ENABLED ?? 'true').toLowerCase() === 'true';
 
 export const RESILIENCE_SCORE_CACHE_TTL_SECONDS = 6 * 60 * 60;
-export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 6 * 60 * 60;
+// Ranking TTL must exceed the cron interval (6h) by enough to tolerate one
+// missed/slow cron tick. With TTL==cron_interval, writing near the end of a
+// run and firing the next cron near the start of the next interval left a
+// gap of multiple hours once the key expired between refreshes. 12h gives a
+// full cron-cycle of headroom — ensureRankingPresent() still refreshes on
+// every cron, so under normal operation the key stays well above TTL=0.
+export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 12 * 60 * 60;
 export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v9:';
 export const RESILIENCE_HISTORY_KEY_PREFIX = 'resilience:history:v4:';
 export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v9';
@@ -479,21 +485,45 @@ export async function warmMissingResilienceScores(
   // the prefixed namespace via setCachedJson/cachedFetchJson; writing raw here
   // would (a) make preview warms invisible to subsequent preview reads and
   // (b) leak preview writes into the production-visible unprefixed namespace.
-  const setCommands = scores.map(({ cc, score }) => [
+  //
+  // Chunk size: a single 222-SET pipeline pushes ~600KB of body and routinely
+  // exceeds REDIS_PIPELINE_TIMEOUT_MS (5s) on Vercel Edge → the runRedisPipeline
+  // call returns `[]`, the persistence guard correctly returns an empty map,
+  // and ranking publish gets dropped even though Upstash usually finishes the
+  // writes a moment later. Splitting into ~30-command batches keeps each
+  // pipeline body small enough to land well under the timeout while still
+  // making one round-trip per batch.
+  const SET_BATCH = 30;
+  const allSetCommands = scores.map(({ cc, score }) => [
     'SET',
     scoreCacheKey(cc),
     JSON.stringify(score),
     'EX',
     String(RESILIENCE_SCORE_CACHE_TTL_SECONDS),
   ]);
-  const persistResults = await runRedisPipeline(setCommands);
-  // runRedisPipeline returns [] on transport/HTTP failure. Without a
-  // per-command OK signal we have no proof anything persisted — return an
-  // empty map so the ranking coverage gate can't false-positive on a broken
-  // write path.
-  if (persistResults.length !== scores.length) {
-    console.warn(`[resilience] warm pipeline returned ${persistResults.length}/${scores.length} results — treating all as unpersisted`);
-    return warmed;
+  // Fire all batches concurrently. Serial awaits would add 7 extra Upstash
+  // round-trips for a 222-country warm (~100-500ms each on Edge). Each batch
+  // is independent, so Promise.all collapses them into a single wall-clock
+  // window bounded by the slowest batch. Failed batches still pad with empty
+  // entries to preserve per-command index alignment downstream.
+  const batches: Array<Array<Array<string>>> = [];
+  for (let i = 0; i < allSetCommands.length; i += SET_BATCH) {
+    batches.push(allSetCommands.slice(i, i + SET_BATCH));
+  }
+  const batchOutcomes = await Promise.all(batches.map((batch) => runRedisPipeline(batch)));
+  const persistResults: Array<{ result?: unknown }> = [];
+  for (let b = 0; b < batches.length; b++) {
+    const batch = batches[b]!;
+    const batchResults = batchOutcomes[b]!;
+    if (batchResults.length !== batch.length) {
+      // runRedisPipeline returns [] on transport/HTTP failure. Pad with
+      // empty entries so the per-command index alignment downstream stays
+      // correct — those entries will fail the OK check and be excluded
+      // from `warmed`, which is the safe behavior (no proof = no claim).
+      for (let j = 0; j < batch.length; j++) persistResults.push({});
+    } else {
+      for (const result of batchResults) persistResults.push(result);
+    }
   }
 
   let persistFailures = 0;
