@@ -18,8 +18,10 @@ describe('exported constants', () => {
     assert.equal(RESILIENCE_SCORE_CACHE_PREFIX, 'resilience:score:v9:');
   });
 
-  it('RESILIENCE_RANKING_CACHE_TTL_SECONDS is 6 hours', () => {
-    assert.equal(RESILIENCE_RANKING_CACHE_TTL_SECONDS, 6 * 60 * 60);
+  it('RESILIENCE_RANKING_CACHE_TTL_SECONDS is 12 hours (2x cron interval)', () => {
+    // TTL must exceed cron interval (6h) so a missed/slow cron doesn't create
+    // an EMPTY_ON_DEMAND gap. Seeder and handler must agree on the TTL.
+    assert.equal(RESILIENCE_RANKING_CACHE_TTL_SECONDS, 12 * 60 * 60);
   });
 
   it('RESILIENCE_STATIC_INDEX_KEY matches expected key', () => {
@@ -114,17 +116,16 @@ describe('script is self-contained .mjs', () => {
   });
 });
 
-describe('rebuilds ranking key on race-condition or laggards', () => {
-  // Locks in the defensive rebuild added after the bulk RPC. The bulk call's
-  // handler can suffer a read-after-write race in Vercel where its own
-  // re-read of the per-country cache returns empty even though writes
-  // landed; this leaves resilience:ranking:v9 null even with all 222 score
-  // keys present. The seeder must verify and re-call the RPC in that case.
+describe('ensures ranking aggregate is present every cron, with truthful meta', () => {
+  // The ranking aggregate has the same 6h TTL as the per-country scores. If we
+  // only check + rebuild it inside the missing-scores branch, a cron tick that
+  // finds all scores still warm will skip the probe entirely — and the ranking
+  // can expire mid-cycle without anyone noticing until the NEXT cold-start
+  // cron. The probe + rebuild path must run on every cron, regardless of
+  // whether per-country warm was needed. The seed-meta write must be gated on
+  // post-rebuild verification so it never claims freshness over a missing key.
   let src;
   before(async () => {
-    // Read once in a hook so all assertions get a meaningful failure if the
-    // file read itself breaks — instead of cascading TypeErrors from
-    // `assert.match(undefined, …)` in dependent tests.
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
     const { dirname, join } = await import('node:path');
@@ -132,35 +133,114 @@ describe('rebuilds ranking key on race-condition or laggards', () => {
     src = readFileSync(join(dir, '..', 'scripts', 'seed-resilience-scores.mjs'), 'utf8');
   });
 
-  it('probes the ranking key after bulk RPC and distinguishes absent from probe-failed', () => {
-    assert.match(
-      src,
-      /\$\{encodeURIComponent\(RESILIENCE_RANKING_CACHE_KEY\)\}/,
-      'must GET resilience:ranking:v9 after bulk warmup to verify it was written',
-    );
-    assert.match(
-      src,
-      /rankingProbeFailed\s*=\s*true/,
-      'must distinguish probe failure from genuinely-absent key for incident triage',
+  it('extracts refreshRankingAggregate helper used by both warm and skip-warm branches', () => {
+    assert.match(src, /async function refreshRankingAggregate\b/, 'helper must be defined');
+    const calls = [...src.matchAll(/await\s+refreshRankingAggregate\s*\(/g)];
+    assert.ok(
+      calls.length >= 2,
+      `refreshRankingAggregate must be called from both branches (missing>0 and missing===0); found ${calls.length} call sites`,
     );
   });
 
-  it('triggers rebuild when ranking is null OR laggards were warmed', () => {
+  it('always triggers the rebuild HTTP call — never short-circuits on "key still present"', () => {
+    // Skipping rebuild when the key exists recreates a timing hole: the key
+    // can be alive at probe time but expire a few minutes later, leaving a
+    // multi-hour gap until the NEXT cron where the key happens to be gone at
+    // probe time. Always rebuilding is one cheap HTTP per cron.
+    assert.doesNotMatch(
+      src,
+      /if\s*\(\s*rankingExists\s*!=\s*null[^)]*\)\s*return\s+true/,
+      'refreshRankingAggregate must not early-return when the ranking key is still present',
+    );
+    // The HTTP rebuild call itself must be unconditional (not gated on a probe).
     assert.match(
       src,
-      /if\s*\(laggardsWarmed\s*>\s*0\s*\|\|\s*rankingExists\s*==\s*null\)/,
-      'rebuild gate must fire on EITHER laggard warms OR null ranking key',
+      /async function refreshRankingAggregate[\s\S]*?\/api\/resilience\/v1\/get-resilience-ranking/,
+      'rebuild HTTP call must be in the body of refreshRankingAggregate unconditionally',
     );
   });
 
-  it('only DELs ranking when laggards were warmed (not on race-condition retry)', () => {
-    // On the race path, the key is already null — skipping DEL avoids a
-    // pointless extra Redis call. On the laggard path, DEL forces the
-    // handler to recompute fresh ranking with the now-warmed laggards.
+  it('verifies the ranking key after the rebuild attempt for observability', () => {
     assert.match(
       src,
-      /if\s*\(laggardsWarmed\s*>\s*0\)\s*{\s*await\s+redisPipeline\([^)]+\['DEL',\s*RESILIENCE_RANKING_CACHE_KEY\]\]/,
-      'DEL must be guarded by laggardsWarmed > 0',
+      /\/strlen\/\$\{encodeURIComponent\(RESILIENCE_RANKING_CACHE_KEY\)\}/,
+      'STRLEN verify after rebuild surfaces when handler skipped the SET (coverage gate or partial pipeline)',
+    );
+  });
+
+  it('does NOT DEL the ranking before rebuild — uses ?refresh=1 instead', () => {
+    // The old flow (DEL + rebuild HTTP) created a brief absence window: if
+    // the rebuild request failed transiently, the ranking stayed absent
+    // until the next cron. We now send ?refresh=1 so the handler bypasses
+    // its cache-hit early-return and recomputes+SETs atomically. On failure,
+    // the existing (possibly stale) ranking remains.
+    assert.doesNotMatch(
+      src,
+      /\['DEL',\s*RESILIENCE_RANKING_CACHE_KEY\]/,
+      'seeder must not DEL the ranking key — ?refresh=1 is the atomic replacement path',
+    );
+    // ALL seeder-initiated calls to get-resilience-ranking must carry
+    // ?refresh=1. The bulk-warm path (inside `if (missing > 0)`) also needs
+    // it — the ranking TTL (12h) exceeds the score TTL (6h), so in the 6h-12h
+    // window the handler would hit its cache and skip the warm entirely,
+    // leaving per-country scores absent and coverage degraded.
+    const rankingEndpointCalls = [...src.matchAll(/\/api\/resilience\/v1\/get-resilience-ranking(\?[^\s'`"]*)?/g)];
+    assert.ok(rankingEndpointCalls.length >= 2, `expected at least 2 ranking-endpoint calls (bulk-warm + refresh), got ${rankingEndpointCalls.length}`);
+    for (const [full, query] of rankingEndpointCalls) {
+      assert.ok(
+        (query || '').includes('refresh=1'),
+        `ranking endpoint call must include ?refresh=1 — found: ${full}`,
+      );
+    }
+  });
+
+  it('seeder does NOT write seed-meta:resilience:ranking (handler is sole writer)', () => {
+    // A seeder-written meta can only attest to per-country score count, not
+    // to whether the ranking aggregate was actually published. Handler gates
+    // its SET on 75% coverage; if the gate trips, an older ranking survives
+    // and seeder meta would lie about freshness. Remove the seeder write —
+    // handler writes ranking + meta atomically, ensureRankingPresent()
+    // triggers the handler every cron so meta stays fresh during quiet Pro
+    // usage without the seeder needing to heartbeat.
+    assert.doesNotMatch(
+      src,
+      /writeRankingSeedMeta\s*\(/,
+      'seed-resilience-scores.mjs must NOT define or call writeRankingSeedMeta',
+    );
+    // Assert no SET command targets the meta key — comments that reference
+    // the key name are fine and useful for future maintainers.
+    assert.doesNotMatch(
+      src,
+      /\[\s*['"]SET['"]\s*,\s*['"]seed-meta:resilience:ranking['"]/,
+      'seeder must not issue SET seed-meta:resilience:ranking (handler is sole writer)',
+    );
+  });
+});
+
+describe('handler warm pipeline is chunked', () => {
+  // The 222-country pipeline SET payload (~600KB) exceeds the 5s pipeline
+  // timeout on Vercel Edge → handler reports 0 persisted, ranking skipped.
+  // The fix is to chunk into smaller pipelines that comfortably fit. Static
+  // assertion because behavioral tests can't easily synthesize 222 countries
+  // through the full scoring pipeline.
+  it('warmMissingResilienceScores splits SETs into batches', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(
+      join(dir, '..', 'server', 'worldmonitor', 'resilience', 'v1', '_shared.ts'),
+      'utf8',
+    );
+    assert.match(
+      src,
+      /const\s+SET_BATCH\s*=\s*\d+/,
+      'SET_BATCH constant must be defined',
+    );
+    assert.match(
+      src,
+      /for\s*\([^)]*i\s*\+=\s*SET_BATCH/,
+      'pipeline SETs must be issued in SET_BATCH-sized chunks',
     );
   });
 });

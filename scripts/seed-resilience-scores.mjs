@@ -21,7 +21,10 @@ const SEED_UA = 'Mozilla/5.0 (compatible; WorldMonitor-Seed/1.0)';
 
 export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v9:';
 export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v9';
-export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 6 * 60 * 60;
+// Must match the server-side RESILIENCE_RANKING_CACHE_TTL_SECONDS. Extended
+// to 12h (2x the cron interval) so a missed/slow cron can't create an
+// EMPTY_ON_DEMAND gap before the next successful rebuild.
+export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 12 * 60 * 60;
 export const RESILIENCE_STATIC_INDEX_KEY = 'resilience:static:index:v1';
 
 const INTERVAL_KEY_PREFIX = 'resilience:intervals:v1:';
@@ -162,9 +165,16 @@ async function seedResilienceScores() {
   if (missing > 0) {
     console.log(`[resilience-scores] Warming ${missing} missing via ranking endpoint...`);
     try {
+      // ?refresh=1 MUST be set here. The ranking aggregate (12h TTL) routinely
+      // outlives the per-country score keys (6h TTL), so in the post-6h /
+      // pre-12h window the handler's cache-hit early-return would fire and
+      // skip the whole warm path — scores would stay missing, coverage would
+      // degrade, and only the per-country laggard fallback (or nothing, if
+      // WM_KEY is absent) would recover. Forcing a recompute routes the call
+      // through warmMissingResilienceScores and its chunked pipeline SET.
       const headers = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
       if (WM_KEY) headers['X-WorldMonitor-Key'] = WM_KEY;
-      const resp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking`, {
+      const resp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking?refresh=1`, {
         headers,
         signal: AbortSignal.timeout(60_000),
       });
@@ -216,119 +226,102 @@ async function seedResilienceScores() {
       console.log(`[resilience-scores] Laggards warmed: ${laggardsWarmed}/${stillMissing.length}`);
     }
 
-    // The ranking cache (resilience:ranking:v9) needs to reflect the
-    // freshly-warmed per-country scores. Two failure modes have to be handled:
-    //
-    //   1. Laggards were warmed individually after the bulk RPC. The ranking
-    //      cache (written earlier) froze those countries as coverage-0
-    //      greyedOut entries. Rebuild needed.
-    //
-    //   2. The bulk RPC's handler hit a read-after-write race: it called
-    //      warmMissingResilienceScores() (writing 222 per-country keys), then
-    //      its own re-read of those same keys returned an empty Map (Upstash
-    //      pipeline visibility lag in the same Vercel invocation). Result:
-    //      cachedScores.size = 0, every item built with `undefined` payload =
-    //      coverage 0 = all 222 in greyedOut, coverage gate (cachedScores.size
-    //      / countryCodes.length) = 0% < 75% → handler skips the SET → ranking
-    //      cache stays null.
-    //
-    //      stillMissing is computed from the seeder's OWN pipeline GET (which
-    //      sees the writes), so it correctly reports 0 laggards. The original
-    //      `if (laggardsWarmed > 0)` gate would skip the rebuild — and we'd
-    //      end up with all per-country scores cached but no ranking key.
-    //
-    // Fix: rebuild whenever (a) we warmed laggards OR (b) the ranking key is
-    // null in Redis after the bulk call. Path (b) catches the race; the
-    // second RPC call sees warm per-country scores in cache and the handler's
-    // re-read succeeds.
-    // Inline GET so we can distinguish "key absent" (rebuild needed) from
-    // "GET failed" (rebuild as a precaution but log it for incident triage).
-    // The shared redisGetJson() collapses both into null, which would silently
-    // mask transient Upstash hiccups in the rebuild trigger reason.
-    let rankingExists = null;
-    let rankingProbeFailed = false;
-    try {
-      const probeResp = await fetch(`${url}/get/${encodeURIComponent(RESILIENCE_RANKING_CACHE_KEY)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!probeResp.ok) {
-        rankingProbeFailed = true;
-        console.warn(`[resilience-scores] Ranking probe HTTP ${probeResp.status}; rebuilding as a precaution`);
-      } else {
-        const data = await probeResp.json();
-        rankingExists = data?.result || null;
-      }
-    } catch (err) {
-      rankingProbeFailed = true;
-      console.warn(`[resilience-scores] Ranking probe failed (${err.message}); rebuilding as a precaution`);
-    }
-    if (laggardsWarmed > 0 || rankingExists == null) {
-      const reason = laggardsWarmed > 0
-        ? `${laggardsWarmed} laggard warms`
-        : (rankingProbeFailed ? 'ranking probe failed (precautionary)' : 'bulk-call race left ranking:v9 null');
-      try {
-        if (laggardsWarmed > 0) {
-          await redisPipeline(url, token, [['DEL', RESILIENCE_RANKING_CACHE_KEY]]);
-        }
-        const rebuildHeaders = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
-        if (WM_KEY) rebuildHeaders['X-WorldMonitor-Key'] = WM_KEY;
-        const rebuildResp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking`, {
-          headers: rebuildHeaders,
-          signal: AbortSignal.timeout(60_000),
-        });
-        if (rebuildResp.ok) {
-          const rebuilt = await rebuildResp.json();
-          const total = (rebuilt.items?.length ?? 0) + (rebuilt.greyedOut?.length ?? 0);
-          console.log(`[resilience-scores] Rebuilt ${RESILIENCE_RANKING_CACHE_KEY} with ${total} countries (${reason})`);
-        } else {
-          console.warn(`[resilience-scores] Rebuild ranking HTTP ${rebuildResp.status} — ranking cache is null until next RPC call`);
-        }
-      } catch (err) {
-        console.warn(`[resilience-scores] Failed to rebuild ranking cache: ${err.message}`);
-      }
-    }
-
     const finalResults = await redisPipeline(url, token, getCommands);
     const finalWarmed = countCachedFromPipeline(finalResults);
     console.log(`[resilience-scores] Final: ${finalWarmed}/${countryCodes.length} cached`);
 
     const intervalsWritten = await computeAndWriteIntervals(url, token, countryCodes, finalResults);
-    return { skipped: false, recordCount: finalWarmed, total: countryCodes.length, intervalsWritten };
+    const rankingPresent = await refreshRankingAggregate({ url, token, laggardsWarmed });
+    return { skipped: false, recordCount: finalWarmed, total: countryCodes.length, intervalsWritten, rankingPresent };
   }
 
   const intervalsWritten = await computeAndWriteIntervals(url, token, countryCodes, preResults);
-  return { skipped: false, recordCount: preWarmed, total: countryCodes.length, intervalsWritten };
+  // Refresh the ranking aggregate on every cron, even when per-country
+  // scores are still warm from the previous tick. Ranking has a 12h TTL vs
+  // a 6h cron cadence — skipping the refresh when the key is still alive
+  // would let it drift toward expiry without a rebuild, and a single missed
+  // cron would then produce an EMPTY_ON_DEMAND gap before the next one runs.
+  const rankingPresent = await refreshRankingAggregate({ url, token, laggardsWarmed: 0 });
+  return { skipped: false, recordCount: preWarmed, total: countryCodes.length, intervalsWritten, rankingPresent };
 }
 
-// Write seed-meta:resilience:ranking so api/health.js can track data freshness.
-// Without this, the meta key is only written by the get-resilience-ranking RPC
-// handler when a user hits it, and goes silently stale during quiet Pro usage —
-// firing a misleading "7× stale" alarm in the health endpoint even while the
-// underlying scores are fresh. Non-fatal on Redis failure; seed itself still
-// completed successfully.
-async function writeRankingSeedMeta(recordCount) {
+// Trigger a ranking rebuild via the public endpoint EVERY cron, regardless of
+// whether resilience:ranking:v9 is still live at probe time. Short-circuiting
+// on "key present" left a timing hole: if the key was written late in a prior
+// run and the next cron fires early, the key is still alive at probe time →
+// rebuild skipped → key expires a short while later and stays absent until a
+// cron eventually runs when it's missing. One cheap HTTP per cron keeps both
+// the ranking AND its sibling seed-meta rolling forward, and self-heals the
+// partial-pipeline case where ranking was written but meta wasn't — handler
+// retries the atomic pair on every cron.
+//
+// Returns whether the ranking key is present in Redis after the rebuild
+// attempt (observability only — no caller gates on this).
+async function refreshRankingAggregate({ url, token, laggardsWarmed }) {
+  const reason = laggardsWarmed > 0 ? `${laggardsWarmed} laggard warms` : 'scheduled cron refresh';
   try {
-    const { url, token } = getRedisCredentials();
-    const meta = { fetchedAt: Date.now(), recordCount };
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(['SET', 'seed-meta:resilience:ranking', JSON.stringify(meta), 'EX', 86400 * 7]),
-      signal: AbortSignal.timeout(5_000),
+    // ?refresh=1 tells the handler to skip its cache-hit early-return and
+    // recompute-then-SET atomically. Avoids the earlier "DEL then rebuild"
+    // flow where a failed rebuild would leave the ranking absent instead of
+    // stale-but-present.
+    const rebuildHeaders = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
+    if (WM_KEY) rebuildHeaders['X-WorldMonitor-Key'] = WM_KEY;
+    const rebuildResp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking?refresh=1`, {
+      headers: rebuildHeaders,
+      signal: AbortSignal.timeout(60_000),
     });
-    // fetch() doesn't throw on non-2xx — we must check resp.ok explicitly.
-    // Otherwise a 401/429/500 from Upstash silently looks like success, the
-    // seed-meta stays stale, and /api/health keeps alerting without ops
-    // knowing the write ever failed.
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '<unreadable>');
-      console.warn(`[resilience-scores] seed-meta:resilience:ranking write failed: HTTP ${resp.status} — ${body.slice(0, 200)}`);
+    if (rebuildResp.ok) {
+      const rebuilt = await rebuildResp.json();
+      const total = (rebuilt.items?.length ?? 0) + (rebuilt.greyedOut?.length ?? 0);
+      console.log(`[resilience-scores] Refreshed ${RESILIENCE_RANKING_CACHE_KEY} with ${total} countries (${reason})`);
+    } else {
+      console.warn(`[resilience-scores] Refresh ranking HTTP ${rebuildResp.status} — ranking cache stays at its prior state until next cron`);
     }
   } catch (err) {
-    console.warn('[resilience-scores] seed-meta:resilience:ranking write failed:', err?.message || err);
+    console.warn(`[resilience-scores] Failed to refresh ranking cache: ${err.message}`);
   }
+
+  // Verify BOTH the ranking data key AND the seed-meta key. Upstash REST
+  // pipeline is non-transactional: the handler's atomic SET could land the
+  // ranking but miss the meta, leaving /api/health reading stale meta over a
+  // fresh ranking. If the meta didn't land within ~5 minutes, log a warning
+  // so ops can grep for it — next cron will retry (ranking SET is
+  // idempotent).
+  const [rankingLen, metaFresh] = await Promise.all([
+    fetch(`${url}/strlen/${encodeURIComponent(RESILIENCE_RANKING_CACHE_KEY)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    }).then((r) => r.ok ? r.json() : null).then((d) => Number(d?.result || 0)).catch(() => 0),
+    fetch(`${url}/get/seed-meta:resilience:ranking`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    }).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (!d?.result) return false;
+      try {
+        const meta = JSON.parse(d.result);
+        return typeof meta?.fetchedAt === 'number' && (Date.now() - meta.fetchedAt) < 5 * 60 * 1000;
+      } catch { return false; }
+    }).catch(() => false),
+  ]);
+  const rankingPresent = rankingLen > 0;
+  if (rankingPresent && !metaFresh) {
+    console.warn(`[resilience-scores] Partial publish: ranking:v9 present but seed-meta not fresh — next cron will retry (handler SET is idempotent)`);
+  }
+  return rankingPresent;
 }
+
+// The seeder does NOT write seed-meta:resilience:ranking. Previously it did,
+// as a "heartbeat" when Pro traffic was quiet — but it could only attest to
+// "recordCount of per-country scores", not to whether `resilience:ranking:v9`
+// was actually published this cron. The ranking handler gates its SET on a
+// 75% coverage threshold and skips both the ranking and its meta when the
+// gate fails; a stale-but-present ranking key combined with a fresh seeder
+// meta write was exactly the "meta says fresh, data is stale" failure mode
+// this PR exists to eliminate. The handler is now the sole writer of meta,
+// and it writes both keys atomically via the same pipeline only when coverage
+// passes. refreshRankingAggregate() triggers the handler every cron so meta
+// never goes silently stale during quiet Pro usage — which was the original
+// reason the seeder meta write existed.
 
 async function main() {
   const startedAt = Date.now();
@@ -339,8 +332,10 @@ async function main() {
     ...(result.reason != null && { reason: result.reason }),
     ...(result.intervalsWritten != null && { intervalsWritten: result.intervalsWritten }),
   });
-  if (!result.skipped && (result.recordCount ?? 0) > 0) {
-    await writeRankingSeedMeta(result.recordCount);
+  if (!result.skipped && (result.recordCount ?? 0) > 0 && !result.rankingPresent) {
+    // Observability only — seeder never writes seed-meta. Health will flag the
+    // stale meta on its own if this persists across multiple cron ticks.
+    console.warn('[resilience-scores] resilience:ranking:v9 absent after rebuild attempt; handler-side coverage gate likely tripped. Next cron will retry.');
   }
 }
 

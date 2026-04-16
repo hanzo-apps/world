@@ -263,6 +263,126 @@ describe('resilience ranking contracts', () => {
     }
   });
 
+  it('?refresh=1 is rejected without a valid X-WorldMonitor-Key (Pro bearer token is NOT enough)', async () => {
+    // A full warm is expensive (~222 score computations + chunked pipeline
+    // SETs). Allowing any Pro user to loop on ?refresh=1 would DoS Upstash
+    // and Edge budget. refresh must be seed-service only — validated against
+    // WORLDMONITOR_VALID_KEYS / WORLDMONITOR_API_KEY.
+    const prevValidKeys = process.env.WORLDMONITOR_VALID_KEYS;
+    const prevApiKey = process.env.WORLDMONITOR_API_KEY;
+    process.env.WORLDMONITOR_VALID_KEYS = 'seed-secret';
+    delete process.env.WORLDMONITOR_API_KEY;
+    try {
+      const { redis } = installRedis({ ...RESILIENCE_FIXTURES });
+      redis.set('resilience:static:index:v1', JSON.stringify({
+        countries: ['NO', 'US'],
+        recordCount: 2,
+        failedDatasets: [],
+        seedYear: 2026,
+      }));
+      const stale = { items: [{ countryCode: 'ZZ', overallScore: 1, level: 'low', lowConfidence: true, overallCoverage: 0.5 }], greyedOut: [] };
+      redis.set('resilience:ranking:v9', JSON.stringify(stale));
+
+      // No X-WorldMonitor-Key → refresh must be ignored, stale cache returned.
+      const unauth = new Request('https://example.com/api/resilience/v1/get-resilience-ranking?refresh=1');
+      const unauthResp = await getResilienceRanking({ request: unauth } as never, {});
+      assert.equal(unauthResp.items.length, 1);
+      assert.equal(unauthResp.items[0]?.countryCode, 'ZZ', 'refresh=1 without key must fall back to cached response');
+
+      // Wrong key → same as no key.
+      const wrongKey = new Request('https://example.com/api/resilience/v1/get-resilience-ranking?refresh=1', {
+        headers: { 'X-WorldMonitor-Key': 'bogus' },
+      });
+      const wrongResp = await getResilienceRanking({ request: wrongKey } as never, {});
+      assert.equal(wrongResp.items[0]?.countryCode, 'ZZ', 'refresh=1 with wrong key must fall back to cached response');
+
+      // Valid seed key → refresh is honored, ZZ is NOT in the recomputed response.
+      const authed = new Request('https://example.com/api/resilience/v1/get-resilience-ranking?refresh=1', {
+        headers: { 'X-WorldMonitor-Key': 'seed-secret' },
+      });
+      const authedResp = await getResilienceRanking({ request: authed } as never, {});
+      const codes = (authedResp.items.concat(authedResp.greyedOut ?? [])).map((i) => i.countryCode);
+      assert.ok(!codes.includes('ZZ'), 'refresh=1 with valid seed key must recompute');
+    } finally {
+      if (prevValidKeys == null) delete process.env.WORLDMONITOR_VALID_KEYS;
+      else process.env.WORLDMONITOR_VALID_KEYS = prevValidKeys;
+      if (prevApiKey == null) delete process.env.WORLDMONITOR_API_KEY;
+      else process.env.WORLDMONITOR_API_KEY = prevApiKey;
+    }
+  });
+
+  it('?refresh=1 bypasses the cache-hit early-return and recomputes the ranking (with valid seed key)', async () => {
+    // Seeder uses ?refresh=1 on the unconditional per-cron rebuild. Without
+    // this bypass, the seeder would have to DEL the ranking before rebuild
+    // (the old flow) — a failed rebuild would then leave the key absent
+    // instead of stale-but-present.
+    const prevValidKeys = process.env.WORLDMONITOR_VALID_KEYS;
+    process.env.WORLDMONITOR_VALID_KEYS = 'seed-secret';
+    try {
+      const { redis } = installRedis({ ...RESILIENCE_FIXTURES });
+      redis.set('resilience:static:index:v1', JSON.stringify({
+        countries: ['NO', 'US'],
+        recordCount: 2,
+        failedDatasets: [],
+        seedYear: 2026,
+      }));
+      // Seed a pre-existing ranking so the cache-hit early-return would
+      // normally fire. ?refresh=1 (with valid seed key) must ignore it.
+      const stale = { items: [{ countryCode: 'ZZ', overallScore: 1, level: 'low', lowConfidence: true, overallCoverage: 0.5 }], greyedOut: [] };
+      redis.set('resilience:ranking:v9', JSON.stringify(stale));
+
+      const request = new Request('https://example.com/api/resilience/v1/get-resilience-ranking?refresh=1', {
+        headers: { 'X-WorldMonitor-Key': 'seed-secret' },
+      });
+      const response = await getResilienceRanking({ request } as never, {});
+
+      const returnedCountries = response.items.concat(response.greyedOut ?? []).map((i) => i.countryCode);
+      assert.ok(!returnedCountries.includes('ZZ'), 'refresh=1 must recompute, not return the stale cached ZZ entry');
+      assert.ok(returnedCountries.includes('NO') || returnedCountries.includes('US'), 'recomputed ranking must reflect the current static index');
+    } finally {
+      if (prevValidKeys == null) delete process.env.WORLDMONITOR_VALID_KEYS;
+      else process.env.WORLDMONITOR_VALID_KEYS = prevValidKeys;
+    }
+  });
+
+  it('warms via batched pipeline SETs (avoids 600KB single-pipeline timeout)', async () => {
+    // The 5s pipeline timeout would fail on a 222-SET pipeline (~600KB body)
+    // and the persistence guard would correctly return empty → no ranking.
+    // Splitting into smaller batches keeps each pipeline well under timeout.
+    // We assert the SET path uses MULTIPLE pipelines, not one giant one.
+    const { redis, fetchImpl } = installRedis({ ...RESILIENCE_FIXTURES });
+    redis.set('resilience:static:index:v1', JSON.stringify({
+      countries: ['NO', 'US', 'YE'],
+      recordCount: 3,
+      failedDatasets: [],
+      seedYear: 2026,
+    }));
+
+    const setPipelineSizes: number[] = [];
+    const observing = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/pipeline') && typeof init?.body === 'string') {
+        const commands = JSON.parse(init.body) as Array<Array<string>>;
+        const isAllScoreSets = commands.length > 0 && commands.every(
+          (cmd) => cmd[0] === 'SET' && typeof cmd[1] === 'string' && (cmd[1] as string).includes('resilience:score:v9:'),
+        );
+        if (isAllScoreSets) setPipelineSizes.push(commands.length);
+      }
+      return fetchImpl(input, init);
+    }) as typeof fetch;
+    globalThis.fetch = observing;
+
+    await getResilienceRanking({ request: new Request('https://example.com') } as never, {});
+
+    // For 3 countries the batch fits in one pipeline. The contract under test
+    // is that no single pipeline exceeds the SET_BATCH bound (30) — would-be
+    // 222-element pipelines must be split into multiple smaller ones.
+    assert.ok(setPipelineSizes.length > 0, 'warm must issue at least one score-SET pipeline');
+    for (const size of setPipelineSizes) {
+      assert.ok(size <= 30, `each score-SET pipeline must be ≤30 commands; saw ${size}`);
+    }
+  });
+
   it('does NOT publish ranking when score-key /set writes silently fail (persistence guard)', async () => {
     // Reviewer regression: trusting in-memory warm results without verifying
     // persistence turned a read-lag fix into a write-failure false positive.
