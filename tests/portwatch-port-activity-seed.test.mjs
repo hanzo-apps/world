@@ -44,9 +44,32 @@ describe('seed-portwatch-port-activity.mjs exports', () => {
     assert.match(src, /body\.exceededTransferLimit/);
   });
 
-  it('Endpoint 4 query uses per-country ISO3 filter', () => {
+  it('Endpoint 4 query fetches all ports globally with where=1=1', () => {
     assert.match(src, /PortWatch_ports_database/);
-    assert.match(src, /ISO3=/);
+    assert.match(src, /where:\s*'1=1'/);
+    assert.match(src, /outFields:\s*'portid,ISO3,lat,lon'/);
+  });
+
+  it('Endpoint 3 activity query still filters per-country ISO3', () => {
+    assert.match(src, /where:\s*`ISO3='\$\{iso3\}'\s+AND\s+date\s*>/);
+  });
+
+  it('concurrency is bumped to 12', () => {
+    assert.match(src, /CONCURRENCY\s*=\s*12/);
+  });
+
+  it('registers SIGTERM handler for graceful shutdown', () => {
+    assert.match(src, /process\.on\('SIGTERM'/);
+  });
+
+  it('pagination advances by actual features.length, not PAGE_SIZE', () => {
+    // ArcGIS PortWatch_ports_database caps responses at 1000 rows even when
+    // resultRecordCount=2000. Advancing by PAGE_SIZE skips rows 1000-1999.
+    // Guard: no 'offset += PAGE_SIZE' anywhere in the file, both loops use
+    // 'offset += features.length'.
+    assert.doesNotMatch(src, /offset\s*\+=\s*PAGE_SIZE/);
+    const matches = src.match(/offset\s*\+=\s*features\.length/g) ?? [];
+    assert.ok(matches.length >= 2, `expected both paginators to advance by features.length, found ${matches.length}`);
   });
 
   it('anomalySignal computation is present', () => {
