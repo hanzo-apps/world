@@ -190,6 +190,13 @@ const STANDALONE_KEYS = {
   goldExtended:             'market:gold-extended:v1',
   goldEtfFlows:             'market:gold-etf-flows:v1',
   goldCbReserves:           'market:gold-cb-reserves:v1',
+  // Relay-side loop heartbeats. ais-relay.cjs writes these on successful child
+  // exit for the two execFile-spawned seeders (chokepoint-flows, climate-news).
+  // A stale heartbeat means the relay loop itself is broken (child dying at
+  // import, parent event-loop blocked, container in a restart loop, etc.)
+  // and alarms earlier than the underlying seed-meta staleness window.
+  chokepointFlowsRelayHeartbeat: 'relay:heartbeat:chokepoint-flows',
+  climateNewsRelayHeartbeat:     'relay:heartbeat:climate-news',
 };
 
 const SEED_META = {
@@ -350,6 +357,12 @@ const SEED_META = {
   aaiiSentiment:        { key: 'seed-meta:market:aaii-sentiment',       maxStaleMin: 20160 }, // weekly cron; 20160min = 14 days = 2x weekly cadence
   portwatchChokepointsRef: { key: 'seed-meta:portwatch:chokepoints-ref', maxStaleMin: 60 * 24 * 14 }, // seed-bundle-portwatch runs this at WEEK cadence; 14d = 2× interval
   chokepointFlows:      { key: 'seed-meta:energy:chokepoint-flows',     maxStaleMin: 720 }, // 6h cron; 720min = 2x interval
+  // Relay-side heartbeat written by ais-relay.cjs on successful child exit.
+  // Detects "relay loop fires but child dies at import/runtime" failures
+  // (e.g. ERR_MODULE_NOT_FOUND from a missing Dockerfile COPY) 4h earlier
+  // than the 720min seed-meta threshold above. TTL is 18h on the writer.
+  chokepointFlowsRelayHeartbeat: { key: 'relay:heartbeat:chokepoint-flows', maxStaleMin: 480 }, // 6h loop; 8h alarm
+  climateNewsRelayHeartbeat:     { key: 'relay:heartbeat:climate-news',     maxStaleMin: 60 },  // 30m loop; 60m alarm
   emberElectricity:     { key: 'seed-meta:energy:ember',                maxStaleMin: 2880 }, // daily cron (08:00 UTC); 2880min = 48h = 2x interval
   cryptoSectors:        { key: 'seed-meta:market:crypto-sectors',             maxStaleMin: 120 }, // relay loop every ~30min; 120min = 2h = 4x interval
   ddosAttacks:          { key: 'seed-meta:cf:radar:ddos',                    maxStaleMin: 60 }, // written by seed-internet-outages afterPublish; outages cron ~15min; 60 = 4x interval
@@ -392,6 +405,16 @@ const ON_DEMAND_KEYS = new Set([
   'hyperliquidFlow', // TRANSITIONAL: seed-hyperliquid-flow runs inside seed-bundle-market-backup on
                      // Railway; gate as on-demand so initial deploy-order race or first cold-start
                      // snapshot doesn't CRIT. Remove after ~7 days of clean production cron runs.
+  'chokepointFlowsRelayHeartbeat', // TRANSITIONAL (PR #3133): ais-relay.cjs writes this on the
+                                   // first successful child exit after a deploy. Vercel deploys
+                                   // api/health.js instantly, but Railway rebuild + 6h initial
+                                   // loop interval means the key is absent for up to ~6h post-merge.
+                                   // Gate as on-demand so the deploy window doesn't CRIT. Remove
+                                   // after ~7 days of clean production runs (verify via
+                                   // `relay:heartbeat:chokepoint-flows.fetchedAt`).
+  'climateNewsRelayHeartbeat',     // TRANSITIONAL (PR #3133): same deploy-order rationale.
+                                   // 30min initial loop, so window is shorter but still present.
+                                   // Remove after ~7 days alongside the chokepoint-flows entry.
 ]);
 
 // Keys where 0 records is a valid healthy state (e.g. no airports closed,
