@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Bundle orchestrator: spawns multiple seed scripts sequentially
- * via child_process.execFile, with freshness-gated skipping.
- *
- * Pattern matches ais-relay.cjs:5645-5695 (ClimateNews/ChokepointFlows spawns).
+ * Bundle orchestrator: spawns multiple seed scripts sequentially via
+ * child_process.spawn, with line-streamed stdio, SIGTERM→SIGKILL escalation on
+ * timeout, and freshness-gated skipping. Streaming matters because a hanging
+ * section would otherwise buffer its logs until exit and look like a silent
+ * container crash (see PR that replaced execFile).
  *
  * Usage from a bundle script:
  *   import { runBundle } from './_bundle-runner.mjs';
@@ -20,7 +21,7 @@
  * broken by adopting the runner.
  */
 
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvFile } from './_seed-utils.mjs';
@@ -83,30 +84,81 @@ async function readSectionFreshness(section) {
   return null;
 }
 
+// Stream child stdio line-by-line so hung sections surface progress instead of
+// looking like a silent crash. Escalate SIGTERM → SIGKILL on timeout so child
+// processes with in-flight HTTPS sockets can't outlive the deadline.
+const KILL_GRACE_MS = 10_000;
+
+function streamLines(stream, onLine) {
+  let buf = '';
+  stream.setEncoding('utf8');
+  stream.on('data', (chunk) => {
+    buf += chunk;
+    let idx;
+    while ((idx = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, idx);
+      buf = buf.slice(idx + 1);
+      if (line) onLine(line);
+    }
+  });
+  stream.on('end', () => { if (buf) onLine(buf); });
+  // Child-stdio `error` is rare (SIGKILL emits `end`), but Node throws on an
+  // unhandled `error` event. Log it instead of crashing the runner.
+  stream.on('error', (err) => onLine(`<stdio error: ${err.message}>`));
+}
+
 function spawnSeed(scriptPath, { timeoutMs, label }) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const t0 = Date.now();
-    execFile(process.execPath, [scriptPath], {
+    const child = spawn(process.execPath, [scriptPath], {
       env: process.env,
-      timeout: timeoutMs,
-      maxBuffer: 2 * 1024 * 1024,
-    }, (err, stdout, stderr) => {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    streamLines(child.stdout, (line) => console.log(`  [${label}] ${line}`));
+    streamLines(child.stderr, (line) => console.warn(`  [${label}] ${line}`));
+
+    let settled = false;
+    let timedOut = false;
+    let killTimer = null;
+    // Fire the terminal "Failed ... timeout" log the moment we decide to kill,
+    // BEFORE the SIGTERM→SIGKILL grace window. This guarantees the reason
+    // reaches the log stream even if the container itself is killed during
+    // the grace period (Railway's ~10min cap can land inside the grace for
+    // sections whose timeoutMs is close to 10min).
+    const softKill = setTimeout(() => {
+      timedOut = true;
+      const elapsedAtTimeout = ((Date.now() - t0) / 1000).toFixed(1);
+      console.error(`  [${label}] Failed after ${elapsedAtTimeout}s: timeout after ${Math.round(timeoutMs / 1000)}s — sending SIGTERM`);
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => {
+        console.warn(`  [${label}] Did not exit on SIGTERM within ${KILL_GRACE_MS / 1000}s — sending SIGKILL`);
+        child.kill('SIGKILL');
+      }, KILL_GRACE_MS);
+    }, timeoutMs);
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(softKill);
+      if (killTimer) clearTimeout(killTimer);
+      resolve(value);
+    };
+
+    child.on('error', (err) => {
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-      if (stdout) {
-        for (const line of String(stdout).trim().split('\n')) {
-          if (line) console.log(`  [${label}] ${line}`);
-        }
-      }
-      if (stderr) {
-        for (const line of String(stderr).trim().split('\n')) {
-          if (line) console.warn(`  [${label}] ${line}`);
-        }
-      }
-      if (err) {
-        const reason = err.killed ? 'timeout' : (err.code || err.message);
-        reject(new Error(`${label} failed after ${elapsed}s: ${reason}`));
+      console.error(`  [${label}] Failed after ${elapsed}s: spawn error: ${err.message}`);
+      settle({ elapsed, ok: false, reason: `spawn error: ${err.message}`, alreadyLogged: true });
+    });
+
+    child.on('close', (code, signal) => {
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      if (timedOut) {
+        // Terminal reason already logged by softKill — just record the outcome.
+        settle({ elapsed, ok: false, reason: `timeout after ${Math.round(timeoutMs / 1000)}s (signal ${signal || 'SIGTERM'})`, alreadyLogged: true });
+      } else if (code === 0) {
+        settle({ elapsed, ok: true });
       } else {
-        resolve({ elapsed });
+        settle({ elapsed, ok: false, reason: `exit ${code ?? 'null'}${signal ? ` (signal ${signal})` : ''}` });
       }
     });
   });
@@ -149,20 +201,25 @@ export async function runBundle(label, sections, opts = {}) {
     }
 
     const elapsedBundle = Date.now() - t0;
-    if (elapsedBundle + timeout > maxBundleMs) {
+    // Worst-case runtime is timeoutMs + KILL_GRACE_MS (child may ignore SIGTERM
+    // and need SIGKILL after grace). Admit only when the full worst-case fits.
+    const worstCase = timeout + KILL_GRACE_MS;
+    if (elapsedBundle + worstCase > maxBundleMs) {
       const remainingSec = Math.max(0, Math.round((maxBundleMs - elapsedBundle) / 1000));
-      const timeoutSec = Math.round(timeout / 1000);
-      console.log(`  [${section.label}] Deferred, needs ${timeoutSec}s but only ${remainingSec}s left in bundle budget`);
+      const needSec = Math.round(worstCase / 1000);
+      console.log(`  [${section.label}] Deferred, needs ${needSec}s (timeout+grace) but only ${remainingSec}s left in bundle budget`);
       deferred++;
       continue;
     }
 
-    try {
-      const result = await spawnSeed(scriptPath, { timeoutMs: timeout, label: section.label });
+    const result = await spawnSeed(scriptPath, { timeoutMs: timeout, label: section.label });
+    if (result.ok) {
       console.log(`  [${section.label}] Done (${result.elapsed}s)`);
       ran++;
-    } catch (err) {
-      console.error(`  [${section.label}] ${err.message}`);
+    } else {
+      if (!result.alreadyLogged) {
+        console.error(`  [${section.label}] Failed after ${result.elapsed}s: ${result.reason}`);
+      }
       failed++;
     }
   }
