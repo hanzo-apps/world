@@ -17,12 +17,13 @@ export const setChannelForUser = internalMutation({
     userId: v.string(),
     channelType: channelTypeValidator,
     chatId: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
     webhookEnvelope: v.optional(v.string()),
     email: v.optional(v.string()),
     webhookLabel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, channelType, chatId, webhookEnvelope, email, webhookLabel } = args;
+    const { userId, channelType, chatId, phoneNumber, webhookEnvelope, email, webhookLabel } = args;
     const existing = await ctx.db
       .query("notificationChannels")
       .withIndex("by_user_channel", (q) =>
@@ -34,6 +35,10 @@ export const setChannelForUser = internalMutation({
     if (channelType === "telegram") {
       if (!chatId) throw new ConvexError("chatId required for telegram channel");
       const doc = { userId, channelType: "telegram" as const, chatId, verified: true, linkedAt: now };
+      if (existing) { await ctx.db.replace(existing._id, doc); } else { await ctx.db.insert("notificationChannels", doc); }
+    } else if (channelType === "whatsapp") {
+      if (!phoneNumber) throw new ConvexError("phoneNumber required for whatsapp channel");
+      const doc = { userId, channelType: "whatsapp" as const, phoneNumber, verified: true, linkedAt: now };
       if (existing) { await ctx.db.replace(existing._id, doc); } else { await ctx.db.insert("notificationChannels", doc); }
     } else if (channelType === "slack") {
       if (!webhookEnvelope) throw new ConvexError("webhookEnvelope required for slack channel");
@@ -185,6 +190,7 @@ export const setChannel = mutation({
   args: {
     channelType: channelTypeValidator,
     chatId: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
     webhookEnvelope: v.optional(v.string()),
     email: v.optional(v.string()),
     webhookLabel: v.optional(v.string()),
@@ -206,6 +212,14 @@ export const setChannel = mutation({
     if (args.channelType === "telegram") {
       if (!args.chatId) throw new ConvexError("chatId required for telegram channel");
       const doc = { userId, channelType: "telegram" as const, chatId: args.chatId, verified: true, linkedAt: now };
+      if (existing) {
+        await ctx.db.replace(existing._id, doc);
+      } else {
+        await ctx.db.insert("notificationChannels", doc);
+      }
+    } else if (args.channelType === "whatsapp") {
+      if (!args.phoneNumber) throw new ConvexError("phoneNumber required for whatsapp channel");
+      const doc = { userId, channelType: "whatsapp" as const, phoneNumber: args.phoneNumber, verified: true, linkedAt: now };
       if (existing) {
         await ctx.db.replace(existing._id, doc);
       } else {

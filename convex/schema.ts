@@ -41,6 +41,13 @@ export default defineSchema({
       }),
       v.object({
         userId: v.string(),
+        channelType: v.literal("whatsapp"),
+        phoneNumber: v.string(),
+        verified: v.boolean(),
+        linkedAt: v.number(),
+      }),
+      v.object({
+        userId: v.string(),
         channelType: v.literal("slack"),
         webhookEnvelope: v.string(),
         verified: v.boolean(),
