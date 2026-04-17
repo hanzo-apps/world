@@ -1,7 +1,7 @@
 import { getClerkToken } from '@/services/clerk';
 import { SITE_VARIANT } from '@/config/variant';
 
-export type ChannelType = 'telegram' | 'slack' | 'email' | 'discord' | 'webhook';
+export type ChannelType = 'telegram' | 'whatsapp' | 'slack' | 'email' | 'discord' | 'webhook';
 export type Sensitivity = 'all' | 'high' | 'critical';
 export type QuietHoursOverride = 'critical_only' | 'silence_all' | 'batch_on_wake';
 export type DigestMode = 'realtime' | 'daily' | 'twice_daily' | 'weekly';
@@ -11,6 +11,7 @@ export interface NotificationChannel {
   verified: boolean;
   linkedAt: number;
   chatId?: string;
+  phoneNumber?: string;
   email?: string;
   slackChannelName?: string;
   slackTeamName?: string;
@@ -71,6 +72,15 @@ export async function createPairingToken(): Promise<{ token: string; expiresAt: 
   });
   if (!res.ok) throw new Error(`create pairing token: ${res.status}`);
   return res.json();
+}
+
+export async function setWhatsAppChannel(phoneNumber: string): Promise<void> {
+  const res = await authFetch('/api/notification-channels', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set-channel', channelType: 'whatsapp', phoneNumber }),
+  });
+  if (!res.ok) throw new Error(`set whatsapp channel: ${res.status}`);
 }
 
 export async function setEmailChannel(email: string): Promise<void> {

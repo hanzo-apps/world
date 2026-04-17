@@ -58,10 +58,10 @@ function htmlVariantPlugin(activeMeta: VariantMeta, activeVariant: string, isDes
         .replace(/<meta name="twitter:url" content=".*?" \/>/, `<meta name="twitter:url" content="${activeMeta.url}" />`)
         .replace(/<meta name="twitter:title" content=".*?" \/>/, `<meta name="twitter:title" content="${activeMeta.title}" />`)
         .replace(/<meta name="twitter:description" content=".*?" \/>/, `<meta name="twitter:description" content="${activeMeta.description}" />`)
-        .replace(/"name": "World Monitor"/, `"name": "${activeMeta.siteName}"`)
-        .replace(/"alternateName": "WorldMonitor"/, `"alternateName": "${activeMeta.siteName.replace(' ', '')}"`)
-        .replace(/"url": "https:\/\/worldmonitor\.app\/"/, `"url": "${activeMeta.url}"`)
-        .replace(/"description": "Real-time global intelligence dashboard with live news, markets, military tracking, infrastructure monitoring, and geopolitical data."/, `"description": "${activeMeta.description}"`)
+        .replace(/"name": "Hanzo World"/, `"name": "${activeMeta.siteName}"`)
+        .replace(/"alternateName": \["HanzoWorld"/, `"alternateName": ["${activeMeta.siteName.replace(' ', '')}"`)
+        .replace(/"url": "https:\/\/world\.hanzo\.ai\/"/, `"url": "${activeMeta.url}"`)
+        .replace(/"description": "Real-time global intelligence dashboard by Hanzo AI\. Aggregates conflicts, military movements, markets, infrastructure, and geopolitical data\."/, `"description": "${activeMeta.description}"`)
         .replace(/"featureList": \[[\s\S]*?\]/, `"featureList": ${JSON.stringify(activeMeta.features, null, 8).replace(/\n/g, '\n      ')}`);
 
       // Theme-color meta — warm cream for happy variant
@@ -852,9 +852,9 @@ export default defineConfig(({ mode }) => {
         ],
       },
       proxy: {
-        // Widget agent — forward to Railway relay for SSE streaming
+        // Widget agent — forward to relay for SSE streaming
         '/widget-agent': {
-          target: 'https://proxy.worldmonitor.app',
+          target: 'https://proxy.world.hanzo.ai',
           changeOrigin: true,
         },
         // Yahoo Finance API
