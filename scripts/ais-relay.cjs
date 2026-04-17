@@ -403,6 +403,19 @@ function envelopeWrite(key, data, ttlSeconds, meta) {
   return upstashSet(key, envelope, ttlSeconds);
 }
 
+// Envelope-aware read. Mirrors server/_shared/redis.ts::getCachedJson semantics:
+// returns the bare payload for contract-mode canonical keys ({_seed, data}) and
+// passes legacy shapes through unchanged. MUST be used for any seeded canonical
+// key — reading raw via upstashGet() on an enveloped key iterates {_seed, data}
+// as payload keys and silently corrupts downstream consumers.
+async function envelopeRead(key) {
+  const raw = await upstashGet(key);
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && '_seed' in raw && 'data' in raw) {
+    return raw.data;
+  }
+  return raw;
+}
+
 function notifySimpleHash(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
@@ -1198,7 +1211,10 @@ async function orefBootstrapHistoryWithRetry() {
 
   // Phase 1: try Redis first
   try {
-    const cached = await upstashGet(OREF_REDIS_KEY);
+    // envelopeRead unwraps the {_seed, data} shape written by orefPersistHistory()
+    // at line 1133. Reading raw left cached.history undefined, so OREF state was
+    // never restored across relay restarts (reported in PR #3139 review).
+    const cached = await envelopeRead(OREF_REDIS_KEY);
     if (cached && Array.isArray(cached.history) && cached.history.length > 0) {
       const valid = cached.history.every(
         h => Array.isArray(h.alerts) && typeof h.timestamp === 'string'
@@ -5879,7 +5895,7 @@ const WSB_TICKER_SET_CACHE_TTL_MS = 30 * 60 * 1000; // refresh known ticker set 
 async function loadWsbTickerSet() {
   if (wsbTickerSetCache && (Date.now() - wsbTickerSetCacheTs < WSB_TICKER_SET_CACHE_TTL_MS)) return wsbTickerSetCache;
   try {
-    const data = await upstashGet('market:stocks-bootstrap:v1');
+    const data = await envelopeRead('market:stocks-bootstrap:v1');
     if (data && Array.isArray(data.quotes)) {
       wsbTickerSetCache = new Set(data.quotes.map(s => s.symbol?.toUpperCase()).filter(Boolean));
       wsbTickerSetCacheTs = Date.now();
@@ -7353,11 +7369,11 @@ function detectTrafficAnomalyRelay(history, threatLevel) {
 }
 
 async function seedTransitSummaries() {
-  const pw = await upstashGet(PORTWATCH_REDIS_KEY);
+  const pw = await envelopeRead(PORTWATCH_REDIS_KEY);
   if (!pw || typeof pw !== 'object' || Object.keys(pw).length === 0) return;
 
   if (!latestCorridorRiskData) {
-    const persisted = await upstashGet(CORRIDOR_RISK_REDIS_KEY);
+    const persisted = await envelopeRead(CORRIDOR_RISK_REDIS_KEY);
     if (persisted && typeof persisted === 'object' && Object.keys(persisted).length > 0) {
       latestCorridorRiskData = persisted;
       console.log(`[TransitSummary] Hydrated CorridorRisk from Redis (${Object.keys(persisted).length} corridors)`);

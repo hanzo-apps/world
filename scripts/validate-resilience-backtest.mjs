@@ -22,6 +22,7 @@
  */
 
 import { getRedisCredentials, loadEnvFile } from './_seed-utils.mjs';
+import { unwrapEnvelope } from './_seed-envelope-source.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -111,7 +112,11 @@ async function redisGetJson(url, token, key) {
   if (!resp.ok) return null;
   const data = await resp.json();
   if (!data?.result) return null;
-  try { return JSON.parse(data.result); } catch { return null; }
+  try {
+    // Envelope-aware: unwrapEnvelope returns bare payload for contract-mode
+    // {_seed, data} shapes (PR #3097) and passes legacy raw payloads through.
+    return unwrapEnvelope(JSON.parse(data.result)).data;
+  } catch { return null; }
 }
 
 async function redisPipeline(url, token, commands) {

@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveIso2 } from './_country-resolver.mjs';
 import { getRedisCredentials, loadEnvFile } from './_seed-utils.mjs';
+import { unwrapEnvelope } from './_seed-envelope-source.mjs';
 
 // Normalize any country identifier the upstream seeders emit (ISO2, ISO3, or
 // full English name) to canonical uppercase ISO2, or null when unrecognized.
@@ -157,7 +158,9 @@ async function redisGetJson(url, token, key) {
   const data = await resp.json();
   if (!data?.result) return null;
   try {
-    return JSON.parse(data.result);
+    // Envelope-aware: unwrapEnvelope returns bare payload for contract-mode
+    // {_seed, data} shapes (PR #3097) and passes legacy raw payloads through.
+    return unwrapEnvelope(JSON.parse(data.result)).data;
   } catch {
     return typeof data.result === 'string' ? data.result : null;
   }
