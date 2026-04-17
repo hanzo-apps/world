@@ -634,6 +634,103 @@ http.route({
   }),
 });
 
+// ---------------------------------------------------------------------------
+// User API key validation (service-to-service only)
+// ---------------------------------------------------------------------------
+
+// Service-to-service: validate a user API key by its SHA-256 hash.
+// Called by the Vercel edge gateway to look up user-owned keys.
+http.route({
+  path: "/api/internal-validate-api-key",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const providedSecret = request.headers.get("x-convex-shared-secret") ?? "";
+    const expectedSecret = process.env.CONVEX_SERVER_SHARED_SECRET ?? "";
+    if (!expectedSecret || !(await timingSafeEqualStrings(providedSecret, expectedSecret))) {
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let body: { keyHash?: unknown };
+    try {
+      body = await request.json() as { keyHash?: unknown };
+    } catch {
+      return new Response(JSON.stringify({ error: "INVALID_JSON" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (typeof body.keyHash !== "string" || body.keyHash.length === 0) {
+      return new Response(JSON.stringify({ error: "MISSING_KEY_HASH" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const result = await ctx.runQuery(
+      (internal as any).apiKeys.validateKeyByHash,
+      { keyHash: body.keyHash },
+    );
+
+    if (result) {
+      // Fire-and-forget: update lastUsedAt (don't await, don't block response)
+      void ctx.runMutation((internal as any).apiKeys.touchKeyLastUsed, { keyId: result.id });
+    }
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
+// Service-to-service: look up the owner of a key by hash (regardless of revoked status).
+// Used by the cache-invalidation endpoint to verify tenancy boundaries.
+http.route({
+  path: "/api/internal-get-key-owner",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const providedSecret = request.headers.get("x-convex-shared-secret") ?? "";
+    const expectedSecret = process.env.CONVEX_SERVER_SHARED_SECRET ?? "";
+    if (!expectedSecret || !(await timingSafeEqualStrings(providedSecret, expectedSecret))) {
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let body: { keyHash?: unknown };
+    try {
+      body = await request.json() as { keyHash?: unknown };
+    } catch {
+      return new Response(JSON.stringify({ error: "INVALID_JSON" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (typeof body.keyHash !== "string" || !/^[a-f0-9]{64}$/.test(body.keyHash)) {
+      return new Response(JSON.stringify({ error: "INVALID_KEY_HASH" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const result = await ctx.runQuery(
+      (internal as any).apiKeys.getKeyOwner,
+      { keyHash: body.keyHash },
+    );
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 http.route({
   path: "/dodopayments-webhook",
   method: "POST",
