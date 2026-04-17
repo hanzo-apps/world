@@ -975,8 +975,7 @@ export class App {
     correlationEngine.registerAdapter(disasterAdapter);
     this.state.correlationEngine = correlationEngine;
     this.eventHandlers.setupUnifiedSettings();
-    // TODO: isProUser() gate should be removed when we are ready to get new users signing up
-    if (isProUser()) this.eventHandlers.setupAuthWidget();
+    this.eventHandlers.setupAuthWidget();
     const pendingCheckout = capturePendingCheckoutIntentFromUrl();
     if (pendingCheckout) {
       // Checkout intent from /pro page redirect. Resume immediately if
