@@ -8,6 +8,7 @@ import type { MapProvider } from '@/config/basemap';
 import { escapeHtml } from '@/utils/sanitize';
 import type { PanelConfig } from '@/types';
 import { renderPreferences } from '@/services/preferences-content';
+import { renderNotificationsSettings, type NotificationsSettingsResult } from '@/services/notifications-settings';
 import { getAuthState } from '@/services/auth-state';
 import { track } from '@/services/analytics';
 import { isEntitled } from '@/services/entitlements';
@@ -39,7 +40,7 @@ export interface UnifiedSettingsConfig {
   onMapProviderChange?: (provider: MapProvider) => void;
 }
 
-type TabId = 'settings' | 'panels' | 'sources' | 'api-keys';
+type TabId = 'settings' | 'panels' | 'sources' | 'notifications' | 'api-keys';
 
 export class UnifiedSettings {
   private overlay: HTMLElement;
@@ -51,6 +52,8 @@ export class UnifiedSettings {
   private panelFilter = '';
   private escapeHandler: (e: KeyboardEvent) => void;
   private prefsCleanup: (() => void) | null = null;
+  private notifCleanup: (() => void) | null = null;
+  private pendingNotifs: NotificationsSettingsResult | null = null;
   private draftPanelSettings: Record<string, PanelConfig> = {};
   private panelsJustSaved = false;
   private savedTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -224,6 +227,9 @@ export class UnifiedSettings {
     this.overlay.classList.remove('active');
     this.prefsCleanup?.();
     this.prefsCleanup = null;
+    this.notifCleanup?.();
+    this.notifCleanup = null;
+    this.pendingNotifs = null;
     this.resetPanelDraft();
     localStorage.removeItem('wm-settings-open');
     document.removeEventListener('keydown', this.escapeHandler);
@@ -248,6 +254,9 @@ export class UnifiedSettings {
     if (this.savedTimeout) clearTimeout(this.savedTimeout);
     this.prefsCleanup?.();
     this.prefsCleanup = null;
+    this.notifCleanup?.();
+    this.notifCleanup = null;
+    this.pendingNotifs = null;
     document.removeEventListener('keydown', this.escapeHandler);
     this.overlay.remove();
   }
@@ -255,13 +264,21 @@ export class UnifiedSettings {
   private render(): void {
     this.prefsCleanup?.();
     this.prefsCleanup = null;
+    this.notifCleanup?.();
+    this.notifCleanup = null;
+    this.pendingNotifs = null;
 
     const tabClass = (id: TabId) => `unified-settings-tab${this.activeTab === id ? ' active' : ''}`;
+    const isSignedIn = !this.config.isDesktopApp && (getAuthState().user !== null);
     const prefs = renderPreferences({
       isDesktopApp: this.config.isDesktopApp,
       onMapProviderChange: this.config.onMapProviderChange,
-      isSignedIn: !this.config.isDesktopApp && (getAuthState().user !== null),
+      isSignedIn,
     });
+    const showNotificationsTab = !this.config.isDesktopApp;
+    const notifs = showNotificationsTab
+      ? renderNotificationsSettings({ isSignedIn })
+      : null;
 
     this.overlay.innerHTML = `
       <div class="modal unified-settings-modal">
@@ -273,6 +290,7 @@ export class UnifiedSettings {
           <button class="${tabClass('settings')}" data-tab="settings" role="tab" aria-selected="${this.activeTab === 'settings'}" id="us-tab-settings" aria-controls="us-tab-panel-settings">${t('header.tabSettings')}</button>
           <button class="${tabClass('panels')}" data-tab="panels" role="tab" aria-selected="${this.activeTab === 'panels'}" id="us-tab-panels" aria-controls="us-tab-panel-panels">${t('header.tabPanels')}</button>
           <button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>
+          ${showNotificationsTab ? `<button class="${tabClass('notifications')}" data-tab="notifications" role="tab" aria-selected="${this.activeTab === 'notifications'}" id="us-tab-notifications" aria-controls="us-tab-panel-notifications">${t('header.tabNotifications')}</button>` : ''}
           ${getAuthState().user ? `<button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys</button>` : ''}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
@@ -307,6 +325,11 @@ export class UnifiedSettings {
             <button class="sources-select-none">${t('common.selectNone')}</button>
           </div>
         </div>
+        ${notifs ? `
+        <div class="unified-settings-tab-panel${this.activeTab === 'notifications' ? ' active' : ''}" data-panel-id="notifications" id="us-tab-panel-notifications" role="tabpanel" aria-labelledby="us-tab-notifications">
+          ${notifs.html}
+        </div>
+        ` : ''}
         ${getAuthState().user ? `
         <div class="unified-settings-tab-panel${this.activeTab === 'api-keys' ? ' active' : ''}" data-panel-id="api-keys" id="us-tab-panel-api-keys" role="tabpanel" aria-labelledby="us-tab-api-keys">
           <div class="api-keys-section">
@@ -332,6 +355,12 @@ export class UnifiedSettings {
     if (settingsPanel) {
       this.prefsCleanup = prefs.attach(settingsPanel as HTMLElement);
     }
+
+    // Defer notifications attach until the tab is first activated —
+    // otherwise Pro users pay a getChannelsData() fetch on every modal
+    // open even if they never visit this tab.
+    this.pendingNotifs = notifs;
+    if (this.activeTab === 'notifications') this.attachNotificationsTab();
 
     const closeBtn = this.overlay.querySelector<HTMLButtonElement>('.unified-settings-close');
     if (closeBtn) {
@@ -375,6 +404,18 @@ export class UnifiedSettings {
 
     if (tab === 'api-keys') {
       void this.loadApiKeys();
+    }
+
+    if (tab === 'notifications') {
+      this.attachNotificationsTab();
+    }
+  }
+
+  private attachNotificationsTab(): void {
+    if (this.notifCleanup || !this.pendingNotifs) return;
+    const notifPanel = this.overlay.querySelector('#us-tab-panel-notifications');
+    if (notifPanel) {
+      this.notifCleanup = this.pendingNotifs.attach(notifPanel as HTMLElement);
     }
   }
 
