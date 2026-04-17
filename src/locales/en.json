@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "World Monitor",
+    "title": "Hanzo World",
     "description": "Global Situation with AI Insights"
   },
   "widgets": {
@@ -39,12 +39,12 @@
     "phaseError": "Error",
     "previewCheckingHeading": "Connecting the widget builder",
     "previewReadyHeading": "Describe the widget you want",
-    "previewFetchingHeading": "Fetching live WorldMonitor data",
+    "previewFetchingHeading": "Fetching live Hanzo World data",
     "previewComposingHeading": "Composing the widget layout",
     "previewErrorHeading": "The preview needs attention",
     "previewCheckingCopy": "We are validating your widget key and backend availability before enabling generation.",
     "previewReadyCopy": "Use a prompt example or describe the exact live view you want. The preview will update here before you save it.",
-    "previewFetchingCopy": "The agent is calling approved WorldMonitor endpoints and shaping the dataset for the widget.",
+    "previewFetchingCopy": "The agent is calling approved Hanzo World endpoints and shaping the dataset for the widget.",
     "previewComposingCopy": "The preview is rendering with the latest live data and dashboard styling.",
     "previewErrorCopy": "Fix the issue, then retry. Your existing widgets are unaffected.",
     "createInteractive": "Create Interactive Widget",
@@ -655,7 +655,7 @@
       "sidecarUnreachable": "Sidecar not reachable.",
       "logCleared": "Log cleared.",
       "worldMonitor": {
-        "tabLabel": "World Monitor",
+        "tabLabel": "Hanzo World",
         "heroTitle": "One key. Everything included.",
         "heroDescription": "A single World Monitor license replaces every API key and LLM provider you'd otherwise configure yourself. AI summaries, real-time intelligence, market data, conflict tracking, fire detection, satellite imagery — all powered, all managed, zero setup.",
         "apiKey": {
