@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 export const channelTypeValidator = v.union(
   v.literal("telegram"),
+  v.literal("whatsapp"),
   v.literal("slack"),
   v.literal("email"),
   v.literal("discord"),

@@ -1,18 +1,18 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Tech Monitor",
-  "mainBinaryName": "tech-monitor",
-  "identifier": "app.worldmonitor.tech.desktop",
+  "productName": "Hanzo Tech",
+  "mainBinaryName": "hanzo-tech",
+  "identifier": "ai.hanzo.world.tech.desktop",
   "app": {
     "windows": [
       {
-        "title": "Tech Monitor"
+        "title": "Hanzo Tech"
       }
     ]
   },
   "bundle": {
-    "shortDescription": "Tech Monitor desktop app",
-    "longDescription": "Tech Monitor desktop app for real-time AI and technology intelligence.",
+    "shortDescription": "Hanzo Tech desktop app",
+    "longDescription": "Hanzo Tech desktop app for real-time AI and technology intelligence.",
     "targets": [
       "app",
       "dmg",

@@ -1,18 +1,18 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Finance Monitor",
-  "mainBinaryName": "finance-monitor",
-  "identifier": "app.worldmonitor.finance.desktop",
+  "productName": "Hanzo Finance",
+  "mainBinaryName": "hanzo-finance",
+  "identifier": "ai.hanzo.world.finance.desktop",
   "app": {
     "windows": [
       {
-        "title": "Finance Monitor"
+        "title": "Hanzo Finance"
       }
     ]
   },
   "bundle": {
-    "shortDescription": "Finance Monitor desktop app",
-    "longDescription": "Finance Monitor desktop app for real-time markets and trading intelligence.",
+    "shortDescription": "Hanzo Finance desktop app",
+    "longDescription": "Hanzo Finance desktop app for real-time markets and trading intelligence.",
     "targets": [
       "app",
       "dmg",
