@@ -78,8 +78,9 @@ describe('seedTransitSummaries (relay)', () => {
     assert.match(relaySrc, /\{\s*summaries,\s*fetchedAt:\s*now\s*\}/);
   });
 
-  it('PortWatch data is read directly from Redis each cycle', () => {
-    assert.match(relaySrc, /const pw = await upstashGet\(PORTWATCH_REDIS_KEY\)/);
+  it('PortWatch data is read via envelopeRead (unwraps {_seed, data} contract-mode shape)', () => {
+    assert.match(relaySrc, /const pw = await envelopeRead\(PORTWATCH_REDIS_KEY\)/);
+    assert.doesNotMatch(relaySrc, /const pw = await upstashGet\(PORTWATCH_REDIS_KEY\)/);
   });
 
   it('is triggered after CorridorRisk seed completes', () => {
@@ -504,31 +505,99 @@ describe('handler transit data strategy', () => {
 describe('seedTransitSummaries Redis reads', () => {
   it('always reads PortWatch fresh from Redis (no in-memory cache guard)', () => {
     assert.doesNotMatch(relaySrc, /if\s*\(\s*!latestPortwatchData\s*\)/);
-    assert.match(relaySrc, /upstashGet\(PORTWATCH_REDIS_KEY\)/);
+    assert.match(relaySrc, /envelopeRead\(PORTWATCH_REDIS_KEY\)/);
   });
 
   it('reads CorridorRisk from Redis when latestCorridorRiskData is null', () => {
     assert.match(relaySrc, /if\s*\(\s*!latestCorridorRiskData\s*\)/);
-    assert.match(relaySrc, /upstashGet\(CORRIDOR_RISK_REDIS_KEY\)/);
+    assert.match(relaySrc, /envelopeRead\(CORRIDOR_RISK_REDIS_KEY\)/);
     assert.match(relaySrc, /Hydrated CorridorRisk from Redis/);
+  });
+
+  it('PortWatch Redis read unwraps contract-mode envelope (reader parity with producer)', () => {
+    // Regression guard: PR #3097 migrated producers to {_seed, data}. A raw
+    // upstashGet iterates those wrapper keys as chokepoint IDs and silently
+    // zeroes the transit chart for every chokepoint.
+    assert.doesNotMatch(relaySrc, /const pw = await upstashGet\(PORTWATCH_REDIS_KEY\)/);
+    assert.doesNotMatch(relaySrc, /const persisted = await upstashGet\(CORRIDOR_RISK_REDIS_KEY\)/);
+  });
+
+  it('loadWsbTickerSet reads market:stocks-bootstrap:v1 via envelopeRead', () => {
+    // Regression guard (Greptile review PR #3139): market:stocks-bootstrap:v1 is
+    // written via envelopeWrite at lines 1867 + dual-write elsewhere. Reading raw
+    // left data.quotes undefined, silently disabling WSB ticker matching.
+    assert.match(relaySrc, /envelopeRead\('market:stocks-bootstrap:v1'\)/);
+    assert.doesNotMatch(relaySrc, /upstashGet\('market:stocks-bootstrap:v1'\)/);
+  });
+
+  it('OREF bootstrap reads OREF_REDIS_KEY via envelopeRead (parity with orefPersistHistory)', () => {
+    // Regression guard (Greptile review PR #3139): orefPersistHistory() writes via
+    // envelopeWrite. Reading raw left cached.history undefined, so OREF history
+    // was never restored across relay restarts — every cold start hit the
+    // upstream API unnecessarily.
+    assert.match(relaySrc, /const cached = await envelopeRead\(OREF_REDIS_KEY\)/);
+    assert.doesNotMatch(relaySrc, /const cached = await upstashGet\(OREF_REDIS_KEY\)/);
   });
 
   it('PortWatch Redis read is the first statement (before early return)', () => {
     const fnBody = relaySrc.match(/async function seedTransitSummaries\(\)\s*\{([\s\S]*?)\n\}/)?.[1] || '';
-    const readPos = fnBody.indexOf('upstashGet(PORTWATCH_REDIS_KEY)');
+    const readPos = fnBody.indexOf('envelopeRead(PORTWATCH_REDIS_KEY)');
     const earlyReturnPos = fnBody.indexOf('if (!pw ||');
-    assert.ok(readPos > 0, 'upstashGet(PORTWATCH_REDIS_KEY) not found in function body');
+    assert.ok(readPos > 0, 'envelopeRead(PORTWATCH_REDIS_KEY) not found in function body');
     assert.ok(earlyReturnPos > 0, 'pw early return not found');
     assert.ok(readPos < earlyReturnPos, 'Redis read must come before the early return');
   });
 
   it('PortWatch data is assigned directly from Redis (no stale in-memory cache)', () => {
     const fnBody = relaySrc.match(/async function seedTransitSummaries\(\)\s*\{([\s\S]*?)\n\}/)?.[1] || '';
-    assert.match(fnBody, /const pw = await upstashGet\(PORTWATCH_REDIS_KEY\)/);
+    assert.match(fnBody, /const pw = await envelopeRead\(PORTWATCH_REDIS_KEY\)/);
   });
 
   it('assigns hydrated data back to latestCorridorRiskData', () => {
     const fnBody = relaySrc.match(/async function seedTransitSummaries\(\)\s*\{([\s\S]*?)\n\}/)?.[1] || '';
     assert.match(fnBody, /latestCorridorRiskData\s*=\s*persisted/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// envelopeRead helper — runtime behavior (regression guard for PR #3097 drift)
+// ---------------------------------------------------------------------------
+describe('envelopeRead helper', () => {
+  // Extract and eval the helper — it is pure aside from upstashGet, which we stub.
+  const helperSrc = relaySrc.match(/async function envelopeRead\([\s\S]*?\n\}/)?.[0];
+
+  it('is defined in ais-relay.cjs next to envelopeWrite', () => {
+    assert.ok(helperSrc, 'envelopeRead not found in ais-relay.cjs');
+  });
+
+  function buildEnvelopeRead(stub) {
+    // eslint-disable-next-line no-new-func
+    return new Function('upstashGet', `${helperSrc}\nreturn envelopeRead;`)(stub);
+  }
+
+  it('unwraps contract-mode envelope {_seed, data} -> data', async () => {
+    const stub = async () => ({ _seed: { fetchedAt: 1 }, data: { hormuz_strait: { history: [1, 2, 3] } } });
+    const read = buildEnvelopeRead(stub);
+    const out = await read('supply_chain:portwatch:v1');
+    assert.deepEqual(out, { hormuz_strait: { history: [1, 2, 3] } });
+  });
+
+  it('passes legacy raw shape through unchanged', async () => {
+    const stub = async () => ({ hormuz_strait: { history: [1] }, suez: { history: [] } });
+    const read = buildEnvelopeRead(stub);
+    const out = await read('legacy:key');
+    assert.deepEqual(out, { hormuz_strait: { history: [1] }, suez: { history: [] } });
+  });
+
+  it('returns null when Redis returns null', async () => {
+    const stub = async () => null;
+    const read = buildEnvelopeRead(stub);
+    assert.equal(await read('missing:key'), null);
+  });
+
+  it('does NOT unwrap arrays that happen to have _seed/data indices', async () => {
+    const stub = async () => [1, 2, 3];
+    const read = buildEnvelopeRead(stub);
+    assert.deepEqual(await read('array:key'), [1, 2, 3]);
   });
 });
