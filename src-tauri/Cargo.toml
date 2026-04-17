@@ -1,8 +1,8 @@
 [package]
-name = "world-monitor"
+name = "hanzo-world"
 version = "2.6.7"
-description = "World Monitor desktop application"
-authors = ["World Monitor"]
+description = "Hanzo World desktop application"
+authors = ["Hanzo AI"]
 edition = "2021"
 
 [build-dependencies]
