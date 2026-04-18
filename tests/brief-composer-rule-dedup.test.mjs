@@ -13,7 +13,7 @@ import {
   dedupeRulesByUser,
   groupEligibleRulesByUser,
   shouldExitNonZero,
-} from '../scripts/seed-brief-composer.mjs';
+} from '../scripts/lib/brief-compose.mjs';
 
 function rule(overrides = {}) {
   return {
