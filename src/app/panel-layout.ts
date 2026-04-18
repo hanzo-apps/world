@@ -20,6 +20,7 @@ import {
   OtherTokensPanel,
   PredictionPanel,
   MonitorPanel,
+  LatestBriefPanel,
   EconomicPanel,
   ConsumerPricesPanel,
   EnergyComplexPanel,
@@ -123,6 +124,7 @@ const WEB_PREMIUM_PANELS = new Set([
   'deduction',
   'chat-analyst',
   'wsb-ticker-scanner',
+  'latest-brief',
 ]);
 
 export interface PanelLayoutManagerCallbacks {
@@ -753,6 +755,11 @@ export class PanelLayoutManager implements AppModule {
       saveToStorage(STORAGE_KEYS.monitors, monitors);
       this.callbacks.updateMonitorResults();
     });
+
+    // Latest Brief — reads /api/latest-brief and opens the hosted
+    // magazine on click. Self-fetching (no data-loader integration);
+    // PRO gating handled by the base Panel class via premium: 'locked'.
+    this.createPanel('latest-brief', () => new LatestBriefPanel());
 
     this.createPanel('commodities', () => new CommoditiesPanel());
     this.createPanel('energy-complex', () => new EnergyComplexPanel());
