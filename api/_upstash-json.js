@@ -25,6 +25,51 @@ export async function readJsonFromUpstash(key, timeoutMs = 3_000) {
   }
 }
 
+/**
+ * Raw GET on a Redis key. Returns the parsed JSON value (or bare
+ * string for non-JSON) without applying seed-envelope unwrap. Use
+ * this for caches whose stored shape is NOT `{_seed, data}` — e.g.
+ * the per-user brief envelope `{version, issuedAt, data}` whose
+ * outer frame must reach the consumer.
+ *
+ * Semantics:
+ *   - Returns the parsed value on a hit.
+ *   - Returns `null` ONLY on a genuine miss (Upstash replied 200 with
+ *     no result field).
+ *   - Throws on every other failure mode (missing credentials, HTTP
+ *     non-2xx, timeout/abort, JSON parse failure). Callers MUST
+ *     distinguish infrastructure failure from empty-state to avoid
+ *     showing users "composing" / "expired" UX during an outage.
+ *
+ * @param {string} key
+ * @param {number} [timeoutMs=3000]
+ * @returns {Promise<unknown | null>}
+ */
+export async function readRawJsonFromUpstash(key, timeoutMs = 3_000) {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    throw new Error('readRawJsonFromUpstash: UPSTASH_REDIS_REST_URL/TOKEN not configured');
+  }
+
+  const resp = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!resp.ok) {
+    throw new Error(`readRawJsonFromUpstash: Upstash GET ${key} returned HTTP ${resp.status}`);
+  }
+  const data = await resp.json();
+  if (data.result == null) return null; // genuine miss
+  try {
+    return JSON.parse(data.result);
+  } catch (err) {
+    throw new Error(
+      `readRawJsonFromUpstash: JSON.parse failed for ${key}: ${(err instanceof Error ? err.message : String(err))}`,
+    );
+  }
+}
+
 /** Returns Redis credentials or null if not configured. */
 export function getRedisCredentials() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
