@@ -13,7 +13,8 @@ src-tauri
 blog-site
 pro-test
 consumer-prices-core
-scripts
+scripts/
+!scripts/shared/
 tests
 convex
 *.log
