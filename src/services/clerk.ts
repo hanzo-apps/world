@@ -1,206 +1,237 @@
 /**
- * Clerk JS initialization and thin wrapper.
+ * Backwards-compatible auth shim over Hanzo IAM.
  *
- * Uses dynamic import so the module is safe to import in Node.js test
- * environments where @clerk/clerk-js (browser-only) is not available.
+ * This module keeps the `clerk.ts` export surface that 14 callers depend on
+ * (getClerkToken, getCurrentClerkUser, openSignIn, mountUserButton, etc.)
+ * and redirects every call to the IAM (`hanzo.id`) implementation.
+ *
+ * No Clerk dependency. The file name is historical; new code should import
+ * from `@/services/iam` directly.
  */
 
-import type { Clerk } from '@clerk/clerk-js';
+import {
+  getAccessToken,
+  getCurrentUser,
+  startLogin,
+  logout as iamLogout,
+  subscribe as iamSubscribe,
+  refreshUserInfo,
+  isConfigured,
+} from './iam';
 
-type ClerkInstance = Clerk;
-
-const PUBLISHABLE_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CLERK_PUBLISHABLE_KEY) as string | undefined;
-
-let clerkInstance: ClerkInstance | null = null;
-let loadPromise: Promise<void> | null = null;
-
-const MONO_FONT = "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', 'DejaVu Sans Mono', monospace";
-
-function getAppearance() {
-  const isDark = typeof document !== 'undefined'
-    ? document.documentElement.dataset.theme !== 'light'
-    : true;
-
-  return isDark
-    ? {
-        variables: {
-          colorBackground: '#0f0f0f',
-          colorInputBackground: '#141414',
-          colorInputText: '#e8e8e8',
-          colorText: '#e8e8e8',
-          colorTextSecondary: '#aaaaaa',
-          colorPrimary: '#44ff88',
-          colorNeutral: '#e8e8e8',
-          colorDanger: '#ff4444',
-          borderRadius: '4px',
-          fontFamily: MONO_FONT,
-          fontFamilyButtons: MONO_FONT,
-        },
-        elements: {
-          card: { backgroundColor: '#111111', border: '1px solid #2a2a2a', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' },
-          headerTitle: { color: '#e8e8e8' },
-          headerSubtitle: { color: '#aaaaaa' },
-          dividerLine: { backgroundColor: '#2a2a2a' },
-          dividerText: { color: '#666666' },
-          formButtonPrimary: { color: '#000000', fontWeight: '600' },
-          footerActionLink: { color: '#44ff88' },
-          identityPreviewEditButton: { color: '#44ff88' },
-          formFieldLabel: { color: '#cccccc' },
-          formFieldInput: { borderColor: '#2a2a2a' },
-          socialButtonsBlockButton: { borderColor: '#2a2a2a', color: '#e8e8e8', backgroundColor: '#141414' },
-          socialButtonsBlockButtonText: { color: '#e8e8e8' },
-          modalCloseButton: { color: '#888888' },
-        },
-      }
-    : {
-        variables: {
-          colorBackground: '#ffffff',
-          colorInputBackground: '#f8f9fa',
-          colorInputText: '#1a1a1a',
-          colorText: '#1a1a1a',
-          colorTextSecondary: '#555555',
-          colorPrimary: '#16a34a',
-          colorNeutral: '#1a1a1a',
-          colorDanger: '#dc2626',
-          borderRadius: '4px',
-          fontFamily: MONO_FONT,
-          fontFamilyButtons: MONO_FONT,
-        },
-        elements: {
-          card: { backgroundColor: '#ffffff', border: '1px solid #d4d4d4', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' },
-          formButtonPrimary: { color: '#ffffff', fontWeight: '600' },
-          footerActionLink: { color: '#16a34a' },
-          identityPreviewEditButton: { color: '#16a34a' },
-          socialButtonsBlockButton: { borderColor: '#d4d4d4' },
-        },
-      };
-}
-
-/** Initialize Clerk. Call once at app startup. */
+/** Initialize IAM auth. No-op in IAM-world — kept for callers that expect async init. */
 export async function initClerk(): Promise<void> {
-  if (clerkInstance) return;
-  if (loadPromise) return loadPromise;
-  if (!PUBLISHABLE_KEY) {
-    console.warn('[clerk] VITE_CLERK_PUBLISHABLE_KEY not set, auth disabled');
+  if (!isConfigured()) {
+    console.warn('[auth] IAM not configured — VITE_IAM_SERVER_URL / VITE_IAM_CLIENT_ID missing');
     return;
   }
-  loadPromise = (async () => {
-    try {
-      const { Clerk } = await import('@clerk/clerk-js');
-      const clerk = new Clerk(PUBLISHABLE_KEY);
-      await clerk.load({ appearance: getAppearance() });
-      clerkInstance = clerk;
-    } catch (e) {
-      loadPromise = null; // allow retry on next call
-      throw e;
-    }
-  })();
-  return loadPromise;
+  // IAM state lives in localStorage; no async load needed.
+  // Refresh the cached user record if we have a token (non-blocking).
+  refreshUserInfo().catch(() => { /* best-effort */ });
 }
 
-/** Get the initialized Clerk instance. Returns null if not loaded. */
-export function getClerk(): ClerkInstance | null {
-  return clerkInstance;
+/** Placeholder for legacy callers that treat Clerk as a handle. Always null now. */
+export function getClerk(): null {
+  return null;
 }
 
-/** Open the Clerk sign-in modal. */
+/** Kick off the IAM login flow. */
 export function openSignIn(): void {
-  clerkInstance?.openSignIn({ appearance: getAppearance() });
+  if (typeof window === 'undefined') return;
+  startLogin().catch((err) => {
+    console.error('[auth] startLogin failed:', err);
+  });
 }
 
-/** Sign out the current user. */
+/** Sign the user out and notify subscribers. */
 export async function signOut(): Promise<void> {
-  _cachedToken = null;
-  _cachedTokenAt = 0;
-  await clerkInstance?.signOut();
+  iamLogout();
 }
 
-/** Clear the cached Clerk token (call when Convex signals a 401 via forceRefreshToken). */
+/** No-op — kept for API compatibility; IAM tokens are read fresh from storage. */
 export function clearClerkTokenCache(): void {
-  _cachedToken = null;
-  _cachedTokenAt = 0;
+  // IAM tokens aren't cached in-memory by this shim; no cache to invalidate.
 }
 
-/**
- * Get a bearer token for premium API requests.
- * Uses the 'convex' JWT template which includes the `plan` claim.
- * Returns null if no active session.
- *
- * Tokens are cached for 50s (Clerk tokens expire at 60s) with in-flight
- * deduplication to prevent concurrent panels from racing against Clerk.
- */
-let _cachedToken: string | null = null;
-let _cachedTokenAt = 0;
-let _tokenInflight: Promise<string | null> | null = null;
-const TOKEN_CACHE_TTL_MS = 50_000;
-
+/** Return the current IAM access token, or null if signed out / expired. */
 export async function getClerkToken(): Promise<string | null> {
-  if (_cachedToken && Date.now() - _cachedTokenAt < TOKEN_CACHE_TTL_MS) {
-    return _cachedToken;
-  }
-  if (_tokenInflight) return _tokenInflight;
-
-  _tokenInflight = (async () => {
-    if (!clerkInstance && PUBLISHABLE_KEY) {
-      try { await initClerk(); } catch { /* Clerk load failed, proceed with null */ }
-    }
-    const session = clerkInstance?.session;
-    if (!session) {
-      console.warn(`[clerk] getClerkToken: no session (clerkInstance=${!!clerkInstance}, user=${!!clerkInstance?.user})`);
-      _tokenInflight = null;
-      return null;
-    }
-    try {
-      // Try the 'convex' template first (includes plan claim for faster server-side checks).
-      // Fall back to the standard session token if the template isn't configured in Clerk.
-      const token = (await session.getToken({ template: 'convex' }).catch(() => null))
-        ?? await session.getToken().catch(() => null);
-      if (token) {
-        _cachedToken = token;
-        _cachedTokenAt = Date.now();
-      }
-      return token;
-    } catch {
-      return null;
-    } finally {
-      _tokenInflight = null;
-    }
-  })();
-  return _tokenInflight;
+  return getAccessToken();
 }
 
-/** Get current Clerk user metadata. Returns null if signed out. */
-export function getCurrentClerkUser(): { id: string; name: string; email: string; image: string | null; plan: 'free' | 'pro' } | null {
-  const user = clerkInstance?.user;
-  if (!user) return null;
-  const plan = (user.publicMetadata as Record<string, unknown>)?.plan;
+export interface ClerkUserSnapshot {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  plan: 'free' | 'pro';
+}
+
+/** Snapshot of the current IAM user, shaped like the old Clerk return. */
+export function getCurrentClerkUser(): ClerkUserSnapshot | null {
+  const u = getCurrentUser();
+  if (!u) return null;
   return {
-    id: user.id,
-    name: user.fullName ?? user.firstName ?? 'User',
-    email: user.primaryEmailAddress?.emailAddress ?? '',
-    image: user.imageUrl ?? null,
-    plan: plan === 'pro' ? 'pro' : 'free',
+    id: u.id,
+    name: u.displayName || u.name || 'User',
+    email: u.email,
+    image: u.avatar,
+    plan: u.plan,
   };
 }
 
-/**
- * Subscribe to Clerk auth state changes.
- * Returns unsubscribe function.
- */
+/** Subscribe to auth-state changes. Returns unsubscribe. */
 export function subscribeClerk(callback: () => void): () => void {
-  if (!clerkInstance) return () => {};
-  return clerkInstance.addListener(callback);
+  return iamSubscribe(callback);
 }
 
 /**
- * Mount Clerk's UserButton component into a DOM element.
- * Returns an unmount function.
+ * Mount a lightweight "user button" UI into the given element.
+ *
+ * The old Clerk UserButton was a rich modal; here we render a compact
+ * button that displays the user name/email and on click offers Sign Out.
+ * All DOM is self-contained (no Shadow DOM) and scoped by classnames.
  */
 export function mountUserButton(el: HTMLDivElement): () => void {
-  if (!clerkInstance) return () => {};
-  clerkInstance.mountUserButton(el, {
-    afterSignOutUrl: window.location.href,
-    appearance: getAppearance(),
+  const snap = getCurrentClerkUser();
+  if (!snap) {
+    const btn = document.createElement('button');
+    btn.className = 'auth-signin-btn';
+    btn.textContent = 'Sign In';
+    btn.addEventListener('click', () => openSignIn());
+    el.innerHTML = '';
+    el.appendChild(btn);
+    return () => {
+      el.innerHTML = '';
+    };
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'auth-user-button';
+  wrap.style.cssText = 'position:relative;display:inline-block;';
+
+  const trigger = document.createElement('button');
+  trigger.className = 'auth-user-button-trigger';
+  trigger.setAttribute('aria-haspopup', 'true');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.style.cssText = [
+    'display:flex',
+    'align-items:center',
+    'gap:8px',
+    'padding:6px 10px',
+    'border-radius:20px',
+    'border:1px solid var(--border, #2a2a2a)',
+    'background:var(--panel-bg, #141414)',
+    'color:var(--text, #e8e8e8)',
+    'cursor:pointer',
+    "font-family:'SF Mono',Monaco,'Cascadia Code',monospace",
+    'font-size:12px',
+  ].join(';');
+
+  const avatar = document.createElement('span');
+  avatar.className = 'auth-user-avatar';
+  avatar.style.cssText = [
+    'width:24px',
+    'height:24px',
+    'border-radius:50%',
+    'background:#2a2a2a',
+    'display:inline-flex',
+    'align-items:center',
+    'justify-content:center',
+    'overflow:hidden',
+    'font-size:12px',
+    'color:#fff',
+  ].join(';');
+  if (snap.image) {
+    const img = document.createElement('img');
+    img.src = snap.image;
+    img.alt = snap.name;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    avatar.appendChild(img);
+  } else {
+    avatar.textContent = (snap.name?.charAt(0) || snap.email?.charAt(0) || 'U').toUpperCase();
+  }
+
+  const label = document.createElement('span');
+  label.className = 'auth-user-label';
+  label.textContent = snap.name || snap.email || 'User';
+
+  trigger.appendChild(avatar);
+  trigger.appendChild(label);
+
+  const menu = document.createElement('div');
+  menu.className = 'auth-user-menu';
+  menu.style.cssText = [
+    'position:absolute',
+    'top:calc(100% + 6px)',
+    'right:0',
+    'min-width:220px',
+    'border:1px solid var(--border, #2a2a2a)',
+    'background:var(--panel-bg, #141414)',
+    'color:var(--text, #e8e8e8)',
+    'border-radius:6px',
+    'box-shadow:0 8px 24px rgba(0,0,0,0.5)',
+    'display:none',
+    'z-index:10000',
+    "font-family:'SF Mono',Monaco,'Cascadia Code',monospace",
+    'font-size:12px',
+    'overflow:hidden',
+  ].join(';');
+
+  const email = document.createElement('div');
+  email.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border, #2a2a2a);color:var(--muted, #aaa);word-break:break-all;';
+  email.textContent = snap.email || snap.name;
+
+  const signOutBtn = document.createElement('button');
+  signOutBtn.type = 'button';
+  signOutBtn.textContent = 'Sign out';
+  signOutBtn.style.cssText = [
+    'display:block',
+    'width:100%',
+    'padding:10px 12px',
+    'background:transparent',
+    'border:none',
+    'color:inherit',
+    'cursor:pointer',
+    'text-align:left',
+    "font-family:'SF Mono',Monaco,'Cascadia Code',monospace",
+    'font-size:12px',
+  ].join(';');
+  signOutBtn.addEventListener('mouseenter', () => {
+    signOutBtn.style.background = 'rgba(255,255,255,0.04)';
   });
-  return () => clerkInstance?.unmountUserButton(el);
+  signOutBtn.addEventListener('mouseleave', () => {
+    signOutBtn.style.background = 'transparent';
+  });
+  signOutBtn.addEventListener('click', () => {
+    signOut().finally(() => {
+      window.location.reload();
+    });
+  });
+
+  menu.appendChild(email);
+  menu.appendChild(signOutBtn);
+  wrap.appendChild(trigger);
+  wrap.appendChild(menu);
+
+  const onDocClick = (ev: MouseEvent) => {
+    if (!wrap.contains(ev.target as Node)) {
+      menu.style.display = 'none';
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  };
+  trigger.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const open = menu.style.display === 'block';
+    menu.style.display = open ? 'none' : 'block';
+    trigger.setAttribute('aria-expanded', open ? 'false' : 'true');
+  });
+  document.addEventListener('click', onDocClick);
+
+  el.innerHTML = '';
+  el.appendChild(wrap);
+
+  return () => {
+    document.removeEventListener('click', onDocClick);
+    el.innerHTML = '';
+  };
 }

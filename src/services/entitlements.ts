@@ -1,13 +1,17 @@
 /**
- * Frontend entitlement service with reactive ConvexClient subscription.
+ * Frontend entitlement service — polls /v1/world/me for the current plan.
  *
- * Uses the shared ConvexClient singleton from convex-client.ts to avoid
- * duplicate WebSocket connections. Subscribes to real-time entitlement
- * updates via Convex WebSocket. Falls back gracefully when VITE_CONVEX_URL
- * is not configured or ConvexClient is unavailable.
+ * Replaces the previous Convex reactive subscription. Entitlements live
+ * in @hanzo/base and are projected by /v1/world/me based on the active
+ * subscription in Hanzo Commerce.
+ *
+ * The public surface is unchanged:
+ *   initEntitlementSubscription, onEntitlementChange, destroyEntitlementSubscription,
+ *   resetEntitlementState, getEntitlementState, hasFeature, hasTier, isEntitled.
  */
 
-import { getConvexClient, getConvexApi } from './convex-client';
+import { getMe } from './world-api';
+import { subscribe as subscribeIam, isLoggedIn } from './iam';
 
 export interface EntitlementState {
   planKey: string;
@@ -22,130 +26,116 @@ export interface EntitlementState {
   validUntil: number;
 }
 
-// Module-level state
-let currentState: EntitlementState | null = null;
 const listeners = new Set<(state: EntitlementState | null) => void>();
+const POLL_INTERVAL_MS = 60_000;
+
+let currentState: EntitlementState | null = null;
 let initialized = false;
-let unsubscribeFn: (() => void) | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let authUnsubscribe: (() => void) | null = null;
+
+function fanout(state: EntitlementState | null): void {
+  currentState = state;
+  for (const cb of listeners) {
+    try {
+      cb(state);
+    } catch {
+      // isolate listener errors
+    }
+  }
+}
+
+async function fetchOnce(): Promise<void> {
+  if (!isLoggedIn()) {
+    fanout(null);
+    return;
+  }
+  try {
+    const me = await getMe();
+    fanout(me.entitlements);
+  } catch (err) {
+    console.warn('[entitlements] Failed to fetch /v1/world/me:', (err as Error).message);
+    // Don't break the dashboard — preserve last known good state.
+  }
+}
 
 /**
- * Initialize the entitlement subscription for the authenticated user.
- * Idempotent — calling multiple times is a no-op after the first.
- * Failures are logged but never thrown (dashboard must not break).
+ * Initialize the entitlement watch. Idempotent. Failures are logged
+ * but never thrown — the dashboard must survive auth/network issues.
  */
 export async function initEntitlementSubscription(_userId?: string): Promise<void> {
   if (initialized) return;
+  initialized = true;
 
-  try {
-    const client = await getConvexClient();
-    if (!client) {
-      console.log('[entitlements] No VITE_CONVEX_URL — skipping Convex subscription');
-      return;
-    }
+  await fetchOnce();
 
-    const api = await getConvexApi();
-    if (!api) {
-      console.log('[entitlements] Could not load Convex API — skipping subscription');
-      return;
-    }
+  authUnsubscribe = subscribeIam(() => {
+    fetchOnce().catch(() => { /* swallow */ });
+  });
 
-    const watch = client.onUpdate(
-      api.entitlements.getEntitlementsForUser,
-      {},
-      (result: EntitlementState | null) => {
-        currentState = result;
-        for (const cb of listeners) cb(result);
-      },
-      (err: Error) => {
-        console.warn('[entitlements] Subscription query error:', err.message);
-      },
-    );
-
-    unsubscribeFn = watch.unsubscribe;
-    initialized = true;
-  } catch (err) {
-    console.error('[entitlements] Failed to initialize Convex subscription:', err);
-    // Do not rethrow — entitlement service failure must not break the dashboard
-  }
+  pollTimer = setInterval(() => {
+    fetchOnce().catch(() => { /* swallow */ });
+  }, POLL_INTERVAL_MS);
 }
 
 /**
- * Tears down the entitlement subscription and clears all listeners.
- * Resets initialized flag so a new subscription can be started.
- * Does NOT null currentState — preserves the last known state across
- * destroy/reinit cycles (e.g. WebSocket reconnects) so paying users don't
- * see locked panels during backoff. Call resetEntitlementState() on sign-out.
+ * Stop polling and unwire auth listener. Preserves currentState across
+ * reconnects; call resetEntitlementState() on explicit sign-out.
  */
 export function destroyEntitlementSubscription(): void {
-  if (unsubscribeFn) {
-    unsubscribeFn();
-    unsubscribeFn = null;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
-  // Keep listeners intact — PanelLayout registers them once and expects them
-  // to survive auth transitions. Only the Convex transport is torn down.
+  if (authUnsubscribe) {
+    authUnsubscribe();
+    authUnsubscribe = null;
+  }
   initialized = false;
+  // Leave listeners/state intact across reinit cycles.
 }
 
-/**
- * Explicitly nulls currentState. Call on sign-out to prevent the previous
- * user's entitlements from leaking into a subsequent session.
- * Distinct from destroyEntitlementSubscription() which preserves state for reconnects.
- */
+/** Explicitly null currentState. Call on sign-out so stale plan doesn't leak. */
 export function resetEntitlementState(): void {
   currentState = null;
 }
 
 /**
- * Register a callback for entitlement changes.
- * If entitlement state is already available, the callback fires immediately.
- * Returns an unsubscribe function.
+ * Register a callback for entitlement changes. If state is already loaded,
+ * the callback fires immediately. Returns unsubscribe.
  */
 export function onEntitlementChange(
   cb: (state: EntitlementState | null) => void,
 ): () => void {
   listeners.add(cb);
-
-  // Late subscribers get the current value immediately
-  if (currentState !== null) {
-    cb(currentState);
-  }
-
+  if (currentState !== null) cb(currentState);
   return () => {
     listeners.delete(cb);
   };
 }
 
-/**
- * Returns the current entitlement state, or null if not yet loaded.
- */
+/** Synchronous snapshot of the current entitlement state, or null. */
 export function getEntitlementState(): EntitlementState | null {
   return currentState;
 }
 
-/**
- * Check whether a specific feature flag is truthy in the current entitlement state.
- */
+/** True if the given feature flag is enabled in the current state. */
 export function hasFeature(flag: keyof EntitlementState['features']): boolean {
   if (currentState === null) return false;
   return Boolean(currentState.features[flag]);
 }
 
-/**
- * Check whether the user's tier meets or exceeds the given minimum.
- */
+/** True if the current tier meets or exceeds the given minimum. */
 export function hasTier(minTier: number): boolean {
   if (currentState === null) return false;
   return currentState.features.tier >= minTier;
 }
 
-/**
- * Simple "is this a paying user" check.
- * Returns true if entitlement data exists, plan is not free, and hasn't expired.
- */
+/** True if the user is on a paid plan that hasn't expired. */
 export function isEntitled(): boolean {
   return (
-    currentState !== null &&
-    currentState.planKey !== 'free' &&
-    currentState.validUntil >= Date.now()
+    currentState !== null
+    && currentState.planKey !== 'free'
+    && currentState.validUntil >= Date.now()
   );
 }

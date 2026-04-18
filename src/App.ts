@@ -73,7 +73,7 @@ import { resolveUserRegion, resolvePreciseUserCoordinates, type PreciseCoordinat
 import { showProBanner } from '@/components/ProBanner';
 import { initAuthState, subscribeAuthState } from '@/services/auth-state';
 import { install as installCloudPrefsSync, onSignIn as cloudPrefsSignIn, onSignOut as cloudPrefsSignOut } from '@/utils/cloud-prefs-sync';
-import { getConvexClient, getConvexApi, waitForConvexAuth } from '@/services/convex-client';
+// Convex removed — anon→user claim flow moved server-side to /v1/world/me.
 import { initEntitlementSubscription, destroyEntitlementSubscription, resetEntitlementState } from '@/services/entitlements';
 import { initSubscriptionWatch, destroySubscriptionWatch } from '@/services/billing';
 import { capturePendingCheckoutIntentFromUrl, resumePendingCheckout } from '@/services/checkout';
@@ -862,41 +862,19 @@ export class App {
       if (userId !== null && userId !== _prevUserId) {
         void cloudPrefsSignIn(userId, SITE_VARIANT);
 
-        // Rebind Convex watches to the real Clerk userId (was bound to anon UUID at init)
+        // Rebind subscription/entitlement watches to the real IAM userId
+        // (server also reconciles anon→user purchases on /v1/world/me).
         destroyEntitlementSubscription();
         destroySubscriptionWatch();
         void initEntitlementSubscription(userId);
         void initSubscriptionWatch(userId);
 
-        // Claim any anonymous purchase made before sign-in (anon → real user migration)
-        const anonId = localStorage.getItem('wm-anon-id');
-        if (anonId) {
-          void (async () => {
-            const [client, api] = await Promise.all([getConvexClient(), getConvexApi()]);
-            if (!client || !api) return;
-            // Wait for ConvexClient WebSocket auth handshake to complete.
-            // Without this, mutations arrive at Convex before the server
-            // has the JWT → "Authentication required" errors.
-            const ready = await waitForConvexAuth(10_000);
-            if (!ready) {
-              console.warn('[billing] claimSubscription skipped — Convex auth not ready');
-              return;
-            }
-            const result = await client.mutation(api.payments.billing.claimSubscription, { anonId });
-            const claimed = result.claimed;
-            const totalClaimed = claimed.subscriptions + claimed.entitlements +
-                                 claimed.customers + claimed.payments;
-            if (totalClaimed > 0) {
-              console.log('[billing] Claimed anon subscription on sign-in:', claimed);
-            }
-            // Always remove after non-throwing completion — mutation is idempotent.
-            // Prevents cold Convex init + mutation on every sign-in for non-purchasers.
-            localStorage.removeItem('wm-anon-id');
-          })().catch((err: unknown) => {
-            console.warn('[billing] claimSubscription failed:', err);
-            // Non-fatal — anon ID preserved for retry on next page load
-          });
+        // The previous Convex-driven anon→real claim flow is handled server-side
+        // now. Clear any stale anon id so the next sign-in is clean.
+        if (localStorage.getItem('wm-anon-id')) {
+          localStorage.removeItem('wm-anon-id');
         }
+
         void resumePendingCheckout({
           openAuth: () => this.state.authModal?.open(),
         });
