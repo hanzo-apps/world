@@ -13,8 +13,8 @@ export interface VariantMeta {
 
 export const VARIANT_META: { full: VariantMeta; [k: string]: VariantMeta } = {
   full: {
-    title: 'Hanzo World - Real-Time Global Intelligence Dashboard',
-    description: 'Real-time global intelligence dashboard with live news, markets, military tracking, infrastructure monitoring, and geopolitical data. OSINT in one view.',
+    title: 'Hanzo World — Real-time streaming news, world events, and simulations',
+    description: 'Hanzo World: low-latency streaming of public news, world events, market data, conflicts, infrastructure, and simulations. Palantir-grade intelligence, open and public, from Hanzo AI.',
     keywords: 'global intelligence, geopolitical dashboard, world news, market data, military bases, nuclear facilities, undersea cables, conflict zones, real-time monitoring, situation awareness, OSINT, flight tracking, AIS ships, earthquake monitor, protest tracker, power outages, oil prices, government spending, polymarket predictions',
     url: 'https://world.hanzo.ai/',
     siteName: 'Hanzo World',
