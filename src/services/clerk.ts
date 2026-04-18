@@ -115,10 +115,20 @@ export async function signOut(): Promise<void> {
   await clerkInstance?.signOut();
 }
 
-/** Clear the cached Clerk token (call when Convex signals a 401 via forceRefreshToken). */
+/**
+ * Clear the cached Clerk token. Call when:
+ *   - Convex signals a 401 via forceRefreshToken
+ *   - The observed Clerk user changes (account switch / sign-out)
+ *
+ * Also drops the inflight promise so an A→B switch while a token
+ * fetch is mid-air doesn't let the next caller reuse A's promise.
+ * The old promise still resolves to its closure but nothing
+ * downstream references it once this runs.
+ */
 export function clearClerkTokenCache(): void {
   _cachedToken = null;
   _cachedTokenAt = 0;
+  _tokenInflight = null;
 }
 
 /**
@@ -168,6 +178,7 @@ export async function getClerkToken(): Promise<string | null> {
   })();
   return _tokenInflight;
 }
+
 
 /** Get current Clerk user metadata. Returns null if signed out. */
 export function getCurrentClerkUser(): { id: string; name: string; email: string; image: string | null; plan: 'free' | 'pro' } | null {
