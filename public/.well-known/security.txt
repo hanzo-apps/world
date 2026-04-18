@@ -1,6 +1,6 @@
-Contact: mailto:elie@worldmonitor.app
-Contact: https://github.com/eliehabib/worldmonitor/security/advisories
-Policy: https://github.com/eliehabib/worldmonitor/security/advisories
+Contact: mailto:security@hanzo.ai
+Contact: https://github.com/hanzoai/world/security/advisories
+Policy: https://github.com/hanzoai/world/security/advisories
 Preferred-Languages: en
-Canonical: https://worldmonitor.app/.well-known/security.txt
+Canonical: https://world.hanzo.ai/.well-known/security.txt
 Expires: 2027-03-02T00:00:00.000Z
