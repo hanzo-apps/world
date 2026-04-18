@@ -1,150 +1,137 @@
 /**
- * Frontend billing service with reactive ConvexClient subscription.
+ * Frontend billing service — reads subscription state from /v1/world/*.
  *
- * Uses the shared ConvexClient singleton from convex-client.ts to avoid
- * duplicate WebSocket connections. Subscribes to real-time subscription
- * updates via Convex WebSocket. Falls back gracefully when VITE_CONVEX_URL
- * is not configured or ConvexClient is unavailable.
+ * Replaces the previous Convex + Dodo implementation. Subscriptions live
+ * in @hanzo/base (accessed via the world-api HTTP client) and billing flows
+ * route through Hanzo Commerce (commerce.hanzo.ai).
  *
- * Follows the same lazy reactive pattern as entitlements.ts.
+ * The public surface is unchanged:
+ *   initSubscriptionWatch, onSubscriptionChange, destroySubscriptionWatch,
+ *   getSubscription, openBillingPortal.
  */
 
 import * as Sentry from '@sentry/browser';
-import { getConvexClient, getConvexApi } from './convex-client';
+import { listSubscriptions, type WorldSubscription } from './world-api';
+import { subscribe as subscribeIam, isLoggedIn } from './iam';
 
 export interface SubscriptionInfo {
   planKey: string;
   displayName: string;
   status: 'active' | 'on_hold' | 'cancelled' | 'expired';
-  currentPeriodEnd: number; // epoch ms, renewal date
+  currentPeriodEnd: number;
 }
 
-// Module-level state
+const listeners = new Set<(sub: SubscriptionInfo | null) => void>();
+const POLL_INTERVAL_MS = 60_000;
+
 let currentSubscription: SubscriptionInfo | null = null;
 let subscriptionLoaded = false;
-const listeners = new Set<(sub: SubscriptionInfo | null) => void>();
 let initialized = false;
-let unsubscribeConvex: (() => void) | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let authUnsubscribe: (() => void) | null = null;
 
-/**
- * Initialize the subscription watch for the authenticated user.
- * Idempotent -- calling multiple times is a no-op after the first.
- * Failures are logged but never thrown (dashboard must not break).
- */
-export async function initSubscriptionWatch(_userId?: string): Promise<void> {
-  if (initialized) return;
+function toSubInfo(s: WorldSubscription | null): SubscriptionInfo | null {
+  if (!s) return null;
+  return {
+    planKey: s.planKey,
+    displayName: s.displayName,
+    status: s.status,
+    currentPeriodEnd: s.currentPeriodEnd,
+  };
+}
 
-  try {
-    const client = await getConvexClient();
-    if (!client) {
-      console.warn('[billing] No VITE_CONVEX_URL -- skipping subscription watch');
-      return;
+function fanout(sub: SubscriptionInfo | null): void {
+  currentSubscription = sub;
+  subscriptionLoaded = true;
+  for (const cb of listeners) {
+    try {
+      cb(sub);
+    } catch {
+      // isolate listener errors
     }
-
-    const api = await getConvexApi();
-    if (!api) {
-      console.warn('[billing] Could not load Convex API -- skipping subscription watch');
-      return;
-    }
-
-    unsubscribeConvex = client.onUpdate(
-      api.payments.billing.getSubscriptionForUser,
-      {},
-      (result: SubscriptionInfo | null) => {
-        currentSubscription = result;
-        subscriptionLoaded = true;
-        for (const cb of listeners) cb(result);
-      },
-      (err: Error) => {
-        console.warn('[billing] Subscription query error:', err.message);
-        // Clear stale cached value so getSubscription() returns null (not old plan).
-        currentSubscription = null;
-        subscriptionLoaded = true;
-        for (const cb of listeners) cb(null);
-      },
-    );
-
-    initialized = true;
-  } catch (err) {
-    console.error('[billing] Failed to initialize subscription watch:', err);
-    // Do not rethrow -- billing service failure must not break the dashboard
-    Sentry.captureException(err, { tags: { component: 'dodo-billing', action: 'initSubscriptionWatch' } });
   }
 }
 
+async function fetchOnce(): Promise<void> {
+  if (!isLoggedIn()) {
+    fanout(null);
+    return;
+  }
+  try {
+    const subs = await listSubscriptions();
+    // Pick the active subscription (or the most recent one if multiple).
+    const active = subs.find((s) => s.status === 'active') ?? subs[0] ?? null;
+    fanout(toSubInfo(active));
+  } catch (err) {
+    console.warn('[billing] Failed to fetch subscriptions:', (err as Error).message);
+    // Don't break the dashboard — treat as "no subscription" and keep polling.
+    fanout(null);
+    Sentry.captureException(err, {
+      tags: { component: 'billing', action: 'fetchSubscription' },
+    });
+  }
+}
+
+/** Start polling /v1/world/subscriptions and fanning out changes. Idempotent. */
+export async function initSubscriptionWatch(_userId?: string): Promise<void> {
+  if (initialized) return;
+  initialized = true;
+
+  await fetchOnce();
+
+  // Re-fetch on auth changes
+  authUnsubscribe = subscribeIam(() => {
+    fetchOnce().catch(() => { /* swallow */ });
+  });
+
+  // Periodic refresh so cancellations / plan changes propagate.
+  pollTimer = setInterval(() => {
+    fetchOnce().catch(() => { /* swallow */ });
+  }, POLL_INTERVAL_MS);
+}
+
 /**
- * Register a callback for subscription changes.
- * If subscription state is already available, the callback fires immediately.
- * Returns an unsubscribe function.
+ * Register a callback for subscription changes. Callback fires immediately
+ * with the current state if already loaded. Returns an unsubscribe function.
  */
 export function onSubscriptionChange(
   cb: (sub: SubscriptionInfo | null) => void,
 ): () => void {
   listeners.add(cb);
-
-  // Late subscribers get the current value immediately (including null if loaded)
-  if (subscriptionLoaded) {
-    cb(currentSubscription);
-  }
-
+  if (subscriptionLoaded) cb(currentSubscription);
   return () => {
     listeners.delete(cb);
   };
 }
 
-/**
- * Tear down the subscription watch. Call from PanelLayout.destroy() for cleanup.
- */
+/** Tear down polling + listeners. Safe to call on panel destroy. */
 export function destroySubscriptionWatch(): void {
-  if (unsubscribeConvex) {
-    unsubscribeConvex();
-    unsubscribeConvex = null;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (authUnsubscribe) {
+    authUnsubscribe();
+    authUnsubscribe = null;
   }
   initialized = false;
   subscriptionLoaded = false;
   currentSubscription = null;
-  // Keep listeners intact — PanelLayout registers them once and expects them
-  // to survive auth transitions. Only the Convex transport is torn down.
+  // Keep listeners intact — callers register once and expect them to survive reinit.
 }
 
-/**
- * Returns the current subscription info, or null if not yet loaded.
- */
+/** Synchronous snapshot of the current subscription, or null if not loaded. */
 export function getSubscription(): SubscriptionInfo | null {
   return currentSubscription;
 }
 
-const DODO_PORTAL_FALLBACK_URL = 'https://customer.dodopayments.com';
+const COMMERCE_PORTAL_URL = 'https://commerce.hanzo.ai/account/billing';
 
 /**
- * Open the Dodo Customer Portal in a new tab.
- *
- * Calls the Convex getCustomerPortalUrl action to get a personalized portal
- * session URL. Falls back to the generic Dodo customer portal on error.
- * Returns the URL that was opened (useful for agent/programmatic callers).
+ * Open the Hanzo Commerce self-service billing portal in a new tab.
+ * Commerce handles session auth via IAM (same SSO session).
  */
-export async function openBillingPortal(): Promise<string | null> {
-  try {
-    const client = await getConvexClient();
-    if (!client) {
-      window.open(DODO_PORTAL_FALLBACK_URL, '_blank');
-      return DODO_PORTAL_FALLBACK_URL;
-    }
-
-    const api = await getConvexApi();
-    if (!api) {
-      window.open(DODO_PORTAL_FALLBACK_URL, '_blank');
-      return DODO_PORTAL_FALLBACK_URL;
-    }
-
-    const result = await client.action(api.payments.billing.getCustomerPortalUrl, {});
-    const url = (result?.portal_url as string | undefined) ?? DODO_PORTAL_FALLBACK_URL;
-    window.open(url, '_blank');
-    return url;
-  } catch (err) {
-    console.warn('[billing] Failed to get customer portal URL, falling back:', err);
-    Sentry.captureException(err, { tags: { component: 'dodo-billing', action: 'openBillingPortal' } });
-    window.open(DODO_PORTAL_FALLBACK_URL, '_blank');
-    return DODO_PORTAL_FALLBACK_URL;
-  }
+export async function openBillingPortal(): Promise<string> {
+  window.open(COMMERCE_PORTAL_URL, '_blank');
+  return COMMERCE_PORTAL_URL;
 }

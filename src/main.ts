@@ -5,6 +5,10 @@ import * as Sentry from '@sentry/browser';
 import { inject } from '@vercel/analytics';
 import { App } from './App';
 import { installUtmInterceptor } from './utils/utm';
+import { isOnAuthCallback, handleAuthCallback } from './bootstrap/auth-callback';
+// Hanzo branded chrome — header, footer, chat widget, settings sheet.
+// Mounts into <body> independently of the vanilla map shell under <div id="app">.
+import { mountHanzoChrome } from './ui/app-shell/mount';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
 
@@ -522,8 +526,13 @@ requestAnimationFrame(() => {
 // Clear stale settings-open flag (survives ungraceful shutdown)
 localStorage.removeItem('wm-settings-open');
 
+// OAuth callback: IAM redirects to /auth/callback?code=...&state=...
+// Handle the exchange, then redirect — don't bootstrap the full app.
+if (isOnAuthCallback()) {
+  void handleAuthCallback();
 // Standalone windows: ?settings=1 = panel display settings, ?live-channels=1 = channel management
 // Both need i18n initialized so t() does not return undefined.
+} else {
 const urlParams = new URL(location.href).searchParams;
 if (urlParams.get('settings') === '1') {
   void Promise.all([import('./services/i18n'), import('./settings-window')]).then(
@@ -548,6 +557,7 @@ if (urlParams.get('settings') === '1') {
       clearChunkReloadGuard(chunkReloadStorageKey);
     })
     .catch(console.error);
+}
 }
 
 // Debug helpers for geo-convergence testing (remove in production)
