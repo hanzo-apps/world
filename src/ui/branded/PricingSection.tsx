@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@hanzo/ui/button';
+import {  Button  } from '@hanzo/ui';
 import { Check, Sparkles } from 'lucide-react';
 import { signInWithIam, getCurrentSession } from '../lib/iam-auth';
 import { cn } from '../lib/cn';

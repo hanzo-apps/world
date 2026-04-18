@@ -6,8 +6,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@hanzo/ui/sheet';
-import { Button } from '@hanzo/ui/button';
-import { Input } from '@hanzo/ui/input';
+import {  Button  } from '@hanzo/ui';
+import {  Input  } from '@hanzo/ui';
 import { MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 

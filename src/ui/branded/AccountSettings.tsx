@@ -6,9 +6,9 @@ import {
   SheetTitle,
 } from '@hanzo/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hanzo/ui/tabs';
-import { Button } from '@hanzo/ui/button';
-import { Input } from '@hanzo/ui/input';
-import { Label } from '@hanzo/ui/label';
+import {  Button  } from '@hanzo/ui';
+import {  Input  } from '@hanzo/ui';
+import {  Label  } from '@hanzo/ui';
 import { Switch } from '@hanzo/ui/switch';
 import { getCurrentSession, signInWithIam, signOut } from '../lib/iam-auth';
 
