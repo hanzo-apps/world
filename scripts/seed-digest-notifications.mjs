@@ -36,6 +36,8 @@ import {
   groupEligibleRulesByUser,
   shouldExitNonZero as shouldExitOnBriefFailures,
 } from './lib/brief-compose.mjs';
+import { enrichBriefEnvelopeWithLLM } from './lib/brief-llm.mjs';
+import { assertBriefEnvelope } from '../server/_shared/brief-render.js';
 import { signBriefUrl, BriefUrlError } from './lib/brief-url-sign.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -97,6 +99,27 @@ const BRIEF_COMPOSE_ENABLED =
   !BRIEF_COMPOSE_DISABLED_BY_OPERATOR && BRIEF_URL_SIGNING_SECRET !== '';
 const BRIEF_SIGNING_SECRET_MISSING =
   !BRIEF_COMPOSE_DISABLED_BY_OPERATOR && BRIEF_URL_SIGNING_SECRET === '';
+
+// Phase 3b LLM enrichment. Kept separate from AI_DIGEST_ENABLED so
+// the email-digest AI summary and the brief editorial prose can be
+// toggled independently (e.g. kill the brief LLM without silencing
+// the email's AI summary during a provider outage).
+const BRIEF_LLM_ENABLED = process.env.BRIEF_LLM_ENABLED !== '0';
+
+// Dependencies injected into brief-llm.mjs. Defined near the top so
+// the upstashRest helper below is in scope when this closure runs
+// inside composeAndStoreBriefForUser().
+const briefLlmDeps = {
+  callLLM,
+  async cacheGet(key) {
+    const raw = await upstashRest('GET', key);
+    if (typeof raw !== 'string' || raw.length === 0) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  },
+  async cacheSet(key, value, ttlSec) {
+    await upstashRest('SETEX', key, String(ttlSec), JSON.stringify(value));
+  },
+};
 
 // ── Redis helpers ──────────────────────────────────────────────────────────────
 
@@ -1003,6 +1026,7 @@ async function composeBriefsForRun(rules, nowMs) {
 async function composeAndStoreBriefForUser(userId, candidates, insightsNumbers, digestFor, nowMs) {
   let envelope = null;
   let chosenVariant = null;
+  let chosenCandidate = null;
   for (const candidate of candidates) {
     const digestStories = await digestFor(candidate);
     if (!digestStories || digestStories.length === 0) continue;
@@ -1015,10 +1039,42 @@ async function composeAndStoreBriefForUser(userId, candidates, insightsNumbers, 
     if (composed) {
       envelope = composed;
       chosenVariant = candidate.variant;
+      chosenCandidate = candidate;
       break;
     }
   }
   if (!envelope) return null;
+
+  // Phase 3b — LLM enrichment. Substitutes the stubbed whyMatters /
+  // lead / threads / signals fields with Gemini 2.5 Flash output.
+  // Pure passthrough on any failure: the baseline envelope has
+  // already passed validation and is safe to ship as-is. Do NOT
+  // abort composition if the LLM is down; the stub is better than
+  // no brief.
+  if (BRIEF_LLM_ENABLED && chosenCandidate) {
+    const baseline = envelope;
+    try {
+      const enriched = await enrichBriefEnvelopeWithLLM(envelope, chosenCandidate, briefLlmDeps);
+      // Defence in depth: re-validate the enriched envelope against
+      // the renderer's strict contract before we SETEX it. If
+      // enrichment produced a structurally broken shape (bad cache
+      // row, code bug, upstream type drift) we'd otherwise SETEX it
+      // and /api/brief would 404 the user's brief at read time. Fall
+      // back to the unenriched baseline — which is already known to
+      // pass assertBriefEnvelope() because composeBriefFromDigestStories
+      // asserted on construction.
+      try {
+        assertBriefEnvelope(enriched);
+        envelope = enriched;
+      } catch (assertErr) {
+        console.warn(`[digest] brief: enriched envelope failed assertion for ${userId} — shipping stubbed:`, assertErr?.message);
+        envelope = baseline;
+      }
+    } catch (err) {
+      console.warn(`[digest] brief: LLM enrichment threw for ${userId} — shipping stubbed envelope:`, err?.message);
+      envelope = baseline;
+    }
+  }
 
   const issueDate = envelope.data.date;
   const key = `brief:${userId}:${issueDate}`;
