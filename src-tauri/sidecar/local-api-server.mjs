@@ -413,7 +413,7 @@ async function proxyToCloud(requestUrl, req, remoteBase) {
   headers.delete('If-Modified-Since');
   // Identify sidecar as trusted origin so the cloud API key validator
   // doesn't reject the request (no origin + no key = 401).
-  headers.set('Origin', 'https://worldmonitor.app');
+  headers.set('Origin', 'https://world.hanzo.ai');
   return fetch(target, {
     method: req.method,
     headers,
@@ -520,7 +520,7 @@ async function importHandler(modulePath) {
 
 function resolveConfig(options = {}) {
   const port = Number(options.port ?? process.env.LOCAL_API_PORT ?? 46123);
-  const remoteBase = String(options.remoteBase ?? process.env.LOCAL_API_REMOTE_BASE ?? 'https://api.worldmonitor.app').replace(/\/$/, '');
+  const remoteBase = String(options.remoteBase ?? process.env.LOCAL_API_REMOTE_BASE ?? 'https://api.world.hanzo.ai').replace(/\/$/, '');
   const resourceDir = String(options.resourceDir ?? process.env.LOCAL_API_RESOURCE_DIR ?? process.cwd());
   const apiDir = options.apiDir
     ? String(options.apiDir)
@@ -533,7 +533,7 @@ function resolveConfig(options = {}) {
   const requestedFallback = String(options.cloudFallback ?? process.env.LOCAL_API_CLOUD_FALLBACK ?? '') === 'true';
   const cloudFallback = mode === 'docker' ? false : requestedFallback;
   if (mode === 'docker' && requestedFallback) {
-    (options.logger ?? console).warn('[local-api] Cloud fallback disabled in Docker mode (self-hosted instances must not proxy to api.worldmonitor.app)');
+    (options.logger ?? console).warn('[local-api] Cloud fallback disabled in Docker mode (self-hosted instances must not proxy to api.world.hanzo.ai)');
   }
   const logger = options.logger ?? console;
 
@@ -598,7 +598,7 @@ const SIDECAR_ALLOWED_ORIGINS = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
-  // Only allow exact domain or single-level subdomains (e.g. preview-xyz.worldmonitor.app).
+  // Only allow exact domain or single-level subdomains (e.g. preview-xyz.world.hanzo.ai).
   // The previous (.*\.)? pattern was overly broad. Anchored to prevent spoofing
   // via domains like worldmonitorEVIL.vercel.app.
   /^https:\/\/([a-z0-9-]+\.)?worldmonitor\.app$/,

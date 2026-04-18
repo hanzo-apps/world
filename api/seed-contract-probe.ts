@@ -8,7 +8,7 @@
  *
  * Usage:
  *   curl -H "x-probe-secret: $RELAY_SHARED_SECRET" \
- *        https://api.worldmonitor.app/api/seed-contract-probe
+ *        https://api.world.hanzo.ai/api/seed-contract-probe
  *
  * On failure returns 503 + the failing `checks`/`boundary` entries so CI or
  * operators can pinpoint the regression. Replaces the curl/jq shell ritual.
@@ -171,7 +171,7 @@ export async function checkPublicBoundary(origin: string): Promise<BoundaryResul
       const r = await fetch(`${origin}${endpoint}`, {
         signal: AbortSignal.timeout(5_000),
         headers: {
-          Origin: 'https://worldmonitor.app',
+          Origin: 'https://world.hanzo.ai',
           'User-Agent': 'WorldMonitor-SeedContractProbe/1.0',
         },
       });

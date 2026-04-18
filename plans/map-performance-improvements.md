@@ -2,7 +2,7 @@
 
 ## Context
 
-worldmonitor.app renders a real-time geopolitical map using three engines:
+world.hanzo.ai renders a real-time geopolitical map using three engines:
 
 - **DeckGLMap** (WebGL, deck.gl over MapLibre) — primary desktop map
 - **GlobeMap** (globe.gl / Three.js) — 3D globe mode

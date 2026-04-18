@@ -85,7 +85,7 @@ Option 1 — explicit `Content-Type` header in `vercel.json` is simpler and does
 
 ## Acceptance Criteria
 
-- [ ] `curl -I https://worldmonitor.app/.well-known/oauth-authorization-server` returns `content-type: application/json`
+- [ ] `curl -I https://world.hanzo.ai/.well-known/oauth-authorization-server` returns `content-type: application/json`
 - [ ] Discovery doc no longer contains `response_types_supported` field (or it is `[]`)
 - [ ] Discovery doc still contains all required fields: `issuer`, `token_endpoint`, `grant_types_supported`
 - [ ] Tests pass (deploy-config tests)

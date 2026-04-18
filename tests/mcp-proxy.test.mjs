@@ -3,8 +3,8 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 
 const originalFetch = globalThis.fetch;
 
-function makeGetRequest(params = {}, origin = 'https://worldmonitor.app') {
-  const url = new URL('https://worldmonitor.app/api/mcp-proxy');
+function makeGetRequest(params = {}, origin = 'https://world.hanzo.ai') {
+  const url = new URL('https://world.hanzo.ai/api/mcp-proxy');
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined) url.searchParams.set(k, typeof v === 'string' ? v : JSON.stringify(v));
   }
@@ -14,16 +14,16 @@ function makeGetRequest(params = {}, origin = 'https://worldmonitor.app') {
   });
 }
 
-function makePostRequest(body = {}, origin = 'https://worldmonitor.app') {
-  return new Request('https://worldmonitor.app/api/mcp-proxy', {
+function makePostRequest(body = {}, origin = 'https://world.hanzo.ai') {
+  return new Request('https://world.hanzo.ai/api/mcp-proxy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', origin },
     body: JSON.stringify(body),
   });
 }
 
-function makeOptionsRequest(origin = 'https://worldmonitor.app') {
-  return new Request('https://worldmonitor.app/api/mcp-proxy', {
+function makeOptionsRequest(origin = 'https://world.hanzo.ai') {
+  return new Request('https://world.hanzo.ai/api/mcp-proxy', {
     method: 'OPTIONS',
     headers: { origin },
   });
@@ -81,17 +81,17 @@ describe('api/mcp-proxy', () => {
     });
 
     it('returns 405 for DELETE', async () => {
-      const res = await handler(new Request('https://worldmonitor.app/api/mcp-proxy', {
+      const res = await handler(new Request('https://world.hanzo.ai/api/mcp-proxy', {
         method: 'DELETE',
-        headers: { origin: 'https://worldmonitor.app' },
+        headers: { origin: 'https://world.hanzo.ai' },
       }));
       assert.equal(res.status, 405);
     });
 
     it('returns 405 for PUT', async () => {
-      const res = await handler(new Request('https://worldmonitor.app/api/mcp-proxy', {
+      const res = await handler(new Request('https://world.hanzo.ai/api/mcp-proxy', {
         method: 'PUT',
-        headers: { origin: 'https://worldmonitor.app' },
+        headers: { origin: 'https://world.hanzo.ai' },
         body: '{}',
       }));
       assert.equal(res.status, 405);
@@ -200,10 +200,10 @@ describe('api/mcp-proxy', () => {
 
     it('ignores invalid JSON in headers param', async () => {
       globalThis.fetch = makeMcpFetch({ tools: [] });
-      const url = new URL('https://worldmonitor.app/api/mcp-proxy');
+      const url = new URL('https://world.hanzo.ai/api/mcp-proxy');
       url.searchParams.set('serverUrl', 'https://mcp.example.com/mcp');
       url.searchParams.set('headers', 'not json');
-      const req = new Request(url.toString(), { method: 'GET', headers: { origin: 'https://worldmonitor.app' } });
+      const req = new Request(url.toString(), { method: 'GET', headers: { origin: 'https://world.hanzo.ai' } });
       const res = await handler(req);
       assert.equal(res.status, 200);
     });

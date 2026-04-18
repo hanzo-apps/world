@@ -21,7 +21,7 @@ export const config = { runtime: 'edge' };
 import { getCorsHeaders } from './_cors.js';
 import { validateBearerToken } from '../server/auth-session';
 
-const RELAY_BASE = 'https://proxy.worldmonitor.app';
+const RELAY_BASE = 'https://proxy.world.hanzo.ai';
 const WIDGET_AGENT_KEY = process.env.WIDGET_AGENT_KEY ?? '';
 const PRO_WIDGET_KEY = process.env.PRO_WIDGET_KEY ?? '';
 const WORLDMONITOR_VALID_KEY_SET = new Set(

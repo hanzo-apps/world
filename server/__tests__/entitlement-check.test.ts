@@ -38,7 +38,7 @@ function makeRequest(
   pathname: string,
   headers: Record<string, string> = {},
 ): Request {
-  return new Request(`https://worldmonitor.app${pathname}`, { headers });
+  return new Request(`https://world.hanzo.ai${pathname}`, { headers });
 }
 
 function makeEntitlements(tier: number, planKey = "free") {

@@ -4,8 +4,8 @@ import handler from './og-story.js';
 
 function renderOgStory(query = '') {
   const req = {
-    url: `https://worldmonitor.app/api/og-story${query ? `?${query}` : ''}`,
-    headers: { host: 'worldmonitor.app' },
+    url: `https://world.hanzo.ai/api/og-story${query ? `?${query}` : ''}`,
+    headers: { host: 'world.hanzo.ai' },
   };
 
   let statusCode = 0;

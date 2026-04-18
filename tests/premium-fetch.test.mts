@@ -31,7 +31,7 @@ function sentHeaders(callIndex = 0): Headers {
   return new Headers((call.arguments[1] as RequestInit | undefined)?.headers);
 }
 
-const TARGET = 'https://api.worldmonitor.app/api/some-premium-rpc';
+const TARGET = 'https://api.world.hanzo.ai/api/some-premium-rpc';
 
 // ---------------------------------------------------------------------------
 // Suite

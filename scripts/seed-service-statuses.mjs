@@ -12,7 +12,7 @@ import { loadEnvFile, CHROME_UA, getRedisCredentials, logSeedResult, extendExist
 
 loadEnvFile(import.meta.url);
 
-const RPC_URL = 'https://api.worldmonitor.app/api/infrastructure/v1/list-service-statuses';
+const RPC_URL = 'https://api.world.hanzo.ai/api/infrastructure/v1/list-service-statuses';
 const CANONICAL_KEY = 'infra:service-statuses:v1';
 
 async function warmPing() {
@@ -28,7 +28,7 @@ async function warmPing() {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': CHROME_UA,
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
       },
       body: '{}',
       signal: AbortSignal.timeout(60_000),

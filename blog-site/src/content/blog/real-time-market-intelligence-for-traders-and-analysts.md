@@ -14,7 +14,7 @@ Traditional financial dashboards show you price. World Monitor shows you context
 
 ## Finance Monitor: Markets Meet Geopolitics
 
-World Monitor's Finance variant (finance.worldmonitor.app) combines traditional market data with the geopolitical intelligence that drives price action. It's built for traders who understand that a Reuters headline and a ship position can be more valuable than a moving average.
+World Monitor's Finance variant (finance.world.hanzo.ai) combines traditional market data with the geopolitical intelligence that drives price action. It's built for traders who understand that a Reuters headline and a ship position can be more valuable than a moving average.
 
 Here's what you get:
 
@@ -65,7 +65,7 @@ For commodity traders, World Monitor maps the **10 major commodity exchanges** (
 - Critical minerals (lithium, cobalt, rare earths)
 - Agricultural commodities
 
-The Commodity Monitor variant (commodity.worldmonitor.app) goes deeper with mining company locations, pipeline infrastructure, and supply chain disruption alerts. For more on supply chain tracking, see [monitoring global supply chains and commodity disruptions](/blog/posts/monitor-global-supply-chains-and-commodity-disruptions/).
+The Commodity Monitor variant (commodity.world.hanzo.ai) goes deeper with mining company locations, pipeline infrastructure, and supply chain disruption alerts. For more on supply chain tracking, see [monitoring global supply chains and commodity disruptions](/blog/posts/monitor-global-supply-chains-and-commodity-disruptions/).
 
 ## Crypto Intelligence
 
@@ -150,4 +150,4 @@ Market data refreshes in real time during trading hours. Central bank trackers, 
 
 ---
 
-**Open Finance Monitor at [finance.worldmonitor.app](https://finance.worldmonitor.app). Your geopolitical edge starts here.**
+**Open Finance Monitor at [finance.world.hanzo.ai](https://finance.world.hanzo.ai). Your geopolitical edge starts here.**

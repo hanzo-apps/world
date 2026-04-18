@@ -147,4 +147,4 @@ The palette is context-aware: it ranks results based on your currently active pa
 
 ---
 
-**Try it now: open [worldmonitor.app](https://worldmonitor.app) and press Cmd+K. Your intelligence is one search away.**
+**Try it now: open [world.hanzo.ai](https://world.hanzo.ai) and press Cmd+K. Your intelligence is one search away.**

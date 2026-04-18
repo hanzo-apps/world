@@ -12,7 +12,7 @@ In March 2021, the Ever Given blocked the Suez Canal for six days. Global trade 
 
 The companies that recovered fastest were the ones that already had multi-source monitoring in place: ship positions, port congestion data, commodity prices, and alternative route analysis, all visible before the situation hit mainstream news.
 
-World Monitor's Commodity Monitor (commodity.worldmonitor.app) gives every supply chain team that capability.
+World Monitor's Commodity Monitor (commodity.world.hanzo.ai) gives every supply chain team that capability.
 
 ## The Supply Chain Visibility Gap
 
@@ -162,7 +162,7 @@ World Monitor maps these jamming zones using H3 hexagonal grid classification, u
 
 **Daily Morning Check:**
 
-1. Open commodity.worldmonitor.app
+1. Open commodity.world.hanzo.ai
 2. Review commodity price changes in the dashboard
 3. Check the CII heatmap for rising instability in sourcing countries
 4. Scan hotspot escalation scores for new disruption risks
@@ -204,4 +204,4 @@ Yes. The Country Instability Index (CII), conflict layers, and Infrastructure Ca
 
 ---
 
-**Start monitoring at [commodity.worldmonitor.app](https://commodity.worldmonitor.app). Free real-time intelligence for supply chain professionals.**
+**Start monitoring at [commodity.world.hanzo.ai](https://commodity.world.hanzo.ai). Free real-time intelligence for supply chain professionals.**

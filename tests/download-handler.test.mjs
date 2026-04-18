@@ -22,7 +22,7 @@ test('matches full variant for dotted World.Monitor AppImage asset names', async
 
   try {
     const response = await handler(
-      new Request('https://worldmonitor.app/api/download?platform=linux-appimage&variant=full')
+      new Request('https://world.hanzo.ai/api/download?platform=linux-appimage&variant=full')
     );
     assert.equal(response.status, 302);
     assert.equal(
@@ -49,7 +49,7 @@ test('matches tech variant for dashed Tech-Monitor AppImage asset names', async 
 
   try {
     const response = await handler(
-      new Request('https://worldmonitor.app/api/download?platform=linux-appimage&variant=tech')
+      new Request('https://world.hanzo.ai/api/download?platform=linux-appimage&variant=tech')
     );
     assert.equal(response.status, 302);
     assert.equal(
@@ -72,7 +72,7 @@ test('falls back to release page when requested variant has no matching asset', 
 
   try {
     const response = await handler(
-      new Request('https://worldmonitor.app/api/download?platform=linux-appimage&variant=finance')
+      new Request('https://world.hanzo.ai/api/download?platform=linux-appimage&variant=finance')
     );
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('location'), RELEASES_PAGE);
