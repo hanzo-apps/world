@@ -21,7 +21,7 @@
 //   - Brainstorm: docs/brainstorms/2026-04-17-worldmonitor-brief-magazine-requirements.md
 //   - Plan: docs/plans/2026-04-17-003-feat-worldmonitor-brief-magazine-plan.md
 
-import { BRIEF_ENVELOPE_VERSION } from '../../shared/brief-envelope.js';
+import { BRIEF_ENVELOPE_VERSION, SUPPORTED_ENVELOPE_VERSIONS } from '../../shared/brief-envelope.js';
 
 /**
  * @typedef {import('../../shared/brief-envelope.js').BriefEnvelope} BriefEnvelope
@@ -123,8 +123,48 @@ const ALLOWED_STORY_KEYS = new Set([
   'headline',
   'description',
   'source',
+  'sourceUrl',
   'whyMatters',
 ]);
+
+// Closed list of URL schemes we will interpolate into `href=`. A source
+// record with an unknown scheme is a composer bug, not something to
+// render — the story is dropped at envelope-validation time rather than
+// shipping with an unlinked / broken source.
+const ALLOWED_SOURCE_URL_SCHEMES = new Set(['https:', 'http:']);
+
+/**
+ * Parses and validates a story source URL. Returns the normalised URL
+ * string on success; throws a descriptive error otherwise. The renderer
+ * validator wraps this in a per-story path-prefixed error so composer
+ * bugs are easy to locate.
+ *
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function validateSourceUrl(raw) {
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new Error('must be a non-empty string');
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`must be a parseable absolute URL (got ${JSON.stringify(raw)})`);
+  }
+  if (!ALLOWED_SOURCE_URL_SCHEMES.has(parsed.protocol)) {
+    throw new Error(`scheme ${JSON.stringify(parsed.protocol)} is not allowed (http/https only)`);
+  }
+  // Bar `javascript:`-style smuggling via credentials or a Unicode host
+  // that renders like a legitimate outlet. These aren't exploitable
+  // through the renderer (we only emit the URL in an href with
+  // rel=noopener and we escape it), but they're always a composer bug
+  // so flag at write time.
+  if (parsed.username || parsed.password) {
+    throw new Error('must not include userinfo credentials');
+  }
+  return parsed.toString();
+}
 
 /**
  * @param {Record<string, unknown>} obj
@@ -165,9 +205,15 @@ export function assertBriefEnvelope(envelope) {
   const env = /** @type {Record<string, unknown>} */ (envelope);
   assertNoExtraKeys(env, ALLOWED_ENVELOPE_KEYS, 'envelope');
 
-  if (env.version !== BRIEF_ENVELOPE_VERSION) {
+  // Accept any version in SUPPORTED_ENVELOPE_VERSIONS. The composer
+  // only ever writes the current BRIEF_ENVELOPE_VERSION; older
+  // versions are tolerated on READ so links issued in the 7-day TTL
+  // window survive a renderer rollout. Unknown versions are still
+  // rejected — an unexpected shape would lead the renderer to
+  // interpolate garbage.
+  if (typeof env.version !== 'number' || !SUPPORTED_ENVELOPE_VERSIONS.has(env.version)) {
     throw new Error(
-      `renderBriefMagazine: envelope.version=${JSON.stringify(env.version)} does not match renderer version=${BRIEF_ENVELOPE_VERSION}. Deploy a matching renderer before producing envelopes at this version.`,
+      `renderBriefMagazine: envelope.version=${JSON.stringify(env.version)} is not in supported set [${[...SUPPORTED_ENVELOPE_VERSIONS].join(', ')}]. Deploy a matching renderer before producing envelopes at this version.`,
     );
   }
   if (!isFiniteNumber(env.issuedAt)) {
@@ -241,6 +287,20 @@ export function assertBriefEnvelope(envelope) {
       throw new Error(
         `envelope.data.stories[${i}].threatLevel must be one of critical|high|medium|low (got ${JSON.stringify(st.threatLevel)})`,
       );
+    }
+    // sourceUrl is required on v2 and absent on v1. When present on
+    // either version, it must parse cleanly — a malformed URL would
+    // break the href. On v1 it's expected to be absent; a v1 envelope
+    // that somehow carries a sourceUrl is still validated (cheap
+    // defence against composer regressions).
+    if (env.version === BRIEF_ENVELOPE_VERSION || st.sourceUrl !== undefined) {
+      try {
+        validateSourceUrl(st.sourceUrl);
+      } catch (err) {
+        throw new Error(
+          `envelope.data.stories[${i}].sourceUrl ${/** @type {Error} */ (err).message}`,
+        );
+      }
     }
   });
 
@@ -455,11 +515,44 @@ function renderDigestSignals({ signals, dateShort, pageIndex, totalPages }) {
 }
 
 /**
- * @param {{ story: BriefStory; rank: number; palette: 'light' | 'dark'; pageIndex: number; totalPages: number }} opts
+ * Build a tracked outgoing URL for the source line. Adds utm_source /
+ * utm_medium / utm_campaign / utm_content only when absent — if the
+ * upstream feed already embeds UTM (many publisher RSS do), we keep
+ * their attribution intact and just append ours after.
+ *
+ * Returns the original `raw` on URL parse failure. This path is
+ * unreachable in practice because assertBriefEnvelope already proved
+ * the URL parses, but fail-safe is cheap.
+ *
+ * @param {string} raw           validated absolute https URL
+ * @param {string} issueDate     envelope.data.date (YYYY-MM-DD)
+ * @param {number} rank          1-indexed story rank
  */
-function renderStoryPage({ story, rank, palette, pageIndex, totalPages }) {
+function buildTrackedSourceUrl(raw, issueDate, rank) {
+  try {
+    const u = new URL(raw);
+    if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'worldmonitor');
+    if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', 'brief');
+    if (!u.searchParams.has('utm_campaign')) u.searchParams.set('utm_campaign', issueDate);
+    if (!u.searchParams.has('utm_content')) u.searchParams.set('utm_content', `story-${pad2(rank)}`);
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * @param {{ story: BriefStory; rank: number; palette: 'light' | 'dark'; pageIndex: number; totalPages: number; issueDate: string }} opts
+ */
+function renderStoryPage({ story, rank, palette, pageIndex, totalPages, issueDate }) {
   const threatClass = HIGHLIGHTED_LEVELS.has(story.threatLevel) ? ' crit' : '';
   const threatLabel = THREAT_LABELS[story.threatLevel];
+  // v1 envelopes don't carry sourceUrl — render the source as plain
+  // text (matching pre-v2 appearance). v2 envelopes always have a
+  // validated URL, so we wrap in a UTM-tracked anchor.
+  const sourceBlock = story.sourceUrl
+    ? `<a class="source-link" href="${escapeHtml(buildTrackedSourceUrl(story.sourceUrl, issueDate, rank))}" target="_blank" rel="noopener noreferrer">${escapeHtml(story.source)}</a>`
+    : escapeHtml(story.source);
   return (
     `<section class="page story ${palette}">` +
     '<div class="left">' +
@@ -472,7 +565,7 @@ function renderStoryPage({ story, rank, palette, pageIndex, totalPages }) {
     '</div>' +
     `<h3>${escapeHtml(story.headline)}</h3>` +
     `<p class="desc">${escapeHtml(story.description)}</p>` +
-    `<div class="source">Source · ${escapeHtml(story.source)}</div>` +
+    `<div class="source">Source · ${sourceBlock}</div>` +
     '</div>' +
     '</div>' +
     '<div class="right">' +
@@ -715,6 +808,17 @@ const STYLE_BLOCK = `<style>
   }
   .story.light .source { color: var(--sienna); }
   .story.dark  .source { color: var(--mint); }
+  /* Outgoing source anchor — inherit the palette colour from .source,
+     underline for affordance. rel=noopener noreferrer and target=_blank
+     are set in HTML; this is purely visual. */
+  .story .source-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    transition: text-decoration-thickness 160ms ease;
+  }
+  .story .source-link:hover { text-decoration-thickness: 2px; }
   /* Logo ekg dot: mint on every page so the brand "signal" pulse
      shows across the whole magazine. Light pages use the muted mint
      so it doesn't glare against #fafafa. */
@@ -986,6 +1090,7 @@ export function renderBriefMagazine(envelope) {
         palette: i % 2 === 0 ? 'light' : 'dark',
         pageIndex: ++p,
         totalPages,
+        issueDate: date,
       }),
     );
   });
