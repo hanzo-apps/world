@@ -549,3 +549,154 @@ describe('renderBriefMagazine — source link (v2)', () => {
     );
   });
 });
+
+describe('renderBriefMagazine — Share button (non-public views)', () => {
+  const SHARE_URL = 'https://worldmonitor.app/api/brief/public/abcDEF012345';
+
+  it('renders a Share button with data-share-url and issue date', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { shareUrl: SHARE_URL });
+    assert.ok(html.includes('class="wm-share"'), 'share button must be present');
+    assert.ok(html.includes(`data-share-url="${SHARE_URL}"`), 'share button carries pre-derived URL');
+    assert.ok(html.includes(`data-issue-date="${env.data.date}"`), 'share button carries issue date');
+    assert.ok(html.includes('aria-label="Share this brief"'), 'share button has a11y label');
+  });
+
+  it('emits the inline share script exactly once', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { shareUrl: SHARE_URL });
+    const matches = html.match(/document\.querySelector\('\.wm-share'\)/g) ?? [];
+    assert.equal(matches.length, 1, 'share script emitted once');
+  });
+
+  it('click handler reads from dataset rather than fetching — no auth round-trip', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { shareUrl: SHARE_URL });
+    // The script must NOT contain any fetch call. It reads the URL
+    // from btn.dataset.shareUrl (server-derived) and invokes
+    // navigator.share / clipboard directly.
+    const scriptStart = html.indexOf("document.querySelector('.wm-share')");
+    const scriptEnd = html.indexOf('</script>', scriptStart);
+    assert.ok(scriptStart > -1 && scriptEnd > scriptStart);
+    const scriptBody = html.slice(scriptStart, scriptEnd);
+    assert.ok(!scriptBody.includes('fetch('), 'inline share script must not make fetch calls');
+    assert.ok(scriptBody.includes('btn.dataset.shareUrl'), 'script reads URL from dataset');
+    assert.ok(scriptBody.includes('navigator.share'), 'script uses Web Share API');
+    assert.ok(scriptBody.includes('navigator.clipboard'), 'script has clipboard fallback');
+  });
+
+  it('gracefully hides the Share button when shareUrl is absent', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env);
+    assert.ok(!html.includes('class="wm-share"'), 'no Share button when shareUrl unset');
+    assert.ok(
+      !html.includes("document.querySelector('.wm-share')"),
+      'no Share script when shareUrl unset',
+    );
+  });
+
+  it('HTML-escapes the shareUrl into the data attribute', () => {
+    const env = envelope();
+    const hostile = 'https://example.com/path?a=1&b="evil"';
+    const html = renderBriefMagazine(env, { shareUrl: hostile });
+    // The raw " must not appear inside data-share-url — would
+    // break the HTML attribute parser.
+    assert.ok(
+      html.includes('&quot;evil&quot;'),
+      'hostile quotes are HTML-escaped in data-share-url',
+    );
+  });
+});
+
+describe('renderBriefMagazine — publicMode', () => {
+  it('strips Share button + share script on public mode even when shareUrl is passed', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, {
+      publicMode: true,
+      shareUrl: 'https://worldmonitor.app/api/brief/public/abcDEF012345',
+    });
+    assert.ok(!html.includes('class="wm-share"'), 'share button absent on public');
+    assert.ok(
+      !html.includes("document.querySelector('.wm-share')"),
+      'share script (runtime) absent on public',
+    );
+  });
+
+  it('replaces whyMatters with a generic callout on every story page', () => {
+    const env = envelope();
+    // Pre-test sanity: the fixture uses the Hormuz whyMatters on all
+    // stories, so we know it appears in the private render.
+    const privateHtml = renderBriefMagazine(env);
+    assert.ok(privateHtml.includes('Hormuz is roughly a fifth'), 'private render carries whyMatters');
+
+    const publicHtml = renderBriefMagazine(env, { publicMode: true });
+    assert.ok(!publicHtml.includes('Hormuz is roughly a fifth'), 'whyMatters stripped on public');
+    assert.ok(
+      publicHtml.includes('Subscribe to WorldMonitor Brief to see the full editorial'),
+      'generic placeholder callout rendered',
+    );
+  });
+
+  it('emits a noindex meta tag on public views', () => {
+    const env = envelope();
+    const privateHtml = renderBriefMagazine(env);
+    const publicHtml = renderBriefMagazine(env, { publicMode: true });
+    assert.ok(!privateHtml.includes('noindex'), 'private render is indexable');
+    assert.ok(publicHtml.includes('<meta name="robots" content="noindex,nofollow">'), 'public render sets noindex meta');
+  });
+
+  it('prepends a Subscribe strip on public views', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { publicMode: true });
+    assert.ok(html.includes('class="wm-public-strip"'), 'subscribe strip element emitted');
+    assert.ok(html.includes('worldmonitor.app/pro'), 'strip links to /pro');
+    assert.ok(html.includes('Subscribe'), 'strip CTA text present');
+  });
+
+  it('attaches ?ref= to public CTAs when refCode is provided', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { publicMode: true, refCode: 'ABC123' });
+    assert.ok(html.includes('worldmonitor.app/pro?ref=ABC123'), 'refCode appended to /pro URL');
+  });
+
+  it('HTML-escapes a hostile refCode before interpolation', () => {
+    const env = envelope();
+    const hostile = '"><script>1';
+    const html = renderBriefMagazine(env, { publicMode: true, refCode: hostile });
+    // encodeURIComponent handles most of the sanitisation; the result
+    // should contain percent-encoded chars and NO raw <script> tag.
+    assert.ok(!html.includes('<script>1'), 'raw hostile payload never appears');
+  });
+
+  it('swaps the back cover to a Subscribe CTA on public views', () => {
+    const env = envelope();
+    const privateHtml = renderBriefMagazine(env);
+    const publicHtml = renderBriefMagazine(env, { publicMode: true });
+    assert.ok(privateHtml.includes('End of'), 'private back cover reads "End of Transmission"');
+    assert.ok(publicHtml.includes('Get your own'), 'public back cover reads Subscribe-style headline');
+    assert.ok(publicHtml.includes('class="mono back-cta"'), 'public back cover has CTA anchor');
+  });
+
+  it('does NOT leak the original user name on public views', () => {
+    const env = envelope({
+      user: { name: 'Alice Personally', tz: 'UTC' },
+    });
+    const html = renderBriefMagazine(env, { publicMode: true });
+    assert.ok(!html.includes('Alice Personally'), 'user name must not appear on public mirror');
+  });
+
+  it('keeps story headlines, categories, sources on public views (shared content)', () => {
+    const env = envelope();
+    const html = renderBriefMagazine(env, { publicMode: true });
+    // Story content itself IS shared — that's the point of the mirror.
+    assert.ok(html.includes('Iran declares Strait of Hormuz open'));
+    assert.ok(html.includes('Multiple wires'));
+  });
+
+  it('default options (no second arg) behaves identically to the private path', () => {
+    const env = envelope();
+    const a = renderBriefMagazine(env);
+    const b = renderBriefMagazine(env, {});
+    assert.equal(a, b);
+  });
+});
