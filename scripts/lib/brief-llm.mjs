@@ -31,6 +31,7 @@ import { createHash } from 'node:crypto';
 
 const WHY_MATTERS_TTL_SEC = 24 * 60 * 60;
 const DIGEST_PROSE_TTL_SEC = 4 * 60 * 60;
+const STORY_DESCRIPTION_TTL_SEC = 24 * 60 * 60;
 const WHY_MATTERS_CONCURRENCY = 5;
 
 // Pin to openrouter (google/gemini-2.5-flash). Ollama isn't deployed
@@ -48,20 +49,26 @@ const WHY_MATTERS_SYSTEM =
   'no quotes. One sentence only.';
 
 /**
- * Deterministic hash of every field that flows into buildWhyMattersPrompt.
+ * Deterministic 16-char hex hash of the five story fields that flow
+ * into both buildWhyMattersPrompt and buildStoryDescriptionPrompt.
  *
  * Keying only on headline/source/severity (as an earlier draft did)
  * leaves `category` and `country` out of the cache identity, which is
  * wrong: those fields appear in the user prompt, and if a story's
  * classification or geocoding is corrected upstream we must re-LLM
- * rather than serve the pre-correction prose. Bumped key version to
- * v2 so any pre-fix cached entries (on the v1 hash) are ignored
- * rather than reused — a one-off recompute is cheaper than serving
- * stale editorial content.
+ * rather than serve the pre-correction prose. whyMatters bumped to v2
+ * cache prefix when this was tightened; description launched on v1
+ * with the same hash material.
+ *
+ * The two prompts share the same hash because they cover the same
+ * inputs — cache separation is enforced via the distinct key prefixes
+ * (`brief:llm:whymatters:v2:` vs `brief:llm:description:v1:`). Keeping
+ * a single helper prevents silent drift if a future field is added to
+ * one prompt and forgotten in the other.
  *
  * @param {{ headline: string; source: string; threatLevel: string; category: string; country: string }} story
  */
-function hashStory(story) {
+function hashBriefStory(story) {
   const material = [
     story.headline ?? '',
     story.source ?? '',
@@ -126,8 +133,8 @@ export function parseWhyMatters(text) {
  */
 export async function generateWhyMatters(story, deps) {
   // v2: hash now covers the full prompt (headline/source/severity/
-  // category/country) — see hashStory() comment.
-  const key = `brief:llm:whymatters:v2:${hashStory(story)}`;
+  // category/country) — see hashBriefStory() comment.
+  const key = `brief:llm:whymatters:v2:${hashBriefStory(story)}`;
   try {
     const hit = await deps.cacheGet(key);
     if (typeof hit === 'string' && hit.length > 0) return hit;
@@ -149,6 +156,108 @@ export async function generateWhyMatters(story, deps) {
   try {
     await deps.cacheSet(key, parsed, WHY_MATTERS_TTL_SEC);
   } catch { /* cache write failures don't matter here */ }
+  return parsed;
+}
+
+// ── Per-story description (replaces title-verbatim fallback) ──────────────
+
+const STORY_DESCRIPTION_SYSTEM =
+  'You are the editor of WorldMonitor Brief, a geopolitical intelligence magazine. ' +
+  'Given the story attributes below, write ONE concise sentence (16–30 words) that ' +
+  'describes the development itself — not why it matters, not the reader reaction. ' +
+  'Editorial, serious, past/present tense, named actors where possible. Do NOT ' +
+  'repeat the headline verbatim. No preamble, no quotes, no questions, no markdown, ' +
+  'no hedging. One sentence only.';
+
+/**
+ * @param {{ headline: string; source: string; category: string; country: string; threatLevel: string }} story
+ * @returns {{ system: string; user: string }}
+ */
+export function buildStoryDescriptionPrompt(story) {
+  const user = [
+    `Headline: ${story.headline}`,
+    `Source: ${story.source}`,
+    `Severity: ${story.threatLevel}`,
+    `Category: ${story.category}`,
+    `Country: ${story.country}`,
+    '',
+    'One editorial sentence describing what happened (not why it matters):',
+  ].join('\n');
+  return { system: STORY_DESCRIPTION_SYSTEM, user };
+}
+
+/**
+ * Parse + validate the LLM story-description output. Rejects empty
+ * responses, boilerplate preambles that slipped through the system
+ * prompt, outputs that trivially echo the headline (sanity guard
+ * against models that default to copying the prompt), and lengths
+ * that drift far outside the prompted range.
+ *
+ * @param {unknown} text
+ * @param {string} [headline]  used to detect headline-echo drift
+ * @returns {string | null}
+ */
+export function parseStoryDescription(text, headline) {
+  if (typeof text !== 'string') return null;
+  let s = text.trim();
+  if (!s) return null;
+  s = s.replace(/^[\u201C"']+/, '').replace(/[\u201D"']+$/, '').trim();
+  const match = s.match(/^[^.!?]+[.!?]/);
+  const sentence = match ? match[0].trim() : s;
+  if (sentence.length < 40 || sentence.length > 400) return null;
+  if (typeof headline === 'string') {
+    const normalise = /** @param {string} x */ (x) => x.trim().toLowerCase().replace(/\s+/g, ' ');
+    // Reject outputs that are a verbatim echo of the headline — that
+    // is exactly the fallback we're replacing, shipping it as
+    // "LLM enrichment" would be dishonest about cache spend.
+    if (normalise(sentence) === normalise(headline)) return null;
+  }
+  return sentence;
+}
+
+/**
+ * Resolve a description sentence for one story via cache → LLM.
+ * Returns null on any failure; caller falls back to the composer's
+ * baseline (cleaned headline) rather than shipping with a placeholder.
+ *
+ * @param {object} story
+ * @param {{
+ *   callLLM: (system: string, user: string, opts: object) => Promise<string|null>;
+ *   cacheGet: (key: string) => Promise<unknown>;
+ *   cacheSet: (key: string, value: unknown, ttlSec: number) => Promise<void>;
+ * }} deps
+ */
+export async function generateStoryDescription(story, deps) {
+  // Shares hashBriefStory() with whyMatters — the key prefix
+  // (`brief:llm:description:v1:`) is what separates the two cache
+  // namespaces; the material is the same five fields.
+  const key = `brief:llm:description:v1:${hashBriefStory(story)}`;
+  try {
+    const hit = await deps.cacheGet(key);
+    if (typeof hit === 'string') {
+      // Revalidate on cache hit so a pre-fix bad row (short, echo,
+      // malformed) can't flow into the envelope unchecked.
+      const valid = parseStoryDescription(hit, story.headline);
+      if (valid) return valid;
+    }
+  } catch { /* cache miss is fine */ }
+  const { system, user } = buildStoryDescriptionPrompt(story);
+  let text = null;
+  try {
+    text = await deps.callLLM(system, user, {
+      maxTokens: 140,
+      temperature: 0.4,
+      timeoutMs: 10_000,
+      skipProviders: BRIEF_LLM_SKIP_PROVIDERS,
+    });
+  } catch {
+    return null;
+  }
+  const parsed = parseStoryDescription(text, story.headline);
+  if (!parsed) return null;
+  try {
+    await deps.cacheSet(key, parsed, STORY_DESCRIPTION_TTL_SEC);
+  } catch { /* ignore */ }
   return parsed;
 }
 
@@ -378,11 +487,19 @@ export async function enrichBriefEnvelopeWithLLM(envelope, rule, deps) {
   const stories = envelope.data.stories;
   const sensitivity = rule?.sensitivity ?? 'all';
 
-  // Per-story whyMatters — parallel but bounded.
+  // Per-story enrichment — whyMatters AND description in parallel
+  // per story (two LLM calls) but bounded across stories.
   const enrichedStories = await mapLimit(stories, WHY_MATTERS_CONCURRENCY, async (story) => {
-    const why = await generateWhyMatters(story, deps);
-    if (!why) return story;
-    return { ...story, whyMatters: why };
+    const [why, desc] = await Promise.all([
+      generateWhyMatters(story, deps),
+      generateStoryDescription(story, deps),
+    ]);
+    if (!why && !desc) return story;
+    return {
+      ...story,
+      ...(why ? { whyMatters: why } : {}),
+      ...(desc ? { description: desc } : {}),
+    };
   });
 
   // Per-user digest prose — one call.
