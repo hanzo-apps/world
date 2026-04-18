@@ -32,7 +32,7 @@ FROM nginx:alpine AS runtime
 
 WORKDIR /usr/share/nginx/html
 
-ENV API_UPSTREAM=https://api.world.hanzo.ai
+ENV API_UPSTREAM=https://worldmonitor.app
 
 # Copy built assets, nginx template (API_UPSTREAM substituted at startup), and entrypoint.
 COPY --from=builder /app/dist/ ./
