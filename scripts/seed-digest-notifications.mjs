@@ -434,7 +434,7 @@ function formatDigestHtml(stories, nowMs) {
     </div>
     <div style="background: #0a0a0a; border-top: 1px solid #1a1a1a; padding: 20px 36px; text-align: center;">
       <div style="margin-bottom: 12px;">
-        <a href="https://x.com/hanaborosky" style="color: #555; text-decoration: none; font-size: 11px; margin: 0 10px;">X / Twitter</a>
+        <a href="https://x.com/hanzoai" style="color: #555; text-decoration: none; font-size: 11px; margin: 0 10px;">X / Twitter</a>
         <a href="https://github.com/hanzoai/world" style="color: #555; text-decoration: none; font-size: 11px; margin: 0 10px;">GitHub</a>
         <a href="https://discord.gg/re63kWKxaz" style="color: #555; text-decoration: none; font-size: 11px; margin: 0 10px;">Discord</a>
       </div>
