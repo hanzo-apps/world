@@ -97,15 +97,15 @@ export function getWidget(id: string): CustomWidgetSpec | null {
 }
 
 // ── Cross-domain key helpers ──────────────────────────────────────────────
-// Cookies with domain=.worldmonitor.app are shared across all subdomains
-// (worldmonitor.app, tech., finance., commodity., happy., etc.).
+// Cookies with domain=.world.hanzo.ai are shared across all subdomains
+// (world.hanzo.ai, tech., finance., commodity., happy., etc.).
 // We read cookie first and fall back to localStorage for migration compat.
 
-const COOKIE_DOMAIN = '.worldmonitor.app';
+const COOKIE_DOMAIN = '.world.hanzo.ai';
 const KEY_MAX_AGE = 365 * 24 * 60 * 60;
 
 function usesCookies(): boolean {
-  return location.hostname.endsWith('worldmonitor.app');
+  return location.hostname.endsWith('world.hanzo.ai');
 }
 
 function getCookieValue(name: string): string {
