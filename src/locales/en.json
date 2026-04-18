@@ -2083,7 +2083,7 @@
       "loadError": "Climate news temporarily unavailable"
     },
     "chatAnalyst": {
-      "infoTooltip": "<strong>WM Analyst</strong> AI analyst with live context across geopolitical, market, military, and economic domains. Powered by Claude with real-time data injected from active WorldMonitor feeds."
+      "infoTooltip": "<strong>WM Analyst</strong> AI analyst with live context across geopolitical, market, military, and economic domains. Powered by Claude with real-time data injected from active Hanzo World feeds."
     },
     "cotPositioning": {
       "infoTooltip": "<strong>CFTC COT Positioning</strong> Commitments of Traders report: net positioning of commercials, large speculators, and small traders across commodity and financial futures. Published weekly (Friday). Source: CFTC."
@@ -2142,7 +2142,7 @@
       "infoTooltip": "<strong>Macro Indicators</strong> Key macroeconomic indicators for the US and Euro Area: CPI, unemployment, GDP, and central bank rates. Values shown with prior period delta. Source: FRED (Federal Reserve Economic Data)."
     },
     "monitors": {
-      "infoTooltip": "<strong>Keyword Monitors</strong> Add any term to track live news mentions across all WorldMonitor sources. Results update in real time as matching articles are ingested."
+      "infoTooltip": "<strong>Keyword Monitors</strong> Add any term to track live news mentions across all Hanzo World sources. Results update in real time as matching articles are ingested."
     },
     "renewable": {
       "infoTooltip": "<strong>Renewable Energy</strong> Global renewable energy project pipeline: solar, wind, hydro, and storage capacity additions. Tracks announced, under-construction, and commissioned projects by region and technology type."

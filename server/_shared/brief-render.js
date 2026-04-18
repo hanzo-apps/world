@@ -502,7 +502,7 @@ function renderBackCover({ tz, pageIndex, totalPages }) {
     '<h1>End of<br/>Transmission.</h1>' +
     '</div>' +
     '<div class="meta-bottom">' +
-    '<span class="mono">worldmonitor.app</span>' +
+    '<span class="mono">world.hanzo.ai</span>' +
     `<span class="mono">Next brief · 08:00 ${escapeHtml(tz)}</span>` +
     '</div>' +
     `<div class="page-number mono">${pad2(pageIndex)} / ${pad2(totalPages)}</div>` +
