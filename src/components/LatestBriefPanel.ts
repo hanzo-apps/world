@@ -23,6 +23,7 @@ import { Panel } from './Panel';
 import { getClerkToken, clearClerkTokenCache } from '@/services/clerk';
 import { PanelGateReason, hasPremiumAccess } from '@/services/panel-gating';
 import { getAuthState, subscribeAuthState } from '@/services/auth-state';
+import { hasTier, getEntitlementState } from '@/services/entitlements';
 import { h, rawHtml, replaceChildren, clearChildren } from '@/utils/dom-utils';
 
 interface LatestBriefReady {
@@ -182,12 +183,24 @@ export class LatestBriefPanel extends Panel {
       this.renderSignInRequired();
       return;
     }
-    // Mixed-auth edge case: desktop/tester keys open the panel even
-    // when the signed-in Clerk account is FREE. /api/latest-brief
-    // verifies entitlement from the JWT's userId and returns 403
-    // for free accounts. Render the upgrade CTA locally instead of
-    // bouncing through a doomed fetch.
-    if (authState.user?.role !== 'pro') {
+    // Client-side entitlement is NOT authoritative. /api/latest-brief
+    // does its own server-side entitlement check against the Clerk
+    // JWT — that IS the source of truth. We only use the client
+    // snapshot for AFFIRMATIVE DENIAL: skip the doomed fetch when
+    // we KNOW the user is free. If the snapshot is missing, stale,
+    // or the Convex subscription failed to establish, we fall
+    // through and let the server decide. The server's 403 response
+    // is translated to renderUpgradeRequired() in the catch block
+    // below (via BriefAccessError).
+    //
+    // Consequence: an API-key-only user with a free Clerk account
+    // will fire one doomed fetch per refresh and see the upgrade
+    // CTA a beat later than they would with a client-side gate.
+    // Accepted — the alternative (trusting the client snapshot as
+    // a gate) locked legitimate Pro users out whenever the Convex
+    // entitlement subscription was skipped or failed, which is a
+    // worse failure mode.
+    if (getEntitlementState() !== null && !hasTier(1)) {
       this.renderUpgradeRequired();
       return;
     }
