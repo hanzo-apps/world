@@ -27,24 +27,24 @@ function createHandler() {
 
 async function requestPublicRoute(origin: string) {
   const handler = createHandler();
-  return handler(new Request('https://worldmonitor.app/api/market/v1/list-market-quotes?symbols=AAPL', {
+  return handler(new Request('https://world.hanzo.ai/api/market/v1/list-market-quotes?symbols=AAPL', {
     headers: { Origin: origin },
   }));
 }
 
 describe('gateway CDN origin policy', () => {
-  it('keeps per-origin CORS and enables CDN caching for worldmonitor.app', async () => {
-    const res = await requestPublicRoute('https://worldmonitor.app');
+  it('keeps per-origin CORS and enables CDN caching for world.hanzo.ai', async () => {
+    const res = await requestPublicRoute('https://world.hanzo.ai');
     assert.equal(res.status, 200);
-    assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://worldmonitor.app');
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://world.hanzo.ai');
     assert.equal(res.headers.get('Vary'), 'Origin');
     assert.match(res.headers.get('CDN-Cache-Control') ?? '', /s-maxage=/);
   });
 
   it('keeps per-origin CORS and enables CDN caching for production subdomains', async () => {
-    const res = await requestPublicRoute('https://tech.worldmonitor.app');
+    const res = await requestPublicRoute('https://tech.world.hanzo.ai');
     assert.equal(res.status, 200);
-    assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://tech.worldmonitor.app');
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://tech.world.hanzo.ai');
     assert.equal(res.headers.get('Vary'), 'Origin');
     assert.match(res.headers.get('CDN-Cache-Control') ?? '', /s-maxage=/);
   });
@@ -71,7 +71,7 @@ describe('gateway CDN origin policy', () => {
     const origin = 'tauri://localhost';
     process.env.WORLDMONITOR_VALID_KEYS = 'real-key-123';
     const handler = createHandler();
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/list-market-quotes?symbols=AAPL', {
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/list-market-quotes?symbols=AAPL', {
       headers: {
         Origin: origin,
         'X-WorldMonitor-Key': 'real-key-123',
@@ -85,7 +85,7 @@ describe('gateway CDN origin policy', () => {
 
   it('still blocks disallowed origins before route handling', async () => {
     const handler = createHandler();
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/list-market-quotes?symbols=AAPL', {
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/list-market-quotes?symbols=AAPL', {
       headers: { Origin: 'https://evil.example.com' },
     }));
     assert.equal(res.status, 403);
@@ -95,19 +95,19 @@ describe('gateway CDN origin policy', () => {
     process.env.WORLDMONITOR_VALID_KEYS = 'real-key-123';
     const handler = createHandler();
 
-    const noCreds = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const noCreds = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(noCreds.status, 401);
 
-    const withKey = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
+    const withKey = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         'X-WorldMonitor-Key': 'real-key-123',
       },
     }));
     assert.equal(withKey.status, 200);
-    assert.equal(withKey.headers.get('Access-Control-Allow-Origin'), 'https://worldmonitor.app');
+    assert.equal(withKey.headers.get('Access-Control-Allow-Origin'), 'https://world.hanzo.ai');
     assert.equal(withKey.headers.get('Vary'), 'Origin');
     assert.equal(withKey.headers.get('CDN-Cache-Control'), null, 'premium endpoints must NOT have CDN caching');
   });

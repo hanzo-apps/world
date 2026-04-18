@@ -8,7 +8,7 @@
 import type { Clerk } from '@clerk/clerk-js';
 import type { CheckoutEvent } from 'dodopayments-checkout';
 
-const API_BASE = 'https://api.worldmonitor.app/api';
+const API_BASE = 'https://api.world.hanzo.ai/api';
 
 const MONO_FONT = "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace";
 
@@ -135,7 +135,7 @@ async function doCheckout(
       },
       body: JSON.stringify({
         productId,
-        returnUrl: 'https://worldmonitor.app',
+        returnUrl: 'https://world.hanzo.ai',
         discountCode: options.discountCode,
         referralCode: options.referralCode,
       }),

@@ -44,7 +44,7 @@ My 90-day plan would be simple. Month one: publish the methodology paper, indica
 
 Do that, and this becomes a reference-grade country resilience product. Skip it, and it stays a strong feature inside a broader intelligence platform.
 
-[1]: https://www.worldmonitor.app/?lat=20.0000&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2CiranAttacks&lon=0.0000&timeRange=7d&view=global&zoom=1.00 "https://www.worldmonitor.app/?lat=20.0000&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2CiranAttacks&lon=0.0000&timeRange=7d&view=global&zoom=1.00"
+[1]: https://www.world.hanzo.ai/?lat=20.0000&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2CiranAttacks&lon=0.0000&timeRange=7d&view=global&zoom=1.00 "https://www.world.hanzo.ai/?lat=20.0000&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2CiranAttacks&lon=0.0000&timeRange=7d&view=global&zoom=1.00"
 [2]: https://raw.githubusercontent.com/koala73/worldmonitor/main/docs/api/ResilienceService.openapi.yaml "https://raw.githubusercontent.com/koala73/worldmonitor/main/docs/api/ResilienceService.openapi.yaml"
 [3]: https://raw.githubusercontent.com/koala73/worldmonitor/main/server/worldmonitor/resilience/v1/_dimension-scorers.ts "https://raw.githubusercontent.com/koala73/worldmonitor/main/server/worldmonitor/resilience/v1/_dimension-scorers.ts"
 [4]: https://github.com/koala73/worldmonitor/blob/main/docs/country-instability-index.mdx "https://github.com/koala73/worldmonitor/blob/main/docs/country-instability-index.mdx"

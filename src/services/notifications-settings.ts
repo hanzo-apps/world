@@ -60,12 +60,12 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           upgradeBtn.addEventListener('click', () => {
             if (!host.isSignedIn) {
               import('@/services/clerk').then(m => m.openSignIn()).catch(() => {
-                window.open('https://worldmonitor.app/pro', '_blank');
+                window.open('https://world.hanzo.ai/pro', '_blank');
               });
               return;
             }
             import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DEFAULT_UPGRADE_PRODUCT))).catch(() => {
-              window.open('https://worldmonitor.app/pro', '_blank');
+              window.open('https://world.hanzo.ai/pro', '_blank');
             });
           }, { signal });
         }
@@ -796,9 +796,9 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
 
       const onMessage = (e: MessageEvent): void => {
         const trustedOrigin = e.origin === window.location.origin ||
-          e.origin === 'https://worldmonitor.app' ||
-          e.origin === 'https://www.worldmonitor.app' ||
-          e.origin.endsWith('.worldmonitor.app');
+          e.origin === 'https://world.hanzo.ai' ||
+          e.origin === 'https://www.world.hanzo.ai' ||
+          e.origin.endsWith('.world.hanzo.ai');
         const fromSlack = slackOAuthPopup !== null && e.source === slackOAuthPopup;
         const fromDiscord = discordOAuthPopup !== null && e.source === discordOAuthPopup;
         if (!trustedOrigin || (!fromSlack && !fromDiscord)) return;

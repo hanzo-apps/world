@@ -46,7 +46,7 @@ export function validateApiKey(req, options = {}) {
     return { valid: true, required: true };
   }
 
-  // Trusted browser origin (worldmonitor.app, Vercel previews, localhost dev) — no key needed
+  // Trusted browser origin (world.hanzo.ai, Vercel previews, localhost dev) — no key needed
   if (isTrustedBrowserOrigin(origin)) {
     if (forceKey && !key) {
       return { valid: false, required: true, error: 'API key required' };

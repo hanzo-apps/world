@@ -36,7 +36,7 @@ const ADVISORY_FEEDS = [
   { name: 'WHO Africa Emergencies', sourceCountry: 'INT', url: 'https://www.afro.who.int/rss/emergencies.xml' },
 ];
 
-const RELAY_URL = process.env.RELAY_URL || 'https://proxy.worldmonitor.app';
+const RELAY_URL = process.env.RELAY_URL || 'https://proxy.world.hanzo.ai';
 
 function parseUsLevel(title) {
   const m = title.match(/Level (\d)/i);

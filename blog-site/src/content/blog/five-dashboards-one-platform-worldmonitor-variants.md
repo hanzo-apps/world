@@ -14,7 +14,7 @@ World Monitor runs **five specialized dashboards** from a single codebase. Switc
 
 ## 1. World Monitor: The Geopolitical Command Center
 
-**URL:** worldmonitor.app
+**URL:** world.hanzo.ai
 **Panels:** 45
 **Focus:** Conflicts, military, infrastructure, geopolitical risk
 
@@ -37,7 +37,7 @@ This is the flagship. World Monitor is built for OSINT analysts, defense researc
 
 ## 2. Tech Monitor: The Silicon Valley Radar
 
-**URL:** tech.worldmonitor.app
+**URL:** tech.world.hanzo.ai
 **Panels:** 28
 **Focus:** AI/ML, startups, cybersecurity, cloud infrastructure
 
@@ -60,7 +60,7 @@ Tech Monitor maps the global technology landscape: where AI is being built, wher
 
 ## 3. Finance Monitor: Markets with Context
 
-**URL:** finance.worldmonitor.app
+**URL:** finance.world.hanzo.ai
 **Panels:** 27
 **Focus:** Markets, central banks, forex, Gulf FDI, macro signals
 
@@ -84,7 +84,7 @@ Finance Monitor is for [traders and analysts](/blog/posts/real-time-market-intel
 
 ## 4. Commodity Monitor: Raw Materials Intelligence
 
-**URL:** commodity.worldmonitor.app
+**URL:** commodity.world.hanzo.ai
 **Panels:** 16
 **Focus:** Mining, metals, energy, supply chain disruption
 
@@ -105,7 +105,7 @@ Commodity Monitor tracks the physical resources that power the global economy: w
 
 ## 5. Happy Monitor: The Antidote to Doom Scrolling
 
-**URL:** happy.worldmonitor.app
+**URL:** happy.world.hanzo.ai
 **Panels:** 10
 **Focus:** Good news, human progress, conservation, renewable energy
 
@@ -201,8 +201,8 @@ No. All five variants are completely free with no time limits, feature gates, or
 
 **Pick your variant and start exploring:**
 
-- [worldmonitor.app](https://worldmonitor.app) for geopolitics
-- [tech.worldmonitor.app](https://tech.worldmonitor.app) for technology
-- [finance.worldmonitor.app](https://finance.worldmonitor.app) for markets
-- [commodity.worldmonitor.app](https://commodity.worldmonitor.app) for commodities
-- [happy.worldmonitor.app](https://happy.worldmonitor.app) for good news
+- [world.hanzo.ai](https://world.hanzo.ai) for geopolitics
+- [tech.world.hanzo.ai](https://tech.world.hanzo.ai) for technology
+- [finance.world.hanzo.ai](https://finance.world.hanzo.ai) for markets
+- [commodity.world.hanzo.ai](https://commodity.world.hanzo.ai) for commodities
+- [happy.world.hanzo.ai](https://happy.world.hanzo.ai) for good news

@@ -27,7 +27,7 @@ FROM nginx:alpine
 
 WORKDIR /usr/share/nginx/html
 
-ENV API_UPSTREAM=https://worldmonitor.app
+ENV API_UPSTREAM=https://world.hanzo.ai
 
 COPY --from=builder /app/dist/ ./
 COPY docker/nginx.conf.template /etc/nginx/nginx.conf.template

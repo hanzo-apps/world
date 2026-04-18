@@ -271,7 +271,7 @@ ws.report.domainOverview  // check if military appears in activeDomainCount
 
 Also check the seed inputs to confirm theater posture data:
 ```
-curl https://api.worldmonitor.app/api/forecast-bootstrap | jq '.militaryData'
+curl https://api.world.hanzo.ai/api/forecast-bootstrap | jq '.militaryData'
 ```
 
 ### Two possible fixes depending on diagnosis:

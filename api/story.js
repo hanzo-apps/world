@@ -16,7 +16,7 @@ const COUNTRY_NAMES = {
 const BOT_UA = /twitterbot|facebookexternalhit|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|redditbot|googlebot/i;
 
 export default function handler(req, res) {
-  const url = new URL(req.url, 'https://worldmonitor.app');
+  const url = new URL(req.url, 'https://world.hanzo.ai');
   const countryCode = (url.searchParams.get('c') || '').toUpperCase();
   const type = url.searchParams.get('t') || 'ciianalysis';
   const ts = url.searchParams.get('ts') || '';
@@ -26,7 +26,7 @@ export default function handler(req, res) {
   const ua = req.headers['user-agent'] || '';
   const isBot = BOT_UA.test(ua);
 
-  const baseUrl = 'https://worldmonitor.app';
+  const baseUrl = 'https://world.hanzo.ai';
   const spaUrl = `${baseUrl}/?c=${countryCode}&t=${type}${ts ? `&ts=${ts}` : ''}`;
 
   // Real users → redirect to SPA
@@ -61,7 +61,7 @@ export default function handler(req, res) {
   <meta property="og:site_name" content="World Monitor"/>
 
   <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:site" content="@WorldMonitorApp"/>
+  <meta name="twitter:site" content="@hanzoai"/>
   <meta name="twitter:title" content="${esc(title)}"/>
   <meta name="twitter:description" content="${esc(description)}"/>
   <meta name="twitter:image" content="${esc(imageUrl)}"/>

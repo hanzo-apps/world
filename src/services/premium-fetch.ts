@@ -27,7 +27,7 @@ function reportServerError(res: Response, input: RequestInfo | URL): void {
   if (res.status < 500) return;
   try {
     const href = input instanceof Request ? input.url : String(input);
-    const path = new URL(href, globalThis.location?.href ?? 'https://worldmonitor.app').pathname;
+    const path = new URL(href, globalThis.location?.href ?? 'https://world.hanzo.ai').pathname;
     Sentry.captureMessage(`API ${res.status}: ${path}`, {
       level: 'error',
       tags: { kind: 'api_5xx' },

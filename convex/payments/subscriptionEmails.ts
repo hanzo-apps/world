@@ -9,8 +9,8 @@ import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 
 const RESEND_URL = "https://api.resend.com/emails";
-const FROM = "World Monitor <noreply@worldmonitor.app>";
-const ADMIN_EMAIL = "elie@worldmonitor.app";
+const FROM = "World Monitor <noreply@world.hanzo.ai>";
+const ADMIN_EMAIL = "elie@world.hanzo.ai";
 
 const PLAN_DISPLAY: Record<string, string> = {
   free: "Free",
@@ -126,7 +126,7 @@ function userWelcomeHtml(planName: string, planKey: string): string {
     <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 32px;">
       <tr>
         <td style="width: 40px; height: 40px; vertical-align: middle;">
-          <img src="https://www.worldmonitor.app/favico/android-chrome-192x192.png" width="40" height="40" alt="WorldMonitor" style="border-radius: 50%; display: block;" />
+          <img src="https://www.world.hanzo.ai/favico/android-chrome-192x192.png" width="40" height="40" alt="WorldMonitor" style="border-radius: 50%; display: block;" />
         </td>
         <td style="padding-left: 12px;">
           <div style="font-size: 16px; font-weight: 800; color: #fff; letter-spacing: -0.5px;">WORLD MONITOR</div>
@@ -144,7 +144,7 @@ function userWelcomeHtml(planName: string, planKey: string): string {
     </table>
 
     <div style="text-align: center; margin-bottom: 36px;">
-      <a href="https://worldmonitor.app" style="display: inline-block; background: #4ade80; color: #0a0a0a; padding: 14px 36px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; border-radius: 2px;">Open Dashboard</a>
+      <a href="https://world.hanzo.ai" style="display: inline-block; background: #4ade80; color: #0a0a0a; padding: 14px 36px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; border-radius: 2px;">Open Dashboard</a>
     </div>
   </div>
 
@@ -155,7 +155,7 @@ function userWelcomeHtml(planName: string, planKey: string): string {
     </div>
     <p style="font-size: 11px; color: #444; margin: 0; line-height: 1.6;">
       World Monitor \u2014 Real-time intelligence for a connected world.<br />
-      <a href="https://worldmonitor.app" style="color: #4ade80; text-decoration: none;">worldmonitor.app</a>
+      <a href="https://world.hanzo.ai" style="color: #4ade80; text-decoration: none;">world.hanzo.ai</a>
     </p>
   </div>
 </div>`;

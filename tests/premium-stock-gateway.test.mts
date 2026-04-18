@@ -40,41 +40,41 @@ describe('premium gateway API key enforcement', () => {
     process.env.WORLDMONITOR_VALID_KEYS = 'real-key-123';
 
     // Trusted browser origin without credentials — 401 (no API key, no bearer token)
-    const browserNoKey = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const browserNoKey = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(browserNoKey.status, 401);
 
-    const resilienceScoreNoKey = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-score?countryCode=US', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const resilienceScoreNoKey = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-score?countryCode=US', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(resilienceScoreNoKey.status, 401);
 
-    const resilienceRankingNoKey = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-ranking', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const resilienceRankingNoKey = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-ranking', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(resilienceRankingNoKey.status, 401);
 
     // Trusted browser origin with valid API key — 200 (API-key holders bypass entitlement check)
-    const browserWithKey = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
+    const browserWithKey = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         'X-WorldMonitor-Key': 'real-key-123',
       },
     }));
     assert.equal(browserWithKey.status, 200);
 
-    const resilienceScoreWithKey = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-score?countryCode=US', {
+    const resilienceScoreWithKey = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-score?countryCode=US', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         'X-WorldMonitor-Key': 'real-key-123',
       },
     }));
     assert.equal(resilienceScoreWithKey.status, 200);
 
-    const resilienceRankingWithKey = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-ranking', {
+    const resilienceRankingWithKey = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-ranking', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         'X-WorldMonitor-Key': 'real-key-123',
       },
     }));
@@ -87,8 +87,8 @@ describe('premium gateway API key enforcement', () => {
     assert.equal(unknownNoKey.status, 403);
 
     // Public endpoint — always accessible from trusted origin (no credentials needed)
-    const publicAllowed = await handler(new Request('https://worldmonitor.app/api/market/v1/list-market-quotes?symbols=AAPL', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const publicAllowed = await handler(new Request('https://world.hanzo.ai/api/market/v1/list-market-quotes?symbols=AAPL', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(publicAllowed.status, 200);
   });
@@ -181,9 +181,9 @@ describe('premium gateway bearer token auth', () => {
     // A valid Pro bearer token resolves a userId via session, but without entitlement data
     // in the test env (no Redis/Convex), the entitlement check fails closed → 403
     const token = await signToken({ sub: 'user_pro', plan: 'pro' });
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
@@ -195,9 +195,9 @@ describe('premium gateway bearer token auth', () => {
 
   it('free bearer token on premium endpoint → 403', async () => {
     const token = await signToken({ sub: 'user_free', plan: 'free' });
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
@@ -206,9 +206,9 @@ describe('premium gateway bearer token auth', () => {
 
   it('rejects invalid/expired bearer token on premium endpoint → 401', async () => {
     const token = await signToken({ sub: 'user_bad', plan: 'pro' }, { key: wrongPrivateKey });
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/analyze-stock?symbol=AAPL', {
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/analyze-stock?symbol=AAPL', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
@@ -217,8 +217,8 @@ describe('premium gateway bearer token auth', () => {
   });
 
   it('public routes are unaffected by absence of auth header', async () => {
-    const res = await handler(new Request('https://worldmonitor.app/api/market/v1/list-market-quotes?symbols=AAPL', {
-      headers: { Origin: 'https://worldmonitor.app' },
+    const res = await handler(new Request('https://world.hanzo.ai/api/market/v1/list-market-quotes?symbols=AAPL', {
+      headers: { Origin: 'https://world.hanzo.ai' },
     }));
     assert.equal(res.status, 200);
   });
@@ -226,17 +226,17 @@ describe('premium gateway bearer token auth', () => {
   it('rejects free bearer token on resilience premium endpoints → 403', async () => {
     const token = await signToken({ sub: 'user_free', plan: 'free' });
 
-    const scoreRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-score?countryCode=US', {
+    const scoreRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-score?countryCode=US', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
     assert.equal(scoreRes.status, 403);
 
-    const rankingRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-ranking', {
+    const rankingRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-ranking', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
@@ -246,17 +246,17 @@ describe('premium gateway bearer token auth', () => {
   it('rejects invalid bearer token on resilience premium endpoints → 401', async () => {
     const token = await signToken({ sub: 'user_bad', plan: 'pro' }, { key: wrongPrivateKey });
 
-    const scoreRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-score?countryCode=US', {
+    const scoreRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-score?countryCode=US', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
     assert.equal(scoreRes.status, 401);
 
-    const rankingRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-ranking', {
+    const rankingRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-ranking', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
@@ -266,17 +266,17 @@ describe('premium gateway bearer token auth', () => {
   it('accepts valid Pro bearer token on resilience premium endpoints → 200', async () => {
     const token = await signToken({ sub: 'user_pro', plan: 'pro' });
 
-    const scoreRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-score?countryCode=US', {
+    const scoreRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-score?countryCode=US', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
     assert.equal(scoreRes.status, 200);
 
-    const rankingRes = await handler(new Request('https://worldmonitor.app/api/resilience/v1/get-resilience-ranking', {
+    const rankingRes = await handler(new Request('https://world.hanzo.ai/api/resilience/v1/get-resilience-ranking', {
       headers: {
-        Origin: 'https://worldmonitor.app',
+        Origin: 'https://world.hanzo.ai',
         Authorization: `Bearer ${token}`,
       },
     }));
