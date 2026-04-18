@@ -7367,7 +7367,13 @@ setInterval(() => {
 }, CHOKEPOINT_TRANSIT_INTERVAL_MS).unref?.();
 
 // --- Pre-assembled Transit Summaries (Railway advantage: avoids large Redis reads on Vercel) ---
+// Split storage: compact summary (no history, ~30KB) + per-id history keys (~35KB each).
+// The compact summary is read on every /api/supply-chain/v1/get-chokepoint-status call.
+// History keys are read only on card expand via /get-chokepoint-history. Before this
+// split the combined payload was ~500KB and timed out at Vercel edge's 1.5s Redis read
+// budget (docs/plans/chokepoint-rpc-payload-split.md).
 const TRANSIT_SUMMARY_REDIS_KEY = 'supply_chain:transit-summaries:v1';
+const TRANSIT_SUMMARY_HISTORY_KEY_PREFIX = 'supply_chain:transit-summaries:history:v1:';
 const TRANSIT_SUMMARY_TTL = 3600; // 1h — 6x interval; survives ~5 consecutive missed pings
 const TRANSIT_SUMMARY_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -7424,10 +7430,22 @@ async function seedTransitSummaries() {
 
   const now = Date.now();
   const summaries = {};
+  // Iterate the canonical chokepoint ID set rather than whatever pw happens to
+  // carry today. If seed-portwatch dropped 3 of 13 (flaky ArcGIS), those 3
+  // would otherwise vanish from summaries and the RPC would render zero-state
+  // rows for them — which get-chokepoint-status treats as healthy because its
+  // upstreamUnavailable gate fires only on fully-empty summaries. By emitting
+  // all 13 with zero-state for missing IDs, the shape is consistent and the
+  // coverage shortfall surfaces via the `pwCovered/N` log + recordCount only.
+  const CANONICAL_IDS = Object.keys(CHOKEPOINT_THREAT_LEVELS);
+  let pwCovered = 0;
 
-  for (const [cpId, cpData] of Object.entries(pw)) {
+  for (const cpId of CANONICAL_IDS) {
+    const cpData = pw[cpId];
+    if (cpData) pwCovered++;
     const threatLevel = CHOKEPOINT_THREAT_LEVELS[cpId] || 'normal';
-    const anomaly = detectTrafficAnomalyRelay(cpData.history, threatLevel);
+    const history = cpData?.history ?? [];
+    const anomaly = detectTrafficAnomalyRelay(history, threatLevel);
 
     // Get relay transit counts for this chokepoint
     let relayTransit = null;
@@ -7448,13 +7466,15 @@ async function seedTransitSummaries() {
     }
 
     const cr = latestCorridorRiskData?.[cpId];
+
+    // Compact summary: no history field. Consumed by get-chokepoint-status on
+    // every request, so keep it small.
     summaries[cpId] = {
       todayTotal: relayTransit?.total ?? 0,
       todayTanker: relayTransit?.tanker ?? 0,
       todayCargo: relayTransit?.cargo ?? 0,
       todayOther: relayTransit?.other ?? 0,
-      wowChangePct: cpData.wowChangePct ?? 0,
-      history: cpData.history ?? [],
+      wowChangePct: cpData?.wowChangePct ?? 0,
       riskLevel: cr?.riskLevel ?? '',
       incidentCount7d: cr?.incidentCount7d ?? 0,
       disruptionPct: cr?.disruptionPct ?? 0,
@@ -7462,11 +7482,31 @@ async function seedTransitSummaries() {
       riskReportAction: cr?.riskReportAction ?? '',
       anomaly,
     };
+
+    // Per-id history key — only fetched on card expand via GetChokepointHistory.
+    // Write best-effort: a failure here doesn't block the summary publish. An
+    // empty history key just means the chart is unavailable for that chokepoint
+    // until the next successful relay tick.
+    const historyPayload = { chokepointId: cpId, history, fetchedAt: now };
+    const historyOk = await envelopeWrite(
+      `${TRANSIT_SUMMARY_HISTORY_KEY_PREFIX}${cpId}`,
+      historyPayload,
+      TRANSIT_SUMMARY_TTL,
+      { recordCount: history.length, sourceVersion: 'transit-summaries-history' },
+    );
+    if (!historyOk) console.warn(`[TransitSummary] history write failed for ${cpId}`);
   }
 
-  const ok = await envelopeWrite(TRANSIT_SUMMARY_REDIS_KEY, { summaries, fetchedAt: now }, TRANSIT_SUMMARY_TTL, { recordCount: Object.keys(summaries).length, sourceVersion: 'transit-summaries' });
-  await upstashSet('seed-meta:supply_chain:transit-summaries', { fetchedAt: now, recordCount: Object.keys(summaries).length }, 604800);
-  console.log(`[TransitSummary] Seeded ${Object.keys(summaries).length} summaries (redis: ${ok ? 'OK' : 'FAIL'})`);
+  if (pwCovered < CANONICAL_IDS.length) {
+    console.warn(`[TransitSummary] portwatch coverage shortfall: ${pwCovered}/${CANONICAL_IDS.length} — missing chokepoints will publish zero-state until next upstream success`);
+  }
+
+  const ok = await envelopeWrite(TRANSIT_SUMMARY_REDIS_KEY, { summaries, fetchedAt: now }, TRANSIT_SUMMARY_TTL, { recordCount: pwCovered, sourceVersion: 'transit-summaries' });
+  // seed-meta recordCount = pwCovered (actual upstream coverage), not the
+  // canonical-shape key count. Lets api/health.js detect a coverage shortfall
+  // as a freshness anomaly rather than being masked by the always-13 shape.
+  await upstashSet('seed-meta:supply_chain:transit-summaries', { fetchedAt: now, recordCount: pwCovered }, 604800);
+  console.log(`[TransitSummary] Seeded ${pwCovered}/${CANONICAL_IDS.length} from portwatch + per-id history (redis: ${ok ? 'OK' : 'FAIL'})`);
 }
 
 // Seed transit summaries every 10 min (same as transit counter)
