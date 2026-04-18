@@ -542,6 +542,23 @@ export async function handleSubscriptionExpired(
     updatedAt: eventTimestamp,
   });
 
+  // Honour a standing complimentary entitlement before revoking. Support
+  // tooling writes compUntil via grantComplimentaryEntitlement; a Dodo
+  // subscription expiring after a cancellation or refund must not wipe the
+  // goodwill credit before it runs out. If the comp is still valid we
+  // leave the entitlement as-is — compUntil already acts as a floor for
+  // validUntil (grant logic keeps them synced).
+  const entitlement = await ctx.db
+    .query("entitlements")
+    .withIndex("by_userId", (q) => q.eq("userId", existing.userId))
+    .first();
+  if (entitlement?.compUntil && entitlement.compUntil > eventTimestamp) {
+    console.log(
+      `[subscriptionHelpers] subscription.expired for ${existing.userId} — complimentary entitlement still valid until ${new Date(entitlement.compUntil).toISOString()}, preserving`,
+    );
+    return;
+  }
+
   // Revoke entitlements by downgrading to free tier
   await upsertEntitlements(ctx, existing.userId, "free", eventTimestamp, eventTimestamp);
 }

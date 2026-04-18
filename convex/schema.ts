@@ -169,6 +169,10 @@ export default defineSchema({
       exportFormats: v.array(v.string()),
     }),
     validUntil: v.number(),
+    // Optional complimentary-entitlement floor. When set and in the future,
+    // subscription.expired events skip the normal downgrade-to-free so
+    // goodwill credits outlive Dodo subscription cancellations.
+    compUntil: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
 
