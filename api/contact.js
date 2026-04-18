@@ -1,6 +1,5 @@
 export const config = { runtime: 'edge' };
 
-import { ConvexHttpClient } from 'convex/browser';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { getClientIp, verifyTurnstile } from './_turnstile.js';
 import { jsonResponse } from './_json-response.js';
@@ -159,21 +158,27 @@ export default async function handler(req) {
   const safeMsg = typeof message === 'string' ? message.slice(0, MAX_MESSAGE) : undefined;
   const safeSource = typeof source === 'string' ? source.slice(0, 100) : 'enterprise-contact';
 
-  const convexUrl = process.env.CONVEX_URL;
-  if (!convexUrl) {
-    return jsonResponse({ error: 'Service unavailable' }, 503, cors);
-  }
-
+  // Persist lead to Hanzo Base (best-effort) + always attempt email notification.
   try {
-    const client = new ConvexHttpClient(convexUrl);
-    await client.mutation('contactMessages:submit', {
-      name: safeName,
-      email: email.trim(),
-      organization: safeOrg,
-      phone: safePhone,
-      message: safeMsg,
-      source: safeSource,
-    });
+    const baseUrl = process.env.BASE_URL || 'https://base.hanzo.ai';
+    const token = process.env.BASE_TOKEN || '';
+    await fetch(`${baseUrl}/api/collections/contactMessages/records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        name: safeName,
+        email: email.trim(),
+        organization: safeOrg,
+        phone: safePhone,
+        message: safeMsg,
+        source: safeSource,
+        receivedAt: Date.now(),
+      }),
+      signal: AbortSignal.timeout(5000),
+    }).catch((err) => console.warn('[contact] Base persistence failed:', err));
 
     const emailSent = await sendNotificationEmail(safeName, email.trim(), safeOrg, safePhone, safeMsg, ip, country);
 

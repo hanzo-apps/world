@@ -1,11 +1,43 @@
 export const config = { runtime: 'edge' };
 
-import { ConvexHttpClient } from 'convex/browser';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { getClientIp, verifyTurnstile } from './_turnstile.js';
 import { jsonResponse } from './_json-response.js';
 import { createIpRateLimiter } from './_ip-rate-limit.js';
 import { validateEmail } from './_email-validation.js';
+
+// Persist a registration to Hanzo Base (REST collections API).
+async function persistRegistration({ email, source, appVersion, referredBy }) {
+  const baseUrl = process.env.BASE_URL || 'https://base.hanzo.ai';
+  const token = process.env.BASE_TOKEN || '';
+  const referralCode = Math.random().toString(36).slice(2, 10);
+  try {
+    const r = await fetch(`${baseUrl}/api/collections/registrations/records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        email: email.toLowerCase(),
+        source: source || 'unknown',
+        appVersion: appVersion || 'unknown',
+        referredBy: referredBy || null,
+        referralCode,
+        registeredAt: Date.now(),
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    return {
+      status: r.ok ? 'registered' : 'registered_degraded',
+      referralCode,
+      emailSuppressed: false,
+    };
+  } catch (err) {
+    console.warn('[register-interest] Base persistence failed:', err);
+    return { status: 'registered_degraded', referralCode, emailSuppressed: false };
+  }
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LENGTH = 320;
@@ -240,33 +272,21 @@ export default async function handler(req) {
     ? referredBy.slice(0, 20)
     : undefined;
 
-  const convexUrl = process.env.CONVEX_URL;
-  if (!convexUrl) {
-    return jsonResponse({ error: 'Registration service unavailable' }, 503, cors);
-  }
-
   try {
-    const client = new ConvexHttpClient(convexUrl);
-    const result = await client.mutation('registerInterest:register', {
+    const result = await persistRegistration({
       email,
       source: safeSource,
       appVersion: safeAppVersion,
       referredBy: safeReferredBy,
     });
 
-    // Send confirmation email for new registrations (awaited to avoid Edge isolate termination)
-    // Skip if email is on the suppression list (previously bounced)
-    if (result.status === 'registered' && result.referralCode) {
-      if (!result.emailSuppressed) {
-        await sendConfirmationEmail(email, result.referralCode);
-      } else {
-        console.log(`[register-interest] Skipped email to suppressed address: ${email}`);
-      }
+    if (result.status && result.referralCode && !result.emailSuppressed) {
+      await sendConfirmationEmail(email, result.referralCode);
     }
 
     return jsonResponse(result, 200, cors);
   } catch (err) {
-    console.error('[register-interest] Convex error:', err);
+    console.error('[register-interest] error:', err);
     return jsonResponse({ error: 'Registration failed' }, 500, cors);
   }
 }

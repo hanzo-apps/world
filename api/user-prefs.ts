@@ -1,11 +1,10 @@
 /**
  * User preferences sync endpoint.
  *
- * GET  /api/user-prefs?variant=<variant>  — returns current cloud prefs for signed-in user
- * POST /api/user-prefs                     — saves prefs blob for signed-in user
+ * GET  /api/user-prefs?variant=<variant>  — returns current cloud prefs
+ * POST /api/user-prefs                    — saves prefs blob
  *
- * Authentication: Clerk Bearer token in Authorization header.
- * Requires CONVEX_URL + CLERK_JWT_ISSUER_DOMAIN env vars.
+ * Auth: IAM Bearer token. Persistence: Hanzo Base (REST collections API).
  */
 
 export const config = { runtime: 'edge' };
@@ -14,8 +13,18 @@ export const config = { runtime: 'edge' };
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 // @ts-expect-error — JS module, no declaration file
 import { jsonResponse } from './_json-response.js';
-import { ConvexHttpClient } from 'convex/browser';
 import { validateBearerToken } from '../server/auth-session';
+
+const BASE_URL = process.env.BASE_URL || 'https://base.hanzo.ai';
+const BASE_TOKEN = process.env.BASE_TOKEN || '';
+
+function baseHeaders(userToken: string): Record<string, string> {
+  // Prefer user's IAM token for Base's IAM-bridged auth; fall back to service token.
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${userToken || BASE_TOKEN}`,
+  };
+}
 
 export default async function handler(req: Request): Promise<Response> {
   if (isDisallowedOrigin(req)) {
@@ -43,22 +52,21 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: 'UNAUTHENTICATED' }, 401, cors);
   }
 
-  const convexUrl = process.env.CONVEX_URL;
-  if (!convexUrl) {
-    return jsonResponse({ error: 'Service unavailable' }, 503, cors);
-  }
-
-  const client = new ConvexHttpClient(convexUrl);
-  client.setAuth(token);
+  const userId = session.userId;
 
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const variant = url.searchParams.get('variant') ?? 'full';
-
+    const filter = encodeURIComponent(`userId="${userId}" && variant="${variant}"`);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const prefs = await client.query('userPreferences:getPreferences' as any, { variant });
-      return jsonResponse(prefs ?? null, 200, cors);
+      const r = await fetch(
+        `${BASE_URL}/api/collections/userPreferences/records?filter=${filter}&perPage=1`,
+        { headers: baseHeaders(token), signal: AbortSignal.timeout(5000) },
+      );
+      if (!r.ok) return jsonResponse(null, 200, cors);
+      const data = await r.json();
+      const rec = Array.isArray(data.items) && data.items.length ? data.items[0] : null;
+      return jsonResponse(rec, 200, cors);
     } catch (err) {
       console.error('[user-prefs] GET error:', err);
       return jsonResponse({ error: 'Failed to fetch preferences' }, 500, cors);
@@ -82,22 +90,43 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await client.mutation('userPreferences:setPreferences' as any, {
+    // Upsert: find existing record, then PATCH or POST.
+    const filter = encodeURIComponent(`userId="${userId}" && variant="${body.variant}"`);
+    const findResp = await fetch(
+      `${BASE_URL}/api/collections/userPreferences/records?filter=${filter}&perPage=1`,
+      { headers: baseHeaders(token), signal: AbortSignal.timeout(5000) },
+    );
+    const find = findResp.ok ? await findResp.json() : { items: [] };
+    const existing = Array.isArray(find.items) && find.items.length ? find.items[0] : null;
+
+    const payload = {
+      userId,
       variant: body.variant,
       data: body.data,
-      expectedSyncVersion: body.expectedSyncVersion,
-      schemaVersion: typeof body.schemaVersion === 'number' ? body.schemaVersion : undefined,
-    });
-    return jsonResponse(result, 200, cors);
+      schemaVersion: typeof body.schemaVersion === 'number' ? body.schemaVersion : 1,
+      syncVersion: (typeof body.expectedSyncVersion === 'number' ? body.expectedSyncVersion : 0) + 1,
+      updatedAt: Date.now(),
+    };
+
+    if (existing) {
+      if (existing.syncVersion !== body.expectedSyncVersion) {
+        return jsonResponse({ error: 'CONFLICT' }, 409, cors);
+      }
+      const upd = await fetch(
+        `${BASE_URL}/api/collections/userPreferences/records/${existing.id}`,
+        { method: 'PATCH', headers: baseHeaders(token), body: JSON.stringify(payload) },
+      );
+      if (!upd.ok) throw new Error(`Base PATCH ${upd.status}`);
+      return jsonResponse(await upd.json(), 200, cors);
+    } else {
+      const created = await fetch(
+        `${BASE_URL}/api/collections/userPreferences/records`,
+        { method: 'POST', headers: baseHeaders(token), body: JSON.stringify(payload) },
+      );
+      if (!created.ok) throw new Error(`Base POST ${created.status}`);
+      return jsonResponse(await created.json(), 200, cors);
+    }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('CONFLICT')) {
-      return jsonResponse({ error: 'CONFLICT' }, 409, cors);
-    }
-    if (msg.includes('BLOB_TOO_LARGE')) {
-      return jsonResponse({ error: 'BLOB_TOO_LARGE' }, 400, cors);
-    }
     console.error('[user-prefs] POST error:', err);
     return jsonResponse({ error: 'Failed to save preferences' }, 500, cors);
   }
