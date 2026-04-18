@@ -100,12 +100,12 @@ import { CustomWidgetPanel } from '@/components/CustomWidgetPanel';
 import { openWidgetChatModal } from '@/components/WidgetChatModal';
 import { loadWidgets, saveWidget } from '@/services/widget-store';
 import type { CustomWidgetSpec } from '@/services/widget-store';
-import { initEntitlementSubscription, destroyEntitlementSubscription, isEntitled, onEntitlementChange } from '@/services/entitlements';
+import { initEntitlementSubscription, destroyEntitlementSubscription, isEntitled, onEntitlementChange, shouldReloadOnEntitlementChange } from '@/services/entitlements';
 import { initSubscriptionWatch, destroySubscriptionWatch } from '@/services/billing';
 import { getUserId } from '@/services/user-identity';
 import { initPaymentFailureBanner } from '@/components/payment-failure-banner';
 import { handleCheckoutReturn } from '@/services/checkout-return';
-import { initCheckoutOverlay, destroyCheckoutOverlay, showCheckoutSuccess } from '@/services/checkout';
+import { initCheckoutOverlay, destroyCheckoutOverlay, showCheckoutSuccess, consumePostCheckoutFlag } from '@/services/checkout';
 import { McpDataPanel } from '@/components/McpDataPanel';
 import { openMcpConnectModal } from '@/components/McpConnectModal';
 import { loadMcpPanels, saveMcpPanel } from '@/services/mcp-store';
@@ -161,7 +161,16 @@ export class PanelLayoutManager implements AppModule {
     // Free users need the subscription active so they receive real-time
     // entitlement updates after purchasing (P1: newly upgraded users must
     // see their premium access without a manual page reload).
-    if (handleCheckoutReturn()) {
+    //
+    // Two return paths need to seed the transition detector as post-checkout:
+    //   1. Full-page Dodo redirect — handleCheckoutReturn() reads
+    //      subscription_id/status URL params and cleans them.
+    //   2. Dodo overlay success — setTimeout(reload) with no URL params;
+    //      we stash a session flag before the reload and consume it here.
+    const returnedFromCheckoutUrl = handleCheckoutReturn();
+    const returnedFromOverlay = consumePostCheckoutFlag();
+    const returnedFromCheckout = returnedFromCheckoutUrl || returnedFromOverlay;
+    if (returnedFromCheckout) {
       showCheckoutSuccess();
     }
 
@@ -174,16 +183,24 @@ export class PanelLayoutManager implements AppModule {
 
     initCheckoutOverlay(() => showCheckoutSuccess());
 
-    // Listen for entitlement changes — reload panels to pick up new gating state.
-    // Skip the initial snapshot to avoid a reload loop for users who already have
-    // premium via legacy signals (API key / wm-pro-key).
-    let skipInitialSnapshot = true;
+    // Reload only on a free→pro transition. Legacy-pro users whose first
+    // snapshot is already pro (lastEntitled === null) must not trigger a
+    // reload loop, but a user who pays mid-session (false → true) must see
+    // their panels unlock without manual refresh.
+    //
+    // When we just returned from a Dodo full-page redirect checkout, seed
+    // lastEntitled = false instead of null. The webhook may have already
+    // landed by the time the user's browser comes back, so the first
+    // entitlement snapshot can arrive as pro. Without this seed the
+    // transition detector would swallow that snapshot as "legacy-pro" and
+    // the user would see locked panels until a manual refresh — exactly the
+    // symptom that caused the 2026-04-17/18 duplicate-subscription incident.
+    let lastEntitled: boolean | null = returnedFromCheckout ? false : null;
     this.unsubscribeEntitlementChange = onEntitlementChange(() => {
-      if (skipInitialSnapshot) {
-        skipInitialSnapshot = false;
-        return;
-      }
-      if (isEntitled()) {
+      const entitled = isEntitled();
+      const reload = shouldReloadOnEntitlementChange(lastEntitled, entitled);
+      lastEntitled = entitled;
+      if (reload) {
         console.log('[entitlements] Subscription activated — reloading to unlock panels');
         window.location.reload();
       }
