@@ -4,6 +4,7 @@
 
 # Stage 1: Build the frontend with TypeScript + Vite.
 FROM node:22-alpine AS builder
+LABEL org.opencontainers.image.source="https://github.com/hanzoai/world"
 
 WORKDIR /app
 
