@@ -10,7 +10,7 @@
  */
 
 import { v } from "convex/values";
-import { action, mutation, query, internalAction, internalQuery, type ActionCtx } from "../_generated/server";
+import { action, mutation, query, internalAction, internalMutation, internalQuery, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { DodoPayments } from "dodopayments";
 import { resolveUserId, requireUserId } from "../lib/auth";
@@ -384,6 +384,92 @@ export const claimSubscription = mutation({
         customers: customers.length,
         payments: payments.length,
       },
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Complimentary entitlements (support/goodwill tooling)
+// ---------------------------------------------------------------------------
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Grants a complimentary entitlement to a user.
+ *
+ * Extends both validUntil and compUntil to max(existing, now + days). Never
+ * shrinks — calling twice with small durations won't accidentally shorten an
+ * existing longer comp. compUntil is an independent floor that
+ * handleSubscriptionExpired honours, so Dodo cancellations/expirations don't
+ * wipe the comp before it runs out.
+ *
+ * Typical usage (CLI):
+ *   npx convex run 'payments/billing:grantComplimentaryEntitlement' \
+ *     '{"userId":"user_XXX","planKey":"pro_monthly","days":90}'
+ */
+export const grantComplimentaryEntitlement = internalMutation({
+  args: {
+    userId: v.string(),
+    planKey: v.string(),
+    days: v.number(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.days <= 0 || !Number.isFinite(args.days)) {
+      throw new Error(`grantComplimentaryEntitlement: days must be a positive finite number, got ${args.days}`);
+    }
+    if (!PRODUCT_CATALOG[args.planKey]) {
+      throw new Error(
+        `grantComplimentaryEntitlement: unknown planKey "${args.planKey}". Must be in PRODUCT_CATALOG.`,
+      );
+    }
+    const now = Date.now();
+    const until = now + args.days * DAY_MS;
+    const existing = await ctx.db
+      .query("entitlements")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .first();
+    const features = getFeaturesForPlan(args.planKey);
+    const validUntil = Math.max(existing?.validUntil ?? 0, until);
+    const compUntil = Math.max(existing?.compUntil ?? 0, until);
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        planKey: args.planKey,
+        features,
+        validUntil,
+        compUntil,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("entitlements", {
+        userId: args.userId,
+        planKey: args.planKey,
+        features,
+        validUntil,
+        compUntil,
+        updatedAt: now,
+      });
+    }
+
+    console.log(
+      `[billing] grantComplimentaryEntitlement userId=${args.userId} planKey=${args.planKey} days=${args.days} validUntil=${new Date(validUntil).toISOString()}${args.reason ? ` reason="${args.reason}"` : ""}`,
+    );
+
+    // Sync Redis cache so edge gateway sees the comp without waiting for TTL.
+    if (process.env.UPSTASH_REDIS_REST_URL) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.payments.cacheActions.syncEntitlementCache,
+        { userId: args.userId, planKey: args.planKey, features, validUntil },
+      );
+    }
+
+    return {
+      userId: args.userId,
+      planKey: args.planKey,
+      validUntil,
+      compUntil,
     };
   },
 });
