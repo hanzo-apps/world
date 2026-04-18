@@ -1,0 +1,181 @@
+// WorldMonitor Brief compose library.
+//
+// Pure helpers for producing the per-user brief envelope that the
+// hosted magazine route (api/brief/*) + dashboard panel + future
+// channels all consume. Shared between:
+//   - scripts/seed-digest-notifications.mjs (the consolidated cron;
+//     composes a brief for every user it's about to dispatch a
+//     digest to, so the magazine URL can be injected into the
+//     notification output).
+//   - future tests + ad-hoc tools.
+//
+// Deliberately has NO top-level side effects: no env guards, no
+// process.exit, no main(). Import anywhere.
+//
+// History: this file used to include a stand-alone Railway cron
+// (`seed-brief-composer.mjs`). That path was retired in the
+// consolidation PR — the digest cron now owns the compose+send
+// pipeline so there is exactly one cron writing brief:{userId}:
+// {issueDate} keys.
+
+import {
+  assembleStubbedBriefEnvelope,
+  filterTopStories,
+  issueDateInTz,
+} from '../../shared/brief-filter.js';
+
+// ── Rule dedupe (one brief per user, not per variant) ───────────────────────
+
+const SENSITIVITY_RANK = { all: 0, high: 1, critical: 2 };
+
+function compareRules(a, b) {
+  const aFull = a.variant === 'full' ? 0 : 1;
+  const bFull = b.variant === 'full' ? 0 : 1;
+  if (aFull !== bFull) return aFull - bFull;
+  const aRank = SENSITIVITY_RANK[a.sensitivity ?? 'all'] ?? 0;
+  const bRank = SENSITIVITY_RANK[b.sensitivity ?? 'all'] ?? 0;
+  if (aRank !== bRank) return aRank - bRank;
+  return (a.updatedAt ?? 0) - (b.updatedAt ?? 0);
+}
+
+/**
+ * Group eligible (not-opted-out) rules by userId with each user's
+ * candidates sorted in preference order. Callers walk the candidate
+ * list and take the first that produces non-empty stories — falls
+ * back across variants cleanly.
+ */
+export function groupEligibleRulesByUser(rules) {
+  const byUser = new Map();
+  for (const rule of rules) {
+    if (!rule || typeof rule.userId !== 'string') continue;
+    if (rule.aiDigestEnabled === false) continue;
+    const list = byUser.get(rule.userId);
+    if (list) list.push(rule);
+    else byUser.set(rule.userId, [rule]);
+  }
+  for (const list of byUser.values()) list.sort(compareRules);
+  return byUser;
+}
+
+/**
+ * @deprecated Kept for existing test imports. Prefer
+ * groupEligibleRulesByUser + per-user fallback at call sites.
+ */
+export function dedupeRulesByUser(rules) {
+  const out = [];
+  for (const candidates of groupEligibleRulesByUser(rules).values()) {
+    if (candidates.length > 0) out.push(candidates[0]);
+  }
+  return out;
+}
+
+// ── Failure gate ─────────────────────────────────────────────────────────────
+
+/**
+ * Decide whether the consolidated cron should exit non-zero because
+ * the brief-write failure rate is structurally bad (not just a
+ * transient blip). Denominator is ATTEMPTED writes, not eligible
+ * users: skipped-empty users never reach the write path and must not
+ * dilute the ratio.
+ *
+ * @param {{ success: number; failed: number; thresholdRatio?: number }} counters
+ */
+export function shouldExitNonZero({ success, failed, thresholdRatio = 0.05 }) {
+  if (failed <= 0) return false;
+  const attempted = success + failed;
+  if (attempted <= 0) return false;
+  const threshold = Math.max(1, Math.floor(attempted * thresholdRatio));
+  return failed >= threshold;
+}
+
+// ── Insights fetch ───────────────────────────────────────────────────────────
+
+/** Unwrap news:insights:v1 envelope and project the fields the brief needs. */
+export function extractInsights(raw) {
+  const data = raw?.data ?? raw;
+  const topStories = Array.isArray(data?.topStories) ? data.topStories : [];
+  const clusterCount = Number.isFinite(data?.clusterCount) ? data.clusterCount : topStories.length;
+  const multiSourceCount = Number.isFinite(data?.multiSourceCount) ? data.multiSourceCount : 0;
+  return {
+    topStories,
+    numbers: { clusters: clusterCount, multiSource: multiSourceCount },
+  };
+}
+
+// ── Date + display helpers ───────────────────────────────────────────────────
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+export function dateLongFromIso(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+export function issueCodeFromIso(iso) {
+  const [, m, d] = iso.split('-');
+  return `${d}.${m}`;
+}
+
+export function localHourInTz(nowMs, timezone) {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    const hour = fmt.formatToParts(new Date(nowMs)).find((p) => p.type === 'hour')?.value;
+    const n = Number(hour);
+    return Number.isFinite(n) ? n : 9;
+  } catch {
+    return 9;
+  }
+}
+
+export function userDisplayNameFromId(userId) {
+  // Clerk IDs look like "user_2abc…". Phase 3b will hydrate real
+  // names via a Convex query; for now a generic placeholder so the
+  // magazine's greeting reads naturally.
+  void userId;
+  return 'Reader';
+}
+
+// ── Compose a full brief for a single rule ──────────────────────────────────
+
+const MAX_STORIES_PER_USER = 12;
+
+/**
+ * Filter + assemble a BriefEnvelope for one alert rule. Returns null
+ * when the filter produces zero stories — the caller decides whether
+ * to fall back to another variant or skip the user.
+ *
+ * @param {object} rule — enabled alertRule row
+ * @param {{ topStories: unknown[]; numbers: { clusters: number; multiSource: number } }} insights
+ * @param {{ nowMs: number }} [opts]
+ */
+export function composeBriefForRule(rule, insights, { nowMs = Date.now() } = {}) {
+  const sensitivity = rule.sensitivity ?? 'all';
+  const tz = rule.digestTimezone ?? 'UTC';
+  const stories = filterTopStories({
+    stories: insights.topStories,
+    sensitivity,
+    maxStories: MAX_STORIES_PER_USER,
+  });
+  if (stories.length === 0) return null;
+  const issueDate = issueDateInTz(nowMs, tz);
+  return assembleStubbedBriefEnvelope({
+    user: { name: userDisplayNameFromId(rule.userId), tz },
+    stories,
+    issueDate,
+    dateLong: dateLongFromIso(issueDate),
+    issue: issueCodeFromIso(issueDate),
+    insightsNumbers: insights.numbers,
+    // Same nowMs as the rest of the envelope so the function stays
+    // deterministic for a given input — tests + retries see identical
+    // output.
+    issuedAt: nowMs,
+    localHour: localHourInTz(nowMs, tz),
+  });
+}
