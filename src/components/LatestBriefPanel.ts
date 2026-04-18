@@ -20,9 +20,9 @@
  */
 
 import { Panel } from './Panel';
-import { premiumFetch } from '@/services/premium-fetch';
+import { getClerkToken, clearClerkTokenCache } from '@/services/clerk';
 import { PanelGateReason, hasPremiumAccess } from '@/services/panel-gating';
-import { getAuthState } from '@/services/auth-state';
+import { getAuthState, subscribeAuthState } from '@/services/auth-state';
 import { h, rawHtml, replaceChildren, clearChildren } from '@/utils/dom-utils';
 
 interface LatestBriefReady {
@@ -41,6 +41,20 @@ interface LatestBriefComposing {
 
 type LatestBriefResponse = LatestBriefReady | LatestBriefComposing;
 
+/**
+ * Typed access-failure surface. Lets the refresh loop branch on the
+ * specific condition (sign-in / upgrade) instead of retrying as if
+ * the error were transient.
+ */
+class BriefAccessError extends Error {
+  readonly code: 'sign_in_required' | 'upgrade_required';
+  constructor(code: BriefAccessError['code']) {
+    super(code);
+    this.code = code;
+    this.name = 'BriefAccessError';
+  }
+}
+
 const LATEST_BRIEF_ENDPOINT = '/api/latest-brief';
 
 const WM_LOGO_SVG = (
@@ -57,6 +71,11 @@ const WM_LOGO_SVG = (
   + '</svg>'
 );
 
+// Composing-state poll interval. 60s balances "responsive when the
+// composer finishes between digest ticks" against "don't hammer
+// Upstash with 401-path checks from backgrounded tabs".
+const COMPOSING_POLL_MS = 60_000;
+
 export class LatestBriefPanel extends Panel {
   private refreshing = false;
   private refreshQueued = false;
@@ -69,6 +88,11 @@ export class LatestBriefPanel extends Panel {
    */
   private gateLocked = false;
   private inflightAbort: AbortController | null = null;
+  private composingPollId: ReturnType<typeof setTimeout> | null = null;
+  private unsubscribeAuth: (() => void) | null = null;
+  private onVisibility: (() => void) | null = null;
+  /** Last Clerk user-id seen. Used to detect sign-in / sign-out transitions. */
+  private lastUserId: string | null = null;
 
   constructor() {
     super({
@@ -86,13 +110,43 @@ export class LatestBriefPanel extends Panel {
     });
 
     this.renderLoading();
-    // Defer the self-fetch until updatePanelGating() (called on mount
-    // + on auth state changes) has either unlocked us or rendered
-    // the gated CTA. If we fetch first, anonymous/free users would
-    // hit 401/403 and see raw error UI for a moment before the gate
-    // repaints over us. refresh() also short-circuits when the user
-    // has no premium access, so a mid-session downgrade stops
-    // hitting the endpoint immediately.
+    this.lastUserId = getAuthState().user?.id ?? null;
+    // Refresh on ANY auth-id transition:
+    //   null → id      : sign-in, load brief
+    //   idA → idB      : account switch, load new user's brief
+    //   id → null      : sign-out, abort + render sign-in CTA
+    //                    (hasPremiumAccess may still be true via
+    //                    desktop/tester key, so the layout-level
+    //                    updatePanelGating won't re-lock us — we
+    //                    must clear state ourselves)
+    this.unsubscribeAuth = subscribeAuthState((state) => {
+      const nextId = state.user?.id ?? null;
+      if (nextId === this.lastUserId) return;
+      this.lastUserId = nextId;
+      this.inflightAbort?.abort();
+      this.inflightAbort = null;
+      this.clearComposingPoll();
+      // The Clerk token cache is keyed by time, not user. On every
+      // id transition we MUST drop it so the next fetch reflects
+      // the new session. Without this, /api/latest-brief derives
+      // userId from the stale token's sub claim and paints the
+      // previous user's brief in the new session for up to 50s.
+      clearClerkTokenCache();
+      if (nextId) {
+        void this.refresh();
+      } else {
+        // Sign-out. Don't leave the previous user's content on
+        // screen even when premium keys keep the panel unlocked.
+        this.renderSignInRequired();
+      }
+    });
+    // visibilitychange drives a refresh when the user returns to
+    // the tab. Addresses the "composing → stays composing forever"
+    // case where the composer completed while the tab was hidden.
+    this.onVisibility = () => {
+      if (document.visibilityState === 'visible') void this.refresh();
+    };
+    document.addEventListener('visibilitychange', this.onVisibility);
     void this.refresh();
   }
 
@@ -113,18 +167,39 @@ export class LatestBriefPanel extends Panel {
       this.refreshQueued = true;
       return;
     }
+    this.clearComposingPoll();
     // Check #1: gate before starting.
-    if (this.gateLocked || !hasPremiumAccess(getAuthState())) return;
+    const authState = getAuthState();
+    if (this.gateLocked || !hasPremiumAccess(authState)) return;
+    // Per-user endpoint needs a Clerk userId. Desktop API key +
+    // browser tester keys satisfy hasPremiumAccess but don't bind
+    // to a Clerk user, so there's nothing to fetch.
+    const requestUserId = authState.user?.id ?? null;
+    if (!requestUserId) {
+      this.renderSignInRequired();
+      return;
+    }
+    // Mixed-auth edge case: desktop/tester keys open the panel even
+    // when the signed-in Clerk account is FREE. /api/latest-brief
+    // verifies entitlement from the JWT's userId and returns 403
+    // for free accounts. Render the upgrade CTA locally instead of
+    // bouncing through a doomed fetch.
+    if (authState.user?.role !== 'pro') {
+      this.renderUpgradeRequired();
+      return;
+    }
     this.refreshing = true;
     const controller = new AbortController();
     this.inflightAbort = controller;
     try {
       const data = await this.fetchLatest(controller.signal);
-      // Check #3 (post-response): auth may have flipped during the
-      // await. If the gate was flipped by updatePanelGating, it has
-      // already replaced `this.content` with the locked CTA — we
-      // must NOT overwrite that with brief content.
+      // Check #3 (post-response): verify we're still on the SAME
+      // user AND still unlocked. A Clerk account switch during the
+      // await (A→B) would otherwise paint user A's brief into user
+      // B's session because getClerkToken caches for up to 50s
+      // across account changes.
       if (this.gateLocked || !hasPremiumAccess(getAuthState())) return;
+      if ((getAuthState().user?.id ?? null) !== requestUserId) return;
       if (data.status === 'ready') {
         this.renderReady(data);
       } else {
@@ -134,6 +209,14 @@ export class LatestBriefPanel extends Panel {
       // AbortError comes from showGatedCta's abort() → render nothing.
       if ((err as { name?: string } | null)?.name === 'AbortError') return;
       if (this.gateLocked || !hasPremiumAccess(getAuthState())) return;
+      if ((getAuthState().user?.id ?? null) !== requestUserId) return;
+      // Structured access errors render a terminal CTA, not a retry
+      // error — retrying a 401 or 403 can't flip the outcome.
+      if (err instanceof BriefAccessError) {
+        if (err.code === 'sign_in_required') this.renderSignInRequired();
+        else this.renderUpgradeRequired();
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Brief unavailable — try again shortly.';
       this.showError(message, () => { void this.refresh(); });
     } finally {
@@ -155,6 +238,7 @@ export class LatestBriefPanel extends Panel {
     this.gateLocked = true;
     this.inflightAbort?.abort();
     this.inflightAbort = null;
+    this.clearComposingPoll();
     super.showGatedCta(reason, onAction);
   }
 
@@ -176,15 +260,31 @@ export class LatestBriefPanel extends Panel {
   }
 
   private async fetchLatest(signal: AbortSignal): Promise<LatestBriefResponse> {
-    const res = await premiumFetch(LATEST_BRIEF_ENDPOINT, { signal });
-    if (res.status === 401) {
+    // /api/latest-brief is user-scoped and Bearer-only. premiumFetch
+    // short-circuits on desktop WORLDMONITOR_API_KEY / tester keys
+    // and never sends Clerk, producing a 401 we can't recover from.
+    // Always mint a fresh Bearer here — the refresh() pre-check
+    // guaranteed authState.user exists.
+    const token = await getClerkToken();
+    if (!token) {
+      // Clerk token evicted between the pre-check and now (logout,
+      // cache expiry + Clerk session gone). Surface as sign-in.
       throw new Error('Sign in to view your brief.');
     }
+    const res = await fetch(LATEST_BRIEF_ENDPOINT, {
+      signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) {
+      throw new BriefAccessError('sign_in_required');
+    }
     if (res.status === 403) {
-      // PRO gate — base panel handles the visual. Keep the throw so
-      // the caller's error branch is a no-op; locked-state overlay
-      // already covers the content area.
-      throw new Error('PRO required');
+      // Server says the Clerk userId is not Pro. This can happen
+      // when the client's authState says role=pro but the server's
+      // entitlement source (Convex) disagrees, or when the Clerk
+      // plan claim goes stale. Surface as upgrade CTA — not a
+      // retryable error, since retrying won't flip entitlement.
+      throw new BriefAccessError('upgrade_required');
     }
     if (!res.ok) {
       throw new Error(`Brief service unavailable (${res.status})`);
@@ -205,8 +305,68 @@ export class LatestBriefPanel extends Panel {
     );
   }
 
+  /**
+   * Desktop / tester-key auth can satisfy hasPremiumAccess without a
+   * Clerk userId. /api/latest-brief is user-scoped, so there's
+   * nothing to fetch. Render a specific CTA rather than pretending
+   * this is an error state.
+   */
+  private renderSignInRequired(): void {
+    clearChildren(this.content);
+    const logo = h('div', { className: 'latest-brief-logo' });
+    logo.appendChild(rawHtml(WM_LOGO_SVG));
+    this.content.appendChild(
+      h('div', { className: 'latest-brief-card latest-brief-card--composing' },
+        logo,
+        h('div', { className: 'latest-brief-empty-title' }, 'Sign in to view your brief.'),
+        h('div', { className: 'latest-brief-empty-body' },
+          'Your personalised brief is tied to your WorldMonitor account. Sign in to see today\u2019s issue.',
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Free Clerk account (either via local authState or via a 403
+   * from the server). Render an upgrade CTA instead of retrying —
+   * the user needs a plan change, not a fresh fetch.
+   */
+  private renderUpgradeRequired(): void {
+    clearChildren(this.content);
+    const logo = h('div', { className: 'latest-brief-logo' });
+    logo.appendChild(rawHtml(WM_LOGO_SVG));
+    this.content.appendChild(
+      h('div', { className: 'latest-brief-card latest-brief-card--composing' },
+        logo,
+        h('div', { className: 'latest-brief-empty-title' }, 'Pro required.'),
+        h('div', { className: 'latest-brief-empty-body' },
+          'The WorldMonitor Brief is included with the Pro plan. Upgrade to unlock today\u2019s issue.',
+        ),
+      ),
+    );
+  }
+
+  private scheduleComposingPoll(): void {
+    this.clearComposingPoll();
+    this.composingPollId = setTimeout(() => {
+      this.composingPollId = null;
+      void this.refresh();
+    }, COMPOSING_POLL_MS);
+  }
+
+  private clearComposingPoll(): void {
+    if (this.composingPollId !== null) {
+      clearTimeout(this.composingPollId);
+      this.composingPollId = null;
+    }
+  }
+
   private renderComposing(data: LatestBriefComposing): void {
     clearChildren(this.content);
+    // While we're stuck on composing, re-poll every minute so the
+    // panel transitions to ready on the next cron tick without
+    // requiring a full page reload.
+    this.scheduleComposingPoll();
     // h()'s applyProps has no special-case for innerHTML — passing
     // it as a prop sets a literal DOM attribute named "innerHTML"
     // rather than parsing HTML. Use rawHtml() which returns a
@@ -251,5 +411,18 @@ export class LatestBriefPanel extends Panel {
     );
 
     replaceChildren(this.content, coverCard);
+  }
+
+  public override destroy(): void {
+    this.clearComposingPoll();
+    this.inflightAbort?.abort();
+    this.inflightAbort = null;
+    if (this.onVisibility) {
+      document.removeEventListener('visibilitychange', this.onVisibility);
+      this.onVisibility = null;
+    }
+    this.unsubscribeAuth?.();
+    this.unsubscribeAuth = null;
+    super.destroy();
   }
 }
