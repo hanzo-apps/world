@@ -5,9 +5,9 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@hanzo/ui/primitives/sheet';
-import { Button } from '@hanzo/ui/primitives/button';
-import { Input } from '@hanzo/ui/primitives/input';
+} from '@hanzo/ui/sheet';
+import { Button } from '@hanzo/ui/button';
+import { Input } from '@hanzo/ui/input';
 import { MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 

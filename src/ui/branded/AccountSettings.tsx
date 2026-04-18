@@ -4,12 +4,12 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '@hanzo/ui/primitives/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hanzo/ui/primitives/tabs';
-import { Button } from '@hanzo/ui/primitives/button';
-import { Input } from '@hanzo/ui/primitives/input';
-import { Label } from '@hanzo/ui/primitives/label';
-import { Switch } from '@hanzo/ui/primitives/switch';
+} from '@hanzo/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hanzo/ui/tabs';
+import { Button } from '@hanzo/ui/button';
+import { Input } from '@hanzo/ui/input';
+import { Label } from '@hanzo/ui/label';
+import { Switch } from '@hanzo/ui/switch';
 import { getCurrentSession, signInWithIam, signOut } from '../lib/iam-auth';
 
 export interface AccountSettingsProps {
