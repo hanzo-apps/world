@@ -1,0 +1,121 @@
+/*
+ * Hanzo chrome stylesheet.
+ *
+ * Scope: top navbar, footer, pricing page, chat widget, account settings.
+ * The map, panels, and legacy chrome continue to use src/styles/main.css.
+ *
+ * Tokens mirror hanzo.ai to keep the Hanzo ecosystem visually consistent.
+ * Class-based dark mode via `.dark` on <html>; managed by ThemeProvider.
+ */
+
+@import 'tailwindcss';
+@config '../../../tailwind.config.ts';
+@import '@fontsource-variable/inter/wght.css';
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --radius: 0.5rem;
+  --font-sans: var(--font-inter);
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #f5f5f5;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #525252;
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #999999;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #d4d4d4;
+  --brand: #e4e4e7;
+  --brand-foreground: #09090b;
+  --radius: 0.5rem;
+  --font-inter: 'Inter Variable', Inter, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.dark,
+:root[data-theme='dark'] {
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0a0a0a;
+  --card-foreground: #f5f5f5;
+  --popover: #0a0a0a;
+  --popover-foreground: #f5f5f5;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #f5f5f5;
+  --muted: #111111;
+  --muted-foreground: #a3a3a3;
+  --accent: #1a1a1a;
+  --accent-foreground: #f5f5f5;
+  --destructive: #666666;
+  --destructive-foreground: #f5f5f5;
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #333333;
+  --brand: #e4e4e7;
+  --brand-foreground: #09090b;
+}
+
+/*
+ * Utility: `.font-inter` forces Inter on descendants (useful for overriding the
+ * legacy Geist Mono set at <body> via main.css on the map shell).
+ */
+.font-inter,
+.hanzo-chrome {
+  font-family: var(--font-inter);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/*
+ * The map shell sets `body { font-family: 'Geist Mono', ... }` globally. New
+ * chrome components opt into Inter by wrapping themselves in `.hanzo-chrome`.
+ * This avoids collateral damage to the map's intentional monospace typography.
+ */
+.hanzo-chrome {
+  color: var(--foreground);
+}
+
+.hanzo-chrome * {
+  border-color: var(--border);
+}
+
+/* Hide chrome on focus (fullscreen map) mode — toggled via data attribute on body */
+body[data-map-focus='true'] .hanzo-site-header,
+body[data-map-focus='true'] .hanzo-chat-widget,
+body[data-map-focus='true'] .hanzo-site-footer {
+  display: none !important;
+}
