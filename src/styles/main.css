@@ -399,20 +399,48 @@ canvas,
   opacity: 1;
 }
 
-.logo {
-  font-weight: bold;
+.hanzo-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg, #fff);
+  text-decoration: none;
+  opacity: 0.95;
+  transition: opacity 120ms ease;
+}
+.hanzo-brand:hover { opacity: 1; }
+.hanzo-mark {
+  display: inline-block;
+  color: var(--fg, #fff);
+  flex-shrink: 0;
+}
+.hanzo-wordmark {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-weight: 600;
   font-size: 14px;
-  letter-spacing: 2px;
-  color: var(--accent);
+  letter-spacing: -0.01em;
+  color: var(--fg, #fff);
+}
+
+.logo {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-weight: 300;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted, #9a9a9a);
 }
 
 .logo-mobile {
   display: none;
-  font-weight: bold;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-weight: 600;
   font-size: 14px;
-  letter-spacing: 2px;
-  color: var(--accent);
+  letter-spacing: -0.01em;
+  color: var(--fg, #fff);
 }
+
+/* Stars display hidden — monochromatic theme, no counters. */
+.github-stars { display: none !important; }
 
 .version {
   font-size: 9px;

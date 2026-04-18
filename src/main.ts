@@ -550,6 +550,9 @@ if (urlParams.get('settings') === '1') {
   );
 } else {
   installUtmInterceptor();
+  // Mount Hanzo chrome first (fast, static React islands) so the header
+  // is visible during the slow map boot. The map renders into #app below.
+  try { mountHanzoChrome(); } catch (e) { console.warn('[chrome] mount failed', e); }
   const app = new App('app');
   app
     .init()
