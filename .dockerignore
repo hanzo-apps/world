@@ -16,7 +16,7 @@ consumer-prices-core
 scripts/
 !scripts/shared/
 tests
-convex
+# convex — needed by vite build (convex-client.ts imports _generated/api)
 *.log
 *.md
 todos
