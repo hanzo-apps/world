@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@hanzo/ui/button';
+import {  Button  } from '@hanzo/ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
