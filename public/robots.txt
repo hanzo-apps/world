@@ -6,5 +6,5 @@ Allow: /api/og-story
 Disallow: /api/
 Disallow: /tests/
 
-Sitemap: https://www.worldmonitor.app/sitemap.xml
-Sitemap: https://www.worldmonitor.app/blog/sitemap-index.xml
+Sitemap: https://www.world.hanzo.ai/sitemap.xml
+Sitemap: https://www.world.hanzo.ai/blog/sitemap-index.xml
