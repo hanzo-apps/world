@@ -13,13 +13,8 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts --prefer-offline 2>/dev/null || npm install --ignore-scripts
 
-# Source layer
-COPY src/ src/
-COPY public/ public/
-COPY server/ server/
-COPY api/ api/
-COPY docker/ docker/
-COPY index.html settings.html live-channels.html tsconfig.json vite.config.ts ./
+# Source (.dockerignore excludes node_modules, .git, tests, src-tauri, etc.)
+COPY . .
 
 ARG VITE_VARIANT=full
 ENV VITE_VARIANT=${VITE_VARIANT}
