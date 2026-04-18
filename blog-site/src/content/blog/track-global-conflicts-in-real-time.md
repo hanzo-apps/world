@@ -14,7 +14,7 @@ World Monitor was built to give you those 24 hours back.
 
 ## A Situation Room in Your Browser
 
-World Monitor's core dashboard (worldmonitor.app) is designed around one question: **what's happening in the world right now, and where is it getting worse?**
+World Monitor's core dashboard (world.hanzo.ai) is designed around one question: **what's happening in the world right now, and where is it getting worse?**
 
 The answer comes from layering multiple intelligence sources onto a single interactive 3D globe:
 
@@ -166,4 +166,4 @@ The CII scores each country from 0 to 100 using four weighted components: baseli
 
 ---
 
-**Monitor developing situations at [worldmonitor.app](https://worldmonitor.app). Real-time geopolitical intelligence, free and open source.**
+**Monitor developing situations at [world.hanzo.ai](https://world.hanzo.ai). Real-time geopolitical intelligence, free and open source.**

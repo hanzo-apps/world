@@ -89,9 +89,9 @@ const PAGE_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'X-Frame-Opti
 function htmlError(title, detail) {
   return new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Error &#x2014; WorldMonitor MCP</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:ui-monospace,'SF Mono','Cascadia Code',monospace;background:#0a0a0a;color:#e8e8e8;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem}.wm-logo{display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;text-decoration:none}.wm-logo svg{color:#2d8a6e}.wm-logo-text{font-size:.75rem;color:#555;letter-spacing:.1em;text-transform:uppercase}.card{width:100%;max-width:420px;background:#111;border:1px solid #1e1e1e;padding:2rem}h1{font-size:.95rem;font-weight:600;color:#ef4444;margin-bottom:.75rem;letter-spacing:.02em}p{font-size:.85rem;color:#666;line-height:1.6}.back{display:inline-block;margin-top:1.5rem;font-size:.75rem;color:#444;text-decoration:none;letter-spacing:.03em}.back:hover{color:#888}.footer{margin-top:1.5rem;font-size:.7rem;color:#2a2a2a;text-align:center}.footer a{color:#333;text-decoration:none}.footer a:hover{color:#555}</style></head>
-<body><a href="https://www.worldmonitor.app" class="wm-logo" target="_blank" rel="noopener">${GLOBE_SVG}<span class="wm-logo-text">WorldMonitor MCP</span></a>
+<body><a href="https://www.world.hanzo.ai" class="wm-logo" target="_blank" rel="noopener">${GLOBE_SVG}<span class="wm-logo-text">WorldMonitor MCP</span></a>
 <div class="card"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p><a href="javascript:history.back()" class="back">&#8592; go back</a></div>
-<p class="footer"><a href="https://www.worldmonitor.app" target="_blank" rel="noopener">worldmonitor.app</a></p>
+<p class="footer"><a href="https://www.world.hanzo.ai" target="_blank" rel="noopener">world.hanzo.ai</a></p>
 </body></html>`, { status: 400, headers: PAGE_HEADERS });
 }
 
@@ -131,7 +131,7 @@ button:disabled{opacity:.5;cursor:default}
 .footer a:hover{color:#555}
 </style></head>
 <body>
-<a href="https://www.worldmonitor.app" class="wm-logo" target="_blank" rel="noopener">${GLOBE_SVG}<span class="wm-logo-text">WorldMonitor MCP</span></a>
+<a href="https://www.world.hanzo.ai" class="wm-logo" target="_blank" rel="noopener">${GLOBE_SVG}<span class="wm-logo-text">WorldMonitor MCP</span></a>
 <div class="card">
 <div class="client-hd">
 <div class="client-name">${escapeHtml(client_name)} wants access</div>
@@ -147,17 +147,17 @@ button:disabled{opacity:.5;cursor:default}
 <li>Markets: stocks, commodities, crypto &amp; FX</li>
 </ul>
 <hr>
-<form id="cf" method="POST" action="https://api.worldmonitor.app/oauth/authorize">
+<form id="cf" method="POST" action="https://api.world.hanzo.ai/oauth/authorize">
 <input type="hidden" name="_nonce" id="nn" value="${escapeHtml(nonce)}">
 <input type="hidden" name="_js" id="jf" value="">
 <label for="api_key">API Key</label>
 <input type="password" id="api_key" name="api_key" placeholder="wm_&#8230;" autocomplete="current-password" required>
-<p class="hint">No key? <a href="https://www.worldmonitor.app/pro" target="_blank" rel="noopener">Get one at worldmonitor.app/pro &#x2192;</a></p>
+<p class="hint">No key? <a href="https://www.world.hanzo.ai/pro" target="_blank" rel="noopener">Get one at world.hanzo.ai/pro &#x2192;</a></p>
 <p class="error" id="ke"${errorMsg ? '' : ' style="display:none"'}>${errorMsg ? escapeHtml(errorMsg) : ''}</p>
 <button type="submit" id="ab">Authorize</button>
 </form>
 </div>
-<p class="footer"><a href="https://www.worldmonitor.app" target="_blank" rel="noopener">worldmonitor.app</a> &middot; <a href="https://www.worldmonitor.app/pro" target="_blank" rel="noopener">Get an API key &#x2192;</a></p>
+<p class="footer"><a href="https://www.world.hanzo.ai" target="_blank" rel="noopener">world.hanzo.ai</a> &middot; <a href="https://www.world.hanzo.ai/pro" target="_blank" rel="noopener">Get an API key &#x2192;</a></p>
 <script>document.getElementById('cf').addEventListener('submit',function(e){e.preventDefault();var jf=document.getElementById('jf');if(jf)jf.value='1';var b=document.getElementById('ab');b.disabled=true;b.textContent='Authorizing\u2026';var d=new URLSearchParams(new FormData(e.target));fetch('/oauth/authorize',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:d}).then(function(r){var c=r.headers.get('Content-Type')||'';if(c.indexOf('json')>=0)return r.json().then(function(j){if(j.location){window.location.replace(j.location);return;}if(j.error==='invalid_key'){var n=document.getElementById('nn');if(n)n.value=j.nonce||'';var em=document.getElementById('ke');if(em){em.textContent='Invalid API key. Please check and try again.';em.style.display='';}}b.disabled=false;b.textContent='Authorize';});return r.text().then(function(h){document.open();document.write(h);document.close();});}).catch(function(){b.disabled=false;b.textContent='Authorize';});})</script>
 </body></html>`, { status: 200, headers: PAGE_HEADERS });
 }
@@ -222,7 +222,7 @@ export default async function handler(req) {
     // Origin validation: allow our domain, absent origin (server/CLI), and 'null'
     // (WebView with opaque/sandboxed origin). CSRF nonce provides the actual protection.
     const origin = req.headers.get('origin');
-    if (origin && origin !== 'https://api.worldmonitor.app' && origin !== 'null') {
+    if (origin && origin !== 'https://api.world.hanzo.ai' && origin !== 'null') {
       return new Response('Forbidden', { status: 403 });
     }
 

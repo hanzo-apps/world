@@ -9,7 +9,7 @@ import { unwrapEnvelope } from './_seed-envelope-source.mjs';
 
 loadEnvFile(import.meta.url);
 
-const API_BASE = process.env.API_BASE_URL || 'https://api.worldmonitor.app';
+const API_BASE = process.env.API_BASE_URL || 'https://api.world.hanzo.ai';
 // Reuse WORLDMONITOR_VALID_KEYS when a dedicated WORLDMONITOR_API_KEY isn't set —
 // any entry in that comma-separated list is accepted by the API (same
 // validation list that server/_shared/premium-check.ts and validateApiKey read).

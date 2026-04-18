@@ -108,9 +108,9 @@ World Monitor ships as three product variants from a single codebase. Each varia
 
 | Variant | Domain | Focus |
 |---|---|---|
-| `full` | worldmonitor.app | Geopolitics, military, OSINT, conflicts, markets |
-| `tech` | tech.worldmonitor.app | AI/ML, startups, cybersecurity, developer tools |
-| `finance` | finance.worldmonitor.app | Markets, trading, central banks, macro indicators |
+| `full` | world.hanzo.ai | Geopolitics, military, OSINT, conflicts, markets |
+| `tech` | tech.world.hanzo.ai | AI/ML, startups, cybersecurity, developer tools |
+| `finance` | finance.world.hanzo.ai | Markets, trading, central banks, macro indicators |
 
 ### Variant Resolution
 

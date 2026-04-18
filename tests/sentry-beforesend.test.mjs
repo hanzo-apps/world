@@ -132,7 +132,7 @@ describe('empty-stack network/timeout errors are NOT suppressed', () => {
     'TypeError: Failed to fetch',
     'TypeError: NetworkError when attempting to fetch resource.',
     'Could not connect to the server',
-    'Failed to fetch dynamically imported module: https://worldmonitor.app/assets/panels-abc.js',
+    'Failed to fetch dynamically imported module: https://world.hanzo.ai/assets/panels-abc.js',
     'Importing a module script failed.',
     'Operation timed out',
     'signal timed out',

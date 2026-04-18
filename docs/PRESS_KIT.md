@@ -22,11 +22,11 @@ World Monitor runs five thematic variants from a single codebase, each tailored 
 
 | Variant | Domain | Focus |
 |---------|--------|-------|
-| **World Monitor** | worldmonitor.app | Geopolitics, military, conflicts, infrastructure |
-| **Tech Monitor** | tech.worldmonitor.app | AI/ML, startups, cybersecurity, tech ecosystems |
-| **Finance Monitor** | finance.worldmonitor.app | Markets, central banks, Gulf FDI, commodities |
-| **Commodity Monitor** | commodity.worldmonitor.app | Mining, metals, energy, critical minerals |
-| **Happy Monitor** | happy.worldmonitor.app | Good news, conservation, positive global trends |
+| **World Monitor** | world.hanzo.ai | Geopolitics, military, conflicts, infrastructure |
+| **Tech Monitor** | tech.world.hanzo.ai | AI/ML, startups, cybersecurity, tech ecosystems |
+| **Finance Monitor** | finance.world.hanzo.ai | Markets, central banks, Gulf FDI, commodities |
+| **Commodity Monitor** | commodity.world.hanzo.ai | Mining, metals, energy, critical minerals |
+| **Happy Monitor** | happy.world.hanzo.ai | Good news, conservation, positive global trends |
 
 ### AI Intelligence Layer
 
@@ -195,7 +195,7 @@ The system identifies emerging crises by blending news clustering, geographic co
 
 ## Availability
 
-- **Web**: Available at worldmonitor.app and variant subdomains
+- **Web**: Available at world.hanzo.ai and variant subdomains
 - **Desktop**: Native apps for macOS, Windows, and Linux (via Tauri)
 - **PWA**: Installable as a progressive web app with offline map tile caching
 - **Mobile**: Mobile-optimized responsive layout with touch gestures
@@ -260,7 +260,7 @@ A: Yes. World Monitor is licensed under AGPL-3.0, meaning anyone can inspect, au
 A: World Monitor was created by Elie Habib. It is an independent project, not affiliated with any government, intelligence agency, or defense contractor.
 
 **Q: Can I embed World Monitor or use its data in my reporting?**
-A: The web interface can be referenced and linked in reporting. For data integration, an API tier is planned. Please attribute "World Monitor (worldmonitor.app)" when referencing the platform in published work.
+A: The web interface can be referenced and linked in reporting. For data integration, an API tier is planned. Please attribute "World Monitor (world.hanzo.ai)" when referencing the platform in published work.
 
 **Q: How is this different from Janes, Palantir, or Dataminr?**
 A: Those are enterprise products costing tens to hundreds of thousands of dollars per year, typically sold to governments and large corporations. World Monitor aims to democratize access to situational awareness by aggregating public data and using AI to make it digestible. It is open source, free to use, and designed for individual analysts and small teams, not just large organizations.
@@ -278,7 +278,7 @@ A: World Monitor is primarily a solo project by its creator, with occasional ope
 For press inquiries, interview requests, or additional information:
 
 - **GitHub**: github.com/koala73/worldmonitor
-- **Website**: worldmonitor.app
+- **Website**: world.hanzo.ai
 
 ---
 

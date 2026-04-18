@@ -27,10 +27,10 @@ function overrideGlobal(name, value) {
 
 function installBrowserEnv() {
   const location = {
-    hostname: 'worldmonitor.app',
+    hostname: 'world.hanzo.ai',
     protocol: 'https:',
-    host: 'worldmonitor.app',
-    origin: 'https://worldmonitor.app',
+    host: 'world.hanzo.ai',
+    origin: 'https://world.hanzo.ai',
   };
   const navigator = { userAgent: 'node-test', onLine: true };
   const window = { location, navigator };

@@ -44,7 +44,7 @@ const DEFAULT_PROVIDERS = [
     headers: (key) => ({
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://worldmonitor.app',
+      'HTTP-Referer': 'https://world.hanzo.ai',
       'X-Title': 'World Monitor',
       'User-Agent': CHROME_UA,
     }),

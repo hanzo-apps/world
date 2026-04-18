@@ -15,7 +15,7 @@ The `fetch` calls in `SupplyChainPanel.attachScenarioTriggers()` — both the in
 - **File:** `src/components/SupplyChainPanel.ts` — `attachScenarioTriggers()` polling loop
 - No `X-WorldMonitor-Key` or `Authorization` header on either fetch call
 - `validateApiKey(req)` with no `{ forceKey: true }` returns `{ required: false }` for browser origins (see MEMORY: `feedback_validateapikey_forcekey_vendor.md`)
-- The PRO gate is only checked client-side in `MapContainer.activateScenario()` — bypassing it server-side is trivial via curl with `Origin: https://worldmonitor.app`
+- The PRO gate is only checked client-side in `MapContainer.activateScenario()` — bypassing it server-side is trivial via curl with `Origin: https://world.hanzo.ai`
 - Identified by security-sentinel during PR #2910 review
 
 ## Proposed Solutions

@@ -5,7 +5,7 @@ const originalFetch = globalThis.fetch;
 const originalEnv = { ...process.env };
 
 const VALID_KEY = 'wm_test_key_123';
-const BASE_URL = 'https://api.worldmonitor.app/mcp';
+const BASE_URL = 'https://api.world.hanzo.ai/mcp';
 
 function makeReq(method = 'POST', body = null, headers = {}) {
   return new Request(BASE_URL, {
@@ -76,7 +76,7 @@ describe('api/mcp.ts — PRO MCP Server', () => {
   // --- Protocol ---
 
   it('OPTIONS returns 204 with CORS headers', async () => {
-    const req = new Request(BASE_URL, { method: 'OPTIONS', headers: { origin: 'https://worldmonitor.app' } });
+    const req = new Request(BASE_URL, { method: 'OPTIONS', headers: { origin: 'https://world.hanzo.ai' } });
     const res = await handler(req);
     assert.equal(res.status, 204);
     assert.ok(res.headers.get('access-control-allow-methods'));

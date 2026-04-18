@@ -24,14 +24,14 @@ import { loadEnvFile, CHROME_UA } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
-const API_BASE = 'https://api.worldmonitor.app';
+const API_BASE = 'https://api.world.hanzo.ai';
 const TIMEOUT = 30_000;
 
 async function warmPing(name, path, body = {}) {
   try {
     const resp = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA, Origin: 'https://worldmonitor.app' },
+      headers: { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA, Origin: 'https://world.hanzo.ai' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT),
     });

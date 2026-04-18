@@ -82,14 +82,14 @@ The API layer runs on **Vercel Edge Functions**, providing:
 
 API endpoints follow the pattern:
 ```
-api.worldmonitor.app/api/{domain}/v1/{rpc}
+api.world.hanzo.ai/api/{domain}/v1/{rpc}
 ```
 
 For example:
 
-- `api.worldmonitor.app/api/market/v1/quotes` for stock quotes
-- `api.worldmonitor.app/api/conflict/v1/events` for conflict data
-- `api.worldmonitor.app/api/intelligence/v1/cii` for Country Instability Index scores
+- `api.world.hanzo.ai/api/market/v1/quotes` for stock quotes
+- `api.world.hanzo.ai/api/conflict/v1/events` for conflict data
+- `api.world.hanzo.ai/api/intelligence/v1/cii` for Country Instability Index scores
 
 ## Building with World Monitor's API
 
@@ -199,7 +199,7 @@ The intelligence platform of the future isn't a product. It's an ecosystem. Worl
 ## Frequently Asked Questions
 
 **Is the World Monitor API free to use?**
-Yes. World Monitor is AGPL-3.0 open source. You can use the public API at api.worldmonitor.app or self-host the entire stack. There are no API keys required for public endpoints and no usage fees.
+Yes. World Monitor is AGPL-3.0 open source. You can use the public API at api.world.hanzo.ai or self-host the entire stack. There are no API keys required for public endpoints and no usage fees.
 
 **What languages can I use to consume the API?**
 Any language that supports HTTP. The auto-generated OpenAPI spec provides compatibility with Swift, Kotlin, Python, Go, Java, and more. TypeScript clients are generated directly from the proto files for first-class type safety.

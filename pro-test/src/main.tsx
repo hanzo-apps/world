@@ -9,12 +9,12 @@ const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
 
 Sentry.init({
   dsn: sentryDsn || undefined,
-  environment: (location.hostname === 'worldmonitor.app' || location.hostname.endsWith('.worldmonitor.app')) ? 'production'
+  environment: (location.hostname === 'world.hanzo.ai' || location.hostname.endsWith('.world.hanzo.ai')) ? 'production'
     : location.hostname.includes('vercel.app') ? 'preview'
     : 'development',
   enabled: Boolean(sentryDsn) && !location.hostname.startsWith('localhost'),
   allowUrls: [
-    /https?:\/\/(www\.|tech\.|finance\.|commodity\.|happy\.)?worldmonitor\.app/,
+    /https?:\/\/(www\.|tech\.|finance\.|commodity\.|happy\.)?world\.hanzo\.ai/,
     /https?:\/\/.*\.vercel\.app/,
   ],
   tracesSampleRate: 0.1,

@@ -105,7 +105,7 @@ ollama pull llama3.1
 
 ### Step 2: Open World Monitor
 
-Navigate to worldmonitor.app or install the desktop app from GitHub releases.
+Navigate to world.hanzo.ai or install the desktop app from GitHub releases.
 
 ### Step 3: Configure AI
 
@@ -153,4 +153,4 @@ For most intelligence tasks, local models like Llama 3.1 70B produce comparable 
 
 ---
 
-**Run intelligence analysis on your own terms at [worldmonitor.app](https://worldmonitor.app). Install Ollama for fully private AI. No login, no tracking, no compromise.**
+**Run intelligence analysis on your own terms at [world.hanzo.ai](https://world.hanzo.ai). Install Ollama for fully private AI. No login, no tracking, no compromise.**

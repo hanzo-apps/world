@@ -38,7 +38,7 @@ describe('CSP violation filter (shouldSuppressCspViolation)', () => {
 
   describe('connect-src HTTPS suppression (policy-aware)', () => {
     it('suppresses HTTPS connect-src when CSP allows https:', () => {
-      assert.ok(suppress('enforce', 'connect-src', 'https://api.worldmonitor.app/api/oref-alerts', '', true));
+      assert.ok(suppress('enforce', 'connect-src', 'https://api.world.hanzo.ai/api/oref-alerts', '', true));
     });
 
     it('suppresses HTTPS connect-src for tilecache.rainviewer.com', () => {
@@ -58,7 +58,7 @@ describe('CSP violation filter (shouldSuppressCspViolation)', () => {
     });
 
     it('does NOT suppress HTTPS connect-src when CSP does not allow https:', () => {
-      assert.ok(!suppress('enforce', 'connect-src', 'https://api.worldmonitor.app/api/oref-alerts', '', false));
+      assert.ok(!suppress('enforce', 'connect-src', 'https://api.world.hanzo.ai/api/oref-alerts', '', false));
     });
 
     it('does NOT suppress HTTP connect-src even when CSP allows https:', () => {
@@ -90,7 +90,7 @@ describe('CSP violation filter (shouldSuppressCspViolation)', () => {
     });
 
     it('suppresses blob: URI', () => {
-      assert.ok(suppress('enforce', 'worker-src', 'blob:https://www.worldmonitor.app/abc', '', false));
+      assert.ok(suppress('enforce', 'worker-src', 'blob:https://www.world.hanzo.ai/abc', '', false));
     });
 
     it('suppresses eval', () => {
@@ -136,7 +136,7 @@ describe('CSP violation filter (shouldSuppressCspViolation)', () => {
     });
 
     it('suppresses manifest.webmanifest', () => {
-      assert.ok(suppress('enforce', 'default-src', 'https://www.worldmonitor.app/manifest.webmanifest', '', false));
+      assert.ok(suppress('enforce', 'default-src', 'https://www.world.hanzo.ai/manifest.webmanifest', '', false));
     });
   });
 

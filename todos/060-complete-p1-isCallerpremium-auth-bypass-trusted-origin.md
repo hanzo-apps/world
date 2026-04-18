@@ -9,13 +9,13 @@ dependencies: []
 # `isCallerPremium` grants premium to ALL trusted browser origins — free users bypass PRO gate
 
 ## Problem Statement
-`server/_shared/premium-check.ts` calls `validateApiKey(request, {})` first. `validateApiKey` returns `{ valid: true, required: false }` for ANY request from a trusted origin (worldmonitor.app, Vercel preview URLs, localhost) — regardless of the user's subscription tier. Since `isCallerPremium` short-circuits to `true` on `keyCheck.valid`, every free-tier user on the web app passes the PRO gate for `framework`/`systemAppend`. The Bearer token / Clerk JWT path that actually checks `session.role === 'pro'` is never reached for browser sessions.
+`server/_shared/premium-check.ts` calls `validateApiKey(request, {})` first. `validateApiKey` returns `{ valid: true, required: false }` for ANY request from a trusted origin (world.hanzo.ai, Vercel preview URLs, localhost) — regardless of the user's subscription tier. Since `isCallerPremium` short-circuits to `true` on `keyCheck.valid`, every free-tier user on the web app passes the PRO gate for `framework`/`systemAppend`. The Bearer token / Clerk JWT path that actually checks `session.role === 'pro'` is never reached for browser sessions.
 
 The `validateApiKey` function was designed for origin-level access control ("is this a legitimate caller of our API?"), NOT for tier entitlement ("is this caller a paying PRO subscriber?"). Conflating these two meanings makes the entire `framework`/`systemAppend` PRO feature ungated in production.
 
 ## Findings
-- **`server/_shared/premium-check.ts:10-12`** — `if (keyCheck.valid) return true;` triggers for all worldmonitor.app sessions
-- **`api/_api-key.js:49-68`** — `isTrustedBrowserOrigin()` returns `true` for `*.worldmonitor.app`, `*vercel.app`, `localhost`; causes `validateApiKey` to return `{ valid: true, required: false }` with no key present
+- **`server/_shared/premium-check.ts:10-12`** — `if (keyCheck.valid) return true;` triggers for all world.hanzo.ai sessions
+- **`api/_api-key.js:49-68`** — `isTrustedBrowserOrigin()` returns `true` for `*.world.hanzo.ai`, `*vercel.app`, `localhost`; causes `validateApiKey` to return `{ valid: true, required: false }` with no key present
 - **`src/services/panel-gating.ts:15`** — client-side `hasPremiumAccess()` correctly checks role; server-side `isCallerPremium` diverges from this contract
 - Confirmed independently by: kieran-typescript-reviewer, security-sentinel, architecture-strategist
 
@@ -49,7 +49,7 @@ Only check Bearer token for premium. API key holders who lack a Bearer token wou
 - Related: `api/_api-key.js:49-68` (`isTrustedBrowserOrigin`)
 
 ## Acceptance Criteria
-- [ ] Free-tier users on worldmonitor.app do NOT pass `isCallerPremium` check
+- [ ] Free-tier users on world.hanzo.ai do NOT pass `isCallerPremium` check
 - [ ] PRO users with valid Bearer token DO pass `isCallerPremium`
 - [ ] Desktop callers with explicit API key DO pass `isCallerPremium`
 - [ ] Test: stub `validateApiKey` returning `{ valid: true, required: false }` → `isCallerPremium` returns `false`

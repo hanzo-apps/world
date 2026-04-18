@@ -1,6 +1,6 @@
 {
-  "resource": "https://api.worldmonitor.app",
-  "authorization_servers": ["https://api.worldmonitor.app"],
+  "resource": "https://api.world.hanzo.ai",
+  "authorization_servers": ["https://api.world.hanzo.ai"],
   "bearer_methods_supported": ["header"],
   "scopes_supported": ["mcp"]
 }

@@ -2,7 +2,7 @@
 
 > Comprehensive reference for all Vercel Edge Function endpoints powering the World Monitor intelligence dashboard.
 
-**Base URL**: All endpoints are relative to `/api/` (e.g., `https://worldmonitor.app/api/earthquakes`).
+**Base URL**: All endpoints are relative to `/api/` (e.g., `https://world.hanzo.ai/api/earthquakes`).
 
 ---
 
@@ -135,8 +135,8 @@ Eight regex patterns control access:
 
 | # | Pattern | Matches |
 |---|---------|---------|
-| 1 | `worldmonitor\.app$` | `https://worldmonitor.app` |
-| 2 | `\.worldmonitor\.app$` | `https://*.worldmonitor.app` |
+| 1 | `worldmonitor\.app$` | `https://world.hanzo.ai` |
+| 2 | `\.worldmonitor\.app$` | `https://*.world.hanzo.ai` |
 | 3 | `\.vercel\.app$` | Vercel preview deploys |
 | 4 | `localhost(:\d+)?$` | `http://localhost:*` |
 | 5 | `127\.0\.0\.1(:\d+)?$` | IPv4 loopback |

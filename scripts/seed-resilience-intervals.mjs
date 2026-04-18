@@ -10,7 +10,7 @@ import {
 
 loadEnvFile(import.meta.url);
 
-const API_BASE = process.env.API_BASE_URL || 'https://api.worldmonitor.app';
+const API_BASE = process.env.API_BASE_URL || 'https://api.world.hanzo.ai';
 // Reuse WORLDMONITOR_VALID_KEYS when a dedicated WORLDMONITOR_API_KEY isn't set.
 // See seed-resilience-scores.mjs for the rationale.
 const WM_KEY = process.env.WORLDMONITOR_API_KEY

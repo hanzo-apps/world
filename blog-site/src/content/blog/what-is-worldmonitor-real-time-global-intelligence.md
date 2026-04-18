@@ -39,11 +39,11 @@ World Monitor isn't one dashboard. It's five:
 
 | Dashboard | Focus | URL |
 |-----------|-------|-----|
-| **World Monitor** | Geopolitics, conflicts, military, infrastructure | worldmonitor.app |
-| **Tech Monitor** | AI labs, startups, cybersecurity, cloud infrastructure | tech.worldmonitor.app |
-| **Finance Monitor** | Markets, central banks, forex, Gulf FDI | finance.worldmonitor.app |
-| **Commodity Monitor** | Mining, metals, energy, supply chain disruption | commodity.worldmonitor.app |
-| **Happy Monitor** | Good news, breakthroughs, conservation, renewable energy | happy.worldmonitor.app |
+| **World Monitor** | Geopolitics, conflicts, military, infrastructure | world.hanzo.ai |
+| **Tech Monitor** | AI labs, startups, cybersecurity, cloud infrastructure | tech.world.hanzo.ai |
+| **Finance Monitor** | Markets, central banks, forex, Gulf FDI | finance.world.hanzo.ai |
+| **Commodity Monitor** | Mining, metals, energy, supply chain disruption | commodity.world.hanzo.ai |
+| **Happy Monitor** | Good news, breakthroughs, conservation, renewable energy | happy.world.hanzo.ai |
 
 Switch between them with a single click. Each variant curates panels and layers for its specific audience while sharing the same underlying intelligence engine. Read more about each variant in [Five Dashboards, One Platform](/blog/posts/five-dashboards-one-platform-worldmonitor-variants/).
 
@@ -84,7 +84,7 @@ The dashboard serves a surprisingly wide audience:
 
 World Monitor works as:
 
-- A **web app** at worldmonitor.app (no install needed)
+- A **web app** at world.hanzo.ai (no install needed)
 - A **Progressive Web App** you can install on any device with offline map caching
 - A **native desktop app** via Tauri for macOS, Windows, and Linux
 - Fully **mobile-optimized** with touch gestures, pinch-to-zoom, and bottom-sheet panels
@@ -100,7 +100,7 @@ The tech stack is modern and approachable: React + TypeScript + Vite on the fron
 ## Frequently Asked Questions
 
 **Do I need to create an account to use World Monitor?**
-No. World Monitor requires no login, no signup, and collects no personal data. Open worldmonitor.app in any browser and start using it immediately.
+No. World Monitor requires no login, no signup, and collects no personal data. Open world.hanzo.ai in any browser and start using it immediately.
 
 **Can I run World Monitor completely offline?**
 Yes. The Tauri desktop app (macOS, Windows, Linux) includes a local Node.js sidecar and supports local LLMs via Ollama or LM Studio. You can also install the PWA for offline map caching.
@@ -110,4 +110,4 @@ World Monitor covers geopolitics, markets, military tracking, and infrastructure
 
 ---
 
-**Try World Monitor now at [worldmonitor.app](https://worldmonitor.app). No signup required.**
+**Try World Monitor now at [world.hanzo.ai](https://world.hanzo.ai). No signup required.**

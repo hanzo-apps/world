@@ -38,7 +38,7 @@ async function _createCheckoutSession(
   user: UserInfo,
 ) {
   // Validate returnUrl to prevent open-redirect attacks.
-  const siteUrl = process.env.SITE_URL ?? "https://worldmonitor.app";
+  const siteUrl = process.env.SITE_URL ?? "https://world.hanzo.ai";
   let returnUrl = siteUrl;
   if (args.returnUrl) {
     let parsedReturnUrl: URL;
@@ -49,18 +49,18 @@ async function _createCheckoutSession(
     }
 
     const allowedOrigins = new Set([
-      "https://worldmonitor.app",
-      "https://www.worldmonitor.app",
-      "https://app.worldmonitor.app",
-      "https://tech.worldmonitor.app",
-      "https://finance.worldmonitor.app",
-      "https://commodity.worldmonitor.app",
-      "https://happy.worldmonitor.app",
+      "https://world.hanzo.ai",
+      "https://www.world.hanzo.ai",
+      "https://app.world.hanzo.ai",
+      "https://tech.world.hanzo.ai",
+      "https://finance.world.hanzo.ai",
+      "https://commodity.world.hanzo.ai",
+      "https://happy.world.hanzo.ai",
       new URL(siteUrl).origin,
     ]);
     if (!allowedOrigins.has(parsedReturnUrl.origin)) {
       throw new ConvexError(
-        "Invalid returnUrl: must use a trusted worldmonitor.app origin",
+        "Invalid returnUrl: must use a trusted world.hanzo.ai origin",
       );
     }
     returnUrl = parsedReturnUrl.toString();

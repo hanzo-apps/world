@@ -9,7 +9,7 @@
     if (handled) return;
     if (!e.data || e.data.type !== 'wm-html') return;
     var origin = e.origin || '';
-    if (!origin.endsWith('worldmonitor.app') && !/^https?:\/\/localhost/.test(origin)) return;
+    if (!origin.endsWith('world.hanzo.ai') && !/^https?:\/\/localhost/.test(origin)) return;
     handled = true;
     document.open();
     document.write(e.data.html);

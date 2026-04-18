@@ -1,8 +1,8 @@
-const COOKIE_DOMAIN = '.worldmonitor.app';
+const COOKIE_DOMAIN = '.world.hanzo.ai';
 const MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
 function usesCookies(): boolean {
-  return location.hostname.endsWith('worldmonitor.app');
+  return location.hostname.endsWith('world.hanzo.ai');
 }
 
 export function getDismissed(key: string): boolean {

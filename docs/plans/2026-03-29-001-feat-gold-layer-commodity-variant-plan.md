@@ -29,7 +29,7 @@ This plan is additive enrichment, not new infrastructure.
 
 ## Problem Statement / Motivation
 
-The commodity variant (`commodity.worldmonitor.app`) serves users focused on gold, metals, and energy markets. Compared to the fork's gold layer design, three user-facing gaps exist:
+The commodity variant (`commodity.world.hanzo.ai`) serves users focused on gold, metals, and energy markets. Compared to the fork's gold layer design, three user-facing gaps exist:
 
 - **Map incompleteness**: Major producing mines (Muruntau, Kibali, Yanacocha, Ahafo, South Deep, etc.) are absent from the mining layer. A user clicking into gold production misses ~40% of the top 20 global mines.
 - **Brief irrelevance**: The AI brief on the commodity variant reads news from `['markets', 'economic', 'crypto', 'finance']` — all of which are finance-variant categories. Commodity users get a stock market brief, not a gold/commodities brief.

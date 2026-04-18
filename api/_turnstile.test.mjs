@@ -20,7 +20,7 @@ test.afterEach(() => {
 });
 
 test('getClientIp prefers x-real-ip, then cf-connecting-ip, then x-forwarded-for', () => {
-  const request = new Request('https://worldmonitor.app/api/test', {
+  const request = new Request('https://world.hanzo.ai/api/test', {
     headers: {
       'x-forwarded-for': '198.51.100.8, 203.0.113.10',
       'cf-connecting-ip': '203.0.113.7',
