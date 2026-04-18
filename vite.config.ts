@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { resolve, dirname, extname } from 'path';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { brotliCompress } from 'zlib';
@@ -576,6 +578,98 @@ function youtubeLivePlugin(): Plugin {
   };
 }
 
+/**
+ * Dev-mode route plugin: rewrites `/pricing`, `/pro`, `/upgrade` to
+ * `/pricing.html` so the multi-page build works under `vite dev`.
+ */
+function pricingRoutePlugin(): Plugin {
+  return {
+    name: 'pricing-route',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (!req.url) return next();
+        const path = req.url.split('?')[0];
+        if (path === '/pricing' || path === '/pro' || path === '/upgrade') {
+          req.url = `/pricing.html${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
+        }
+        next();
+      });
+    },
+  };
+}
+
+/**
+ * Dev-mode stub for /v1/world/* endpoints that the backend agent is building.
+ *
+ * - POST /v1/world/register  — newsletter/waitlist. Logs + returns 200 stub.
+ * - POST /v1/world/checkout  — Pro upgrade. Returns {url} pointing at Dodo test.
+ * - POST /v1/world/chat      — streamed Zen chat. Returns a minimal SSE stream.
+ *
+ * In production these are served by the real backend at api.world.hanzo.ai.
+ * This plugin only intercepts in `vite dev` so local development is unblocked
+ * without waiting for the backend to ship. Remove once endpoints exist server-side.
+ */
+function worldApiPlugin(): Plugin {
+  return {
+    name: 'world-api-stub',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url ?? '';
+        if (!url.startsWith('/v1/world/')) return next();
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+        if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
+
+        // Collect body
+        const chunks: Buffer[] = [];
+        for await (const c of req) chunks.push(typeof c === 'string' ? Buffer.from(c) : c);
+        const bodyRaw = Buffer.concat(chunks).toString('utf8');
+        let body: any = {};
+        try { body = bodyRaw ? JSON.parse(bodyRaw) : {}; } catch { /* ignore */ }
+
+        if (url.startsWith('/v1/world/register')) {
+          console.log('[world-api stub] register:', body);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, status: 'queued', email: body.email ?? null }));
+          return;
+        }
+
+        if (url.startsWith('/v1/world/checkout')) {
+          console.log('[world-api stub] checkout:', body);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ url: '/pricing?checkout=stub', session_id: 'dev-stub' }));
+          return;
+        }
+
+        if (url.startsWith('/v1/world/chat')) {
+          console.log('[world-api stub] chat:', body);
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          const chunks = [
+            'Dev stub: the `/v1/world/chat` endpoint is not wired to Zen yet. ',
+            'The backend agent is adding it. Your prompt was received ',
+            `(${(body.messages?.[body.messages.length - 1]?.content ?? '').slice(0, 60)}...). `,
+            'Streaming will work once the production endpoint is live.',
+          ];
+          for (const c of chunks) {
+            res.write(`data: ${JSON.stringify({ content: c })}\n\n`);
+            await new Promise((r) => setTimeout(r, 80));
+          }
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: 'not found' }));
+      });
+    },
+  };
+}
+
 function gpsjamDevPlugin(): Plugin {
   return {
     name: 'gpsjam-dev',
@@ -618,11 +712,20 @@ export default defineConfig(({ mode }) => {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },
     plugins: [
+      // React JSX support for @hanzo/ui-based chrome components in src/ui/**.
+      // The map shell stays vanilla TS/DOM; JSX compiles only where used.
+      react({ include: [/src\/ui\/.*\.tsx?$/, /src\/pages\/.*\.tsx?$/] }),
+      // Tailwind v4 Vite plugin — scans src/ui/**, src/pages/**, index.html,
+      // pricing.html (per tailwind.config.ts content[]). Legacy styles in
+      // src/styles/**.css bypass Tailwind entirely.
+      tailwindcss(),
       htmlVariantPlugin(activeMeta, activeVariant, isDesktopBuild),
       polymarketPlugin(),
       rssProxyPlugin(),
       youtubeLivePlugin(),
       gpsjamDevPlugin(),
+      worldApiPlugin(),
+      pricingRoutePlugin(),
       sebufApiPlugin(),
       brotliPrecompressPlugin(),
       VitePWA({
@@ -790,6 +893,7 @@ export default defineConfig(({ mode }) => {
           main: resolve(__dirname, 'index.html'),
           settings: resolve(__dirname, 'settings.html'),
           liveChannels: resolve(__dirname, 'live-channels.html'),
+          pricing: resolve(__dirname, 'pricing.html'),
         },
         output: {
           manualChunks(id) {
