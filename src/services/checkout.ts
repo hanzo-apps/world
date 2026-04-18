@@ -14,6 +14,7 @@
 import * as Sentry from '@sentry/browser';
 import { DodoPayments } from 'dodopayments-checkout';
 import type { CheckoutEvent } from 'dodopayments-checkout';
+import { openBillingPortal } from './billing';
 import { getCurrentClerkUser, getClerkToken } from './clerk';
 
 const CHECKOUT_PRODUCT_PARAM = 'checkoutProduct';
@@ -22,6 +23,7 @@ const CHECKOUT_DISCOUNT_PARAM = 'checkoutDiscount';
 const PENDING_CHECKOUT_KEY = 'wm-pending-checkout';
 const POST_CHECKOUT_FLAG_KEY = 'wm-post-checkout';
 const APP_CHECKOUT_BASE_URL = 'https://worldmonitor.app/';
+const ACTIVE_SUBSCRIPTION_EXISTS = 'ACTIVE_SUBSCRIPTION_EXISTS';
 
 /**
  * Session flag set just before the post-overlay reload. Lets panel-layout
@@ -297,6 +299,11 @@ export async function startCheckout(
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       console.error('[checkout] Edge endpoint error:', resp.status, err);
+      if (resp.status === 409 && err?.error === ACTIVE_SUBSCRIPTION_EXISTS) {
+        clearPendingCheckoutIntent();
+        await openBillingPortal();
+        return false;
+      }
       if (fallbackToPricingPage) window.open('https://worldmonitor.app/pro', '_blank');
       return false;
     }
