@@ -779,6 +779,50 @@ const STYLE_BLOCK = `<style>
     font-size: max(11px, 0.85vw);
     letter-spacing: 0.2em; opacity: 0.55;
   }
+  @media (max-width: 640px) {
+    .page { padding: 5vh 6vw 8vh; }
+    /* padding-right must clear the absolute .page-number block on the
+       right. "09 / 12" in IBM Plex Mono at 11px is ~65-70px wide and
+       .page-number sits at right:5vw; on a 360px Android ~19px + 70px
+       = ~89px of occupied space. 22vw ≈ 79px at 360px AND ≈ 86px at
+       393px — enough headroom with a one-vw safety margin. 18vw left
+       ~0 clearance on iPhone SE (Greptile P2). */
+    .digest .running-head {
+      flex-direction: column; align-items: flex-start;
+      gap: 1vh; padding-right: 22vw;
+    }
+    .page-number { top: 4vh; right: 5vw; opacity: 0.6; }
+    .digest h2 { font-size: 10vw; max-width: 22ch; margin-bottom: 4vh; }
+    .digest blockquote {
+      font-size: max(17px, 4.6vw); line-height: 1.35;
+      max-width: 40ch; padding-left: 4vw;
+    }
+    .digest .rule { width: 14vw; margin-top: 4vh; }
+    .digest .stat-row { grid-template-columns: 1fr; gap: 1.5vh; }
+    .digest .stat-num { font-size: 18vw; }
+    /* Keep px floors at or above the base-rule floors (17px / 18px)
+       so very narrow viewports (<375px) never render smaller than
+       desktop. vw term still scales up on typical phones (4vw ≈ 15.7px
+       at 393px so the max() picks the px floor). Greptile P2. */
+    .digest .stat-label { font-size: max(17px, 4vw); }
+    .digest .thread { font-size: max(17px, 4vw); line-height: 1.5; }
+    .digest .signal { font-size: max(18px, 4vw); padding-left: 4vw; }
+    .story { display: flex; flex-direction: column; gap: 4vh; }
+    .story .left { padding-right: 0; }
+    .story .rank-ghost { font-size: 62vw; left: -4vw; top: 30%; }
+    .story h3 { font-size: 9.5vw; max-width: none; margin-bottom: 3vh; }
+    .story .desc {
+      font-size: max(16px, 4.4vw); max-width: none;
+      margin-bottom: 3vh; line-height: 1.5;
+    }
+    .story .tag-row { gap: 2vw; margin-bottom: 3vh; }
+    .story .tag { font-size: 11px; padding: 0.4em 0.8em; }
+    .story .source { font-size: 11px; }
+    .story .right { justify-content: flex-start; }
+    .story .callout { padding: 3vh 4vw; border-left-width: 3px; }
+    .story .callout .label { font-size: 11px; margin-bottom: 1.5vh; opacity: 0.7; }
+    .story .callout .note { font-size: max(16px, 4.2vw); line-height: 1.5; }
+  }
 </style>`;
 
 const NAV_SCRIPT = `<script>
