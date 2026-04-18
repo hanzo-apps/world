@@ -13,8 +13,7 @@ src-tauri
 blog-site
 pro-test
 consumer-prices-core
-scripts/
-!scripts/shared/
+# scripts/ — keep: shared/ and data/ needed by vite build
 tests
 # convex — needed by vite build (convex-client.ts imports _generated/api)
 *.log
