@@ -240,8 +240,12 @@ export class SupplyChainPanel extends Panel {
     }
 
     // Re-insert scenario banner after setContent replaces inner content.
+    // Use the private renderScenarioBanner() — NOT showScenarioSummary() —
+    // so this render() call doesn't recurse. showScenarioSummary() is the
+    // public activate entrypoint that triggers render(); the banner DOM
+    // itself is built here from activeScenarioState.
     if (this.activeScenarioState) {
-      this.showScenarioSummary(this.activeScenarioState.scenarioId, this.activeScenarioState.result);
+      this.renderScenarioBanner();
     }
   }
 
@@ -324,8 +328,18 @@ export class SupplyChainPanel extends Panel {
       return `<div class="economic-empty">${t('components.supplyChain.noChokepoints')}</div>`;
     }
 
+    // Scenario projection overlay: when a scenario is active, show the
+    // projected disruption score on every affected chokepoint card (current
+    // XX → projected YY arrow). Before this, the scenario affected only the
+    // map and a small banner; the card itself gave no visual indication that
+    // the card's chokepoint was the one being simulated.
+    const scenarioResult = this.activeScenarioState?.result;
+    const affectedSet = new Set(scenarioResult?.affectedChokepointIds ?? []);
+    const projectedScore = scenarioResult?.template?.disruptionPct ?? null;
+
     return `<div class="trade-restrictions-list">
       ${[...this.chokepointData.chokepoints].sort((a, b) => b.disruptionScore - a.disruptionScore).map(cp => {
+        const isAffectedByScenario = affectedSet.has(cp.id);
         const statusClass = cp.status === 'red' ? 'status-active' : cp.status === 'yellow' ? 'status-notified' : 'status-terminated';
         const statusDot = cp.status === 'red' ? 'sc-dot-red' : cp.status === 'yellow' ? 'sc-dot-yellow' : 'sc-dot-green';
         const aisDisruptions = cp.aisDisruptions ?? (cp.congestionLevel === 'normal' ? 0 : 1);
@@ -376,22 +390,63 @@ export class SupplyChainPanel extends Panel {
           );
           if (!template) return '';
           const isPro = hasPremiumAccess(getAuthState());
-          const btnClass = isPro ? 'sc-scenario-btn' : 'sc-scenario-btn sc-scenario-btn--gated';
+          // Derive button state from activeScenarioState so it stays correct
+          // across re-renders. Previously runScenario() imperatively set
+          // btn.disabled = true + btn.textContent = 'Active' AFTER the
+          // activate path had already called render() (via showScenarioSummary),
+          // so the mutation hit a detached node and the visible button
+          // remained enabled + "Simulate Closure" — letting users queue
+          // duplicate runs of an already-active scenario.
+          const isActiveScenario = this.activeScenarioState?.scenarioId === template.id;
+          const btnClass = [
+            'sc-scenario-btn',
+            !isPro ? 'sc-scenario-btn--gated' : '',
+            isActiveScenario ? 'sc-scenario-btn--active' : '',
+          ].filter(Boolean).join(' ');
+          const btnLabel = isActiveScenario ? 'Active' : 'Simulate Closure';
+          const btnAttrs = [
+            !isPro ? 'data-gated="1"' : '',
+            isActiveScenario ? 'disabled' : '',
+          ].filter(Boolean).join(' ');
           return `<div class="sc-scenario-trigger" data-scenario-id="${escapeHtml(template.id)}" data-chokepoint-id="${escapeHtml(cp.id)}">
-            <button class="${btnClass}" ${!isPro ? 'data-gated="1"' : ''} aria-label="Simulate ${escapeHtml(template.name)}">
-              Simulate Closure
+            <button class="${btnClass}" ${btnAttrs} aria-label="Simulate ${escapeHtml(template.name)}">
+              ${btnLabel}
             </button>
           </div>`;
         })() : '';
 
-        return `<div class="trade-restriction-card${expanded ? ' expanded' : ''}" data-cp-id="${escapeHtml(cp.name)}" style="cursor:pointer">
+        // Projected score (0–100) when this card is the scenario target AND
+        // the scenario would push the score higher than today's. disruptionPct
+        // is "% of capacity blocked" in the template — NOT the same scale as
+        // the computed cp.disruptionScore (threat + warnings + anomaly), but
+        // they share the 0–100 axis so we can compare directionally.
+        //
+        // Only show the projection arrow when `template.disruptionPct >
+        // cp.disruptionScore`. When current already meets or exceeds the
+        // scenario's closure level (e.g., Suez scenario at 80% with Suez
+        // currently at 82/100, or Panama at 50% scenario vs a 60/100
+        // current score), the arrow would render `N/100 → N/100` and
+        // imply the scenario has zero effect, which is misleading. The
+        // red left border + scenario callout still indicate the card is
+        // affected; the arrow stays reserved for a genuine escalation.
+        const showProjection = isAffectedByScenario
+          && projectedScore != null
+          && projectedScore > cp.disruptionScore;
+        const badgeHtml = showProjection
+          ? `<span class="trade-badge">${cp.disruptionScore}/100</span> <span class="trade-badge trade-badge--projected" style="background:#7f1d1d;color:#fff;margin-left:4px">\u2192 ${projectedScore}/100</span>`
+          : `<span class="trade-badge">${cp.disruptionScore}/100</span>`;
+
+        return `<div class="trade-restriction-card${expanded ? ' expanded' : ''}${isAffectedByScenario ? ' scenario-affected' : ''}" data-cp-id="${escapeHtml(cp.name)}" style="cursor:pointer${isAffectedByScenario ? ';border-left:3px solid #dc2626' : ''}">
           <div class="trade-restriction-header">
             <span class="trade-country">${escapeHtml(cp.name)}</span>
             <span class="sc-status-dot ${statusDot}"></span>
-            <span class="trade-badge">${cp.disruptionScore}/100</span>
+            ${badgeHtml}
             <span class="trade-status ${statusClass}">${escapeHtml(cp.status)}</span>
           </div>
           <div class="trade-restriction-body">
+            ${isAffectedByScenario && scenarioResult?.template ? `<div class="sc-metric-row" style="background:#7f1d1d22;padding:4px 6px;border-radius:3px;margin-bottom:4px;font-size:11px">
+              <span style="color:#fca5a5;font-weight:600">\u26A0 Projected under scenario: ${scenarioResult.template.disruptionPct}% closure for ${scenarioResult.template.durationDays} days${scenarioResult.template.costShockMultiplier > 1 ? ` (+${Math.round((scenarioResult.template.costShockMultiplier - 1) * 100)}% cost)` : ''}</span>
+            </div>` : ''}
             <div class="sc-metric-row">
               <span>${cp.activeWarnings} ${t('components.supplyChain.warnings')} · ${aisDisruptions} ${t('components.supplyChain.aisDisruptions')}</span>
               ${cp.directions?.length ? `<span>${cp.directions.map(d => escapeHtml(d)).join('/')}</span>` : ''}
@@ -675,31 +730,81 @@ export class SupplyChainPanel extends Panel {
 
   // ─── Scenario banner ─────────────────────────────────────────────────────────
 
+  /**
+   * Activate a scenario: set state and trigger a full re-render. Re-rendering
+   * is required so renderChokepoints() sees the new activeScenarioState and
+   * paints the projected score + red border on affected chokepoint cards —
+   * prior code only mutated the banner DOM, leaving cards stale until an
+   * unrelated update forced a re-render.
+   */
   public showScenarioSummary(scenarioId: string, result: ScenarioResult): void {
     this.activeScenarioState = { scenarioId, result };
+    this.render();
+  }
+
+  /**
+   * Build the banner DOM from activeScenarioState and prepend it. Called
+   * from render() after setContent() wipes inner HTML. Kept private so no
+   * caller mutates banner-only state without triggering a full re-render.
+   */
+  private renderScenarioBanner(): void {
+    const state = this.activeScenarioState;
+    if (!state) return;
+    const { scenarioId, result } = state;
     this.content.querySelector('.sc-scenario-banner')?.remove();
     const top5 = result.topImpactCountries.slice(0, 5);
     // impactPct is already a 0–100 integer from the scenario-worker
     // (scripts/scenario-worker.mjs: `Math.min(Math.round((totalImpact / maxImpact) * 100), 100)`).
-    // Prior code multiplied by 100 again → banner showed "10000%" instead of "100%".
     const countriesHtml = top5.map(c =>
       `<span class="sc-scenario-country">${escapeHtml(c.iso2)} <em>${c.impactPct.toFixed(0)}%</em></span>`
     ).join(' \u00B7 ');
     const banner = document.createElement('div');
     banner.className = 'sc-scenario-banner';
     const scenarioName = SCENARIO_TEMPLATES.find(tmpl => tmpl.id === scenarioId)?.name ?? scenarioId.replace(/-/g, ' ');
-    banner.innerHTML = `<span class="sc-scenario-icon">\u26A0</span><span class="sc-scenario-name">${escapeHtml(scenarioName)}</span><span class="sc-scenario-countries">${countriesHtml}</span><button class="sc-scenario-dismiss" aria-label="Dismiss scenario">\u00D7</button>`;
+
+    // Surface the scenario's defining parameters — before this, users saw only
+    // a list of country percentages with no context for what "100% impact"
+    // actually meant (100% of what? over how long?). The template fields
+    // (durationDays, disruptionPct, costShockMultiplier) come from the scenario
+    // worker's result.template — optional field, defaults hide cleanly if absent.
+    const tpl = result.template;
+    const durationStr = tpl ? `${tpl.durationDays}d` : null;
+    const closurePctStr = tpl ? `${tpl.disruptionPct}% closure` : null;
+    const costBumpPct = tpl ? Math.round((tpl.costShockMultiplier - 1) * 100) : null;
+    const costStr = costBumpPct != null && costBumpPct > 0 ? `+${costBumpPct}% cost` : null;
+    const paramsHtml = [durationStr, costStr].filter(Boolean).map(s =>
+      `<span class="sc-scenario-param">${escapeHtml(s!)}</span>`
+    ).join(' \u00B7 ');
+
+    const taglineParts = [durationStr, closurePctStr, costStr].filter(Boolean).join(' / ');
+    const taglineHtml = taglineParts
+      ? `<div class="sc-scenario-tagline">Simulating ${escapeHtml(taglineParts)} on ${result.affectedChokepointIds.length} chokepoint${result.affectedChokepointIds.length === 1 ? '' : 's'}. Chokepoint card below shows projected score; map highlights disrupted routes.</div>`
+      : '';
+
+    banner.innerHTML = [
+      `<div class="sc-scenario-top">`,
+      `<span class="sc-scenario-icon">\u26A0</span>`,
+      `<span class="sc-scenario-name">${escapeHtml(scenarioName)}</span>`,
+      paramsHtml ? `<span class="sc-scenario-params">${paramsHtml}</span>` : '',
+      `<span class="sc-scenario-countries">${countriesHtml}</span>`,
+      `<button class="sc-scenario-dismiss" aria-label="Dismiss scenario">\u00D7</button>`,
+      `</div>`,
+      taglineHtml,
+    ].join('');
     banner.querySelector('.sc-scenario-dismiss')!.addEventListener('click', () => this.onDismissScenario?.());
     this.content.prepend(banner);
   }
 
+  /**
+   * Dismiss the active scenario: clear state and trigger a full re-render.
+   * Re-rendering strips the projected score / red border / callout from
+   * affected chokepoint cards, and the fresh card template resets the
+   * Simulate Closure button text by construction — no manual button loop
+   * needed.
+   */
   public hideScenarioSummary(): void {
     this.activeScenarioState = null;
-    this.content.querySelector('.sc-scenario-banner')?.remove();
-    this.content.querySelectorAll<HTMLButtonElement>('.sc-scenario-btn').forEach(btn => {
-      btn.disabled = false;
-      btn.textContent = 'Simulate Closure';
-    });
+    this.render();
   }
 
   public setOnDismissScenario(cb: () => void): void {
@@ -751,10 +856,14 @@ export class SupplyChainPanel extends Panel {
       if (!runResp.ok) throw new Error(`Run failed: ${runResp.status}`);
       const { jobId } = await runResp.json() as { jobId: string };
       let result: ScenarioResult | null = null;
-      for (let i = 0; i < 30; i++) {
+      // 60 × 1s = 60s max (worker typically completes in <1s). 1s poll keeps
+      // the perceived latency <2s in the common case. First iteration polls
+      // immediately (no sleep) in case the worker was already running on a
+      // previous job and blocked here only because of network round-trip.
+      for (let i = 0; i < 60; i++) {
         if (signal.aborted) { resetButton('Simulate Closure'); return; }
         if (!this.content.isConnected) return; // panel gone — nothing to update
-        if (i > 0) await new Promise(r => setTimeout(r, 2000));
+        if (i > 0) await new Promise(r => setTimeout(r, 1000));
         const statusResp = await premiumFetch(`/api/scenario/v1/status?jobId=${encodeURIComponent(jobId)}`, { signal });
         if (!statusResp.ok) throw new Error(`Status poll failed: ${statusResp.status}`);
         const status = await statusResp.json() as { status: string; result?: ScenarioResult };
@@ -769,9 +878,13 @@ export class SupplyChainPanel extends Panel {
       if (!result) throw new Error('Timeout — scenario worker may be down');
       if (signal.aborted) { resetButton('Simulate Closure'); return; }
       if (!this.content.isConnected) return;
+      // After this callback fires, showScenarioSummary() → render() will rebuild
+      // the scenario-trigger DOM with the button already in its "Active" +
+      // disabled state (driven by activeScenarioState in renderChokepoints()).
+      // Do NOT touch the captured btn reference here — it's about to be detached
+      // by render()'s setContent(), and any imperative update would no-op
+      // silently while the fresh button shows the wrong state.
       this.onScenarioActivate?.(scenarioId, result);
-      resetButton('Active');
-      btn.disabled = true; // active state stays disabled until user dismisses
     } catch (err) {
       // Abort from a new click = user-triggered retry, no error banner needed.
       if (err instanceof Error && err.name === 'AbortError') {
