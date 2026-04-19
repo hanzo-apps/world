@@ -292,6 +292,25 @@ Sentry.init({
     if (/undefined is not an object \(evaluating 't\.x'\)|Cannot read properties of undefined \(reading 'x'\)/.test(msg)) {
       if (!hasFirstParty || frames.some(f => /\b_handleTouch\w*Dolly|OrbitControls/.test(f.function ?? ''))) return null;
     }
+    // Suppress Three.js OrbitControls pointer-capture race: pointerdown handler calls
+    // setPointerCapture but the browser has already released the pointer (focus change,
+    // rapid re-tap). OrbitControls is bundled into main-*.js, so hasFirstParty=true and
+    // production stacks are often unsymbolicated — require a positive three.js signature
+    // in the frame context (the literal `this._pointers … setPointerCapture` code slice)
+    // so an unrelated first-party setPointerCapture regression still surfaces (WORLDMONITOR-NC).
+    if (excType === 'NotFoundError' && /setPointerCapture.*No active pointer with the given id/.test(msg)) {
+      // Sentry wire format includes `context: [[lineno, text], ...]` per frame, but the
+      // SDK's StackFrame type omits it — cast to any to read it.
+      const hasOrbitControlsContext = frames.some(f => {
+        const ctx = (f as any).context;
+        if (!Array.isArray(ctx)) return false;
+        return ctx.some(row =>
+          Array.isArray(row) && typeof row[1] === 'string'
+          && /_pointers[^\n]*setPointerCapture|setPointerCapture[^\n]*_pointers/.test(row[1]),
+        );
+      });
+      if (hasOrbitControlsContext) return null;
+    }
     // Suppress deck.gl/maplibre null-access crashes with no usable stack trace (requestAnimationFrame wrapping)
     if (/null is not an object \(evaluating '\w{1,3}\.(id|type|style)'\)/.test(msg) && frames.length === 0) return null;
     // Suppress Safari sortedTrackListForMenu native crash (value is generic "Type error", function name in stack)
