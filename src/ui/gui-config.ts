@@ -1,45 +1,35 @@
 /**
- * Hanzo World Tamagui config — built on @hanzo/gui (Tamagui-based).
+ * Hanzo World GUI config — pure @hanzo/gui (Tamagui-based).
  *
- * Monochromatic dark-first palette. Only neutral greys, no accent color.
- * Inter font for chrome (Hanzo brand). Map chrome retains its own typography.
+ * Built on the official Hanzo defaultConfig from @hanzogui/config (which
+ * is a transitive peer of @hanzo/gui). Overrides the dark/light themes for
+ * the monochromatic Hanzo brand: black bg, white fg, neutral greys only.
+ *
+ * Inter is the chrome font for all Hanzo-branded surfaces.
  */
 
-import { createGui, defaultConfig } from '@hanzo/gui';
+import { defaultConfig } from '@hanzogui/config/v5';
+import { createGui } from '@hanzo/gui';
 
-const tokens = {
-  ...defaultConfig.tokens,
-  color: {
-    ...defaultConfig.tokens.color,
-    bg: '#000000',
-    bgMuted: '#0a0a0a',
-    bgElevated: '#111111',
-    fg: '#ffffff',
-    fgMuted: '#9a9a9a',
-    fgSubtle: '#525252',
-    border: '#1a1a1a',
-    borderHover: '#262626',
-    overlay: 'rgba(0, 0, 0, 0.85)',
-  },
-};
-
-export const guiConfig = createGui({
+const monoOverrides = {
   ...defaultConfig,
-  tokens,
   themes: {
+    ...defaultConfig.themes,
     dark: {
-      background: tokens.color.bg,
-      backgroundHover: tokens.color.bgElevated,
-      backgroundPress: tokens.color.bgMuted,
-      backgroundFocus: tokens.color.bgMuted,
-      color: tokens.color.fg,
-      colorHover: tokens.color.fg,
-      colorPress: tokens.color.fgMuted,
-      colorFocus: tokens.color.fg,
-      borderColor: tokens.color.border,
-      borderColorHover: tokens.color.borderHover,
+      ...defaultConfig.themes.dark,
+      background: '#000000',
+      backgroundHover: '#111111',
+      backgroundPress: '#0a0a0a',
+      backgroundFocus: '#0a0a0a',
+      color: '#ffffff',
+      colorHover: '#ffffff',
+      colorPress: '#9a9a9a',
+      colorFocus: '#ffffff',
+      borderColor: '#1a1a1a',
+      borderColorHover: '#262626',
     },
     light: {
+      ...defaultConfig.themes.light,
       background: '#ffffff',
       backgroundHover: '#f5f5f5',
       backgroundPress: '#fafafa',
@@ -52,19 +42,18 @@ export const guiConfig = createGui({
       borderColorHover: '#d4d4d4',
     },
   },
-  fonts: {
-    ...defaultConfig.fonts,
-    body: { ...defaultConfig.fonts.body, family: 'Inter, system-ui, sans-serif' },
-    heading: { ...defaultConfig.fonts.heading, family: 'Inter, system-ui, sans-serif' },
-  },
-  defaultTheme: 'dark',
+  defaultTheme: 'dark' as const,
   shouldAddPrefersColorThemes: true,
   themeClassNameOnRoot: true,
-});
+};
 
-export type AppGui = typeof guiConfig;
+export const config = createGui(monoOverrides);
+
+export default config;
+
+export type Conf = typeof config;
 
 declare module '@hanzo/gui' {
   // eslint-disable-next-line @typescript-eslint/no-empty-interface
-  interface GuiCustomConfig extends AppGui {}
+  interface GuiCustomConfig extends Conf {}
 }
