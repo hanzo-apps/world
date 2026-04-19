@@ -70,7 +70,7 @@ const _inFlight = new Map<string, Promise<CachedEntitlements | null>>();
 // Environment-aware Redis key prefix (P2-3)
 // ---------------------------------------------------------------------------
 
-const ENV_PREFIX = process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode' ? 'live' : 'test';
+const ENV_PREFIX = process.env.HANZO_ENVIRONMENT === 'production' ? 'live' : 'test';
 
 // Cache TTL: 15 min — short enough that subscription expiry is reflected promptly (P2-5)
 const ENTITLEMENT_CACHE_TTL_SECONDS = 900;
@@ -89,7 +89,7 @@ export function getRequiredTier(pathname: string): number | null {
 
 /**
  * Fetches entitlements for a user. Tries Redis cache first (raw key),
- * then falls back to ConvexHttpClient query on cache miss.
+ * then falls back to Base REST on cache miss.
  *
  * Returns null on any failure (fail-closed: caller must treat null as no entitlements).
  *

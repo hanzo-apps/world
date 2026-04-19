@@ -1,14 +1,16 @@
-// AUTO-GENERATED from convex/config/productCatalog.ts
-// Do not edit manually. Run: npx tsx scripts/generate-product-config.mjs
+// Hanzo World product IDs for frontend checkout CTAs.
+// Matches Commerce plan slugs in /Users/z/work/hanzo/plans/subscription.json.
 
-export const DODO_PRODUCTS = {
-  PRO_MONTHLY: 'pdt_0Nbtt71uObulf7fGXhQup',
-  PRO_ANNUAL: 'pdt_0NbttMIfjLWC10jHQWYgJ',
-  API_STARTER_MONTHLY: 'pdt_0NbttVmG1SERrxhygbbUq',
-  API_STARTER_ANNUAL: 'pdt_0Nbu2lawHYE3dv2THgSEV',
-  API_BUSINESS: 'pdt_0Nbttg7NuOJrhbyBGCius',
-  ENTERPRISE: 'pdt_0Nbttnqrfh51cRqhMdVLx',
+export const WORLD_PRODUCTS = {
+  FREE: 'world-free',
+  PRO_MONTHLY: 'world-pro',
+  PRO_ANNUAL: 'world-pro',
+  TEAM_MONTHLY: 'world-team',
+  TEAM_ANNUAL: 'world-team',
 } as const;
 
 /** Default product for upgrade CTAs (Pro Monthly). */
-export const DEFAULT_UPGRADE_PRODUCT = DODO_PRODUCTS.PRO_MONTHLY;
+export const DEFAULT_UPGRADE_PRODUCT = WORLD_PRODUCTS.PRO_MONTHLY;
+
+/** Backward-compat alias — old call sites expected DODO_PRODUCTS. */
+export const DODO_PRODUCTS = WORLD_PRODUCTS;
