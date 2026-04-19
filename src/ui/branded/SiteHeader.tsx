@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import {  Button  } from '@hanzo/ui';
+import {  Button  } from '@hanzo/gui';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +7,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@hanzo/ui/dropdown-menu';
+} from '@hanzo/gui';
 import { Moon, Sun, Menu as MenuIcon, LogOut, Settings, User } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { HanzoLogo } from './HanzoLogo';
