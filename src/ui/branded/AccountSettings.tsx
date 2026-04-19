@@ -4,12 +4,12 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '@hanzo/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hanzo/ui/tabs';
-import {  Button  } from '@hanzo/ui';
-import {  Input  } from '@hanzo/ui';
-import {  Label  } from '@hanzo/ui';
-import { Switch } from '@hanzo/ui/switch';
+} from '@hanzo/gui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hanzo/gui';
+import {  Button  } from '@hanzo/gui';
+import {  Input  } from '@hanzo/gui';
+import {  Label  } from '@hanzo/gui';
+import { Switch } from '@hanzo/gui';
 import { getCurrentSession, signInWithIam, signOut } from '../lib/iam-auth';
 
 export interface AccountSettingsProps {

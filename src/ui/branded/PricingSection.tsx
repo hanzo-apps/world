@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import {  Button  } from '@hanzo/ui';
+import {  Button  } from '@hanzo/gui';
 import { Check, Sparkles } from 'lucide-react';
 import { signInWithIam, getCurrentSession } from '../lib/iam-auth';
 import { cn } from '../lib/cn';
@@ -26,11 +26,12 @@ async function startCheckout() {
     const res = await fetch('/v1/world/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan: 'pro', return_url: window.location.origin }),
+      body: JSON.stringify({ planId: 'world-pro', return_url: window.location.origin }),
     });
     if (!res.ok) throw new Error(`Checkout failed (${res.status})`);
-    const data: { url?: string } = await res.json();
-    if (data.url) window.location.href = data.url;
+    const data: { url?: string; checkoutUrl?: string } = await res.json();
+    const url = data.checkoutUrl || data.url;
+    if (url) window.location.href = url;
   } catch (err) {
     console.error('[pricing] checkout error', err);
     alert('Checkout unavailable. Please try again shortly.');
@@ -59,17 +60,18 @@ const TIERS: Tier[] = [
   },
   {
     name: 'Pro',
-    price: '$20',
+    price: '$29',
     cadence: '/month',
-    tagline: 'AI synthesis on the house.',
+    tagline: 'Zen AI analyst, ZAP + MCP API, priority feeds.',
     features: [
       'Everything in Free',
-      'Zen AI briefings &mdash; no API key required',
-      'Unlimited country & regional briefs',
-      'Predictive alerts &amp; anomaly detection',
-      'Priority data refresh (real-time)',
-      'Export to PDF, CSV, JSON',
-      'Email + Discord support',
+      'Zen AI analyst chat (zen4-thinking, unlimited)',
+      'ZAP + MCP real-time API access',
+      'WhatsApp / Telegram / SMS alerts',
+      'Priority data feeds (AIS, FIRMS, GDELT, ACLED CAST)',
+      'Unlimited custom alerts',
+      'Data export (CSV, JSON, parquet)',
+      'Priority support',
     ],
     cta: 'Upgrade to Pro',
     ctaVariant: 'primary',
@@ -78,22 +80,22 @@ const TIERS: Tier[] = [
   },
   {
     name: 'Team',
-    price: 'Custom',
-    cadence: '',
-    tagline: 'Multi-seat, SSO, dedicated support.',
+    price: '$99',
+    cadence: '/month',
+    tagline: '5 seats, shared workspace, SSO.',
     features: [
       'Everything in Pro',
+      '5 team seats included',
+      'Shared alert rules + saved views',
       'SSO via Hanzo IAM (SAML/OIDC)',
-      'Shared workspaces &amp; saved views',
-      'Private data connectors',
-      'Custom model routing',
-      'SLA &amp; uptime guarantees',
-      'Dedicated CSM',
+      'Org-level API keys',
+      'Audit log',
+      'Higher rate limits (15k MCP/min)',
     ],
-    cta: 'Contact sales',
+    cta: 'Get Team',
     ctaVariant: 'secondary',
     action: () => {
-      window.location.href = 'mailto:hi@hanzo.ai?subject=Hanzo%20World%20Team';
+      window.location.href = '/v1/world/checkout?plan=world-team';
     },
   },
 ];
@@ -152,7 +154,7 @@ export function PricingSection() {
               </div>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-4xl font-semibold tracking-tight text-foreground">
-                  {tier.name === 'Pro' && billing === 'annual' ? '$16' : tier.price}
+                  {tier.name === 'Pro' && billing === 'annual' ? '$24' : tier.name === 'Team' && billing === 'annual' ? '$82' : tier.price}
                 </span>
                 {tier.cadence && (
                   <span className="text-sm text-muted-foreground">{tier.cadence}</span>

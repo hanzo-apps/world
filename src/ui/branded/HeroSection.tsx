@@ -1,4 +1,4 @@
-import {  Button  } from '@hanzo/ui';
+import {  Button  } from '@hanzo/gui';
 import { ArrowRight, Play } from 'lucide-react';
 import { signInWithIam } from '../lib/iam-auth';
 

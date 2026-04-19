@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import {  Button  } from '@hanzo/ui';
-import {  Input  } from '@hanzo/ui';
+import {  Button  } from '@hanzo/gui';
+import {  Input  } from '@hanzo/gui';
 import { HanzoLogo } from './HanzoLogo';
 
 const SECTIONS = [

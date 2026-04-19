@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import {  Button  } from '@hanzo/ui';
-import {  Input  } from '@hanzo/ui';
+import {  Button  } from '@hanzo/gui';
+import {  Input  } from '@hanzo/gui';
 
 export function FinalCTASection({ endpoint = '/v1/world/register' }: { endpoint?: string }) {
   const [email, setEmail] = useState('');
