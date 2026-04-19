@@ -86,9 +86,17 @@
               "signal-intelligence",
               "ai-intelligence",
               "country-instability-index",
+              "methodology/country-resilience-index",
               "geographic-convergence",
               "strategic-risk",
               "algorithms"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "route-explorer",
+              "scenario-engine"
             ]
           },
           {
