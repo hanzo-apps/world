@@ -11,7 +11,7 @@ import { renderPreferences } from '@/services/preferences-content';
 import { renderNotificationsSettings, type NotificationsSettingsResult } from '@/services/notifications-settings';
 import { getAuthState } from '@/services/auth-state';
 import { track } from '@/services/analytics';
-import { isEntitled } from '@/services/entitlements';
+import { isEntitled, hasFeature, onEntitlementChange } from '@/services/entitlements';
 import { getSubscription, openBillingPortal } from '@/services/billing';
 import { createApiKey, listApiKeys, revokeApiKey, type ApiKeyInfo } from '@/services/api-keys';
 
@@ -61,6 +61,7 @@ export class UnifiedSettings {
   private apiKeysLoading = false;
   private apiKeysError = '';
   private newlyCreatedKey: string | null = null;
+  private unsubscribeEntitlement: (() => void) | null = null;
 
   constructor(config: UnifiedSettingsConfig) {
     this.config = config;
@@ -220,6 +221,22 @@ export class UnifiedSettings {
     localStorage.setItem('wm-settings-open', '1');
     document.addEventListener('keydown', this.escapeHandler);
     track('settings-open', { tab: tab ?? 'default' });
+
+    // Re-render API Keys panel when entitlements arrive (cold-load race:
+    // hasFeature('apiAccess') returns false until the Convex subscription
+    // delivers data, so a paid API Starter user sees the upgrade CTA briefly).
+    this.unsubscribeEntitlement?.();
+    this.unsubscribeEntitlement = onEntitlementChange(() => {
+      const panel = this.overlay.querySelector<HTMLElement>('[data-panel-id="api-keys"]');
+      if (panel) {
+        panel.innerHTML = this.renderApiKeysContent();
+        // Re-attach CTA and input handlers for the refreshed content
+        this.attachApiKeysHandlers();
+        if (this.activeTab === 'api-keys' && getAuthState().user && hasFeature('apiAccess')) {
+          void this.loadApiKeys();
+        }
+      }
+    });
   }
 
   public close(): void {
@@ -230,6 +247,8 @@ export class UnifiedSettings {
     this.notifCleanup?.();
     this.notifCleanup = null;
     this.pendingNotifs = null;
+    this.unsubscribeEntitlement?.();
+    this.unsubscribeEntitlement = null;
     this.resetPanelDraft();
     localStorage.removeItem('wm-settings-open');
     document.removeEventListener('keydown', this.escapeHandler);
@@ -257,6 +276,8 @@ export class UnifiedSettings {
     this.notifCleanup?.();
     this.notifCleanup = null;
     this.pendingNotifs = null;
+    this.unsubscribeEntitlement?.();
+    this.unsubscribeEntitlement = null;
     document.removeEventListener('keydown', this.escapeHandler);
     this.overlay.remove();
   }
@@ -291,7 +312,7 @@ export class UnifiedSettings {
           <button class="${tabClass('panels')}" data-tab="panels" role="tab" aria-selected="${this.activeTab === 'panels'}" id="us-tab-panels" aria-controls="us-tab-panel-panels">${t('header.tabPanels')}</button>
           <button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>
           ${showNotificationsTab ? `<button class="${tabClass('notifications')}" data-tab="notifications" role="tab" aria-selected="${this.activeTab === 'notifications'}" id="us-tab-notifications" aria-controls="us-tab-panel-notifications">${t('header.tabNotifications')}</button>` : ''}
-          ${getAuthState().user ? `<button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys</button>` : ''}
+          <button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys <span class="panel-pro-badge">PRO</span></button>
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
           ${prefs.html}
@@ -330,24 +351,9 @@ export class UnifiedSettings {
           ${notifs.html}
         </div>
         ` : ''}
-        ${getAuthState().user ? `
         <div class="unified-settings-tab-panel${this.activeTab === 'api-keys' ? ' active' : ''}" data-panel-id="api-keys" id="us-tab-panel-api-keys" role="tabpanel" aria-labelledby="us-tab-api-keys">
-          <div class="api-keys-section">
-            <div class="api-keys-header">
-              <p class="api-keys-desc">Create API keys to access WorldMonitor data programmatically. Keys are shown once on creation — store them securely.</p>
-            </div>
-            <div class="api-keys-create-form">
-              <input type="text" class="api-keys-name-input" placeholder="Key name (e.g. my-app)" maxlength="64" />
-              <button class="btn btn-primary api-keys-create-btn">Create Key</button>
-            </div>
-            <div class="api-keys-created-banner" id="usApiKeysBanner" style="display:none;"></div>
-            <div class="api-keys-error" id="usApiKeysError" style="display:none;"></div>
-            <div class="api-keys-list" id="usApiKeysList">
-              <div class="api-keys-loading">Loading...</div>
-            </div>
-          </div>
+          ${this.renderApiKeysContent()}
         </div>
-        ` : ''}
       </div>
     `;
 
@@ -376,15 +382,8 @@ export class UnifiedSettings {
     this.renderSourcesGrid();
     this.updateSourcesCounter();
 
-    // API keys: Enter to submit
-    const apiKeyInput = this.overlay.querySelector<HTMLInputElement>('.api-keys-name-input');
-    if (apiKeyInput) {
-      apiKeyInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') void this.handleCreateApiKey();
-      });
-    }
-
-    if (this.activeTab === 'api-keys') {
+    this.attachApiKeysHandlers();
+    if (this.activeTab === 'api-keys' && getAuthState().user && hasFeature('apiAccess')) {
       void this.loadApiKeys();
     }
   }
@@ -402,7 +401,7 @@ export class UnifiedSettings {
       el.classList.toggle('active', (el as HTMLElement).dataset.panelId === tab);
     });
 
-    if (tab === 'api-keys') {
+    if (tab === 'api-keys' && getAuthState().user && hasFeature('apiAccess')) {
       void this.loadApiKeys();
     }
 
@@ -722,6 +721,72 @@ export class UnifiedSettings {
   // ---------------------------------------------------------------------------
   // API Keys tab
   // ---------------------------------------------------------------------------
+
+  private attachApiKeysHandlers(): void {
+    // Enter to submit (only exists when entitled user sees full UI)
+    const apiKeyInput = this.overlay.querySelector<HTMLInputElement>('.api-keys-name-input');
+    if (apiKeyInput) {
+      apiKeyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') void this.handleCreateApiKey();
+      });
+    }
+
+    // Gate CTA click (sign-in for anonymous, checkout for free)
+    const gateBtn = this.overlay.querySelector<HTMLElement>('.api-keys-gate-btn');
+    if (gateBtn) {
+      gateBtn.addEventListener('click', () => {
+        if (!getAuthState().user) {
+          this.close();
+          import('@/services/clerk').then(m => m.openSignIn()).catch(() => {});
+        } else {
+          this.close();
+          import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DODO_PRODUCTS.API_STARTER_MONTHLY))).catch(() => {
+            window.open('https://worldmonitor.app/pro', '_blank');
+          });
+        }
+      });
+    }
+  }
+
+  private renderApiKeysContent(): string {
+    const authState = getAuthState();
+
+    if (!authState.user) {
+      const lockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>`;
+      return `
+        <div class="panel-locked-state">
+          <div class="panel-locked-icon">${lockIcon}</div>
+          <div class="panel-locked-desc">Sign in to unlock API Keys</div>
+          <button class="panel-locked-cta api-keys-gate-btn">Sign In</button>
+        </div>`;
+    }
+
+    if (!hasFeature('apiAccess')) {
+      const upgradeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>`;
+      return `
+        <div class="panel-locked-state">
+          <div class="panel-locked-icon">${upgradeIcon}</div>
+          <div class="panel-locked-desc">Create and manage API keys to access WorldMonitor data programmatically.</div>
+          <button class="panel-locked-cta api-keys-gate-btn">Upgrade to API Starter</button>
+        </div>`;
+    }
+
+    return `
+      <div class="api-keys-section">
+        <div class="api-keys-header">
+          <p class="api-keys-desc">Create API keys to access WorldMonitor data programmatically. Keys are shown once on creation — store them securely.</p>
+        </div>
+        <div class="api-keys-create-form">
+          <input type="text" class="api-keys-name-input" placeholder="Key name (e.g. my-app)" maxlength="64" />
+          <button class="btn btn-primary api-keys-create-btn">Create Key</button>
+        </div>
+        <div class="api-keys-created-banner" id="usApiKeysBanner" style="display:none;"></div>
+        <div class="api-keys-error" id="usApiKeysError" style="display:none;"></div>
+        <div class="api-keys-list" id="usApiKeysList">
+          <div class="api-keys-loading">Loading...</div>
+        </div>
+      </div>`;
+  }
 
   private async loadApiKeys(): Promise<void> {
     this.apiKeysLoading = true;
