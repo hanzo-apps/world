@@ -1,87 +1,75 @@
-import { useState, type FormEvent } from 'react';
-import {  Button  } from '@hanzo/gui';
-import {  Input  } from '@hanzo/gui';
+import { useState } from 'react';
+import { YStack, XStack, H2, Text, Button, Input } from '@hanzo/gui';
 
-export function FinalCTASection({ endpoint = '/v1/world/register' }: { endpoint?: string }) {
+export function FinalCTASection() {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
+  async function submit() {
+    if (!email || !email.includes('@')) {
+      setStatus('error');
+      return;
+    }
     setStatus('loading');
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch('/v1/world/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: 'world-final-cta' }),
+        body: JSON.stringify({ email, source: 'cta-final' }),
       });
-      if (!res.ok) throw new Error(`Subscribe failed (${res.status})`);
-      setStatus('success');
-      setMessage('Subscribed. Thanks &mdash; we will send sparingly.');
+      if (!res.ok) throw new Error(String(res.status));
+      setStatus('ok');
       setEmail('');
-    } catch (err) {
+    } catch {
       setStatus('error');
-      setMessage(err instanceof Error ? err.message : 'Subscription failed.');
     }
   }
 
   return (
-    <section className="hanzo-chrome font-inter w-full border-t border-border bg-secondary/30">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center gap-6 px-4 py-20 text-center sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-          Subscribe for updates.
-        </h2>
-        <p className="max-w-xl text-sm text-muted-foreground">
-          New sources, model upgrades, major feature releases. Low volume. Unsubscribe any time.
-        </p>
+    <YStack paddingHorizontal="$6" paddingVertical="$10" gap="$5" alignItems="center">
+      <H2 fontSize={32} fontWeight="700" letterSpacing={-1} color="$color" textAlign="center">
+        Subscribe for updates.
+      </H2>
+      <Text fontSize={15} color="$colorPress" maxWidth={520} textAlign="center">
+        Weekly intelligence digest. Major-incident alerts. New feeds and
+        capabilities. No spam.
+      </Text>
+      <XStack gap="$2" maxWidth={420} width="100%">
+        <Input
+          size="$4"
+          flex={1}
+          placeholder="you@example.com"
+          value={email}
+          onChangeText={setEmail}
+          onSubmitEditing={submit}
+          disabled={status === 'loading'}
+        />
+        <Button
+          size="$4"
+          onPress={submit}
+          disabled={status === 'loading' || status === 'ok'}
+        >
+          {status === 'ok' ? 'Subscribed' : status === 'loading' ? '...' : 'Subscribe'}
+        </Button>
+      </XStack>
+      {status === 'error' ? (
+        <Text fontSize={11} color="$red10">
+          Try again with a valid email.
+        </Text>
+      ) : null}
 
-        <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col items-center gap-3 sm:flex-row">
-          <Input
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 bg-background"
-          />
-          <Button
-            type="submit"
-            disabled={status === 'loading'}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {status === 'loading' ? 'Subscribing...' : 'Subscribe'}
-          </Button>
-        </form>
-
-        {message && (
-          <p
-            className={`text-xs ${status === 'error' ? 'text-destructive-foreground' : 'text-muted-foreground'}`}
-            dangerouslySetInnerHTML={{ __html: message }}
-          />
-        )}
-
-        <div className="mt-2 flex flex-wrap justify-center gap-3">
-          <a
-            href="https://discord.gg/hanzo"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-transparent px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
-          >
+      <XStack gap="$2" marginTop="$4">
+        <a href="https://discord.gg/re63kWKxaz" style={{ textDecoration: 'none' }}>
+          <Button size="$3" chromeless>
             Join Discord
-          </a>
-          <a
-            href="https://t.me/hanzoai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-transparent px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
-          >
-            Join Telegram
-          </a>
-        </div>
-      </div>
-    </section>
+          </Button>
+        </a>
+        <a href="https://t.me/hanzoai" style={{ textDecoration: 'none' }}>
+          <Button size="$3" chromeless>
+            Telegram
+          </Button>
+        </a>
+      </XStack>
+    </YStack>
   );
 }
