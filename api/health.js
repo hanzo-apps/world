@@ -677,21 +677,52 @@ export default async function handler(req, ctx) {
 
   const httpStatus = 200;
 
-  if (overall !== 'HEALTHY' && overall !== 'WARNING') {
+  if (overall !== 'HEALTHY') {
+    // problemKeys includes seedAgeMin for the snapshot (useful for post-mortem),
+    // but the dedupe signature uses only key:status (no age) so a long STALE_SEED
+    // window doesn't produce a new log entry on every poll.
     const problemKeys = Object.entries(checks)
-      .filter(([, c]) => c.status === 'EMPTY' || c.status === 'EMPTY_DATA' || c.status === 'STALE_SEED' || c.status === 'SEED_ERROR' || c.status === 'REDIS_PARTIAL')
+      .filter(([, c]) => c.status !== 'OK' && c.status !== 'OK_CASCADE' && c.status !== 'EMPTY_ON_DEMAND')
       .map(([k, c]) => `${k}:${c.status}${c.seedAgeMin != null ? `(${c.seedAgeMin}min)` : ''}`);
-    console.log('[health] %s crits=[%s]', overall, problemKeys.join(', '));
-    // Persist last failure snapshot for post-mortem. Vercel edge isolates can
-    // terminate before a fire-and-forget Promise resolves; ctx.waitUntil keeps
-    // the runtime alive until the write completes.
-    const persist = redisPipeline([['SET', 'health:last-failure', JSON.stringify({
+    const sigKeys = Object.entries(checks)
+      .filter(([, c]) => c.status !== 'OK' && c.status !== 'OK_CASCADE' && c.status !== 'EMPTY_ON_DEMAND')
+      .map(([k, c]) => `${k}:${c.status}`)
+      .sort();
+    console.log('[health] %s problems=[%s]', overall, problemKeys.join(', '));
+    const snapshot = {
       at: new Date(now).toISOString(),
       status: overall,
       critCount,
-      crits: problemKeys,
-    }), 'EX', 86400]]).catch(() => {});
+      warnCount: realWarnCount,
+      problems: problemKeys,
+    };
+    // Dedupe: only LPUSH when the incident signature (status + problem set,
+    // excluding seedAgeMin) changes. Read the previous sig first, then write
+    // everything (last-failure + sig + LPUSH) in one atomic pipeline so the
+    // sig only advances when the LPUSH succeeds. If the pipeline fails, the
+    // sig stays stale and the next poll retries the append.
+    const sig = `${overall}|${sigKeys.join(',')}`;
+    const prevSigResult = await redisPipeline([['GET', 'health:failure-log-sig']], 4_000).catch(() => null);
+    const prevSig = prevSigResult?.[0]?.result ?? '';
+    const persistCmds = [
+      ['SET', 'health:last-failure', JSON.stringify(snapshot), 'EX', 86400],
+    ];
+    if (sig !== prevSig) {
+      persistCmds.push(
+        ['LPUSH', 'health:failure-log', JSON.stringify(snapshot)],
+        ['LTRIM', 'health:failure-log', 0, 49],
+        ['EXPIRE', 'health:failure-log', 86400 * 7],
+        ['SET', 'health:failure-log-sig', sig, 'EX', 86400],
+      );
+    }
+    const persist = redisPipeline(persistCmds, 4_000).catch(() => {});
     if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(persist);
+  } else {
+    // Clear the sig on recovery so a recurrence of the same problem set
+    // after a healthy gap is logged as a new incident, not deduped against
+    // the previous one.
+    const clear = redisPipeline([['DEL', 'health:failure-log-sig']], 4_000).catch(() => {});
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(clear);
   }
 
   const url = new URL(req.url);
