@@ -1,32 +1,31 @@
 import { useState } from 'react';
-import {  Button  } from '@hanzo/gui';
-import { Check, Sparkles } from 'lucide-react';
+import { YStack, XStack, H2, H3, Text, Button, Card, Separator } from '@hanzo/gui';
 import { signInWithIam, getCurrentSession } from '../lib/iam-auth';
-import { cn } from '../lib/cn';
 
 interface Tier {
+  id: string;
   name: string;
-  price: string;
+  monthly: string;
+  annual: string;
   cadence: string;
   tagline: string;
   features: string[];
   cta: string;
-  ctaVariant: 'primary' | 'secondary';
   popular?: boolean;
   action: () => void;
 }
 
-async function startCheckout() {
+async function startCheckout(planId: string) {
   const session = getCurrentSession();
   if (!session) {
-    signInWithIam('/pricing?upgrade=pro');
+    signInWithIam(`/pricing?upgrade=${planId}`);
     return;
   }
   try {
     const res = await fetch('/v1/world/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planId: 'world-pro', return_url: window.location.origin }),
+      body: JSON.stringify({ planId, return_url: window.location.origin }),
     });
     if (!res.ok) throw new Error(`Checkout failed (${res.status})`);
     const data: { url?: string; checkoutUrl?: string } = await res.json();
@@ -40,47 +39,48 @@ async function startCheckout() {
 
 const TIERS: Tier[] = [
   {
+    id: 'world-free',
     name: 'Free',
-    price: '$0',
+    monthly: '$0',
+    annual: '$0',
     cadence: 'forever',
     tagline: 'Full dashboard, open source.',
     features: [
       '435+ live data sources',
-      '45 map layers including conflicts, AIS, ADS-B',
+      '45 map layers (conflicts, AIS, ADS-B, FIRMS)',
       'Country intelligence briefs',
       '21 languages',
-      'BYOK: use your own OpenAI/Anthropic key',
+      'BYOK: your own OpenAI/Anthropic key',
       'Desktop app (macOS, Windows, Linux)',
     ],
     cta: 'Open dashboard',
-    ctaVariant: 'secondary',
-    action: () => {
-      window.location.href = '/';
-    },
+    action: () => (window.location.href = '/'),
   },
   {
+    id: 'world-pro',
     name: 'Pro',
-    price: '$29',
+    monthly: '$29',
+    annual: '$24',
     cadence: '/month',
     tagline: 'Zen AI analyst, ZAP + MCP API, priority feeds.',
     features: [
       'Everything in Free',
       'Zen AI analyst chat (zen4-thinking, unlimited)',
-      'ZAP + MCP real-time API access',
+      'ZAP + MCP real-time API',
       'WhatsApp / Telegram / SMS alerts',
-      'Priority data feeds (AIS, FIRMS, GDELT, ACLED CAST)',
+      'Priority feeds (AIS, FIRMS, GDELT, ACLED CAST)',
       'Unlimited custom alerts',
       'Data export (CSV, JSON, parquet)',
-      'Priority support',
     ],
     cta: 'Upgrade to Pro',
-    ctaVariant: 'primary',
     popular: true,
-    action: startCheckout,
+    action: () => startCheckout('world-pro'),
   },
   {
+    id: 'world-team',
     name: 'Team',
-    price: '$99',
+    monthly: '$99',
+    annual: '$82',
     cadence: '/month',
     tagline: '5 seats, shared workspace, SSO.',
     features: [
@@ -93,10 +93,7 @@ const TIERS: Tier[] = [
       'Higher rate limits (15k MCP/min)',
     ],
     cta: 'Get Team',
-    ctaVariant: 'secondary',
-    action: () => {
-      window.location.href = '/v1/world/checkout?plan=world-team';
-    },
+    action: () => startCheckout('world-team'),
   },
 ];
 
@@ -104,91 +101,106 @@ export function PricingSection() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
 
   return (
-    <section id="pricing" className="hanzo-chrome font-inter w-full bg-background">
-      <div className="mx-auto w-full max-w-[1400px] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
-            Simple pricing.
-          </h2>
-          <p className="mt-4 text-base text-muted-foreground">
-            Free forever. Go Pro when you want Zen to brief you. Talk to us when you bring a team.
-          </p>
-          <div className="mt-6 inline-flex rounded-full border border-border bg-secondary p-1 text-xs font-medium">
-            <button
-              onClick={() => setBilling('monthly')}
-              className={cn(
-                'rounded-full px-4 py-1.5 transition-colors',
-                billing === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
-              )}
+    <YStack paddingHorizontal="$4" paddingVertical="$10" gap="$8" maxWidth={1100} marginHorizontal="auto">
+      <YStack alignItems="center" gap="$3" textAlign="center">
+        <H2 fontSize={36} fontWeight="700" letterSpacing={-1} color="$color">
+          Simple pricing
+        </H2>
+        <Text fontSize={15} color="$colorPress" maxWidth={560}>
+          Free tier stays free forever. Pro adds Zen AI analysis + real-time API
+          access. Team adds seats and SSO.
+        </Text>
+
+        <XStack
+          marginTop="$3"
+          padding="$1"
+          borderWidth={1}
+          borderColor="$borderColor"
+          borderRadius="$10"
+          backgroundColor="$backgroundPress"
+        >
+          {(['monthly', 'annual'] as const).map((m) => (
+            <Button
+              key={m}
+              size="$2"
+              chromeless={billing !== m}
+              backgroundColor={billing === m ? '$color' : 'transparent'}
+              color={billing === m ? '$background' : '$colorPress'}
+              onPress={() => setBilling(m)}
             >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBilling('annual')}
-              className={cn(
-                'rounded-full px-4 py-1.5 transition-colors',
-                billing === 'annual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
-              )}
-            >
-              Annual <span className="ml-1 text-[10px] opacity-70">&minus;20%</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TIERS.map((tier) => (
-            <div
-              key={tier.name}
-              className={cn(
-                'relative flex flex-col rounded-2xl border bg-card p-8 transition-colors',
-                tier.popular ? 'border-foreground/40 shadow-lg' : 'border-border',
-              )}
-            >
-              {tier.popular && (
-                <div className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary-foreground">
-                  <Sparkles className="h-3 w-3" /> Most popular
-                </div>
-              )}
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-lg font-semibold text-foreground">{tier.name}</h3>
-              </div>
-              <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold tracking-tight text-foreground">
-                  {tier.name === 'Pro' && billing === 'annual' ? '$24' : tier.name === 'Team' && billing === 'annual' ? '$82' : tier.price}
-                </span>
-                {tier.cadence && (
-                  <span className="text-sm text-muted-foreground">{tier.cadence}</span>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">{tier.tagline}</p>
-
-              <ul className="mt-6 space-y-3 text-sm">
-                {tier.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-muted-foreground">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
-                    <span dangerouslySetInnerHTML={{ __html: f }} />
-                  </li>
-                ))}
-              </ul>
-
-              <div className="flex-1" />
-
-              <Button
-                size="lg"
-                onClick={tier.action}
-                className={cn(
-                  'mt-8 w-full',
-                  tier.ctaVariant === 'primary'
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'border border-border bg-transparent text-foreground hover:bg-secondary',
-                )}
-              >
-                {tier.cta}
-              </Button>
-            </div>
+              {m === 'monthly' ? 'Monthly' : 'Annual −20%'}
+            </Button>
           ))}
-        </div>
-      </div>
-    </section>
+        </XStack>
+      </YStack>
+
+      <XStack flexWrap="wrap" gap="$4" justifyContent="center">
+        {TIERS.map((t) => (
+          <Card
+            key={t.id}
+            elevate
+            bordered
+            padding="$5"
+            gap="$4"
+            width={320}
+            borderColor={t.popular ? '$color' : '$borderColor'}
+            backgroundColor="$background"
+          >
+            <YStack gap="$2">
+              <XStack justifyContent="space-between" alignItems="center">
+                <H3 fontSize={20} fontWeight="600" color="$color">
+                  {t.name}
+                </H3>
+                {t.popular ? (
+                  <Text fontSize={10} fontWeight="600" letterSpacing={1.5} textTransform="uppercase" color="$color">
+                    Most popular
+                  </Text>
+                ) : null}
+              </XStack>
+              <Text fontSize={13} color="$colorPress" lineHeight={1.5}>
+                {t.tagline}
+              </Text>
+            </YStack>
+
+            <XStack alignItems="baseline" gap="$2">
+              <Text fontSize={36} fontWeight="700" color="$color" letterSpacing={-1.5}>
+                {billing === 'annual' ? t.annual : t.monthly}
+              </Text>
+              {t.cadence ? (
+                <Text fontSize={13} color="$colorPress">
+                  {t.cadence}
+                </Text>
+              ) : null}
+            </XStack>
+
+            <Button
+              size="$4"
+              backgroundColor={t.popular ? '$color' : 'transparent'}
+              color={t.popular ? '$background' : '$color'}
+              borderWidth={1}
+              borderColor={t.popular ? '$color' : '$borderColor'}
+              onPress={t.action}
+            >
+              {t.cta}
+            </Button>
+
+            <Separator />
+
+            <YStack gap="$2">
+              {t.features.map((f) => (
+                <XStack key={f} gap="$2" alignItems="flex-start">
+                  <Text fontSize={12} color="$color">
+                    ✓
+                  </Text>
+                  <Text fontSize={13} color="$color" flex={1}>
+                    {f}
+                  </Text>
+                </XStack>
+              ))}
+            </YStack>
+          </Card>
+        ))}
+      </XStack>
+    </YStack>
   );
 }
