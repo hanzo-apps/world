@@ -156,7 +156,7 @@
     "ws": "^8.19.0",
     "youtubei.js": "^16.0.1",
     "@hanzo/gui": "^4.7.2",
-    "@hanzogui/config": "^1.131.0",
+    "@hanzogui/config": "^4.4.0",
     "react-native-web": "^0.21.0"
   },
   "overrides": {
