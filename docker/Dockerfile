@@ -9,9 +9,14 @@ LABEL org.opencontainers.image.source="https://github.com/hanzoai/world"
 WORKDIR /app
 
 # Deps layer — cached unless package*.json changes
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts --prefer-offline 2>/dev/null || npm install --ignore-scripts
+    if [ -f package-lock.json ]; then \
+      npm ci --ignore-scripts --prefer-offline --legacy-peer-deps 2>/dev/null \
+        || npm install --ignore-scripts --legacy-peer-deps; \
+    else \
+      npm install --ignore-scripts --legacy-peer-deps; \
+    fi
 
 # Source (.dockerignore excludes node_modules, .git, tests, src-tauri, etc.)
 COPY . .
