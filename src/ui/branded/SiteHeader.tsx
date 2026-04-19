@@ -1,165 +1,116 @@
-import { useEffect, useState } from 'react';
-import {  Button  } from '@hanzo/gui';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@hanzo/gui';
-import { Moon, Sun, Menu as MenuIcon, LogOut, Settings, User } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useState } from 'react';
+import { XStack, YStack, Text, Button, Popover, Separator } from '@hanzo/gui';
 import { HanzoLogo } from './HanzoLogo';
-import { signInWithIam, signOut, getCurrentSession, type IamSession } from '../lib/iam-auth';
-import { cn } from '../lib/cn';
+import { signInWithIam, signOutFromIam, getCurrentSession } from '../lib/iam-auth';
+
+interface SiteHeaderProps {
+  onOpenSettings?: () => void;
+}
 
 const NAV_LINKS = [
   { label: 'Overview', href: '/' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Docs', href: 'https://docs.hanzo.ai', external: true },
-  { label: 'Blog', href: '/blog/' },
-  { label: 'Status', href: 'https://status.hanzo.ai', external: true },
-];
-
-const SOCIAL_LINKS = [
+  { label: 'Docs', href: 'https://docs.world.hanzo.ai' },
+  { label: 'Status', href: 'https://status.hanzo.ai' },
   { label: 'GitHub', href: 'https://github.com/hanzoai/world' },
-  { label: 'Discord', href: 'https://discord.gg/hanzo' },
 ];
-
-export interface SiteHeaderProps {
-  /** Callback to open the AccountSettings sheet. */
-  onOpenSettings?: () => void;
-}
 
 export function SiteHeader({ onOpenSettings }: SiteHeaderProps) {
-  const [session, setSession] = useState<IamSession | null>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    setSession(getCurrentSession());
-    const onScroll = () => setScrolled(window.scrollY > 4);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const isDark = (resolvedTheme ?? theme) === 'dark';
+  const session = getCurrentSession();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header
-      className={cn(
-        'hanzo-site-header hanzo-chrome font-inter sticky top-0 z-40 w-full transition-colors',
-        'border-b',
-        scrolled ? 'bg-background/90 backdrop-blur-md border-border' : 'bg-background/60 border-transparent',
-      )}
+    <XStack
+      tag="header"
+      position="fixed"
+      top={0}
+      left={0}
+      right={0}
+      height={48}
+      paddingHorizontal="$4"
+      alignItems="center"
+      justifyContent="space-between"
+      borderBottomWidth={1}
+      borderBottomColor="$borderColor"
+      backgroundColor="$background"
+      zIndex={100}
     >
-      <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center gap-6 px-4 sm:px-6 lg:px-8">
-        <a href="/" className="shrink-0" aria-label="Hanzo World home">
+      <XStack alignItems="center" gap="$3">
+        <a href="https://hanzo.ai" target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>
           <HanzoLogo />
         </a>
+        <Text fontSize={14} fontWeight="300" color="$colorPress" letterSpacing={0.5}>
+          World
+        </Text>
+      </XStack>
 
-        <nav className="hidden md:flex items-center gap-5 text-sm">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              target={link.external ? '_blank' : undefined}
-              rel={link.external ? 'noopener noreferrer' : undefined}
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
+      <XStack alignItems="center" gap="$5" display="none" $gtSm={{ display: 'flex' }}>
+        {NAV_LINKS.map((l) => (
+          <a key={l.href} href={l.href} style={{ textDecoration: 'none' }}>
+            <Text fontSize={13} color="$colorPress" hoverStyle={{ color: '$color' }}>
+              {l.label}
+            </Text>
+          </a>
+        ))}
+      </XStack>
 
-        <div className="flex-1" />
-
-        <div className="hidden lg:flex items-center gap-3 text-sm">
-          {SOCIAL_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          onClick={() => setTheme(isDark ? 'light' : 'dark')}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-
+      <XStack alignItems="center" gap="$2">
         {session ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-foreground"
-              >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                  {(session.name ?? session.email ?? 'U').slice(0, 1).toUpperCase()}
-                </div>
-                <span className="hidden sm:inline max-w-[120px] truncate">
-                  {session.name ?? session.email}
-                </span>
+          <Popover open={menuOpen} onOpenChange={setMenuOpen} placement="bottom-end">
+            <Popover.Trigger asChild>
+              <Button size="$2" chromeless>
+                {session.user?.name || session.user?.email || 'Account'}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{session.name ?? 'Account'}</span>
-                  {session.email && (
-                    <span className="text-xs text-muted-foreground truncate">{session.email}</span>
-                  )}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onOpenSettings?.()} className="gap-2">
-                <Settings className="h-4 w-4" /> Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href="/pricing" className="gap-2">
-                  <User className="h-4 w-4" /> Billing
+            </Popover.Trigger>
+            <Popover.Content
+              backgroundColor="$background"
+              borderColor="$borderColor"
+              borderWidth={1}
+              padding="$2"
+              minWidth={180}
+            >
+              <YStack gap="$1">
+                <Button
+                  size="$2"
+                  chromeless
+                  justifyContent="flex-start"
+                  onPress={() => {
+                    setMenuOpen(false);
+                    onOpenSettings?.();
+                  }}
+                >
+                  Settings
+                </Button>
+                <a
+                  href="/pricing"
+                  style={{ textDecoration: 'none', display: 'block' }}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Button size="$2" chromeless justifyContent="flex-start" width="100%">
+                    Plans
+                  </Button>
                 </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => signOut()} className="gap-2 text-destructive-foreground">
-                <LogOut className="h-4 w-4" /> Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Separator />
+                <Button
+                  size="$2"
+                  chromeless
+                  justifyContent="flex-start"
+                  onPress={() => {
+                    signOutFromIam();
+                    setMenuOpen(false);
+                  }}
+                >
+                  Sign out
+                </Button>
+              </YStack>
+            </Popover.Content>
+          </Popover>
         ) : (
-          <Button
-            size="sm"
-            onClick={() => signInWithIam()}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
+          <Button size="$2" onPress={() => signInWithIam(window.location.pathname)}>
             Sign in
           </Button>
         )}
-
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Menu"
-          className="md:hidden text-muted-foreground"
-          onClick={() => onOpenSettings?.()}
-        >
-          <MenuIcon className="h-5 w-5" />
-        </Button>
-      </div>
-    </header>
+      </XStack>
+    </XStack>
   );
 }
