@@ -77,7 +77,14 @@ Server-side verification uses `jose` with a cached JWKS — no round-trip to Cle
 
 ## Entitlement / tier gating
 
-Valid key ≠ access. Every PRO-gated endpoint also checks the caller's entitlement via `isCallerPremium(req)` before returning data.
+**Valid key ≠ PRO.** Authentication and entitlement are orthogonal. Every PRO-gated endpoint runs a separate `isCallerPremium(req)` check (`server/_shared/premium-check.ts`) that **does not** accept a trusted browser Origin as proof of PRO, even though it accepts Origin for anonymous/public access.
+
+`isCallerPremium` returns true only when one of these is present:
+
+- A valid `X-WorldMonitor-Key` (env-allowlisted from `WORLDMONITOR_VALID_KEYS`, or a user-owned `wm_`-prefixed key whose Convex record has the `apiAccess` entitlement), **or**
+- A Clerk `Authorization: Bearer …` token whose user has role `pro` or Dodo entitlement tier ≥ 1.
+
+From the browser, `premiumFetch()` (`src/services/premium-fetch.ts`) handles this by injecting one of those credentials on every request. Desktop app uses `WORLDMONITOR_API_KEY` from the runtime config. Server-to-server callers must send the header explicitly.
 
 | Tier | Access |
 |------|--------|

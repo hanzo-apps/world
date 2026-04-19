@@ -15,22 +15,24 @@ This service is documented inline (not yet proto-backed). Proto migration is tra
 
 Returns the catalog of pre-defined scenario templates. Cached `public, max-age=3600`.
 
-**Response**:
+**Response** — abbreviated example using one of the live shipped templates (`server/worldmonitor/supply-chain/v1/scenario-templates.ts`):
 ```json
 {
   "templates": [
     {
-      "id": "hormuz-closure-30d",
-      "name": "Strait of Hormuz closure (30 days)",
-      "affectedChokepointIds": ["hormuz"],
+      "id": "hormuz-tanker-blockade",
+      "name": "Hormuz Strait Tanker Blockade",
+      "affectedChokepointIds": ["hormuz_strait"],
       "disruptionPct": 100,
-      "durationDays": 30,
-      "affectedHs2": ["27"],
-      "costShockMultiplier": 1.8
+      "durationDays": 14,
+      "affectedHs2": ["27", "29"],
+      "costShockMultiplier": 2.10
     }
   ]
 }
 ```
+
+Other shipped templates at the time of writing: `taiwan-strait-full-closure`, `suez-bab-simultaneous`, `panama-drought-50pct`, `russia-baltic-grain-suspension`, `us-tariff-escalation-electronics`. Use the live `/templates` response as the source of truth — the set grows over time.
 
 ## Run a scenario
 
@@ -38,7 +40,7 @@ Returns the catalog of pre-defined scenario templates. Cached `public, max-age=3
 
 Enqueues a job. Returns `202 Accepted` with a `jobId` the caller must poll.
 
-- **Auth**: `X-WorldMonitor-Key` (or trusted browser origin) + PRO
+- **Auth**: PRO entitlement required. Granted by either (a) a valid `X-WorldMonitor-Key` (env key from `WORLDMONITOR_VALID_KEYS`, or a user-owned `wm_`-prefixed key whose owner has the `apiAccess` entitlement), **or** (b) a Clerk bearer token whose user has role `pro` or Dodo entitlement tier ≥ 1. A trusted browser Origin alone is **not** sufficient — `isCallerPremium()` in `server/_shared/premium-check.ts` only counts explicit credentials. Browser calls work because `premiumFetch()` (`src/services/premium-fetch.ts`) injects one of the two credential forms on the caller's behalf.
 - **Rate limits**:
   - 10 jobs / minute / user
   - Global queue capped at 100 in-flight jobs; excess rejected with `429` + `Retry-After: 30`
@@ -46,7 +48,7 @@ Enqueues a job. Returns `202 Accepted` with a `jobId` the caller must poll.
 **Request**:
 ```json
 {
-  "scenarioId": "hormuz-closure-30d",
+  "scenarioId": "hormuz-tanker-blockade",
   "iso2": "SG"
 }
 ```
@@ -82,10 +84,19 @@ Enqueues a job. Returns `202 Accepted` with a `jobId` the caller must poll.
 
 ### `GET /api/scenario/v1/status?jobId=<jobId>`
 
-Returns the job result or `{ status: "pending" }` while the worker is still running.
+Returns the job's current state as written by the worker, or a synthesised `pending` stub while the job is still queued.
 
 - **Auth**: same as `/run`
 - **jobId format**: `scenario:{unix-ms}:{8-char-suffix}` — strictly validated to guard against path traversal
+
+**Status lifecycle**:
+
+| `status` | When | Additional fields |
+|---|---|---|
+| `pending` | Job enqueued but worker has not picked it up yet. Synthesised by the status handler when no Redis record exists. | — |
+| `processing` | Worker dequeued the job and started computing. Written by the worker at job pickup. | `startedAt` (ms epoch) |
+| `done` | Worker completed successfully. | `completedAt`, `result` (scenario-specific payload) |
+| `failed` | Worker hit a computation error. | `failedAt`, `error` (string) |
 
 **Pending response (`200`)**:
 ```json
@@ -95,13 +106,19 @@ Returns the job result or `{ status: "pending" }` while the worker is still runn
 }
 ```
 
-**Completed response (`200`)** — shape is scenario-specific; always includes:
+**Processing response (`200`)**:
 ```json
 {
-  "jobId": "scenario:1713456789012:a1b2c3d4",
-  "scenarioId": "hormuz-closure-30d",
-  "iso2": "SG",
-  "status": "completed",
+  "status": "processing",
+  "startedAt": 1713456789500
+}
+```
+
+**Done response (`200`)** — the worker writes the result directly to Redis; the status endpoint returns it verbatim:
+
+```json
+{
+  "status": "done",
   "completedAt": 1713456890123,
   "result": {
     "costShockPct": 14.2,
@@ -110,6 +127,18 @@ Returns the job result or `{ status: "pending" }` while the worker is still runn
   }
 }
 ```
+
+**Failed response (`200`)**:
+
+```json
+{
+  "status": "failed",
+  "error": "computation_error",
+  "failedAt": 1713456890123
+}
+```
+
+Poll loop: treat `pending` and `processing` as non-terminal; only `done` and `failed` are terminal. Both pending and processing can legitimately persist for several seconds under load.
 
 **Errors**:
 
