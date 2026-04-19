@@ -53,3 +53,10 @@ export function getCurrentSession(): IamSession | null {
     return null;
   }
 }
+
+// Aliases used by Tamagui-rewritten components.
+export const signOutFromIam = signOut;
+export function getAccessToken(): string | null {
+  const s = getCurrentSession();
+  return s?.accessToken ?? null;
+}
