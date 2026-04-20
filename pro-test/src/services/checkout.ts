@@ -5,6 +5,7 @@
  * No Convex client needed — the edge endpoint handles relay.
  */
 
+import * as Sentry from '@sentry/react';
 import type { Clerk } from '@clerk/clerk-js';
 import type { CheckoutEvent } from 'dodopayments-checkout';
 
@@ -23,16 +24,19 @@ let clerkLoadPromise: Promise<InstanceType<typeof Clerk>> | null = null;
 export async function ensureClerk(): Promise<InstanceType<typeof Clerk>> {
   if (clerk) return clerk;
   if (clerkLoadPromise) return clerkLoadPromise;
-  clerkLoadPromise = _loadClerk();
+  clerkLoadPromise = _loadClerk().catch((err) => {
+    clerkLoadPromise = null;
+    throw err;
+  });
   return clerkLoadPromise;
 }
 
 async function _loadClerk(): Promise<InstanceType<typeof Clerk>> {
-  const { Clerk: C } = await import('@clerk/clerk-js');
+  const { Clerk: C } = await import('@clerk/clerk-js/no-rhc');
   const key = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   if (!key) throw new Error('VITE_CLERK_PUBLISHABLE_KEY not set');
-  clerk = new C(key);
-  await clerk.load({
+  const instance = new C(key);
+  await instance.load({
     appearance: {
       variables: {
         colorBackground: '#0f0f0f',
@@ -55,6 +59,11 @@ async function _loadClerk(): Promise<InstanceType<typeof Clerk>> {
       },
     },
   });
+
+  // Only publish the instance after load() succeeds, so a failed load
+  // doesn't wedge ensureClerk()'s `if (clerk) return clerk;` short-circuit
+  // and bypass the retry path.
+  clerk = instance;
 
   // Auto-resume checkout after sign-in
   clerk.addListener(() => {
@@ -97,11 +106,26 @@ export async function startCheckout(
 ): Promise<boolean> {
   if (checkoutInFlight) return false;
 
-  const c = await ensureClerk();
+  let c: InstanceType<typeof Clerk>;
+  try {
+    c = await ensureClerk();
+  } catch (err) {
+    console.error('[checkout] Failed to load Clerk:', err);
+    Sentry.captureException(err, { tags: { surface: 'pro-marketing', action: 'load-clerk' } });
+    return false;
+  }
+
   if (!c.user) {
     pendingProductId = productId;
     pendingOptions = options ?? null;
-    c.openSignIn();
+    try {
+      c.openSignIn();
+    } catch (err) {
+      console.error('[checkout] Failed to open sign in:', err);
+      Sentry.captureException(err, { tags: { surface: 'pro-marketing', action: 'checkout-sign-in' } });
+      pendingProductId = null;
+      pendingOptions = null;
+    }
     return false;
   }
 
