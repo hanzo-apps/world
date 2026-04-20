@@ -35,6 +35,12 @@ const HISTORY_DAYS = 90;
 const MAX_PORTS_PER_COUNTRY = 50;
 const CONCURRENCY = 12;
 const BATCH_LOG_EVERY = 5;
+// Per-country budget. Promise.allSettled waits for the slowest member of the
+// batch, so one runaway country (e.g. USA: many ports × many pages when EP3
+// is slow) can stall the whole batch and cascade to the section timeout,
+// leaving batches 2..N unattempted. This caps a single country without
+// aborting the whole section.
+const PER_COUNTRY_TIMEOUT_MS = 90_000;
 
 function epochToTimestamp(epochMs) {
   const d = new Date(epochMs);
@@ -42,16 +48,30 @@ function epochToTimestamp(epochMs) {
   return `timestamp '${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}'`;
 }
 
-async function fetchWithTimeout(url) {
+async function fetchWithTimeout(url, { signal } = {}) {
+  // Combine the per-call FETCH_TIMEOUT with the upstream per-country signal
+  // so a per-country abort propagates into the in-flight fetch AND future
+  // pagination iterations (review feedback P1 on PR #3222). Without this,
+  // the 90s withPerCountryTimeout timer fires, the batch moves on, but the
+  // orphaned country keeps paginating with fresh 45s fetch timeouts —
+  // breaking the CONCURRENCY=12 cap and amplifying ArcGIS throttling.
+  const combined = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT)])
+    : AbortSignal.timeout(FETCH_TIMEOUT);
   const resp = await fetch(url, {
     headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    signal: combined,
   });
   if (resp.status === 429) {
     const proxyAuth = resolveProxyForConnect();
     if (!proxyAuth) throw new Error(`ArcGIS HTTP 429 (rate limited) for ${url.slice(0, 80)}`);
     console.warn(`  [portwatch] 429 rate-limited — retrying via proxy: ${url.slice(0, 80)}`);
-    const { buffer } = await httpsProxyFetchRaw(url, proxyAuth, { accept: 'application/json', timeoutMs: FETCH_TIMEOUT });
+    // Pass the caller signal so a per-country abort also cancels the proxy
+    // fallback path (review feedback on PR #3222). Without this, a timed-out
+    // country could keep a proxy CONNECT tunnel + request alive for another
+    // 45s after the batch moved on, re-creating the orphan-work problem
+    // under the exact throttling scenario this PR addresses.
+    const { buffer } = await httpsProxyFetchRaw(url, proxyAuth, { accept: 'application/json', timeoutMs: FETCH_TIMEOUT, signal });
     const proxied = JSON.parse(buffer.toString('utf8'));
     if (proxied.error) throw new Error(`ArcGIS error (via proxy): ${proxied.error.message}`);
     return proxied;
@@ -105,11 +125,15 @@ async function fetchAllPortRefs() {
   return byIso3;
 }
 
-async function fetchActivityRows(iso3, since) {
+async function fetchActivityRows(iso3, since, { signal } = {}) {
   let offset = 0;
   const allRows = [];
   let body;
   do {
+    // Abort between pages so a cancelled per-country timer stops the
+    // paginator on the next iteration boundary even if the current fetch
+    // has already resolved.
+    if (signal?.aborted) throw signal.reason ?? new Error('aborted');
     const params = new URLSearchParams({
       where: `ISO3='${iso3}' AND date > ${epochToTimestamp(since)}`,
       outFields: 'portid,portname,ISO3,date,portcalls_tanker,import_tanker,export_tanker',
@@ -119,7 +143,7 @@ async function fetchActivityRows(iso3, since) {
       outSR: '4326',
       f: 'json',
     });
-    body = await fetchWithTimeout(`${EP3_BASE}?${params}`);
+    body = await fetchWithTimeout(`${EP3_BASE}?${params}`, { signal });
     const features = body.features ?? [];
     if (features.length) allRows.push(...features);
     // Advance by actual returned count, not PAGE_SIZE. ArcGIS can cap below
@@ -207,17 +231,40 @@ async function redisPipeline(commands) {
   return resp.json();
 }
 
-async function processCountry(iso3, iso2, since, refMap) {
-  const rawRows = await fetchActivityRows(iso3, since);
+async function processCountry(iso3, iso2, since, refMap, { signal } = {}) {
+  const rawRows = await fetchActivityRows(iso3, since, { signal });
   if (!rawRows.length) return null;
   const ports = computeCountryPorts(rawRows, refMap);
   if (!ports.length) return null;
   return { iso2, ports, fetchedAt: new Date().toISOString() };
 }
 
+// Runs `doWork(signal)` but rejects if the per-country timer fires first,
+// aborting the controller so the in-flight fetch (and its pagination loop)
+// actually stops instead of orphaning. Keeps the CONCURRENCY=12 cap real:
+// the next batch cannot pile new requests on top of still-running earlier
+// work. Exported with an injectable timeoutMs so runtime tests can exercise
+// the abort path at 50ms instead of the production 90s.
+export function withPerCountryTimeout(doWork, iso3, timeoutMs = PER_COUNTRY_TIMEOUT_MS) {
+  const controller = new AbortController();
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`per-country timeout after ${timeoutMs / 1000}s (${iso3})`);
+      try { controller.abort(err); } catch {}
+      reject(err);
+    }, timeoutMs);
+  });
+  const work = doWork(controller.signal);
+  return Promise.race([work, guard]).finally(() => clearTimeout(timer));
+}
+
 // fetchAll() — pure data collection, no Redis writes.
 // Returns { countries: string[], countryData: Map<iso2, payload>, fetchedAt: string }.
-export async function fetchAll() {
+//
+// `progress` (optional) is mutated in-place so a SIGTERM handler in main()
+// can read the last batch index, seeded count, and error list at kill time.
+export async function fetchAll(progress) {
   const { iso3ToIso2 } = createCountryResolvers();
   const since = Date.now() - HISTORY_DAYS * 86400000;
 
@@ -229,33 +276,43 @@ export async function fetchAll() {
   // Only fetch activity for ISO3s that have at least one port AND exist in our iso3→iso2 map.
   const eligibleIso3 = [...refsByIso3.keys()].filter(iso3 => iso3ToIso2.has(iso3));
   const skipped = refsByIso3.size - eligibleIso3.length;
-  console.log(`  [port-activity] Activity queue: ${eligibleIso3.length} countries (skipping ${skipped} unmapped iso3, concurrency ${CONCURRENCY})`);
+  console.log(`  [port-activity] Activity queue: ${eligibleIso3.length} countries (skipping ${skipped} unmapped iso3, concurrency ${CONCURRENCY}, per-country cap ${PER_COUNTRY_TIMEOUT_MS / 1000}s)`);
 
   const countryData = new Map();
-  const errors = [];
+  const errors = progress?.errors ?? [];
   const batches = Math.ceil(eligibleIso3.length / CONCURRENCY);
   const activityStart = Date.now();
+  if (progress) progress.totalBatches = batches;
 
   for (let i = 0; i < eligibleIso3.length; i += CONCURRENCY) {
     const batch = eligibleIso3.slice(i, i + CONCURRENCY);
     const batchIdx = Math.floor(i / CONCURRENCY) + 1;
-    const settled = await Promise.allSettled(
-      batch.map(iso3 => {
-        const iso2 = iso3ToIso2.get(iso3);
-        return processCountry(iso3, iso2, since, refsByIso3.get(iso3));
-      })
-    );
+    if (progress) progress.batchIdx = batchIdx;
+    const promises = batch.map(iso3 => {
+      const iso2 = iso3ToIso2.get(iso3);
+      const p = withPerCountryTimeout(
+        (signal) => processCountry(iso3, iso2, since, refsByIso3.get(iso3), { signal }),
+        iso3,
+      );
+      // Eager error flush (review feedback P2 on PR #3222). Push into the
+      // shared errors array the moment each promise rejects, so a SIGTERM
+      // that arrives MID-batch (while Promise.allSettled is still pending)
+      // sees the rejections that have already fired. The settled-loop
+      // below skips rejected outcomes to avoid double-counting.
+      p.catch(err => {
+        errors.push(`${iso3}: ${err?.message || err}`);
+      });
+      return p;
+    });
+    const settled = await Promise.allSettled(promises);
     for (let j = 0; j < batch.length; j++) {
-      const iso3 = batch[j];
       const outcome = settled[j];
-      if (outcome.status === 'rejected') {
-        errors.push(`${iso3}: ${outcome.reason?.message || outcome.reason}`);
-        continue;
-      }
+      if (outcome.status === 'rejected') continue; // already recorded via .catch above
       if (!outcome.value) continue;
       const { iso2, ports, fetchedAt } = outcome.value;
       countryData.set(iso2, { iso2, ports, fetchedAt });
     }
+    if (progress) progress.seeded = countryData.size;
     if (batchIdx === 1 || batchIdx % BATCH_LOG_EVERY === 0 || batchIdx === batches) {
       const elapsed = ((Date.now() - activityStart) / 1000).toFixed(1);
       console.log(`  [port-activity]   batch ${batchIdx}/${batches}: ${countryData.size} countries seeded, ${errors.length} errors (${elapsed}s)`);
@@ -293,6 +350,12 @@ async function main() {
   let prevCountryKeys = [];
   let prevCount = 0;
 
+  // Mutated in-place by fetchAll() so the SIGTERM handler can log which batch
+  // we died in and what the per-country errors looked like. Without this, a
+  // timeout kill flushes nothing from the errors array — past regressions
+  // have been undiagnosable for exactly this reason.
+  const progress = { batchIdx: 0, totalBatches: 0, seeded: 0, errors: [] };
+
   // Bundle-runner SIGKILLs via SIGTERM → SIGKILL on timeout. Release the lock
   // and extend existing TTLs synchronously(ish) so the next cron tick isn't
   // blocked for up to 30 min and the Redis snapshot doesn't evaporate.
@@ -300,7 +363,13 @@ async function main() {
   const onSigterm = async () => {
     if (sigHandled) return;
     sigHandled = true;
-    console.error('  [port-activity] SIGTERM received — releasing lock + extending TTLs');
+    console.error(
+      `  [port-activity] SIGTERM at batch ${progress.batchIdx}/${progress.totalBatches} — ${progress.seeded} seeded, ${progress.errors.length} errors`,
+    );
+    if (progress.errors.length) {
+      console.error(`  [port-activity] First errors: ${progress.errors.slice(0, 10).join('; ')}`);
+    }
+    console.error('  [port-activity] Releasing lock + extending TTLs');
     try {
       await extendExistingTtl([CANONICAL_KEY, META_KEY, ...prevCountryKeys], TTL);
     } catch {}
@@ -317,7 +386,7 @@ async function main() {
     prevCount = Array.isArray(prevIso2List) ? prevIso2List.length : 0;
 
     console.log(`  Fetching port activity data (${HISTORY_DAYS}d history)...`);
-    const { countries, countryData } = await fetchAll();
+    const { countries, countryData } = await fetchAll(progress);
 
     console.log(`  Fetched ${countryData.size} countries`);
 

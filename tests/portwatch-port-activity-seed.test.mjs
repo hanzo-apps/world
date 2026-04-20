@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+import { withPerCountryTimeout } from '../scripts/seed-portwatch-port-activity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
 const src = readFileSync(resolve(root, 'scripts/seed-portwatch-port-activity.mjs'), 'utf-8');
+const seedUtilsSrc = readFileSync(resolve(root, 'scripts/_seed-utils.mjs'), 'utf-8');
+const proxyUtilsSrc = readFileSync(resolve(root, 'scripts/_proxy-utils.cjs'), 'utf-8');
 
 // ── seeder source assertions ──────────────────────────────────────────────────
 
@@ -60,6 +65,72 @@ describe('seed-portwatch-port-activity.mjs exports', () => {
 
   it('registers SIGTERM handler for graceful shutdown', () => {
     assert.match(src, /process\.on\('SIGTERM'/);
+  });
+
+  it('defines a per-country timeout to cap Promise.allSettled stalls', () => {
+    // Without this cap, one slow country (USA: many ports × many pages when
+    // ArcGIS is throttled) blocks the whole batch via Promise.allSettled and
+    // cascades to the 420s section timeout, leaving batches 2..N unattempted.
+    assert.match(src, /PER_COUNTRY_TIMEOUT_MS\s*=\s*\d/);
+  });
+
+  it('wraps processCountry with the per-country timeout in the batch loop', () => {
+    // Must pass a factory (signal) => processCountry(...) so the timer can
+    // abort the in-flight fetch (PR #3222 review P1), not just race a
+    // detached promise.
+    assert.match(src, /withPerCountryTimeout\s*\(\s*\n?\s*\(signal\)\s*=>\s*processCountry/);
+  });
+
+  it('fetchWithTimeout combines caller signal with FETCH_TIMEOUT via AbortSignal.any', () => {
+    // Otherwise the per-country abort cannot propagate into the in-flight
+    // fetch; orphan pagination would continue with fresh 45s budgets each
+    // page (PR #3222 review P1).
+    assert.match(src, /AbortSignal\.any\(\[signal,\s*AbortSignal\.timeout\(FETCH_TIMEOUT\)\]\)/);
+  });
+
+  it('fetchActivityRows checks signal.aborted between pages', () => {
+    assert.match(src, /signal\?\.aborted\)\s*throw\s+signal\.reason/);
+  });
+
+  it('429 proxy fallback threads caller signal into httpsProxyFetchRaw', () => {
+    // Review feedback: without this, a timed-out country can leak a
+    // proxy CONNECT tunnel for up to FETCH_TIMEOUT (45s) after the
+    // batch moved on, defeating the concurrency cap under the exact
+    // throttling scenario this PR addresses.
+    assert.match(src, /httpsProxyFetchRaw\(url,\s*proxyAuth,\s*\{[^}]*signal\s*\}/s);
+  });
+
+  it('httpsProxyFetchRaw accepts and forwards signal', () => {
+    assert.match(seedUtilsSrc, /httpsProxyFetchRaw\(url,\s*proxyAuth,\s*\{[^}]*signal\s*\}/s);
+    assert.match(seedUtilsSrc, /proxyFetch\(url,\s*proxyConfig,\s*\{[^}]*signal[^}]*\}/s);
+  });
+
+  it('proxyFetch + proxyConnectTunnel accept signal and bail early if aborted', () => {
+    assert.match(proxyUtilsSrc, /function proxyFetch\([\s\S]*?\bsignal,?\s*\}\s*=\s*\{\}/);
+    assert.match(proxyUtilsSrc, /function proxyConnectTunnel\([\s\S]*?\bsignal\s*\}\s*=\s*\{\}/);
+    assert.match(proxyUtilsSrc, /signal && signal\.aborted/);
+    assert.match(proxyUtilsSrc, /signal\.addEventListener\('abort'/);
+  });
+
+  it('eager error flush attaches p.catch before Promise.allSettled', () => {
+    // Review P2: without this, errors collected only AFTER allSettled
+    // returns. A mid-batch SIGTERM would flush zero errors even though
+    // several promises had already rejected.
+    assert.match(src, /p\.catch\(err\s*=>\s*\{[^}]*errors\.push/);
+  });
+
+  it('SIGTERM handler flushes batch progress + first errors', () => {
+    // Past regressions were undiagnosable because the errors array was only
+    // logged after all batches completed — a SIGTERM kill discarded it.
+    assert.match(src, /SIGTERM at batch \$\{progress\.batchIdx\}/);
+    assert.match(src, /progress\.errors\.slice\(0,\s*10\)/);
+  });
+
+  it('fetchAll accepts a progress object and mutates it', () => {
+    assert.match(src, /export async function fetchAll\(progress\)/);
+    assert.match(src, /progress\.totalBatches\s*=\s*batches/);
+    assert.match(src, /progress\.batchIdx\s*=\s*batchIdx/);
+    assert.match(src, /progress\.seeded\s*=\s*countryData\.size/);
   });
 
   it('pagination advances by actual features.length, not PAGE_SIZE', () => {
@@ -215,6 +286,106 @@ describe('top-N port truncation', () => {
     assert.equal(result[0].portId, 'b');
     assert.equal(result[1].portId, 'c');
     assert.equal(result[2].portId, 'a');
+  });
+});
+
+describe('withPerCountryTimeout (runtime)', () => {
+  it('aborts the per-country signal when the timer fires', async () => {
+    let observedSignal;
+    const p = withPerCountryTimeout(
+      (signal) => {
+        observedSignal = signal;
+        // Never resolves on its own; can only reject via abort.
+        return new Promise((_, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      },
+      'TST',
+      40, // 40ms — keeps the test fast
+    );
+
+    await assert.rejects(p, /per-country timeout after 0\.04s \(TST\)/);
+    assert.equal(observedSignal.aborted, true, 'underlying work received the abort');
+  });
+
+  it('resolves with the work result when work completes before the timer', async () => {
+    const result = await withPerCountryTimeout(
+      (_signal) => Promise.resolve({ ok: true }),
+      'TST',
+      500,
+    );
+    assert.deepEqual(result, { ok: true });
+  });
+
+  it('does not invoke the timer path when work rejects first', async () => {
+    // Rejecting with a non-timeout error should surface as-is, not as the
+    // per-country timeout message.
+    await assert.rejects(
+      withPerCountryTimeout(
+        (_signal) => Promise.reject(new Error('ArcGIS HTTP 500')),
+        'TST',
+        1_000,
+      ),
+      /ArcGIS HTTP 500/,
+    );
+  });
+});
+
+describe('proxyFetch signal propagation (runtime)', () => {
+  const require_ = createRequire(import.meta.url);
+  const { proxyFetch } = require_('../scripts/_proxy-utils.cjs');
+
+  it('rejects synchronously when called with an already-aborted signal', async () => {
+    // Review feedback: the per-country AbortController must kill the proxy
+    // fallback too. Pre-aborted signals must short-circuit BEFORE any
+    // CONNECT tunnel opens; otherwise a timed-out country's proxy call
+    // continues in the background. No network reached in this test — the
+    // synchronous aborted check is the guard.
+    const controller = new AbortController();
+    controller.abort(new Error('test-cancel'));
+    await assert.rejects(
+      proxyFetch('https://example.invalid/x', { host: 'nope', port: 1, auth: 'a:b', tls: true }, {
+        timeoutMs: 60_000,
+        signal: controller.signal,
+      }),
+      /test-cancel|aborted/,
+    );
+  });
+});
+
+describe('eager error flush (runtime)', () => {
+  it('populates shared errors via p.catch before Promise.allSettled resolves', async () => {
+    // Mirrors the wiring in fetchAll(): attach p.catch to each promise so
+    // rejections land in the errors array at the moment they fire, not
+    // only after allSettled. A SIGTERM that hits during allSettled still
+    // sees the already-pushed errors.
+    const errors = [];
+    let stuckResolve;
+
+    const rejecting = Promise.reject(new Error('boom A'));
+    rejecting.catch(err => errors.push(`A: ${err.message}`));
+
+    const stuck = new Promise(resolve => { stuckResolve = resolve; });
+    stuck.catch(err => errors.push(`B: ${err.message}`));
+
+    // Yield microtasks so `rejecting.catch` fires.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.deepEqual(errors, ['A: boom A'], 'rejected promise pushed BEFORE allSettled is even awaited');
+
+    // Sanity: the hung promise still blocks allSettled, proving the
+    // behavior we rely on: errors from resolved-rejected members are
+    // visible to a SIGTERM handler even while the batch itself is stuck.
+    const allSettledPromise = Promise.allSettled([rejecting, stuck]);
+    let settledEarly = false;
+    allSettledPromise.then(() => { settledEarly = true; });
+    await new Promise(r => setTimeout(r, 10));
+    assert.equal(settledEarly, false, 'allSettled still pending while one member is stuck');
+    assert.equal(errors.length, 1, 'error list observable despite pending batch');
+
+    stuckResolve();
+    await allSettledPromise;
   });
 });
 
