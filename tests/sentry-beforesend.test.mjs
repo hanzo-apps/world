@@ -29,9 +29,14 @@ const fnBody = mainSrc.slice(bsStart + 'beforeSend(event) '.length, bsEnd)
   .replace(/as\s+\w+(\[\])?/g, '')        // type assertions
   .replace(/<[A-Z]\w*>/g, '');            // generic type params
 
+// Extract the MAPLIBRE_THIRD_PARTY_TILE_HOSTS Set so the test harness can evaluate
+// beforeSend with the same allowlist the real module has.
+const tpMatch = mainSrc.match(/const MAPLIBRE_THIRD_PARTY_TILE_HOSTS = new Set\(\[[^\]]*\]\);/);
+assert.ok(tpMatch, 'MAPLIBRE_THIRD_PARTY_TILE_HOSTS must be defined in src/main.ts');
+
 // Build a callable version. Input: a Sentry-shaped event object. Returns event or null.
 // eslint-disable-next-line no-new-func
-const beforeSend = new Function('event', fnBody);
+const beforeSend = new Function('event', `${tpMatch[0]}\n${fnBody}`);
 
 /** Helper to build a minimal Sentry event. */
 function makeEvent(value, type = 'Error', frames = []) {
@@ -311,6 +316,16 @@ describe('existing beforeSend filters', () => {
     assert.equal(beforeSend(event), null, 'MapLibre tile AJAX failure should be suppressed');
   });
 
+  it('suppresses MapLibre AJAXError for allowlisted host even with an all-maplibre stack', () => {
+    // Proves the allowlist path fires on all-vendor stacks too: the AJAX carve-out
+    // above bypasses the broad "all-maplibre TypeError" filter and routes into the
+    // host-allowlist check, which still suppresses allowlisted third-party hosts.
+    const event = makeEvent('Failed to fetch (tilecache.rainviewer.com)', 'TypeError', [
+      { filename: '/assets/maplibre-A8Ca0ysS.js', lineno: 4, function: 'ajaxFetch' },
+    ]);
+    assert.equal(beforeSend(event), null, 'Allowlisted AJAX host should be suppressed regardless of stack shape');
+  });
+
   it('does NOT suppress plain "Failed to fetch" from first-party code without maplibre frames', () => {
     const event = makeEvent('Failed to fetch', 'TypeError', [
       { filename: '/assets/panels-wF5GXf0N.js', lineno: 100, function: 'MyApiCall' },
@@ -325,6 +340,27 @@ describe('existing beforeSend filters', () => {
       { filename: '/assets/panels-wF5GXf0N.js', lineno: 100, function: 'MyApiCall' },
     ]);
     assert.ok(beforeSend(event) !== null, 'Non-maplibre Failed-to-fetch must reach Sentry');
+  });
+
+  it('does NOT suppress MapLibre AJAXError for a non-allowlisted host (mixed stack)', () => {
+    // Mirrors WORLDMONITOR-NE/NF real-world stack: maplibre + first-party fetch wrapper.
+    const event = makeEvent('Failed to fetch (pmtiles.worldmonitor.app)', 'TypeError', [
+      { filename: '/assets/maplibre-A8Ca0ysS.js', lineno: 4, function: 'ajaxFetch' },
+      { filename: '/assets/panels-wF5GXf0N.js', lineno: 24, function: 'window.fetch' },
+    ]);
+    assert.ok(beforeSend(event) !== null, 'Self-hosted tile fetch failure must reach Sentry');
+  });
+
+  it('does NOT suppress MapLibre AJAXError for a non-allowlisted host when stack is entirely maplibre', () => {
+    // Critical edge case: the pre-existing "all non-infra frames are maplibre internals"
+    // filter would normally drop TypeErrors with an all-maplibre stack. `Failed to fetch`
+    // AJAX errors must bypass that generic filter so the host allowlist is what decides,
+    // otherwise a self-hosted R2 basemap regression whose stack happens to be vendor-only
+    // would be silently dropped.
+    const event = makeEvent('Failed to fetch (pmtiles.worldmonitor.app)', 'TypeError', [
+      { filename: '/assets/maplibre-A8Ca0ysS.js', lineno: 4, function: 'ajaxFetch' },
+    ]);
+    assert.ok(beforeSend(event) !== null, 'All-maplibre first-party tile fetch failure must still reach Sentry');
   });
 
   it('does NOT suppress setPointerCapture NotFoundError when no frame context is present', () => {
