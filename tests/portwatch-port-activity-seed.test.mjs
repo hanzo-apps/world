@@ -1,11 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-
-import { withPerCountryTimeout } from '../scripts/seed-portwatch-port-activity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -55,48 +53,96 @@ describe('seed-portwatch-port-activity.mjs exports', () => {
     assert.match(src, /outFields:\s*'portid,ISO3,lat,lon'/);
   });
 
-  it('Endpoint 3 activity query still filters per-country ISO3', () => {
-    assert.match(src, /where:\s*`ISO3='\$\{iso3\}'\s+AND\s+date\s*>/);
+  it('both paginators set returnGeometry:false to avoid wasted wire bandwidth', () => {
+    // ArcGIS returns geometry by default (~100-200KB per page). Omitting
+    // this in the EP3 paginator across ~150-200 pages adds tens of MB to
+    // the perf-critical path. Review feedback on PR #3225.
+    const matches = src.match(/returnGeometry:\s*'false'/g) ?? [];
+    assert.ok(matches.length >= 2, `expected returnGeometry:'false' in both EP3 and EP4 paginators, found ${matches.length}`);
   });
 
-  it('concurrency is bumped to 12', () => {
-    assert.match(src, /CONCURRENCY\s*=\s*12/);
+  it('fetchAllPortRefs accepts + forwards signal for SIGTERM cancellation', () => {
+    // Review feedback on PR #3225: during the 'refs' stage a SIGTERM must
+    // cancel in-flight EP4 fetches, not let them run up to FETCH_TIMEOUT
+    // after the handler fires. The signal must thread through the
+    // paginator into fetchWithTimeout.
+    assert.match(src, /async function fetchAllPortRefs\(\{\s*signal\s*\}\s*=\s*\{\}\)/);
+    assert.match(src, /fetchWithTimeout\(`\$\{EP4_BASE\}\?\$\{params\}`,\s*\{\s*signal\s*\}\)/);
+    // fetchAll must pass the signal when calling it.
+    assert.match(src, /fetchAllPortRefs\(\{\s*signal\s*\}\)/);
+  });
+
+  it('Endpoint 3 activity query is globalised — no per-country ISO3 filter', () => {
+    // The per-country `WHERE ISO3='XX' AND date > ...` shape is gone; the
+    // globalised paginator uses a single date filter and groups by ISO3 in
+    // memory. This eliminates the 174-per-country round-trip cost that
+    // blew the 420s section budget even when every country was fast, and
+    // also removes the `Invalid query parameters` errors that hit
+    // BRA/IDN/NGA under the per-country shape.
+    assert.doesNotMatch(src, /where:\s*`ISO3=/);
+    assert.match(src, /where:\s*`date\s*>\s*\$\{epochToTimestamp\(since\)\}`/);
+  });
+
+  it('streams EP3 into per-port accumulators, not a flat rows array', () => {
+    // Review feedback on PR #3225: materialising the full 90d activity
+    // dataset as Map<iso3, Feature[]> holds ~180k feature objects at once
+    // (~70MB) on a 1GB Railway container. The aggregator now folds each
+    // page into Map<iso3, Map<portId, PortAccum>> (~200KB) and discards
+    // the rows. Assert both the rename and the accumulator shape.
+    assert.match(src, /async function fetchAndAggregateActivity/);
+    assert.doesNotMatch(src, /async function fetchAllActivityRows/);
+    // Accumulator fields (at least the key ones we rely on downstream).
+    assert.match(src, /last30_calls:\s*0/);
+    assert.match(src, /last30_count:\s*0/);
+    assert.match(src, /prev30_calls:\s*0/);
+    assert.match(src, /last7_calls:\s*0/);
+    // No more flat rows array collected per country.
+    assert.doesNotMatch(src, /byIso3\.set\(key,\s*list\)/);
+  });
+
+  it('finalisePortsForCountry emits top-N ports from accumulators', () => {
+    assert.match(src, /function finalisePortsForCountry\(portAccumMap,\s*refMap\)/);
+    assert.match(src, /MAX_PORTS_PER_COUNTRY/);
+    // Same anomaly/trend formula as the old per-row code.
+    assert.match(src, /avg7d\s*<\s*avg30d\s*\*\s*0\.5/);
   });
 
   it('registers SIGTERM handler for graceful shutdown', () => {
     assert.match(src, /process\.on\('SIGTERM'/);
   });
 
-  it('defines a per-country timeout to cap Promise.allSettled stalls', () => {
-    // Without this cap, one slow country (USA: many ports × many pages when
-    // ArcGIS is throttled) blocks the whole batch via Promise.allSettled and
-    // cascades to the 420s section timeout, leaving batches 2..N unattempted.
-    assert.match(src, /PER_COUNTRY_TIMEOUT_MS\s*=\s*\d/);
+  it('SIGTERM handler aborts shutdownController + logs stage/pages/countries', () => {
+    // Per-country batching is gone, but the SIGTERM path still must (a)
+    // abort the in-flight global paginator via the shared controller, and
+    // (b) emit a forensic line identifying which stage we died in.
+    assert.match(src, /shutdownController\.abort\(new Error\('SIGTERM'\)\)/);
+    assert.match(src, /SIGTERM during stage=\$\{progress\.stage\}/);
+    assert.match(src, /pages=\$\{progress\.pages\},\s*countries=\$\{progress\.countries\}/);
   });
 
-  it('wraps processCountry with the per-country timeout in the batch loop', () => {
-    // Must pass a factory (signal) => processCountry(...) so the timer can
-    // abort the in-flight fetch (PR #3222 review P1), not just race a
-    // detached promise.
-    assert.match(src, /withPerCountryTimeout\s*\(\s*\n?\s*\(signal\)\s*=>\s*processCountry/);
+  it('fetchAll accepts progress + { signal } and mutates progress.stage', () => {
+    assert.match(src, /export async function fetchAll\(progress,\s*\{\s*signal\s*\}\s*=\s*\{\}\)/);
+    assert.match(src, /progress\.stage\s*=\s*'refs'/);
+    assert.match(src, /progress\.stage\s*=\s*'activity'/);
+    assert.match(src, /progress\.stage\s*=\s*'compute'/);
+  });
+
+  it('fetchAndAggregateActivity updates progress.pages + progress.countries', () => {
+    assert.match(src, /progress\.pages\s*=\s*page/);
+    assert.match(src, /progress\.countries\s*=\s*accumByIso3\.size/);
   });
 
   it('fetchWithTimeout combines caller signal with FETCH_TIMEOUT via AbortSignal.any', () => {
-    // Otherwise the per-country abort cannot propagate into the in-flight
-    // fetch; orphan pagination would continue with fresh 45s budgets each
-    // page (PR #3222 review P1).
+    // Still needed so a shutdown-controller abort propagates into the
+    // in-flight fetch instead of orphaning it for up to 45s.
     assert.match(src, /AbortSignal\.any\(\[signal,\s*AbortSignal\.timeout\(FETCH_TIMEOUT\)\]\)/);
   });
 
-  it('fetchActivityRows checks signal.aborted between pages', () => {
+  it('fetchAndAggregateActivity checks signal.aborted between pages', () => {
     assert.match(src, /signal\?\.aborted\)\s*throw\s+signal\.reason/);
   });
 
   it('429 proxy fallback threads caller signal into httpsProxyFetchRaw', () => {
-    // Review feedback: without this, a timed-out country can leak a
-    // proxy CONNECT tunnel for up to FETCH_TIMEOUT (45s) after the
-    // batch moved on, defeating the concurrency cap under the exact
-    // throttling scenario this PR addresses.
     assert.match(src, /httpsProxyFetchRaw\(url,\s*proxyAuth,\s*\{[^}]*signal\s*\}/s);
   });
 
@@ -110,27 +156,6 @@ describe('seed-portwatch-port-activity.mjs exports', () => {
     assert.match(proxyUtilsSrc, /function proxyConnectTunnel\([\s\S]*?\bsignal\s*\}\s*=\s*\{\}/);
     assert.match(proxyUtilsSrc, /signal && signal\.aborted/);
     assert.match(proxyUtilsSrc, /signal\.addEventListener\('abort'/);
-  });
-
-  it('eager error flush attaches p.catch before Promise.allSettled', () => {
-    // Review P2: without this, errors collected only AFTER allSettled
-    // returns. A mid-batch SIGTERM would flush zero errors even though
-    // several promises had already rejected.
-    assert.match(src, /p\.catch\(err\s*=>\s*\{[^}]*errors\.push/);
-  });
-
-  it('SIGTERM handler flushes batch progress + first errors', () => {
-    // Past regressions were undiagnosable because the errors array was only
-    // logged after all batches completed — a SIGTERM kill discarded it.
-    assert.match(src, /SIGTERM at batch \$\{progress\.batchIdx\}/);
-    assert.match(src, /progress\.errors\.slice\(0,\s*10\)/);
-  });
-
-  it('fetchAll accepts a progress object and mutates it', () => {
-    assert.match(src, /export async function fetchAll\(progress\)/);
-    assert.match(src, /progress\.totalBatches\s*=\s*batches/);
-    assert.match(src, /progress\.batchIdx\s*=\s*batchIdx/);
-    assert.match(src, /progress\.seeded\s*=\s*countryData\.size/);
   });
 
   it('pagination advances by actual features.length, not PAGE_SIZE', () => {
@@ -289,45 +314,87 @@ describe('top-N port truncation', () => {
   });
 });
 
-describe('withPerCountryTimeout (runtime)', () => {
-  it('aborts the per-country signal when the timer fires', async () => {
-    let observedSignal;
-    const p = withPerCountryTimeout(
-      (signal) => {
-        observedSignal = signal;
-        // Never resolves on its own; can only reject via abort.
-        return new Promise((_, reject) => {
-          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-        });
-      },
-      'TST',
-      40, // 40ms — keeps the test fast
-    );
-
-    await assert.rejects(p, /per-country timeout after 0\.04s \(TST\)/);
-    assert.equal(observedSignal.aborted, true, 'underlying work received the abort');
+describe('finalisePortsForCountry (runtime, semantic equivalence)', () => {
+  // eslint-disable-next-line import/first
+  let finalisePortsForCountry;
+  before(async () => {
+    ({ finalisePortsForCountry } = await import('../scripts/seed-portwatch-port-activity.mjs'));
   });
 
-  it('resolves with the work result when work completes before the timer', async () => {
-    const result = await withPerCountryTimeout(
-      (_signal) => Promise.resolve({ ok: true }),
-      'TST',
-      500,
-    );
-    assert.deepEqual(result, { ok: true });
+  it('emits tankerCalls30d / trendDelta / anomalySignal that match the old per-row formula', () => {
+    // Accum equivalent of: last30 has 30 rows × 60 calls, prev30 has 30 × 40,
+    // last7 has 7 rows × 20 calls (subset of last30 — but note that the
+    // streaming aggregator increments last30 AND last7 on the same row for
+    // dates ≤ 7d, so last7_calls should be <= last30_calls).
+    const portAccumMap = new Map([
+      ['42', {
+        portname: 'Test Port',
+        last30_calls: 60 * 23 + 20 * 7, // 23 rows in 8-30d window + 7 rows in 0-7d window
+        last30_count: 30,
+        last30_import: 1000,
+        last30_export: 500,
+        prev30_calls: 40 * 30,
+        last7_calls: 20 * 7,
+        last7_count: 7,
+      }],
+    ]);
+    const refMap = new Map([['42', { lat: 10, lon: 20 }]]);
+    const [port] = finalisePortsForCountry(portAccumMap, refMap);
+
+    assert.equal(port.portId, '42');
+    assert.equal(port.portName, 'Test Port');
+    assert.equal(port.lat, 10);
+    assert.equal(port.lon, 20);
+    assert.equal(port.tankerCalls30d, 60 * 23 + 20 * 7);
+    assert.equal(port.importTankerDwt30d, 1000);
+    assert.equal(port.exportTankerDwt30d, 500);
+    // trendDelta = ((last30 - prev30) / prev30) * 100, rounded to 1 decimal
+    const expectedTrend = Math.round(((60 * 23 + 20 * 7 - 40 * 30) / (40 * 30)) * 1000) / 10;
+    assert.equal(port.trendDelta, expectedTrend);
+    // avg30d = last30_calls / last30_count; avg7d = last7_calls / last7_count
+    // (60*23 + 20*7) / 30 = (1380+140)/30 = 50.67; last7 avg = 140/7 = 20
+    // 20 < 50.67 * 0.5 = 25.33 → anomaly = true
+    assert.equal(port.anomalySignal, true);
   });
 
-  it('does not invoke the timer path when work rejects first', async () => {
-    // Rejecting with a non-timeout error should surface as-is, not as the
-    // per-country timeout message.
-    await assert.rejects(
-      withPerCountryTimeout(
-        (_signal) => Promise.reject(new Error('ArcGIS HTTP 500')),
-        'TST',
-        1_000,
-      ),
-      /ArcGIS HTTP 500/,
-    );
+  it('returns trendDelta=0 when prev30_calls is zero (no baseline)', () => {
+    const portAccumMap = new Map([
+      ['1', {
+        portname: 'P', last30_calls: 100, last30_count: 30,
+        last30_import: 0, last30_export: 0,
+        prev30_calls: 0, // no prior-period baseline
+        // last7 matches last30 rate → no anomaly
+        last7_calls: Math.round((100 / 30) * 7),
+        last7_count: 7,
+      }],
+    ]);
+    const [port] = finalisePortsForCountry(portAccumMap, new Map());
+    assert.equal(port.trendDelta, 0);
+    assert.equal(port.anomalySignal, false);
+  });
+
+  it('sorts by tankerCalls30d desc and truncates to MAX_PORTS_PER_COUNTRY=50', () => {
+    const portAccumMap = new Map();
+    for (let i = 0; i < 60; i++) {
+      portAccumMap.set(String(i), {
+        portname: `P${i}`, last30_calls: 60 - i, last30_count: 1,
+        last30_import: 0, last30_export: 0, prev30_calls: 0,
+        last7_calls: 0, last7_count: 0,
+      });
+    }
+    const out = finalisePortsForCountry(portAccumMap, new Map());
+    assert.equal(out.length, 50);
+    assert.equal(out[0].tankerCalls30d, 60);
+    assert.equal(out[49].tankerCalls30d, 11);
+  });
+
+  it('falls back to lat/lon=0 when a portId is missing from refMap', () => {
+    const portAccumMap = new Map([
+      ['999', { portname: 'Orphan', last30_calls: 1, last30_count: 1, last30_import: 0, last30_export: 0, prev30_calls: 0, last7_calls: 0, last7_count: 0 }],
+    ]);
+    const [port] = finalisePortsForCountry(portAccumMap, new Map());
+    assert.equal(port.lat, 0);
+    assert.equal(port.lon, 0);
   });
 });
 
@@ -336,11 +403,9 @@ describe('proxyFetch signal propagation (runtime)', () => {
   const { proxyFetch } = require_('../scripts/_proxy-utils.cjs');
 
   it('rejects synchronously when called with an already-aborted signal', async () => {
-    // Review feedback: the per-country AbortController must kill the proxy
-    // fallback too. Pre-aborted signals must short-circuit BEFORE any
-    // CONNECT tunnel opens; otherwise a timed-out country's proxy call
-    // continues in the background. No network reached in this test — the
-    // synchronous aborted check is the guard.
+    // A shutdown-controller abort must short-circuit BEFORE any CONNECT
+    // tunnel opens; otherwise a killed run's proxy call continues in the
+    // background past SIGKILL. No network reached in this test.
     const controller = new AbortController();
     controller.abort(new Error('test-cancel'));
     await assert.rejects(
@@ -350,42 +415,6 @@ describe('proxyFetch signal propagation (runtime)', () => {
       }),
       /test-cancel|aborted/,
     );
-  });
-});
-
-describe('eager error flush (runtime)', () => {
-  it('populates shared errors via p.catch before Promise.allSettled resolves', async () => {
-    // Mirrors the wiring in fetchAll(): attach p.catch to each promise so
-    // rejections land in the errors array at the moment they fire, not
-    // only after allSettled. A SIGTERM that hits during allSettled still
-    // sees the already-pushed errors.
-    const errors = [];
-    let stuckResolve;
-
-    const rejecting = Promise.reject(new Error('boom A'));
-    rejecting.catch(err => errors.push(`A: ${err.message}`));
-
-    const stuck = new Promise(resolve => { stuckResolve = resolve; });
-    stuck.catch(err => errors.push(`B: ${err.message}`));
-
-    // Yield microtasks so `rejecting.catch` fires.
-    await Promise.resolve();
-    await Promise.resolve();
-
-    assert.deepEqual(errors, ['A: boom A'], 'rejected promise pushed BEFORE allSettled is even awaited');
-
-    // Sanity: the hung promise still blocks allSettled, proving the
-    // behavior we rely on: errors from resolved-rejected members are
-    // visible to a SIGTERM handler even while the batch itself is stuck.
-    const allSettledPromise = Promise.allSettled([rejecting, stuck]);
-    let settledEarly = false;
-    allSettledPromise.then(() => { settledEarly = true; });
-    await new Promise(r => setTimeout(r, 10));
-    assert.equal(settledEarly, false, 'allSettled still pending while one member is stuck');
-    assert.equal(errors.length, 1, 'error list observable despite pending batch');
-
-    stuckResolve();
-    await allSettledPromise;
   });
 });
 
