@@ -40,7 +40,11 @@ import { issueSlotInTz } from '../shared/brief-filter.js';
 import { enrichBriefEnvelopeWithLLM } from './lib/brief-llm.mjs';
 import { assertBriefEnvelope } from '../server/_shared/brief-render.js';
 import { signBriefUrl, BriefUrlError } from './lib/brief-url-sign.mjs';
-import { deduplicateStories } from './lib/brief-dedup.mjs';
+import {
+  deduplicateStories,
+  groupTopicsPostDedup,
+  readOrchestratorConfig,
+} from './lib/brief-dedup.mjs';
 import { stripSourceSuffix } from './lib/brief-dedup-jaccard.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -289,7 +293,9 @@ async function buildDigest(rule, windowStartMs) {
   if (stories.length === 0) return null;
 
   stories.sort((a, b) => b.currentScore - a.currentScore);
-  const dedupedAll = await deduplicateStories(stories);
+  const cfg = readOrchestratorConfig(process.env);
+  const { reps: dedupedAll, embeddingByHash, logSummary } =
+    await deduplicateStories(stories);
   // Apply the absolute-score floor AFTER dedup so the floor runs on
   // the representative's score (mentionCount-sum doesn't change the
   // score field; the rep is the highest-scoring member of its
@@ -319,7 +325,40 @@ async function buildDigest(rule, windowStartMs) {
     }
     return null;
   }
-  const top = deduped.slice(0, DIGEST_MAX_ITEMS);
+  const sliced = deduped.slice(0, DIGEST_MAX_ITEMS);
+
+  // Secondary topic-grouping pass: re-orders `sliced` so related stories
+  // form contiguous blocks. Disabled via DIGEST_DEDUP_TOPIC_GROUPING=0.
+  // Gate on the sidecar Map being non-empty — this is the precise
+  // signal for "primary embed path produced vectors". Gating on
+  // cfg.mode is WRONG: the embed path can run AND fall back to
+  // Jaccard at runtime (try/catch inside deduplicateStories), leaving
+  // cfg.mode==='embed' but embeddingByHash empty. The Map size is the
+  // only ground truth. Kill-switch (mode=jaccard) and runtime fallback
+  // both produce size=0 → shouldGroupTopics=false → no misleading
+  // "topic grouping failed: missing embedding" warn.
+  // Errors from the helper are returned (not thrown) and MUST NOT
+  // cascade into the outer Jaccard fallback — they just preserve
+  // primary order.
+  const shouldGroupTopics = cfg.topicGroupingEnabled && embeddingByHash.size > 0;
+  const { reps: top, topicCount, error: topicErr } = shouldGroupTopics
+    ? groupTopicsPostDedup(sliced, cfg, embeddingByHash)
+    : { reps: sliced, topicCount: sliced.length, error: null };
+  if (topicErr) {
+    console.warn(
+      `[digest] topic grouping failed, preserving primary order: ${topicErr.message}`,
+    );
+  }
+  if (logSummary) {
+    const finalLog =
+      shouldGroupTopics && !topicErr
+        ? logSummary.replace(
+            /clusters=(\d+) /,
+            `clusters=$1 topics=${topicCount} `,
+          )
+        : logSummary;
+    console.log(finalLog);
+  }
 
   const allSourceCmds = [];
   const cmdIndex = [];
