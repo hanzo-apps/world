@@ -15,6 +15,10 @@ message GetVesselSnapshotRequest {
   double sw_lat = 3 [(sebuf.http.query) = { name: "sw_lat" }];
   // South-west corner longitude of bounding box.
   double sw_lon = 4 [(sebuf.http.query) = { name: "sw_lon" }];
+  // When true, populate VesselSnapshot.candidate_reports with per-vessel
+  // position reports. Clients with no position callbacks should leave this
+  // false to keep responses small.
+  bool include_candidates = 5 [(sebuf.http.query) = { name: "include_candidates" }];
 }
 
 // GetVesselSnapshotResponse contains the vessel traffic snapshot.

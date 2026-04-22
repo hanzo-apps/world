@@ -8,6 +8,8 @@ import { getShippingStress } from './get-shipping-stress';
 import { getCountryChokepointIndex } from './get-country-chokepoint-index';
 import { getBypassOptions } from './get-bypass-options';
 import { getCountryCostShock } from './get-country-cost-shock';
+import { getCountryProducts } from './get-country-products';
+import { getMultiSectorCostShock } from './get-multi-sector-cost-shock';
 import { getSectorDependency } from './get-sector-dependency';
 import { getRouteExplorerLane } from './get-route-explorer-lane';
 import { getRouteImpact } from './get-route-impact';
@@ -21,6 +23,8 @@ export const supplyChainHandler: SupplyChainServiceHandler = {
   getCountryChokepointIndex,
   getBypassOptions,
   getCountryCostShock,
+  getCountryProducts,
+  getMultiSectorCostShock,
   getSectorDependency,
   getRouteExplorerLane,
   getRouteImpact,

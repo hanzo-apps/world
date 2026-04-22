@@ -1097,7 +1097,7 @@ const EnterprisePage = () => (
             const turnstileWidget = form.querySelector('.cf-turnstile') as HTMLElement | null;
             const turnstileToken = turnstileWidget?.dataset.token || '';
             try {
-              const res = await fetch(`${API_BASE}/contact`, {
+              const res = await fetch(`${API_BASE}/leads/v1/submit-contact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1115,7 +1115,7 @@ const EnterprisePage = () => (
               if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 if (res.status === 422 && errorEl) {
-                  errorEl.textContent = data.error || t('enterpriseShowcase.workEmailRequired');
+                  errorEl.textContent = data.message || data.error || t('enterpriseShowcase.workEmailRequired');
                   errorEl.classList.remove('hidden');
                   btn.textContent = origText;
                   btn.disabled = false;

@@ -192,10 +192,13 @@ describe('getCacheKey determinism', () => {
 describe('getVesselSnapshot caching (HIGH-1)', () => {
   const src = readSrc('server/worldmonitor/maritime/v1/get-vessel-snapshot.ts');
 
-  it('has in-memory cache variables at module scope', () => {
-    assert.match(src, /let cachedSnapshot/);
-    assert.match(src, /let cacheTimestamp/);
-    assert.match(src, /let inFlightRequest/);
+  it('has per-variant cache slots (candidates=on vs off)', () => {
+    assert.match(src, /cache:\s*Record<'with'\s*\|\s*'without'/,
+      'Cache should split on include_candidates so the large/small payloads do not share a slot');
+    assert.match(src, /with:\s*\{\s*snapshot:\s*undefined/,
+      'with-candidates slot should be initialized empty');
+    assert.match(src, /without:\s*\{\s*snapshot:\s*undefined/,
+      'without-candidates slot should be initialized empty');
   });
 
   it('has 5-minute TTL cache', () => {
@@ -204,27 +207,27 @@ describe('getVesselSnapshot caching (HIGH-1)', () => {
   });
 
   it('checks cache before calling relay', () => {
-    // fetchVesselSnapshot should check cachedSnapshot before fetchVesselSnapshotFromRelay
-    const cacheCheckIdx = src.indexOf('cachedSnapshot && (now - cacheTimestamp)');
-    const relayCallIdx = src.indexOf('fetchVesselSnapshotFromRelay()');
-    assert.ok(cacheCheckIdx > -1, 'Should check cache');
+    // fetchVesselSnapshot should check slot freshness before fetchVesselSnapshotFromRelay
+    const cacheCheckIdx = src.indexOf('slot.snapshot && (now - slot.timestamp)');
+    const relayCallIdx = src.indexOf('fetchVesselSnapshotFromRelay(includeCandidates)');
+    assert.ok(cacheCheckIdx > -1, 'Should check slot freshness');
     assert.ok(relayCallIdx > -1, 'Should have relay fetch function');
     assert.ok(cacheCheckIdx < relayCallIdx,
       'Cache check should come before relay call');
   });
 
-  it('has in-flight dedup via shared promise', () => {
-    assert.match(src, /if\s*\(inFlightRequest\)/,
-      'Should check for in-flight request');
-    assert.match(src, /inFlightRequest\s*=\s*fetchVesselSnapshotFromRelay/,
-      'Should assign in-flight promise');
-    assert.match(src, /inFlightRequest\s*=\s*null/,
+  it('has in-flight dedup via per-slot promise', () => {
+    assert.match(src, /if\s*\(slot\.inFlight\)/,
+      'Should check for in-flight request on the selected slot');
+    assert.match(src, /slot\.inFlight\s*=\s*fetchVesselSnapshotFromRelay/,
+      'Should assign in-flight promise on the slot');
+    assert.match(src, /slot\.inFlight\s*=\s*null/,
       'Should clear in-flight promise in finally block');
   });
 
   it('serves stale snapshot when relay fetch fails', () => {
-    assert.match(src, /return\s+result\s*\?\?\s*cachedSnapshot/,
-      'Should return stale cached snapshot when fresh relay fetch fails');
+    assert.match(src, /return\s+result\s*\?\?\s*slot\.snapshot/,
+      'Should return stale cached snapshot from the selected slot when fresh relay fetch fails');
   });
 
   // NOTE: Full integration test (mocking fetch, verifying cache hits) requires

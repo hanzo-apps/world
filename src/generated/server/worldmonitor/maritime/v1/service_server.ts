@@ -7,6 +7,7 @@ export interface GetVesselSnapshotRequest {
   neLon: number;
   swLat: number;
   swLon: number;
+  includeCandidates: boolean;
 }
 
 export interface GetVesselSnapshotResponse {
@@ -17,6 +18,9 @@ export interface VesselSnapshot {
   snapshotAt: number;
   densityZones: AisDensityZone[];
   disruptions: AisDisruption[];
+  sequence: number;
+  status?: AisSnapshotStatus;
+  candidateReports: SnapshotCandidateReport[];
 }
 
 export interface AisDensityZone {
@@ -46,6 +50,24 @@ export interface AisDisruption {
   vesselCount: number;
   region: string;
   description: string;
+}
+
+export interface AisSnapshotStatus {
+  connected: boolean;
+  vessels: number;
+  messages: number;
+}
+
+export interface SnapshotCandidateReport {
+  mmsi: string;
+  name: string;
+  lat: number;
+  lon: number;
+  shipType: number;
+  heading: number;
+  speed: number;
+  course: number;
+  timestamp: number;
 }
 
 export interface ListNavigationalWarningsRequest {
@@ -146,6 +168,7 @@ export function createMaritimeServiceRoutes(
             neLon: Number(params.get("ne_lon") ?? "0"),
             swLat: Number(params.get("sw_lat") ?? "0"),
             swLon: Number(params.get("sw_lon") ?? "0"),
+            includeCandidates: params.get("include_candidates") === "true",
           };
           if (options?.validateRequest) {
             const bodyViolations = options.validateRequest("getVesselSnapshot", body);

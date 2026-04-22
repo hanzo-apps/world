@@ -229,6 +229,62 @@ export interface GetCountryCostShockResponse {
   fetchedAt: string;
 }
 
+export interface GetCountryProductsRequest {
+  iso2: string;
+}
+
+export interface GetCountryProductsResponse {
+  iso2: string;
+  products: CountryProduct[];
+  fetchedAt: string;
+}
+
+export interface CountryProduct {
+  hs4: string;
+  description: string;
+  totalValue: number;
+  topExporters: ProductExporter[];
+  year: number;
+}
+
+export interface ProductExporter {
+  partnerCode: number;
+  partnerIso2: string;
+  value: number;
+  share: number;
+}
+
+export interface GetMultiSectorCostShockRequest {
+  iso2: string;
+  chokepointId: string;
+  closureDays: number;
+}
+
+export interface GetMultiSectorCostShockResponse {
+  iso2: string;
+  chokepointId: string;
+  closureDays: number;
+  warRiskTier: WarRiskTier;
+  sectors: MultiSectorCostShock[];
+  totalAddedCost: number;
+  fetchedAt: string;
+  unavailableReason: string;
+}
+
+export interface MultiSectorCostShock {
+  hs2: string;
+  hs2Label: string;
+  importValueAnnual: number;
+  freightAddedPctPerTon: number;
+  warRiskPremiumBps: number;
+  addedTransitDays: number;
+  totalCostShockPerDay: number;
+  totalCostShock30Days: number;
+  totalCostShock90Days: number;
+  totalCostShock: number;
+  closureDays: number;
+}
+
 export interface GetSectorDependencyRequest {
   iso2: string;
   hs2: string;
@@ -575,6 +631,58 @@ export class SupplyChainServiceClient {
     }
 
     return await resp.json() as GetCountryCostShockResponse;
+  }
+
+  async getCountryProducts(req: GetCountryProductsRequest, options?: SupplyChainServiceCallOptions): Promise<GetCountryProductsResponse> {
+    let path = "/api/supply-chain/v1/get-country-products";
+    const params = new URLSearchParams();
+    if (req.iso2 != null && req.iso2 !== "") params.set("iso2", String(req.iso2));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetCountryProductsResponse;
+  }
+
+  async getMultiSectorCostShock(req: GetMultiSectorCostShockRequest, options?: SupplyChainServiceCallOptions): Promise<GetMultiSectorCostShockResponse> {
+    let path = "/api/supply-chain/v1/get-multi-sector-cost-shock";
+    const params = new URLSearchParams();
+    if (req.iso2 != null && req.iso2 !== "") params.set("iso2", String(req.iso2));
+    if (req.chokepointId != null && req.chokepointId !== "") params.set("chokepointId", String(req.chokepointId));
+    if (req.closureDays != null && req.closureDays !== 0) params.set("closureDays", String(req.closureDays));
+    const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...this.defaultHeaders,
+      ...options?.headers,
+    };
+
+    const resp = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: options?.signal,
+    });
+
+    if (!resp.ok) {
+      return this.handleError(resp);
+    }
+
+    return await resp.json() as GetMultiSectorCostShockResponse;
   }
 
   async getSectorDependency(req: GetSectorDependencyRequest, options?: SupplyChainServiceCallOptions): Promise<GetSectorDependencyResponse> {

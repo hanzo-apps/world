@@ -229,6 +229,62 @@ export interface GetCountryCostShockResponse {
   fetchedAt: string;
 }
 
+export interface GetCountryProductsRequest {
+  iso2: string;
+}
+
+export interface GetCountryProductsResponse {
+  iso2: string;
+  products: CountryProduct[];
+  fetchedAt: string;
+}
+
+export interface CountryProduct {
+  hs4: string;
+  description: string;
+  totalValue: number;
+  topExporters: ProductExporter[];
+  year: number;
+}
+
+export interface ProductExporter {
+  partnerCode: number;
+  partnerIso2: string;
+  value: number;
+  share: number;
+}
+
+export interface GetMultiSectorCostShockRequest {
+  iso2: string;
+  chokepointId: string;
+  closureDays: number;
+}
+
+export interface GetMultiSectorCostShockResponse {
+  iso2: string;
+  chokepointId: string;
+  closureDays: number;
+  warRiskTier: WarRiskTier;
+  sectors: MultiSectorCostShock[];
+  totalAddedCost: number;
+  fetchedAt: string;
+  unavailableReason: string;
+}
+
+export interface MultiSectorCostShock {
+  hs2: string;
+  hs2Label: string;
+  importValueAnnual: number;
+  freightAddedPctPerTon: number;
+  warRiskPremiumBps: number;
+  addedTransitDays: number;
+  totalCostShockPerDay: number;
+  totalCostShock30Days: number;
+  totalCostShock90Days: number;
+  totalCostShock: number;
+  closureDays: number;
+}
+
 export interface GetSectorDependencyRequest {
   iso2: string;
   hs2: string;
@@ -385,6 +441,8 @@ export interface SupplyChainServiceHandler {
   getCountryChokepointIndex(ctx: ServerContext, req: GetCountryChokepointIndexRequest): Promise<GetCountryChokepointIndexResponse>;
   getBypassOptions(ctx: ServerContext, req: GetBypassOptionsRequest): Promise<GetBypassOptionsResponse>;
   getCountryCostShock(ctx: ServerContext, req: GetCountryCostShockRequest): Promise<GetCountryCostShockResponse>;
+  getCountryProducts(ctx: ServerContext, req: GetCountryProductsRequest): Promise<GetCountryProductsResponse>;
+  getMultiSectorCostShock(ctx: ServerContext, req: GetMultiSectorCostShockRequest): Promise<GetMultiSectorCostShockResponse>;
   getSectorDependency(ctx: ServerContext, req: GetSectorDependencyRequest): Promise<GetSectorDependencyResponse>;
   getRouteExplorerLane(ctx: ServerContext, req: GetRouteExplorerLaneRequest): Promise<GetRouteExplorerLaneResponse>;
   getRouteImpact(ctx: ServerContext, req: GetRouteImpactRequest): Promise<GetRouteImpactResponse>;
@@ -715,6 +773,102 @@ export function createSupplyChainServiceRoutes(
 
           const result = await handler.getCountryCostShock(ctx, body);
           return new Response(JSON.stringify(result as GetCountryCostShockResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/supply-chain/v1/get-country-products",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: GetCountryProductsRequest = {
+            iso2: params.get("iso2") ?? "",
+          };
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getCountryProducts", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getCountryProducts(ctx, body);
+          return new Response(JSON.stringify(result as GetCountryProductsResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (err: unknown) {
+          if (err instanceof ValidationError) {
+            return new Response(JSON.stringify({ violations: err.violations }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (options?.onError) {
+            return options.onError(err, req);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          return new Response(JSON.stringify({ message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/supply-chain/v1/get-multi-sector-cost-shock",
+      handler: async (req: Request): Promise<Response> => {
+        try {
+          const pathParams: Record<string, string> = {};
+          const url = new URL(req.url, "http://localhost");
+          const params = url.searchParams;
+          const body: GetMultiSectorCostShockRequest = {
+            iso2: params.get("iso2") ?? "",
+            chokepointId: params.get("chokepointId") ?? "",
+            closureDays: Number(params.get("closureDays") ?? "0"),
+          };
+          if (options?.validateRequest) {
+            const bodyViolations = options.validateRequest("getMultiSectorCostShock", body);
+            if (bodyViolations) {
+              throw new ValidationError(bodyViolations);
+            }
+          }
+
+          const ctx: ServerContext = {
+            request: req,
+            pathParams,
+            headers: Object.fromEntries(req.headers.entries()),
+          };
+
+          const result = await handler.getMultiSectorCostShock(ctx, body);
+          return new Response(JSON.stringify(result as GetMultiSectorCostShockResponse), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
