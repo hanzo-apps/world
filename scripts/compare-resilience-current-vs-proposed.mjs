@@ -275,6 +275,25 @@ const EXTRACTION_RULES = {
   gasStorageStress: { type: 'gas-storage-field', field: 'fillPct' },
   energyPriceStress: { type: 'not-implemented', reason: 'Scorer input is a global mean across commodity price changes; no per-country variance' },
   electricityConsumption: { type: 'static-wb-infrastructure', code: 'EG.USE.ELEC.KH.PC' },
+  // PR 1 v2 energy indicators — `tier: 'experimental'` until seeders
+  // land. The extractor reads the same bulk-payload shape the scorer
+  // reads: { countries: { [ISO2]: { value, year } } }. When seed is
+  // absent the pairedSampleSize drops to 0 and Pearson returns 0,
+  // surfacing the "no influence yet" state in the harness output.
+  // importedFossilDependence is a SCORER-LEVEL COMPOSITE, not a direct
+  // seed-key read: scoreEnergyV2 computes
+  //   fossilElectricityShare × max(netImports, 0) / 100
+  // where netImports is staticRecord.iea.energyImportDependency.value.
+  // Measuring only fossilShare underreports effective influence for
+  // net importers (whose composite is modulated by netImports) and
+  // zeros out the signal entirely for net exporters. The extractor
+  // therefore has to recompute the same composite; the shape family
+  // below reads BOTH inputs per country and applies the same math.
+  importedFossilDependence: { type: 'imported-fossil-dependence-composite' },
+  lowCarbonGenerationShare: { type: 'bulk-v1-country-value', key: 'resilience:low-carbon-generation:v1' },
+  powerLossesPct: { type: 'bulk-v1-country-value', key: 'resilience:power-losses:v1' },
+  // reserveMarginPct deferred per plan §3.1 — no seeder, no registry
+  // entry. Add here when the IEA electricity-balance seeder lands.
 
   // ── governanceInstitutional (all 6 WGI sub-pillars) ─────────────────
   wgiVoiceAccountability: { type: 'static-wgi', code: 'VA.EST' },
@@ -426,6 +445,32 @@ const SIMPLE_EXTRACTORS = {
     const direct = sanctionsCounts?.[countryCode];
     return typeof direct === 'number' ? direct : null;
   },
+  // Shape: { countries: { [ISO2]: { value, year } } }. Used by the
+  // PR 1 v2 energy seeders. The key is specified per-rule so the
+  // dispatcher can route multiple bulk-v1 payloads through one
+  // extractor.
+  'bulk-v1-country-value': (rule, { bulkV1 }, countryCode) => {
+    const payload = bulkV1?.[rule.key];
+    const entry = payload?.countries?.[countryCode];
+    return typeof entry?.value === 'number' ? entry.value : null;
+  },
+  // Mirrors scoreEnergyV2's `importedFossilDependence` composite:
+  //   fossilElectricityShare × max(netImports, 0) / 100
+  // fossilElectricityShare lives in the PR 1 bulk key; netImports
+  // reuses the legacy resilience:static.iea.energyImportDependency.value
+  // (EG.IMP.CONS.ZS) that the static seeder already publishes. This
+  // extractor MUST stay in lockstep with the scorer — drift between
+  // the two breaks gate-9's effective-influence interpretation.
+  'imported-fossil-dependence-composite': (_rule, { staticRecord, bulkV1 }, countryCode) => {
+    const fossilPayload = bulkV1?.['resilience:fossil-electricity-share:v1'];
+    const fossilEntry = fossilPayload?.countries?.[countryCode];
+    const fossilShare = typeof fossilEntry?.value === 'number' ? fossilEntry.value : null;
+    const netImports = typeof staticRecord?.iea?.energyImportDependency?.value === 'number'
+      ? staticRecord.iea.energyImportDependency.value
+      : null;
+    if (fossilShare == null || netImports == null) return null;
+    return fossilShare * Math.max(netImports, 0) / 100;
+  },
 };
 
 // Aggregator extractors wire through exported scorer helpers so the
@@ -512,12 +557,24 @@ async function readExtractionSources(countryCode, reader) {
   // the same resolver so the harness pulls the same payload the scorer
   // would at the moment of execution.
   const currentYear = new Date().getFullYear();
+  // PR 1 v2 energy bulk keys. Fetched once per country (the memoized
+  // reader de-dupes; these bulk payloads aren't country-scoped in the
+  // key, so all 220 country iterations share one fetch per key.)
+  const BULK_V1_KEYS = [
+    'resilience:fossil-electricity-share:v1',
+    'resilience:low-carbon-generation:v1',
+    'resilience:power-losses:v1',
+    // resilience:reserve-margin:v1 intentionally omitted — no seeder,
+    // no registry entry, per plan §3.1 deferral. Add when the IEA
+    // electricity-balance seeder lands.
+  ];
   const [
     staticRecord, energyMix, gasStorage, fiscalSpace, reserveAdequacy,
     externalDebt, importHhi, fuelStocks, imfMacro, imfLabor,
     nationalDebt, sanctionsCounts,
     cyber, outages, gps, ucdp, unrest, newsThreat, displacement,
     socialVelocity, tradeRestrictions, tradeBarriers,
+    ...bulkV1Payloads
   ] = await Promise.all([
     reader(`resilience:static:${countryCode}`),
     reader(`energy:mix:v1:${countryCode}`),
@@ -541,13 +598,16 @@ async function readExtractionSources(countryCode, reader) {
     reader('intelligence:social:reddit:v1'),
     reader('trade:restrictions:v1:tariff-overview:50'),
     reader('trade:barriers:v1:tariff-gap:50'),
+    ...BULK_V1_KEYS.map((k) => reader(k)),
   ]);
+  const bulkV1 = Object.fromEntries(BULK_V1_KEYS.map((k, i) => [k, bulkV1Payloads[i]]));
   return {
     staticRecord, energyMix, gasStorage, fiscalSpace, reserveAdequacy,
     externalDebt, importHhi, fuelStocks, imfMacro, imfLabor,
     nationalDebt, sanctionsCounts,
     cyber, outages, gps, ucdp, unrest, newsThreat, displacement,
     socialVelocity, tradeRestrictions, tradeBarriers,
+    bulkV1,
   };
 }
 
@@ -1123,6 +1183,114 @@ async function main() {
     };
   }
 
+  // Acceptance-gate verdict per plan §6. Computed programmatically
+  // from the inputs above so every scorer-changing PR has a
+  // machine-readable pass/fail on every gate. Gate numbering matches
+  // the plan sections literally — do NOT reorder without updating the
+  // plan.
+  //
+  // Thresholds are encoded here (not tunable per-PR) so gate criteria
+  // can't silently soften. Any adjustment requires a PR touching this
+  // file + the plan doc in the same commit.
+  const GATE_THRESHOLDS = {
+    SPEARMAN_VS_BASELINE_MIN: 0.85,
+    MAX_COUNTRY_ABS_DELTA_MAX: 15,
+    COHORT_MEDIAN_SHIFT_MAX: 10,
+  };
+  const gates = [];
+  const addGate = (id, name, status, detail) => {
+    gates.push({ id, name, status, detail });
+  };
+
+  // Gate 1: Spearman vs immediate-prior baseline >= 0.85.
+  if (baselineComparison.status === 'ok') {
+    const s = baselineComparison.spearmanVsBaseline;
+    addGate('gate-1-spearman', 'Spearman vs baseline >= 0.85',
+      s >= GATE_THRESHOLDS.SPEARMAN_VS_BASELINE_MIN ? 'pass' : 'fail',
+      `${s} (floor ${GATE_THRESHOLDS.SPEARMAN_VS_BASELINE_MIN})`);
+  } else {
+    addGate('gate-1-spearman', 'Spearman vs baseline >= 0.85', 'skipped',
+      'baseline unavailable; re-run after PR 0 freeze ships');
+  }
+
+  // Gate 2: No country's overallScore changes by more than 15 points
+  // from the immediate-prior baseline.
+  if (baselineComparison.status === 'ok') {
+    const drift = baselineComparison.maxCountryAbsDelta;
+    addGate('gate-2-country-drift', 'Max country drift vs baseline <= 15 points',
+      drift <= GATE_THRESHOLDS.MAX_COUNTRY_ABS_DELTA_MAX ? 'pass' : 'fail',
+      `${drift}pt (ceiling ${GATE_THRESHOLDS.MAX_COUNTRY_ABS_DELTA_MAX})`);
+  } else {
+    addGate('gate-2-country-drift', 'Max country drift vs baseline <= 15 points', 'skipped',
+      'baseline unavailable');
+  }
+
+  // Gate 6: Cohort median shift vs baseline capped at 10 points.
+  if (baselineComparison.status === 'ok') {
+    const worstCohort = (baselineComparison.cohortShiftVsBaseline ?? [])
+      .filter((c) => !c.skipped && typeof c.medianScoreDeltaVsBaseline === 'number')
+      .reduce((worst, c) => {
+        const abs = Math.abs(c.medianScoreDeltaVsBaseline);
+        return abs > Math.abs(worst?.medianScoreDeltaVsBaseline ?? 0) ? c : worst;
+      }, null);
+    if (worstCohort) {
+      const shift = Math.abs(worstCohort.medianScoreDeltaVsBaseline);
+      addGate('gate-6-cohort-median', 'Cohort median shift vs baseline <= 10 points',
+        shift <= GATE_THRESHOLDS.COHORT_MEDIAN_SHIFT_MAX ? 'pass' : 'fail',
+        `worst: ${worstCohort.cohortId} ${worstCohort.medianScoreDeltaVsBaseline}pt (ceiling ${GATE_THRESHOLDS.COHORT_MEDIAN_SHIFT_MAX})`);
+    } else {
+      addGate('gate-6-cohort-median', 'Cohort median shift vs baseline <= 10 points', 'skipped',
+        'no cohort has baseline overlap');
+    }
+  } else {
+    addGate('gate-6-cohort-median', 'Cohort median shift vs baseline <= 10 points', 'skipped',
+      'baseline unavailable');
+  }
+
+  // Gate 7: Matched-pair within-pair gap signs verified. Any pair
+  // flipping direction or falling below minGap stops the PR.
+  addGate('gate-7-matched-pair', 'Matched-pair within-pair gaps hold expected direction',
+    matchedPairFailures.length === 0 ? 'pass' : 'fail',
+    matchedPairFailures.length === 0
+      ? `${matchedPairSummary.filter((p) => !p.skipped).length}/${matchedPairSummary.filter((p) => !p.skipped).length} pairs pass`
+      : `${matchedPairFailures.length} pair(s) failed: ${matchedPairFailures.map((p) => p.pairId).join(', ')}`);
+
+  // Gate 9: Per-indicator effective-influence baseline present. Sign-
+  // and rank-order correctness against nominal weights is a post-hoc
+  // human-review check; this gate asserts the MEASUREMENT exists,
+  // which is the diagnostic-apparatus pre-requisite from PR 0.
+  addGate('gate-9-effective-influence-baseline',
+    'Per-indicator effective-influence baseline exists (>= 80% of Core implemented)',
+    extractionCoverage.coreTotal > 0 && (extractionCoverage.coreImplemented / extractionCoverage.coreTotal) >= 0.80
+      ? 'pass' : 'fail',
+    `${extractionCoverage.coreImplemented}/${extractionCoverage.coreTotal} Core indicators measurable`);
+
+  // Gate: cohort/pair membership present in scorable universe (not
+  // numbered in plan §6 but is the PR 0 fail-loud addition — if any
+  // cohort/pair endpoint falls out of listScorableCountries, every
+  // other gate is being computed over a silently-partial universe).
+  addGate('gate-universe-integrity', 'All cohort/pair endpoints are in the scorable universe',
+    cohortMissingFromScorable.length === 0 ? 'pass' : 'fail',
+    cohortMissingFromScorable.length === 0
+      ? `${cohortOrPairMembers.size} endpoints verified`
+      : `missing from scorable: ${cohortMissingFromScorable.join(', ')}`);
+
+  const acceptanceGates = {
+    thresholds: GATE_THRESHOLDS,
+    results: gates,
+    summary: {
+      total: gates.length,
+      pass: gates.filter((g) => g.status === 'pass').length,
+      fail: gates.filter((g) => g.status === 'fail').length,
+      skipped: gates.filter((g) => g.status === 'skipped').length,
+    },
+    verdict: gates.some((g) => g.status === 'fail')
+      ? 'BLOCK' // any fail halts the PR per plan §6
+      : gates.some((g) => g.status === 'skipped')
+        ? 'CONDITIONAL' // skipped gates need the missing inputs before final merge
+        : 'PASS',
+  };
+
   const output = {
     comparison: 'currentDomainAggregate_vs_proposedPillarCombined',
     penaltyAlpha: PENALTY_ALPHA,
@@ -1144,7 +1312,9 @@ async function main() {
       meanAbsScoreDelta: Math.round(meanAbsScoreDelta * 100) / 100,
       maxRankAbsDelta,
       matchedPairFailures: matchedPairFailures.length,
+      acceptanceVerdict: acceptanceGates.verdict,
     },
+    acceptanceGates,
     baselineComparison,
     cohortSummary,
     matchedPairSummary,

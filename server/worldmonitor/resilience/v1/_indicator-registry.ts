@@ -455,6 +455,67 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     license: 'open-data',
   },
 
+  // ── PR 1 energy-construct v2 (tier='experimental' until RESILIENCE_ENERGY_V2_ENABLED ──
+  // flips default-on and seeders land). Indicators are registered so
+  // the per-indicator harness in scripts/compare-resilience-current-vs-
+  // proposed.mjs can begin tracking them, but the 'experimental' tier
+  // keeps them OUT of the Core coverage gate (>=180 countries required
+  // per Phase 2 A4) until seed coverage is confirmed at flag-flip.
+  {
+    id: 'importedFossilDependence',
+    dimension: 'energy',
+    description: 'Composite: fossil share of electricity (EG.ELC.FOSL.ZS) × max(net energy imports % of primary energy use, 0) / 100. Lower is better. Replaces gasShare + coalShare + dependency under the Option B (power-system security) framing.',
+    direction: 'lowerBetter',
+    goalposts: { worst: 100, best: 0 },
+    weight: 0.35,
+    sourceKey: 'resilience:fossil-electricity-share:v1',
+    scope: 'global',
+    cadence: 'annual',
+    imputation: { type: 'conservative', score: 50, certainty: 0.3 },
+    tier: 'experimental',
+    coverage: 190,
+    license: 'open-data',
+  },
+  {
+    id: 'lowCarbonGenerationShare',
+    dimension: 'energy',
+    description: 'Nuclear + renewable share of electricity generation (EG.ELC.NUCL.ZS + EG.ELC.RNEW.ZS). Absorbs the legacy renewShare and adds nuclear credit.',
+    direction: 'higherBetter',
+    goalposts: { worst: 0, best: 80 },
+    weight: 0.2,
+    sourceKey: 'resilience:low-carbon-generation:v1',
+    scope: 'global',
+    cadence: 'annual',
+    imputation: { type: 'conservative', score: 30, certainty: 0.3 },
+    tier: 'experimental',
+    coverage: 190,
+    license: 'open-data',
+  },
+  {
+    id: 'powerLossesPct',
+    dimension: 'energy',
+    description: 'Electric power transmission + distribution losses (World Bank EG.ELC.LOSS.ZS). Direct grid-integrity measure. Weight is 0.20 in PR 1 — it temporarily absorbs the deferred reserveMarginPct slot (plan §3.1 open-question); when the IEA electricity-balance seeder lands, split 0.10 back out and restore reserveMarginPct at 0.10. Keep this field in lockstep with scoreEnergyV2 in _dimension-scorers.ts, because the PR 0 compare harness copies spec.weight into nominalWeight for gate-9 reporting.',
+    direction: 'lowerBetter',
+    goalposts: { worst: 25, best: 3 },
+    weight: 0.2,
+    sourceKey: 'resilience:power-losses:v1',
+    scope: 'global',
+    cadence: 'annual',
+    imputation: { type: 'conservative', score: 50, certainty: 0.3 },
+    tier: 'experimental',
+    coverage: 188,
+    license: 'open-data',
+  },
+  // reserveMarginPct is DEFERRED per plan §3.1 open-question: IEA
+  // electricity-balance data is sparse outside OECD+G20 and the
+  // indicator will likely ship as tier='unmonitored' with weight 0.05
+  // if it lands at all. Registering the indicator before a seeder
+  // exists would orphan its sourceKey in the seed-meta coverage
+  // test. The v2 scorer still READS from resilience:reserve-margin:v1
+  // (key reserved in _dimension-scorers.ts) so the scorer shape
+  // stays stable for the commit that provides data. Add the registry
+  // entry in that follow-up commit.
+
   // ── governanceInstitutional (6 sub-metrics, equal weight) ─────────────────
   {
     id: 'wgiVoiceAccountability',
