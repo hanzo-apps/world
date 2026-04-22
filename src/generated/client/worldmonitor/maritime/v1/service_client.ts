@@ -7,6 +7,7 @@ export interface GetVesselSnapshotRequest {
   neLon: number;
   swLat: number;
   swLon: number;
+  includeCandidates: boolean;
 }
 
 export interface GetVesselSnapshotResponse {
@@ -17,6 +18,9 @@ export interface VesselSnapshot {
   snapshotAt: number;
   densityZones: AisDensityZone[];
   disruptions: AisDisruption[];
+  sequence: number;
+  status?: AisSnapshotStatus;
+  candidateReports: SnapshotCandidateReport[];
 }
 
 export interface AisDensityZone {
@@ -46,6 +50,24 @@ export interface AisDisruption {
   vesselCount: number;
   region: string;
   description: string;
+}
+
+export interface AisSnapshotStatus {
+  connected: boolean;
+  vessels: number;
+  messages: number;
+}
+
+export interface SnapshotCandidateReport {
+  mmsi: string;
+  name: string;
+  lat: number;
+  lon: number;
+  shipType: number;
+  heading: number;
+  speed: number;
+  course: number;
+  timestamp: number;
 }
 
 export interface ListNavigationalWarningsRequest {
@@ -134,6 +156,7 @@ export class MaritimeServiceClient {
     if (req.neLon != null && req.neLon !== 0) params.set("ne_lon", String(req.neLon));
     if (req.swLat != null && req.swLat !== 0) params.set("sw_lat", String(req.swLat));
     if (req.swLon != null && req.swLon !== 0) params.set("sw_lon", String(req.swLon));
+    if (req.includeCandidates) params.set("include_candidates", String(req.includeCandidates));
     const url = this.baseURL + path + (params.toString() ? "?" + params.toString() : "");
 
     const headers: Record<string, string> = {

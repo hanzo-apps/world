@@ -17,9 +17,23 @@ All notable changes to World Monitor are documented here.
 - PortWatch, CorridorRisk, and transit seed loops on Railway relay (#1560)
 - R2 trace storage for forecast debugging with Cloudflare API upload (#1655)
 
+### Changed
+
+- **Sebuf API migration (#3207)** — scenario + supply-chain endpoints migrated to the typed sebuf contract. RPC URLs now derive from method names; the five renamed v1 URLs remain live as thin aliases so existing integrations keep working:
+  - `/api/scenario/v1/run` → `/api/scenario/v1/run-scenario`
+  - `/api/scenario/v1/status` → `/api/scenario/v1/get-scenario-status`
+  - `/api/scenario/v1/templates` → `/api/scenario/v1/list-scenario-templates`
+  - `/api/supply-chain/v1/country-products` → `/api/supply-chain/v1/get-country-products`
+  - `/api/supply-chain/v1/multi-sector-cost-shock` → `/api/supply-chain/v1/get-multi-sector-cost-shock`
+
+  Aliases will retire at the next v1→v2 break ([#3282](https://github.com/koala73/worldmonitor/issues/3282)).
+
+- `POST /api/scenario/v1/run-scenario` now returns `200 OK` instead of the pre-migration `202 Accepted` on successful enqueue. sebuf's HTTP annotations don't support per-RPC status codes. Branch on response body `status === "pending"` instead of `response.status === 202`. `statusUrl` is preserved.
+
 ### Security
 
 - CDN-Cache-Control header now only set for trusted origins (worldmonitor.app, Vercel previews, Tauri); no-origin server-side requests always reach the edge function so `validateApiKey` can run, closing a potential cache-bypass path for external scrapers
+- **Shipping v2 webhook tenant isolation (#3242)** — `POST /api/v2/shipping/webhooks` (register) and `GET /api/v2/shipping/webhooks` (list) now enforce `validateApiKey(req, { forceKey: true })`, matching the sibling `[subscriberId]{,/[action]}` routes and the documented contract in `docs/api-shipping-v2.mdx`. Without this gate, a Clerk-authenticated pro user with no API key would fall through `callerFingerprint()` to the shared `'anon'` bucket and see/overwrite webhooks owned by other `'anon'`-bucket tenants.
 
 ### Fixed
 

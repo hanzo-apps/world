@@ -218,9 +218,17 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/supply-chain/v1/get-country-chokepoint-index': 'slow-browser',
   '/api/supply-chain/v1/get-bypass-options': 'slow-browser',
   '/api/supply-chain/v1/get-country-cost-shock': 'slow-browser',
+  '/api/supply-chain/v1/get-country-products': 'slow-browser',
+  '/api/supply-chain/v1/get-multi-sector-cost-shock': 'slow-browser',
   '/api/supply-chain/v1/get-sector-dependency': 'slow-browser',
   '/api/supply-chain/v1/get-route-explorer-lane': 'slow-browser',
   '/api/supply-chain/v1/get-route-impact': 'slow-browser',
+  // Scenario engine: list-scenario-templates is a compile-time constant catalog;
+  // daily tier gives browser max-age=3600 matching the legacy /api/scenario/v1/templates
+  // endpoint header. get-scenario-status is premium-gated — gateway short-circuits
+  // to 'slow-browser' but the entry is still required by tests/route-cache-tier.test.mjs.
+  '/api/scenario/v1/list-scenario-templates': 'daily',
+  '/api/scenario/v1/get-scenario-status': 'slow-browser',
   '/api/health/v1/list-disease-outbreaks': 'slow',
   '/api/health/v1/list-air-quality-alerts': 'fast',
   '/api/intelligence/v1/get-social-velocity': 'fast',
@@ -241,6 +249,13 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/intelligence/v1/get-regional-brief': 'slow',
   '/api/resilience/v1/get-resilience-score': 'slow',
   '/api/resilience/v1/get-resilience-ranking': 'slow',
+
+  // Partner-facing shipping/v2. route-intelligence is premium-gated; gateway
+  // short-circuits to slow-browser. Entry required by tests/route-cache-tier.test.mjs.
+  '/api/v2/shipping/route-intelligence': 'slow-browser',
+  // GET /webhooks lists caller's webhooks — premium-gated; short-circuited to
+  // slow-browser. Entry required by tests/route-cache-tier.test.mjs.
+  '/api/v2/shipping/webhooks': 'slow-browser',
 };
 
 import { PREMIUM_RPC_PATHS } from '../src/shared/premium-paths';

@@ -7,6 +7,7 @@ import type {
   AisDisruption,
   AisDisruptionType,
   AisDisruptionSeverity,
+  SnapshotCandidateReport,
 } from '../../../../src/generated/server/worldmonitor/maritime/v1/service_server';
 
 import { getRelayBaseUrl, getRelayHeaders } from '../../../_shared/relay';
@@ -26,44 +27,73 @@ const SEVERITY_MAP: Record<string, AisDisruptionSeverity> = {
   high: 'AIS_DISRUPTION_SEVERITY_HIGH',
 };
 
-// In-memory cache (matches old /api/ais-snapshot behavior)
+// Cache the two variants separately — candidate reports materially change
+// payload size, and clients with no position callbacks should not have to
+// wait on or pay for the heavier payload.
 const SNAPSHOT_CACHE_TTL_MS = 300_000; // 5 min -- matches client poll interval
-let cachedSnapshot: VesselSnapshot | undefined;
-let cacheTimestamp = 0;
-let inFlightRequest: Promise<VesselSnapshot | undefined> | null = null;
 
-async function fetchVesselSnapshot(): Promise<VesselSnapshot | undefined> {
-  // Return cached if fresh
+interface SnapshotCacheSlot {
+  snapshot: VesselSnapshot | undefined;
+  timestamp: number;
+  inFlight: Promise<VesselSnapshot | undefined> | null;
+}
+
+const cache: Record<'with' | 'without', SnapshotCacheSlot> = {
+  with: { snapshot: undefined, timestamp: 0, inFlight: null },
+  without: { snapshot: undefined, timestamp: 0, inFlight: null },
+};
+
+async function fetchVesselSnapshot(includeCandidates: boolean): Promise<VesselSnapshot | undefined> {
+  const slot = cache[includeCandidates ? 'with' : 'without'];
   const now = Date.now();
-  if (cachedSnapshot && (now - cacheTimestamp) < SNAPSHOT_CACHE_TTL_MS) {
-    return cachedSnapshot;
+  if (slot.snapshot && (now - slot.timestamp) < SNAPSHOT_CACHE_TTL_MS) {
+    return slot.snapshot;
   }
 
-  // In-flight dedup: if a request is already running, await it
-  if (inFlightRequest) {
-    return inFlightRequest;
+  if (slot.inFlight) {
+    return slot.inFlight;
   }
 
-  inFlightRequest = fetchVesselSnapshotFromRelay();
+  slot.inFlight = fetchVesselSnapshotFromRelay(includeCandidates);
   try {
-    const result = await inFlightRequest;
+    const result = await slot.inFlight;
     if (result) {
-      cachedSnapshot = result;
-      cacheTimestamp = Date.now();
+      slot.snapshot = result;
+      slot.timestamp = Date.now();
     }
-    return result ?? cachedSnapshot; // serve stale on relay failure
+    return result ?? slot.snapshot; // serve stale on relay failure
   } finally {
-    inFlightRequest = null;
+    slot.inFlight = null;
   }
 }
 
-async function fetchVesselSnapshotFromRelay(): Promise<VesselSnapshot | undefined> {
+function toCandidateReport(raw: any): SnapshotCandidateReport | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const mmsi = String(raw.mmsi ?? '');
+  if (!mmsi) return null;
+  const lat = Number(raw.lat);
+  const lon = Number(raw.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return {
+    mmsi,
+    name: String(raw.name ?? ''),
+    lat,
+    lon,
+    shipType: Number.isFinite(Number(raw.shipType)) ? Number(raw.shipType) : 0,
+    heading: Number.isFinite(Number(raw.heading)) ? Number(raw.heading) : 0,
+    speed: Number.isFinite(Number(raw.speed)) ? Number(raw.speed) : 0,
+    course: Number.isFinite(Number(raw.course)) ? Number(raw.course) : 0,
+    timestamp: Number.isFinite(Number(raw.timestamp)) ? Number(raw.timestamp) : Date.now(),
+  };
+}
+
+async function fetchVesselSnapshotFromRelay(includeCandidates: boolean): Promise<VesselSnapshot | undefined> {
   try {
     const relayBaseUrl = getRelayBaseUrl();
     if (!relayBaseUrl) return undefined;
 
     const response = await fetch(
-      `${relayBaseUrl}/ais/snapshot?candidates=false`,
+      `${relayBaseUrl}/ais/snapshot?candidates=${includeCandidates ? 'true' : 'false'}`,
       {
         headers: getRelayHeaders(),
         signal: AbortSignal.timeout(10000),
@@ -107,10 +137,22 @@ async function fetchVesselSnapshotFromRelay(): Promise<VesselSnapshot | undefine
       description: String(d.description || ''),
     }));
 
+    const rawStatus = (data.status && typeof data.status === 'object') ? data.status : {};
+    const candidateReports = (includeCandidates && Array.isArray(data.candidateReports))
+      ? data.candidateReports.map(toCandidateReport).filter((r: SnapshotCandidateReport | null): r is SnapshotCandidateReport => r !== null)
+      : [];
+
     return {
       snapshotAt: Date.now(),
       densityZones,
       disruptions,
+      sequence: Number.isFinite(Number(data.sequence)) ? Number(data.sequence) : 0,
+      status: {
+        connected: Boolean(rawStatus.connected),
+        vessels: Number.isFinite(Number(rawStatus.vessels)) ? Number(rawStatus.vessels) : 0,
+        messages: Number.isFinite(Number(rawStatus.messages)) ? Number(rawStatus.messages) : 0,
+      },
+      candidateReports,
     };
   } catch {
     return undefined;
@@ -123,10 +165,10 @@ async function fetchVesselSnapshotFromRelay(): Promise<VesselSnapshot | undefine
 
 export async function getVesselSnapshot(
   _ctx: ServerContext,
-  _req: GetVesselSnapshotRequest,
+  req: GetVesselSnapshotRequest,
 ): Promise<GetVesselSnapshotResponse> {
   try {
-    const snapshot = await fetchVesselSnapshot();
+    const snapshot = await fetchVesselSnapshot(Boolean(req.includeCandidates));
     return { snapshot };
   } catch {
     return { snapshot: undefined };

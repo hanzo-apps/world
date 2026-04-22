@@ -112,6 +112,6 @@ No `referrals` count or `rewardMonths` is returned today — Dodo's `affonso_ref
 
 ## Waitlist
 
-### `POST /api/register-interest`
+### `POST /api/leads/v1/register-interest`
 
-Captures an email into the Convex waitlist table. Turnstile-verified, rate-limited per IP. See [Platform endpoints](/api-platform) for the request shape.
+Captures an email into the Convex waitlist table. Turnstile-verified (desktop sources bypass), rate-limited per IP. Part of `LeadsService`; see [Platform endpoints](/api-platform) for the request shape.

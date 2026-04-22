@@ -812,8 +812,8 @@ describe('military flights bbox behavior', { concurrency: 1 }, () => {
       const result = await module.listMilitaryFlights({}, request);
       assert.deepEqual(
         result.flights.map((flight) => flight.id),
-        ['in-bounds'],
-        'response should not include out-of-viewport flights',
+        ['IN-BOUNDS'],
+        'response should not include out-of-viewport flights (hex_code canonical form is uppercase)',
       );
 
       assert.equal(fetchUrls.length, 1);
