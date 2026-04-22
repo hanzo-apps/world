@@ -28,6 +28,7 @@ import {
 } from './checkout-errors';
 import { showCheckoutErrorToast } from './checkout-error-toast';
 import { decideNoUserPathOutcome } from './checkout-no-user-policy';
+import { shouldSkipSentryForAction } from './checkout-sentry-policy';
 import { isEntitled, onEntitlementChange } from './entitlements';
 import {
   CLASSIC_AUTO_DISMISS_MS,
@@ -694,10 +695,12 @@ function reportCheckoutError(
       serverMessage: error.serverMessage,
     },
   };
-  if (caught) {
-    Sentry.captureException(caught, payload);
-  } else {
-    Sentry.captureMessage(`Checkout error: ${error.code}`, payload);
+  if (!shouldSkipSentryForAction(context.action)) {
+    if (caught) {
+      Sentry.captureException(caught, payload);
+    } else {
+      Sentry.captureMessage(`Checkout error: ${error.code}`, payload);
+    }
   }
   const logger = level === 'info' ? console.info : console.error;
   logger(
