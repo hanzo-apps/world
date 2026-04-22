@@ -65,6 +65,7 @@ import {
   DisasterCorrelationPanel,
   DefensePatentsPanel,
   HormuzPanel,
+  ChokepointStripPanel,
   MacroTilesPanel,
   FSIPanel,
   YieldCurvePanel,
@@ -463,6 +464,15 @@ export class PanelLayoutManager implements AppModule {
               <span class="variant-label">${t('header.commodity')}</span>
             </a>
             <span class="variant-divider"></span>
+            <a href="${vHref('energy', 'https://energy.worldmonitor.app')}"
+               class="variant-option ${SITE_VARIANT === 'energy' ? 'active' : ''}"
+               data-variant="energy"
+               ${vTarget('energy')}
+               title="${t('header.energy')}${SITE_VARIANT === 'energy' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">⚡</span>
+              <span class="variant-label">${t('header.energy')}</span>
+            </a>
+            <span class="variant-divider"></span>
             <a href="${vHref('happy', 'https://happy.worldmonitor.app')}"
                class="variant-option ${SITE_VARIANT === 'happy' ? 'active' : ''}"
                data-variant="happy"
@@ -528,6 +538,7 @@ export class PanelLayoutManager implements AppModule {
           { key: 'tech', icon: '💻', label: t('header.tech') },
           { key: 'finance', icon: '📈', label: t('header.finance') },
           { key: 'commodity', icon: '⛏️', label: t('header.commodity') },
+          { key: 'energy', icon: '⚡', label: t('header.energy') },
           { key: 'happy', icon: '☀️', label: 'Good News' },
         ];
         return variants.map(v =>
@@ -871,6 +882,7 @@ export class PanelLayoutManager implements AppModule {
     this.createPanel('energy-complex', () => new EnergyComplexPanel());
     this.createPanel('oil-inventories', () => new OilInventoriesPanel());
     this.createPanel('energy-crisis', () => new EnergyCrisisPanel());
+    this.createPanel('chokepoint-strip', () => new ChokepointStripPanel());
     this.createPanel('polymarket', () => new PredictionPanel());
 
     this.createNewsPanel('gov', 'panels.gov');
