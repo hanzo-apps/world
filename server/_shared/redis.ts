@@ -57,6 +57,44 @@ export async function getRawJson(key: string): Promise<unknown | null> {
   return unwrapEnvelope(JSON.parse(data.result)).data;
 }
 
+/**
+ * Read a key's value as a raw Upstash string — no JSON.parse, no envelope unwrap.
+ * Use when a seeder stores a bare scalar (e.g., a snapshot_id pointer) via
+ * `['SET', key, bareString]` without JSON.stringify. getCachedJson() on these
+ * keys silently returns null because JSON.parse throws on unquoted strings,
+ * and the try/catch swallows the error.
+ *
+ * Always uses the raw (unprefixed) key — matches the seed-script write path
+ * (seeders don't know about the Vercel env-prefix scheme).
+ */
+export async function getCachedRawString(key: string): Promise<string | null> {
+  if (process.env.LOCAL_API_MODE === 'tauri-sidecar') {
+    const { sidecarCacheGet } = await import('./sidecar-cache');
+    const v = sidecarCacheGet(key);
+    return typeof v === 'string' ? v : null;
+  }
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const resp = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(REDIS_OP_TIMEOUT_MS),
+    });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { result?: string | null };
+    return typeof data.result === 'string' && data.result.length > 0 ? data.result : null;
+  } catch (err) {
+    // AbortSignal.timeout() throws DOMException name='TimeoutError' (on V8
+    // runtimes incl. Vercel Edge); manual controller.abort() throws 'AbortError'.
+    // Match both so the [REDIS-TIMEOUT] structured log actually fires.
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    if (isTimeout) console.error(`[REDIS-TIMEOUT] getCachedRawString key=${key} timeoutMs=${REDIS_OP_TIMEOUT_MS}`);
+    else console.warn('[redis] getCachedRawString failed:', errMsg(err));
+    return null;
+  }
+}
+
 export async function getCachedJson(key: string, raw = false): Promise<unknown | null> {
   if (process.env.LOCAL_API_MODE === 'tauri-sidecar') {
     const { sidecarCacheGet } = await import('./sidecar-cache');
@@ -80,12 +118,16 @@ export async function getCachedJson(key: string, raw = false): Promise<unknown |
     // through unchanged (unwrapEnvelope returns {_seed: null, data: raw}).
     return unwrapEnvelope(JSON.parse(data.result)).data;
   } catch (err) {
-    // AbortError = timeout; structured + errored so log drains (e.g. Sentry via
-    // Vercel integration) pick it up. Large-payload timeouts used to silently
-    // return null and let downstream callers cache zero-state — see
-    // docs/plans/chokepoint-rpc-payload-split.md for the incident that added
-    // this tag.
-    const isTimeout = err instanceof Error && err.name === 'AbortError';
+    // Structured timeout log goes to Sentry via Vercel integration. Large-
+    // payload timeouts used to silently return null and let downstream callers
+    // cache zero-state — see docs/plans/chokepoint-rpc-payload-split.md for
+    // the incident that added this tag.
+    //
+    // AbortSignal.timeout() throws DOMException name='TimeoutError' (on V8
+    // runtimes incl. Vercel Edge); manual controller.abort() throws
+    // 'AbortError'. Checking only 'AbortError' meant the [REDIS-TIMEOUT] log
+    // never fired — every timeout fell through to the generic console.warn.
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
     if (isTimeout) {
       console.error(`[REDIS-TIMEOUT] getCachedJson key=${key} timeoutMs=${REDIS_OP_TIMEOUT_MS}`);
     } else {
