@@ -108,11 +108,49 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     license: 'non-commercial',
   },
 
-  // ── currencyExternal (3 sub-metrics, plus IMF inflation fallback for non-BIS) ─
+  // ── currencyExternal ─────────────────────────────────────────────────────
+  // PR 3 §3.5 point 3 rebalanced the dimension's core scoring:
+  //   - BIS-dependent signals (fxVolatility, fxDeviation) moved to
+  //     tier='experimental'. BIS EER covers ~64 economies, which is too
+  //     narrow for a world-ranking Core signal. They remain in the registry
+  //     for drill-down / enrichment panels but scoreCurrencyExternal no
+  //     longer reads them.
+  //   - Core scoring is now: inflationStability (IMF CPI, ~185 countries)
+  //     at weight 0.6, fxReservesAdequacy (WB FI.RES.TOTL.MO, ~188 countries)
+  //     at weight 0.4. Both are global-coverage, so every country gets the
+  //     same construct regardless of BIS membership.
+  {
+    id: 'inflationStability',
+    dimension: 'currencyExternal',
+    description: 'IMF CPI inflation (lower is better). Global-coverage primary signal for currency stability. Core input to scoreCurrencyExternal under PR 3 §3.5. A future PR may upgrade this to a 5-year inflation-volatility computation once the seeder tracks the series; headline inflation is a reasonable first-cut for stability ranking.',
+    direction: 'lowerBetter',
+    goalposts: { worst: 50, best: 0 },
+    weight: 0.6,
+    sourceKey: 'economic:imf:macro:v2',
+    scope: 'global',
+    cadence: 'annual',
+    tier: 'core',
+    coverage: 185,
+    license: 'open-data',
+  },
+  {
+    id: 'fxReservesAdequacy',
+    dimension: 'currencyExternal',
+    description: 'Total reserves in months of imports (World Bank FI.RES.TOTL.MO). Global-coverage core signal for currency stability; paired with inflationStability in scoreCurrencyExternal after PR 3 §3.5 rebalancing.',
+    direction: 'higherBetter',
+    goalposts: { worst: 1, best: 12 },
+    weight: 0.4,
+    sourceKey: 'resilience:static:*',
+    scope: 'global',
+    cadence: 'annual',
+    tier: 'core',
+    coverage: 188,
+    license: 'open-data',
+  },
   {
     id: 'fxVolatility',
     dimension: 'currencyExternal',
-    description: 'Annualized BIS real effective exchange rate volatility (std-dev of monthly changes * sqrt(12)). Fallback chain when BIS absent: (1) IMF inflation + WB reserves proxy, (2) IMF inflation alone, (3) reserves alone, (4) conservative imputation.',
+    description: 'Annualized BIS real effective exchange rate volatility (std-dev of monthly changes * sqrt(12)). Enrichment-only for the ~64 BIS-tracked economies after PR 3 §3.5 — NOT read by scoreCurrencyExternal. Available via drill-down panels only.',
     direction: 'lowerBetter',
     goalposts: { worst: 50, best: 0 },
     weight: 0.6,
@@ -120,17 +158,14 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     scope: 'curated',
     cadence: 'monthly',
     imputation: { type: 'conservative', score: 50, certainty: 0.3 },
-    // BIS REER is curated (~60 countries). Demoted to Enrichment by the
-    // Phase 2 A4 coverage gate; the IMF inflation + WB reserves fallback
-    // chain still feeds the Core fxReservesAdequacy signal globally.
-    tier: 'enrichment',
+    tier: 'experimental',
     coverage: 60,
     license: 'non-commercial',
   },
   {
     id: 'fxDeviation',
     dimension: 'currencyExternal',
-    description: 'Absolute deviation of latest BIS real EER from 100 (equilibrium index). Fallback chain when BIS absent: (1) IMF inflation + WB reserves proxy, (2) IMF inflation alone, (3) reserves alone, (4) conservative imputation.',
+    description: 'Absolute deviation of latest BIS real EER from 100 (equilibrium index). Enrichment-only for the ~64 BIS-tracked economies after PR 3 §3.5 — NOT read by scoreCurrencyExternal. Available via drill-down panels only.',
     direction: 'lowerBetter',
     goalposts: { worst: 35, best: 0 },
     weight: 0.25,
@@ -138,24 +173,9 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     scope: 'curated',
     cadence: 'monthly',
     imputation: { type: 'conservative', score: 50, certainty: 0.3 },
-    // BIS REER curated source, same coverage limitation as fxVolatility.
-    tier: 'enrichment',
+    tier: 'experimental',
     coverage: 60,
     license: 'non-commercial',
-  },
-  {
-    id: 'fxReservesAdequacy',
-    dimension: 'currencyExternal',
-    description: 'Total reserves in months of imports (World Bank FI.RES.TOTL.MO). Supplementary metric for BIS countries (weight 0.15), primary metric alongside IMF inflation for non-BIS countries (~160 countries).',
-    direction: 'higherBetter',
-    goalposts: { worst: 1, best: 12 },
-    weight: 0.15,
-    sourceKey: 'resilience:static:*',
-    scope: 'global',
-    cadence: 'annual',
-    tier: 'core',
-    coverage: 188,
-    license: 'open-data',
   },
 
   // ── tradeSanctions (4 sub-metrics) ────────────────────────────────────────
@@ -905,9 +925,16 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'recoveryDebtToReserves',
     dimension: 'externalDebtCoverage',
-    description: 'Short-term external debt to reserves ratio (World Bank DT.DOD.DSTC.CD / FI.RES.TOTL.CD); values above 1 signal reserve inadequacy for debt service',
+    description: 'Short-term external debt to reserves ratio (World Bank DT.DOD.DSTC.CD / FI.RES.TOTL.CD); Greenspan-Guidotti rule treats ratio≥1 as reserve inadequacy, ratio≥2 as acute rollover-shock exposure',
     direction: 'lowerBetter',
-    goalposts: { worst: 5, best: 0 },
+    // PR 3 §3.5 point 3: re-goalposted from (0..5) to (0..2). Old goalpost
+    // saturated at 100 across the full 9-country probe including stressed
+    // states. New anchor: ratio=1.0 (Greenspan-Guidotti reserve-adequacy
+    // threshold) maps to score 50; ratio=2.0 (double the threshold, acute
+    // distress) maps to 0. Ratios above 2.0 clamp to 0 — consistent with
+    // "beyond this point the precise value stops mattering, the country
+    // is already in a rollover-crisis regime."
+    goalposts: { worst: 2, best: 0 },
     weight: 1.0,
     sourceKey: 'resilience:recovery:external-debt:v1',
     scope: 'global',
@@ -978,17 +1005,31 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   },
 
   // ── fuelStockDays (1 sub-metric) ─────────────────────────────────────────
+  // PR 3 §3.5 point 1: RETIRED from the core score. IEA emergency-
+  // stockholding is defined in days of NET IMPORTS; the net-importer
+  // vs net-exporter framings are incomparable, so no global resilience
+  // signal can be built from this data. scoreFuelStockDays now returns
+  // coverage=0 + imputationClass=null for every country (filtered out
+  // of confidence/coverage averages via the RESILIENCE_RETIRED_DIMENSIONS
+  // registry in _dimension-scorers.ts). imputationClass is deliberately
+  // `null` rather than 'source-failure' — a retirement is structural,
+  // not a runtime outage, and surfacing 'source-failure' would manufacture
+  // a false "Source down" label in the widget for every country. The
+  // registry entry stays at tier='experimental' so the Core coverage
+  // gate treats it as out-of-score; the dimension itself remains
+  // registered for structural continuity (PR 4 structural-audit may
+  // remove it entirely).
   {
     id: 'recoveryFuelStockDays',
     dimension: 'fuelStockDays',
-    description: 'Days of fuel stock cover (IEA Oil Stocks / EIA Weekly Petroleum Status); strategic buffer for energy-dependent recovery',
+    description: 'RETIRED in PR 3. Legacy days-of-fuel-stock-cover (IEA Oil Stocks / EIA Weekly Petroleum Status). Does not contribute to the score — scoreFuelStockDays returns coverage=0 + imputationClass=null, and the dimension is excluded from confidence/coverage averages via the RESILIENCE_RETIRED_DIMENSIONS registry. Kept in the registry as tier=experimental for structural continuity; a globally-comparable recovery-fuel concept could replace this in a future PR.',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 120 },
     weight: 1.0,
     sourceKey: 'resilience:recovery:fuel-stocks:v1',
     scope: 'global',
     cadence: 'monthly',
-    tier: 'enrichment',
+    tier: 'experimental',
     coverage: 45,
     license: 'open-data',
   },

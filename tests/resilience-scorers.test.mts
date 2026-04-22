@@ -60,10 +60,17 @@ describe('resilience scorer contracts', () => {
     //     source-failure when the adapter is in seed-meta failedDatasets. This is the
     //     single source of truth for "no currency data"; null-imputationClass paths
     //     on non-real-data return branches are no longer permitted.
+    // PR 3 §3.5: fuelStockDays removed from this set — scoreFuelStockDays
+    // now returns coverage=0 + imputationClass=null for every country
+    // (retired), so it passes the default coverage=0 assertion below
+    // instead of the T1.7 fall-through assertion. The `null` tag (rather
+    // than 'source-failure') reflects the intentional retirement — see
+    // the widget `formatDimensionConfidence` absent-path which would
+    // otherwise surface a false "Source down" label on every country.
     const coverageZeroExempt = new Set([
       'currencyExternal',
       'fiscalSpace', 'reserveAdequacy', 'externalDebtCoverage',
-      'importConcentration', 'stateContinuity', 'fuelStockDays',
+      'importConcentration', 'stateContinuity',
     ]);
     for (const [dimensionId, scorer] of Object.entries(RESILIENCE_DIMENSION_SCORERS)) {
       const result = await scorer('US');
@@ -92,13 +99,17 @@ describe('resilience scorer contracts', () => {
       return [domainId, average];
     }));
 
+    // PR 3 §3.5: economic 68.33 → 66.33 after currencyExternal rebuild.
+    // Recovery 54.83 → 47.33 after externalDebtCoverage goalpost was
+    // tightened from (0..5) to (0..2) per §3.5 point 3 (US ratio=1.5
+    // now scores 25 instead of 70).
     assert.deepEqual(domainAverages, {
-      economic: 68.33,
+      economic: 66.33,
       infrastructure: 79,
       energy: 80,
       'social-governance': 61.75,
       'health-food': 60.5,
-      recovery: 54.83,
+      recovery: 47.33,
     });
 
     function round(v: number, d = 2) { return Number(v.toFixed(d)); }
@@ -126,9 +137,16 @@ describe('resilience scorer contracts', () => {
     const stressScore = round(coverageWeightedMean(stressDims));
     const stressFactor = round(Math.max(0, Math.min(1 - stressScore / 100, 0.5)), 4);
 
-    assert.equal(baselineScore, 62.64);
-    assert.equal(stressScore, 65.84);
-    assert.equal(stressFactor, 0.3416);
+    // PR 3 §3.5: 62.64 → 63.63 (fuelStockDays retirement) → 60.12
+    // (externalDebtCoverage goalpost tightened; US score drops from 70
+    // to 25, pulling the coverage-weighted baseline mean down).
+    assert.equal(baselineScore, 60.12);
+    // PR 3 §3.5: 65.84 → 67.85 (fuelStockDays retirement) → 67.21
+    // (currencyExternal rebuilt on IMF inflation + WB reserves, coverage
+    // shifts and US stress score moves). stressFactor updates in lockstep:
+    //   1 - 67.21/100 = 0.3279, clamped to 0.5.
+    assert.equal(stressScore, 67.21);
+    assert.equal(stressFactor, 0.3279);
 
     const overallScore = round(
       RESILIENCE_DOMAIN_ORDER.map((domainId) => {
@@ -140,7 +158,10 @@ describe('resilience scorer contracts', () => {
         return round(cwMean) * getResilienceDomainWeight(domainId);
       }).reduce((sum, v) => sum + v, 0),
     );
-    assert.equal(overallScore, 65.57);
+    // PR 3 §3.5: 65.57 → 65.82 (fuelStockDays retirement) → 65.52
+    // (currencyExternal rebuild) → 63.27 (externalDebtCoverage goalpost
+    // tightened 0..5 → 0..2; US recovery-domain contribution drops).
+    assert.equal(overallScore, 63.27);
   });
 
   it('baselineScore is computed from baseline + mixed dimensions only', async () => {
@@ -211,7 +232,9 @@ describe('resilience scorer contracts', () => {
     );
 
     assert.ok(expected > 0, 'overall should be positive');
-    assert.equal(expected, 65.57, 'overallScore should match sum(domainScore * domainWeight)');
+    // PR 3 §3.5: 65.82 → 65.52 (currencyExternal rebuild) → 63.27 after
+    // externalDebtCoverage goalpost tightened from (0..5) to (0..2).
+    assert.equal(expected, 63.27, 'overallScore should match sum(domainScore * domainWeight); 65.52 → 63.27 after PR 3 §3.5 externalDebtCoverage re-goalpost');
   });
 
   it('stressFactor is still computed (informational) and clamped to [0, 0.5]', () => {
