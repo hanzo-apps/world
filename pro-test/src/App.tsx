@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactElement } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, type ReactElement, type ReactNode } from 'react';
 import type { UserResource } from '@clerk/types';
 import * as Sentry from '@sentry/react';
 import { motion } from 'motion/react';
@@ -132,6 +132,77 @@ function useClerkUser(): { user: UserResource | null; isLoaded: boolean } {
 }
 
 /**
+ * Entitlement state shared across /pro — `isPro: true` when the signed-in
+ * visitor has an active Pro entitlement, either via Clerk pro role OR a
+ * Convex Dodo subscription (tier >= 1). The provider below performs
+ * exactly one /api/me/entitlement fetch per page load and makes the
+ * result available via useProEntitlement(); Navbar and Hero (and any
+ * future caller) share a single source of truth, so the nav and hero
+ * can't disagree on transient failures.
+ *
+ * Defaults to `{ isPro: false, isChecked: false }` for consumers that
+ * render without a provider (e.g. tests) — matches the closed-by-default
+ * stance for unpaid visitors.
+ */
+type ProEntitlementState = { isPro: boolean; isChecked: boolean };
+const ProEntitlementContext = createContext<ProEntitlementState>({ isPro: false, isChecked: false });
+
+function ProEntitlementProvider({ children }: { children: ReactNode }): ReactElement {
+  const { user } = useClerkUser();
+  const signedIn = !!user;
+  const [state, setState] = useState<ProEntitlementState>({ isPro: false, isChecked: false });
+
+  useEffect(() => {
+    if (!signedIn) {
+      setState({ isPro: false, isChecked: true });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const clerk = await ensureClerk();
+        // Clerk can expose `user` before its session-token endpoint is
+        // ready; a first null return is a known transient, not a final
+        // "no token." Retry once after a 2s gap — same pattern as
+        // services/checkout.ts:getAuthToken. Without the retry, a real
+        // Pro user hitting /pro on a cold Clerk load gets a permanent
+        // isPro=false for the whole session.
+        let token = await clerk.session?.getToken().catch(() => null);
+        if (!token) {
+          await new Promise((r) => setTimeout(r, 2000));
+          token = await clerk.session?.getToken().catch(() => null);
+        }
+        if (!token) {
+          if (!cancelled) setState({ isPro: false, isChecked: true });
+          return;
+        }
+        const resp = await fetch(`${API_BASE}/me/entitlement`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!resp.ok) {
+          if (!cancelled) setState({ isPro: false, isChecked: true });
+          return;
+        }
+        const data = await resp.json() as { isPro?: boolean };
+        if (!cancelled) setState({ isPro: data.isPro === true, isChecked: true });
+      } catch (err) {
+        console.error('[auth] Failed to check pro entitlement:', err);
+        Sentry.captureException(err, { tags: { surface: 'pro-marketing', action: 'check-entitlement' } });
+        if (!cancelled) setState({ isPro: false, isChecked: true });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [signedIn]);
+
+  return <ProEntitlementContext.Provider value={state}>{children}</ProEntitlementContext.Provider>;
+}
+
+function useProEntitlement(): ProEntitlementState {
+  return useContext(ProEntitlementContext);
+}
+
+/**
  * Mounts Clerk's native UserButton (avatar + dropdown with profile + sign
  * out) into a DOM node. Using Clerk's built-in widget avoids reimplementing
  * a signed-in UI from scratch and inherits theming from the existing
@@ -190,6 +261,14 @@ const Logo = () => (
 /* ─── 0. Navbar ─── */
 const Navbar = () => {
   const { user, isLoaded } = useClerkUser();
+  const { isPro, isChecked } = useProEntitlement();
+  // Show "Go to Dashboard" instead of "Upgrade to Pro" once we confirm
+  // the visitor is already a paying customer. Until the entitlement
+  // check completes we keep the upgrade CTA in place — a signed-in
+  // free user would see a one-frame flash otherwise, which is less
+  // annoying than showing "Go to Dashboard" for half a second to a
+  // visitor who hasn't paid.
+  const showGoToDashboard = isLoaded && !!user && isChecked && isPro;
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-panel border-b-0 border-x-0 rounded-none" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -214,9 +293,18 @@ const Navbar = () => {
                 {t('nav.signIn')}
               </button>
             ))}
-          <a href="#pricing" className="bg-wm-green text-wm-bg px-4 py-2 rounded-sm font-mono text-xs uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
-            {t('nav.upgradeToPro')}
-          </a>
+          {showGoToDashboard ? (
+            <a
+              href="https://worldmonitor.app"
+              className="bg-wm-green text-wm-bg px-4 py-2 rounded-sm font-mono text-xs uppercase tracking-wider font-bold hover:bg-green-400 transition-colors inline-flex items-center gap-1.5"
+            >
+              {t('nav.goToDashboard')} <ArrowRight className="w-3 h-3" aria-hidden="true" />
+            </a>
+          ) : (
+            <a href="#pricing" className="bg-wm-green text-wm-bg px-4 py-2 rounded-sm font-mono text-xs uppercase tracking-wider font-bold hover:bg-green-400 transition-colors">
+              {t('nav.upgradeToPro')}
+            </a>
+          )}
         </div>
       </div>
     </nav>
@@ -286,10 +374,16 @@ const SignalBars = () => {
 
 const Hero = () => {
   const { user, isLoaded } = useClerkUser();
+  const { isPro, isChecked } = useProEntitlement();
   // Showing "Sign In" to an already-signed-in user wastes a CTA slot.
   // Hide it once auth state confirms; falls back to just the "Choose Plan"
   // CTA which is the relevant action for returning users anyway.
   const showSignIn = isLoaded && !user;
+  // Swap "Choose Plan" for "Go to Dashboard" once we confirm the visitor
+  // is already Pro — same reasoning as the nav swap, and also removes
+  // the #pricing anchor jump which is actively misleading for a paying
+  // customer.
+  const showGoToDashboard = isLoaded && !!user && isChecked && isPro;
   return (
     <section className="pt-28 pb-12 px-6 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(74,222,128,0.08)_0%,transparent_50%)] pointer-events-none" />
@@ -316,9 +410,15 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
-            <a href="#pricing" className="bg-wm-green text-wm-bg px-6 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2">
-              {t('hero.choosePlan')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </a>
+            {showGoToDashboard ? (
+              <a href="https://worldmonitor.app" className="bg-wm-green text-wm-bg px-6 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2">
+                {t('hero.goToDashboard')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </a>
+            ) : (
+              <a href="#pricing" className="bg-wm-green text-wm-bg px-6 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2">
+                {t('hero.choosePlan')} <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </a>
+            )}
             {showSignIn && (
               <button type="button" onClick={openSignIn} className="border border-wm-border text-wm-text px-6 py-3 rounded-sm font-mono text-sm uppercase tracking-wider font-bold hover:border-wm-text transition-colors">
                 {t('hero.signIn')}
@@ -1306,26 +1406,28 @@ export default function App() {
   if (page === 'enterprise') return <EnterprisePage />;
 
   return (
-    <div className="min-h-screen selection:bg-wm-green/30 selection:text-wm-green">
-      <Navbar />
-      <main>
-        <Hero />
-        <SourceMarquee />
-        <Pillars />
-        <WhyUpgrade />
-        <TwoPathSplit />
-        <ProShowcase />
-        <DeliveryDesk />
-        <AudiencePersonas />
-        <SocialProof />
-        <LivePreview />
-        <PricingSection refCode={getRefCode()} />
-        <PricingTable />
-        <ApiSection />
-        <EnterpriseShowcase />
-        <FAQ />
-      </main>
-      <Footer />
-    </div>
+    <ProEntitlementProvider>
+      <div className="min-h-screen selection:bg-wm-green/30 selection:text-wm-green">
+        <Navbar />
+        <main>
+          <Hero />
+          <SourceMarquee />
+          <Pillars />
+          <WhyUpgrade />
+          <TwoPathSplit />
+          <ProShowcase />
+          <DeliveryDesk />
+          <AudiencePersonas />
+          <SocialProof />
+          <LivePreview />
+          <PricingSection refCode={getRefCode()} />
+          <PricingTable />
+          <ApiSection />
+          <EnterpriseShowcase />
+          <FAQ />
+        </main>
+        <Footer />
+      </div>
+    </ProEntitlementProvider>
   );
 }
