@@ -167,12 +167,9 @@ interface ImfMacroEntry {
   year?: number | null;
 }
 
-interface BisExchangeRate {
-  countryCode?: string;
-  realEer?: number;
-  realChange?: number;
-  date?: string;
-}
+// BisExchangeRate interface removed in PR 3 §3.5: only the
+// now-removed getCountryBisExchangeRates() + scoreCurrencyExternal's
+// BIS path used it.
 
 interface NationalDebtEntry {
   iso3?: string;
@@ -235,7 +232,10 @@ interface SocialVelocityPost {
 const RESILIENCE_STATIC_PREFIX = 'resilience:static:';
 const RESILIENCE_SHIPPING_STRESS_KEY = 'supply_chain:shipping_stress:v1';
 const RESILIENCE_TRANSIT_SUMMARIES_KEY = 'supply_chain:transit-summaries:v1';
-const RESILIENCE_BIS_EXCHANGE_KEY = 'economic:bis:eer:v1';
+// RESILIENCE_BIS_EXCHANGE_KEY removed in PR 3 §3.5: scoreCurrencyExternal
+// no longer reads BIS EER. fxVolatility / fxDeviation indicators remain
+// registered as tier='experimental' for drill-down panels; those panels
+// read BIS directly via their own handlers, not via this scorer.
 const RESILIENCE_BIS_DSR_KEY = 'economic:bis:dsr:v1';
 const RESILIENCE_NATIONAL_DEBT_KEY = 'economic:national-debt:v1';
 const RESILIENCE_IMF_MACRO_KEY = 'economic:imf:macro:v2';
@@ -258,7 +258,11 @@ const RESILIENCE_RECOVERY_FISCAL_SPACE_KEY = 'resilience:recovery:fiscal-space:v
 const RESILIENCE_RECOVERY_RESERVE_ADEQUACY_KEY = 'resilience:recovery:reserve-adequacy:v1';
 const RESILIENCE_RECOVERY_EXTERNAL_DEBT_KEY = 'resilience:recovery:external-debt:v1';
 const RESILIENCE_RECOVERY_IMPORT_HHI_KEY = 'resilience:recovery:import-hhi:v1';
-const RESILIENCE_RECOVERY_FUEL_STOCKS_KEY = 'resilience:recovery:fuel-stocks:v1';
+// RESILIENCE_RECOVERY_FUEL_STOCKS_KEY removed in PR 3: scoreFuelStockDays
+// no longer reads any source key. If a new globally-comparable
+// recovery-fuel concept lands in a future PR, add a new key with an
+// explicit semantic (e.g. resilience:fuel-import-volatility:v1) rather
+// than resurrecting this one.
 
 // PR 1 energy-construct v2 seed keys (plan §3.1–§3.3). Written by
 // scripts/seed-low-carbon-generation.mjs, scripts/seed-fossil-
@@ -448,13 +452,9 @@ function mean(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function stddev(values: number[]): number | null {
-  if (values.length < 2) return null;
-  const avg = mean(values);
-  if (avg == null) return null;
-  const variance = values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / values.length;
-  return Math.sqrt(variance);
-}
+// stddev() removed in PR 3 §3.5: its only caller was scoreCurrencyExternal's
+// BIS-volatility path which is now retired. Re-introduce if a future
+// scorer genuinely needs a series-volatility computation.
 
 // T1.7 schema pass: tie-break order when multiple imputed metrics share
 // weight. Earlier classes in this list win on ties. stable-absence expresses
@@ -565,15 +565,8 @@ function matchesCountryText(value: unknown, countryCode: string): boolean {
   return false;
 }
 
-function dateToSortableNumber(value: unknown): number {
-  if (typeof value === 'string') {
-    const compact = value.replace(/[^0-9]/g, '');
-    const numeric = Number(compact);
-    if (Number.isFinite(numeric) && numeric > 0) return numeric;
-  }
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-}
+// dateToSortableNumber() removed in PR 3 §3.5: only the now-removed
+// getCountryBisExchangeRates() used it.
 
 async function defaultSeedReader(key: string): Promise<unknown | null> {
   return getCachedJson(key, true);
@@ -631,14 +624,9 @@ function getImfLaborEntry(raw: unknown, countryCode: string): ImfLaborEntry | nu
   return (countries[countryCode] as ImfLaborEntry | undefined) ?? null;
 }
 
-function getCountryBisExchangeRates(raw: unknown, countryCode: string): BisExchangeRate[] {
-  const rates: BisExchangeRate[] = Array.isArray((raw as { rates?: unknown[] } | null)?.rates)
-    ? ((raw as { rates?: BisExchangeRate[] }).rates ?? [])
-    : [];
-  return rates
-    .filter((entry) => matchesCountryIdentifier(entry.countryCode, countryCode))
-    .sort((left, right) => dateToSortableNumber(left.date) - dateToSortableNumber(right.date));
-}
+// getCountryBisExchangeRates() removed in PR 3 §3.5: only scoreCurrencyExternal
+// called it, and that scorer no longer reads BIS EER. Drill-down panels
+// that want BIS series read it via their own dedicated handler.
 
 function getLatestDebtEntry(raw: unknown, countryCode: string): NationalDebtEntry | null {
   const iso3 = ISO2_TO_ISO3[countryCode.toUpperCase()];
@@ -890,76 +878,87 @@ function scoreFxReserves(months: number): number {
   return normalizeHigherBetter(Math.min(months, 12), 1, 12);
 }
 
+// PR 3 §3.5 point 3: retire the BIS-dependent primary path. BIS EER
+// covers ~64 economies — a core signal that's null for ~150 countries
+// is structurally wrong for a world-ranking score. The scorer now
+// uses only global-coverage inputs:
+//   - inflationStability: IMF `inflationPct` (CPI, ~185 countries)
+//   - fxReservesAdequacy: WB `FI.RES.TOTL.MO` (~160 countries)
+// BIS `realChange` / `realEer` are still read for drill-down panels
+// via the fxVolatility / fxDeviation registry entries (now re-tagged
+// `tier='experimental'` so they're excluded from the Core coverage
+// gate), but the SCORER path ignores them entirely. A country that
+// used to take the "BIS primary" branch now takes the same path as
+// a non-BIS country, producing consistent per-country-reproducibility
+// regardless of whether BIS tracks them.
+//
+// Weight split in the core blend:
+//   inflationStability 0.6 | fxReservesAdequacy 0.4
+// Mirrors the pre-existing "fallback when no BIS" blend weights.
 export async function scoreCurrencyExternal(
   countryCode: string,
   reader: ResilienceSeedReader = defaultSeedReader,
 ): Promise<ResilienceDimensionScore> {
-  const [bisExchangeRaw, imfMacroRaw, staticRecord] = await Promise.all([
-    reader(RESILIENCE_BIS_EXCHANGE_KEY),
+  const [imfMacroRaw, staticRecord] = await Promise.all([
     reader(RESILIENCE_IMF_MACRO_KEY),
     readStaticCountry(countryCode, reader),
   ]);
-  const countryRates = getCountryBisExchangeRates(bisExchangeRaw, countryCode);
-  const latest = countryRates[countryRates.length - 1] ?? null;
-  const volSource = countryRates
-    .map((entry) => safeNum(entry.realChange))
-    .filter((value): value is number => value != null)
-    .slice(-12);
-  const vol = volSource.length >= 2
-    ? (stddev(volSource) ?? 0) * Math.sqrt(12)
-    : volSource.length === 1
-      ? Math.abs(volSource[0]!) * Math.sqrt(12)
-      : null;
+
+  const imfEntry = getImfMacroEntry(imfMacroRaw, countryCode);
+  const hasInflation = imfMacroRaw != null && imfEntry?.inflationPct != null;
+  const inflationScore = hasInflation
+    ? normalizeLowerBetter(Math.min(imfEntry!.inflationPct!, 50), 0, 50)
+    : null;
 
   const reservesMonths = getFxReservesMonths(staticRecord);
   const reservesScore = reservesMonths != null ? scoreFxReserves(reservesMonths) : null;
 
-  // Country not in BIS EER (curated ~40 economies), or BIS seed is down entirely.
-  // Use IMF CPI inflation + WB FX reserves as currency stability proxies.
-  // Inflation covers ~185 countries, reserves ~160 countries via World Bank FI.RES.TOTL.MO.
-  if (countryRates.length === 0) {
-    const imfEntry = getImfMacroEntry(imfMacroRaw, countryCode);
-    const hasInflation = imfMacroRaw != null && imfEntry?.inflationPct != null;
-    const hasReserves = reservesScore != null;
-
-    if (hasInflation && hasReserves) {
-      const inflScore = normalizeLowerBetter(Math.min(imfEntry!.inflationPct!, 50), 0, 50);
-      const blended = inflScore * 0.6 + reservesScore * 0.4;
-      const coverage = bisExchangeRaw != null ? 0.55 : 0.45;
-      return { score: roundScore(blended), coverage, observedWeight: 1, imputedWeight: 0, imputationClass: null, freshness: { lastObservedAtMs: 0, staleness: '' } };
-    }
-    if (hasInflation) {
-      const coverage = bisExchangeRaw != null ? 0.45 : 0.35;
-      return { score: normalizeLowerBetter(Math.min(imfEntry!.inflationPct!, 50), 0, 50), coverage, observedWeight: 1, imputedWeight: 0, imputationClass: null, freshness: { lastObservedAtMs: 0, staleness: '' } };
-    }
-    if (hasReserves) {
-      const coverage = bisExchangeRaw != null ? 0.4 : 0.3;
-      return { score: reservesScore, coverage, observedWeight: 1, imputedWeight: 0, imputationClass: null, freshness: { lastObservedAtMs: 0, staleness: '' } };
-    }
-    // No BIS EER, no IMF inflation fallback, no WB reserves fallback.
-    // This is true structural absence: the country isn't covered by any
-    // currency-stability source we track. Tag with curated_list_absent
-    // (= 'unmonitored') so the taxonomy is the single source of truth
-    // and the aggregation pass can still re-tag it as 'source-failure'
-    // when the underlying adapter fails. The prior absence-based branch
-    // returned { score: 50, imputationClass: null } which silently
-    // bypassed the taxonomy; replaced in T1.7 source-failure wiring.
+  if (hasInflation && reservesScore != null) {
+    const blended = inflationScore! * 0.6 + reservesScore * 0.4;
     return {
-      score: IMPUTE.bisEer.score,
-      coverage: IMPUTE.bisEer.certaintyCoverage,
-      observedWeight: 0,
-      imputedWeight: 1,
-      imputationClass: IMPUTE.bisEer.imputationClass,
+      score: roundScore(blended),
+      coverage: 0.85,
+      observedWeight: 1,
+      imputedWeight: 0,
+      imputationClass: null,
+      freshness: { lastObservedAtMs: 0, staleness: '' },
+    };
+  }
+  if (hasInflation) {
+    return {
+      score: inflationScore!,
+      coverage: 0.55,
+      observedWeight: 1,
+      imputedWeight: 0,
+      imputationClass: null,
+      freshness: { lastObservedAtMs: 0, staleness: '' },
+    };
+  }
+  if (reservesScore != null) {
+    return {
+      score: reservesScore,
+      coverage: 0.4,
+      observedWeight: 1,
+      imputedWeight: 0,
+      imputationClass: null,
       freshness: { lastObservedAtMs: 0, staleness: '' },
     };
   }
 
-  // BIS EER data present: volatility + deviation are primary, reserves supplementary.
-  return weightedBlend([
-    { score: vol == null ? null : normalizeLowerBetter(vol, 0, 50), weight: 0.6 },
-    { score: latest == null ? null : normalizeLowerBetter(Math.abs((safeNum(latest.realEer) ?? 100) - 100), 0, 35), weight: 0.25 },
-    { score: reservesScore, weight: 0.15 },
-  ]);
+  // Neither global-coverage source present. True structural absence;
+  // keep the curated_list_absent → unmonitored taxonomy so the
+  // aggregation pass can still re-tag as source-failure on adapter
+  // outage. (IMPUTE.bisEer is the existing entry; we keep its
+  // identity/name for snapshot continuity but the semantics now read
+  // as "no IMF + no WB reserves" rather than "no BIS".)
+  return {
+    score: IMPUTE.bisEer.score,
+    coverage: IMPUTE.bisEer.certaintyCoverage,
+    observedWeight: 0,
+    imputedWeight: 1,
+    imputationClass: IMPUTE.bisEer.imputationClass,
+    freshness: { lastObservedAtMs: 0, staleness: '' },
+  };
 }
 
 export async function scoreTradeSanctions(
@@ -1407,11 +1406,11 @@ interface RecoveryImportHhiCountry {
   year?: number | null;
 }
 
-interface RecoveryFuelStocksCountry {
-  fuelStockDays?: number | null;
-  meetsObligation?: boolean | null;
-  belowObligation?: boolean | null;
-}
+// RecoveryFuelStocksCountry interface removed in PR 3 — scoreFuelStockDays
+// no longer reads any payload. Do NOT re-add the type as a reservation;
+// the tsc noUnusedLocals rule rejects unused locals. When a new
+// recovery-fuel concept lands, introduce a fresh interface with a
+// different name + the actual shape it needs.
 
 function getRecoveryCountryEntry<T>(raw: unknown, countryCode: string): T | null {
   const countries = (raw as { countries?: Record<string, T> } | null)?.countries;
@@ -1480,8 +1479,12 @@ export async function scoreExternalDebtCoverage(
       freshness: { lastObservedAtMs: 0, staleness: '' },
     };
   }
+  // PR 3 §3.5 point 3: goalpost re-anchored on Greenspan-Guidotti.
+  // Ratio 1.0 (short-term debt matches reserves) = score 50; ratio 2.0
+  // = score 0 (acute rollover-shock exposure). See registry entry
+  // recoveryDebtToReserves for the construct rationale.
   return weightedBlend([
-    { score: normalizeLowerBetter(entry.debtToReservesRatio, 0, 5), weight: 1.0 },
+    { score: normalizeLowerBetter(entry.debtToReservesRatio, 0, 2), weight: 1.0 },
   ]);
 }
 
@@ -1551,26 +1554,75 @@ export async function scoreStateContinuity(
   ]);
 }
 
+// PR 3 §3.5 point 1: retired permanently from the core score. IEA
+// emergency-stockholding rules are defined in days of NET IMPORTS
+// and do not bind net exporters by design; the net-importer vs net-
+// exporter framings are incomparable, so no global resilience signal
+// can be built from this data. Published coverage for the IEA/EIA
+// connector sat at 100% imputed at 50 for every country in the
+// pre-repair probe (`fuelStockDays` was `source-failure` for every
+// ISO in the April 2026 freeze snapshot).
+//
+// Returning `coverage: 0` + `observedWeight: 0` drops the dimension
+// from the `recovery` domain's coverage-weighted mean entirely; the
+// remaining recovery dimensions pick up its share of the domain
+// weight via auto-redistribution (no explicit weight transfer needed
+// — `coverageWeightedMean` in `_shared.ts` already does this).
+//
+// Does NOT return in PR 4. A new globally-comparable recovery-fuel
+// concept (e.g. fuel-import-volatility or strategic-buffer-ratio
+// with a unified net-importer/net-exporter definition) could replace
+// this scorer in a future PR, but that is out of scope for the
+// first-publication repair.
+//
+// The dimension `fuelStockDays` remains in `RESILIENCE_DIMENSION_ORDER`
+// for structural continuity (tests, pillar membership, registry
+// shape); retiring the dimension entirely is a PR 4 structural-audit
+// concern. The `recoveryFuelStockDays` indicator is re-tagged as
+// `tier: 'experimental'` in the registry so the Core coverage gate
+// does not consider it active.
+// Authoritative registry of dimensions retired from the core score.
+// Retired dimensions still appear in `RESILIENCE_DIMENSION_ORDER` for
+// structural continuity (tests, pillar membership, registry shape) and
+// their scorers still run (returning coverage=0). This set exists so
+// downstream confidence/coverage averages (`computeLowConfidence`,
+// `computeOverallCoverage`, the widget's `formatResilienceConfidence`)
+// can explicitly exclude retired dims — distinct from coverage=0
+// dimensions that reflect genuine data sparsity, which must still drag
+// the confidence reading down so sparse-data countries stay flagged as
+// low-confidence. See `tests/resilience-confidence-averaging.test.mts`
+// for the exact semantic this set enables.
+//
+// Client-side mirror: `RESILIENCE_RETIRED_DIMENSION_IDS` in
+// `src/components/resilience-widget-utils.ts`. Kept in lockstep via
+// `tests/resilience-retired-dimensions-parity.test.mts`.
+export const RESILIENCE_RETIRED_DIMENSIONS: ReadonlySet<ResilienceDimensionId> = new Set([
+  'fuelStockDays',
+]);
+
 export async function scoreFuelStockDays(
-  countryCode: string,
-  reader: ResilienceSeedReader = defaultSeedReader,
+  _countryCode: string,
+  _reader: ResilienceSeedReader = defaultSeedReader,
 ): Promise<ResilienceDimensionScore> {
-  const raw = await reader(RESILIENCE_RECOVERY_FUEL_STOCKS_KEY);
-  const entry = getRecoveryCountryEntry<RecoveryFuelStocksCountry>(raw, countryCode);
-  // The seeder writes `fuelStockDays`, not `stockDays`.
-  if (!entry || entry.fuelStockDays == null) {
-    return {
-      score: IMPUTE.recoveryFuelStocks.score,
-      coverage: IMPUTE.recoveryFuelStocks.certaintyCoverage,
-      observedWeight: 0,
-      imputedWeight: 1,
-      imputationClass: IMPUTE.recoveryFuelStocks.imputationClass,
-      freshness: { lastObservedAtMs: 0, staleness: '' },
-    };
-  }
-  return weightedBlend([
-    { score: normalizeHigherBetter(Math.min(entry.fuelStockDays, 120), 0, 120), weight: 1.0 },
-  ]);
+  // imputationClass is `null` (not 'source-failure') because the dimension
+  // is retired by design, not failing at runtime. 'source-failure' renders
+  // as "Source down: upstream seeder failed" with a `!` icon in the widget
+  // (see IMPUTATION_CLASS_LABELS in src/components/resilience-widget-utils.ts);
+  // surfacing that label for every country would manufacture a false outage
+  // signal for a deliberate construct retirement. The dimension is excluded
+  // from confidence/coverage averages via the `RESILIENCE_RETIRED_DIMENSIONS`
+  // registry filter in `computeLowConfidence`, `computeOverallCoverage`, and
+  // the widget's `formatResilienceConfidence`. The filter is registry-keyed
+  // (not `coverage === 0`) so genuinely sparse-data countries still surface
+  // as low-confidence from non-retired coverage=0 dims.
+  return {
+    score: 50,
+    coverage: 0,
+    observedWeight: 0,
+    imputedWeight: 0,
+    imputationClass: null,
+    freshness: { lastObservedAtMs: 0, staleness: '' },
+  };
 }
 
 export const RESILIENCE_DIMENSION_SCORERS: Record<

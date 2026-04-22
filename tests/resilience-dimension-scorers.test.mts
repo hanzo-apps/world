@@ -227,53 +227,36 @@ describe('resilience dimension scorers', () => {
       `coverage should be ~0.45 (only sanctions loaded), got ${score.coverage}`);
   });
 
-  it('scoreCurrencyExternal: non-BIS country with no IMF data falls back to curated_list_absent (score 50)', async () => {
-    // BIS loaded, IMF macro also null — no inflation proxy available → curated_list_absent imputation.
-    const reader = async (key: string): Promise<unknown | null> => {
-      if (key === 'economic:bis:eer:v1') return { rates: [{ countryCode: 'US', realChange: 1.2, realEer: 101, date: '2025-09' }] };
-      return null; // economic:imf:macro:v1 also null
-    };
-    const score = await scoreCurrencyExternal('MZ', reader); // Mozambique not in BIS
-    assert.equal(score.score, 50, 'curated_list_absent must impute score=50 when IMF also missing');
+  it('scoreCurrencyExternal: no IMF and no reserves → curated_list_absent imputation (score 50)', async () => {
+    // PR 3 §3.5: BIS retired. Without IMF inflation or WB reserves,
+    // scorer falls through to IMPUTE.bisEer (kept for snapshot continuity).
+    const reader = async (_key: string): Promise<unknown | null> => null;
+    const score = await scoreCurrencyExternal('MZ', reader);
+    assert.equal(score.score, 50, 'curated_list_absent must impute score=50 when IMF+reserves missing');
     assert.equal(score.coverage, 0.3, 'curated_list_absent certaintyCoverage=0.3');
   });
 
-  it('scoreCurrencyExternal: non-BIS country with IMF inflation uses inflation proxy (coverage 0.45)', async () => {
-    // BIS loaded, IMF macro has inflation → use inflation proxy instead of curated_list_absent.
+  it('scoreCurrencyExternal: IMF inflation only (no reserves) uses inflation proxy (coverage 0.55)', async () => {
+    // PR 3 §3.5: BIS retired. IMF inflation alone gives inflation-only path (0.55).
     const reader = async (key: string): Promise<unknown | null> => {
-      if (key === 'economic:bis:eer:v1') return { rates: [{ countryCode: 'US', realChange: 1.2, realEer: 101, date: '2025-09' }] };
       if (key === 'economic:imf:macro:v2') return { countries: { MZ: { inflationPct: 8, currentAccountPct: -5, year: 2024 } } };
       return null;
     };
     const score = await scoreCurrencyExternal('MZ', reader);
     // normalizeLowerBetter(min(8,50), 0, 50) = (50-8)/50*100 = 84
     assert.equal(score.score, 84, 'low-inflation country gets high currency score via IMF proxy');
-    assert.equal(score.coverage, 0.45, 'IMF inflation proxy coverage=0.45 (better than pure imputation)');
+    assert.equal(score.coverage, 0.55, 'IMF inflation only (no reserves) → coverage 0.55');
   });
 
-  it('scoreCurrencyExternal: non-BIS country with hyperinflation is capped at score 0', async () => {
+  it('scoreCurrencyExternal: hyperinflation is capped at score 0 (inflation-only path)', async () => {
     const reader = async (key: string): Promise<unknown | null> => {
-      if (key === 'economic:bis:eer:v1') return { rates: [{ countryCode: 'US', realChange: 1.2, realEer: 101, date: '2025-09' }] };
       if (key === 'economic:imf:macro:v2') return { countries: { ZW: { inflationPct: 250, currentAccountPct: -8, year: 2024 } } };
       return null;
     };
     const score = await scoreCurrencyExternal('ZW', reader);
     // min(250, 50) = 50 → normalizeLowerBetter(50, 0, 50) = 0
     assert.equal(score.score, 0, 'hyperinflation ≥50% is capped → score 0');
-    assert.equal(score.coverage, 0.45, 'hyperinflation still gets IMF proxy coverage=0.45');
-  });
-
-  it('scoreCurrencyExternal: BIS outage + IMF inflation present → uses proxy with coverage=0.35', async () => {
-    // BIS seed is completely down (null), but IMF macro is available.
-    // The inflation proxy should still be applied — BIS outage must not block the IMF path.
-    const reader = async (key: string): Promise<unknown | null> => {
-      if (key === 'economic:imf:macro:v2') return { countries: { MZ: { inflationPct: 6, currentAccountPct: -2, year: 2024 } } };
-      return null; // economic:bis:eer:v1 null = BIS seed outage
-    };
-    const score = await scoreCurrencyExternal('MZ', reader);
-    // normalizeLowerBetter(min(6,50), 0, 50) = (50-6)/50*100 = 88
-    assert.equal(score.score, 88, 'BIS outage must not block IMF inflation proxy');
-    assert.equal(score.coverage, 0.35, 'BIS outage reduces proxy coverage to 0.35 (primary source unavailable)');
+    assert.equal(score.coverage, 0.55, 'hyperinflation still gets IMF inflation-only coverage 0.55');
   });
 
   it('scoreCurrencyExternal: both BIS and IMF null → curated_list_absent imputation (T1.7)', async () => {
@@ -308,9 +291,9 @@ describe('resilience dimension scorers', () => {
     assert.ok(withReserves.coverage > 0, 'coverage must be positive with BIS + reserves');
   });
 
-  it('scoreCurrencyExternal: non-BIS country with good reserves scores higher than with bad reserves', async () => {
+  it('scoreCurrencyExternal: good reserves score higher than bad reserves (inflation+reserves path)', async () => {
+    // PR 3 §3.5: BIS retired. inflation+reserves path → coverage 0.85.
     const makeReader = (months: number) => async (key: string): Promise<unknown | null> => {
-      if (key === 'economic:bis:eer:v1') return { rates: [{ countryCode: 'US', realChange: 1.2, realEer: 101, date: '2025-09' }] };
       if (key === 'economic:imf:macro:v2') return { countries: { MZ: { inflationPct: 15, currentAccountPct: -5, year: 2024 } } };
       if (key === 'resilience:static:MZ') return { fxReservesMonths: { source: 'worldbank', months, year: 2023 } };
       return null;
@@ -319,7 +302,7 @@ describe('resilience dimension scorers', () => {
     const badRes = await scoreCurrencyExternal('MZ', makeReader(1.5));
     assert.ok(goodRes.score > badRes.score, `good reserves (${goodRes.score}) must score higher than bad (${badRes.score})`);
     assert.equal(goodRes.coverage, badRes.coverage, 'coverage should be the same when both have inflation+reserves');
-    assert.equal(goodRes.coverage, 0.55, 'non-BIS with inflation+reserves gets coverage=0.55');
+    assert.equal(goodRes.coverage, 0.85, 'inflation+reserves path gets coverage=0.85');
   });
 
   it('scoreMacroFiscal: IMF current account loaded, surplus country scores higher than deficit', async () => {
@@ -1150,8 +1133,9 @@ describe('resilience source-failure aggregation (T1.7)', () => {
   });
 
   it('scoreExternalDebtCoverage: low debt-to-reserves ratio scores well', async () => {
+    // PR 3 §3.5: goalpost tightened (5→2). NO ratio=0.2 → (2-0.2)/2 = 90.
     const no = await scoreExternalDebtCoverage('NO', fixtureReader);
-    assert.ok(no.score > 90, `NO with ratio 0.2 should score >90, got ${no.score}`);
+    assert.ok(no.score >= 85, `NO with ratio 0.2 should score >=85, got ${no.score}`);
   });
 
   it('scoreImportConcentration: low HHI scores well', async () => {
@@ -1167,17 +1151,29 @@ describe('resilience source-failure aggregation (T1.7)', () => {
     assert.equal(no.imputationClass, null, 'NO has real data, no imputation class');
   });
 
-  it('scoreFuelStockDays: country with stock data scores based on coverage', async () => {
+  // PR 3 §3.5: fuelStockDays retired permanently from the core score.
+  // scoreFuelStockDays returns coverage=0 + observedWeight=0 +
+  // imputationClass=null for every country regardless of seed content —
+  // the previous two behavioural tests no longer apply because there is
+  // no distinction between "has data" and "missing data" any more. New
+  // regression test: assert the retirement shape holds identically for
+  // a country that USED to have data and a country that never did, so no
+  // future commit silently re-enables the old branch.
+  //
+  // imputationClass is pinned to `null` (not 'source-failure') because
+  // 'source-failure' renders as "Source down: upstream seeder failed"
+  // with a `!` icon in the widget — semantically wrong for an intentional
+  // retirement. `null` lets the widget render the dimension as a neutral
+  // "absent" cell without a false outage label.
+  it('scoreFuelStockDays: retired — returns coverage=0 + null imputationClass for every country', async () => {
     const no = await scoreFuelStockDays('NO', fixtureReader);
-    // NO fixture: fuelStockDays=90 → normalizeHigherBetter(90, 0, 120) = 75
-    assert.ok(no.score > 60, `NO with 90 fuelStockDays should score >60, got ${no.score}`);
-    assert.ok(no.observedWeight > 0, 'real fuel-stock data must have observed weight');
-  });
-
-  it('scoreFuelStockDays: country without fuel stock data returns unmonitored', async () => {
     const ye = await scoreFuelStockDays('YE', fixtureReader);
-    assert.equal(ye.imputationClass, 'unmonitored');
-    assert.equal(ye.observedWeight, 0);
+    for (const [label, result] of [['NO', no], ['YE', ye]] as const) {
+      assert.equal(result.coverage, 0, `${label}: retired dimension must have coverage=0`);
+      assert.equal(result.observedWeight, 0, `${label}: retired dimension must have observedWeight=0`);
+      assert.equal(result.imputedWeight, 0, `${label}: retired dimension must have imputedWeight=0`);
+      assert.equal(result.imputationClass, null, `${label}: retired dimension must not tag source-failure (intentional retirement, not a runtime outage)`);
+    }
   });
 
   it('recovery domain is present in scoreAllDimensions output', async () => {
