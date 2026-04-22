@@ -379,9 +379,9 @@ export class App {
     if (shouldPrime('energy-complex')) {
       primeTask('oil', () => this.dataLoader.loadOilAnalytics());
     }
-    if (shouldPrime('trade-policy')) {
-      primeTask('tradePolicy', () => this.dataLoader.loadTradePolicy());
-    }
+    // trade-policy moved into the _wmAccess block below — see fix for
+    // anonymous 401 bug where loadTradePolicy fired 6 PRO-gated RPCs
+    // unconditionally on every page load.
     if (shouldPrime('supply-chain')) {
       primeTask('supplyChain', () => this.dataLoader.loadSupplyChain());
     }
@@ -391,6 +391,9 @@ export class App {
 
     const _wmAccess = hasPremiumAccess();
     if (_wmAccess) {
+      if (shouldPrime('trade-policy')) {
+        primeTask('tradePolicy', () => this.dataLoader.loadTradePolicy());
+      }
       if (shouldPrime('stock-analysis')) {
         primeTask('stockAnalysis', () => this.dataLoader.loadStockAnalysis());
       }
@@ -861,8 +864,27 @@ export class App {
     this.enforceFreeTierLimits();
 
     let _prevUserId: string | null = null;
+    // Track the last-seen PRO entitlement so we can re-fire PRO-gated loaders
+    // ONCE on a false→true transition (user signs in / purchase lands mid-session).
+    // Without this, loaders gated behind hasPremiumAccess() at init time (e.g.
+    // loadTradePolicy) would sit empty until the next scheduled refresh — for
+    // trade-policy that's a 10-minute wait post-sign-in. See PR #3295 review.
+    let _prevHadPremium = hasPremiumAccess();
     this.unsubFreeTier = subscribeAuthState((session) => {
       this.enforceFreeTierLimits();
+      const hadPremium = _prevHadPremium;
+      const nowPremium = hasPremiumAccess();
+      if (nowPremium && !hadPremium) {
+        // Entitlement just resolved → fire PRO-gated initial loads that were
+        // skipped at boot. Each loader early-returns if the panel isn't
+        // mounted and re-checks hasPremiumAccess() internally, so these
+        // calls are safe and idempotent. Without this, trade-policy would
+        // sit empty for up to REFRESH_INTERVALS.tradePolicy (~10 min) after
+        // sign-in because the scheduler's viewport gate is the only retry.
+        void this.dataLoader.loadTradePolicy();
+      }
+      _prevHadPremium = nowPremium;
+
       const userId = session.user?.id ?? null;
       if (userId !== null && userId !== _prevUserId) {
         void cloudPrefsSignIn(userId, SITE_VARIANT);
@@ -1356,9 +1378,12 @@ export class App {
       this.refreshScheduler.scheduleRefresh('temporalBaseline', () => this.dataLoader.refreshTemporalBaseline(), REFRESH_INTERVALS.temporalBaseline, () => this.shouldRefreshIntelligence());
     }
 
-    // WTO trade policy data — annual data, poll every 10 min to avoid hammering upstream
+    // WTO trade policy data — annual data, poll every 10 min to avoid hammering upstream.
+    // PRO-gated: the isNearViewport check is a visibility gate, not an entitlement gate,
+    // so without hasPremiumAccess() here we'd still hit the 6 WTO RPCs every poll for
+    // free users once the panel scrolled into view.
     if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'commodity' || SITE_VARIANT === 'energy') {
-      this.refreshScheduler.scheduleRefresh('tradePolicy', () => this.dataLoader.loadTradePolicy(), REFRESH_INTERVALS.tradePolicy, () => this.isPanelNearViewport('trade-policy'));
+      this.refreshScheduler.scheduleRefresh('tradePolicy', () => this.dataLoader.loadTradePolicy(), REFRESH_INTERVALS.tradePolicy, () => hasPremiumAccess() && this.isPanelNearViewport('trade-policy'));
       this.refreshScheduler.scheduleRefresh('supplyChain', () => this.dataLoader.loadSupplyChain(), REFRESH_INTERVALS.supplyChain, () => this.isPanelNearViewport('supply-chain'));
     }
 
