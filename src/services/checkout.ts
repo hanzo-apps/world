@@ -15,9 +15,19 @@ import * as Sentry from '@sentry/browser';
 import { DodoPayments } from 'dodopayments-checkout';
 import type { CheckoutEvent } from 'dodopayments-checkout';
 import { openBillingPortal } from './billing';
-import { getCurrentClerkUser, getClerkToken } from './clerk';
+import { getCurrentClerkUser, getClerkToken, openSignIn } from './clerk';
 import { subscribeAuthState } from './auth-state';
 import { saveCheckoutAttempt, clearCheckoutAttempt } from './checkout-attempt';
+import {
+  classifyHttpCheckoutError,
+  classifySyntheticCheckoutError,
+  classifyThrownCheckoutError,
+  type CheckoutError,
+  type CheckoutErrorBody,
+  type CheckoutErrorCode,
+} from './checkout-errors';
+import { showCheckoutErrorToast } from './checkout-error-toast';
+import { decideNoUserPathOutcome } from './checkout-no-user-policy';
 
 export {
   saveCheckoutAttempt,
@@ -34,7 +44,6 @@ const CHECKOUT_DISCOUNT_PARAM = 'checkoutDiscount';
 const PENDING_CHECKOUT_KEY = 'wm-pending-checkout';
 const POST_CHECKOUT_FLAG_KEY = 'wm-post-checkout';
 const APP_CHECKOUT_BASE_URL = 'https://worldmonitor.app/';
-const ACTIVE_SUBSCRIPTION_EXISTS = 'ACTIVE_SUBSCRIPTION_EXISTS';
 
 /**
  * Session flag set just before the post-overlay reload. Lets panel-layout
@@ -407,7 +416,33 @@ export async function startCheckout(
 
   const user = getCurrentClerkUser();
   if (!user) {
-    if (fallbackToPricingPage) window.open('https://worldmonitor.app/pro', '_blank');
+    const intent = {
+      productId,
+      referralCode: options?.referralCode,
+      discountCode: options?.discountCode,
+    };
+    reportCheckoutError(
+      classifySyntheticCheckoutError('unauthorized'),
+      { productId, action: 'no-user' },
+    );
+    // Pure policy decision lives in checkout-no-user-policy.ts; tested
+    // against regression in tests/checkout-no-user-policy.test.mts. The
+    // contract: redirect path MUST NOT write sessionStorage (would
+    // create a stale dashboard intent that a later unrelated sign-in
+    // would auto-resume); inline path MUST write so the post-auth
+    // Clerk listener can resume the exact checkout.
+    const outcome = decideNoUserPathOutcome(fallbackToPricingPage);
+    if (outcome.kind === 'redirect-pro') {
+      window.location.assign(outcome.redirectUrl);
+    } else {
+      savePendingCheckoutIntent(intent);
+      saveCheckoutAttempt({
+        ...intent,
+        startedAt: Date.now(),
+        origin: 'dashboard',
+      });
+      openSignIn();
+    }
     return false;
   }
 
@@ -430,7 +465,9 @@ export async function startCheckout(
       token = await getClerkToken();
     }
     if (!token) {
-      if (fallbackToPricingPage) window.open('https://worldmonitor.app/pro', '_blank');
+      const error = classifySyntheticCheckoutError('session_expired');
+      reportCheckoutError(error, { productId, action: 'no-token' });
+      renderCheckoutErrorSurface(error, fallbackToPricingPage);
       return false;
     }
 
@@ -447,15 +484,40 @@ export async function startCheckout(
     });
 
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      console.error('[checkout] Edge endpoint error:', resp.status, err);
-      if (resp.status === 409 && err?.error === ACTIVE_SUBSCRIPTION_EXISTS) {
+      const body = (await resp.json().catch(() => ({}))) as CheckoutErrorBody;
+      const error = classifyHttpCheckoutError(resp.status, body);
+      reportCheckoutError(error, { productId, action: 'http-error' });
+      // 409 duplicate-subscription continues to route through the
+      // billing portal (PR-7 will add a user-facing dialog before the
+      // portal hand-off). The taxonomy now classifies the code but we
+      // preserve the current navigation until PR-7.
+      if (error.code === 'duplicate_subscription') {
         clearPendingCheckoutIntent();
         clearCheckoutAttempt('duplicate');
         await openBillingPortal();
         return false;
       }
-      if (fallbackToPricingPage) window.open('https://worldmonitor.app/pro', '_blank');
+      // 401 from /api/create-checkout means the Clerk session we sent
+      // is invalid or expired. A toast alone is a dead end — the user
+      // needs to re-auth to retry. Save the intent and reopen sign-in
+      // inline so the post-auth Clerk listener can auto-resume the
+      // exact checkout without manual re-click.
+      //
+      // 403 is intentionally NOT routed here: 403 = valid auth but
+      // forbidden action (banned account, plan-tier mismatch, etc.).
+      // Reopening sign-in would not change the outcome and would
+      // confuse the user. 403 falls through to the normal error
+      // surface (toast) below.
+      if (error.code === 'unauthorized' || error.code === 'session_expired') {
+        savePendingCheckoutIntent({
+          productId,
+          referralCode: options?.referralCode,
+          discountCode: options?.discountCode,
+        });
+        openSignIn();
+        return false;
+      }
+      renderCheckoutErrorSurface(error, fallbackToPricingPage);
       return false;
     }
 
@@ -464,15 +526,105 @@ export async function startCheckout(
       openCheckout(result.checkout_url);
       return true;
     }
+    // 200 OK but no checkout_url is a server contract violation (the
+    // edge relayer returned success but the payload is unusable). Used
+    // to silently `return false` — the user saw nothing happen and the
+    // bug was invisible in Sentry. Classify as service_unavailable
+    // (closest accurate user-facing copy) and tag action so engineers
+    // can filter this specific contract violation in Sentry. httpStatus
+    // stays 200 — we want the actual status the server returned, not a
+    // synthetic 5xx that would mask the real anomaly.
+    const missingUrlError: CheckoutError = {
+      code: 'service_unavailable',
+      userMessage: 'Checkout is temporarily unavailable. Please try again in a moment.',
+      serverMessage: 'Server returned 200 without a checkout_url',
+      httpStatus: resp.status,
+      retryable: true,
+    };
+    reportCheckoutError(missingUrlError, { productId, action: 'missing-checkout-url' });
+    renderCheckoutErrorSurface(missingUrlError, fallbackToPricingPage);
     return false;
   } catch (err) {
-    console.error('[checkout] Failed to create checkout session:', err);
-    Sentry.captureException(err, { tags: { component: 'dodo-checkout', action: 'createCheckout' }, extra: { productId } });
-    if (fallbackToPricingPage) window.open('https://worldmonitor.app/pro', '_blank');
+    const error = classifyThrownCheckoutError(err);
+    reportCheckoutError(error, { productId, action: 'exception' }, err);
+    renderCheckoutErrorSurface(error, fallbackToPricingPage);
     return false;
   } finally {
     _checkoutInFlight = false;
   }
+}
+
+/**
+ * Capture a checkout error to Sentry with structured context. Raw
+ * server-generated text is attached as `extra.serverMessage` — never
+ * surfaces to the user.
+ *
+ * Unauthorized / session_expired are *expected* user states (nobody
+ * signed in yet, Clerk session aged out) rather than engineering
+ * failures. They fire on every free-tier pricing click, so reporting
+ * them at `error` level would drown Sentry in non-actionable noise.
+ * Capture them at `info` so the funnel is still observable without
+ * triggering alerts. Everything else stays at `error`.
+ */
+type SentryLevel = 'error' | 'info';
+const INFO_LEVEL_CODES: ReadonlySet<CheckoutErrorCode> = new Set([
+  'unauthorized',
+  'session_expired',
+]);
+
+function reportCheckoutError(
+  error: CheckoutError,
+  context: { productId: string; action: string },
+  caught?: unknown,
+): void {
+  const level: SentryLevel = INFO_LEVEL_CODES.has(error.code) ? 'info' : 'error';
+  const payload = {
+    level,
+    tags: {
+      component: 'dodo-checkout',
+      action: context.action,
+      code: error.code,
+    },
+    extra: {
+      productId: context.productId,
+      httpStatus: error.httpStatus,
+      serverMessage: error.serverMessage,
+    },
+  };
+  if (caught) {
+    Sentry.captureException(caught, payload);
+  } else {
+    Sentry.captureMessage(`Checkout error: ${error.code}`, payload);
+  }
+  const logger = level === 'info' ? console.info : console.error;
+  logger(
+    `[checkout] ${error.code}${error.httpStatus ? ` (HTTP ${error.httpStatus})` : ''}`,
+    error.serverMessage ?? '',
+  );
+}
+
+/**
+ * Render the appropriate user-facing surface for a checkout error.
+ *
+ * `fallbackToPricingPage` semantics:
+ *   - true  → same-tab navigate to `/pro` so the user lands on the
+ *             marketing pricing page (used by in-product upsells that
+ *             expect to route users away from the dashboard).
+ *   - false → inline toast only (default for dashboard-origin retries
+ *             and resumePendingCheckout).
+ *
+ * Never uses `window.open(..., '_blank')` anymore — the stranded new
+ * tab pattern was the failure mode this PR closes.
+ */
+function renderCheckoutErrorSurface(
+  error: CheckoutError,
+  fallbackToPricingPage: boolean,
+): void {
+  if (fallbackToPricingPage) {
+    window.location.assign('https://worldmonitor.app/pro');
+    return;
+  }
+  showCheckoutErrorToast(error.userMessage);
 }
 
 /**
