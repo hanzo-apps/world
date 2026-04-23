@@ -376,6 +376,75 @@ describe('agent readiness: api-catalog + openapi build', () => {
   });
 });
 
+// The MCP endpoint and OAuth protected-resource metadata must share an
+// origin — a scanner or client that enters from a mismatched host sees
+// "this server says its resource lives on a different origin", which
+// violates RFC 9728 and breaks the PRM discovery flow in strict clients.
+// The resource/authorization-server split is intentional: apex serves
+// the MCP transport + resource metadata, api.worldmonitor.app serves
+// the OAuth endpoints. Keep them in lockstep — all resource-side
+// pointers (MCP server-card transport.endpoint, MCP server-card
+// authentication.resource, oauth-protected-resource.resource, and every
+// WWW-Authenticate resource_metadata pointer emitted from api/mcp.ts)
+// must agree, while authorization_servers stays on the api host.
+describe('agent readiness: MCP/OAuth origin alignment', () => {
+  const mcpCard = JSON.parse(
+    readFileSync(resolve(__dirname, '../public/.well-known/mcp/server-card.json'), 'utf-8')
+  );
+  const oauthMeta = JSON.parse(
+    readFileSync(resolve(__dirname, '../public/.well-known/oauth-protected-resource'), 'utf-8')
+  );
+
+  const mcpEndpointOrigin = new URL(mcpCard.transport.endpoint).origin;
+  const resourceOrigin = new URL(oauthMeta.resource).origin;
+
+  it('MCP transport.endpoint origin matches OAuth metadata resource origin', () => {
+    assert.equal(
+      mcpEndpointOrigin,
+      resourceOrigin,
+      'MCP transport.endpoint and OAuth resource must share the same origin'
+    );
+  });
+
+  it('MCP card authentication.resource equals OAuth metadata resource exactly', () => {
+    assert.equal(
+      mcpCard.authentication.resource,
+      oauthMeta.resource,
+      'MCP card authentication.resource must equal OAuth metadata resource'
+    );
+  });
+
+  it('authorization_servers stay on api.worldmonitor.app (intentional resource/AS split)', () => {
+    assert.ok(
+      Array.isArray(oauthMeta.authorization_servers) && oauthMeta.authorization_servers.length > 0,
+      'oauth-protected-resource.authorization_servers must be a non-empty array'
+    );
+    for (const s of oauthMeta.authorization_servers) {
+      assert.equal(
+        new URL(s).origin,
+        'https://api.worldmonitor.app',
+        `authorization_servers entry must stay on api.worldmonitor.app, got: ${s}`
+      );
+    }
+  });
+
+  it('api/mcp.ts WWW-Authenticate resource_metadata pointers share origin with oauth-protected-resource', () => {
+    const mcpSource = readFileSync(resolve(__dirname, '../api/mcp.ts'), 'utf-8');
+    const matches = [...mcpSource.matchAll(/resource_metadata="([^"]+)"/g)];
+    assert.ok(
+      matches.length > 0,
+      'api/mcp.ts should emit resource_metadata pointers in its 401 WWW-Authenticate headers'
+    );
+    for (const [, url] of matches) {
+      assert.equal(
+        new URL(url).origin,
+        resourceOrigin,
+        `api/mcp.ts resource_metadata pointer ${url} must share origin with oauth-protected-resource`
+      );
+    }
+  });
+});
+
 // PR history: #3204 / #3206 forced the resvg linux-x64-gnu native
 // binding into the carousel function via vercel.json
 // `functions.includeFiles`. That entire workaround became unnecessary

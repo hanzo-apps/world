@@ -15,7 +15,7 @@
   "authentication": {
     "type": "oauth2",
     "authorization_servers": ["https://api.worldmonitor.app"],
-    "resource": "https://api.worldmonitor.app",
+    "resource": "https://worldmonitor.app",
     "scopes": ["mcp"]
   }
 }
