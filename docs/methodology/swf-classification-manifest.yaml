@@ -1,0 +1,360 @@
+# Sovereign Wealth Fund Classification Manifest
+# =============================================
+#
+# Authoritative list of sovereign wealth funds scored for the
+# `sovereignFiscalBuffer` resilience dimension (PR 2 of the resilience
+# repair plan, docs/plans/2026-04-22-001-fix-resilience-scorer-
+# structural-bias-plan.md §3.4).
+#
+# Methodology of the per-fund classification. Each coefficient
+# (access / liquidity / transparency) is derived from the published
+# evidence cited in that fund's `rationale.*` + `sources:` block —
+# fund mandate documents, latest annual reports, Linaburg-Maduell
+# transparency index, IFSWF member profiles. The `rationale` text is
+# the committed audit trail: any reader can verify the coefficient
+# against the cited source, and any future revision must update both
+# the coefficient and the rationale in the same PR.
+#
+# Revision policy: revise this manifest in a follow-up PR when a fund
+# governance signal changes substantively — mandate shift, major asset-
+# mix rebalance, transparency upgrade/downgrade (LM index bump, IFSWF
+# membership change), or a new fund becoming scorable. Quarterly is
+# the default cadence but the gate is "did the evidence change?", not
+# the calendar.
+#
+# Schema (per fund):
+#   country:      ISO-3166-1 alpha-2 country code
+#   fund:         short identifier used in aggregation (one per country or
+#                 multiple when a country operates multiple state funds)
+#   display_name: human-readable name for the methodology doc / drill-down
+#   classification:
+#     access:       0..1 — how directly the state can deploy fund assets
+#                   into budget support during a shock. Stabilization =
+#                   high; savings-with-fiscal-rule = medium;
+#                   illiquid domestic strategic = low.
+#     liquidity:    0..1 — share of fund AUM in liquid public markets.
+#     transparency: 0..1 — normalized Linaburg-Maduell / IFSWF compliance.
+#   rationale:
+#     access:       cite the mandate / fiscal rule that drives the score
+#     liquidity:    cite the latest published asset-mix split
+#     transparency: cite the LM score or IFSWF-audit status
+#   sources:
+#     - URL or citation for the latest disclosure
+#
+# Scoring composition (applied in `scoreSovereignFiscalBuffer`):
+#   effectiveMonths = rawSwfMonths × access × liquidity × transparency
+#   rawSwfMonths    = disclosedSwfAssets / annualImports × 12
+#   score           = 100 × (1 − exp(−effectiveMonths / 12))
+#
+# The saturating transform prevents Norway-type outliers (effective
+# months in the 100s) from dominating the recovery pillar out of
+# proportion to their marginal resilience benefit.
+#
+# Countries NOT listed here have no sovereign wealth fund for scoring
+# purposes. Absence is substantive (not "not applicable") — they score
+# 0 on `sovereignFiscalBuffer` with full coverage, contributing 0×weight
+# to the recovery-pillar numerator. See plan §3.4 "What happens to no-
+# SWF countries."
+#
+# Adding / removing a fund: open a PR that updates this manifest, cites
+# the source (annual report URL, IFSWF profile, LM index page), and
+# re-runs the seeder against the new entry to confirm 8/N live match.
+
+manifest_version: 1
+last_reviewed: 2026-04-23
+# REVIEWED means: coefficients derive from the committed rationale +
+# sources block and the seeder end-to-end matches the expected funds
+# against the live Wikipedia / IFSWF / official-disclosure surfaces.
+# PENDING is reserved for PRs that ship unresolved / TBD coefficients.
+external_review_status: REVIEWED
+
+funds:
+
+  # ── Norway ──
+  # GPFG is the archetypal long-horizon-savings vehicle with a fiscal
+  # rule (max 3% expected real-return withdrawal). v2 mislabeled this
+  # as a "stabilization fund"; the rationale below gets it right.
+  - country: NO
+    fund: gpfg
+    display_name: Government Pension Fund Global (GPFG)
+    wikipedia:
+      abbrev: GPF-G
+      fund_name: Government Pension Fund Global
+    classification:
+      access: 0.6
+      liquidity: 1.0
+      transparency: 1.0
+    rationale:
+      access: |
+        Norwegian fiscal rule caps annual withdrawal at expected real
+        return (~3%). Long-horizon-savings vehicle with a fiscal-access
+        rule — not a pure stabilization fund. Medium-high access score.
+      liquidity: |
+        100% publicly listed equities + fixed income + listed real estate
+        (NBIM 2025 annual report). No private markets. Full liquidity.
+      transparency: |
+        Full audited AUM, daily returns disclosed, holdings-level
+        reporting. IFSWF full-compliance. LM index = 10.
+    sources:
+      - https://www.nbim.no/en/the-fund/about-the-fund/
+      - https://www.regjeringen.no/en/topics/the-economy/the-government-pension-fund/id1441/
+
+  # ── United Arab Emirates ──
+  # Multiple federal + emirate-level vehicles. ADIA (Abu Dhabi) is the
+  # flagship intergenerational savings fund; Mubadala is a strategic
+  # holding-and-financial hybrid. ADQ + ICD (Dubai) omitted from v1;
+  # candidates for a follow-up PR if their AUM disclosures stabilize.
+  - country: AE
+    fund: adia
+    display_name: Abu Dhabi Investment Authority (ADIA)
+    wikipedia:
+      abbrev: ADIA
+      fund_name: Abu Dhabi Investment Authority
+    classification:
+      access: 0.3
+      liquidity: 0.7
+      transparency: 0.5
+    rationale:
+      access: |
+        Intergenerational savings mandate; no explicit stabilization
+        access rule. Ruler-discretionary deployment. Low-medium access.
+      liquidity: |
+        ADIA 2024 review discloses ~55-70% public-market (equities +
+        bonds) allocation, balance in alternatives and real assets.
+      transparency: |
+        Annual review published with asset-class ranges (not exact AUM).
+        Partial IFSWF engagement. LM index = 6.
+    sources:
+      - https://www.adia.ae/en/review
+      - https://www.ifswf.org/member-profiles/abu-dhabi-investment-authority
+
+  - country: AE
+    fund: mubadala
+    display_name: Mubadala Investment Company
+    wikipedia:
+      fund_name: Mubadala Investment Company
+    classification:
+      access: 0.4
+      liquidity: 0.5
+      transparency: 0.6
+    rationale:
+      access: |
+        Strategic + financial hybrid mandate — combines economic-
+        diversification assets with financial investments. Medium
+        access for fiscal support; constrained by strategic holdings.
+      liquidity: |
+        Mixed: ~50% public equities + credit, ~50% private equity,
+        real estate, infrastructure (Mubadala 2024 annual report).
+      transparency: |
+        Audited AUM published, asset-mix disclosed annually. IFSWF
+        member. LM index = 10.
+    sources:
+      - https://www.mubadala.com/en/annual-review
+      - https://www.ifswf.org/member-profiles/mubadala-investment-company
+
+  # ── Saudi Arabia ──
+  # PIF combines stabilization, strategic-diversification, and domestic
+  # development mandates. Asset mix is heavily domestic-strategic
+  # (Aramco stake, Vision 2030 megaprojects). Limited IFSWF engagement.
+  - country: SA
+    fund: pif
+    display_name: Public Investment Fund (PIF)
+    wikipedia:
+      abbrev: PIF
+      fund_name: Public Investment Fund
+    classification:
+      access: 0.4
+      liquidity: 0.4
+      transparency: 0.3
+    rationale:
+      access: |
+        Hybrid strategic + stabilization mandate; deployment for budget
+        support possible but constrained by domestic-strategic
+        allocation locked to Vision 2030.
+      liquidity: |
+        Heavy domestic-strategic allocation (Aramco, megaprojects,
+        domestic equities). Public-market share estimated ~40%.
+      transparency: |
+        Audited financials published but line-item allocation limited.
+        Joined IFSWF observer status; not full member. LM index ~ 4.
+    sources:
+      - https://www.pif.gov.sa/en/about-pif/annual-report/
+      - https://www.ifswf.org/members
+
+  # ── Kuwait ──
+  # KIA runs two legally distinct funds: General Reserve Fund (budget-
+  # financing) and Future Generations Fund (intergenerational). Combined
+  # here since audited AUM is reported at the KIA level.
+  - country: KW
+    fund: kia
+    display_name: Kuwait Investment Authority (KIA)
+    wikipedia:
+      abbrev: KIA
+      fund_name: Kuwait Investment Authority
+    classification:
+      access: 0.7
+      liquidity: 0.8
+      transparency: 0.4
+    rationale:
+      access: |
+        General Reserve Fund explicitly finances budget shortfalls from
+        oil-revenue swings. Strongest stabilization access in the Gulf.
+      liquidity: |
+        Predominantly public-market (~75-85% listed equities + fixed
+        income). Private-asset sleeve is a minority allocation.
+      transparency: |
+        Financials reported to National Assembly but sealed from
+        public; partial IFSWF engagement. LM index = 6.
+    sources:
+      - https://www.kia.gov.kw/en/
+      - https://www.ifswf.org/member-profiles/kuwait-investment-authority
+
+  # ── Qatar ──
+  - country: QA
+    fund: qia
+    display_name: Qatar Investment Authority (QIA)
+    wikipedia:
+      abbrev: QIA
+      fund_name: Qatar Investment Authority
+    classification:
+      access: 0.4
+      liquidity: 0.6
+      transparency: 0.4
+    rationale:
+      access: |
+        Long-horizon wealth-management mandate; some strategic domestic
+        exposure. Deployment for budget support requires amiri decree.
+      liquidity: |
+        Estimated ~60% public-market + ~40% private (real estate, PE,
+        strategic stakes). Mid-liquid.
+      transparency: |
+        Limited public disclosure. IFSWF full member with audited
+        filings to the secretariat. LM index = 5.
+    sources:
+      - https://www.qia.qa/en/
+      - https://www.ifswf.org/member-profiles/qatar-investment-authority
+
+  # ── Singapore ──
+  # Two distinct vehicles with different mandates. GIC = reserve-
+  # investment (coordinated with MAS), Temasek = strategic holding
+  # company (active ownership in listed + unlisted). Both are state
+  # investors; only GIC sits cleanly in the "SWF" taxonomy, but Temasek
+  # is included here because its combination of state ownership +
+  # deployable public-market positions is the exact fiscal-buffer
+  # signal the dimension measures. Wikipedia's list article classifies
+  # Temasek as a "state holding company" and excludes it — the seeder
+  # closes that gap via the per-fund infobox Tier 3b path.
+  - country: SG
+    fund: gic
+    display_name: Government of Singapore Investment Corporation (GIC)
+    wikipedia:
+      abbrev: GIC
+      fund_name: GIC Private Limited
+    classification:
+      access: 0.6
+      liquidity: 0.9
+      transparency: 0.8
+    rationale:
+      access: |
+        Reserve-investment mandate coordinated with MAS; designed for
+        long-horizon reserve management with fiscal-contribution
+        mechanism (Net Investment Returns Contribution framework).
+      liquidity: |
+        ~90% public-market (equities + bonds + nominal cash) per GIC
+        2024/25 annual report. High liquidity.
+      transparency: |
+        Annual report with asset-class breakdown and 20-year rolling
+        returns. Does not disclose exact AUM. IFSWF full member.
+        LM index = 8.
+    sources:
+      - https://www.gic.com.sg/annual-report
+      - https://www.ifswf.org/member-profiles/gic-private-limited
+
+  - country: SG
+    fund: temasek
+    display_name: Temasek Holdings
+    wikipedia:
+      fund_name: Temasek Holdings
+      # Temasek is not listed on Wikipedia's /wiki/List_of_sovereign_wealth_funds
+      # (Wikipedia editorially classifies it as a state holding company, not an
+      # SWF — the practitioner classification is contested). Scraper uses the
+      # per-fund article infobox via `article_url` as Tier 3b fallback. Infobox
+      # reports AUM in SGD, which the seeder converts via its baked-in FX table.
+      article_url: https://en.wikipedia.org/wiki/Temasek_Holdings
+    classification:
+      access: 0.4
+      liquidity: 0.5
+      transparency: 0.9
+    rationale:
+      access: |
+        Strategic holding company with active ownership. Budget-support
+        deployment is mechanically possible via dividend flow but not
+        via primary-asset liquidation (would disrupt portfolio
+        companies). Medium-low access.
+      liquidity: |
+        Mixed: listed equities (~50%), unlisted + private (~50%) per
+        Temasek Review 2025. Mid-liquid.
+      transparency: |
+        Audited net portfolio value published, MSCI-benchmarked returns
+        disclosed, holdings-level reporting for top 20 exposures. LM
+        index = 10.
+    sources:
+      - https://www.temasekreview.com.sg/
+      - https://www.temasek.com.sg/en/our-financials
+
+# ────────────────────────────────────────────────────────────────────
+# CANDIDATES DEFERRED FROM V1
+# ────────────────────────────────────────────────────────────────────
+#
+# Funds considered but not scored in v1. Adding any of these to the
+# active `funds:` list above requires a follow-up PR with the same
+# audit discipline: committed rationale, cited sources, end-to-end
+# seeder match verification. The shortlist below is the committed
+# checklist of what was evaluated and the reasons for deferral — so a
+# future PR author (or `/loop seed-sovereign-wealth` pass) can argue
+# the case on record.
+#
+#   China:       CIC (China Investment Corporation), SAFE Investment Co.
+#                — size is consequential (both >$1T) but political-economy
+#                classification is contested, and Wikipedia's list
+#                article bundles both under PRC policy banks. Defer
+#                until the access-factor rubric has a tested treatment
+#                for state-directed non-financial return mandates.
+#   Hong Kong:   HKMA Exchange Fund — commonly classified as an FX
+#                reserve vehicle rather than an SWF. Out of scope for
+#                the fiscal-buffer dimension; revisit if the Exchange
+#                Fund's "Future Fund" branch expands materially.
+#   Russia:      National Wealth Fund (NWF) — sanctions + asset-freeze
+#                make `access` effectively 0. Include only after a
+#                regime change that restores deployable liquidity.
+#   Azerbaijan:  SOFAZ — well-documented, IFSWF member; shippable in
+#                the next manifest PR.
+#   Kazakhstan:  Samruk-Kazyna (domestic strategic), NFRK (oil
+#                stabilization). Score separately; NFRK is the cleaner
+#                fit for the dimension.
+#   Libya:       LIA — sanctions + asset-freeze; same exclusion as
+#                NWF. Revisit on sanctions change.
+#   Nigeria:     NSIA (Nigeria Sovereign Investment Authority) — IFSWF
+#                member, three-fund structure; shippable in a follow-up
+#                PR once the three sub-fund mandates are mapped.
+#   Angola:      FSDEA — governance concerns historically. Defer until
+#                audited AUM disclosure stabilizes.
+#   Oman:        OIA — merged SGRF + OIF 2020; IFSWF member. Shippable.
+#   Brunei:      BIA — opaque, LM index ~2. Transparency coefficient
+#                would pin at ~0.1, heavily dampening any contribution;
+#                ship only if the rationale holds up to audit.
+#   Timor-Leste: Petroleum Fund — high transparency, textbook fit.
+#   Iran:        NDFI (National Development Fund of Iran) — sanctions +
+#                access concerns; exclude from v1.
+#   Korea:       KIC — FX reserve investor rather than stabilization
+#                fund; edge case on whether it belongs in this dim.
+#   Australia:   Future Fund — well-documented, likely shippable.
+#   New Zealand: NZ Super Fund — well-documented, likely shippable.
+#   Ireland:     ISIF — strategic-development mandate; low access,
+#                medium liquidity, high transparency — composite
+#                probably mid-low.
+#   Chile:       ESSF (Economic and Social Stabilization Fund) —
+#                textbook stabilization fund; high priority for the
+#                next manifest PR.
+#   Panama, Trinidad & Tobago, Ghana, Senegal — smaller funds; include
+#   when the AUM / annual-imports ratio is non-negligible.
