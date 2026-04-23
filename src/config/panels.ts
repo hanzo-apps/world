@@ -908,6 +908,9 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
 const ENERGY_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Energy Atlas Map', enabled: true, priority: 1 },
   'chokepoint-strip': { name: 'Chokepoint Status', enabled: true, priority: 1 },
+  'pipeline-status': { name: 'Oil & Gas Pipeline Status', enabled: true, priority: 1 },
+  'storage-facility-map': { name: 'Strategic Storage Atlas', enabled: true, priority: 1 },
+  'fuel-shortages': { name: 'Global Fuel Shortage Registry', enabled: true, priority: 1 },
   'live-news': { name: 'Energy Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Energy Insights', enabled: true, priority: 1 },
   // Energy complex — existing panels reused at launch
@@ -993,6 +996,8 @@ const ENERGY_MAP_LAYERS: MapLayers = {
   commodityPorts: true,   // LNG import/export + crude terminals
   webcams: false,
   diseaseOutbreaks: false,
+  storageFacilities: true, // UGS / SPR / LNG / crude hubs (Day 9-10 registry)
+  fuelShortages: true,     // Global fuel shortage alerts (Day 11-12 registry)
 };
 
 const ENERGY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -1048,6 +1053,8 @@ const ENERGY_MOBILE_MAP_LAYERS: MapLayers = {
   commodityPorts: true,
   webcams: false,
   diseaseOutbreaks: false,
+  storageFacilities: true,
+  fuelShortages: true,
 };
 
 // ============================================

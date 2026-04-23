@@ -58,6 +58,21 @@ import { H3HexagonLayer, TripsLayer } from '@deck.gl/geo-layers';
 import { PathStyleExtension } from '@deck.gl/extensions';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
+import {
+  derivePipelinePublicBadge,
+  type PipelineEvidenceInput,
+  type PipelinePublicBadge,
+} from '@/shared/pipeline-evidence';
+import { getCachedPipelineRegistries } from '@/shared/pipeline-registry-store';
+import {
+  deriveStoragePublicBadge,
+  type StorageEvidenceInput,
+  type StoragePublicBadge,
+} from '@/shared/storage-evidence';
+import { getCachedStorageFacilityRegistry } from '@/shared/storage-facility-registry-store';
+import { getCachedFuelShortageRegistry } from '@/shared/fuel-shortage-registry-store';
+// getCountryCentroid is imported lower in the file alongside other
+// country-geometry helpers; don't re-import it here.
 import { tokenizeForMatch, matchKeyword, matchesAnyKeyword, findMatchingKeywords } from '@/utils/keyword-match';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
@@ -1493,11 +1508,36 @@ export class DeckGLMap {
       this.layerCache.delete('cables-layer');
     }
 
-    // Pipelines layer
+    // Pipelines layer. Energy variant uses the evidence-backed registry
+    // (seed-pipelines-{gas,oil}.mjs) and colors by derived publicBadge;
+    // other variants keep the static PIPELINES config colored by type.
     if (mapLayers.pipelines) {
-      layers.push(this.createPipelinesLayer());
+      layers.push(SITE_VARIANT === 'energy'
+        ? this.createEnergyPipelinesLayer()
+        : this.createPipelinesLayer());
     } else {
       this.layerCache.delete('pipelines-layer');
+    }
+
+    // Storage facilities layer (energy variant only). Registry is seeded
+    // weekly by scripts/seed-storage-facilities.mjs; colors by derived
+    // publicBadge identical to the panel's evidence deriver so first-paint
+    // map dots match panel status exactly.
+    if (SITE_VARIANT === 'energy' && mapLayers.storageFacilities) {
+      const storageLayer = this.createEnergyStorageLayer();
+      if (storageLayer) layers.push(storageLayer);
+    } else {
+      this.layerCache.delete('storage-facilities-layer');
+    }
+
+    // Fuel shortage pins (energy variant only). One pin per active shortage
+    // placed at the country centroid. Color by severity; click opens the
+    // FuelShortagePanel drawer via event.
+    if (SITE_VARIANT === 'energy' && mapLayers.fuelShortages) {
+      const shortageLayer = this.createEnergyShortagePinsLayer();
+      if (shortageLayer) layers.push(shortageLayer);
+    } else {
+      this.layerCache.delete('fuel-shortages-layer');
     }
 
     // Conflict zones layer
@@ -1921,6 +1961,352 @@ export class DeckGLMap {
     this.lastPipelineHighlightSignature = highlightSignature;
     this.layerCache.set(cacheKey, layer);
     return layer;
+  }
+
+  // Energy-variant override for the pipelines map layer. Instead of the
+  // static PIPELINES config (colored by oil/gas type), this reads the
+  // evidence-backed pipeline registries seeded by scripts/seed-pipelines-
+  // {gas,oil}.mjs and colors each path by its derived publicBadge —
+  // flowing/reduced/offline/disputed. Click dispatches an
+  // `open-pipeline-detail` window event that PipelineStatusPanel listens
+  // for to open its drawer. Falls back to the static layer if bootstrap
+  // hasn't hydrated yet (e.g. variant switch before the fetch completes).
+  private createEnergyPipelinesLayer(): PathLayer {
+    const cacheKey = 'pipelines-layer';
+    const highlightedPipelines = this.highlightedAssets.pipeline;
+    const highlightSignature = this.getSetSignature(highlightedPipelines);
+
+    interface RawEntry {
+      id?: string; name?: string; commodityType?: string;
+      startPoint?: { lat?: number; lon?: number };
+      endPoint?:   { lat?: number; lon?: number };
+      waypoints?:  Array<{ lat?: number; lon?: number }>;
+      operator?: string;
+      evidence?: PipelineEvidenceInput;
+    }
+    interface EnergyPipeline {
+      id: string;
+      name: string;
+      operator: string;
+      commodityType: string;
+      points: Array<[number, number]>;
+      badge: PipelinePublicBadge;
+    }
+
+    // Read through the shared store instead of getHydratedData directly —
+    // getHydratedData is single-use (deletes on first read), and this same
+    // data is also consumed by PipelineStatusPanel. The store memoizes so
+    // both consumers see identical data regardless of mount order.
+    const { gas, oil } = getCachedPipelineRegistries() as {
+      gas: { pipelines?: Record<string, RawEntry> } | undefined;
+      oil: { pipelines?: Record<string, RawEntry> } | undefined;
+    };
+    const rawEntries: RawEntry[] = [
+      ...Object.values(gas?.pipelines ?? {}),
+      ...Object.values(oil?.pipelines ?? {}),
+    ];
+
+    // Bootstrap not hydrated yet → fall back to the static layer so the
+    // map always has some representation of the pipelines toggle.
+    if (rawEntries.length === 0) return this.createPipelinesLayer();
+
+    const data: EnergyPipeline[] = rawEntries
+      .map(raw => {
+        const id = typeof raw.id === 'string' ? raw.id : '';
+        if (!id) return null;
+        const start = raw.startPoint;
+        const end = raw.endPoint;
+        if (!start || !end || typeof start.lat !== 'number' || typeof start.lon !== 'number' ||
+            typeof end.lat !== 'number' || typeof end.lon !== 'number') return null;
+        const points: Array<[number, number]> = [[start.lon, start.lat]];
+        if (Array.isArray(raw.waypoints)) {
+          for (const wp of raw.waypoints) {
+            if (wp && typeof wp.lat === 'number' && typeof wp.lon === 'number') {
+              points.push([wp.lon, wp.lat]);
+            }
+          }
+        }
+        points.push([end.lon, end.lat]);
+        return {
+          id,
+          name: raw.name || id,
+          operator: raw.operator || '',
+          commodityType: raw.commodityType || 'gas',
+          points,
+          badge: derivePipelinePublicBadge(raw.evidence),
+        } as EnergyPipeline;
+      })
+      .filter((p): p is EnergyPipeline => p != null);
+
+    const HIGHLIGHT_COLOR: [number, number, number, number] = [255, 100, 100, 240];
+    const badgeColor = (b: PipelinePublicBadge): [number, number, number, number] => {
+      switch (b) {
+        case 'flowing':  return [46, 204, 113, 200];  // green
+        case 'reduced':  return [243, 156, 18, 220];  // amber
+        case 'offline':  return [231, 76, 60, 230];   // red
+        case 'disputed': return [155, 89, 182, 220];  // purple
+      }
+    };
+
+    const layer = new PathLayer<EnergyPipeline>({
+      id: cacheKey,
+      data,
+      getPath: d => d.points,
+      getColor: d => highlightedPipelines.has(d.id) ? HIGHLIGHT_COLOR : badgeColor(d.badge),
+      getWidth: d => {
+        if (highlightedPipelines.has(d.id)) return 4;
+        return (d.badge === 'offline' || d.badge === 'disputed') ? 3 : 2;
+      },
+      widthMinPixels: 1.5,
+      widthMaxPixels: 6,
+      pickable: true,
+      // updateTriggers make DeckGL recompute per-path getColor/getWidth
+      // when the highlight set changes; without this, flashAssets() /
+      // highlightAssets() would have no visible effect on the energy layer.
+      updateTriggers: {
+        getColor: highlightSignature,
+        getWidth: highlightSignature,
+      },
+      onClick: info => {
+        const obj = info?.object as EnergyPipeline | undefined;
+        if (!obj?.id) return false;
+        // Emit an event; PipelineStatusPanel listens and opens its drawer.
+        // Cross-component coupling stays loose — no direct reference to the
+        // panel class, and if the panel isn't mounted the event is a no-op.
+        try {
+          window.dispatchEvent(new CustomEvent('energy:open-pipeline-detail', {
+            detail: { pipelineId: obj.id },
+          }));
+        } catch {
+          // Non-browser / tauri edge cases — silent no-op.
+        }
+        return true;
+      },
+    });
+
+    // Intentionally NOT caching this layer: the underlying registries can
+    // update via setCachedPipelineRegistries() when the panel's RPC lands,
+    // and cached layers keyed only on highlightSignature would serve stale
+    // data. With ~25 critical-asset pipelines, rebuild cost per render is
+    // trivial (far cheaper than a stale-data UI bug).
+    return layer;
+  }
+
+  /**
+   * Storage facilities scatterplot layer (energy variant only). Reads
+   * through the shared store so this layer and StorageFacilityMapPanel
+   * both see the same bootstrap-hot registry without racing on
+   * getHydratedData's single-use drain.
+   *
+   * Dot radius = log(capacity) so Ras Laffan (77 Mtpa) visually dominates
+   * Chiren (6.5 TWh) without blowing out small sites to invisibility.
+   * Color = derived publicBadge, same deriver as the server handler.
+   */
+  private createEnergyStorageLayer(): ScatterplotLayer | null {
+    const cacheKey = 'storage-facilities-layer';
+
+    interface RawEntry {
+      id?: string; name?: string; operator?: string;
+      facilityType?: string; country?: string;
+      location?: { lat?: number; lon?: number };
+      capacityTwh?: number; capacityMb?: number; capacityMtpa?: number;
+      evidence?: StorageEvidenceInput;
+    }
+    interface EnergyStorageDot {
+      id: string;
+      name: string;
+      operator: string;
+      facilityType: string;
+      country: string;
+      position: [number, number];
+      capacityDisplay: string;
+      radius: number;
+      badge: StoragePublicBadge;
+    }
+
+    const { registry } = getCachedStorageFacilityRegistry() as {
+      registry: { facilities?: Record<string, RawEntry> } | undefined;
+    };
+    const rawEntries: RawEntry[] = Object.values(registry?.facilities ?? {});
+    if (rawEntries.length === 0) return null;
+
+    const data: EnergyStorageDot[] = rawEntries
+      .map(raw => {
+        const id = typeof raw.id === 'string' ? raw.id : '';
+        if (!id) return null;
+        const loc = raw.location;
+        if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') return null;
+
+        // Capacity → radius. Each facility type has its own unit, so
+        // normalize to a common "relative size" before log — Mtpa is
+        // already the largest numerically; TWh and Mb are comparable.
+        let cap = 0;
+        let capDisplay = '—';
+        if (raw.facilityType === 'ugs' && typeof raw.capacityTwh === 'number' && raw.capacityTwh > 0) {
+          cap = raw.capacityTwh;
+          capDisplay = `${raw.capacityTwh.toFixed(1)} TWh`;
+        } else if ((raw.facilityType === 'spr' || raw.facilityType === 'crude_tank_farm')
+                   && typeof raw.capacityMb === 'number' && raw.capacityMb > 0) {
+          cap = raw.capacityMb;
+          capDisplay = `${raw.capacityMb.toLocaleString()} Mb`;
+        } else if ((raw.facilityType === 'lng_export' || raw.facilityType === 'lng_import')
+                   && typeof raw.capacityMtpa === 'number' && raw.capacityMtpa > 0) {
+          cap = raw.capacityMtpa;
+          capDisplay = `${raw.capacityMtpa.toFixed(1)} Mtpa`;
+        }
+        // log-scale radius so small sites stay visible; floor + ceiling to
+        // keep hit targets reasonable at all zoom levels.
+        const radius = Math.max(6000, Math.min(26000, 5000 + Math.log(Math.max(cap, 1)) * 5500));
+
+        return {
+          id,
+          name: raw.name || id,
+          operator: raw.operator || '',
+          facilityType: raw.facilityType || 'unknown',
+          country: raw.country || '',
+          position: [loc.lon, loc.lat] as [number, number],
+          capacityDisplay: capDisplay,
+          radius,
+          badge: deriveStoragePublicBadge(raw.evidence),
+        } as EnergyStorageDot;
+      })
+      .filter((d): d is EnergyStorageDot => d != null);
+
+    const badgeColor = (b: StoragePublicBadge): [number, number, number, number] => {
+      switch (b) {
+        case 'operational': return [46, 204, 113, 220];  // green
+        case 'reduced':     return [243, 156, 18, 230];  // amber
+        case 'offline':     return [231, 76, 60, 240];   // red
+        case 'disputed':    return [155, 89, 182, 230];  // purple
+      }
+    };
+
+    return new ScatterplotLayer<EnergyStorageDot>({
+      id: cacheKey,
+      data,
+      getPosition: d => d.position,
+      getFillColor: d => badgeColor(d.badge),
+      getRadius: d => d.radius,
+      stroked: true,
+      getLineColor: [255, 255, 255, 200],
+      lineWidthMinPixels: 1,
+      radiusMinPixels: 5,
+      radiusMaxPixels: 28,
+      pickable: true,
+      onClick: info => {
+        const obj = info?.object as EnergyStorageDot | undefined;
+        if (!obj?.id) return false;
+        // Dispatch to StorageFacilityMapPanel — same loose-coupling
+        // pattern as the pipelines layer.
+        try {
+          window.dispatchEvent(new CustomEvent('energy:open-storage-facility-detail', {
+            detail: { facilityId: obj.id },
+          }));
+        } catch {
+          // Silent no-op on non-browser runtimes.
+        }
+        return true;
+      },
+    });
+  }
+
+  /**
+   * Fuel shortage pins (energy variant only). One dot per active shortage
+   * placed at the country centroid. Color by severity (confirmed = red,
+   * watch = amber). Click dispatches 'energy:open-fuel-shortage-detail'
+   * which FuelShortagePanel listens for.
+   *
+   * Multiple shortages in the same country stack with a small angular
+   * offset so they don't render as one overlapping dot.
+   */
+  private createEnergyShortagePinsLayer(): ScatterplotLayer | null {
+    const cacheKey = 'fuel-shortages-layer';
+
+    interface RawEntry {
+      id?: string; country?: string; product?: string; severity?: string;
+      shortDescription?: string;
+      resolvedAt?: string | null;
+    }
+    interface ShortagePin {
+      id: string;
+      country: string;
+      product: string;
+      severity: string;
+      description: string;
+      position: [number, number];
+    }
+
+    const { registry } = getCachedFuelShortageRegistry() as {
+      registry: { shortages?: Record<string, RawEntry> } | undefined;
+    };
+    // Exclude resolved shortages — a pin on the map is a claim of an
+    // ACTIVE crisis, and rendering resolved entries as active inflates
+    // severity counts and shows stale crisis data. Classifier writes
+    // resolvedAt as ISO string on resolution; raw seed uses null.
+    const rawEntries: RawEntry[] = Object.values(registry?.shortages ?? {})
+      .filter(s => !s.resolvedAt);
+    if (rawEntries.length === 0) return null;
+
+    // Stack multiple shortages per country by offsetting longitudes.
+    const perCountryCount = new Map<string, number>();
+
+    const data: ShortagePin[] = rawEntries
+      .map(raw => {
+        const id = typeof raw.id === 'string' ? raw.id : '';
+        if (!id) return null;
+        const country = raw.country;
+        if (typeof country !== 'string' || country.length !== 2) return null;
+        const centroid = getCountryCentroid(country);
+        if (!centroid) return null;
+        const idx = perCountryCount.get(country) ?? 0;
+        perCountryCount.set(country, idx + 1);
+        // ~0.8° offset per additional pin in the same country.
+        const offsetLon = idx === 0 ? 0 : (idx * 0.8 * (idx % 2 === 0 ? 1 : -1));
+        return {
+          id,
+          country,
+          product: raw.product || '',
+          severity: raw.severity || 'watch',
+          description: raw.shortDescription || '',
+          position: [centroid.lon + offsetLon, centroid.lat] as [number, number],
+        };
+      })
+      .filter((d): d is ShortagePin => d != null);
+
+    const severityColor = (sev: string): [number, number, number, number] => {
+      switch (sev) {
+        case 'confirmed': return [231, 76, 60, 240];  // red
+        case 'watch':     return [243, 156, 18, 230]; // amber
+        default:          return [127, 140, 141, 200]; // grey
+      }
+    };
+
+    return new ScatterplotLayer<ShortagePin>({
+      id: cacheKey,
+      data,
+      getPosition: d => d.position,
+      getFillColor: d => severityColor(d.severity),
+      // Confirmed pins slightly larger than watch to pre-attentively indicate weight.
+      getRadius: d => d.severity === 'confirmed' ? 55000 : 38000,
+      stroked: true,
+      getLineColor: [255, 255, 255, 230],
+      lineWidthMinPixels: 1.5,
+      radiusMinPixels: 7,
+      radiusMaxPixels: 24,
+      pickable: true,
+      onClick: info => {
+        const obj = info?.object as ShortagePin | undefined;
+        if (!obj?.id) return false;
+        try {
+          window.dispatchEvent(new CustomEvent('energy:open-fuel-shortage-detail', {
+            detail: { shortageId: obj.id },
+          }));
+        } catch {
+          // Silent no-op on non-browser runtimes.
+        }
+        return true;
+      },
+    });
   }
 
   private buildConflictZoneGeoJson(): GeoJSON.FeatureCollection {
@@ -3746,15 +4132,37 @@ export class DeckGLMap {
       case 'cables-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${t('components.deckgl.tooltip.underseaCable')}</div>` };
       case 'pipelines-layer': {
-        const pipelineType = String(obj.type || '').toLowerCase();
-        const pipelineTypeLabel = pipelineType === 'oil'
+        // Energy variant emits objects with {commodityType, badge}; other
+        // variants emit the static-config shape {type}. Differentiate by
+        // checking for the evidence-derived badge field.
+        const hasBadge = typeof obj.badge === 'string';
+        const commodity = hasBadge ? String(obj.commodityType || '').toLowerCase() : String(obj.type || '').toLowerCase();
+        const commodityLabel = commodity === 'oil'
           ? t('popups.pipeline.types.oil')
-          : pipelineType === 'gas'
+          : commodity === 'gas'
             ? t('popups.pipeline.types.gas')
-            : pipelineType === 'products'
+            : commodity === 'products'
               ? t('popups.pipeline.types.products')
-              : `${text(obj.type)} ${t('components.deckgl.tooltip.pipeline')}`;
-        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${pipelineTypeLabel}</div>` };
+              : `${text(commodity)} ${t('components.deckgl.tooltip.pipeline')}`.trim();
+        if (hasBadge) {
+          const badge = String(obj.badge).toUpperCase();
+          return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${commodityLabel} · <strong>${text(badge)}</strong></div>` };
+        }
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${commodityLabel}</div>` };
+      }
+      case 'storage-facilities-layer': {
+        const typeLabel = {
+          ugs: 'UGS', spr: 'SPR',
+          lng_export: 'LNG export', lng_import: 'LNG import',
+          crude_tank_farm: 'Crude hub',
+        }[String(obj.facilityType)] ?? text(obj.facilityType);
+        const badge = String(obj.badge || 'disputed').toUpperCase();
+        const cap = text(obj.capacityDisplay || '—');
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${typeLabel} · ${text(obj.country)} · ${cap}<br/><strong>${text(badge)}</strong></div>` };
+      }
+      case 'fuel-shortages-layer': {
+        const severity = String(obj.severity || 'watch').toUpperCase();
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.country)} · ${text(obj.product)}</strong><br/>${text(obj.description)}<br/><strong>${text(severity)}</strong></div>` };
       }
       case 'conflict-zones-layer': {
         const props = obj.properties || obj;
