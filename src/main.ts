@@ -262,6 +262,9 @@ Sentry.init({
     /\[CONVEX [AQM]\(.+?\)\] Connection lost while action was in flight/, // Convex SDK transient WS disconnect
     /Response did not contain `success` or `data`/, // DuckDuckGo browser internal tracker/content-block response — never emitted by our code
     /Cannot set properties of undefined \(setting 'bodyTouched'\)/, // Quark browser (Alibaba mobile) touch-tracking script injection (WORLDMONITOR-N1)
+    /Cannot read properties of \w+ \(reading '[^']*[^\x00-\x7F][^']*'\)/, // Non-ASCII property name in message = mojibake/corrupted identifier from injected extension; our bundle emits ASCII-only identifiers (WORLDMONITOR-NS)
+    /Octal literals are not allowed in strict mode/, // Runtime SyntaxError from injected extension script; our TS bundle never emits octal literals and doesn't eval (WORLDMONITOR-NV)
+    /Unexpected identifier 'm'/, // Foreign script injection on Opera; pre-compiled bundle can't parse-fail at runtime (WORLDMONITOR-NT)
   ],
   beforeSend(event) {
     const msg = event.exception?.values?.[0]?.value ?? '';
