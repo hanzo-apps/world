@@ -310,6 +310,1173 @@
         "classifierVersion": "v1",
         "classifierConfidence": 0.95
       }
+    },
+    "europipe-1": {
+      "id": "europipe-1",
+      "name": "Europipe I",
+      "operator": "Gassco",
+      "commodityType": "gas",
+      "fromCountry": "NO",
+      "toCountry": "DE",
+      "transitCountries": [],
+      "capacityBcmYr": 16,
+      "lengthKm": 620,
+      "inService": 1995,
+      "startPoint": { "lat": 56.55, "lon": 3.22 },
+      "endPoint": { "lat": 53.50, "lon": 7.12 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.95
+      }
+    },
+    "europipe-2": {
+      "id": "europipe-2",
+      "name": "Europipe II",
+      "operator": "Gassco",
+      "commodityType": "gas",
+      "fromCountry": "NO",
+      "toCountry": "DE",
+      "transitCountries": [],
+      "capacityBcmYr": 24,
+      "lengthKm": 658,
+      "inService": 1999,
+      "startPoint": { "lat": 58.85, "lon": 2.07 },
+      "endPoint": { "lat": 53.50, "lon": 7.12 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.95
+      }
+    },
+    "franpipe": {
+      "id": "franpipe",
+      "name": "Franpipe",
+      "operator": "Gassco",
+      "commodityType": "gas",
+      "fromCountry": "NO",
+      "toCountry": "FR",
+      "transitCountries": [],
+      "capacityBcmYr": 19.2,
+      "lengthKm": 840,
+      "inService": 1998,
+      "startPoint": { "lat": 56.54, "lon": 3.22 },
+      "endPoint": { "lat": 51.08, "lon": 2.35 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.95
+      }
+    },
+    "zeepipe": {
+      "id": "zeepipe",
+      "name": "Zeepipe",
+      "operator": "Gassco",
+      "commodityType": "gas",
+      "fromCountry": "NO",
+      "toCountry": "BE",
+      "transitCountries": [],
+      "capacityBcmYr": 15,
+      "lengthKm": 814,
+      "inService": 1993,
+      "startPoint": { "lat": 60.62, "lon": 3.33 },
+      "endPoint": { "lat": 51.33, "lon": 3.20 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.95
+      }
+    },
+    "interconnector-uk-be": {
+      "id": "interconnector-uk-be",
+      "name": "Interconnector UK–Belgium",
+      "operator": "Interconnector (UK) Limited",
+      "commodityType": "gas",
+      "fromCountry": "GB",
+      "toCountry": "BE",
+      "transitCountries": [],
+      "capacityBcmYr": 25.5,
+      "lengthKm": 235,
+      "inService": 1998,
+      "startPoint": { "lat": 52.08, "lon": 1.67 },
+      "endPoint": { "lat": 51.33, "lon": 3.20 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.92
+      }
+    },
+    "bbl": {
+      "id": "bbl",
+      "name": "BBL (Balgzand–Bacton Line)",
+      "operator": "BBL Company",
+      "commodityType": "gas",
+      "fromCountry": "NL",
+      "toCountry": "GB",
+      "transitCountries": [],
+      "capacityBcmYr": 19,
+      "lengthKm": 235,
+      "inService": 2006,
+      "startPoint": { "lat": 52.93, "lon": 4.83 },
+      "endPoint": { "lat": 52.85, "lon": 1.45 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.92
+      }
+    },
+    "transmed": {
+      "id": "transmed",
+      "name": "Trans-Mediterranean (Enrico Mattei)",
+      "operator": "Sonatrach / Eni",
+      "commodityType": "gas",
+      "fromCountry": "DZ",
+      "toCountry": "IT",
+      "transitCountries": ["TN"],
+      "capacityBcmYr": 33.5,
+      "lengthKm": 2475,
+      "inService": 1983,
+      "startPoint": { "lat": 31.67, "lon": 5.02 },
+      "endPoint": { "lat": 37.63, "lon": 12.73 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.92
+      }
+    },
+    "greenstream": {
+      "id": "greenstream",
+      "name": "Greenstream",
+      "operator": "Eni / Mellitah Oil & Gas",
+      "commodityType": "gas",
+      "fromCountry": "LY",
+      "toCountry": "IT",
+      "transitCountries": [],
+      "capacityBcmYr": 8,
+      "lengthKm": 520,
+      "inService": 2004,
+      "startPoint": { "lat": 32.60, "lon": 12.47 },
+      "endPoint": { "lat": 37.12, "lon": 14.28 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": "Libya supply constrained since 2011 civil conflict; Eni/Mellitah flows reportedly well below 8 Bcm/yr nameplate per Reuters and Eni operator statements (2020-2024).",
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.78
+      }
+    },
+    "meg-maghreb-europe": {
+      "id": "meg-maghreb-europe",
+      "name": "Maghreb–Europe Gas Pipeline (GME)",
+      "operator": "Metragaz / Enagás",
+      "commodityType": "gas",
+      "fromCountry": "DZ",
+      "toCountry": "ES",
+      "transitCountries": ["MA"],
+      "capacityBcmYr": 12,
+      "lengthKm": 1620,
+      "inService": 1996,
+      "startPoint": { "lat": 32.13, "lon": -0.67 },
+      "endPoint": { "lat": 36.15, "lon": -5.45 },
+      "evidence": {
+        "physicalState": "offline",
+        "physicalStateSource": "regulator",
+        "operatorStatement": {
+          "text": "Contract not renewed Oct 2021; pipeline closed between Algeria and Morocco amid diplomatic dispute.",
+          "url": "https://www.energy.gov.dz/",
+          "date": "2021-10-31"
+        },
+        "commercialState": "expired",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "igb": {
+      "id": "igb",
+      "name": "Interconnector Greece–Bulgaria (IGB)",
+      "operator": "ICGB",
+      "commodityType": "gas",
+      "fromCountry": "GR",
+      "toCountry": "BG",
+      "transitCountries": [],
+      "capacityBcmYr": 3,
+      "lengthKm": 182,
+      "inService": 2022,
+      "startPoint": { "lat": 40.93, "lon": 25.14 },
+      "endPoint": { "lat": 42.15, "lon": 24.75 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "arab-gas-pipeline": {
+      "id": "arab-gas-pipeline",
+      "name": "Arab Gas Pipeline",
+      "operator": "Arab Gas Pipeline Consortium",
+      "commodityType": "gas",
+      "fromCountry": "EG",
+      "toCountry": "LB",
+      "transitCountries": ["JO", "SY"],
+      "capacityBcmYr": 10.3,
+      "lengthKm": 1200,
+      "inService": 2003,
+      "startPoint": { "lat": 31.33, "lon": 32.28 },
+      "endPoint": { "lat": 34.27, "lon": 35.67 },
+      "evidence": {
+        "physicalState": "offline",
+        "physicalStateSource": "press",
+        "operatorStatement": null,
+        "commercialState": "suspended",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "Caesar Act (Syria)", "date": "2020-06-17", "url": "https://www.congress.gov/bill/116th-congress/house-bill/31" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "blue-stream": {
+      "id": "blue-stream",
+      "name": "Blue Stream",
+      "operator": "Gazprom / Eni (Blue Stream Pipeline Company)",
+      "commodityType": "gas",
+      "fromCountry": "RU",
+      "toCountry": "TR",
+      "transitCountries": [],
+      "capacityBcmYr": 16,
+      "lengthKm": 1213,
+      "inService": 2003,
+      "startPoint": { "lat": 44.72, "lon": 37.75 },
+      "endPoint": { "lat": 41.05, "lon": 34.58 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [
+          { "authority": "EU", "listId": "2022/1269 (energy sanctions package 8)", "date": "2022-10-06", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R1269" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "west-east-3": {
+      "id": "west-east-3",
+      "name": "West–East Gas Pipeline 3 (China)",
+      "operator": "PetroChina",
+      "commodityType": "gas",
+      "fromCountry": "CN",
+      "toCountry": "CN",
+      "transitCountries": [],
+      "capacityBcmYr": 30,
+      "lengthKm": 7378,
+      "inService": 2014,
+      "startPoint": { "lat": 42.95, "lon": 80.35 },
+      "endPoint": { "lat": 26.08, "lon": 119.30 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.88
+      }
+    },
+    "myanmar-china-gas": {
+      "id": "myanmar-china-gas",
+      "name": "Myanmar–China Gas Pipeline (Shwe)",
+      "operator": "South East Asia Gas Pipeline Company (CNPC-led)",
+      "commodityType": "gas",
+      "fromCountry": "MM",
+      "toCountry": "CN",
+      "transitCountries": [],
+      "capacityBcmYr": 12,
+      "lengthKm": 793,
+      "inService": 2013,
+      "startPoint": { "lat": 20.15, "lon": 93.53 },
+      "endPoint": { "lat": 24.45, "lon": 98.58 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "wagp": {
+      "id": "wagp",
+      "name": "West African Gas Pipeline (WAGP)",
+      "operator": "WAPCo (Chevron-led consortium)",
+      "commodityType": "gas",
+      "fromCountry": "NG",
+      "toCountry": "GH",
+      "transitCountries": ["BJ", "TG"],
+      "capacityBcmYr": 5,
+      "lengthKm": 678,
+      "inService": 2010,
+      "startPoint": { "lat": 6.35, "lon": 3.38 },
+      "endPoint": { "lat": 5.10, "lon": -1.27 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": "Chronic feedgas shortages from Nigerian domestic demand + recurring vandalism of Escravos-Lagos feeder have kept WAGP throughput intermittent since 2012 per GhanaWeb / Reuters coverage and operator WAPCo status notices.",
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.78
+      }
+    },
+    "gasbol": {
+      "id": "gasbol",
+      "name": "Bolivia–Brazil Gas Pipeline (GASBOL)",
+      "operator": "TBG / GTB",
+      "commodityType": "gas",
+      "fromCountry": "BO",
+      "toCountry": "BR",
+      "transitCountries": [],
+      "capacityBcmYr": 11,
+      "lengthKm": 3150,
+      "inService": 1999,
+      "startPoint": { "lat": -18.85, "lon": -57.85 },
+      "endPoint": { "lat": -29.95, "lon": -51.13 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "vesterled": {
+      "id": "vesterled",
+      "name": "Vesterled",
+      "operator": "Gassco",
+      "commodityType": "gas",
+      "fromCountry": "NO",
+      "toCountry": "GB",
+      "transitCountries": [],
+      "capacityBcmYr": 13,
+      "lengthKm": 363,
+      "inService": 2001,
+      "startPoint": { "lat": 59.90, "lon": 1.85 },
+      "endPoint": { "lat": 57.60, "lon": -1.80 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.92
+      }
+    },
+    "cats": {
+      "id": "cats",
+      "name": "Central Area Transmission System (CATS)",
+      "operator": "Kellas Midstream",
+      "commodityType": "gas",
+      "fromCountry": "GB",
+      "toCountry": "GB",
+      "transitCountries": [],
+      "capacityBcmYr": 9.6,
+      "lengthKm": 404,
+      "inService": 1993,
+      "startPoint": { "lat": 57.83, "lon": 0.90 },
+      "endPoint": { "lat": 54.63, "lon": -1.17 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "iran-turkey-gas": {
+      "id": "iran-turkey-gas",
+      "name": "Iran–Turkey Gas Pipeline (Tabriz–Ankara)",
+      "operator": "NIGC / BOTAŞ",
+      "commodityType": "gas",
+      "fromCountry": "IR",
+      "toCountry": "TR",
+      "transitCountries": [],
+      "capacityBcmYr": 14,
+      "lengthKm": 2577,
+      "inService": 2001,
+      "startPoint": { "lat": 38.08, "lon": 46.30 },
+      "endPoint": { "lat": 39.92, "lon": 32.85 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "OFAC Iran energy sanctions framework", "date": "2018-08-07", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/iran-sanctions" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "iran-armenia-gas": {
+      "id": "iran-armenia-gas",
+      "name": "Iran–Armenia Gas Pipeline",
+      "operator": "Gazprom Armenia",
+      "commodityType": "gas",
+      "fromCountry": "IR",
+      "toCountry": "AM",
+      "transitCountries": [],
+      "capacityBcmYr": 2.3,
+      "lengthKm": 140,
+      "inService": 2007,
+      "startPoint": { "lat": 38.92, "lon": 46.08 },
+      "endPoint": { "lat": 39.33, "lon": 45.35 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "OFAC Iran energy sanctions framework", "date": "2018-08-07", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/iran-sanctions" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.82
+      }
+    },
+    "iran-iraq-basra-gas": {
+      "id": "iran-iraq-basra-gas",
+      "name": "Iran–Iraq Gas Pipeline (Basra line)",
+      "operator": "NIGC / Iraq Ministry of Electricity",
+      "commodityType": "gas",
+      "fromCountry": "IR",
+      "toCountry": "IQ",
+      "transitCountries": [],
+      "capacityBcmYr": 9,
+      "lengthKm": 270,
+      "inService": 2017,
+      "startPoint": { "lat": 31.35, "lon": 48.67 },
+      "endPoint": { "lat": 30.50, "lon": 47.80 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "OFAC Iran energy sanctions framework (US waivers intermittent)", "date": "2018-08-07", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/iran-sanctions" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.78
+      }
+    },
+    "central-asia-center": {
+      "id": "central-asia-center",
+      "name": "Central Asia–Center (CAC)",
+      "operator": "Gazprom / TürkmenGaz",
+      "commodityType": "gas",
+      "fromCountry": "TM",
+      "toCountry": "RU",
+      "transitCountries": ["UZ", "KZ"],
+      "capacityBcmYr": 44,
+      "lengthKm": 5000,
+      "inService": 1967,
+      "startPoint": { "lat": 40.80, "lon": 54.02 },
+      "endPoint": { "lat": 51.53, "lon": 45.72 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": "Gazprom terminated Turkmen imports in 2016 over price dispute; limited 2019+ reactivation at well below nameplate per Reuters and TASS coverage.",
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.75
+      }
+    },
+    "south-caucasus-scp": {
+      "id": "south-caucasus-scp",
+      "name": "South Caucasus Pipeline (SCP / Baku–Tbilisi–Erzurum)",
+      "operator": "BP (South Caucasus Pipeline Company)",
+      "commodityType": "gas",
+      "fromCountry": "AZ",
+      "toCountry": "TR",
+      "transitCountries": ["GE"],
+      "capacityBcmYr": 22,
+      "lengthKm": 692,
+      "inService": 2006,
+      "startPoint": { "lat": 40.37, "lon": 50.25 },
+      "endPoint": { "lat": 39.90, "lon": 41.27 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.92
+      }
+    },
+    "west-east-1": {
+      "id": "west-east-1",
+      "name": "West–East Gas Pipeline 1 (China)",
+      "operator": "PetroChina",
+      "commodityType": "gas",
+      "fromCountry": "CN",
+      "toCountry": "CN",
+      "transitCountries": [],
+      "capacityBcmYr": 17,
+      "lengthKm": 4200,
+      "inService": 2004,
+      "startPoint": { "lat": 39.47, "lon": 84.98 },
+      "endPoint": { "lat": 31.23, "lon": 121.47 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.88
+      }
+    },
+    "west-east-2": {
+      "id": "west-east-2",
+      "name": "West–East Gas Pipeline 2 (China)",
+      "operator": "PetroChina",
+      "commodityType": "gas",
+      "fromCountry": "CN",
+      "toCountry": "CN",
+      "transitCountries": [],
+      "capacityBcmYr": 30,
+      "lengthKm": 8700,
+      "inService": 2011,
+      "startPoint": { "lat": 45.13, "lon": 82.57 },
+      "endPoint": { "lat": 22.95, "lon": 113.40 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.88
+      }
+    },
+    "bolivia-argentina-yacuiba": {
+      "id": "bolivia-argentina-yacuiba",
+      "name": "Bolivia–Argentina Gas Pipeline (GIJA / Yacuiba)",
+      "operator": "YPFB / Energía Argentina",
+      "commodityType": "gas",
+      "fromCountry": "BO",
+      "toCountry": "AR",
+      "transitCountries": [],
+      "capacityBcmYr": 7.7,
+      "lengthKm": 441,
+      "inService": 1972,
+      "startPoint": { "lat": -22.02, "lon": -63.67 },
+      "endPoint": { "lat": -24.15, "lon": -65.30 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": "Bolivian upstream output declining since 2018; YPFB-CIESA exports fell from 22 MMcm/d to <14 MMcm/d by 2023 per IEA Gas Market Report + BNamericas coverage.",
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.78
+      }
+    },
+    "antonio-ricaurte": {
+      "id": "antonio-ricaurte",
+      "name": "Antonio Ricaurte Pipeline (Colombia–Venezuela)",
+      "operator": "TGI / PDVSA",
+      "commodityType": "gas",
+      "fromCountry": "CO",
+      "toCountry": "VE",
+      "transitCountries": [],
+      "capacityBcmYr": 5,
+      "lengthKm": 224,
+      "inService": 2007,
+      "startPoint": { "lat": 11.38, "lon": -72.47 },
+      "endPoint": { "lat": 10.67, "lon": -71.67 },
+      "evidence": {
+        "physicalState": "offline",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Exports halted 2015; both sides have floated restarts but no flows recorded in recent GIE / industry data.",
+          "url": "https://www.tgi.com.co/",
+          "date": "2015-08-01"
+        },
+        "commercialState": "suspended",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "OFAC Venezuela/PDVSA sanctions", "date": "2019-01-28", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/venezuela-related-sanctions" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "saudi-master-gas-system": {
+      "id": "saudi-master-gas-system",
+      "name": "Saudi Master Gas System",
+      "operator": "Saudi Aramco",
+      "commodityType": "gas",
+      "fromCountry": "SA",
+      "toCountry": "SA",
+      "transitCountries": [],
+      "capacityBcmYr": 95,
+      "lengthKm": 2400,
+      "inService": 1982,
+      "startPoint": { "lat": 26.10, "lon": 49.87 },
+      "endPoint": { "lat": 22.20, "lon": 39.13 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.9
+      }
+    },
+    "galsi-planned": {
+      "id": "galsi-planned",
+      "name": "GALSI (Algeria–Sardinia–Italy, planned)",
+      "operator": "Enagás / Edison / Sonatrach (consortium paused)",
+      "commodityType": "gas",
+      "fromCountry": "DZ",
+      "toCountry": "IT",
+      "transitCountries": [],
+      "capacityBcmYr": 8,
+      "lengthKm": 1470,
+      "inService": 0,
+      "startPoint": { "lat": 37.12, "lon": 8.83 },
+      "endPoint": { "lat": 40.55, "lon": 9.73 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Proposed Algeria–Sardinia–Italy gas pipeline; construction not commenced. Project paused but periodically revived in policy commentary around EU gas diversification.",
+          "url": "https://www.edison.it/",
+          "date": "2023-01-01"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.72
+      }
+    },
+    "eastmed-planned": {
+      "id": "eastmed-planned",
+      "name": "EastMed Pipeline (Israel–Cyprus–Greece, planned)",
+      "operator": "IGI Poseidon (DEPA / Edison)",
+      "commodityType": "gas",
+      "fromCountry": "IL",
+      "toCountry": "GR",
+      "transitCountries": ["CY"],
+      "capacityBcmYr": 10,
+      "lengthKm": 1900,
+      "inService": 0,
+      "startPoint": { "lat": 32.40, "lon": 34.13 },
+      "endPoint": { "lat": 38.93, "lon": 21.76 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Proposed East Mediterranean gas pipeline. US withdrew prior political support Jan 2022; EU funding for Greece–Cyprus segment ongoing as an electrical interconnector pivot. Gas pipeline construction not commenced.",
+          "url": "https://www.igi-poseidon.com/",
+          "date": "2022-01-10"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.75
+      }
+    },
+    "trans-saharan-planned": {
+      "id": "trans-saharan-planned",
+      "name": "Trans-Saharan Gas Pipeline (Nigeria–Algeria, planned)",
+      "operator": "NNPC / Sonatrach / Sonidep (MoU consortium)",
+      "commodityType": "gas",
+      "fromCountry": "NG",
+      "toCountry": "DZ",
+      "transitCountries": ["NE"],
+      "capacityBcmYr": 30,
+      "lengthKm": 4128,
+      "inService": 0,
+      "startPoint": { "lat": 9.07, "lon": 7.48 },
+      "endPoint": { "lat": 36.75, "lon": 3.05 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "MoU signed 2022, revived after MEG closure. Route crosses high-insurgency areas; security and financing unresolved. Construction not commenced on main trunk.",
+          "url": "https://nnpcgroup.com/",
+          "date": "2022-07-28"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.65
+      }
+    },
+    "israel-egypt-arish-ashkelon": {
+      "id": "israel-egypt-arish-ashkelon",
+      "name": "Arish–Ashkelon Pipeline (reverse flow IL→EG)",
+      "operator": "EMG / East Gas Company",
+      "commodityType": "gas",
+      "fromCountry": "IL",
+      "toCountry": "EG",
+      "transitCountries": [],
+      "capacityBcmYr": 7,
+      "lengthKm": 90,
+      "inService": 2020,
+      "startPoint": { "lat": 31.67, "lon": 34.58 },
+      "endPoint": { "lat": 31.13, "lon": 33.80 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "turkmenistan-iran-korpeje": {
+      "id": "turkmenistan-iran-korpeje",
+      "name": "Korpeje–Kurt Kui (Turkmenistan–Iran)",
+      "operator": "TürkmenGaz / NIGC",
+      "commodityType": "gas",
+      "fromCountry": "TM",
+      "toCountry": "IR",
+      "transitCountries": [],
+      "capacityBcmYr": 8,
+      "lengthKm": 200,
+      "inService": 1997,
+      "startPoint": { "lat": 39.42, "lon": 54.83 },
+      "endPoint": { "lat": 37.47, "lon": 54.67 },
+      "evidence": {
+        "physicalState": "reduced",
+        "physicalStateSource": "press",
+        "operatorStatement": "Flows suspended Jan 2017 over NIGC/Turkmenistan payment dispute; intermittent partial restart reported by NIGC press office + Reuters.",
+        "commercialState": "expired",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.75
+      }
+    },
+    "morocco-nigeria-offshore-planned": {
+      "id": "morocco-nigeria-offshore-planned",
+      "name": "Nigeria–Morocco Offshore Gas Pipeline (planned)",
+      "operator": "NNPC / ONHYM",
+      "commodityType": "gas",
+      "fromCountry": "NG",
+      "toCountry": "MA",
+      "transitCountries": ["BJ", "TG", "GH", "CI", "LR", "SL", "GN", "GW", "SN", "MR"],
+      "capacityBcmYr": 30,
+      "lengthKm": 6800,
+      "inService": 0,
+      "startPoint": { "lat": 6.35, "lon": 3.38 },
+      "endPoint": { "lat": 35.75, "lon": -5.80 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "FID not reached; FEED phase complete 2024. Seen as competing vision to the Trans-Saharan overland route. Construction not commenced.",
+          "url": "https://nnpcgroup.com/",
+          "date": "2024-09-01"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.6
+      }
+    },
+    "power-of-siberia-2-planned": {
+      "id": "power-of-siberia-2-planned",
+      "name": "Power of Siberia 2 (planned)",
+      "operator": "Gazprom / CNPC",
+      "commodityType": "gas",
+      "fromCountry": "RU",
+      "toCountry": "CN",
+      "transitCountries": ["MN"],
+      "capacityBcmYr": 50,
+      "lengthKm": 6700,
+      "inService": 0,
+      "startPoint": { "lat": 67.50, "lon": 80.57 },
+      "endPoint": { "lat": 43.82, "lon": 125.32 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Mongolia route announced; CNPC has not signed binding capacity contract as of reference date. Project remains a talking point between Gazprom and CNPC without construction on the China-segment trunk.",
+          "url": "https://www.gazprom.com/",
+          "date": "2024-05-01"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [
+          { "authority": "EU", "listId": "2022/1269 (energy sanctions package 8)", "date": "2022-10-06", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R1269" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.7
+      }
+    },
+    "egypt-jordan-aqaba": {
+      "id": "egypt-jordan-aqaba",
+      "name": "Egypt–Jordan–Aqaba Gas Pipeline (AGP south leg)",
+      "operator": "EGAS / NEPCO",
+      "commodityType": "gas",
+      "fromCountry": "EG",
+      "toCountry": "JO",
+      "transitCountries": [],
+      "capacityBcmYr": 3.5,
+      "lengthKm": 390,
+      "inService": 2003,
+      "startPoint": { "lat": 29.93, "lon": 32.57 },
+      "endPoint": { "lat": 29.52, "lon": 35.00 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.82
+      }
+    },
+    "sakarya-black-sea-tr": {
+      "id": "sakarya-black-sea-tr",
+      "name": "Sakarya Gas Field Pipeline (Turkish Black Sea)",
+      "operator": "TPAO",
+      "commodityType": "gas",
+      "fromCountry": "TR",
+      "toCountry": "TR",
+      "transitCountries": [],
+      "capacityBcmYr": 14,
+      "lengthKm": 170,
+      "inService": 2023,
+      "startPoint": { "lat": 42.38, "lon": 31.85 },
+      "endPoint": { "lat": 41.27, "lon": 31.40 },
+      "evidence": {
+        "physicalState": "flowing",
+        "physicalStateSource": "operator",
+        "operatorStatement": null,
+        "commercialState": "under_contract",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.85
+      }
+    },
+    "kirkuk-dohuk-turkey-gas-planned": {
+      "id": "kirkuk-dohuk-turkey-gas-planned",
+      "name": "Kirkuk–Dohuk–Turkey Gas Pipeline (planned)",
+      "operator": "KRG / BOTAŞ (commercial framework TBD)",
+      "commodityType": "gas",
+      "fromCountry": "IQ",
+      "toCountry": "TR",
+      "transitCountries": [],
+      "capacityBcmYr": 10,
+      "lengthKm": 430,
+      "inService": 0,
+      "startPoint": { "lat": 35.47, "lon": 44.40 },
+      "endPoint": { "lat": 37.07, "lon": 37.33 },
+      "evidence": {
+        "physicalState": "unknown",
+        "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Proposed northern Iraq gas corridor into Turkey; subject to Baghdad–Erbil revenue dispute and Turkey's existing IGAT/SCP capacity. Construction not commenced.",
+          "url": "https://www.botas.gov.tr/",
+          "date": "2024-02-01"
+        },
+        "commercialState": "unknown",
+        "sanctionRefs": [],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z",
+        "classifierVersion": "v1",
+        "classifierConfidence": 0.62
+      }
+    },
+    "statpipe": {
+      "id": "statpipe", "name": "Statpipe", "operator": "Gassco", "commodityType": "gas",
+      "fromCountry": "NO", "toCountry": "NO", "transitCountries": [],
+      "capacityBcmYr": 25, "lengthKm": 880, "inService": 1985,
+      "startPoint": { "lat": 61.25, "lon": 1.85 }, "endPoint": { "lat": 59.28, "lon": 5.42 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.9 }
+    },
+    "sleipner-karsto": {
+      "id": "sleipner-karsto", "name": "Sleipner–Kårstø", "operator": "Gassco", "commodityType": "gas",
+      "fromCountry": "NO", "toCountry": "NO", "transitCountries": [],
+      "capacityBcmYr": 12, "lengthKm": 245, "inService": 1993,
+      "startPoint": { "lat": 58.37, "lon": 1.90 }, "endPoint": { "lat": 59.28, "lon": 5.42 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88 }
+    },
+    "troll-a-gas-pipeline": {
+      "id": "troll-a-gas-pipeline", "name": "Troll A – Kollsnes", "operator": "Gassco", "commodityType": "gas",
+      "fromCountry": "NO", "toCountry": "NO", "transitCountries": [],
+      "capacityBcmYr": 30, "lengthKm": 67, "inService": 1996,
+      "startPoint": { "lat": 60.65, "lon": 3.72 }, "endPoint": { "lat": 60.55, "lon": 4.85 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.92 }
+    },
+    "oseberg-gas-transport": {
+      "id": "oseberg-gas-transport", "name": "Oseberg Gas Transport (OGT)", "operator": "Gassco", "commodityType": "gas",
+      "fromCountry": "NO", "toCountry": "NO", "transitCountries": [],
+      "capacityBcmYr": 9, "lengthKm": 109, "inService": 2000,
+      "startPoint": { "lat": 60.48, "lon": 2.82 }, "endPoint": { "lat": 60.55, "lon": 4.85 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88 }
+    },
+    "asgard-transport": {
+      "id": "asgard-transport", "name": "Åsgard Transport", "operator": "Gassco", "commodityType": "gas",
+      "fromCountry": "NO", "toCountry": "NO", "transitCountries": [],
+      "capacityBcmYr": 14, "lengthKm": 707, "inService": 2000,
+      "startPoint": { "lat": 65.05, "lon": 6.78 }, "endPoint": { "lat": 59.28, "lon": 5.42 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88 }
+    },
+    "dampier-bunbury": {
+      "id": "dampier-bunbury", "name": "Dampier to Bunbury Natural Gas Pipeline", "operator": "DBNGP WA", "commodityType": "gas",
+      "fromCountry": "AU", "toCountry": "AU", "transitCountries": [],
+      "capacityBcmYr": 8.6, "lengthKm": 1594, "inService": 1984,
+      "startPoint": { "lat": -20.68, "lon": 116.72 }, "endPoint": { "lat": -33.33, "lon": 115.63 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.9 }
+    },
+    "moomba-sydney": {
+      "id": "moomba-sydney", "name": "Moomba–Sydney Pipeline", "operator": "APA Group", "commodityType": "gas",
+      "fromCountry": "AU", "toCountry": "AU", "transitCountries": [],
+      "capacityBcmYr": 5.5, "lengthKm": 1299, "inService": 1976,
+      "startPoint": { "lat": -28.12, "lon": 140.20 }, "endPoint": { "lat": -33.87, "lon": 151.20 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88 }
+    },
+    "mozambique-rompco": {
+      "id": "mozambique-rompco", "name": "ROMPCO (Mozambique–South Africa)", "operator": "Sasol / CEF / Companhia Moçambicana de Gasoduto", "commodityType": "gas",
+      "fromCountry": "MZ", "toCountry": "ZA", "transitCountries": [],
+      "capacityBcmYr": 5.5, "lengthKm": 865, "inService": 2004,
+      "startPoint": { "lat": -22.93, "lon": 31.33 }, "endPoint": { "lat": -26.20, "lon": 28.02 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.85 }
+    },
+    "escravos-lagos-gas": {
+      "id": "escravos-lagos-gas", "name": "Escravos–Lagos Pipeline System", "operator": "NNPC / Chevron Nigeria", "commodityType": "gas",
+      "fromCountry": "NG", "toCountry": "NG", "transitCountries": [],
+      "capacityBcmYr": 9, "lengthKm": 342, "inService": 1989,
+      "startPoint": { "lat": 5.62, "lon": 5.20 }, "endPoint": { "lat": 6.46, "lon": 3.37 },
+      "evidence": { "physicalState": "reduced", "physicalStateSource": "press", "operatorStatement": "Regular pipeline vandalism and NNPC/Chevron force-majeure declarations (2020-2024) per NNPC press releases + Reuters Lagos coverage.", "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.75 }
+    },
+    "tanzania-mtwara-dar": {
+      "id": "tanzania-mtwara-dar", "name": "Mtwara–Dar es Salaam Gas Pipeline", "operator": "TPDC / CPI-CPP consortium", "commodityType": "gas",
+      "fromCountry": "TZ", "toCountry": "TZ", "transitCountries": [],
+      "capacityBcmYr": 2, "lengthKm": 542, "inService": 2015,
+      "startPoint": { "lat": -10.27, "lon": 40.18 }, "endPoint": { "lat": -6.80, "lon": 39.28 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.78 }
+    },
+    "thailand-malaysia-cakerawala": {
+      "id": "thailand-malaysia-cakerawala", "name": "Cakerawala–Pengerang (Thai–Malaysia JDA)", "operator": "Carigali-PTTEPI Operating Company", "commodityType": "gas",
+      "fromCountry": "TH", "toCountry": "MY", "transitCountries": [],
+      "capacityBcmYr": 14, "lengthKm": 270, "inService": 2005,
+      "startPoint": { "lat": 6.78, "lon": 102.75 }, "endPoint": { "lat": 6.43, "lon": 99.67 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.82 }
+    },
+    "indonesia-singapore-west-natuna": {
+      "id": "indonesia-singapore-west-natuna", "name": "West Natuna–Singapore Gas Pipeline", "operator": "ConocoPhillips / SembGas", "commodityType": "gas",
+      "fromCountry": "ID", "toCountry": "SG", "transitCountries": [],
+      "capacityBcmYr": 3.7, "lengthKm": 656, "inService": 2001,
+      "startPoint": { "lat": 3.67, "lon": 108.32 }, "endPoint": { "lat": 1.31, "lon": 103.65 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.82 }
+    },
+    "indonesia-singapore-grissik-sakra": {
+      "id": "indonesia-singapore-grissik-sakra", "name": "Grissik–Sakra Gas Pipeline", "operator": "ConocoPhillips / SembGas", "commodityType": "gas",
+      "fromCountry": "ID", "toCountry": "SG", "transitCountries": [],
+      "capacityBcmYr": 3.5, "lengthKm": 470, "inService": 2003,
+      "startPoint": { "lat": -2.08, "lon": 103.77 }, "endPoint": { "lat": 1.31, "lon": 103.65 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.82 }
+    },
+    "nel-pipeline-germany": {
+      "id": "nel-pipeline-germany", "name": "NEL Pipeline (Nord Stream continuation)", "operator": "Gasunie Deutschland / Fluxys / WIGA", "commodityType": "gas",
+      "fromCountry": "DE", "toCountry": "DE", "transitCountries": [],
+      "capacityBcmYr": 20, "lengthKm": 440, "inService": 2013,
+      "startPoint": { "lat": 54.14, "lon": 13.66 }, "endPoint": { "lat": 52.52, "lon": 7.77 },
+      "evidence": { "physicalState": "reduced", "physicalStateSource": "press", "operatorStatement": "Direct Nord Stream 1 continuation; flows reduced to zero post-Sep-2022 sabotage per Gasunie Deutschland operator notice + BBC coverage.", "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.8 }
+    },
+    "opal-pipeline-germany": {
+      "id": "opal-pipeline-germany", "name": "OPAL Pipeline (Nord Stream continuation)", "operator": "OPAL Gastransport (WIGA joint venture)", "commodityType": "gas",
+      "fromCountry": "DE", "toCountry": "CZ", "transitCountries": [],
+      "capacityBcmYr": 36, "lengthKm": 470, "inService": 2011,
+      "startPoint": { "lat": 54.14, "lon": 13.66 }, "endPoint": { "lat": 50.73, "lon": 14.03 },
+      "evidence": { "physicalState": "reduced", "physicalStateSource": "press", "operatorStatement": "Direct Nord Stream 1 continuation; flows reduced to zero post-Sep-2022 sabotage per OPAL operator notice + BBC coverage.", "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.8 }
+    },
+    "eugal-pipeline-germany": {
+      "id": "eugal-pipeline-germany", "name": "EUGAL Pipeline (Nord Stream 2 continuation)", "operator": "EUGAL Gastransport consortium", "commodityType": "gas",
+      "fromCountry": "DE", "toCountry": "CZ", "transitCountries": [],
+      "capacityBcmYr": 55, "lengthKm": 485, "inService": 2020,
+      "startPoint": { "lat": 54.14, "lon": 13.66 }, "endPoint": { "lat": 50.73, "lon": 14.03 },
+      "evidence": {
+        "physicalState": "offline", "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Built to carry Nord Stream 2 volumes into Central/Southern Europe; never reached commercial operation after NS2 certification was halted (Feb 2022) and NS2 was damaged (Sep 2022). Pipeline physically complete but dormant.",
+          "url": "https://www.eugal.de/en/",
+          "date": "2022-02-22"
+        },
+        "commercialState": "suspended",
+        "sanctionRefs": [
+          { "authority": "EU", "listId": "2022/1269 (energy sanctions package 8)", "date": "2022-10-06", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R1269" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88
+      }
+    },
+    "megal-pipeline": {
+      "id": "megal-pipeline", "name": "Mid-European Gas Pipeline (MEGAL)", "operator": "GRTgaz Deutschland / OGE", "commodityType": "gas",
+      "fromCountry": "DE", "toCountry": "FR", "transitCountries": [],
+      "capacityBcmYr": 37, "lengthKm": 1101, "inService": 1980,
+      "startPoint": { "lat": 48.93, "lon": 12.35 }, "endPoint": { "lat": 48.28, "lon": 6.97 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.88 }
+    },
+    "trans-austria-gas": {
+      "id": "trans-austria-gas", "name": "Trans Austria Gas Pipeline (TAG)", "operator": "Trans Austria Gasleitung GmbH", "commodityType": "gas",
+      "fromCountry": "AT", "toCountry": "IT", "transitCountries": [],
+      "capacityBcmYr": 45, "lengthKm": 380, "inService": 1974,
+      "startPoint": { "lat": 48.35, "lon": 16.87 }, "endPoint": { "lat": 45.90, "lon": 13.20 },
+      "evidence": { "physicalState": "reduced", "physicalStateSource": "press", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [
+        { "authority": "EU", "listId": "2022/1269 (energy sanctions package 8)", "date": "2022-10-06", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R1269" }
+      ], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.82 }
+    },
+    "progress-urengoy-uzhhorod": {
+      "id": "progress-urengoy-uzhhorod", "name": "Urengoy–Pomary–Uzhhorod (Progress)", "operator": "Gazprom / Naftogaz", "commodityType": "gas",
+      "fromCountry": "RU", "toCountry": "SK", "transitCountries": ["UA"],
+      "capacityBcmYr": 32, "lengthKm": 4451, "inService": 1984,
+      "startPoint": { "lat": 65.97, "lon": 76.55 }, "endPoint": { "lat": 48.62, "lon": 22.30 },
+      "evidence": { "physicalState": "offline", "physicalStateSource": "regulator", "operatorStatement": {
+        "text": "Ukraine did not renew the 2019 transit agreement; transit via Sudzha halted 1 Jan 2025. Pipeline physically intact; flow zero.",
+        "url": "https://naftogaz.com/",
+        "date": "2025-01-01"
+      }, "commercialState": "expired", "sanctionRefs": [
+        { "authority": "EU", "listId": "2022/1269 (energy sanctions package 8)", "date": "2022-10-06", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R1269" }
+      ], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.92 }
+    },
+    "kish-iran-gas": {
+      "id": "kish-iran-gas", "name": "Kish Island–Iran Mainland Gas Pipeline", "operator": "NIGC", "commodityType": "gas",
+      "fromCountry": "IR", "toCountry": "IR", "transitCountries": [],
+      "capacityBcmYr": 2.5, "lengthKm": 42, "inService": 2010,
+      "startPoint": { "lat": 26.53, "lon": 53.95 }, "endPoint": { "lat": 27.20, "lon": 53.57 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [
+        { "authority": "US", "listId": "OFAC Iran energy sanctions framework", "date": "2018-08-07", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/iran-sanctions" }
+      ], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.75 }
+    },
+    "ghana-gas": {
+      "id": "ghana-gas", "name": "Ghana Gas Company Pipeline (Atuabo)", "operator": "Ghana National Gas Company", "commodityType": "gas",
+      "fromCountry": "GH", "toCountry": "GH", "transitCountries": [],
+      "capacityBcmYr": 1.5, "lengthKm": 111, "inService": 2015,
+      "startPoint": { "lat": 4.85, "lon": -2.33 }, "endPoint": { "lat": 4.90, "lon": -1.73 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.75 }
+    },
+    "iran-pakistan-gas-planned": {
+      "id": "iran-pakistan-gas-planned", "name": "Iran–Pakistan Gas Pipeline (Peace, Pakistani segment stalled)", "operator": "NIGC / ISGS Pakistan", "commodityType": "gas",
+      "fromCountry": "IR", "toCountry": "PK", "transitCountries": [],
+      "capacityBcmYr": 11, "lengthKm": 1931, "inService": 0,
+      "startPoint": { "lat": 25.62, "lon": 60.90 }, "endPoint": { "lat": 25.00, "lon": 67.03 },
+      "evidence": {
+        "physicalState": "unknown", "physicalStateSource": "press",
+        "operatorStatement": {
+          "text": "Iranian segment completed to border 2013. Pakistani segment stalled since 2014 amid US sanction risk on completion; NIOC served arbitration notice 2023. Pipeline not operational end-to-end.",
+          "url": "https://isgs.gov.pk/",
+          "date": "2024-02-01"
+        },
+        "commercialState": "expired",
+        "sanctionRefs": [
+          { "authority": "US", "listId": "OFAC Iran energy sanctions framework (applied to Pakistani completion)", "date": "2018-08-07", "url": "https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/iran-sanctions" }
+        ],
+        "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.8
+      }
+    },
+    "gascade-jagal": {
+      "id": "gascade-jagal", "name": "JAGAL (North German gas link)", "operator": "GASCADE", "commodityType": "gas",
+      "fromCountry": "DE", "toCountry": "DE", "transitCountries": [],
+      "capacityBcmYr": 16, "lengthKm": 340, "inService": 1999,
+      "startPoint": { "lat": 53.87, "lon": 14.27 }, "endPoint": { "lat": 51.87, "lon": 10.57 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.8 }
+    },
+    "zeelink-germany": {
+      "id": "zeelink-germany", "name": "ZEELINK (H-gas conversion pipeline)", "operator": "OGE / Thyssengas", "commodityType": "gas",
+      "fromCountry": "BE", "toCountry": "DE", "transitCountries": [],
+      "capacityBcmYr": 10, "lengthKm": 216, "inService": 2021,
+      "startPoint": { "lat": 51.33, "lon": 3.20 }, "endPoint": { "lat": 50.33, "lon": 7.57 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.85 }
+    },
+    "china-hong-kong-gas": {
+      "id": "china-hong-kong-gas", "name": "Mainland–Hong Kong Gas Pipeline", "operator": "CNOOC Gas & Power / Towngas", "commodityType": "gas",
+      "fromCountry": "CN", "toCountry": "HK", "transitCountries": [],
+      "capacityBcmYr": 2.5, "lengthKm": 92, "inService": 2006,
+      "startPoint": { "lat": 22.68, "lon": 113.83 }, "endPoint": { "lat": 22.35, "lon": 114.18 },
+      "evidence": { "physicalState": "flowing", "physicalStateSource": "operator", "operatorStatement": null, "commercialState": "under_contract", "sanctionRefs": [], "lastEvidenceUpdate": "2026-04-22T00:00:00Z", "classifierVersion": "v1", "classifierConfidence": 0.8 }
     }
   }
 }
