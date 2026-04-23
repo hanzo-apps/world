@@ -29,6 +29,15 @@
           "type": "application/json"
         }
       ]
+    },
+    {
+      "anchor": "https://worldmonitor.app/",
+      "agent-skills-index": [
+        {
+          "href": "https://worldmonitor.app/.well-known/agent-skills/index.json",
+          "type": "application/json"
+        }
+      ]
     }
   ]
 }
