@@ -509,6 +509,7 @@ describe('agent readiness: homepage Link headers', () => {
         'rel="http://www.iana.org/assignments/relation/oauth-protected-resource"',
         'rel="http://www.iana.org/assignments/relation/oauth-authorization-server"',
         'rel="mcp-server-card"',
+        'rel="agent-skills-index"',
       ];
       for (const rel of requiredRels) {
         assert.ok(
