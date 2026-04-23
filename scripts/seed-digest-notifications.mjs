@@ -48,6 +48,7 @@ import {
   readOrchestratorConfig,
 } from './lib/brief-dedup.mjs';
 import { stripSourceSuffix } from './lib/brief-dedup-jaccard.mjs';
+import { writeReplayLog } from './lib/brief-dedup-replay-log.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -390,8 +391,42 @@ async function buildDigest(rule, windowStartMs) {
 
   stories.sort((a, b) => b.currentScore - a.currentScore);
   const cfg = readOrchestratorConfig(process.env);
+  // Sample tsMs BEFORE dedup so briefTickId anchors to tick-start, not
+  // to dedup-completion. Dedup can take a few seconds on cold-cache
+  // embed calls; we want the replay log's tick id to reflect when the
+  // tick began processing, which is the natural reading of
+  // "briefTickId" for downstream readers.
+  const tsMs = Date.now();
   const { reps: dedupedAll, embeddingByHash, logSummary } =
     await deduplicateStories(stories);
+  // Replay log (opt-in via DIGEST_DEDUP_REPLAY_LOG=1). Best-effort — any
+  // failure is swallowed by writeReplayLog. Runs AFTER dedup so the log
+  // captures the real rep + cluster assignments. RuleId omits userId on
+  // purpose: dedup input is shared across users of the same (variant,
+  // lang, sensitivity), and we don't want user identity in log keys.
+  // See docs/brainstorms/2026-04-23-001-brief-dedup-recall-gap.md §5 Phase 1.
+  //
+  // AWAITED on purpose: this script exits via explicit process.exit(1)
+  // on the brief-compose failure gate (~line 1539) and on main().catch
+  // (~line 1545). process.exit does NOT drain in-flight promises like
+  // natural exit does, so a `void` call here would silently drop the
+  // last N ticks' replay records — exactly the runs where measurement
+  // fidelity matters most. writeReplayLog has its own internal try/
+  // catch + early return when the flag is off, so awaiting is free on
+  // the disabled path and bounded by the 10s Upstash pipeline timeout
+  // on the enabled path.
+  const ruleKey = `${variant}:${lang}:${rule.sensitivity ?? 'high'}`;
+  await writeReplayLog({
+    stories,
+    reps: dedupedAll,
+    embeddingByHash,
+    cfg,
+    tickContext: {
+      briefTickId: `${ruleKey}:${tsMs}`,
+      ruleId: ruleKey,
+      tsMs,
+    },
+  });
   // Apply the absolute-score floor AFTER dedup so the floor runs on
   // the representative's score (mentionCount-sum doesn't change the
   // score field; the rep is the highest-scoring member of its
