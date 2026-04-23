@@ -376,72 +376,83 @@ describe('agent readiness: api-catalog + openapi build', () => {
   });
 });
 
-// The MCP endpoint and OAuth protected-resource metadata must share an
-// origin — a scanner or client that enters from a mismatched host sees
-// "this server says its resource lives on a different origin", which
-// violates RFC 9728 and breaks the PRM discovery flow in strict clients.
-// The resource/authorization-server split is intentional: apex serves
-// the MCP transport + resource metadata, api.worldmonitor.app serves
-// the OAuth endpoints. Keep them in lockstep — all resource-side
-// pointers (MCP server-card transport.endpoint, MCP server-card
-// authentication.resource, oauth-protected-resource.resource, and every
-// WWW-Authenticate resource_metadata pointer emitted from api/mcp.ts)
-// must agree, while authorization_servers stays on the api host.
+// The MCP endpoint and OAuth protected-resource metadata must be
+// self-consistent per host. The static file that used to live at
+// public/.well-known/oauth-protected-resource was replaced with a
+// dynamic edge function at api/oauth-protected-resource.ts that
+// derives `resource` and `authorization_servers` from the request
+// Host header, so every origin (apex / www / api) sees same-origin
+// metadata regardless of which host the scanner entered from.
+// Scanners like isitagentready.com (and Cloudflare's reference at
+// mcp.cloudflare.com) enforce that `authorization_servers[*]` share
+// origin with `resource` — this construction guarantees that.
 describe('agent readiness: MCP/OAuth origin alignment', () => {
-  const mcpCard = JSON.parse(
-    readFileSync(resolve(__dirname, '../public/.well-known/mcp/server-card.json'), 'utf-8')
-  );
-  const oauthMeta = JSON.parse(
-    readFileSync(resolve(__dirname, '../public/.well-known/oauth-protected-resource'), 'utf-8')
-  );
+  it('oauth-protected-resource handler returns origin-matching metadata per host', async () => {
+    // Runtime test (not source-regex): dynamically import the edge handler
+    // and invoke it against synthetic Host headers to prove the response
+    // is actually same-origin per host, with correct Vary + Content-Type.
+    const mod = await import('../api/oauth-protected-resource.ts');
+    const handler = mod.default;
+    assert.equal(typeof handler, 'function', 'handler must be the default export');
 
-  const mcpEndpointOrigin = new URL(mcpCard.transport.endpoint).origin;
-  const resourceOrigin = new URL(oauthMeta.resource).origin;
-
-  it('MCP transport.endpoint origin matches OAuth metadata resource origin', () => {
-    assert.equal(
-      mcpEndpointOrigin,
-      resourceOrigin,
-      'MCP transport.endpoint and OAuth resource must share the same origin'
-    );
-  });
-
-  it('MCP card authentication.resource equals OAuth metadata resource exactly', () => {
-    assert.equal(
-      mcpCard.authentication.resource,
-      oauthMeta.resource,
-      'MCP card authentication.resource must equal OAuth metadata resource'
-    );
-  });
-
-  it('authorization_servers stay on api.worldmonitor.app (intentional resource/AS split)', () => {
-    assert.ok(
-      Array.isArray(oauthMeta.authorization_servers) && oauthMeta.authorization_servers.length > 0,
-      'oauth-protected-resource.authorization_servers must be a non-empty array'
-    );
-    for (const s of oauthMeta.authorization_servers) {
-      assert.equal(
-        new URL(s).origin,
-        'https://api.worldmonitor.app',
-        `authorization_servers entry must stay on api.worldmonitor.app, got: ${s}`
-      );
+    const hosts = ['worldmonitor.app', 'www.worldmonitor.app', 'api.worldmonitor.app'];
+    for (const host of hosts) {
+      const req = new Request(`https://${host}/.well-known/oauth-protected-resource`, {
+        headers: { host },
+      });
+      const res = await handler(req);
+      assert.equal(res.status, 200, `status 200 for ${host}`);
+      assert.equal(res.headers.get('content-type'), 'application/json', `JSON for ${host}`);
+      assert.equal(res.headers.get('vary'), 'Host', `Vary: Host for ${host}`);
+      const json = await res.json();
+      assert.equal(json.resource, `https://${host}`, `resource matches ${host}`);
+      assert.deepEqual(json.authorization_servers, [`https://${host}`], `auth_servers match ${host}`);
+      assert.deepEqual(json.bearer_methods_supported, ['header']);
+      assert.deepEqual(json.scopes_supported, ['mcp']);
     }
   });
 
-  it('api/mcp.ts WWW-Authenticate resource_metadata pointers share origin with oauth-protected-resource', () => {
-    const mcpSource = readFileSync(resolve(__dirname, '../api/mcp.ts'), 'utf-8');
-    const matches = [...mcpSource.matchAll(/resource_metadata="([^"]+)"/g)];
-    assert.ok(
-      matches.length > 0,
-      'api/mcp.ts should emit resource_metadata pointers in its 401 WWW-Authenticate headers'
+  it('MCP server card authentication.resource is a valid https URL on a known host', () => {
+    const mcpCard = JSON.parse(
+      readFileSync(resolve(__dirname, '../public/.well-known/mcp/server-card.json'), 'utf-8')
     );
-    for (const [, url] of matches) {
-      assert.equal(
-        new URL(url).origin,
-        resourceOrigin,
-        `api/mcp.ts resource_metadata pointer ${url} must share origin with oauth-protected-resource`
-      );
-    }
+    const u = new URL(mcpCard.authentication.resource);
+    assert.equal(u.protocol, 'https:');
+    assert.ok(
+      ['worldmonitor.app', 'www.worldmonitor.app', 'api.worldmonitor.app'].includes(u.host),
+      `unexpected host: ${u.host}`
+    );
+  });
+
+  it('api/mcp.ts resource_metadata is host-derived, not hardcoded', () => {
+    const source = readFileSync(resolve(__dirname, '../api/mcp.ts'), 'utf-8');
+    // Must NOT contain a hardcoded apex or api URL for resource_metadata —
+    // that regressed once (PR #3351 review: apex pointer emitted from
+    // api.worldmonitor.app/mcp 401s) and the grep-only test didn't catch it.
+    assert.ok(
+      !/resource_metadata="https:\/\/(?:api\.)?worldmonitor\.app\/\.well-known\//.test(source),
+      'api/mcp.ts must not hardcode resource_metadata URL — derive from request host'
+    );
+    // Must contain a template-literal construction that uses a host variable.
+    assert.match(
+      source,
+      /resource_metadata="\$\{[A-Za-z_][A-Za-z0-9_]*\}"|`[^`]*resource_metadata="\$\{[^}]+\}"/,
+      'api/mcp.ts must construct resource_metadata from a host-derived variable'
+    );
+    // Must actually read the request host header somewhere in the file.
+    assert.match(
+      source,
+      /request\.headers\.get\(['"]host['"]\)|req\.headers\.get\(['"]host['"]\)/i,
+      'api/mcp.ts should read the request host header'
+    );
+  });
+
+  it('vercel.json rewrites /.well-known/oauth-protected-resource to the edge fn', () => {
+    const rewrite = vercelConfig.rewrites.find(
+      (r) => r.source === '/.well-known/oauth-protected-resource'
+    );
+    assert.ok(rewrite, 'expected a rewrite for /.well-known/oauth-protected-resource');
+    assert.equal(rewrite.destination, '/api/oauth-protected-resource');
   });
 });
 
