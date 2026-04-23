@@ -853,7 +853,7 @@ export default async function handler(req: Request): Promise<Response> {
       // Bearer token present but unresolvable — expired or invalid UUID
       return new Response(
         JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Invalid or expired OAuth token. Re-authenticate via /oauth/token.' } }),
-        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor", error="invalid_token", resource_metadata="https://api.worldmonitor.app/.well-known/oauth-protected-resource"', ...corsHeaders } }
+        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor", error="invalid_token", resource_metadata="https://worldmonitor.app/.well-known/oauth-protected-resource"', ...corsHeaders } }
       );
     }
   } else {
@@ -861,7 +861,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (!candidateKey) {
       return new Response(
         JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Authentication required. Use OAuth (/oauth/token) or pass your API key via X-WorldMonitor-Key header.' } }),
-        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor", resource_metadata="https://api.worldmonitor.app/.well-known/oauth-protected-resource"', ...corsHeaders } }
+        { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="worldmonitor", resource_metadata="https://worldmonitor.app/.well-known/oauth-protected-resource"', ...corsHeaders } }
       );
     }
     const validKeys = (process.env.WORLDMONITOR_VALID_KEYS || '').split(',').filter(Boolean);

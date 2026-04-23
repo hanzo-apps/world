@@ -13,12 +13,12 @@ The MCP server is gated behind **PRO**. Free-tier users see a 401 at the OAuth s
 
 | Endpoint | Purpose |
 |----------|---------|
-| `https://api.worldmonitor.app/api/mcp` | JSON-RPC server (Streamable HTTP transport, protocol `2025-03-26`) |
+| `https://worldmonitor.app/mcp` | JSON-RPC server (Streamable HTTP transport, protocol `2025-03-26`) |
 | `https://api.worldmonitor.app/api/oauth/register` | Dynamic Client Registration (RFC 7591) |
 | `https://api.worldmonitor.app/api/oauth/authorize` | OAuth 2.1 authorization endpoint (PKCE required) |
 | `https://api.worldmonitor.app/api/oauth/token` | Token endpoint (authorization_code + refresh_token) |
 | `https://api.worldmonitor.app/.well-known/oauth-authorization-server` | AS metadata (RFC 8414) |
-| `https://api.worldmonitor.app/.well-known/oauth-protected-resource` | Resource server metadata (RFC 9728) |
+| `https://worldmonitor.app/.well-known/oauth-protected-resource` | Resource server metadata (RFC 9728) |
 
 Protocol version: `2025-03-26`. Server identifier: `worldmonitor` v1.0.
 
@@ -69,7 +69,7 @@ Exceeding returns `429` with a `Retry-After` header.
 {
   "mcpServers": {
     "worldmonitor": {
-      "url": "https://api.worldmonitor.app/api/mcp"
+      "url": "https://worldmonitor.app/mcp"
     }
   }
 }
@@ -82,7 +82,7 @@ Claude Desktop handles the OAuth flow automatically on first connection.
 Add via **Settings → Connectors → Add custom connector**:
 
 - Name: `WorldMonitor`
-- URL: `https://api.worldmonitor.app/api/mcp`
+- URL: `https://worldmonitor.app/mcp`
 
 ### Cursor
 
@@ -92,7 +92,7 @@ Add via **Settings → Connectors → Add custom connector**:
 {
   "mcpServers": {
     "worldmonitor": {
-      "url": "https://api.worldmonitor.app/api/mcp"
+      "url": "https://worldmonitor.app/mcp"
     }
   }
 }
@@ -101,7 +101,7 @@ Add via **Settings → Connectors → Add custom connector**:
 ### MCP Inspector (debugging)
 
 ```bash
-npx @modelcontextprotocol/inspector https://api.worldmonitor.app/api/mcp
+npx @modelcontextprotocol/inspector https://worldmonitor.app/mcp
 ```
 
 ## Tool catalog
@@ -173,13 +173,13 @@ Server-side with a direct API key — send it as `X-WorldMonitor-Key`, **not** a
 WM_KEY="wm_live_..."
 
 # 1. List tools
-curl -s https://api.worldmonitor.app/api/mcp \
+curl -s https://worldmonitor.app/mcp \
   -H "X-WorldMonitor-Key: $WM_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # 2. Call a cache tool
-curl -s https://api.worldmonitor.app/api/mcp \
+curl -s https://worldmonitor.app/mcp \
   -H "X-WorldMonitor-Key: $WM_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
