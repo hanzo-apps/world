@@ -14,7 +14,7 @@ GO_INSTALL := $(GO_PROXY) $(GO_PRIVATE) go install
 
 # Required tool versions
 BUF_VERSION := v1.64.0
-SEBUF_VERSION := v0.7.0
+SEBUF_VERSION := v0.11.1
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -55,7 +55,6 @@ lint: ## Lint protobuf files
 generate: clean ## Generate code from proto definitions
 	@mkdir -p $(GEN_CLIENT_DIR) $(GEN_SERVER_DIR) $(DOCS_API_DIR)
 	cd $(PROTO_DIR) && buf generate
-	@find $(GEN_CLIENT_DIR) $(GEN_SERVER_DIR) -name '*.ts' -exec sed -i.bak '1s;^;// @ts-nocheck\n;' {} \; -exec rm -f {}.bak \;
 	@echo "Code generation complete!"
 
 breaking: ## Check for breaking changes against main

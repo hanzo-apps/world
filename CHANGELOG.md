@@ -6,6 +6,7 @@ All notable changes to World Monitor are documented here.
 
 ### Added
 
+- **Unified OpenAPI bundle** — `docs/api/worldmonitor.openapi.yaml` is now emitted alongside per-service specs, merging every WorldMonitor RPC into a single OpenAPI 3.1 document (190 operations). Powered by sebuf v0.11.1's origin-level bundle support ([SebastienMelki/sebuf#158](https://github.com/SebastienMelki/sebuf/issues/158)). Bumps `SEBUF_VERSION` in the Makefile from v0.7.0 to v0.11.1 — rerun `make install-plugins` after pulling.
 - **Route Explorer**: standalone full-screen modal (CMD+K) for planning shipments between any two countries. Includes Current/Alternatives/Land/Impact tabs, keyboard-first navigation, URL state sharing, strategic-product trade data, dependency flags, and free-tier blur with public route highlight (#2980, #2982, #2994, #2996, #2997, #2998)
 - US Treasury customs revenue in Trade Policy panel with monthly data, FYTD year-over-year comparison, and revenue spike highlighting (#1663)
 - Security advisories gold standard migration: Railway cron seed fetches 24 government RSS feeds hourly, Vercel reads Redis only (#1637)
