@@ -23,14 +23,37 @@ export function normaliseThreatLevel(upstream: string): BriefThreatLevel | null;
 export type AlertSensitivity = 'all' | 'high' | 'critical';
 
 /**
+ * Optional drop-metrics callback. Called synchronously once per
+ * dropped story. `severity` is present when threatLevel parsed but
+ * failed the sensitivity gate, or when a later gate (headline/url)
+ * dropped a story that had already passed the severity check.
+ *
+ * `cap` fires once per story skipped after `maxStories` has been
+ * reached — neither severity nor field metadata is included since
+ * the loop short-circuits without parsing the remaining stories.
+ */
+export type DropMetricsFn = (event: {
+  reason: 'severity' | 'headline' | 'url' | 'shape' | 'cap';
+  severity?: string;
+  sourceUrl?: string;
+}) => void;
+
+/**
  * Filters the upstream `topStories` array against a user's
  * `alertRules.sensitivity` setting and caps at `maxStories`. Stories
  * with an unknown upstream severity are dropped.
+ *
+ * When `onDrop` is provided, it is invoked synchronously for each
+ * dropped story with the drop reason and available metadata. The
+ * callback runs before the `continue` that skips the story — callers
+ * can use it to aggregate per-user drop counters without altering
+ * filter behaviour.
  */
 export function filterTopStories(input: {
   stories: UpstreamTopStory[];
   sensitivity: AlertSensitivity;
   maxStories?: number;
+  onDrop?: DropMetricsFn;
 }): BriefStory[];
 
 /**

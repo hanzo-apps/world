@@ -32,8 +32,15 @@ function compareRules(a, b) {
   const aFull = a.variant === 'full' ? 0 : 1;
   const bFull = b.variant === 'full' ? 0 : 1;
   if (aFull !== bFull) return aFull - bFull;
-  const aRank = SENSITIVITY_RANK[a.sensitivity ?? 'all'] ?? 0;
-  const bRank = SENSITIVITY_RANK[b.sensitivity ?? 'all'] ?? 0;
+  // Default missing sensitivity to 'high' (NOT 'all') so the rank
+  // matches what compose/buildDigest/cache/log actually treat the
+  // rule as. Otherwise a legacy undefined-sensitivity rule would be
+  // ranked as the most-permissive 'all' and tried first, but compose
+  // would then apply a 'high' filter — shipping a narrow brief while
+  // an explicit 'all' rule for the same user is never tried.
+  // See PR #3387 review (P2).
+  const aRank = SENSITIVITY_RANK[a.sensitivity ?? 'high'] ?? 0;
+  const bRank = SENSITIVITY_RANK[b.sensitivity ?? 'high'] ?? 0;
   if (aRank !== bRank) return aRank - bRank;
   return (a.updatedAt ?? 0) - (b.updatedAt ?? 0);
 }
@@ -161,7 +168,10 @@ const MAX_STORIES_PER_USER = 12;
  * @param {{ nowMs: number }} [opts]
  */
 export function composeBriefForRule(rule, insights, { nowMs = Date.now() } = {}) {
-  const sensitivity = rule.sensitivity ?? 'all';
+  // Default to 'high' (NOT 'all') for parity with composeBriefFromDigestStories,
+  // buildDigest, the digestFor cache key, and the per-attempt log line.
+  // See PR #3387 review (P2).
+  const sensitivity = rule.sensitivity ?? 'high';
   const tz = rule.digestTimezone ?? 'UTC';
   const stories = filterTopStories({
     stories: insights.topStories,
@@ -272,17 +282,30 @@ function digestStoryToUpstreamTopStory(s) {
  * @param {object} rule — enabled alertRule row
  * @param {unknown[]} digestStories — output of buildDigest(rule, windowStart)
  * @param {{ clusters: number; multiSource: number }} insightsNumbers
- * @param {{ nowMs?: number }} [opts]
+ * @param {{ nowMs?: number, onDrop?: import('../../shared/brief-filter.js').DropMetricsFn }} [opts]
+ *   `onDrop` is forwarded to filterTopStories so the seeder can
+ *   aggregate per-user filter-drop counts without this module knowing
+ *   how they are reported.
  */
-export function composeBriefFromDigestStories(rule, digestStories, insightsNumbers, { nowMs = Date.now() } = {}) {
+export function composeBriefFromDigestStories(rule, digestStories, insightsNumbers, { nowMs = Date.now(), onDrop } = {}) {
   if (!Array.isArray(digestStories) || digestStories.length === 0) return null;
-  const sensitivity = rule.sensitivity ?? 'all';
+  // Default to 'high' (NOT 'all') for undefined sensitivity, aligning
+  // with buildDigest at scripts/seed-digest-notifications.mjs:392 and
+  // the digestFor cache key. The live cron path pre-filters the pool
+  // to {critical, high}, so this default is a no-op for production
+  // calls — but a non-prefiltered caller with undefined sensitivity
+  // would otherwise silently widen to {medium, low} stories while the
+  // operator log labels the attempt as 'high', misleading telemetry.
+  // See PR #3387 review (P2) and Defect 2 / Solution 1 in
+  // docs/plans/2026-04-24-004-fix-brief-topic-adjacency-defects-plan.md.
+  const sensitivity = rule.sensitivity ?? 'high';
   const tz = rule.digestTimezone ?? 'UTC';
   const upstreamLike = digestStories.map(digestStoryToUpstreamTopStory);
   const stories = filterTopStories({
     stories: upstreamLike,
     sensitivity,
     maxStories: MAX_STORIES_PER_USER,
+    onDrop,
   });
   if (stories.length === 0) return null;
   const issueDate = issueDateInTz(nowMs, tz);
