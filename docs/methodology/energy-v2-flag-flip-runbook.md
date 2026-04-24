@@ -22,10 +22,15 @@ All must be green before flipping `RESILIENCE_ENERGY_V2_ENABLED=true`:
    `HEALTHY` with the three keys in the `lowCarbonGeneration`,
    `fossilElectricityShare`, `powerLosses` slots. If any shows
    `EMPTY_DATA` or `STALE_SEED`, the flag cannot flip.
-3. **ON_DEMAND_KEYS graduation.** After ≥ 7 days of clean weekly cron
-   runs, remove the three entries from `api/health.js` `ON_DEMAND_KEYS`
-   set (transitional block added in this PR). Graduating them out of
-   on-demand puts them under the normal CRIT alerting path.
+3. **Health-registry state (no code change needed at flip time).** Per
+   plan `2026-04-24-001` the three v2 seed labels are already STRICT
+   `SEED_META` entries — NOT in `ON_DEMAND_KEYS`. `/api/health` reports
+   CRIT on absent/stale data from the moment the Railway bundle is
+   provisioned. No "graduation" step is required at flag-flip time;
+   this transitional posture was removed before the flag-flip activation
+   path to keep the scorer and health layers in fail-closed lockstep
+   (scorer throws `ResilienceConfigurationError` → source-failure;
+   health reports CRIT; both surface the gap independently).
 4. **Acceptance-gate rerun with flag-off.** Baseline Spearman vs the
    PR 0 freeze must remain 1.0000:
    ```bash
@@ -56,11 +61,11 @@ All must be green before flipping `RESILIENCE_ENERGY_V2_ENABLED=true`:
    ```
    Every gate must be `pass`. If any is `fail`, STOP and debug before
    proceeding. Check in order:
-   - `gate-1-spearman`: Spearman vs baseline >= 0.85
-   - `gate-2-country-drift`: max country drift <= 15 points
-   - `gate-6-cohort-median`: cohort median shift <= 10 points
+   - `gate-1-spearman`: Spearman vs baseline ≥ 0.85
+   - `gate-2-country-drift`: max country drift ≤ 15 points
+   - `gate-6-cohort-median`: cohort median shift ≤ 10 points
    - `gate-7-matched-pair`: every matched pair holds expected direction
-   - `gate-9-effective-influence-baseline`: >= 80% Core indicators measurable
+   - `gate-9-effective-influence-baseline`: ≥ 80% Core indicators measurable
 
 3. **Bump the score-cache prefix.** Add a new commit to this branch
    bumping `RESILIENCE_SCORE_CACHE_PREFIX` from `v10` to `v11` in
