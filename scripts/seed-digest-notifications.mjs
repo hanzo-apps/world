@@ -149,6 +149,17 @@ const BRIEF_WHY_MATTERS_ENDPOINT_URL =
   `${WORLDMONITOR_PUBLIC_BASE_URL}/api/internal/brief-why-matters`;
 
 /**
+ * Lowercase + collapse whitespace to mirror extractor-side gate in
+ * server/worldmonitor/news/v1/list-feed-digest.ts
+ * (normalizeForDescriptionEquality). Duplicated (not imported) because
+ * that module is .ts on a different loader path; a shared .mjs helper
+ * would be a cleaner home if more surfaces adopt this check.
+ */
+function normalizeForDescriptionEquality(s) {
+  return String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
  * POST one story to the analyst whyMatters endpoint. Returns the
  * string on success, null on any failure (auth, non-200, parse error,
  * timeout, missing value). The cron's `generateWhyMatters` is
@@ -178,7 +189,12 @@ async function callAnalystWhyMatters(story) {
   if (
     typeof story.description === 'string' &&
     story.description.length > 0 &&
-    story.description !== story.headline
+    // Normalize-equality (case + whitespace) mirrors the extractor-side gate
+    // in list-feed-digest.ts (normalizeForDescriptionEquality) so a feed
+    // whose description only differs from the headline by casing/spacing
+    // doesn't leak as "grounding" content here.
+    normalizeForDescriptionEquality(story.description) !==
+      normalizeForDescriptionEquality(story.headline ?? '')
   ) {
     payload.description = story.description;
   }
@@ -384,6 +400,10 @@ async function buildDigest(rule, windowStartMs) {
       mentionCount: parseInt(track.mentionCount ?? '1', 10),
       phase,
       sources: [],
+      // Cleaned RSS description from list-feed-digest's parseRssXml; empty
+      // on old story:track rows (pre-fix, 48h bleed) and feeds without a
+      // description. Downstream adapter falls back to the cleaned headline.
+      description: typeof track.description === 'string' ? track.description : '',
     });
   }
 
@@ -537,6 +557,15 @@ function formatDigest(stories, nowMs) {
         ? ` [${item.sources.slice(0, 3).join(', ')}${item.sources.length > 3 ? ` +${item.sources.length - 3}` : ''}]`
         : '';
       lines.push(`  \u2022 ${stripSourceSuffix(item.title)}${src}`);
+      // Append the RSS description as a short context line when upstream
+      // persisted one. Truncated at a word boundary to ~200 chars to keep
+      // the plain-text email terse. Empty \u2192 no context line (R6).
+      if (typeof item.description === 'string' && item.description.length > 0) {
+        const trimmed = item.description.length > 200
+          ? item.description.slice(0, 200).replace(/\s+\S*$/, '') + '\u2026'
+          : item.description;
+        lines.push(`    ${trimmed}`);
+      }
     }
     if (items.length > limit) lines.push(`  ... and ${items.length - limit} more`);
     lines.push('');
@@ -576,11 +605,20 @@ function formatDigestHtml(stories, nowMs) {
     const titleEl = s.link
       ? `<a href="${escapeHtml(s.link)}" style="color: #e0e0e0; text-decoration: none; font-size: 14px; font-weight: 600; line-height: 1.4;">${escapeHtml(cleanTitle)}</a>`
       : `<span style="color: #e0e0e0; font-size: 14px; font-weight: 600; line-height: 1.4;">${escapeHtml(cleanTitle)}</span>`;
+    // RSS description: truncated ~200 chars at a word boundary, rendered
+    // between title and meta when present. Empty → section omitted (R6).
+    let snippetEl = '';
+    if (typeof s.description === 'string' && s.description.length > 0) {
+      const trimmed = s.description.length > 200
+        ? s.description.slice(0, 200).replace(/\s+\S*$/, '') + '…'
+        : s.description;
+      snippetEl = `<div style="margin-top: 6px; font-size: 12px; color: #999; line-height: 1.45;">${escapeHtml(trimmed)}</div>`;
+    }
     const meta = [
       phaseCap ? `<span style="font-size: 10px; color: ${phaseColor}; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">${phaseCap}</span>` : '',
       srcText ? `<span style="font-size: 11px; color: #555;">${escapeHtml(srcText)}</span>` : '',
     ].filter(Boolean).join('<span style="color: #333; margin: 0 6px;">&bull;</span>');
-    return `<div style="background: #111; border: 1px solid #1a1a1a; border-left: 3px solid ${borderColor}; padding: 12px 16px; margin-bottom: 8px;">${titleEl}${meta ? `<div style="margin-top: 6px;">${meta}</div>` : ''}</div>`;
+    return `<div style="background: #111; border: 1px solid #1a1a1a; border-left: 3px solid ${borderColor}; padding: 12px 16px; margin-bottom: 8px;">${titleEl}${snippetEl}${meta ? `<div style="margin-top: 6px;">${meta}</div>` : ''}</div>`;
   }
 
   const SEVERITY_LIMITS = { critical: DIGEST_CRITICAL_LIMIT, high: DIGEST_HIGH_LIMIT, medium: DIGEST_MEDIUM_LIMIT };
