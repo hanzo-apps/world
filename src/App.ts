@@ -1033,6 +1033,34 @@ export class App {
     this.eventHandlers.setupMapLayerHandlers();
     this.countryIntel.init();
 
+    // WebMCP — expose a small set of UI tools to in-page agents.
+    // Feature-detects `navigator.modelContext`; no-ops in browsers without it.
+    // Registered after search+country modules so the bound callbacks have real
+    // targets; tools intentionally route through the same paths a click takes
+    // so paywall/auth gates still apply to agent invocations.
+    //
+    // Bindings throw when a required UI target is missing so the tool's
+    // withInvocationLogging shim catches it and reports ok:false instead of
+    // a misleading "Opened …" success — the underlying UI methods silently
+    // no-op on null targets.
+    void import('@/services/webmcp').then(({ registerWebMcpTools }) => {
+      registerWebMcpTools({
+        openCountryBriefByCode: async (code, country) => {
+          if (!this.state.countryBriefPage) {
+            throw new Error('Country brief panel is not initialised yet');
+          }
+          await this.countryIntel.openCountryBriefByCode(code, country);
+        },
+        resolveCountryName: (code) => CountryIntelManager.resolveCountryName(code),
+        openSearch: () => {
+          if (!this.state.searchModal) {
+            throw new Error('Search modal is not initialised yet');
+          }
+          this.state.searchModal.open();
+        },
+      });
+    });
+
     // Phase 5: Event listeners + URL sync
     this.eventHandlers.init();
     // Capture deep link params BEFORE URL sync overwrites them
