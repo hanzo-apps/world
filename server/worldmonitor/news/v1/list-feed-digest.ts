@@ -81,7 +81,20 @@ interface ParsedItem {
   corroborationCount: number;
   titleHash?: string;
   lang: string;
+  // Cleaned RSS/Atom article description: HTML-stripped, entity-decoded,
+  // whitespace-normalised, clipped to MAX_DESCRIPTION_LEN. Empty string when
+  // absent, too short, or indistinguishable from the headline. Grounding input
+  // for brief / whyMatters / SummarizeArticle LLMs.
+  description: string;
 }
+
+const MAX_DESCRIPTION_LEN = 400;
+const MIN_DESCRIPTION_LEN = 40;
+
+const DESCRIPTION_TAG_PRIORITY = {
+  rss: ['description', 'content:encoded'] as const,
+  atom: ['summary', 'content'] as const,
+};
 
 function computeImportanceScore(
   level: ThreatLevel,
@@ -216,6 +229,7 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParsedItem
 
     const threat = classifyByKeyword(title, variant);
     const isAlert = threat.level === 'critical' || threat.level === 'high';
+    const description = extractDescription(block, isAtom, title);
 
     items.push({
       source: feed.name,
@@ -230,10 +244,73 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParsedItem
       importanceScore: 0,
       corroborationCount: 1,
       lang: feed.lang ?? 'en',
+      description,
     });
   }
 
   return items.length > 0 ? items : null;
+}
+
+/**
+ * Raw-body extractor for HTML-carrying tags (description, content:encoded,
+ * summary, content). Non-greedy `[\s\S]*?` captures the full tag body including
+ * nested markup; the CDATA end is anchored to the closing tag so internal `]]>`
+ * sequences followed by more content do not truncate the match prematurely.
+ * Returns the raw content without entity decoding — caller strips HTML and
+ * decodes entities via `decodeXmlEntities`.
+ */
+const DESCRIPTION_TAG_REGEX_CACHE = new Map<string, { cdata: RegExp; plain: RegExp }>();
+
+function extractRawTagBody(xml: string, tag: string): string {
+  let cached = DESCRIPTION_TAG_REGEX_CACHE.get(tag);
+  if (!cached) {
+    cached = {
+      cdata: new RegExp(
+        `<${tag}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*<\\/${tag}>`,
+        'i',
+      ),
+      plain: new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'),
+    };
+    DESCRIPTION_TAG_REGEX_CACHE.set(tag, cached);
+  }
+  const cdataMatch = xml.match(cached.cdata);
+  if (cdataMatch) return cdataMatch[1] ?? '';
+
+  const match = xml.match(cached.plain);
+  return match ? match[1] ?? '' : '';
+}
+
+function normalizeForDescriptionEquality(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Extract + clean the article description/summary for an RSS `<item>` or Atom
+ * `<entry>` block. Picks the LONGEST non-empty candidate across the dialect's
+ * tag priority list after HTML-strip + entity-decode + whitespace-normalise.
+ * Returns '' when the best candidate is empty, shorter than
+ * MIN_DESCRIPTION_LEN, or normalises-equal to the headline — in those cases
+ * downstream consumers must fall back to the cleaned headline (R6).
+ */
+function extractDescription(block: string, isAtom: boolean, title: string): string {
+  const tags = isAtom ? DESCRIPTION_TAG_PRIORITY.atom : DESCRIPTION_TAG_PRIORITY.rss;
+
+  let best = '';
+  for (const tag of tags) {
+    const raw = extractRawTagBody(block, tag);
+    if (!raw) continue;
+    const cleaned = decodeXmlEntities(raw)
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (cleaned.length > best.length) best = cleaned;
+  }
+
+  if (best.length === 0) return '';
+  if (best.length < MIN_DESCRIPTION_LEN) return '';
+  if (normalizeForDescriptionEquality(best) === normalizeForDescriptionEquality(title)) return '';
+
+  return best.slice(0, MAX_DESCRIPTION_LEN);
 }
 
 const TAG_REGEX_CACHE = new Map<string, { cdata: RegExp; plain: RegExp }>();
@@ -382,6 +459,7 @@ function toProtoItem(item: ParsedItem, storyMeta?: ProtoStoryMeta): ProtoNewsIte
       source: item.classSource,
     },
     locationName: '',
+    snippet: item.description ?? '',
   };
 }
 
@@ -428,6 +506,37 @@ export async function listFeedDigest(
 
 const STORY_BATCH_SIZE = 80; // keeps each pipeline call well under Upstash's 1000-command cap
 
+/**
+ * Build the HSET field list for a story:track:v1 row.
+ *
+ * Description is written UNCONDITIONALLY (empty string when the current
+ * mention has no body). Rationale: story:track rows are collapsed by
+ * normalized-title hash, so multiple wire reports of the same event share a
+ * row. If we only wrote description when non-empty, an earlier mention's
+ * body would persist on subsequent body-less mentions for up to STORY_TTL
+ * (7 days), and consumers would unknowingly ground LLMs on "some mention's
+ * body" rather than "this mention's body" — violating the grounding
+ * contract advertised to brief / whyMatters / SummarizeArticle. Writing
+ * empty is the authoritative signal that the current mention has no body;
+ * consumers then fall back to the cleaned headline (R6) honestly, and the
+ * next mention with a body re-populates the field naturally.
+ */
+function buildStoryTrackHsetFields(
+  item: ParsedItem,
+  nowStr: string,
+  score: number,
+): Array<string | number> {
+  return [
+    'lastSeen', nowStr,
+    'currentScore', score,
+    'title', item.title,
+    'link', item.link,
+    'severity', item.level,
+    'lang', item.lang,
+    'description', item.description ?? '',
+  ];
+}
+
 async function writeStoryTracking(items: ParsedItem[], variant: string, lang: string, hashes: string[]): Promise<void> {
   if (items.length === 0) return;
   const now = Date.now();
@@ -447,16 +556,11 @@ async function writeStoryTracking(items: ParsedItem[], variant: string, lang: st
       const nowStr = String(now);
       const ttl = STORY_TTL;
 
+      const hsetFields = buildStoryTrackHsetFields(item, nowStr, score);
+
       commands.push(
         ['HINCRBY', trackKey, 'mentionCount', '1'],
-        ['HSET', trackKey,
-          'lastSeen', nowStr,
-          'currentScore', score,
-          'title', item.title,
-          'link', item.link,
-          'severity', item.level,
-          'lang', item.lang,
-        ],
+        ['HSET', trackKey, ...hsetFields],
         ['HSETNX', trackKey, 'firstSeen', nowStr],
         ['ZADD', peakKey, 'GT', score, 'peak'],
         ['SADD', sourcesKey, item.source],
@@ -627,3 +731,13 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     clearTimeout(deadlineTimeout);
   }
 }
+
+/** Internal exports for unit tests only — do not import in production code. */
+export const __testing__ = {
+  parseRssXml,
+  extractDescription,
+  extractRawTagBody,
+  buildStoryTrackHsetFields,
+  MAX_DESCRIPTION_LEN,
+  MIN_DESCRIPTION_LEN,
+};
