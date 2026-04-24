@@ -107,7 +107,7 @@ function streamLines(stream, onLine) {
   stream.on('error', (err) => onLine(`<stdio error: ${err.message}>`));
 }
 
-function spawnSeed(scriptPath, { timeoutMs, label }) {
+function spawnSeed(scriptPath, { timeoutMs, label, bundleStartedAtMs }) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     // Capture the child's structured `seed_complete` event if emitted, so
@@ -118,8 +118,15 @@ function spawnSeed(scriptPath, { timeoutMs, label }) {
     // dropped a different subset of Run ID / Mode / seed_complete lines
     // despite identical code paths). Bundle-level lines survive reliably.
     let lastSeedComplete = null;
+    // BUNDLE_RUN_STARTED_AT_MS lets consumer seeders detect when a cohort
+    // peer's seed-meta predates the current bundle run and fall back to a
+    // hard default instead of reading a stale peer key. See plan
+    // 2026-04-24-003 §"Phase 2 — SWF seeder" bundle-freshness guard.
     const child = spawn(process.execPath, [scriptPath], {
-      env: process.env,
+      env: {
+        ...process.env,
+        BUNDLE_RUN_STARTED_AT_MS: String(bundleStartedAtMs ?? Date.now()),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -189,10 +196,33 @@ function spawnSeed(scriptPath, { timeoutMs, label }) {
  *   canonicalKey?: string,   // PR 2+: reads envelope from the canonical data key
  *   intervalMs: number,
  *   timeoutMs?: number,
+ *   dependsOn?: string[],    // labels that MUST run earlier in the array
  * }>} sections
  * @param {{ maxBundleMs?: number }} [opts]
  */
 export async function runBundle(label, sections, opts = {}) {
+  // Topological-order assertion. A consumer seeder reading a peer's
+  // Redis output in-bundle depends on the peer running first; if a
+  // future edit (e.g. alphabetizing sections) reorders them, the
+  // consumer reads last-bundle's stale output. The freshness-guard in
+  // the consumer is a safety net; this assertion is the contract.
+  // Throws on violation so misconfiguration surfaces before any cron
+  // tick runs.
+  const labelIndex = new Map(sections.map((s, i) => [s.label, i]));
+  for (let i = 0; i < sections.length; i++) {
+    const deps = sections[i].dependsOn;
+    if (!Array.isArray(deps)) continue;
+    for (const depLabel of deps) {
+      const depIdx = labelIndex.get(depLabel);
+      if (depIdx == null) {
+        throw new Error(`[Bundle:${label}] section '${sections[i].label}' dependsOn unknown label '${depLabel}'`);
+      }
+      if (depIdx >= i) {
+        throw new Error(`[Bundle:${label}] section '${sections[i].label}' dependsOn '${depLabel}' but '${depLabel}' is at index ${depIdx} (must be < ${i})`);
+      }
+    }
+  }
+
   const t0 = Date.now();
   const maxBundleMs = opts.maxBundleMs ?? Infinity;
   const budgetLabel = Number.isFinite(maxBundleMs) ? `, budget ${Math.round(maxBundleMs / 1000)}s` : '';
@@ -228,7 +258,7 @@ export async function runBundle(label, sections, opts = {}) {
       continue;
     }
 
-    const result = await spawnSeed(scriptPath, { timeoutMs: timeout, label: section.label });
+    const result = await spawnSeed(scriptPath, { timeoutMs: timeout, label: section.label, bundleStartedAtMs: t0 });
     if (result.ok) {
       console.log(`  [${section.label}] Done (${result.elapsed}s)`);
       // Bundle-level per-section summary — emitted from parent stdout so
