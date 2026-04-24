@@ -74,6 +74,19 @@ const SEVERITY_ORDER: Record<ThreatLevel, number> = {
   info: 0,
 };
 
+// Clamp long disruption shortDescriptions when rendered in the compact
+// CountryDeepDive Atlas row. Some registry entries (OFAC designations,
+// multi-clause sanctions summaries) run 100–200 chars; without a clamp
+// they overflow the row. 80 chars is a balance between scannability and
+// information density; full detail stays accessible by clicking through
+// to the asset drawer.
+const DISRUPTION_LABEL_MAX_LEN = 80;
+function truncateDisruptionLabel(eventType: string, shortDescription: string): string {
+  const base = `${eventType} — ${shortDescription}`;
+  if (base.length <= DISRUPTION_LABEL_MAX_LEN) return base;
+  return base.slice(0, DISRUPTION_LABEL_MAX_LEN - 1) + '…';
+}
+
 export class CountryDeepDivePanel implements CountryBriefPanel {
   private panel: HTMLElement;
   private content: HTMLElement;
@@ -1255,6 +1268,80 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         );
       }
     }).catch(() => {});
+
+    // Disruptions filter (plan §R/#5 decision B). The seeded registry carries
+    // denormalised `countries[]` on every event, populated from the referenced
+    // pipeline or storage facility. We fetch the full list once (no asset
+    // filter) and narrow client-side; the bootstrap payload already contains
+    // the registry so this is usually cache-hot. If the RPC round-trip returns
+    // nothing, we silently skip — CountryDeepDive is not the primary
+    // disruption surface (EnergyDisruptionsPanel is), so an empty row is
+    // preferable to a spurious error.
+    this.loadDisruptionsForCountry(iso2);
+  }
+
+  private async loadDisruptionsForCountry(iso2: string): Promise<void> {
+    try {
+      const { SupplyChainServiceClient } = await import(
+        '@/generated/client/worldmonitor/supply_chain/v1/service_client'
+      );
+      const { getRpcBaseUrl } = await import('@/services/rpc-client');
+      // Thread the panel's `signal` into the fetch shim so a country
+      // switch or panel close cancels the in-flight request, not just
+      // discards the result via the `this.currentCode !== iso2` guard
+      // below. Codex P2 on PR #3377.
+      const abortSignal = this.signal;
+      const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
+        fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), signal: abortSignal }),
+      });
+      const res = await client.listEnergyDisruptions({
+        assetId: '',
+        assetType: '',
+        ongoingOnly: false,
+      });
+      if (!res || !Array.isArray(res.events) || this.currentCode !== iso2) return;
+      const events = res.events.filter(e =>
+        Array.isArray(e.countries) && e.countries.includes(iso2),
+      );
+      if (events.length === 0) return;
+      const ongoing = events.filter(e => !e.endAt).length;
+      const summary = ongoing > 0
+        ? `${ongoing} ongoing · ${events.length - ongoing} resolved`
+        : `${events.length} resolved`;
+      this.appendAtlasRow(
+        `Energy disruptions in ${iso2}`,
+        summary,
+        events.map(e => ({
+          id: e.id,
+          // Clamp long descriptions (some registry entries run 100-200
+          // chars, e.g. OFAC designation paragraphs) so the row layout
+          // stays compact. 80-char limit + ellipsis. Codex P2 on PR #3377.
+          label: truncateDisruptionLabel(e.eventType, e.shortDescription),
+          // Event type mirrors the existing asset-detail events (pipeline /
+          // storage) because disruptions reference the underlying asset; the
+          // panel-layout listener routes to the matching asset panel.
+          event: e.assetType === 'storage'
+            ? 'energy:open-storage-facility-detail'
+            : 'energy:open-pipeline-detail',
+          // Emit ONLY the {pipelineId, facilityId} the drawers consume today
+          // (see PipelineStatusPanel + StorageFacilityMapPanel
+          // openDetailHandler). Previously this detail included a
+          // `highlightEventId` that no receiver read — Codex P2 flagged the
+          // misleading API surface. Clicking a row jumps to the asset
+          // drawer; the user sees the full per-asset timeline and locates
+          // the event visually. Re-add `highlightEventId` here and in
+          // EnergyDisruptionsPanel's dispatchOpenAsset only when the
+          // drawer panels ship matching consumer code.
+          detail: e.assetType === 'storage'
+            ? { facilityId: e.assetId }
+            : { pipelineId: e.assetId },
+        })),
+      );
+    } catch {
+      // Silent — disruptions row is supplementary; failures elsewhere
+      // surface via the dedicated EnergyDisruptionsPanel. Abort errors
+      // from signal cancellation are also swallowed here intentionally.
+    }
   }
 
   private appendAtlasRow(
