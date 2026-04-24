@@ -247,7 +247,7 @@
     {
       "path": "api/internal/brief-why-matters.ts",
       "category": "internal-helper",
-      "reason": "Internal brief-pipeline helper — auth'd by RELAY_SHARED_SECRET (Railway cron only), not a user-facing API. Generated on merge of #3248 from main without a manifest entry; filed here to keep the lint green.",
+      "reason": "LLM-enrichment helper for the brief pipeline. Cron-triggered from Railway under RELAY_SHARED_SECRET bearer auth — never reached by dashboards, desktop, or partners. Request/response shape is an implementation detail of the brief renderer; modeling it as a generated service would publish internal cron plumbing as user-facing API surface. Same shape constraint as api/notify.ts (also cron-only).",
       "owner": "@SebastienMelki",
       "removal_issue": null
     },

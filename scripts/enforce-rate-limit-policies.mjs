@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S npx tsx
 /**
  * Validates every key in ENDPOINT_RATE_POLICIES (server/_shared/rate-limit.ts)
  * is a real gateway route by checking the OpenAPI specs generated from protos.
@@ -8,50 +8,54 @@
  * `/api/sanctions/v1/lookup-sanction-entity`, so the 30/min limit never
  * applied and the endpoint fell through to the 600/min global limiter).
  *
- * Runs in the same pre-push + CI context as lint:api-contract.
+ * Runs in the same pre-push + CI context as lint:api-contract. Invoked via
+ * `tsx` so it can import the policy object straight from the TS source
+ * (#3278) — the previous regex-parse implementation would silently break if
+ * the source object literal was reformatted.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const OPENAPI_DIR = join(ROOT, 'docs/api');
 const RATE_LIMIT_SRC = join(ROOT, 'server/_shared/rate-limit.ts');
 
-function extractPolicyKeys() {
-  const src = readFileSync(RATE_LIMIT_SRC, 'utf8');
-  const match = src.match(/ENDPOINT_RATE_POLICIES:\s*Record<[^>]+>\s*=\s*\{([\s\S]*?)\n\};/);
-  if (!match) {
-    throw new Error('Could not locate ENDPOINT_RATE_POLICIES in rate-limit.ts');
+async function extractPolicyKeys() {
+  // Dynamic import via the file URL — works under tsx (the shebang) which
+  // transparently transpiles TS. Importing the live object means any reformat
+  // of the source literal can never desync the lint from the runtime.
+  const mod = await import(pathToFileURL(RATE_LIMIT_SRC).href);
+  if (!mod.ENDPOINT_RATE_POLICIES || typeof mod.ENDPOINT_RATE_POLICIES !== 'object') {
+    throw new Error(
+      `${RATE_LIMIT_SRC} no longer exports ENDPOINT_RATE_POLICIES — the lint relies on it (#3278).`,
+    );
   }
-  const block = match[1];
-  const keys = [];
-  // Match quoted keys: '/api/...' or "/api/..."
-  const keyRe = /['"](\/api\/[^'"]+)['"]\s*:/g;
-  let m;
-  while ((m = keyRe.exec(block)) !== null) {
-    keys.push(m[1]);
-  }
-  return keys;
+  return Object.keys(mod.ENDPOINT_RATE_POLICIES);
 }
 
 function extractRoutesFromOpenApi() {
+  // Parse the OpenAPI YAML rather than regex-scrape for top-level `paths:`
+  // keys — the earlier `/^\s{4}(\/api\/[^\s:]+):/gm` hard-coded 4-space
+  // indent, so any YAML formatter change (2-space indent, flow style, line
+  // folding) would silently drop routes and let policy-drift slip through
+  // (#3287 greptile nit 3).
   const routes = new Set();
   const files = readdirSync(OPENAPI_DIR).filter((f) => f.endsWith('.openapi.yaml'));
   for (const file of files) {
-    const yaml = readFileSync(join(OPENAPI_DIR, file), 'utf8');
-    // OpenAPI paths section — each route is a top-level key under `paths:`
-    // indented 4 spaces. Strip trailing colon.
-    const pathRe = /^\s{4}(\/api\/[^\s:]+):/gm;
-    let m;
-    while ((m = pathRe.exec(yaml)) !== null) {
-      routes.add(m[1]);
+    const doc = parseYaml(readFileSync(join(OPENAPI_DIR, file), 'utf8'));
+    const paths = doc?.paths;
+    if (!paths || typeof paths !== 'object') continue;
+    for (const route of Object.keys(paths)) {
+      if (route.startsWith('/api/')) routes.add(route);
     }
   }
   return routes;
 }
 
-function main() {
-  const keys = extractPolicyKeys();
+async function main() {
+  const keys = await extractPolicyKeys();
   const routes = extractRoutesFromOpenApi();
   const missing = keys.filter((k) => !routes.has(k));
 
@@ -73,4 +77,7 @@ function main() {
   console.log(`✓ rate-limit policies clean: ${keys.length} policies validated against ${routes.size} gateway routes.`);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
