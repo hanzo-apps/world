@@ -1244,14 +1244,20 @@ async function composeBriefsForRun(rules, nowMs) {
     console.warn('[digest] brief: insights read failed, using zeroed stats:', err.message);
   }
 
-  // Memoize buildDigest by (variant, lang, windowStart). Many users
-  // share a variant/lang, so this saves ZRANGE + HGETALL round-trips
-  // across the per-user loop. Scoped to this cron run — no cross-run
-  // memoization needed (Redis is authoritative).
+  // Memoize buildDigest by (variant, lang, sensitivity, windowStart).
+  // Many users share a variant/lang, so this saves ZRANGE + HGETALL
+  // round-trips across the per-user loop. Scoped to this cron run —
+  // no cross-run memoization needed (Redis is authoritative).
+  //
+  // Sensitivity is part of the key because buildDigest filters by
+  // rule.sensitivity BEFORE dedup — without it, a stricter user
+  // inherits a looser populator's pool (the earlier populator "wins"
+  // and decides which severity tiers enter the pool, so stricter
+  // users get a pool that contains severities they never wanted).
   const windowStart = nowMs - BRIEF_STORY_WINDOW_MS;
   const digestCache = new Map();
   async function digestFor(candidate) {
-    const key = `${candidate.variant ?? 'full'}:${candidate.lang ?? 'en'}:${windowStart}`;
+    const key = `${candidate.variant ?? 'full'}:${candidate.lang ?? 'en'}:${candidate.sensitivity ?? 'high'}:${windowStart}`;
     if (digestCache.has(key)) return digestCache.get(key);
     const stories = await buildDigest(candidate, windowStart);
     digestCache.set(key, stories ?? []);
@@ -1298,12 +1304,56 @@ async function composeAndStoreBriefForUser(userId, candidates, insightsNumbers, 
   for (const candidate of candidates) {
     const digestStories = await digestFor(candidate);
     if (!digestStories || digestStories.length === 0) continue;
+    const dropStats = { severity: 0, headline: 0, url: 0, shape: 0, cap: 0, in: digestStories.length };
     const composed = composeBriefFromDigestStories(
       candidate,
       digestStories,
       insightsNumbers,
-      { nowMs },
+      {
+        nowMs,
+        onDrop: (ev) => { dropStats[ev.reason] = (dropStats[ev.reason] ?? 0) + 1; },
+      },
     );
+
+    // Per-attempt filter-drop line. Emits one structured row for every
+    // candidate whose digest pool was non-empty, tagged with that
+    // candidate's own sensitivity and variant. See Solution 0 in
+    // docs/plans/2026-04-24-004-fix-brief-topic-adjacency-defects-plan.md
+    // for why this log exists (deciding whether Solution 3 is warranted).
+    //
+    // Emitting per attempt — not per user — because:
+    //   - A user can have multiple rules with different sensitivities;
+    //     a single-row-per-user log would have to either pick one
+    //     sensitivity arbitrarily or label as 'mixed', hiding drops
+    //     from the non-winning candidates.
+    //   - An earlier candidate wiped out by post-group filtering (the
+    //     exact signal Sol-0 targets) is invisible if only the winner
+    //     is logged. Every attempt emits its own row so the fallback
+    //     chain is visible.
+    //
+    // Outcomes per row:
+    //   outcome=shipped  — this candidate's envelope shipped; loop breaks.
+    //   outcome=rejected — composed was null (every story filtered out);
+    //                      loop continues to the next candidate.
+    //
+    // A user whose every row is `outcome=rejected` is a wipeout —
+    // operators detect it by grouping rows by user and checking for
+    // absence of `outcome=shipped` within the tick.
+    const out = composed?.data?.stories?.length ?? 0;
+    console.log(
+      `[digest] brief filter drops user=${userId} ` +
+        `sensitivity=${candidate.sensitivity ?? 'high'} ` +
+        `variant=${candidate.variant ?? 'full'} ` +
+        `outcome=${composed ? 'shipped' : 'rejected'} ` +
+        `in=${dropStats.in} ` +
+        `dropped_severity=${dropStats.severity} ` +
+        `dropped_url=${dropStats.url} ` +
+        `dropped_headline=${dropStats.headline} ` +
+        `dropped_shape=${dropStats.shape} ` +
+        `dropped_cap=${dropStats.cap} ` +
+        `out=${out}`,
+    );
+
     if (composed) {
       envelope = composed;
       chosenVariant = candidate.variant;
@@ -1311,6 +1361,7 @@ async function composeAndStoreBriefForUser(userId, candidates, insightsNumbers, 
       break;
     }
   }
+
   if (!envelope) return null;
 
   // Phase 3b — LLM enrichment. Substitutes the stubbed whyMatters /

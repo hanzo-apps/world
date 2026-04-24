@@ -230,6 +230,168 @@ describe('assembleStubbedBriefEnvelope', () => {
   });
 });
 
+describe('filterTopStories — onDrop metrics', () => {
+  const sensitivity = 'high';
+
+  it('does not invoke onDrop when every story passes', () => {
+    const calls = [];
+    const stories = [upstreamStory(), upstreamStory({ primaryTitle: 'Another' })];
+    filterTopStories({ stories, sensitivity, onDrop: (ev) => calls.push(ev) });
+    assert.equal(calls.length, 0);
+  });
+
+  it('fires onDrop with reason=severity when sensitivity excludes the level', () => {
+    const calls = [];
+    filterTopStories({
+      stories: [upstreamStory({ threatLevel: 'low' })],
+      sensitivity,
+      onDrop: (ev) => calls.push(ev),
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].reason, 'severity');
+    assert.equal(calls[0].severity, 'low');
+  });
+
+  it('fires onDrop with reason=headline when primaryTitle is empty', () => {
+    const calls = [];
+    filterTopStories({
+      stories: [upstreamStory({ primaryTitle: '' })],
+      sensitivity,
+      onDrop: (ev) => calls.push(ev),
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].reason, 'headline');
+    assert.equal(calls[0].severity, 'high');
+  });
+
+  it('fires onDrop with reason=url when primaryLink is invalid', () => {
+    const calls = [];
+    filterTopStories({
+      stories: [upstreamStory({ primaryLink: 'ftp://bad' })],
+      sensitivity,
+      onDrop: (ev) => calls.push(ev),
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].reason, 'url');
+    assert.equal(calls[0].severity, 'high');
+    assert.equal(calls[0].sourceUrl, 'ftp://bad');
+  });
+
+  it('fires onDrop with reason=shape for non-object input', () => {
+    const calls = [];
+    filterTopStories({
+      stories: [null, 'not an object', upstreamStory()],
+      sensitivity,
+      onDrop: (ev) => calls.push(ev),
+    });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].reason, 'shape');
+    assert.equal(calls[1].reason, 'shape');
+  });
+
+  it('output is byte-identical whether onDrop is supplied or not', () => {
+    // Regression guard: the metrics hook must not alter filter behaviour.
+    const stories = [
+      upstreamStory({ threatLevel: 'low' }),
+      upstreamStory(),
+      upstreamStory({ primaryLink: 'ftp://bad' }),
+      upstreamStory({ primaryTitle: '' }),
+      upstreamStory({ primaryTitle: 'Second valid' }),
+    ];
+    const without = filterTopStories({ stories, sensitivity });
+    const with_ = filterTopStories({ stories, sensitivity, onDrop: () => {} });
+    assert.deepEqual(without, with_);
+  });
+
+  it('distinct reasons are counted separately across a mixed batch', () => {
+    // Matches the seeder's per-user aggregation pattern.
+    const tally = { severity: 0, headline: 0, url: 0, shape: 0, cap: 0 };
+    filterTopStories({
+      stories: [
+        upstreamStory({ threatLevel: 'low' }),        // severity
+        upstreamStory({ threatLevel: 'medium' }),     // severity
+        upstreamStory({ primaryTitle: '' }),          // headline
+        upstreamStory({ primaryLink: 'ftp://bad' }),  // url
+        null,                                          // shape
+        upstreamStory(),                              // kept
+      ],
+      sensitivity,
+      onDrop: (ev) => { tally[ev.reason]++; },
+    });
+    assert.equal(tally.severity, 2);
+    assert.equal(tally.headline, 1);
+    assert.equal(tally.url, 1);
+    assert.equal(tally.shape, 1);
+    assert.equal(tally.cap, 0);
+  });
+
+  it('fires onDrop with reason=cap once per story skipped after maxStories', () => {
+    // Without this, cap-truncated stories are invisible to telemetry
+    // and `in - out - sum(other_drops)` does not reconcile.
+    const calls = [];
+    filterTopStories({
+      stories: [
+        upstreamStory({ primaryTitle: 'A' }),
+        upstreamStory({ primaryTitle: 'B' }),
+        upstreamStory({ primaryTitle: 'C' }),
+        upstreamStory({ primaryTitle: 'D' }),
+        upstreamStory({ primaryTitle: 'E' }),
+      ],
+      sensitivity,
+      maxStories: 2,
+      onDrop: (ev) => calls.push(ev),
+    });
+    assert.equal(calls.length, 3, 'should emit one cap event per story past maxStories');
+    for (const ev of calls) assert.equal(ev.reason, 'cap');
+  });
+
+  it('cap events do NOT count earlier severity/headline/url drops twice', () => {
+    // The cap-emit loop runs from the break point onward — earlier
+    // valid stories that pushed `out` to maxStories are not re-emitted,
+    // and earlier-dropped stories are accounted under their own reason.
+    const tally = { severity: 0, headline: 0, url: 0, shape: 0, cap: 0 };
+    filterTopStories({
+      stories: [
+        upstreamStory({ primaryTitle: 'A' }),         // kept
+        upstreamStory({ threatLevel: 'low' }),        // severity (not cap)
+        upstreamStory({ primaryTitle: 'B' }),         // kept (out reaches 2)
+        upstreamStory({ primaryTitle: 'C' }),         // cap
+        upstreamStory({ primaryLink: 'ftp://bad' }),  // cap (loop short-circuits past url check)
+      ],
+      sensitivity,
+      maxStories: 2,
+      onDrop: (ev) => { tally[ev.reason]++; },
+    });
+    assert.equal(tally.severity, 1);
+    assert.equal(tally.cap, 2);
+    assert.equal(tally.url, 0, 'url drop should NOT fire after cap break');
+  });
+
+  it('reconciliation invariant: in === out + sum(dropped_*) across all reasons', () => {
+    // Locks in the operator-facing invariant that motivated adding `cap`.
+    const tally = { severity: 0, headline: 0, url: 0, shape: 0, cap: 0 };
+    const stories = [
+      upstreamStory({ primaryTitle: 'A' }),
+      upstreamStory({ primaryTitle: 'B' }),
+      upstreamStory({ threatLevel: 'low' }),
+      upstreamStory({ primaryTitle: '' }),
+      upstreamStory({ primaryLink: 'ftp://bad' }),
+      null,
+      upstreamStory({ primaryTitle: 'C' }),
+      upstreamStory({ primaryTitle: 'D' }),
+      upstreamStory({ primaryTitle: 'E' }),
+    ];
+    const out = filterTopStories({
+      stories,
+      sensitivity,
+      maxStories: 3,
+      onDrop: (ev) => { tally[ev.reason]++; },
+    });
+    const totalDrops = tally.severity + tally.headline + tally.url + tally.shape + tally.cap;
+    assert.equal(stories.length, out.length + totalDrops);
+  });
+});
+
 describe('issueDateInTz', () => {
   // 2026-04-18T00:30:00Z — midnight UTC + 30min. Tokyo (+9) is
   // already mid-morning on the 18th; LA (-7) is late on the 17th.
