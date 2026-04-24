@@ -10,6 +10,7 @@ import {
   recordCount,
   GAS_CANONICAL_KEY,
   OIL_CANONICAL_KEY,
+  VALID_OIL_PRODUCT_CLASSES,
 } from '../scripts/_pipeline-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -127,6 +128,64 @@ describe('pipeline registries — commodity-capacity pairing', () => {
       assert.equal(typeof p.capacityMbd, 'number', `${p.id} missing capacityMbd`);
       assert.ok(p.capacityMbd > 0, `${p.id} capacityMbd must be > 0`);
     }
+  });
+});
+
+describe('pipeline registries — productClass', () => {
+  test('every oil pipeline declares a productClass from the enum', () => {
+    for (const p of Object.values(oil.pipelines)) {
+      assert.ok(
+        VALID_OIL_PRODUCT_CLASSES.has(p.productClass),
+        `${p.id} has invalid productClass: ${p.productClass}`,
+      );
+    }
+  });
+
+  test('gas pipelines do not carry a productClass field', () => {
+    for (const p of Object.values(gas.pipelines)) {
+      assert.equal(
+        p.productClass,
+        undefined,
+        `${p.id} should not have productClass (gas pipelines use commodity as their class)`,
+      );
+    }
+  });
+
+  test('validateRegistry rejects oil pipeline without productClass', () => {
+    const oilSample = oil.pipelines[Object.keys(oil.pipelines)[0]!];
+    const { productClass: _drop, ...stripped } = oilSample;
+    const bad = {
+      pipelines: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [`p${i}`, { ...stripped, id: `p${i}` }]),
+      ),
+    };
+    assert.equal(validateRegistry(bad), false);
+  });
+
+  test('validateRegistry rejects oil pipeline with unknown productClass', () => {
+    const oilSample = oil.pipelines[Object.keys(oil.pipelines)[0]!];
+    const bad = {
+      pipelines: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [
+          `p${i}`,
+          { ...oilSample, id: `p${i}`, productClass: 'diesel-only' },
+        ]),
+      ),
+    };
+    assert.equal(validateRegistry(bad), false);
+  });
+
+  test('validateRegistry rejects gas pipeline carrying productClass', () => {
+    const gasSample = gas.pipelines[Object.keys(gas.pipelines)[0]!];
+    const bad = {
+      pipelines: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [
+          `p${i}`,
+          { ...gasSample, id: `p${i}`, productClass: 'crude' },
+        ]),
+      ),
+    };
+    assert.equal(validateRegistry(bad), false);
   });
 });
 
