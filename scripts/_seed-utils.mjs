@@ -17,6 +17,38 @@ const __seed_dirname = dirname(fileURLToPath(import.meta.url));
 
 export { CHROME_UA };
 
+/**
+ * Return the bundle-run start timestamp injected by `_bundle-runner.mjs`
+ * as the `BUNDLE_RUN_STARTED_AT_MS` env var, or `null` when the seeder
+ * is running STANDALONE (manual invocation outside the bundle).
+ *
+ * All sibling seeders in a single bundle run share ONE value (captured
+ * at `runBundle` start, not at spawn time). Use this when a consumer
+ * seeder reads a peer's output inside the same bundle and must detect
+ * stale data from a previous bundle tick:
+ *
+ *   const bundleStartMs = getBundleRunStartedAtMs();
+ *   if (bundleStartMs != null && fetchedAt < bundleStartMs) {
+ *     // in-bundle context + peer did NOT run in THIS bundle → fallback
+ *   }
+ *
+ * The null-on-unset contract matters. Earlier designs fell back to
+ * `Date.now()` when the env was absent, which regressed standalone
+ * runs: a sibling seeder invoked manually just before the consumer
+ * wrote `fetchedAt = (process start - 5s)`, and the consumer's own
+ * `bundleStartMs = Date.now()` rejected that perfectly-fresh peer
+ * envelope as "stale". Returning null keeps the gate scoped to its
+ * real purpose: protecting against across-bundle-tick staleness,
+ * which has no analog outside a bundle context.
+ *
+ * @returns {number | null} epoch milliseconds when spawned by the
+ *   bundle runner; null when running standalone.
+ */
+export function getBundleRunStartedAtMs() {
+  const raw = Number(process.env.BUNDLE_RUN_STARTED_AT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
 // Canonical FX fallback rates — used when Yahoo Finance returns null/zero.
 // Single source of truth shared by seed-bigmac, seed-grocery-basket, seed-fx-rates.
 // EGP: 0.0192 is the most recently observed live rate (2026-03-21 seed run).
@@ -821,11 +853,42 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     process.exit(0);
   }
 
+  // SIGTERM handler, SCOPED to the fetch phase only. _bundle-runner.mjs
+  // sends SIGTERM when a section's timeout fires, then SIGKILL after
+  // KILL_GRACE_MS (5s). The fetch phase is the long-running blocking
+  // call where timeout realistically fires; publish/verify is bounded
+  // Redis writes. Narrowing the handler's lifetime prevents it from
+  // racing graceful exit paths that MUST NOT refresh TTL — notably the
+  // `emptyDataIsFailure: true` strict-floor branch (IMF-External,
+  // WB-bulk) which deliberately avoids refreshing seed-meta so the next
+  // cron tick retries. Release lock + extend existing-data TTL in
+  // parallel (disjoint keys; serializing compounds Upstash latency
+  // during the exact failure mode this handler exists to handle).
+  // Exit 143 = POSIX convention for SIGTERM-terminated process.
+  const sigTermHandler = async () => {
+    console.error(`  [${domain}:${resource}] SIGTERM received — releasing lock runId=${runId}, extending existing TTL`);
+    try {
+      const ttl = ttlSeconds || 600;
+      const keys = [canonicalKey, `seed-meta:${domain}:${resource}`];
+      if (extraKeys) keys.push(...extraKeys.map((ek) => ek.key));
+      await Promise.allSettled([
+        releaseLock(`${domain}:${resource}`, runId),
+        extendExistingTtl(keys, ttl),
+      ]);
+    } catch (err) {
+      console.error(`  [${domain}:${resource}] SIGTERM cleanup error: ${err?.message || err}`);
+    } finally {
+      process.exit(143);
+    }
+  };
+
   // Phase 1: Fetch data (graceful on failure — extend TTL on stale data)
   let data;
   try {
+    process.once('SIGTERM', sigTermHandler);
     data = await withRetry(fetchFn);
   } catch (err) {
+    process.off('SIGTERM', sigTermHandler);
     await releaseLock(`${domain}:${resource}`, runId);
     const durationMs = Date.now() - startMs;
     const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
@@ -838,6 +901,12 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
 
     console.log(`\n=== Failed gracefully (${Math.round(durationMs)}ms) ===`);
     process.exit(0);
+  } finally {
+    // Remove the SIGTERM handler unconditionally: success path (fall
+    // through to publish), catch path (already removed above), and any
+    // future exit path added inside the try. process.off is a safe
+    // no-op when the listener was never registered or already removed.
+    process.off('SIGTERM', sigTermHandler);
   }
 
   // Phase 2: Publish to Redis (rethrow on failure — data was fetched but not stored)
