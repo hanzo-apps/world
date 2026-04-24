@@ -66,12 +66,16 @@ export async function registerWebhook(
     ]);
   }
 
-  // Proto default int32 is 0 — treat 0 as "unset" to preserve the legacy
-  // default of 50 when the caller omits alertThreshold.
-  const alertThreshold = req.alertThreshold > 0 ? req.alertThreshold : 50;
+  // alert_threshold is `optional int32` (#3242 followup #4) — undefined means
+  // the partner omitted the field, so apply the legacy default of 50. An
+  // explicit 0 is preserved (deliver every alert). The 0..100 range is
+  // normally enforced by buf.validate at the wire layer, but we re-enforce
+  // it here so direct handler calls (internal jobs, test harnesses, future
+  // transports that bypass buf.validate) can't store out-of-range values.
+  const alertThreshold = req.alertThreshold ?? 50;
   if (alertThreshold < 0 || alertThreshold > 100) {
     throw new ValidationError([
-      { field: 'alertThreshold', description: 'alertThreshold must be a number between 0 and 100' },
+      { field: 'alertThreshold', description: 'alertThreshold must be between 0 and 100' },
     ]);
   }
 

@@ -4,8 +4,24 @@ export const WEBHOOK_TTL = 86400 * 30; // 30 days
 export const VALID_CHOKEPOINT_IDS = new Set(CHOKEPOINT_REGISTRY.map(c => c.id));
 
 // Private IP ranges + known cloud metadata hostnames blocked at registration.
-// DNS rebinding is not mitigated here (no DNS resolution in edge runtime); the
-// delivery worker must re-resolve and re-check before sending.
+//
+// DNS rebinding is NOT mitigated by isBlockedCallbackUrl below — the Vercel
+// Edge runtime can't resolve hostnames before the request goes out. Defense
+// against a hostname that returns a public IP at registration time and a
+// private IP later (or different IPs per resolution) MUST happen in the
+// delivery worker that actually POSTs to the callback URL:
+//
+//   1. Re-validate the URL with isBlockedCallbackUrl right before each send.
+//   2. Resolve the hostname to its current IP via dns.promises.lookup
+//      (Node runtime — Edge can't do this).
+//   3. Verify the resolved IP is not in PRIVATE_HOSTNAME_PATTERNS or
+//      BLOCKED_METADATA_HOSTNAMES.
+//   4. Issue the fetch using the resolved IP with the Host header preserved
+//      so TLS still validates against the original hostname.
+//
+// As of the #3242 followup audit, no delivery worker for shipping/v2 webhooks
+// exists in this repo — tracked in issue #3288. Anyone landing delivery code
+// MUST import the patterns + sets above and apply steps 1–3 before each send.
 export const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
   /^127\.\d+\.\d+\.\d+$/,
