@@ -64,6 +64,7 @@ import { fetchBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, ty
 import { describeFreshness } from '@/services/persistent-cache';
 import { DesktopUpdater } from '@/app/desktop-updater';
 import { CountryIntelManager } from '@/app/country-intel';
+import { registerWebMcpTools } from '@/services/webmcp';
 import { SearchManager } from '@/app/search-manager';
 import { RefreshScheduler } from '@/app/refresh-scheduler';
 import { PanelLayoutManager } from '@/app/panel-layout';
@@ -112,6 +113,18 @@ export class App {
   private modules: { destroy(): void }[] = [];
   private unsubAiFlow: (() => void) | null = null;
   private unsubFreeTier: (() => void) | null = null;
+  // Resolves once Phase-4 UI modules (searchManager, countryIntel) have
+  // initialised so WebMCP bindings can await readiness before touching
+  // the nullable UI targets. Avoids the startup race where an agent
+  // discovers a tool via early registerTool and invokes it before the
+  // target panel exists.
+  private uiReady!: Promise<void>;
+  private resolveUiReady!: () => void;
+  // Returned by registerWebMcpTools when running in a registerTool-capable
+  // browser — aborting it unregisters every tool. destroy() triggers it
+  // so that test harnesses / same-document re-inits don't accumulate
+  // duplicate registrations.
+  private webMcpController: AbortController | null = null;
   private visiblePanelPrimed = new Set<string>();
   private visiblePanelPrimeRaf: number | null = null;
   private bootstrapHydrationState: BootstrapHydrationState = getBootstrapHydrationState();
@@ -416,6 +429,10 @@ export class App {
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
     if (!el) throw new Error(`Container ${containerId} not found`);
+
+    this.uiReady = new Promise<void>((resolve) => {
+      this.resolveUiReady = resolve;
+    });
 
     const PANEL_ORDER_KEY = 'panel-order';
     const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
@@ -803,6 +820,33 @@ export class App {
 
   public async init(): Promise<void> {
     const initStart = performance.now();
+
+    // WebMCP — register synchronously before any init awaits so agent
+    // scanners (isitagentready.com, in-browser agents) find the tools on
+    // their first probe. No-op in browsers without navigator.modelContext.
+    // Bindings await `this.uiReady` (resolves after Phase-4 UI init) so
+    // a tool invoked during the startup window waits for the target
+    // panel to exist instead of throwing. A 10s timeout keeps a genuinely
+    // broken state from hanging the caller. Store the returned controller
+    // so destroy() can unregister every tool on teardown.
+    this.webMcpController = registerWebMcpTools({
+      openCountryBriefByCode: async (code, country) => {
+        await this.waitForUiReady();
+        if (!this.state.countryBriefPage) {
+          throw new Error('Country brief panel is not initialised');
+        }
+        await this.countryIntel.openCountryBriefByCode(code, country);
+      },
+      resolveCountryName: (code) => CountryIntelManager.resolveCountryName(code),
+      openSearch: async () => {
+        await this.waitForUiReady();
+        if (!this.state.searchModal) {
+          throw new Error('Search modal is not initialised');
+        }
+        this.state.searchModal.open();
+      },
+    });
+
     await initDB();
     await initI18n();
     const aiFlow = getAiFlowSettings();
@@ -1032,34 +1076,8 @@ export class App {
     this.searchManager.init();
     this.eventHandlers.setupMapLayerHandlers();
     this.countryIntel.init();
-
-    // WebMCP — expose a small set of UI tools to in-page agents.
-    // Feature-detects `navigator.modelContext`; no-ops in browsers without it.
-    // Registered after search+country modules so the bound callbacks have real
-    // targets; tools intentionally route through the same paths a click takes
-    // so paywall/auth gates still apply to agent invocations.
-    //
-    // Bindings throw when a required UI target is missing so the tool's
-    // withInvocationLogging shim catches it and reports ok:false instead of
-    // a misleading "Opened …" success — the underlying UI methods silently
-    // no-op on null targets.
-    void import('@/services/webmcp').then(({ registerWebMcpTools }) => {
-      registerWebMcpTools({
-        openCountryBriefByCode: async (code, country) => {
-          if (!this.state.countryBriefPage) {
-            throw new Error('Country brief panel is not initialised yet');
-          }
-          await this.countryIntel.openCountryBriefByCode(code, country);
-        },
-        resolveCountryName: (code) => CountryIntelManager.resolveCountryName(code),
-        openSearch: () => {
-          if (!this.state.searchModal) {
-            throw new Error('Search modal is not initialised yet');
-          }
-          this.state.searchModal.open();
-        },
-      });
-    });
+    // Unblock any WebMCP tool invocations that arrived during startup.
+    this.resolveUiReady();
 
     // Phase 5: Event listeners + URL sync
     this.eventHandlers.init();
@@ -1212,6 +1230,31 @@ export class App {
     this.cachedModeBannerEl = null;
     this.state.map?.destroy();
     disconnectAisStream();
+    // Unregister every WebMCP tool so a same-document re-init (tests,
+    // HMR, SPA harness) doesn't leave the browser with stale bindings
+    // pointing at a disposed App.
+    this.webMcpController?.abort();
+    this.webMcpController = null;
+  }
+
+  // Waits for Phase-4 UI modules (searchManager + countryIntel) to finish
+  // initialising. WebMCP bindings call this before touching nullable UI
+  // state so a tool invoked during startup waits rather than throwing;
+  // the timeout guards against a genuinely broken init path hanging the
+  // agent forever.
+  private async waitForUiReady(timeoutMs = 10_000): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`UI did not initialise within ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+    try {
+      await Promise.race([this.uiReady, timeout]);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
   }
 
   private handleDeepLinks(): void {
