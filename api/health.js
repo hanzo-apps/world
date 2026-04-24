@@ -193,8 +193,11 @@ const STANDALONE_KEYS = {
   recoveryExternalDebt:     'resilience:recovery:external-debt:v1',
   recoveryImportHhi:        'resilience:recovery:import-hhi:v1',
   recoveryFuelStocks:       'resilience:recovery:fuel-stocks:v1',
-  // PR 1 v2 energy-construct seeds. ON_DEMAND_KEYS until Railway cron
-  // provisions; see below.
+  // PR 1 v2 energy-construct seeds. STRICT SEED_META (not ON_DEMAND):
+  // plan 2026-04-24-001 removed these from ON_DEMAND_KEYS so /api/health
+  // reports CRIT (not WARN) when they are absent. This is the intended
+  // alarm on the Railway bundle-not-provisioned state. See the ON_DEMAND_KEYS
+  // comment block below for the full rationale.
   lowCarbonGeneration:      'resilience:low-carbon-generation:v1',
   fossilElectricityShare:   'resilience:fossil-electricity-share:v1',
   powerLosses:              'resilience:power-losses:v1',
@@ -395,9 +398,9 @@ const SEED_META = {
   recoveryImportHhi:       { key: 'seed-meta:resilience:recovery:import-hhi',       maxStaleMin: 86400 }, // monthly cron; 86400min = 60d = 2x interval
   recoveryFuelStocks:      { key: 'seed-meta:resilience:recovery:fuel-stocks',      maxStaleMin: 86400 }, // monthly cron; 86400min = 60d = 2x interval
   // PR 1 v2 energy seeds — weekly cron (8d * 1440 = 11520min = 2x interval).
-  // Listed in ON_DEMAND_KEYS below until Railway cron provisions and
-  // the first clean run lands; after that they graduate to the normal
-  // SEED_META staleness check like the recovery seeds above.
+  // STRICT SEED_META (not ON_DEMAND): plan 2026-04-24-001 made /api/health
+  // CRIT on absent/stale so operators see the Railway-bundle gap before
+  // the flag flips. See the ON_DEMAND_KEYS "do not add back" note below.
   lowCarbonGeneration:     { key: 'seed-meta:resilience:low-carbon-generation',     maxStaleMin: 11520 },
   fossilElectricityShare:  { key: 'seed-meta:resilience:fossil-electricity-share',  maxStaleMin: 11520 },
   powerLosses:             { key: 'seed-meta:resilience:power-losses',              maxStaleMin: 11520 },
@@ -423,13 +426,16 @@ const ON_DEMAND_KEYS = new Set([
   'resilienceRanking', // on-demand RPC cache populated after ranking requests; missing before first Pro use is expected
   'recoveryFiscalSpace', 'recoveryReserveAdequacy', 'recoveryExternalDebt',
   'recoveryImportHhi', 'recoveryFuelStocks', // recovery pillar: stub seeders not yet deployed, keys may be absent
-  // PR 1 v2 energy-construct seeds. TRANSITIONAL: the three seeders
-  // ship with their health registry rows in this PR but Railway cron
-  // is provisioned as a follow-up action. Gated as on-demand until
-  // the first clean run lands; graduate out of this set after ~7 days
-  // of successful production cron runs (verify via
-  // `seed-meta:resilience:{low-carbon-generation,fossil-electricity-share,power-losses}.fetchedAt`).
-  'lowCarbonGeneration', 'fossilElectricityShare', 'powerLosses',
+  // NOTE (2026-04-24, plan 2026-04-24-001): the PR 1 v2 energy seeds
+  // (`lowCarbonGeneration`, `fossilElectricityShare`, `powerLosses`)
+  // are INTENTIONALLY NOT listed in ON_DEMAND_KEYS. They stay strict
+  // SEED_META so `/api/health` returns CRIT (not WARN) when they are
+  // absent — which is the alarm a future operator needs before flipping
+  // `RESILIENCE_ENERGY_V2_ENABLED=true`. The scorer fails closed via
+  // ResilienceConfigurationError if the flag flips before the seeds
+  // populate (server/worldmonitor/resilience/v1/_dimension-scorers.ts
+  // #scoreEnergy). Do NOT add these labels back to ON_DEMAND_KEYS
+  // without revisiting that plan.
   'displacementPrev', // covered by cascade onto current-year displacement; empty most of the year
   'fxYoy', // TRANSITIONAL (PR #3071): seed-fx-yoy Railway cron deployed manually after merge —
            // gate as on-demand so a deploy-order race or first-cron-run failure doesn't
