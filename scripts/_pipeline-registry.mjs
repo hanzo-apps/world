@@ -44,9 +44,11 @@ export const VALID_SOURCES = new Set(['operator', 'regulator', 'press', 'satelli
 // inline copy in tests could silently drift when the enum is extended.
 export const VALID_OIL_PRODUCT_CLASSES = new Set(['crude', 'products', 'mixed']);
 
-// Minimum viable registry size. Expansion to ~75 each happens in the follow-up
-// GEM import PR; this seeder doesn't care about exact counts beyond the floor.
-const MIN_PIPELINES_PER_REGISTRY = 8;
+// Minimum viable registry size. Post-GEM-import floor: 200. Live counts after
+// the 2025-11 GGIT + 2025-03 GOIT merge are 297 gas / 334 oil; 200 leaves ~100
+// rows of jitter headroom so a partial GEM re-import or a coverage-narrowing
+// release fails loud rather than silently halving the registry.
+const MIN_PIPELINES_PER_REGISTRY = 200;
 
 function loadRegistry(filename) {
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -96,6 +98,13 @@ export function validateRegistry(data) {
     if (!p.endPoint || typeof p.endPoint.lat !== 'number' || typeof p.endPoint.lon !== 'number') return false;
     if (!isValidLatLon(p.startPoint.lat, p.startPoint.lon)) return false;
     if (!isValidLatLon(p.endPoint.lat, p.endPoint.lon)) return false;
+    // Reject degenerate routes where startPoint == endPoint. PR #3406 review
+    // surfaced 9 GEM rows (incl. Trans-Alaska, Enbridge Line 3, Ichthys)
+    // whose source GeoJSON had a Point geometry or a single-coord LineString,
+    // producing zero-length pipelines that render as map-point artifacts and
+    // skew aggregate-length statistics. Defense in depth — converter also
+    // drops these — but the validator gate makes the contract explicit.
+    if (p.startPoint.lat === p.endPoint.lat && p.startPoint.lon === p.endPoint.lon) return false;
 
     if (!p.evidence || typeof p.evidence !== 'object') return false;
     const ev = p.evidence;
