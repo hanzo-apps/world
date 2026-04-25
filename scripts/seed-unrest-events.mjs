@@ -166,54 +166,70 @@ function describeErr(err) {
   return causeCode ? `${err.message} (cause: ${causeCode})` : (err.message || String(err));
 }
 
-async function fetchGdeltDirect(url) {
-  const resp = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!resp.ok) throw Object.assign(new Error(`GDELT API error: ${resp.status}`), { httpStatus: resp.status });
-  return resp.json();
+// Direct fetch from Railway has 0% success — every attempt errors with
+// UND_ERR_CONNECT_TIMEOUT or ECONNRESET. Path is always proxy-only here.
+// Decodo→Cloudflare→GDELT occasionally returns 522 or RSTs the TLS handshake
+// (~80% per single attempt in production); retry-with-jitter recovers most of
+// it without touching the cron interval.
+//
+// Test seams:
+//   _proxyFetcher  — replaces httpsProxyFetchRaw (default production wiring).
+//   _sleep         — replaces the inter-attempt jitter delay.
+//   _maxAttempts   — replaces the default 3 (lets tests bound iterations).
+//   _jitter        — replaces Math.random()-based jitter (deterministic in tests).
+export async function fetchGdeltViaProxy(url, proxyAuth, opts = {}) {
+  const {
+    _proxyFetcher = httpsProxyFetchRaw,
+    _sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+    _maxAttempts = 3,
+    _jitter = () => 1500 + Math.random() * 1500,
+  } = opts;
+  let lastErr;
+  for (let attempt = 1; attempt <= _maxAttempts; attempt++) {
+    try {
+      const { buffer } = await _proxyFetcher(url, proxyAuth, {
+        accept: 'application/json',
+        timeoutMs: 45_000,
+      });
+      return JSON.parse(buffer.toString('utf8'));
+    } catch (err) {
+      lastErr = err;
+      // JSON.parse on a successfully fetched body is deterministic — retrying
+      // can't recover. Bail immediately so we don't burn three attempts on
+      // a malformed-but-cached upstream response.
+      if (err instanceof SyntaxError) throw err;
+      if (attempt < _maxAttempts) {
+        console.warn(`  [GDELT] proxy attempt ${attempt}/${_maxAttempts} failed (${describeErr(err)}); retrying`);
+        await _sleep(_jitter());
+      }
+    }
+  }
+  throw lastErr;
 }
 
-async function fetchGdeltViaProxy(url, proxyAuth) {
-  // GDELT v1 gkg_geojson responds in ~19s when degraded; 20s timeout caused
-  // chronic "HTTP 522" / "CONNECT tunnel timeout" from Decodo, freezing
-  // seed-meta and firing STALE_SEED across health. 45s absorbs that variance
-  // with headroom.
-  const { buffer } = await httpsProxyFetchRaw(url, proxyAuth, {
-    accept: 'application/json',
-    timeoutMs: 45_000,
-  });
-  return JSON.parse(buffer.toString('utf8'));
-}
-
-async function fetchGdeltEvents() {
+export async function fetchGdeltEvents(opts = {}) {
+  const { _resolveProxyForConnect = resolveProxyForConnect, ..._proxyOpts } = opts;
   const params = new URLSearchParams({
     query: 'protest OR riot OR demonstration OR strike',
     maxrows: '2500',
   });
   const url = `${GDELT_GKG_URL}?${params}`;
 
+  const proxyAuth = _resolveProxyForConnect();
+  if (!proxyAuth) {
+    // Direct fetch hasn't worked from Railway since PR #3256; this seeder
+    // hard-requires a CONNECT proxy. Surface the env var ops needs to set.
+    throw new Error('GDELT requires CONNECT proxy: PROXY_URL env var is not set on this Railway service');
+  }
+
   let data;
   try {
-    data = await fetchGdeltDirect(url);
-  } catch (directErr) {
-    // Upstream HTTP error (4xx/5xx) — proxy routes to the same GDELT endpoint so
-    // it won't change the response. Save the 20s proxy timeout and bubble up.
-    if (directErr.httpStatus) throw directErr;
-    const proxyAuth = resolveProxyForConnect();
-    if (!proxyAuth) {
-      throw Object.assign(new Error(`GDELT direct failed (no proxy configured): ${describeErr(directErr)}`), { cause: directErr });
-    }
-    console.warn(`  [GDELT] direct failed (${describeErr(directErr)}); retrying via proxy`);
-    try {
-      data = await fetchGdeltViaProxy(url, proxyAuth);
-    } catch (proxyErr) {
-      throw Object.assign(
-        new Error(`GDELT both paths failed — direct: ${describeErr(directErr)}; proxy: ${describeErr(proxyErr)}`),
-        { cause: proxyErr },
-      );
-    }
+    data = await fetchGdeltViaProxy(url, proxyAuth, _proxyOpts);
+  } catch (proxyErr) {
+    throw Object.assign(
+      new Error(`GDELT proxy failed (3 attempts): ${describeErr(proxyErr)}`),
+      { cause: proxyErr },
+    );
   }
 
   const features = data?.features || [];
@@ -298,15 +314,22 @@ export function declareRecords(data) {
   return Array.isArray(data?.events) ? data.events.length : 0;
 }
 
-runSeed('unrest', 'events', CANONICAL_KEY, fetchUnrestEvents, {
-  validateFn: validate,
-  ttlSeconds: CACHE_TTL,
-  sourceVersion: 'acled+gdelt',
+// Gate the runSeed entry-point so this module is importable from tests
+// without triggering a real seed run. process.argv[1] is set when this file
+// is invoked as a script (`node scripts/seed-unrest-events.mjs`); under
+// `node --test`, argv[1] is the test runner, not this file.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  runSeed('unrest', 'events', CANONICAL_KEY, fetchUnrestEvents, {
+    validateFn: validate,
+    ttlSeconds: CACHE_TTL,
+    sourceVersion: 'acled+gdelt',
 
-  declareRecords,
-  schemaVersion: 1,
-  maxStaleMin: 120,
-}).catch((err) => {
-  const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
-  process.exit(1);
-});
+    declareRecords,
+    schemaVersion: 1,
+    maxStaleMin: 120,
+  }).catch((err) => {
+    const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
+    process.exit(1);
+  });
+}
