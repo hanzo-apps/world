@@ -151,7 +151,36 @@ export function userDisplayNameFromId(userId) {
 
 // ── Compose a full brief for a single rule ──────────────────────────────────
 
-const MAX_STORIES_PER_USER = 12;
+// Cap on stories shown per user per brief.
+//
+// Default 12 — kept at the historical value because the offline sweep
+// harness (scripts/sweep-topic-thresholds.mjs) showed bumping the cap
+// to 16 against 2026-04-24 production replay data DROPPED visible
+// quality at the active 0.45 threshold (visible_quality 0.916 → 0.716;
+// positions 13-16 are mostly singletons or members of "should-separate"
+// clusters at this threshold, so they dilute without helping adjacency).
+//
+// Env-tunable via DIGEST_MAX_STORIES_PER_USER so future sweep evidence
+// (different threshold, different label set, different pool composition)
+// can be acted on with a Railway env flip without a redeploy. Any
+// invalid / non-positive value falls back to the 12 default.
+//
+// "Are we getting better" signal: re-run scripts/sweep-topic-thresholds.mjs
+// with --cap N before flipping the env, and the daily
+// scripts/brief-quality-report.mjs after.
+function readMaxStoriesPerUser() {
+  const raw = process.env.DIGEST_MAX_STORIES_PER_USER;
+  if (raw == null || raw === '') return 12;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 12;
+}
+// Exported so brief-llm.mjs (buildDigestPrompt + hashDigestInput) can
+// slice to the same cap. Hard-coding `slice(0, 12)` there would mean
+// the LLM prose only references the first 12 stories even when the
+// brief envelope carries more — a quiet mismatch between what the
+// reader sees as story cards vs the AI summary above them. Reviewer
+// P1 on PR #3389.
+export const MAX_STORIES_PER_USER = readMaxStoriesPerUser();
 
 /**
  * Filter + assemble a BriefEnvelope for one alert rule from a

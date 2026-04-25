@@ -192,7 +192,14 @@ describe('composeBriefFromDigestStories — continued', () => {
     assert.deepEqual(env.data.stories.map((s) => s.headline), ['A', 'B']);
   });
 
-  it('caps at 12 stories per brief', () => {
+  it('caps at 12 stories per brief by default (env-tunable via DIGEST_MAX_STORIES_PER_USER)', () => {
+    // Default kept at 12. Offline sweep harness against 2026-04-24
+    // production replay showed cap=16 dropped visible_quality from
+    // 0.916 → 0.716 at the active 0.45 threshold (positions 13-16
+    // are mostly singletons or "should-separate" members at this
+    // threshold, so they dilute without helping adjacency). The
+    // constant is env-tunable so a Railway flip can experiment with
+    // cap values once new sweep evidence justifies them.
     const many = Array.from({ length: 30 }, (_, i) =>
       digestStory({ hash: `h${i}`, title: `Story ${i}` }),
     );
