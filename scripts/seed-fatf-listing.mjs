@@ -16,7 +16,7 @@
 // of publication). Cache TTL 90d so a transient parse failure doesn't
 // drop the full listing.
 
-import { loadEnvFile, CHROME_UA, runSeed, resolveProxyForConnect, httpsProxyFetchRaw } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, runSeed, resolveProxyForConnect, httpsProxyFetchRaw, describeErr } from './_seed-utils.mjs';
 import countryNames from './shared/country-names.json' with { type: 'json' };
 
 loadEnvFile(import.meta.url);
@@ -56,12 +56,25 @@ function normalizeName(name) {
 // even if Cloudflare blocked Wayback's own crawler for a few weeks.
 const WAYBACK_CDX_URL = 'https://web.archive.org/cdx/search/cdx';
 const WAYBACK_LOOKBACK_DAYS = 180;
+// Per-tier timeout. Railway-egress observations (log 2026-04-25T20:35)
+// showed direct CDX timing out past 20s when archive.org rate-limits the
+// shared pool; 25s gives 25% margin over that and pairs with a Decodo
+// proxy fallback for the case where direct still times out. Together
+// (direct 25s + proxy 25s = 50s per Wayback call × CDX + snapshot = 100s
+// max Wayback budget per URL) this fits inside the seeder's overall
+// per-URL ceiling (see comment block at fetchHtml).
+const WAYBACK_TIMEOUT_MS = 25_000;
 
 /**
  * Fetch a URL via Wayback Machine's most recent successful (statuscode:200)
  * snapshot. Used when both direct and CONNECT-proxy fetches are blocked at
  * the URL level (e.g. FATF's Cloudflare "Just a moment…" JS challenge —
  * neither browser headers nor residential proxy IPs pass without JS exec).
+ *
+ * Two-tier per-call: direct fetch → CONNECT proxy fallback. Railway egress
+ * IPs are routinely soft-rate-limited or slowed by archive.org; routing
+ * the same CDX/snapshot request through Decodo's residential proxy pool
+ * bypasses that without changing the response shape.
  *
  * Wayback's `id_` URL modifier returns the captured HTML byte-for-byte
  * without Wayback's banner injection or href/src rewriting — critical for
@@ -73,10 +86,17 @@ const WAYBACK_LOOKBACK_DAYS = 180;
  * bundle interval is 30d; for any caller with a tighter freshness budget,
  * tune `WAYBACK_LOOKBACK_DAYS` accordingly.
  *
- * Test seam: `fetchFn` defaults to global `fetch` so production wiring is
- * untouched; tests pass a mocked fetch.
+ * Test seams: `fetchFn` and `proxyFetcher` default to global `fetch` and
+ * `httpsProxyFetchRaw` so production wiring is untouched; tests can pass
+ * mocked versions of either.
  */
-export async function fetchViaWayback(url, { fetchFn = fetch, lookbackDays = WAYBACK_LOOKBACK_DAYS } = {}) {
+export async function fetchViaWayback(url, opts = {}) {
+  const {
+    fetchFn = fetch,
+    proxyFetcher = httpsProxyFetchRaw,
+    proxyAuth = resolveProxyForConnect(),
+    lookbackDays = WAYBACK_LOOKBACK_DAYS,
+  } = opts;
   const fromDate = new Date(Date.now() - lookbackDays * 86_400_000)
     .toISOString()
     .slice(0, 10)
@@ -90,12 +110,7 @@ export async function fetchViaWayback(url, { fetchFn = fetch, lookbackDays = WAY
   // is exactly what we want and also avoids fetching ~20× more rows than
   // we need.
   const cdxUrl = `${WAYBACK_CDX_URL}?url=${encodeURIComponent(url)}&filter=statuscode:200&output=json&from=${fromDate}&limit=-1`;
-  const cdxResp = await fetchFn(cdxUrl, {
-    headers: { 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!cdxResp.ok) throw new Error(`Wayback CDX HTTP ${cdxResp.status} for ${url}`);
-  const rows = await cdxResp.json();
+  const rows = await fetchWaybackJson(cdxUrl, { fetchFn, proxyFetcher, proxyAuth });
   // CDX returns: [headerRow, snapshotRow]. Each snapshot row =
   // [urlkey, timestamp, original, mimetype, statuscode, digest, length].
   // With `limit=-1` we expect exactly one snapshot row.
@@ -108,47 +123,117 @@ export async function fetchViaWayback(url, { fetchFn = fetch, lookbackDays = WAY
     throw new Error(`Wayback CDX returned malformed timestamp "${timestamp}" for ${url}`);
   }
   const snapshotUrl = `https://web.archive.org/web/${timestamp}id_/${url}`;
-  const snapResp = await fetchFn(snapshotUrl, {
-    headers: { 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!snapResp.ok) throw new Error(`Wayback snapshot ${timestamp} HTTP ${snapResp.status} for ${url}`);
-  return snapResp.text();
+  return await fetchWaybackText(snapshotUrl, timestamp, { fetchFn, proxyFetcher, proxyAuth });
 }
 
+async function fetchWaybackJson(cdxUrl, { fetchFn, proxyFetcher, proxyAuth }) {
+  let directErr;
+  try {
+    const cdxResp = await fetchFn(cdxUrl, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(WAYBACK_TIMEOUT_MS),
+    });
+    if (!cdxResp.ok) throw new Error(`Wayback CDX HTTP ${cdxResp.status}`);
+    return await cdxResp.json();
+  } catch (err) {
+    directErr = err;
+  }
+  if (!proxyAuth) {
+    throw new Error(`Wayback CDX direct failed (${describeErr(directErr)}); no proxy configured`);
+  }
+  try {
+    // Note: httpsProxyFetchRaw injects User-Agent: CHROME_UA internally
+    // (see scripts/_seed-utils.mjs:httpsProxyFetchRaw) — we don't need to
+    // pass headers here. AGENTS.md UA convention is satisfied on both legs.
+    const { buffer } = await proxyFetcher(cdxUrl, proxyAuth, {
+      accept: 'application/json',
+      timeoutMs: WAYBACK_TIMEOUT_MS,
+    });
+    return JSON.parse(buffer.toString('utf8'));
+  } catch (proxyErr) {
+    throw new Error(`Wayback CDX direct=${describeErr(directErr)}; proxy=${describeErr(proxyErr)}`);
+  }
+}
+
+async function fetchWaybackText(snapshotUrl, timestamp, { fetchFn, proxyFetcher, proxyAuth }) {
+  let directErr;
+  try {
+    const snapResp = await fetchFn(snapshotUrl, {
+      headers: { 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(WAYBACK_TIMEOUT_MS),
+    });
+    if (!snapResp.ok) throw new Error(`Wayback snapshot ${timestamp} HTTP ${snapResp.status}`);
+    return await snapResp.text();
+  } catch (err) {
+    directErr = err;
+  }
+  if (!proxyAuth) {
+    throw new Error(`Wayback snapshot ${timestamp} direct failed (${describeErr(directErr)}); no proxy configured`);
+  }
+  try {
+    // Note: httpsProxyFetchRaw injects User-Agent: CHROME_UA internally
+    // (see scripts/_seed-utils.mjs:httpsProxyFetchRaw) — UA is sent on
+    // the proxy snapshot fetch even though it's not in the opts here.
+    const { buffer } = await proxyFetcher(snapshotUrl, proxyAuth, {
+      accept: 'text/html',
+      timeoutMs: WAYBACK_TIMEOUT_MS,
+    });
+    return buffer.toString('utf8');
+  } catch (proxyErr) {
+    throw new Error(`Wayback snapshot ${timestamp} direct=${describeErr(directErr)}; proxy=${describeErr(proxyErr)}`);
+  }
+}
+
+// Per-URL fetch budget — total ≤ 125s in the absolute worst case where
+// every tier exhausts its timeout. Composed of: direct(10s) + proxy(15s)
+// + wayback-CDX-direct(25s) + wayback-CDX-proxy(25s) + wayback-snapshot-
+// direct(25s) + wayback-snapshot-proxy(25s) = 125s. The seeder fetches
+// the entry page sequentially, then black + grey publication pages in
+// parallel via Promise.all, so end-to-end worst case is ≤ 250s — fits
+// inside seed-bundle-macro.mjs's 300_000 ms FATF-Listing section budget
+// with ~50s margin. Direct 30s / proxy 30s / wayback 45s in the prior
+// design summed to 240s per URL × sequential entry + parallel pubs =
+// 480s worst case, exceeded the original 120_000 ms section budget and
+// caused bundle-runner SIGTERM to interrupt the graceful-fail path.
 async function fetchHtml(url) {
-  // Tier 1: direct fetch.
+  // Tier 1: direct fetch (Cloudflare 403s in <1s when blocking; 10s
+  // gives 10× margin without burning section budget on a guaranteed
+  // failure).
   let directErr;
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': CHROME_UA, Accept: 'text/html' },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return await resp.text();
   } catch (err) {
     directErr = err;
-    console.warn(`  FATF ${url}: direct failed (${err.message})`);
+    console.warn(`  FATF ${url}: direct failed (${describeErr(err)})`);
   }
-  // Tier 2: CONNECT proxy (if configured).
+  // Tier 2: CONNECT proxy (if configured) — Decodo adds ~1s of CONNECT-
+  // tunnel overhead; 15s lets a slow-but-eventually-200 proxy response
+  // through while still leaving 100s of budget for Wayback.
   let proxyErr;
   if (_proxyAuth) {
     try {
-      const { buffer } = await httpsProxyFetchRaw(url, _proxyAuth, { accept: 'text/html', timeoutMs: 30_000 });
+      const { buffer } = await httpsProxyFetchRaw(url, _proxyAuth, { accept: 'text/html', timeoutMs: 15_000 });
       return buffer.toString('utf8');
     } catch (err) {
       proxyErr = err;
-      console.warn(`  FATF ${url}: proxy failed (${err.message}), falling back to Wayback`);
+      console.warn(`  FATF ${url}: proxy failed (${describeErr(err)}), falling back to Wayback`);
     }
   } else {
     console.warn(`  FATF ${url}: no proxy configured, falling back to Wayback`);
   }
-  // Tier 3: Wayback Machine (bypasses Cloudflare JS challenge).
+  // Tier 3: Wayback Machine (bypasses Cloudflare JS challenge). Internally
+  // does its own direct → proxy fallback because Railway egress IPs are
+  // routinely soft-rate-limited by archive.org.
   try {
     return await fetchViaWayback(url);
   } catch (wbErr) {
-    const proxyMsg = proxyErr ? ` proxy=${proxyErr.message};` : '';
-    throw new Error(`FATF fetch ${url}: direct=${directErr.message};${proxyMsg} wayback=${wbErr.message}`);
+    const proxyMsg = proxyErr ? ` proxy=${describeErr(proxyErr)};` : '';
+    throw new Error(`FATF fetch ${url}: direct=${describeErr(directErr)};${proxyMsg} wayback=${describeErr(wbErr)}`);
   }
 }
 
