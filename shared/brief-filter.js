@@ -7,6 +7,7 @@
 
 import { BRIEF_ENVELOPE_VERSION } from './brief-envelope.js';
 import { assertBriefEnvelope } from '../server/_shared/brief-render.js';
+import { isInstitutionalStaticPage } from './url-classifier.js';
 
 /**
  * @typedef {import('./brief-envelope.js').BriefEnvelope} BriefEnvelope
@@ -94,7 +95,7 @@ function clip(v, cap) {
 }
 
 /**
- * @typedef {(event: { reason: 'severity'|'headline'|'url'|'shape'|'cap', severity?: string, sourceUrl?: string }) => void} DropMetricsFn
+ * @typedef {(event: { reason: 'severity'|'headline'|'url'|'shape'|'cap'|'source_topic_cap'|'institutional_static_page', severity?: string, sourceUrl?: string }) => void} DropMetricsFn
  */
 
 /**
@@ -148,10 +149,10 @@ function applyRankedOrder(stories, rankedStoryHashes) {
 }
 
 /**
- * @param {{ stories: UpstreamTopStory[]; sensitivity: AlertSensitivity; maxStories?: number; onDrop?: DropMetricsFn; rankedStoryHashes?: string[] }} input
+ * @param {{ stories: UpstreamTopStory[]; sensitivity: AlertSensitivity; maxStories?: number; maxPerSourceTopic?: number; onDrop?: DropMetricsFn; rankedStoryHashes?: string[] }} input
  * @returns {BriefStory[]}
  */
-export function filterTopStories({ stories, sensitivity, maxStories = 12, onDrop, rankedStoryHashes }) {
+export function filterTopStories({ stories, sensitivity, maxStories = 12, maxPerSourceTopic = 2, onDrop, rankedStoryHashes }) {
   if (!Array.isArray(stories)) return [];
   const allowed = ALLOWED_LEVELS_BY_SENSITIVITY[sensitivity];
   if (!allowed) return [];
@@ -174,6 +175,18 @@ export function filterTopStories({ stories, sensitivity, maxStories = 12, onDrop
 
   /** @type {BriefStory[]} */
   const out = [];
+  // Per-(source, category) survivor count. Updated atomically with each
+  // out.push() below so the U5 source-topic cap check is O(1) instead of
+  // O(n) per candidate. Key format: source + KEY_DELIM + category. The
+  // ASCII Unit Separator (0x1F) prevents collisions when source or
+  // category itself contains spaces (e.g. (source='Reuters',
+  // category='World Politics') vs (source='Reuters World',
+  // category='Politics') would both produce the same key under a space
+  // delimiter). Sources/categories never legitimately contain control
+  // characters so 0x1F is a safe sentinel.
+  const KEY_DELIM = String.fromCharCode(31);
+  /** @type {Map<string, number>} */
+  const pairCounts = new Map();
   for (let i = 0; i < orderedStories.length; i++) {
     const raw = orderedStories[i];
     if (out.length >= maxStories) {
@@ -218,6 +231,16 @@ export function filterTopStories({ stories, sensitivity, maxStories = 12, onDrop
       continue;
     }
 
+    // U7: defense-in-depth URL/path denylist for static institutional
+    // pages on .gov/.mil/.int. The upstream ingest gates (U1+U2+U3)
+    // should keep these out, but a regression in the feed registry or
+    // a new dialect bypassing U2 could let one through — this gate
+    // ensures the brief surface stays clean even then. R7.
+    if (isInstitutionalStaticPage(sourceUrl)) {
+      if (emit) emit({ reason: 'institutional_static_page', severity: threatLevel, sourceUrl });
+      continue;
+    }
+
     const description = clip(
       asTrimmedString(raw.description) || headline,
       MAX_DESCRIPTION_LEN,
@@ -228,6 +251,20 @@ export function filterTopStories({ stories, sensitivity, maxStories = 12, onDrop
     );
     const category = asTrimmedString(raw.category) || 'General';
     const country = asTrimmedString(raw.countryCode) || 'Global';
+
+    // Source-topic cap (R6, U5): prevent more than maxPerSourceTopic
+    // (default 2) stories sharing the same (source, category) pair from
+    // reaching a single brief. Surgical fix for editorial-clutter cases
+    // like the 2026-04-25 brief shipping both "Millions under tornado
+    // threat" and "Watch tornadoes swirl through Oklahoma" from CBS News
+    // — distinct stories the dedup correctly kept separate, but redundant
+    // for a 12-story brief. Ranked-order rule above ensures the
+    // highest-importance member of each pair survives.
+    const pairKey = source + KEY_DELIM + category;
+    if ((pairCounts.get(pairKey) ?? 0) >= maxPerSourceTopic) {
+      if (emit) emit({ reason: 'source_topic_cap', severity: threatLevel, sourceUrl });
+      continue;
+    }
 
     out.push({
       category,
@@ -244,6 +281,7 @@ export function filterTopStories({ stories, sensitivity, maxStories = 12, onDrop
       whyMatters:
         'Story flagged by your sensitivity settings. Open for context.',
     });
+    pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
   }
   return out;
 }
