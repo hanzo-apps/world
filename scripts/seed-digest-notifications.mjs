@@ -64,6 +64,7 @@ import {
 } from './lib/brief-dedup.mjs';
 import { stripSourceSuffix } from './lib/brief-dedup-jaccard.mjs';
 import { writeReplayLog } from './lib/brief-dedup-replay-log.mjs';
+import { readStoryTracksChunked } from './lib/story-track-batch-reader.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -451,9 +452,16 @@ async function buildDigest(rule, windowStartMs) {
   );
   if (!Array.isArray(hashes) || hashes.length === 0) return null;
 
-  const trackResults = await upstashPipeline(
-    hashes.map((h) => ['HGETALL', `story:track:v1:${h}`]),
-  );
+  // null = at least one HGETALL chunk failed. Returning null here
+  // matches the legacy semantic (single-pipeline failure produced
+  // an empty story list → null buildDigest result → cron skipped
+  // sending the digest for this user/variant). The alternative —
+  // shipping a digest built from only the successfully-fetched
+  // chunks — would silently drop stories AND mark the slot as sent,
+  // suppressing retry on the next tick. See:
+  //   scripts/lib/story-track-batch-reader.mjs (bail-on-failure rationale).
+  const trackResults = await readStoryTracksChunked(hashes, upstashPipeline);
+  if (trackResults === null) return null;
 
   // READ-time freshness cutoff is anchored to the rule's own digest
   // window. Daily user (24h window) → 48h cutoff; weekly user (7d
