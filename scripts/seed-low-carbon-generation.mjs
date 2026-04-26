@@ -19,7 +19,10 @@
 // the power-system security intent.
 //
 // All three series are annual; WDI reports latest observed year per
-// country. We fetch the most-recent value (mrv=1) and sum by ISO2.
+// country. We fetch up to 5 most-recent years (mrv=5) and pick the
+// latest non-null per country, then sum by ISO2. The mrv=5 + null-skip
+// recipe is documented in skill `wb-bulk-mrv1-null-coverage-trap`;
+// applied to this file in PR #3432 (review fixup).
 // Missing any of the three (e.g. a country with no nuclear filing)
 // is treated as 0 for that slice — the scorer's 0..80 saturating
 // goalpost tolerates partial coverage without dropping the indicator
@@ -40,7 +43,11 @@ async function fetchIndicator(indicatorId) {
   let page = 1;
   let totalPages = 1;
   while (page <= totalPages) {
-    const url = `${WB_BASE}/country/all/indicator/${indicatorId}?format=json&per_page=500&page=${page}&mrv=1`;
+    // mrv=5 (NOT mrv=1) per memory `feedback_wb_bulk_mrv1_null_coverage_trap`:
+    // mrv=1 returns a SINGLE year across all countries with `value: null` for
+    // late-reporters (KW/QA/AE publish 1-2y behind G7), silently dropping
+    // them. mrv=5 + per-country pickLatest gives a true latest-non-null.
+    const url = `${WB_BASE}/country/all/indicator/${indicatorId}?format=json&per_page=2000&page=${page}&mrv=5`;
     const resp = await fetch(url, {
       headers: { 'User-Agent': CHROME_UA },
       signal: AbortSignal.timeout(30_000),
@@ -60,10 +67,23 @@ function collectByIso2(records) {
     const rawCode = record?.countryiso3code ?? record?.country?.id ?? '';
     const iso2 = rawCode.length === 3 ? (iso3ToIso2[rawCode] ?? null) : (rawCode.length === 2 ? rawCode : null);
     if (!iso2) continue;
-    const value = Number(record?.value);
+    // CRITICAL: skip null records BEFORE Number() coercion.
+    // Number(null) === 0 (not NaN), passes Number.isFinite(), and the
+    // `out.set(iso2, ...)` overwrite below would replace an older
+    // non-null record. EG.ELC.{NUCL,RNEW,HYRO}.ZS are "% of" indicators
+    // where 0 IS a legitimate value (country has 0% nuclear / renewable /
+    // hydro), so we CAN'T use the `value <= 0` defense — must skip
+    // null explicitly. Same recipe as PR #3427.
+    if (record?.value == null) continue;
+    const value = Number(record.value);
     if (!Number.isFinite(value)) continue;
     const year = Number(record?.date);
-    out.set(iso2, { value, year: Number.isFinite(year) ? year : null });
+    if (!Number.isFinite(year)) continue;
+    // Per-country latest-non-null (mrv=5 returns up to 5 records per country).
+    const existing = out.get(iso2);
+    if (!existing || year > existing.year) {
+      out.set(iso2, { value, year });
+    }
   }
   return out;
 }
