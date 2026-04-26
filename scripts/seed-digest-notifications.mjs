@@ -41,7 +41,9 @@ import {
 import {
   digestWindowStartMs,
   pickWinningCandidateWithPool,
+  readTimeAgeCutoffMs,
   runSynthesisWithFallback,
+  shouldDropTrackByAge,
   subjectForBrief,
 } from './lib/digest-orchestration-helpers.mjs';
 import { injectEmailSummary } from './lib/email-summary-html.mjs';
@@ -453,12 +455,26 @@ async function buildDigest(rule, windowStartMs) {
     hashes.map((h) => ['HGETALL', `story:track:v1:${h}`]),
   );
 
+  // READ-time freshness cutoff is anchored to the rule's own digest
+  // window. Daily user (24h window) → 48h cutoff; weekly user (7d
+  // window) → 8d cutoff. See: skill ingest-gate-tightening-leaves-
+  // residue-in-read-path. Legacy rows without publishedAt fall through
+  // (back-compat); pre-deploy residue with no publishedAt is handled
+  // by audit --mode=residue (one-shot).
+  const ageCutoffMs = readTimeAgeCutoffMs(windowStartMs);
+
   const stories = [];
+  let droppedStaleAtRead = 0;
   for (let i = 0; i < hashes.length; i++) {
     const raw = trackResults[i]?.result;
     if (!Array.isArray(raw) || raw.length === 0) continue;
     const track = flatArrayToObject(raw);
     if (!track.title || !track.severity) continue;
+
+    if (shouldDropTrackByAge(track, ageCutoffMs)) {
+      droppedStaleAtRead++;
+      continue;
+    }
 
     const phase = derivePhase(track);
     if (phase === 'fading') continue;
@@ -478,6 +494,14 @@ async function buildDigest(rule, windowStartMs) {
       // description. Downstream adapter falls back to the cleaned headline.
       description: typeof track.description === 'string' ? track.description : '',
     });
+  }
+
+  if (droppedStaleAtRead > 0) {
+    const cutoffH = Math.round((Date.now() - ageCutoffMs) / (60 * 60 * 1000));
+    console.warn(
+      `[digest] buildDigest read-time freshness floor dropped ${droppedStaleAtRead} ` +
+        `stale items (window cutoff: ${cutoffH}h ago) — likely pre-deploy residue`,
+    );
   }
 
   if (stories.length === 0) return null;
