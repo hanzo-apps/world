@@ -13,7 +13,7 @@ import { markNoCacheResponse } from '../../../_shared/response-headers';
 import { sha256Hex } from '../../../_shared/hash';
 import { CHROME_UA } from '../../../_shared/constants';
 import { VARIANT_FEEDS, INTEL_SOURCES, type ServerFeed } from './_feeds';
-import { classifyByKeyword, type ThreatLevel } from './_classifier';
+import { classifyByKeyword, hasHistoricalMarker, type ThreatLevel } from './_classifier';
 import { buildClassifyCacheKey } from '../../intelligence/v1/_shared';
 import { getSourceTier } from '../../../_shared/source-tiers';
 import {
@@ -129,7 +129,7 @@ interface ParsedItem {
   level: ThreatLevel;
   category: string;
   confidence: number;
-  classSource: 'keyword' | 'llm';
+  classSource: 'keyword' | 'keyword-historical-downgrade' | 'llm';
   importanceScore: number;
   corroborationCount: number;
   titleHash?: string;
@@ -348,7 +348,7 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParseResul
       level: threat.level,
       category: threat.category,
       confidence: threat.confidence,
-      classSource: 'keyword',
+      classSource: threat.source,
       importanceScore: 0,
       corroborationCount: 1,
       lang: feed.lang ?? 'en',
@@ -498,7 +498,13 @@ function decodeXmlEntities(s: string): string {
 }
 
 async function enrichWithAiCache(items: ParsedItem[]): Promise<void> {
-  const candidates = items.filter(i => i.classSource === 'keyword');
+  // Apply the LLM cache to BOTH 'keyword' and 'keyword-historical-downgrade'
+  // sources. The historical-downgrade path forced an info level based on a
+  // headline-shape heuristic; the LLM cache (when warmed) is a stronger
+  // signal and should be allowed to either confirm or override.
+  const candidates = items.filter(
+    i => i.classSource === 'keyword' || i.classSource === 'keyword-historical-downgrade',
+  );
   if (candidates.length === 0) return;
 
   // Use the canonical buildClassifyCacheKey from intelligence/v1/_shared
@@ -521,14 +527,70 @@ async function enrichWithAiCache(items: ParsedItem[]): Promise<void> {
     if (!hit || hit.level === '_skip' || !hit.level || !hit.category) continue;
 
     for (const item of relatedItems) {
+      // L3 defense-in-depth runs FIRST, BEFORE capLlmUpgrade. If the
+      // title carries a historical-retrospective marker, force info
+      // regardless of what the LLM cache claimed — retrospective content
+      // should never ship at any non-info level.
+      //
+      // Why before the cap (P1 fix on PR #3429 round 3): when keyword=info
+      // and hit=critical, capLlmUpgrade returns medium (info+2=medium).
+      // A post-cap check on `cappedLevel === 'critical' || === 'high'`
+      // would miss this — `medium` doesn't match — so the brief 2026-04-
+      // 26-1302 Chernobyl-style title would have shipped at MEDIUM (which
+      // still passes 'all' sensitivity briefs). Running the marker check
+      // on the original hit and forcing info — not on cappedLevel — closes
+      // that gap.
+      //
+      // Why force info unconditionally (not just critical/high): retro-
+      // spective markers should suppress the LLM verdict at every non-info
+      // level, including medium and low. A medium-level retrospective would
+      // still ship in 'all'-sensitivity briefs; the goal of this guard is
+      // "retrospective content NEVER ships, regardless of LLM verdict."
+      if (hasHistoricalMarker(item.title)) {
+        console.warn(
+          `[classify] LLM hit forced to info by historical marker: ` +
+            `keyword=${item.level} llm=${hit.level} title="${item.title.slice(0, 60)}"`,
+        );
+        item.level = 'info';
+        item.category = hit.category;
+        item.confidence = 0.9;
+        item.classSource = 'llm';
+        item.isAlert = false;
+        continue;
+      }
+
+      // Skip the LLM cache for high-confidence keyword=critical matches
+      // (confidence 0.9). Without this skip, capLlmUpgrade is a Math.min
+      // — a stale or wrong LLM cache entry saying 'info' would silently
+      // demote a genuine current critical event to info via min(critical,
+      // info) = info, with no remaining safeguard.
+      //
+      // The retrospective case the prior PR #3424 wanted to handle here
+      // is already handled UPSTREAM: a keyword=critical title with a
+      // historical marker becomes classSource='keyword-historical-
+      // downgrade' (confidence 0.85, level=info) inside classifyByKeyword
+      // BEFORE reaching this function, so the L3 marker check above
+      // catches it via the historical-downgrade source. Items reaching
+      // here at confidence 0.9 are by construction items where the
+      // keyword classifier saw a critical match AND saw no marker —
+      // the safer default for those is to trust the keyword verdict.
+      //
+      // The L3 marker check above intentionally runs BEFORE this skip so
+      // that keyword=info (confidence 0.3, no-match) titles with a
+      // marker — the brief 2026-04-26-1302 "Science history: melts
+      // down…" shape — still get forced to info via the cache hit.
+      // Belt-and-suspenders for substring-keyword-miss contamination.
+      //
+      // P1 fix on PR #3429 round 4 (Greptile review on commit 96d3c12d7).
       if (0.9 <= item.confidence) continue;
+
+      //
       // Cap the LLM upgrade at +2 tiers above the keyword classification
       // so a poisoned cache entry (e.g., "About Section 508" → high) can't
       // promote an info-keyword item past medium (info+2=medium). Legitimate
-      // medium→critical upgrades (medium+2=critical) remain reachable; the
-      // bounded loss is keyword=low → LLM=critical, which caps at high
-      // (low+2=high) and is logged below. See LEVEL_RANK doc + R4 for the
-      // full per-keyword cap table.
+      // medium→critical upgrades (medium+2=critical) remain reachable.
+      // capLlmUpgrade is a Math.min so downgrades pass through freely.
+      // See LEVEL_RANK doc + R4 for the full per-keyword cap table.
       const cappedLevel = capLlmUpgrade(item.level, hit.level);
       if (cappedLevel !== hit.level) {
         console.warn(
