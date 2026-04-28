@@ -1,5 +1,5 @@
 /**
- * Toaster — Tamagui-native toast surface using @hanzo/gui's <Toast> primitives.
+ * Toaster — @hanzo/gui-native toast surface using @hanzo/gui's <Toast> primitives.
  * Imperative callers may dispatch:
  *   window.dispatchEvent(new CustomEvent('hanzo:toast', { detail: { message } }))
  */
