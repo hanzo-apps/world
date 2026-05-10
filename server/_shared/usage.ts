@@ -65,6 +65,10 @@ export type RequestReason =
   | 'auth_401'
   | 'auth_403'
   | 'tier_403'
+  // F8/F14 (U7+U8 review pass): body-buffer / payload-size rejections.
+  // Distinct from auth_401 so telemetry separates malformed requests
+  // from auth failures.
+  | 'malformed_request'
   | 'unknown_route'
   | 'method_not_allowed';
 
