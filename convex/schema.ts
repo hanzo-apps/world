@@ -424,6 +424,11 @@ export default defineSchema({
       apiRateLimit: v.number(),
       prioritySupport: v.boolean(),
       exportFormats: v.array(v.string()),
+      // Optional for backward-compat with existing rows written before
+      // plan 2026-05-10-001 (Pro MCP). Dodo webhooks repopulate this on
+      // the next subscription event; legacy rows return undefined and
+      // every consumer treats undefined as "no MCP access" (fail-closed).
+      mcpAccess: v.optional(v.boolean()),
     }),
     validUntil: v.number(),
     // Optional complimentary-entitlement floor. When set and in the future,
@@ -524,6 +529,20 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_keyHash", ["keyHash"]),
+
+  // Non-key Pro MCP identity rows. One row per OAuth grant for a Pro user.
+  // Referenced from OAuth code/token records as `mcpTokenId` — never carries
+  // plaintext or `wm_` keys. Revoke deletes the row's revokedAt → next
+  // bearer-resolution at api/mcp.ts returns 401 (no token-index sweep needed).
+  // See plan: docs/plans/2026-05-10-001-feat-pro-mcp-clerk-auth-quota-plan.md
+  mcpProTokens: defineTable({
+    userId: v.string(),
+    clientId: v.optional(v.string()),
+    name: v.optional(v.string()),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  }).index("by_userId", ["userId"]),
 
   emailSuppressions: defineTable({
     normalizedEmail: v.string(),
