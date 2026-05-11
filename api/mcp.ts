@@ -34,6 +34,12 @@ const MCP_PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'worldmonitor';
 const SERVER_VERSION = '1.0';
 
+// Country-code whitelist for get_consumer_prices. The consumer-prices seeder
+// currently only produces data for AE (UAE); future markets will be added
+// here as they're seeded. Kept near COUNTRY_BBOXES (the other ISO-3166 alpha-2
+// lookup table used by tools) so adding a market is a single-file change.
+const SUPPORTED_CONSUMER_PRICES_COUNTRIES = new Set(['ae']);
+
 // ---------------------------------------------------------------------------
 // Rate limiters
 // ---------------------------------------------------------------------------
@@ -148,12 +154,18 @@ interface CacheToolDef extends BaseToolDef {
 }
 
 // AI inference tool: calls an internal RPC endpoint and returns the raw response.
+// Hybrid variant: when an _execute tool also reads cache keys directly
+// (e.g. parameterised by country_code), it MAY declare `_coverageKeys` so the
+// U7 Tier 3 parity test can verify that every BOOTSTRAP_KEYS/STANDALONE_KEYS
+// entry it owns is covered by some tool — cache-tool's `_cacheKeys` and
+// hybrid _execute's `_coverageKeys` are equivalent for that audit.
 interface RpcToolDef extends BaseToolDef {
   _cacheKeys?: never;
   _seedMetaKey?: never;
   _maxStaleMin?: never;
   _freshnessChecks?: never;
   _execute: (params: Record<string, unknown>, base: string, context: McpAuthContext) => Promise<unknown>;
+  _coverageKeys?: string[];
 }
 
 type ToolDef = CacheToolDef | RpcToolDef;
@@ -327,6 +339,71 @@ const TOOL_REGISTRY: ToolDef[] = [
     _maxStaleMin: 1440,
   },
   {
+    name: 'get_displacement_data',
+    description: 'Refugee and IDP counts by country (UNHCR annual data).',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    // Dynamic-year key resolved once at module evaluation — mirrors the
+    // STANDALONE_KEYS pattern in api/health.js:147. The UNHCR seeder publishes
+    // a single current-year key; the prior year exists at the same prefix but
+    // is intentionally excluded — the executeTool label-walk would strip the
+    // year segment from both keys and collide on the same `summary` label,
+    // causing the second result to overwrite the first.
+    _cacheKeys: [`displacement:summary:v1:${new Date().getUTCFullYear()}`],
+    _seedMetaKey: 'seed-meta:displacement:summary',
+    _maxStaleMin: 3600,
+  },
+  {
+    name: 'get_health_signals',
+    description: 'Active disease outbreaks (WHO/ECDC etc.) and global air-quality station readings (OpenAQ/WAQI PM2.5). For health-risk screening.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    // Uses the health-domain canonical key health:air-quality:v1 (NOT the
+    // climate-domain mirror climate:air-quality:v1, which stays exclusively
+    // in get_climate_data). Both are written by the same seeder
+    // (scripts/seed-health-air-quality.mjs exports HEALTH_AIR_QUALITY_KEY +
+    // CLIMATE_AIR_QUALITY_KEY) so no duplicate seed work.
+    _cacheKeys: ['health:disease-outbreaks:v1', 'health:air-quality:v1'],
+    _seedMetaKey: 'seed-meta:health:disease-outbreaks',
+    _maxStaleMin: 2880,
+    _freshnessChecks: [
+      { key: 'seed-meta:health:disease-outbreaks', maxStaleMin: 2880 }, // daily cron; 48h budget
+      { key: 'seed-meta:health:air-quality', maxStaleMin: 180 },        // hourly cron; 3h budget
+    ],
+  },
+  {
+    name: 'get_energy_intelligence',
+    description: 'Energy supply, prices, storage, disruptions, and policy: EIA petroleum stocks, electricity prices (Ember), gas storage (GIE), fuel shortages, fossil & renewable shares, active energy disruptions, government crisis policies.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    // Broad 9-key energy bundle mirroring get_economic_data. Cadences span
+    // hourly (electricity prices) to annual (World Bank renewable share); use
+    // _freshnessChecks with per-key maxStaleMin pulled from
+    // api/health.js::SEED_META so a slow-cadence key doesn't drag the
+    // aggregate stale flag unnecessarily.
+    _cacheKeys: [
+      'energy:eia-petroleum:v1',                  // STANDALONE_KEYS::eiaPetroleum
+      'energy:electricity:v1:index',              // BOOTSTRAP_KEYS::electricityPrices
+      'energy:ember:v1:_all',                     // STANDALONE_KEYS::emberElectricity
+      'energy:gas-storage:v1:_countries',         // BOOTSTRAP_KEYS::gasStorageCountries
+      'energy:fuel-shortages:v1',                 // STANDALONE_KEYS::fuelShortages
+      'energy:disruptions:v1',                    // STANDALONE_KEYS::energyDisruptions
+      'energy:crisis-policies:v1',                // STANDALONE_KEYS::energyCrisisPolicies
+      'resilience:fossil-electricity-share:v1',   // STANDALONE_KEYS::fossilElectricityShare
+      'economic:worldbank-renewable:v1',          // BOOTSTRAP_KEYS::renewableEnergy
+    ],
+    _seedMetaKey: 'seed-meta:energy:eia-petroleum',
+    _maxStaleMin: 4320, // EIA petroleum daily-bundle baseline; per-key budgets via _freshnessChecks below
+    _freshnessChecks: [
+      { key: 'seed-meta:energy:eia-petroleum',                  maxStaleMin: 4320 },   // daily bundle; 72h = 3× interval
+      { key: 'seed-meta:energy:electricity-prices',             maxStaleMin: 2880 },   // daily cron (14:00 UTC); 48h = 2× interval
+      { key: 'seed-meta:energy:ember',                          maxStaleMin: 2880 },   // daily cron (08:00 UTC); 48h = 2× interval
+      { key: 'seed-meta:energy:gas-storage-countries',          maxStaleMin: 2880 },   // daily cron at 10:30 UTC; 48h = 2× interval
+      { key: 'seed-meta:energy:fuel-shortages',                 maxStaleMin: 2880 },   // 2d — daily cron × 2 headroom
+      { key: 'seed-meta:energy:disruptions',                    maxStaleMin: 20160 },  // 14d — weekly cron × 2 headroom
+      { key: 'seed-meta:energy:crisis-policies',                maxStaleMin: 60 * 24 * 400 }, // ~400d static registry
+      { key: 'seed-meta:resilience:fossil-electricity-share',   maxStaleMin: 11520 },  // ~8d (annual WB-style cadence)
+      { key: 'seed-meta:economic:worldbank-renewable:v1',       maxStaleMin: 10080 },  // 7d WB weekly-cron annual data
+    ],
+  },
+  {
     name: 'get_climate_data',
     description: 'Climate intelligence: temperature/precipitation anomalies (vs 30-year WMO normals), climate-relevant disaster alerts (ReliefWeb/GDACS/FIRMS), atmospheric CO2 trend (NOAA Mauna Loa), air quality (OpenAQ/WAQI PM2.5 stations), Arctic sea ice extent and ocean heat indicators (NSIDC/NOAA), weather alerts, and climate news.',
     inputSchema: { type: 'object', properties: {}, required: [] },
@@ -362,6 +439,76 @@ const TOOL_REGISTRY: ToolDef[] = [
     ],
     _seedMetaKey: 'seed-meta:trade:customs-revenue',
     _maxStaleMin: 2880,
+  },
+  {
+    name: 'get_tariff_trends',
+    description: 'Global trade and pricing indicators: US tariff trends (HTS-coded), BigMac index, FAO Food Price Index, and per-country national debt levels.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    // 4-key bundle spanning trade + economic domains. Cadences span hourly-ish
+    // (tariffs co-pinned to 8h TARIFF_TTL) to monthly (FAO / national debt).
+    // Per-key _freshnessChecks pulled from api/health.js::SEED_META so a slow
+    // monthly key doesn't drag the aggregate stale flag and a fast tariff
+    // outage isn't masked by a long FAO budget.
+    _cacheKeys: [
+      'trade:tariffs:v1:840:all:10',   // STANDALONE_KEYS::tariffTrendsUs
+      'economic:bigmac:v1',            // BOOTSTRAP_KEYS::bigmac
+      'economic:fao-ffpi:v1',          // BOOTSTRAP_KEYS::faoFoodPriceIndex
+      'economic:national-debt:v1',     // BOOTSTRAP_KEYS::nationalDebt
+    ],
+    _seedMetaKey: 'seed-meta:trade:tariffs:v1:840:all:10',
+    _maxStaleMin: 540, // tariff cron baseline; per-key budgets via _freshnessChecks below
+    _freshnessChecks: [
+      { key: 'seed-meta:trade:tariffs:v1:840:all:10', maxStaleMin: 540 },   // TARIFF_TTL 8h + 60min grace
+      { key: 'seed-meta:economic:bigmac',             maxStaleMin: 10080 }, // weekly seed; 7d
+      { key: 'seed-meta:economic:fao-ffpi',           maxStaleMin: 86400 }, // monthly seed; 60d (2× interval)
+      { key: 'seed-meta:economic:national-debt',      maxStaleMin: 86400 }, // monthly seed; 60d (2× interval)
+    ],
+  },
+  {
+    name: 'get_chokepoint_status',
+    description: 'Live maritime chokepoint status: per-chokepoint vessel transit counts (10-min cadence), rolling transit summaries, per-port activity, plus static reference data (chokepoint geometry, canonical 13-chokepoint registry) and flow aggregates. Covers Suez, Hormuz, Malacca, Bab-el-Mandeb, Panama, etc.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    // Maritime chokepoint bundle distinct from get_supply_chain_data (which keeps
+    // shipping-stress + customs + comtrade). Cadences span 10-minute relay
+    // (transit-summaries, chokepoint_transits) to ~400-day static registries
+    // (chokepoint-baselines), so per-key _freshnessChecks pulled from
+    // api/health.js::SEED_META — a fast transit outage isn't masked by the
+    // slow chokepoint-baselines budget, and the long-cadence portwatch keys
+    // don't drag aggregate stale flagging.
+    //
+    // Payload measurement (PR pre-merge, fun-toad-55127.upstash.io 2026-05-11):
+    //   transit-summaries:v1                        — 6.8 KB
+    //   chokepoint_transits:v1                      — 1.1 KB
+    //   portwatch-ports:v1:_countries               — 0.9 KB
+    //   energy:chokepoint-baselines:v1              — 0.6 KB
+    //   portwatch:chokepoints:ref:v1                — 7.9 KB
+    //   energy:chokepoint-flows:v1                  — 1.2 KB
+    //   ────────────────────────────────────────────────────
+    //   Total: 18.5 KB (well under the 200KB/single-key and 500KB/aggregate
+    //   thresholds that historically tripped handler timeouts —
+    //   see tests/transit-summaries.test.mjs:539-545).
+    //
+    // EXCLUDED on purpose: supply_chain:corridorrisk:v1 is an intermediate
+    // key whose data flows through supply_chain:transit-summaries:v1
+    // (api/health.js:461). U7 will add corridorrisk to EXCLUDED_FROM_MCP.
+    _cacheKeys: [
+      'supply_chain:transit-summaries:v1',          // STANDALONE_KEYS::transitSummaries
+      'supply_chain:chokepoint_transits:v1',        // STANDALONE_KEYS::chokepointTransits
+      'supply_chain:portwatch-ports:v1:_countries', // STANDALONE_KEYS::portwatchPortActivity
+      'energy:chokepoint-baselines:v1',             // STANDALONE_KEYS::chokepointBaselines
+      'portwatch:chokepoints:ref:v1',               // STANDALONE_KEYS::portwatchChokepointsRef
+      'energy:chokepoint-flows:v1',                 // STANDALONE_KEYS::chokepointFlows
+    ],
+    _seedMetaKey: 'seed-meta:supply_chain:transit-summaries',
+    _maxStaleMin: 30, // transit-summaries 10-min relay baseline; per-key budgets via _freshnessChecks below
+    _freshnessChecks: [
+      { key: 'seed-meta:supply_chain:transit-summaries',   maxStaleMin: 30 },             // 10-min relay; 30min = 3× interval
+      { key: 'seed-meta:supply_chain:chokepoint_transits', maxStaleMin: 30 },             // 10-min relay; 30min = 3× interval
+      { key: 'seed-meta:supply_chain:portwatch-ports',     maxStaleMin: 2160 },           // 12h cron; 36h = 3× interval
+      { key: 'seed-meta:energy:chokepoint-baselines',      maxStaleMin: 60 * 24 * 400 },  // ~400d static registry
+      { key: 'seed-meta:portwatch:chokepoints-ref',        maxStaleMin: 60 * 24 * 14 },   // weekly cron; 14d = 2× interval
+      { key: 'seed-meta:energy:chokepoint-flows',          maxStaleMin: 720 },            // 6h cron; 12h = 2× interval
+    ],
   },
   {
     name: 'get_positive_events',
@@ -539,6 +686,103 @@ const TOOL_REGISTRY: ToolDef[] = [
       });
       if (!res.ok) throw new Error(`get-country-risk HTTP ${res.status}`);
       return res.json();
+    },
+  },
+  {
+    name: 'get_consumer_prices',
+    description: "Per-country consumer-prices intelligence: 30-day overview, category-level inflation, retailer spread (essentials basket), top movers, and source freshness. Requires country_code (currently only 'ae' is seeded).",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        country_code: {
+          type: 'string',
+          description: 'ISO 3166-1 alpha-2 country code. Currently supported: AE (case-insensitive).',
+        },
+      },
+      required: ['country_code'],
+    },
+    // Hybrid _execute (not a pure cache tool) because the cache keys are
+    // parameterised by country. Mirrors api/health.js::BOOTSTRAP_KEYS:55-59
+    // exactly so the U7 Tier-3 parity test treats every key as covered.
+    _coverageKeys: [
+      'consumer-prices:overview:ae',
+      'consumer-prices:categories:ae:30d',
+      'consumer-prices:movers:ae:30d',
+      'consumer-prices:retailer-spread:ae:essentials-ae',
+      'consumer-prices:freshness:ae',
+    ],
+    _execute: async (params) => {
+      // Result-level errors (NOT throws) for user-input issues — the dispatcher
+      // maps thrown errors to JSON-RPC -32603 "Internal error", which is
+      // misleading for a clearly-user-side fault like a missing/unknown
+      // country_code. Returning {error: ...} surfaces a usable message via
+      // the normal tools/call result envelope.
+      if (!params.country_code || typeof params.country_code !== 'string') {
+        return { error: 'country_code is required' };
+      }
+      const code = params.country_code.toLowerCase();
+      // Strict ISO 3166-1 alpha-2 shape: exactly two lowercase letters.
+      // Without this, .slice(0,2) would silently truncate inputs like
+      // "aexxx" or "AE-DXB" to "ae" and serve AE data — masking client bugs.
+      if (!/^[a-z]{2}$/.test(code)) {
+        return { error: 'country_code must be a two-letter ISO code (e.g. "ae")' };
+      }
+      if (!SUPPORTED_CONSUMER_PRICES_COUNTRIES.has(code)) {
+        return { error: 'Country not yet supported. Available: ae' };
+      }
+
+      const dataKeys = [
+        `consumer-prices:overview:${code}`,
+        `consumer-prices:categories:${code}:30d`,
+        `consumer-prices:movers:${code}:30d`,
+        `consumer-prices:retailer-spread:${code}:essentials-${code}`,
+        `consumer-prices:freshness:${code}`,
+      ];
+
+      // Freshness checks use the producer's actual meta keys. Note the spread
+      // entry: scripts/seed-consumer-prices.mjs:151 writes
+      // `seed-meta:consumer-prices:spread:<code>` (NO `retailer-` prefix,
+      // NO `:essentials-<code>` suffix). api/health.js:337 has the documented
+      // drift bug (expects `retailer-spread:<code>:essentials-<code>` which
+      // never exists) and so would always report stale; we deliberately
+      // diverge from health.js here to match the actual producer.
+      const freshnessChecks: FreshnessCheck[] = [
+        { key: `seed-meta:consumer-prices:overview:${code}`,      maxStaleMin: 1500 }, // 25h = 24h cron + 1h grace
+        { key: `seed-meta:consumer-prices:categories:${code}:30d`, maxStaleMin: 1500 },
+        { key: `seed-meta:consumer-prices:movers:${code}:30d`,     maxStaleMin: 1500 },
+        { key: `seed-meta:consumer-prices:spread:${code}`,         maxStaleMin: 1500 }, // producer's actual key shape
+        { key: `seed-meta:consumer-prices:freshness:${code}`,      maxStaleMin: 1500 },
+      ];
+
+      const [dataResults, metaResults] = await Promise.all([
+        Promise.all(dataKeys.map((k) => readJsonFromUpstash(k))),
+        Promise.all(freshnessChecks.map((c) => readJsonFromUpstash(c.key))),
+      ]);
+
+      // F6 contract parity with the cache-tool path (executeTool, ~line 1139):
+      // if every data read is null/undefined, this is a degenerate-empty
+      // response (Redis transient / stampede / pre-seed). Throw so
+      // dispatchToolsCall's catch fires proRollback — without this, the Pro
+      // user's daily MCP counter increments by 1 for a useless result while
+      // every other cache-tool refunds via the same code path.
+      if (dataResults.every((v: unknown) => v === null || v === undefined)) {
+        throw new Error('cache_all_null');
+      }
+
+      const { cached_at, stale } = evaluateFreshness(freshnessChecks, metaResults);
+
+      return {
+        cached_at,
+        stale,
+        country_code: code,
+        data: {
+          overview: dataResults[0],
+          categories: dataResults[1],
+          movers: dataResults[2],
+          retailerSpread: dataResults[3],
+          freshness: dataResults[4],
+        },
+      };
     },
   },
   {
@@ -1372,3 +1616,15 @@ export default async function handler(
 ): Promise<Response> {
   return mcpHandler(req, PRODUCTION_DEPS, ctx);
 }
+
+// ---------------------------------------------------------------------------
+// Test-only escape hatch. Exposes the TOOL_REGISTRY for the U7 Tier 3 parity
+// test (tests/mcp-bootstrap-parity.test.mjs), which asserts that every
+// canonical seeded cache key from api/health.js (BOOTSTRAP_KEYS ∪
+// STANDALONE_KEYS) is either covered by some tool's `_cacheKeys` (cache-tool)
+// or `_coverageKeys` (RpcToolDef hybrid), or explicitly excluded via the
+// test's EXCLUDED_FROM_MCP map with a documented reason.
+// ---------------------------------------------------------------------------
+export const __testing__ = {
+  TOOL_REGISTRY,
+};
