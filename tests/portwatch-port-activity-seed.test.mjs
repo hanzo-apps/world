@@ -305,6 +305,98 @@ describe('ArcGIS 429 proxy fallback', () => {
   it('429 proxy fallback threads caller signal', () => {
     assert.match(src, /httpsProxyFetchRaw\(url,\s*proxyAuth,\s*\{[^}]*signal\s*\}/s);
   });
+
+  // WM 2026-05-13 incident: ArcGIS silently stalled instead of returning
+  // 429, so all 30 cold-fetches timed out at 45s without ever entering
+  // the 429 retry branch. Fix: also fall through to proxy on timeout /
+  // transient network errors.
+  it('proxy fallback also fires on timeout (not just HTTP 429)', () => {
+    // The fetchWithTimeout body must wrap `await fetch(...)` in try/catch
+    // so a thrown AbortError (timeout) can be inspected and re-dispatched
+    // to the proxy path. Pre-fix the fetch was bare-awaited, so any
+    // throw exited the function before the 429 branch.
+    assert.match(src, /try\s*\{[\s\S]*?resp\s*=\s*await fetch\(url/);
+    // The catch block must detect timeout-class errors before deciding to
+    // re-throw vs retry-via-proxy.
+    assert.match(src, /errName\s*===\s*'TimeoutError'/);
+    assert.match(src, /isTimeoutLike/);
+  });
+
+  it('proxy retry helper is shared between 429 and timeout paths', () => {
+    // Centralized in arcgisProxyRetry so both branches behave identically
+    // (same Decodo creds resolution, same proxy-side timeout budget, same
+    // error message format). Pre-fix the 429 branch had inline proxy
+    // logic; the timeout path would have duplicated it. Refactored to
+    // share the helper.
+    assert.match(src, /async function arcgisProxyRetry/);
+    // Both branches must dispatch through the helper:
+    const callSites = src.match(/arcgisProxyRetry\(url,/g) ?? [];
+    assert.ok(
+      callSites.length >= 2,
+      `arcgisProxyRetry must be called from both 429 and timeout paths, found ${callSites.length}`,
+    );
+  });
+
+  it('caller signal-abort propagates without proxy retry (real cancellation)', () => {
+    // If the OUTER signal aborts (SIGTERM, per-country 90s timeout), we
+    // must NOT silently retry via proxy — the caller is asking us to
+    // stop. The check is `if (signal?.aborted) throw err`. Without this,
+    // a SIGTERM-triggered abort would still fire a proxy attempt and
+    // potentially miss the shutdown window.
+    assert.match(src, /if\s*\(\s*signal\?\.aborted\s*\)\s*throw err/);
+  });
+
+  it('proxy fallback distinguishes timeout error sources for operator visibility', () => {
+    // Pre-fix the 429 warn log said only "429 rate-limited — retrying via
+    // proxy". Post-fix the same helper is reused with a reason string,
+    // so operator logs distinguish "HTTP 429 rate-limited" from "direct
+    // TimeoutError" from "direct AbortError". Critical for diagnosing
+    // whether ArcGIS is explicitly rate-limiting (429) or silently
+    // stalling (timeout) — different mitigation paths.
+    assert.match(src, /direct \$\{errName \|\| 'timeout'\}/);
+    assert.match(src, /'HTTP 429 rate-limited'/);
+  });
+
+  // Greptile PR #3681 review round 2 P2: combined direct + proxy budget must
+  // stay under PER_COUNTRY_TIMEOUT_MS with slack for proxy setup overhead.
+  it('proxy timeout is tighter than direct timeout to leave PER_COUNTRY budget slack', () => {
+    // FETCH_TIMEOUT (45s) + PROXY_FETCH_TIMEOUT (35s) = 80s, under
+    // PER_COUNTRY_TIMEOUT_MS (90s) with 10s slack for Decodo TCP handshake
+    // + CONNECT setup. Pre-fix used FETCH_TIMEOUT on both sides (90s exact,
+    // racey with the per-country signal abort).
+    assert.match(src, /const PROXY_FETCH_TIMEOUT\s*=\s*35_000/);
+    // The proxy retry MUST pass PROXY_FETCH_TIMEOUT, not FETCH_TIMEOUT:
+    assert.match(src, /timeoutMs:\s*PROXY_FETCH_TIMEOUT/);
+    // And the budget invariant: direct + proxy < per-country.
+    const fetchTimeout = src.match(/const FETCH_TIMEOUT\s*=\s*(\d+_?\d*)/)?.[1];
+    const proxyTimeout = src.match(/const PROXY_FETCH_TIMEOUT\s*=\s*(\d+_?\d*)/)?.[1];
+    const perCountry = src.match(/const PER_COUNTRY_TIMEOUT_MS\s*=\s*(\d+_?\d*)/)?.[1];
+    const parseMs = (s) => parseInt((s ?? '0').replace(/_/g, ''), 10);
+    const total = parseMs(fetchTimeout) + parseMs(proxyTimeout);
+    const perCountryMs = parseMs(perCountry);
+    assert.ok(
+      total < perCountryMs,
+      `direct(${fetchTimeout}) + proxy(${proxyTimeout}) = ${total}ms must be < PER_COUNTRY_TIMEOUT_MS(${perCountryMs}); ` +
+      `pre-fix 45+45=90 exactly equalled per-country, no slack for proxy setup.`,
+    );
+    // Specifically require ≥5s slack for the TCP handshake and CONNECT setup
+    // to Decodo, which can run ~3-5s on cold connections.
+    assert.ok(
+      perCountryMs - total >= 5000,
+      `proxy setup needs ≥5s slack; got ${perCountryMs - total}ms`,
+    );
+  });
+
+  // Greptile PR #3681 review round 2 P2: ArcGIS can return error objects
+  // without a `message` field (observed `{"error":{"code":400}}`). The thrown
+  // message must stay informative on unexpected shapes.
+  it('proxy error message falls back through message → code → JSON.stringify', () => {
+    assert.match(
+      src,
+      /proxied\.error\.message\s*\?\?\s*proxied\.error\.code\s*\?\?\s*JSON\.stringify\(proxied\.error\)/,
+      'proxy error path must fall back through message → code → JSON.stringify so `undefined` never reaches the thrown message',
+    );
+  });
 });
 
 // ── standalone bundle + Dockerfile assertions ────────────────────────────────

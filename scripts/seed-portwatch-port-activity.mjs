@@ -41,6 +41,12 @@ const EP4_BASE =
 
 const PAGE_SIZE = 2000;
 const FETCH_TIMEOUT = 45_000;
+// Tighter timeout for the proxy-retry leg. Direct + proxy must total under
+// PER_COUNTRY_TIMEOUT_MS (90s) with slack for Decodo's TCP handshake +
+// CONNECT setup (~3-5s). 45s direct + 35s proxy = 80s, leaving ~10s for
+// setup overhead and the surrounding pagination accounting. Greptile PR
+// #3681 review P2 flagged the prior 45+45=90s arrangement as racey.
+const PROXY_FETCH_TIMEOUT = 35_000;
 // Two aggregation windows, hardcoded in fetchCountryAccum:
 //   last30 = days  0-30 → tankerCalls30d, avg30d, import/export sums
 //   prev30 = days 30-60 → trendDelta baseline
@@ -86,24 +92,68 @@ function epochToTimestamp(epochMs) {
   return `timestamp '${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}'`;
 }
 
+// Retry an ArcGIS request through the Decodo proxy. Used as the fallback
+// path when the direct request returns 429 OR silently times out — both
+// are signals that ArcGIS is rate-limiting our seed-server IP. Returns the
+// parsed JSON body or throws.
+//
+// Uses PROXY_FETCH_TIMEOUT (35s, shorter than the 45s direct FETCH_TIMEOUT)
+// so the combined direct + proxy budget stays under PER_COUNTRY_TIMEOUT_MS
+// (90s) with slack for Decodo's TCP handshake and CONNECT setup. Greptile
+// PR #3681 review P2.
+async function arcgisProxyRetry(url, reason, { signal } = {}) {
+  const proxyAuth = resolveProxyForConnect();
+  if (!proxyAuth) throw new Error(`ArcGIS direct ${reason} + no proxy configured for ${url.slice(0, 80)}`);
+  console.warn(`  [portwatch] ${reason} — retrying via proxy: ${url.slice(0, 80)}`);
+  const { buffer } = await httpsProxyFetchRaw(url, proxyAuth, { accept: 'application/json', timeoutMs: PROXY_FETCH_TIMEOUT, signal });
+  const proxied = JSON.parse(buffer.toString('utf8'));
+  if (proxied.error) {
+    // Greptile PR #3681 review P2: ArcGIS can return `{"error":{"code":400}}`
+    // with no message field. Fall back to code, then JSON.stringify so the
+    // thrown error message stays informative on unexpected error shapes.
+    const errInfo = proxied.error.message ?? proxied.error.code ?? JSON.stringify(proxied.error);
+    throw new Error(`ArcGIS error (via proxy after ${reason}): ${errInfo}`);
+  }
+  return proxied;
+}
+
 async function fetchWithTimeout(url, { signal } = {}) {
   // Combine the per-call FETCH_TIMEOUT with the upstream caller signal so an
   // abort propagates into the in-flight fetch AND future pagination iterations.
   const combined = signal
     ? AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT)])
     : AbortSignal.timeout(FETCH_TIMEOUT);
-  const resp = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
-    signal: combined,
-  });
+  let resp;
+  try {
+    resp = await fetch(url, {
+      headers: { 'User-Agent': CHROME_UA, Accept: 'application/json' },
+      signal: combined,
+    });
+  } catch (err) {
+    // If the CALLER signal aborted (real cancellation request from SIGTERM
+    // / per-country timeout), propagate as-is. Only the internal 45s
+    // FETCH_TIMEOUT or transient network errors fall through to the proxy
+    // retry below.
+    if (signal?.aborted) throw err;
+    // WM 2026-05-13 incident: ArcGIS rate-limited our seed-server by
+    // silently stalling responses instead of returning HTTP 429. Every
+    // direct per-country fetch hit the 45s FETCH_TIMEOUT, none reached
+    // the existing 429 retry branch. Result: 30/30 timeouts on the
+    // cold-fetch path, coverage gate failed at 27/50.
+    //
+    // Detect timeout / transient network errors and fall through to the
+    // same proxy retry that 429 uses. The proxy path has its own
+    // FETCH_TIMEOUT so one stalled call can't accumulate indefinitely.
+    const errName = err?.name || '';
+    const errMsg = err?.message || '';
+    const isTimeoutLike = errName === 'TimeoutError'
+      || errName === 'AbortError'
+      || /timeout|aborted|fetch failed|ECONNRESET|UND_ERR_/i.test(errMsg);
+    if (!isTimeoutLike) throw err;
+    return await arcgisProxyRetry(url, `direct ${errName || 'timeout'}`, { signal });
+  }
   if (resp.status === 429) {
-    const proxyAuth = resolveProxyForConnect();
-    if (!proxyAuth) throw new Error(`ArcGIS HTTP 429 (rate limited) for ${url.slice(0, 80)}`);
-    console.warn(`  [portwatch] 429 rate-limited — retrying via proxy: ${url.slice(0, 80)}`);
-    const { buffer } = await httpsProxyFetchRaw(url, proxyAuth, { accept: 'application/json', timeoutMs: FETCH_TIMEOUT, signal });
-    const proxied = JSON.parse(buffer.toString('utf8'));
-    if (proxied.error) throw new Error(`ArcGIS error (via proxy): ${proxied.error.message}`);
-    return proxied;
+    return await arcgisProxyRetry(url, 'HTTP 429 rate-limited', { signal });
   }
   if (!resp.ok) throw new Error(`ArcGIS HTTP ${resp.status} for ${url.slice(0, 80)}`);
   const body = await resp.json();
