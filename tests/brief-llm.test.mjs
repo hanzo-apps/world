@@ -31,6 +31,7 @@ import {
 } from '../scripts/lib/brief-llm.mjs';
 import { assertBriefEnvelope } from '../server/_shared/brief-render.js';
 import { composeBriefFromDigestStories, digestStoryToSynthesisShape } from '../scripts/lib/brief-compose.mjs';
+import { briefDateLine } from '../shared/brief-llm-core.js';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -177,8 +178,8 @@ describe('generateWhyMatters', () => {
     const real = makeLLM('Closure would freeze a fifth of seaborne crude within days.');
     const first = await generateWhyMatters(story(), { ...cache, callLLM: real.callLLM });
     assert.ok(first);
-    const cachedKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:whymatters:v3:'));
-    assert.ok(cachedKey, 'expected a whymatters cache entry under the v3 key (bumped 2026-04-24 for RSS-description grounding)');
+    const cachedKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:whymatters:v4:'));
+    assert.ok(cachedKey, 'expected a whymatters cache entry under the v4 key (bumped 2026-05-14 for the F6 date-grounding line)');
 
     // Second call: responder throws — cache must prevent the call
     llm.calls.length = 0;
@@ -313,6 +314,31 @@ describe('buildDigestPrompt', () => {
   it('asks model to emit rankedStoryHashes in JSON output (system prompt)', () => {
     const { system } = buildDigestPrompt([story()], 'critical');
     assert.match(system, /rankedStoryHashes/);
+  });
+
+  it('appends the date-grounding line to the system prompt (F6)', () => {
+    // Injected todayIso → deterministic assertion.
+    const injected = buildDigestPrompt([story()], 'critical', { todayIso: '2026-05-14' });
+    assert.ok(
+      injected.system.endsWith(`\n${briefDateLine('2026-05-14')}`),
+      'system prompt must end with the injected date-grounding line',
+    );
+    assert.match(injected.system, /Today is 2026-05-14\. Do not state any year or date that contradicts/);
+    // The base editorial contract is still intact ahead of the date line.
+    assert.match(injected.system, /chief editor of WorldMonitor Brief/);
+
+    // No ctx.todayIso → falls back to the current UTC date, never absent.
+    // `before`/`after` bracket the call so a UTC-midnight rollover
+    // mid-test still matches one of the two valid dates.
+    const before = new Date().toISOString().slice(0, 10);
+    const fallback = buildDigestPrompt([story()], 'critical');
+    const after = new Date().toISOString().slice(0, 10);
+    const m = fallback.system.match(/\nToday is (\d{4}-\d{2}-\d{2})\./);
+    assert.ok(m, 'fallback system prompt must carry a dated grounding line');
+    assert.ok(
+      m[1] === before || m[1] === after,
+      `fallback date must be the current UTC date (got ${m[1]}, expected ${before} or ${after})`,
+    );
   });
 });
 
@@ -486,7 +512,7 @@ describe('generateDigestProse', () => {
     const llm1 = makeLLM(validJson);
     await generateDigestProse('user_a', stories, 'all', { ...cache, callLLM: llm1.callLLM });
 
-    const badKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:digest:v5:'));
+    const badKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:digest:v6:'));
     assert.ok(badKey, 'expected a digest prose cache entry');
     // Overwrite with a payload whose content has zero proper-noun
     // overlap with `stories` (Iran Hormuz / Gaza). Shape is impeccable.
@@ -512,11 +538,11 @@ describe('generateDigestProse', () => {
     // `threads`, which the renderer's assertBriefEnvelope requires.
     const llm1 = makeLLM(validJson);
     await generateDigestProse('user_a', stories, 'all', { ...cache, callLLM: llm1.callLLM });
-    // Corrupt the stored row in place. Cache key prefix bumped to v5
-    // (2026-05-12) when validateDigestProseShape gained the
-    // grounding gate. v3 rows ignored at v4 rollout; v4 rows ignored
-    // at v5 rollout — see generateDigestProse header comment.
-    const badKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:digest:v5:'));
+    // Corrupt the stored row in place. Cache key prefix bumped to v6
+    // (2026-05-14) when buildDigestPrompt gained the F6 date-grounding
+    // line. v4 rows ignored at v5 rollout; v5 rows ignored at v6
+    // rollout — see generateDigestProse header comment.
+    const badKey = [...cache.store.keys()].find((k) => k.startsWith('brief:llm:digest:v6:'));
     assert.ok(badKey, 'expected a digest prose cache entry');
     cache.store.set(badKey, { lead: 'short', /* missing threads + signals */ });
     const llm2 = makeLLM(validJson);
@@ -1148,12 +1174,13 @@ describe('generateDigestProsePublic — public cache shared across users', () =>
     assert.equal(llm2.calls.length, 1, 'profile change re-keys the cache');
   });
 
-  it('writes to cache under brief:llm:digest:v5 prefix (v4/v3/v2 evicted)', async () => {
+  it('writes to cache under brief:llm:digest:v6 prefix (v5/v4/v3/v2 evicted)', async () => {
     const cache = makeCache();
     const llm = makeLLM(validJson);
     await generateDigestProse('user_a', stories, 'all', { ...cache, callLLM: llm.callLLM });
     const keys = [...cache.store.keys()];
-    assert.ok(keys.some((k) => k.startsWith('brief:llm:digest:v5:')), 'v5 prefix used');
+    assert.ok(keys.some((k) => k.startsWith('brief:llm:digest:v6:')), 'v6 prefix used');
+    assert.ok(!keys.some((k) => k.startsWith('brief:llm:digest:v5:')), 'no v5 writes');
     assert.ok(!keys.some((k) => k.startsWith('brief:llm:digest:v4:')), 'no v4 writes');
     assert.ok(!keys.some((k) => k.startsWith('brief:llm:digest:v3:')), 'no v3 writes');
     assert.ok(!keys.some((k) => k.startsWith('brief:llm:digest:v2:')), 'no v2 writes');
