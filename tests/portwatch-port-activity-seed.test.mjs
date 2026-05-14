@@ -128,9 +128,95 @@ describe('seed-portwatch-port-activity.mjs exports', () => {
     assert.ok(matches.length >= 2, `expected retry wrapper used by both paginators, found ${matches.length}`);
   });
 
-  it('CONCURRENCY is 12 and PER_COUNTRY_TIMEOUT_MS is 90s', () => {
-    assert.match(src, /CONCURRENCY\s*=\s*12/);
+  it('CONCURRENCY is 6 and PER_COUNTRY_TIMEOUT_MS is 90s', () => {
+    // Halved from 12 → 6 on 2026-05-14 (PR #3694) to ease pressure on both
+    // ArcGIS-direct AND Decodo-proxy rate-limits during the ongoing
+    // ArcGIS degradation. Math at concurrency 6 + cold-fetch cap 30:
+    //   5 batches × ~60s realistic (90s worst case) + 4×5s backoff
+    //   ≈ 320s realistic, 470s worst case — still fits the 570s
+    //   bundle budget.
+    assert.match(src, /const CONCURRENCY\s*=\s*6/);
     assert.match(src, /PER_COUNTRY_TIMEOUT_MS\s*=\s*90_000/);
+  });
+
+  it('BATCH_BACKOFF_MS spaces out per-batch bursts + signal-aborts break the loop', () => {
+    // Inter-batch sleep prevents back-to-back rate-limit hits on Decodo +
+    // ArcGIS. Post-#3681 run #2 showed Decodo throttling us after run #1
+    // hammered it (24/30 → 5/30 success degradation). 5s × 4 = 20s total
+    // added; negligible against the 570s bundle budget.
+    assert.match(src, /const BATCH_BACKOFF_MS\s*=\s*5_000/);
+    // The sleep itself is gated on not-last-batch. Pre-Greptile P2 it was
+    // also gated on !signal.aborted but the loop kept iterating after the
+    // skipped sleep — defeating the SIGTERM-responsiveness intent. Now an
+    // aborted signal `break`s the loop entirely (Greptile PR #3694 P2).
+    assert.match(src, /if\s*\(\s*signal\?\.aborted\s*\)\s*break/);
+    assert.match(src, /if\s*\(\s*batchIdx\s*<\s*batches\s*\)/);
+    assert.match(src, /setTimeout\(r,\s*BATCH_BACKOFF_MS\)/);
+  });
+
+  it('MIN_VALID_COUNTRIES is temporarily lowered to 25 (ArcGIS degraded)', () => {
+    // Pre-2026-05-14 value: 50. Lowered to 25 to let seed-meta refresh
+    // during the ArcGIS rate-limit degradation. The comment must call
+    // out the temporary nature + review date so this doesn't get
+    // forgotten as the new permanent floor.
+    assert.match(src, /const MIN_VALID_COUNTRIES\s*=\s*25/);
+    // Require the comment to flag temporariness (so a future reviewer
+    // doesn't normalise the lower value silently).
+    assert.match(src, /TEMPORARILY lowered from 50/);
+    assert.match(src, /Revert to 50/);
+  });
+
+  // Greptile PR #3694 round 3 P1: with the temp gate lowered to 25 but the
+  // 80% degradation guard unchanged, a cap-mode partial-success run that
+  // CLEARS the coverage gate (countryData.size ≥ 25) would STILL fail the
+  // degradation guard (countryData.size < prevCount × 0.8 ≈ 139). The fix
+  // is to bypass the degradation guard when capTriggered.
+  it('degradation guard is bypassed when capTriggered (cap-mode partial publish)', () => {
+    // fetchAll must surface capTriggered + counter fields to main()
+    assert.match(src, /capTriggered,\s*\n\s*servedStaleCount,/);
+    assert.match(src, /droppedTooOldCount,/);
+    assert.match(src, /droppedNoCacheCount,/);
+    // main() must read those fields off the fetchAll result
+    assert.match(src, /capTriggered,\s*\n\s*servedStaleCount,\s*\n\s*droppedTooOldCount,\s*\n\s*droppedNoCacheCount,\s*\n\s*\}\s*=\s*await fetchAll/);
+    // The guard branch must be wrapped in `if (capTriggered) {} else if (...)`
+    // so cap-mode runs SKIP the guard entirely (not just log a warning and
+    // then still fall through to the guard).
+    assert.match(src, /if\s*\(\s*capTriggered\s*\)\s*\{[\s\S]+?PARTIAL PUBLISH \(cap-mode\)[\s\S]+?\}\s*else if\s*\(\s*prevCount\s*>\s*0\s*&&\s*countryData\.size\s*<\s*prevCount\s*\*\s*0\.8\s*\)/);
+  });
+
+  it('cap-mode partial publish logs operator-visible bucket counts', () => {
+    // Without this log, operators see seed-meta advance but have no signal
+    // that the publish was partial. The log must include servedStale,
+    // droppedTooOld, droppedNoCache counts so /api/health WARNING ↔ HEALTHY
+    // transitions are explainable from the seed log alone.
+    assert.match(src, /PARTIAL PUBLISH \(cap-mode\)/);
+    assert.match(src, /\$\{servedStaleCount\}\s*stale-served/);
+    assert.match(src, /\$\{droppedTooOldCount\}\s*dropped/);
+    assert.match(src, /\$\{droppedNoCacheCount\}\s*dropped/);
+    assert.match(src, /Degradation guard bypassed/);
+  });
+
+  it('non-cap-mode runs still enforce the 80% degradation guard (silent-loss protection)', () => {
+    // The bypass MUST only fire when capTriggered. A run where
+    // needsFetch.length ≤ MAX_COLD_FETCH_PER_RUN (normal happy path) must
+    // still apply the 80% guard so an ArcGIS schema regression that
+    // silently drops 100 → 50 countries can't sneak through as a publish.
+    //
+    // Assert by structure: the else-if branch contains the prevCount × 0.8
+    // comparison and a DEGRADATION GUARD error+return, AND the comparison
+    // is INSIDE the else-if condition (not in a separate unconditional
+    // check before it that would bypass the else-if scoping).
+    assert.match(src, /else if\s*\([\s\S]{0,200}prevCount\s*\*\s*0\.8[\s\S]{0,200}\)\s*\{[\s\S]{0,400}DEGRADATION GUARD/);
+    // Ensure the 0.8 threshold appears exactly twice (once in the
+    // condition, once in the error message's `Math.ceil(prevCount * 0.8)`
+    // suggestion) — both inside the else-if scope. A third occurrence
+    // would suggest a duplicated check leaked outside the bypass.
+    const matches = src.match(/prevCount\s*\*\s*0\.8/g) ?? [];
+    assert.equal(
+      matches.length,
+      2,
+      `expected exactly 2 prevCount × 0.8 references (condition + error-msg suggestion), found ${matches.length}`,
+    );
   });
 
   it('batch loop wires eager .catch for mid-batch SIGTERM diagnostics', () => {

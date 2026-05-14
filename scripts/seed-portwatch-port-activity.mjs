@@ -23,7 +23,16 @@ const LOCK_DOMAIN = 'supply_chain:portwatch-ports';
 // 60 min — covers the widest realistic run of this standalone service.
 const LOCK_TTL_MS = 60 * 60 * 1000;
 const TTL = 259_200; // 3 days — 6× the 12h cron interval
-const MIN_VALID_COUNTRIES = 50;
+// Coverage gate. TEMPORARILY lowered from 50 → 25 on 2026-05-14 to let
+// seed-meta refresh while ArcGIS is in a degraded rate-limit state.
+// Background: post-#3681 the proxy retry IS firing, but both direct AND
+// proxy paths are throttled — successful per-country fetches dropped from
+// 24 → 5 between successive runs as Decodo hit its own rate-limit. With
+// gate=50 the seed-meta stayed frozen at 2026-05-12 00:03 UTC for 60+ hours.
+// Lowering to 25 lets a partial-success run advance the meta and clears
+// the operator-facing WARNING while ArcGIS recovers. Revert to 50 once
+// successive runs reliably exceed 50 again (target: 2026-05-20 review).
+const MIN_VALID_COUNTRIES = 25;
 
 const EP3_BASE =
   'https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Ports_Data/FeatureServer/0/query';
@@ -59,7 +68,19 @@ const MAX_PORTS_PER_COUNTRY = 50;
 // similar) can push 60-90s when the server is under load. Promise.allSettled would
 // otherwise wait for the slowest, stalling the whole batch.
 const PER_COUNTRY_TIMEOUT_MS = 90_000;
-const CONCURRENCY = 12;
+// Concurrency for the per-country activity fetch. Halved from 12 → 6 on
+// 2026-05-14 to ease pressure on both ArcGIS direct AND Decodo proxy paths,
+// which were each hitting their own rate-limits in the post-3676/3681 runs
+// (24/30 successes on run #1, 5/30 on run #2 as Decodo throttled us).
+// Math at concurrency 6 + cold-fetch cap 30:
+//   5 batches × ~60s realistic (90s worst-case per country) + 4×5s backoff
+//   ≈ 320s realistic, 470s worst case — fits the 570s bundle budget.
+const CONCURRENCY = 6;
+// Cooldown between activity-fetch batches. Spaces out per-batch bursts so
+// neither ArcGIS-direct nor Decodo-proxy hits its rate-limit window from
+// our run alone. 5s × 4 inter-batch gaps = 20s total added to a 30-country
+// run — negligible against the 570s bundle budget.
+const BATCH_BACKOFF_MS = 5_000;
 const BATCH_LOG_EVERY = 5;
 // Cache hygiene: force a full refetch if the cached payload is older than 7 days
 // even when upstream maxDate is unchanged. Protects against window-shift drift
@@ -658,7 +679,19 @@ export async function fetchAll(progress, { signal } = {}) {
   // stale → 174 cold-fetches → bundle SIGTERM" failure mode that produced
   // 37h of stale data after a single upstream-advance event. A full
   // rotation completes in ~ceil(174/30) = 6 runs ≈ 3 days at 12h cadence.
+  // Cap-mode signaling. Surfaces to the caller so main() can bypass the 80%
+  // degradation guard for an intentionally-partial publish. Greptile PR #3694
+  // round 3 P1: pre-fix, cap-mode + temp-gate=25 would clear the coverage gate
+  // (countryData.size ≥ 25) but still fail the degradation guard
+  // (countryData.size < prevCount × 0.8 ≈ 139), so seed-meta would not advance
+  // and the WARNING would persist — defeating the PR's main recovery claim.
+  let capTriggered = false;
+  let servedStaleCount = 0;
+  let droppedTooOldCount = 0;
+  let droppedNoCacheCount = 0;
+
   if (needsFetch.length > MAX_COLD_FETCH_PER_RUN) {
+    capTriggered = true;
     // Deterministic-ish shuffle: Fisher-Yates with Math.random — fine here
     // because we just need "different subset each run", not crypto strength.
     const shuffled = [...needsFetch];
@@ -701,6 +734,11 @@ export async function fetchAll(progress, { signal } = {}) {
     // slice, so the two are numerically equal here, but using the constant
     // keeps the intent unambiguous if this log block is ever reordered.
     const originalMisses = MAX_COLD_FETCH_PER_RUN + servedStale + droppedTooOld + droppedNoCache;
+    // Surface the bucket counts to the outer-scope fields so main()'s
+    // degradation-guard bypass can include them in the partial-publish log.
+    servedStaleCount = servedStale;
+    droppedTooOldCount = droppedTooOld;
+    droppedNoCacheCount = droppedNoCache;
     console.warn(
       `  [port-activity] Cold-fetch capped at ${MAX_COLD_FETCH_PER_RUN}/run — ` +
       `refreshing ${MAX_COLD_FETCH_PER_RUN} now, serving ${servedStale} on stale cache (asof behind), ` +
@@ -786,6 +824,22 @@ export async function fetchAll(progress, { signal } = {}) {
         break;
       }
     }
+
+    // Inter-batch backoff. Spaces out per-batch bursts so neither
+    // ArcGIS-direct nor Decodo-proxy hits its rate-limit window from our
+    // run alone (post-#3681 run #2 showed Decodo throttling us after run
+    // #1 hammered it back-to-back: 24/30 → 5/30 success rate degradation).
+    // Skip on the final batch — no point waiting before exiting the loop.
+    //
+    // On caller-signal abort: skip the sleep AND break the loop.
+    // Greptile PR #3694 P2: pre-fix this was "skip the sleep only" which
+    // still started the next batch's 6 concurrent fetches before the
+    // onSigterm → process.exit(1) backstop fired. Now the loop exits
+    // immediately so SIGTERM doesn't start additional in-flight work.
+    if (signal?.aborted) break;
+    if (batchIdx < batches) {
+      await new Promise((r) => setTimeout(r, BATCH_BACKOFF_MS));
+    }
   }
 
   if (errors.length) {
@@ -793,7 +847,18 @@ export async function fetchAll(progress, { signal } = {}) {
   }
 
   if (countryData.size === 0) throw new Error('No country port data returned from ArcGIS');
-  return { countries: [...countryData.keys()], countryData, fetchedAt: new Date().toISOString() };
+  return {
+    countries: [...countryData.keys()],
+    countryData,
+    fetchedAt: new Date().toISOString(),
+    // Cap-mode signaling — see capTriggered declaration. main() reads these
+    // to bypass the 80% degradation guard for an intentionally-partial
+    // publish AND to emit a "PARTIAL PUBLISH" log noting the fresh/stale split.
+    capTriggered,
+    servedStaleCount,
+    droppedTooOldCount,
+    droppedNoCacheCount,
+  };
 }
 
 export function validateFn(data) {
@@ -855,7 +920,14 @@ async function main() {
     prevCount = Array.isArray(prevIso2List) ? prevIso2List.length : 0;
 
     console.log(`  Fetching port activity data (60d: last30 + prev30 windows)...`);
-    const { countries, countryData } = await fetchAll(progress, { signal: shutdownController.signal });
+    const {
+      countries,
+      countryData,
+      capTriggered,
+      servedStaleCount,
+      droppedTooOldCount,
+      droppedNoCacheCount,
+    } = await fetchAll(progress, { signal: shutdownController.signal });
 
     console.log(`  Fetched ${countryData.size} countries`);
 
@@ -865,7 +937,27 @@ async function main() {
       return;
     }
 
-    if (prevCount > 0 && countryData.size < prevCount * 0.8) {
+    // Degradation guard — bypass when capTriggered (Greptile PR #3694 round 3 P1).
+    //
+    // The 80%-of-prev guard exists to catch SILENT data loss: an ArcGIS
+    // regression that drops 100 → 50 countries with no other signal. In
+    // cap-mode the partial coverage is LOUD, INTENTIONAL, and ROTATIONAL
+    // (refresh 30 per run, serve rest from cache up to 7d age) — the
+    // coverage gate (countryData.size ≥ MIN_VALID_COUNTRIES) is the right
+    // floor here, not the 80%-of-prev comparison.
+    //
+    // Without this bypass, the cap-mode path would always trip the guard
+    // (cap=30 + ~24 stale-served = ~54 << 0.8 × 174 = 139), seed-meta
+    // would never advance, and the operator-facing WARNING would persist
+    // — defeating the entire recovery design from #3676 onwards.
+    if (capTriggered) {
+      console.warn(
+        `  PARTIAL PUBLISH (cap-mode): ${countryData.size}/${prevCount} countries — ` +
+        `${servedStaleCount} stale-served, ${droppedTooOldCount} dropped (cache > 7d), ` +
+        `${droppedNoCacheCount} dropped (no prior payload). ` +
+        `Degradation guard bypassed; seed-meta will advance.`,
+      );
+    } else if (prevCount > 0 && countryData.size < prevCount * 0.8) {
       console.error(`  DEGRADATION GUARD: ${countryData.size} countries vs ${prevCount} previous — refusing to overwrite (need ≥${Math.ceil(prevCount * 0.8)})`);
       await extendExistingTtl([CANONICAL_KEY, META_KEY, ...prevCountryKeys], TTL).catch(() => {});
       return;
