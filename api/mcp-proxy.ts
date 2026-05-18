@@ -1,5 +1,10 @@
+// @ts-nocheck — Migrated from .js to .ts only to unlock the
+// `isCallerPremium` import from server/ (PR #3768 review). Body remains
+// JS-shaped; not annotating types in this commit. Future PR can add
+// types incrementally; behaviour is unchanged.
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { jsonResponse } from './_json-response.js';
+import { isCallerPremium } from '../server/_shared/premium-check';
 
 export const config = { runtime: 'edge' };
 
@@ -333,6 +338,32 @@ export default async function handler(req) {
   const cors = getCorsHeaders(req, 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS')
     return new Response(null, { status: 204, headers: cors });
+
+  // Auth gate (issue #3723). The proxy can relay arbitrary customHeaders
+  // (Authorization, API keys) to any public MCP server under WorldMonitor's
+  // outbound IP, and consume our outbound-IP reputation / quota — so the
+  // gate must accept ONLY paying / authorised callers.
+  //
+  // Pre-this-PR the endpoint was open. The first cut accepted wms_
+  // anonymous session tokens which are freely mintable via /api/wm-session
+  // → two-step bypass. The second cut went enterprise-key-only via
+  // validateApiKey forceKey:true, which broke the Pro "Connect MCP" UI
+  // for normal web Pro users (no enterprise key path).
+  //
+  // isCallerPremium is the project's canonical premium-caller check. It
+  // accepts: enterprise key (WORLDMONITOR_VALID_KEYS), wm_ user API key
+  // (Convex-validated + entitlement check), and Clerk Pro Bearer JWT
+  // (role==='pro' or entitlement tier>=1). It rejects wms_ session tokens
+  // by requiring keyCheck.required === true (wms_ short-circuits at
+  // required:false). isDisallowedOrigin already blocked cross-origin
+  // browser callers; this closes the curl + wms_ farm paths too.
+  //
+  // Pair: src/components/McpConnectModal.ts + McpDataPanel.ts must use
+  // premiumFetch (not plain fetch) so the renderer attaches the Bearer
+  // for Pro users; /api/mcp-proxy is now in PREMIUM_RPC_PATHS for that
+  // path-gated injection.
+  if (!(await isCallerPremium(req)))
+    return jsonResponse({ error: 'Pro authentication required' }, 401, cors);
 
   try {
     if (req.method === 'GET') {
