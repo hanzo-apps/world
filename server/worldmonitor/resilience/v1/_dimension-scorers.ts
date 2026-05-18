@@ -73,6 +73,14 @@ interface WeightedMetric {
   // T1.7 schema pass: populated only when imputed=true so weightedBlend can
   // aggregate a dominant class at the dimension level.
   imputationClass?: ImputationClass;
+  // #3787 follow-up: design-time weight, used as the coverage-computation
+  // denominator share when the runtime `weight` has been attenuated by a
+  // confidence factor (e.g. langFactor in scoreInformationCognitive). Without
+  // this, attenuating `weight` shrinks the coverage denominator alongside the
+  // numerator and the dimension reports a HIGHER coverage for sparse-coverage
+  // countries — the inverse of the intended semantic. Omit when `weight` is
+  // already the nominal design-time value (default = weight).
+  nominalWeight?: number;
 }
 
 // Four-class imputation taxonomy (Phase 1 T1.7 of the country-resilience
@@ -648,12 +656,25 @@ function weightedBlend(metrics: WeightedMetric[]): ResilienceDimensionScore {
 
   const weightedScore = available.reduce((sum, metric) => sum + (metric.score || 0) * metric.weight, 0) / availableWeight;
 
-  // Coverage: weighted average of certainty per metric.
-  // Real data → 1.0; imputed (certaintyCoverage set) → partial; absent (null, no imputation) → 0.
+  // Coverage: weighted average of certainty per metric, computed against the
+  // NOMINAL design-time weight rather than the runtime weight. Real data → 1.0;
+  // imputed (certaintyCoverage set) → partial; absent (null, no imputation) → 0.
+  //
+  // The nominalWeight vs weight split matters whenever a caller attenuates
+  // `weight` by a confidence factor (e.g. scoreInformationCognitive scales
+  // velocity/threat sub-indicator weights by langFactor). If coverage were
+  // computed against the attenuated weights, the denominator would shrink
+  // alongside the numerator and sparse-coverage countries would report a
+  // HIGHER coverage than primary-coverage ones — the inverse of the intended
+  // semantic (#3787). Using nominalWeight keeps coverage as a stable
+  // measurement of "what fraction of designed signal we observed", independent
+  // of the confidence weighting applied to the score.
+  const totalNominalWeight = metrics.reduce((sum, metric) => sum + (metric.nominalWeight ?? metric.weight), 0);
   const weightedCertainty = metrics.reduce((sum, metric) => {
     const certainty = metric.certaintyCoverage ?? (metric.score != null ? 1 : 0);
-    return sum + metric.weight * certainty;
-  }, 0) / totalWeight;
+    const nominalWeight = metric.nominalWeight ?? metric.weight;
+    return sum + nominalWeight * certainty;
+  }, 0) / totalNominalWeight;
 
   // Track provenance: observed (real data) vs imputed weight.
   // Metrics with imputed=true → imputed (synthetic absence-based scores).
@@ -1982,14 +2003,36 @@ export async function scoreInformationCognitive(
   const velocity = summarizeSocialVelocity(socialVelocityRaw, countryCode);
   const threatScore = getThreatSummaryScore(threatSummaryRaw, countryCode);
 
+  // Language-coverage adjustment (fixes #3736).
+  //
+  // The previous implementation divided raw velocity + threatScore by
+  // `langFactor` (range 0.2..1.0), which AMPLIFIED signal for countries with
+  // sparse English-language news coverage by up to 5x. Effect: a small uptick
+  // in coverage-poor countries scored worse than a substantial signal in
+  // coverage-rich ones — exactly the inverse of what the data justifies.
+  //
+  // Correct framing: sparse English coverage means LOW CONFIDENCE in the
+  // observable velocity/threat sub-signals, not a higher inferred underlying
+  // signal. Apply `langFactor` to the WEIGHT of those sub-indicators, not to
+  // the signal value itself. Raw signals flow through unchanged; coverage-poor
+  // countries lean more heavily on the static RSF press-freedom indicator
+  // (which IS coverage-independent and the most reliable annual signal).
+  //
+  // #3787 follow-up: the velocity/threat sub-indicators also pass `nominalWeight`
+  // so that `weightedBlend` computes the dimension's `coverage` field against
+  // the un-attenuated design-time weights (0.15 + 0.30 + 0.55 = 1.0). Without
+  // this, attenuating `weight` would shrink the coverage denominator alongside
+  // the numerator, and a minimal-coverage country reporting the same data shape
+  // as a primary-coverage country would inadvertently report a HIGHER coverage
+  // value — the inverse of the intended semantic. With nominalWeight, coverage
+  // stays a stable measurement of "what fraction of designed signal we observed"
+  // independent of the confidence-weighting applied to the score.
   const langFactor = getLanguageCoverageFactor(countryCode);
-  const adjustedVelocity = velocity > 0 ? Math.min(velocity / Math.max(langFactor, 0.1), 1000) : 0;
-  const adjustedThreat = threatScore != null ? Math.min(threatScore / Math.max(langFactor, 0.1), 100) : null;
 
   return weightedBlend([
     { score: rsfScore == null ? null : normalizeLowerBetter(rsfScore, 0, 100), weight: 0.55 },
-    { score: adjustedVelocity > 0 ? normalizeLowerBetter(Math.log10(adjustedVelocity + 1), 0, 3) : null, weight: 0.15 },
-    { score: adjustedThreat == null ? null : normalizeLowerBetter(adjustedThreat, 0, 20), weight: 0.3 },
+    { score: velocity > 0 ? normalizeLowerBetter(Math.log10(velocity + 1), 0, 3) : null, weight: 0.15 * langFactor, nominalWeight: 0.15 },
+    { score: threatScore == null ? null : normalizeLowerBetter(threatScore, 0, 20), weight: 0.30 * langFactor, nominalWeight: 0.30 },
   ]);
 }
 
