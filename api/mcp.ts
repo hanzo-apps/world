@@ -160,9 +160,26 @@ const SERVER_NAME = 'worldmonitor';
 //     unknown fields, and discovery on 2025-03-26 sessions should still benefit.
 //   - Purely additive on the wire — no input contract change. Bundle delta is
 //     documented in the v1.6.0 PR body.
+// Bumped 1.6.0 → 1.7.0 (2026-05-23) reflecting:
+//   - De-blanket the `Tool.annotations` object. Previously buildPublicTool
+//     hard-coded `{ readOnlyHint: true, openWorldHint: true }` for every
+//     tool. Now each tool declares all four spec hints (readOnlyHint,
+//     destructiveHint, idempotentHint, openWorldHint) explicitly on its
+//     registry entry — same per-tool authorship discipline as
+//     _outputBudgetBytes (v1.6.0 PR 4) and outputSchema (v1.6.0 PR 6).
+//   - Hint shape extends from 2 booleans → 4 booleans per tool. Wire delta
+//     is small (~50 B × 39 tools); hints unchanged for tools that already
+//     matched the old blanket. Cache tools + pure-internal RPCs now
+//     correctly advertise `openWorldHint: false` (closed-world like a
+//     memory tool — they read our seeded Redis cache); LLM-synthesized
+//     tools AND live external-API reads (live ADS-B, live maritime, live
+//     flight pricing) advertise `idempotentHint: false` so MCP clients
+//     don't dedup / cache responses whose content drifts between calls.
+//   - Purely additive on the wire — clients that read only the legacy two
+//     hints keep working; new four-hint clients get a richer signal.
 // Keep aligned with public/.well-known/mcp/server-card.json::serverInfo.version
 // — discovery scanners cross-check both values.
-const SERVER_VERSION = '1.6.0';
+const SERVER_VERSION = '1.7.0';
 
 // MCP logging capability — valid severity levels per the 2025-03-26 spec
 // (RFC 5424 subset). Stateless HTTP transport: we ACK the level but do not
@@ -347,6 +364,55 @@ interface BaseToolDef {
   // practically safe and lets every LLM client benefit during the rollout
   // window before MCP_PROTOCOL_FLOOR_2025_06_18 flips default-on.
   outputSchema: object;
+  // Spec-defined `Tool.annotations` (MCP 2025-06-18+). Required object with
+  // all four booleans declared so a new tool can't be added without an
+  // explicit per-hint decision — same discipline as `_outputBudgetBytes` and
+  // `outputSchema`. Per spec, annotations are HINTS (advisory only) — a
+  // misclassification is hint-fidelity, not correctness, but the discipline
+  // forces a deliberate choice per tool. Spec reference:
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+  //
+  //   - readOnlyHint: "If true, the tool does not modify its environment."
+  //     Every tool here is true — none write/mutate any user-visible state.
+  //     Consuming a daily Pro quota counter is NOT environment modification
+  //     in the spec sense (which targets the read/write split on the data
+  //     plane, not metering on the auth plane).
+  //   - destructiveHint: "If true, the tool may perform destructive updates
+  //     to its environment." Meaningful only when readOnlyHint == false;
+  //     we set it explicitly false on every tool to make the choice visible.
+  //   - idempotentHint: "If true, calling the tool repeatedly with the same
+  //     arguments will have no additional effect on the its environment."
+  //     Spec definition is environmental (every read-only tool satisfies
+  //     this). We use the stricter and more operationally useful "same
+  //     args → same result content over short windows" reading, because
+  //     downstream MCP clients use this hint to decide whether to dedup,
+  //     cache, or auto-retry tool calls. Two classes of tool earn `false`:
+  //       1. LLM-synthesized tools (get_world_brief, get_country_brief,
+  //          analyze_situation, generate_forecasts) — the model output is
+  //          non-deterministic across calls.
+  //       2. Live external-API reads with rapidly-changing content
+  //          (get_airspace, get_maritime_activity, search_flights,
+  //          search_flight_prices_by_date) — flight prices and live
+  //          positions drift minute-to-minute, so a client that dedupes
+  //          on `idempotentHint: true` would silently serve stale data
+  //          as authoritative.
+  //     Cache tools and pure-internal RPCs are `true` — those serve a
+  //     deliberate snapshot from our seeded cache with `cached_at` /
+  //     `stale` envelope metadata, and client-side dedup of the snapshot
+  //     within a single request burst is desirable.
+  //   - openWorldHint: "If true, this tool may interact with an 'open world'
+  //     of external entities. If false, the tool's domain of interaction is
+  //     closed. For example, the world of a web search tool is open, whereas
+  //     that of a memory tool is not." Cache tools read our own internal
+  //     Redis cache (controlled, bounded, like a memory tool) → false. RPC
+  //     tools that hit external APIs at execution time (live ADS-B, live
+  //     maritime, Google Flights) or external LLM providers → true.
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    idempotentHint: boolean;
+    openWorldHint: boolean;
+  };
 }
 
 interface FreshnessCheck {
@@ -970,6 +1036,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const symbols = argStrList(params.symbols);
       if (symbols.length > 0) {
@@ -1086,6 +1153,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const country = argStr(params.country);
       const minFatal = argNum(params.min_fatalities);
@@ -1152,6 +1220,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const country = argStr(params.country);
       const iata = argStr(params.iata);
@@ -1214,6 +1283,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const topic = argStr(params.topic);
       const category = argStr(params.category);
@@ -1291,6 +1361,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const minMag = argNum(params.min_magnitude);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -1346,6 +1417,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const theater = argStr(params.theater);
       const level = argStr(params.posture_level);
@@ -1400,6 +1472,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const type = argStr(params.threat_type);
       const countries = argStrList(params.country);
@@ -1487,6 +1560,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         properties: { entries: { type: 'array', items: { type: 'object', properties: { countryCode: { type: 'string' }, value: { type: 'number' } } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -1559,6 +1633,7 @@ const TOOL_REGISTRY: ToolDef[] = [
       labor: { type: ['object', 'null'], properties: { countries: { type: 'object', additionalProperties: { type: 'object' } } } },
       external: { type: ['object', 'null'], properties: { countries: { type: 'object', additionalProperties: { type: 'object' } } } },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const codes = argStrList(params.countries);
       if (codes.length > 0) {
@@ -1611,6 +1686,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const codes = argStrList(params.countries);
       if (codes.length > 0) {
@@ -1651,6 +1727,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const codes = argStrList(params.countries);
       if (codes.length > 0) {
@@ -1691,6 +1768,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const codes = argStrList(params.countries);
       if (codes.length > 0) {
@@ -1734,6 +1812,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const category = argStr(params.category);
       const query = argStr(params.query);
@@ -1798,6 +1877,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       const etype = argStr(params.entity_type);
@@ -1854,6 +1934,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const codes = argStrList(params.countries);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -1920,6 +2001,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       const disease = argStr(params.disease);
@@ -2004,6 +2086,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         regions: { type: 'array', items: { type: 'object' } },
       } },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       if (countries.length > 0) {
@@ -2106,6 +2189,7 @@ const TOOL_REGISTRY: ToolDef[] = [
       'news-intelligence': { type: ['object', 'null'], properties: { items: { type: 'array', items: { type: 'object' } } } },
       alerts: { type: ['object', 'null'], properties: { alerts: { type: 'array', items: { type: 'object' } } } },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -2163,6 +2247,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const country = argStr(params.country);
       const severity = argStr(params.severity);
@@ -2219,6 +2304,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const commodity = argStr(params.commodity);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -2285,6 +2371,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const countries = argStrList(params.country);
       const limit = (argNum(params.limit) ?? DEFAULT_LIST_LIMIT);
@@ -2402,6 +2489,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         additionalProperties: { type: 'object' },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const cp = argStr(params.chokepoint);
       if (cp) {
@@ -2487,6 +2575,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const category = argStr(params.category);
       if (category) narrowNested(data, 'geo-bootstrap', 'events', (e) => argStr(e.category) === category);
@@ -2525,6 +2614,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const country = argStr(params.country);
       if (country) narrowNested(data, 'observations', 'observations', (o) => ciIncludes(o.country, country));
@@ -2567,6 +2657,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const type = argStr(params.type);
       const source = argStr(params.source);
@@ -2604,6 +2695,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const domain = argStr(params.domain);
       const region = argStr(params.region);
@@ -2644,6 +2736,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         } } } },
       },
     }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _postFilter: (data, params) => {
       const sub = argStr(params.subreddit);
       if (sub) narrowNested(data, 'reddit', 'posts', (p) => argStr(p.subreddit) === sub);
@@ -2684,6 +2777,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         generatedAt: { type: ['string', 'number', 'null'] },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const UA = 'worldmonitor-mcp-edge/1.0';
       // Step 1: fetch current geopolitical headlines (budget: 6 s, leaves ~24 s for LLM)
@@ -2754,6 +2848,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         model: { type: 'string' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const UA = 'worldmonitor-mcp-edge/1.0';
       const countryCode = String(params.country_code ?? '').toUpperCase().slice(0, 2);
@@ -2835,6 +2930,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         sanctionsExposure: { type: ['object', 'array', 'null'] },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _execute: async (params, base, context) => {
       const code = String(params.country_code ?? '').toUpperCase().slice(0, 2);
       const url = `${base}/api/intelligence/v1/get-country-risk?country_code=${encodeURIComponent(code)}`;
@@ -2885,6 +2981,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         error: { type: 'string', description: 'Present only on user-input failure (missing/unknown country_code).' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Hybrid _execute (not a pure cache tool) because the cache keys are
     // parameterised by country. Mirrors api/health.js::BOOTSTRAP_KEYS:55-59
     // exactly so the U7 Tier-3 parity test treats every key as covered.
@@ -3037,6 +3134,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         error: { type: 'string', description: 'Present only on unknown country_code.' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const code = String(params.country_code ?? '').toUpperCase().slice(0, 2);
       const bbox = COUNTRY_BBOXES[code];
@@ -3152,6 +3250,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         error: { type: 'string', description: 'Present only on unknown country_code.' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const code = String(params.country_code ?? '').toUpperCase().slice(0, 2);
       const bbox = COUNTRY_BBOXES[code];
@@ -3224,6 +3323,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         model: { type: 'string' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const url = `${base}/api/intelligence/v1/deduct-situation`;
       const body = JSON.stringify({ query: String(params.query ?? ''), geoContext: String(params.context ?? ''), framework: String(params.framework ?? '') });
@@ -3265,6 +3365,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         model: { type: 'string' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       // 25 s — stays within Vercel Edge's ~30 s hard ceiling (was 60 s, which exceeded the limit)
       const url = `${base}/api/forecast/v1/get-forecasts`;
@@ -3314,6 +3415,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         error: { type: 'string', description: 'Present when upstream returned a usable error message.' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const qs = new URLSearchParams({
         origin: String(params.origin ?? ''),
@@ -3375,6 +3477,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         error: { type: 'string' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _execute: async (params, base, context) => {
       const qs = new URLSearchParams({
         origin: String(params.origin ?? ''),
@@ -3429,6 +3532,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         total: { type: 'number' },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _execute: async (params: Record<string, unknown>) => {
       type MineSite = { id: string; name: string; lat: number; lon: number; mineral: string; country: string; operator: string; status: string; significance: string; annualOutput?: string; productionRank?: number; openPitOrUnderground?: string };
       let sites = MINING_SITES_RAW as MineSite[];
@@ -3472,6 +3576,7 @@ const TOOL_REGISTRY: ToolDef[] = [
         available: { type: 'array', items: { type: 'string' } },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _execute: async (params: Record<string, unknown>) => {
       const name = params.tool_name;
       if (typeof name !== 'string' || name.length === 0) {
@@ -3548,7 +3653,12 @@ export interface PublicToolShape {
   description: string;
   inputSchema: { type: string; properties: Record<string, unknown>; required: string[] };
   outputSchema: object;
-  annotations: { readOnlyHint: boolean; openWorldHint: boolean };
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    idempotentHint: boolean;
+    openWorldHint: boolean;
+  };
 }
 
 export function buildPublicTool(
@@ -3589,7 +3699,10 @@ export function buildPublicTool(
     // Deep-clone for the same reason as inputSchema.properties — mutating the
     // returned object must not corrupt the module-level outputSchema literal.
     outputSchema: structuredClone(tool.outputSchema),
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    // Per-tool annotations declared on each registry entry (v1.7.0).
+    // Deep-cloned so a mutating client can't poison the registry literal —
+    // matches the inputSchema.properties + outputSchema treatment above.
+    annotations: structuredClone(tool.annotations),
   };
 }
 
