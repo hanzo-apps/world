@@ -65,6 +65,24 @@ async function importPatchedTsModule(relPath, replacements) {
   };
 }
 
+// Match the body-mode shape `setCachedJson` emits: `POST /` with body
+// ['SET', key, value, 'EX', ttl]. The previous URL-path form
+// (`POST /set/{key}/{value}/EX/{ttl}`) is no longer produced by any caller,
+// so we don't bother matching it.
+function isSetRequest(_url, init) {
+  try {
+    const body = JSON.parse(String(init?.body ?? 'null'));
+    return Array.isArray(body) && body[0] === 'SET';
+  } catch {
+    return false;
+  }
+}
+
+function parseSetRequest(_url, init) {
+  const body = JSON.parse(String(init.body));
+  return { key: body[1], value: body[2] };
+}
+
 describe('redis caching behavior', { concurrency: 1 }, () => {
   it('coalesces concurrent misses into one upstream fetcher execution', async () => {
     const redis = await importRedisFresh();
@@ -78,13 +96,13 @@ describe('redis caching behavior', { concurrency: 1 }, () => {
 
     let getCalls = 0;
     let setCalls = 0;
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         getCalls += 1;
         return jsonResponse({ result: undefined });
       }
-      if (raw.includes('/set/')) {
+      if (isSetRequest(url, init)) {
         setCalls += 1;
         return jsonResponse({ result: 'OK' });
       }
@@ -198,10 +216,10 @@ describe('cachedFetchJsonWithMeta source labeling', { concurrency: 1 }, () => {
     });
     const originalFetch = globalThis.fetch;
 
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) return jsonResponse({ result: undefined });
-      if (raw.includes('/set/')) return jsonResponse({ result: 'OK' });
+      if (isSetRequest(url, init)) return jsonResponse({ result: 'OK' });
       throw new Error(`Unexpected fetch URL: ${raw}`);
     };
 
@@ -228,10 +246,10 @@ describe('cachedFetchJsonWithMeta source labeling', { concurrency: 1 }, () => {
     });
     const originalFetch = globalThis.fetch;
 
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) return jsonResponse({ result: undefined });
-      if (raw.includes('/set/')) return jsonResponse({ result: 'OK' });
+      if (isSetRequest(url, init)) return jsonResponse({ result: 'OK' });
       throw new Error(`Unexpected fetch URL: ${raw}`);
     };
 
@@ -274,7 +292,7 @@ describe('cachedFetchJsonWithMeta source labeling', { concurrency: 1 }, () => {
 
     // First call: cache miss. Second call (from a "different instance"): cache hit.
     let getCalls = 0;
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         getCalls += 1;
@@ -282,7 +300,7 @@ describe('cachedFetchJsonWithMeta source labeling', { concurrency: 1 }, () => {
         // Simulate another instance populating cache between calls
         return jsonResponse({ result: JSON.stringify({ value: 'from-other-instance' }) });
       }
-      if (raw.includes('/set/')) return jsonResponse({ result: 'OK' });
+      if (isSetRequest(url, init)) return jsonResponse({ result: 'OK' });
       throw new Error(`Unexpected fetch URL: ${raw}`);
     };
 
@@ -320,17 +338,15 @@ describe('negative-result caching', { concurrency: 1 }, () => {
     const originalFetch = globalThis.fetch;
 
     const store = new Map();
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         const key = decodeURIComponent(raw.split('/get/').pop() || '');
         const val = store.get(key);
         return jsonResponse({ result: val ?? undefined });
       }
-      if (raw.includes('/set/')) {
-        const parts = raw.split('/set/').pop().split('/');
-        const key = decodeURIComponent(parts[0]);
-        const value = decodeURIComponent(parts[1]);
+      if (isSetRequest(raw, init)) {
+        const { key, value } = parseSetRequest(raw, init);
         store.set(key, value);
         return jsonResponse({ result: 'OK' });
       }
@@ -369,17 +385,15 @@ describe('negative-result caching', { concurrency: 1 }, () => {
     const originalFetch = globalThis.fetch;
 
     const store = new Map();
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         const key = decodeURIComponent(raw.split('/get/').pop() || '');
         const val = store.get(key);
         return jsonResponse({ result: val ?? undefined });
       }
-      if (raw.includes('/set/')) {
-        const parts = raw.split('/set/').pop().split('/');
-        const key = decodeURIComponent(parts[0]);
-        const value = decodeURIComponent(parts[1]);
+      if (isSetRequest(raw, init)) {
+        const { key, value } = parseSetRequest(raw, init);
         store.set(key, value);
         return jsonResponse({ result: 'OK' });
       }
@@ -414,10 +428,10 @@ describe('negative-result caching', { concurrency: 1 }, () => {
     const originalFetch = globalThis.fetch;
 
     let setCalls = 0;
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) return jsonResponse({ result: undefined });
-      if (raw.includes('/set/')) {
+      if (isSetRequest(url, init)) {
         setCalls += 1;
         return jsonResponse({ result: 'OK' });
       }
@@ -703,7 +717,7 @@ describe('theater posture caching behavior', { concurrency: 1 }, () => {
 
     const staleData = { theaters: [{ theater: 'stale-test', postureLevel: 'normal', activeFlights: 1, trackedVessels: 0, activeOperations: [], assessedAt: 1 }] };
 
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         const key = decodeURIComponent(raw.split('/get/').pop() || '');
@@ -715,7 +729,7 @@ describe('theater posture caching behavior', { concurrency: 1 }, () => {
         }
         return jsonResponse({ result: undefined });
       }
-      if (raw.includes('/set/')) {
+      if (isSetRequest(url, init)) {
         return jsonResponse({ result: 'OK' });
       }
       if (raw.includes('opensky-network.org')) {
@@ -747,12 +761,12 @@ describe('theater posture caching behavior', { concurrency: 1 }, () => {
     });
     const originalFetch = globalThis.fetch;
 
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         return jsonResponse({ result: undefined });
       }
-      if (raw.includes('/set/')) {
+      if (isSetRequest(url, init)) {
         return jsonResponse({ result: 'OK' });
       }
       if (raw.includes('opensky-network.org')) {
@@ -780,12 +794,12 @@ describe('theater posture caching behavior', { concurrency: 1 }, () => {
     const originalFetch = globalThis.fetch;
 
     const cacheWrites = [];
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = async (url, init) => {
       const raw = String(url);
       if (raw.includes('/get/')) {
         return jsonResponse({ result: undefined });
       }
-      if (raw.includes('/set/') || raw.includes('/pipeline')) {
+      if (isSetRequest(url, init) || raw.includes('/pipeline')) {
         cacheWrites.push(raw);
         return jsonResponse({ result: 'OK' });
       }
@@ -854,10 +868,9 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
         const key = parseRedisKey(raw, 'get');
         return jsonResponse({ result: store.get(key) });
       }
-      if (raw.includes('/set/')) {
-        const key = parseRedisKey(raw, 'set');
-        const encodedValue = raw.slice(raw.indexOf('/set/') + 5).split('/')[1] || '';
-        store.set(key, decodeURIComponent(encodedValue));
+      if (isSetRequest(raw, init)) {
+        const { key, value } = parseSetRequest(raw, init);
+        store.set(key, value);
         if (!key.startsWith('seed-meta:')) setKeys.push(key);
         return jsonResponse({ result: 'OK' });
       }
@@ -918,10 +931,9 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
         const key = parseRedisKey(raw, 'get');
         return jsonResponse({ result: store.get(key) });
       }
-      if (raw.includes('/set/')) {
-        const key = parseRedisKey(raw, 'set');
-        const encodedValue = raw.slice(raw.indexOf('/set/') + 5).split('/')[1] || '';
-        store.set(key, decodeURIComponent(encodedValue));
+      if (isSetRequest(raw, init)) {
+        const { key, value } = parseSetRequest(raw, init);
+        store.set(key, value);
         if (!key.startsWith('seed-meta:')) setKeys.push(key);
         return jsonResponse({ result: 'OK' });
       }
@@ -1134,6 +1146,122 @@ describe('military flights bbox behavior', { concurrency: 1 }, () => {
     } finally {
       cleanup();
       globalThis.fetch = originalFetch;
+      restoreEnv();
+    }
+  });
+});
+
+describe('setCachedJson wire shape and failure reporting', { concurrency: 1 }, () => {
+  it('emits POST / with body ["SET", key, value, "EX", String(ttl)]', async () => {
+    // Pins the body-mode wire shape so a future "simplification" back to
+    // URL-path encoding (`POST /set/{key}/{value}/EX/{ttl}`) fails loudly.
+    // That regression silently broke large-payload writes (e.g. news:digest:v1
+    // at ~126KB) because the self-hosted redis-rest-proxy runs Node's
+    // http.createServer, which rejects URLs >~16KB with ECONNRESET.
+    const redis = await importRedisFresh();
+    const restoreEnv = withEnv({
+      UPSTASH_REDIS_REST_URL: 'https://redis.test',
+      UPSTASH_REDIS_REST_TOKEN: 'token',
+      VERCEL_ENV: undefined,
+      VERCEL_GIT_COMMIT_SHA: undefined,
+    });
+    const originalFetch = globalThis.fetch;
+
+    const captured = [];
+    globalThis.fetch = async (url, init) => {
+      captured.push({ url: String(url), init });
+      return jsonResponse({ result: 'OK' });
+    };
+
+    try {
+      const key = 'news:digest:v1';
+      const value = { items: [{ id: 'a' }, { id: 'b' }] };
+      const ttl = 600;
+      const ok = await redis.setCachedJson(key, value, ttl);
+
+      assert.equal(ok, true, 'setCachedJson should return true on success');
+      assert.equal(captured.length, 1, 'exactly one Redis write should be issued');
+      const [req] = captured;
+      assert.equal(req.init.method, 'POST');
+      assert.equal(req.url, 'https://redis.test/', 'POST goes to base URL (not /set/...)');
+      assert.equal(
+        req.init.headers['Content-Type'],
+        'application/json',
+        'body-mode requires JSON Content-Type',
+      );
+      assert.deepEqual(
+        JSON.parse(String(req.init.body)),
+        ['SET', key, JSON.stringify(value), 'EX', String(ttl)],
+        'body must carry the SET command + args verbatim',
+      );
+      assert.ok(
+        !req.url.includes('/set/'),
+        'URL must NOT carry payload in path — that was the original bug',
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      restoreEnv();
+    }
+  });
+
+  it('returns false and warns when Upstash returns an error in the body', async () => {
+    const redis = await importRedisFresh();
+    const restoreEnv = withEnv({
+      UPSTASH_REDIS_REST_URL: 'https://redis.test',
+      UPSTASH_REDIS_REST_TOKEN: 'token',
+      VERCEL_ENV: undefined,
+      VERCEL_GIT_COMMIT_SHA: undefined,
+    });
+    const originalFetch = globalThis.fetch;
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => { warnings.push(args); };
+
+    globalThis.fetch = async () => jsonResponse({ error: 'WRONGTYPE' });
+
+    try {
+      const ok = await redis.setCachedJson('k', { v: 1 }, 30);
+      assert.equal(ok, false, 'Upstash error must surface as false');
+      assert.equal(warnings.length, 1, 'should warn exactly once');
+      const [msg, detail] = warnings[0];
+      assert.match(String(msg), /setCachedJson failed/);
+      assert.equal(detail, 'WRONGTYPE', 'warn payload should be the Upstash error string');
+    } finally {
+      globalThis.fetch = originalFetch;
+      console.warn = originalWarn;
+      restoreEnv();
+    }
+  });
+
+  it('returns false and warns on non-2xx HTTP responses', async () => {
+    const redis = await importRedisFresh();
+    const restoreEnv = withEnv({
+      UPSTASH_REDIS_REST_URL: 'https://redis.test',
+      UPSTASH_REDIS_REST_TOKEN: 'token',
+      VERCEL_ENV: undefined,
+      VERCEL_GIT_COMMIT_SHA: undefined,
+    });
+    const originalFetch = globalThis.fetch;
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => { warnings.push(args); };
+
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 503,
+      async json() { return null; },
+    });
+
+    try {
+      const ok = await redis.setCachedJson('k', { v: 1 }, 30);
+      assert.equal(ok, false, 'HTTP failure must surface as false');
+      assert.equal(warnings.length, 1, 'should warn exactly once');
+      const [msg, detail] = warnings[0];
+      assert.match(String(msg), /setCachedJson failed/);
+      assert.equal(detail, 'HTTP 503', 'warn payload should name the HTTP status');
+    } finally {
+      globalThis.fetch = originalFetch;
+      console.warn = originalWarn;
       restoreEnv();
     }
   });
