@@ -334,6 +334,17 @@ import { PREMIUM_RPC_PATHS } from '../src/shared/premium-paths';
  */
 export type GatewayCtx = { waitUntil: (p: Promise<unknown>) => void };
 
+const POST_TO_GET_MAX_BODY_BYTES = 1_048_576;
+const POST_TO_GET_MAX_ARRAY_VALUES_PER_KEY = 200;
+
+function isPostToGetCompatibleBodySize(headers: Headers): boolean {
+  const rawContentLength = headers.get('Content-Length');
+  if (rawContentLength === null || !/^\d+$/.test(rawContentLength)) return false;
+
+  const contentLength = Number(rawContentLength);
+  return Number.isSafeInteger(contentLength) && contentLength < POST_TO_GET_MAX_BODY_BYTES;
+}
+
 export function createDomainGateway(
   routes: RouteDescriptor[],
 ): (req: Request, ctx?: GatewayCtx) => Promise<Response> {
@@ -925,18 +936,34 @@ export function createDomainGateway(
     // Route matching — if POST doesn't match, convert to GET for stale clients
     let matchedHandler = router.match(request);
     if (!matchedHandler && request.method === 'POST') {
-      const contentLen = parseInt(request.headers.get('Content-Length') ?? '0', 10);
-      if (contentLen < 1_048_576) {
+      if (isPostToGetCompatibleBodySize(request.headers)) {
         const url = new URL(request.url);
+        let oversizedKey: string | null = null;
         try {
           const body = await request.clone().json();
           const isScalar = (x: unknown): x is string | number | boolean =>
             typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean';
           for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
-            if (Array.isArray(v)) v.forEach((item) => { if (isScalar(item)) url.searchParams.append(k, String(item)); });
-            else if (isScalar(v)) url.searchParams.set(k, String(v));
+            if (Array.isArray(v)) {
+              if (v.length > POST_TO_GET_MAX_ARRAY_VALUES_PER_KEY) {
+                oversizedKey = k;
+                break;
+              }
+              v.forEach((item) => { if (isScalar(item)) url.searchParams.append(k, String(item)); });
+            } else if (isScalar(v)) url.searchParams.set(k, String(v));
           }
         } catch { /* non-JSON body — skip POST→GET conversion */ }
+        if (oversizedKey !== null) {
+          emitRequest(400, 'malformed_request', null);
+          return new Response(JSON.stringify({
+            error: 'Too many values for POST compatibility parameter',
+            parameter: oversizedKey,
+            maxValues: POST_TO_GET_MAX_ARRAY_VALUES_PER_KEY,
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        }
         const getReq = new Request(url.toString(), { method: 'GET', headers: request.headers });
         matchedHandler = router.match(getReq);
         if (matchedHandler) request = getReq;
