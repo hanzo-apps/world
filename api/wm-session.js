@@ -54,6 +54,34 @@ function normalizeLegacyKey(value) {
   return trimmed;
 }
 
+function submittedLegacyKey(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function envList(name) {
+  return (process.env[name] || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function matchesEnvSecret(key, name) {
+  const secret = process.env[name] || '';
+  return Boolean(key && secret && key === secret);
+}
+
+function isValidEnterpriseKey(key) {
+  return Boolean(key && envList('WORLDMONITOR_VALID_KEYS').includes(key));
+}
+
+function isValidWidgetKey(key) {
+  return matchesEnvSecret(key, 'WIDGET_AGENT_KEY') || isValidEnterpriseKey(key);
+}
+
+function isValidProKey(key) {
+  return matchesEnvSecret(key, 'PRO_WIDGET_KEY') || isValidEnterpriseKey(key);
+}
+
 async function readBody(req) {
   const contentType = req.headers.get('content-type') || '';
   if (!contentType.toLowerCase().includes('application/json')) return {};
@@ -99,15 +127,25 @@ export default async function handler(req) {
   const widgetKey = normalizeLegacyKey(body.widgetKey);
   const proKey = normalizeLegacyKey(body.proKey);
 
-  // Best-effort cleanup for the old JS-readable cookies with the same names.
-  // HttpOnly cookies cannot be cleared from JS; setting these tombstones from
-  // the server removes any legacy non-HttpOnly variants the browser still has.
-  let headers = appendHeader(cors, 'Set-Cookie', clearReadableCookie(WIDGET_KEY_COOKIE));
-  headers = appendHeader(headers, 'Set-Cookie', clearReadableCookie(PRO_KEY_COOKIE));
+  if (
+    (submittedLegacyKey(body.widgetKey) && !isValidWidgetKey(widgetKey)) ||
+    (submittedLegacyKey(body.proKey) && !isValidProKey(proKey))
+  ) {
+    return jsonResponse({ error: 'Invalid session key' }, 401, cors);
+  }
 
-  headers = appendHeader(headers, 'Set-Cookie', sessionCookie(req, SESSION_COOKIE, issued.token));
-  if (widgetKey) headers = appendHeader(headers, 'Set-Cookie', sessionCookie(req, WIDGET_KEY_COOKIE, widgetKey));
-  if (proKey) headers = appendHeader(headers, 'Set-Cookie', sessionCookie(req, PRO_KEY_COOKIE, proKey));
+  let headers = appendHeader(cors, 'Set-Cookie', sessionCookie(req, SESSION_COOKIE, issued.token));
+
+  // Best-effort cleanup for old JS-readable cookies only when replacing that
+  // key. A no-key session refresh must preserve existing HttpOnly key cookies.
+  if (widgetKey) {
+    headers = appendHeader(headers, 'Set-Cookie', clearReadableCookie(WIDGET_KEY_COOKIE));
+    headers = appendHeader(headers, 'Set-Cookie', sessionCookie(req, WIDGET_KEY_COOKIE, widgetKey));
+  }
+  if (proKey) {
+    headers = appendHeader(headers, 'Set-Cookie', clearReadableCookie(PRO_KEY_COOKIE));
+    headers = appendHeader(headers, 'Set-Cookie', sessionCookie(req, PRO_KEY_COOKIE, proKey));
+  }
 
   return jsonResponse({ ok: true, exp: issued.exp }, 200, headers);
 }

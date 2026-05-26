@@ -3,6 +3,9 @@ import test from 'node:test';
 
 const SECRET = 'test-secret-must-be-at-least-32-chars-long-xxx';
 process.env.WM_SESSION_SECRET = SECRET;
+process.env.WIDGET_AGENT_KEY = 'widget-secret';
+process.env.PRO_WIDGET_KEY = 'pro-secret';
+process.env.WORLDMONITOR_VALID_KEYS = 'enterprise-secret';
 
 const { default: handler } = await import('./wm-session.js');
 const { validateSessionToken } = await import('./_session.js');
@@ -97,6 +100,15 @@ test('No origin (curl) is allowed (rate limit + token TTL are the throttles)', a
   assert.match(cookieValue(setCookies(resp), 'wm-session'), /^wms_/);
 });
 
+test('no-key session refresh preserves existing HttpOnly key cookies', async () => {
+  const resp = await handler(makeReq('POST', { origin: 'https://worldmonitor.app' }));
+  assert.equal(resp.status, 200);
+  const cookies = setCookies(resp);
+  assert.ok(cookies.some((cookie) => cookie.startsWith('wm-session=')));
+  assert.equal(cookies.some((cookie) => cookie.startsWith('wm-widget-key=')), false);
+  assert.equal(cookies.some((cookie) => cookie.startsWith('wm-pro-key=')), false);
+});
+
 test('legacy widget/pro keys are moved into short-lived HttpOnly cookies', async () => {
   const req = new Request('https://api.worldmonitor.app/api/wm-session', {
     method: 'POST',
@@ -115,6 +127,39 @@ test('legacy widget/pro keys are moved into short-lived HttpOnly cookies', async
   assert.match(joined, /wm-widget-key=widget-secret;.*Domain=\.worldmonitor\.app/);
   assert.match(joined, /wm-pro-key=pro-secret;.*Domain=\.worldmonitor\.app/);
   assert.match(joined, /Max-Age=43200/);
+});
+
+test('enterprise key can be exchanged into a short-lived HttpOnly pro cookie', async () => {
+  const req = new Request('https://api.worldmonitor.app/api/wm-session', {
+    method: 'POST',
+    headers: {
+      origin: 'https://worldmonitor.app',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ proKey: 'enterprise-secret' }),
+  });
+  const resp = await handler(req);
+  assert.equal(resp.status, 200);
+  const cookies = setCookies(resp);
+  assert.match(cookies.join('\n'), /wm-pro-key=enterprise-secret;.*HttpOnly/);
+});
+
+test('invalid legacy keys are rejected and not persisted as HttpOnly cookies', async () => {
+  const req = new Request('https://api.worldmonitor.app/api/wm-session', {
+    method: 'POST',
+    headers: {
+      origin: 'https://worldmonitor.app',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ widgetKey: 'wrong-widget-key', proKey: 'wrong-pro-key' }),
+  });
+  const resp = await handler(req);
+  assert.equal(resp.status, 401);
+  const body = await resp.json();
+  assert.equal(body.error, 'Invalid session key');
+  const joined = setCookies(resp).join('\n');
+  assert.doesNotMatch(joined, /wm-widget-key=wrong-widget-key/);
+  assert.doesNotMatch(joined, /wm-pro-key=wrong-pro-key/);
 });
 
 test('legacy cookie tombstones do not delete replacement HttpOnly key cookies', async () => {
