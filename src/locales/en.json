@@ -1488,6 +1488,8 @@
       "ciiDeviation": "CII Deviation",
       "infraEvents": "Infra Events",
       "highAlerts": "High Alerts",
+      "dataFreshness": "Data Freshness",
+      "sourcesDetail": "{{active}}/{{total}} sources",
       "topRisks": "Top Risks",
       "recentAlerts": "Recent Alerts ({{count}})",
       "updated": "Updated: {{time}}",
