@@ -27,6 +27,7 @@ const crypto = require('crypto');
 const v8 = require('v8');
 const { WebSocketServer, WebSocket } = require('ws');
 const { parseProxyConfig, resolveProxyString } = require('./_proxy-utils.cjs');
+const { countryNameToIso2 } = require('./shared/country-name-to-iso2.cjs');
 const parseProxyUrl = parseProxyConfig;
 
 const httpsKeepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 6, timeout: 60_000 });
@@ -464,6 +465,10 @@ function notifySimpleHash(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
   return Math.abs(h).toString(36);
+}
+
+function normalizeNotificationCountryCode(raw) {
+  return countryNameToIso2(raw) ?? undefined;
 }
 
 /**
@@ -1121,7 +1126,7 @@ async function orefFetchAlerts() {
         : '';
       publishNotificationEvent({
         eventType: 'oref_siren',
-        payload: { title: orefTitle + orefLocationSuffix, source: source === 'tzeva-adom' ? 'Tzeva Adom / Pikud HaOref' : 'OREF Pikud HaOref' },
+        payload: { title: orefTitle + orefLocationSuffix, source: source === 'tzeva-adom' ? 'Tzeva Adom / Pikud HaOref' : 'OREF Pikud HaOref', countryCode: 'IL' },
         severity: 'critical',
         variant: undefined,
       }).catch(e => console.warn('[Notify] OREF publish error:', e?.message));
@@ -1560,9 +1565,10 @@ async function seedUcdpEvents() {
     for (const e of newConflicts.slice(0, 2)) {
       ucdpPrevAlertedIds.add(e.id);
       const parties = e.sideA && e.sideB ? `${e.sideA.slice(0, 40)} vs ${e.sideB.slice(0, 40)}` : e.sideA || e.sideB || 'Unknown parties';
+      const countryCode = normalizeNotificationCountryCode(e.country);
       publishNotificationEvent({
         eventType: 'conflict_escalation',
-        payload: { title: `${e.country}: ${parties} — ${e.deathsBest} casualties`, source: 'UCDP' },
+        payload: { title: `${e.country}: ${parties} — ${e.deathsBest} casualties`, source: 'UCDP', ...(countryCode ? { countryCode } : {}) },
         severity: e.deathsBest >= 50 ? 'critical' : 'high',
         variant: undefined,
         dedupTtl: 86400,
@@ -2860,9 +2866,10 @@ async function seedCyberThreats() {
       cyberPrevAlertedIds.add(t.indicator);
       const typeLabel = (t.type || 'threat').replace(/_/g, ' ');
       const familyTag = t.malwareFamily ? ` (${t.malwareFamily.slice(0, 30)})` : '';
+      const countryCode = normalizeNotificationCountryCode(t.country);
       publishNotificationEvent({
         eventType: 'cyber_threat',
-        payload: { title: `${typeLabel}: ${t.indicator?.slice(0, 50)}${familyTag}`, source: t.source || 'Cyber Intel' },
+        payload: { title: `${typeLabel}: ${t.indicator?.slice(0, 50)}${familyTag}`, source: t.source || 'Cyber Intel', ...(countryCode ? { countryCode } : {}) },
         severity: t.severity === 'critical' ? 'critical' : 'high',
         variant: undefined,
         dedupTtl: 43200,
@@ -4516,6 +4523,7 @@ async function seedWeatherAlerts() {
         payload: {
           title: a.headline || a.event || 'Weather alert',
           source: 'NWS',
+          countryCode: 'US',
           ...(coalesceKey ? { coalesceKey } : {}),
         },
         severity: a.severity === 'Extreme' ? 'critical' : 'high',
