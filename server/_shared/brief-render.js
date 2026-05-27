@@ -903,6 +903,7 @@ const STYLE_BLOCK = `<style>
     font-family: 'Source Serif 4', serif; font-style: italic;
     font-size: max(18px, 1.7vw); line-height: 1.3;
     color: var(--cream-ink); opacity: 0.85;
+    overflow-wrap: anywhere;
   }
   .digest .footer-caption { margin-top: 4vh; color: var(--sienna); opacity: 0.85; }
   .digest .threads { display: flex; flex-direction: column; gap: 3.2vh; max-width: 62ch; }
@@ -955,6 +956,7 @@ const STYLE_BLOCK = `<style>
     font-size: max(11px, 0.85vw); font-weight: 600;
     letter-spacing: 0.22em; text-transform: uppercase;
     padding: 0.5em 1em; border: 1px solid currentColor; opacity: 0.82;
+    max-width: 100%; overflow-wrap: anywhere;
   }
   .story .tag.crit { background: currentColor; color: var(--paper); }
   .story.dark .tag.crit { background: var(--bone); color: var(--ink); border-color: var(--bone); }
@@ -979,6 +981,7 @@ const STYLE_BLOCK = `<style>
     font-family: 'IBM Plex Mono', monospace;
     font-size: max(11px, 0.9vw); letter-spacing: 0.2em;
     text-transform: uppercase;
+    overflow-wrap: anywhere;
   }
   .story.light .source { color: var(--sienna); }
   .story.dark  .source { color: var(--mint); }
