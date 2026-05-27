@@ -1,13 +1,14 @@
 /**
- * ML Web Worker for ONNX inference using @xenova/transformers
+ * ML Web Worker for ONNX inference using @huggingface/transformers
  * Handles embeddings, sentiment analysis, summarization, and NER
  */
 
-import { pipeline, env } from '@xenova/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 import { MODEL_CONFIGS, type ModelConfig } from '@/config/ml-config';
 import { storeVectors, searchVectors, getCount, resetStore, sanitizeTitle, type VectorSearchResult } from './vector-db';
+import { normalizeTokenClassificationOutput, type NEREntity } from './ml-ner';
 
-// Configure transformers.js
+// Configure Hugging Face Transformers (JS).
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
@@ -204,7 +205,7 @@ async function summarizeTexts(texts: string[], modelId = 'summarization'): Promi
   for (const text of texts) {
     const output = await pipe(`summarize: ${text}`, {
       max_new_tokens: 64,
-      min_length: 10,
+      min_new_tokens: 10,
     });
     const result = (output as Array<{ generated_text: string }>)[0];
     results.push(result?.generated_text ?? '');
@@ -232,14 +233,6 @@ async function classifySentiment(texts: string[]): Promise<Array<{ label: string
   return results;
 }
 
-interface NEREntity {
-  text: string;
-  type: string;
-  confidence: number;
-  start: number;
-  end: number;
-}
-
 async function extractEntities(texts: string[]): Promise<NEREntity[][]> {
   await loadModel('ner');
   const pipe = loadedPipelines.get('ner')!;
@@ -247,20 +240,7 @@ async function extractEntities(texts: string[]): Promise<NEREntity[][]> {
   const results: NEREntity[][] = [];
   for (const text of texts) {
     const output = await pipe(text);
-    const entities = (output as Array<{
-      entity_group: string;
-      score: number;
-      word: string;
-      start: number;
-      end: number;
-    }>).map(e => ({
-      text: e.word,
-      type: e.entity_group,
-      confidence: e.score,
-      start: e.start,
-      end: e.end,
-    }));
-    results.push(entities);
+    results.push(normalizeTokenClassificationOutput(output, text));
   }
 
   return results;
