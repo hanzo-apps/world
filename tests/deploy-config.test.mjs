@@ -141,7 +141,16 @@ describe('docker runtime dependency guardrails', () => {
     );
 
     const lockPackageNames = Object.keys(runtimeLock.packages);
-    for (const omitted of ['node_modules/@xenova/transformers', 'node_modules/onnxruntime-web', 'node_modules/playwright']) {
+    // Keep the legacy and current Transformers.js package paths excluded so a
+    // future migration cannot accidentally copy browser ML deps into runtime.
+    for (const omitted of [
+      'node_modules/@xenova/transformers',
+      'node_modules/@huggingface/transformers',
+      'node_modules/@huggingface/jinja',
+      'node_modules/@huggingface/tokenizers',
+      'node_modules/onnxruntime-web',
+      'node_modules/playwright',
+    ]) {
       assert.ok(!lockPackageNames.includes(omitted), `${omitted} should not be in Docker runtime deps`);
     }
   });
