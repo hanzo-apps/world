@@ -19,11 +19,16 @@ import { FEEDS } from '@/config/feeds';
 import {
   applyMigrationChain,
   buildMigrations,
+  migrateLegacyPanelOrderStorage,
   mergeCloudWithLocalDirty,
   settledDirtyKeys,
 } from './cloud-prefs-migrations';
+import {
+  dispatchCloudPrefsAppliedEvent,
+  CLOUD_PREFS_APPLIED_EVENT,
+  type CloudPrefsAppliedDetail,
+} from './cloud-prefs-events';
 import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 const ENABLED = import.meta.env.VITE_CLOUD_PREFS_ENABLED === 'true';
 
@@ -41,7 +46,8 @@ const KEY_LAST_SIGNED_IN_AS = 'wm-last-signed-in-as';
 // the new schema version. Defaults to 1 when missing (assumes oldest).
 const KEY_LOCAL_SCHEMA_VERSION = 'wm-cloud-prefs-local-schema-version';
 
-const CURRENT_PREFS_SCHEMA_VERSION = 2;
+const CURRENT_PREFS_SCHEMA_VERSION = 3;
+export { CLOUD_PREFS_APPLIED_EVENT, type CloudPrefsAppliedDetail };
 
 // Migrations live in cloud-prefs-migrations.ts to keep them testable —
 // cloud-prefs-sync.ts has a transitive `import.meta.env.DEV` dep via
@@ -158,19 +164,26 @@ function buildCloudBlob(): Record<string, string> {
 }
 
 function applyCloudBlob(data: Record<string, unknown>): void {
+  const changedKeys: string[] = [];
   _suppressPatch = true;
   try {
     for (const key of CLOUD_SYNC_KEYS) {
       const val = data[key];
+      const before = localStorage.getItem(key);
       if (typeof val === 'string') {
+        if (before !== val) changedKeys.push(key);
         localStorage.setItem(key, val);
       } else if (!(key in data)) {
+        if (before !== null) changedKeys.push(key);
         localStorage.removeItem(key);
+      } else if (import.meta.env.DEV) {
+        console.warn(`[cloud-prefs] ignoring non-string cloud value for ${key}`);
       }
     }
   } finally {
     _suppressPatch = false;
   }
+  dispatchCloudPrefsAppliedEvent(changedKeys);
 }
 
 function applyMigrations(
@@ -234,15 +247,27 @@ function showUndoToast(prevBlobJson: string): void {
   toast.addEventListener('click', (e) => {
     const action = (e.target as HTMLElement).closest('[data-action]')?.getAttribute('data-action');
     if (action === 'undo') {
+      // prevBlobJson comes from buildCloudBlob(), which contains only current
+      // sync keys after install-time legacy cleanup; undo restores that shape.
       const prev = JSON.parse(prevBlobJson) as Record<string, string>;
+      const changedKeys: string[] = [];
       _suppressPatch = true;
       try {
-        for (const [k, v] of Object.entries(prev)) {
-          if (CLOUD_SYNC_KEYS.includes(k as CloudSyncKey)) localStorage.setItem(k, v);
+        for (const key of CLOUD_SYNC_KEYS) {
+          const before = localStorage.getItem(key);
+          if (Object.prototype.hasOwnProperty.call(prev, key)) {
+            const val = prev[key]!;
+            if (before !== val) changedKeys.push(key);
+            localStorage.setItem(key, val);
+          } else {
+            if (before !== null) changedKeys.push(key);
+            localStorage.removeItem(key);
+          }
         }
       } finally {
         _suppressPatch = false;
       }
+      dispatchCloudPrefsAppliedEvent(changedKeys);
       toast.remove();
       clearTimeout(autoTimer);
     } else if (action === 'dismiss') {
@@ -625,6 +650,10 @@ export function install(variant: string): void {
   if (!isEnabled() || _installed) return;
   _installed = true;
   _currentVariant = variant;
+
+  // Remove stale local copies of the pre-schema-3 panel-order key before the
+  // localStorage patch is installed, so cleanup does not mark prefs dirty.
+  migrateLegacyPanelOrderStorage(localStorage);
 
   // Patch localStorage.setItem and removeItem to detect pref changes in this tab.
   // Use _suppressPatch to prevent applyCloudBlob from triggering spurious uploads.
