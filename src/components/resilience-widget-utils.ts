@@ -251,6 +251,29 @@ export function formatBaselineStress(baseline: number, stress: number): string {
   return `Baseline: ${b} | Stress: ${s}`;
 }
 
+type ScoreIntervalDisplayInput = ResilienceScoreResponse['scoreInterval'] | null | undefined;
+export interface ResilienceScoreIntervalDisplay {
+  label: string;
+  title: string;
+}
+
+function normalizeScoreInterval(interval: ScoreIntervalDisplayInput): { p05: number; p95: number } | null {
+  if (!interval) return null;
+  const p05 = Number(interval.p05);
+  const p95 = Number(interval.p95);
+  if (!Number.isFinite(p05) || !Number.isFinite(p95)) return null;
+  return { p05, p95 };
+}
+
+export function formatResilienceScoreInterval(interval: ScoreIntervalDisplayInput): ResilienceScoreIntervalDisplay | null {
+  const normalized = normalizeScoreInterval(interval);
+  if (!normalized) return null;
+  return {
+    label: `[${Math.round(normalized.p05)}\u2013${Math.round(normalized.p95)}]`,
+    title: `95% confidence interval: ${normalized.p05} - ${normalized.p95}`,
+  };
+}
+
 // Formats the dataVersion field (ISO date YYYY-MM-DD, sourced from the
 // seed-meta:resilience:static.fetchedAt key) for display in the widget
 // footer. Returns an empty string when dataVersion is missing, malformed,
