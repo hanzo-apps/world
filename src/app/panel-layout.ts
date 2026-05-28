@@ -100,6 +100,7 @@ import {
   VARIANT_DEFAULTS,
   isPanelInVariantDefaults,
 } from '@/config';
+import { resolveDefaultPanelOrder, resolveSavedPanelOrder } from '@/app/panel-order';
 import { resolveNewsCategories, enabledNewsCategoryKeys } from '@/config/feed-resolution';
 import { BETA_MODE } from '@/config/beta';
 import { t } from '@/services/i18n';
@@ -1439,11 +1440,12 @@ export class PanelLayoutManager implements AppModule {
       }
     }
 
-    const variantOrder = (VARIANT_DEFAULTS[SITE_VARIANT] ?? VARIANT_DEFAULTS['full'] ?? []).filter(k => k !== 'map');
-    const activePanelSet = new Set(Object.keys(this.ctx.panelSettings));
-    const crossVariantKeys = Object.keys(this.ctx.panelSettings).filter(k => !variantOrder.includes(k) && k !== 'map');
-    const defaultOrder = [...variantOrder.filter(k => activePanelSet.has(k)), ...crossVariantKeys];
     const activePanelKeys = Object.keys(this.ctx.panelSettings).filter(k => k !== 'map');
+    const defaultOrder = resolveDefaultPanelOrder(activePanelKeys, {
+      variant: SITE_VARIANT,
+      variantDefaults: VARIANT_DEFAULTS,
+      isDesktopApp: this.ctx.isDesktopApp,
+    });
     const bottomSet = this.getSavedBottomSet();
     const savedOrder = this.getSavedPanelOrder();
     this.bottomSetMemory = bottomSet;
@@ -1454,52 +1456,11 @@ export class PanelLayoutManager implements AppModule {
     let allOrder: string[];
 
     if (hasSavedOrder) {
-      const valid = savedOrder.filter(k => activePanelKeys.includes(k));
-      const missing = activePanelKeys.filter(k => !valid.includes(k));
-
-      missing.forEach(k => {
-        if (k === 'monitors') return;
-        const defaultIdx = defaultOrder.indexOf(k);
-        if (defaultIdx === -1) { valid.push(k); return; }
-        let inserted = false;
-        for (let i = defaultIdx + 1; i < defaultOrder.length; i++) {
-          const afterIdx = valid.indexOf(defaultOrder[i]!);
-          if (afterIdx !== -1) { valid.splice(afterIdx, 0, k); inserted = true; break; }
-        }
-        if (!inserted) valid.push(k);
+      allOrder = resolveSavedPanelOrder(activePanelKeys, savedOrder, defaultOrder, {
+        variant: SITE_VARIANT,
       });
-
-      const monitorsIdx = valid.indexOf('monitors');
-      if (monitorsIdx !== -1) valid.splice(monitorsIdx, 1);
-      if (SITE_VARIANT !== 'happy') valid.push('monitors');
-      allOrder = valid;
     } else {
       allOrder = [...defaultOrder];
-
-      if (SITE_VARIANT !== 'happy') {
-        const liveNewsIdx = allOrder.indexOf('live-news');
-        if (liveNewsIdx > 0) {
-          allOrder.splice(liveNewsIdx, 1);
-          allOrder.unshift('live-news');
-        }
-
-        const webcamsIdx = allOrder.indexOf('live-webcams');
-        if (webcamsIdx !== -1 && webcamsIdx !== allOrder.indexOf('live-news') + 1) {
-          allOrder.splice(webcamsIdx, 1);
-          const afterNews = allOrder.indexOf('live-news') + 1;
-          allOrder.splice(afterNews, 0, 'live-webcams');
-        }
-      }
-
-      if (this.ctx.isDesktopApp) {
-        const runtimeIdx = allOrder.indexOf('runtime-config');
-        if (runtimeIdx > 1) {
-          allOrder.splice(runtimeIdx, 1);
-          allOrder.splice(1, 0, 'runtime-config');
-        } else if (runtimeIdx === -1) {
-          allOrder.splice(1, 0, 'runtime-config');
-        }
-      }
     }
 
     this.resolvedPanelOrder = allOrder;
@@ -1762,6 +1723,76 @@ export class PanelLayoutManager implements AppModule {
     }
     this.savePanelOrder();
     this.applyPanelSettings();
+  }
+
+  public reloadPanelOrderFromStorage(): void {
+    const grid = document.getElementById('panelsGrid');
+    const bottomGrid = document.getElementById('mapBottomGrid');
+    if (!grid || !bottomGrid) return;
+
+    const mountedOrder = this.getMountedPanelOrder(grid, bottomGrid);
+    // If cloud restore lands before initial panel mount, createPanels() will
+    // read the just-written localStorage order during normal startup.
+    if (mountedOrder.length === 0) return;
+
+    const savedOrder = this.getSavedPanelOrder();
+    const validSaved = savedOrder.filter(k => mountedOrder.includes(k));
+    const defaultOrder = resolveDefaultPanelOrder(mountedOrder, {
+      variant: SITE_VARIANT,
+      variantDefaults: VARIANT_DEFAULTS,
+      isDesktopApp: this.ctx.isDesktopApp,
+    }).filter(k => mountedOrder.includes(k));
+    const nextOrder = validSaved.length > 0
+      ? resolveSavedPanelOrder(mountedOrder, savedOrder, defaultOrder, {
+        variant: SITE_VARIANT,
+      })
+      : [
+        ...defaultOrder,
+        ...mountedOrder.filter(k => !defaultOrder.includes(k)),
+      ];
+
+    this.resolvedPanelOrder = nextOrder;
+    this.bottomSetMemory = this.getSavedBottomSet();
+
+    const effectiveUltraWide = this.getEffectiveUltraWide();
+    this.wasUltraWide = effectiveUltraWide;
+    const sidebarOrder = effectiveUltraWide
+      ? nextOrder.filter(k => !this.bottomSetMemory.has(k))
+      : nextOrder;
+    const bottomOrder = effectiveUltraWide
+      ? nextOrder.filter(k => this.bottomSetMemory.has(k))
+      : [];
+    const roots = [grid, bottomGrid];
+
+    this.reorderPanelElements(grid, sidebarOrder, roots);
+    this.reorderPanelElements(bottomGrid, bottomOrder, roots);
+    this.applyPanelSettings();
+  }
+
+  private getMountedPanelOrder(grid: HTMLElement, bottomGrid: HTMLElement): string[] {
+    return [...Array.from(grid.children), ...Array.from(bottomGrid.children)]
+      .map((el) => (el as HTMLElement).dataset.panel)
+      .filter((key): key is string => !!key);
+  }
+
+  private findMountedPanelElement(key: string, roots: HTMLElement[]): HTMLElement | null {
+    for (const root of roots) {
+      for (const child of Array.from(root.children)) {
+        const el = child as HTMLElement;
+        if (el.dataset.panel === key) return el;
+      }
+    }
+    return null;
+  }
+
+  private reorderPanelElements(target: HTMLElement, orderedKeys: string[], roots: HTMLElement[]): void {
+    const anchor = target.querySelector('.add-panel-block');
+    for (const key of orderedKeys) {
+      const el = this.findMountedPanelElement(key, roots);
+      if (!el) continue;
+      if (anchor && anchor.parentNode === target) target.insertBefore(el, anchor);
+      else target.appendChild(el);
+    }
   }
 
   private getSavedPanelOrder(): string[] {
