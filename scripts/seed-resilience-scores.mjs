@@ -53,8 +53,11 @@ function requireSeedRefreshKey() {
 // v19 → v20 for country-resilience audit P1-3: stale observed data now
 // derates confidence coverage and headline eligibility, so seeder-written
 // payloads must not share keys with pre-derate confidence metadata.
-export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v20:';
-export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v20';
+// v20 → v21 for the P1-1 CRI contract fix: pillar member domains now use
+// domain.weight * average dimension coverage inside the active `pc` formula.
+// v20 is reserved for the parallel staleness-derate rollout.
+export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v21:';
+export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v21';
 // Must match the server-side RESILIENCE_RANKING_CACHE_TTL_SECONDS. Extended
 // to 12h (2x the cron interval) so a missed/slow cron can't create an
 // EMPTY_ON_DEMAND gap before the next successful rebuild.
