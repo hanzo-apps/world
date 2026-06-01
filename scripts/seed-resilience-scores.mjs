@@ -26,6 +26,7 @@ const WM_KEY = process.env.WORLDMONITOR_API_KEY
 // only this seed-only secret can force the expensive recompute path.
 const WM_REFRESH_KEY = process.env.WORLDMONITOR_SEED_REFRESH_KEY?.trim() || '';
 const SEED_UA = 'Mozilla/5.0 (compatible; WorldMonitor-Seed/1.0)';
+const NEG_SENTINEL = '__WM_NEG__';
 
 function requireSeedRefreshKey() {
   if (WM_REFRESH_KEY) return;
@@ -62,10 +63,19 @@ export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v21';
 // to 12h (2x the cron interval) so a missed/slow cron can't create an
 // EMPTY_ON_DEMAND gap before the next successful rebuild.
 export const RESILIENCE_RANKING_CACHE_TTL_SECONDS = 12 * 60 * 60;
+// Scores section health is independent from ranking-cache freshness. Keep this
+// at 6x the 2h cron cadence even if ranking cache TTL is tuned separately.
+export const RESILIENCE_SCORE_SECTION_META_TTL_SECONDS = 12 * 60 * 60;
 export const RESILIENCE_STATIC_INDEX_KEY = 'resilience:static:index:v1';
 
 const INTERVAL_TTL_SECONDS = 7 * 24 * 60 * 60;
 export { computeIntervals };
+
+function currentCacheFormulaLocal() {
+  const combine = (process.env.RESILIENCE_PILLAR_COMBINE_ENABLED ?? 'false').toLowerCase() === 'true';
+  const schemaV2 = (process.env.RESILIENCE_SCHEMA_V2_ENABLED ?? 'true').toLowerCase() === 'true';
+  return combine && schemaV2 ? 'pc' : 'd6';
+}
 
 async function redisGetJson(url, token, key) {
   const resp = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
@@ -92,12 +102,26 @@ async function redisPipeline(url, token, commands) {
   return resp.json();
 }
 
+export function parseCachedScorePayload(raw) {
+  if (typeof raw !== 'string' || raw.length === 0 || raw === 'null') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed === NEG_SENTINEL) return null;
+    const payload = unwrapEnvelope(parsed).data;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    if (payload._formula !== currentCacheFormulaLocal()) return null;
+    const overallScore = Number(payload.overallScore);
+    if (!Number.isFinite(overallScore) || overallScore <= 0) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 function countCachedFromPipeline(results) {
   let count = 0;
   for (const entry of results) {
-    if (typeof entry?.result === 'string') {
-      try { JSON.parse(entry.result); count++; } catch { /* malformed */ }
-    }
+    if (parseCachedScorePayload(entry?.result) != null) count++;
   }
   return count;
 }
@@ -211,11 +235,7 @@ async function seedResilienceScores() {
     const stillMissing = [];
     for (let i = 0; i < countryCodes.length; i++) {
       const raw = postResults[i]?.result ?? null;
-      if (!raw || raw === 'null') { stillMissing.push(countryCodes[i]); continue; }
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed.overallScore <= 0) stillMissing.push(countryCodes[i]);
-      } catch { stillMissing.push(countryCodes[i]); }
+      if (parseCachedScorePayload(raw) == null) stillMissing.push(countryCodes[i]);
     }
 
     // Warm laggards individually (countries the bulk ranking timed out on)
@@ -282,7 +302,7 @@ async function seedResilienceScores() {
 }
 
 // Trigger a ranking rebuild via the public endpoint EVERY cron, regardless of
-// whether resilience:ranking:v9 is still live at probe time. Short-circuiting
+// whether the current resilience:ranking key is still live at probe time. Short-circuiting
 // on "key present" left a timing hole: if the key was written late in a prior
 // run and the next cron fires early, the key is still alive at probe time →
 // rebuild skipped → key expires a short while later and stays absent until a
@@ -341,16 +361,16 @@ async function refreshRankingAggregate({ url, token, laggardsWarmed }) {
   ]);
   const rankingPresent = rankingLen > 0;
   if (rankingPresent && !metaFresh) {
-    console.warn(`[resilience-scores] Partial publish: ranking:v9 present but seed-meta not fresh — next cron will retry (handler SET is idempotent)`);
+    console.warn(`[resilience-scores] Partial publish: ${RESILIENCE_RANKING_CACHE_KEY} present but seed-meta not fresh — next cron will retry (handler SET is idempotent)`);
   }
   return rankingPresent;
 }
 
 // The seeder does NOT write seed-meta:resilience:ranking. Previously it did,
 // as a "heartbeat" when Pro traffic was quiet — but it could only attest to
-// "recordCount of per-country scores", not to whether `resilience:ranking:v9`
+// "recordCount of per-country scores", not to whether the current ranking key
 // was actually published this cron. The ranking handler gates its SET on a
-// 75% coverage threshold and skips both the ranking and its meta when the
+// 90% coverage threshold and skips both the ranking and its meta when the
 // gate fails; a stale-but-present ranking key combined with a fresh seeder
 // meta write was exactly the "meta says fresh, data is stale" failure mode
 // this PR exists to eliminate. The handler is now the sole writer of meta,
@@ -358,6 +378,26 @@ async function refreshRankingAggregate({ url, token, laggardsWarmed }) {
 // passes. refreshRankingAggregate() triggers the handler every cron so meta
 // never goes silently stale during quiet Pro usage — which was the original
 // reason the seeder meta write existed.
+
+async function writeScoreSectionHeartbeat(result) {
+  if (result?.skipped && result.reason === 'no_index') {
+    console.warn('[resilience-scores] Skipping seed-meta:resilience:scores heartbeat because static index is empty');
+    return;
+  }
+
+  try {
+    await writeFreshnessMetadata(
+      'resilience',
+      'scores',
+      result.recordCount ?? 0,
+      '',
+      RESILIENCE_SCORE_SECTION_META_TTL_SECONDS,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[resilience-scores] Failed to write seed-meta:resilience:scores heartbeat: ${message}`);
+  }
+}
 
 async function main() {
   const startedAt = Date.now();
@@ -374,6 +414,7 @@ async function main() {
   }
 
   const result = await seedResilienceScores();
+  await writeScoreSectionHeartbeat(result);
   logSeedResult('resilience:scores', result.recordCount ?? 0, Date.now() - startedAt, {
     skipped: Boolean(result.skipped),
     ...(result.total != null && { total: result.total }),
