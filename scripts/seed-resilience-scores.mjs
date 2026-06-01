@@ -111,6 +111,13 @@ async function computeAndWriteIntervals(url, token, countryCodes, pipelineResult
     } catch { /* skip malformed */ }
   }
 
+  if (diagnostics.formulaSkipCount > 0) {
+    console.warn(
+      `[resilience-scores] Skipped ${diagnostics.formulaSkipCount} interval payloads with missing/ambiguous formula tags ` +
+      `(samples=${JSON.stringify(diagnostics.formulaSkipSamples)})`,
+    );
+  }
+
   if (commands.length === 0) {
     console.log('[resilience-scores] No domain data available for intervals');
     return { recordCount: 0, diagnostics };
@@ -242,6 +249,8 @@ async function seedResilienceScores() {
       intervalsWritten: intervalResult.recordCount,
       intervalClampCount: intervalResult.diagnostics.activeScoreClampCount,
       intervalClampMaxDelta: intervalResult.diagnostics.activeScoreClampMaxDelta,
+      intervalFormulaSkipCount: intervalResult.diagnostics.formulaSkipCount,
+      intervalFormulaSkipSamples: intervalResult.diagnostics.formulaSkipSamples,
       rankingPresent,
     };
   }
@@ -260,6 +269,8 @@ async function seedResilienceScores() {
     intervalsWritten: intervalResult.recordCount,
     intervalClampCount: intervalResult.diagnostics.activeScoreClampCount,
     intervalClampMaxDelta: intervalResult.diagnostics.activeScoreClampMaxDelta,
+    intervalFormulaSkipCount: intervalResult.diagnostics.formulaSkipCount,
+    intervalFormulaSkipSamples: intervalResult.diagnostics.formulaSkipSamples,
     rankingPresent,
   };
 }
@@ -364,6 +375,8 @@ async function main() {
     ...(result.intervalsWritten != null && { intervalsWritten: result.intervalsWritten }),
     ...(result.intervalClampCount != null && { intervalClampCount: result.intervalClampCount }),
     ...(result.intervalClampMaxDelta != null && { intervalClampMaxDelta: result.intervalClampMaxDelta }),
+    ...(result.intervalFormulaSkipCount != null && { intervalFormulaSkipCount: result.intervalFormulaSkipCount }),
+    ...(result.intervalFormulaSkipSamples?.length ? { intervalFormulaSkipSamples: result.intervalFormulaSkipSamples } : {}),
   });
   if (!result.skipped && (result.recordCount ?? 0) > 0 && !result.rankingPresent) {
     // Observability only — seeder never writes seed-meta. Health will flag the
