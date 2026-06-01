@@ -1,5 +1,5 @@
 /**
- * Theme bridge — wraps the React island in a Hanzo Tamagui provider so all
+ * Theme bridge — wraps the React island in a @hanzo/gui provider so all
  * @hanzo/gui components inherit tokens. The `dark` theme is the default, with
  * a `light` opt-in mirroring the legacy `worldmonitor-theme` localStorage key.
  */

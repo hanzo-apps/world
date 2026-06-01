@@ -1,5 +1,5 @@
 /**
- * Hanzo World GUI config — pure @hanzo/gui (Tamagui-based).
+ * Hanzo World GUI config — pure @hanzo/gui.
  *
  * Built on the official Hanzo defaultConfig from @hanzogui/config (which
  * is a transitive peer of @hanzo/gui). Overrides the dark/light themes for

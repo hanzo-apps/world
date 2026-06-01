@@ -54,7 +54,7 @@ export function getCurrentSession(): IamSession | null {
   }
 }
 
-// Aliases used by Tamagui-rewritten components.
+// Aliases used by @hanzo/gui-rewritten components.
 export const signOutFromIam = signOut;
 export function getAccessToken(): string | null {
   const s = getCurrentSession();
