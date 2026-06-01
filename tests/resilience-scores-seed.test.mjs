@@ -218,6 +218,37 @@ describe('ensures ranking aggregate is present every cron, with truthful meta', 
     }
   });
 
+  it('uses the dedicated seed refresh key for ranking ?refresh=1 calls', () => {
+    assert.match(
+      src,
+      /const WM_REFRESH_KEY = process\.env\.WORLDMONITOR_SEED_REFRESH_KEY\?\.trim\(\) \|\| '';/,
+      'seeder must read the dedicated seed-only refresh secret',
+    );
+    assert.match(
+      src,
+      /if \(WM_REFRESH_KEY\) headers\['X-WorldMonitor-Key'\] = WM_REFRESH_KEY;/,
+      'bulk ranking warmup must send the seed-only refresh secret, not a normal read key',
+    );
+    assert.match(
+      src,
+      /if \(WM_REFRESH_KEY\) rebuildHeaders\['X-WorldMonitor-Key'\] = WM_REFRESH_KEY;/,
+      'scheduled ranking refresh must send the seed-only refresh secret, not a normal read key',
+    );
+  });
+
+  it('fails fast when the dedicated seed refresh key is missing', () => {
+    assert.match(
+      src,
+      /function requireSeedRefreshKey\(\)[\s\S]*?if \(WM_REFRESH_KEY\) return;[\s\S]*?throw new Error\('WORLDMONITOR_SEED_REFRESH_KEY is required for resilience ranking refresh'\);/,
+      'seeder main must hard-fail when the seed-only refresh secret is missing',
+    );
+    assert.match(
+      src,
+      /requireSeedRefreshKey\(\);[\s\S]*?logSeedResult\('resilience:scores', 0,[\s\S]*?reason: 'missing_seed_refresh_key'/,
+      'missing refresh-key failures must emit a seed_complete record before exiting non-zero',
+    );
+  });
+
   it('seeder does NOT write seed-meta:resilience:ranking (handler is sole writer)', () => {
     // A seeder-written meta can only attest to per-country score count, not
     // to whether the ranking aggregate was actually published. Handler gates
