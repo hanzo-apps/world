@@ -4,9 +4,11 @@ import assert from 'node:assert/strict';
 import {
   RESILIENCE_RANKING_CACHE_KEY,
   RESILIENCE_RANKING_CACHE_TTL_SECONDS,
+  RESILIENCE_SCORE_SECTION_META_TTL_SECONDS,
   RESILIENCE_SCORE_CACHE_PREFIX,
   RESILIENCE_STATIC_INDEX_KEY,
   computeIntervals,
+  parseCachedScorePayload,
 } from '../scripts/seed-resilience-scores.mjs';
 
 describe('exported constants', () => {
@@ -25,6 +27,10 @@ describe('exported constants', () => {
     // TTL must exceed cron interval (6h) so a missed/slow cron doesn't create
     // an EMPTY_ON_DEMAND gap. Seeder and handler must agree on the TTL.
     assert.equal(RESILIENCE_RANKING_CACHE_TTL_SECONDS, 12 * 60 * 60);
+  });
+
+  it('RESILIENCE_SCORE_SECTION_META_TTL_SECONDS is 12 hours (6x score cron interval)', () => {
+    assert.equal(RESILIENCE_SCORE_SECTION_META_TTL_SECONDS, 12 * 60 * 60);
   });
 
   it('RESILIENCE_STATIC_INDEX_KEY matches expected key', () => {
@@ -56,6 +62,43 @@ describe('seed script does not export tsx/esm helpers', () => {
   it('buildRankingPayload is not exported (ranking write removed)', async () => {
     const mod = await import('../scripts/seed-resilience-scores.mjs');
     assert.equal(typeof mod.buildRankingPayload, 'undefined');
+  });
+});
+
+describe('score cache payload validation', () => {
+  it('counts only real current-formula score payloads', () => {
+    const originalCombine = process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+    const originalSchema = process.env.RESILIENCE_SCHEMA_V2_ENABLED;
+    process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = 'false';
+    process.env.RESILIENCE_SCHEMA_V2_ENABLED = 'true';
+    try {
+      const valid = {
+        countryCode: 'NO',
+        overallScore: 82,
+        level: 'high',
+        _formula: 'd6',
+      };
+
+      assert.deepEqual(parseCachedScorePayload(JSON.stringify(valid)), valid);
+      assert.deepEqual(
+        parseCachedScorePayload(JSON.stringify({
+          _seed: { fetchedAt: Date.now(), recordCount: 1, sourceVersion: 'test', schemaVersion: 1, state: 'OK' },
+          data: valid,
+        })),
+        valid,
+        'contract envelopes should count when their inner score payload is valid',
+      );
+      assert.equal(parseCachedScorePayload(JSON.stringify('__WM_NEG__')), null);
+      assert.equal(parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'pc' })), null);
+      assert.equal(parseCachedScorePayload(JSON.stringify({ ...valid, overallScore: 0 })), null);
+      assert.equal(parseCachedScorePayload(JSON.stringify({ countryCode: 'NO', overallScore: 82 })), null);
+      assert.equal(parseCachedScorePayload('not-json'), null);
+    } finally {
+      if (originalCombine == null) delete process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+      else process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = originalCombine;
+      if (originalSchema == null) delete process.env.RESILIENCE_SCHEMA_V2_ENABLED;
+      else process.env.RESILIENCE_SCHEMA_V2_ENABLED = originalSchema;
+    }
   });
 });
 
@@ -278,10 +321,23 @@ describe('ensures ranking aggregate is present every cron, with truthful meta', 
     );
   });
 
+  it('writes a score-section heartbeat independent of interval writes', () => {
+    assert.match(
+      src,
+      /async function writeScoreSectionHeartbeat\b[\s\S]*?result\?\.skipped && result\.reason === 'no_index'[\s\S]*?return;[\s\S]*?writeFreshnessMetadata\(\s*'resilience',\s*'scores',[\s\S]*?RESILIENCE_SCORE_SECTION_META_TTL_SECONDS/,
+      'score seeder must write seed-meta:resilience:scores for completed score/ranking work, but not for empty-index skips',
+    );
+    assert.match(
+      src,
+      /const result = await seedResilienceScores\(\);\s*await writeScoreSectionHeartbeat\(result\);/,
+      'score heartbeat helper must run after the score/ranking section so it can gate completed runs and skip no_index safely',
+    );
+  });
+
   it('seeder does NOT write seed-meta:resilience:ranking (handler is sole writer)', () => {
     // A seeder-written meta can only attest to per-country score count, not
     // to whether the ranking aggregate was actually published. Handler gates
-    // its SET on 75% coverage; if the gate trips, an older ranking survives
+    // its SET on 90% coverage; if the gate trips, an older ranking survives
     // and seeder meta would lie about freshness. Remove the seeder write —
     // handler writes ranking + meta atomically, ensureRankingPresent()
     // triggers the handler every cron so meta stays fresh during quiet Pro
@@ -325,6 +381,20 @@ describe('seed-bundle-resilience section interval keeps refresh alive', () => {
       hours > 0 && hours <= 2,
       `intervalMs must be ≤ 2 hours (found ${hours}) so refreshRankingAggregate runs frequently enough to keep the ranking key alive before its 12h TTL`,
     );
+  });
+
+  it('Resilience-Scores section gates on score heartbeat, not interval heartbeat', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(
+      join(dir, '..', 'scripts', 'seed-bundle-resilience.mjs'),
+      'utf8',
+    );
+    const section = src.match(/label:\s*'Resilience-Scores'[\s\S]{0,240}/)?.[0] ?? '';
+    assert.match(section, /seedMetaKey:\s*'resilience:scores'/);
+    assert.doesNotMatch(section, /seedMetaKey:\s*'resilience:intervals'/);
   });
 });
 
