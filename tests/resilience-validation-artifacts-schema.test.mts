@@ -3,6 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  KNOWN_CACHE_FORMULAS,
+  KNOWN_METHODOLOGY_FORMULAS,
+  PC_VALIDATION_ARTIFACT_MIN_GENERATED_AT,
+  methodologyFormulaForCacheFormula,
+} from '../scripts/lib/resilience-formula.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const validationDir = resolve(here, '../docs/methodology/country-resilience-index/validation');
@@ -28,7 +34,6 @@ const EXPECTED_BACKTEST_DATA_SOURCES = new Map<string, string>([
   ['sanctions-shocks', 'hardcoded'],
   ['sovereign-stress', 'hardcoded'],
 ]);
-
 function readJson(path: string): unknown {
   assert.ok(existsSync(path), `${path} must exist`);
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -49,11 +54,39 @@ function assertPositiveTimestamp(value: unknown, label: string): void {
   assert.ok(value > 0, `${label} must be non-zero`);
 }
 
+function assertString(value: unknown, label: string): string {
+  assert.equal(typeof value, 'string', `${label} must be a string`);
+  return value;
+}
+
+function assertFormulaMetadata(artifact: Record<string, unknown>, label: string): void {
+  const cacheFormula = assertString(artifact._formula, `${label}._formula`);
+  assert.ok(KNOWN_CACHE_FORMULAS.has(cacheFormula), `${label}._formula must be one of ${[...KNOWN_CACHE_FORMULAS].join(', ')}`);
+  const methodologyFormula = assertString(artifact.methodologyFormula, `${label}.methodologyFormula`);
+  assert.ok(
+    KNOWN_METHODOLOGY_FORMULAS.has(methodologyFormula),
+    `${label}.methodologyFormula must be one of ${[...KNOWN_METHODOLOGY_FORMULAS].join(', ')}`,
+  );
+  assert.equal(
+    methodologyFormula,
+    methodologyFormulaForCacheFormula(cacheFormula),
+    `${label}.methodologyFormula must match ${label}._formula`,
+  );
+  if (cacheFormula === 'pc') {
+    assertFiniteNumber(artifact.generatedAt, `${label}.generatedAt`);
+    assert.ok(
+      artifact.generatedAt >= PC_VALIDATION_ARTIFACT_MIN_GENERATED_AT,
+      `${label} pc artifact generatedAt ${new Date(artifact.generatedAt).toISOString()} must be at or after ${new Date(PC_VALIDATION_ARTIFACT_MIN_GENERATED_AT).toISOString()}`,
+    );
+  }
+}
+
 describe('resilience validation artifacts', () => {
   it('commits a real benchmark artifact for the current comparator set', () => {
     const benchmark = asRecord(readJson(benchmarkPath), 'benchmark artifact');
 
     assertPositiveTimestamp(benchmark.generatedAt, 'benchmark.generatedAt');
+    assertFormulaMetadata(benchmark, 'benchmark');
     assert.ok(!('_note' in benchmark), 'benchmark artifact must not be a placeholder');
 
     assert.equal(typeof benchmark.license, 'string', 'benchmark.license must be a string');
@@ -99,6 +132,7 @@ describe('resilience validation artifacts', () => {
     const backtest = asRecord(readJson(backtestPath), 'backtest artifact');
 
     assertPositiveTimestamp(backtest.generatedAt, 'backtest.generatedAt');
+    assertFormulaMetadata(backtest, 'backtest');
     assert.ok(!('_note' in backtest), 'backtest artifact must not be a placeholder');
     assert.equal(backtest.holdoutPeriod, '2024-2025');
     assert.equal(backtest.aucThreshold, 0.75);
