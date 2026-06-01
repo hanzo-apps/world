@@ -18,14 +18,19 @@ import {
 loadEnvFile(import.meta.url);
 
 const API_BASE = process.env.API_BASE_URL || 'https://api.worldmonitor.app';
-// Reuse WORLDMONITOR_VALID_KEYS when a dedicated WORLDMONITOR_API_KEY isn't set —
-// any entry in that comma-separated list is accepted by the API (same
-// validation list that server/_shared/premium-check.ts and validateApiKey read).
-// Avoids duplicating the same secret under a second env-var name per service.
+// Normal premium reads/warmups use the standard API key allowlist.
 const WM_KEY = process.env.WORLDMONITOR_API_KEY
   || (process.env.WORLDMONITOR_VALID_KEYS ?? '').split(',').map((k) => k.trim()).filter(Boolean)[0]
   || '';
+// Ranking ?refresh=1 is intentionally stronger than a normal premium read:
+// only this seed-only secret can force the expensive recompute path.
+const WM_REFRESH_KEY = process.env.WORLDMONITOR_SEED_REFRESH_KEY?.trim() || '';
 const SEED_UA = 'Mozilla/5.0 (compatible; WorldMonitor-Seed/1.0)';
+
+function requireSeedRefreshKey() {
+  if (WM_REFRESH_KEY) return;
+  throw new Error('WORLDMONITOR_SEED_REFRESH_KEY is required for resilience ranking refresh');
+}
 
 // Bumped v13 → v14 in lockstep with server/worldmonitor/resilience/v1/
 // _shared.ts for plan 2026-04-25-004 Phase 2 (Ship 2) — adds the new
@@ -171,7 +176,7 @@ async function seedResilienceScores() {
       // WM_KEY is absent) would recover. Forcing a recompute routes the call
       // through warmMissingResilienceScores and its chunked pipeline SET.
       const headers = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
-      if (WM_KEY) headers['X-WorldMonitor-Key'] = WM_KEY;
+      if (WM_REFRESH_KEY) headers['X-WorldMonitor-Key'] = WM_REFRESH_KEY;
       const resp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking?refresh=1`, {
         headers,
         signal: AbortSignal.timeout(60_000),
@@ -279,7 +284,7 @@ async function refreshRankingAggregate({ url, token, laggardsWarmed }) {
     // flow where a failed rebuild would leave the ranking absent instead of
     // stale-but-present.
     const rebuildHeaders = { 'User-Agent': SEED_UA, 'Accept': 'application/json' };
-    if (WM_KEY) rebuildHeaders['X-WorldMonitor-Key'] = WM_KEY;
+    if (WM_REFRESH_KEY) rebuildHeaders['X-WorldMonitor-Key'] = WM_REFRESH_KEY;
     const rebuildResp = await fetch(`${API_BASE}/api/resilience/v1/get-resilience-ranking?refresh=1`, {
       headers: rebuildHeaders,
       signal: AbortSignal.timeout(60_000),
@@ -339,6 +344,18 @@ async function refreshRankingAggregate({ url, token, laggardsWarmed }) {
 
 async function main() {
   const startedAt = Date.now();
+  try {
+    requireSeedRefreshKey();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logSeedResult('resilience:scores', 0, Date.now() - startedAt, {
+      skipped: true,
+      reason: 'missing_seed_refresh_key',
+      error: message,
+    });
+    throw err;
+  }
+
   const result = await seedResilienceScores();
   logSeedResult('resilience:scores', result.recordCount ?? 0, Date.now() - startedAt, {
     skipped: Boolean(result.skipped),
