@@ -7,7 +7,7 @@
  * OIDC JWTs.
  *
  * Env:
- *   IAM_ENDPOINT / IAM_URL / HANZO_IAM_URL — base URL of hanzo.id (default https://hanzo.id)
+ *   IAM_ENDPOINT / IAM_URL — base URL of hanzo.id (default https://hanzo.id)
  *   IAM_JWKS_URL — override JWKS location (default <IAM_ENDPOINT>/.well-known/jwks.json)
  */
 
@@ -17,7 +17,6 @@ function iamBaseUrl(): string {
   return (
     process.env.IAM_ENDPOINT
     ?? process.env.IAM_URL
-    ?? process.env.HANZO_IAM_URL
     ?? 'https://hanzo.id'
   ).replace(/\/+$/, '');
 }
