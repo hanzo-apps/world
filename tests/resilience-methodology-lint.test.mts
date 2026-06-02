@@ -35,14 +35,18 @@ const METHODOLOGY_CANDIDATES = [
 const HEADING_TO_DIMENSION: Readonly<Record<string, ResilienceDimensionId>> = {
   'Macro-Fiscal': 'macroFiscal',
   'Currency & External': 'currencyExternal',
-  'Trade & Sanctions': 'tradeSanctions',
+  'Trade Policy': 'tradePolicy',
+  'Financial System Exposure': 'financialSystemExposure',
   'Cyber & Digital': 'cyberDigital',
   'Logistics & Supply': 'logisticsSupply',
   'Infrastructure': 'infrastructure',
   'Energy': 'energy',
   'Governance': 'governanceInstitutional',
   'Social Cohesion': 'socialCohesion',
-  'Border Security': 'borderSecurity',
+  // #3737 — methodology doc heading relabeled from 'Border Security' to match
+  // what the scorer actually measures. Internal id `borderSecurity` retained
+  // for proto / cache-key stability.
+  'Conflict & Displacement': 'borderSecurity',
   'Information & Cognitive': 'informationCognitive',
   'Health & Public Service': 'healthPublicService',
   'Food & Water': 'foodWater',
@@ -52,6 +56,8 @@ const HEADING_TO_DIMENSION: Readonly<Record<string, ResilienceDimensionId>> = {
   'Import Concentration': 'importConcentration',
   'State Continuity': 'stateContinuity',
   'Fuel Stock Days': 'fuelStockDays',
+  'Liquid Reserve Adequacy': 'liquidReserveAdequacy',
+  'Sovereign Fiscal Buffer': 'sovereignFiscalBuffer',
 };
 
 function findMethodologyFile(): string {
@@ -154,6 +160,66 @@ describe('resilience methodology doc linter (T1.8)', () => {
       registryNotMapped,
       [],
       `RESILIENCE_DIMENSION_ORDER contains dimensions that are not in HEADING_TO_DIMENSION: ${registryNotMapped.join(', ')}`,
+    );
+  });
+
+  it('does not describe shipped source-failure and score-interval features as future work', () => {
+    assert.doesNotMatch(
+      source,
+      /The `source-failure` class is reserved for the runtime path/i,
+      'The methodology must not preserve the old source-failure placeholder paragraph.',
+    );
+    assert.doesNotMatch(
+      source,
+      /that wiring lands with a later Phase 1 task/i,
+      'The methodology must not claim source-failure re-tagging is future work; the scorer aggregation path is wired.',
+    );
+    assert.doesNotMatch(
+      source,
+      /not yet represented in the table above/i,
+      'The methodology must not claim the source-failure table entry is missing.',
+    );
+    assert.doesNotMatch(
+      source,
+      /widget does not render (?:them|the overall score interval) yet/i,
+      'The methodology must not claim the widget omits score sensitivity bands; it renders the overall [p05-p95] range.',
+    );
+    assert.match(
+      source,
+      /seed-meta:resilience:static\.failedDatasets[\s\S]{0,160}re-tags affected imputed dimensions as `source-failure`/i,
+      'The methodology should document the live failedDatasets to source-failure re-tagging path.',
+    );
+    assert.match(
+      source,
+      /widget renders the overall `\[p05\u2013p95\]` range/i,
+      'The methodology should document that the widget renders the overall score sensitivity band.',
+    );
+  });
+
+  it('does not use stale PR0 current-state language before the changelog', () => {
+    const changelogIndex = source.indexOf('\n## Changelog');
+    assert.notEqual(changelogIndex, -1, 'Methodology doc should have a Changelog section.');
+    const currentStateSource = source.slice(0, changelogIndex);
+
+    assert.doesNotMatch(
+      currentStateSource,
+      /This PR \(the diagnostic freeze\)/i,
+      'Current methodology prose must not describe the document as the PR0 diagnostic freeze.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /Published rankings today reflect the pre-repair scorer/i,
+      'Current methodology prose must not claim published rankings are pre-repair.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /At the time of writing \(PR 0 shipping\)/i,
+      'Current methodology prose must not preserve stale PR0 timestamp language.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /Until PR 1[\u2013-]PR 3 land/i,
+      'Current methodology prose must not describe already-landed repairs as future work.',
     );
   });
 });

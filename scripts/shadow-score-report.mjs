@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Extract shadow:score-log (defaults to v3; override via SHADOW_SCORE_KEY) from
+// Extract shadow:score-log (defaults to v4; override via SHADOW_SCORE_KEY) from
 // Upstash and write a review bundle to ./shadow-score-report/. Parses both v2
 // JSON members and legacy v1 string members.
 // Usage: node scripts/shadow-score-report.mjs
@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 
 // v2 is the post-fix key (JSON members). v1 is the legacy key (compact strings).
 // Override with SHADOW_SCORE_KEY=shadow:score-log:v2 (pre-weight-rebalance) or v1 (pre-PR #3069).
-const KEY = process.env.SHADOW_SCORE_KEY || 'shadow:score-log:v3';
+const KEY = process.env.SHADOW_SCORE_KEY || 'shadow:score-log:v5';
 const OUT = resolve(process.cwd(), 'shadow-score-report');
 const GATE_MIN = 40;     // current IMPORTANCE_SCORE_MIN default
 const HIGH = 65;         // current shouldNotify "high" sensitivity threshold
@@ -119,7 +119,7 @@ function summary(events) {
   return { total, mean, p50: p(0.5), p75: p(0.75), p90: p(0.9), p95: p(0.95), p99: p(0.99), min: scores[0], max: scores[total - 1], hist, gates, byDay, byType, dupesLikely: dupes };
 }
 
-function renderReport(s, events) {
+function renderReport(s, _events) {
   const lines = [];
   const push = (...a) => lines.push(a.join(''));
   push(`# ${KEY} report`);

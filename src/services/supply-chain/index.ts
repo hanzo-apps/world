@@ -1,14 +1,18 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
+import { premiumFetch } from '@/services/premium-fetch';
 import type { CargoType } from '@/config/bypass-corridors';
 import {
   SupplyChainServiceClient,
   type GetShippingRatesResponse,
   type GetChokepointStatusResponse,
+  type GetChokepointHistoryResponse,
   type GetCriticalMineralsResponse,
   type GetShippingStressResponse,
   type GetCountryChokepointIndexResponse,
   type GetBypassOptionsResponse,
   type GetCountryCostShockResponse,
+  type GetCountryProductsResponse,
+  type GetMultiSectorCostShockResponse,
   type GetSectorDependencyResponse,
   type GetRouteExplorerLaneResponse,
   type GetRouteImpactResponse,
@@ -19,18 +23,26 @@ import {
   type ShippingRatePoint,
   type ChokepointExposureEntry,
   type BypassOption,
+  type TransitDayCount,
+  type CountryProduct,
+  type ProductExporter,
+  type MultiSectorCostShock,
 } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getHydratedData } from '@/services/bootstrap';
+import { hasPremiumAccess } from '@/services/panel-gating';
 
 export type {
   GetShippingRatesResponse,
   GetChokepointStatusResponse,
+  GetChokepointHistoryResponse,
   GetCriticalMineralsResponse,
   GetShippingStressResponse,
   GetCountryChokepointIndexResponse,
   GetBypassOptionsResponse,
   GetCountryCostShockResponse,
+  GetCountryProductsResponse,
+  GetMultiSectorCostShockResponse,
   GetSectorDependencyResponse,
   GetRouteExplorerLaneResponse,
   GetRouteImpactResponse,
@@ -41,9 +53,27 @@ export type {
   ShippingRatePoint,
   ChokepointExposureEntry,
   BypassOption,
+  TransitDayCount,
+  CountryProduct,
+  ProductExporter,
+  MultiSectorCostShock,
 };
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+// Legacy aliases consumed by CountryBriefPanel + CountryDeepDivePanel — match the
+// proto-generated shapes exactly so callsites compile without churn.
+export type CountryProductsResponse = GetCountryProductsResponse;
+export type MultiSectorShockResponse = GetMultiSectorCostShockResponse;
+export type MultiSectorShock = MultiSectorCostShock;
+
+// premiumFetch for the whole client: 8 of 13 methods target paths in
+// PREMIUM_RPC_PATHS. The gateway runs validateApiKey with forceKey=true on
+// those paths *before* isCallerPremium; globalThis.fetch here would 401 for
+// signed-in browser pros (no Clerk bearer / no WM key injected) and the
+// generated client's try/catch would swallow the 401, returning the empty
+// fallbacks below. premiumFetch no-ops safely when no credentials are
+// available, so the 5 non-premium methods (shippingRates, chokepointStatus,
+// chokepointHistory, criticalMinerals, shippingStress) keep working as before.
+const client = new SupplyChainServiceClient(getRpcBaseUrl(), { fetch: premiumFetch });
 
 const shippingBreaker = createCircuitBreaker<GetShippingRatesResponse>({ name: 'Shipping Rates', cacheTtlMs: 60 * 60 * 1000, persistCache: true });
 const chokepointBreaker = createCircuitBreaker<GetChokepointStatusResponse>({ name: 'Chokepoint Status', cacheTtlMs: 90 * 60 * 1000, persistCache: true });
@@ -76,6 +106,22 @@ export async function fetchChokepointStatus(): Promise<GetChokepointStatusRespon
     }, emptyChokepoints);
   } catch {
     return emptyChokepoints;
+  }
+}
+
+/**
+ * Lazy-load transit history for a single chokepoint. Main status RPC returns
+ * transitSummary.history = [] to keep the payload under the 1.5s Redis read
+ * budget; this call pulls the ~35KB per-id history key only when a card is
+ * expanded. See docs/plans/chokepoint-rpc-payload-split.md.
+ */
+export async function fetchChokepointHistory(
+  chokepointId: string,
+): Promise<GetChokepointHistoryResponse> {
+  try {
+    return await client.getChokepointHistory({ chokepointId });
+  } catch {
+    return { chokepointId, history: [], fetchedAt: '0' };
   }
 }
 
@@ -118,6 +164,12 @@ export async function fetchCountryChokepointIndex(
   iso2: string,
   hs2 = '27',
 ): Promise<GetCountryChokepointIndexResponse> {
+  // Anonymous (non-premium) users: skip the Pro-gated RPC. The path
+  // /api/supply-chain/v1/get-country-chokepoint-index is in
+  // PREMIUM_RPC_PATHS, so an anonymous client gets a deterministic 401
+  // and the catch returns this same emptyChokepointIndex anyway — minus
+  // the console-noise on every country-brief open. Mirrors PR #3584.
+  if (!hasPremiumAccess()) return { ...emptyChokepointIndex, iso2, hs2 };
   try {
     return await client.getCountryChokepointIndex({ iso2, hs2 });
   } catch {
@@ -187,6 +239,8 @@ export async function fetchBypassOptions(
   closurePct = 100,
 ): Promise<GetBypassOptionsResponse> {
   const empty: GetBypassOptionsResponse = { chokepointId, cargoType, closurePct, options: [], primaryChokepointWarRiskTier: 'WAR_RISK_TIER_UNSPECIFIED', fetchedAt: '' };
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return empty;
   try {
     return await client.getBypassOptions({ chokepointId, cargoType, closurePct });
   } catch {
@@ -205,6 +259,8 @@ export async function fetchCountryCostShock(
     warRiskTier: 'WAR_RISK_TIER_UNSPECIFIED',
     hasEnergyModel: false, unavailableReason: '', fetchedAt: '',
   };
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return empty;
   try {
     return await client.getCountryCostShock({ iso2, chokepointId, hs2 });
   } catch {
@@ -223,6 +279,8 @@ export async function fetchSectorDependency(
   iso2: string,
   hs2 = '27',
 ): Promise<GetSectorDependencyResponse> {
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return { ...emptySectorDependency, iso2, hs2 };
   try {
     return await client.getSectorDependency({ iso2, hs2 });
   } catch {
@@ -252,6 +310,8 @@ export interface FetchRouteExplorerLaneArgs {
 export async function fetchRouteExplorerLane(
   args: FetchRouteExplorerLaneArgs,
 ): Promise<GetRouteExplorerLaneResponse> {
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return { ...emptyRouteExplorerLane, ...args };
   try {
     return await client.getRouteExplorerLane(args);
   } catch {
@@ -280,6 +340,8 @@ export interface FetchRouteImpactArgs {
 export async function fetchRouteImpact(
   args: FetchRouteImpactArgs,
 ): Promise<GetRouteImpactResponse> {
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return { ...emptyRouteImpact };
   try {
     return await client.getRouteImpact(args);
   } catch {
@@ -287,70 +349,19 @@ export async function fetchRouteImpact(
   }
 }
 
-export interface ProductExporter {
-  partnerCode: number;
-  partnerIso2: string;
-  value: number;
-  share: number;
-}
+const emptyProducts: GetCountryProductsResponse = { iso2: '', products: [], fetchedAt: '' };
 
-export interface CountryProduct {
-  hs4: string;
-  description: string;
-  totalValue: number;
-  topExporters: ProductExporter[];
-  year: number;
-}
-
-export interface CountryProductsResponse {
-  iso2: string;
-  products: CountryProduct[];
-  fetchedAt: string;
-}
-
-const emptyProducts: CountryProductsResponse = { iso2: '', products: [], fetchedAt: '' };
-
-export async function fetchCountryProducts(iso2: string): Promise<CountryProductsResponse> {
+export async function fetchCountryProducts(iso2: string): Promise<GetCountryProductsResponse> {
+  // Pro-gated path — see fetchCountryChokepointIndex.
+  if (!hasPremiumAccess()) return { ...emptyProducts, iso2 };
   try {
-    const { premiumFetch } = await import('@/services/premium-fetch');
-    const { toApiUrl } = await import('@/services/runtime');
-    const resp = await premiumFetch(
-      toApiUrl(`/api/supply-chain/v1/country-products?iso2=${encodeURIComponent(iso2)}`),
-    );
-    if (!resp.ok) return { ...emptyProducts, iso2 };
-    return await resp.json() as CountryProductsResponse;
+    return await client.getCountryProducts({ iso2 });
   } catch {
     return { ...emptyProducts, iso2 };
   }
 }
 
-export interface MultiSectorShock {
-  hs2: string;
-  hs2Label: string;
-  importValueAnnual: number;
-  freightAddedPctPerTon: number;
-  warRiskPremiumBps: number;
-  addedTransitDays: number;
-  totalCostShockPerDay: number;
-  totalCostShock30Days: number;
-  totalCostShock90Days: number;
-  /** Cost for the currently-requested closure duration (server-clamped). */
-  totalCostShock: number;
-  closureDays: number;
-}
-
-export interface MultiSectorShockResponse {
-  iso2: string;
-  chokepointId: string;
-  closureDays: number;
-  warRiskTier: string;
-  sectors: MultiSectorShock[];
-  totalAddedCost: number;
-  fetchedAt: string;
-  unavailableReason: string;
-}
-
-const emptyMultiSectorShock: MultiSectorShockResponse = {
+const emptyMultiSectorShock: GetMultiSectorCostShockResponse = {
   iso2: '',
   chokepointId: '',
   closureDays: 30,
@@ -363,25 +374,23 @@ const emptyMultiSectorShock: MultiSectorShockResponse = {
 
 /**
  * Fetch multi-sector cost shock for a country+chokepoint+closureDays window.
- * PRO-gated: non-premium callers receive HTTP 403 and this function returns an empty response.
+ * PRO-gated: non-premium callers get an empty payload from the handler.
  */
 export async function fetchMultiSectorCostShock(
   iso2: string,
   chokepointId: string,
   closureDays: number,
   options?: { signal?: AbortSignal },
-): Promise<MultiSectorShockResponse> {
+): Promise<GetMultiSectorCostShockResponse> {
+  // Pro-gated path — see fetchCountryChokepointIndex. Existing call sites
+  // already guard with hasPremiumAccess(); the service-layer check here
+  // is defense-in-depth to keep parity with sibling fetchers.
+  if (!hasPremiumAccess()) return { ...emptyMultiSectorShock, iso2, chokepointId, closureDays };
   try {
-    const { premiumFetch } = await import('@/services/premium-fetch');
-    const { toApiUrl } = await import('@/services/runtime');
-    const url = toApiUrl(
-      `/api/supply-chain/v1/multi-sector-cost-shock?iso2=${encodeURIComponent(iso2)}`
-      + `&chokepointId=${encodeURIComponent(chokepointId)}`
-      + `&closureDays=${encodeURIComponent(String(closureDays))}`,
+    return await client.getMultiSectorCostShock(
+      { iso2, chokepointId, closureDays },
+      { signal: options?.signal },
     );
-    const resp = await premiumFetch(url, { signal: options?.signal });
-    if (!resp.ok) return { ...emptyMultiSectorShock, iso2, chokepointId, closureDays };
-    return await resp.json() as MultiSectorShockResponse;
   } catch {
     return { ...emptyMultiSectorShock, iso2, chokepointId, closureDays };
   }

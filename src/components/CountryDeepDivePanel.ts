@@ -43,6 +43,8 @@ import { fetchMultiSectorCostShock, HS2_SHORT_LABELS } from '@/services/supply-c
 import type { MapContainer } from './MapContainer';
 import { ResilienceWidget } from './ResilienceWidget';
 import { dedupeHeadlines } from './CountryDeepDivePanel-news-utils';
+import { renderFollowButton } from '@/utils/follow-button';
+import { renderNotifyCountryLink } from '@/utils/notify-country-link';
 
 const DEPENDENCY_FLAG_LABELS: Record<string, { text: string; cls: string }> = {
   DEPENDENCY_FLAG_SINGLE_SOURCE_CRITICAL:   { text: 'Single Source',   cls: 'cdp-dep-critical' },
@@ -52,6 +54,8 @@ const DEPENDENCY_FLAG_LABELS: Record<string, { text: string; cls: string }> = {
 };
 import { toApiUrl } from '@/services/runtime';
 import type { ComputeEnergyShockScenarioResponse, ProductImpact } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 type ThreatLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 type TrendDirection = 'up' | 'down' | 'flat';
@@ -73,6 +77,19 @@ const SEVERITY_ORDER: Record<ThreatLevel, number> = {
   low: 1,
   info: 0,
 };
+
+// Clamp long disruption shortDescriptions when rendered in the compact
+// CountryDeepDive Atlas row. Some registry entries (OFAC designations,
+// multi-clause sanctions summaries) run 100–200 chars; without a clamp
+// they overflow the row. 80 chars is a balance between scannability and
+// information density; full detail stays accessible by clicking through
+// to the asset drawer.
+const DISRUPTION_LABEL_MAX_LEN = 80;
+function truncateDisruptionLabel(eventType: string, shortDescription: string): string {
+  const base = `${eventType} — ${shortDescription}`;
+  if (base.length <= DISRUPTION_LABEL_MAX_LEN) return base;
+  return base.slice(0, DISRUPTION_LABEL_MAX_LEN - 1) + '…';
+}
 
 export class CountryDeepDivePanel implements CountryBriefPanel {
   private panel: HTMLElement;
@@ -127,6 +144,15 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
   private costShockCalcClosureDays = 30;
   private costShockCalcAbort: AbortController | null = null;
   private costShockCalcDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Holds the teardown returned by the FollowButton's `attach()` mounted
+  // in the title row. The skeleton is rebuilt every `show()` call (via
+  // `resetPanelContent` → `renderSkeleton`), and the panel itself is
+  // long-lived (singleton on `document.body`), so this teardown must
+  // fire BEFORE the skeleton is wiped and on `hide()`.
+  private followButtonTeardown: (() => void) | null = null;
+  // Sibling teardown for the U8 "Notify me about this country" sub-action
+  // mounted alongside the FollowButton. Same lifecycle constraints.
+  private notifyLinkTeardown: (() => void) | null = null;
 
   private readonly handleGlobalKeydown = (event: KeyboardEvent): void => {
     if (!this.panel.classList.contains('active')) return;
@@ -243,6 +269,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
   public hide(): void {
     this.destroyResilienceWidget();
+    this.tearDownFollowButton();
     if (this.isMaximizedState) {
       this.isMaximizedState = false;
       this.panel.classList.remove('maximized');
@@ -1138,7 +1165,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         // allocate the residual to "Other" so the breakdown sums to the Fossil legend value (see #2971).
         // If independent rounding pushes coal+gas above fossilR, trim the larger of the two so
         // the breakdown never sums above the Fossil legend.
-        let overshoot = (coalR + gasR) - fossilR;
+        const overshoot = (coalR + gasR) - fossilR;
         if (overshoot > 0) {
           if (coalR >= gasR) coalR -= overshoot;
           else gasR -= overshoot;
@@ -1165,6 +1192,202 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     if (data.jodiOilAvailable || data.jodiGasAvailable) {
       this.energyBody.append(this.renderShockScenarioWidget());
     }
+
+    // Atlas exposure: pipelines, storage, shortages, disruptions filtered
+    // to this country. Reads from the same bootstrap-hydrated stores as
+    // the Energy Atlas variant, so the count is free when data is warm
+    // and silently absent when a user is on a variant that doesn't
+    // pre-hydrate those keys.
+    this.renderAtlasExposure();
+  }
+
+  private renderAtlasExposure(): void {
+    if (!this.energyBody) return;
+    const iso2 = this.currentCode;
+    if (!iso2 || iso2.length !== 2) return;
+
+    // Late-import so non-energy variants can tree-shake these modules at
+    // build time if the Atlas panels aren't bundled. Static imports are
+    // safe here because all four stores are pure client caches.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    import('@/shared/pipeline-registry-store').then(({ getCachedPipelineRegistries }) => {
+      const { gas, oil } = getCachedPipelineRegistries() as {
+        gas: { pipelines?: Record<string, { fromCountry?: string; toCountry?: string; transitCountries?: string[]; name?: string; id?: string }> } | undefined;
+        oil: { pipelines?: Record<string, { fromCountry?: string; toCountry?: string; transitCountries?: string[]; name?: string; id?: string }> } | undefined;
+      };
+      const touches = (p: { fromCountry?: string; toCountry?: string; transitCountries?: string[] }): boolean =>
+        p.fromCountry === iso2 || p.toCountry === iso2 ||
+        (Array.isArray(p.transitCountries) && p.transitCountries.includes(iso2));
+      const pipes = [
+        ...Object.values(gas?.pipelines ?? {}).filter(touches),
+        ...Object.values(oil?.pipelines ?? {}).filter(touches),
+      ];
+      if (pipes.length > 0) {
+        this.appendAtlasRow(
+          `Pipelines touching ${iso2}`,
+          `${pipes.length} pipeline${pipes.length === 1 ? '' : 's'}`,
+          pipes.map(p => ({
+            id: p.id || '',
+            label: p.name || p.id || '',
+            event: 'energy:open-pipeline-detail',
+            detail: { pipelineId: p.id },
+          })),
+        );
+      }
+    }).catch(() => {});
+
+    import('@/shared/storage-facility-registry-store').then(({ getCachedStorageFacilityRegistry }) => {
+      const { registry } = getCachedStorageFacilityRegistry() as {
+        registry: { facilities?: Record<string, { country?: string; name?: string; id?: string }> } | undefined;
+      };
+      const facilities = Object.values(registry?.facilities ?? {}).filter(f => f.country === iso2);
+      if (facilities.length > 0) {
+        this.appendAtlasRow(
+          `Storage in ${iso2}`,
+          `${facilities.length} facilit${facilities.length === 1 ? 'y' : 'ies'}`,
+          facilities.map(f => ({
+            id: f.id || '',
+            label: f.name || f.id || '',
+            event: 'energy:open-storage-facility-detail',
+            detail: { facilityId: f.id },
+          })),
+        );
+      }
+    }).catch(() => {});
+
+    import('@/shared/fuel-shortage-registry-store').then(({ getCachedFuelShortageRegistry }) => {
+      const { registry } = getCachedFuelShortageRegistry() as {
+        registry: { shortages?: Record<string, { country?: string; product?: string; severity?: string; id?: string; shortDescription?: string; resolvedAt?: string | null }> } | undefined;
+      };
+      // Exclude resolved shortages — the drill-down counts ACTIVE crises
+      // per country, and rendering resolved rows as active inflates the
+      // confirmed/watch severity line. Classifier writes resolvedAt on
+      // resolution; raw seed uses null.
+      const shortages = Object.values(registry?.shortages ?? {})
+        .filter(s => s.country === iso2 && !s.resolvedAt);
+      if (shortages.length > 0) {
+        const confirmedCount = shortages.filter(s => s.severity === 'confirmed').length;
+        const severityLine = confirmedCount > 0
+          ? `${confirmedCount} confirmed · ${shortages.length - confirmedCount} watch`
+          : `${shortages.length} watch`;
+        this.appendAtlasRow(
+          `Fuel shortages in ${iso2}`,
+          severityLine,
+          shortages.map(s => ({
+            id: s.id || '',
+            label: `${s.product || ''} — ${s.shortDescription || ''}`.trim(),
+            event: 'energy:open-fuel-shortage-detail',
+            detail: { shortageId: s.id },
+          })),
+        );
+      }
+    }).catch(() => {});
+
+    // Disruptions filter (plan §R/#5 decision B). The seeded registry carries
+    // denormalised `countries[]` on every event, populated from the referenced
+    // pipeline or storage facility. We fetch the full list once (no asset
+    // filter) and narrow client-side; the bootstrap payload already contains
+    // the registry so this is usually cache-hot. If the RPC round-trip returns
+    // nothing, we silently skip — CountryDeepDive is not the primary
+    // disruption surface (EnergyDisruptionsPanel is), so an empty row is
+    // preferable to a spurious error.
+    this.loadDisruptionsForCountry(iso2);
+  }
+
+  private async loadDisruptionsForCountry(iso2: string): Promise<void> {
+    try {
+      const { SupplyChainServiceClient } = await import(
+        '@/generated/client/worldmonitor/supply_chain/v1/service_client'
+      );
+      const { getRpcBaseUrl } = await import('@/services/rpc-client');
+      // Thread the panel's `signal` into the fetch shim so a country
+      // switch or panel close cancels the in-flight request, not just
+      // discards the result via the `this.currentCode !== iso2` guard
+      // below. Codex P2 on PR #3377.
+      const abortSignal = this.signal;
+      const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
+        fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), signal: abortSignal }),
+      });
+      const res = await client.listEnergyDisruptions({
+        assetId: '',
+        assetType: '',
+        ongoingOnly: false,
+      });
+      if (!res || !Array.isArray(res.events) || this.currentCode !== iso2) return;
+      const events = res.events.filter(e =>
+        Array.isArray(e.countries) && e.countries.includes(iso2),
+      );
+      if (events.length === 0) return;
+      const ongoing = events.filter(e => !e.endAt).length;
+      const summary = ongoing > 0
+        ? `${ongoing} ongoing · ${events.length - ongoing} resolved`
+        : `${events.length} resolved`;
+      this.appendAtlasRow(
+        `Energy disruptions in ${iso2}`,
+        summary,
+        events.map(e => ({
+          id: e.id,
+          // Clamp long descriptions (some registry entries run 100-200
+          // chars, e.g. OFAC designation paragraphs) so the row layout
+          // stays compact. 80-char limit + ellipsis. Codex P2 on PR #3377.
+          label: truncateDisruptionLabel(e.eventType, e.shortDescription),
+          // Event type mirrors the existing asset-detail events (pipeline /
+          // storage) because disruptions reference the underlying asset; the
+          // panel-layout listener routes to the matching asset panel.
+          event: e.assetType === 'storage'
+            ? 'energy:open-storage-facility-detail'
+            : 'energy:open-pipeline-detail',
+          // Emit ONLY the {pipelineId, facilityId} the drawers consume today
+          // (see PipelineStatusPanel + StorageFacilityMapPanel
+          // openDetailHandler). Previously this detail included a
+          // `highlightEventId` that no receiver read — Codex P2 flagged the
+          // misleading API surface. Clicking a row jumps to the asset
+          // drawer; the user sees the full per-asset timeline and locates
+          // the event visually. Re-add `highlightEventId` here and in
+          // EnergyDisruptionsPanel's dispatchOpenAsset only when the
+          // drawer panels ship matching consumer code.
+          detail: e.assetType === 'storage'
+            ? { facilityId: e.assetId }
+            : { pipelineId: e.assetId },
+        })),
+      );
+    } catch {
+      // Silent — disruptions row is supplementary; failures elsewhere
+      // surface via the dedicated EnergyDisruptionsPanel. Abort errors
+      // from signal cancellation are also swallowed here intentionally.
+    }
+  }
+
+  private appendAtlasRow(
+    title: string,
+    summary: string,
+    items: Array<{ id: string; label: string; event: string; detail: Record<string, string | undefined> }>,
+  ): void {
+    if (!this.energyBody || items.length === 0) return;
+    const section = this.el('div', '');
+    section.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)';
+    const header = this.el('div', '');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px';
+    header.append(this.el('div', 'cdp-subtitle', title));
+    header.append(this.el('div', 'cdp-economic-source', summary));
+    section.append(header);
+    for (const it of items.slice(0, 5)) {
+      const row = this.el('div', '');
+      row.style.cssText = 'font-size:11px;color:#ddd;padding:2px 0;cursor:pointer';
+      row.textContent = it.label || it.id;
+      row.addEventListener('click', () => {
+        if (!it.id) return;
+        try {
+          window.dispatchEvent(new CustomEvent(it.event, { detail: it.detail }));
+        } catch { /* Non-browser runtime no-op */ }
+      });
+      section.append(row);
+    }
+    if (items.length > 5) {
+      const more = this.el('div', 'cdp-economic-source', `+${items.length - 5} more`);
+      section.append(more);
+    }
+    this.energyBody.append(section);
   }
 
   private buildDonutSvg(
@@ -1677,21 +1900,21 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
       const pathStr = pathParts.map(p => escapeHtml(p)).join(' \u2192 ');
 
       const pathEl = this.el('div', 'cdp-route-path');
-      pathEl.innerHTML = `${escapeHtml(route.name)}: ${pathStr}`;
+      setTrustedHtml(pathEl, trustedHtml(`${escapeHtml(route.name)}: ${pathStr}`, "legacy direct innerHTML migration"));
       wrap.append(pathEl);
     }
 
     const statsEl = this.el('div', 'cdp-route-stats');
     const distEl = this.el('div');
-    distEl.innerHTML = `Distance: <span>\u2014</span>`;
+    setTrustedHtml(distEl, trustedHtml(`Distance: <span>\u2014</span>`, "legacy direct innerHTML migration"));
     const transitEl = this.el('div');
-    transitEl.innerHTML = `Transit: <span>\u2014</span>`;
+    setTrustedHtml(transitEl, trustedHtml(`Transit: <span>\u2014</span>`, "legacy direct innerHTML migration"));
     const riskEl = this.el('div');
     const riskScore = sector.exposureScore;
     const riskColor = riskScore >= 70 ? '#ef4444' : riskScore > 30 ? '#f59e0b' : '#94a3b8';
-    riskEl.innerHTML = `Chokepoint Risk: <span style="color:${riskColor}">${riskScore.toFixed(0)}/100</span>`;
+    setTrustedHtml(riskEl, trustedHtml(`Chokepoint Risk: <span style="color:${riskColor}">${riskScore.toFixed(0)}/100</span>`, "legacy direct innerHTML migration"));
     const routeCountEl = this.el('div');
-    routeCountEl.innerHTML = `Routes via chokepoint: <span>${matchingRoutes.length}</span>`;
+    setTrustedHtml(routeCountEl, trustedHtml(`Routes via chokepoint: <span>${matchingRoutes.length}</span>`, "legacy direct innerHTML migration"));
     statsEl.append(distEl, transitEl, riskEl, routeCountEl);
     wrap.append(statsEl);
 
@@ -1995,7 +2218,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     }
     if (top) {
       const updatedEl = top.querySelector('.cdp-updated');
-      if (updatedEl) updatedEl.textContent = `Updated ${this.shortDate(score?.lastUpdated ?? new Date())}`;
+      if (updatedEl) updatedEl.textContent = `Updated ${score?.lastUpdated ? this.shortDate(score.lastUpdated) : '—'}`;
     }
     if (score) {
       const band = this.ciiBand(score.score);
@@ -2090,7 +2313,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
     const summaryHtml = this.formatBrief(this.summarizeBrief(data.brief), 0);
     const text = this.el('div', 'cdp-assessment-text cdp-summary-only');
-    text.innerHTML = summaryHtml;
+    setTrustedHtml(text, trustedHtml(summaryHtml, "legacy direct innerHTML migration"));
 
     const metaTokens: string[] = [];
     if (data.cached) metaTokens.push('Cached');
@@ -2101,7 +2324,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
     const expandedBrief = this.el('div', 'cdp-expanded-only');
     const fullText = this.el('div', 'cdp-assessment-text');
-    fullText.innerHTML = this.formatBrief(data.brief, this.currentHeadlineCount);
+    setTrustedHtml(fullText, trustedHtml(this.formatBrief(data.brief, this.currentHeadlineCount), "legacy direct innerHTML migration"));
     expandedBrief.append(fullText);
     this.briefBody.append(expandedBrief);
   }
@@ -2128,7 +2351,36 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const name = this.el('h2', 'cdp-country-name', country);
     const subtitle = this.el('div', 'cdp-country-subtitle', `${code.toUpperCase()} • Country Intelligence`);
     titleWrap.append(name, subtitle);
-    left.append(flag, titleWrap);
+
+    // `resetPanelContent` (called at the top of renderSkeleton) already
+    // tore down the prior FollowButton's subscriptions; here we just
+    // mount a fresh one for the new country.
+    const followHost = this.el('span', 'cdp-follow-btn-host');
+    followHost.dataset.country = code;
+    const handle = renderFollowButton({
+      countryCode: code,
+      countryName: country,
+      size: 'md',
+    });
+    setTrustedHtml(followHost, trustedHtml(handle.html, "legacy direct innerHTML migration"));
+    this.followButtonTeardown = handle.attach(followHost);
+
+    // U8 (degraded path) — "Notify me about this country" sub-action.
+    // Visible only when the user is currently following this country.
+    // The schema PR for `alertRules.countries` has NOT merged, so the
+    // click just opens the existing notifications settings tab — no
+    // pre-fill. See plan U8 R9 + the TODO inside notify-country-link.ts
+    // for the future pre-fill injection point.
+    const notifyHost = this.el('span', 'cdp-notify-link-host');
+    notifyHost.dataset.country = code;
+    const notifyHandle = renderNotifyCountryLink({
+      countryCode: code,
+      countryName: country,
+    });
+    setTrustedHtml(notifyHost, trustedHtml(notifyHandle.html, "legacy direct innerHTML migration"));
+    this.notifyLinkTeardown = notifyHandle.attach(notifyHost);
+
+    left.append(flag, titleWrap, followHost, notifyHost);
 
     const right = this.el('div', 'cdp-header-right');
 
@@ -2144,14 +2396,14 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const shareBtn = this.el('button', 'cdp-action-btn cdp-share-btn') as HTMLButtonElement;
     shareBtn.setAttribute('type', 'button');
     shareBtn.setAttribute('aria-label', t('components.countryBrief.shareLink'));
-    shareBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>';
+    setTrustedHtml(shareBtn, trustedHtml('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>', "legacy direct innerHTML migration"));
     shareBtn.addEventListener('click', () => {
       if (!this.currentCode || !this.currentName) return;
       const url = `${window.location.origin}/?c=${encodeURIComponent(this.currentCode)}`;
       navigator.clipboard.writeText(url).then(() => {
         const orig = shareBtn.innerHTML;
-        shareBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-        setTimeout(() => { shareBtn.innerHTML = orig; }, 1500);
+        setTrustedHtml(shareBtn, trustedHtml('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>', "legacy direct innerHTML migration"));
+        setTimeout(() => { setTrustedHtml(shareBtn, trustedHtml(orig, "legacy direct innerHTML migration")); }, 1500);
       }).catch(() => {});
     });
 
@@ -2177,7 +2429,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.scoreCard = scoreCard;
     const top = this.el('div', 'cdp-score-top');
     const label = this.el('span', 'cdp-score-label', t('countryBrief.instabilityIndex'));
-    const updated = this.el('span', 'cdp-updated', `Updated ${this.shortDate(score?.lastUpdated ?? new Date())}`);
+    const updated = this.el('span', 'cdp-updated', `Updated ${score?.lastUpdated ? this.shortDate(score.lastUpdated) : '—'}`);
     top.append(label, updated);
     scoreCard.append(top);
 
@@ -2291,8 +2543,28 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.resilienceWidget = null;
   }
 
+  private tearDownFollowButton(): void {
+    if (this.followButtonTeardown) {
+      try {
+        this.followButtonTeardown();
+      } catch {
+        /* swallow */
+      }
+      this.followButtonTeardown = null;
+    }
+    if (this.notifyLinkTeardown) {
+      try {
+        this.notifyLinkTeardown();
+      } catch {
+        /* swallow */
+      }
+      this.notifyLinkTeardown = null;
+    }
+  }
+
   private resetPanelContent(): void {
     this.destroyResilienceWidget();
+    this.tearDownFollowButton();
     this.selectedSectorHs2 = null;
     this.sectorBypassAbort?.abort();
     this.sectorBypassAbort = null;
@@ -2521,7 +2793,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const shell = this.el('div', 'country-deep-dive-shell');
     const close = this.el('button', 'panel-close', '×') as HTMLButtonElement;
     close.id = 'deep-dive-close';
-    close.setAttribute('aria-label', 'Close');
+    close.setAttribute('aria-label', t('common.close'));
 
     const content = this.el('div', 'panel-content');
     content.id = 'deep-dive-content';

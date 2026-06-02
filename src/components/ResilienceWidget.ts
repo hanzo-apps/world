@@ -12,14 +12,18 @@ import {
   RESILIENCE_VISUAL_LEVEL_COLORS,
   collectDimensionConfidences,
   formatBaselineStress,
+  formatResilienceMethodologyHelpTitle,
   formatResilienceChange30d,
   formatResilienceConfidence,
   formatResilienceDataVersion,
+  formatResilienceScoreInterval,
+  getResilienceOverallDisplay,
   getImputationClassIcon,
   getImputationClassLabel,
   getResilienceDomainLabel,
   getResilienceTrendArrow,
   getResilienceVisualLevel,
+  getStalenessIcon,
   getStalenessLabel,
 } from './resilience-widget-utils';
 import type { CountryEnergyProfileData } from './CountryBriefPanel';
@@ -29,6 +33,7 @@ import type { CountryEnergyProfileData } from './CountryBriefPanel';
 // full ResilienceWidget class transitive graph (the class indirectly
 // depends on import.meta.env.DEV via proxy.ts, which breaks plain
 // node test runners). Moved in the PR #2949 review round.
+const METHODOLOGY_HELP_TITLE = formatResilienceMethodologyHelpTitle();
 
 function normalizeCountryCode(countryCode: string | null | undefined): string | null {
   const normalized = String(countryCode || '').trim().toUpperCase();
@@ -151,7 +156,7 @@ export class ResilienceWidget {
           'span',
           {
             className: 'resilience-widget__help',
-            title: 'Composite resilience score derived from economic, infrastructure, energy, social/governance, and health/food domains.',
+            title: METHODOLOGY_HELP_TITLE,
             'aria-label': 'Resilience score methodology',
           },
           '?',
@@ -237,9 +242,9 @@ export class ResilienceWidget {
   }
 
   private renderScoreCard(data: ResilienceScoreResponse, preview = false): HTMLElement {
-    const visualLevel = getResilienceVisualLevel(data.overallScore);
-    const levelLabel = visualLevel.replace('_', ' ').toUpperCase();
-    const levelColor = RESILIENCE_VISUAL_LEVEL_COLORS[visualLevel];
+    const overallDisplay = getResilienceOverallDisplay(data);
+    const levelColor = RESILIENCE_VISUAL_LEVEL_COLORS[overallDisplay.visualLevel];
+    const scoreInterval = overallDisplay.hasScore ? formatResilienceScoreInterval(data.scoreInterval) : null;
 
     return h(
       'div',
@@ -248,20 +253,30 @@ export class ResilienceWidget {
         'div',
         { className: 'resilience-widget__overall' },
         this.renderBarBlock(
-          clampScore(data.overallScore),
+          overallDisplay.scoreForBar,
           levelColor,
           h(
             'div',
             { className: 'resilience-widget__overall-meta' },
-            h('span', { className: 'resilience-widget__overall-score' }, String(Math.round(clampScore(data.overallScore)))),
-            ...(data.scoreInterval
+            h('span', { className: 'resilience-widget__overall-score' }, overallDisplay.scoreLabel),
+            ...(scoreInterval
               ? [h('span', {
                   className: 'resilience-widget__overall-interval',
-                  title: `95% confidence interval: ${data.scoreInterval.p05} - ${data.scoreInterval.p95}`,
-                }, `[${Math.round(data.scoreInterval.p05)}\u2013${Math.round(data.scoreInterval.p95)}]`)]
+                  title: scoreInterval.title,
+                }, scoreInterval.label)]
               : []),
-            h('span', { className: 'resilience-widget__overall-level', style: { color: levelColor } }, levelLabel),
-            h('span', { className: 'resilience-widget__overall-trend' }, `${getResilienceTrendArrow(data.trend)} ${data.trend}`),
+            h(
+              'span',
+              {
+                className: 'resilience-widget__overall-level',
+                style: { color: levelColor },
+                title: overallDisplay.serverLevelLabel,
+              },
+              overallDisplay.visualLevelLabel,
+            ),
+            ...(overallDisplay.hasScore
+              ? [h('span', { className: 'resilience-widget__overall-trend' }, `${getResilienceTrendArrow(data.trend)} ${data.trend}`)]
+              : []),
           ),
         ),
       ),
@@ -308,7 +323,7 @@ export class ResilienceWidget {
                 'span',
                 {
                   className: 'resilience-widget__data-version',
-                  title: 'Date the underlying source data was last refreshed by the Railway static-seed job.',
+                  title: 'Date the static-seed bundle (Railway job) was last refreshed. Individual live inputs (conflict events, sanctions, prices) can be newer — see the per-dimension freshness badge for those.',
                 },
                 dataVersionLabel,
               )]
@@ -380,7 +395,7 @@ export class ResilienceWidget {
           className: freshnessClassName,
           'aria-label': dim.staleness ? getStalenessLabel(dim.staleness) : undefined,
         },
-        dim.staleness ? '\u25CF' : '',
+        getStalenessIcon(dim.staleness),
       ),
     );
   }

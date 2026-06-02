@@ -1,9 +1,16 @@
+// @notification-source: rss (list-feed-digest)
+//   /api/notify fetch in this file forwards RSS NewsItem objects as
+//   rss_alert notifications. `payload.description` is set when the upstream
+//   NewsItem carried a snippet (post-RSS-description-fix, 2026-04-24), so
+//   the relay can render a context line without a second Redis lookup.
+//   Enforced by tests/notification-relay-payload-audit.test.mjs.
 import type { NewsItem } from '@/types';
 import type { OrefAlert } from '@/services/oref-alerts';
 import { getSourceTier } from '@/config/feeds';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { getClerkToken } from '@/services/clerk';
 import { SITE_VARIANT } from '@/config/variant';
+import { effectivePubDateMs } from '@/services/feed-date';
 
 export interface BreakingAlert {
   id: string;
@@ -14,6 +21,13 @@ export interface BreakingAlert {
   timestamp: Date;
   origin: 'rss_alert' | 'keyword_spike' | 'hotspot_escalation' | 'military_surge' | 'oref_siren';
   importanceScore?: number;
+  /**
+   * RSS article description (cleaned, ≤400 chars). Present on rss_alert
+   * origins when the upstream NewsItem carried a snippet. Enables the relay
+   * to render a context line under the push/Telegram title without a second
+   * lookup. Absent/empty → relay renders title-only today.
+   */
+  description?: string;
 }
 
 export interface AlertSettings {
@@ -129,8 +143,14 @@ export function updateAlertSettings(partial: Partial<AlertSettings>): void {
 
 // ─── Gate checks ───────────────────────────────────────────────────────────
 
-function isRecent(pubDate: Date): boolean {
-  return pubDate.getTime() >= (Date.now() - RECENCY_GATE_MS);
+function isRecent(item: { pubDate: Date; pubDateMissing?: boolean }): boolean {
+  // Routes through effectivePubDateMs so items with pubDateMissing get 0.
+  // The gate `effective >= Date.now() - RECENCY_GATE_MS` then evaluates
+  // `0 >= (large positive)` → false for missing-date items, excluding
+  // them from breaking-alert eligibility. Without the helper, the
+  // synthesized pubDate (≈ Date.now()) would pass this gate and fire
+  // false-fresh alerts.
+  return effectivePubDateMs(item) >= (Date.now() - RECENCY_GATE_MS);
 }
 
 function isInStartupGrace(): boolean {
@@ -169,9 +189,17 @@ function dispatchAlert(alert: BreakingAlert): void {
     void (async () => {
       const token = await getClerkToken();
       if (!token) { console.warn('[breaking-news-alerts] no Clerk token, skipping notify'); return; }
+      // source: rss (list-feed-digest) — RSS-origin producer; carries
+      // `description` when the upstream NewsItem had a snippet so the relay
+      // can render a context line without a secondary Redis lookup.
       const body = JSON.stringify({
         eventType: alert.origin,
-        payload: { title: alert.headline, source: alert.source, link: alert.link },
+        payload: {
+          title: alert.headline,
+          source: alert.source,
+          link: alert.link,
+          ...(alert.description ? { description: alert.description } : {}),
+        },
         severity: alert.threatLevel,
         variant: SITE_VARIANT,
       });
@@ -208,11 +236,19 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
   if (isInStartupGrace()) return;
 
   let best: BreakingAlert | null = null;
+  // Effective timestamp of the current best, captured so the tie-break
+  // comparison below is symmetric (effectivePubDateMs on both sides). The
+  // BreakingAlert type doesn't carry pubDateMissing — it's a render-time
+  // shape — so without this local, comparing the candidate's effective
+  // time against best.timestamp.getTime() would silently treat any
+  // future missing-date best as fresh. Today isRecent filters that out
+  // upstream; the local makes the gate defense-in-depth.
+  let bestEffectiveMs = -Infinity;
 
   for (const item of items) {
     if (!item.isAlert) continue;
     if (!item.threat) continue;
-    if (!isRecent(item.pubDate)) continue;
+    if (!isRecent(item)) continue;
 
     const level = item.threat.level;
     if (level !== 'critical' && level !== 'high') continue;
@@ -234,11 +270,13 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
     // Items below the importance threshold are too low-signal for the banner.
     if (item.importanceScore !== undefined && item.importanceScore < IMPORTANCE_SCORE_MIN) continue;
 
+    const itemEffectiveMs = effectivePubDateMs(item);
     const isBetter = !best
       || (level === 'critical' && best.threatLevel !== 'critical')
-      || (level === best.threatLevel && item.pubDate.getTime() > best.timestamp.getTime());
+      || (level === best.threatLevel && itemEffectiveMs > bestEffectiveMs);
 
     if (isBetter) {
+      bestEffectiveMs = itemEffectiveMs;
       best = {
         id: key,
         headline: item.title,
@@ -248,6 +286,7 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
         timestamp: item.pubDate,
         origin: 'rss_alert',
         importanceScore: item.importanceScore,
+        ...(item.snippet ? { description: item.snippet } : {}),
       };
     }
   }

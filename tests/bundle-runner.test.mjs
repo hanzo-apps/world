@@ -61,13 +61,30 @@ test('streams child stdout live and reports Done on success', async () => {
 test('timeout emits terminal reason BEFORE SIGTERM/SIGKILL grace (survives container kill)', async () => {
   const cleanup = writeFixture(
     '_bundle-fixture-hang.mjs',
-    // Ignore SIGTERM so the runner must SIGKILL.
+    // Ignore SIGTERM so the runner must SIGKILL. Handler registers FIRST
+    // (synchronously, before any I/O) so even a slow cold-start gets the
+    // SIGTERM-ignore behaviour as soon as Node finishes parsing this line.
     `process.on('SIGTERM', () => {}); console.log('hung'); setInterval(() => {}, 1000);\n`,
   );
   try {
     const t0 = Date.now();
+    // Cold-Node startup on slow CI runners (GitHub-hosted, under load)
+    // can exceed 1s before user code parses + executes. A 1s timeout
+    // produced a real flake on PR #3617's post-merge run: SIGTERM
+    // arrived before the fixture's `process.on('SIGTERM', () => {})`
+    // handler registered, so the child died via default SIGTERM
+    // handling before logging 'hung' or surviving to SIGKILL — total
+    // elapsed 1.1s instead of the expected ~11s (1s + 10s grace), and
+    // the `[HANG] hung` assertion failed.
+    //
+    // 3000ms gives generous cold-start margin (typical Node startup
+    // is 50-200ms; even loaded CI shouldn't exceed 1-2s) while still
+    // exercising the same timeout → SIGTERM → grace → SIGKILL flow
+    // the test is here to validate. The 20s cap below remains
+    // comfortably above 3s + 10s grace + overhead.
+    const TIMEOUT_MS = 3000;
     const { code, stdout, stderr } = await runBundleWith([
-      { label: 'HANG', script: '_bundle-fixture-hang.mjs', intervalMs: 1, timeoutMs: 1000 },
+      { label: 'HANG', script: '_bundle-fixture-hang.mjs', intervalMs: 1, timeoutMs: TIMEOUT_MS },
     ]);
     const elapsedMs = Date.now() - t0;
     assert.equal(code, 1, 'bundle must exit non-zero on failure');
@@ -80,9 +97,12 @@ test('timeout emits terminal reason BEFORE SIGTERM/SIGKILL grace (survives conta
     const sigkillIdx = combined.indexOf('SIGKILL');
     assert.ok(failIdx >= 0, 'must emit Failed line');
     assert.ok(sigkillIdx > failIdx, 'Failed line must precede SIGKILL escalation');
-    assert.match(combined, /Failed after .*s: timeout after 1s — sending SIGTERM/);
+    // Match the timeout-seconds value loosely so a future bump doesn't
+    // require a coordinated regex update — the assertion's purpose is
+    // "Failed line names the timeout-after-N pattern", not the literal N.
+    assert.match(combined, /Failed after .*s: timeout after \d+s — sending SIGTERM/);
     assert.match(combined, /Did not exit on SIGTERM.*SIGKILL/);
-    // 1s timeout + 10s SIGTERM grace + overhead; cap well above that to avoid flake.
+    // timeout + 10s SIGTERM grace + overhead; cap well above that to avoid flake.
     assert.ok(elapsedMs < 20_000, `timeout escalation took ${elapsedMs}ms — too slow`);
   } finally {
     cleanup();
@@ -121,6 +141,108 @@ test('non-zero exit without timeout reports exit code', async () => {
     const combined = stdout + stderr;
     assert.match(combined, /\[FAIL\] boom/);
     assert.match(combined, /Failed after .*s: exit 2/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('injects BUNDLE_RUN_STARTED_AT_MS env into child; value is within run bounds', async () => {
+  const cleanup = writeFixture(
+    '_bundle-fixture-env.mjs',
+    `console.log('BUNDLE_RUN_STARTED_AT_MS=' + process.env.BUNDLE_RUN_STARTED_AT_MS);\n`,
+  );
+  const before = Date.now();
+  try {
+    const { code, stdout } = await runBundleWith([
+      { label: 'ENV', script: '_bundle-fixture-env.mjs', intervalMs: 1, timeoutMs: 5000 },
+    ]);
+    const after = Date.now();
+    assert.equal(code, 0);
+    const match = stdout.match(/BUNDLE_RUN_STARTED_AT_MS=(\d+)/);
+    assert.ok(match, `expected env var in child stdout; got:\n${stdout}`);
+    const injected = Number(match[1]);
+    assert.ok(Number.isInteger(injected), 'injected value must be an integer');
+    // Parent captured t0 at bundle start (before this test's `before` call) and
+    // child ran before `after`. So: before - tolerance <= injected <= after.
+    assert.ok(injected >= before - 5000 && injected <= after,
+      `injected=${injected} out of bounds [${before - 5000}, ${after}]`);
+  } finally {
+    cleanup();
+  }
+});
+
+test('sibling sections share the same BUNDLE_RUN_STARTED_AT_MS (one-shot per bundle)', async () => {
+  const cleanupA = writeFixture(
+    '_bundle-fixture-env-a.mjs',
+    `console.log('TS_A=' + process.env.BUNDLE_RUN_STARTED_AT_MS);\n`,
+  );
+  const cleanupB = writeFixture(
+    '_bundle-fixture-env-b.mjs',
+    `await new Promise((r) => setTimeout(r, 200));\nconsole.log('TS_B=' + process.env.BUNDLE_RUN_STARTED_AT_MS);\n`,
+  );
+  try {
+    const { code, stdout } = await runBundleWith([
+      { label: 'A', script: '_bundle-fixture-env-a.mjs', intervalMs: 1, timeoutMs: 5000 },
+      { label: 'B', script: '_bundle-fixture-env-b.mjs', intervalMs: 1, timeoutMs: 5000 },
+    ]);
+    assert.equal(code, 0);
+    const tsA = Number(stdout.match(/TS_A=(\d+)/)?.[1]);
+    const tsB = Number(stdout.match(/TS_B=(\d+)/)?.[1]);
+    assert.ok(tsA && tsB, `both timestamps present; stdout:\n${stdout}`);
+    // Both children read the same bundle-level t0, so the injected value is
+    // identical across siblings (NOT spawn time). This is the critical
+    // property Phase 2's bundle-freshness guard relies on.
+    assert.equal(tsA, tsB, 'siblings must share one bundle-level timestamp');
+  } finally {
+    cleanupA();
+    cleanupB();
+  }
+});
+
+test('dependsOn: throws when a dep appears later in the sections array', async () => {
+  // Consumer (depends on Producer) is at index 0 — violates the contract.
+  const cleanupC = writeFixture('_bundle-fixture-dep-consumer.mjs', `console.log('consumer');\n`);
+  const cleanupP = writeFixture('_bundle-fixture-dep-producer.mjs', `console.log('producer');\n`);
+  try {
+    const { code, stderr } = await runBundleWith([
+      { label: 'Consumer', script: '_bundle-fixture-dep-consumer.mjs', intervalMs: 1, timeoutMs: 5000, dependsOn: ['Producer'] },
+      { label: 'Producer', script: '_bundle-fixture-dep-producer.mjs', intervalMs: 1, timeoutMs: 5000 },
+    ]);
+    assert.notEqual(code, 0, 'out-of-order dependsOn must cause non-zero exit');
+    assert.match(stderr, /dependsOn 'Producer' but 'Producer' is at index 1/,
+      `expected topological violation error; stderr:\n${stderr}`);
+  } finally {
+    cleanupC();
+    cleanupP();
+  }
+});
+
+test('dependsOn: passes when deps appear earlier in the sections array', async () => {
+  const cleanupP = writeFixture('_bundle-fixture-dep-producer-ok.mjs', `console.log('producer');\n`);
+  const cleanupC = writeFixture('_bundle-fixture-dep-consumer-ok.mjs', `console.log('consumer');\n`);
+  try {
+    const { code, stdout } = await runBundleWith([
+      { label: 'Producer', script: '_bundle-fixture-dep-producer-ok.mjs', intervalMs: 1, timeoutMs: 5000 },
+      { label: 'Consumer', script: '_bundle-fixture-dep-consumer-ok.mjs', intervalMs: 1, timeoutMs: 5000, dependsOn: ['Producer'] },
+    ]);
+    assert.equal(code, 0);
+    assert.match(stdout, /\[Producer\] producer/);
+    assert.match(stdout, /\[Consumer\] consumer/);
+  } finally {
+    cleanupP();
+    cleanupC();
+  }
+});
+
+test('dependsOn: throws on unknown label reference', async () => {
+  const cleanup = writeFixture('_bundle-fixture-dep-orphan.mjs', `console.log('orphan');\n`);
+  try {
+    const { code, stderr } = await runBundleWith([
+      { label: 'Orphan', script: '_bundle-fixture-dep-orphan.mjs', intervalMs: 1, timeoutMs: 5000, dependsOn: ['DoesNotExist'] },
+    ]);
+    assert.notEqual(code, 0);
+    assert.match(stderr, /dependsOn unknown label 'DoesNotExist'/,
+      `expected unknown-label error; stderr:\n${stderr}`);
   } finally {
     cleanup();
   }

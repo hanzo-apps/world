@@ -1,4 +1,4 @@
-import { getCorsHeaders, getPublicCorsHeaders, isDisallowedOrigin } from './_cors.js';
+import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { validateApiKey } from './_api-key.js';
 import { jsonResponse } from './_json-response.js';
 // @ts-expect-error — JS module, no declaration file
@@ -28,6 +28,17 @@ const BOOTSTRAP_CACHE_KEYS = {
   imfGrowth:        'economic:imf:growth:v1',
   imfLabor:         'economic:imf:labor:v1',
   imfExternal:      'economic:imf:external:v1',
+  // plan 2026-04-25-004 Phase 2 (financialSystemExposure data keys):
+  // intentionally NOT added here. The 3 new keys
+  // (economic:wb-external-debt:v1, economic:bis-lbs:v1,
+  //  economic:fatf-listing:v1) are SERVER-ONLY inputs to
+  // scoreFinancialSystemExposure — no client-side panel consumes them
+  // directly. AGENTS.md's "new data sources must hydrate via bootstrap"
+  // applies to keys with `getHydratedData` consumers in src/; the
+  // bootstrap-key-hydration-coverage test enforces that invariant. If
+  // a future PR adds a client panel that displays raw BIS LBS / FATF /
+  // WB external-debt data, register the keys here AND add the
+  // corresponding consumer + cache-keys.ts entries in the same PR.
   shippingRates:    'supply_chain:shipping:v2',
   chokepoints:      'supply_chain:chokepoints:v4',
   minerals:         'supply_chain:minerals:v2',
@@ -47,9 +58,9 @@ const BOOTSTRAP_CACHE_KEYS = {
   renewableEnergy:  'economic:worldbank-renewable:v1',
   positiveGeoEvents: 'positive_events:geo-bootstrap:v1',
   theaterPosture: 'theater_posture:sebuf:stale:v1',
-  riskScores: 'risk:scores:sebuf:stale:v1',
+  riskScores: 'risk:scores:sebuf:stale:v3',
   naturalEvents: 'natural:events:v1',
-  flightDelays: 'aviation:delays-bootstrap:v1',
+  flightDelays: 'aviation:delays-bootstrap:v2',
   insights: 'news:insights:v1',
   predictions: 'prediction:markets-bootstrap:v1',
   cryptoQuotes:     'market:crypto:v1',
@@ -107,6 +118,11 @@ const BOOTSTRAP_CACHE_KEYS = {
   oilStocksAnalysis:    'energy:oil-stocks-analysis:v1',
   lngVulnerability:     'energy:lng-vulnerability:v1',
   sprPolicies:          'energy:spr-policies:v1',
+  pipelinesGas:         'energy:pipelines:gas:v1',
+  pipelinesOil:         'energy:pipelines:oil:v1',
+  storageFacilities:    'energy:storage-facilities:v1',
+  fuelShortages:        'energy:fuel-shortages:v1',
+  energyDisruptions:    'energy:disruptions:v1',
   energyCrisisPolicies: 'energy:crisis-policies:v1',
   aaiiSentiment:        'market:aaii-sentiment:v1',
   breadthHistory:       'market:breadth-history:v1',
@@ -155,6 +171,11 @@ const SLOW_KEYS = new Set([
   'oilStocksAnalysis',
   'lngVulnerability',
   'sprPolicies',
+  'pipelinesGas',
+  'pipelinesOil',
+  'storageFacilities',
+  'fuelShortages',
+  'energyDisruptions',
   'energyCrisisPolicies',
   'aaiiSentiment',
   'breadthHistory',
@@ -215,7 +236,7 @@ export default async function handler(req) {
   if (req.method === 'OPTIONS')
     return new Response(null, { status: 204, headers: cors });
 
-  const apiKeyResult = validateApiKey(req);
+  const apiKeyResult = await validateApiKey(req);
   if (apiKeyResult.required && !apiKeyResult.valid)
     return jsonResponse({ error: apiKeyResult.error }, 401, cors);
 
@@ -261,12 +282,11 @@ export default async function handler(req) {
 
   const cacheControl = (tier && TIER_CACHE[tier]) || 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900';
 
-  // Bootstrap data is fully public (world events, market prices, seismic data).
-  // Use ACAO: * so CF caches one entry valid for all origins, including Vercel
-  // preview deployments. Per-origin ACAO with Vary: Origin causes CF to pin the
-  // first origin's ACAO on the cached response, breaking CORS for other origins.
+  // The browser runtime sends API requests with credentials so session and
+  // entitlement cookies can ride along. Credentialed requests cannot consume
+  // ACAO: * responses, even for public bootstrap data.
   return jsonResponse({ data, missing }, 200, {
-    ...getPublicCorsHeaders(),
+    ...cors,
     'Cache-Control': cacheControl,
     'CDN-Cache-Control': (tier && TIER_CDN_CACHE[tier]) || TIER_CDN_CACHE.fast,
   });

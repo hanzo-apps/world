@@ -963,7 +963,7 @@
 
 /* T1.6 Phase 1 of the country-resilience reference-grade upgrade plan:
    per-dimension confidence grid. Renders a compact 2-column grid of the
-   13 scorer dimensions between the 5-domain bars and the footer.
+   19 scorer dimensions between the 6-domain bars and the footer.
    Each cell shows a short label, a coverage bar, and a percentage.
    Status modifiers (--observed, --partial, --imputed, --absent) tint
    the bar fill so analysts can see provenance at a glance. */
@@ -1060,12 +1060,12 @@
 .resilience-widget__dimension-imputation--source-failure { color: #ef4444; }
 .resilience-widget__dimension-imputation--not-applicable { color: var(--text-faint); }
 
-/* T1.5 propagation: freshness dot at the far right. Colors mirror the
-   fresh/aging/stale staleness levels from the classifier. Empty span
-   when freshness is unknown so the grid column reserves its 10px slot
-   and rows stay aligned. */
+/* T1.5 propagation: freshness glyph at the far right. Shape and color
+   both mirror the fresh/aging/stale staleness levels from the
+   classifier. Empty span when freshness is unknown so the grid column
+   reserves its 10px slot and rows stay aligned. */
 .resilience-widget__dimension-freshness {
-  font-size: 8px;
+  font-size: 9px;
   line-height: 1;
   text-align: center;
   cursor: help;
