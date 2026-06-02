@@ -26,6 +26,13 @@ const D6_DOMAINS = [
   { id: 'recovery', score: 71, weight: 0.25 },
 ];
 
+// Three pillars so a pc-tagged payload produces a real pillar-jitter interval.
+const PC_PILLARS = [
+  { id: 'structural-readiness', score: 72, weight: 0.40 },
+  { id: 'live-shock-exposure', score: 70, weight: 0.35 },
+  { id: 'recovery-capacity', score: 68, weight: 0.25 },
+];
+
 function withD6CacheFormula(fn) {
   const originalCombine = process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
   const originalSchema = process.env.RESILIENCE_SCHEMA_V2_ENABLED;
@@ -96,7 +103,12 @@ describe('seed script does not export tsx/esm helpers', () => {
 });
 
 describe('score cache payload validation', () => {
-  it('counts only real current-formula score payloads', () => {
+  it('accepts any valid formula tag independent of seeder env unless a live runtime formula is supplied', () => {
+    // The seeder no longer re-derives a "current" formula from its own env.
+    // Force the env to the d6 resolution to prove a 'pc' payload is still
+    // accepted (the 2026-06-02 durable fix) — production owns the formula it
+    // served. Once the live runtime manifest supplies a formula, stale cached
+    // payloads from a prior formula must no longer count as warmed.
     const originalCombine = process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
     const originalSchema = process.env.RESILIENCE_SCHEMA_V2_ENABLED;
     process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = 'false';
@@ -118,10 +130,27 @@ describe('score cache payload validation', () => {
         valid,
         'contract envelopes should count when their inner score payload is valid',
       );
+      // A 'pc' payload is valid even though the env resolves to 'd6'.
+      assert.deepEqual(
+        parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'pc' })),
+        { ...valid, _formula: 'pc' },
+        'pc payloads must be accepted regardless of the seeder env formula',
+      );
+      assert.deepEqual(
+        parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'pc' }), { expectedFormula: 'pc' }),
+        { ...valid, _formula: 'pc' },
+        'pc payloads must count when they match the live runtime formula',
+      );
+      assert.equal(
+        parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'pc' }), { expectedFormula: 'd6' }),
+        null,
+        'pc payloads must be treated as stale when the live runtime formula is d6',
+      );
       assert.equal(parseCachedScorePayload(JSON.stringify('__WM_NEG__')), null);
-      assert.equal(parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'pc' })), null);
       assert.equal(parseCachedScorePayload(JSON.stringify({ ...valid, overallScore: 0 })), null);
+      // Untagged / invalid-formula payloads are still rejected.
       assert.equal(parseCachedScorePayload(JSON.stringify({ countryCode: 'NO', overallScore: 82 })), null);
+      assert.equal(parseCachedScorePayload(JSON.stringify({ ...valid, _formula: 'xx' })), null);
       assert.equal(parseCachedScorePayload('not-json'), null);
     } finally {
       if (originalCombine == null) delete process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
@@ -233,24 +262,53 @@ describe('cached score interval payload classification', () => {
     });
   });
 
-  it('records stale score payloads separately from formula skips', () => {
+  it('writes pc intervals from pc-tagged payloads even when the seeder env resolves to d6', () => {
+    // Regression for the 2026-06-02 production incident: `seed-bundle-resilience`
+    // ran without RESILIENCE_PILLAR_COMBINE_ENABLED=true, so the seeder resolved
+    // to 'd6' while every live score was tagged 'pc'. The old env-formula gate
+    // rejected all 196 payloads as "stale", wrote zero intervals, failed the
+    // seed section, and left `resilienceIntervals` EMPTY in production while the
+    // ranking stayed fresh. The interval writer must trust the payload's own
+    // `_formula` tag, not a formula re-derived from this process's env.
+    withD6CacheFormula(() => {
+      const diagnostics = createIntervalDiagnostics();
+      const payload = buildIntervalPayloadFromCachedScore(JSON.stringify({
+        countryCode: 'PC',
+        _formula: 'pc',
+        overallScore: 75,
+        domains: D6_DOMAINS,
+        pillars: PC_PILLARS,
+      }), 'PC', diagnostics, { expectedFormula: 'pc' });
+
+      assert.ok(payload, 'pc payload must produce an interval even under a d6 seeder env');
+      assert.equal(payload._formula, 'pc', 'interval formula must follow the payload tag, not the seeder env');
+      assert.equal(diagnostics.staleScorePayloadCount, 0, 'pc-vs-d6 must no longer be treated as stale');
+      assert.equal(diagnostics.formulaSkipCount, 0);
+      assert.equal(diagnostics.intervalPayloadSkipCount, 0);
+      assert.equal(diagnostics.missingScorePayloadCount, 0);
+    });
+  });
+
+  it('records stale score payloads when cached formula differs from the live runtime formula', () => {
     withD6CacheFormula(() => {
       const diagnostics = createIntervalDiagnostics();
       const payload = buildIntervalPayloadFromCachedScore(JSON.stringify({
         countryCode: 'ST',
         _formula: 'pc',
-        overallScore: 70,
+        overallScore: 75,
         domains: D6_DOMAINS,
-      }), 'ST', diagnostics);
+        pillars: PC_PILLARS,
+      }), 'ST', diagnostics, { expectedFormula: 'd6' });
 
       assert.equal(payload, null);
       assert.equal(diagnostics.staleScorePayloadCount, 1);
-      assert.equal(diagnostics.formulaSkipCount, 0);
       assert.deepEqual(diagnostics.staleScorePayloadSamples[0], {
         countryCode: 'ST',
         formula: 'pc',
         expectedFormula: 'd6',
       });
+      assert.equal(diagnostics.formulaSkipCount, 0);
+      assert.equal(diagnostics.intervalPayloadSkipCount, 0);
     });
   });
 
@@ -411,6 +469,22 @@ describe('script is self-contained .mjs', () => {
     assert.match(src, /intervalFailureReason/);
   });
 
+  it('gates interval writes on the live runtime formula when available', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(dir, '..', 'scripts', 'seed-resilience-scores.mjs'), 'utf8');
+    assert.match(src, /\/api\/resilience\/v1\/get-runtime-manifest/);
+    assert.match(src, /const expectedFormula = await fetchRuntimeFormulaTag\(\);/);
+    assert.match(src, /countCachedFromPipeline\(preResults, expectedFormula\)/);
+    assert.match(src, /parseCachedScorePayload\(raw, \{ expectedFormula \}\)/);
+    assert.match(src, /countCachedFromPipeline\(finalResults, expectedFormula\)/);
+    assert.match(src, /computeAndWriteIntervals\(url, token, countryCodes, finalResults, \{ expectedFormula \}\)/);
+    assert.match(src, /computeAndWriteIntervals\(url, token, countryCodes, preResults, \{ expectedFormula \}\)/);
+    assert.doesNotMatch(src, /currentCacheFormulaLocal/);
+  });
+
   it('builds intervals only from tagged Redis score payloads', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
@@ -422,7 +496,7 @@ describe('script is self-contained .mjs', () => {
       src.indexOf('async function seedResilienceScores'),
     );
     assert.match(src, /\['GET', `\$\{RESILIENCE_SCORE_CACHE_PREFIX\}\$\{c\}`\]/);
-    assert.match(intervalWriter, /buildIntervalPayloadFromCachedScore\(raw, countryCode, diagnostics\)/);
+    assert.match(intervalWriter, /buildIntervalPayloadFromCachedScore\(raw, countryCode, diagnostics, options\)/);
     assert.doesNotMatch(intervalWriter, /get-resilience-score\?countryCode=/);
     assert.doesNotMatch(intervalWriter, /allowLegacyFormulaInference:\s*true/);
   });
