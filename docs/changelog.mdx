@@ -6,7 +6,7 @@ rss: true
 
 All notable changes to World Monitor are documented here. Subscribe via [RSS](/changelog/rss.xml) to stay updated.
 
-<Update label="Unreleased" description="Unreleased" tags={["Trade", "Intelligence", "Search", "Supply Chain", "Maritime"]}>
+<Update label="Unreleased" description="Unreleased" tags={["Trade", "Intelligence", "Search", "Supply Chain", "Maritime", "Security"]}>
 
 ### Added
 
@@ -20,6 +20,21 @@ All notable changes to World Monitor are documented here. Subscribe via [RSS](/c
 - Real-time transit counting with crossing detection on Railway relay (#1560)
 - R2 trace storage for forecast debugging with Cloudflare API upload (#1655)
 - `@ts-nocheck` injection in Makefile generate target for CI proto-freshness parity (#1637)
+
+### Changed
+
+- **CII weights source of truth (#3789, foundation for #2457)**: `baselineRisk` and `eventMultiplier` now come from one shared coefficient table used by both server-side risk scoring and frontend client-side CII rendering. The previous 7-country frontend/server drift was resolved to the published server/API values. Because those server/API values did not change, `CII_FORMULA_VERSION` remains `v2`.
+
+- **Sebuf API migration (#3207)** — scenario + supply-chain endpoints moved to the typed sebuf contract. RPC URLs now derive from method names; five renamed v1 URLs remain live as thin aliases so existing integrations keep working:
+  - `/api/scenario/v1/run` → `/api/scenario/v1/run-scenario`
+  - `/api/scenario/v1/status` → `/api/scenario/v1/get-scenario-status`
+  - `/api/scenario/v1/templates` → `/api/scenario/v1/list-scenario-templates`
+  - `/api/supply-chain/v1/country-products` → `/api/supply-chain/v1/get-country-products`
+  - `/api/supply-chain/v1/multi-sector-cost-shock` → `/api/supply-chain/v1/get-multi-sector-cost-shock`
+
+  Aliases retire at the next v1→v2 break (tracked in [#3282](https://github.com/koala73/worldmonitor/issues/3282)).
+
+- `POST /api/scenario/v1/run-scenario` now returns `200 OK` instead of the pre-migration `202 Accepted`. sebuf's HTTP annotations don't carry per-RPC status codes. Branch on response body `status === "pending"` instead of `response.status === 202`. `statusUrl` field is preserved.
 
 ### Security
 

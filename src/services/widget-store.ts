@@ -1,6 +1,12 @@
 import { loadFromStorage, saveToStorage } from '@/utils';
 import { sanitizeWidgetHtml } from '@/utils/widget-sanitizer';
 import { getAuthState } from '@/services/auth-state';
+import { isEntitled } from '@/services/entitlements';
+import {
+  clearLegacyKeyStorage,
+  migrateLegacyKeysToHttpOnlySession,
+  readLegacySessionKey,
+} from '@/services/browser-key-session';
 
 const STORAGE_KEY = 'wm-custom-widgets';
 const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
@@ -129,21 +135,35 @@ function getKey(name: string): string {
 }
 
 export function setWidgetKey(key: string): void {
-  setDomainCookie('wm-widget-key', key);
-  try { localStorage.setItem('wm-widget-key', key); } catch { /* ignore */ }
+  const trimmed = key.trim();
+  widgetSessionHint = !!trimmed;
+  if (!trimmed) {
+    clearLegacyKeyStorage('wm-widget-key');
+    return;
+  }
+  void migrateLegacyKeysToHttpOnlySession({ widgetKey: trimmed })
+    .catch(() => { /* caller can retry; no new JS-readable write */ });
 }
 
 export function setProKey(key: string): void {
-  setDomainCookie('wm-pro-key', key);
-  try { localStorage.setItem('wm-pro-key', key); } catch { /* ignore */ }
+  const trimmed = key.trim();
+  proSessionHint = !!trimmed;
+  if (!trimmed) {
+    clearLegacyKeyStorage('wm-pro-key');
+    return;
+  }
+  void migrateLegacyKeysToHttpOnlySession({ proKey: trimmed })
+    .catch(() => { /* caller can retry; no new JS-readable write */ });
 }
 
 export function isWidgetFeatureEnabled(): boolean {
-  return !!getKey('wm-widget-key');
+  migrateLegacyKeyStorage();
+  return widgetSessionHint;
 }
 
 export function getWidgetAgentKey(): string {
-  return getKey('wm-widget-key');
+  migrateLegacyKeyStorage();
+  return '';
 }
 
 export function getBrowserTesterKeys(): string[] {
@@ -164,15 +184,22 @@ export function getBrowserTesterKey(): string {
 }
 
 export function isProWidgetEnabled(): boolean {
-  return !!getKey('wm-pro-key');
+  migrateLegacyKeyStorage();
+  return proSessionHint;
 }
 
 export function isProUser(): boolean {
-  return isWidgetFeatureEnabled() || isProWidgetEnabled() || getAuthState().user?.role === 'pro';
+  return (
+    isWidgetFeatureEnabled() ||
+    isProWidgetEnabled() ||
+    getAuthState().user?.role === 'pro' ||
+    isEntitled()
+  );
 }
 
 export function getProWidgetKey(): string {
-  return getKey('wm-pro-key');
+  migrateLegacyKeyStorage();
+  return '';
 }
 
 function cleanSpanEntry(storageKey: string, panelId: string): void {

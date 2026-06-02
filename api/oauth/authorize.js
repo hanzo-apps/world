@@ -95,9 +95,23 @@ function htmlError(title, detail) {
 </body></html>`, { status: 400, headers: PAGE_HEADERS });
 }
 
-function consentPage(params, nonce, errorMsg = '') {
+// Exported for unit tests (tests/oauth-authorize.test.mjs).
+//
+// Default state: API-key form is hidden behind a "Use API key instead"
+// disclosure — Pro users see only the brand-green Pro CTA. The form is
+// auto-revealed in two cases (handled by the inline script):
+//   1. When `errorMsg` is truthy (invalid-key retry path at handler line ~302)
+//      — the `<p class="error">` element renders with no inline display:none
+//      and the script reveals the form whenever `#ke` is non-empty. Hiding
+//      the form after a bad-key submit would be hostile to Starter+ users.
+//   2. When the URL fragment is `#api-key` — Starter+ users can bookmark
+//      `…/oauth/authorize?…#api-key` to skip the disclosure click.
+export function consentPage(params, nonce, errorMsg = '') {
   const { client_name, redirect_uri } = params;
   const redirectHost = new URL(redirect_uri).hostname;
+  // U3 contract: bridge URL is apex (no www, no return_to). Apex page reads
+  // oauth:nonce:<nonce> itself to recover client metadata + mint a grant.
+  const proCtaHref = `https://worldmonitor.app/mcp-grant?nonce=${encodeURIComponent(nonce)}`;
   return new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Authorize &#x2014; WorldMonitor MCP</title>
@@ -126,6 +140,11 @@ input[type=password]:focus{border-color:#2d8a6e}
 button{width:100%;margin-top:1.25rem;padding:.75rem;background:#2563eb;color:#fff;border:none;font-family:inherit;font-size:.9rem;cursor:pointer;font-weight:500;letter-spacing:.02em;border-radius:0}
 button:hover{background:#1d4ed8}
 button:disabled{opacity:.5;cursor:default}
+.pro-cta{display:block;width:100%;padding:.75rem;background:#2d8a6e;color:#fff;border:none;font-family:inherit;font-size:.9rem;font-weight:500;letter-spacing:.02em;text-align:center;text-decoration:none;cursor:pointer;border-radius:0}
+.pro-cta:hover{background:#246e58}
+.disclosure{margin-top:1rem;text-align:center}
+.disclosure a{font-size:.75rem;color:#555;text-decoration:none;letter-spacing:.02em;cursor:pointer}
+.disclosure a:hover{color:#888;text-decoration:underline}
 .footer{font-size:.7rem;color:#2a2a2a;text-align:center;margin-top:1.25rem}
 .footer a{color:#333;text-decoration:none}
 .footer a:hover{color:#555}

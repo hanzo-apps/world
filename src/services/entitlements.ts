@@ -22,6 +22,14 @@ export interface EntitlementState {
     maxDashboards: number;
     prioritySupport: boolean;
     exportFormats: string[];
+    /**
+     * Pro MCP access (plan 2026-05-10-001). Undefined on legacy entitlement
+     * snapshots that pre-date the catalog field. `hasFeature('mcpAccess')`
+     * coerces undefined → false via Boolean(), so the settings tab
+     * fails-closed for unrefreshed Pro users (they'll see it appear once
+     * Dodo's next webhook repopulates the field).
+     */
+    mcpAccess?: boolean;
   };
   validUntil: number;
 }
@@ -138,4 +146,23 @@ export function isEntitled(): boolean {
     && currentState.planKey !== 'free'
     && currentState.validUntil >= Date.now()
   );
+}
+
+/**
+ * Decides whether to reload the page when an entitlement snapshot arrives.
+ *
+ * Rules:
+ *   - First snapshot ever (last === null): never reload. A legacy-pro user
+ *     whose first snapshot is already `true` must not trigger a reload loop
+ *     on every page load.
+ *   - Free → pro transition (last === false, next === true): reload. This is
+ *     the post-payment activation case — panels rendered against free-tier
+ *     gating need to re-render to pick up the new entitlement.
+ *   - Everything else (free→free, pro→pro, pro→free): no reload.
+ */
+export function shouldReloadOnEntitlementChange(
+  last: boolean | null,
+  next: boolean,
+): boolean {
+  return last === false && next === true;
 }

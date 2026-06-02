@@ -10,20 +10,13 @@
     { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/pro", "destination": "/pricing.html" },
     { "source": "/mcp", "destination": "/api/mcp" },
+    { "source": "/mcp-grant", "destination": "/mcp-grant.html" },
     { "source": "/oauth/token", "destination": "/api/oauth/token" },
     { "source": "/oauth/register", "destination": "/api/oauth/register" },
     { "source": "/oauth/authorize", "destination": "/api/oauth/authorize" },
     { "source": "/((?!api|mcp|oauth|assets|blog|docs|favico|map-styles|data|textures|pro|pricing|upgrade|sw\\.js|workbox-[a-f0-9]+\\.js|manifest\\.webmanifest|offline\\.html|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|\\.well-known|wm-widget-sandbox\\.html).*)", "destination": "/index.html" }
   ],
   "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-WorldMonitor-Key, X-Widget-Key, X-Pro-Key" }
-      ]
-    },
     {
       "source": "/mcp",
       "headers": [
@@ -41,14 +34,6 @@
       ]
     },
     {
-      "source": "/.well-known/oauth-protected-resource",
-      "headers": [
-        { "key": "Content-Type", "value": "application/json" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
-      ]
-    },
-    {
       "source": "/.well-known/oauth-authorization-server",
       "headers": [
         { "key": "Content-Type", "value": "application/json" },
@@ -57,8 +42,24 @@
       ]
     },
     {
+      "source": "/.well-known/api-catalog",
+      "headers": [
+        { "key": "Content-Type", "value": "application/linkset+json" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
       "source": "/.well-known/(.*)",
       "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/openapi.yaml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/yaml; charset=utf-8" },
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
@@ -95,21 +96,41 @@
       ]
     },
     {
+      "source": "/api/brief/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self' https://www.worldmonitor.app https://worldmonitor.app; base-uri 'self'; object-src 'none'; form-action 'none'" }
+      ]
+    },
+    {
       "source": "/",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        { "key": "Cache-Control", "value": "private, no-cache, must-revalidate" },
+        { "key": "Link", "value": "</.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </openapi.yaml>; rel=\"service-desc\"; type=\"application/vnd.oai.openapi\", </docs/documentation>; rel=\"service-doc\"; type=\"text/html\", </api/health>; rel=\"status\"; type=\"application/json\", </.well-known/oauth-protected-resource>; rel=\"http://www.iana.org/assignments/relation/oauth-protected-resource\", </.well-known/oauth-authorization-server>; rel=\"http://www.iana.org/assignments/relation/oauth-authorization-server\", </.well-known/mcp/server-card.json>; rel=\"mcp-server-card\"; anchor=\"/mcp\", </.well-known/agent-skills/index.json>; rel=\"agent-skills-index\"; type=\"application/json\"" }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache, must-revalidate" },
+        { "key": "Link", "value": "</.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </openapi.yaml>; rel=\"service-desc\"; type=\"application/vnd.oai.openapi\", </docs/documentation>; rel=\"service-doc\"; type=\"text/html\", </api/health>; rel=\"status\"; type=\"application/json\", </.well-known/oauth-protected-resource>; rel=\"http://www.iana.org/assignments/relation/oauth-protected-resource\", </.well-known/oauth-authorization-server>; rel=\"http://www.iana.org/assignments/relation/oauth-authorization-server\", </.well-known/mcp/server-card.json>; rel=\"mcp-server-card\"; anchor=\"/mcp\", </.well-known/agent-skills/index.json>; rel=\"agent-skills-index\"; type=\"application/json\"" }
+      ]
+    },
+    {
+      "source": "/mcp-grant",
+      "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]
     },
     {
-      "source": "/((?!api|mcp|oauth|assets|blog|docs|favico|map-styles|data|textures|pro|sw\\.js|workbox-[a-f0-9]+\\.js|manifest\\.webmanifest|offline\\.html|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|\\.well-known|wm-widget-sandbox\\.html).*)",
+      "source": "/mcp-grant.html",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/((?!api|mcp|oauth|assets|blog|docs|favico|map-styles|data|textures|pro|sw\\.js|workbox-[a-f0-9]+\\.js|manifest\\.webmanifest|offline\\.html|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|openapi\\.yaml|\\.well-known|wm-widget-sandbox\\.html|mcp-grant\\.html|mcp-grant).*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache, must-revalidate" }
       ]
     },
     {
@@ -133,13 +154,13 @@
     {
       "source": "/pro/:path*",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        { "key": "Cache-Control", "value": "private, no-cache, must-revalidate" }
       ]
     },
     {
       "source": "/pro",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        { "key": "Cache-Control", "value": "private, no-cache, must-revalidate" }
       ]
     },
     {

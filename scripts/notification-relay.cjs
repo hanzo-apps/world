@@ -7,6 +7,7 @@ const { Resend } = require('resend');
 const { decrypt } = require('./lib/crypto.cjs');
 const { callLLM } = require('./lib/llm-chain.cjs');
 const { fetchUserPreferences, extractUserContext, formatUserProfile } = require('./lib/user-context.cjs');
+const { countryNameToIso2 } = require('./shared/country-name-to-iso2.cjs');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -53,8 +54,15 @@ function sha256Hex(str) {
   return createHash('sha256').update(str).digest('hex');
 }
 
-async function checkDedup(userId, eventType, title) {
-  const hash = sha256Hex(`${eventType}:${title}`);
+async function checkDedup(userId, eventType, title, coalesceKey) {
+  // Slot B: when the publisher provides a coalesceKey (e.g. NWS VTEC family
+  // string), key the per-user dedup on it instead of the title hash. This
+  // collapses adjacent-zone NWS alerts (same storm system, different counties)
+  // into one notification per user — the title-based dedup misses these
+  // because each zone produces a slightly different title.
+  // See plans/forbid-realtime-all-events.md "Out of scope: Slot B".
+  const keyMaterial = coalesceKey ? `coalesce:${coalesceKey}` : `${eventType}:${title}`;
+  const hash = sha256Hex(keyMaterial);
   const key = `wm:notif:dedup:${userId}:${hash}`;
   const result = await upstashRest('SET', key, '1', 'NX', 'EX', '1800');
   return result === 'OK'; // true = new, false = duplicate
@@ -82,8 +90,39 @@ async function deactivateChannel(userId, channelType) {
 
 // ── Entitlement check (PRO gate for delivery) ───────────────────────────────
 
-const ENTITLEMENT_CACHE_TTL = 900; // 15 min
+const ENTITLEMENT_CACHE_TTL = 900; // 15 min — success-path cache
+// Short-TTL cache for fail-closed results during entitlement-endpoint
+// outages. Without this, every event during a sustained outage would
+// re-attempt the 5-second fetch per unique user — turning a high-frequency
+// event stream into a continuous 5-sec stall per poll iteration. 60s
+// absorbs a poll burst, recovers quickly when the endpoint comes back.
+// Cache value "0" (free); the success path naturally refreshes with the
+// real tier on the next attempt past TTL.
+const ENTITLEMENT_FAILCLOSED_CACHE_TTL = 60;
 
+/**
+ * Layer-3 PRO gate. Returns true iff the user has tier>=1 entitlement.
+ *
+ * Fail-CLOSED policy (changed from fail-open in PR #3485 following the
+ * 2026-04-28 audit that found 7 of 28 enabled alertRules belonged to free-
+ * tier users — the relay's PRO filter has been silently masking a write-side
+ * gap, but the previous fail-open policy meant any entitlement-endpoint
+ * outage would briefly let those free users receive notifications).
+ *
+ * Three-layer model context:
+ *   - Layer 1 (UI paywall): visual, necessary, insufficient.
+ *   - Layer 2 (server-side mutation gate): primary defense (PR #3483).
+ *   - Layer 3 (THIS function): defense-in-depth at delivery time.
+ *
+ * Caching:
+ *   - Success path: 15-min Upstash TTL.
+ *   - Fail-closed paths (HTTP non-OK, transport error, timeout): cache "0"
+ *     with 60s TTL — see ENTITLEMENT_FAILCLOSED_CACHE_TTL note above.
+ *
+ * Tradeoff: an entitlement-endpoint outage drops notifications for
+ * legitimate PRO users for up to 60s after each cache miss. Pair with
+ * monitoring on `[relay][entitlement-fail-closed]` log lines.
+ */
 async function isUserPro(userId) {
   const cacheKey = `relay:entitlement:${userId}`;
   try {
@@ -97,12 +136,25 @@ async function isUserPro(userId) {
       body: JSON.stringify({ userId }),
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return true; // fail-open: don't block delivery on entitlement service failure
+    if (!res.ok) {
+      // fail-CLOSED: drop delivery rather than risk exposing a paywalled
+      // feature to a free-tier user during an entitlement-endpoint outage.
+      // Cache "0" with short TTL so subsequent events for this user during
+      // the same outage skip the 5-sec fetch. Logged with stable prefix
+      // for alerting on volume.
+      console.error(`[relay][entitlement-fail-closed] HTTP ${res.status} for ${userId}; dropping delivery`);
+      try { await upstashRest('SET', cacheKey, '0', 'EX', String(ENTITLEMENT_FAILCLOSED_CACHE_TTL)); } catch { /* cache write best-effort */ }
+      return false;
+    }
     const { tier } = await res.json();
     await upstashRest('SET', cacheKey, String(tier ?? 0), 'EX', String(ENTITLEMENT_CACHE_TTL));
     return (tier ?? 0) >= 1;
-  } catch {
-    return true; // fail-open
+  } catch (err) {
+    // Same fail-CLOSED policy on transport error / timeout. Same short-TTL
+    // cache write so we don't re-attempt the 5-sec fetch for every event.
+    console.error(`[relay][entitlement-fail-closed] error for ${userId}: ${err && err.message ? err.message : err}; dropping delivery`);
+    try { await upstashRest('SET', cacheKey, '0', 'EX', String(ENTITLEMENT_FAILCLOSED_CACHE_TTL)); } catch { /* cache write best-effort */ }
+    return false;
   }
 }
 
@@ -192,6 +244,15 @@ async function drainHeldForUser(userId, variant, allowedChannelTypes) {
           alerts: events.map(ev => ({ eventType: ev.eventType, severity: ev.severity ?? 'high', title: ev.payload?.title ?? ev.eventType })),
         },
       });
+      else if (ch.channelType === 'web_push' && ch.endpoint && ch.p256dh && ch.auth) {
+        ok = await sendWebPush(userId, ch, {
+          title: `WorldMonitor · ${events.length} held alert${events.length === 1 ? '' : 's'}`,
+          body: subject,
+          url: 'https://worldmonitor.app/',
+          tag: `quiet_hours_batch:${userId}`,
+          eventType: 'quiet_hours_batch',
+        });
+      }
       if (ok) anyDelivered = true;
     } catch (err) {
       console.warn(`[relay] drainHeldForUser: delivery error for ${userId}/${ch.channelType}:`, err.message);
@@ -256,7 +317,7 @@ async function processFlushQuietHeld(event) {
 
 // ── Delivery: Telegram ────────────────────────────────────────────────────────
 
-async function sendTelegram(userId, chatId, text) {
+async function sendTelegram(userId, chatId, text, _retryCount = 0) {
   if (!TELEGRAM_BOT_TOKEN) {
     console.warn('[relay] Telegram: TELEGRAM_BOT_TOKEN not set — skipping');
     return false;
@@ -277,10 +338,15 @@ async function sendTelegram(userId, chatId, text) {
     return false;
   }
   if (res.status === 429) {
+    if (_retryCount >= 1) {
+      res.body?.cancel();
+      console.warn(`[relay] Telegram 429 retry limit reached for ${userId} — bailing`);
+      return false;
+    }
     const body = await res.json().catch(() => ({}));
     const wait = ((body.parameters?.retry_after ?? 5) + 1) * 1000;
     await new Promise(r => setTimeout(r, wait));
-    return sendTelegram(userId, chatId, text); // single retry
+    return sendTelegram(userId, chatId, text, _retryCount + 1); // single retry
   }
   if (res.status === 401) {
     console.error('[relay] Telegram 401 Unauthorized — TELEGRAM_BOT_TOKEN is invalid or belongs to a different bot; correct the Railway env var to restore Telegram delivery');
@@ -448,10 +514,9 @@ async function sendWebhook(userId, webhookEnvelope, event) {
   // Envelope version stays at '1'. Payload gained optional `corroborationCount`
   // on rss_alert (PR #3069) — this is an additive field, backwards-compatible
   // for consumers that don't enforce `additionalProperties: false`. Bumping
-  // version here would have broken parity with the other webhook producers
-  // (scripts/proactive-intelligence.mjs, scripts/seed-digest-notifications.mjs)
-  // which still emit v1, causing the same endpoint to receive mixed envelope
-  // versions per event type.
+  // version here would have broken parity with the other webhook producer
+  // (scripts/seed-digest-notifications.mjs), which still emits v1, causing
+  // the same endpoint to receive mixed envelope versions per event type.
   const payload = JSON.stringify({
     version: '1',
     eventType: event.eventType,
@@ -484,12 +549,124 @@ async function sendWebhook(userId, webhookEnvelope, event) {
   }
 }
 
+// ── Web Push (Phase 6) ────────────────────────────────────────────────────────
+//
+// Lazy-require web-push so the relay can still start on Railway if the
+// dep isn't pulled in. If VAPID keys are unset the relay logs once and
+// skips web_push deliveries entirely — telegram/slack/email still work.
+
+let webpushLib = null;
+let webpushConfigured = false;
+let webpushConfigWarned = false;
+
+function getWebpushClient() {
+  if (webpushLib) return webpushLib;
+  try {
+    webpushLib = require('web-push');
+  } catch (err) {
+    if (!webpushConfigWarned) {
+      console.warn('[relay] web-push dep unavailable — web_push deliveries disabled:', err.message);
+      webpushConfigWarned = true;
+    }
+    return null;
+  }
+  return webpushLib;
+}
+
+function ensureVapidConfigured(client) {
+  if (webpushConfigured) return true;
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT || 'mailto:support@worldmonitor.app';
+  if (!pub || !priv) {
+    if (!webpushConfigWarned) {
+      console.warn('[relay] VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set — web_push deliveries disabled');
+      webpushConfigWarned = true;
+    }
+    return false;
+  }
+  try {
+    client.setVapidDetails(subject, pub, priv);
+    webpushConfigured = true;
+    return true;
+  } catch (err) {
+    console.warn('[relay] VAPID configuration failed:', err.message);
+    return false;
+  }
+}
+
+/**
+ * Deliver a web push notification to one subscription. Returns true on
+ * success. On 404/410 (subscription gone) the channel is deactivated
+ * in Convex so the next run doesn't re-try a dead endpoint.
+ *
+ * @param {string} userId
+ * @param {{ endpoint: string; p256dh: string; auth: string }} subscription
+ * @param {{ title: string; body: string; url?: string; tag?: string; eventType?: string }} payload
+ */
+async function sendWebPush(userId, subscription, payload) {
+  const client = getWebpushClient();
+  if (!client) return false;
+  if (!ensureVapidConfigured(client)) return false;
+
+  const body = JSON.stringify({
+    title: payload.title || 'WorldMonitor',
+    body: payload.body || '',
+    url: payload.url || 'https://worldmonitor.app/',
+    tag: payload.tag || 'worldmonitor-generic',
+    eventType: payload.eventType,
+  });
+
+  // Event-type-aware TTL. Push services hold undeliverable messages
+  // until TTL expires — a 24h blanket meant a device offline 20h
+  // would reconnect to a flood of yesterday's rss_alerts. Three tiers:
+  //   brief_ready:    12h  — the editorial brief is a daily artefact
+  //                          and remains interesting into the next
+  //                          afternoon even on a long reconnect
+  //   quiet_hours_batch: 6h — by definition the alerts inside are
+  //                          already queued-on-wake; users care
+  //                          about the batch when they wake
+  //   everything else:   30 min — rss_alert / oref_siren / conflict_
+  //                          escalation are transient. After 30 min
+  //                          they're noise; the dashboard is the
+  //                          canonical surface.
+  const ttlSec =
+    payload.eventType === 'brief_ready'        ? 60 * 60 * 12 :
+    payload.eventType === 'quiet_hours_batch'  ? 60 * 60 * 6  :
+    60 * 30;
+
+  try {
+    await client.sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+      },
+      body,
+      { TTL: ttlSec },
+    );
+    return true;
+  } catch (err) {
+    const code = err?.statusCode;
+    if (code === 404 || code === 410) {
+      console.warn(`[relay] web_push ${code} for ${userId} — deactivating`);
+      await deactivateChannel(userId, 'web_push');
+      return false;
+    }
+    console.warn(`[relay] web_push delivery error for ${userId}:`, err?.message ?? String(err));
+    return false;
+  }
+}
+
 // ── Event processing ──────────────────────────────────────────────────────────
 
 function matchesSensitivity(ruleSensitivity, eventSeverity) {
   if (ruleSensitivity === 'all') return true;
   if (ruleSensitivity === 'high') return eventSeverity === 'high' || eventSeverity === 'critical';
   return eventSeverity === 'critical';
+}
+
+function normalizeEventCountryCode(raw) {
+  return countryNameToIso2(raw);
 }
 
 /**
@@ -503,22 +680,130 @@ function matchesSensitivity(ruleSensitivity, eventSeverity) {
  * back to the legacy result so real notifications are unaffected. Logs to
  * shadow:score-log (currently v3) for tuning.
  */
+/**
+ * Filter events by per-rule country-scope.
+ *
+ * When `rule.countries` is empty / absent, all events match (current behavior,
+ * full backwards-compat for pre-migration rules).
+ *
+ * When `rule.countries` is populated, the user explicitly opted into country-
+ * scoped alerts. We try multiple payload shapes for the event's country
+ * attribution because publishers are inconsistent: regional-snapshot uses
+ * `payload.countryCode`, ais-relay sometimes uses `payload.country`, browser-
+ * submitted rss_alert events occasionally lift `country` to the event root.
+ *
+ * PERMISSIVE semantics for unattributed events: when a rule has
+ * countries=['US'] and an event has NO country attribution, we deliver it.
+ * The publisher didn't give us enough information to filter, so the user
+ * receives a global alert that may or may not be about their country.
+ *
+ * RATIONALE: most publishers today (rss_alert, ais-relay generic events,
+ * etc.) do not emit a country code. Strict drop-on-missing semantics would
+ * deliver ZERO alerts to a user who set countries=['US'] — strictly worse
+ * UX than "occasional unscoped global event slips through." A user opting
+ * into country-scope expects to receive AT LEAST events from those
+ * countries; permissive delivery on unattributed events meets that
+ * expectation. As publishers add country attribution (planned follow-up
+ * audit), scoped delivery tightens automatically. A future strict-mode
+ * opt-in (e.g. rule.countriesStrict=true) is left to a follow-up UI surface.
+ *
+ * Strict semantics still apply when the event IS attributed but doesn't
+ * match: rule.countries=['US'] + event.payload.countryCode='IR' → drop.
+ *
+ * Country values are normalized to uppercase ISO-3166 alpha-2 before
+ * matching. Known malformed values emitted by current publishers (for
+ * example 'USA', 'United States', 'UAE') are mapped to ISO2 and filtered
+ * strictly. Unknown malformed values fall through to the "unattributed"
+ * branch and are delivered permissively — the publisher emitted garbage,
+ * treat it as if it emitted nothing.
+ */
+function eventMatchesCountryScope(event, rule) {
+  // Empty/absent countries on the rule → all events (no filter applied).
+  if (!Array.isArray(rule.countries) || rule.countries.length === 0) return true;
+
+  const eventCountry =
+    event?.payload?.countryCode
+    ?? event?.payload?.country
+    ?? event?.country
+    ?? null;
+
+  // Unattributed → PERMISSIVE deliver (see RATIONALE above).
+  if (typeof eventCountry !== 'string' || eventCountry.trim().length === 0) {
+    return true;
+  }
+
+  const normalized = normalizeEventCountryCode(eventCountry);
+  // Unknown malformed value → treat as unattributed → PERMISSIVE deliver.
+  if (normalized === null) return true;
+
+  return rule.countries.includes(normalized);
+}
+
 function shouldNotify(rule, event) {
-  const passesLegacy = matchesSensitivity(rule.sensitivity, event.severity ?? 'high');
+  // Coerce (effective realtime + non-critical) → 'critical' before consulting
+  // sensitivity in either branch. The mutation validators + migration make this
+  // state unreachable for new traffic; this catches in-flight rows during
+  // migration and any tooling that bypasses the validators.
+  //
+  // Tightened rule (2026-04-27): realtime is reserved for `critical`-tier events
+  // only. Both `(realtime, all)` and `(realtime, high)` are forbidden, so the
+  // relay collapses both to `'critical'` for in-flight forbidden rows.
+  //
+  // Both reads (legacy match below AND the importance threshold lookup) must
+  // use the SAME effective value, otherwise the threshold path silently falls
+  // through to the looser IMPORTANCE_SCORE_MIN floor.
+  // See plans/forbid-realtime-all-events.md §3.
+  const effectiveDigestMode = rule.digestMode ?? 'realtime';
+  const effectiveSensitivity =
+    effectiveDigestMode === 'realtime' && (rule.sensitivity === 'all' || rule.sensitivity === 'high')
+      ? 'critical'
+      : rule.sensitivity;
+
+  const passesLegacy = matchesSensitivity(effectiveSensitivity, event.severity ?? 'high');
   if (!passesLegacy) return false;
 
   if (process.env.IMPORTANCE_SCORE_LIVE === '1' && event.payload?.importanceScore != null) {
-    const threshold = rule.sensitivity === 'critical' ? 85
-                    : rule.sensitivity === 'high' ? 65
-                    : 40; // 'all'
+    // Calibrated from v5 shadow-log recalibration (2026-04-20).
+    // IMPORTANCE_SCORE_MIN env var controls the 'all' floor at both the
+    // relay ingress gate AND per-rule sensitivity — single tuning surface.
+    const threshold = effectiveSensitivity === 'critical' ? 82
+                    : effectiveSensitivity === 'high' ? 69
+                    : IMPORTANCE_SCORE_MIN;
     return event.payload.importanceScore >= threshold;
   }
 
   return true;
 }
 
+// ── RSS-origin event contract (audit codified in
+// tests/notification-relay-payload-audit.test.*) ────────────────────────────
+// RSS-origin events (source: rss, e.g. from src/services/breaking-news-alerts.ts)
+// MUST set `payload.description` when their upstream NewsItem carried a
+// snippet. Domain-origin events (ais-relay, seed-aviation, alert-emitter)
+// MUST NOT set `payload.description` — those titles are built from structured
+// domain data, not free-form RSS text. The audit test enforces the tag
+// comment on every publishNotificationEvent / /api/notify call site so
+// future additions can't silently drift.
+//
+// NOTIFY_RELAY_INCLUDE_SNIPPET gate: when set to '1', the relay renders a
+// context line under the event title for payloads that carry `description`.
+// Default-off in the first cut so the initial rollout is a pure upstream
+// plumbing change; when disabled, output is byte-identical to pre-U7.
+const NOTIFY_RELAY_INCLUDE_SNIPPET = process.env.NOTIFY_RELAY_INCLUDE_SNIPPET === '1';
+const SNIPPET_TELEGRAM_MAX = 400;   // Telegram handles 4096; 400 keeps notifications terse
+
+function truncateForDisplay(str, maxLen) {
+  if (typeof str !== 'string' || str.length === 0) return '';
+  if (str.length <= maxLen) return str;
+  const cutAtWord = str.slice(0, maxLen).replace(/\s+\S*$/, '');
+  return (cutAtWord.length > 0 ? cutAtWord : str.slice(0, maxLen)) + '…';
+}
+
 function formatMessage(event) {
   const parts = [`[${(event.severity ?? 'high').toUpperCase()}] ${event.payload?.title ?? event.eventType}`];
+  if (NOTIFY_RELAY_INCLUDE_SNIPPET && typeof event.payload?.description === 'string' && event.payload.description.length > 0) {
+    parts.push(`> ${truncateForDisplay(event.payload.description, SNIPPET_TELEGRAM_MAX)}`);
+  }
   if (event.payload?.source) parts.push(`Source: ${event.payload.source}`);
   if (event.payload?.link) parts.push(event.payload.link);
   return parts.join('\n');
@@ -551,6 +836,20 @@ async function processWelcome(event) {
     await sendDiscord(userId, ch.webhookEnvelope, text);
   } else if (channelType === 'email' && ch.email) {
     await sendEmail(ch.email, 'WorldMonitor Notifications Connected', text);
+  } else if (channelType === 'web_push' && ch.endpoint && ch.p256dh && ch.auth) {
+    // Welcome push on first web_push connect. Short body — Chrome's
+    // notification shelf clips past ~80 chars on most OSes. Click
+    // opens the dashboard so the user lands somewhere useful. Uses
+    // the 'channel_welcome' event type which maps to the 30-min TTL
+    // in sendWebPush — a welcome past 30 minutes after subscribe is
+    // noise, not value.
+    await sendWebPush(userId, ch, {
+      title: 'WorldMonitor connected',
+      body: "You'll receive alerts here when events match your sensitivity settings.",
+      url: 'https://worldmonitor.app/',
+      tag: `channel_welcome:${userId}`,
+      eventType: 'channel_welcome',
+    });
   }
 }
 
@@ -560,7 +859,7 @@ const IMPORTANCE_SCORE_MIN = Number(process.env.IMPORTANCE_SCORE_MIN ?? 40);
 // The old v1 key (compact string format) is retained by consumers for
 // backward-compat reading but is no longer written. See
 // docs/internal/scoringDiagnostic.md §5 and §9 Step 4.
-const SHADOW_SCORE_LOG_KEY = 'shadow:score-log:v3';
+const SHADOW_SCORE_LOG_KEY = 'shadow:score-log:v5';
 const SHADOW_LOG_TTL = 7 * 24 * 3600; // 7 days
 
 async function shadowLogScore(event) {
@@ -717,6 +1016,7 @@ async function processEvent(event) {
     (!r.digestMode || r.digestMode === 'realtime') &&
     (r.eventTypes.length === 0 || r.eventTypes.includes(event.eventType)) &&
     shouldNotify(r, event) &&
+    eventMatchesCountryScope(event, r) &&
     (!event.variant || !r.variant || r.variant === event.variant) &&
     (!event.userId || r.userId === event.userId)
   );
@@ -745,15 +1045,20 @@ async function processEvent(event) {
       continue;
     }
 
+    // event.payload.coalesceKey (Slot B) — when set, dedup keys on the family
+    // identifier (e.g. NWS VTEC string) instead of the title; collapses adjacent
+    // NWS zone alerts to one notification per user.
+    const coalesceKey = typeof event.payload?.coalesceKey === 'string' ? event.payload.coalesceKey : undefined;
+
     if (quietAction === 'hold') {
-      const isNew = await checkDedup(rule.userId, event.eventType, event.payload?.title ?? '');
+      const isNew = await checkDedup(rule.userId, event.eventType, event.payload?.title ?? '', coalesceKey);
       if (!isNew) { console.log(`[relay] Dedup hit (held) for ${rule.userId}`); continue; }
       console.log(`[relay] Quiet hours hold for ${rule.userId} — queuing for batch_on_wake`);
       await holdEvent(rule.userId, rule.variant ?? 'full', JSON.stringify(event));
       continue;
     }
 
-    const isNew = await checkDedup(rule.userId, event.eventType, event.payload?.title ?? '');
+    const isNew = await checkDedup(rule.userId, event.eventType, event.payload?.title ?? '', coalesceKey);
     if (!isNew) { console.log(`[relay] Dedup hit for ${rule.userId}`); continue; }
 
     let channels = [];
@@ -796,6 +1101,20 @@ async function processEvent(event) {
           await sendEmail(ch.email, subject, deliveryText);
         } else if (ch.channelType === 'webhook' && ch.webhookEnvelope) {
           await sendWebhook(rule.userId, ch.webhookEnvelope, event);
+        } else if (ch.channelType === 'web_push' && ch.endpoint && ch.p256dh && ch.auth) {
+          // Web push carries short payloads (Chrome caps at ~4KB and
+          // auto-truncates longer ones anyway). Use title + first line
+          // of the formatted text as the body; the click URL points
+          // at the event's link if present, else the dashboard.
+          const firstLine = (deliveryText || '').split('\n')[1] || '';
+          const eventUrl = event.payload?.link || event.payload?.url || 'https://worldmonitor.app/';
+          await sendWebPush(rule.userId, ch, {
+            title: event.payload?.title || event.eventType || 'WorldMonitor',
+            body: firstLine,
+            url: eventUrl,
+            tag: `${event.eventType}:${rule.userId}`,
+            eventType: event.eventType,
+          });
         }
       } catch (err) {
         console.warn(`[relay] Delivery error for ${rule.userId}/${ch.channelType}:`, err instanceof Error ? err.message : String(err));
@@ -851,12 +1170,16 @@ async function subscribe() {
   }
 }
 
-process.on('SIGTERM', () => {
-  console.log('[relay] SIGTERM received — shutting down');
-  process.exit(0);
-});
+if (require.main === module) {
+  process.on('SIGTERM', () => {
+    console.log('[relay] SIGTERM received — shutting down');
+    process.exit(0);
+  });
 
-subscribe().catch(err => {
-  console.error('[relay] Fatal error:', err);
-  process.exit(1);
-});
+  subscribe().catch(err => {
+    console.error('[relay] Fatal error:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { sendTelegram };

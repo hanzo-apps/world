@@ -7,6 +7,12 @@
  *   AISSTREAM_API_KEY=your_key
  *
  * Local: node scripts/ais-relay.cjs
+ *
+ * @notification-source: domain (ais)
+ *   Every publishNotificationEvent() call in this file builds payload.title
+ *   from structured AIS/vessel/port domain fields (MMSI, vessel name, ETA,
+ *   port code, etc.). Events are NOT RSS-origin and MUST NOT set
+ *   payload.description. Enforced by tests/notification-relay-payload-audit.test.mjs.
  */
 
 const http = require('http');
@@ -21,6 +27,7 @@ const crypto = require('crypto');
 const v8 = require('v8');
 const { WebSocketServer, WebSocket } = require('ws');
 const { parseProxyConfig, resolveProxyString } = require('./_proxy-utils.cjs');
+const { countryNameToIso2 } = require('./shared/country-name-to-iso2.cjs');
 const parseProxyUrl = parseProxyConfig;
 
 const httpsKeepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 6, timeout: 60_000 });
@@ -72,11 +79,16 @@ const MEMORY_CLEANUP_THRESHOLD_GB = (() => {
 })();
 const RELAY_SHARED_SECRET = process.env.RELAY_SHARED_SECRET || '';
 const RELAY_AUTH_HEADER = (process.env.RELAY_AUTH_HEADER || 'x-relay-key').toLowerCase();
-const ALLOW_UNAUTHENTICATED_RELAY = process.env.ALLOW_UNAUTHENTICATED_RELAY === 'true';
-const IS_PRODUCTION_RELAY = process.env.NODE_ENV === 'production'
-  || !!process.env.RAILWAY_ENVIRONMENT
-  || !!process.env.RAILWAY_PROJECT_ID
-  || !!process.env.RAILWAY_STATIC_URL;
+// Auth bypass: new canonical name + legacy alias. The new name's verbose
+// wording is intentional — it should be hard to set in production by accident.
+// The legacy `ALLOW_UNAUTHENTICATED_RELAY` is still accepted but emits a
+// deprecation warning so existing self-hosted operators are not broken.
+const _AUTH_BYPASS_NEW = process.env.I_UNDERSTAND_THIS_DISABLES_AUTH === 'true';
+const _AUTH_BYPASS_OLD = process.env.ALLOW_UNAUTHENTICATED_RELAY === 'true';
+const ALLOW_UNAUTHENTICATED_RELAY = _AUTH_BYPASS_NEW || _AUTH_BYPASS_OLD;
+if (_AUTH_BYPASS_OLD && !_AUTH_BYPASS_NEW) {
+  console.warn('[DEPRECATED] ALLOW_UNAUTHENTICATED_RELAY=true is deprecated. Use I_UNDERSTAND_THIS_DISABLES_AUTH=true instead.');
+}
 const RELAY_RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.RELAY_RATE_LIMIT_WINDOW_MS || 60000));
 const RELAY_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_RATE_LIMIT_MAX))
   ? Number(process.env.RELAY_RATE_LIMIT_MAX) : 1200;
@@ -140,11 +152,44 @@ const OREF_LOCAL_FILE = (() => {
 const RELAY_OREF_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_OREF_RATE_LIMIT_MAX))
   ? Number(process.env.RELAY_OREF_RATE_LIMIT_MAX) : 600;
 
-if (IS_PRODUCTION_RELAY && !RELAY_SHARED_SECRET && !ALLOW_UNAUTHENTICATED_RELAY) {
-  console.error('[Relay] Error: RELAY_SHARED_SECRET is required in production');
-  console.error('[Relay] Set RELAY_SHARED_SECRET on Railway and Vercel to secure relay endpoints');
-  console.error('[Relay] To bypass temporarily (not recommended), set ALLOW_UNAUTHENTICATED_RELAY=true');
+// Fail-closed: refuse to boot without a shared secret. This applies in ALL
+// environments (production, dev, self-hosted Docker, etc.) so a self-hosted
+// `docker compose up -d` against the published image cannot accidentally
+// expose every route. Operators who genuinely need an unauthenticated relay
+// must opt in explicitly with the loud `I_UNDERSTAND_THIS_DISABLES_AUTH=true`.
+// (#3801 — closes the IS_PRODUCTION_RELAY-only gate that left self-hosted
+// deployments wide open.)
+if (!RELAY_SHARED_SECRET && !ALLOW_UNAUTHENTICATED_RELAY) {
+  console.error('[Relay] FATAL: RELAY_SHARED_SECRET is not set.');
+  console.error('[Relay] Generate a strong random secret and set it on every host running the relay:');
+  console.error('[Relay]   RELAY_SHARED_SECRET="$(openssl rand -hex 32)"');
+  console.error('[Relay] To explicitly opt out (DEV ONLY — leaves all routes publicly accessible):');
+  console.error('[Relay]   I_UNDERSTAND_THIS_DISABLES_AUTH=true   (formerly ALLOW_UNAUTHENTICATED_RELAY=true)');
   process.exit(1);
+}
+
+// Loud recurring SECURITY warning when auth is effectively disabled. Operators
+// who opt out with the bypass var get a bright reminder both at boot and every
+// 5 minutes in long-running logs so the no-auth state stays visible.
+//
+// Auth is effectively disabled ONLY when there's no secret to check. If a
+// secret IS set, isAuthorizedRequest() enforces it regardless of the bypass
+// flag — the bypass branch only runs when the secret is absent — so we must
+// not warn (or report auth.enabled=false on /health) when the secret is set.
+const AUTH_EFFECTIVELY_DISABLED = !RELAY_SHARED_SECRET;
+if (AUTH_EFFECTIVELY_DISABLED) {
+  console.warn('[SECURITY] relay is running WITHOUT auth — RELAY_SHARED_SECRET unset and I_UNDERSTAND_THIS_DISABLES_AUTH=true. All non-public routes are reachable by anyone who can hit this port.');
+  setInterval(() => {
+    console.warn('[SECURITY] relay STILL running without auth — set RELAY_SHARED_SECRET to lock down non-public routes.');
+  }, 5 * 60 * 1000).unref();
+}
+
+// Separately: if the bypass is set redundantly alongside a real secret, the
+// bypass is silently ignored (isAuthorizedRequest enforces the secret). Emit
+// a single INFO line so operators can clean up their env without wondering
+// why their bypass appears to have no effect.
+if (RELAY_SHARED_SECRET && ALLOW_UNAUTHENTICATED_RELAY) {
+  console.info('[Relay] I_UNDERSTAND_THIS_DISABLES_AUTH=true is ignored — RELAY_SHARED_SECRET is configured and takes precedence. Unset the bypass flag to silence this notice.');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -422,12 +467,50 @@ function notifySimpleHash(str) {
   return Math.abs(h).toString(36);
 }
 
+function normalizeNotificationCountryCode(raw) {
+  return countryNameToIso2(raw) ?? undefined;
+}
+
+/**
+ * Slot B helper: derive a coalesce-family key from an NWS VTEC string.
+ *
+ * NWS VTEC format (https://www.weather.gov/vtec/):
+ *   /O.NEW.KSGF.SV.W.0034.250427T1257Z-250427T1330Z/
+ *    │  │   │   │  │  │
+ *    │  │   │   │  │  └── event tracking number (per-office, per-phenomenon, per-significance)
+ *    │  │   │   │  └───── significance: W=warning, A=watch, Y=advisory, etc.
+ *    │  │   │   └──────── phenomenon: SV=severe thunderstorm, TO=tornado, FF=flash flood, etc.
+ *    │  │   └──────────── forecast office (4-letter ICAO)
+ *    │  └──────────────── action: NEW, CON (continued), CAN (cancel), EXP (expired), etc.
+ *    └─────────────────── product status: O=operational, T=test, E=exercise, X=experimental
+ *
+ * The (office, phenomenon, significance, eventID) tuple identifies one logical
+ * event across adjacent zones — exactly what we want to coalesce. We drop the
+ * action so NEW + CON + CAN bulletins for the same event also collapse.
+ *
+ * Returns a stable family key like "nws:KSGF.SV.W.0034" or undefined if the
+ * VTEC string is missing or malformed.
+ */
+function deriveWeatherCoalesceKey(vtec) {
+  if (typeof vtec !== 'string') return undefined;
+  const m = vtec.match(/\/[OTEX]\.[A-Z]+\.([A-Z]{4})\.([A-Z]{2})\.([A-Z])\.(\d{4})\./);
+  if (!m) return undefined;
+  return `nws:${m[1]}.${m[2]}.${m[3]}.${m[4]}`;
+}
+
 async function publishNotificationEvent({ eventType, payload, severity, variant, dedupTtl = 1800 }) {
   try {
     // Include variant in dedup key so each variant can independently publish the same title
-    // (e.g. finance and world users both receive an alert for the same headline)
+    // (e.g. finance and world users both receive an alert for the same headline).
+    // Slot B: when payload.coalesceKey is set (e.g. NWS VTEC family), key on it
+    // instead of the title hash so adjacent-zone alerts for the same logical
+    // event collapse at the publisher (queue stays clean) instead of N times
+    // per recipient at the relay.
     const variantSuffix = variant ? `:${variant}` : '';
-    const dedupKey = `wm:notif:scan-dedup:${eventType}${variantSuffix}:${notifySimpleHash(`${eventType}:${payload.title ?? ''}`)}`;
+    const dedupMaterial = payload?.coalesceKey
+      ? `coalesce:${payload.coalesceKey}`
+      : `${eventType}:${payload.title ?? ''}`;
+    const dedupKey = `wm:notif:scan-dedup:${eventType}${variantSuffix}:${notifySimpleHash(dedupMaterial)}`;
     const isNew = await upstashSetNx(dedupKey, '1', dedupTtl);
     if (!isNew) {
       console.log(`[Notify] Dedup hit — ${eventType}: ${String(payload.title ?? '').slice(0, 60)}`);
@@ -1043,7 +1126,7 @@ async function orefFetchAlerts() {
         : '';
       publishNotificationEvent({
         eventType: 'oref_siren',
-        payload: { title: orefTitle + orefLocationSuffix, source: source === 'tzeva-adom' ? 'Tzeva Adom / Pikud HaOref' : 'OREF Pikud HaOref' },
+        payload: { title: orefTitle + orefLocationSuffix, source: source === 'tzeva-adom' ? 'Tzeva Adom / Pikud HaOref' : 'OREF Pikud HaOref', countryCode: 'IL' },
         severity: 'critical',
         variant: undefined,
       }).catch(e => console.warn('[Notify] OREF publish error:', e?.message));
@@ -1175,6 +1258,25 @@ async function orefPersistHistory() {
     const ok = await envelopeWrite(OREF_REDIS_KEY, payload, OREF_PERSIST_TTL_SECONDS, { recordCount: waves.length, sourceVersion: 'oref', zeroOk: true });
     if (ok) {
       orefState._lastPersistedVersion = versionAtStart;
+    }
+    // Companion seed-meta:* write — the OREF payload only carries `persistedAt`
+    // (an ISO string not in extractTimestamp's recognised set), so without this
+    // key the regional-snapshot freshness classifier would flag the input as
+    // STALE on every run (#3781). Tracked by api/health.js for staleness alerts.
+    //
+    // Gate on `ok`: if the envelope write failed (Upstash 5xx / network blip),
+    // a successful meta write alone would tell the freshness classifier the
+    // input is FRESH for data that does not actually exist in Redis. The 7d
+    // meta TTL is deliberately wider than the 15min maxAgeMin so a brief
+    // seed gap keeps the meta around for diagnostics; freshness still flips
+    // STALE off the now-vs-fetchedAt delta.
+    //
+    // NOTE (#3781 review): the transit-summaries write at line ~7370 still
+    // does its meta write unconditionally and has the same failure mode.
+    // That is a pre-existing bug intentionally left out of scope here; it
+    // should be fixed in a follow-up PR.
+    if (ok) {
+      await upstashSet('seed-meta:relay:oref:history', { fetchedAt: Date.now(), recordCount: waves.length }, 604800);
     }
     orefSaveLocalHistory();
   } finally {
@@ -1463,9 +1565,10 @@ async function seedUcdpEvents() {
     for (const e of newConflicts.slice(0, 2)) {
       ucdpPrevAlertedIds.add(e.id);
       const parties = e.sideA && e.sideB ? `${e.sideA.slice(0, 40)} vs ${e.sideB.slice(0, 40)}` : e.sideA || e.sideB || 'Unknown parties';
+      const countryCode = normalizeNotificationCountryCode(e.country);
       publishNotificationEvent({
         eventType: 'conflict_escalation',
-        payload: { title: `${e.country}: ${parties} — ${e.deathsBest} casualties`, source: 'UCDP' },
+        payload: { title: `${e.country}: ${parties} — ${e.deathsBest} casualties`, source: 'UCDP', ...(countryCode ? { countryCode } : {}) },
         severity: e.deathsBest >= 50 ? 'critical' : 'high',
         variant: undefined,
         dedupTtl: 86400,
@@ -2136,34 +2239,89 @@ const CRYPTO_PAPRIKA_MAP = _cryptoCfg.coinpaprika;
 const CRYPTO_SEED_TTL = 7200; // 2h — 1h buffer over 5min cron cadence (was 1h = 55min buffer)
 
 // Shared CoinPaprika tickers fetcher — direct first, PROXY_URL fallback.
-// Cached for 5 min so the 3 crypto seeders (crypto, stablecoins, token-panels)
-// that run in the same cycle don't triple-fetch the same 2000-item response.
-let _paprikaCached = null;
-let _paprikaCachedAt = 0;
+// Cached per ticker for 5 min so crypto, stablecoins, sectors, and token panels
+// that run in the same cycle can share overlap without fetching the full catalog.
+const _paprikaTickerCache = new Map();
 const _PAPRIKA_CACHE_MS = 5 * 60 * 1000;
-const _PAPRIKA_URL = 'https://api.coinpaprika.com/v1/tickers?quotes=USD';
+const _PAPRIKA_FETCH_CONCURRENCY = 4;
 
-async function _fetchCoinPaprikaTickers() {
-  if (_paprikaCached && Date.now() - _paprikaCachedAt < _PAPRIKA_CACHE_MS) return _paprikaCached;
-  // Try direct
-  let data = await cyberHttpGetJson(_PAPRIKA_URL, { Accept: 'application/json' }, 15000);
-  if (Array.isArray(data) && data.length > 0) { _paprikaCached = data; _paprikaCachedAt = Date.now(); return data; }
-  // Fallback via proxy
-  if (!PROXY_URL) throw new Error('CoinPaprika direct failed and no PROXY_URL configured');
+async function _fetchCoinPaprikaTickerById(id) {
+  const url = `https://api.coinpaprika.com/v1/tickers/${encodeURIComponent(id)}?quotes=USD`;
+  const direct = await cyberHttpGetJson(url, { Accept: 'application/json' }, 15000);
+  if (direct && typeof direct === 'object' && direct.id) return direct;
+
+  if (!PROXY_URL) throw new Error(`CoinPaprika ${id} direct failed and no PROXY_URL configured`);
   const proxy = { ...parseProxyUrl(PROXY_URL), tls: true };
-  const resp = await ytFetchViaProxy(_PAPRIKA_URL, proxy);
-  if (!resp?.ok) throw new Error(`CoinPaprika proxy HTTP ${resp?.status || 'unavailable'}`);
-  data = JSON.parse(resp.body);
-  if (!Array.isArray(data)) throw new Error('CoinPaprika proxy returned non-array');
-  _paprikaCached = data; _paprikaCachedAt = Date.now();
+  const resp = await ytFetchViaProxy(url, proxy);
+  if (!resp?.ok) throw new Error(`CoinPaprika ${id} proxy HTTP ${resp?.status || 'unavailable'}`);
+  const data = JSON.parse(resp.body);
+  if (!data || typeof data !== 'object' || !data.id) throw new Error(`CoinPaprika ${id} proxy returned invalid ticker`);
   return data;
 }
 
+async function _fetchCoinPaprikaTickersById(paprikaIds) {
+  const ids = [...new Set(paprikaIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const now = Date.now();
+  const tickers = [];
+  const misses = [];
+  for (const id of ids) {
+    const cached = _paprikaTickerCache.get(id);
+    if (cached && now - cached.cachedAt < _PAPRIKA_CACHE_MS) {
+      tickers.push(cached.ticker);
+    } else {
+      misses.push(id);
+    }
+  }
+
+  const results = await allSettledWithConcurrency(misses, _PAPRIKA_FETCH_CONCURRENCY, async (id) => {
+    const ticker = await _fetchCoinPaprikaTickerById(id);
+    _paprikaTickerCache.set(id, { ticker, cachedAt: Date.now() });
+    return ticker;
+  });
+
+  const failures = [];
+  for (let i = 0; i < results.length; i += 1) {
+    const result = results[i];
+    if (result.status === 'fulfilled') {
+      tickers.push(result.value);
+    } else {
+      failures.push(result.reason);
+      console.warn(`[CoinPaprika] Skipping ${misses[i]}: ${result.reason?.message || result.reason}`);
+    }
+  }
+
+  if (tickers.length === 0 && failures.length > 0) {
+    throw new Error(`All ${failures.length} CoinPaprika ticker request(s) failed`);
+  }
+
+  return tickers;
+}
+
+async function allSettledWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        results[index] = { status: 'fulfilled', value: await mapper(items[index], index) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }));
+  return results;
+}
+
 async function fetchCryptoCoinPaprika() {
-  const data = await _fetchCoinPaprikaTickers();
-  const paprikaIds = new Set(CRYPTO_IDS.map((id) => CRYPTO_PAPRIKA_MAP[id]).filter(Boolean));
+  const paprikaIds = CRYPTO_IDS.map((id) => CRYPTO_PAPRIKA_MAP[id]).filter(Boolean);
+  const data = await _fetchCoinPaprikaTickersById(paprikaIds);
   const reverseMap = Object.fromEntries(Object.entries(CRYPTO_PAPRIKA_MAP).map(([g, p]) => [p, g]));
-  return data.filter((t) => paprikaIds.has(t.id)).map((t) => ({
+  return data.map((t) => ({
     id: reverseMap[t.id] || t.id, current_price: t.quotes.USD.price,
     price_change_percentage_24h: t.quotes.USD.percent_change_24h,
     sparkline_in_7d: undefined, symbol: t.symbol.toLowerCase(), name: t.name,
@@ -2217,11 +2375,11 @@ const STABLECOIN_PAPRIKA_MAP = { tether: 'usdt-tether', 'usd-coin': 'usdc-usd-co
 const STABLECOIN_SEED_TTL = 7200; // 2h — 1h buffer over 5min cron cadence (was 1h = 55min buffer)
 
 async function fetchStablecoinCoinPaprika() {
-  const data = await _fetchCoinPaprikaTickers();
   const ids = STABLECOIN_IDS.split(',');
-  const paprikaIds = new Set(ids.map((id) => STABLECOIN_PAPRIKA_MAP[id]).filter(Boolean));
+  const paprikaIds = ids.map((id) => STABLECOIN_PAPRIKA_MAP[id]).filter(Boolean);
+  const data = await _fetchCoinPaprikaTickersById(paprikaIds);
   const reverseMap = Object.fromEntries(Object.entries(STABLECOIN_PAPRIKA_MAP).map(([g, p]) => [p, g]));
-  return data.filter((t) => paprikaIds.has(t.id)).map((t) => ({
+  return data.map((t) => ({
     id: reverseMap[t.id] || t.id, current_price: t.quotes.USD.price,
     price_change_percentage_24h: t.quotes.USD.percent_change_24h,
     price_change_percentage_7d_in_currency: t.quotes.USD.percent_change_7d,
@@ -2279,11 +2437,9 @@ async function seedCryptoSectors() {
   } catch (err) {
     console.warn(`[CryptoSectors] CoinGecko failed: ${err.message} — trying CoinPaprika`);
     try {
-      const paprika = await _fetchCoinPaprikaTickers();
-      data = paprika.filter((t) => {
-        const geckoId = Object.entries(CRYPTO_PAPRIKA_MAP).find(([, p]) => p === t.id)?.[0];
-        return geckoId && allIds.includes(geckoId);
-      }).map((t) => {
+      const paprikaIds = allIds.map((id) => CRYPTO_PAPRIKA_MAP[id]).filter(Boolean);
+      const paprika = await _fetchCoinPaprikaTickersById(paprikaIds);
+      data = paprika.map((t) => {
         const geckoId = Object.entries(CRYPTO_PAPRIKA_MAP).find(([, p]) => p === t.id)?.[0] || t.id;
         return { id: geckoId, price_change_percentage_24h: t.quotes?.USD?.percent_change_24h ?? 0 };
       });
@@ -2292,7 +2448,7 @@ async function seedCryptoSectors() {
   }
   const byId = new Map(data.map((c) => [c.id, c.price_change_percentage_24h]));
   const sectors = SECTORS_LIST.map((sector) => {
-    const changes = sector.tokens.map((id) => byId.get(id)).filter((v) => typeof v === 'number' && isFinite(v));
+    const changes = sector.tokens.map((id) => byId.get(id)).filter((v) => typeof v === 'number' && Number.isFinite(v));
     const change = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
     return { id: sector.id, name: sector.name, change };
   });
@@ -2327,10 +2483,10 @@ function _mapTokens(ids, meta, byId) {
 }
 
 async function fetchTokenPanelsCoinPaprika(allIds) {
-  const data = await _fetchCoinPaprikaTickers();
-  const paprikaIds = new Set(allIds.map((id) => TOKEN_PANELS_PAPRIKA_MAP[id]).filter(Boolean));
+  const paprikaIds = allIds.map((id) => TOKEN_PANELS_PAPRIKA_MAP[id]).filter(Boolean);
+  const data = await _fetchCoinPaprikaTickersById(paprikaIds);
   const reverseMap = Object.fromEntries(Object.entries(TOKEN_PANELS_PAPRIKA_MAP).map(([g, p]) => [p, g]));
-  return data.filter((t) => paprikaIds.has(t.id)).map((t) => ({
+  return data.map((t) => ({
     id: reverseMap[t.id] || t.id,
     current_price: t.quotes.USD.price,
     price_change_percentage_24h: t.quotes.USD.percent_change_24h,
@@ -2407,490 +2563,18 @@ async function startMarketDataSeedLoop() {
 // Aviation Seed — Railway fetches AviationStack → writes to Redis
 // so Vercel handler serves from cache (avoids 114 API calls per miss)
 // ─────────────────────────────────────────────────────────────
+// AviationStack API key — used only by the /aviationstack live proxy below.
+// The aviation + NOTAM background seeds that used to live here were
+// consolidated into scripts/seed-aviation.mjs (standalone Railway cron).
 const AVIATIONSTACK_API_KEY = process.env.AVIATIONSTACK_API || '';
-const AVIATION_SEED_INTERVAL_MS = 30 * 60 * 1000; // 30min
-const AVIATION_SEED_TTL = 10800; // 3h — 6x interval; survives ~5 consecutive missed pings
-const AVIATION_RETRY_MS = 20 * 60 * 1000;
-const AVIATION_REDIS_KEY = 'aviation:delays:intl:v3';
-const AVIATION_BATCH_CONCURRENCY = 10;
-const AVIATION_MIN_FLIGHTS_FOR_CLOSURE = 10;
-const RESOLVED_STATUSES = new Set(['cancelled', 'landed', 'active', 'arrived', 'diverted']);
 
-// Must match src/config/airports.ts AVIATIONSTACK_AIRPORTS — update both when changing
-const AVIATIONSTACK_AIRPORTS = [
-  'YYZ', 'YVR', 'MEX', 'GRU', 'EZE', 'BOG', 'SCL',
-  'LHR', 'CDG', 'FRA', 'AMS', 'MAD', 'FCO', 'MUC', 'BCN', 'ZRH', 'IST', 'VIE', 'CPH',
-  'DUB', 'LIS', 'ATH', 'WAW',
-  'HND', 'NRT', 'PEK', 'PVG', 'HKG', 'SIN', 'ICN', 'BKK', 'SYD', 'DEL', 'BOM', 'KUL',
-  'CAN', 'TPE', 'MNL',
-  'DXB', 'DOH', 'AUH', 'RUH', 'CAI', 'TLV', 'AMM', 'KWI', 'CMN',
-  'JNB', 'NBO', 'LOS', 'ADD', 'CPT',
-];
-
-// Airport metadata needed for alert construction (inlined from airports.ts)
-const AIRPORT_META = {
-  YYZ: { icao: 'CYYZ', name: 'Toronto Pearson', city: 'Toronto', country: 'Canada', lat: 43.6777, lon: -79.6248, region: 'americas' },
-  MEX: { icao: 'MMMX', name: 'Mexico City International', city: 'Mexico City', country: 'Mexico', lat: 19.4363, lon: -99.0721, region: 'americas' },
-  GRU: { icao: 'SBGR', name: 'São Paulo–Guarulhos', city: 'São Paulo', country: 'Brazil', lat: -23.4356, lon: -46.4731, region: 'americas' },
-  EZE: { icao: 'SAEZ', name: 'Ministro Pistarini', city: 'Buenos Aires', country: 'Argentina', lat: -34.8222, lon: -58.5358, region: 'americas' },
-  BOG: { icao: 'SKBO', name: 'El Dorado International', city: 'Bogotá', country: 'Colombia', lat: 4.7016, lon: -74.1469, region: 'americas' },
-  LHR: { icao: 'EGLL', name: 'London Heathrow', city: 'London', country: 'UK', lat: 51.4700, lon: -0.4543, region: 'europe' },
-  CDG: { icao: 'LFPG', name: 'Paris Charles de Gaulle', city: 'Paris', country: 'France', lat: 49.0097, lon: 2.5479, region: 'europe' },
-  FRA: { icao: 'EDDF', name: 'Frankfurt Airport', city: 'Frankfurt', country: 'Germany', lat: 50.0379, lon: 8.5622, region: 'europe' },
-  AMS: { icao: 'EHAM', name: 'Amsterdam Schiphol', city: 'Amsterdam', country: 'Netherlands', lat: 52.3105, lon: 4.7683, region: 'europe' },
-  MAD: { icao: 'LEMD', name: 'Adolfo Suárez Madrid–Barajas', city: 'Madrid', country: 'Spain', lat: 40.4983, lon: -3.5676, region: 'europe' },
-  FCO: { icao: 'LIRF', name: 'Leonardo da Vinci–Fiumicino', city: 'Rome', country: 'Italy', lat: 41.8003, lon: 12.2389, region: 'europe' },
-  MUC: { icao: 'EDDM', name: 'Munich Airport', city: 'Munich', country: 'Germany', lat: 48.3537, lon: 11.7750, region: 'europe' },
-  BCN: { icao: 'LEBL', name: 'Barcelona–El Prat', city: 'Barcelona', country: 'Spain', lat: 41.2974, lon: 2.0833, region: 'europe' },
-  ZRH: { icao: 'LSZH', name: 'Zurich Airport', city: 'Zurich', country: 'Switzerland', lat: 47.4647, lon: 8.5492, region: 'europe' },
-  IST: { icao: 'LTFM', name: 'Istanbul Airport', city: 'Istanbul', country: 'Turkey', lat: 41.2753, lon: 28.7519, region: 'europe' },
-  VIE: { icao: 'LOWW', name: 'Vienna International', city: 'Vienna', country: 'Austria', lat: 48.1103, lon: 16.5697, region: 'europe' },
-  CPH: { icao: 'EKCH', name: 'Copenhagen Airport', city: 'Copenhagen', country: 'Denmark', lat: 55.6180, lon: 12.6508, region: 'europe' },
-  HND: { icao: 'RJTT', name: 'Tokyo Haneda', city: 'Tokyo', country: 'Japan', lat: 35.5494, lon: 139.7798, region: 'apac' },
-  NRT: { icao: 'RJAA', name: 'Narita International', city: 'Tokyo', country: 'Japan', lat: 35.7720, lon: 140.3929, region: 'apac' },
-  PEK: { icao: 'ZBAA', name: 'Beijing Capital', city: 'Beijing', country: 'China', lat: 40.0799, lon: 116.6031, region: 'apac' },
-  PVG: { icao: 'ZSPD', name: 'Shanghai Pudong', city: 'Shanghai', country: 'China', lat: 31.1443, lon: 121.8083, region: 'apac' },
-  HKG: { icao: 'VHHH', name: 'Hong Kong International', city: 'Hong Kong', country: 'China', lat: 22.3080, lon: 113.9185, region: 'apac' },
-  SIN: { icao: 'WSSS', name: 'Singapore Changi', city: 'Singapore', country: 'Singapore', lat: 1.3644, lon: 103.9915, region: 'apac' },
-  ICN: { icao: 'RKSI', name: 'Incheon International', city: 'Seoul', country: 'South Korea', lat: 37.4602, lon: 126.4407, region: 'apac' },
-  BKK: { icao: 'VTBS', name: 'Suvarnabhumi Airport', city: 'Bangkok', country: 'Thailand', lat: 13.6900, lon: 100.7501, region: 'apac' },
-  SYD: { icao: 'YSSY', name: 'Sydney Kingsford Smith', city: 'Sydney', country: 'Australia', lat: -33.9461, lon: 151.1772, region: 'apac' },
-  DEL: { icao: 'VIDP', name: 'Indira Gandhi International', city: 'Delhi', country: 'India', lat: 28.5562, lon: 77.1000, region: 'apac' },
-  BOM: { icao: 'VABB', name: 'Chhatrapati Shivaji Maharaj', city: 'Mumbai', country: 'India', lat: 19.0896, lon: 72.8656, region: 'apac' },
-  KUL: { icao: 'WMKK', name: 'Kuala Lumpur International', city: 'Kuala Lumpur', country: 'Malaysia', lat: 2.7456, lon: 101.7099, region: 'apac' },
-  DXB: { icao: 'OMDB', name: 'Dubai International', city: 'Dubai', country: 'UAE', lat: 25.2532, lon: 55.3657, region: 'mena' },
-  DOH: { icao: 'OTHH', name: 'Hamad International', city: 'Doha', country: 'Qatar', lat: 25.2731, lon: 51.6081, region: 'mena' },
-  AUH: { icao: 'OMAA', name: 'Abu Dhabi International', city: 'Abu Dhabi', country: 'UAE', lat: 24.4330, lon: 54.6511, region: 'mena' },
-  RUH: { icao: 'OERK', name: 'King Khalid International', city: 'Riyadh', country: 'Saudi Arabia', lat: 24.9576, lon: 46.6988, region: 'mena' },
-  CAI: { icao: 'HECA', name: 'Cairo International', city: 'Cairo', country: 'Egypt', lat: 30.1219, lon: 31.4056, region: 'mena' },
-  TLV: { icao: 'LLBG', name: 'Ben Gurion Airport', city: 'Tel Aviv', country: 'Israel', lat: 32.0055, lon: 34.8854, region: 'mena' },
-  JNB: { icao: 'FAOR', name: 'O.R. Tambo International', city: 'Johannesburg', country: 'South Africa', lat: -26.1392, lon: 28.2460, region: 'africa' },
-  NBO: { icao: 'HKJK', name: 'Jomo Kenyatta International', city: 'Nairobi', country: 'Kenya', lat: -1.3192, lon: 36.9278, region: 'africa' },
-  LOS: { icao: 'DNMM', name: 'Murtala Muhammed International', city: 'Lagos', country: 'Nigeria', lat: 6.5774, lon: 3.3212, region: 'africa' },
-  ADD: { icao: 'HAAB', name: 'Bole International', city: 'Addis Ababa', country: 'Ethiopia', lat: 8.9779, lon: 38.7993, region: 'africa' },
-  CPT: { icao: 'FACT', name: 'Cape Town International', city: 'Cape Town', country: 'South Africa', lat: -33.9715, lon: 18.6021, region: 'africa' },
-  // Added airports
-  YVR: { icao: 'CYVR', name: 'Vancouver International', city: 'Vancouver', country: 'Canada', lat: 49.1947, lon: -123.1792, region: 'americas' },
-  SCL: { icao: 'SCEL', name: 'Arturo Merino Benítez', city: 'Santiago', country: 'Chile', lat: -33.3930, lon: -70.7858, region: 'americas' },
-  DUB: { icao: 'EIDW', name: 'Dublin Airport', city: 'Dublin', country: 'Ireland', lat: 53.4264, lon: -6.2499, region: 'europe' },
-  LIS: { icao: 'LPPT', name: 'Humberto Delgado Airport', city: 'Lisbon', country: 'Portugal', lat: 38.7756, lon: -9.1354, region: 'europe' },
-  ATH: { icao: 'LGAV', name: 'Athens International', city: 'Athens', country: 'Greece', lat: 37.9364, lon: 23.9445, region: 'europe' },
-  WAW: { icao: 'EPWA', name: 'Warsaw Chopin Airport', city: 'Warsaw', country: 'Poland', lat: 52.1657, lon: 20.9671, region: 'europe' },
-  CAN: { icao: 'ZGGG', name: 'Guangzhou Baiyun International', city: 'Guangzhou', country: 'China', lat: 23.3924, lon: 113.2988, region: 'apac' },
-  TPE: { icao: 'RCTP', name: 'Taiwan Taoyuan International', city: 'Taipei', country: 'Taiwan', lat: 25.0797, lon: 121.2342, region: 'apac' },
-  MNL: { icao: 'RPLL', name: 'Ninoy Aquino International', city: 'Manila', country: 'Philippines', lat: 14.5086, lon: 121.0197, region: 'apac' },
-  AMM: { icao: 'OJAI', name: 'Queen Alia International', city: 'Amman', country: 'Jordan', lat: 31.7226, lon: 35.9932, region: 'mena' },
-  KWI: { icao: 'OKBK', name: 'Kuwait International', city: 'Kuwait City', country: 'Kuwait', lat: 29.2266, lon: 47.9689, region: 'mena' },
-  CMN: { icao: 'GMMN', name: 'Mohammed V International', city: 'Casablanca', country: 'Morocco', lat: 33.3675, lon: -7.5898, region: 'mena' },
-};
-
-const REGION_MAP = {
-  americas: 'AIRPORT_REGION_AMERICAS',
-  europe: 'AIRPORT_REGION_EUROPE',
-  apac: 'AIRPORT_REGION_APAC',
-  mena: 'AIRPORT_REGION_MENA',
-  africa: 'AIRPORT_REGION_AFRICA',
-};
-
-const DELAY_TYPE_MAP = {
-  ground_stop: 'FLIGHT_DELAY_TYPE_GROUND_STOP',
-  ground_delay: 'FLIGHT_DELAY_TYPE_GROUND_DELAY',
-  departure_delay: 'FLIGHT_DELAY_TYPE_DEPARTURE_DELAY',
-  arrival_delay: 'FLIGHT_DELAY_TYPE_ARRIVAL_DELAY',
-  general: 'FLIGHT_DELAY_TYPE_GENERAL',
-  closure: 'FLIGHT_DELAY_TYPE_CLOSURE',
-};
-
-const SEVERITY_MAP = {
-  normal: 'FLIGHT_DELAY_SEVERITY_NORMAL',
-  minor: 'FLIGHT_DELAY_SEVERITY_MINOR',
-  moderate: 'FLIGHT_DELAY_SEVERITY_MODERATE',
-  major: 'FLIGHT_DELAY_SEVERITY_MAJOR',
-  severe: 'FLIGHT_DELAY_SEVERITY_SEVERE',
-};
-
-function aviationDetermineSeverity(avgDelay, delayedPct) {
-  if (avgDelay >= 60 || (delayedPct && delayedPct >= 60)) return 'severe';
-  if (avgDelay >= 45 || (delayedPct && delayedPct >= 45)) return 'major';
-  if (avgDelay >= 30 || (delayedPct && delayedPct >= 30)) return 'moderate';
-  if (avgDelay >= 15 || (delayedPct && delayedPct >= 15)) return 'minor';
-  return 'normal';
-}
-
-function fetchAviationStackSingle(apiKey, iata) {
-  return new Promise((resolve) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&dep_iata=${iata}&flight_date=${today}&limit=100`;
-    const req = https.get(url, {
-      headers: { 'User-Agent': CHROME_UA },
-      timeout: 5000,
-      family: 4,
-    }, (resp) => {
-      if (resp.statusCode !== 200) {
-        resp.resume();
-        logThrottled('warn', `aviation-http-${resp.statusCode}:${iata}`, `[Aviation] ${iata}: HTTP ${resp.statusCode}`);
-        return resolve({ ok: false, alert: null });
-      }
-      let body = '';
-      resp.on('data', (chunk) => { body += chunk; });
-      resp.on('end', () => {
-        try {
-          const json = JSON.parse(body);
-          if (json.error) {
-            logThrottled('warn', `aviation-api-err:${iata}`, `[Aviation] ${iata}: API error: ${json.error.message}`);
-            return resolve({ ok: false, alert: null });
-          }
-          const flights = json?.data ?? [];
-          const alert = aviationAggregateFlights(iata, flights);
-          resolve({ ok: true, alert });
-        } catch { resolve({ ok: false, alert: null }); }
-      });
-    });
-    req.on('error', (err) => {
-      logThrottled('warn', `aviation-err:${iata}`, `[Aviation] ${iata}: fetch error: ${err.message}`);
-      resolve({ ok: false, alert: null });
-    });
-    req.on('timeout', () => { req.destroy(); resolve({ ok: false, alert: null }); });
-  });
-}
-
-function aviationAggregateFlights(iata, flights) {
-  if (flights.length === 0) return null;
-  const meta = AIRPORT_META[iata];
-  if (!meta) return null;
-
-  let delayed = 0, cancelled = 0, totalDelay = 0, resolved = 0;
-  for (const f of flights) {
-    if (RESOLVED_STATUSES.has(f.flight_status || '')) resolved++;
-    if (f.flight_status === 'cancelled') cancelled++;
-    if (f.departure?.delay && f.departure.delay > 0) {
-      delayed++;
-      totalDelay += f.departure.delay;
-    }
-  }
-
-  const total = resolved >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE ? resolved : flights.length;
-  const cancelledPct = (cancelled / total) * 100;
-  const delayedPct = (delayed / total) * 100;
-  const avgDelay = delayed > 0 ? Math.round(totalDelay / delayed) : 0;
-
-  let severity, delayType, reason;
-  if (cancelledPct >= 80 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
-    severity = 'severe'; delayType = 'closure';
-    reason = 'Airport closure / airspace restrictions';
-  } else if (cancelledPct >= 50 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
-    severity = 'major'; delayType = 'ground_stop';
-    reason = `${Math.round(cancelledPct)}% flights cancelled`;
-  } else if (cancelledPct >= 20 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
-    severity = 'moderate'; delayType = 'ground_delay';
-    reason = `${Math.round(cancelledPct)}% flights cancelled`;
-  } else if (cancelledPct >= 10 && total >= AVIATION_MIN_FLIGHTS_FOR_CLOSURE) {
-    severity = 'minor'; delayType = 'general';
-    reason = `${Math.round(cancelledPct)}% flights cancelled`;
-  } else if (avgDelay > 0) {
-    severity = aviationDetermineSeverity(avgDelay, delayedPct);
-    delayType = avgDelay >= 60 ? 'ground_delay' : 'general';
-    reason = `Avg ${avgDelay}min delay, ${Math.round(delayedPct)}% delayed`;
-  } else {
-    return null;
-  }
-  if (severity === 'normal') return null;
-
-  return {
-    id: `avstack-${iata}`,
-    iata,
-    icao: meta.icao,
-    name: meta.name,
-    city: meta.city,
-    country: meta.country,
-    location: { latitude: meta.lat, longitude: meta.lon },
-    region: REGION_MAP[meta.region] || 'AIRPORT_REGION_UNSPECIFIED',
-    delayType: DELAY_TYPE_MAP[delayType] || 'FLIGHT_DELAY_TYPE_GENERAL',
-    severity: SEVERITY_MAP[severity] || 'FLIGHT_DELAY_SEVERITY_NORMAL',
-    avgDelayMinutes: avgDelay,
-    delayedFlightsPct: Math.round(delayedPct),
-    cancelledFlights: cancelled,
-    totalFlights: total,
-    reason,
-    source: 'FLIGHT_DELAY_SOURCE_AVIATIONSTACK',
-    updatedAt: Date.now(),
-  };
-}
-
-let aviationSeedInFlight = false;
-let aviationRetryTimer = null;
-
-async function seedAviationDelays() {
-  if (!AVIATIONSTACK_API_KEY) {
-    console.log('[Aviation] No AVIATIONSTACK_API key — skipping seed');
-    return;
-  }
-  if (aviationSeedInFlight) return;
-  aviationSeedInFlight = true;
-  if (aviationRetryTimer) { clearTimeout(aviationRetryTimer); aviationRetryTimer = null; }
-
-  const t0 = Date.now();
-  const alerts = [];
-  let succeeded = 0, failed = 0;
-  const deadline = Date.now() + 50_000;
-
-  try {
-    for (let i = 0; i < AVIATIONSTACK_AIRPORTS.length; i += AVIATION_BATCH_CONCURRENCY) {
-      if (Date.now() >= deadline) {
-        console.warn(`[Aviation] Deadline hit after ${succeeded + failed}/${AVIATIONSTACK_AIRPORTS.length} airports`);
-        break;
-      }
-      const chunk = AVIATIONSTACK_AIRPORTS.slice(i, i + AVIATION_BATCH_CONCURRENCY);
-      const results = await Promise.allSettled(
-        chunk.map((iata) => fetchAviationStackSingle(AVIATIONSTACK_API_KEY, iata))
-      );
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          if (r.value.ok) { succeeded++; if (r.value.alert) alerts.push(r.value.alert); }
-          else failed++;
-        } else {
-          failed++;
-        }
-      }
-    }
-
-    const healthy = AVIATIONSTACK_AIRPORTS.length < 5 || failed <= succeeded;
-    if (!healthy) {
-      console.warn(`[Aviation] Systemic failure: ${failed}/${failed + succeeded} airports failed — extending TTL, retrying in 20min`);
-      try { await upstashExpire(AVIATION_REDIS_KEY, AVIATION_SEED_TTL); } catch {}
-      aviationRetryTimer = setTimeout(() => { seedAviationDelays().catch(() => {}); }, AVIATION_RETRY_MS);
-      return;
-    }
-
-    const ok = await envelopeWrite(AVIATION_REDIS_KEY, { alerts }, AVIATION_SEED_TTL, { recordCount: alerts.length, sourceVersion: 'aviationstack' });
-    await upstashSet('seed-meta:aviation:intl', { fetchedAt: Date.now(), recordCount: alerts.length }, 604800);
-    console.log(`[Aviation] Seeded ${alerts.length} alerts (${succeeded} ok, ${failed} failed, redis: ${ok ? 'OK' : 'FAIL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-    const severeAlerts = alerts.filter(a =>
-      a.severity === 'FLIGHT_DELAY_SEVERITY_SEVERE' || a.severity === 'FLIGHT_DELAY_SEVERITY_MAJOR'
-    );
-    // Change detection: only notify for airports newly entering severe/major state.
-    // aviationPrevAlertedSet persists across polls in-memory; dedupTtl (4h) guards restarts.
-    const currentIatas = new Set(severeAlerts.map(a => a.iata).filter(Boolean));
-    const newAlerts = severeAlerts.filter(a => a.iata && !aviationPrevAlertedSet.has(a.iata));
-    aviationPrevAlertedSet.clear();
-    currentIatas.forEach(iata => aviationPrevAlertedSet.add(iata));
-    for (const a of newAlerts.slice(0, 3)) {
-      publishNotificationEvent({
-        eventType: 'aviation_closure',
-        payload: { title: `${a.iata}${a.city ? ` (${a.city})` : ''}: ${a.reason || 'Airport disruption'}`, source: 'AviationStack' },
-        severity: a.severity === 'FLIGHT_DELAY_SEVERITY_SEVERE' ? 'critical' : 'high',
-        variant: undefined,
-        dedupTtl: 14400, // 4h — well above the 30min poll interval
-      }).catch(e => console.warn('[Notify] Aviation publish error:', e?.message));
-    }
-  } catch (e) {
-    console.warn('[Aviation] Seed error:', e?.message || e, '— extending TTL, retrying in 20min');
-    try { await upstashExpire(AVIATION_REDIS_KEY, AVIATION_SEED_TTL); } catch {}
-    aviationRetryTimer = setTimeout(() => { seedAviationDelays().catch(() => {}); }, AVIATION_RETRY_MS);
-  } finally {
-    aviationSeedInFlight = false;
-  }
-}
-
-async function startAviationSeedLoop() {
-  if (!UPSTASH_ENABLED) {
-    console.log('[Aviation] Disabled (no Upstash Redis)');
-    return;
-  }
-  if (!AVIATIONSTACK_API_KEY) {
-    console.log('[Aviation] Disabled (no AVIATIONSTACK_API key)');
-    return;
-  }
-  console.log(`[Aviation] Seed loop starting (interval ${AVIATION_SEED_INTERVAL_MS / 1000 / 60 / 60}h, airports: ${AVIATIONSTACK_AIRPORTS.length})`);
-  seedAviationDelays().catch((e) => console.warn('[Aviation] Initial seed error:', e?.message || e));
-  setInterval(() => {
-    seedAviationDelays().catch((e) => console.warn('[Aviation] Seed error:', e?.message || e));
-  }, AVIATION_SEED_INTERVAL_MS).unref?.();
-}
-
-// ─────────────────────────────────────────────────────────────
-// NOTAM Closures Seed — Railway fetches ICAO NOTAMs → writes to Redis
-// so Vercel handler and map layer serve from cache (ICAO API times out from edge)
-// ─────────────────────────────────────────────────────────────
-const NOTAM_SEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2h — reduced from 30min to stay within ICAO free-tier quota (~1000 calls/month)
-const NOTAM_SEED_TTL = 21600; // 6h — 3x interval
-const NOTAM_RETRY_MS = 20 * 60 * 1000;
-const NOTAM_QUOTA_BACKOFF_MS = 24 * 60 * 60 * 1000; // 24h backoff when ICAO quota is exhausted
-const NOTAM_REDIS_KEY = 'aviation:notam:closures:v2';
-const NOTAM_CLOSURE_QCODES = new Set(['FA', 'AH', 'AL', 'AW', 'AC', 'AM']);
-const notamPrevClosed = new Set();
-let notamStateLoaded = false; // true after first Redis load — prevents false positives on restart
-const aviationPrevAlertedSet = new Set(); // tracks IATA codes currently in severe/major state
-const cyberPrevAlertedIds = new Set(); // tracks indicators notified this session; cleared at 500 entries
-const ucdpPrevAlertedIds = new Set();  // tracks UCDP event IDs notified; cleared at 500 entries
-const NOTAM_MONITORED_ICAO = [
-  // MENA
-  'OEJN', 'OERK', 'OEMA', 'OEDF', 'OMDB', 'OMAA', 'OMSJ',
-  'OTHH', 'OBBI', 'OOMS', 'OKBK', 'OLBA', 'OJAI', 'OSDI',
-  'ORBI', 'OIIE', 'OISS', 'OIMM', 'OIKB', 'HECA', 'GMMN',
-  'DTTA', 'DAAG', 'HLLT',
-  // Europe
-  'EGLL', 'LFPG', 'EDDF', 'EHAM', 'LEMD', 'LIRF', 'LTFM',
-  'LSZH', 'LOWW', 'EKCH', 'ENGM', 'ESSA', 'EFHK', 'EPWA',
-  // Americas
-  'KJFK', 'KLAX', 'KORD', 'KATL', 'KDFW', 'KDEN', 'KSFO',
-  'CYYZ', 'MMMX', 'SBGR', 'SCEL', 'SKBO',
-  // APAC
-  'RJTT', 'RKSI', 'VHHH', 'WSSS', 'VTBS', 'VIDP', 'YSSY',
-  'ZBAA', 'ZPPP', 'WMKK',
-  // Africa
-  'FAOR', 'DNMM', 'HKJK', 'GABS',
-];
-
-// Returns: Array of NOTAMs on success, null on quota exhaustion, [] on other errors
-function fetchIcaoNotams() {
-  return new Promise((resolve) => {
-    if (!ICAO_API_KEY) return resolve([]);
-    const locations = NOTAM_MONITORED_ICAO.join(',');
-    const apiUrl = `https://dataservices.icao.int/api/notams-realtime-list?api_key=${ICAO_API_KEY}&format=json&locations=${locations}`;
-    const req = https.get(apiUrl, {
-      headers: { 'User-Agent': CHROME_UA },
-      timeout: 30000,
-    }, (resp) => {
-      const chunks = [];
-      resp.on('data', (c) => chunks.push(c));
-      resp.on('end', () => {
-        const body = Buffer.concat(chunks).toString();
-        // Detect quota exhaustion regardless of status code
-        if (/reach call limit/i.test(body) || /quota.?exceed/i.test(body)) {
-          console.warn('[NOTAM-Seed] ICAO quota exhausted ("Reach call limit") — backing off 24h');
-          return resolve(null);
-        }
-        if (resp.statusCode !== 200) {
-          console.warn(`[NOTAM-Seed] ICAO HTTP ${resp.statusCode}`);
-          return resolve([]);
-        }
-        const ct = resp.headers['content-type'] || '';
-        if (ct.includes('text/html')) {
-          console.warn('[NOTAM-Seed] ICAO returned HTML (challenge page)');
-          return resolve([]);
-        }
-        try {
-          const data = JSON.parse(body);
-          resolve(Array.isArray(data) ? data : []);
-        } catch {
-          console.warn('[NOTAM-Seed] Invalid JSON from ICAO');
-          resolve([]);
-        }
-      });
-    });
-    req.on('error', (err) => { console.warn(`[NOTAM-Seed] Fetch error: ${err.message}`); resolve([]); });
-    req.on('timeout', () => { req.destroy(); console.warn('[NOTAM-Seed] Timeout (30s)'); resolve([]); });
-  });
-}
-
-let notamSeedInFlight = false;
-let notamRetryTimer = null;
-
-async function seedNotamClosures() {
-  if (!ICAO_API_KEY) {
-    console.log('[NOTAM-Seed] No ICAO_API_KEY — skipping');
-    return;
-  }
-  if (notamSeedInFlight) return;
-  notamSeedInFlight = true;
-  if (notamRetryTimer) { clearTimeout(notamRetryTimer); notamRetryTimer = null; }
-
-  const t0 = Date.now();
-  try {
-  const notams = await fetchIcaoNotams();
-
-  // null = quota exhausted — touch seed-meta so health.js stays green, back off 24h
-  if (notams === null) {
-    try { await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL); } catch {}
-    try { await upstashSet('seed-meta:aviation:notam', { fetchedAt: Date.now(), recordCount: 0, quotaExhausted: true }, 604800); } catch {}
-    console.log('[NOTAM-Seed] Quota exhausted — extended TTL, wrote seed-meta, backing off 24h');
-    notamRetryTimer = setTimeout(() => { seedNotamClosures().catch(() => {}); }, NOTAM_QUOTA_BACKOFF_MS);
-    return;
-  }
-
-  if (notams.length === 0) {
-    try { await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL); } catch {}
-    console.log('[NOTAM-Seed] No NOTAMs received — refreshed data key TTL, retrying in 20min');
-    notamRetryTimer = setTimeout(() => { seedNotamClosures().catch(() => {}); }, NOTAM_RETRY_MS);
-    return;
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const closedSet = new Set();
-  const reasons = {};
-
-  for (const n of notams) {
-    const icao = n.itema || n.location || '';
-    if (!icao || !NOTAM_MONITORED_ICAO.includes(icao)) continue;
-    if (n.endvalidity && n.endvalidity < now) continue;
-
-    const code23 = (n.code23 || '').toUpperCase();
-    const code45 = (n.code45 || '').toUpperCase();
-    const text = (n.iteme || '').toUpperCase();
-    const isClosureCode = NOTAM_CLOSURE_QCODES.has(code23) &&
-      (code45 === 'LC' || code45 === 'AS' || code45 === 'AU' || code45 === 'XX' || code45 === 'AW');
-    const isClosureText = /\b(AD CLSD|AIRPORT CLOSED|AIRSPACE CLOSED|AD NOT AVBL|CLSD TO ALL)\b/.test(text);
-
-    if (isClosureCode || isClosureText) {
-      closedSet.add(icao);
-      reasons[icao] = n.iteme || 'Airport closure (NOTAM)';
-    }
-  }
-
-  const closedIcaos = [...closedSet];
-  const payload = { closedIcaos, reasons };
-  const ok = await envelopeWrite(NOTAM_REDIS_KEY, payload, NOTAM_SEED_TTL, { recordCount: closedIcaos.length, sourceVersion: 'icao-notam', zeroOk: true });
-  await upstashSet('seed-meta:aviation:notam', { fetchedAt: Date.now(), recordCount: closedIcaos.length }, 604800);
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`[NOTAM-Seed] ${notams.length} raw NOTAMs, ${closedIcaos.length} closures (redis: ${ok ? 'OK' : 'FAIL'}) in ${elapsed}s`);
-  // On first run after a restart, pre-populate notamPrevClosed from Redis so
-  // airports that were already closed before the restart are not treated as new.
-  if (!notamStateLoaded) {
-    notamStateLoaded = true;
-    try {
-      const saved = await upstashGet('notam:prev-closed-state:v1');
-      if (Array.isArray(saved)) saved.forEach(icao => notamPrevClosed.add(icao));
-    } catch {}
-  }
-  const newClosures = closedIcaos.filter(icao => !notamPrevClosed.has(icao));
-  notamPrevClosed.clear();
-  closedIcaos.forEach(icao => notamPrevClosed.add(icao));
-  // Persist current closed set so next restart doesn't re-fire existing closures.
-  upstashSet('notam:prev-closed-state:v1', closedIcaos, NOTAM_SEED_TTL * 2).catch(() => {});
-  for (const icao of newClosures.slice(0, 3)) {
-    publishNotificationEvent({
-      eventType: 'notam_closure',
-      payload: { title: `NOTAM: ${icao} — ${reasons[icao] || 'Airport closure'}`, source: 'ICAO NOTAM' },
-      severity: 'high',
-      variant: undefined,
-      dedupTtl: 21600, // 6h — well above the 2h poll interval; guards across restarts
-    }).catch(e => console.warn('[Notify] NOTAM publish error:', e?.message));
-  }
-  } catch (e) {
-    console.warn('[NOTAM-Seed] Seed error:', e?.message || e, '— extending TTL, retrying in 20min');
-    try { await upstashExpire(NOTAM_REDIS_KEY, NOTAM_SEED_TTL); } catch {}
-    notamRetryTimer = setTimeout(() => { seedNotamClosures().catch(() => {}); }, NOTAM_RETRY_MS);
-  } finally {
-    notamSeedInFlight = false;
-  }
-}
-
-function startNotamSeedLoop() {
-  if (!UPSTASH_ENABLED) {
-    console.log('[NOTAM-Seed] Disabled (no Upstash Redis)');
-    return;
-  }
-  if (!ICAO_API_KEY) {
-    console.log('[NOTAM-Seed] Disabled (no ICAO_API_KEY)');
-    return;
-  }
-  console.log(`[NOTAM-Seed] Seed loop starting (interval ${NOTAM_SEED_INTERVAL_MS / 1000 / 60}min, airports: ${NOTAM_MONITORED_ICAO.length})`);
-  seedNotamClosures().catch((e) => console.warn('[NOTAM-Seed] Initial seed error:', e?.message || e));
-  setInterval(() => {
-    seedNotamClosures().catch((e) => console.warn('[NOTAM-Seed] Seed error:', e?.message || e));
-  }, NOTAM_SEED_INTERVAL_MS).unref?.();
-}
+// In-process dedup sets for non-aviation seed notifications (cyber + UCDP).
+// These track IDs already queued within a seed process's lifetime so the
+// loops below don't re-notify on every poll. Cleared at 500 entries to
+// bound memory. Aviation + NOTAM moved their dedup state to Redis
+// (notifications:dedup:aviation:prev-alerted:v1 / notam:prev-closed-state:v1).
+const cyberPrevAlertedIds = new Set();
+const ucdpPrevAlertedIds = new Set();
 
 // ─────────────────────────────────────────────────────────────
 // Cyber Threat Intelligence Seed — Railway fetches IOC feeds → writes to Redis
@@ -3235,9 +2919,10 @@ async function seedCyberThreats() {
       cyberPrevAlertedIds.add(t.indicator);
       const typeLabel = (t.type || 'threat').replace(/_/g, ' ');
       const familyTag = t.malwareFamily ? ` (${t.malwareFamily.slice(0, 30)})` : '';
+      const countryCode = normalizeNotificationCountryCode(t.country);
       publishNotificationEvent({
         eventType: 'cyber_threat',
-        payload: { title: `${typeLabel}: ${t.indicator?.slice(0, 50)}${familyTag}`, source: t.source || 'Cyber Intel' },
+        payload: { title: `${typeLabel}: ${t.indicator?.slice(0, 50)}${familyTag}`, source: t.source || 'Cyber Intel', ...(countryCode ? { countryCode } : {}) },
         severity: t.severity === 'critical' ? 'critical' : 'high',
         variant: undefined,
         dedupTtl: 43200,
@@ -3278,11 +2963,19 @@ const POSITIVE_EVENTS_RPC_KEY = 'positive-events:geo:v1';
 const POSITIVE_EVENTS_BOOTSTRAP_KEY = 'positive_events:geo-bootstrap:v1';
 const POSITIVE_EVENTS_MAX = 500;
 
+// Single-theme queries — v1 GKG accepts one theme tag per call.
+// http://data.gdeltproject.org/documentation/GKG-MASTER-THEMELIST.TXT
 const POSITIVE_QUERIES = [
-  '(breakthrough OR discovery OR "renewable energy")',
-  '(conservation OR "poverty decline" OR "humanitarian aid")',
-  '("good news" OR volunteer OR donation OR charity)',
+  'SOC_INNOVATION',
+  'EDUCATION',
+  'MEDICAL',
+  'TOURISM',
+  'WB_1765_CULTURE_HERITAGE_AND_SUSTAINABLE_TOURISM',
+  'PEACEKEEPING',
 ];
+
+// urltone threshold — keep only articles with urltone strictly above this value.
+const POSITIVE_TONE_THRESHOLD = 2;
 
 // Mirrors CATEGORY_KEYWORDS from src/services/positive-classifier.ts — keep in sync
 const POSITIVE_CATEGORY_KEYWORDS = [
@@ -3316,14 +3009,20 @@ function classifyPositiveName(name) {
   return 'humanity-kindness';
 }
 
-function fetchGdeltGeoPositive(query) {
+function gkgFeatureUrl(p) {
+  return p?.url || p?.source_url || p?.sourceUrl
+      || p?.document_url || p?.documentUrl
+      || p?.article_url || p?.articleUrl || null;
+}
+
+function fetchGdeltGeoPositive(query, seenUrlLocs) {
   return new Promise((resolve) => {
-    const params = new URLSearchParams({ query, maxrows: '500' });
+    const params = new URLSearchParams({ QUERY: query, MAXROWS: '500' });
     const req = https.get(`https://api.gdeltproject.org/api/v1/gkg_geojson?${params}`, {
       headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
       timeout: 15000,
     }, (resp) => {
-      if (resp.statusCode !== 200) { resp.resume(); return resolve([]); }
+      if (resp.statusCode !== 200) { resp.resume(); return resolve({ ok: false, events: [] }); }
       let body = '';
       resp.on('data', (chunk) => { body += chunk; });
       resp.on('end', () => {
@@ -3332,6 +3031,9 @@ function fetchGdeltGeoPositive(query) {
           const features = Array.isArray(data?.features) ? data.features : [];
           const locationMap = new Map();
           for (const f of features) {
+            // Tone gate — keep only positive-tone articles.
+            const tone = f.properties?.urltone;
+            if (typeof tone !== 'number' || tone <= POSITIVE_TONE_THRESHOLD) continue;
             const name = String(f.properties?.name || '').substring(0, 200);
             if (!name) continue;
             if (name.startsWith('ERROR:') || name.includes('unknown error')) continue;
@@ -3340,6 +3042,14 @@ function fetchGdeltGeoPositive(query) {
             const [lon, lat] = coords;
             if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
             const key = `${lat.toFixed(1)}:${lon.toFixed(1)}`;
+            // GKG v1 emits one feature per (article, location) pair, so an
+            // article mentioning N places contributes N features. Dedup key
+            // is (url, lat/lon bucket) so each (article × location) is counted
+            // once across all theme calls.
+            const url = gkgFeatureUrl(f.properties);
+            const dedupKey = url ? `${url}|${key}` : null;
+            if (dedupKey && seenUrlLocs.has(dedupKey)) continue;
+            if (dedupKey) seenUrlLocs.add(dedupKey);
             const existing = locationMap.get(key);
             if (existing) { existing.count++; }
             else { locationMap.set(key, { latitude: lat, longitude: lon, name, count: 1 }); }
@@ -3349,12 +3059,12 @@ function fetchGdeltGeoPositive(query) {
             if (loc.count < 3) continue;
             events.push({ latitude: loc.latitude, longitude: loc.longitude, name: loc.name, category: classifyPositiveName(loc.name), count: loc.count, timestamp: Date.now() });
           }
-          resolve(events);
-        } catch { resolve([]); }
+          resolve({ ok: true, events });
+        } catch { resolve({ ok: false, events: [] }); }
       });
     });
-    req.on('error', () => resolve([]));
-    req.on('timeout', () => { req.destroy(); resolve([]); });
+    req.on('error', () => resolve({ ok: false, events: [] }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, events: [] }); });
   });
 }
 
@@ -3369,13 +3079,18 @@ async function seedPositiveEvents() {
   try {
     const allEvents = [];
     const seenNames = new Set();
+    // Cross-call (article × location) dedup — same article tagged with
+    // multiple themes would otherwise double-count its location buckets.
+    const seenUrlLocs = new Set();
     let anyQuerySucceeded = false;
 
     for (let i = 0; i < POSITIVE_QUERIES.length; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, 5_500)); // GDELT rate limit: 1 req per 5s
       try {
-        const events = await fetchGdeltGeoPositive(POSITIVE_QUERIES[i]);
+        const result = await fetchGdeltGeoPositive(POSITIVE_QUERIES[i], seenUrlLocs);
+        if (!result?.ok) continue;
         anyQuerySucceeded = true;
+        const events = Array.isArray(result.events) ? result.events : [];
         for (const e of events) {
           if (!seenNames.has(e.name)) {
             seenNames.add(e.name);
@@ -3457,6 +3172,86 @@ const RELAY_TIER4_SOURCES = new Set(
 
 const RELAY_SCORE_WEIGHTS = { severity: 0.55, sourceTier: 0.2, corroboration: 0.15, recency: 0.1 };
 const RELAY_SEVERITY_SCORES = { critical: 100, high: 75, medium: 50, low: 25, info: 0 };
+const RELAY_DIPLOMACY_KEYWORDS = [
+  'ceasefire', 'truce', 'armistice', 'treaty', 'accord', 'pact', 'diplomatic',
+  'diplomacy', 'mediate', 'mediator', 'negotiation', 'negotiations', 'negotiate',
+  'normalization', 'normalisation',
+];
+const RELAY_FLASHPOINT_SCORING_KEYWORDS = [
+  'iran', 'tehran', 'russia', 'moscow', 'china', 'beijing', 'taiwan', 'ukraine', 'kyiv',
+  'north korea', 'pyongyang', 'israel', 'gaza', 'west bank', 'syria', 'damascus',
+  'yemen', 'hezbollah', 'hamas', 'kremlin', 'pentagon', 'nato', 'wagner',
+];
+const RELAY_DIPLOMACY_FLASHPOINT_PAIRS = [
+  ['iran', 'deal'],
+  ['iran', 'talks'],
+  ['iran', 'ceasefire'],
+  ['iran', 'treaty'],
+  ['iran', 'accord'],
+  ['iran', 'peace'],
+  ['israel', 'ceasefire'],
+  ['israel', 'truce'],
+  ['israel', 'accord'],
+  ['gaza', 'ceasefire'],
+  ['gaza', 'truce'],
+  ['ukraine', 'ceasefire'],
+  ['ukraine', 'talks'],
+  ['russia', 'talks'],
+  ['russia', 'treaty'],
+  ['hamas', 'truce'],
+  ['hezbollah', 'truce'],
+  ['syria', 'ceasefire'],
+  ['china', 'talks'],
+  ['china', 'accord'],
+  ['taiwan', 'talks'],
+  ['yemen', 'ceasefire'],
+  ['north korea', 'talks'],
+  ['pyongyang', 'talks'],
+];
+const RELAY_DIPLOMACY_FLASHPOINT_BOOST = 18;
+const RELAY_ENTITY_CORROBORATION_SCORE_PER_SOURCE = 4;
+
+function relayNormalizeScoringText(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Word-start containment in normalized text. Mirrors
+// shared/brief-filter.js:containsKeywordToken — prevents 'pact' inside
+// 'impact' (false positive) while still matching 'iran' inside
+// 'iranian' (demonym preserved). PR #3909 review (P2). Keeps the
+// relay aligned with digest under tests/importance-score-parity.test.mjs.
+function relayContainsKeywordToken(text, kw) {
+  if (!kw) return false;
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|\\s)${escaped}`).test(text);
+}
+
+function relayHasAnySignal(text, keywords) {
+  return keywords.some((kw) => relayContainsKeywordToken(text, kw));
+}
+
+function relayHasDiplomacyFlashpointSignal(title) {
+  if (!title) return false;
+  const text = relayNormalizeScoringText(title);
+  if (
+    RELAY_DIPLOMACY_FLASHPOINT_PAIRS.some(([entity, action]) =>
+      relayContainsKeywordToken(text, entity) && relayContainsKeywordToken(text, action),
+    )
+  ) {
+    return true;
+  }
+  return relayHasAnySignal(text, RELAY_DIPLOMACY_KEYWORDS) &&
+    relayHasAnySignal(text, RELAY_FLASHPOINT_SCORING_KEYWORDS);
+}
+
+function relayDiplomacyFlashpointBoost(title) {
+  return relayHasDiplomacyFlashpointSignal(title) ? RELAY_DIPLOMACY_FLASHPOINT_BOOST : 0;
+}
+
+function relayEntityCorroborationScore(count) {
+  const finite = Number.isFinite(count) ? Number(count) : 0;
+  return Math.min(Math.max(finite, 0), 5) * RELAY_ENTITY_CORROBORATION_SCORE_PER_SOURCE;
+}
 
 // Mirrors computeImportanceScore() in list-feed-digest.ts with ONE intentional
 // deviation: the relay defensively returns 0 for unknown severity levels
@@ -3464,17 +3259,22 @@ const RELAY_SEVERITY_SCORES = { critical: 100, high: 75, medium: 50, low: 25, in
 // exercised in tests/importance-score-parity.test.mjs "unknown severity" case.
 // Caller responsibility: pass defined values; relay publish site defaults
 // corroborationCount → 1 and publishedAt → Date.now() when upstream omits them.
-function relayComputeImportanceScore(level, source, corroborationCount, publishedAt) {
+function relayComputeImportanceScore(level, source, corroborationCount, publishedAt, context = {}) {
   const tier = relayGetSourceTier(source);
   const tierScore = tier === 1 ? 100 : tier === 2 ? 75 : tier === 3 ? 50 : 25;
   const corroborationScore = Math.min(corroborationCount, 5) * 20;
   const ageMs = Date.now() - publishedAt;
   const recencyScore = Math.max(0, 1 - ageMs / (24 * 60 * 60 * 1000)) * 100;
-  return Math.round(
+  const base = Math.round(
     (RELAY_SEVERITY_SCORES[level] ?? 0) * RELAY_SCORE_WEIGHTS.severity +
     tierScore * RELAY_SCORE_WEIGHTS.sourceTier +
     corroborationScore * RELAY_SCORE_WEIGHTS.corroboration +
     recencyScore * RELAY_SCORE_WEIGHTS.recency,
+  );
+  return Math.round(
+    base +
+    relayDiplomacyFlashpointBoost(context.title) +
+    relayEntityCorroborationScore(context.entityCorroborationCount),
   );
 }
 
@@ -3485,15 +3285,34 @@ const CLASSIFY_VALID_CATEGORIES = [
   'crime', 'infrastructure', 'tech', 'general',
 ];
 
-const CLASSIFY_SYSTEM_PROMPT = `You classify news headlines by threat level and category. Return ONLY a JSON array, no other text.
+const CLASSIFY_SYSTEM_PROMPT = `You classify news headlines by threat level and category.
+Return ONLY a JSON array, no other text.
 
 Levels: critical, high, medium, low, info
 Categories: conflict, protest, disaster, diplomatic, economic, terrorism, cyber, health, environmental, military, crime, infrastructure, tech, general
 
+Guidelines for LEVEL assignment (geopolitical scope required for critical):
+- critical: Active military strikes with international implications, geopolitical mass-casualty events (10+ killed in conflict/terrorism/state action), ceasefire agreements/collapses, nuclear incidents, pandemic declarations, coups, strait/waterway closures
+- high: Armed conflict updates, major diplomatic actions, sanctions packages, significant natural disasters, blockades, terrorist attacks, domestic mass-casualty events (mass shootings, industrial disasters)
+- medium: Ongoing conflict analysis, economic impact reports, protest movements, regional policy changes, military exercises
+- low: Diplomatic meetings, trade discussions, humanitarian aid, election updates, peacekeeping deployments
+- info: Opinion/editorial pieces, analysis/explainer articles, historical retrospectives, lifestyle, entertainment, routine local news, tutorials
+
+Key distinction: "critical" requires GEOPOLITICAL scope — events that destabilize international order, threaten cross-border security, or disrupt global systems. Domestic tragedies are "high" unless they trigger international diplomatic responses.
+- "8 children killed in mass shooting in Louisiana" → domestic mass-casualty, not geopolitical → high
+- "23 killed in fireworks factory explosion in India" → industrial accident → high
+- "700 killed in Sudan drone strikes" → geopolitical mass-casualty in active civil war → critical
+- "Iran closes Strait of Hormuz" → global trade disruption → critical
+- "Guardian view on ceasefire: need real peace" → editorial → info
+- "Trump's obsession with energy" → opinion/analysis → info
+- "Man killed his estranged wife" → domestic crime → info
+- "How to Crack the SAM Database in Kali Linux" → tutorial → info
+
 Input: numbered lines "index|Title"
 Output: [{"i":0,"l":"high","c":"conflict"}, ...]
 
-Focus: geopolitical events, conflicts, disasters, diplomacy. Classify by real-world severity and impact.`;
+Focus: geopolitical events, conflicts, disasters, diplomacy.
+Classify by real-world event severity, not headline sentiment.`;
 
 const NEWS_THREAT_SUMMARY_KEY = 'news:threat:summary:v1';
 const NEWS_THREAT_SUMMARY_TTL = 1200; // 20 min — aligns with relay cadence
@@ -3572,9 +3391,21 @@ function matchCountryNamesInText(text) {
   return [];
 }
 
+// v5 (2026-04-28): bumped from v4 in lockstep with
+// server/worldmonitor/intelligence/v1/_shared.ts and
+// server/worldmonitor/news/v1/list-feed-digest.ts to evict cache entries
+// that landed under the pre-publisher-prefix-fix classifier (PR #3480).
+// Brand-prefixed retrospective titles ("CBS News Radio flashback: ...")
+// had been promoted to severity=critical via the `invasion` keyword;
+// the new brand-prefix branch in _classifier.ts re-rules those rows on
+// next touch.
+// The relay maintains its own inline helper because .cjs cannot import
+// from .ts; the prefix-audit static-analysis test
+// (tests/news-classify-cache-prefix-audit.test.mjs) cross-checks all
+// three sites.
 function classifyCacheKey(title) {
   const hash = crypto.createHash('sha256').update(title.toLowerCase()).digest('hex').slice(0, 16);
-  return `classify:sebuf:v1:${hash}`;
+  return `classify:sebuf:v5:${hash}`;
 }
 
 // LLM provider fallback chain — mirrors seed-insights.mjs LLM_PROVIDERS
@@ -3810,6 +3641,14 @@ async function seedClassifyForVariant(variant, seenTitles) {
           meta.source,
           meta.corroborationCount ?? 1,
           meta.publishedAt ?? Date.now(),
+          {
+            title: chunk[idx],
+            classSource: 'llm',
+            // The relay has only exact story-merge corroboration. Entity
+            // corroboration is a separate digest-side signal computed from
+            // flashpoint+diplomacy buckets; do not proxy source count here.
+            entityCorroborationCount: 0,
+          },
         );
         publishNotificationEvent({
           eventType: 'rss_alert',
@@ -4479,6 +4318,48 @@ function startTheaterPostureSeedLoop() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Warm-ping shared auth — relay → api.worldmonitor.app
+//
+// All warm-pings call api.worldmonitor.app/api/* edge functions. Pre-2026-05-02
+// these used Origin-trust alone (the relay sent `Origin: https://worldmonitor.app`
+// which `api/_api-key.js::validateApiKey` accepts via BROWSER_ORIGIN_PATTERNS).
+// On 2026-05-02 ALL three warm-pings (CII + Chokepoints + CableHealth) started
+// returning HTTP 401 simultaneously despite the relay sending the correct
+// Origin header. Root cause unclear (Vercel firewall change, CDN cache
+// poisoning, deploy mismatch) — but Origin-trust is fragile by nature: any
+// intermediary (CF, Vercel firewall, future CDN) can strip or rewrite Origin
+// without leaving a trace.
+//
+// Defense-in-depth: send an explicit X-WorldMonitor-Key in addition to the
+// Origin header. The gateway accepts EITHER, so when Origin trust breaks
+// the key carries the auth. When the key isn't configured, fall through to
+// Origin-only — preserves backward compatibility for local dev / before the
+// env var is provisioned on Railway.
+//
+// Required env var on Railway ais-relay service:
+//   WORLDMONITOR_RELAY_KEY=<value present in Vercel WORLDMONITOR_VALID_KEYS>
+// ─────────────────────────────────────────────────────────────
+const RELAY_API_KEY = process.env.WORLDMONITOR_RELAY_KEY || '';
+// Surface the auth-mode at boot so misconfig (env var on wrong service,
+// typo'd name, missing on a fresh Railway deploy) is visible in the first
+// log lines instead of waiting for the first 401. PR #3565 review P2.
+if (!RELAY_API_KEY) {
+  console.warn('[Relay] WORLDMONITOR_RELAY_KEY not set — warm-pings will rely on Origin-trust only (fragile against CDN/firewall changes)');
+} else {
+  console.log('[Relay] WORLDMONITOR_RELAY_KEY configured — warm-pings will send X-WorldMonitor-Key');
+}
+
+function warmPingHeaders(extra = {}) {
+  const h = {
+    'User-Agent': CHROME_UA,
+    Origin: 'https://worldmonitor.app',
+    ...extra,
+  };
+  if (RELAY_API_KEY) h['X-WorldMonitor-Key'] = RELAY_API_KEY;
+  return h;
+}
+
+// ─────────────────────────────────────────────────────────────
 // CII Risk Scores warm-ping — keeps RPC cache fresh so
 // bootstrap stale key never expires.
 // The RPC handler itself refreshes the stale key on every call.
@@ -4496,7 +4377,7 @@ async function seedCiiWarmPing() {
       signal: AbortSignal.timeout(60_000),
     });
     if (!resp.ok) {
-      console.warn(`[CII] Warm-ping failed: HTTP ${resp.status}`);
+      console.warn(`[CII] Warm-ping failed: HTTP ${resp.status}${RELAY_API_KEY ? '' : ' (no WORLDMONITOR_RELAY_KEY set; relying on Origin-trust)'}`);
       return;
     }
     const data = await resp.json();
@@ -4536,7 +4417,7 @@ async function seedChokepointWarmPing() {
       signal: AbortSignal.timeout(60_000),
     });
     if (!resp.ok) {
-      console.warn(`[Chokepoints] Warm-ping failed: HTTP ${resp.status}`);
+      console.warn(`[Chokepoints] Warm-ping failed: HTTP ${resp.status}${RELAY_API_KEY ? '' : ' (no WORLDMONITOR_RELAY_KEY set; relying on Origin-trust)'}`);
       return;
     }
     const data = await resp.json();
@@ -4574,7 +4455,7 @@ async function seedCableHealthWarmPing() {
       signal: AbortSignal.timeout(60_000),
     });
     if (!resp.ok) {
-      console.warn(`[CableHealth] Warm-ping failed: HTTP ${resp.status}`);
+      console.warn(`[CableHealth] Warm-ping failed: HTTP ${resp.status}${RELAY_API_KEY ? '' : ' (no WORLDMONITOR_RELAY_KEY set; relying on Origin-trust)'}`);
       return;
     }
     const data = await resp.json();
@@ -4641,11 +4522,17 @@ async function seedWeatherAlerts() {
         const centroid = coords.length > 0
           ? [coords.reduce((s, c) => s + c[0], 0) / coords.length, coords.reduce((s, c) => s + c[1], 0) / coords.length]
           : undefined;
+        // Slot B: NWS VTEC string. NWS wraps VTEC in an array under
+        // properties.parameters.VTEC; pick the first entry (most alerts have one;
+        // multi-VTEC alerts use the primary). Used to derive a coalesce family key
+        // so adjacent-zone alerts for the same logical event collapse at the
+        // publisher and at the per-user dedup.
+        const vtec = Array.isArray(p?.parameters?.VTEC) ? p.parameters.VTEC[0] : undefined;
         return {
           id: f.id || '', event: p.event || '', severity: p.severity || 'Unknown',
           headline: p.headline || '', description: (p.description || '').slice(0, 500),
           areaDesc: p.areaDesc || '', onset: p.onset || '', expires: p.expires || '',
-          coordinates: coords, centroid,
+          coordinates: coords, centroid, vtec,
         };
       });
     if (alerts.length === 0) {
@@ -4660,10 +4547,41 @@ async function seedWeatherAlerts() {
     const ok2 = await upstashSet('seed-meta:weather:alerts', { fetchedAt: Date.now(), recordCount: alerts.length }, 604800);
     console.log(`[Weather] Seeded ${alerts.length} alerts (redis: ${ok1 && ok2 ? 'OK' : 'PARTIAL'}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     const highSeverityAlerts = alerts.filter(a => a.severity === 'Extreme' || a.severity === 'Severe');
-    for (const a of highSeverityAlerts.slice(0, 3)) {
+    // Pick up to 3 DISTINCT event families before publishing. The naive
+    // `slice(0, 3)` would silently lose distinct families: if the first 3 raw
+    // alerts are adjacent-zone duplicates for one VTEC family (one storm
+    // crossing 3 counties), the publisher-side dedup collapses them to 1
+    // notification and a 4th genuinely-distinct family (tornado / flood /
+    // different storm) sitting at index 3+ would NEVER be considered.
+    // Dedupe by coalesceKey FIRST, then take the top 3 distinct families.
+    // Slot B regression fix from PR #3467 review.
+    const seenFamilyKeys = new Set();
+    const distinctFamilyAlerts = [];
+    for (const a of highSeverityAlerts) {
+      // Family key: prefer VTEC-derived coalesce key; fall back to a stable
+      // identity from the alert (NWS feature.id, then headline/event) so
+      // VTEC-less alerts still deduplicate against themselves.
+      const familyKey = deriveWeatherCoalesceKey(a.vtec)
+        ?? `nws:fallback:${a.id || a.headline || a.event || ''}`;
+      if (seenFamilyKeys.has(familyKey)) continue;
+      seenFamilyKeys.add(familyKey);
+      distinctFamilyAlerts.push(a);
+      if (distinctFamilyAlerts.length >= 3) break;
+    }
+    for (const a of distinctFamilyAlerts) {
+      // Slot B: derive a coalesceKey from the NWS VTEC string (when present)
+      // so adjacent-zone bulletins for the same logical event collapse to one
+      // notification per user. Falls back to title-based dedup when VTEC is
+      // absent (rare advisory types or missing parameters).
+      const coalesceKey = deriveWeatherCoalesceKey(a.vtec);
       publishNotificationEvent({
         eventType: 'weather_alert',
-        payload: { title: a.headline || a.event || 'Weather alert', source: 'NWS' },
+        payload: {
+          title: a.headline || a.event || 'Weather alert',
+          source: 'NWS',
+          countryCode: 'US',
+          ...(coalesceKey ? { coalesceKey } : {}),
+        },
         severity: a.severity === 'Extreme' ? 'critical' : 'high',
         variant: undefined,
       }).catch(e => console.warn('[Notify] Weather publish error:', e?.message));
@@ -4818,7 +4736,7 @@ function parseGscpiCsv(text) {
       const v = cols[j]?.trim();
       if (v && v !== '#N/A' && v !== '') {
         const num = parseFloat(v);
-        if (!isNaN(num)) { value = num; break; }
+        if (!Number.isNaN(num)) { value = num; break; }
       }
     }
     if (value === null) continue;
@@ -5918,8 +5836,8 @@ const WSB_SUBREDDITS = ['wallstreetbets', 'stocks', 'investing'];
 
 // $-prefixed: case-insensitive ($nvda, $NVDA, $BRK.B). Bare: uppercase only (NVDA, BRK.B).
 // $-prefixed tickers skip whitelist validation (strong signal). Bare uppercase validated against known set.
-const DOLLAR_TICKER_REGEX = /\$([a-zA-Z]{1,5}(?:[.\-][a-zA-Z]{1,2})?)\b/g;
-const BARE_TICKER_REGEX = /\b([A-Z]{1,5}(?:[.\-][A-Z]{1,2})?)\b/g;
+const DOLLAR_TICKER_REGEX = /\$([a-zA-Z]{1,5}(?:[.-][a-zA-Z]{1,2})?)\b/g;
+const BARE_TICKER_REGEX = /\b([A-Z]{1,5}(?:[.-][A-Z]{1,2})?)\b/g;
 const TICKER_BLACKLIST = new Set([
   'I','A','ALL','FOR','THE','CEO','GDP','IPO','SEC','FDA','IMF','ETF','ATH',
   'DD','YOLO','FOMO','FUD','HODL','WSB','USA','EU','UK','AI','EV','IT','OR',
@@ -6594,7 +6512,14 @@ function getRelaySecretFromRequest(req) {
 }
 
 function isAuthorizedRequest(req) {
-  if (!RELAY_SHARED_SECRET) return true;
+  if (!RELAY_SHARED_SECRET) {
+    // Defensive: the startup guard rejects an empty secret unless the
+    // operator explicitly opted out via I_UNDERSTAND_THIS_DISABLES_AUTH
+    // (or the deprecated ALLOW_UNAUTHENTICATED_RELAY). In that bypass case
+    // every request is allowed; otherwise this branch is unreachable. Keeping
+    // the explicit check makes this function safe to call in isolation.
+    return ALLOW_UNAUTHENTICATED_RELAY;
+  }
   const provided = getRelaySecretFromRequest(req);
   if (!provided) return false;
   return safeTokenEquals(provided, RELAY_SHARED_SECRET);
@@ -6807,11 +6732,37 @@ const SNAPSHOT_INTERVAL_MS = Math.max(2000, Number(process.env.AIS_SNAPSHOT_INTE
 const CANDIDATE_RETENTION_MS = 2 * 60 * 60 * 1000; // 2 hours
 const MAX_DENSITY_ZONES = 200;
 const MAX_CANDIDATE_REPORTS = 1500;
+// Hard size cap for vesselMeta. Active global AIS fleet is ~50-70k unique
+// MMSIs at any given time (UNCTAD/MarineTraffic estimates). 50k headroom
+// covers steady state with the 24h TTL; a hostile or buggy upstream that
+// floods unique MMSIs gets bounded after this cap. Pairs with the TTL
+// loop in cleanupAggregates so eviction has both age-based and size-based
+// gates, matching the pattern used by tankerReports / candidateReports /
+// densityGrid / vesselHistory.
+const MAX_VESSEL_META = 50000;
 
 const vessels = new Map();
 const vesselHistory = new Map();
 const densityGrid = new Map();
 const candidateReports = new Map();
+// Parallel store for tanker (AIS ship type 80-89) position reports — populated
+// alongside candidateReports but with a different inclusion predicate.
+// Required by the Energy Atlas live-tanker map layer (parity-push PR 3).
+// Kept SEPARATE from candidateReports so the existing military-detection
+// consumer's contract is unchanged.
+const tankerReports = new Map();
+
+// MMSI → { shipType, shipName, lastSeen } cache populated from
+// ShipStaticData messages. AISStream's PositionReport message does NOT
+// carry ShipType in MetaData (per their schema), so a relay that filters
+// to PositionReport-only never gets the type signal — tanker classification
+// (which needs shipType ∈ 80..89) is impossible on PositionReport alone.
+// Static data arrives every ~6 minutes per MMSI so the cache hits steady
+// state quickly. Without this, tankerReports stays permanently empty and
+// the live-tanker layer renders zero vessels — root cause identified
+// 2026-04-25 when the layer shipped (#3402) but rendered empty.
+const vesselMeta = new Map();
+const VESSEL_META_TTL_MS = 24 * 60 * 60 * 1000; // 24h — well over the 6-min broadcast cycle
 
 let snapshotSequence = 0;
 let lastSnapshot = null;
@@ -6871,9 +6822,15 @@ function getGridKey(lat, lon) {
   return `${gridLat},${gridLon}`;
 }
 
-function isLikelyMilitaryCandidate(meta) {
+function isLikelyMilitaryCandidate(meta, resolvedShipType) {
   const mmsi = String(meta?.MMSI || '');
-  const shipType = Number(meta?.ShipType);
+  // Prefer caller-resolved shipType (typically from vesselMeta cache) so
+  // PositionReport callers — where MetaData lacks ShipType — still hit the
+  // type-based military arm (35/55/50-59) instead of relying purely on
+  // NAVAL_PREFIX_RE + MMSI-suffix fallbacks.
+  const shipType = Number.isFinite(Number(resolvedShipType))
+    ? Number(resolvedShipType)
+    : Number(meta?.ShipType);
   const name = (meta?.ShipName || '').trim().toUpperCase();
 
   if (Number.isFinite(shipType) && (shipType === 35 || shipType === 55 || (shipType >= 50 && shipType <= 59))) {
@@ -7008,6 +6965,12 @@ function processRawUpstreamMessage(raw) {
     const parsed = JSON.parse(raw);
     if (parsed?.MessageType === 'PositionReport') {
       processPositionReportForSnapshot(parsed);
+    } else if (parsed?.MessageType === 'ShipStaticData') {
+      // Cache ShipType + ShipName by MMSI so subsequent PositionReports
+      // can classify the vessel as a tanker. AISStream broadcasts static
+      // data ~every 6 min per vessel; in steady state the cache covers
+      // most active MMSIs within minutes of relay startup.
+      processShipStaticDataForMeta(parsed);
     }
   } catch {
     // Ignore malformed upstream payloads
@@ -7028,6 +6991,34 @@ function processRawUpstreamMessage(raw) {
   }
 }
 
+function processShipStaticDataForMeta(data) {
+  // AISStream Type 5 (ShipStaticData). Carries ShipType, ShipName, IMO,
+  // CallSign, dimensions. We only need ShipType + ShipName for classification.
+  const meta = data?.MetaData;
+  const sd = data?.Message?.ShipStaticData;
+  if (!meta || !sd) return;
+  // MMSI fallback: AISStream's PositionReport wrapper puts MMSI under
+  // MetaData.MMSI, but the ShipStaticData payload sample shows MMSI mirrored
+  // as `UserID` on the message body itself. Read MetaData.MMSI first (the
+  // documented wrapper field), then fall back to the message-body field so
+  // a wrapper schema variant doesn't silently re-empty vesselMeta.
+  const mmsi = String(meta.MMSI || sd.UserID || '');
+  if (!mmsi) return;
+  // ShipType lives in the message body, not MetaData, on Type 5 frames.
+  // Gate on `> 0` (not just `Number.isFinite`) so that Number(null) === 0
+  // and AIS code 0 ("Not available" per ITU-R M.1371) don't overwrite a
+  // previously-cached valid type. Otherwise a vessel that broadcasts
+  // {Type: 85} then later {Type: null} would be downgraded to non-tanker
+  // because the second write replaces the first with shipType=0.
+  const shipType = Number(sd.Type);
+  if (!Number.isFinite(shipType) || shipType <= 0) return;
+  vesselMeta.set(mmsi, {
+    shipType,
+    shipName: (sd.Name || meta.ShipName || '').trim(),
+    lastSeen: Date.now(),
+  });
+}
+
 function processPositionReportForSnapshot(data) {
   const meta = data?.MetaData;
   const pos = data?.Message?.PositionReport;
@@ -7042,13 +7033,29 @@ function processPositionReportForSnapshot(data) {
 
   const now = Date.now();
 
+  // Resolve ShipType ONCE per position report and feed it to every consumer
+  // below (vessels record, military classifier, tanker capture). Pre-fix,
+  // each consumer read meta.ShipType directly — but AISStream's PositionReport
+  // MetaData does NOT carry that field; ShipType only arrives via Type 5
+  // ShipStaticData frames cached in vesselMeta. The consequence wasn't just
+  // an empty tanker layer (PR #3410 original scope) — `vessels[mmsi].shipType`
+  // was also undefined, so classifyVesselType(vessel?.shipType) used by
+  // chokepoint transit logging at line ~6555 always returned 'other'. That
+  // silently broke per-type transit counts in /seedChokepointTransits and
+  // every downstream consumer of transit-by-type breakdowns. PR3410 review
+  // catch — same root cause, same vesselMeta cache fixes all three sites.
+  const cachedMeta = vesselMeta.get(mmsi);
+  const effectiveShipType = Number.isFinite(Number(meta.ShipType))
+    ? Number(meta.ShipType)
+    : (cachedMeta ? cachedMeta.shipType : undefined);
+
   vessels.set(mmsi, {
     mmsi,
-    name: meta.ShipName || '',
+    name: meta.ShipName || (cachedMeta && cachedMeta.shipName) || '',
     lat,
     lon,
     timestamp: now,
-    shipType: meta.ShipType,
+    shipType: effectiveShipType,
     heading: pos.TrueHeading,
     speed: pos.Sog,
     course: pos.Cog,
@@ -7077,13 +7084,33 @@ function processPositionReportForSnapshot(data) {
   // Maintain exact chokepoint membership so moving vessels don't get "stuck" in old buckets.
   updateVesselChokepoints(mmsi, lat, lon);
 
-  if (isLikelyMilitaryCandidate(meta)) {
+  if (isLikelyMilitaryCandidate(meta, effectiveShipType)) {
     candidateReports.set(mmsi, {
       mmsi,
-      name: meta.ShipName || '',
+      name: meta.ShipName || (cachedMeta && cachedMeta.shipName) || '',
       lat,
       lon,
-      shipType: meta.ShipType,
+      shipType: effectiveShipType,
+      heading: pos.TrueHeading,
+      speed: pos.Sog,
+      course: pos.Cog,
+      timestamp: now,
+    });
+  }
+
+  // Tanker capture for the Energy Atlas live-tanker layer. AIS ship type
+  // 80-89 covers all tanker subtypes per ITU-R M.1371 (oil/chemical tanker,
+  // hazardous cargo classes A-D, and other tanker variants). Stored in a
+  // SEPARATE Map from candidateReports so the existing military-detection
+  // consumer never sees tankers (their contract is unchanged).
+  const shipType = Number.isFinite(Number(effectiveShipType)) ? Number(effectiveShipType) : NaN;
+  if (Number.isFinite(shipType) && shipType >= 80 && shipType <= 89) {
+    tankerReports.set(mmsi, {
+      mmsi,
+      name: (cachedMeta && cachedMeta.shipName) || meta.ShipName || '',
+      lat,
+      lon,
+      shipType,
       heading: pos.TrueHeading,
       speed: pos.Sog,
       course: pos.Cog,
@@ -7147,6 +7174,32 @@ function cleanupAggregates() {
   }
   // Hard cap: keep freshest candidate reports.
   evictMapByTimestamp(candidateReports, MAX_CANDIDATE_REPORTS, (report) => report.timestamp || 0);
+
+  // Tanker reports: same retention window as candidate reports — a vessel
+  // that hasn't broadcast a position in CANDIDATE_RETENTION_MS is no longer
+  // useful for a live-tanker map layer. Cap at 2× the per-response cap so
+  // we have headroom for bbox filtering to find recent fixes anywhere on
+  // the globe (not just one chokepoint).
+  for (const [mmsi, report] of tankerReports) {
+    if (report.timestamp < now - CANDIDATE_RETENTION_MS) {
+      tankerReports.delete(mmsi);
+    }
+  }
+  evictMapByTimestamp(tankerReports, MAX_TANKER_REPORTS_PER_RESPONSE * 10, (report) => report.timestamp || 0);
+
+  // vesselMeta TTL eviction: drop entries older than VESSEL_META_TTL_MS so
+  // long-running relays don't accumulate metadata for vessels that have
+  // sailed out of any tracked region. ShipStaticData is rebroadcast every
+  // ~6 min, so a 24h TTL covers vessels with intermittent visibility.
+  for (const [mmsi, entry] of vesselMeta) {
+    if (entry.lastSeen < now - VESSEL_META_TTL_MS) {
+      vesselMeta.delete(mmsi);
+    }
+  }
+  // Hard size cap as defense-in-depth against a hostile/buggy upstream
+  // flooding unique MMSIs faster than the TTL eviction can drain them.
+  // Matches the pattern used by every peer Map in this function.
+  evictMapByTimestamp(vesselMeta, MAX_VESSEL_META, (entry) => entry.lastSeen || 0);
 
   // Clean chokepoint buckets: remove stale vessels
   for (const [cpName, bucket] of chokepointBuckets) {
@@ -7291,6 +7344,55 @@ function getCandidateReportsSnapshot() {
     .slice(0, MAX_CANDIDATE_REPORTS);
 }
 
+// Server-side cap for tanker_reports per request — protects the response
+// payload from a misbehaving filter that returns thousands of vessels.
+// 200/zone × 6 chokepoints in worst case is well under any practical
+// CDN/edge payload budget. Energy Atlas live-tanker layer also caps
+// client-side on top of this.
+const MAX_TANKER_REPORTS_PER_RESPONSE = 200;
+
+/**
+ * Parse a "bbox" query param of the form "swLat,swLon,neLat,neLon" into a
+ * {sw: {lat, lon}, ne: {lat, lon}} or null if absent / malformed.
+ *
+ * Validates:
+ *   - 4 comma-separated finite numbers
+ *   - sw <= ne (after normalization)
+ *   - bbox size ≤ 10° on both lat and lon (10° max per parity-push plan U7;
+ *     prevents pulling every vessel through one query)
+ *
+ * @param {string | null | undefined} raw
+ * @returns {{ sw: {lat:number, lon:number}, ne: {lat:number, lon:number} } | null}
+ */
+function parseBbox(raw) {
+  if (!raw) return null;
+  const parts = String(raw).split(',').map(Number);
+  if (parts.length !== 4 || parts.some((v) => !Number.isFinite(v))) return null;
+  const [swLat, swLon, neLat, neLon] = parts;
+  if (swLat > neLat || swLon > neLon) return null;
+  if (swLat < -90 || neLat > 90 || swLon < -180 || neLon > 180) return null;
+  if (neLat - swLat > 10 || neLon - swLon > 10) return null; // 10° guard
+  return { sw: { lat: swLat, lon: swLon }, ne: { lat: neLat, lon: neLon } };
+}
+
+/**
+ * Filtered + capped tanker reports. Sorted by recency of last fix so the
+ * 200-cap keeps the most-recently-seen vessels rather than a random subset.
+ *
+ * @param {{ sw: {lat:number,lon:number}, ne: {lat:number,lon:number} } | null} bbox
+ */
+function getTankerReportsSnapshot(bbox) {
+  let arr = Array.from(tankerReports.values());
+  if (bbox) {
+    arr = arr.filter(
+      (r) => r.lat >= bbox.sw.lat && r.lat <= bbox.ne.lat &&
+             r.lon >= bbox.sw.lon && r.lon <= bbox.ne.lon,
+    );
+  }
+  arr.sort((a, b) => b.timestamp - a.timestamp);
+  return arr.slice(0, MAX_TANKER_REPORTS_PER_RESPONSE);
+}
+
 function buildSnapshot() {
   const now = Date.now();
   if (lastSnapshot && now - lastSnapshotAt < Math.floor(SNAPSHOT_INTERVAL_MS / 2)) {
@@ -7367,7 +7469,13 @@ setInterval(() => {
 }, CHOKEPOINT_TRANSIT_INTERVAL_MS).unref?.();
 
 // --- Pre-assembled Transit Summaries (Railway advantage: avoids large Redis reads on Vercel) ---
+// Split storage: compact summary (no history, ~30KB) + per-id history keys (~35KB each).
+// The compact summary is read on every /api/supply-chain/v1/get-chokepoint-status call.
+// History keys are read only on card expand via /get-chokepoint-history. Before this
+// split the combined payload was ~500KB and timed out at Vercel edge's 1.5s Redis read
+// budget (docs/plans/chokepoint-rpc-payload-split.md).
 const TRANSIT_SUMMARY_REDIS_KEY = 'supply_chain:transit-summaries:v1';
+const TRANSIT_SUMMARY_HISTORY_KEY_PREFIX = 'supply_chain:transit-summaries:history:v1:';
 const TRANSIT_SUMMARY_TTL = 3600; // 1h — 6x interval; survives ~5 consecutive missed pings
 const TRANSIT_SUMMARY_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -7424,10 +7532,22 @@ async function seedTransitSummaries() {
 
   const now = Date.now();
   const summaries = {};
+  // Iterate the canonical chokepoint ID set rather than whatever pw happens to
+  // carry today. If seed-portwatch dropped 3 of 13 (flaky ArcGIS), those 3
+  // would otherwise vanish from summaries and the RPC would render zero-state
+  // rows for them — which get-chokepoint-status treats as healthy because its
+  // upstreamUnavailable gate fires only on fully-empty summaries. By emitting
+  // all 13 with zero-state for missing IDs, the shape is consistent and the
+  // coverage shortfall surfaces via the `pwCovered/N` log + recordCount only.
+  const CANONICAL_IDS = Object.keys(CHOKEPOINT_THREAT_LEVELS);
+  let pwCovered = 0;
 
-  for (const [cpId, cpData] of Object.entries(pw)) {
+  for (const cpId of CANONICAL_IDS) {
+    const cpData = pw[cpId];
+    if (cpData) pwCovered++;
     const threatLevel = CHOKEPOINT_THREAT_LEVELS[cpId] || 'normal';
-    const anomaly = detectTrafficAnomalyRelay(cpData.history, threatLevel);
+    const history = cpData?.history ?? [];
+    const anomaly = detectTrafficAnomalyRelay(history, threatLevel);
 
     // Get relay transit counts for this chokepoint
     let relayTransit = null;
@@ -7448,25 +7568,52 @@ async function seedTransitSummaries() {
     }
 
     const cr = latestCorridorRiskData?.[cpId];
+
+    // Compact summary: no history field. Consumed by get-chokepoint-status on
+    // every request, so keep it small.
+    // dataAvailable distinguishes genuine zero-traffic (cpData present, 0
+    // crossings) from zero-state fill (upstream missing this cycle). False
+    // here makes the RPC response explicit and lets the client render a
+    // "data unavailable" indicator instead of silently-empty stat rows.
     summaries[cpId] = {
       todayTotal: relayTransit?.total ?? 0,
       todayTanker: relayTransit?.tanker ?? 0,
       todayCargo: relayTransit?.cargo ?? 0,
       todayOther: relayTransit?.other ?? 0,
-      wowChangePct: cpData.wowChangePct ?? 0,
-      history: cpData.history ?? [],
+      wowChangePct: cpData?.wowChangePct ?? 0,
       riskLevel: cr?.riskLevel ?? '',
       incidentCount7d: cr?.incidentCount7d ?? 0,
       disruptionPct: cr?.disruptionPct ?? 0,
       riskSummary: cr?.riskSummary ?? '',
       riskReportAction: cr?.riskReportAction ?? '',
       anomaly,
+      dataAvailable: Boolean(cpData),
     };
+
+    // Per-id history key — only fetched on card expand via GetChokepointHistory.
+    // Write best-effort: a failure here doesn't block the summary publish. An
+    // empty history key just means the chart is unavailable for that chokepoint
+    // until the next successful relay tick.
+    const historyPayload = { chokepointId: cpId, history, fetchedAt: now };
+    const historyOk = await envelopeWrite(
+      `${TRANSIT_SUMMARY_HISTORY_KEY_PREFIX}${cpId}`,
+      historyPayload,
+      TRANSIT_SUMMARY_TTL,
+      { recordCount: history.length, sourceVersion: 'transit-summaries-history' },
+    );
+    if (!historyOk) console.warn(`[TransitSummary] history write failed for ${cpId}`);
   }
 
-  const ok = await envelopeWrite(TRANSIT_SUMMARY_REDIS_KEY, { summaries, fetchedAt: now }, TRANSIT_SUMMARY_TTL, { recordCount: Object.keys(summaries).length, sourceVersion: 'transit-summaries' });
-  await upstashSet('seed-meta:supply_chain:transit-summaries', { fetchedAt: now, recordCount: Object.keys(summaries).length }, 604800);
-  console.log(`[TransitSummary] Seeded ${Object.keys(summaries).length} summaries (redis: ${ok ? 'OK' : 'FAIL'})`);
+  if (pwCovered < CANONICAL_IDS.length) {
+    console.warn(`[TransitSummary] portwatch coverage shortfall: ${pwCovered}/${CANONICAL_IDS.length} — missing chokepoints will publish zero-state until next upstream success`);
+  }
+
+  const ok = await envelopeWrite(TRANSIT_SUMMARY_REDIS_KEY, { summaries, fetchedAt: now }, TRANSIT_SUMMARY_TTL, { recordCount: pwCovered, sourceVersion: 'transit-summaries' });
+  // seed-meta recordCount = pwCovered (actual upstream coverage), not the
+  // canonical-shape key count. Lets api/health.js detect a coverage shortfall
+  // as a freshness anomaly rather than being masked by the always-13 shape.
+  await upstashSet('seed-meta:supply_chain:transit-summaries', { fetchedAt: now, recordCount: pwCovered }, 604800);
+  console.log(`[TransitSummary] Seeded ${pwCovered}/${CANONICAL_IDS.length} from portwatch + per-id history (redis: ${ok ? 'OK' : 'FAIL'})`);
 }
 
 // Seed transit summaries every 10 min (same as transit counter)
@@ -9125,6 +9272,36 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/health' || pathname === '/') {
     const mem = process.memoryUsage();
+    // ⚠ SECURITY — read before adding fields to this response.
+    //
+    // /health is in `isPublicRoute` (no auth check). Fields here are
+    // returned to ANY caller — uptime monitors, attackers probing the
+    // relay, anyone with the URL.
+    //
+    // Per issue #3802, two attacker-aiding fields were REMOVED from the
+    // `auth: {...}` block and the entire `rateLimit: {...}` block was
+    // removed:
+    //
+    //   • `auth.authHeader` — revealed the non-standard header name
+    //     (`x-relay-key`) attackers should target. (Technically also
+    //     exposed via the CORS Allow-Headers preflight, but bundling it
+    //     on /health made the attack one-step instead of two.)
+    //   • `auth.allowVercelPreviewOrigins` — CORS-policy leak.
+    //   • `rateLimit: {...}` — exact windowMs / defaultMax / openskyMax /
+    //     rssMax let an attacker tune scraping cadence to stay just under
+    //     the throttle thresholds.
+    //
+    // The remaining `auth.enabled` + `auth.sharedSecretEnabled` are
+    // PRESERVED intentionally: PR #3812 / #3815 added them as the
+    // operator-visible "is auth configured?" signal that monitoring
+    // tools depend on (tests in tests/relay-auth.test.mjs codify this
+    // contract). Removing them would lie to ops; the trade-off was
+    // explicitly debated and decided in favour of operability.
+    //
+    // If a future operator workflow needs the removed fields, add an
+    // AUTHENTICATED /health/full route instead of widening this public
+    // response. The `ais-relay-health-no-secret-recon` test asserts the
+    // removed fields don't reappear here.
     sendCompressed(req, res, 200, { 'Content-Type': 'application/json' }, JSON.stringify({
       status: 'ok',
       clients: clients.size,
@@ -9171,15 +9348,11 @@ const server = http.createServer(async (req, res) => {
         polymarketInflight: polymarketInflight.size,
       },
       auth: {
+        // Preserved per PR #3812 / #3815 contract — operators monitor
+        // "is auth configured?" via these two fields. authHeader and
+        // allowVercelPreviewOrigins removed per #3802. See note above.
+        enabled: !AUTH_EFFECTIVELY_DISABLED,
         sharedSecretEnabled: !!RELAY_SHARED_SECRET,
-        authHeader: RELAY_AUTH_HEADER,
-        allowVercelPreviewOrigins: ALLOW_VERCEL_PREVIEW_ORIGINS,
-      },
-      rateLimit: {
-        windowMs: RELAY_RATE_LIMIT_WINDOW_MS,
-        defaultMax: RELAY_RATE_LIMIT_MAX,
-        openskyMax: RELAY_OPENSKY_RATE_LIMIT_MAX,
-        rssMax: RELAY_RSS_RATE_LIMIT_MAX,
       },
     }));
   } else if (pathname === '/metrics') {
@@ -9193,19 +9366,40 @@ const server = http.createServer(async (req, res) => {
     buildSnapshot(); // ensures cache is warm
     const url = new URL(req.url, `http://localhost:${PORT}`);
     const includeCandidates = url.searchParams.get('candidates') === 'true';
-    const json = includeCandidates ? lastSnapshotWithCandJson : lastSnapshotJson;
-    const gz = includeCandidates ? lastSnapshotWithCandGzip : lastSnapshotGzip;
-    const br = includeCandidates ? lastSnapshotWithCandBrotli : lastSnapshotBrotli;
+    const includeTankers = url.searchParams.get('tankers') === 'true';
+    const bbox = parseBbox(url.searchParams.get('bbox'));
 
-    if (json) {
-      sendPreGzipped(req, res, 200, {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=2',
-        'CDN-Cache-Control': 'public, max-age=10',
-      }, json, gz, br);
+    // Fast path: pre-gzipped cache covers the {with|without}-candidates
+    // case only (no tankers, no bbox). Used by the existing AIS density +
+    // military-detection consumers, which are the vast majority of traffic.
+    if (!includeTankers && !bbox) {
+      const json = includeCandidates ? lastSnapshotWithCandJson : lastSnapshotJson;
+      const gz = includeCandidates ? lastSnapshotWithCandGzip : lastSnapshotGzip;
+      const br = includeCandidates ? lastSnapshotWithCandBrotli : lastSnapshotBrotli;
+      if (json) {
+        sendPreGzipped(req, res, 200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=2',
+          'CDN-Cache-Control': 'public, max-age=10',
+        }, json, gz, br);
+      } else {
+        const payload = { ...lastSnapshot, candidateReports: includeCandidates ? getCandidateReportsSnapshot() : [], tankerReports: [] };
+        sendCompressed(req, res, 200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=2',
+          'CDN-Cache-Control': 'public, max-age=10',
+        }, JSON.stringify(payload));
+      }
     } else {
-      // Cold start fallback
-      const payload = { ...lastSnapshot, candidateReports: includeCandidates ? getCandidateReportsSnapshot() : [] };
+      // Live-tanker path: bbox-filtered + tanker-included responses skip the
+      // pre-gzipped cache (bbox space would explode the cache key set).
+      // Handler-side 60s cache (server/worldmonitor/maritime/v1/get-vessel-snapshot.ts)
+      // and the gateway 'live' tier absorb identical-bbox requests.
+      const payload = {
+        ...lastSnapshot,
+        candidateReports: includeCandidates ? getCandidateReportsSnapshot() : [],
+        tankerReports: includeTankers ? getTankerReportsSnapshot(bbox) : [],
+      };
       sendCompressed(req, res, 200, {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=2',
@@ -9441,7 +9635,16 @@ const server = http.createServer(async (req, res) => {
             'Accept-Language': 'en-US,en;q=0.9',
             ...conditionalHeaders,
           },
-          timeout: 15000
+          timeout: 15000,
+          // Bumped from Node's 16KB default. Some publishers (Substack, big-CDN-
+          // fronted feeds) chain Set-Cookie + CSP + Permissions-Policy + tracking
+          // headers that exceed 16KB, which makes Node's HTTP parser throw
+          // `Parse Error: Header overflow` and fail every fetch from this relay.
+          // The relay's in-memory rssResponseCache used to mask this on long-
+          // running deploys; a redeploy clears the cache and the broken feeds
+          // surface immediately. 64KB is well above any legitimate header set,
+          // and is per-request (no process-level Node flag needed).
+          maxHeaderSize: 65536,
         }, (response) => {
           if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
             const redirectUrl = response.headers.location.startsWith('http')
@@ -9693,15 +9896,15 @@ function buildFlightFilters(params) {
     departureWindow, airlines, sortBy, passengers } = params;
 
   const isRoundTrip = !!(returnDate && returnDate.length === 10);
-  const adults = Math.max(1, Math.min(parseInt(passengers) || 1, 9));
+  const adults = Math.max(1, Math.min(parseInt(passengers, 10) || 1, 9));
 
   let timeFilters = null;
   if (departureWindow) {
     const parts = departureWindow.split('-');
     if (parts.length === 2) {
-      const h0 = parseInt(parts[0]);
-      const h1 = parseInt(parts[1]);
-      if (!isNaN(h0) && !isNaN(h1)) timeFilters = [h0, h1, null, null];
+      const h0 = parseInt(parts[0], 10);
+      const h1 = parseInt(parts[1], 10);
+      if (!Number.isNaN(h0) && !Number.isNaN(h1)) timeFilters = [h0, h1, null, null];
     }
   }
 
@@ -9755,16 +9958,16 @@ function buildDateFilters(params) {
     cabinClass, maxStops, departureWindow, airlines, passengers } = params;
 
   const roundTrip = isRoundTrip === 'true' || isRoundTrip === true;
-  const adults = Math.max(1, Math.min(parseInt(passengers) || 1, 9));
-  const duration = parseInt(tripDuration) || 0;
+  const adults = Math.max(1, Math.min(parseInt(passengers, 10) || 1, 9));
+  const duration = parseInt(tripDuration, 10) || 0;
 
   let timeFilters = null;
   if (departureWindow) {
     const parts = departureWindow.split('-');
     if (parts.length === 2) {
-      const h0 = parseInt(parts[0]);
-      const h1 = parseInt(parts[1]);
-      if (!isNaN(h0) && !isNaN(h1)) timeFilters = [h0, h1, null, null];
+      const h0 = parseInt(parts[0], 10);
+      const h1 = parseInt(parts[1], 10);
+      if (!Number.isNaN(h0) && !Number.isNaN(h1)) timeFilters = [h0, h1, null, null];
     }
   }
 
@@ -9879,7 +10082,7 @@ function parseGfDates(text, isRoundTrip) {
         if (!Array.isArray(item) || item.length < 3) return null;
         if (!Array.isArray(item[2]) || !Array.isArray(item[2][0]) || item[2][0].length < 2) return null;
         const price = parseFloat(item[2][0][1]);
-        if (!price || isNaN(price)) return null;
+        if (!price || Number.isNaN(price)) return null;
         return { date: item[0] ?? '', returnDate: roundTrip ? (item[1] ?? '') : '', price };
       } catch { return null; }
     }).filter(Boolean);
@@ -9948,7 +10151,7 @@ async function handleGoogleFlightsDates(req, res) {
 
     const isRoundTrip = url.searchParams.get('is_round_trip') || 'false';
     const tripDuration = url.searchParams.get('trip_duration') || '0';
-    if ((isRoundTrip === 'true') && (parseInt(tripDuration) || 0) <= 0) {
+    if ((isRoundTrip === 'true') && (parseInt(tripDuration, 10) || 0) <= 0) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'trip_duration is required for round-trip date searches' }));
       return;
@@ -9980,7 +10183,7 @@ async function handleGoogleFlightsDates(req, res) {
       const text = await gfResp.text();
       allDates.push(...parseGfDates(text, isRoundTrip));
     } else {
-      let current = new Date(start);
+      const current = new Date(start);
       while (current <= end) {
         const chunkEnd = new Date(current);
         chunkEnd.setDate(chunkEnd.getDate() + MAX_CHUNK - 1);
@@ -10069,7 +10272,7 @@ function isWidgetEndpointAllowed(endpoint) {
   if (!endpoint.startsWith('/api/')) return false;
   const blocked = [
     'analyze-stock', 'backtest-stock', 'summarize-article', 'classify-event',
-    'deduce-situation', 'track-aircraft', 'search-flight-prices', 'get-youtube',
+    'deduct-situation', 'track-aircraft', 'search-flight-prices', 'get-youtube',
     'get-vessel-snapshot', 'lookup-sanction', 'get-ip-geo', 'get-simulation',
   ];
   return !blocked.some(b => endpoint.includes(b));
@@ -10535,6 +10738,14 @@ async function handleWidgetAgentRequest(req, res) {
     if (!res.writableEnded) res.end();
   }, timeoutMs);
 
+  // Hoisted out of the try block so the catch's structured-log payload can
+  // read it. `let` is block-scoped — declaring `toolCallCount` inside the
+  // try would make any reference from the catch throw a ReferenceError,
+  // which the inner log-fallback would silently swallow into "[widget-agent]
+  // Error (log-failed)" — defeating the entire diagnostic value of this
+  // log line. `completed` doesn't need hoisting (not read in catch).
+  let toolCallCount = 0;
+
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: WIDGET_ANTHROPIC_KEY });
@@ -10554,7 +10765,6 @@ async function handleWidgetAgentRequest(req, res) {
     messages.push({ role: 'user', content: String(prompt).slice(0, 2000) });
 
     let completed = false;
-    let toolCallCount = 0;
     for (let turn = 0; turn < maxTurns; turn++) {
       if (cancelled) break;
 
@@ -10664,12 +10874,94 @@ async function handleWidgetAgentRequest(req, res) {
       }
     }
   } catch (err) {
-    if (!cancelled) sendWidgetSSE(res, 'error', { message: 'Agent error' });
-    console.error('[widget-agent] Error:', err.message);
+    // Classify the error so the client gets an actionable message instead
+    // of the opaque "Agent error" that leaves the user (and operator) blind.
+    // Anthropic SDK errors expose .status / .error.type / .message; none of
+    // those leak the API key, but the fallback path scrubs sk-* tokens just
+    // in case the SDK changes its error shape.
+    if (!cancelled) {
+      sendWidgetSSE(res, 'error', { message: classifyWidgetAgentError(err, model) });
+    }
+    // Verbose structured log so Railway operators can diagnose without
+    // server-side reproduction. Includes status + type + request shape;
+    // omits headers/body to avoid leaking the prompt or auth headers.
+    try {
+      console.error('[widget-agent] Error:', JSON.stringify({
+        message: err && err.message ? String(err.message).slice(0, 500) : String(err).slice(0, 500),
+        status: err && typeof err.status === 'number' ? err.status : null,
+        type: (err && err.error && err.error.type) || (err && err.type) || null,
+        name: err && err.name ? String(err.name) : null,
+        isPro,
+        model,
+        toolCallCount,
+        promptLen: typeof prompt === 'string' ? prompt.length : 0,
+        historyLen: Array.isArray(conversationHistory) ? conversationHistory.length : 0,
+      }));
+      if (err && err.stack) console.error('[widget-agent] Stack:', err.stack);
+    } catch (logErr) {
+      console.error('[widget-agent] Error (log-failed):', err && err.message);
+    }
   } finally {
     clearTimeout(timeout);
     if (!cancelled && !res.writableEnded) res.end();
   }
+}
+
+// Map a thrown error from the agent loop to a user-facing message.
+// Inputs:
+//   err   - any thrown value (Anthropic SDK error, Error, string, ...)
+//   model - the model identifier we attempted, surfaced in the model-not-found path
+// Output: a short, actionable string safe to send to the client.
+function classifyWidgetAgentError(err, model) {
+  if (err && err.name === 'AbortError') return 'Request cancelled';
+  const status = err && typeof err.status === 'number' ? err.status : null;
+  const type = (err && err.error && err.error.type) || (err && err.type) || null;
+  const rawMsg = err && err.message ? String(err.message) : String(err || '');
+  // Scrub `sk-…` / `sk-ant-…` Claude API keys before surfacing ANY rawMsg
+  // to the client. Today the SDK does not bubble keys into thrown messages,
+  // but we apply this on every branch that interpolates rawMsg (400 +
+  // fallback) so a future SDK change can't leak the key in a single round.
+  const scrub = (s) => String(s || '').replace(/sk-(?:ant-)?[A-Za-z0-9_-]{20,}/g, '[REDACTED]');
+  if (status === 401 || type === 'authentication_error') {
+    // Operator hint without revealing which env var or its value.
+    return 'AI backend rejected the API key. Operator: check ANTHROPIC_API_KEY on the relay.';
+  }
+  if (status === 403 || type === 'permission_error') {
+    return 'AI backend denied access (permission_error).';
+  }
+  if (status === 429 || type === 'rate_limit_error') {
+    return 'AI backend rate limit reached. Try again in a moment.';
+  }
+  if (status === 404 || type === 'not_found_error' || /model.*not.*found|not_found_error/i.test(rawMsg)) {
+    return `AI model "${model}" unavailable on this account. Operator: verify model availability.`;
+  }
+  // Anthropic SDK APITimeoutError carries status 408. We catch it BEFORE the
+  // generic 400 branch so request-level timeouts surface as the friendlier
+  // "timed out" message instead of "Invalid request to AI backend".
+  if (
+    status === 408
+    || (err && (err.name === 'TimeoutError' || err.name === 'APITimeoutError'))
+  ) {
+    return 'AI backend timed out';
+  }
+  if (status === 400 || type === 'invalid_request_error') {
+    // Pass through the SDK's own description (it explains shape issues —
+    // wrong tool definition, malformed messages, oversized prompt — that
+    // are the most useful diagnostics). Cap to 200 chars defensively AND
+    // scrub keys: today Anthropic's 400 messages describe request-shape,
+    // not credentials, but this is on the data path that ends at the
+    // user's screen — keep the same scrub hardening as the fallback.
+    return `Invalid request to AI backend: ${scrub(rawMsg).slice(0, 200)}`;
+  }
+  if ((status !== null && status >= 500) || type === 'api_error' || type === 'overloaded_error') {
+    return 'AI backend temporarily unavailable. Try again in a moment.';
+  }
+  if (/ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(rawMsg)) {
+    return 'Network error reaching AI backend. Try again in a moment.';
+  }
+  // Last-resort fallback for anything we did not classify above.
+  const safe = scrub(rawMsg).slice(0, 200);
+  return safe ? `Agent error: ${safe}` : 'Agent error';
 }
 
 const WIDGET_PRO_SYSTEM_PROMPT = `You are a WorldMonitor PRO widget builder. Your job is to fetch live data and generate an interactive HTML widget body with inline JavaScript.
@@ -10892,7 +11184,13 @@ function connectUpstream() {
     socket.send(JSON.stringify({
       APIKey: API_KEY,
       BoundingBoxes: [[[-90, -180], [90, 180]]],
-      FilterMessageTypes: ['PositionReport'],
+      // ShipStaticData (AIS Type 5) carries ShipType, which PositionReport
+      // does not. Required for tanker classification on the Energy Atlas
+      // live-tanker layer — without it, vesselMeta cache stays empty and
+      // tankerReports never populates. Static data is broadcast every ~6
+      // min per vessel (ITU-R M.1371), so the volume add is small relative
+      // to PositionReport (which broadcasts every 2-10s underway).
+      FilterMessageTypes: ['PositionReport', 'ShipStaticData'],
     }));
   });
 
@@ -10938,8 +11236,9 @@ server.listen(PORT, () => {
   startOrefPollLoop();
   startUcdpSeedLoop();
   startMarketDataSeedLoop();
-  startAviationSeedLoop();
-  startNotamSeedLoop();
+  // Aviation + NOTAM seeds — standalone Railway cron — scripts/seed-aviation.mjs
+  // Writes aviation:delays:intl:v3, aviation:delays:faa:v1, aviation:notam:closures:v2,
+  // aviation:news::24:v1 and publishes aviation_closure/notam_closure events.
   // Energy spine seed — standalone Railway cron (0 6 * * *) — seed-energy-spine.mjs
   // Assembles per-country canonical energy keys from 6 domain sources daily.
   // Cyber seed disabled — standalone cron seed-cyber-threats.mjs handles this

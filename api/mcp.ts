@@ -1,43 +1,72 @@
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-// @ts-expect-error — JS module, no declaration file
-import { getPublicCorsHeaders } from './_cors.js';
-// @ts-expect-error — JS module, no declaration file
-import { jsonResponse } from './_json-response.js';
-// @ts-expect-error — JS module, no declaration file
-import { readJsonFromUpstash } from './_upstash-json.js';
-// @ts-expect-error — JS module, no declaration file
-import { resolveApiKeyFromBearer } from './_oauth-token.js';
-// @ts-expect-error — JS module, no declaration file
-import { timingSafeIncludes } from './_crypto.js';
-import COUNTRY_BBOXES from '../shared/country-bboxes.js';
-// @ts-expect-error — generated JS module, no declaration file
-import MINING_SITES_RAW from '../shared/mining-sites.js';
+// Vercel-edge route entry. The implementation lives under ./mcp/; this file
+// stays here so the deployed route URL (`/api/mcp`) doesn't move.
 
 export const config = { runtime: 'edge' };
 
-const MCP_PROTOCOL_VERSION = '2025-03-26';
-const SERVER_NAME = 'worldmonitor';
-const SERVER_VERSION = '1.0';
+export { default } from './mcp/handler';
+export { mcpHandler } from './mcp/handler';
+export {
+  applyPerMinuteLimit,
+  buildAuthHeaders,
+  PRODUCTION_DEPS,
+  resolveAuthContext,
+  runProPreChecks,
+  wwwAuthHeader,
+} from './mcp/auth';
+export {
+  JMESPATH_MAX_EXPR_BYTES,
+  JMESPATH_MAX_OUTPUT_BYTES,
+  MCP_SUPPORTED_CLIENT_MATRIX,
+  negotiateProtocolVersion,
+  TOOL_DESCRIPTION_MAX_BYTES,
+} from './mcp/constants';
 
-// ---------------------------------------------------------------------------
-// Per-key rate limiter (60 calls/min per PRO API key)
-// ---------------------------------------------------------------------------
-let mcpRatelimit: Ratelimit | null = null;
+// MCP_SUPPORTED_PROTOCOL_VERSIONS / MCP_PROTOCOL_VERSION snapshot the env at
+// THIS module's load. They live here (not in ./mcp/constants) so dynamic
+// re-imports of this file under different `process.env.MCP_PROTOCOL_FLOOR_2025_06_18`
+// snapshots — see tests/mcp-protocol-version.test.mjs — observe the active
+// value. ./mcp/constants's `negotiateProtocolVersion` re-reads env at call
+// time, so the runtime handler returns the active value on every request
+// regardless of when the shim was loaded.
+const MCP_PROTOCOL_FLOOR_2025_06_18_ENABLED =
+  process.env.MCP_PROTOCOL_FLOOR_2025_06_18 === 'on';
+export const MCP_SUPPORTED_PROTOCOL_VERSIONS: readonly string[] =
+  MCP_PROTOCOL_FLOOR_2025_06_18_ENABLED
+    ? ['2025-03-26', '2025-06-18']
+    : ['2025-03-26'];
+export const MCP_PROTOCOL_VERSION: string = MCP_PROTOCOL_FLOOR_2025_06_18_ENABLED
+  ? '2025-06-18'
+  : '2025-03-26';
+export { dispatchToolsCall, executeTool } from './mcp/dispatch';
+export { evaluateFreshness } from './mcp/freshness';
+export { applyJmespath, JMESPATH_SCHEMA } from './mcp/jmespath';
+export { reserveQuota } from './mcp/quota';
+export {
+  buildPublicTool,
+  SUMMARY_SCHEMA,
+  TOOL_LIST_BYTES,
+  TOOL_LIST_RESPONSE,
+  TOOL_REGISTRY,
+} from './mcp/registry/index';
+export {
+  emitTelemetry,
+  MCP_TOOLCALL_TELEMETRY_KEYS,
+  MCP_TOOLS_LIST_TELEMETRY_KEYS,
+  principalIdForLog,
+  telemetryEnabled,
+} from './mcp/telemetry';
+export type {
+  ApplyJmespathResult,
+  JmespathFailKind,
+  McpAuthContext,
+  McpHandlerDeps,
+  PublicToolShape,
+} from './mcp/types';
+export { compressDescription, utf8ByteLength } from './mcp/utils';
 
-function getMcpRatelimit(): Ratelimit | null {
-  if (mcpRatelimit) return mcpRatelimit;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  mcpRatelimit = new Ratelimit({
-    redis: new Redis({ url, token }),
-    limiter: Ratelimit.slidingWindow(60, '60 s'),
-    prefix: 'rl:mcp',
-    analytics: false,
-  });
-  return mcpRatelimit;
-}
+export { buildPromptResponse, PROMPT_LIST_RESPONSE, PROMPT_REGISTRY } from './mcp/prompts/index';
+export { buildResourceResponse, RESOURCE_LIST_RESPONSE, RESOURCE_REGISTRY } from './mcp/resources/index';
+export { CHOKEPOINT_SLUGS } from './mcp/resources/slugs';
 
 // ---------------------------------------------------------------------------
 // Tool registry

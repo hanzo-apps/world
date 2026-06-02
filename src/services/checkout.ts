@@ -15,10 +15,59 @@ const CHECKOUT_DISCOUNT_PARAM = 'checkoutDiscount';
 const PENDING_CHECKOUT_KEY = 'wm-pending-checkout';
 const APP_CHECKOUT_BASE_URL = 'https://world.hanzo.ai/';
 
+/**
+ * Session flag set just before the post-overlay reload. Lets panel-layout
+ * detect "we just returned from an overlay checkout" on the reloaded page —
+ * the overlay uses manualRedirect:true so there are no subscription_id URL
+ * params to key off, unlike the full-page redirect return handled by
+ * handleCheckoutReturn. Exported as a pair (consume+mark) to keep the key
+ * centralized with the rest of the checkout storage constants.
+ */
+export function consumePostCheckoutFlag(): boolean {
+  try {
+    if (sessionStorage.getItem(POST_CHECKOUT_FLAG_KEY) === '1') {
+      sessionStorage.removeItem(POST_CHECKOUT_FLAG_KEY);
+      return true;
+    }
+  } catch {
+    // Private browsing / storage disabled — fall through to false.
+  }
+  return false;
+}
+
+function markPostCheckout(): void {
+  try {
+    sessionStorage.setItem(POST_CHECKOUT_FLAG_KEY, '1');
+  } catch {
+    // Storage denied — the reload will still run; transition detector will
+    // fall back to its null baseline, matching the pre-flag behavior.
+  }
+}
+
 interface PendingCheckoutIntent {
   productId: string;
   referralCode?: string;
   discountCode?: string;
+  /**
+   * User id who saved this intent, or null if saved anonymously (the
+   * common "click Buy, get sign-in modal" path). On resume, we only
+   * fire the auto-checkout if:
+   *   - savedByUserId === current user id (mid-flow redirect return), OR
+   *   - savedByUserId === null AND current user is authenticated
+   *     (anonymous intent → user just signed up/in — THIS IS the
+   *     auto-resume case)
+   * Anything else (A saved, B is now signed in) is a cross-user leak
+   * and the intent is discarded.
+   */
+  savedByUserId?: string | null;
+  /**
+   * Unix-ms when this intent was saved. Stale intents (closed Clerk
+   * modal without signing in, then hours later another sign-in for
+   * unrelated reasons) must not auto-resume checkout — the user's
+   * intent to buy has expired. Loaders apply PENDING_INTENT_TTL_MS
+   * and discard anything older.
+   */
+  savedAt?: number;
 }
 
 interface StartCheckoutOptions {

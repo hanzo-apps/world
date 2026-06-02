@@ -135,3 +135,4 @@ export async function openBillingPortal(): Promise<string> {
   window.open(COMMERCE_PORTAL_URL, '_blank');
   return COMMERCE_PORTAL_URL;
 }
+

@@ -14,7 +14,7 @@ export const config = { runtime: 'edge' };
 // @ts-expect-error — JS module, no declaration file
 import { getCorsHeaders } from './_cors.js';
 // @ts-expect-error — JS module, no declaration file
-import { captureEdgeException } from './_sentry-edge.js';
+import { captureEdgeException, captureSilentError } from './_sentry-edge.js';
 import { validateBearerToken } from '../server/auth-session';
 import { getEntitlements } from '../server/_shared/entitlement-check';
 
@@ -46,6 +46,37 @@ async function encryptSlackWebhook(webhookUrl: string): Promise<string> {
   return `v1:${btoa(binary)}`;
 }
 
+/**
+ * Allow-list of hostnames every major browser's push service uses.
+ *
+ * A PushSubscription's endpoint URL is assigned by the browser's
+ * push platform — users can't pick it. That means we CAN safely
+ * constrain accepted endpoints to known push-service hosts and
+ * reject anything else before it hits Convex storage (and later
+ * the relay's outbound fetch). Without this allow-list the relay's
+ * sendWebPush() becomes a server-side-request primitive for any
+ * PRO user: they could submit `https://internal.example.com/admin`
+ * as their endpoint and the relay would faithfully POST to it.
+ *
+ * Sources (verified 2026-04-18):
+ *   - Chrome / Edge / Brave:  fcm.googleapis.com
+ *   - Firefox:                updates.push.services.mozilla.com
+ *   - Safari (macOS 13+):     web.push.apple.com
+ *   - Windows Notification:   *.notify.windows.com (wns2-*, etc.)
+ *
+ * If a future browser ships a new push service we'll need to widen
+ * this list — fail-closed is the right default.
+ */
+function isAllowedPushEndpointHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === 'fcm.googleapis.com') return true;
+  if (h === 'updates.push.services.mozilla.com') return true;
+  if (h === 'web.push.apple.com') return true;
+  if (h.endsWith('.web.push.apple.com')) return true;
+  if (h.endsWith('.notify.windows.com')) return true;
+  return false;
+}
+
 async function publishWelcome(userId: string, channelType: string): Promise<void> {
   if (!UPSTASH_URL || !UPSTASH_TOKEN) {
     console.error('[notification-channels] publishWelcome: UPSTASH env vars missing — welcome not queued');
@@ -66,6 +97,11 @@ async function publishWelcome(userId: string, channelType: string): Promise<void
     console.log(`[notification-channels] publishWelcome LPUSH: status=${res.status} result=${JSON.stringify(data?.result)}`);
   } catch (err) {
     console.error('[notification-channels] publishWelcome LPUSH failed:', (err as Error).message);
+    // publishWelcome runs inside the handler's ctx.waitUntil chain; await
+    // keeps that chain pending until Sentry delivery completes.
+    await captureSilentError(err, {
+      tags: { route: 'api/notification-channels', step: 'publish-welcome' },
+    });
   }
 }
 
@@ -80,6 +116,9 @@ async function publishFlushHeld(userId: string, variant: string): Promise<void> 
     });
   } catch (err) {
     console.warn('[notification-channels] publishFlushHeld LPUSH failed:', (err as Error).message);
+    await captureSilentError(err, {
+      tags: { route: 'api/notification-channels', step: 'publish-flush-held', severity: 'warn' },
+    });
   }
 }
 
@@ -116,6 +155,11 @@ interface PostBody {
   eventTypes?: string[];
   sensitivity?: string;
   channels?: string[];
+  // web_push subscription triple (Phase 6)
+  endpoint?: string;
+  p256dh?: string;
+  auth?: string;
+  userAgent?: string;
   quietHoursEnabled?: boolean;
   quietHoursStart?: number;
   quietHoursEnd?: number;
@@ -125,6 +169,8 @@ interface PostBody {
   digestHour?: number;
   digestTimezone?: string;
   aiDigestEnabled?: boolean;
+  // Optional ISO-3166 alpha-2 country-scope; relay re-validates + normalizes.
+  countries?: string[];
 }
 
 export default async function handler(req: Request, ctx: { waitUntil: (p: Promise<unknown>) => void }): Promise<Response> {
@@ -164,7 +210,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
       return json(data, 200, corsHeaders, true);
     } catch (err) {
       console.error('[notification-channels] GET error:', err);
-      void captureEdgeException(err, { handler: 'notification-channels', method: 'GET' });
+      captureEdgeException(err, { handler: 'notification-channels', method: 'GET' }, ctx);
       return json({ error: 'Failed to fetch' }, 500, corsHeaders);
     }
   }
@@ -240,6 +286,52 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
         return json({ ok: true }, 200, corsHeaders);
       }
 
+      if (action === 'set-web-push') {
+        const { endpoint, p256dh, auth, userAgent } = body;
+        if (!endpoint || !p256dh || !auth) {
+          return json({ error: 'endpoint, p256dh, auth required' }, 400, corsHeaders);
+        }
+        // SSRF defence. The relay later POSTs to whatever endpoint we
+        // persist here, so an unvalidated user-submitted URL is a
+        // server-side-request primitive bounded only by the relay's
+        // network egress. Browsers always produce endpoints at one
+        // of a small set of push-service hosts (FCM, Mozilla, Apple,
+        // Windows Notification Service); anything else is either an
+        // exotic browser (rare) or an attack. Allow-list the known
+        // hosts and reject everything else.
+        try {
+          const u = new URL(endpoint);
+          if (u.protocol !== 'https:') {
+            return json({ error: 'endpoint must be https' }, 400, corsHeaders);
+          }
+          if (!isAllowedPushEndpointHost(u.hostname)) {
+            return json(
+              { error: 'endpoint host is not a recognised push service' },
+              400,
+              corsHeaders,
+            );
+          }
+        } catch {
+          return json({ error: 'invalid endpoint' }, 400, corsHeaders);
+        }
+        const resp = await convexRelay({
+          action: 'set-web-push',
+          userId: session.userId,
+          endpoint,
+          p256dh,
+          auth,
+          // Trim user agent; it's cosmetic for the settings UI, not identity.
+          userAgent: typeof userAgent === 'string' ? userAgent.slice(0, 200) : undefined,
+        });
+        if (!resp.ok) {
+          console.error('[notification-channels] POST set-web-push relay error:', resp.status);
+          return json({ error: 'Operation failed' }, 500, corsHeaders);
+        }
+        const wpResult = await resp.json() as { ok: boolean; isNew?: boolean };
+        if (wpResult.isNew) ctx.waitUntil(publishWelcome(session.userId, 'web_push'));
+        return json({ ok: true }, 200, corsHeaders);
+      }
+
       if (action === 'delete-channel') {
         const { channelType } = body;
         if (!channelType) return json({ error: 'channelType required' }, 400, corsHeaders);
@@ -252,7 +344,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
       }
 
       if (action === 'set-alert-rules') {
-        const { variant, enabled, eventTypes, sensitivity, channels, aiDigestEnabled } = body;
+        const { variant, enabled, eventTypes, sensitivity, channels, aiDigestEnabled, countries } = body;
         const resp = await convexRelay({
           action: 'set-alert-rules',
           userId: session.userId,
@@ -262,6 +354,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
           sensitivity,
           channels,
           aiDigestEnabled,
+          countries,
         });
         if (!resp.ok) {
           console.error('[notification-channels] POST set-alert-rules relay error:', resp.status);
@@ -272,7 +365,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
 
       if (action === 'set-quiet-hours') {
         const VALID_OVERRIDE = new Set(['critical_only', 'silence_all', 'batch_on_wake']);
-        const { variant, quietHoursEnabled, quietHoursStart, quietHoursEnd, quietHoursTimezone, quietHoursOverride } = body;
+        const { variant, quietHoursEnabled, quietHoursStart, quietHoursEnd, quietHoursTimezone, quietHoursOverride, countries } = body;
         if (!variant || quietHoursEnabled === undefined) {
           return json({ error: 'variant and quietHoursEnabled required' }, 400, corsHeaders);
         }
@@ -288,6 +381,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
           quietHoursEnd,
           quietHoursTimezone,
           quietHoursOverride,
+          countries,
         });
         if (!resp.ok) {
           console.error('[notification-channels] POST set-quiet-hours relay error:', resp.status);
@@ -302,7 +396,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
 
       if (action === 'set-digest-settings') {
         const VALID_DIGEST_MODE = new Set(['realtime', 'daily', 'twice_daily', 'weekly']);
-        const { variant, digestMode, digestHour, digestTimezone } = body;
+        const { variant, digestMode, digestHour, digestTimezone, countries } = body;
         if (!variant || !digestMode || !VALID_DIGEST_MODE.has(digestMode)) {
           return json({ error: 'variant and valid digestMode required' }, 400, corsHeaders);
         }
@@ -313,6 +407,7 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
           digestMode,
           digestHour,
           digestTimezone,
+          countries,
         });
         if (!resp.ok) {
           console.error('[notification-channels] POST set-digest-settings relay error:', resp.status);
@@ -321,10 +416,64 @@ export default async function handler(req: Request, ctx: { waitUntil: (p: Promis
         return json({ ok: true }, 200, corsHeaders);
       }
 
+      // Atomic update of (digestMode, sensitivity) and any subset of the alert-rule
+      // fields. The UI's delivery-mode change flow uses this to avoid the two-call
+      // race against the cross-field validator.
+      // Critical: 400 responses from the relay must pass through with their body
+      // intact so the client can render INCOMPATIBLE_DELIVERY helper text.
+      // See plans/forbid-realtime-all-events.md §1f.
+      if (action === 'set-notification-config') {
+        const VALID_SENSITIVITY = new Set(['all', 'high', 'critical']);
+        const VALID_DIGEST_MODE = new Set(['realtime', 'daily', 'twice_daily', 'weekly']);
+        const { variant, enabled, eventTypes, sensitivity, channels, aiDigestEnabled, digestMode, digestHour, digestTimezone, countries } = body;
+        if (!variant) return json({ error: 'variant required' }, 400, corsHeaders);
+        if (sensitivity !== undefined && !VALID_SENSITIVITY.has(sensitivity)) {
+          return json({ error: 'invalid sensitivity' }, 400, corsHeaders);
+        }
+        if (digestMode !== undefined && !VALID_DIGEST_MODE.has(digestMode)) {
+          return json({ error: 'invalid digestMode' }, 400, corsHeaders);
+        }
+        if (countries !== undefined && !Array.isArray(countries)) {
+          return json({ error: 'COUNTRIES_MUST_BE_ARRAY' }, 400, corsHeaders);
+        }
+        const resp = await convexRelay({
+          action: 'set-notification-config',
+          userId: session.userId,
+          variant,
+          enabled,
+          eventTypes,
+          sensitivity,
+          channels,
+          aiDigestEnabled,
+          digestMode,
+          digestHour,
+          digestTimezone,
+          countries,
+        });
+        if (!resp.ok) {
+          // 400 from convex/http means user-facing validation failure (e.g.
+          // INCOMPATIBLE_DELIVERY). 402 means paywall (PRO_REQUIRED). Both
+          // must pass through with body intact so the client renders the
+          // real reason — inline helper text for 400, upgrade-flow modal
+          // for 402 — instead of a generic toast.
+          if (resp.status === 400 || resp.status === 402) {
+            const text = await resp.text().catch(() => '');
+            let payload: unknown = { error: 'Validation failed' };
+            if (text) {
+              try { payload = JSON.parse(text); } catch { /* keep default */ }
+            }
+            return json(payload, resp.status, corsHeaders);
+          }
+          console.error('[notification-channels] POST set-notification-config relay error:', resp.status);
+          return json({ error: 'Operation failed' }, 500, corsHeaders);
+        }
+        return json({ ok: true }, 200, corsHeaders);
+      }
+
       return json({ error: 'Unknown action' }, 400, corsHeaders);
     } catch (err) {
       console.error('[notification-channels] POST error:', err);
-      void captureEdgeException(err, { handler: 'notification-channels', method: 'POST' });
+      captureEdgeException(err, { handler: 'notification-channels', method: 'POST' }, ctx);
       return json({ error: 'Operation failed' }, 500, corsHeaders);
     }
   }

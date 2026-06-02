@@ -3,12 +3,14 @@ import { WindowedList } from './VirtualList';
 import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAssetContext } from '@/types';
 import { THREAT_PRIORITY } from '@/services/threat-classifier';
 import { formatTime, getCSSColor } from '@/utils';
-import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { escapeHtml, sanitizeUrl, unsafeRawHtml } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 import { SITE_VARIANT } from '@/config';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { track } from '@/services/analytics';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 type SortMode = 'relevance' | 'newest';
 
@@ -50,6 +52,10 @@ export class NewsPanel extends Panel {
   private summaryBtn: HTMLButtonElement | null = null;
   private summaryContainer: HTMLElement | null = null;
   private currentHeadlines: string[] = [];
+  // RSS descriptions paired 1:1 with currentHeadlines. Used to ground the
+  // SummarizeArticle LLM (U7) so it stops hallucinating across unrelated
+  // headlines. Empty strings preserve today headline-only behavior (R6).
+  private currentBodies: string[] = [];
   private lastHeadlineSignature = '';
   private isSummarizing = false;
 
@@ -181,7 +187,7 @@ export class NewsPanel extends Panel {
       ? t('components.newsPanel.sortNewest') || 'Newest'
       : t('components.newsPanel.sortRelevance') || 'Relevance';
     const tooltip = `${t('components.newsPanel.sortBy') || 'Sort by'}: ${label}`;
-    this.sortBtn.innerHTML = icon;
+    setTrustedHtml(this.sortBtn, trustedHtml(icon, "legacy direct innerHTML migration"));
     this.sortBtn.title = tooltip;
     this.sortBtn.setAttribute('aria-label', tooltip);
   }
@@ -204,7 +210,7 @@ export class NewsPanel extends Panel {
     // Create summarize button
     this.summaryBtn = document.createElement('button');
     this.summaryBtn.className = 'panel-summarize-btn';
-    this.summaryBtn.innerHTML = '✨';
+    setTrustedHtml(this.summaryBtn, trustedHtml('✨', "legacy direct innerHTML migration"));
     this.summaryBtn.title = t('components.newsPanel.summarize');
     this.summaryBtn.addEventListener('click', () => {
       track('news-summarize', { panelId: this.panelId });
@@ -235,15 +241,21 @@ export class NewsPanel extends Panel {
 
     // Show loading state
     this.isSummarizing = true;
-    this.summaryBtn.innerHTML = '<span class="panel-summarize-spinner"></span>';
+    setTrustedHtml(this.summaryBtn, trustedHtml('<span class="panel-summarize-spinner"></span>', "legacy direct innerHTML migration"));
     this.summaryBtn.disabled = true;
     this.summaryContainer.style.display = 'block';
-    this.summaryContainer.innerHTML = `<div class="panel-summary-loading">${t('components.newsPanel.generatingSummary')}</div>`;
+    setTrustedHtml(this.summaryContainer, trustedHtml(`<div class="panel-summary-loading">${t('components.newsPanel.generatingSummary')}</div>`, "legacy direct innerHTML migration"));
 
     const sigAtStart = this.lastHeadlineSignature;
 
     try {
-      const result = await generateSummary(this.currentHeadlines.slice(0, 8), undefined, this.panelId, currentLang);
+      const result = await generateSummary(
+        this.currentHeadlines.slice(0, 8),
+        undefined,
+        this.panelId,
+        currentLang,
+        { bodies: this.currentBodies.slice(0, 8) },
+      );
       if (!this.element?.isConnected) return;
       if (this.lastHeadlineSignature !== sigAtStart) {
         this.hideSummary();
@@ -253,17 +265,17 @@ export class NewsPanel extends Panel {
         this.setCachedSummary(cacheKey, result.summary);
         this.showSummary(result.summary);
       } else {
-        this.summaryContainer.innerHTML = `<div class="panel-summary-error">${t('components.newsPanel.summaryError')}</div>`;
+        setTrustedHtml(this.summaryContainer, trustedHtml(`<div class="panel-summary-error">${t('components.newsPanel.summaryError')}</div>`, "legacy direct innerHTML migration"));
         setTimeout(() => this.hideSummary(), 3000);
       }
     } catch {
       if (!this.element?.isConnected) return;
-      this.summaryContainer.innerHTML = `<div class="panel-summary-error">${t('components.newsPanel.summaryFailed')}</div>`;
+      setTrustedHtml(this.summaryContainer, trustedHtml(`<div class="panel-summary-error">${t('components.newsPanel.summaryFailed')}</div>`, "legacy direct innerHTML migration"));
       setTimeout(() => this.hideSummary(), 3000);
     } finally {
       this.isSummarizing = false;
       if (this.summaryBtn) {
-        this.summaryBtn.innerHTML = '✨';
+        setTrustedHtml(this.summaryBtn, trustedHtml('✨', "legacy direct innerHTML migration"));
         this.summaryBtn.disabled = false;
       }
     }
@@ -279,7 +291,7 @@ export class NewsPanel extends Panel {
     const originalText = titleEl.textContent || '';
 
     // Visual feedback
-    element.innerHTML = '...';
+    setTrustedHtml(element, trustedHtml('...', "legacy direct innerHTML migration"));
     element.style.pointerEvents = 'none';
 
     try {
@@ -288,17 +300,17 @@ export class NewsPanel extends Panel {
       if (translated) {
         titleEl.textContent = translated;
         titleEl.dataset.original = originalText;
-        element.innerHTML = '✓';
+        setTrustedHtml(element, trustedHtml('✓', "legacy direct innerHTML migration"));
         element.title = 'Original: ' + originalText;
         element.classList.add('translated');
       } else {
-        element.innerHTML = '文';
+        setTrustedHtml(element, trustedHtml('文', "legacy direct innerHTML migration"));
         // Shake animation or error state could be added here
       }
     } catch (e) {
       if (!this.element?.isConnected) return;
       console.error('Translation failed', e);
-      element.innerHTML = '文';
+      setTrustedHtml(element, trustedHtml('文', "legacy direct innerHTML migration"));
     } finally {
       if (element.isConnected) {
         element.style.pointerEvents = 'auto';
@@ -309,23 +321,26 @@ export class NewsPanel extends Panel {
   private showSummary(summary: string): void {
     if (!this.summaryContainer || !this.element?.isConnected) return;
     this.summaryContainer.style.display = 'block';
-    this.summaryContainer.innerHTML = `
+    setTrustedHtml(this.summaryContainer, trustedHtml(`
       <div class="panel-summary-content">
         <span class="panel-summary-text">${escapeHtml(summary)}</span>
         <button class="panel-summary-close" title="${t('components.newsPanel.close')}" aria-label="${t('components.newsPanel.close')}">×</button>
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
     // Close button click is handled via event delegation on summaryContainer (set up in constructor)
   }
 
   private hideSummary(): void {
     if (!this.summaryContainer) return;
     this.summaryContainer.style.display = 'none';
-    this.summaryContainer.innerHTML = '';
+    setTrustedHtml(this.summaryContainer, trustedHtml('', "legacy direct innerHTML migration"));
   }
 
   private getHeadlineSignature(): string {
-    return JSON.stringify(this.currentHeadlines.slice(0, 5).sort());
+    return JSON.stringify([
+      this.currentHeadlines.slice(0, 5).sort(),
+      this.currentBodies.slice(0, 5), // NOT sorted — paired with headlines
+    ]);
   }
 
   private updateHeadlineSignature(): void {
@@ -411,8 +426,9 @@ export class NewsPanel extends Panel {
     this.setCount(0);
     this.relatedAssetContext.clear();
     this.currentHeadlines = [];
+    this.currentBodies = [];
     this.updateHeadlineSignature();
-    this.setContent(`<div class="panel-empty">${escapeHtml(message)}</div>`);
+    this.setSafeContent(unsafeRawHtml(`<div class="panel-empty">${escapeHtml(message)}</div>`, 'legacy Panel.setContent() migration'));
   }
 
   private async renderClustersAsync(items: NewsItem[]): Promise<void> {
@@ -447,10 +463,13 @@ export class NewsPanel extends Panel {
     }
 
     this.setCount(sorted.length);
-    this.currentHeadlines = sorted
+    const topItems = sorted
       .slice(0, 5)
-      .map(item => item.title)
-      .filter((title): title is string => typeof title === 'string' && title.trim().length > 0);
+      .filter((item) => typeof item.title === 'string' && item.title.trim().length > 0);
+    this.currentHeadlines = topItems.map((item) => item.title);
+    // Paired RSS descriptions for LLM grounding; empty string falls back to
+    // headline-only on the server (R6).
+    this.currentBodies = topItems.map((item) => typeof item.snippet === 'string' ? item.snippet : '');
 
     this.updateHeadlineSignature();
 
@@ -467,6 +486,7 @@ export class NewsPanel extends Panel {
           ${item.isAlert ? '<span class="alert-tag">ALERT</span>' : ''}
         </div>
         <a class="item-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+        ${item.snippet ? `<div class="item-snippet">${escapeHtml(item.snippet.length > 200 ? item.snippet.slice(0, 200).replace(/\s+\S*$/, '') + '…' : item.snippet)}</div>` : ''}
         <div class="item-time">
           ${formatTime(item.pubDate)}
           ${getCurrentLanguage() !== 'en' ? `<button class="item-translate-btn" title="Translate" data-text="${escapeHtml(item.title)}">文</button>` : ''}
@@ -476,7 +496,7 @@ export class NewsPanel extends Panel {
       )
       .join('');
 
-    this.setContent(html);
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 
   private renderClusters(clusters: ClusteredEvent[]): void {
@@ -502,6 +522,11 @@ export class NewsPanel extends Panel {
 
     // Store headlines for summarization (cap at 5 to reduce entity conflation in small models)
     this.currentHeadlines = sorted.slice(0, 5).map(c => c.primaryTitle);
+    // Cluster objects don't carry a description (news:insights:v1 producer
+    // doesn't plumb it yet). Passing empty bodies preserves today behavior
+    // (R6); when the producer adds a primarySnippet, this falls through to
+    // grounded mode without further code change.
+    this.currentBodies = sorted.slice(0, 5).map(() => '');
 
     this.updateHeadlineSignature();
 
@@ -542,7 +567,7 @@ export class NewsPanel extends Panel {
       const html = prepared
         .map(p => this.renderClusterHtmlSafely(p.cluster, p.isNew, p.shouldHighlight, p.showNewTag))
         .join('');
-      this.setContent(html);
+      this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
     }
   }
 

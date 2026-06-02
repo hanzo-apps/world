@@ -1,5 +1,9 @@
 // ── Story persistence tracking keys (E3) ─────────────────────────────────────
-// Hash: firstSeen, lastSeen, mentionCount, sourceCount, currentScore, peakScore, title, link, severity, lang
+// Hash: firstSeen, lastSeen, mentionCount, sourceCount, currentScore, peakScore,
+//       title, link, severity, lang, description, isOpinion, isFeelGood, category
+// description is authoritative per-mention: written unconditionally on every
+// HSET (empty string when the current mention has no body), so an earlier
+// mention's body never silently grounds LLMs for the current mention.
 export const STORY_TRACK_KEY_PREFIX = 'story:track:v1:';
 // Set: unique feed names that have mentioned this story
 export const STORY_SOURCES_KEY_PREFIX = 'story:sources:v1:';
@@ -7,23 +11,28 @@ export const STORY_SOURCES_KEY_PREFIX = 'story:sources:v1:';
 export const STORY_PEAK_KEY_PREFIX = 'story:peak:v1:';
 // Sorted set: accumulator for digest mode notifications (score = pubDate epoch ms)
 export const DIGEST_ACCUMULATOR_KEY_PREFIX = 'digest:accumulator:v1:';
-// TTL for all story tracking keys (48 hours)
-export const STORY_TRACKING_TTL_S = 172800;
 
 /**
  * Story tracking keys — written by list-feed-digest.ts, read by digest cron (E2).
  * All keys use 32-char SHA-256 hex prefix of the normalised title as ${titleHash}.
  *
- *   story:track:v1:${titleHash}     Hash   firstSeen/lastSeen/title/link/severity/mentionCount/currentScore/lang
+ *   story:track:v1:${titleHash}     Hash   firstSeen/lastSeen/title/link/severity/mentionCount/currentScore/lang/description/isOpinion/isFeelGood/category (always-written)
  *   story:sources:v1:${titleHash}   Set    feed IDs (SADD per appearance)
  *   story:peak:v1:${titleHash}      ZSet   single member "peak", score = highest importanceScore (ZADD GT)
  *   digest:accumulator:v1:${variant}:${lang} ZSet  member=titleHash, score=lastSeen_ms (updated every appearance)
  *
- * TTL for all: 172800s (48h), refreshed each digest cycle.
+ * TTLs are split, not uniform:
+ *   - story:track:v1 + story:sources:v1 + story:peak:v1 use STORY_TTL (7d) — sustained multi-day stories
+ *   - digest:accumulator:v1 uses DIGEST_ACCUMULATOR_TTL (48h) — lookback window for digest content
+ * A previous comment here claimed "TTL for all: 48h" alongside a dead
+ * `STORY_TRACKING_TTL_S = 172800` export; both were leftovers from before
+ * the split and were removed to prevent future readers from misreading
+ * the rollout window for category/isFeelGood/isOpinion residue.
  * Shadow scoring key (written by notification-relay.cjs, which owns the live
  * value — the constant here is documentation only, not imported):
- *   shadow:score-log:v3            ZSet   score=epoch_ms, member=JSON{ts,importanceScore,severity,eventType,title,source,publishedAt,corroborationCount,variant}
- *   shadow:score-log:v2            ZSet   legacy (weight rebalance PR) — self-prunes via 7d ZREMRANGEBYSCORE
+ *   shadow:score-log:v5            ZSet   score=epoch_ms, member=JSON{ts,importanceScore,severity,eventType,title,source,publishedAt,corroborationCount,variant}
+ *   shadow:score-log:v3            ZSet   legacy (weight rebalance) — self-prunes via 7d ZREMRANGEBYSCORE
+ *   shadow:score-log:v2            ZSet   legacy (stale-score fix) — self-prunes
  *   shadow:score-log:v1            ZSet   legacy (pre-PR #3069) — self-prunes
  */
 export const STORY_TRACK_KEY = (titleHash: string) => `story:track:v1:${titleHash}`;
@@ -31,10 +40,10 @@ export const STORY_SOURCES_KEY = (titleHash: string) => `story:sources:v1:${titl
 export const STORY_PEAK_KEY = (titleHash: string) => `story:peak:v1:${titleHash}`;
 export const DIGEST_ACCUMULATOR_KEY = (variant: string, lang = 'en') => `digest:accumulator:v1:${variant}:${lang}`;
 export const DIGEST_LAST_SENT_KEY = (userId: string, variant: string) => `digest:last-sent:v1:${userId}:${variant}`;
-// NOTE: notification-relay.cjs owns the live value (shadow:score-log:v3 since weight rebalance).
+// NOTE: notification-relay.cjs owns the live value (shadow:score-log:v5 since prompt upgrade).
 // This export is documentation/discoverability; changing it here does NOT affect the relay.
 // If you modify the key, also update scripts/notification-relay.cjs SHADOW_SCORE_LOG_KEY.
-export const SHADOW_SCORE_LOG_KEY = 'shadow:score-log:v3';
+export const SHADOW_SCORE_LOG_KEY = 'shadow:score-log:v5';
 export const STORY_TTL = 604800;           // 7 days — enough for sustained multi-day stories
 export const DIGEST_ACCUMULATOR_TTL = 172800; // 48h — lookback window for digest content
 
@@ -60,7 +69,7 @@ export const GAS_STORAGE_KEY_PREFIX = 'energy:gas-storage:v1:';
 export const GAS_STORAGE_COUNTRIES_KEY = 'energy:gas-storage:v1:_countries';
 export const ELECTRICITY_KEY_PREFIX = 'energy:electricity:v1:';
 export const ELECTRICITY_INDEX_KEY = 'energy:electricity:v1:index';
-export const ENERGY_INTELLIGENCE_KEY = 'energy:intelligence:v1:feed';
+export const ENERGY_INTELLIGENCE_KEY = 'energy:intelligence:feed:v1';
 export const CHOKEPOINT_FLOWS_KEY = 'energy:chokepoint-flows:v1';
 export const ENERGY_SPINE_KEY_PREFIX = 'energy:spine:v1:';
 export const ENERGY_SPINE_COUNTRIES_KEY = 'energy:spine:v1:_countries';
@@ -68,6 +77,11 @@ export const EMBER_ELECTRICITY_KEY_PREFIX = 'energy:ember:v1:';
 export const EMBER_ELECTRICITY_ALL_KEY = 'energy:ember:v1:_all';
 export const SPR_KEY = 'economic:spr:v1';
 export const SPR_POLICIES_KEY = 'energy:spr-policies:v1';
+export const PIPELINES_GAS_KEY = 'energy:pipelines:gas:v1';
+export const PIPELINES_OIL_KEY = 'energy:pipelines:oil:v1';
+export const STORAGE_FACILITIES_KEY = 'energy:storage-facilities:v1';
+export const FUEL_SHORTAGES_KEY = 'energy:fuel-shortages:v1';
+export const ENERGY_DISRUPTIONS_KEY = 'energy:disruptions:v1';
 export const REFINERY_INPUTS_KEY = 'economic:refinery-inputs:v1';
 
 /**
@@ -159,9 +173,9 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   renewableEnergy:  'economic:worldbank-renewable:v1',
   positiveGeoEvents: 'positive_events:geo-bootstrap:v1',
   theaterPosture:   'theater_posture:sebuf:stale:v1',
-  riskScores:       'risk:scores:sebuf:stale:v1',
+  riskScores:       'risk:scores:sebuf:stale:v3',
   naturalEvents:    'natural:events:v1',
-  flightDelays:     'aviation:delays-bootstrap:v1',
+  flightDelays:     'aviation:delays-bootstrap:v2',
   insights:         'news:insights:v1',
   predictions:      'prediction:markets-bootstrap:v1',
   cryptoQuotes:     'market:crypto:v1',
@@ -215,6 +229,11 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   oilStocksAnalysis:    'energy:oil-stocks-analysis:v1',
   lngVulnerability:     'energy:lng-vulnerability:v1',
   sprPolicies:          'energy:spr-policies:v1',
+  pipelinesGas:         'energy:pipelines:gas:v1',
+  pipelinesOil:         'energy:pipelines:oil:v1',
+  storageFacilities:    'energy:storage-facilities:v1',
+  fuelShortages:        'energy:fuel-shortages:v1',
+  energyDisruptions:    'energy:disruptions:v1',
   energyCrisisPolicies: 'energy:crisis-policies:v1',
   aaiiSentiment:        'market:aaii-sentiment:v1',
   breadthHistory:       'market:breadth-history:v1',
@@ -284,6 +303,11 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   oilStocksAnalysis: 'slow',
   lngVulnerability: 'slow',
   sprPolicies: 'slow',
+  pipelinesGas: 'slow',
+  pipelinesOil: 'slow',
+  storageFacilities: 'slow',
+  fuelShortages: 'slow',
+  energyDisruptions: 'slow',
   energyCrisisPolicies: 'slow',
   aaiiSentiment: 'slow',
   breadthHistory: 'slow',

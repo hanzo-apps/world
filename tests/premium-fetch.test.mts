@@ -162,4 +162,56 @@ describe('premiumFetch', () => {
     assert.equal(sentHeaders().get('Authorization'), 'Bearer clerk-only-token');
     assert.equal(sentHeaders().get('X-WorldMonitor-Key'), null);
   });
+
+  // ---------------------------------------------------------------------
+  // Path-gated Bearer injection — regression for "Pro user 401s on FRED"
+  // ---------------------------------------------------------------------
+  //
+  // The same RPC client is wrapped with premiumFetch end-to-end even
+  // though only some methods target a premium path. Attaching a Clerk
+  // Bearer JWT to non-premium calls suppresses the wm-session
+  // interceptor's wms_ attach (premiumFetch sets Authorization → the
+  // interceptor steps aside) and the gateway only resolves Bearer JWTs
+  // on tier-gated paths. Result: Pro users without tester keys 401'd
+  // on every FRED / BLS / BIS call while anon users (whose premiumFetch
+  // falls through and the interceptor attaches wms_) saw the data.
+  //
+  // The fix: only attach Bearer when the path is in PREMIUM_RPC_PATHS.
+  // Public paths fall through so the wm-session interceptor handles
+  // wms_ attach.
+
+  it('non-premium path: Clerk JWT NOT attached, falls through to plain fetch', async () => {
+    setup({ testerKey: '', clerkToken: 'clerk-token-should-be-skipped' });
+    const res = await premiumFetch(PUBLIC_TARGET);
+    assert.equal(res.status, 200);
+    assert.equal(fetchMock.mock.calls.length, 1);
+    assert.equal(
+      sentHeaders().get('Authorization'),
+      null,
+      'Bearer must NOT be attached on non-premium paths — gateway only resolves it on tier-gated routes',
+    );
+    assert.equal(sentHeaders().get('X-WorldMonitor-Key'), null);
+  });
+
+  it('non-premium path: tester key still attached (works on any path)', async () => {
+    setup({ testerKey: 'valid-key', clerkToken: 'clerk-token' });
+    await premiumFetch(PUBLIC_TARGET);
+    assert.equal(sentHeaders(0).get('X-WorldMonitor-Key'), 'valid-key');
+    assert.equal(sentHeaders(0).get('Authorization'), null);
+  });
+
+  it('premium path: Clerk JWT IS attached (regression guard against over-gating)', async () => {
+    setup({ testerKey: '', clerkToken: 'clerk-only-token' });
+    await premiumFetch(TARGET);
+    assert.equal(sentHeaders().get('Authorization'), 'Bearer clerk-only-token');
+  });
+
+  it('non-premium path: pre-set Authorization still passes through unchanged', async () => {
+    // Caller-supplied auth was always passed through; verify the
+    // path-gating change didn't accidentally alter that contract.
+    setup({ testerKey: '', clerkToken: 'unused' });
+    await premiumFetch(PUBLIC_TARGET, { headers: { Authorization: 'Bearer caller-supplied' } });
+    assert.equal(sentHeaders().get('Authorization'), 'Bearer caller-supplied');
+  });
 });
+

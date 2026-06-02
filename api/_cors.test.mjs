@@ -24,6 +24,7 @@ test('allows desktop Tauri origins', () => {
     assert.equal(isDisallowedOrigin(req), false, `origin should be allowed: ${origin}`);
     const cors = getCorsHeaders(req);
     assert.equal(cors['Access-Control-Allow-Origin'], origin);
+    assert.equal(cors['Access-Control-Allow-Credentials'], 'true');
   }
 });
 
