@@ -1,0 +1,61 @@
+name: Release Matrix (Tauri)
+
+# Cross-platform native builds via self-hosted runner pools.
+# - macOS arm64 (dbc)
+# - Linux amd64 (evo WSL)
+# - Linux arm64 (spark)
+# - Windows amd64 (evo Windows native)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.target.id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - id: macos-arm64
+            runner: hanzoai-macos-arm64
+            tauri-target: aarch64-apple-darwin
+          - id: linux-amd64
+            runner: hanzoai-linux-amd64
+            tauri-target: x86_64-unknown-linux-gnu
+          - id: linux-arm64
+            runner: hanzoai-linux-arm64
+            tauri-target: aarch64-unknown-linux-gnu
+          - id: windows-amd64
+            runner: hanzoai-windows-amd64
+            tauri-target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target.tauri-target }}
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm tauri build --target ${{ matrix.target.tauri-target }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldmonitor-${{ matrix.target.id }}
+          path: src-tauri/target/${{ matrix.target.tauri-target }}/release/bundle/**/*
+          if-no-files-found: warn
+          retention-days: 30
