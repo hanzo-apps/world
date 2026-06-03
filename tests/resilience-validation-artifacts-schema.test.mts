@@ -9,6 +9,14 @@ import {
   PC_VALIDATION_ARTIFACT_MIN_GENERATED_AT,
   methodologyFormulaForCacheFormula,
 } from '../scripts/lib/resilience-formula.mjs';
+import {
+  REQUIRED_GATE_IDS,
+  buildAcceptanceArtifact,
+  buildGateResults,
+  buildSampledCountryEvidenceEntry,
+} from '../scripts/capture-resilience-energy-v2-acceptance.mjs';
+import { RESILIENCE_COHORTS } from './helpers/resilience-cohorts.mts';
+import { MATCHED_PAIRS } from './helpers/resilience-matched-pairs.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const validationDir = resolve(here, '../docs/methodology/country-resilience-index/validation');
@@ -19,6 +27,7 @@ const runbookPath = resolve(here, '../docs/methodology/energy-v2-flag-flip-runbo
 const methodologyPath = resolve(here, '../docs/methodology/country-resilience-index.mdx');
 const freezeScriptPath = resolve(here, '../scripts/freeze-resilience-ranking.mjs');
 const compareScriptPath = resolve(here, '../scripts/compare-resilience-current-vs-proposed.mjs');
+const energyV2CaptureScriptPath = resolve(here, '../scripts/capture-resilience-energy-v2-acceptance.mjs');
 
 const EXPECTED_BENCHMARK_INDICES = ['HDI', 'INFORM', 'WorldRiskIndex'];
 const EXPECTED_BACKTEST_FAMILIES = [
@@ -41,13 +50,7 @@ const EXPECTED_BACKTEST_DATA_SOURCES = new Map<string, string>([
 ]);
 const POST_FLIP_RANKING_RE = /^resilience-ranking-live-post-pr1-(\d{4}-\d{2}-\d{2})\.json$/;
 const ENERGY_V2_ACCEPTANCE_RE = /^resilience-energy-v2-acceptance-(\d{4}-\d{2}-\d{2})\.json$/;
-const REQUIRED_ENERGY_V2_ACCEPTANCE_GATES = [
-  'gate-1-spearman',
-  'gate-2-country-drift',
-  'gate-6-cohort-median',
-  'gate-7-matched-pair',
-  'gate-9-effective-influence-baseline',
-];
+const REQUIRED_ENERGY_V2_ACCEPTANCE_GATES = REQUIRED_GATE_IDS;
 
 function readJson(path: string): unknown {
   assert.ok(existsSync(path), `${path} must exist`);
@@ -166,6 +169,39 @@ function assertEnergyV2AcceptanceArtifact(artifact: Record<string, unknown>, fil
     assert.ok(gate, `${filename} must include ${gateId}`);
     assert.equal(gate.status, 'pass', `${filename} ${gateId} must pass for a committed post-flip acceptance artifact`);
   }
+
+  assertSampledCountryEvidence(artifact.sampledCountryEvidence, filename);
+}
+
+function assertSampledCountryEvidence(value: unknown, label: string): void {
+  const sampledCountryEvidence = asRecord(value, `${label}.sampledCountryEvidence`);
+  const status = assertString(sampledCountryEvidence.status, `${label}.sampledCountryEvidence.status`);
+  assert.ok(['captured', 'skipped'].includes(status), `${label}.sampledCountryEvidence.status must be captured or skipped`);
+  const countries = sampledCountryEvidence.countries;
+  assert.ok(Array.isArray(countries), `${label}.sampledCountryEvidence.countries must be an array`);
+
+  if (status === 'captured') {
+    assert.ok(countries.length > 0, `${label}.sampledCountryEvidence.countries must include sampled countries`);
+    for (const [index, rawCountry] of countries.entries()) {
+      const country = asRecord(rawCountry, `${label}.sampledCountryEvidence.countries.${index}`);
+      assert.match(
+        assertString(country.countryCode, `${label}.sampledCountryEvidence.countries.${index}.countryCode`),
+        /^[A-Z]{2}$/,
+      );
+      assertFiniteNumber(country.scoreEndpointOverallScore, `${label}.sampledCountryEvidence.countries.${index}.scoreEndpointOverallScore`);
+      const energyDimension = asRecord(country.energyDimension, `${label}.sampledCountryEvidence.countries.${index}.energyDimension`);
+      assertFiniteNumber(energyDimension.score, `${label}.sampledCountryEvidence.countries.${index}.energyDimension.score`);
+      assertFiniteNumber(energyDimension.coverage, `${label}.sampledCountryEvidence.countries.${index}.energyDimension.coverage`);
+      assert.ok(
+        energyDimension.coverage >= 0 && energyDimension.coverage <= 1,
+        `${label}.sampledCountryEvidence.countries.${index}.energyDimension.coverage must be in [0, 1]`,
+      );
+      assert.ok(
+        energyDimension.imputationClass === null || typeof energyDimension.imputationClass === 'string',
+        `${label}.sampledCountryEvidence.countries.${index}.energyDimension.imputationClass must be string or null`,
+      );
+    }
+  }
 }
 
 describe('resilience validation artifacts', () => {
@@ -275,6 +311,7 @@ describe('resilience validation artifacts', () => {
     const methodology = readTextFile(methodologyPath);
     const freezeScript = readTextFile(freezeScriptPath);
     const compareScript = readTextFile(compareScriptPath);
+    const energyV2CaptureScript = readTextFile(energyV2CaptureScriptPath);
 
     assert.match(
       runbook,
@@ -303,6 +340,16 @@ describe('resilience validation artifacts', () => {
       /currentDomainAggregate_vs_proposedPillarCombined/,
       'compare script must remain identifiable as the pillar-combine harness, not the energy-v2 post-flip acceptance artifact.',
     );
+    assert.match(
+      energyV2CaptureScript,
+      /requires a committed post-flip PR1 ranking artifact/i,
+      'energy-v2 acceptance harness must require real post-flip ranking evidence before writing an artifact.',
+    );
+    assert.match(
+      runbook,
+      /capture-resilience-energy-v2-acceptance\.mjs/,
+      'runbook must point operators at the dedicated energy-v2 acceptance harness.',
+    );
 
     if (postFlipRankingFiles.length === 0) {
       assert.match(
@@ -320,8 +367,8 @@ describe('resilience validation artifacts', () => {
     if (energyV2AcceptanceFiles.length === 0) {
       assert.match(
         runbook,
-        /dedicated energy-v2 acceptance harness[\s\S]*do not commit (?:a )?synthetic acceptance JSON/i,
-        'runbook must block synthetic energy-v2 acceptance artifacts while the dedicated harness is absent.',
+        /capture-resilience-energy-v2-acceptance\.mjs[\s\S]*do\s+not commit (?:a )?synthetic acceptance JSON/i,
+        'runbook must block synthetic energy-v2 acceptance artifacts until the dedicated harness returns PASS.',
       );
       assert.match(
         runbook,
@@ -329,6 +376,149 @@ describe('resilience validation artifacts', () => {
         'runbook must name the required energy-v2 acceptance artifact pattern.',
       );
     }
+  });
+
+  it('builds a passing energy-v2 acceptance artifact only from ranking snapshot inputs', () => {
+    const countryCodes = new Set<string>();
+    for (const cohort of RESILIENCE_COHORTS) {
+      for (const countryCode of cohort.countryCodes) countryCodes.add(countryCode);
+    }
+    for (const pair of MATCHED_PAIRS) {
+      countryCodes.add(pair.higherExpected);
+      countryCodes.add(pair.lowerExpected);
+    }
+
+    const scores: Record<string, number> = Object.fromEntries([...countryCodes].map((countryCode) => [countryCode, 50]));
+    for (const pair of MATCHED_PAIRS) {
+      scores[pair.higherExpected] = Math.max(scores[pair.higherExpected] ?? 0, 70);
+      scores[pair.lowerExpected] = Math.min(scores[pair.lowerExpected] ?? 50, 60);
+    }
+    const items = Object.entries(scores).map(([countryCode, overallScore], index) => ({
+      rank: index + 1,
+      countryCode,
+      overallScore,
+    }));
+    const baselineSnapshot = { capturedAt: '2026-04-22', commitSha: 'baseline', items, greyedOut: [] };
+    const postFlipSnapshot = {
+      capturedAt: '2026-06-03',
+      commitSha: 'post-flip',
+      source: 'Live capture via tests',
+      methodologyFormula: 'pillar-combined-penalized-v1',
+      formulaVerification: { declaredFormula: 'pillar-combined-penalized-v1' },
+      items,
+      greyedOut: [],
+    };
+    const extractionCoverage = {
+      totalIndicators: 50,
+      implemented: 45,
+      notImplemented: 5,
+      unregisteredInHarness: 0,
+      coreImplemented: 40,
+      coreTotal: 45,
+      extractionRuleCount: 50,
+    };
+
+    const gates = buildGateResults({
+      baselineScores: scores,
+      postFlipScores: scores,
+      extractionCoverage,
+    });
+    for (const gateId of REQUIRED_ENERGY_V2_ACCEPTANCE_GATES) {
+      assert.equal(gates.find((gate) => gate.id === gateId)?.status, 'pass', `${gateId} should pass on stable fixture rankings`);
+    }
+
+    const artifact = buildAcceptanceArtifact({
+      generatedAt: '2026-06-03T12:00:00.000Z',
+      baseUrl: 'https://www.worldmonitor.app',
+      baselineSnapshotPath: resolve(snapshotDir, 'resilience-ranking-live-pre-repair-2026-04-22.json'),
+      baselineSnapshot,
+      postFlipSnapshotPath: resolve(snapshotDir, 'resilience-ranking-live-post-pr1-2026-06-03.json'),
+      postFlipSnapshot,
+      runtimeEvidence: {
+        manifest: {
+          formulaTag: 'pc',
+          constructVersions: { energy: 'v2' },
+          rankingCache: { count: 196, scored: 196, total: 196 },
+        },
+        health: {
+          checks: {
+            lowCarbonGeneration: { status: 'OK' },
+            fossilElectricityShare: { status: 'OK' },
+            powerLosses: { status: 'OK' },
+          },
+        },
+      },
+      sampledCountryEvidence: { status: 'skipped', countries: [] },
+      extractionCoverage,
+    });
+
+    assert.equal(artifact.acceptanceGates.verdict, 'PASS');
+    assert.equal(artifact.capturedAt, '2026-06-03');
+    assert.equal(artifact.postFlip.rankingTotals.scored, items.length);
+    assertEnergyV2AcceptanceArtifact(asRecord(artifact, 'fixture acceptance artifact'), 'resilience-energy-v2-acceptance-2026-06-03.json');
+  });
+
+  it('captures sampled energy evidence from realistic score response domains', () => {
+    const sampledCountry = buildSampledCountryEvidenceEntry({
+      countryCode: 'FR',
+      postFlipScores: { FR: 82.237 },
+      score: {
+        countryCode: 'FR',
+        overallScore: 82.234,
+        domains: [
+          {
+            id: 'economic',
+            score: 78.1,
+            weight: 0.2,
+            dimensions: [
+              { id: 'macroFiscal', score: 76.3, coverage: 0.91, imputationClass: '' },
+            ],
+          },
+          {
+            id: 'energy',
+            score: 86.4,
+            weight: 0.11,
+            dimensions: [
+              {
+                id: 'energy',
+                score: 86.456,
+                coverage: 0.876,
+                observedWeight: 1,
+                imputedWeight: 0,
+                imputationClass: '',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    assert.deepEqual(sampledCountry, {
+      countryCode: 'FR',
+      scoreEndpointOverallScore: 82.23,
+      rankingSnapshotOverallScore: 82.24,
+      energyDimension: {
+        score: 86.46,
+        coverage: 0.88,
+        imputationClass: '',
+      },
+    });
+    assertSampledCountryEvidence(
+      { status: 'captured', countries: [sampledCountry] },
+      'fixture sampled country evidence',
+    );
+    assert.throws(
+      () => buildSampledCountryEvidenceEntry({
+        countryCode: 'DE',
+        postFlipScores: { DE: 80 },
+        score: {
+          countryCode: 'DE',
+          overallScore: 80,
+          domains: [{ id: 'energy', score: 70, weight: 0.11, dimensions: [] }],
+        },
+      }),
+      /did not include energy dimension under domains\[\]\.dimensions/,
+    );
   });
 
   it('validates any committed post-flip PR1 ranking artifacts', () => {
