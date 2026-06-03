@@ -128,11 +128,15 @@ async function loadCountryDeepDivePanel() {
         constructor(code) {
           this.code = code;
           this.destroyCount = 0;
+          this.energyMixData = null;
           this.element = document.createElement('section');
           this.element.className = 'resilience-widget-stub';
           this.element.setAttribute('data-country-code', code);
           this.element.textContent = 'Resilience ' + code;
           state.widgets.push(this);
+        }
+        setEnergyMix(data) {
+          this.energyMixData = data;
         }
         getElement() {
           return this.element;
@@ -161,6 +165,7 @@ async function loadCountryDeepDivePanel() {
     ['@/utils/supplier-route-risk', 'supplier-route-risk-stub'],
     ['@/services/supply-chain', 'supply-chain-stub'],
     ['./ResilienceWidget', 'resilience-widget-stub'],
+    ['@/components/ResilienceWidget', 'resilience-widget-stub'],
     ['@/services/runtime', 'runtime-stub'],
     ['@/generated/client/worldmonitor/intelligence/v1/service_client', 'intelligence-client-stub'],
     ['@/services/panel-gating', 'panel-gating-stub'],
