@@ -353,14 +353,11 @@ const EXTRACTION_RULES = {
   // ── foodWater ───────────────────────────────────────────────────────
   ipcPeopleInCrisis: { type: 'static-path', path: ['fao', 'peopleInCrisis'] },
   ipcPhase: { type: 'static-path', path: ['fao', 'phase'] },
-  // AQUASTAT: both indicators share `.aquastat.value` but the scorer
-  // splits them by the `.aquastat.indicator` tag keyword. The harness
-  // matches the same branching so each row correlates only against
-  // countries whose AQUASTAT entry is in the matching family —
-  // otherwise availability-country readings would corrupt the stress
-  // Pearson (and vice versa).
-  aquastatWaterStress: { type: 'static-aquastat-stress' },
-  aquastatWaterAvailability: { type: 'static-aquastat-availability' },
+  // AQUASTAT: the scorer has one 0.40 slot. `.aquastat.value` carries
+  // different semantics depending on `.aquastat.indicator`, so the
+  // extractor returns the normalized scorer contribution rather than
+  // treating stress and availability as separate registry rows.
+  aquastatScore: { type: 'static-aquastat-score' },
 
   // ── recovery* (seeded bulk keys, deterministic per-country fields) ──
   recoveryGovRevenue: { type: 'recovery-country-field', key: 'resilience:recovery:fiscal-space:v1', field: 'govRevenuePct' },
@@ -403,6 +400,14 @@ const EXTRACTION_RULES = {
 const AQUASTAT_STRESS_KEYWORDS = ['stress', 'withdrawal', 'dependency'];
 const AQUASTAT_AVAILABILITY_KEYWORDS = ['availability', 'renewable', 'access'];
 
+function normalizeLowerBetter(value, best, worst) {
+  return Math.max(0, Math.min(100, 100 * (1 - (value - best) / (worst - best))));
+}
+
+function normalizeHigherBetter(value, worst, best) {
+  return Math.max(0, Math.min(100, 100 * ((value - worst) / (best - worst))));
+}
+
 // Classify the AQUASTAT entry by the scorer's EXACT priority order:
 // stress-family first, then availability-family, then 'unknown'. This
 // mirrors the sequential `if` checks in scoreAquastatValue() so a tag
@@ -436,6 +441,8 @@ const STATIC_EXTRACTORS = {
   },
   'static-who': (rule, { staticRecord }) =>
     staticRecord?.who?.indicators?.[rule.code]?.value ?? null,
+  // Retained as direct classifier fixtures. The live registry now maps
+  // AQUASTAT through the single semantic static-aquastat-score row below.
   'static-aquastat-stress': (_rule, { staticRecord }) => {
     const value = staticRecord?.aquastat?.value;
     if (typeof value !== 'number') return null;
@@ -445,6 +452,20 @@ const STATIC_EXTRACTORS = {
     const value = staticRecord?.aquastat?.value;
     if (typeof value !== 'number') return null;
     return classifyAquastatFamily(staticRecord) === 'availability' ? value : null;
+  },
+  'static-aquastat-score': (_rule, { staticRecord }) => {
+    const value = staticRecord?.aquastat?.value;
+    if (typeof value !== 'number') return null;
+    const family = classifyAquastatFamily(staticRecord);
+    if (family === 'stress') return normalizeLowerBetter(value, 0, 100);
+    if (family === 'availability') {
+      return value <= 100
+        ? normalizeHigherBetter(value, 0, 100)
+        : normalizeHigherBetter(value, 0, 5000);
+    }
+    return value <= 100
+      ? normalizeHigherBetter(value, 0, 100)
+      : normalizeLowerBetter(value, 0, 5000);
   },
 };
 
