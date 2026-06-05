@@ -3,6 +3,12 @@ main = "worker/index.js"
 compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Keep the workers.dev URL live so we have a working endpoint during the
+# Cloudflare DNS cutover. Once world.hanzo.ai is wired and verified,
+# this can be flipped to false to lock the Worker behind the apex.
+workers_dev = true
+preview_urls = true
+
 # Bind the Worker to world.hanzo.ai (and any subdomain) at the Cloudflare
 # edge. The DNS record for `world` (managed in hanzo/dns) just needs to
 # exist as a CNAME at the apex — proxy ON — and Cloudflare routes the
