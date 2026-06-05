@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { XStack, YStack, Text, Button, Popover, Separator } from '@hanzo/gui';
 import { HanzoLogo } from './HanzoLogo';
-import { signInWithIam, signOutFromIam, getCurrentSession } from '../lib/iam-auth';
+import { getCurrentUser, startLogin, logout } from '@/services/iam';
 
 interface SiteHeaderProps {
   onOpenSettings?: () => void;
@@ -16,7 +16,7 @@ const NAV_LINKS = [
 ];
 
 export function SiteHeader({ onOpenSettings }: SiteHeaderProps) {
-  const session = getCurrentSession();
+  const user = getCurrentUser();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -55,11 +55,11 @@ export function SiteHeader({ onOpenSettings }: SiteHeaderProps) {
       </XStack>
 
       <XStack alignItems="center" gap="$2">
-        {session ? (
+        {user ? (
           <Popover open={menuOpen} onOpenChange={setMenuOpen} placement="bottom-end">
             <Popover.Trigger asChild>
               <Button size="$2" chromeless>
-                {session.user?.name || session.user?.email || 'Account'}
+                {user.displayName || user.name || user.email || 'Account'}
               </Button>
             </Popover.Trigger>
             <Popover.Content
@@ -96,7 +96,7 @@ export function SiteHeader({ onOpenSettings }: SiteHeaderProps) {
                   chromeless
                   justifyContent="flex-start"
                   onPress={() => {
-                    signOutFromIam();
+                    logout();
                     setMenuOpen(false);
                   }}
                 >
@@ -106,7 +106,7 @@ export function SiteHeader({ onOpenSettings }: SiteHeaderProps) {
             </Popover.Content>
           </Popover>
         ) : (
-          <Button size="$2" onPress={() => signInWithIam(window.location.pathname)}>
+          <Button size="$2" onPress={() => { void startLogin(window.location.pathname); }}>
             Sign in
           </Button>
         )}

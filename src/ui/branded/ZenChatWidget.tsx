@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet, XStack, YStack, Text, Button, Input, ScrollView } from '@hanzo/gui';
-import { getAccessToken } from '../lib/iam-auth';
+import { getAccessToken } from '@/services/iam';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';

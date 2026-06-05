@@ -1,8 +1,8 @@
 import { YStack, XStack, H1, Text, Button } from '@hanzo/gui';
-import { signInWithIam, getCurrentSession } from '../lib/iam-auth';
+import { getCurrentUser, startLogin } from '@/services/iam';
 
 export function HeroSection() {
-  const session = getCurrentSession();
+  const user = getCurrentUser();
   return (
     <YStack
       alignItems="center"
@@ -38,14 +38,14 @@ export function HeroSection() {
         live globe.
       </Text>
       <XStack gap="$3" marginTop="$3">
-        {session ? (
+        {user ? (
           <Button size="$5" onPress={() => (window.location.href = '/')}>
             Open dashboard
           </Button>
         ) : (
           <Button
             size="$5"
-            onPress={() => signInWithIam('/?onboard=1')}
+            onPress={() => { void startLogin('/?onboard=1'); }}
           >
             Start free
           </Button>
