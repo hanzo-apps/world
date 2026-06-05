@@ -7,15 +7,18 @@ compatibility_flags = ["nodejs_compat"]
 # edge. The DNS record for `world` (managed in hanzo/dns) just needs to
 # exist as a CNAME at the apex — proxy ON — and Cloudflare routes the
 # request to this Worker before reaching origin.
+# Custom-domain attach failed because world.hanzo.ai already has an
+# A record (the stale 129.212.164.5) in the zone. Until that DNS row
+# is removed or flipped to proxied, fall back to a regular zone-name
+# route — the worker still intercepts every world.hanzo.ai/* request
+# the moment any of those records are CF-proxied.
 [[routes]]
 pattern = "world.hanzo.ai/*"
 zone_name = "hanzo.ai"
-custom_domain = false
 
 [[routes]]
 pattern = "*.world.hanzo.ai/*"
 zone_name = "hanzo.ai"
-custom_domain = false
 
 # Static SPA assets — built by `vite build` into ./dist.
 [assets]
