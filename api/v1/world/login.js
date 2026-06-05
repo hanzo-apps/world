@@ -5,7 +5,7 @@
 // Stores token in a signed cookie + returns it in the body for clients that
 // want to attach it as a Bearer.
 
-import { corsHeaders } from '../../_cors.js';
+import { getCorsHeaders } from '../../_cors.js';
 import { jsonResponse } from '../../_json-response.js';
 
 const IAM_ENDPOINT = process.env.IAM_ENDPOINT || 'https://hanzo.id';
@@ -15,7 +15,7 @@ const IAM_ORG = process.env.IAM_ORG || 'hanzo';
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
-  const cors = corsHeaders(req);
+  const cors = getCorsHeaders(req, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405, cors);
 

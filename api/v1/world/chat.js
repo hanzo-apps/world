@@ -4,7 +4,7 @@
 // Streams OpenAI-compatible chat completions from api.hanzo.ai (Zen).
 // Model chosen by user's zenTier: tier_zen_pro → zen4-thinking, else zen4-mini.
 
-import { corsHeaders } from '../../_cors.js';
+import { getCorsHeaders } from '../../_cors.js';
 import { jsonResponse } from '../../_json-response.js';
 
 const IAM_ENDPOINT = process.env.IAM_ENDPOINT || 'https://hanzo.id';
@@ -20,7 +20,7 @@ const MODEL_BY_TIER = {
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
-  const cors = corsHeaders(req);
+  const cors = getCorsHeaders(req, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405, cors);
 

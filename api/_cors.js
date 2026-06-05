@@ -1,6 +1,8 @@
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/(.*\.)?worldmonitor\.app$/,
+  /^https:\/\/(.*\.)?world\.hanzo\.ai$/,
   /^https:\/\/worldmonitor-[a-z0-9-]+-elie-[a-z0-9]+\.vercel\.app$/,
+  /^https:\/\/world-[a-z0-9-]+-hanzo-[a-z0-9]+\.vercel\.app$/,
   /^https?:\/\/tauri\.localhost(:\d+)?$/,
   /^https?:\/\/[a-z0-9-]+\.tauri\.localhost(:\d+)?$/i,
   /^tauri:\/\/localhost$/,
