@@ -50,20 +50,29 @@ export async function onRequestPost({ request }) {
   const returnUrl = sanitizeReturnUrl(body?.returnUrl) || `${APP_BASE_URL}/?checkout=success`;
   const cancelUrl = sanitizeReturnUrl(body?.cancelUrl) || `${APP_BASE_URL}/?checkout=cancel`;
 
-  // Hand off to Hanzo Commerce. The world tenant in Commerce has its
-  // payment-provider credentials stored in KMS; Commerce routes to the
-  // active provider (Stripe / Square / etc.) based on the org config.
+  // Hand off to Hanzo Commerce via the canonical `/v1/commerce/deposits`
+  // public endpoint (see commerce.go: app.Router.Group("/v1/commerce") +
+  // checkout.MountPublic). Commerce resolves the tenant from the Host
+  // header (Resolver.Resolve(req.Host)), then forwards the body to the
+  // tenant's configured backend at <Tenant.Backend.URL>/v1/bd/deposits.
+  //
+  // We pass Host=world.hanzo.ai so the world tenant is selected, and
+  // X-Org-Id=world as the gateway-injected scope for any downstream
+  // service that consumes Hanzo's claim-propagation convention. Commerce
+  // returns { id, provider, clientToken, ... } verbatim from the tenant
+  // backend on success.
   let resp;
   try {
-    resp = await fetch(`${COMMERCE_ENDPOINT}/v1/checkout/charge`, {
+    resp = await fetch(`${COMMERCE_ENDPOINT}/v1/commerce/deposits`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: request.headers.get('Authorization') || '',
+        Host: `${TENANT}.hanzo.ai`,
+        'X-Forwarded-Host': `${TENANT}.hanzo.ai`,
         'X-Org-Id': TENANT,
       },
       body: JSON.stringify({
-        tenant: TENANT,
         planId,
         buyer: {
           id: user.sub || user.id,
@@ -97,14 +106,20 @@ export async function onRequestPost({ request }) {
       commerceError: data?.error || data,
     }, 502, cors);
   }
-  if (!data?.checkoutUrl && !data?.url) {
+  // Commerce returns the tenant backend's deposit envelope verbatim. The
+  // SPA expects { checkoutUrl } so it can redirect; we also expose the
+  // raw provider envelope (clientToken etc.) under `deposit` for SPAs
+  // that drive an in-page widget instead of a redirect.
+  const checkoutUrl = data?.checkoutUrl || data?.url || data?.redirectUrl || data?.hostedUrl;
+  if (!checkoutUrl) {
     return jsonResponse({ error: 'commerce_no_url', payload: data }, 502, cors);
   }
 
   return jsonResponse({
-    checkoutUrl: data.checkoutUrl || data.url,
-    sessionId: data.sessionId || data.id || null,
+    checkoutUrl,
+    sessionId: data?.sessionId || data?.id || null,
     planId,
+    deposit: data,
   }, 200, cors);
 }
 
