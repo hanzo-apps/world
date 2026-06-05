@@ -571,24 +571,24 @@ export class UnifiedSettings {
     if (!isEntitled() && hasPremiumAccess()) {
       return '<div class="upgrade-pro-section upgrade-pro-hidden" hidden></div>';
     }
-    // Signed-in user whose Convex entitlement snapshot has not arrived yet
-    // AND whose bounded-wait window has not expired. Rendering "Upgrade to
+    // Signed-in user whose entitlement snapshot has not arrived yet AND
+    // whose bounded-wait window has not expired. Rendering "Upgrade to
     // Pro" in this window is how paying users click through to
-    // /api/create-checkout and hit 409 duplicate_subscription — same race
+    // /v1/world/checkout and hit 409 duplicate_subscription — same race
     // as the 2026-04-17/18 panel-overlay incident fixed in panel-gating.ts,
     // different surface. The entitlementReady flag is flipped either by
     // the onEntitlementChange listener (healthy path) or by a 12s fallback
-    // timer in open() (Convex-disabled / auth-timeout / init-fail paths
-    // where currentState would otherwise stay null forever and strand a
-    // signed-in free user on an empty placeholder).
+    // timer in open() (entitlement-source-disabled / auth-timeout / init-fail
+    // paths where currentState would otherwise stay null forever and strand
+    // a signed-in free user on an empty placeholder).
     if (!this.entitlementReady && getAuthState().user && getEntitlementState() === null) {
       // `hidden` so the browser's default `[hidden] { display: none }`
       // suppresses the empty card — without it, the base `.upgrade-pro-
       // section` styles (margin + padding + border + surface background
       // in main.css:22833) paint a visibly empty bordered box during the
-      // Convex cold-load window, which is exactly the state we're trying
-      // to clean up. Element stays queryable for the replaceWith swap in
-      // open().
+      // entitlement-source cold-load window, which is exactly the state
+      // we're trying to clean up. Element stays queryable for the
+      // replaceWith swap in open().
       return '<div class="upgrade-pro-section upgrade-pro-loading" hidden aria-hidden="true"></div>';
     }
     if (isEntitled()) {
@@ -657,12 +657,13 @@ export class UnifiedSettings {
   private handleUpgradeClick(): void {
     // Defense in depth: the upgrade CTA can only be clicked when either (a)
     // the user is genuinely free-tier, or (b) the 12s fallback timer fired
-    // before the Convex snapshot arrived. In (b), the snapshot might land
-    // AFTER the timer but BEFORE the click — re-check isEntitled() here so
-    // a late-arriving "you're a paying user" state routes to the billing
-    // portal instead of triggering /api/create-checkout against an active
-    // subscription (which would 409 and re-enter the duplicate_subscription
-    // → getCustomerPortalUrl cascade this PR is trying to eliminate).
+    // before the entitlement snapshot arrived. In (b), the snapshot might
+    // land AFTER the timer but BEFORE the click — re-check isEntitled()
+    // here so a late-arriving "you're a paying user" state routes to the
+    // billing portal instead of triggering /v1/world/checkout against an
+    // active subscription (which would 409 and re-enter the
+    // duplicate_subscription → getCustomerPortalUrl cascade this PR is
+    // trying to eliminate).
     if (isEntitled()) {
       this.close();
       const reservedWin = prereserveBillingPortalTab();

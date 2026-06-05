@@ -491,13 +491,6 @@
       "removal_issue": "TBD"
     },
     {
-      "path": "api/create-checkout.ts",
-      "category": "deferred",
-      "reason": "Creates a Dodo Payments checkout session. Payments domain is still stabilizing (Clerk + Dodo integration); migrate once shape is frozen.",
-      "owner": "@SebastienMelki",
-      "removal_issue": "TBD"
-    },
-    {
       "path": "api/customer-portal.ts",
       "category": "deferred",
       "reason": "Issues a Dodo customer-portal redirect URL. Paired with create-checkout.ts; migrate together.",
