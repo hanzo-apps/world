@@ -12,7 +12,7 @@ import { dataFreshness } from '../data-freshness';
 import { isFeatureAvailable } from '../runtime-config';
 import { startSmartPollLoop, type SmartPollLoopHandle } from '../runtime';
 
-const client = new MaritimeServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new MaritimeServiceClient(getRpcBaseUrl());
 const snapshotBreaker = createCircuitBreaker<GetVesselSnapshotResponse>({ name: 'Maritime Snapshot', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 const emptySnapshotFallback: GetVesselSnapshotResponse = { snapshot: undefined };
 

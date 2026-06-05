@@ -41,7 +41,7 @@ export interface MapFire {
 
 // -- Client --
 
-const client = new WildfireServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new WildfireServiceClient(getRpcBaseUrl());
 const breaker = createCircuitBreaker<ListFireDetectionsResponse>({ name: 'Wildfires', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 
 const emptyFallback: ListFireDetectionsResponse = { fireDetections: [] };

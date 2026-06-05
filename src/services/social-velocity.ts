@@ -8,7 +8,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 export type { GetSocialVelocityResponse, SocialVelocityPost };
 
-const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new IntelligenceServiceClient(getRpcBaseUrl());
 
 const emptyVelocity: GetSocialVelocityResponse = { posts: [], fetchedAt: 0 };
 

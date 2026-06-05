@@ -61,7 +61,7 @@ export class EnergyCrisisPanel extends Panel {
 
   private async refreshFromRpc(): Promise<void> {
     try {
-      const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+      const client = new EconomicServiceClient(getRpcBaseUrl());
       const fresh = await client.getEnergyCrisisPolicies({ countryCode: '', category: '' });
       if (!this.element?.isConnected) return;
       if (fresh.policies?.length || !this.data) {

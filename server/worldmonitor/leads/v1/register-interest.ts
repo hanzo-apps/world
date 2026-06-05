@@ -4,14 +4,32 @@
  * Sources: Convex registerInterest:register mutation + Resend confirmation email
  */
 
-import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
-import { getClientIp, verifyTurnstile } from './_turnstile.js';
-import { jsonResponse } from './_json-response.js';
-import { createIpRateLimiter } from './_ip-rate-limit.js';
-import { validateEmail } from './_email-validation.js';
+import {
+  ApiError,
+  ValidationError,
+  type ServerContext,
+  type RegisterInterestRequest,
+  type RegisterInterestResponse,
+} from '../../../../src/generated/server/worldmonitor/leads/v1/service_server';
+import { getClientIp, verifyTurnstile } from '../../../_shared/turnstile';
+import { checkScopedRateLimit } from '../../../_shared/rate-limit';
+import { validateEmail } from '../../../_shared/email-validation';
+
+interface PersistResult {
+  status: 'registered' | 'registered_degraded';
+  referralCode: string;
+  emailSuppressed: boolean;
+}
+
+interface PersistArgs {
+  email: string;
+  source: string;
+  appVersion: string;
+  referredBy: string | undefined;
+}
 
 // Persist a registration to Hanzo Base (REST collections API).
-async function persistRegistration({ email, source, appVersion, referredBy }) {
+async function persistRegistration({ email, source, appVersion, referredBy }: PersistArgs): Promise<PersistResult> {
   const baseUrl = process.env.BASE_URL || 'https://base.hanzo.ai';
   const token = process.env.BASE_TOKEN || '';
   const referralCode = Math.random().toString(36).slice(2, 10);
@@ -62,7 +80,44 @@ const DESKTOP_RATE_SCOPE = '/api/leads/v1/register-interest#desktop';
 const DESKTOP_RATE_LIMIT = 2;
 const DESKTOP_RATE_WINDOW = '1 h' as const;
 
-async function sendConfirmationEmail(email, referralCode) {
+/**
+ * Authenticate a desktop-source registerInterest request via the WM-Desktop
+ * shared-secret HMAC headers. Throws ApiError on failure so the caller can
+ * stop processing without further checks.
+ */
+async function verifyDesktopAuth(request: Request, req: RegisterInterestRequest): Promise<void> {
+  const secret = process.env[DESKTOP_AUTH_SECRET_ENV];
+  if (!secret) {
+    if (process.env[DESKTOP_AUTH_ALLOW_LEGACY_ENV] === 'true') return;
+    throw new ApiError(503, 'Desktop auth not configured', '');
+  }
+  const ts = request.headers.get(DESKTOP_AUTH_TIMESTAMP_HEADER) || '';
+  const sig = request.headers.get(DESKTOP_AUTH_SIGNATURE_HEADER) || '';
+  if (!ts || !sig) {
+    throw new ApiError(401, 'Missing desktop auth headers', '');
+  }
+  const tsMs = Number(ts);
+  if (!Number.isFinite(tsMs) || Math.abs(Date.now() - tsMs) > DESKTOP_AUTH_WINDOW_MS) {
+    throw new ApiError(401, 'Desktop auth timestamp out of window', '');
+  }
+  const payload = `${ts}:${(req.email || '').toLowerCase()}:${req.source || ''}`;
+  const keyBytes = new TextEncoder().encode(secret);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const expectedBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  const expectedHex = Array.from(new Uint8Array(expectedBuf), (b) => b.toString(16).padStart(2, '0')).join('');
+  if (sig.length !== expectedHex.length) {
+    throw new ApiError(401, 'Desktop auth signature mismatch', '');
+  }
+  // Constant-time compare so the rejection path can't leak timing information
+  // about which prefix bytes matched a real signature.
+  let diff = 0;
+  for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  if (diff !== 0) {
+    throw new ApiError(401, 'Desktop auth signature mismatch', '');
+  }
+}
+
+async function sendConfirmationEmail(email: string, referralCode: string): Promise<void> {
   const referralLink = `https://world.hanzo.ai/pro?ref=${referralCode}`;
   const shareText = encodeURIComponent('I just joined the World Monitor Pro waitlist \u2014 real-time global intelligence powered by AI. Join me:');
   const shareUrl = encodeURIComponent(referralLink);
@@ -268,29 +323,22 @@ export async function registerInterest(
   const safeAppVersion = appVersion ? appVersion.slice(0, MAX_META_LENGTH) : 'unknown';
   const safeReferredBy = referredBy ? referredBy.slice(0, 20) : undefined;
 
-  try {
-    const result = await persistRegistration({
-      email,
-      source: safeSource,
-      appVersion: safeAppVersion,
-      referredBy: safeReferredBy,
-    });
+  const result = await persistRegistration({
+    email,
+    source: safeSource,
+    appVersion: safeAppVersion,
+    referredBy: safeReferredBy,
+  });
 
-    if (result.status && result.referralCode && !result.emailSuppressed) {
-      await sendConfirmationEmail(email, result.referralCode);
-    }
-
-    return jsonResponse(result, 200, cors);
-  } catch (err) {
-    console.error('[register-interest] error:', err);
-    return jsonResponse({ error: 'Registration failed' }, 500, cors);
+  if (result.referralCode && !result.emailSuppressed) {
+    await sendConfirmationEmail(email, result.referralCode);
   }
 
   return {
     status: result.status,
     referralCode: result.referralCode,
-    referralCount: result.referralCount,
-    position: result.position ?? 0,
-    emailSuppressed: result.emailSuppressed ?? false,
+    referralCount: 0,
+    position: 0,
+    emailSuppressed: result.emailSuppressed,
   };
 }

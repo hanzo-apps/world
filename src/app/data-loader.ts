@@ -1797,7 +1797,7 @@ export class DataLoaderManager implements AppModule {
       }
       const { MarketServiceClient } = await import('@/generated/client/worldmonitor/market/v1/service_client');
       const { getRpcBaseUrl } = await import('@/services/rpc-client');
-      const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+      const client = new MarketServiceClient(getRpcBaseUrl());
       const resp = await client.getFearGreedIndex({});
       if (resp.unavailable || resp.compositeScore <= 0) return undefined;
       return {
@@ -1821,7 +1821,7 @@ export class DataLoaderManager implements AppModule {
     try {
       const { EconomicServiceClient } = await import('@/generated/client/worldmonitor/economic/v1/service_client');
       const { getRpcBaseUrl } = await import('@/services/rpc-client');
-      const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+      const client = new EconomicServiceClient(getRpcBaseUrl());
       const resp = await client.getFredSeriesBatch({ seriesIds: ['DGS2', 'DGS10', 'DGS30'], limit: 1 });
       const lastVal = (id: string): number => {
         const obs = resp.results[id]?.observations;
@@ -1977,7 +1977,7 @@ export class DataLoaderManager implements AppModule {
 
       if (!events?.length) {
         // Fallback: RPC call
-        const client = new ResearchServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+        const client = new ResearchServiceClient(getRpcBaseUrl());
         const data = await client.listTechEvents({
           type: 'conference',
           mappable: true,
@@ -3058,7 +3058,7 @@ export class DataLoaderManager implements AppModule {
       }
 
       const { EconomicServiceClient } = await import('@/generated/client/worldmonitor/economic/v1/service_client');
-      const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+      const client = new EconomicServiceClient(getRpcBaseUrl());
       const resp = await client.getEconomicStress({});
       if (!resp.unavailable && Number.isFinite(resp.compositeScore)) {
         economicPanel.updateStress(resp);

@@ -20,7 +20,7 @@ export interface TemporalAnomaly {
   severity: 'medium' | 'high' | 'critical';
 }
 
-const client = new InfrastructureServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new InfrastructureServiceClient(getRpcBaseUrl());
 
 const TYPE_LABELS: Record<TemporalEventType, string> = {
   military_flights: 'Military flights',

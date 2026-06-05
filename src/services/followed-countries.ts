@@ -35,7 +35,18 @@
  * extraction reads `err.data.kind`, not substring-match the message.
  */
 
-import type { FunctionReference } from 'convex/server';
+// Convex was removed but the `FunctionReference<...>` shape is kept as a
+// local stub so the (currently inert) mutation/onUpdate adapters below stay
+// type-stable. The `_args`/`_returnType` phantom fields mirror Convex's
+// inference pattern so the existing `Ref['_args']` / `Ref['_returnType']`
+// indexers continue to resolve. If/when the file is fully migrated to
+// /v1/world/* RPC, this stub goes too.
+type FunctionReference<
+  _Kind extends 'query' | 'mutation' = 'query',
+  _Visibility extends 'public' | 'internal' = 'public',
+  Args = unknown,
+  Returns = unknown,
+> = { _args: Args; _returnType: Returns; __convexStub: true };
 import { toIso2 } from '../utils/country-codes';
 import {
   getEntitlementState as _getEntitlementState,
@@ -48,10 +59,21 @@ import {
   getConvexApi as _getConvexApi,
   waitForConvexAuth as _waitForConvexAuth,
 } from './convex-client';
-import type {
-  FollowMutationResult as ServerFollowMutationResult,
-  MergeAnonymousLocalResult as ServerMergeAnonymousLocalResult,
-} from '../../convex/followedCountries';
+// Inlined from the legacy convex/followedCountries.ts return shapes — kept
+// here so the dead Convex source can be removed without churning every
+// caller. Server-side equivalents are now /v1/world/* RPCs (see the
+// migration plan in plans/follow-countries-edge-migration.md).
+type ServerFollowMutationResult =
+  | { ok: true; idempotent: false }
+  | { ok: true; idempotent: true }
+  | { ok: false; reason: 'FREE_CAP'; currentCount: number; limit: number };
+
+interface ServerMergeAnonymousLocalResult {
+  totalCount: number;
+  accepted: string[];
+  droppedInvalid: string[];
+  droppedDueToCap: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Public constants & types

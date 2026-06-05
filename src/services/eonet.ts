@@ -35,7 +35,7 @@ function normalizeNaturalCategory(category: string | undefined): NaturalEventCat
     : 'manmade';
 }
 
-const client = new NaturalServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new NaturalServiceClient(getRpcBaseUrl());
 const breaker = createCircuitBreaker<ListNaturalEventsResponse>({ name: 'NaturalEvents', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 
 const emptyFallback: ListNaturalEventsResponse = { events: [] };

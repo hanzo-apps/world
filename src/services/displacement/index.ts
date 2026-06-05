@@ -116,7 +116,7 @@ function toDisplayFlow(proto: ProtoFlow): DisplacementFlow {
 
 // ─── Client + circuit breaker ───
 
-const client = new DisplacementServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new DisplacementServiceClient(getRpcBaseUrl());
 
 const breaker = createCircuitBreaker<UnhcrSummary>({
   name: 'UNHCR Displacement',

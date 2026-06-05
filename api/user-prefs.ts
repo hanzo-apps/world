@@ -13,6 +13,10 @@ export const config = { runtime: 'edge' };
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 // @ts-expect-error — JS module, no declaration file
 import { jsonResponse } from './_json-response.js';
+// @ts-expect-error — JS module, no declaration file
+import { extractConvexErrorKind, readConvexErrorNumber } from './_convex-error.js';
+// @ts-expect-error — JS module, no declaration file
+import { captureSilentError } from './_sentry-edge.js';
 import { validateBearerToken } from '../server/auth-session';
 
 const BASE_URL = process.env.BASE_URL || 'https://base.hanzo.ai';
@@ -26,7 +30,10 @@ function baseHeaders(userToken: string): Record<string, string> {
   };
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(
+  req: Request,
+  ctx?: { waitUntil: (p: Promise<unknown>) => void },
+): Promise<Response> {
   if (isDisallowedOrigin(req)) {
     return jsonResponse({ error: 'Origin not allowed' }, 403);
   }
@@ -173,6 +180,7 @@ export default async function handler(req: Request): Promise<Response> {
       return jsonResponse(await created.json(), 200, cors);
     }
   } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error('[user-prefs] POST error:', err);
     captureSilentError(err, buildSentryContext(err, msg, {
       method: 'POST', convexFn: 'userPreferences:setPreferences',
@@ -207,47 +215,11 @@ export default async function handler(req: Request): Promise<Response> {
  * and numeric so the client can refresh its local sync state without a
  * follow-up GET. Type-guarded — drops non-numeric values rather than
  * forwarding them as `unknown`.
+ *
+ * Convex has been retired; setPreferences is now a Hanzo Base PATCH which
+ * never throws this shape, so the helper is unreachable. Kept as a deleted
+ * marker so a future grep for `handleConflictResponse` finds this note.
  */
-function handleConflictResponse(
-  err: unknown,
-  msg: string,
-  opts: {
-    userId: string;
-    variant: unknown;
-    ctx?: { waitUntil: (p: Promise<unknown>) => void };
-    schemaVersion: number | null;
-    expectedSyncVersion: unknown;
-    blobSize: number;
-    cors: Record<string, string>;
-  },
-): Response {
-  const actualSyncVersion = readConvexErrorNumber(err, 'actualSyncVersion');
-  // CONFLICT is an EXPECTED outcome of optimistic concurrency (multi-tab
-  // / multi-device sync, or a stuck-bundle user retrying with an old
-  // expectedSyncVersion). The capture exists to surface stuck-bundle
-  // users via user_id distribution (see WORLDMONITOR-PX 2026-04-30:
-  // 316 events / 59 users at 18 distinct actualSyncVersions). At
-  // level=error it drowned real bugs; level=warning keeps it queryable
-  // in Sentry but drops it out of error totals and alerting.
-  captureSilentError(err, buildSentryContext(err, msg, {
-    method: 'POST',
-    convexFn: 'userPreferences:setPreferences',
-    userId: opts.userId,
-    variant: opts.variant,
-    ctx: opts.ctx,
-    schemaVersion: opts.schemaVersion,
-    expectedSyncVersion: opts.expectedSyncVersion,
-    blobSize: opts.blobSize,
-    errorShapeOverride: 'setPreferences_conflict',
-    extraTags: actualSyncVersion !== undefined ? { actual_sync_version: actualSyncVersion } : undefined,
-    level: 'warning',
-  }));
-  return jsonResponse(
-    actualSyncVersion !== undefined ? { error: 'CONFLICT', actualSyncVersion } : { error: 'CONFLICT' },
-    409,
-    opts.cors,
-  );
-}
 
 /**
  * Build a captureSilentError context that carries enough provenance to triage

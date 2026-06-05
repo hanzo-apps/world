@@ -13,6 +13,7 @@ const CHECKOUT_PRODUCT_PARAM = 'checkoutProduct';
 const CHECKOUT_REFERRAL_PARAM = 'checkoutReferral';
 const CHECKOUT_DISCOUNT_PARAM = 'checkoutDiscount';
 const PENDING_CHECKOUT_KEY = 'wm-pending-checkout';
+const POST_CHECKOUT_FLAG_KEY = 'wm-post-checkout';
 const APP_CHECKOUT_BASE_URL = 'https://world.hanzo.ai/';
 
 /**
@@ -70,7 +71,7 @@ interface PendingCheckoutIntent {
   savedAt?: number;
 }
 
-interface StartCheckoutOptions {
+export interface StartCheckoutOptions {
   productId: string;
   referralCode?: string;
   discountCode?: string;
@@ -81,7 +82,35 @@ type NoopFn = () => void;
 /** Legacy API — kept as a no-op so call sites don't break. */
 export function initCheckoutOverlay(_onSuccess?: NoopFn): void {}
 export function destroyCheckoutOverlay(): void {}
-export function showCheckoutSuccess(): void {}
+
+export interface CheckoutSuccessOptions {
+  waitForEntitlement?: boolean;
+  email?: string | null;
+}
+
+export function showCheckoutSuccess(_opts?: CheckoutSuccessOptions): void {}
+
+/**
+ * Legacy checkout-attempt-record APIs.
+ *
+ * The Dodo overlay flow persisted a fingerprint of the current attempt so the
+ * failure-retry banner could detect "user came back but checkout never
+ * completed" on the next mount. The Stripe-redirect flow encodes the
+ * success/cancel state in URL params (`?checkout=success|cancel`) instead, so
+ * the attempt record is no longer needed — but the call sites in App.ts,
+ * panel-layout.ts, and checkout-failure-banner.ts are kept and these stubs
+ * keep them silent until those modules are migrated to read URL state.
+ */
+export function initCheckoutWatchers(): void {}
+export function clearCheckoutAttempt(_reason?: string): void {}
+
+export interface CheckoutAttempt {
+  productId: string;
+  referralCode?: string;
+  discountCode?: string;
+}
+
+export function loadCheckoutAttempt(): CheckoutAttempt | null { return null; }
 
 /** Build a deep-link URL that captures the pending-checkout intent in query params. */
 export function buildCheckoutLaunchUrl(opts: StartCheckoutOptions): string {
@@ -114,8 +143,19 @@ export function capturePendingCheckoutIntentFromUrl(): PendingCheckoutIntent | n
   }
 }
 
-/** Resume a checkout left pending before login (e.g. anon clicks /pro, then signs in). */
-export async function resumePendingCheckout(_options?: { onSuccess?: NoopFn }): Promise<boolean> {
+/**
+ * Resume a checkout left pending before login (e.g. anon clicks /pro,
+ * then signs in). `openAuth` is invoked when the resume needs the user
+ * to authenticate first — the legacy Clerk flow passed Clerk's openSignIn
+ * here; the IAM flow can pass a no-op since startCheckout's own fallback
+ * already redirects to /pricing for signed-out users.
+ */
+export interface ResumePendingCheckoutOptions {
+  onSuccess?: NoopFn;
+  openAuth?: NoopFn;
+}
+
+export async function resumePendingCheckout(_options?: ResumePendingCheckoutOptions): Promise<boolean> {
   try {
     const raw = localStorage.getItem(PENDING_CHECKOUT_KEY);
     if (!raw) return false;
@@ -135,17 +175,44 @@ export function openCheckout(checkoutUrl: string): void {
   location.href = checkoutUrl;
 }
 
-/** Kick off a new checkout. Requires the user to be logged in (IAM). */
-export async function startCheckout(opts: StartCheckoutOptions): Promise<void> {
+export interface StartCheckoutFallbackOptions {
+  /**
+   * When the user isn't signed in (or the redirect target is unavailable),
+   * navigate to /pricing instead of throwing. Default true. The retry banner
+   * passes `false` so a transient backend error doesn't dump the user out of
+   * the dashboard mid-attempt.
+   */
+  fallbackToPricingPage?: boolean;
+}
+
+/**
+ * Kick off a new checkout. Requires the user to be logged in (IAM).
+ *
+ * Three call shapes supported for back-compat with legacy callers:
+ *   startCheckout(productId)
+ *   startCheckout({ productId, referralCode?, discountCode? })
+ *   startCheckout(productId, { referralCode?, discountCode? }, { fallbackToPricingPage? })
+ *
+ * Returns true on a successfully-initiated redirect, false when the
+ * fallback path was taken (signed-out user, missing endpoint, etc.).
+ */
+export async function startCheckout(
+  opts: string | StartCheckoutOptions,
+  legacyExtras?: { referralCode?: string; discountCode?: string },
+  fallback: StartCheckoutFallbackOptions = {},
+): Promise<boolean> {
+  const params: StartCheckoutOptions = typeof opts === 'string'
+    ? { productId: opts, ...(legacyExtras ?? {}) }
+    : opts;
+  const fallbackToPricing = fallback.fallbackToPricingPage ?? true;
+
   const token = getAccessToken();
-  if (!token) {
-    location.href = buildCheckoutLaunchUrl(opts);
-    return;
-  }
-  const user = getCurrentUser();
-  if (!user) {
-    location.href = buildCheckoutLaunchUrl(opts);
-    return;
+  const user = token ? getCurrentUser() : null;
+  if (!token || !user) {
+    if (fallbackToPricing) {
+      location.href = buildCheckoutLaunchUrl(params);
+    }
+    return false;
   }
 
   const resp = await fetch('/v1/world/checkout', {
@@ -155,9 +222,9 @@ export async function startCheckout(opts: StartCheckoutOptions): Promise<void> {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      planId: opts.productId,
-      referralCode: opts.referralCode,
-      discountCode: opts.discountCode,
+      planId: params.productId,
+      referralCode: params.referralCode,
+      discountCode: params.discountCode,
       successUrl: `${APP_CHECKOUT_BASE_URL}?checkout=success`,
       cancelUrl: `${APP_CHECKOUT_BASE_URL}?checkout=cancel`,
     }),
@@ -169,5 +236,10 @@ export async function startCheckout(opts: StartCheckoutOptions): Promise<void> {
   }
   const data = (await resp.json()) as { checkoutUrl?: string };
   if (!data.checkoutUrl) throw new Error('checkout: no URL returned');
+  // Mark that we're leaving for checkout so the post-redirect bootstrap can
+  // distinguish "returned from checkout" from "fresh load" (consumed by the
+  // legacy consumePostCheckoutFlag readers in panel-layout).
+  markPostCheckout();
   openCheckout(data.checkoutUrl);
+  return true;
 }

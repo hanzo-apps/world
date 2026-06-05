@@ -22,7 +22,7 @@ function isExpired(endDate?: string): boolean {
 
 const breaker = createCircuitBreaker<PredictionMarket[]>({ name: 'Polymarket', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
-const client = new PredictionServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new PredictionServiceClient(getRpcBaseUrl());
 
 import predictionTags from '../../../scripts/data/prediction-tags.json';
 

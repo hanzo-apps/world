@@ -50,7 +50,7 @@ export class ETFFlowsPanel extends Panel {
 
   private async refreshFromRpc(): Promise<void> {
     try {
-      const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+      const client = new MarketServiceClient(getRpcBaseUrl());
       const fresh = await client.listEtfFlows({});
       if (!this.element?.isConnected) return;
       if (fresh.etfs?.length || !this.data) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { YStack, XStack, H2, H3, Text, Button, Card, Separator } from '@hanzo/gui';
+import { YStack, XStack, H2, H3, Paragraph, Text, Button, Card, Separator } from '@hanzo/gui';
 import { getCurrentUser, startLogin } from '@/services/iam';
 
 interface Tier {
@@ -106,10 +106,10 @@ export function PricingSection() {
         <H2 fontSize={36} fontWeight="700" letterSpacing={-1} color="$color">
           Simple pricing
         </H2>
-        <Text fontSize={15} color="$colorPress" maxWidth={560}>
+        <Paragraph fontSize={15} color="$colorPress" maxWidth={560}>
           Free tier stays free forever. Pro adds Zen AI analysis + real-time API
           access. Team adds seats and SSO.
-        </Text>
+        </Paragraph>
 
         <XStack
           marginTop="$3"

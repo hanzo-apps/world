@@ -10,9 +10,7 @@ let _client: ForecastServiceClient | null = null;
 
 function getClient(): ForecastServiceClient {
   if (!_client) {
-    _client = new ForecastServiceClient(getRpcBaseUrl(), {
-      fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-    });
+    _client = new ForecastServiceClient(getRpcBaseUrl());
   }
   return _client;
 }

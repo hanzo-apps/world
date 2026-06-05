@@ -125,7 +125,7 @@ function toDisplayInstitutional(proto?: ProtoInstitutional): InstitutionalGiving
 
 // ─── Client + circuit breaker + caching ───
 
-const client = new GivingServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new GivingServiceClient(getRpcBaseUrl());
 
 const emptyResult: GivingSummary = {
   generatedAt: new Date().toISOString(),

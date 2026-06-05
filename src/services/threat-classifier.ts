@@ -380,7 +380,7 @@ import {
 } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 
-const classifyClient = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const classifyClient = new IntelligenceServiceClient(getRpcBaseUrl());
 
 const classifyBreaker = createCircuitBreaker<ThreatClassification | null>({
   name: 'AIClassify',

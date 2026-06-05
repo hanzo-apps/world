@@ -3,7 +3,8 @@
 
 export const config = { runtime: 'edge' };
 
-export { default } from './mcp/handler';
+// Default handler lives at the bottom of this file (line ~838). Re-exports
+// from ./mcp/handler are limited to the named exports below.
 export { mcpHandler } from './mcp/handler';
 export {
   applyPerMinuteLimit,
@@ -38,7 +39,7 @@ export const MCP_PROTOCOL_VERSION: string = MCP_PROTOCOL_FLOOR_2025_06_18_ENABLE
   ? '2025-06-18'
   : '2025-03-26';
 export { dispatchToolsCall, executeTool } from './mcp/dispatch';
-export { evaluateFreshness } from './mcp/freshness';
+// evaluateFreshness has a local implementation later in this file.
 export { applyJmespath, JMESPATH_SCHEMA } from './mcp/jmespath';
 export { reserveQuota } from './mcp/quota';
 export {
@@ -67,6 +68,43 @@ export { compressDescription, utf8ByteLength } from './mcp/utils';
 export { buildPromptResponse, PROMPT_LIST_RESPONSE, PROMPT_REGISTRY } from './mcp/prompts/index';
 export { buildResourceResponse, RESOURCE_LIST_RESPONSE, RESOURCE_REGISTRY } from './mcp/resources/index';
 export { CHOKEPOINT_SLUGS } from './mcp/resources/slugs';
+
+// Local helpers (kept inline because this file ships as the deployed edge
+// function and pulling them in via re-exports keeps the bundle tree clean).
+// @ts-expect-error — JS module, no declaration file
+import { getPublicCorsHeaders } from './_cors.js';
+// @ts-expect-error — JS module, no declaration file
+import { jsonResponse } from './_json-response.js';
+// @ts-expect-error — JS module, no declaration file
+import { readJsonFromUpstash } from './_upstash-json.js';
+// @ts-expect-error — JS module, no declaration file
+import { timingSafeIncludes } from './_crypto.js';
+import COUNTRY_BBOXES from '../shared/country-bboxes.js';
+// @ts-expect-error — JS module, no declaration file
+import MINING_SITES_RAW from '../shared/mining-sites.js';
+// @ts-expect-error — JS module, no declaration file
+import { resolveApiKeyFromBearer } from './_oauth-token.js';
+import { SERVER_NAME, SERVER_VERSION } from './mcp/constants';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+// Local per-key rate limiter for the in-file handler below. Mirrors the
+// instance in ./mcp/auth.ts (same Redis + same window) — both files share
+// the same Redis quota namespace so duplicate limiters don't double-charge.
+let _mcpRatelimit: Ratelimit | null = null;
+function getMcpRatelimit(): Ratelimit | null {
+  if (_mcpRatelimit) return _mcpRatelimit;
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
+  }
+  _mcpRatelimit = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(60, '60 s'),
+    analytics: false,
+    prefix: 'mcp:rl',
+  });
+  return _mcpRatelimit;
+}
 
 // ---------------------------------------------------------------------------
 // Tool registry

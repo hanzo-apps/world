@@ -977,8 +977,8 @@ export class UnifiedSettings {
           import('@/services/clerk').then(m => m.openSignIn()).catch(() => {});
         } else {
           this.close();
-          import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DODO_PRODUCTS.API_STARTER_MONTHLY))).catch(() => {
-            window.open('https://worldmonitor.app/pro', '_blank');
+          import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.WORLD_PRODUCTS.PRO_MONTHLY))).catch(() => {
+            window.open('https://world.hanzo.ai/pro', '_blank');
           });
         }
       });

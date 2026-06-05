@@ -10,7 +10,7 @@ async function getMarketClient(): Promise<MarketServiceClient> {
   if (!_client) {
     const { MarketServiceClient } = await import('@/generated/client/worldmonitor/market/v1/service_client');
     const { getRpcBaseUrl } = await import('@/services/rpc-client');
-    _client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+    _client = new MarketServiceClient(getRpcBaseUrl());
   }
   return _client;
 }

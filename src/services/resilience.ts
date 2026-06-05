@@ -17,9 +17,7 @@ let _client: ResilienceServiceClient | null = null;
 
 function getClient(): ResilienceServiceClient {
   if (!_client) {
-    _client = new ResilienceServiceClient(getRpcBaseUrl(), {
-      fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-    });
+    _client = new ResilienceServiceClient(getRpcBaseUrl());
   }
   return _client;
 }

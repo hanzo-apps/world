@@ -18,9 +18,7 @@ import {
   type RawStorageFacilityRegistry,
 } from '@/shared/storage-facility-registry-store';
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new SupplyChainServiceClient(getRpcBaseUrl());
 
 const BADGE_COLOR: Record<string, string> = {
   operational: '#2ecc71',

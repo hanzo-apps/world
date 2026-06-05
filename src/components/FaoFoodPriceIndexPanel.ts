@@ -6,7 +6,7 @@ import { getRpcBaseUrl } from '@/services/rpc-client';
 import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import type { GetFaoFoodPriceIndexResponse, FaoFoodPricePoint } from '@/generated/client/worldmonitor/economic/v1/service_client';
 
-const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+const client = new EconomicServiceClient(getRpcBaseUrl());
 
 const SVG_W = 480;
 const SVG_H = 140;

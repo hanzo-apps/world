@@ -1,7 +1,7 @@
 import { getClerkToken } from '@/services/clerk';
 import { SITE_VARIANT } from '@/config/variant';
 
-export type ChannelType = 'telegram' | 'whatsapp' | 'slack' | 'email' | 'discord' | 'webhook';
+export type ChannelType = 'telegram' | 'whatsapp' | 'slack' | 'email' | 'discord' | 'webhook' | 'web_push';
 export type Sensitivity = 'all' | 'high' | 'critical';
 export type QuietHoursOverride = 'critical_only' | 'silence_all' | 'batch_on_wake';
 export type DigestMode = 'realtime' | 'daily' | 'twice_daily' | 'weekly';
