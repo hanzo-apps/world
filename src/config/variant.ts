@@ -22,7 +22,10 @@ function storedVariant(): ValidVariant | null {
 }
 
 function pathVariant(): ValidVariant | null {
-  if (typeof location === 'undefined') return null;
+  // `location` is undefined in Node and stubbed-without-pathname in some
+  // test harnesses (e.g. happy-dom on early teardown). Treat anything but a
+  // string-valued pathname as "no path variant".
+  if (typeof location === 'undefined' || typeof location.pathname !== 'string') return null;
   const seg = location.pathname.split('/')[1]?.toLowerCase() ?? '';
   // 'full' from the path is a no-op — the root IS full; only non-default
   // path segments register as a variant.
@@ -36,6 +39,7 @@ function isDesktopRuntime(): boolean {
 
 function isDevHost(): boolean {
   return typeof location !== 'undefined'
+    && typeof location.hostname === 'string'
     && (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 }
 
