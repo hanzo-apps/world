@@ -1,13 +1,19 @@
 /**
  * RPC: submitContact -- Stores an enterprise contact submission and emails ops.
- * Port from api/contact.js
- * Sources: Convex contactMessages:submit mutation + Resend notification email
+ *
+ * Port from api/contact.js. The original Convex contactMessages:submit
+ * mutation is replaced by a best-effort POST to Hanzo Base; ops notification
+ * stays on Resend.
  */
 
-import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
-import { getClientIp, verifyTurnstile } from './_turnstile.js';
-import { jsonResponse } from './_json-response.js';
-import { createIpRateLimiter } from './_ip-rate-limit.js';
+import {
+  ApiError,
+  ValidationError,
+  type ServerContext,
+  type SubmitContactRequest,
+  type SubmitContactResponse,
+} from '../../../../src/generated/server/worldmonitor/leads/v1/service_server';
+import { getClientIp, verifyTurnstile } from '../../../_shared/turnstile';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[+(]?\d[\d\s()./-]{4,23}\d$/;
@@ -50,7 +56,7 @@ async function sendNotificationEmail(
 ): Promise<boolean> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    console.error('[contact] RESEND_API_KEY not set — lead stored in Convex but notification NOT sent');
+    console.error('[contact] RESEND_API_KEY not set — lead stored but notification NOT sent');
     return false;
   }
   const notifyEmail = process.env.CONTACT_NOTIFY_EMAIL || 'elie@world.hanzo.ai';
@@ -145,40 +151,25 @@ export async function submitContact(
   const safeSource = source ? source.slice(0, 100) : 'enterprise-contact';
 
   // Persist lead to Hanzo Base (best-effort) + always attempt email notification.
-  try {
-    const baseUrl = process.env.BASE_URL || 'https://base.hanzo.ai';
-    const token = process.env.BASE_TOKEN || '';
-    await fetch(`${baseUrl}/api/collections/contactMessages/records`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        name: safeName,
-        email: email.trim(),
-        organization: safeOrg,
-        phone: safePhone,
-        message: safeMsg,
-        source: safeSource,
-        receivedAt: Date.now(),
-      }),
-      signal: AbortSignal.timeout(5000),
-    }).catch((err) => console.warn('[contact] Base persistence failed:', err));
-
-    const emailSent = await sendNotificationEmail(safeName, email.trim(), safeOrg, safePhone, safeMsg, ip, country);
-
-    return jsonResponse({ status: 'sent', emailSent }, 200, cors);
-  } catch (err) {
-    // Translate the Convex per-email throttle into a proper 429 so the
-    // browser can show "try again in an hour" instead of an opaque 500.
-    // Convex serializes ConvexError payloads onto err.data.
-    const data = (err as { data?: { kind?: string; message?: string } } | null)?.data;
-    if (err instanceof ConvexError && data?.kind === 'rate_limited') {
-      throw new ApiError(429, data.message || 'Too many requests', '');
-    }
-    throw err;
-  }
+  const baseUrl = process.env.BASE_URL || 'https://base.hanzo.ai';
+  const baseToken = process.env.BASE_TOKEN || '';
+  await fetch(`${baseUrl}/api/collections/contactMessages/records`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(baseToken ? { Authorization: `Bearer ${baseToken}` } : {}),
+    },
+    body: JSON.stringify({
+      name: safeName,
+      email: email.trim(),
+      organization: safeOrg,
+      phone: safePhone,
+      message: safeMsg,
+      source: safeSource,
+      receivedAt: Date.now(),
+    }),
+    signal: AbortSignal.timeout(5000),
+  }).catch((err) => console.warn('[contact] Base persistence failed:', err));
 
   const emailSent = await sendNotificationEmail(
     safeName,

@@ -24,9 +24,7 @@ import {
 import { isFeatureAvailable } from './runtime-config';
 import { isDesktopRuntime, toApiUrl } from './runtime';
 
-const militaryClient = new MilitaryServiceClient(getRpcBaseUrl(), {
-  fetch: (...args) => globalThis.fetch(...args),
-});
+const militaryClient = new MilitaryServiceClient(getRpcBaseUrl());
 
 const AIRCRAFT_TYPE_REVERSE: Partial<Record<ProtoMilitaryAircraftType, MilitaryAircraftType>> = {
   MILITARY_AIRCRAFT_TYPE_FIGHTER: 'fighter',

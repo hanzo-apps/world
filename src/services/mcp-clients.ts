@@ -33,18 +33,12 @@ export interface McpQuota {
 
 /** List all Pro MCP tokens for the current user. */
 export async function listMcpClients(): Promise<McpClientInfo[]> {
-  const client = await getConvexClient();
-  const api = await getConvexApi();
-  if (!client || !api) return [];
-
-  await waitForConvexAuth();
-
-  // Mirror services/api-keys.ts:listApiKeys cast pattern — the generated
-  // Convex `api` is fully typed at module level but each service casts
-  // `as any` at the call-site to avoid pulling the entire generated index
-  // type into every service file.
-  const rows = await client.query((api as any).mcpProTokens.listProMcpTokens, {});
-  return rows as McpClientInfo[];
+  // Convex is retired; the MCP-token listing migrated to /v1/world/mcp-tokens
+  // once the edge handler ships. Until then this returns empty so the UI
+  // renders the "no clients connected" empty state instead of throwing.
+  // See plans/mcp-pro-tokens-edge-migration.md.
+  await Promise.all([getConvexClient(), getConvexApi(), waitForConvexAuth()]);
+  return [];
 }
 
 /**

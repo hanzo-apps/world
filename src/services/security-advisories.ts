@@ -22,7 +22,7 @@ export interface SecurityAdvisoriesFetchResult {
   cachedAt?: string;
 }
 
-const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new IntelligenceServiceClient(getRpcBaseUrl());
 
 function normalizeAdvisories(
   raw: ListSecurityAdvisoriesResponse | { advisories: Array<{ title: string; link: string; pubDate: string; source: string; sourceCountry: string; level: string; country: string }>; byCountry: Record<string, string> },

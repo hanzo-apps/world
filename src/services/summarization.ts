@@ -43,7 +43,7 @@ export interface SummarizeOptions {
 
 // ── Sebuf client (replaces direct fetch to /api/{provider}-summarize) ──
 
-const newsClient = new NewsServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const newsClient = new NewsServiceClient(getRpcBaseUrl());
 const summaryBreaker = createCircuitBreaker<SummarizeArticleResponse>({ name: 'News Summarization', cacheTtlMs: 0 });
 
 const summaryResultBreaker = createCircuitBreaker<SummarizationResult | null>({

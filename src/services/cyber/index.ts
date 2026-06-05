@@ -16,7 +16,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Client + Circuit Breaker ----
 
-const client = new CyberServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new CyberServiceClient(getRpcBaseUrl());
 const breaker = createCircuitBreaker<ListCyberThreatsResponse>({ name: 'Cyber Threats', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 
 const emptyFallback: ListCyberThreatsResponse = { threats: [], pagination: undefined };

@@ -19,9 +19,7 @@ import {
   type RawFuelShortageRegistry,
 } from '@/shared/fuel-shortage-registry-store';
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new SupplyChainServiceClient(getRpcBaseUrl());
 
 const SEVERITY_COLOR: Record<string, string> = {
   confirmed: '#e74c3c',

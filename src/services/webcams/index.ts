@@ -7,9 +7,7 @@ import {
   type GetWebcamImageResponse,
 } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 
-const client = new WebcamServiceClient(getRpcBaseUrl(), {
-  fetch: (...args) => globalThis.fetch(...args),
-});
+const client = new WebcamServiceClient(getRpcBaseUrl());
 
 const emptyResponse: ListWebcamsResponse = { webcams: [], clusters: [], totalInView: 0 };
 

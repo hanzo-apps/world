@@ -11,7 +11,7 @@ async function getMarketClient(): Promise<MarketServiceClient> {
   if (!_marketClient) {
     const { MarketServiceClient } = await import('@/generated/client/worldmonitor/market/v1/service_client');
     const { getRpcBaseUrl } = await import('@/services/rpc-client');
-    _marketClient = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+    _marketClient = new MarketServiceClient(getRpcBaseUrl());
   }
   return _marketClient;
 }
@@ -21,7 +21,7 @@ async function getEconomicClient(): Promise<EconomicServiceClient> {
   if (!_economicClient) {
     const { EconomicServiceClient } = await import('@/generated/client/worldmonitor/economic/v1/service_client');
     const { getRpcBaseUrl } = await import('@/services/rpc-client');
-    _economicClient = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+    _economicClient = new EconomicServiceClient(getRpcBaseUrl());
   }
   return _economicClient;
 }

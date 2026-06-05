@@ -206,7 +206,7 @@ export class MarketBreadthPanel extends Panel {
     try {
       const { MarketServiceClient } = await import('@/generated/client/worldmonitor/market/v1/service_client');
       const { getRpcBaseUrl } = await import('@/services/rpc-client');
-      const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+      const client = new MarketServiceClient(getRpcBaseUrl());
       const resp = await client.getMarketBreadthHistory({});
       if (resp.unavailable) {
         if (!this.data) this.showError(t('common.noDataShort'), () => void this.fetchData());

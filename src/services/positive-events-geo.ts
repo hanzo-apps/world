@@ -19,9 +19,7 @@ export interface PositiveGeoEvent {
   timestamp: number;
 }
 
-const client = new PositiveEventsServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new PositiveEventsServiceClient(getRpcBaseUrl());
 
 const breaker = createCircuitBreaker<PositiveGeoEvent[]>({
   name: 'Positive Geo Events',

@@ -7,7 +7,7 @@ import {
   type GetUSNIFleetReportResponse,
 } from '@/generated/client/worldmonitor/military/v1/service_client';
 
-const client = new MilitaryServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new MilitaryServiceClient(getRpcBaseUrl());
 
 const breaker = createCircuitBreaker<USNIFleetReport | null>({
   name: 'USNI Fleet Tracker',

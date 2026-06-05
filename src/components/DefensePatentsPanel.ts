@@ -35,7 +35,7 @@ const CPC_ICONS: Record<string, string> = {
 let _militaryClient: MilitaryServiceClient | null = null;
 function militaryClient(): MilitaryServiceClient {
   if (!_militaryClient) {
-    _militaryClient = new MilitaryServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+    _militaryClient = new MilitaryServiceClient(getRpcBaseUrl());
   }
   return _militaryClient;
 }

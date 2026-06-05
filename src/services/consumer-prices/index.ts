@@ -47,9 +47,7 @@ export const MARKETS: Array<{ code: string; label: string }> = [
 
 export const SINGLE_MARKETS = MARKETS.filter((m) => m.code !== 'all');
 
-const client = new ConsumerPricesServiceClient(getRpcBaseUrl(), {
-  fetch: (...args) => globalThis.fetch(...args),
-});
+const client = new ConsumerPricesServiceClient(getRpcBaseUrl());
 
 const overviewBreaker = createCircuitBreaker<GetConsumerPriceOverviewResponse>({
   name: 'Consumer Prices Overview',

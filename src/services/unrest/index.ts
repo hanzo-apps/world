@@ -10,7 +10,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Client + Circuit Breaker ----
 
-const client = new UnrestServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new UnrestServiceClient(getRpcBaseUrl());
 const unrestBreaker = createCircuitBreaker<ListUnrestEventsResponse>({
   name: 'Unrest Events',
   cacheTtlMs: 10 * 60 * 1000,

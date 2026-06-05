@@ -8,6 +8,48 @@ import {
   readLegacySessionKey,
 } from '@/services/browser-key-session';
 
+/**
+ * In-memory hints for whether the user holds widget/pro session keys.
+ *
+ * Real keys live in an httpOnly server-issued session cookie that JS can't
+ * read. These flags track what we've SEEN via migrateLegacyKeyStorage()
+ * (legacy key found locally and forwarded to the session) so callers like
+ * isProUser() / isWidgetFeatureEnabled() can answer synchronously without
+ * waiting for a server round-trip on every call.
+ *
+ * Once the legacy keys are wiped from cookies and localStorage on this
+ * client, these hints are the only client-side record we keep — they get
+ * reset whenever the user explicitly clears their keys via setWidgetKey('')
+ * / setProKey('') (matching the cookie-erase semantics callers expect).
+ */
+let widgetSessionHint = false;
+let proSessionHint = false;
+let legacyMigrationRan = false;
+
+/**
+ * One-shot legacy-key migration. On the first call after page load, read
+ * any wm-widget-key / wm-pro-key value the user still has cached locally
+ * (cookie under the apex domain, or localStorage fallback) and forward it
+ * into the httpOnly server session, then wipe the local copy. Subsequent
+ * calls are a no-op — the flag at module scope makes this safe to invoke
+ * from every public reader (isProUser, getProWidgetKey, ...) without
+ * paying the cost more than once per page load.
+ */
+function migrateLegacyKeyStorage(): void {
+  if (legacyMigrationRan) return;
+  legacyMigrationRan = true;
+  const widgetKey = readLegacySessionKey('wm-widget-key');
+  const proKey = readLegacySessionKey('wm-pro-key');
+  widgetSessionHint = !!widgetKey;
+  proSessionHint = !!proKey;
+  if (widgetKey || proKey) {
+    void migrateLegacyKeysToHttpOnlySession({
+      widgetKey: widgetKey || undefined,
+      proKey: proKey || undefined,
+    }).catch(() => { /* server retry later via wm-session bootstrap */ });
+  }
+}
+
 const STORAGE_KEY = 'wm-custom-widgets';
 const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
 const PANEL_COL_SPANS_KEY = 'worldmonitor-panel-col-spans';
@@ -103,36 +145,9 @@ export function getWidget(id: string): CustomWidgetSpec | null {
 }
 
 // ── Cross-domain key helpers ──────────────────────────────────────────────
-// Cookies with domain=.world.hanzo.ai are shared across all subdomains
-// (world.hanzo.ai, tech., finance., commodity., happy., etc.).
-// We read cookie first and fall back to localStorage for migration compat.
-
-const COOKIE_DOMAIN = '.world.hanzo.ai';
-const KEY_MAX_AGE = 365 * 24 * 60 * 60;
-
-function usesCookies(): boolean {
-  return location.hostname.endsWith('world.hanzo.ai');
-}
-
-function getCookieValue(name: string): string {
-  try {
-    const match = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
-    return match ? match.slice(name.length + 1) : '';
-  } catch {
-    return '';
-  }
-}
-
-function setDomainCookie(name: string, value: string): void {
-  if (!usesCookies()) return;
-  document.cookie = `${name}=${encodeURIComponent(value)}; domain=${COOKIE_DOMAIN}; path=/; max-age=${KEY_MAX_AGE}; SameSite=Lax; Secure`;
-}
-
-function getKey(name: string): string {
-  const cookieVal = getCookieValue(name);
-  if (cookieVal) return decodeURIComponent(cookieVal);
-  try { return localStorage.getItem(name) ?? ''; } catch { return ''; }
-}
+// Legacy cookie/localStorage helpers have moved to browser-key-session.ts.
+// The values now live in an httpOnly server-issued session — see the
+// migration runbook above.
 
 export function setWidgetKey(key: string): void {
   const trimmed = key.trim();

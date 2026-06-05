@@ -14,9 +14,7 @@ import {
   type DisruptionStatus,
 } from '@/shared/disruption-timeline';
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new SupplyChainServiceClient(getRpcBaseUrl());
 
 // One glyph per event type so readers can scan the timeline by nature of
 // disruption. Kept terse — the type string itself is shown next to the glyph.

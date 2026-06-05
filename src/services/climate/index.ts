@@ -72,7 +72,7 @@ export interface Co2Monitoring {
 
 export type { OceanIceIndicators, OceanIceTrendPoint } from './ocean-ice';
 
-const client = new ClimateServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new ClimateServiceClient(getRpcBaseUrl());
 const breaker = createCircuitBreaker<ListClimateAnomaliesResponse>({ name: 'Climate Anomalies', cacheTtlMs: 20 * 60 * 1000, persistCache: true });
 const co2Breaker = createCircuitBreaker<GetCo2MonitoringResponse>({ name: 'CO2 Monitoring', cacheTtlMs: 6 * 60 * 60 * 1000, persistCache: true });
 const oceanIceBreaker = createCircuitBreaker<GetOceanIceDataResponse>({ name: 'Ocean Ice', cacheTtlMs: 26 * 60 * 60 * 1000, persistCache: true });

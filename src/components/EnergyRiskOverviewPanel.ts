@@ -27,9 +27,7 @@ import { fetchCommodityQuotes } from '@/services/market';
 import { SupplyChainServiceClient } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
 import { buildOverviewState, type OverviewState } from './_energy-risk-overview-state';
 
-const supplyChain = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const supplyChain = new SupplyChainServiceClient(getRpcBaseUrl());
 
 const BRENT_SYMBOL = 'BZ=F';
 const BRENT_META = [{ symbol: BRENT_SYMBOL, name: 'Brent Crude', display: 'BRENT' }];

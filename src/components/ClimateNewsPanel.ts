@@ -6,7 +6,7 @@ import { getRpcBaseUrl } from '@/services/rpc-client';
 import { ClimateServiceClient } from '@/generated/client/worldmonitor/climate/v1/service_client';
 import type { ListClimateNewsResponse, ClimateNewsItem } from '@/generated/client/worldmonitor/climate/v1/service_client';
 
-const client = new ClimateServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+const client = new ClimateServiceClient(getRpcBaseUrl());
 
 function formatTimeAgo(epochMs: number): string {
   const diffMs = Date.now() - epochMs;

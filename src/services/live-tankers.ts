@@ -22,9 +22,7 @@ import { getRpcBaseUrl } from '@/services/rpc-client';
 import { MaritimeServiceClient } from '@/generated/client/worldmonitor/maritime/v1/service_client';
 import type { SnapshotCandidateReport } from '@/generated/client/worldmonitor/maritime/v1/service_client';
 
-const client = new MaritimeServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new MaritimeServiceClient(getRpcBaseUrl());
 
 // ±2° box around each chokepoint centroid. Tuned in the implementation
 // section of plan U8 — Hormuz traffic at peak transit is ~50-150 vessels

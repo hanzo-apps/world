@@ -22,9 +22,7 @@ import {
   type RawPipelineRegistry,
 } from '@/shared/pipeline-registry-store';
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const client = new SupplyChainServiceClient(getRpcBaseUrl());
 
 // Shape of the raw Redis registry hydrated by bootstrap. This mirrors
 // scripts/data/pipelines-{gas,oil}.json verbatim — the seeder does NOT

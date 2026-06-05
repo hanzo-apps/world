@@ -55,6 +55,12 @@ function reportServerError(res: Response, input: RequestInfo | URL): void {
   try {
     const href = input instanceof Request ? input.url : String(input);
     const path = new URL(href, globalThis.location?.href ?? 'https://world.hanzo.ai').pathname;
+    // Cloudflare-edge 5xx (cf-ray with no server header from us, or 521/522/523)
+    // are infrastructure problems we can't fix from the client. Downgrade to
+    // warning so they don't drown out genuine server-side bugs in Sentry.
+    const isCloudflareEdgeError =
+      [521, 522, 523, 524, 525, 526].includes(res.status) ||
+      (res.headers.get('cf-ray') !== null && res.headers.get('x-vercel-id') === null);
     Sentry.captureMessage(`API ${res.status}: ${path}`, {
       level: isCloudflareEdgeError ? 'warning' : 'error',
       tags: { kind: isCloudflareEdgeError ? 'api_cf_5xx' : 'api_5xx' },

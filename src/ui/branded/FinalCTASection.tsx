@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { YStack, XStack, H2, Text, Button, Input } from '@hanzo/gui';
+import { YStack, XStack, H2, Paragraph, Text, Button, Input } from '@hanzo/gui';
 
 export function FinalCTASection() {
   const [email, setEmail] = useState('');
@@ -30,10 +30,10 @@ export function FinalCTASection() {
       <H2 fontSize={32} fontWeight="700" letterSpacing={-1} color="$color" textAlign="center">
         Subscribe for updates.
       </H2>
-      <Text fontSize={15} color="$colorPress" maxWidth={520} textAlign="center">
+      <Paragraph fontSize={15} color="$colorPress" maxWidth={520} textAlign="center">
         Weekly intelligence digest. Major-incident alerts. New feeds and
         capabilities. No spam.
-      </Text>
+      </Paragraph>
       <XStack gap="$2" maxWidth={420} width="100%">
         <Input
           size="$4"

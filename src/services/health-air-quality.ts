@@ -7,7 +7,7 @@ import {
 
 export type { AirQualityAlert, ListAirQualityAlertsResponse };
 
-const client = new HealthServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new HealthServiceClient(getRpcBaseUrl());
 const emptyAirQualityAlerts: ListAirQualityAlertsResponse = { alerts: [], fetchedAt: 0 };
 
 export async function fetchHealthAirQuality(): Promise<ListAirQualityAlertsResponse> {

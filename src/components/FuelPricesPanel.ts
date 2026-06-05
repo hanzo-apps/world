@@ -6,7 +6,7 @@ import { getRpcBaseUrl } from '@/services/rpc-client';
 import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import type { ListFuelPricesResponse } from '@/generated/client/worldmonitor/economic/v1/service_client';
 
-const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+const client = new EconomicServiceClient(getRpcBaseUrl());
 
 export class FuelPricesPanel extends Panel {
   constructor() {

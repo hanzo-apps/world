@@ -13,7 +13,7 @@
  */
 
 import { jwtVerify } from 'jose';
-import { getClerkJwtVerifyOptions, getJWKS } from '../auth-session';
+import { getIamJwtVerifyOptions, getJWKS } from '../auth-session';
 
 export interface ClerkSession {
   userId: string;
@@ -25,6 +25,8 @@ export interface ClerkSession {
  * Returns { userId, orgId } on success, null on any failure.
  *
  * Fail-open: errors are logged but never thrown.
+ *
+ * Name is historical (Clerk era); the verifier is now IAM/OIDC.
  */
 export async function resolveClerkSession(request: Request): Promise<ClerkSession | null> {
   try {
@@ -35,13 +37,9 @@ export async function resolveClerkSession(request: Request): Promise<ClerkSessio
     if (!token) return null;
 
     const jwks = getJWKS();
-    if (!jwks) return null; // CLERK_JWT_ISSUER_DOMAIN not configured
+    if (!jwks) return null; // IAM JWKS not configured
 
-    const issuerDomain = process.env.CLERK_JWT_ISSUER_DOMAIN!;
-    const { payload } = await jwtVerify(token, jwks, {
-      ...getClerkJwtVerifyOptions(),
-      issuer: issuerDomain,
-    });
+    const { payload } = await jwtVerify(token, jwks, getIamJwtVerifyOptions());
 
     const userId = (payload.sub as string) ?? null;
     if (!userId) return null;

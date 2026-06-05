@@ -12,7 +12,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 type ViewMode = 'upcoming' | 'conferences' | 'earnings' | 'all';
 
-const researchClient = new ResearchServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const researchClient = new ResearchServiceClient(getRpcBaseUrl());
 
 export class TechEventsPanel extends Panel {
   private viewMode: ViewMode = 'upcoming';

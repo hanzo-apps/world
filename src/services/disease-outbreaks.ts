@@ -8,7 +8,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 export type { ListDiseaseOutbreaksResponse, DiseaseOutbreakItem };
 
-const client = new HealthServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new HealthServiceClient(getRpcBaseUrl());
 
 // Fallback methodology version matches the server-side transitional fallback
 // in server/worldmonitor/health/v1/list-disease-outbreaks.ts so empty/offline

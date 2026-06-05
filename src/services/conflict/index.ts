@@ -19,7 +19,7 @@ import { toApiUrl } from '@/services/runtime';
 
 // ---- Client + Circuit Breakers (per-RPC; HAPI uses per-country map) ----
 
-const client = new ConflictServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new ConflictServiceClient(getRpcBaseUrl());
 const acledBreaker = createCircuitBreaker<ListAcledEventsResponse>({ name: 'ACLED Conflicts', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 const ucdpBreaker = createCircuitBreaker<ListUcdpEventsResponse>({ name: 'UCDP Events', cacheTtlMs: 10 * 60 * 1000, persistCache: true });
 const hapiBreakers = new Map<string, ReturnType<typeof createCircuitBreaker<GetHumanitarianSummaryResponse>>>();

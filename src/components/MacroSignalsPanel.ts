@@ -24,7 +24,7 @@ interface MacroSignalData {
   unavailable?: boolean;
 }
 
-const economicClient = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const economicClient = new EconomicServiceClient(getRpcBaseUrl());
 
 /** Map proto response (optional fields = undefined) to MacroSignalData (null for absent values). */
 function mapProtoToData(r: GetMacroSignalsResponse): MacroSignalData {

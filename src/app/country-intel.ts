@@ -242,7 +242,7 @@ export class CountryIntelManager implements AppModule {
     this.ctx.countryBriefPage.updateMilitaryActivity?.(this.buildMilitarySummary(code, country));
     this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, null));
 
-    const marketClient = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args) });
+    const marketClient = new MarketServiceClient(getRpcBaseUrl());
     const stockPromise = marketClient.getCountryStockIndex({ countryCode: code })
       .then((resp) => ({
         available: resp.available,
@@ -301,9 +301,7 @@ export class CountryIntelManager implements AppModule {
 
     this.ctx.countryBriefPage.updateInfrastructure(code);
 
-    const intelClient = new IntelligenceServiceClient(getRpcBaseUrl(), {
-      fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args),
-    });
+    const intelClient = new IntelligenceServiceClient(getRpcBaseUrl());
     intelClient.getCountryFacts({ countryCode: code })
       .then((facts) => {
         if (this.ctx.countryBriefPage?.getCode() !== code) return;

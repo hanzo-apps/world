@@ -61,7 +61,7 @@ const breaker = createCircuitBreaker<RadiationWatchResult>({
   cacheTtlMs: 15 * 60 * 1000,
   persistCache: true,
 });
-const client = new RadiationServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new RadiationServiceClient(getRpcBaseUrl());
 
 const emptyResult: RadiationWatchResult = {
   fetchedAt: new Date(0),

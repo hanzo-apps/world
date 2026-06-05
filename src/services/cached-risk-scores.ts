@@ -12,7 +12,7 @@ import { getHydratedData } from '@/services/bootstrap';
 
 // ---- Sebuf client ----
 
-const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new IntelligenceServiceClient(getRpcBaseUrl());
 
 // ---- Legacy types (preserved for consumer compatibility) ----
 

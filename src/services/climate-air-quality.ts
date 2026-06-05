@@ -7,7 +7,7 @@ import {
 
 export type { AirQualityStation, ListAirQualityDataResponse };
 
-const client = new ClimateServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new ClimateServiceClient(getRpcBaseUrl());
 const emptyClimateAirQuality: ListAirQualityDataResponse = { stations: [], fetchedAt: 0 };
 
 export async function fetchClimateAirQuality(): Promise<ListAirQualityDataResponse> {

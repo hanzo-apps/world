@@ -148,7 +148,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 <Switch
                   id="alert-wa"
                   checked={prefs.alertsViaWhatsApp}
-                  onCheckedChange={(v) => setPrefs((p) => ({ ...p, alertsViaWhatsApp: !!v }))}
+                  onCheckedChange={(v: boolean) => setPrefs((p) => ({ ...p, alertsViaWhatsApp: !!v }))}
                 />
               </XStack>
               <XStack justifyContent="space-between" alignItems="center">
@@ -156,7 +156,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 <Switch
                   id="alert-sms"
                   checked={prefs.alertsViaSms}
-                  onCheckedChange={(v) => setPrefs((p) => ({ ...p, alertsViaSms: !!v }))}
+                  onCheckedChange={(v: boolean) => setPrefs((p) => ({ ...p, alertsViaSms: !!v }))}
                 />
               </XStack>
               <XStack justifyContent="space-between" alignItems="center">
@@ -164,7 +164,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 <Switch
                   id="alert-digest"
                   checked={prefs.dailyDigest}
-                  onCheckedChange={(v) => setPrefs((p) => ({ ...p, dailyDigest: !!v }))}
+                  onCheckedChange={(v: boolean) => setPrefs((p) => ({ ...p, dailyDigest: !!v }))}
                 />
               </XStack>
               <Text fontSize={11} color="$colorPress">
@@ -180,7 +180,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 <Switch
                   id="pref-dark"
                   checked={prefs.darkMode}
-                  onCheckedChange={(v) => {
+                  onCheckedChange={(v: boolean) => {
                     setPrefs((p) => ({ ...p, darkMode: !!v }));
                     document.documentElement.classList.toggle('dark', !!v);
                     try {

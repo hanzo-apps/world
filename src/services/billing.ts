@@ -128,11 +128,44 @@ export function getSubscription(): SubscriptionInfo | null {
 const COMMERCE_PORTAL_URL = 'https://commerce.hanzo.ai/account/billing';
 
 /**
- * Open the Hanzo Commerce self-service billing portal in a new tab.
+ * Reserve a browser tab for the billing portal SYNCHRONOUSLY inside the click
+ * handler, before any await. Most popup blockers allow window.open() only
+ * during the user-gesture window; awaiting an entitlement lookup before the
+ * open consumes the gesture and the portal is silently suppressed. Callers
+ * pass the returned Window back into openBillingPortal which redirects it.
+ *
+ * Returns null if window.open() failed or no window is available — caller
+ * passes null and openBillingPortal falls back to a fresh tab.
+ */
+export function prereserveBillingPortalTab(): Window | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.open('about:blank', '_blank');
+  } catch {
+    return null;
+  }
+}
+
+export type BillingPortalOutcome =
+  | { outcome: 'opened'; url: string }
+  | { outcome: 'no-customer' }
+  | { outcome: 'blocked' };
+
+/**
+ * Open the Hanzo Commerce self-service billing portal. If a pre-reserved tab
+ * is passed, redirect it to the portal; otherwise open a fresh tab.
  * Commerce handles session auth via IAM (same SSO session).
  */
-export async function openBillingPortal(): Promise<string> {
-  window.open(COMMERCE_PORTAL_URL, '_blank');
-  return COMMERCE_PORTAL_URL;
+export async function openBillingPortal(
+  reservedWindow?: Window | null,
+): Promise<BillingPortalOutcome> {
+  if (typeof window === 'undefined') return { outcome: 'blocked' };
+  const url = COMMERCE_PORTAL_URL;
+  if (reservedWindow && !reservedWindow.closed) {
+    reservedWindow.location.href = url;
+    return { outcome: 'opened', url };
+  }
+  const opened = window.open(url, '_blank');
+  return opened ? { outcome: 'opened', url } : { outcome: 'blocked' };
 }
 

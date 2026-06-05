@@ -57,7 +57,7 @@ export type {
 //     and list-comtrade-flows. Injects the caller's Clerk bearer /
 //     tester-key / WORLDMONITOR_API_KEY, so pro users get real data
 //     instead of 401.
-const publicClient = new TradeServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const publicClient = new TradeServiceClient(getRpcBaseUrl());
 const premiumClient = new TradeServiceClient(getRpcBaseUrl(), { fetch: premiumFetch });
 
 const restrictionsBreaker = createCircuitBreaker<GetTradeRestrictionsResponse>({ name: 'WTO Restrictions', cacheTtlMs: 30 * 60 * 1000, persistCache: true });

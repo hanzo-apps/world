@@ -67,7 +67,7 @@ export interface ThermalEscalationWatch {
   };
 }
 
-const client = new ThermalServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const client = new ThermalServiceClient(getRpcBaseUrl());
 const breaker = createCircuitBreaker<ThermalEscalationWatch>({
   name: 'Thermal Escalation',
   cacheTtlMs: 30 * 60 * 1000,

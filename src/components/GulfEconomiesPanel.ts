@@ -8,7 +8,7 @@ import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/s
 import type { ListGulfQuotesResponse, GulfQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { getHydratedData } from '@/services/bootstrap';
 
-const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+const client = new MarketServiceClient(getRpcBaseUrl());
 
 function renderSection(title: string, quotes: GulfQuote[]): string {
   if (quotes.length === 0) return '';

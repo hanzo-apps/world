@@ -1,4 +1,4 @@
-import { YStack, XStack, H1, Text, Button } from '@hanzo/gui';
+import { YStack, XStack, H1, Paragraph, Button } from '@hanzo/gui';
 import { getCurrentUser, startLogin } from '@/services/iam';
 
 export function HeroSection() {
@@ -25,7 +25,7 @@ export function HeroSection() {
       >
         Real-time streaming news, world events, and simulations.
       </H1>
-      <Text
+      <Paragraph
         fontSize={17}
         $sm={{ fontSize: 19 }}
         color="$colorPress"
@@ -36,7 +36,7 @@ export function HeroSection() {
         Palantir-grade intelligence — open and public. Conflicts, markets,
         cables, ships, satellites, weather, cyber, and Zen AI analysis on a
         live globe.
-      </Text>
+      </Paragraph>
       <XStack gap="$3" marginTop="$3">
         {user ? (
           <Button size="$5" onPress={() => (window.location.href = '/')}>
@@ -56,9 +56,9 @@ export function HeroSection() {
           </Button>
         </a>
       </XStack>
-      <Text fontSize={12} color="$colorPress" marginTop="$3">
+      <Paragraph fontSize={12} color="$colorPress" marginTop="$3">
         No credit card. Free tier stays free.
-      </Text>
+      </Paragraph>
     </YStack>
   );
 }

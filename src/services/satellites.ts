@@ -16,7 +16,7 @@ import { IntelligenceServiceClient } from '@/generated/client/worldmonitor/intel
 import { twoline2satrec, propagate, eciToGeodetic, gstime, degreesLong, degreesLat } from 'satellite.js';
 import type { SatRec } from 'satellite.js';
 
-const intelligenceClient = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+const intelligenceClient = new IntelligenceServiceClient(getRpcBaseUrl());
 
 export interface SatelliteTLE {
   noradId: string;
