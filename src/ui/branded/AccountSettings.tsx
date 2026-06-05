@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Sheet, Tabs, YStack, XStack, Text, Button, Input, Label, Switch, Separator } from '@hanzo/gui';
-import { getCurrentSession, signOutFromIam, getAccessToken } from '../lib/iam-auth';
+import { getCurrentUser, getAccessToken, logout } from '@/services/iam';
 
 interface AccountSettingsProps {
   open: boolean;
@@ -16,7 +16,7 @@ interface Entitlements {
 }
 
 export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
-  const session = getCurrentSession();
+  const user = getCurrentUser();
   const [tab, setTab] = useState('profile');
   const [ent, setEnt] = useState<Entitlements | null>(null);
   const [prefs, setPrefs] = useState({ darkMode: true, dailyDigest: true, alertsViaWhatsApp: false, alertsViaSms: false });
@@ -67,20 +67,20 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
           </Tabs.List>
 
           <Tabs.Content value="profile" padding="$4" gap="$3">
-            {session ? (
+            {user ? (
               <YStack gap="$3">
                 <XStack gap="$3" alignItems="center">
                   <YStack>
                     <Text fontSize={14} color="$color">
-                      {session.user?.name || 'Hanzo user'}
+                      {user.displayName || user.name || 'Hanzo user'}
                     </Text>
                     <Text fontSize={12} color="$colorPress">
-                      {session.user?.email || ''}
+                      {user.email || ''}
                     </Text>
                   </YStack>
                 </XStack>
                 <Separator />
-                <Button onPress={signOutFromIam}>Sign out</Button>
+                <Button onPress={logout}>Sign out</Button>
               </YStack>
             ) : (
               <Text fontSize={13} color="$colorPress">

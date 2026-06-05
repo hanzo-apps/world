@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { YStack, XStack, H2, H3, Text, Button, Card, Separator } from '@hanzo/gui';
-import { signInWithIam, getCurrentSession } from '../lib/iam-auth';
+import { getCurrentUser, startLogin } from '@/services/iam';
 
 interface Tier {
   id: string;
@@ -16,9 +16,9 @@ interface Tier {
 }
 
 async function startCheckout(planId: string) {
-  const session = getCurrentSession();
-  if (!session) {
-    signInWithIam(`/pricing?upgrade=${planId}`);
+  const user = getCurrentUser();
+  if (!user) {
+    void startLogin(`/pricing?upgrade=${planId}`);
     return;
   }
   try {
