@@ -1,0 +1,28 @@
+name = "world"
+main = "worker/index.js"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind the Worker to world.hanzo.ai (and any subdomain) at the Cloudflare
+# edge. The DNS record for `world` (managed in hanzo/dns) just needs to
+# exist as a CNAME at the apex — proxy ON — and Cloudflare routes the
+# request to this Worker before reaching origin.
+[[routes]]
+pattern = "world.hanzo.ai/*"
+zone_name = "hanzo.ai"
+custom_domain = false
+
+[[routes]]
+pattern = "*.world.hanzo.ai/*"
+zone_name = "hanzo.ai"
+custom_domain = false
+
+# Static SPA assets — built by `vite build` into ./dist.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/v1/world/*", "/api/*"]
+
+[observability]
+enabled = true

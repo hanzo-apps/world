@@ -1,0 +1,21 @@
+# Cloudflare Pages redirects.
+#
+# Variant path aliases (legacy subdomains → canonical path-prefix). The
+# DNS for the subdomains points at the same Pages project, so this
+# captures any direct link that still lands on the old hosts.
+/pricing  /pricing.html   200
+/pro      /pricing.html   200
+/upgrade  /pricing        302
+/docs     /docs/documentation  302
+
+# Mintlify-hosted docs.
+/docs/*   https://worldmonitor.mintlify.dev/docs/:splat  200
+
+# OAuth shim paths (kept for backward-compat with old SDKs).
+/oauth/authorize  /v1/oauth/authorize  200
+/oauth/token      /v1/oauth/token      200
+/oauth/register   /v1/oauth/register   200
+
+# MCP shorthand.
+/mcp        /v1/mcp        200
+/mcp-grant  /mcp-grant.html  200
