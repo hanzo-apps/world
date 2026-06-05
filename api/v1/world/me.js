@@ -3,7 +3,7 @@
 // GET with Cookie (IAM session) OR Authorization: Bearer <iam-token>
 // Returns: { user, entitlements: { plan, tier, worldTrial, zenTier, balance } }
 
-import { corsHeaders } from '../../_cors.js';
+import { getCorsHeaders } from '../../_cors.js';
 import { jsonResponse } from '../../_json-response.js';
 
 const IAM_ENDPOINT = process.env.IAM_ENDPOINT || 'https://hanzo.id';
@@ -11,7 +11,7 @@ const IAM_ENDPOINT = process.env.IAM_ENDPOINT || 'https://hanzo.id';
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
-  const cors = corsHeaders(req);
+  const cors = getCorsHeaders(req, 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (req.method !== 'GET') return jsonResponse({ error: 'method_not_allowed' }, 405, cors);
 
