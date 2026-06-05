@@ -63,8 +63,17 @@ function requireSeedRefreshKey() {
 // v21 → v22 for country-resilience audit round 2 P2-N2/P2-N3: currencyExternal
 // inflation stability and NaN-safe blend math change published score values, so
 // seeder-written scores and rankings must share the server reader namespace.
-export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v22:';
-export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v22';
+// v22 → v23 batches three same-tag `pc` scorer changes: import-HHI stale /
+// missing source years now derate certainty coverage (#4088), observed
+// zero-outage feeds score as observed-quiet in infrastructure (P3-8), and WTO
+// tradePolicy restriction/barrier rows score one-row-per-reporter severity
+// instead of stale count anchors (P2-1). Seeder-written scores and rankings must
+// share the server reader namespace for the full batch.
+// v23 → v24 for country-resilience audit round 5 R5-2 / PR #4101: governance
+// WGI indicator slot semantics changed under the same `pc` formula tag, so the
+// seeder-written score/ranking namespace must match the server reader bump.
+export const RESILIENCE_SCORE_CACHE_PREFIX = 'resilience:score:v24:';
+export const RESILIENCE_RANKING_CACHE_KEY = 'resilience:ranking:v24';
 // Must match the server-side RESILIENCE_RANKING_CACHE_TTL_SECONDS. Extended
 // to 12h (2x the cron interval) so a missed/slow cron can't create an
 // EMPTY_ON_DEMAND gap before the next successful rebuild.
@@ -77,6 +86,10 @@ export const RESILIENCE_STATIC_INDEX_KEY = 'resilience:static:index:v1';
 const INTERVAL_TTL_SECONDS = 7 * 24 * 60 * 60;
 export { computeIntervals };
 
+function isKnownScoreFormulaTag(value) {
+  return value === 'pc' || value === 'd6';
+}
+
 function recordDiagnosticSample(diagnostics, sampleKey, countryCode, details = {}) {
   const samples = diagnostics?.[sampleKey];
   if (!Array.isArray(samples) || samples.length >= 5) return;
@@ -86,12 +99,6 @@ function recordDiagnosticSample(diagnostics, sampleKey, countryCode, details = {
 function recordDiagnosticCount(diagnostics, countKey, sampleKey, countryCode, details = {}) {
   diagnostics[countKey] = (Number(diagnostics[countKey]) || 0) + 1;
   recordDiagnosticSample(diagnostics, sampleKey, countryCode, details);
-}
-
-function currentCacheFormulaLocal() {
-  const combine = (process.env.RESILIENCE_PILLAR_COMBINE_ENABLED ?? 'false').toLowerCase() === 'true';
-  const schemaV2 = (process.env.RESILIENCE_SCHEMA_V2_ENABLED ?? 'true').toLowerCase() === 'true';
-  return combine && schemaV2 ? 'pc' : 'd6';
 }
 
 async function redisGetJson(url, token, key) {
@@ -119,14 +126,42 @@ async function redisPipeline(url, token, commands) {
   return resp.json();
 }
 
-export function parseCachedScorePayload(raw) {
+async function fetchRuntimeFormulaTag() {
+  try {
+    const resp = await fetch(`${API_BASE}/api/resilience/v1/get-runtime-manifest`, {
+      headers: { 'User-Agent': SEED_UA, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[resilience-scores] Runtime manifest returned ${resp.status}; accepting any valid score formula tag`);
+      return null;
+    }
+
+    const data = await resp.json();
+    if (isKnownScoreFormulaTag(data?.formulaTag)) return data.formulaTag;
+    console.warn(`[resilience-scores] Runtime manifest formulaTag=${String(data?.formulaTag)} is not recognized; accepting any valid score formula tag`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[resilience-scores] Runtime manifest formula lookup failed (${message}); accepting any valid score formula tag`);
+  }
+  return null;
+}
+
+export function parseCachedScorePayload(raw, options = {}) {
   if (typeof raw !== 'string' || raw.length === 0 || raw === 'null') return null;
   try {
     const parsed = JSON.parse(raw);
     if (parsed === NEG_SENTINEL) return null;
     const payload = unwrapEnvelope(parsed).data;
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-    if (payload._formula !== currentCacheFormulaLocal()) return null;
+    // Require a valid formula tag, but DO NOT re-derive that formula from this
+    // process's env. Production is the source of truth for the formula it
+    // actually served; callers may pass the live runtime formula when they need
+    // to reject stale cache entries from a prior formula.
+    const formula = payload._formula;
+    if (!isKnownScoreFormulaTag(formula)) return null;
+    const expectedFormula = options?.expectedFormula;
+    if (isKnownScoreFormulaTag(expectedFormula) && formula !== expectedFormula) return null;
     const overallScore = Number(payload.overallScore);
     if (!Number.isFinite(overallScore) || overallScore <= 0) return null;
     return payload;
@@ -135,15 +170,15 @@ export function parseCachedScorePayload(raw) {
   }
 }
 
-function countCachedFromPipeline(results) {
+function countCachedFromPipeline(results, expectedFormula = null) {
   let count = 0;
   for (const entry of results) {
-    if (parseCachedScorePayload(entry?.result) != null) count++;
+    if (parseCachedScorePayload(entry?.result, { expectedFormula }) != null) count++;
   }
   return count;
 }
 
-export function buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostics) {
+export function buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostics, options = {}) {
   if (!raw || raw === 'null') {
     recordDiagnosticCount(diagnostics, 'missingScorePayloadCount', 'missingScorePayloadSamples', countryCode);
     return null;
@@ -157,14 +192,14 @@ export function buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostic
     }
 
     const formula = typeof score?._formula === 'string' ? score._formula : undefined;
-    if (formula !== 'pc' && formula !== 'd6') {
+    if (!isKnownScoreFormulaTag(formula)) {
       // buildScoreIntervalPayload records formula skip diagnostics for ambiguous cached scores.
       buildScoreIntervalPayload(score, { draws: DRAWS, diagnostics });
       return null;
     }
 
-    const expectedFormula = currentCacheFormulaLocal();
-    if (formula !== expectedFormula) {
+    const expectedFormula = options?.expectedFormula;
+    if (isKnownScoreFormulaTag(expectedFormula) && formula !== expectedFormula) {
       recordDiagnosticCount(diagnostics, 'staleScorePayloadCount', 'staleScorePayloadSamples', countryCode, {
         formula,
         expectedFormula,
@@ -172,7 +207,12 @@ export function buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostic
       return null;
     }
 
-    const currentScore = parseCachedScorePayload(raw);
+    // The payload carries a valid 'pc'|'d6' tag. Build the interval that
+    // matches THAT tag, but only after checking the live runtime formula when
+    // the manifest lookup succeeded. We deliberately do not gate on a formula
+    // re-derived from this process's env: that drift left production
+    // interval-less while the ranking stayed fresh.
+    const currentScore = parseCachedScorePayload(raw, { expectedFormula });
     if (!currentScore) {
       recordDiagnosticCount(diagnostics, 'invalidScorePayloadCount', 'invalidScorePayloadSamples', countryCode, { formula });
       return null;
@@ -194,14 +234,14 @@ export function buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostic
   }
 }
 
-async function computeAndWriteIntervals(url, token, countryCodes, pipelineResults) {
+async function computeAndWriteIntervals(url, token, countryCodes, pipelineResults, options = {}) {
   const commands = [];
   const diagnostics = createIntervalDiagnostics();
 
   for (let i = 0; i < countryCodes.length; i++) {
     const raw = pipelineResults[i]?.result ?? null;
     const countryCode = countryCodes[i];
-    const payload = buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostics);
+    const payload = buildIntervalPayloadFromCachedScore(raw, countryCode, diagnostics, options);
     if (payload) {
       commands.push(['SET', `${INTERVAL_KEY_PREFIX}${countryCode}`, JSON.stringify(payload), 'EX', INTERVAL_TTL_SECONDS]);
     }
@@ -332,11 +372,16 @@ async function seedResilienceScores() {
     return { skipped: true, reason: 'no_index' };
   }
 
+  const expectedFormula = await fetchRuntimeFormulaTag();
+  if (expectedFormula) {
+    console.log(`[resilience-scores] Runtime formula tag: ${expectedFormula}`);
+  }
+
   console.log(`[resilience-scores] Reading cached scores for ${countryCodes.length} countries...`);
 
   const getCommands = countryCodes.map((c) => ['GET', `${RESILIENCE_SCORE_CACHE_PREFIX}${c}`]);
   const preResults = await redisPipeline(url, token, getCommands);
-  const preWarmed = countCachedFromPipeline(preResults);
+  const preWarmed = countCachedFromPipeline(preResults, expectedFormula);
 
   console.log(`[resilience-scores] ${preWarmed}/${countryCodes.length} scores pre-warmed`);
 
@@ -374,7 +419,7 @@ async function seedResilienceScores() {
     const stillMissing = [];
     for (let i = 0; i < countryCodes.length; i++) {
       const raw = postResults[i]?.result ?? null;
-      if (parseCachedScorePayload(raw) == null) stillMissing.push(countryCodes[i]);
+      if (parseCachedScorePayload(raw, { expectedFormula }) == null) stillMissing.push(countryCodes[i]);
     }
 
     // Warm laggards individually (countries the bulk ranking timed out on)
@@ -402,10 +447,10 @@ async function seedResilienceScores() {
     }
 
     const finalResults = await redisPipeline(url, token, getCommands);
-    const finalWarmed = countCachedFromPipeline(finalResults);
+    const finalWarmed = countCachedFromPipeline(finalResults, expectedFormula);
     console.log(`[resilience-scores] Final: ${finalWarmed}/${countryCodes.length} cached`);
 
-    const intervalResult = await computeAndWriteIntervals(url, token, countryCodes, finalResults);
+    const intervalResult = await computeAndWriteIntervals(url, token, countryCodes, finalResults, { expectedFormula });
     const rankingPresent = await refreshRankingAggregate({ url, token, laggardsWarmed });
     return {
       skipped: false,
@@ -430,7 +475,7 @@ async function seedResilienceScores() {
     };
   }
 
-  const intervalResult = await computeAndWriteIntervals(url, token, countryCodes, preResults);
+  const intervalResult = await computeAndWriteIntervals(url, token, countryCodes, preResults, { expectedFormula });
   // Refresh the ranking aggregate on every cron, even when per-country
   // scores are still warm from the previous tick. Ranking has a 12h TTL vs
   // a 6h cron cadence — skipping the refresh when the key is still alive

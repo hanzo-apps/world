@@ -53,9 +53,22 @@ import {
 import {
   MACRO_FISCAL_INDICATOR_WEIGHTS,
 } from '../server/worldmonitor/resilience/v1/_macro-fiscal-weights.ts';
+import {
+  RANKABLE_UNIVERSE_SIZE,
+} from '../server/worldmonitor/resilience/v1/_rankable-universe.ts';
+import {
+  SCORER_DOC_PARITY_NON_LINEAR_IDS,
+  SCORER_DOC_PARITY_SPECS,
+  SCORER_DOC_PARITY_UNSUPPORTED_DIMENSION_SPECS,
+  SCORER_DOC_PARITY_UNSUPPORTED_DIMENSIONS,
+  STATIC_SCORER_CATALOG_PARITY_IDS,
+  extractLinearNormalizerForTest,
+  scorerDocParitySpecsBySection,
+} from './helpers/resilience-scorer-doc-parity-specs.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DOC_PATH = resolve(here, '../docs/methodology/country-resilience-index.mdx');
+const INDICATOR_SOURCE_CATALOG_PATH = resolve(here, '../docs/methodology/indicator-sources.yaml');
 const DOCUMENTATION_PATH = resolve(here, '../docs/documentation.mdx');
 const FEATURES_PATH = resolve(here, '../docs/features.mdx');
 const STATIC_SEED_SCRIPT_PATH = resolve(here, '../scripts/seed-resilience-static.mjs');
@@ -64,6 +77,7 @@ const RESILIENCE_OPENAPI_YAML_PATH = resolve(here, '../docs/api/ResilienceServic
 const RESILIENCE_OPENAPI_JSON_PATH = resolve(here, '../docs/api/ResilienceService.openapi.json');
 const BUNDLED_OPENAPI_YAML_PATH = resolve(here, '../docs/api/worldmonitor.openapi.yaml');
 const docText = readFileSync(DOC_PATH, 'utf8');
+const indicatorSourceCatalogText = readFileSync(INDICATOR_SOURCE_CATALOG_PATH, 'utf8');
 const staticSeedScriptText = readFileSync(STATIC_SEED_SCRIPT_PATH, 'utf8');
 const healthApiText = readFileSync(HEALTH_API_PATH, 'utf8');
 const CURRENT_DIMENSION_COUNT_SURFACES = [
@@ -96,6 +110,21 @@ const GENERATED_OPENAPI_SURFACES = [
     text: readFileSync(BUNDLED_OPENAPI_YAML_PATH, 'utf8'),
   },
 ];
+const ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS = new Map([
+  ['importedFossilDependence', 0.35],
+  ['lowCarbonGenerationShare', 0.20],
+  ['powerLossesPct', 0.20],
+  ['euGasStorageStress', 0.10],
+  ['energyPriceStress', 0.15],
+]);
+const SCORER_TABLE_PARITY_SPECS = scorerDocParitySpecsBySection();
+const LEGACY_ONLY_ENERGY_INDICATORS = new Set([
+  'energyImportDependency',
+  'gasShare',
+  'coalShare',
+  'renewShare',
+  'electricityConsumption',
+]);
 const DIMENSION_LABELS: Readonly<Record<ResilienceDimensionId, string>> = {
   macroFiscal: 'Macro-Fiscal',
   currencyExternal: 'Currency & External',
@@ -120,6 +149,26 @@ const DIMENSION_LABELS: Readonly<Record<ResilienceDimensionId, string>> = {
   liquidReserveAdequacy: 'Liquid Reserve Adequacy',
   sovereignFiscalBuffer: 'Sovereign Fiscal Buffer',
 };
+
+interface MethodologyIndicatorSpec {
+  id: string;
+  direction: string;
+  goalposts: string;
+  weight: number;
+}
+
+interface MethodologyIndicatorRow extends MethodologyIndicatorSpec {
+  description: string;
+  source: string;
+  cadence: string;
+}
+
+interface MethodologyIndicatorTextRow {
+  id: string;
+  direction: string;
+  goalposts: string;
+  weight: string;
+}
 
 describe('methodology doc parity (Plan 2026-04-26-002 §U8)', () => {
   it('cache prefixes named in the changelog match the live constants', () => {
@@ -150,6 +199,27 @@ describe('methodology doc parity (Plan 2026-04-26-002 §U8)', () => {
       docText.includes(intervalPrefix.replace(/:$/, '')) || docText.includes(intervalPrefix),
       `methodology doc must reference current interval key prefix "${intervalPrefix}". ` +
       'Bump the doc when bumping the interval cache.',
+    );
+  });
+
+  it('keeps the v1.1 Reproducibility scorecard row free of concrete cache-key examples', () => {
+    const reproducibilityRow = docText.match(/^\| \*\*Reproducibility\*\* \| \d+(?:\.\d+)? \| (?<rationale>.+) \|$/m);
+    assert.ok(
+      reproducibilityRow?.groups?.rationale,
+      'Methodology doc must keep a v1.1 Reproducibility scorecard row that this cache-key guard can inspect.',
+    );
+    const rationale = reproducibilityRow.groups.rationale;
+
+    assert.match(
+      rationale,
+      /see the Redis keys table/i,
+      'The v1.1 Reproducibility row should point readers to the current Redis keys table instead of repeating cache-key examples.',
+    );
+    assert.doesNotMatch(
+      rationale,
+      /`(?:resilience:)?(?:score|ranking|history|intervals):v\d+(?::[^`]*)?`/,
+      'The historical v1.1 Reproducibility row must not repeat concrete cache-key examples. ' +
+      'Even fully-qualified stale examples read like current public-state docs and drift silently.',
     );
   });
 
@@ -229,6 +299,34 @@ describe('methodology doc parity (Plan 2026-04-26-002 §U8)', () => {
           `contradict the live count: ${stale.join(', ')}. Current active count is ${activeCount} ` +
           `(or total ${totalCount} if explicitly including retired dimensions).`,
       );
+    }
+  });
+
+  it('current public CRI surfaces distinguish the rankable universe from stale broad country-count copy', () => {
+    const expectedUniverseRe = new RegExp(
+      `${RANKABLE_UNIVERSE_SIZE}(?:-country public rankable universe|\\s+countries?\\s+in\\s+the\\s+public\\s+rankable\\s+universe)`,
+      'i',
+    );
+    const stalePublicCountryCountPatterns = [
+      /~\s*220[-\s]countries?/i,
+      /scores\s+every\s+country\s+in\s+the\s+world/i,
+      /\b\d+\s+countries?\s+with\s+\d+\s+in\s+`?greyedOut\[\]`?/i,
+      /\b\d+\s+countries?\s+are\s+currently\s+in\s+`?greyedOut\[\]`?/i,
+    ];
+
+    for (const surface of CURRENT_DIMENSION_COUNT_SURFACES) {
+      assert.ok(
+        expectedUniverseRe.test(surface.text),
+        `${surface.label} (${surface.path}) must mention the current ${RANKABLE_UNIVERSE_SIZE}-country public rankable universe.`,
+      );
+
+      for (const pattern of stalePublicCountryCountPatterns) {
+        assert.equal(
+          pattern.test(surface.text),
+          false,
+          `${surface.label} (${surface.path}) contains stale public CRI country-count copy matching ${pattern}.`,
+        );
+      }
     }
   });
 
@@ -373,6 +471,387 @@ describe('methodology doc parity (Plan 2026-04-26-002 §U8)', () => {
     );
   });
 
+  it('Energy v2 methodology table matches active production registry weights', () => {
+    const tableWeights = extractIndicatorWeightsForMarkedTable(
+      docText,
+      'Energy',
+      '**v2 construct (active; framing decision: Option B, power-system security).**',
+    );
+    const registryWeights = new Map(
+      INDICATOR_REGISTRY
+        .filter((indicator) => ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS.has(indicator.id))
+        .map((indicator) => [indicator.id, indicator.weight]),
+    );
+
+    assert.deepEqual(
+      [...tableWeights.keys()],
+      [...ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS.keys()],
+      'Energy v2 methodology table must list exactly the active production energy-v2 indicators.',
+    );
+    assert.deepEqual(
+      registryWeights,
+      ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS,
+      'Energy v2 INDICATOR_REGISTRY weights must mirror scoreEnergyV2 active production weights.',
+    );
+    assert.deepEqual(
+      tableWeights,
+      ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS,
+      'Energy v2 methodology table weights must match the active production registry/scorer weights.',
+    );
+    for (const id of LEGACY_ONLY_ENERGY_INDICATORS) {
+      assert.equal(
+        tableWeights.has(id),
+        false,
+        `${id} is legacy-only under production energy v2 and must not appear in the active v2 table.`,
+      );
+    }
+  });
+
+  it('affected methodology indicator tables match live scorer specs', () => {
+    for (const [section, expectedRows] of SCORER_TABLE_PARITY_SPECS) {
+      const actualRows = extractIndicatorRowsForSection(docText, section);
+      const expectedIds = expectedRows.map((row) => row.id);
+      const actualIds = actualRows.map((row) => row.id);
+      assert.deepEqual(
+        actualIds,
+        expectedIds,
+        `${section} methodology table must list exactly the indicators used by the current scorer, in scorer order.`,
+      );
+
+      for (const expected of expectedRows) {
+        const actual = actualRows.find((row) => row.id === expected.id);
+        assert.ok(actual, `${section} methodology table row for ${expected.id} not found.`);
+        assert.equal(
+          actual.direction,
+          expected.methodologyDirection,
+          `${section}.${expected.id} direction must match scorer semantics.`,
+        );
+        assert.equal(
+          actual.goalposts,
+          expected.methodologyGoalposts,
+          `${section}.${expected.id} goalposts must match scorer normalizeHigherBetter/normalizeLowerBetter anchors.`,
+        );
+        assert.equal(
+          actual.weight,
+          expected.weight,
+          `${section}.${expected.id} weight must match the current weightedBlend input.`,
+        );
+      }
+    }
+  });
+
+  it('scorer doc parity coverage is source-derived or explicitly allowlisted', () => {
+    const coveredDimensions = [...new Set(SCORER_DOC_PARITY_SPECS.map((spec) => spec.dimension))].sort();
+    assert.deepEqual(
+      coveredDimensions,
+      [
+        'borderSecurity',
+        'currencyExternal',
+        'cyberDigital',
+        'externalDebtCoverage',
+        'financialSystemExposure',
+        'foodWater',
+        'fiscalSpace',
+        'healthPublicService',
+        'importConcentration',
+        'informationCognitive',
+        'infrastructure',
+        'liquidReserveAdequacy',
+        'macroFiscal',
+        'sovereignFiscalBuffer',
+        'stateContinuity',
+        'tradePolicy',
+      ].sort(),
+      'Parity coverage changed. Add source extraction for new dimensions where practical, or update the unsupported allowlist with a rationale.',
+    );
+    assert.deepEqual(
+      [...SCORER_DOC_PARITY_UNSUPPORTED_DIMENSIONS].sort(),
+      [
+        'energy',
+        'fuelStockDays',
+        'governanceInstitutional',
+        'logisticsSupply',
+        'reserveAdequacy',
+        'socialCohesion',
+      ].sort(),
+      'Unsupported scorer dimensions must be explicit so skipped parity coverage cannot drift silently.',
+    );
+    assert.equal(
+      SCORER_DOC_PARITY_SPECS.filter((spec) => spec.extraction === 'scorer-source' || spec.extraction === 'custom-source').length,
+      42,
+      'Expected 42 scorer/doc parity rows to derive weights from scorer source or a custom scorer-source extractor.',
+    );
+    assert.deepEqual(
+      SCORER_DOC_PARITY_SPECS
+        .filter((spec) => spec.extraction === 'non-linear-allowlist')
+        .map((spec) => spec.id),
+      [...SCORER_DOC_PARITY_NON_LINEAR_IDS].filter((id) => id !== 'inflationStability'),
+      'Non-linear scorer rows in weightedBlend tables must be explicitly allowlisted.',
+    );
+  });
+
+  it('unsupported scorer doc parity dimensions have explicit rationale', () => {
+    for (const spec of SCORER_DOC_PARITY_UNSUPPORTED_DIMENSION_SPECS) {
+      assert.ok(
+        spec.reason.trim().length >= 80,
+        `${spec.dimension} unsupported parity entry must explain why automatic source extraction is not used.`,
+      );
+      assert.ok(
+        spec.indicators.length > 0,
+        `${spec.dimension} unsupported parity entry must pin at least one methodology row.`,
+      );
+      for (const indicator of spec.indicators) {
+        assert.equal(
+          indicator.methodologySection.length > 0,
+          true,
+          `${spec.dimension}.${indicator.id} must name the methodology section it guards.`,
+        );
+      }
+    }
+  });
+
+  it('unsupported scorer dimensions keep hardcoded methodology row parity', () => {
+    for (const spec of SCORER_DOC_PARITY_UNSUPPORTED_DIMENSION_SPECS) {
+      const section = spec.indicators[0]?.methodologySection;
+      assert.ok(section, `${spec.dimension} must declare at least one indicator section.`);
+      const actualRows = extractIndicatorTextRowsForSection(docText, section, spec.tableMarker);
+      const expectedIds = spec.indicators.map((row) => row.id);
+      const actualIds = actualRows.map((row) => row.id);
+      assert.deepEqual(
+        actualIds,
+        expectedIds,
+        `${section} methodology table must list exactly the hardcoded unsupported parity rows for ${spec.dimension}.`,
+      );
+
+      for (const expected of spec.indicators) {
+        const actual = actualRows.find((row) => row.id === expected.id);
+        assert.ok(actual, `${section} methodology table row for ${expected.id} not found.`);
+        assert.equal(
+          actual.direction,
+          expected.methodologyDirection,
+          `${section}.${expected.id} direction must stay pinned for unsupported scorer parity.`,
+        );
+        assert.equal(
+          actual.goalposts,
+          expected.methodologyGoalposts,
+          `${section}.${expected.id} goalposts must stay pinned for unsupported scorer parity.`,
+        );
+        assert.equal(
+          actual.weight,
+          expected.methodologyWeight,
+          `${section}.${expected.id} weight must stay pinned for unsupported scorer parity.`,
+        );
+      }
+    }
+  });
+
+  it('source-derived scorer specs pin representative anchor and weight drift', () => {
+    const broadband = SCORER_DOC_PARITY_SPECS.find((spec) => spec.id === 'broadband');
+    assert.ok(broadband, 'broadband must be covered by scorer/doc parity specs.');
+    assert.equal(
+      broadband.extraction,
+      'scorer-source',
+      'broadband parity must be extracted from scoreInfrastructure, not copied into helper constants.',
+    );
+    assert.equal(
+      broadband.weight,
+      0.15,
+      'Changing scoreInfrastructure broadband weight now changes the generated spec and breaks doc/registry parity unless those surfaces move too.',
+    );
+    assert.deepEqual(
+      broadband.registryGoalposts,
+      { worst: 0, best: 40 },
+      'Changing scoreInfrastructure broadband anchors now changes the generated spec and breaks doc/registry parity unless those surfaces move too.',
+    );
+  });
+
+  it('source extraction rejects mixed linear normalizers instead of guessing direction', () => {
+    assert.throws(
+      () => extractLinearNormalizerForTest(
+        'flag ? normalizeHigherBetter(value, 0, 100) : normalizeLowerBetter(value, 80, 20)',
+        'syntheticConditionalNormalizer',
+      ),
+      /mixes normalizeHigherBetter and normalizeLowerBetter/,
+      'A scorer entry with both linear normalizers must fail loudly so helper extraction cannot silently choose higher-better.',
+    );
+  });
+
+  it('trend enum prose matches the response enum', () => {
+    assert.match(
+      docText,
+      /Direction of score movement over the last 30 days \(`rising`, `stable`, or `falling`\)/,
+      'Methodology trend prose must document the live rising/stable/falling enum.',
+    );
+    assert.doesNotMatch(
+      docText,
+      /`improving`, `stable`, or `declining`/,
+      'Methodology trend prose must not preserve the stale improving/stable/declining enum.',
+    );
+  });
+
+  it('Social Cohesion GPI-only unrest prose documents the non-comprehensive source fallback', () => {
+    const sectionText = extractSectionText(docText, 'Social Cohesion');
+    assert.match(
+      sectionText,
+      /zero unrest events\s+fall back to `curated_list_absent` at 50\/coverage 0\.3 \(`unmonitored`\)/,
+      'Social Cohesion prose must document the live curated_list_absent fallback for GPI-only zero-unrest rows.',
+    );
+    assert.doesNotMatch(
+      sectionText,
+      /zero unrest events\s+(?:are\s+)?imputed at 70\/coverage 0\.5/,
+      'Social Cohesion prose must not preserve the stale stable-absence 70/0.5 unrest fallback.',
+    );
+  });
+
+  it('methodology changelog does not claim UNHCR displacement is population-normalized', () => {
+    const changelogText = extractSectionText(docText, 'v17 (April 2026) — universe + coverage rebuild (plan 2026-04-26-002)');
+    assert.match(
+      changelogText,
+      /`unrestEvents` and `ucdpConflict` divide by `max\(populationMillions, 0\.5\)`/,
+      'v17 changelog must limit per-capita normalization to the live event metrics.',
+    );
+    assert.match(
+      changelogText,
+      /UNHCR `displacementTotal` and `displacementHosted` are still scored on log10 absolute displaced-person counts/,
+      'v17 changelog must state that displacement rows remain log10 absolute counts.',
+    );
+    assert.doesNotMatch(
+      changelogText,
+      /`unrestEvents`, `ucdpConflict`, `displacementTotal`, and `displacementHosted` divide by `max\(populationMillions, 0\.5\)`/,
+      'v17 changelog must not preserve the stale displacement population-normalization claim.',
+    );
+  });
+
+  it('indicator source catalog labels energy-v2 rows as active and legacy-only rows as replaced', () => {
+    for (const id of ACTIVE_ENERGY_V2_INDICATOR_WEIGHTS.keys()) {
+      const block = extractIndicatorSourceBlock(indicatorSourceCatalogText, id);
+      assert.match(
+        block,
+        /reviewNotes: Active energy-v2 (?:Core|Enrichment) scorer input\./,
+        `${id} source-catalog row must identify it as an active energy-v2 scorer input.`,
+      );
+      const registrySpec = INDICATOR_REGISTRY.find((indicator) => indicator.id === id);
+      assert.ok(registrySpec, `${id} must exist in INDICATOR_REGISTRY.`);
+      if (registrySpec.tier === 'core') {
+        const coveragePct = Number(extractIndicatorSourceScalar(block, 'coveragePct'));
+        const license = extractIndicatorSourceScalar(block, 'license').toLowerCase();
+        assert.ok(
+          coveragePct >= 0.90,
+          `${id} is active Core in the registry, so indicator-sources.yaml coveragePct must be >= 0.90; got ${coveragePct}.`,
+        );
+        assert.notEqual(
+          license,
+          'internal',
+          `${id} is active Core in the registry, so indicator-sources.yaml must not leave license=Internal.`,
+        );
+      }
+    }
+
+    for (const id of LEGACY_ONLY_ENERGY_INDICATORS) {
+      const catalogId = id === 'energyImportDependency' ? 'dependency' : id;
+      const block = extractIndicatorSourceBlock(indicatorSourceCatalogText, catalogId);
+      assert.match(
+        block,
+        /reviewNotes: PR 1 §3\.[123] (?:removes|replaces|collapses)/,
+        `${id} source-catalog row must remain explicit that the standalone legacy input is replaced under energy v2.`,
+      );
+    }
+    assert.doesNotMatch(
+      indicatorSourceCatalogText,
+      /PR 1 additions \(not yet in the scorer\)/,
+      'indicator source catalog must not describe active energy-v2 inputs as pending/not yet in the scorer.',
+    );
+  });
+
+  it('indicator source catalog covers newly registered static scorer inputs', () => {
+    for (const id of STATIC_SCORER_CATALOG_PARITY_IDS) {
+      const block = extractIndicatorSourceBlock(indicatorSourceCatalogText, id);
+      const registrySpec = INDICATOR_REGISTRY.find((indicator) => indicator.id === id);
+      assert.ok(registrySpec, `${id} must exist in INDICATOR_REGISTRY.`);
+
+      assert.equal(
+        extractIndicatorSourceScalar(block, 'dimension'),
+        registrySpec.dimension,
+        `${id} source-catalog dimension must match INDICATOR_REGISTRY.`,
+      );
+      assert.equal(
+        Number(extractIndicatorSourceScalar(block, 'weight')),
+        registrySpec.weight,
+        `${id} source-catalog weight must match INDICATOR_REGISTRY.`,
+      );
+      assert.ok(
+        Number(extractIndicatorSourceScalar(block, 'coveragePct')) >= 0.90,
+        `${id} is active Core in the registry, so indicator-sources.yaml coveragePct must be >= 0.90.`,
+      );
+      assert.notEqual(
+        extractIndicatorSourceScalar(block, 'license'),
+        'internal',
+        `${id} is active Core in the registry, so indicator-sources.yaml license must not be internal.`,
+      );
+      assert.match(
+        block,
+        /reviewNotes: Active (?:infrastructure|healthPublicService) Core scorer input\./,
+        `${id} source-catalog row must identify it as an active Core scorer input.`,
+      );
+    }
+
+    assert.doesNotMatch(
+      indicatorSourceCatalogText,
+      /- indicator: whoHealthExpenditure\n/,
+      'stale whoHealthExpenditure catalog alias must not obscure the active healthExpPerCapitaUsd scorer id.',
+    );
+  });
+
+  it('indicator source catalog mirrors scorer-derived metadata for round5 repaired rows', () => {
+    const repairedIds = ['tradeRestrictions', 'rsfPressFreedom'] as const;
+
+    for (const id of repairedIds) {
+      const block = extractIndicatorSourceBlock(indicatorSourceCatalogText, id);
+      const scorerSpec = SCORER_DOC_PARITY_SPECS.find((spec) => spec.id === id);
+      const registrySpec = INDICATOR_REGISTRY.find((indicator) => indicator.id === id);
+      assert.ok(scorerSpec, `${id} must be covered by scorer doc parity specs.`);
+      assert.ok(registrySpec, `${id} must exist in INDICATOR_REGISTRY.`);
+
+      assert.equal(
+        extractIndicatorSourceScalar(block, 'dimension'),
+        scorerSpec.dimension,
+        `${id} source-catalog dimension must mirror the scorer-derived dimension.`,
+      );
+      assert.equal(
+        Number(extractIndicatorSourceScalar(block, 'weight')),
+        scorerSpec.weight,
+        `${id} source-catalog weight must mirror the scorer-derived weightedBlend row.`,
+      );
+      assert.equal(
+        extractIndicatorSourceScalar(block, 'direction'),
+        indicatorSourceDirection(scorerSpec.registryDirection),
+        `${id} source-catalog direction must mirror scorer normalization.`,
+      );
+      assert.equal(
+        registrySpec.direction,
+        scorerSpec.registryDirection,
+        `${id} registry direction must mirror scorer normalization.`,
+      );
+      assert.deepEqual(
+        registrySpec.goalposts,
+        scorerSpec.registryGoalposts,
+        `${id} registry goalposts must mirror scorer normalization anchors.`,
+      );
+    }
+
+    const tradeRestrictionsBlock = extractIndicatorSourceBlock(indicatorSourceCatalogText, 'tradeRestrictions');
+    assert.doesNotMatch(
+      tradeRestrictionsBlock,
+      /weighted\s*3[×x]|in-force,\s*weighted/i,
+      'tradeRestrictions catalog rationale must not describe the retired active-restriction 3x count model.',
+    );
+    assert.match(
+      extractIndicatorSourceScalar(tradeRestrictionsBlock, 'mechanismTestRationale'),
+      /severity[\s\S]*low=0[\s\S]*moderate=1[\s\S]*high=2/i,
+      'tradeRestrictions catalog rationale must document the current WTO severity scoring model.',
+    );
+  });
+
   it('generated OpenAPI pillar weight prose matches PILLAR_WEIGHTS and formula semantics', () => {
     const expectedWeightList = PILLAR_ORDER
       .map((id) => PILLAR_WEIGHTS[id].toFixed(2))
@@ -428,14 +907,7 @@ function escapeRegex(s: string): string {
 }
 
 function extractIndicatorWeightsForSection(text: string, sectionHeading: string): Map<string, number> {
-  const headingRe = new RegExp(`^#### ${escapeRegex(sectionHeading)}\\s*$`, 'm');
-  const headingMatch = headingRe.exec(text);
-  assert.ok(headingMatch, `Methodology section "${sectionHeading}" not found.`);
-
-  const sectionStart = headingMatch.index + headingMatch[0].length;
-  const rest = text.slice(sectionStart);
-  const nextHeadingMatch = /^#{3,4}\s.+$/m.exec(rest);
-  const sectionText = nextHeadingMatch == null ? rest : rest.slice(0, nextHeadingMatch.index);
+  const sectionText = extractSectionText(text, sectionHeading);
 
   const rows = [...sectionText.matchAll(/^\|\s*([^|\s][^|]*?)\s*\|(?:[^|]*\|){3}\s*([0-9.]+)\s*\|/gm)];
   const weights = new Map<string, number>();
@@ -445,6 +917,121 @@ function extractIndicatorWeightsForSection(text: string, sectionHeading: string)
     weights.set(indicatorId, Number(row[2]));
   }
   return weights;
+}
+
+function extractIndicatorRowsForSection(text: string, sectionHeading: string): MethodologyIndicatorRow[] {
+  const sectionText = extractSectionText(text, sectionHeading);
+  const rows: MethodologyIndicatorRow[] = [];
+
+  for (const row of sectionText.split('\n')) {
+    if (!row.startsWith('|')) continue;
+    const cells = row
+      .split('|')
+      .map((cell) => decodeMarkdownEntityText(cell.trim()))
+      .filter(Boolean);
+    if (cells.length !== 7 || cells[0] === 'Indicator' || cells[0].startsWith('---')) continue;
+    const weight = Number(cells[4]);
+    assert.ok(Number.isFinite(weight), `Indicator row "${cells[0]}" in "${sectionHeading}" must have a numeric weight.`);
+    rows.push({
+      id: cells[0],
+      description: cells[1],
+      direction: cells[2],
+      goalposts: cells[3],
+      weight,
+      source: cells[5],
+      cadence: cells[6],
+    });
+  }
+
+  return rows;
+}
+
+function extractIndicatorTextRowsForSection(
+  text: string,
+  sectionHeading: string,
+  marker?: string,
+): MethodologyIndicatorTextRow[] {
+  let sectionText = extractSectionText(text, sectionHeading);
+  if (marker != null) {
+    const markerIndex = sectionText.indexOf(marker);
+    assert.notEqual(markerIndex, -1, `Marker "${marker}" not found in section "${sectionHeading}".`);
+    sectionText = sectionText.slice(markerIndex + marker.length);
+  }
+
+  const rows: MethodologyIndicatorTextRow[] = [];
+  for (const row of sectionText.split('\n')) {
+    if (!row.startsWith('|')) continue;
+    const cells = row
+      .split('|')
+      .map((cell) => decodeMarkdownEntityText(cell.trim()))
+      .filter(Boolean);
+    if (cells.length !== 7 || cells[0] === 'Indicator' || cells[0].startsWith('---')) continue;
+    rows.push({
+      id: cells[0],
+      direction: cells[2],
+      goalposts: cells[3],
+      weight: cells[4],
+    });
+  }
+  return rows;
+}
+
+function extractSectionText(text: string, sectionHeading: string): string {
+  const headingRe = new RegExp(`^#{3,4} ${escapeRegex(sectionHeading)}\\s*$`, 'm');
+  const headingMatch = headingRe.exec(text);
+  assert.ok(headingMatch, `Methodology section "${sectionHeading}" not found.`);
+
+  const headingLevel = headingMatch[0].match(/^#+/)?.[0].length ?? 3;
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const rest = text.slice(sectionStart);
+  const nextHeadingMatch = new RegExp(`^#{1,${headingLevel}}\\s.+$`, 'm').exec(rest);
+  return nextHeadingMatch == null ? rest : rest.slice(0, nextHeadingMatch.index);
+}
+
+function extractIndicatorWeightsForMarkedTable(
+  text: string,
+  sectionHeading: string,
+  marker: string,
+): Map<string, number> {
+  const headingRe = new RegExp(`^#### ${escapeRegex(sectionHeading)}\\s*$`, 'm');
+  const headingMatch = headingRe.exec(text);
+  assert.ok(headingMatch, `Methodology section "${sectionHeading}" not found.`);
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const rest = text.slice(sectionStart);
+  const nextHeadingMatch = /^#{3,4}\s.+$/m.exec(rest);
+  const sectionText = nextHeadingMatch == null ? rest : rest.slice(0, nextHeadingMatch.index);
+  const markerIndex = sectionText.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `Marker "${marker}" not found in section "${sectionHeading}".`);
+
+  const afterMarker = sectionText.slice(markerIndex + marker.length);
+  const rows = [...afterMarker.matchAll(/^\|\s*([^|\s][^|]*?)\s*\|(?:[^|]*\|){3}\s*([0-9.]+)\s*\|/gm)];
+  const weights = new Map<string, number>();
+  for (const row of rows) {
+    const indicatorId = row[1].trim();
+    if (indicatorId === 'Indicator' || indicatorId.startsWith('---')) continue;
+    weights.set(indicatorId, Number(row[2]));
+  }
+  return weights;
+}
+
+function extractIndicatorSourceBlock(text: string, indicatorId: string): string {
+  const blockRe = new RegExp(`^- indicator: ${escapeRegex(indicatorId)}\\n[\\s\\S]*?(?=\\n- indicator: |\\n# [A-Z]|\\n$)`, 'm');
+  const match = blockRe.exec(text);
+  assert.ok(match, `indicator-sources.yaml row for "${indicatorId}" not found.`);
+  return match[0];
+}
+
+function extractIndicatorSourceScalar(block: string, field: string): string {
+  const match = new RegExp(`^\\s*${escapeRegex(field)}:\\s*(.+)$`, 'm').exec(block);
+  assert.ok(match, `indicator-sources.yaml field "${field}" not found in block:\n${block}`);
+  return match[1].trim();
+}
+
+function indicatorSourceDirection(direction: 'higherBetter' | 'lowerBetter' | 'indicatorSemantics'): string {
+  if (direction === 'higherBetter') return 'higher-better';
+  if (direction === 'lowerBetter') return 'lower-better';
+  return 'composite';
 }
 
 function extractIndicatorRowForSection(
@@ -470,9 +1057,16 @@ function extractIndicatorRowForSection(
     .filter(Boolean);
   assert.equal(cells.length, 7, `Indicator row "${indicatorId}" should have seven cells.`);
   return {
-    direction: cells[2],
-    goalposts: cells[3],
+    direction: decodeMarkdownEntityText(cells[2]),
+    goalposts: decodeMarkdownEntityText(cells[3]),
   };
+}
+
+function decodeMarkdownEntityText(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 function extractDomainRowDimensionLabels(text: string, domainId: ResilienceDomainId): string[] {

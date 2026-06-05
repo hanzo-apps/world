@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -43,6 +44,33 @@ const baseResponse: ResilienceScoreResponse = {
   dataVersion: '2026-04-03',
 };
 
+test('ResilienceWidget stays out of the components barrel and loads through CountryDeepDivePanel dynamically', async () => {
+  const [barrelSource, deepDiveSource] = await Promise.all([
+    readFile(new URL('../src/components/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/CountryDeepDivePanel.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.doesNotMatch(barrelSource, /export\s+\*\s+from\s+['"]\.\/ResilienceWidget['"]/);
+  assert.doesNotMatch(deepDiveSource, /import\s+\{\s*ResilienceWidget\s*\}\s+from\s+['"]\.\/ResilienceWidget['"]/);
+  assert.match(deepDiveSource, /import\(['"]@\/components\/ResilienceWidget['"]\)/);
+  assert.match(deepDiveSource, /import\(['"]@\/components\/ResilienceWidget['"]\)[\s\S]*?\.then\(\(\{\s*ResilienceWidget\s*\}\)\s*=>[\s\S]*?\)\s*\.catch\(renderFallback\)/);
+});
+
+test('ResilienceWidget auth refresh guard tolerates malformed server countryCode values', async () => {
+  const source = await readFile(new URL('../src/components/ResilienceWidget.ts', import.meta.url), 'utf8');
+
+  assert.match(
+    source,
+    /const loadedCountryCode = normalizeCountryCode\(this\.currentData\?\.countryCode\);/,
+    'auth refresh guard must validate the server countryCode before comparing it',
+  );
+  assert.match(
+    source,
+    /const needsRefresh = !this\.currentData \|\| \(loadedCountryCode !== null && loadedCountryCode !== this\.currentCountryCode\);/,
+    'malformed legacy countryCode values must not cause repeated auth-state refreshes',
+  );
+});
+
 test('getResilienceVisualLevel maps the score thresholds from the widget spec', () => {
   assert.equal(getResilienceVisualLevel(80), 'very_high');
   assert.equal(getResilienceVisualLevel(79), 'high');
@@ -69,6 +97,29 @@ test('getResilienceOverallDisplay treats negative and non-finite scores as insuf
     scoreLabel: 'n/a',
     visualLevel: 'unknown',
     visualLevelLabel: 'Insufficient data',
+    serverLevelLabel: 'API level: low',
+  });
+});
+
+test('getResilienceOverallDisplay preserves API unknown zero as no score', () => {
+  assert.equal(getResilienceVisualLevel(0), 'very_low');
+  assert.deepEqual(getResilienceOverallDisplay({ overallScore: 0, level: 'unknown' }), {
+    hasScore: false,
+    scoreForBar: 0,
+    scoreLabel: 'n/a',
+    visualLevel: 'unknown',
+    visualLevelLabel: 'Insufficient data',
+    serverLevelLabel: 'API level: unknown',
+  });
+});
+
+test('getResilienceOverallDisplay keeps explicit zero scores when API level is real', () => {
+  assert.deepEqual(getResilienceOverallDisplay({ overallScore: 0, level: 'low' }), {
+    hasScore: true,
+    scoreForBar: 0,
+    scoreLabel: '0',
+    visualLevel: 'very_low',
+    visualLevelLabel: 'Visual band: VERY LOW',
     serverLevelLabel: 'API level: low',
   });
 });
@@ -285,6 +336,9 @@ test('formatResilienceScoreInterval omits malformed intervals', () => {
   assert.equal(formatResilienceScoreInterval(undefined), null);
   assert.equal(formatResilienceScoreInterval({ p05: Number.NaN, p95: 72.8 }), null);
   assert.equal(formatResilienceScoreInterval({ p05: 65.2, p95: Number.POSITIVE_INFINITY }), null);
+  assert.equal(formatResilienceScoreInterval({ p05: 80, p95: 70 }), null);
+  assert.equal(formatResilienceScoreInterval({ p05: -1, p95: 70 }), null);
+  assert.equal(formatResilienceScoreInterval({ p05: 65.2, p95: 101 }), null);
 });
 
 // T1.4 Phase 1 of the country-resilience reference-grade upgrade plan.
