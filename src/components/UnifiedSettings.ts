@@ -480,6 +480,10 @@ export class UnifiedSettings {
             </div>
           </div>
         </div>
+        ${hasFeature('mcpAccess') ? `
+        <div class="unified-settings-tab-panel${this.activeTab === 'mcp-clients' ? ' active' : ''}" data-panel-id="mcp-clients" id="us-tab-panel-mcp-clients" role="tabpanel" aria-labelledby="us-tab-mcp-clients">
+          ${this.renderMcpClientsContent()}
+        </div>
         ` : ''}
       </div>
     `, "legacy direct innerHTML migration"));

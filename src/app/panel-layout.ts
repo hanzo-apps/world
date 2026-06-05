@@ -482,7 +482,7 @@ export class PanelLayoutManager implements AppModule {
   }
 
   renderLayout(): void {
-    this.ctx.container.innerHTML = `
+    setTrustedHtml(this.ctx.container, trustedHtml(`
       ${this.ctx.isDesktopApp ? '<div class="tauri-titlebar" data-tauri-drag-region></div>' : ''}
       <div class="header">
         <div class="header-left">

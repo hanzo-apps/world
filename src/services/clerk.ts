@@ -30,6 +30,27 @@ export async function initClerk(): Promise<void> {
   refreshUserInfo().catch(() => { /* best-effort */ });
 }
 
+/**
+ * Schedule background auth state hydration. With Clerk this was an idle-callback
+ * dynamic import of the 2.98 MB SDK; with IAM it's just a non-blocking userinfo
+ * refresh so cached plan claims stay current after token issuance.
+ */
+export function scheduleClerkLoad(): void {
+  if (typeof window === 'undefined') return;
+  const run = () => {
+    refreshUserInfo().catch(() => { /* best-effort */ });
+  };
+  // Use requestIdleCallback when available, else microtask.
+  const w = window as unknown as {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+  };
+  if (typeof w.requestIdleCallback === 'function') {
+    w.requestIdleCallback(run, { timeout: 2000 });
+  } else {
+    setTimeout(run, 0);
+  }
+}
+
 /** Placeholder for legacy callers that treat Clerk as a handle. Always null now. */
 export function getClerk(): null {
   return null;
@@ -41,6 +62,56 @@ export function openSignIn(): void {
   startLogin().catch((err) => {
     console.error('[auth] startLogin failed:', err);
   });
+}
+
+/**
+ * Open the sign-up flow. IAM's Casdoor uses a unified authorize endpoint
+ * (sign-in and sign-up share the same surface — the page exposes a tab),
+ * so this is the same code path as openSignIn(). Kept distinct so call
+ * sites that want to surface the registration intent remain explicit.
+ */
+export function openSignUp(): void {
+  openSignIn();
+}
+
+function scheduleNextFrame(cb: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => cb());
+  else setTimeout(cb, 50);
+}
+
+/**
+ * Open an auth surface with one retry on synchronous failure. Kept (and
+ * exported) for parity with the prior Clerk implementation so the existing
+ * surface-open test suite continues to exercise the retry semantics, even
+ * though IAM's `startLogin` is a `location.href` assignment that doesn't
+ * throw the "Clerk was not loaded with Ui components" race the original
+ * guard was written for.
+ */
+export function runClerkSurfaceOpen(
+  open: () => void,
+  onPersistentFailure: (err: unknown) => void,
+  scheduleRetry: (cb: () => void) => void = scheduleNextFrame,
+): void {
+  try {
+    open();
+  } catch {
+    scheduleRetry(() => {
+      try {
+        open();
+      } catch (err) {
+        onPersistentFailure(err);
+      }
+    });
+  }
+}
+
+/**
+ * IAM doesn't surface `createdAt` for accounts, so fresh-signup analytics
+ * cannot use timestamp-based detection. Callers (analytics.ts) treat null
+ * as "unknown" and fall back to userId-transition heuristics.
+ */
+export function getClerkUserCreatedAt(): number | null {
+  return null;
 }
 
 /** Sign the user out and notify subscribers. */

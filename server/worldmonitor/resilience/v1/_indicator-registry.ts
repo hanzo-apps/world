@@ -18,14 +18,33 @@ export type IndicatorLicense =
   | 'proprietary' // Bloomberg, S&P Global Platts (not used in Core)
   | 'unknown'; // placeholder for any indicator still awaiting license audit
 
+export type IndicatorNormalization =
+  | { kind: 'linear' }
+  | {
+      kind: 'targetBand';
+      targetBand: { min: number; max: number };
+      zeroScoreAt: { min: number; max: number };
+      disclaimer: string;
+    }
+  | { kind: 'uShape'; disclaimer: string }
+  | { kind: 'discrete'; disclaimer: string }
+  | { kind: 'saturating'; disclaimer: string };
+
 export type IndicatorSpec = {
   id: string;
   dimension: ResilienceDimensionId;
   description: string;
-  direction: 'higherBetter' | 'lowerBetter';
+  direction: 'higherBetter' | 'lowerBetter' | 'indicatorSemantics';
   goalposts: { worst: number; best: number };
+  // Defaults to { kind: 'linear' }. Non-linear indicators keep goalposts as
+  // documentation anchors only and must describe the real scorer shape here.
+  normalization?: IndicatorNormalization;
   weight: number;
+  // Primary source key for legacy callers and simple one-source indicators.
   sourceKey: string;
+  // Composite indicators can list every upstream source they depend on.
+  // Must include `sourceKey`; freshness/source-failure audits expand this list.
+  sourceKeys?: readonly [string, ...string[]];
   scope: 'global' | 'curated';
   cadence: 'realtime' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual';
   imputation?: { type: 'absenceSignal' | 'conservative'; score: number; certainty: number };
@@ -48,6 +67,12 @@ export type IndicatorSpec = {
   // impute is the safer error-mode per the plan §risk-mitigation row).
   comprehensive: boolean;
 };
+
+export function getIndicatorSourceKeys(
+  indicator: Pick<IndicatorSpec, 'sourceKey' | 'sourceKeys'>,
+): readonly [string, ...string[]] {
+  return indicator.sourceKeys ?? [indicator.sourceKey];
+}
 
 export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   // ── macroFiscal (5 sub-metrics) ───────────────────────────────────────────
@@ -142,9 +167,15 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'inflationStability',
     dimension: 'currencyExternal',
-    description: 'IMF CPI inflation (lower is better). Global-coverage primary signal for currency stability. Core input to scoreCurrencyExternal under PR 3 §3.5. A future PR may upgrade this to a 5-year inflation-volatility computation once the seeder tracks the series; headline inflation is a reasonable first-cut for stability ranking.',
+    description: 'IMF CPI inflation target-band score. 1-3% YoY scores best; deflation at <=-5% and high inflation at >=50% score 0. Global-coverage primary signal for currency stability. Core input to scoreCurrencyExternal under PR 3 §3.5.',
     direction: 'lowerBetter',
-    goalposts: { worst: 50, best: 0 },
+    goalposts: { worst: 50, best: 3 },
+    normalization: {
+      kind: 'targetBand',
+      targetBand: { min: 1, max: 3 },
+      zeroScoreAt: { min: -5, max: 50 },
+      disclaimer: 'scoreInflationStability is non-linear: 1-3% maps to 100, <=-5% and >=50% map to 0. goalposts are documentation anchors, not generic lowerBetter inputs.',
+    },
     weight: 0.6,
     sourceKey: 'economic:imf:macro:v2',
     scope: 'global',
@@ -211,9 +242,9 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'tradeRestrictions',
     dimension: 'tradePolicy',
-    description: 'WTO trade restrictions count (IN_FORCE weighted 3x); curated reporter set',
+    description: 'WTO trade restriction severity (low=0, moderate=1, high=2); curated reporter set',
     direction: 'lowerBetter',
-    goalposts: { worst: 30, best: 0 },
+    goalposts: { worst: 2, best: 0 },
     weight: 0.30,
     sourceKey: 'trade:restrictions:v1:tariff-overview:50',
     scope: 'curated',
@@ -230,9 +261,9 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'tradeBarriers',
     dimension: 'tradePolicy',
-    description: 'WTO trade barrier notifications count; curated reporter set',
+    description: 'WTO trade barrier severity (low=0, moderate=1, high=2); curated reporter set',
     direction: 'lowerBetter',
-    goalposts: { worst: 40, best: 0 },
+    goalposts: { worst: 2, best: 0 },
     weight: 0.30,
     sourceKey: 'trade:barriers:v1:tariff-gap:50',
     scope: 'curated',
@@ -312,6 +343,10 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     // scores must consult `normalizeBandLowerBetter` directly, not assume
     // these are the inputs to a generic linear normalizer.
     goalposts: { worst: 60, best: 25 },
+    normalization: {
+      kind: 'uShape',
+      disclaimer: 'normalizeBandLowerBetter peaks around diversified middle exposure and penalizes both isolation and over-exposure. goalposts summarize the over-exposed documentation branch only.',
+    },
     weight: 0.30,
     sourceKey: 'economic:bis-lbs:v1',
     scope: 'global',
@@ -327,6 +362,10 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'FATF AML/CFT listing status — black list (call for action) → 0, gray list (increased monitoring) → 30, compliant → 100',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 100 },
+    normalization: {
+      kind: 'discrete',
+      disclaimer: 'fatfStatusToScore maps black=0, gray=30, compliant=100; goalposts are categorical documentation anchors.',
+    },
     weight: 0.20,
     sourceKey: 'economic:fatf-listing:v1',
     scope: 'global',
@@ -446,14 +485,14 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     comprehensive: false,
   },
 
-  // ── infrastructure (3 sub-metrics) ────────────────────────────────────────
+  // ── infrastructure (4 sub-metrics) ────────────────────────────────────────
   {
     id: 'electricityAccess',
     dimension: 'infrastructure',
     description: 'Access to electricity as % of population (World Bank EG.ELC.ACCS.ZS)',
     direction: 'higherBetter',
     goalposts: { worst: 40, best: 100 },
-    weight: 0.4,
+    weight: 0.3,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -468,7 +507,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'Paved roads as % of total road network (World Bank IS.ROD.PAVE.ZS)',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 100 },
-    weight: 0.35,
+    weight: 0.3,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -492,15 +531,13 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     license: 'open-attribution',
     comprehensive: false,
   },
-
-  // ── energy (7 sub-metrics) ────────────────────────────────────────────────
   {
-    id: 'energyImportDependency',
-    dimension: 'energy',
-    description: 'IEA energy import dependency (% of total energy supply from imports)',
-    direction: 'lowerBetter',
-    goalposts: { worst: 100, best: 0 },
-    weight: 0.25,
+    id: 'broadband',
+    dimension: 'infrastructure',
+    description: 'Fixed broadband subscriptions per 100 people (World Bank IT.NET.BBND.P2)',
+    direction: 'higherBetter',
+    goalposts: { worst: 0, best: 40 },
+    weight: 0.15,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -509,17 +546,38 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     license: 'open-data',
     comprehensive: true,
   },
+
+  // ── energy (active production construct = v2) ─────────────────────────────
+  // The legacy standalone indicators remain registered for rollback/docs and
+  // the compare harness, but the production runtime manifest reports
+  // constructVersions.energy='v2'. The flat tier field therefore represents
+  // the active production construct, not the dormant rollback path.
+  {
+    id: 'energyImportDependency',
+    dimension: 'energy',
+    description: 'LEGACY rollback standalone input: IEA energy import dependency (% of total energy supply from imports). In active energy v2 this source is absorbed into importedFossilDependence rather than scored as its own indicator.',
+    direction: 'lowerBetter',
+    goalposts: { worst: 100, best: 0 },
+    weight: 0.25,
+    sourceKey: 'resilience:static:{ISO2}',
+    scope: 'global',
+    cadence: 'annual',
+    tier: 'experimental',
+    coverage: 188,
+    license: 'open-data',
+    comprehensive: true,
+  },
   {
     id: 'gasShare',
     dimension: 'energy',
-    description: 'Natural gas share of energy mix (%); high share = single-source vulnerability',
+    description: 'LEGACY rollback standalone input: natural gas share of energy mix (%). Retired under active energy v2 because it conflates domestic fossil generation with import exposure.',
     direction: 'lowerBetter',
     goalposts: { worst: 100, best: 0 },
     weight: 0.12,
     sourceKey: 'energy:mix:v1:{ISO2}',
     scope: 'global',
     cadence: 'annual',
-    tier: 'core',
+    tier: 'experimental',
     coverage: 195,
     license: 'open-attribution',
     comprehensive: true,
@@ -527,14 +585,14 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'coalShare',
     dimension: 'energy',
-    description: 'Coal share of energy mix (%); high share = transition risk and pollution',
+    description: 'LEGACY rollback standalone input: coal share of energy mix (%). Retired under active energy v2 because domestic coal is not an import-dependence signal.',
     direction: 'lowerBetter',
     goalposts: { worst: 100, best: 0 },
     weight: 0.08,
     sourceKey: 'energy:mix:v1:{ISO2}',
     scope: 'global',
     cadence: 'annual',
-    tier: 'core',
+    tier: 'experimental',
     coverage: 195,
     license: 'open-attribution',
     comprehensive: true,
@@ -542,22 +600,22 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'renewShare',
     dimension: 'energy',
-    description: 'Renewable energy share of energy mix (%); diversification and resilience',
+    description: 'LEGACY rollback standalone input: renewable energy share of energy mix (%). Absorbed by active energy v2 lowCarbonGenerationShare, which also credits nuclear and hydroelectric generation.',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 100 },
     weight: 0.05,
     sourceKey: 'energy:mix:v1:{ISO2}',
     scope: 'global',
     cadence: 'annual',
-    tier: 'core',
+    tier: 'experimental',
     coverage: 195,
     license: 'open-attribution',
     comprehensive: true,
   },
   {
-    id: 'gasStorageStress',
+    id: 'euGasStorageStress',
     dimension: 'energy',
-    description: 'Gas storage fill stress: (80 - fillPct) / 80 clamped to [0,1], scaled to 0-100',
+    description: 'EU gas storage fill stress: (80 - fillPct) / 80 clamped to [0,1], scaled to 0-100. Active energy v2 scopes the signal to EU gas-storage countries and contributes null outside that set.',
     direction: 'lowerBetter',
     goalposts: { worst: 100, best: 0 },
     weight: 0.1,
@@ -577,7 +635,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'Mean absolute energy price change across commodities',
     direction: 'lowerBetter',
     goalposts: { worst: 25, best: 0 },
-    weight: 0.1,
+    weight: 0.15,
     sourceKey: 'economic:energy:v1:all',
     scope: 'global',
     cadence: 'daily',
@@ -589,25 +647,22 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'electricityConsumption',
     dimension: 'energy',
-    description: 'Per-capita electricity consumption (kWh/year, World Bank EG.USE.ELEC.KH.PC); low = grid collapse',
+    description: 'LEGACY rollback standalone input: per-capita electricity consumption (kWh/year, World Bank EG.USE.ELEC.KH.PC). Retired under active energy v2 because it is a wealth/load proxy rather than a resilience mechanism.',
     direction: 'higherBetter',
     goalposts: { worst: 200, best: 8000 },
     weight: 0.3,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
-    tier: 'core',
+    tier: 'experimental',
     coverage: 217,
     license: 'open-data',
     comprehensive: true,
   },
 
-  // ── PR 1 energy-construct v2 (tier='experimental' until RESILIENCE_ENERGY_V2_ENABLED ──
-  // flips default-on and seeders land). Indicators are registered so
-  // the per-indicator harness in scripts/compare-resilience-current-vs-
-  // proposed.mjs can begin tracking them, but the 'experimental' tier
-  // keeps them OUT of the Core coverage gate (>=180 countries required
-  // per Phase 2 A4) until seed coverage is confirmed at flag-flip.
+  // ── energy v2 global inputs ───────────────────────────────────────────────
+  // Production is flipped to energy v2, so these now participate in the Core
+  // coverage/license gates. The required seed coverage is >=188 countries.
   {
     id: 'importedFossilDependence',
     dimension: 'energy',
@@ -616,10 +671,14 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     goalposts: { worst: 100, best: 0 },
     weight: 0.35,
     sourceKey: 'resilience:fossil-electricity-share:v1',
+    sourceKeys: [
+      'resilience:fossil-electricity-share:v1',
+      'resilience:static:{ISO2}',
+    ],
     scope: 'global',
     cadence: 'annual',
     imputation: { type: 'conservative', score: 50, certainty: 0.3 },
-    tier: 'experimental',
+    tier: 'core',
     coverage: 190,
     license: 'open-data',
     comprehensive: true,
@@ -635,7 +694,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     scope: 'global',
     cadence: 'annual',
     imputation: { type: 'conservative', score: 30, certainty: 0.3 },
-    tier: 'experimental',
+    tier: 'core',
     coverage: 190,
     license: 'open-data',
     comprehensive: true,
@@ -651,7 +710,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     scope: 'global',
     cadence: 'annual',
     imputation: { type: 'conservative', score: 50, certainty: 0.3 },
-    tier: 'experimental',
+    tier: 'core',
     coverage: 188,
     license: 'open-data',
     comprehensive: true,
@@ -799,7 +858,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     dimension: 'socialCohesion',
     description: 'Unrest event count (severity-weighted) + sqrt(fatalities)',
     direction: 'lowerBetter',
-    goalposts: { worst: 20, best: 0 },
+    goalposts: { worst: 10, best: 0 },
     weight: 0.2,
     sourceKey: 'unrest:events:v1',
     scope: 'global',
@@ -820,7 +879,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     dimension: 'borderSecurity',
     description: 'UCDP armed conflict metric: eventCount*2 + typeWeight + sqrt(deaths)',
     direction: 'lowerBetter',
-    goalposts: { worst: 30, best: 0 },
+    goalposts: { worst: 15, best: 0 },
     weight: 0.65,
     sourceKey: 'conflict:ucdp-events:v1',
     scope: 'global',
@@ -861,8 +920,8 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     id: 'rsfPressFreedom',
     dimension: 'informationCognitive',
     description: 'Reporters Sans Frontieres press freedom score (0-100)',
-    direction: 'higherBetter',
-    goalposts: { worst: 0, best: 100 },
+    direction: 'lowerBetter',
+    goalposts: { worst: 100, best: 0 },
     weight: 0.55,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
@@ -903,14 +962,14 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     comprehensive: false,
   },
 
-  // ── healthPublicService (3 sub-metrics) ───────────────────────────────────
+  // ── healthPublicService (5 sub-metrics) ───────────────────────────────────
   {
     id: 'uhcIndex',
     dimension: 'healthPublicService',
     description: 'WHO Universal Health Coverage service coverage index (0-100)',
     direction: 'higherBetter',
     goalposts: { worst: 40, best: 90 },
-    weight: 0.45,
+    weight: 0.35,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -925,7 +984,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'WHO measles immunization coverage among 1-year-olds (%)',
     direction: 'higherBetter',
     goalposts: { worst: 50, best: 99 },
-    weight: 0.35,
+    weight: 0.25,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -940,7 +999,37 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'WHO hospital beds per 1,000 people',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 8 },
-    weight: 0.2,
+    weight: 0.1,
+    sourceKey: 'resilience:static:{ISO2}',
+    scope: 'global',
+    cadence: 'annual',
+    tier: 'core',
+    coverage: 194,
+    license: 'public-domain',
+    comprehensive: true,
+  },
+  {
+    id: 'physiciansPer1k',
+    dimension: 'healthPublicService',
+    description: 'WHO physicians per 1,000 people (HWF_0001 converted from per 10,000)',
+    direction: 'higherBetter',
+    goalposts: { worst: 0, best: 5 },
+    weight: 0.15,
+    sourceKey: 'resilience:static:{ISO2}',
+    scope: 'global',
+    cadence: 'annual',
+    tier: 'core',
+    coverage: 194,
+    license: 'public-domain',
+    comprehensive: true,
+  },
+  {
+    id: 'healthExpPerCapitaUsd',
+    dimension: 'healthPublicService',
+    description: 'WHO current health expenditure per capita, USD (GHED_CHE_pc_US_SHA2011)',
+    direction: 'higherBetter',
+    goalposts: { worst: 20, best: 3000 },
+    weight: 0.15,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -987,27 +1076,12 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     comprehensive: true,
   },
   {
-    id: 'aquastatWaterStress',
+    id: 'aquastatScore',
     dimension: 'foodWater',
-    description: 'FAO AQUASTAT stress/withdrawal/dependency indicators (% scale 0-100)',
-    direction: 'lowerBetter',
+    description: 'FAO AQUASTAT value scored by indicator semantics: stress/withdrawal/dependency readings are lower-better on 0-100; availability/renewable/access readings are higher-better on 0-100 or 0-5000 m3/capita.',
+    direction: 'indicatorSemantics',
     goalposts: { worst: 100, best: 0 },
-    weight: 0.25,
-    sourceKey: 'resilience:static:{ISO2}',
-    scope: 'global',
-    cadence: 'annual',
-    tier: 'core',
-    coverage: 188,
-    license: 'open-data',
-    comprehensive: true,
-  },
-  {
-    id: 'aquastatWaterAvailability',
-    dimension: 'foodWater',
-    description: 'FAO AQUASTAT availability/renewable/access indicators (0-100 % or 0-5000 m3/capita)',
-    direction: 'higherBetter',
-    goalposts: { worst: 0, best: 5000 },
-    weight: 0.15,
+    weight: 0.4,
     sourceKey: 'resilience:static:{ISO2}',
     scope: 'global',
     cadence: 'annual',
@@ -1153,6 +1227,10 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
     description: 'Sovereign-wealth fiscal-buffer signal per plan §3.4. Seeded from Wikipedia SWF list + per-fund article infoboxes (CC-BY-SA), haircut by the classification manifest (scripts/shared/swf-classification-manifest.yaml): effectiveMonths = rawSwfMonths × access × liquidity × transparency, summed across a country\'s manifest funds. Scorer applies a saturating transform score = 100 × (1 − exp(−effectiveMonths / 12)).',
     direction: 'higherBetter',
     goalposts: { worst: 0, best: 60 },
+    normalization: {
+      kind: 'saturating',
+      disclaimer: 'scoreSovereignFiscalBuffer uses 100 * (1 - exp(-effectiveMonths / 12)); goalposts document the display range, not a linear scorer anchor.',
+    },
     weight: 1.0,
     sourceKey: 'resilience:recovery:sovereign-wealth:v1',
     scope: 'global',
@@ -1200,7 +1278,7 @@ export const INDICATOR_REGISTRY: IndicatorSpec[] = [
   {
     id: 'recoveryImportHhi',
     dimension: 'importConcentration',
-    description: 'Herfindahl-Hirschman Index of import partner concentration (UN Comtrade HS2 bilateral); higher HHI = more dependent on fewer partners = slower recovery if a key partner is disrupted',
+    description: 'Herfindahl-Hirschman Index of import partner concentration (UN Comtrade HS2 bilateral); higher HHI = more dependent on fewer partners = slower recovery if a key partner is disrupted. Missing source years and years outside the normal 4-year Comtrade window derate certainty coverage.',
     direction: 'lowerBetter',
     goalposts: { worst: 5000, best: 0 },
     weight: 1.0,
