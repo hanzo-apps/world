@@ -1,14 +1,19 @@
 /**
- * Hanzo IAM OAuth helpers.
+ * Hanzo IAM auth helpers for the @hanzo/gui React island.
  *
- * The app will migrate off Clerk to IAM (hanzo.id) OIDC. These helpers are
- * the seam — they route to IAM in production, fall back to Clerk in dev
- * until the backend agent wires IAM server-side. Keeping the seam narrow
- * means the day IAM is ready we only flip this file, not every call site.
+ * Thin adapter over `src/services/iam` (the canonical PKCE/OIDC client) —
+ * the React components consume the legacy `IamSession` shape, so this file
+ * remaps `IamUser` → `IamSession` and forwards login/logout/token reads to
+ * the real client. There's exactly one OAuth implementation; this is only
+ * the shape adapter for the chrome surface.
  */
 
-const IAM_ENDPOINT = 'https://hanzo.id';
-const IAM_CLIENT_ID = 'hanzo-world-client-id';
+import {
+  startLogin,
+  logout as iamLogout,
+  getCurrentUser,
+  getAccessToken as iamGetAccessToken,
+} from '@/services/iam';
 
 export interface IamSession {
   userId: string;
@@ -17,46 +22,34 @@ export interface IamSession {
   avatarUrl?: string;
 }
 
-export function getIamAuthorizeUrl(redirectAfter = '/'): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const redirectUri = `${origin}/callback/hanzo`;
-  const state = encodeURIComponent(redirectAfter);
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: IAM_CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: 'openid profile email',
-    state,
-  });
-  return `${IAM_ENDPOINT}/oauth/authorize?${params.toString()}`;
-}
-
 export function signInWithIam(redirectAfter?: string): void {
-  if (typeof window === 'undefined') return;
-  window.location.href = getIamAuthorizeUrl(redirectAfter ?? window.location.pathname);
+  startLogin(redirectAfter).catch((err) => {
+    // PKCE prep can throw if localStorage is unavailable; surface to the
+    // console so the user sees a click that did nothing has a reason.
+    console.error('[iam] signInWithIam failed:', err);
+  });
 }
 
 export function signOut(): void {
-  if (typeof window === 'undefined') return;
-  // Clear local tokens
-  localStorage.removeItem('hanzo-iam-token');
-  localStorage.removeItem('hanzo-iam-user');
-  window.location.href = `${IAM_ENDPOINT}/oauth/logout`;
+  iamLogout();
+  // The canonical client doesn't redirect to IAM's logout endpoint (which
+  // would clear the IAM session cookie too); call sites that want hard
+  // logout can hit `${IAM_ENDPOINT}/oauth/logout` themselves.
 }
+
+export const signOutFromIam = signOut;
 
 export function getCurrentSession(): IamSession | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem('hanzo-iam-user');
-    return raw ? (JSON.parse(raw) as IamSession) : null;
-  } catch {
-    return null;
-  }
+  const u = getCurrentUser();
+  if (!u) return null;
+  return {
+    userId: u.id,
+    email: u.email || undefined,
+    name: u.displayName || u.name || undefined,
+    avatarUrl: u.avatar || undefined,
+  };
 }
 
-// Aliases used by @hanzo/gui-rewritten components.
-export const signOutFromIam = signOut;
 export function getAccessToken(): string | null {
-  const s = getCurrentSession();
-  return s?.accessToken ?? null;
+  return iamGetAccessToken();
 }
