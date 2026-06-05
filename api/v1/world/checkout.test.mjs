@@ -122,17 +122,11 @@ test('accepts planKey as alias for planId', async () => {
   assert.equal(body.error, 'plan_unconfigured', 'planKey should be resolved like planId');
 });
 
-test('CORS allows world.hanzo.ai origin and its subdomains', async () => {
+test('CORS allows world.hanzo.ai as the canonical origin', async () => {
   resetEnv();
   process.env.STRIPE_SECRET_KEY = 'sk_test_x';
-  for (const origin of [
-    'https://world.hanzo.ai',
-    'https://tech.world.hanzo.ai',
-    'https://finance.world.hanzo.ai',
-  ]) {
-    const res = await handler(makeRequest({ method: 'OPTIONS', origin }));
-    assert.equal(res.headers.get('Access-Control-Allow-Origin'), origin, `origin ${origin}`);
-  }
+  const res = await handler(makeRequest({ method: 'OPTIONS', origin: 'https://world.hanzo.ai' }));
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://world.hanzo.ai');
 });
 
 test('CORS falls back to world.hanzo.ai for disallowed origin', async () => {
