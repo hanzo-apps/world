@@ -46,12 +46,9 @@ const SOCIAL_IMAGE_UA =
 const BRIEF_CAROUSEL_PATH_RE =
   /^\/api\/brief\/carousel\/[^/]+\/\d{4}-\d{2}-\d{2}-\d{4}\/[0-2]\/?$/;
 
-const VARIANT_HOST_MAP: Record<string, string> = {
-  'tech.world.hanzo.ai': 'tech',
-  'finance.world.hanzo.ai': 'finance',
-  'commodity.world.hanzo.ai': 'commodity',
-  'happy.world.hanzo.ai': 'happy',
-};
+// Variants live at world.hanzo.ai/<slug>. First path segment is the variant
+// key — see src/config/variant.ts for the matching client-side resolver.
+const VARIANT_SLUGS = new Set(['tech', 'finance', 'commodity', 'happy', 'energy']);
 
 // Source of truth: src/config/variant-meta.ts — keep in sync when variant metadata changes.
 // `name` is the short brand for JSON-LD `WebApplication.name`; `title` is the full
@@ -59,46 +56,42 @@ const VARIANT_HOST_MAP: Record<string, string> = {
 // future title format change cannot silently corrupt the JSON-LD name.
 const VARIANT_OG: Record<string, { name: string; title: string; description: string; image: string; url: string }> = {
   tech: {
-    name: 'Tech Monitor',
-    title: 'Tech Monitor - Real-Time AI & Tech Industry Dashboard',
+    name: 'Hanzo Tech',
+    title: 'Hanzo Tech - Real-Time AI & Tech Industry Dashboard',
     description: 'Real-time AI and tech industry dashboard tracking tech giants, AI labs, startup ecosystems, funding rounds, and tech events worldwide.',
-    image: 'https://tech.world.hanzo.ai/favico/tech/og-image.png',
-    url: 'https://tech.world.hanzo.ai/',
+    image: 'https://world.hanzo.ai/favico/tech/og-image.png',
+    url: 'https://world.hanzo.ai/tech',
   },
   finance: {
-    name: 'Finance Monitor',
-    title: 'Finance Monitor - Real-Time Markets & Trading Dashboard',
+    name: 'Hanzo Finance',
+    title: 'Hanzo Finance - Real-Time Markets & Trading Dashboard',
     description: 'Real-time finance and trading dashboard tracking global markets, stock exchanges, central banks, commodities, forex, crypto, and economic indicators worldwide.',
-    image: 'https://finance.world.hanzo.ai/favico/finance/og-image.png',
-    url: 'https://finance.world.hanzo.ai/',
+    image: 'https://world.hanzo.ai/favico/finance/og-image.png',
+    url: 'https://world.hanzo.ai/finance',
   },
   commodity: {
-    name: 'Commodity Monitor',
-    title: 'Commodity Monitor - Real-Time Commodity Markets & Supply Chain Dashboard',
+    name: 'Hanzo Commodity',
+    title: 'Hanzo Commodity - Real-Time Commodity Markets & Supply Chain Dashboard',
     description: 'Real-time commodity markets dashboard tracking mining sites, processing plants, commodity ports, supply chains, and global commodity trade flows.',
-    image: 'https://commodity.world.hanzo.ai/favico/commodity/og-image.png',
-    url: 'https://commodity.world.hanzo.ai/',
+    image: 'https://world.hanzo.ai/favico/commodity/og-image.png',
+    url: 'https://world.hanzo.ai/commodity',
   },
   happy: {
-    name: 'Happy Monitor',
-    title: 'Happy Monitor - Good News & Global Progress',
+    name: 'Hanzo Happy',
+    title: 'Hanzo Happy - Good News & Global Progress',
     description: 'Curated positive news, progress data, and uplifting stories from around the world.',
-    image: 'https://happy.world.hanzo.ai/favico/happy/og-image.png',
-    url: 'https://happy.world.hanzo.ai/',
+    image: 'https://world.hanzo.ai/favico/happy/og-image.png',
+    url: 'https://world.hanzo.ai/happy',
   },
   energy: {
-    name: 'Energy Atlas',
-    title: 'Energy Atlas - Real-Time Global Energy Intelligence Dashboard',
+    name: 'Hanzo Energy Atlas',
+    title: 'Hanzo Energy Atlas - Real-Time Global Energy Intelligence Dashboard',
     description: 'Real-time global energy atlas tracking oil and gas pipelines, storage facilities, chokepoints, fuel shortages, tanker flows, and disruption events worldwide.',
-    image: 'https://energy.worldmonitor.app/favico/energy/og-image.png',
-    url: 'https://energy.worldmonitor.app/',
+    image: 'https://world.hanzo.ai/favico/energy/og-image.png',
+    url: 'https://world.hanzo.ai/energy',
   },
 };
 
-const ALLOWED_HOSTS = new Set([
-  'world.hanzo.ai',
-  ...Object.keys(VARIANT_HOST_MAP),
-]);
 const VERCEL_PREVIEW_RE = /^[a-z0-9-]+-[a-z0-9]{8,}\.vercel\.app$/;
 
 function normalizeHost(raw: string): string {
@@ -106,7 +99,12 @@ function normalizeHost(raw: string): string {
 }
 
 function isAllowedHost(host: string): boolean {
-  return ALLOWED_HOSTS.has(host) || VERCEL_PREVIEW_RE.test(host);
+  return host === 'world.hanzo.ai' || VERCEL_PREVIEW_RE.test(host);
+}
+
+function variantFromPath(path: string): string | null {
+  const seg = path.split('/')[1]?.toLowerCase();
+  return seg && VARIANT_SLUGS.has(seg) ? seg : null;
 }
 
 // HTML-escape a string for safe interpolation into BOTH text content and
@@ -129,62 +127,62 @@ export default function middleware(request: Request) {
   const host = normalizeHost(request.headers.get('host') ?? url.hostname);
 
   // Variant-aware crawlable stub for social preview bots AND AI crawlers
-  // (GPTBot, ClaudeBot, PerplexityBot, etc.) when hitting variant subdomain
-  // roots. Social bots get OG-only; AI crawlers additionally get JSON-LD
-  // WebApplication + a body with internal links and external citations so
-  // each variant is indexed under its own identity.
-  if (path === '/') {
+  // (GPTBot, ClaudeBot, PerplexityBot, etc.) when hitting variant path
+  // prefixes (world.hanzo.ai/tech, /finance, etc.). Social bots get OG-only;
+  // AI crawlers additionally get JSON-LD WebApplication + a body with
+  // internal links so each variant is indexed under its own identity.
+  const variant = variantFromPath(path);
+  if (variant && (path === `/${variant}` || path === `/${variant}/`) && isAllowedHost(host)) {
     const isSocial = SOCIAL_PREVIEW_UA.test(ua);
     const isAI = AI_CRAWLER_UA.test(ua);
     if (isSocial || isAI) {
-      const variant = VARIANT_HOST_MAP[host];
-      if (variant && isAllowedHost(host)) {
-        const og = VARIANT_OG[variant as keyof typeof VARIANT_OG];
-        if (og) {
-          // Pre-escape every VARIANT_OG field used in the template. JSON-LD is
-          // safe via JSON.stringify, but the OG/Twitter/canonical attributes
-          // and the visible <h1>/<p> body need explicit HTML escaping.
-          const eTitle = escHtml(og.title);
-          const eDesc = escHtml(og.description);
-          const eImage = escHtml(og.image);
-          const eUrl = escHtml(og.url);
-          const jsonLd = isAI ? `\n<script type="application/ld+json">${JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebApplication',
-            name: og.name,
-            url: og.url,
-            description: og.description,
-            applicationCategory: 'BusinessApplication',
-            operatingSystem: 'Web, Windows, macOS, Linux',
-            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-            screenshot: og.image,
-            isPartOf: {
-              '@type': 'WebSite',
-              name: 'World Monitor',
-              url: 'https://www.worldmonitor.app/',
-            },
-            sameAs: [
-              'https://github.com/koala73/worldmonitor',
-              'https://x.com/worldmonitorai',
-            ],
-          })}</script>` : '';
-          const aiBody = isAI ? `
+      const og = VARIANT_OG[variant];
+      if (og) {
+        // Pre-escape every VARIANT_OG field used in the template. JSON-LD is
+        // safe via JSON.stringify, but the OG/Twitter/canonical attributes
+        // and the visible <h1>/<p> body need explicit HTML escaping.
+        const eTitle = escHtml(og.title);
+        const eDesc = escHtml(og.description);
+        const eImage = escHtml(og.image);
+        const eUrl = escHtml(og.url);
+        const jsonLd = isAI ? `\n<script type="application/ld+json">${JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebApplication',
+          name: og.name,
+          url: og.url,
+          description: og.description,
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web, Windows, macOS, Linux',
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          screenshot: og.image,
+          isPartOf: {
+            '@type': 'WebSite',
+            name: 'Hanzo World',
+            url: 'https://world.hanzo.ai/',
+          },
+          sameAs: [
+            'https://github.com/hanzoai/world',
+            'https://x.com/hanzoai',
+          ],
+        })}</script>` : '';
+        const aiBody = isAI ? `
 <h1>${eTitle}</h1>
 <p>${eDesc}</p>
 <h2>Explore the platform</h2>
 <ul>
-<li><a href="https://www.worldmonitor.app/">World Monitor — geopolitics &amp; intelligence</a></li>
-<li><a href="https://tech.worldmonitor.app/">Tech Monitor</a></li>
-<li><a href="https://finance.worldmonitor.app/">Finance Monitor</a></li>
-<li><a href="https://commodity.worldmonitor.app/">Commodity Monitor</a></li>
-<li><a href="https://happy.worldmonitor.app/">Happy Monitor</a></li>
-<li><a href="https://www.worldmonitor.app/pro">World Monitor Pro</a></li>
-<li><a href="https://www.worldmonitor.app/blog/">Blog</a></li>
-<li><a href="https://github.com/koala73/worldmonitor">Open source on GitHub</a></li>
+<li><a href="https://world.hanzo.ai/">Hanzo World — geopolitics &amp; intelligence</a></li>
+<li><a href="https://world.hanzo.ai/tech">Hanzo Tech</a></li>
+<li><a href="https://world.hanzo.ai/finance">Hanzo Finance</a></li>
+<li><a href="https://world.hanzo.ai/commodity">Hanzo Commodity</a></li>
+<li><a href="https://world.hanzo.ai/happy">Hanzo Happy</a></li>
+<li><a href="https://world.hanzo.ai/energy">Hanzo Energy Atlas</a></li>
+<li><a href="https://world.hanzo.ai/pro">Hanzo World Pro</a></li>
+<li><a href="https://world.hanzo.ai/blog/">Blog</a></li>
+<li><a href="https://github.com/hanzoai/world">Open source on GitHub</a></li>
 </ul>
 <h2>Sources</h2>
 <p>Data ingested live from <a href="https://acleddata.com/">ACLED</a>, <a href="https://ucdp.uu.se/">UCDP</a>, <a href="https://firms.modaps.eosdis.nasa.gov/">NASA FIRMS</a>, <a href="https://earthquake.usgs.gov/">USGS</a>, <a href="https://opensky-network.org/">OpenSky</a>, <a href="https://aisstream.io/">AISStream</a>, <a href="https://fred.stlouisfed.org/">FRED</a>, <a href="https://www.imf.org/en/Data">IMF</a>, and <a href="https://www.bis.org/">BIS</a>.</p>` : '';
-          const html = `<!DOCTYPE html><html lang="en"><head>
+        const html = `<!DOCTYPE html><html lang="en"><head>
 <meta property="og:type" content="website"/>
 <meta property="og:title" content="${eTitle}"/>
 <meta property="og:description" content="${eDesc}"/>
@@ -197,15 +195,14 @@ export default function middleware(request: Request) {
 <link rel="canonical" href="${eUrl}"/>
 <title>${eTitle}</title>${jsonLd}
 </head><body>${aiBody}</body></html>`;
-          return new Response(html, {
-            status: 200,
-            headers: {
-              'Content-Type': 'text/html; charset=utf-8',
-              'Cache-Control': 'no-store',
-              'Vary': 'User-Agent, Host',
-            },
-          });
-        }
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'User-Agent',
+          },
+        });
       }
     }
   }
