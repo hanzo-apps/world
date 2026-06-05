@@ -14,7 +14,12 @@ import { jsonResponse } from '../../_shared/json.js';
 import { corsHeaders } from '../../_shared/cors.js';
 
 const TENANT = 'world';
-const COMMERCE_ENDPOINT = 'https://api.hanzo.ai';
+// Commerce's public ingress (see hanzo-k8s commerce-ingress: host
+// commerce-api.hanzo.ai → service commerce:8001). The gateway at
+// api.hanzo.ai intentionally does NOT proxy /v1/commerce/*; the checkout
+// path is direct ingress → commerce pod, with X-Forwarded-Host carrying
+// the tenant host so multi-tenant resolution still sees world.hanzo.ai.
+const COMMERCE_ENDPOINT = 'https://commerce-api.hanzo.ai';
 const APP_BASE_URL = 'https://world.hanzo.ai';
 
 const VALID_PLAN_IDS = new Set([
