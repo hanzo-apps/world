@@ -39,7 +39,7 @@ export function corsHeaders(request, methods = 'GET, OPTIONS', env = null) {
     'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Allow-Methods': methods,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-IAM-Org, X-WorldMonitor-Key, X-Api-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Org-Id, X-WorldMonitor-Key, X-Api-Key',
     'Access-Control-Max-Age': '3600',
     Vary: 'Origin',
   };

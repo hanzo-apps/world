@@ -7,7 +7,7 @@
 // Stack: Cloudflare Pages Function → api.hanzo.ai/v1/checkout/charge (Hanzo
 // Commerce gateway). Commerce holds the Stripe/Square/etc. credentials in
 // KMS for the `world` tenant; the world dashboard never sees a payment
-// processor secret. The tenant is selected via the X-IAM-Org header.
+// processor secret. The tenant is selected via the X-Org-Id header.
 
 import { iamUserinfo, unauthenticated } from '../../_shared/iam.js';
 import { jsonResponse } from '../../_shared/json.js';
@@ -60,7 +60,7 @@ export async function onRequestPost({ request }) {
       headers: {
         'Content-Type': 'application/json',
         Authorization: request.headers.get('Authorization') || '',
-        'X-IAM-Org': TENANT,
+        'X-Org-Id': TENANT,
       },
       body: JSON.stringify({
         tenant: TENANT,
