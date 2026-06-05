@@ -14,7 +14,8 @@
     { "source": "/oauth/token", "destination": "/api/oauth/token" },
     { "source": "/oauth/register", "destination": "/api/oauth/register" },
     { "source": "/oauth/authorize", "destination": "/api/oauth/authorize" },
-    { "source": "/((?!api|mcp|oauth|assets|blog|docs|favico|map-styles|data|textures|pro|pricing|upgrade|sw\\.js|workbox-[a-f0-9]+\\.js|manifest\\.webmanifest|offline\\.html|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|\\.well-known|wm-widget-sandbox\\.html).*)", "destination": "/index.html" }
+    { "source": "/v1/world/:path*", "destination": "/api/v1/world/:path*" },
+    { "source": "/((?!api|mcp|oauth|v1|assets|blog|docs|favico|map-styles|data|textures|pro|pricing|upgrade|sw\\.js|workbox-[a-f0-9]+\\.js|manifest\\.webmanifest|offline\\.html|robots\\.txt|sitemap\\.xml|llms\\.txt|llms-full\\.txt|\\.well-known|wm-widget-sandbox\\.html).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
