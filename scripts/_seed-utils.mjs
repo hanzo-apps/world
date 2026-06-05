@@ -1123,6 +1123,18 @@ export function parseYahooChart(data, symbol) {
   return { symbol, name: symbol, display: symbol, price, change: +change.toFixed(2), sparkline };
 }
 
+/**
+ * Decide whether an extra-key write should be skipped to preserve last-good
+ * cached data. Opt-in per extra-key via `skipWhenEmpty: true` — when set and the
+ * resolved recordCount is 0, runSeed skips the write (and extends the key's TTL)
+ * instead of clobbering a good cached payload with an empty recordCount=0 one on
+ * a partial upstream fetch. The canonical key is already guarded by validateFn;
+ * this closes the same gap for extra keys. Pure function — extracted for tests.
+ */
+export function shouldSkipEmptyExtraKey(ek, recordCount) {
+  return Boolean(ek && ek.skipWhenEmpty) && recordCount === 0;
+}
+
 export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}) {
   const {
     validateFn,
@@ -1433,6 +1445,12 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
     // the canonical one.
     if (extraKeys) {
       for (const ek of extraKeys) {
+        // skipWhenEmpty needs a resolved recordCount, which only exists in
+        // contract mode (declareRecords). Warn loudly on misconfig instead of
+        // silently writing the empty payload the flag was meant to guard against.
+        if (ek.skipWhenEmpty && !contractMode) {
+          console.warn(`  [extraKey] ${ek.key} declares skipWhenEmpty but ${domain}:${resource} is not in contract mode (no declareRecords) — guard inactive`);
+        }
         const ekData = ek.transform ? ek.transform(data) : data;
         let ekEnvelope = null;
         if (contractMode) {
@@ -1444,6 +1462,15 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
             await releaseLock(`${domain}:${resource}`, runId);
             console.error(`  CONTRACT VIOLATION on extraKey ${ek.key}: ${err.message || err}`);
             process.exit(1);
+          }
+          // Opt-in skip-empty: don't overwrite a good cached extra-key payload
+          // with a recordCount=0 write on a partial fetch (e.g. a token panel
+          // whose IDs the upstream dropped this cycle). Preserve last-good by
+          // extending the existing key's TTL instead.
+          if (shouldSkipEmptyExtraKey(ek, ekCount)) {
+            await extendExistingTtl([ek.key], ek.ttl || ttlSeconds || 600);
+            console.log(`  [extraKey] ${ek.key} empty (recordCount=0) — skipped write, extended TTL to preserve last-good`);
+            continue;
           }
           ekEnvelope = {
             fetchedAt: envelopeMeta.fetchedAt,
