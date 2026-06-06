@@ -1,33 +1,39 @@
-// POST /v1/world/checkout — IAM-authed checkout session via Hanzo Commerce.
+// POST /v1/world/checkout — IAM-authed checkout session for Hanzo World.
 //
 // Body: { planId | planKey, returnUrl?, cancelUrl?, referralCode?, discountCode? }
 // Auth: IAM Bearer or hanzo.id session cookie.
 // Returns: { checkoutUrl, sessionId, planId }
 //
-// Stack: Cloudflare Pages Function → api.hanzo.ai/v1/checkout/charge (Hanzo
-// Commerce gateway). Commerce holds the Stripe/Square/etc. credentials in
-// KMS for the `world` tenant; the world dashboard never sees a payment
-// processor secret. The tenant is selected via the X-Org-Id header.
+// Flow:
+//   world SPA → POST /v1/world/checkout
+//     → resolve plan price from FALLBACK_PRICES
+//     → return a billing.hanzo.ai/topup URL with amount + IAM context
+//   billing.hanzo.ai/topup → Square Web Payments SDK
+//     → POST commerce.hanzo.ai /v1/billing/topup/token (charges card)
+//     → redirect back to returnUrl with the user's balance credited
+//
+// Hanzo plans bill through Hanzo Commerce's billing/topup_token surface
+// (Square is the active processor). The Liquidity-style BD deposits proxy
+// in commerce is for broker-dealer flows and is unrelated to Hanzo's
+// hosted plans — we hand off to billing.hanzo.ai directly so a single
+// Square-authed page handles the charge and the credit in one round-trip.
 
 import { iamUserinfo, unauthenticated } from '../../_shared/iam.js';
 import { jsonResponse } from '../../_shared/json.js';
 import { corsHeaders } from '../../_shared/cors.js';
 
-const TENANT = 'world';
-// Commerce's public ingress (see hanzo-k8s commerce-ingress: host
-// commerce-api.hanzo.ai → service commerce:8001). The gateway at
-// api.hanzo.ai intentionally does NOT proxy /v1/commerce/*; the checkout
-// path is direct ingress → commerce pod, with X-Forwarded-Host carrying
-// the tenant host so multi-tenant resolution still sees world.hanzo.ai.
-const COMMERCE_ENDPOINT = 'https://commerce-api.hanzo.ai';
 const APP_BASE_URL = 'https://world.hanzo.ai';
+const BILLING_BASE_URL = 'https://billing.hanzo.ai';
 
-const VALID_PLAN_IDS = new Set([
-  'world-pro',
-  'world-pro-annual',
-  'world-team',
-  'world-team-annual',
-]);
+// USD cents per plan slug. Mirrors api/_product-fallback-prices.js so the
+// SPA's displayed price and the checkout charge agree without an extra
+// catalog hop. Source of truth: ~/work/hanzo/plans/subscription.json.
+const PLAN_PRICE_CENTS = {
+  'world-pro': 2900,
+  'world-pro-annual': 29000,
+  'world-team': 9900,
+  'world-team-annual': 99000,
+};
 
 export async function onRequestOptions({ request }) {
   return new Response(null, { headers: corsHeaders(request, 'POST, OPTIONS') });
@@ -45,86 +51,38 @@ export async function onRequestPost({ request }) {
 
   const planId = String(body?.planId || body?.planKey || '').trim();
   if (!planId) return jsonResponse({ error: 'planId_required' }, 400, cors);
-  if (!VALID_PLAN_IDS.has(planId)) {
+
+  const amountCents = PLAN_PRICE_CENTS[planId];
+  if (!amountCents) {
     return jsonResponse({ error: 'unknown_plan', planId }, 400, cors);
   }
 
   const user = await iamUserinfo(request);
   if (!user) return unauthenticated(cors);
 
-  const returnUrl = sanitizeReturnUrl(body?.returnUrl) || `${APP_BASE_URL}/?checkout=success`;
-  const cancelUrl = sanitizeReturnUrl(body?.cancelUrl) || `${APP_BASE_URL}/?checkout=cancel`;
+  const returnUrl = sanitizeReturnUrl(body?.returnUrl) || `${APP_BASE_URL}/?checkout=success&plan=${encodeURIComponent(planId)}`;
 
-  // Hand off to Hanzo Commerce via the canonical `/v1/commerce/deposits`
-  // public endpoint (see commerce.go: app.Router.Group("/v1/commerce") +
-  // checkout.MountPublic). Commerce resolves the tenant from the Host
-  // header (Resolver.Resolve(req.Host)), then forwards the body to the
-  // tenant's configured backend at <Tenant.Backend.URL>/v1/bd/deposits.
-  //
-  // We pass Host=world.hanzo.ai so the world tenant is selected, and
-  // X-Org-Id=world as the gateway-injected scope for any downstream
-  // service that consumes Hanzo's claim-propagation convention. Commerce
-  // returns { id, provider, clientToken, ... } verbatim from the tenant
-  // backend on success.
-  let resp;
-  try {
-    resp = await fetch(`${COMMERCE_ENDPOINT}/v1/commerce/deposits`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: request.headers.get('Authorization') || '',
-        Host: `${TENANT}.hanzo.ai`,
-        'X-Forwarded-Host': `${TENANT}.hanzo.ai`,
-        'X-Org-Id': TENANT,
-      },
-      body: JSON.stringify({
-        planId,
-        buyer: {
-          id: user.sub || user.id,
-          email: user.email,
-          name: user.displayName || user.name,
-        },
-        items: [{ planId, quantity: 1 }],
-        successUrl: returnUrl,
-        cancelUrl,
-        metadata: {
-          source: 'world.hanzo.ai',
-          iamUserId: user.sub || user.id,
-          ...(body?.referralCode ? { referralCode: String(body.referralCode) } : {}),
-        },
-        ...(body?.discountCode ? { couponCodes: [String(body.discountCode)] } : {}),
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (err) {
-    return jsonResponse({
-      error: 'commerce_unreachable',
-      message: err?.message || String(err),
-    }, 502, cors);
-  }
+  // Forward the user's IAM bearer so billing.hanzo.ai can authenticate the
+  // /v1/billing/topup/token POST without a second sign-in. The token lives
+  // in the query string for one navigation hop; billing.hanzo.ai reads it
+  // from `token=` and immediately swaps it into a same-origin cookie.
+  const authz = request.headers.get('Authorization') || '';
+  const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
 
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    return jsonResponse({
-      error: 'commerce_error',
-      status: resp.status,
-      commerceError: data?.error || data,
-    }, 502, cors);
-  }
-  // Commerce returns the tenant backend's deposit envelope verbatim. The
-  // SPA expects { checkoutUrl } so it can redirect; we also expose the
-  // raw provider envelope (clientToken etc.) under `deposit` for SPAs
-  // that drive an in-page widget instead of a redirect.
-  const checkoutUrl = data?.checkoutUrl || data?.url || data?.redirectUrl || data?.hostedUrl;
-  if (!checkoutUrl) {
-    return jsonResponse({ error: 'commerce_no_url', payload: data }, 502, cors);
-  }
+  const url = new URL(`${BILLING_BASE_URL}/topup`);
+  url.searchParams.set('amount', String(amountCents));
+  url.searchParams.set('plan', planId);
+  url.searchParams.set('returnUrl', returnUrl);
+  if (user.sub || user.id) url.searchParams.set('userId', user.sub || user.id);
+  if (bearer) url.searchParams.set('token', bearer);
+  if (body?.referralCode) url.searchParams.set('referral', String(body.referralCode));
+  if (body?.discountCode) url.searchParams.set('coupon', String(body.discountCode));
 
   return jsonResponse({
-    checkoutUrl,
-    sessionId: data?.sessionId || data?.id || null,
+    checkoutUrl: url.toString(),
+    sessionId: null,
     planId,
-    deposit: data,
+    amountCents,
   }, 200, cors);
 }
 
