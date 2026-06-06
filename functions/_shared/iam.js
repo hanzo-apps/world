@@ -21,7 +21,13 @@ export async function iamUserinfo(request) {
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    // IAM returns 200 OK with {status:"error"} for invalid/expired tokens
+    // (Casdoor convention). Treat anything without a stable subject as
+    // unauthenticated regardless of HTTP status.
+    if (!data || data.status === 'error') return null;
+    if (!data.sub && !data.id && !data.email) return null;
+    return data;
   } catch {
     return null;
   }
