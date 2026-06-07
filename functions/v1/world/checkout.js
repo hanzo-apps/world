@@ -26,14 +26,30 @@ import { corsHeaders } from '../../_shared/cors.js';
 const APP_BASE_URL = 'https://world.hanzo.ai';
 const PAY_BASE_URL = 'https://pay.hanzo.ai';
 
-// USD cents per plan slug. Mirrors api/_product-fallback-prices.js so the
-// SPA's displayed price and the checkout charge agree without an extra
-// catalog hop. Source of truth: ~/work/hanzo/plans/subscription.json.
+// USD cents per plan slug. Source of truth: ~/work/hanzo/plans/subscription.json
+// (mirrored into commerce's embedded catalog and surfaced as
+// commerce-api.hanzo.ai/v1/billing/plans). Anything here is also a
+// valid POST /v1/billing/subscriptions planId — Hanzo's bundled plans
+// (pro/team/etc.) grant world-pro/world-team entitlements for free via
+// commerce's bundle expansion, so a customer who buys Pro at $49 gets
+// the World Pro tier rolled in. world-pro / world-team stay live as
+// standalone $29 / $99 SKUs for customers who only want the OSINT
+// dashboard.
 const PLAN_PRICE_CENTS = {
+  // Standalone Hanzo World tiers (OSINT dashboard only).
   'world-pro': 2900,
   'world-pro-annual': 29000,
   'world-team': 9900,
   'world-team-annual': 99000,
+  // Hanzo platform tiers that bundle World Pro / World Team.
+  pro: 4900,
+  'pro-annual': 39 * 12 * 100,
+  max: 20000,
+  'max-annual': 160 * 12 * 100,
+  team: 19900,
+  'team-annual': 159 * 12 * 100,
+  'team-max': 22500,
+  'team-max-annual': 180 * 12 * 100,
 };
 
 export async function onRequestOptions({ request }) {

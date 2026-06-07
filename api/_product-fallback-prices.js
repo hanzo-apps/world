@@ -1,13 +1,17 @@
 // Hanzo World plan catalog fallback.
 //
 // Used by api/product-catalog.js when commerce.hanzo.ai is unreachable.
-// Pricing source: /Users/z/work/hanzo/plans/subscription.json (the world-*
-// plans). Slugs match api/v1/world/checkout's PLAN_PRICE_ENV map.
+// Pricing source: ~/work/hanzo/plans/subscription.json (the canonical
+// hanzoai/plans repo) mirrored into commerce's embedded catalog.
 //
 // Editing rules:
-//   - Slugs (id) MUST match the keys in api/v1/world/checkout.js PLAN_PRICE_ENV.
-//   - prices are USD per month / per year. The Stripe price ID lives in env
-//     (STRIPE_PRICE_WORLD_PRO etc.); the catalog only carries display prices.
+//   - Slugs (id) MUST match commerce's `/v1/billing/plans` slugs and
+//     the keys in functions/v1/world/checkout.js PLAN_PRICE_CENTS.
+//   - prices are USD per month / per year.
+//   - World-Pro is included free in pro / max / team / team-max /
+//     enterprise. The fallback advertises both paths so a customer who
+//     wants only the OSINT dashboard pays $29, while a customer who
+//     wants Pro + World pays $49 instead of $29 + $49.
 
 const FALLBACK_TIERS = [
   {
@@ -62,6 +66,41 @@ const FALLBACK_TIERS = [
     limits: { maxAlerts: -1, apiRateLimit: 15000, mcpRateLimit: 15000, maxMembers: 5 },
     popular: false,
   },
+  {
+    id: 'pro',
+    name: 'Hanzo Pro',
+    description: 'Hanzo Pro for developers — includes Hanzo World Pro at no extra cost.',
+    priceMonthly: 49,
+    priceAnnual: 39,
+    bundles: ['world-pro'],
+    features: [
+      'Everything in World Pro',
+      '500 requests/min on Hanzo APIs',
+      '1M tokens/min',
+      'Email support',
+      'Analytics dashboard',
+      'Priority inference across Zen + frontier models',
+    ],
+    limits: { maxAlerts: -1, apiRateLimit: 6000, mcpRateLimit: 3000 },
+    popular: false,
+  },
+  {
+    id: 'team',
+    name: 'Hanzo Team',
+    description: 'Hanzo Team for shared workspaces — includes Hanzo World Team at no extra cost.',
+    priceMonthly: 199,
+    priceAnnual: 159,
+    bundles: ['world-team'],
+    features: [
+      'Everything in World Team',
+      'Up to 10 team seats',
+      'SSO / SAML',
+      'Custom model training',
+      'Shared billing',
+    ],
+    limits: { maxAlerts: -1, apiRateLimit: 30000, mcpRateLimit: 15000, maxMembers: 10 },
+    popular: false,
+  },
 ];
 
 /** Catalog returned when commerce.hanzo.ai is unreachable. */
@@ -78,10 +117,18 @@ export function getFallbackPrice(planId) {
   return tier ? tier.priceMonthly : null;
 }
 
-// Legacy export kept for prior callers — the cents-priced Dodo SKU map.
+// Legacy export kept for prior callers — the cents-priced SKU map.
+// Mirrors the keys in functions/v1/world/checkout.js PLAN_PRICE_CENTS.
+// Hanzo platform tiers bundle World Pro / Team at no extra cost via
+// commerce's `bundles` field, so a Pro purchase ($49) also entitles
+// the user to World Pro features without a second charge.
 export const FALLBACK_PRICES = {
   'world-pro': 2900,
   'world-pro-annual': 29000,
   'world-team': 9900,
   'world-team-annual': 99000,
+  pro: 4900,
+  'pro-annual': 39 * 12 * 100,
+  team: 19900,
+  'team-annual': 159 * 12 * 100,
 };
