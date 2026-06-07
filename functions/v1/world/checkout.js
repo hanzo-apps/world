@@ -71,12 +71,16 @@ export async function onRequestPost({ request }) {
   const authz = request.headers.get('Authorization') || '';
   const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
 
-  // Hanzo Pay SPA route shape: `/amount/card?amount=...` jumps straight
-  // to the card form with the amount preset. `plan=` lets the SPA tag
-  // the resulting transaction so downstream subscription mapping knows
-  // which Hanzo product was being purchased.
-  const url = new URL(`${PAY_BASE_URL}/amount/card`);
-  url.searchParams.set('amount', String(amountCents));
+  // Hanzo Pay SPA route shape: `/confirm/card?amount=29.00&plan=...`
+  // skips the keypad and goes straight to the Square card form with
+  // the price preset. `plan=` lets the Pay SPA POST the matching
+  // /v1/billing/subscriptions record after a successful charge.
+  // Amount is a dollar string (e.g. "29.00") because that's what the
+  // existing /confirm/$method route expects; the Pay SPA's
+  // depositsApi.confirm converts to cents on the way to topup_token.
+  const amountDollars = (amountCents / 100).toFixed(2);
+  const url = new URL(`${PAY_BASE_URL}/confirm/card`);
+  url.searchParams.set('amount', amountDollars);
   url.searchParams.set('plan', planId);
   url.searchParams.set('returnUrl', returnUrl);
   if (user.sub || user.id) url.searchParams.set('userId', user.sub || user.id);
