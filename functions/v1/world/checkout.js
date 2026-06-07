@@ -6,24 +6,25 @@
 //
 // Flow:
 //   world SPA → POST /v1/world/checkout
-//     → resolve plan price from FALLBACK_PRICES
-//     → return a billing.hanzo.ai/topup URL with amount + IAM context
-//   billing.hanzo.ai/topup → Square Web Payments SDK
-//     → POST commerce.hanzo.ai /v1/billing/topup/token (charges card)
+//     → resolve plan price from PLAN_PRICE_CENTS
+//     → return a pay.hanzo.ai URL with amount + IAM context
+//   pay.hanzo.ai (Hanzo Pay SPA) → Square Web Payments SDK
+//     → POST commerce-api.hanzo.ai /v1/billing/topup/token (charges card)
 //     → redirect back to returnUrl with the user's balance credited
 //
-// Hanzo plans bill through Hanzo Commerce's billing/topup_token surface
-// (Square is the active processor). The Liquidity-style BD deposits proxy
-// in commerce is for broker-dealer flows and is unrelated to Hanzo's
-// hosted plans — we hand off to billing.hanzo.ai directly so a single
-// Square-authed page handles the charge and the credit in one round-trip.
+// Hanzo Pay (pay.hanzo.ai) is the single canonical payment surface for
+// every Hanzo product — world, chat, search, app, hanzo.ai. It loads the
+// tenant config from commerce, renders the Square Web Payments SDK card
+// form, drives the charge through commerce's billing/topup_token, and
+// redirects back to returnUrl. world.hanzo.ai never has to embed a
+// payment widget; the redirect IS the integration.
 
 import { iamUserinfo, unauthenticated } from '../../_shared/iam.js';
 import { jsonResponse } from '../../_shared/json.js';
 import { corsHeaders } from '../../_shared/cors.js';
 
 const APP_BASE_URL = 'https://world.hanzo.ai';
-const BILLING_BASE_URL = 'https://billing.hanzo.ai';
+const PAY_BASE_URL = 'https://pay.hanzo.ai';
 
 // USD cents per plan slug. Mirrors api/_product-fallback-prices.js so the
 // SPA's displayed price and the checkout charge agree without an extra
@@ -62,14 +63,19 @@ export async function onRequestPost({ request }) {
 
   const returnUrl = sanitizeReturnUrl(body?.returnUrl) || `${APP_BASE_URL}/?checkout=success&plan=${encodeURIComponent(planId)}`;
 
-  // Forward the user's IAM bearer so billing.hanzo.ai can authenticate the
+  // Forward the user's IAM bearer so pay.hanzo.ai can authenticate the
   // /v1/billing/topup/token POST without a second sign-in. The token lives
-  // in the query string for one navigation hop; billing.hanzo.ai reads it
-  // from `token=` and immediately swaps it into a same-origin cookie.
+  // in the query string for one navigation hop; the Pay SPA reads it
+  // from `token=` and immediately swaps it into a same-origin cookie
+  // before discarding the URL parameter.
   const authz = request.headers.get('Authorization') || '';
   const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
 
-  const url = new URL(`${BILLING_BASE_URL}/topup`);
+  // Hanzo Pay SPA route shape: `/amount/card?amount=...` jumps straight
+  // to the card form with the amount preset. `plan=` lets the SPA tag
+  // the resulting transaction so downstream subscription mapping knows
+  // which Hanzo product was being purchased.
+  const url = new URL(`${PAY_BASE_URL}/amount/card`);
   url.searchParams.set('amount', String(amountCents));
   url.searchParams.set('plan', planId);
   url.searchParams.set('returnUrl', returnUrl);
