@@ -20,8 +20,6 @@ jobs:
     with:
       image: ghcr.io/hanzoai/world
       dockerfile: docker/Dockerfile
-      # Spark Ampere is the canonical online arm64 hanzoai runner;
-      # the legacy spark-hanzoai-arm64 default has zero advertised
-      # runners after the arcd relabel. Pin to spark-hanzo.
-      runner-arm64: spark-hanzo
+      # Canonical native arcd labels — matches spark for arm64.
+      runner-arm64: '["self-hosted","linux","arm64"]'
     secrets: inherit
