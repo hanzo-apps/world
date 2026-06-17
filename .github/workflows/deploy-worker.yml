@@ -24,7 +24,7 @@ permissions:
 jobs:
   unit-test:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     defaults:
       run:
         working-directory: workers/api-cors-preflight
@@ -41,7 +41,7 @@ jobs:
   deploy:
     name: Wrangler deploy
     needs: unit-test
-    runs-on: ubuntu-latest
+    runs-on: hanzo-deploy-linux-amd64
     defaults:
       run:
         working-directory: workers/api-cors-preflight
@@ -61,7 +61,7 @@ jobs:
   live-smoke:
     name: Live preflight smoke test
     needs: deploy
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

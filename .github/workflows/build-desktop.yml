@@ -490,7 +490,7 @@ jobs:
   update-release-notes:
     needs: build-tauri
     if: always() && contains(needs.build-tauri.result, 'success')
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     permissions:
       contents: write
     steps:

@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     outputs:
       convex: ${{ steps.diff.outputs.convex }}
     steps:
@@ -87,7 +87,7 @@ jobs:
   deploy:
     needs: changes
     if: needs.changes.outputs.convex == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-deploy-linux-amd64
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

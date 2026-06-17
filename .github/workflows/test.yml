@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     permissions:
       pull-requests: read
     outputs:
@@ -73,7 +73,7 @@ jobs:
     # docs against the code sources of truth. Runs on every PR/push (docs-only
     # PRs set changes.code=false and skip `unit`, so this must not gate on it).
     # Pure Node builtins — no npm install required.
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -97,7 +97,7 @@ jobs:
   unit:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -131,7 +131,7 @@ jobs:
   sidecar:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
   convex-tests:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -159,7 +159,7 @@ jobs:
   variant-smoke-full:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     # No secrets are injected here. The smoke allows provider-level
     # unavailable/stale states and gates app-level boot, variant, 401,
     # page-error, and expected-panel invariants.
@@ -177,7 +177,7 @@ jobs:
   resilience-validation-smoke:
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.validation == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +191,7 @@ jobs:
   digest-image:
     needs: changes
     if: needs.changes.outputs.digest == 'true'
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     # docker build with the warm runner cache typically lands in ~90s.
     # 20min cap catches base-image-pull stalls, npm-registry flakes, and
     # native-dep compile failures without letting one bad PR check block
