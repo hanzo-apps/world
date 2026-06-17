@@ -1,0 +1,15 @@
+World Monitor — Hanzo fork
+
+This repository is a fork of koala73/worldmonitor
+(https://github.com/koala73/worldmonitor) taken at v2.4.0 (commit 572f3808),
+the last release published under the MIT License.
+
+Original code: Copyright (c) 2024-2026 Elie Habib, under the MIT License
+(see LICENSE.MIT). An MIT grant is irrevocable for code released under it.
+
+Modifications, additions, and this fork as maintained by Hanzo AI are licensed
+under the BSD-3-Clause License (see LICENSE). Copyright (c) 2026 Hanzo AI.
+
+Upstream worldmonitor moved to AGPL-3.0 after v2.4.0; this fork tracks only the
+MIT-era code and develops forward independently. Post-v2.4.0 AGPL code is NOT
+included.
