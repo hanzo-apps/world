@@ -1,7 +1,3 @@
-> **Hanzo fork.** Fork of [koala73/worldmonitor](https://github.com/koala73/worldmonitor) at **v2.4.0** — the last MIT-licensed release. Original work © Elie Habib; Hanzo modifications © 2026 Hanzo AI. MIT-licensed throughout — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
----
-
 # World Monitor
 
 **Real-time global intelligence dashboard** — AI-powered news aggregation, geopolitical monitoring, and infrastructure tracking in a unified situational awareness interface.
