@@ -1,0 +1,34 @@
+name: Build & Deploy world.hanzo.ai
+
+# Canonical native pipeline: arcd self-hosted runners -> GHCR -> DOKS, via the
+# reusable docker-build workflow. Replaces the Vercel build (vercel.json removed).
+# This image is the hanzoai/static SPA frontend only (Dockerfile); the dynamic
+# data/MCP API (world-gw) is a separate service and is unaffected.
+#
+# amd64-only: the do-sfo3-hanzo-k8s nodes are amd64 and the running image has
+# always been amd64. arm64 can be added once the static base is multi-arch.
+#
+# Deploy (kubectl set image to the freshly-built tag) runs on semver tags only,
+# matching world's tag-based release cadence; pushes to main only build/push.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  docker:
+    uses: hanzoai/.github/.github/workflows/docker-build.yml@main
+    with:
+      image: ghcr.io/hanzoai/world
+      platforms: linux/amd64
+      deploy: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      deploy-deployment: world
+      deploy-namespace: hanzo
+    secrets: inherit
