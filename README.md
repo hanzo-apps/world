@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="world" width="880"></p>
+
 # World Monitor
 
 **Real-time global intelligence dashboard** — AI-powered news aggregation, geopolitical monitoring, and infrastructure tracking in a unified situational awareness interface.
