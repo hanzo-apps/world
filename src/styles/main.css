@@ -11014,21 +11014,22 @@ a.prediction-link:hover {
   top: 10px;
   left: 10px;
   z-index: 100;
-  background: var(--bg);
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  /* Hanzo: no outer rectangle — bare pill buttons only. */
+  background: transparent;
+  padding: 0;
+  border: none;
 }
 
 .deckgl-time-slider .time-options {
   display: flex;
-  gap: 2px;
+  gap: 6px;
 }
 
 .deckgl-time-slider .time-btn {
   padding: 4px 11px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 999px;
   border-radius: var(--radius-pill);
   color: var(--text-dim);
   font-family: var(--font-mono);
