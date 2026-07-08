@@ -41,7 +41,7 @@ interface GDACSResponse {
   features: GDACSFeature[];
 }
 
-const GDACS_API = 'https://www.gdacs.org/gdacsapi/v1/world/events/geteventlist/MAP';
+const GDACS_API = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP';
 const breaker = createCircuitBreaker<GDACSEvent[]>({ name: 'GDACS' });
 
 const EVENT_TYPE_NAMES: Record<string, string> = {

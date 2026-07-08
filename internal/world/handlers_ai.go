@@ -236,7 +236,7 @@ func (s *Server) handleCountryIntel(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	brief, _, err := s.ai.chat(ctx, s, bearer, system, user, 0.4, 900)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, "", map[string]any{"error": "AI service error", "fallback": true})
+		writeJSON(w, http.StatusOK, "", map[string]any{"error": "AI service error", "fallback": true})
 		return
 	}
 	writeJSON(w, http.StatusOK, "public, max-age=3600, s-maxage=3600, stale-while-revalidate=600",

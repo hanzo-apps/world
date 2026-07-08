@@ -55,7 +55,7 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 			}, nil
 		},
 		func(w http.ResponseWriter, err error) {
-			writeError(w, http.StatusBadGateway, "fetch_failed")
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": "fetch_failed"})
 		})
 }
 

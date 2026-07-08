@@ -61,7 +61,7 @@ func (s *Server) computeMacroSignals(ctx context.Context) (any, error) {
 		func() { qqq, _ = s.yahooChart(ctx, "QQQ", "range=1y&interval=1d") },
 		func() { xlp, _ = s.yahooChart(ctx, "XLP", "range=1y&interval=1d") },
 		func() { _ = s.getJSON(ctx, "https://api.alternative.me/fng/?limit=30&format=json", nil, &fng) },
-		func() { _ = s.getJSON(ctx, "https://mempool.space/v1/world/v1/mining/hashrate/1m", nil, &hash) },
+		func() { _ = s.getJSON(ctx, "https://mempool.space/api/v1/mining/hashrate/1m", nil, &hash) },
 	)
 	jpyP, btcP, qqqP, xlpP := jpy.closes(), btc.closes(), qqq.closes(), xlp.closes()
 	btcPV := btc.alignedPV()
