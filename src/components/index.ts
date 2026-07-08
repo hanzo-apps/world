@@ -46,3 +46,9 @@ export * from './SpaceWeatherPanel';
 export * from './LanguageSelector';
 export { AiAnalystPanel } from './AiAnalystPanel';
 export { CustomFeedPanel } from './CustomFeedPanel';
+// SaaS / cloud variant panels
+export * from './CloudOverviewPanel';
+export * from './ModelUsagePanel';
+export * from './FleetPanel';
+export * from './MyUsagePanel';
+export * from './LiveActivityPanel';
