@@ -81,9 +81,12 @@ import {
   PopulationExposurePanel,
   InvestmentsPanel,
   LanguageSelector,
+  AiAnalystPanel,
+  CustomFeedPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { AccountMenu } from '@/components/AccountMenu';
+import type { AnalystHost } from '@/services/analyst-actions';
 import { collectStoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { openStoryModal } from '@/components/StoryModal';
@@ -166,6 +169,7 @@ export class App {
   private isIdle = false;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000; // 2 minutes - pause animations when idle
   private disabledSources: Set<string> = new Set();
+  private customFeeds: Array<{ key: string; name: string; url: string }> = [];
   private mapFlashCache: Map<string, number> = new Map();
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
   private initialLoadComplete = false;
@@ -260,6 +264,12 @@ export class App {
           localStorage.setItem(TECH_INSIGHTS_MIGRATION_KEY, 'done');
         }
       }
+    }
+
+    // AI analyst ships enabled for everyone — returning users won't have it in
+    // their saved panel settings, so ensure it's present + toggleable.
+    if (!this.panelSettings['ai-analyst']) {
+      this.panelSettings['ai-analyst'] = { name: 'AI analyst', enabled: true, priority: 2 };
     }
 
     // Desktop key management panel must always remain accessible in Tauri.
@@ -2136,6 +2146,9 @@ export class App {
     const insightsPanel = new InsightsPanel();
     this.panels['insights'] = insightsPanel;
 
+    // AI Analyst — chat with live data + agentic control surface (all variants)
+    this.panels['ai-analyst'] = new AiAnalystPanel(this.buildAnalystHost());
+
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -2187,6 +2200,9 @@ export class App {
         panelsGrid.appendChild(el);
       }
     });
+
+    // Restore any analyst-created custom feed panels (appended after the grid loop).
+    this.mountCustomFeedPanels();
 
     this.map.onTimeRangeChanged((range) => {
       this.currentTimeRange = range;
@@ -2255,6 +2271,209 @@ export class App {
       .map((el) => (el as HTMLElement).dataset.panel)
       .filter((key): key is string => !!key);
     localStorage.setItem(this.PANEL_ORDER_KEY, JSON.stringify(order));
+  }
+
+  // ── AI Analyst host (agentic control surface) ───────────────────────────────
+  // The narrow port the AI analyst drives. All dashboard mutation stays here in
+  // App; the analyst services only see this interface.
+  private buildAnalystHost(): AnalystHost {
+    return {
+      getState: () => ({ variant: SITE_VARIANT, timeRange: this.currentTimeRange }),
+      listPanels: () =>
+        Object.entries(this.panelSettings)
+          .filter(([k]) => k !== 'runtime-config' || this.isDesktopApp)
+          .map(([key, cfg]) => ({ key, name: this.getLocalizedPanelName(key, cfg.name), enabled: !!cfg.enabled })),
+      listLayers: () => Object.entries(this.mapLayers).map(([key, on]) => ({ key, on: !!on })),
+      showPanel: (key) => this.setPanelEnabled(key, true),
+      hidePanel: (key) => this.setPanelEnabled(key, false),
+      movePanel: (key, opts) => this.movePanelInGrid(key, opts),
+      toggleLayer: (key, on) => this.setMapLayerEnabled(key, on),
+      setTimeRange: (range) => this.setGlobalTimeRange(range),
+      setVariant: (variant) => this.setSiteVariant(variant),
+      resetLayout: () => this.resetPanelLayout(),
+      addFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
+      removeCustomPanel: (name) => this.removeCustomFeedPanel(name),
+    };
+  }
+
+  private setPanelEnabled(key: string, enabled: boolean): boolean {
+    const cfg = this.panelSettings[key];
+    if (!cfg) return false;
+    cfg.enabled = enabled;
+    saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+    this.applyPanelSettings();
+    this.renderPanelToggles();
+    return true;
+  }
+
+  private movePanelInGrid(
+    key: string,
+    opts: { before?: string; after?: string; position?: 'top' | 'bottom' },
+  ): boolean {
+    // live-news spans two columns and MUST stay first (CSS grid) — never move it.
+    if (key === 'live-news') return false;
+    const grid = document.getElementById('panelsGrid');
+    const el = this.panels[key]?.getElement();
+    if (!grid || !el || el.parentElement !== grid) return false;
+
+    if (opts.position === 'top') {
+      const liveNews = this.panels['live-news']?.getElement();
+      if (liveNews && liveNews.parentElement === grid && liveNews !== el) {
+        grid.insertBefore(el, liveNews.nextSibling);
+      } else {
+        grid.insertBefore(el, grid.firstElementChild);
+      }
+    } else if (opts.position === 'bottom') {
+      grid.appendChild(el);
+    } else {
+      const anchorKey = opts.before || opts.after;
+      const anchor = anchorKey ? this.panels[anchorKey]?.getElement() : null;
+      if (!anchor || anchor.parentElement !== grid) return false;
+      if (anchorKey === 'live-news' && opts.before) return false; // can't sit before live-news
+      grid.insertBefore(el, opts.before ? anchor : anchor.nextSibling);
+    }
+    this.savePanelOrder();
+    return true;
+  }
+
+  private setMapLayerEnabled(key: string, on: boolean): boolean {
+    if (!(key in this.mapLayers)) return false;
+    const layer = key as keyof MapLayers;
+    this.mapLayers[layer] = on;
+    saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
+    this.map?.setLayers(this.mapLayers);
+    if (layer === 'ais') {
+      if (on) {
+        this.map?.setLayerLoading('ais', true);
+        initAisStream();
+      } else {
+        disconnectAisStream();
+      }
+    } else if (on) {
+      void this.loadDataForLayer(layer);
+    }
+    return true;
+  }
+
+  private setGlobalTimeRange(range: string): boolean {
+    const valid: TimeRange[] = ['1h', '6h', '24h', '48h', '7d', 'all'];
+    if (!valid.includes(range as TimeRange)) return false;
+    this.currentTimeRange = range as TimeRange;
+    this.map?.setTimeRange(range as TimeRange);
+    this.applyTimeRangeFilterToNewsPanelsDebounced();
+    return true;
+  }
+
+  private setSiteVariant(variant: string): boolean {
+    if (!['full', 'tech', 'finance'].includes(variant)) return false;
+    if (variant === SITE_VARIANT) return true;
+    const u = new URL(window.location.href);
+    u.searchParams.set('variant', variant);
+    window.location.href = u.toString(); // reload picks up the new SITE_VARIANT
+    return true;
+  }
+
+  private resetPanelLayout(): void {
+    localStorage.removeItem(this.PANEL_ORDER_KEY);
+    const grid = document.getElementById('panelsGrid');
+    if (!grid) return;
+    const order = ['live-news', ...Object.keys(DEFAULT_PANELS).filter((k) => k !== 'map' && k !== 'live-news')];
+    order.forEach((key) => {
+      const el = this.panels[key]?.getElement();
+      if (el && el.parentElement === grid) grid.appendChild(el);
+    });
+  }
+
+  private customFeedKey(name: string): string {
+    return 'custom:' + name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  private async addCustomFeedPanel(name: string, url: string): Promise<{ ok: boolean; note?: string }> {
+    name = name.trim();
+    if (!name) return { ok: false, note: 'a name is required' };
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { ok: false, note: 'that URL is invalid' };
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return { ok: false, note: 'that URL is invalid' };
+
+    // Validate against the server RSS allowlist — the single SSRF boundary.
+    let xml: string;
+    try {
+      const res = await fetch(`/v1/world/rss-proxy?url=${encodeURIComponent(url)}`);
+      if (res.status === 403) return { ok: false, note: 'domain not in the allowlist' };
+      if (!res.ok) return { ok: false, note: 'could not load that feed' };
+      xml = await res.text();
+    } catch {
+      return { ok: false, note: 'could not reach that feed' };
+    }
+
+    const key = this.customFeedKey(name);
+    if (this.panels[key]) this.removeCustomFeedPanel(name); // replace on re-add
+
+    const panel = new CustomFeedPanel(key, name, url, xml);
+    this.panels[key] = panel;
+    this.panelSettings[key] = { name, enabled: true, priority: 2 };
+    saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+
+    const grid = document.getElementById('panelsGrid');
+    const el = panel.getElement();
+    this.makeDraggable(el, key);
+    grid?.appendChild(el);
+
+    this.customFeeds = this.customFeeds.filter((f) => f.key !== key);
+    this.customFeeds.push({ key, name, url });
+    this.persistCustomFeeds();
+    this.renderPanelToggles();
+    return { ok: true };
+  }
+
+  private removeCustomFeedPanel(name: string): boolean {
+    const key = this.customFeedKey(name);
+    const panel = this.panels[key];
+    if (!panel) return false;
+    panel.getElement().remove();
+    panel.destroy();
+    delete this.panels[key];
+    delete this.panelSettings[key];
+    saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+    this.customFeeds = this.customFeeds.filter((f) => f.key !== key);
+    this.persistCustomFeeds();
+    this.renderPanelToggles();
+    return true;
+  }
+
+  private persistCustomFeeds(): void {
+    try {
+      localStorage.setItem('hanzo-world-custom-panels', JSON.stringify(this.customFeeds));
+    } catch {
+      /* private mode */
+    }
+  }
+
+  private mountCustomFeedPanels(): void {
+    let saved: Array<{ key?: string; name: string; url: string }> = [];
+    try {
+      saved = JSON.parse(localStorage.getItem('hanzo-world-custom-panels') || '[]');
+    } catch {
+      saved = [];
+    }
+    if (!Array.isArray(saved)) return;
+    const grid = document.getElementById('panelsGrid');
+    saved.forEach((f) => {
+      if (!f || !f.name || !f.url) return;
+      const key = f.key || this.customFeedKey(f.name);
+      if (this.panels[key]) return;
+      const panel = new CustomFeedPanel(key, f.name, f.url);
+      this.panels[key] = panel;
+      if (!this.panelSettings[key]) this.panelSettings[key] = { name: f.name, enabled: true, priority: 2 };
+      this.customFeeds.push({ key, name: f.name, url: f.url });
+      const el = panel.getElement();
+      this.makeDraggable(el, key);
+      grid?.appendChild(el);
+    });
   }
 
   private attachRelatedAssetHandlers(panel: NewsPanel): void {
