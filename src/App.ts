@@ -83,6 +83,7 @@ import {
   LanguageSelector,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
+import { AccountMenu } from '@/components/AccountMenu';
 import { collectStoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { openStoryModal } from '@/components/StoryModal';
@@ -138,6 +139,7 @@ export class App {
   private statusPanel: StatusPanel | null = null;
   private exportPanel: ExportPanel | null = null;
   private languageSelector: LanguageSelector | null = null;
+  private accountMenu: AccountMenu | null = null;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
@@ -327,6 +329,7 @@ export class App {
     this.setupPizzIntIndicator();
     this.setupExportPanel();
     this.setupLanguageSelector();
+    this.setupAccountMenu();
     this.setupSearchModal();
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
@@ -505,6 +508,17 @@ export class App {
       headerRight.insertBefore(this.languageSelector.getElement(), searchBtn);
     } else if (headerRight) {
       headerRight.insertBefore(this.languageSelector.getElement(), headerRight.firstChild);
+    }
+  }
+
+  // Hanzo IAM: show the logged-in user + org/project switcher (or "Sign in").
+  // Rightmost in the header so identity is always visible. Desktop builds keep
+  // it too — the same hanzo.id session backs the Tauri app.
+  private setupAccountMenu(): void {
+    this.accountMenu = new AccountMenu();
+    const headerRight = this.container.querySelector('.header-right');
+    if (headerRight) {
+      headerRight.appendChild(this.accountMenu.getElement());
     }
   }
 
