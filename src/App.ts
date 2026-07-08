@@ -16,6 +16,7 @@ import { BETA_MODE } from '@/config/beta';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
+import { attachPanelDrag } from '@/services/panel-drag';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
@@ -2521,50 +2522,14 @@ export class App {
     }
   }
 
+  // Pointer-driven reorder: custom ghost, gap-opening FLIP reflow, touch support.
+  // The drag module owns all pointer math + visuals; App only persists the order
+  // that the reorder leaves in the live DOM (savePanelOrder reads data-panel).
   private makeDraggable(el: HTMLElement, key: string): void {
-    el.draggable = true;
     el.dataset.panel = key;
-
-    el.addEventListener('dragstart', (e) => {
-      const target = e.target as HTMLElement;
-      // Don't start drag if panel is being resized
-      if (el.dataset.resizing === 'true') {
-        e.preventDefault();
-        return;
-      }
-      // Don't start drag if target is the resize handle
-      if (target.classList?.contains('panel-resize-handle') || target.closest?.('.panel-resize-handle')) {
-        e.preventDefault();
-        return;
-      }
-      el.classList.add('dragging');
-      e.dataTransfer?.setData('text/plain', key);
-    });
-
-    el.addEventListener('dragend', () => {
-      el.classList.remove('dragging');
-      this.savePanelOrder();
-    });
-
-    el.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const dragging = document.querySelector('.dragging');
-      if (!dragging || dragging === el) return;
-
-      const grid = document.getElementById('panelsGrid');
-      if (!grid) return;
-
-      const siblings = Array.from(grid.children).filter((c) => c !== dragging);
-      const nextSibling = siblings.find((sibling) => {
-        const rect = sibling.getBoundingClientRect();
-        return e.clientY < rect.top + rect.height / 2;
-      });
-
-      if (nextSibling) {
-        grid.insertBefore(dragging, nextSibling);
-      } else {
-        grid.appendChild(dragging);
-      }
+    attachPanelDrag(el, {
+      getGrid: () => document.getElementById('panelsGrid'),
+      onReorder: () => this.savePanelOrder(),
     });
   }
 
