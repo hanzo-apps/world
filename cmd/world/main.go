@@ -73,11 +73,18 @@ func main() {
 type spaHandler struct {
 	root      string
 	indexHTML []byte
+	csp       string
 	fileSrv   http.Handler
 }
 
 func newSPAHandler(root string) http.Handler {
-	h := &spaHandler{root: root, fileSrv: http.FileServer(http.Dir(root))}
+	// Honor the same CSP env the prior hanzoai/static image used, so the world
+	// CR needs no change on cutover; WORLD_CSP is an explicit alias.
+	h := &spaHandler{
+		root:    root,
+		fileSrv: http.FileServer(http.Dir(root)),
+		csp:     envOr("HANZO_STATIC_CSP", envOr("WORLD_CSP", "")),
+	}
 	if b, err := os.ReadFile(filepath.Join(root, "index.html")); err == nil {
 		h.indexHTML = b
 	} else {
@@ -122,6 +129,9 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
+	if h.csp != "" {
+		w.Header().Set("Content-Security-Policy", h.csp)
+	}
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
 		_, _ = w.Write(h.indexHTML)
