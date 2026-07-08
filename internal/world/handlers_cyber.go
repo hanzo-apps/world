@@ -27,7 +27,7 @@ func (s *Server) handleCyberThreats(w http.ResponseWriter, r *http.Request) {
 		10*time.Minute, 24*time.Hour,
 		func(ctx context.Context) (any, error) { return s.cyberThreats(ctx, limit, days) },
 		func(w http.ResponseWriter, err error) {
-			writeJSON(w, http.StatusBadGateway, "", map[string]any{"error": "Fetch failed: " + err.Error(), "data": []any{}})
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": "Fetch failed: " + err.Error(), "data": []any{}})
 		})
 }
 
