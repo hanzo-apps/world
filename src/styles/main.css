@@ -377,9 +377,9 @@ canvas,
 }
 
 .logo {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 14px;
-  letter-spacing: 2px;
+  letter-spacing: 0.3px;
   color: var(--accent);
 }
 
@@ -537,7 +537,7 @@ canvas,
 .focus-label {
   font-size: 10px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-right: 6px;
 }
@@ -879,7 +879,7 @@ canvas,
   left: 50%;
   transform: translateX(-50%);
   font-size: 16px;
-  letter-spacing: 2px;
+  letter-spacing: 0.3px;
   color: var(--text-dim);
   transition: color 0.2s;
 }
@@ -942,7 +942,7 @@ canvas,
   color: var(--text-secondary);
   letter-spacing: 0.5px;
   pointer-events: none;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .panel-header-left {
@@ -954,7 +954,7 @@ canvas,
 .panel-title {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 1px;
   color: var(--text);
 }
@@ -1215,7 +1215,7 @@ canvas,
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
@@ -1330,7 +1330,7 @@ canvas,
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   transition: opacity 0.2s;
 }
@@ -1425,7 +1425,7 @@ canvas,
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   white-space: nowrap;
   display: flex;
@@ -1491,7 +1491,7 @@ canvas,
 .webcam-city {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   letter-spacing: 1px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
@@ -1543,7 +1543,7 @@ canvas,
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -1610,7 +1610,7 @@ canvas,
 .item-source {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
   display: flex;
@@ -1623,7 +1623,7 @@ canvas,
   color: var(--bg);
   padding: 1px 4px;
   font-size: 8px;
-  font-weight: bold;
+  font-weight: 600;
   animation: pulse-alert 1s infinite;
 }
 
@@ -1859,7 +1859,7 @@ canvas,
   border-radius: 3px;
   font-weight: 600;
   border: 1px solid;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
 }
 
@@ -1887,7 +1887,7 @@ canvas,
   color: var(--bg);
   padding: 1px 5px;
   font-size: 8px;
-  font-weight: bold;
+  font-weight: 600;
   border-radius: 8px;
 }
 
@@ -1994,7 +1994,7 @@ canvas,
 .related-assets-header {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.6px;
   display: flex;
   gap: 6px;
@@ -2033,7 +2033,7 @@ canvas,
 
 .related-asset-type {
   font-size: 8px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--accent);
   letter-spacing: 0.4px;
 }
@@ -2053,7 +2053,7 @@ canvas,
   font-size: 8px;
   padding: 1px 5px;
   border-radius: 8px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .velocity-badge.elevated {
@@ -2096,7 +2096,7 @@ canvas,
 /* Deviation indicators */
 .deviation-indicator {
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   margin-left: 8px;
   padding: 1px 6px;
   border-radius: 8px;
@@ -2174,7 +2174,7 @@ canvas,
 }
 
 .signal-modal-title {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 14px;
   letter-spacing: 1px;
 }
@@ -2240,13 +2240,13 @@ canvas,
 
 .signal-type {
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
   margin-bottom: 4px;
 }
 
 .signal-title {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 13px;
   color: var(--text);
   margin-bottom: 6px;
@@ -2328,7 +2328,7 @@ canvas,
   font-size: 11px;
   cursor: pointer;
   border-radius: 2px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -2397,7 +2397,7 @@ canvas,
   padding: 8px 12px;
   border-bottom: 1px solid var(--panel-border);
   font-size: 11px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   color: var(--accent);
 }
@@ -2439,7 +2439,7 @@ canvas,
   margin-top: 8px;
   font-size: 12px;
   color: var(--green);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .playback-time.historical {
@@ -2471,7 +2471,7 @@ canvas,
 .playback-btn.playback-live {
   background: var(--green);
   color: var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .playback-btn.playback-live.active {
@@ -2623,7 +2623,7 @@ body.playback-mode .status-dot {
   font-size: 9px;
   color: var(--text-dim);
   letter-spacing: 1px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .time-slider-buttons {
@@ -2651,7 +2651,7 @@ body.playback-mode .status-dot {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .layer-toggles:not(.deckgl-layer-toggles) {
@@ -2673,7 +2673,7 @@ body.playback-mode .status-dot {
   font-family: inherit;
   font-size: 9px;
   cursor: pointer;
-  text-transform: uppercase;
+  text-transform: none;
   position: relative;
   transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
@@ -2727,7 +2727,7 @@ body.playback-mode .status-dot {
   color: var(--text-dim);
   font-family: inherit;
   font-size: 11px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -2763,8 +2763,8 @@ body.playback-mode .status-dot {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
   color: var(--accent);
 }
@@ -2804,8 +2804,8 @@ body.playback-mode .status-dot {
 
 .layer-help-title {
   font-size: 9px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
   color: var(--green);
   margin-bottom: 6px;
@@ -2825,7 +2825,7 @@ body.playback-mode .status-dot {
 .layer-help-item span {
   flex-shrink: 0;
   min-width: 80px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--accent);
   font-size: 9px;
 }
@@ -2882,7 +2882,7 @@ body.playback-mode .status-dot {
   font-size: 8px;
   color: var(--text);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 1px;
 }
 
@@ -2893,7 +2893,7 @@ body.playback-mode .status-dot {
   transform: translateX(-50%);
   white-space: nowrap;
   font-size: 7px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--bg);
   background: var(--red);
   padding: 1px 4px;
@@ -3105,7 +3105,7 @@ body.playback-mode .status-dot {
 .cable-advisory-label {
   font-size: 8px;
   color: var(--cable-advisory-color, var(--semantic-critical));
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.4px;
   margin-top: 2px;
   white-space: nowrap;
@@ -3128,7 +3128,7 @@ body.playback-mode .status-dot {
 .repair-ship-label {
   font-size: 8px;
   color: var(--repair-ship-color, var(--semantic-low));
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.4px;
   margin-top: 2px;
   white-space: nowrap;
@@ -3192,7 +3192,7 @@ body.playback-mode .status-dot {
 .protest-label {
   font-size: 8px;
   color: var(--protest-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.4px;
   margin-top: 2px;
   white-space: nowrap;
@@ -3213,7 +3213,7 @@ body.playback-mode .status-dot {
   background: var(--protest-color);
   color: var(--bg);
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   padding: 1px 4px;
   border-radius: 8px;
   min-width: 14px;
@@ -3268,7 +3268,7 @@ body.playback-mode .status-dot {
 .datacenter-label {
   font-size: 8px;
   color: var(--datacenter-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.4px;
   margin-top: 2px;
   white-space: nowrap;
@@ -3289,7 +3289,7 @@ body.playback-mode .status-dot {
   background: var(--datacenter-color);
   color: var(--bg);
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   padding: 1px 4px;
   border-radius: 8px;
   min-width: 14px;
@@ -3343,7 +3343,7 @@ body.playback-mode .status-dot {
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 9px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-muted);
 }
 
@@ -3356,7 +3356,7 @@ body.playback-mode .status-dot {
 
 .stat-value.alert {
   color: var(--semantic-critical);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 /* Internet Outage markers */
@@ -3393,7 +3393,7 @@ body.playback-mode .status-dot {
   font-size: 8px;
   color: var(--outage-color, var(--semantic-elevated));
   white-space: nowrap;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 2px;
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
@@ -3439,8 +3439,8 @@ body.playback-mode .status-dot {
 .conflict-label {
   fill: var(--red);
   font-size: 9px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg), 0 0 12px var(--bg);
   pointer-events: none;
@@ -3454,8 +3454,8 @@ body.playback-mode .status-dot {
   transform-origin: center;
   color: var(--red);
   font-size: 10px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
   text-shadow:
     0 0 4px var(--bg),
@@ -3578,7 +3578,7 @@ body.playback-mode .status-dot {
   color: var(--text);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
   white-space: nowrap;
-  text-transform: uppercase;
+  text-transform: none;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -3698,7 +3698,7 @@ body.playback-mode .status-dot {
   color: var(--text);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
   white-space: nowrap;
-  text-transform: uppercase;
+  text-transform: none;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -3761,7 +3761,7 @@ body.playback-mode .status-dot {
   font-size: 8px;
   color: var(--semantic-high);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
+  font-weight: 600;
   margin-top: 2px;
   transition: opacity 0.2s ease;
 }
@@ -3814,7 +3814,7 @@ body.playback-mode .status-dot {
   font-size: 8px;
   color: var(--accent);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
+  font-weight: 600;
   white-space: nowrap;
   margin-top: 2px;
   max-width: 120px;
@@ -3826,7 +3826,7 @@ body.playback-mode .status-dot {
   font-size: 7px;
   color: var(--yellow);
   text-shadow: 0 0 4px var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 /* Category-specific colors */
@@ -3959,8 +3959,8 @@ body.playback-mode .status-dot {
   font-size: 7px;
   color: var(--semantic-elevated);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   transition: opacity 0.2s ease;
 }
 
@@ -4022,8 +4022,8 @@ body.playback-mode .status-dot {
   font-size: 6px;
   color: var(--status-live);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   opacity: 0.8;
 }
 
@@ -4086,8 +4086,8 @@ body.playback-mode .status-dot {
   font-size: 6px;
   color: var(--semantic-info);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   opacity: 0.8;
   max-width: 60px;
   overflow: hidden;
@@ -4154,7 +4154,7 @@ body.playback-mode .status-dot {
 
 .sector-change {
   font-size: 11px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .sector-change.up {
@@ -4209,7 +4209,7 @@ body.playback-mode .status-dot {
 
 .market-price {
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text);
   display: block;
 }
@@ -4242,12 +4242,12 @@ body.playback-mode .status-dot {
 .commodity-name {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .commodity-price {
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -4331,7 +4331,7 @@ a.prediction-link:hover {
 
 .prediction-label {
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--bg);
   text-shadow: 0 0 2px var(--overlay-heavy);
   white-space: nowrap;
@@ -4368,9 +4368,9 @@ a.prediction-link:hover {
   color: var(--bg);
   font-family: inherit;
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .monitor-add-btn:hover {
@@ -4559,8 +4559,8 @@ a.prediction-link:hover {
 
 .modal-title {
   font-size: 14px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
 }
 
@@ -4614,7 +4614,7 @@ a.prediction-link:hover {
 
 .panel-toggle-label {
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 /* Sources Modal */
@@ -4728,7 +4728,7 @@ a.prediction-link:hover {
   font-family: inherit;
   font-size: 10px;
   cursor: pointer;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .sources-footer button:hover {
@@ -4843,7 +4843,7 @@ a.prediction-link:hover {
 
 .popup-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--red);
   letter-spacing: 1px;
   flex: 1;
@@ -4868,7 +4868,7 @@ a.prediction-link:hover {
 .popup-badge {
   padding: 4px 10px;
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   border-radius: 2px;
   letter-spacing: 1px;
 }
@@ -4955,7 +4955,7 @@ a.prediction-link:hover {
   font-size: 9px;
   color: var(--text-dim);
   letter-spacing: 1px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .stat-value {
@@ -5026,7 +5026,7 @@ a.prediction-link:hover {
 .popup-news-item .news-source {
   font-size: 9px;
   color: var(--red);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -5123,7 +5123,7 @@ a.prediction-link:hover {
 
 .ais-disruption-label {
   font-size: 8px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.6px;
   color: var(--ais-color, var(--defcon-4));
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
@@ -5171,7 +5171,7 @@ a.prediction-link:hover {
   position: absolute;
   white-space: nowrap;
   font-size: 8px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--bg);
   background: var(--red);
   padding: 2px 6px;
@@ -5366,7 +5366,7 @@ a.prediction-link:hover {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   font-size: 11px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -5391,7 +5391,7 @@ a.prediction-link:hover {
 .status-section-title {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   margin-bottom: 6px;
 }
 
@@ -5598,7 +5598,7 @@ a.prediction-link:hover {
 }
 
 .popup-headline {
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: 8px;
   color: var(--text);
 }
@@ -5738,8 +5738,8 @@ a.prediction-link:hover {
   font-size: 7px;
   color: var(--defcon-4);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -5813,8 +5813,8 @@ a.prediction-link:hover {
   font-size: 7px;
   color: var(--semantic-info);
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -5892,7 +5892,7 @@ a.prediction-link:hover {
   padding: 2px 4px;
   background: var(--bg);
   border-radius: 2px;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
   margin-top: 2px;
@@ -5987,7 +5987,7 @@ a.prediction-link:hover {
   padding: 1px 3px;
   background: var(--bg);
   border-radius: 2px;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
   margin-top: 2px;
@@ -6098,11 +6098,11 @@ a.prediction-link:hover {
   padding: 2px 4px;
   background: var(--bg);
   border-radius: 2px;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
   margin-top: 2px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .tech-hq-marker:hover .tech-hq-label {
@@ -6159,7 +6159,7 @@ a.prediction-link:hover {
   background: var(--red);
   color: var(--accent);
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   min-width: 14px;
   height: 14px;
   border-radius: 7px;
@@ -6303,7 +6303,7 @@ a.prediction-link:hover {
   padding: 2px 4px;
   background: var(--bg);
   border-radius: 2px;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0;
   transition: opacity 0.2s ease;
   margin-top: 2px;
@@ -6366,7 +6366,7 @@ a.prediction-link:hover {
   display: block;
   font-size: 8px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   margin-bottom: 4px;
 }
 
@@ -6416,7 +6416,7 @@ a.prediction-link:hover {
 
 .indicator-value .value {
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--accent);
 }
 
@@ -6614,7 +6614,7 @@ a.prediction-link:hover {
   background: var(--border);
   padding: 2px 6px;
   border-radius: 4px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .search-input {
@@ -6649,7 +6649,7 @@ a.prediction-link:hover {
   padding: 8px 16px;
   font-size: 10px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 1px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
@@ -6711,7 +6711,7 @@ a.prediction-link:hover {
 .search-result-type {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   background: var(--bg);
   padding: 2px 6px;
   border-radius: 3px;
@@ -6796,12 +6796,12 @@ a.prediction-link:hover {
 .flight-delay-label {
   font-size: 9px;
   color: var(--flight-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 2px;
   white-space: nowrap;
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 @keyframes flight-pulse {
@@ -6986,12 +6986,12 @@ a.prediction-link:hover {
 .military-flight-label {
   font-size: 7px;
   color: var(--mil-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
   margin-top: 1px;
   white-space: nowrap;
   text-shadow: 0 0 3px var(--shadow-color), 0 0 6px var(--shadow-color);
-  font-weight: bold;
+  font-weight: 600;
   font-family: 'Courier New', monospace;
   opacity: 0.8;
 }
@@ -7151,12 +7151,12 @@ a.prediction-link:hover {
 .military-vessel-label {
   font-size: 8px;
   color: var(--vessel-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 2px;
   white-space: nowrap;
   text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg);
-  font-weight: bold;
+  font-weight: 600;
   max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7260,7 +7260,7 @@ a.prediction-link:hover {
 /* Targeting reticle style for cluster count */
 .military-cluster-marker .cluster-count {
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--cluster-color);
   font-family: 'Courier New', monospace;
   text-shadow: 0 0 4px var(--shadow-color);
@@ -7294,11 +7294,11 @@ a.prediction-link:hover {
 .military-cluster-marker .cluster-label {
   font-size: 7px;
   color: var(--cluster-color);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 3px;
   white-space: nowrap;
-  font-weight: bold;
+  font-weight: 600;
   font-family: 'Courier New', monospace;
   text-shadow: 0 0 3px var(--shadow-color);
   opacity: 0.85;
@@ -7439,7 +7439,7 @@ a.prediction-link:hover {
 
 .popup-description.alert {
   color: var(--semantic-critical);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .popup-attribution {
@@ -7461,12 +7461,12 @@ a.prediction-link:hover {
   background: var(--accent);
   color: var(--bg);
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   padding: 2px 6px;
   border-radius: 10px;
   margin-left: 8px;
   letter-spacing: 0.3px;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -7503,7 +7503,7 @@ a.prediction-link:hover {
   background: var(--green);
   color: var(--bg);
   font-size: 8px;
-  font-weight: bold;
+  font-weight: 600;
   padding: 1px 4px;
   border-radius: 3px;
   margin-right: 4px;
@@ -8134,7 +8134,7 @@ a.prediction-link:hover {
   font-size: 10px;
   color: var(--accent);
   font-weight: 500;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8260,7 +8260,7 @@ a.prediction-link:hover {
 
 .cii-score {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
   font-family: var(--font-mono);
 }
@@ -8328,9 +8328,9 @@ a.prediction-link:hover {
 
 .cii-learning-banner .learning-title {
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--semantic-elevated);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -8460,7 +8460,7 @@ a.prediction-link:hover {
   border: 1px solid rgba(100, 200, 255, 0.2);
   border-radius: 10px;
   color: rgba(100, 200, 255, 0.7);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -8764,7 +8764,7 @@ a.prediction-link:hover {
   border-radius: 4px;
   color: var(--bg);
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -8806,14 +8806,14 @@ a.prediction-link:hover {
 }
 
 .cascade-source-name {
-  font-weight: bold;
+  font-weight: 600;
   flex: 1;
 }
 
 .cascade-source-type {
   font-size: 10px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .cascade-section {
@@ -8824,9 +8824,9 @@ a.prediction-link:hover {
 
 .cascade-section-title {
   font-size: 11px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -8853,8 +8853,8 @@ a.prediction-link:hover {
 
 .cascade-impact {
   font-size: 10px;
-  text-transform: uppercase;
-  font-weight: bold;
+  text-transform: none;
+  font-weight: 600;
 }
 
 .cascade-capacity {
@@ -8879,7 +8879,7 @@ a.prediction-link:hover {
 .cascade-redundancy-capacity {
   font-size: 11px;
   color: var(--green);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 /* Strategic Risk Panel */
@@ -8943,14 +8943,14 @@ a.prediction-link:hover {
 
 .risk-score {
   font-size: 32px;
-  font-weight: bold;
+  font-weight: 600;
   line-height: 1;
 }
 
 .risk-level {
   font-size: 10px;
-  font-weight: bold;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 2px;
 }
@@ -8965,7 +8965,7 @@ a.prediction-link:hover {
 .risk-trend-label {
   font-size: 10px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -8974,7 +8974,7 @@ a.prediction-link:hover {
   align-items: center;
   gap: 6px;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .risk-metrics {
@@ -9001,14 +9001,14 @@ a.prediction-link:hover {
 
 .risk-metric-value {
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--accent);
 }
 
 .risk-metric-label {
   font-size: 8px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   text-align: center;
   letter-spacing: 0.3px;
   line-height: 1.2;
@@ -9022,9 +9022,9 @@ a.prediction-link:hover {
 
 .risk-section-title {
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
@@ -9048,7 +9048,7 @@ a.prediction-link:hover {
 
 .risk-rank {
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--yellow);
   min-width: 14px;
 }
@@ -9083,14 +9083,14 @@ a.prediction-link:hover {
 
 .risk-country-score {
   font-size: 13px;
-  font-weight: bold;
+  font-weight: 600;
   min-width: 28px;
   text-align: right;
 }
 
 .risk-country-level {
   font-size: 9px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
   min-width: 50px;
 }
@@ -9128,7 +9128,7 @@ a.prediction-link:hover {
 
 .risk-alert-title {
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -9233,7 +9233,7 @@ a.prediction-link:hover {
 
 .risk-no-data-title {
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--semantic-high);
   margin-bottom: 4px;
 }
@@ -9459,7 +9459,7 @@ a.prediction-link:hover {
 
 .escalation-score .score-value {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
 }
 
@@ -9542,7 +9542,7 @@ a.prediction-link:hover {
   color: var(--text-dim);
   width: 45px;
   flex-shrink: 0;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
 }
 
@@ -9659,7 +9659,7 @@ a.prediction-link:hover {
   color: var(--accent);
   font-weight: 600;
   font-size: 9px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
   display: block;
   margin-bottom: 2px;
@@ -9719,8 +9719,8 @@ a.prediction-link:hover {
 .focal-points-header,
 .news-correlation-header {
   font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 0.5px;
   color: var(--semantic-info);
   margin-bottom: 8px;
@@ -10434,7 +10434,7 @@ a.prediction-link:hover {
 
 .event-day {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   line-height: 1;
 }
@@ -10651,13 +10651,13 @@ a.prediction-link:hover {
 
 .service-status-summary .summary-count {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
 }
 
 .service-status-summary .summary-label {
   font-size: 8px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   color: var(--text-dim);
 }
@@ -10734,7 +10734,7 @@ a.prediction-link:hover {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 3px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
 }
 
@@ -10921,7 +10921,7 @@ a.prediction-link:hover {
   background: var(--green);
   border-color: var(--green);
   color: var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 
 /* deck.gl Layer Toggles */
@@ -10948,9 +10948,9 @@ a.prediction-link:hover {
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 1px;
   flex-shrink: 0;
 }
@@ -10991,7 +10991,7 @@ a.prediction-link:hover {
   transition: background 0.15s ease, border-color 0.15s ease;
   position: relative;
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text);
 }
 
@@ -11027,7 +11027,7 @@ a.prediction-link:hover {
   transform: translate(-50%, -50%);
   color: var(--bg);
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -11084,9 +11084,9 @@ a.prediction-link:hover {
 
 .deckgl-legend .legend-label-title {
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -11225,9 +11225,9 @@ a.prediction-link:hover {
   padding: 2px 6px;
   border-radius: 2px;
   font-size: 8px;
-  font-weight: bold;
+  font-weight: 600;
   letter-spacing: 0.5px;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0.7;
 }
 
@@ -11349,7 +11349,7 @@ a.prediction-link:hover {
 
 .insights-section-title {
   font-size: 9px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
   margin-bottom: 6px;
   letter-spacing: 0.5px;
@@ -11467,7 +11467,7 @@ a.prediction-link:hover {
   background: rgba(68, 136, 255, 0.15);
   color: var(--accent);
   border-radius: 8px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-left: 6px;
   vertical-align: middle;
@@ -11498,7 +11498,7 @@ a.prediction-link:hover {
 .insight-stat-label {
   font-size: 9px;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .insight-stat.alert .insight-stat-value {
@@ -11774,7 +11774,7 @@ a.prediction-link:hover {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 3px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .focal-point-urgency.critical {
@@ -12065,7 +12065,7 @@ body.has-critical-banner .panels-grid {
   font-size: 9px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   width: 28px;
   flex-shrink: 0;
@@ -12113,7 +12113,7 @@ body.has-critical-banner .panels-grid {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   margin-top: 8px;
   margin-bottom: 4px;
@@ -12567,7 +12567,7 @@ body.has-critical-banner .panels-grid {
 
 .cii-badge {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
@@ -12724,7 +12724,7 @@ body.has-critical-banner .panels-grid {
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 6px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -12846,12 +12846,12 @@ body.has-critical-banner .panels-grid {
 .verdict-label {
   font-size: 11px;
   color: var(--text-muted);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .verdict-value {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 1px;
 }
 
@@ -12910,7 +12910,7 @@ body.has-critical-banner .panels-grid {
   padding: 2px 6px;
   border-radius: 3px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -13036,7 +13036,7 @@ body.has-critical-banner .panels-grid {
   padding: 4px 6px;
   border-bottom: 1px solid var(--overlay-medium);
   font-weight: 500;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .etf-table td {
@@ -13093,10 +13093,10 @@ body.has-critical-banner .panels-grid {
 
 .health-label {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 3px;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
 }
 
@@ -13126,7 +13126,7 @@ body.has-critical-banner .panels-grid {
 
 .stable-section-title {
   font-size: 10px;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-muted);
   padding: 4px 8px;
   font-weight: 600;
@@ -13176,7 +13176,7 @@ body.has-critical-banner .panels-grid {
   padding: 2px 6px;
   border-radius: 3px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .peg-on .peg-badge {
@@ -13478,13 +13478,13 @@ body.has-critical-banner .panels-grid {
 
 .cb-country-name {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
 }
 
 .cb-badge {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 10px;
   border-radius: 4px;
   letter-spacing: 0.5px;
@@ -13573,8 +13573,8 @@ body.has-critical-banner .panels-grid {
 
 .cb-section-title {
   font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 1px;
   color: var(--text-dim);
   margin-bottom: 12px;
@@ -13598,7 +13598,7 @@ body.has-critical-banner .panels-grid {
 .cb-score-value {
   position: absolute;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 600;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -60%);
@@ -13716,7 +13716,7 @@ body.has-critical-banner .panels-grid {
   color: var(--semantic-low);
   text-decoration: none;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   vertical-align: super;
   cursor: pointer;
   transition: color 0.15s;
@@ -13854,8 +13854,8 @@ body.has-critical-banner .panels-grid {
 
 .cb-infra-type {
   font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
+  text-transform: none;
   letter-spacing: 0.5px;
   color: var(--text-muted);
   margin-bottom: 6px;
