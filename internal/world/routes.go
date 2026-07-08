@@ -89,6 +89,9 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/story", s.handleStory)
 	mux.HandleFunc("/v1/world/og-story", s.handleOGStory)
 
+	// world model (continuously-folded world-state engine)
+	s.worldModel.Mount(mux)
+
 	// Catch-all for any unregistered /v1/world/* path: a JSON 404, never the SPA
 	// shell. Exact and subtree routes above are longer prefixes and win.
 	mux.HandleFunc("/v1/world/", s.handleAPINotFound)

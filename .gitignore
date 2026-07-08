@@ -21,3 +21,7 @@ ideas/
 test-results/
 src-tauri/sidecar/node/*
 !src-tauri/sidecar/node/.gitkeep
+
+# world-model runtime snapshot (regenerated on boot)
+data/world-model.json
+data/world-model.json.tmp

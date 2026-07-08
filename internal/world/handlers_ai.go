@@ -231,7 +231,15 @@ func (s *Server) handleCountryIntel(w http.ResponseWriter, r *http.Request) {
 			dataSection = "\nCURRENT SENSOR DATA:\n" + string(b)
 		}
 	}
-	user := "Country: " + body.Country + " (" + body.Code + ")" + dataSection
+	// Ground the brief in the world model: the country's continuously-folded
+	// state vector, so the narrative tracks the numbers rather than raw feeds.
+	modelSection := ""
+	if mv, ok := s.worldModel.CountryContext(body.Code); ok {
+		if b, err := json.Marshal(mv); err == nil {
+			modelSection = "\nWORLD-MODEL STATE VECTOR:\n" + string(b)
+		}
+	}
+	user := "Country: " + body.Country + " (" + body.Code + ")" + dataSection + modelSection
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
 	brief, _, err := s.ai.chat(ctx, s, bearer, system, user, 0.4, 900)
