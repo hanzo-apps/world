@@ -7,10 +7,10 @@
 :root {
   /* Backgrounds — Hanzo black monochrome (matches hanzo.ai) */
   --bg: #000;
-  --bg-secondary: #0a0a0a;
-  --surface: #0a0a0a;
-  --surface-hover: #161616;
-  --surface-active: #1c1c1c;
+  --bg-secondary: #000;
+  --surface: #000;
+  --surface-hover: #0a0a0a;
+  --surface-active: #101010;
 
   /* Borders — neutral monochrome grey (no purple/blue tint) */
   --border: #1e1e1e;
@@ -41,13 +41,13 @@
   --scrollbar-thumb-hover: #555;
 
   /* Input */
-  --input-bg: #1a1a1a;
+  --input-bg: #000;
 
   /* Panels — Bloomberg-terminal: transparent over the pure-black bg by
      default (text-driven, no card chrome). ONE token — override --panel-bg
      to customize widget backgrounds; --panel-bg-solid stays for popups. */
   --panel-bg: transparent;
-  --panel-bg-solid: #0a0a0a;
+  --panel-bg-solid: #000;
   --panel-border: #1a1a1a;
 
   /* Map */
