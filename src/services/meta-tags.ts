@@ -1,4 +1,4 @@
-// Dynamic Meta Tags Service for World Monitor
+// Dynamic Meta Tags Service for Hanzo World
 // Updates OG tags and Twitter Cards for shared stories
 
 interface StoryMeta {
@@ -17,7 +17,7 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
   const { countryCode, countryName, ciiScore, ciiLevel, trend, type } = meta;
   
   // Generate dynamic content
-  const title = `${countryName} Intelligence Brief | World Monitor`;
+  const title = `${countryName} Intelligence Brief | Hanzo World`;
   const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
   const storyUrl = `${BASE_URL}/api/story?c=${countryCode}&t=${type}`;
   let imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
@@ -48,7 +48,7 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
 }
 
 export function resetMetaTags(): void {
-  const defaultTitle = 'World Monitor - Global Situation with AI Insights';
+  const defaultTitle = 'Hanzo World — Real-Time Global Intelligence';
   const defaultDesc = 'AI-powered real-time global intelligence dashboard with live news, markets, military tracking, and geopolitical data.';
   
   setMetaTag('title', defaultTitle);
@@ -96,7 +96,7 @@ function generateDescription(
     parts.push(typeDescriptions[type]);
   }
   
-  return `World Monitor ${parts.join('. ')}. Free, open-source geopolitical intelligence.`;
+  return `Hanzo World ${parts.join('. ')}. Real-time global intelligence by Hanzo.`;
 }
 
 function setMetaTag(property: string, content: string): void {
