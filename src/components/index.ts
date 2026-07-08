@@ -3,7 +3,7 @@ export * from './VirtualList';
 export { MapComponent } from './Map';
 export * from './MapPopup';
 export { DeckGLMap } from './DeckGLMap';
-export { MapContainer, type MapView, type TimeRange, type MapContainerState } from './MapContainer';
+export { MapContainer, type MapView, type TimeRange, type MapContainerState, type MapProjectionMode } from './MapContainer';
 export * from './NewsPanel';
 export * from './MarketPanel';
 export * from './PredictionPanel';
