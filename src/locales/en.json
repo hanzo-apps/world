@@ -66,6 +66,7 @@
     "filterSources": "Filter sources...",
     "sourcesEnabled": "{{enabled}}/{{total}} enabled",
     "finance": "FINANCE",
+    "cloud": "CLOUD",
     "toggleTheme": "Toggle dark/light mode"
   },
   "panels": {

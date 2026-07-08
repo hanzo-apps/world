@@ -77,6 +77,11 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/theater-posture", s.handleTheaterPosture)
 	mux.HandleFunc("/v1/world/temporal-baseline", s.handleTemporalBaseline)
 
+	// SaaS mode — anonymized platform-wide aggregate (signed-out investor view).
+	// Demo-flagged by default; real non-sensitive counts when a service token is
+	// configured. Org-scoped drill-down goes straight to api.hanzo.ai, not here.
+	mux.HandleFunc("/v1/world/cloud-pulse", s.handleCloudPulse)
+
 	// AI (Hanzo inference)
 	mux.HandleFunc("/v1/world/groq-summarize", s.handleSummarize)
 	mux.HandleFunc("/v1/world/openrouter-summarize", s.handleSummarize)
