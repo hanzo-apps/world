@@ -448,8 +448,11 @@ export class App {
     }
   }
 
+  // Hanzo: novelty indicators (pizza-index/DEFCON badge) are OFF by default —
+  // this is a serious intelligence product for builders/enterprises. The data
+  // route stays for API consumers; re-enable via localStorage hanzo-world-pizzint=1.
   private setupPizzIntIndicator(): void {
-    // Skip DEFCON indicator for tech/startup and finance variants
+    if (localStorage.getItem('hanzo-world-pizzint') !== '1') return;
     if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance') return;
 
     this.pizzintIndicator = new PizzIntIndicator();
