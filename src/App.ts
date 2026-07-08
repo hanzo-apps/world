@@ -83,6 +83,11 @@ import {
   LanguageSelector,
   AiAnalystPanel,
   CustomFeedPanel,
+  CloudOverviewPanel,
+  ModelUsagePanel,
+  FleetPanel,
+  MyUsagePanel,
+  LiveActivityPanel,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -1647,6 +1652,13 @@ export class App {
               <span class="variant-icon">📈</span>
               <span class="variant-label">${t('header.finance')}</span>
             </a>
+            <a href="?variant=saas"
+               class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
+               data-variant="saas"
+               title="${t('header.cloud')}${SITE_VARIANT === 'saas' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>
+              <span class="variant-label">${t('header.cloud')}</span>
+            </a>
           </div>
           <div class="status-indicator">
             <span class="status-dot"></span>
@@ -2113,6 +2125,19 @@ export class App {
         focusInvestmentOnMap(this.map, this.mapLayers, inv.lat, inv.lon);
       });
       this.panels['gcc-investments'] = investmentsPanel;
+    }
+
+    // SaaS / cloud panels — Hanzo Cloud metrics + org drill-down (saas variant).
+    if (SITE_VARIANT === 'saas') {
+      this.panels['cloud-overview'] = new CloudOverviewPanel();
+      this.panels['model-usage'] = new ModelUsagePanel();
+      const fleetPanel = new FleetPanel();
+      fleetPanel.setLocationClickHandler((lat, lon) => {
+        this.map?.setCenter(lat, lon, 4);
+      });
+      this.panels['fleet'] = fleetPanel;
+      this.panels['live-activity'] = new LiveActivityPanel();
+      this.panels['my-usage'] = new MyUsagePanel();
     }
 
     const liveNewsPanel = new LiveNewsPanel();
