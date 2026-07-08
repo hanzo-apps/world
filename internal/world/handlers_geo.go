@@ -399,7 +399,7 @@ func (s *Server) handleWingbits(w http.ResponseWriter, r *http.Request) {
 	case path == "" || path == "/" || path == "/health":
 		var d map[string]any
 		if err := s.getJSON(ctx, wingbitsBase+"/health", hdr, &d); err != nil {
-			writeJSON(w, http.StatusInternalServerError, "", map[string]any{"error": err.Error(), "configured": true})
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "configured": true, "data": []any{}})
 			return
 		}
 		d["configured"] = true
@@ -436,7 +436,7 @@ func (s *Server) handleWingbits(w http.ResponseWriter, r *http.Request) {
 func (s *Server) wingbitsProxyGET(w http.ResponseWriter, ctx context.Context, url string, hdr map[string]string, cc string) {
 	b, status, err := s.get(ctx, url, hdr)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, "", map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "data": []any{}})
 		return
 	}
 	if status < 200 || status >= 300 {
@@ -451,7 +451,7 @@ func (s *Server) wingbitsBatch(w http.ResponseWriter, r *http.Request, ctx conte
 		Icao24s []string `json:"icao24s"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "data": []any{}})
 		return
 	}
 	if len(body.Icao24s) == 0 {
