@@ -22,7 +22,7 @@ import { t } from '@/services/i18n';
 const SIGNUP_URLS: Partial<Record<RuntimeSecretKey, string>> = {
   GROQ_API_KEY: 'https://console.groq.com/keys',
   OPENROUTER_API_KEY: 'https://openrouter.ai/settings/keys',
-  FRED_API_KEY: 'https://fred.stlouisfed.org/docs/v1/world/api_key.html',
+  FRED_API_KEY: 'https://fred.stlouisfed.org/docs/api/api_key.html',
   EIA_API_KEY: 'https://www.eia.gov/opendata/register.php',
   CLOUDFLARE_API_TOKEN: 'https://dash.cloudflare.com/profile/api-tokens',
   ACLED_ACCESS_TOKEN: 'https://developer.acleddata.com/',
@@ -34,7 +34,7 @@ const SIGNUP_URLS: Partial<Record<RuntimeSecretKey, string>> = {
   OPENSKY_CLIENT_ID: 'https://opensky-network.org/login?view=registration',
   OPENSKY_CLIENT_SECRET: 'https://opensky-network.org/login?view=registration',
   FINNHUB_API_KEY: 'https://finnhub.io/register',
-  NASA_FIRMS_API_KEY: 'https://firms.modaps.eosdis.nasa.gov/v1/world/area/',
+  NASA_FIRMS_API_KEY: 'https://firms.modaps.eosdis.nasa.gov/api/area/',
   UC_DP_KEY: 'https://ucdp.uu.se/downloads/',
 };
 

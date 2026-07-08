@@ -94,9 +94,19 @@ type chatResponse struct {
 // bearer is the Authorization value (the signed-in user's IAM token, so the
 // inference meters to their org/project/billing).
 func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user string, temperature float64, maxTokens int) (string, int, error) {
+	return a.chatMessages(ctx, s, bearer,
+		[]chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
+		temperature, maxTokens)
+}
+
+// chatMessages runs a multi-turn completion over a full messages array (system +
+// prior turns) and returns the trimmed content. It is the single completion path;
+// chat is the system+user special case. bearer is the caller's IAM token so the
+// inference meters to their org/project/billing.
+func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, messages []chatMessage, temperature float64, maxTokens int) (string, int, error) {
 	reqBody, err := json.Marshal(chatRequest{
 		Model:       a.model,
-		Messages:    []chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
+		Messages:    messages,
 		Temperature: temperature,
 		MaxTokens:   maxTokens,
 		TopP:        0.9,
