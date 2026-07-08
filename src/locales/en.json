@@ -574,6 +574,8 @@
         "nuclearSites": "Nuclear Sites",
         "gammaIrradiators": "Gamma Irradiators",
         "spaceports": "Spaceports",
+        "robotics": "Robotics Labs",
+        "quantum": "Quantum Computing",
         "pipelines": "Pipelines",
         "militaryActivity": "Military Activity",
         "shipTraffic": "Ship Traffic",

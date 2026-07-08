@@ -105,6 +105,8 @@ const layers = {
   military: false,
   natural: false,
   spaceports: false,
+  robotics: false,
+  quantum: false,
   minerals: false,
   fires: false,
   ucdpEvents: false,
