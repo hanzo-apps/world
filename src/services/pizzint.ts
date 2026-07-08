@@ -80,7 +80,7 @@ const defaultStatus: PizzIntStatus = {
 
 export async function fetchPizzIntStatus(): Promise<PizzIntStatus> {
   return pizzintBreaker.execute(async () => {
-    const response = await fetch('/api/pizzint/dashboard-data');
+    const response = await fetch('/v1/world/pizzint/dashboard-data');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: PizzIntApiResponse = await response.json();
@@ -143,7 +143,7 @@ export async function fetchGdeltTensions(): Promise<GdeltTensionPair[]> {
     const endDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
 
-    const response = await fetch(`/api/pizzint/gdelt/batch?pairs=${pairs}&method=gpr&dateStart=${startDate}&dateEnd=${endDate}`);
+    const response = await fetch(`/v1/world/pizzint/gdelt/batch?pairs=${pairs}&method=gpr&dateStart=${startDate}&dateEnd=${endDate}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data: GdeltApiResponse = await response.json();

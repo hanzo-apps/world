@@ -305,7 +305,7 @@ function flushBatch(): void {
   const variant = batch[0]!.variant;
   const titles = batch.map(j => j.title);
 
-  fetch('/api/classify-batch', {
+  fetch('/v1/world/classify-batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ titles, variant }),

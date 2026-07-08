@@ -27,7 +27,7 @@ func (s *Server) handleOpenSky(w http.ResponseWriter, r *http.Request) {
 			parts = append(parts, k+"="+urlQueryEscape(v))
 		}
 	}
-	upstream := "https://opensky-network.org/api/states/all"
+	upstream := "https://opensky-network.org/v1/world/states/all"
 	if len(parts) > 0 {
 		upstream += "?" + strings.Join(parts, "&")
 	}
@@ -109,7 +109,7 @@ func (s *Server) handleFIRMS(w http.ResponseWriter, r *http.Request) {
 				wg.Add(1)
 				go func(name, bbox string) {
 					defer wg.Done()
-					u := fmt.Sprintf("https://firms.modaps.eosdis.nasa.gov/api/area/csv/%s/%s/%s/%d", key, firmsSource, bbox, days)
+					u := fmt.Sprintf("https://firms.modaps.eosdis.nasa.gov/v1/world/area/csv/%s/%s/%s/%d", key, firmsSource, bbox, days)
 					csv, err := s.getText(ctx, u, map[string]string{"Accept": "text/csv"})
 					if err != nil {
 						return
@@ -379,7 +379,7 @@ func boolStr(b bool) string {
 
 const wingbitsBase = "https://customer-api.wingbits.com"
 
-// handleWingbits routes the /api/wingbits/* subpaths to the Wingbits customer
+// handleWingbits routes the /v1/world/wingbits/* subpaths to the Wingbits customer
 // API, keeping the key server-side. Ported from api/wingbits/[[...path]].js.
 func (s *Server) handleWingbits(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, POST, OPTIONS") {
@@ -390,7 +390,7 @@ func (s *Server) handleWingbits(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, "", map[string]any{"error": "Wingbits not configured", "configured": false})
 		return
 	}
-	path := strings.TrimPrefix(r.URL.Path, "/api/wingbits")
+	path := strings.TrimPrefix(r.URL.Path, "/v1/world/wingbits")
 	hdr := map[string]string{"x-api-key": key, "Accept": "application/json"}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()

@@ -59,7 +59,7 @@ const ucdpBreaker = createCircuitBreaker<Map<string, UcdpConflictStatus>>({ name
 
 export async function fetchUcdpClassifications(): Promise<Map<string, UcdpConflictStatus>> {
   return ucdpBreaker.execute(async () => {
-    const response = await fetch('/api/ucdp', {
+    const response = await fetch('/v1/world/ucdp', {
       headers: { Accept: 'application/json' },
     });
 
