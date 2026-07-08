@@ -528,6 +528,10 @@
       "zoomIn": "Zoom In",
       "zoomOut": "Zoom Out",
       "resetView": "Reset View",
+      "projection": {
+        "flat": "Flat map (2D)",
+        "globe": "3D globe"
+      },
       "legend": {
         "title": "LEGEND",
         "startupHub": "Startup Hub",
