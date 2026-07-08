@@ -64,6 +64,7 @@ window.addEventListener('unhandledrejection', (e) => {
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
+import { isCallback, handleCallback } from '@/services/iam';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chunk-reload';
@@ -89,14 +90,26 @@ requestAnimationFrame(() => {
   document.documentElement.classList.remove('no-transition');
 });
 
-const app = new App('app');
-app
-  .init()
-  .then(() => {
-    // Clear the one-shot guard after a successful boot so future stale-chunk incidents can recover.
-    clearChunkReloadGuard(chunkReloadStorageKey);
-  })
-  .catch(console.error);
+async function boot(): Promise<void> {
+  // Complete the hanzo.id OIDC PKCE redirect before the dashboard renders, then
+  // restore a clean URL (the SPA server returns index.html for /auth/callback).
+  if (isCallback()) {
+    try {
+      const returnTo = await handleCallback();
+      history.replaceState({}, '', returnTo);
+    } catch (err) {
+      console.error('[iam] login callback failed', err);
+      history.replaceState({}, '', '/');
+    }
+  }
+
+  const app = new App('app');
+  await app.init();
+  // Clear the one-shot guard after a successful boot so future stale-chunk incidents can recover.
+  clearChunkReloadGuard(chunkReloadStorageKey);
+}
+
+void boot().catch(console.error);
 
 // Debug helpers for geo-convergence testing (remove in production)
 (window as unknown as Record<string, unknown>).geoDebug = {
