@@ -47,6 +47,13 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   displacement: { name: 'UNHCR Displacement', enabled: true, priority: 2 },
   climate: { name: 'Climate Anomalies', enabled: true, priority: 2 },
   'population-exposure': { name: 'Population Exposure', enabled: true, priority: 2 },
+  // Hanzo World Model domain lenses — realtime feeds for app-builders on hanzo.ai.
+  robotics: { name: 'Robotics', enabled: true, priority: 2 },
+  quantum: { name: 'Quantum Computing', enabled: true, priority: 2 },
+  'post-quantum': { name: 'Post-Quantum Readiness', enabled: true, priority: 2 },
+  weather: { name: 'Severe Weather', enabled: true, priority: 2 },
+  sports: { name: 'Sports & Events', enabled: true, priority: 2 },
+  'space-weather': { name: 'Space Weather', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -72,6 +79,9 @@ const FULL_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
@@ -113,6 +123,9 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
@@ -194,6 +207,9 @@ const TECH_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
@@ -235,6 +251,9 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
@@ -311,6 +330,9 @@ const FINANCE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
@@ -352,6 +374,9 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
   // Data source layers
   ucdpEvents: false,
   displacement: false,
