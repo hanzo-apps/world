@@ -14310,3 +14310,20 @@ a.domain-item:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
   color: var(--text-dim, #888); padding-top: 6px; margin-top: 2px;
   border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
+
+/* ── Live-value flash + motion polish (Hanzo) ──────────────────────────── */
+@keyframes value-bump {
+  0%   { transform: scale(1);    color: inherit; }
+  30%  { transform: scale(1.06); color: #fff; text-shadow: 0 0 12px rgba(255,255,255,0.35); }
+  100% { transform: scale(1);    color: inherit; text-shadow: none; }
+}
+.value-bump {
+  animation: value-bump 0.7s ease;
+  display: inline-block;
+  will-change: transform;
+}
+/* frosted depth on floating chrome (header bar, map controls, layer panel) */
+.header, .deckgl-layer-toggles, .map-legend, .deckgl-time-slider .time-btn {
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+}
