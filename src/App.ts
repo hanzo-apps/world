@@ -1626,7 +1626,6 @@ export class App {
               <span class="variant-label">${t('header.finance')}</span>
             </a>
           </div>
-          <span class="logo">HANZO</span><span class="logo-sub">World</span>
           <div class="status-indicator">
             <span class="status-dot"></span>
             <span>${t('header.live')}</span>
@@ -2153,13 +2152,8 @@ export class App {
       panelOrder.unshift('live-news');
     }
 
-    // live-webcams MUST follow live-news (one-time migration for existing users)
-    const webcamsIdx = panelOrder.indexOf('live-webcams');
-    if (webcamsIdx !== -1 && webcamsIdx !== panelOrder.indexOf('live-news') + 1) {
-      panelOrder.splice(webcamsIdx, 1);
-      const afterNews = panelOrder.indexOf('live-news') + 1;
-      panelOrder.splice(afterNews, 0, 'live-webcams');
-    }
+    // Hanzo: live-webcams is off by default (dead "not available" clutter); no
+    // longer force-inserted after live-news.
 
     // Desktop configuration should stay easy to reach in Tauri builds.
     if (this.isDesktopApp) {

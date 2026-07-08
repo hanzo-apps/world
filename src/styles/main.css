@@ -5,17 +5,17 @@
    Theme Colors — overridden by [data-theme="light"] below
    ============================================================ */
 :root {
-  /* Backgrounds */
-  --bg: #0a0a0a;
-  --bg-secondary: #111;
-  --surface: #141414;
-  --surface-hover: #1e1e1e;
-  --surface-active: #1a1a2e;
+  /* Backgrounds — Hanzo black monochrome (matches hanzo.ai) */
+  --bg: #000;
+  --bg-secondary: #0a0a0a;
+  --surface: #0d0d0d;
+  --surface-hover: #161616;
+  --surface-active: #1c1c1c;
 
-  /* Borders */
-  --border: #2a2a2a;
-  --border-strong: #444;
-  --border-subtle: #1a1a1a;
+  /* Borders — neutral monochrome grey (no purple/blue tint) */
+  --border: #222;
+  --border-strong: #3a3a3a;
+  --border-subtle: #141414;
 
   /* Text */
   --text: #e8e8e8;
@@ -43,9 +43,9 @@
   /* Input */
   --input-bg: #1a1a1a;
 
-  /* Panels */
-  --panel-bg: #141414;
-  --panel-border: #2a2a2a;
+  /* Panels — black monochrome surfaces */
+  --panel-bg: #0a0a0a;
+  --panel-border: #1e1e1e;
 
   /* Map */
   --map-bg: #020a08;
@@ -53,8 +53,23 @@
   --map-country: #0a2018;
   --map-stroke: #0f5040;
 
-  /* Font stack */
-  --font-body: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  /* Font stack — Hanzo: Geist Sans (UI) + Geist Mono (data/numeric) */
+  --font-body: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'Monaco', monospace;
+}
+
+/* Self-hosted Geist (no CDN — CSP-safe), from @hanzo/gui / Hanzo brand pack */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/GeistVF.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMonoVF.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
 }
 
 [dir="rtl"] {
