@@ -69,7 +69,7 @@ export class StablecoinPanel extends Panel {
 
   private async fetchData(): Promise<void> {
     try {
-      const res = await fetch('/api/stablecoin-markets');
+      const res = await fetch('/v1/world/stablecoin-markets');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this.data = await res.json();
       this.error = null;

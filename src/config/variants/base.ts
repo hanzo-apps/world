@@ -9,20 +9,20 @@ export { AI_DATA_CENTERS } from '../ai-datacenters';
 // API URLs - shared across all variants
 export const API_URLS = {
   finnhub: (symbols: string[]) =>
-    `/api/finnhub?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`,
+    `/v1/world/finnhub?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`,
   yahooFinance: (symbol: string) =>
-    `/api/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
+    `/v1/world/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
   coingecko:
-    '/api/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
-  polymarket: '/api/polymarket?closed=false&order=volume&ascending=false&limit=100',
-  earthquakes: '/api/earthquakes',
+    '/v1/world/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
+  polymarket: '/v1/world/polymarket?closed=false&order=volume&ascending=false&limit=100',
+  earthquakes: '/v1/world/earthquakes',
   // Tech variant APIs
   arxiv: (category: string = 'cs.AI', maxResults: number = 50) =>
-    `/api/arxiv?category=${encodeURIComponent(category)}&max_results=${maxResults}`,
+    `/v1/world/arxiv?category=${encodeURIComponent(category)}&max_results=${maxResults}`,
   githubTrending: (language: string = 'python', since: string = 'daily') =>
-    `/api/github-trending?language=${encodeURIComponent(language)}&since=${since}`,
+    `/v1/world/github-trending?language=${encodeURIComponent(language)}&since=${since}`,
   hackernews: (type: string = 'top', limit: number = 30) =>
-    `/api/hackernews?type=${type}&limit=${limit}`,
+    `/v1/world/hackernews?type=${type}&limit=${limit}`,
 };
 
 // Refresh intervals - shared across all variants
