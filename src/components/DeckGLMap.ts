@@ -2831,9 +2831,9 @@ export class DeckGLMap {
       <div class="toggle-header">
         <span>${t('components.deckgl.layersTitle')}</span>
         <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
-        <button class="toggle-collapse">&#9660;</button>
+        <button class="toggle-collapse">&#9654;</button>
       </div>
-      <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
+      <div class="toggle-list collapsed" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
         ${layerConfig.map(({ key, label, icon }) => `
           <label class="layer-toggle" data-layer="${key}">
             <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}>
