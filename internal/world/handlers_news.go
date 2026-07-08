@@ -292,6 +292,12 @@ func (s *Server) handleArxiv(w http.ResponseWriter, r *http.Request) {
 var ytVideoIDRe = regexp.MustCompile(`"videoId":"([a-zA-Z0-9_-]{11})"`)
 var ytIsLiveRe = regexp.MustCompile(`"isLive":\s*true`)
 
+// On a channel /live page the canonical link is the AUTHORITATIVE live video —
+// the first "videoId":"…" in the HTML is often a recommended/sidebar clip
+// (which is why several channels used to collapse onto one shared id). Prefer
+// canonical; fall back to the first videoId only if it's absent.
+var ytCanonicalRe = regexp.MustCompile(`<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})"`)
+
 // handleYouTubeLive resolves a channel handle to its current LIVE video id. It
 // scrapes the channel /live page (no key required); when YOUTUBE_API_KEY is set
 // it first tries the Data API for reliability. Degrades to {videoId:null} so the
@@ -337,9 +343,15 @@ func (s *Server) handleYouTubeLive(w http.ResponseWriter, r *http.Request) {
 		"Accept-Language": "en-US,en;q=0.9",
 	})
 	res := map[string]any{"videoId": nil, "isLive": false}
-	if err == nil {
-		if m := ytVideoIDRe.FindStringSubmatch(html); m != nil && ytIsLiveRe.MatchString(html) {
-			res = map[string]any{"videoId": m[1], "isLive": true}
+	if err == nil && ytIsLiveRe.MatchString(html) {
+		vid := ""
+		if m := ytCanonicalRe.FindStringSubmatch(html); m != nil {
+			vid = m[1] // authoritative: the canonical live watch URL
+		} else if m := ytVideoIDRe.FindStringSubmatch(html); m != nil {
+			vid = m[1] // fallback only when canonical is absent
+		}
+		if vid != "" {
+			res = map[string]any{"videoId": vid, "isLive": true}
 			s.cache.Set(cacheKey, res, 5*time.Minute, 30*time.Minute)
 		}
 	}
