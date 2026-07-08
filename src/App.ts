@@ -75,6 +75,8 @@ import {
   MacroSignalsPanel,
   ETFFlowsPanel,
   StablecoinPanel,
+  SentimentPanel,
+  TraderDeskPanel,
   UcdpEventsPanel,
   DisplacementPanel,
   ClimateAnomalyPanel,
@@ -2141,6 +2143,8 @@ export class App {
     this.panels['macro-signals'] = new MacroSignalsPanel();
     this.panels['etf-flows'] = new ETFFlowsPanel();
     this.panels['stablecoins'] = new StablecoinPanel();
+    this.panels['sentiment'] = new SentimentPanel();
+    this.panels['trader-desk'] = new TraderDeskPanel();
 
     // AI Insights Panel (desktop only - hides itself on mobile)
     const insightsPanel = new InsightsPanel();
