@@ -105,6 +105,9 @@ async function boot(): Promise<void> {
 
   const app = new App('app');
   await app.init();
+  // Live-value flash: changed numbers bump briefly (one observer, zero panel coupling).
+  const { installLiveFlash } = await import('@/services/live-flash');
+  installLiveFlash();
   // Clear the one-shot guard after a successful boot so future stale-chunk incidents can recover.
   clearChunkReloadGuard(chunkReloadStorageKey);
 }
