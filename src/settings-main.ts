@@ -148,7 +148,7 @@ function initDiagnostics(): void {
   async function syncVerboseState(): Promise<void> {
     if (!verboseToggle) return;
     try {
-      const res = await fetch(`${SIDECAR_BASE}/api/local-debug-toggle`);
+      const res = await fetch(`${SIDECAR_BASE}/v1/world/local-debug-toggle`);
       const data = await res.json();
       verboseToggle.checked = data.verboseMode;
     } catch { /* sidecar not running */ }
@@ -156,7 +156,7 @@ function initDiagnostics(): void {
 
   verboseToggle?.addEventListener('change', async () => {
     try {
-      const res = await fetch(`${SIDECAR_BASE}/api/local-debug-toggle`, { method: 'POST' });
+      const res = await fetch(`${SIDECAR_BASE}/v1/world/local-debug-toggle`, { method: 'POST' });
       const data = await res.json();
       if (verboseToggle) verboseToggle.checked = data.verboseMode;
       setActionStatus(data.verboseMode ? t('modals.settingsWindow.verboseOn') : t('modals.settingsWindow.verboseOff'), 'ok');
@@ -170,7 +170,7 @@ function initDiagnostics(): void {
   async function refreshTrafficLog(): Promise<void> {
     if (!trafficLogEl) return;
     try {
-      const res = await fetch(`${SIDECAR_BASE}/api/local-traffic-log`);
+      const res = await fetch(`${SIDECAR_BASE}/v1/world/local-traffic-log`);
       const data = await res.json();
       const entries: Array<{ timestamp: string; method: string; path: string; status: number; durationMs: number }> = data.entries || [];
       if (trafficCount) trafficCount.textContent = `(${entries.length})`;
@@ -196,7 +196,7 @@ function initDiagnostics(): void {
 
   clearBtn?.addEventListener('click', async () => {
     try {
-      await fetch(`${SIDECAR_BASE}/api/local-traffic-log`, { method: 'DELETE' });
+      await fetch(`${SIDECAR_BASE}/v1/world/local-traffic-log`, { method: 'DELETE' });
     } catch { /* ignore */ }
     if (trafficLogEl) trafficLogEl.innerHTML = `<p class="diag-empty">${t('modals.settingsWindow.logCleared')}</p>`;
     if (trafficCount) trafficCount.textContent = '(0)';

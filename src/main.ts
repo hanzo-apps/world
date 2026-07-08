@@ -78,7 +78,7 @@ inject();
 // Initialize dynamic meta tags for sharing
 initMetaTags();
 
-// In desktop mode, route /api/* calls to the local Tauri sidecar backend.
+// In desktop mode, route /v1/world/* calls to the local Tauri sidecar backend.
 installRuntimeFetchPatch();
 void loadDesktopSecrets();
 

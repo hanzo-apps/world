@@ -39,7 +39,7 @@ export interface EnrichedAircraftInfo {
   confidence: 'confirmed' | 'likely' | 'possible' | 'civilian';
 }
 
-const WINGBITS_PROXY_URL = '/api/wingbits';
+const WINGBITS_PROXY_URL = '/v1/world/wingbits';
 
 // Client-side cache for aircraft details
 const localCache = new Map<string, { data: WingbitsAircraftDetails; timestamp: number }>();

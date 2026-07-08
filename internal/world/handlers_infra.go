@@ -46,7 +46,7 @@ func (s *Server) handleFAAStatus(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, OPTIONS") {
 		return
 	}
-	s.passthrough(w, "faa-status", "https://nasstatus.faa.gov/api/airport-status-information",
+	s.passthrough(w, "faa-status", "https://nasstatus.faa.gov/v1/world/airport-status-information",
 		"application/xml", "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
 		map[string]string{"Accept": "application/xml"}, time.Minute, 10*time.Minute,
 		func(w http.ResponseWriter, err error) {
@@ -62,7 +62,7 @@ func (s *Server) handleNGAWarnings(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, OPTIONS") {
 		return
 	}
-	s.passthrough(w, "nga-warnings", "https://msi.nga.mil/api/publications/broadcast-warn?output=json&status=A",
+	s.passthrough(w, "nga-warnings", "https://msi.nga.mil/v1/world/publications/broadcast-warn?output=json&status=A",
 		"application/json", "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		map[string]string{"Accept": "application/json"}, 5*time.Minute, 30*time.Minute,
 		func(w http.ResponseWriter, err error) {
@@ -78,7 +78,7 @@ func (s *Server) handlePizzintDashboard(w http.ResponseWriter, r *http.Request) 
 	if preflight(w, r, "GET, OPTIONS") {
 		return
 	}
-	s.passthrough(w, "pizzint:dashboard", "https://www.pizzint.watch/api/dashboard-data",
+	s.passthrough(w, "pizzint:dashboard", "https://www.pizzint.watch/v1/world/dashboard-data",
 		"application/json", "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
 		map[string]string{"Accept": "application/json", "User-Agent": "Hanzo-World/1.0"},
 		time.Minute, 10*time.Minute,
@@ -102,7 +102,7 @@ func (s *Server) handlePizzintGdeltBatch(w http.ResponseWriter, r *http.Request)
 	if method == "" {
 		method = "gpr"
 	}
-	upstream := "https://www.pizzint.watch/api/gdelt/batch?pairs=" + urlQueryEscape(pairs) + "&method=" + method
+	upstream := "https://www.pizzint.watch/v1/world/gdelt/batch?pairs=" + urlQueryEscape(pairs) + "&method=" + method
 	if v := q.Get("dateStart"); v != "" {
 		upstream += "&dateStart=" + v
 	}
@@ -126,33 +126,33 @@ var statusServices = []statusService{
 	{"aws", "AWS", "https://health.aws.amazon.com/health/status", "aws", "cloud"},
 	{"azure", "Azure", "https://azure.status.microsoft/en-us/status/feed/", "rss", "cloud"},
 	{"gcp", "Google Cloud", "https://status.cloud.google.com/incidents.json", "gcp", "cloud"},
-	{"cloudflare", "Cloudflare", "https://www.cloudflarestatus.com/api/v2/status.json", "", "cloud"},
-	{"vercel", "Vercel", "https://www.vercel-status.com/api/v2/status.json", "", "cloud"},
-	{"netlify", "Netlify", "https://www.netlifystatus.com/api/v2/status.json", "", "cloud"},
-	{"digitalocean", "DigitalOcean", "https://status.digitalocean.com/api/v2/status.json", "", "cloud"},
-	{"render", "Render", "https://status.render.com/api/v2/status.json", "", "cloud"},
+	{"cloudflare", "Cloudflare", "https://www.cloudflarestatus.com/v1/world/v2/status.json", "", "cloud"},
+	{"vercel", "Vercel", "https://www.vercel-status.com/v1/world/v2/status.json", "", "cloud"},
+	{"netlify", "Netlify", "https://www.netlifystatus.com/v1/world/v2/status.json", "", "cloud"},
+	{"digitalocean", "DigitalOcean", "https://status.digitalocean.com/v1/world/v2/status.json", "", "cloud"},
+	{"render", "Render", "https://status.render.com/v1/world/v2/status.json", "", "cloud"},
 	{"railway", "Railway", "https://railway.instatus.com/summary.json", "instatus", "cloud"},
-	{"github", "GitHub", "https://www.githubstatus.com/api/v2/status.json", "", "dev"},
+	{"github", "GitHub", "https://www.githubstatus.com/v1/world/v2/status.json", "", "dev"},
 	{"gitlab", "GitLab", "https://status.gitlab.com/1.0/status/5b36dc6502d06804c08349f7", "statusio", "dev"},
-	{"npm", "npm", "https://status.npmjs.org/api/v2/status.json", "", "dev"},
+	{"npm", "npm", "https://status.npmjs.org/v1/world/v2/status.json", "", "dev"},
 	{"docker", "Docker Hub", "https://www.dockerstatus.com/1.0/status/533c6539221ae15e3f000031", "statusio", "dev"},
-	{"bitbucket", "Bitbucket", "https://bitbucket.status.atlassian.com/api/v2/status.json", "", "dev"},
-	{"circleci", "CircleCI", "https://status.circleci.com/api/v2/status.json", "", "dev"},
-	{"jira", "Jira", "https://jira-software.status.atlassian.com/api/v2/status.json", "", "dev"},
-	{"confluence", "Confluence", "https://confluence.status.atlassian.com/api/v2/status.json", "", "dev"},
-	{"linear", "Linear", "https://linearstatus.com/api/v2/status.json", "incidentio", "dev"},
-	{"slack", "Slack", "https://slack-status.com/api/v2.0.0/current", "slack", "comm"},
-	{"discord", "Discord", "https://discordstatus.com/api/v2/status.json", "", "comm"},
-	{"zoom", "Zoom", "https://www.zoomstatus.com/api/v2/status.json", "", "comm"},
-	{"notion", "Notion", "https://www.notion-status.com/api/v2/status.json", "", "comm"},
-	{"openai", "OpenAI", "https://status.openai.com/api/v2/status.json", "incidentio", "ai"},
-	{"anthropic", "Anthropic", "https://status.claude.com/api/v2/status.json", "incidentio", "ai"},
-	{"replicate", "Replicate", "https://www.replicatestatus.com/api/v2/status.json", "incidentio", "ai"},
+	{"bitbucket", "Bitbucket", "https://bitbucket.status.atlassian.com/v1/world/v2/status.json", "", "dev"},
+	{"circleci", "CircleCI", "https://status.circleci.com/v1/world/v2/status.json", "", "dev"},
+	{"jira", "Jira", "https://jira-software.status.atlassian.com/v1/world/v2/status.json", "", "dev"},
+	{"confluence", "Confluence", "https://confluence.status.atlassian.com/v1/world/v2/status.json", "", "dev"},
+	{"linear", "Linear", "https://linearstatus.com/v1/world/v2/status.json", "incidentio", "dev"},
+	{"slack", "Slack", "https://slack-status.com/v1/world/v2.0.0/current", "slack", "comm"},
+	{"discord", "Discord", "https://discordstatus.com/v1/world/v2/status.json", "", "comm"},
+	{"zoom", "Zoom", "https://www.zoomstatus.com/v1/world/v2/status.json", "", "comm"},
+	{"notion", "Notion", "https://www.notion-status.com/v1/world/v2/status.json", "", "comm"},
+	{"openai", "OpenAI", "https://status.openai.com/v1/world/v2/status.json", "incidentio", "ai"},
+	{"anthropic", "Anthropic", "https://status.claude.com/v1/world/v2/status.json", "incidentio", "ai"},
+	{"replicate", "Replicate", "https://www.replicatestatus.com/v1/world/v2/status.json", "incidentio", "ai"},
 	{"stripe", "Stripe", "https://status.stripe.com/current", "stripe", "saas"},
-	{"twilio", "Twilio", "https://status.twilio.com/api/v2/status.json", "", "saas"},
-	{"datadog", "Datadog", "https://status.datadoghq.com/api/v2/status.json", "", "saas"},
-	{"sentry", "Sentry", "https://status.sentry.io/api/v2/status.json", "", "saas"},
-	{"supabase", "Supabase", "https://status.supabase.com/api/v2/status.json", "", "saas"},
+	{"twilio", "Twilio", "https://status.twilio.com/v1/world/v2/status.json", "", "saas"},
+	{"datadog", "Datadog", "https://status.datadoghq.com/v1/world/v2/status.json", "", "saas"},
+	{"sentry", "Sentry", "https://status.sentry.io/v1/world/v2/status.json", "", "saas"},
+	{"supabase", "Supabase", "https://status.supabase.com/v1/world/v2/status.json", "", "saas"},
 }
 
 // handleServiceStatus aggregates provider status pages into one board. Ported
