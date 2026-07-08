@@ -35,24 +35,12 @@ func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
 	s.cachedJSON(w, key, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		5*time.Minute, 15*time.Minute,
 		func(ctx context.Context) (any, error) {
-			u := "https://api.gdeltproject.org/api/v2/doc/doc?query=" + urlQueryEscape(query) +
-				"&mode=artlist&maxrecords=" + itoa(maxrecords) + "&format=json&sort=date&timespan=" + urlQueryEscape(timespan)
-			var raw struct {
-				Articles []struct {
-					Title       string  `json:"title"`
-					URL         string  `json:"url"`
-					Domain      string  `json:"domain"`
-					SeenDate    string  `json:"seendate"`
-					SocialImage string  `json:"socialimage"`
-					Language    string  `json:"language"`
-					Tone        float64 `json:"tone"`
-				} `json:"articles"`
-			}
-			if err := s.getJSON(ctx, u, nil, &raw); err != nil {
+			arts, err := s.fetchGDELTArticles(ctx, query, timespan, maxrecords)
+			if err != nil {
 				return nil, err
 			}
-			articles := make([]map[string]any, 0, len(raw.Articles))
-			for _, a := range raw.Articles {
+			articles := make([]map[string]any, 0, len(arts))
+			for _, a := range arts {
 				articles = append(articles, map[string]any{
 					"title": a.Title, "url": a.URL, "source": a.Domain,
 					"date": a.SeenDate, "image": a.SocialImage, "language": a.Language, "tone": a.Tone,
@@ -63,6 +51,32 @@ func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
 		func(w http.ResponseWriter, err error) {
 			writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "articles": []any{}})
 		})
+}
+
+// gdeltArticle is one GDELT DOC 2.0 artlist row. The shared decode target for
+// both the /gdelt-doc endpoint and the world-model news source.
+type gdeltArticle struct {
+	Title       string  `json:"title"`
+	URL         string  `json:"url"`
+	Domain      string  `json:"domain"`
+	SeenDate    string  `json:"seendate"`
+	SocialImage string  `json:"socialimage"`
+	Language    string  `json:"language"`
+	Tone        float64 `json:"tone"`
+}
+
+// fetchGDELTArticles queries the GDELT DOC 2.0 article list once — the single
+// fetch path for GDELT news, reused by the endpoint and the model ingest loop.
+func (s *Server) fetchGDELTArticles(ctx context.Context, query, timespan string, maxrecords int) ([]gdeltArticle, error) {
+	u := "https://api.gdeltproject.org/api/v2/doc/doc?query=" + urlQueryEscape(query) +
+		"&mode=artlist&maxrecords=" + itoa(maxrecords) + "&format=json&sort=date&timespan=" + urlQueryEscape(timespan)
+	var raw struct {
+		Articles []gdeltArticle `json:"articles"`
+	}
+	if err := s.getJSON(ctx, u, nil, &raw); err != nil {
+		return nil, err
+	}
+	return raw.Articles, nil
 }
 
 var gdeltGeoFormats = []string{"geojson", "json", "csv"}
