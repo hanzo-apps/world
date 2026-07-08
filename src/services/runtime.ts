@@ -1,7 +1,11 @@
+// Same-origin by default: the frontend fetches /api/* from whatever host it's
+// deployed on (world.hanzo.ai, or any *.hanzo.app fork). No hardcoded upstream —
+// each deployment serves its own backend. Override per-deploy via
+// VITE_REMOTE_API_BASE if a fork points at a shared API host.
 const DEFAULT_REMOTE_HOSTS: Record<string, string> = {
-  tech: 'https://tech.worldmonitor.app',
-  full: 'https://worldmonitor.app',
-  world: 'https://worldmonitor.app',
+  tech: '',
+  full: '',
+  world: '',
 };
 
 const DEFAULT_LOCAL_API_BASE = 'http://127.0.0.1:46123';
@@ -81,8 +85,10 @@ export function getRemoteApiBaseUrl(): string {
     return normalizeBaseUrl(configuredRemoteBase);
   }
 
+  const configuredRemote = import.meta.env.VITE_REMOTE_API_BASE;
+  if (configuredRemote) return normalizeBaseUrl(configuredRemote);
   const variant = import.meta.env.VITE_VARIANT || 'full';
-  return DEFAULT_REMOTE_HOSTS[variant] ?? DEFAULT_REMOTE_HOSTS.full ?? 'https://worldmonitor.app';
+  return DEFAULT_REMOTE_HOSTS[variant] ?? '';
 }
 
 export function toRuntimeUrl(path: string): string {
@@ -99,9 +105,9 @@ export function toRuntimeUrl(path: string): string {
 }
 
 const APP_HOSTS = new Set([
-  'worldmonitor.app',
-  'www.worldmonitor.app',
-  'tech.worldmonitor.app',
+  'world.hanzo.ai',
+  'hanzo.app',
+  'tech.hanzo.ai',
   'localhost',
   '127.0.0.1',
 ]);
@@ -110,7 +116,7 @@ function isAppOriginUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr);
     const host = u.hostname;
-    return APP_HOSTS.has(host) || host.endsWith('.worldmonitor.app');
+    return APP_HOSTS.has(host) || host.endsWith('.hanzo.ai') || host.endsWith('.hanzo.app');
   } catch {
     return false;
   }
