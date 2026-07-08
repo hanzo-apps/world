@@ -19,6 +19,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/hanzoai/world/internal/world/model"
 )
 
 const (
@@ -30,21 +32,51 @@ const (
 		"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-// Server holds the shared HTTP client, in-memory cache, and AI client used by
-// every handler. It is safe for concurrent use.
+// Server holds the shared HTTP client, in-memory cache, AI client, and the
+// world-model engine used by every handler. It is safe for concurrent use.
 type Server struct {
-	client *http.Client
-	cache  *Cache
-	ai     *AIClient
+	client     *http.Client
+	cache      *Cache
+	ai         *AIClient
+	worldModel *model.Engine
 }
 
-// NewServer constructs the backend.
+// NewServer constructs the backend and its world-model engine (built from the
+// feed sources in model_sources.go). Call StartModel to begin ingest.
 func NewServer() *Server {
-	return &Server{
+	s := &Server{
 		client: &http.Client{Timeout: 25 * time.Second},
 		cache:  NewCache(4096),
 		ai:     newAIClient(),
 	}
+	s.worldModel = model.New(s.modelSources(), modelDataDir(), modelInterval())
+	return s
+}
+
+// StartModel begins the world-model ingest loop; it folds once immediately then
+// every interval, snapshotting to disk, until ctx is cancelled. Safe to call
+// once from main after the server is built.
+func (s *Server) StartModel(ctx context.Context) { s.worldModel.Start(ctx) }
+
+// modelDataDir is where the model snapshot is persisted for warm restart.
+func modelDataDir() string { return env2("WORLD_DATA_DIR", "data") }
+
+// modelInterval is the ingest cadence (WORLD_MODEL_INTERVAL, e.g. "10m"),
+// defaulting to the engine default.
+func modelInterval() time.Duration {
+	if v := env("WORLD_MODEL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+	}
+	return model.DefaultInterval
+}
+
+func env2(key, def string) string {
+	if v := env(key); v != "" {
+		return v
+	}
+	return def
 }
 
 // ── upstream fetch ──────────────────────────────────────────────────────────
