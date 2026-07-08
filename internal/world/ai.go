@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -34,9 +35,36 @@ func newAIClient() *AIClient {
 	}
 }
 
-// configured reports whether an API key is present. Without one the AI
-// endpoints return a clean "skipped" response rather than an error.
-func (a *AIClient) configured() bool { return a.key != "" }
+// userBearer extracts the caller's IAM token exactly as Hanzo services accept
+// it: the Authorization header first, then the browser session cookies. This is
+// the logged-in world.hanzo.ai user's token — forwarding it lets api.hanzo.ai
+// derive their org + project + linked billing account and meter the inference to
+// THEM. No shared key: user-facing AI runs on the normal IAM login flow.
+func userBearer(r *http.Request) string {
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(h), "bearer ") {
+		return h
+	}
+	for _, name := range []string{"hanzo_token", "access_token"} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" {
+			return "Bearer " + c.Value
+		}
+	}
+	return ""
+}
+
+// bearerFor returns the Authorization value to use for an inference call. The
+// signed-in user's IAM token is preferred (metered to their org/project/billing);
+// a.key is only a fallback for keyed self-host/dev deployments (env HANZO_AI_KEY),
+// never the path for a normal metered user on world.hanzo.ai.
+func (a *AIClient) bearerFor(r *http.Request) string {
+	if b := userBearer(r); b != "" {
+		return b
+	}
+	if a.key != "" {
+		return "Bearer " + a.key
+	}
+	return ""
+}
 
 type chatMessage struct {
 	Role    string `json:"role"`
@@ -63,7 +91,9 @@ type chatResponse struct {
 }
 
 // chat runs a single system+user completion and returns the trimmed content.
-func (a *AIClient) chat(ctx context.Context, s *Server, system, user string, temperature float64, maxTokens int) (string, int, error) {
+// bearer is the Authorization value (the signed-in user's IAM token, so the
+// inference meters to their org/project/billing).
+func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user string, temperature float64, maxTokens int) (string, int, error) {
 	reqBody, err := json.Marshal(chatRequest{
 		Model:       a.model,
 		Messages:    []chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
@@ -77,7 +107,7 @@ func (a *AIClient) chat(ctx context.Context, s *Server, system, user string, tem
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", map[string]string{
-		"Authorization": "Bearer " + a.key,
+		"Authorization": bearer,
 		"Content-Type":  "application/json",
 	}, reqBody)
 	if err != nil {
