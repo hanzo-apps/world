@@ -70,6 +70,8 @@ import {
   COMMODITY_HUBS,
   GULF_INVESTMENTS,
 } from '@/config';
+import { ROBOTICS_ORGS, roboticsCategoryColor } from '@/config/robotics';
+import { QUANTUM_PLAYERS, quantumModalityColor } from '@/config/quantum';
 import type { GulfInvestment } from '@/types';
 import { MapPopup, type PopupType } from './MapPopup';
 import {
@@ -149,6 +151,8 @@ const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; 
   datacenters: { minZoom: 5 },
   irradiators: { minZoom: 4 },
   spaceports: { minZoom: 3 },
+  robotics: { minZoom: 3 },
+  quantum: { minZoom: 3 },
   gulfInvestments: { minZoom: 2, showLabels: 5 },
 };
 // Export for external use
@@ -955,6 +959,16 @@ export class DeckGLMap {
       layers.push(this.createSpaceportsLayer());
     }
 
+    // Robotics labs layer — hidden at low zoom
+    if (mapLayers.robotics && this.isLayerVisible('robotics')) {
+      layers.push(this.createRoboticsLayer());
+    }
+
+    // Quantum computing players layer — hidden at low zoom
+    if (mapLayers.quantum && this.isLayerVisible('quantum')) {
+      layers.push(this.createQuantumLayer());
+    }
+
     // Hotspots layer (all hotspots including high/breaking, with pulse + ghost)
     if (mapLayers.hotspots) {
       layers.push(...this.createHotspotsLayers());
@@ -1325,6 +1339,32 @@ export class DeckGLMap {
       getPosition: (d) => [d.lon, d.lat],
       getRadius: 10000,
       getFillColor: [200, 100, 255, 200] as [number, number, number, number], // Purple
+      radiusMinPixels: 5,
+      radiusMaxPixels: 12,
+      pickable: true,
+    });
+  }
+
+  private createRoboticsLayer(): ScatterplotLayer {
+    return new ScatterplotLayer({
+      id: 'robotics-layer',
+      data: ROBOTICS_ORGS,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 9000,
+      getFillColor: (d) => roboticsCategoryColor(d.category),
+      radiusMinPixels: 5,
+      radiusMaxPixels: 12,
+      pickable: true,
+    });
+  }
+
+  private createQuantumLayer(): ScatterplotLayer {
+    return new ScatterplotLayer({
+      id: 'quantum-layer',
+      data: QUANTUM_PLAYERS,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 9000,
+      getFillColor: (d) => quantumModalityColor(d.modality),
       radiusMinPixels: 5,
       radiusMaxPixels: 12,
       pickable: true,
@@ -2390,6 +2430,10 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.type || t('components.deckgl.layers.gammaIrradiators'))}</div>` };
       case 'spaceports-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.country || t('components.deckgl.layers.spaceports'))}</div>` };
+      case 'robotics-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.focus)}<br/>${text(obj.city)}, ${text(obj.country)}</div>` };
+      case 'quantum-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.metric)}<br/>${text(obj.modality)} · ${text(obj.city)}</div>` };
       case 'ports-layer': {
         const typeIcon = obj.type === 'naval' ? '⚓' : obj.type === 'oil' || obj.type === 'lng' ? '🛢️' : '🏭';
         return { html: `<div class="deckgl-tooltip"><strong>${typeIcon} ${text(obj.name)}</strong><br/>${text(obj.type || t('components.deckgl.tooltip.port'))} - ${text(obj.country)}</div>` };
@@ -2761,6 +2805,8 @@ export class DeckGLMap {
         { key: 'nuclear', label: t('components.deckgl.layers.nuclearSites'), icon: '&#9762;' },
         { key: 'irradiators', label: t('components.deckgl.layers.gammaIrradiators'), icon: '&#9888;' },
         { key: 'spaceports', label: t('components.deckgl.layers.spaceports'), icon: '&#128640;' },
+        { key: 'robotics', label: t('components.deckgl.layers.robotics'), icon: '&#129302;' },
+        { key: 'quantum', label: t('components.deckgl.layers.quantum'), icon: '&#9883;' },
         { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
         { key: 'pipelines', label: t('components.deckgl.layers.pipelines'), icon: '&#128738;' },
         { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },

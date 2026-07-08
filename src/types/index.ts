@@ -537,6 +537,9 @@ export interface MapLayers {
   spaceports: boolean;
   minerals: boolean;
   fires: boolean;
+  // Hanzo World Model domain layers
+  robotics: boolean;
+  quantum: boolean;
   // Data source layers
   ucdpEvents: boolean;
   displacement: boolean;
