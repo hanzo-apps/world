@@ -8,12 +8,12 @@
   /* Backgrounds — Hanzo black monochrome (matches hanzo.ai) */
   --bg: #000;
   --bg-secondary: #0a0a0a;
-  --surface: #0d0d0d;
+  --surface: #0a0a0a;
   --surface-hover: #161616;
   --surface-active: #1c1c1c;
 
   /* Borders — neutral monochrome grey (no purple/blue tint) */
-  --border: #222;
+  --border: #1e1e1e;
   --border-strong: #3a3a3a;
   --border-subtle: #141414;
 
@@ -56,6 +56,42 @@
   /* Font stack — Hanzo: Geist Sans (UI) + Geist Mono (data/numeric) */
   --font-body: 'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', 'SF Mono', 'Monaco', monospace;
+
+  /* Radius scale — @hanzo/gui token (soft, Vercel-like) */
+  --radius: 8px;        /* panels, modals, cards */
+  --radius-sm: 6px;     /* buttons, inputs, selects, tabs */
+  --radius-pill: 999px; /* chips, toggles, badges */
+
+  /* Accent alias (white on black — monochrome, no tint) */
+  --primary: var(--accent);
+
+  /* @hanzo/ui/world tokens — world renders identically to the embeddable
+     <NewsStream/> <MarketTicker/> <InstabilityScore/> <PredictionMarket/>.
+     One look across world.hanzo.ai and any host that imports @hanzo/ui/world. */
+  --world-bg: var(--bg);
+  --world-surface: var(--surface);
+  --world-surface-hover: var(--surface-hover);
+  --world-surface-active: var(--surface-active);
+  --world-border: var(--border);
+  --world-border-strong: var(--border-strong);
+  --world-text: var(--text);
+  --world-text-muted: var(--text-dim);
+  --world-text-dim: var(--text-muted);
+  --world-accent: var(--accent);
+  --world-critical: var(--semantic-critical);
+  --world-high: var(--semantic-high);
+  --world-elevated: var(--semantic-elevated);
+  --world-normal: var(--semantic-normal);
+  --world-info: var(--semantic-info);
+  --world-up: var(--green);
+  --world-down: var(--red);
+  --world-live: var(--status-live);
+  --world-stale: var(--status-cached);
+  --world-font-sans: var(--font-body);
+  --world-font-mono: var(--font-mono);
+  --world-radius: var(--radius);
+  --world-radius-sm: var(--radius-sm);
+  --world-transition: 150ms ease;
 }
 
 /* Self-hosted Geist (no CDN — CSP-safe), from @hanzo/gui / Hanzo brand pack */
@@ -277,17 +313,27 @@ canvas,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--surface);
+  padding: 0 14px;
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
-  height: 40px;
+  height: 46px;
   flex-shrink: 0;
+  gap: 12px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+/* Slot reserved for the IAM AccountMenu (injected by a separate branch) */
+.header-account {
+  display: flex;
+  align-items: center;
+}
+.header-account:empty {
+  display: none;
 }
 
 /* Variant Switcher */
@@ -295,25 +341,24 @@ canvas,
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--overlay-subtle);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin-right: 6px;
+  border-radius: var(--radius-pill);
+  padding: 3px;
 }
 
 .variant-option {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
   text-decoration: none;
   color: var(--text-dim);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  transition: all 0.25s ease;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
@@ -324,56 +369,32 @@ canvas,
 }
 
 .variant-option .variant-label {
-  max-width: 0;
   overflow: hidden;
-  opacity: 0;
-  transition: max-width 0.3s ease, opacity 0.2s ease;
-}
-
-.variant-option:hover .variant-label,
-.variant-option.active .variant-label {
-  max-width: 50px;
-  opacity: 1;
+  transition: opacity 0.2s ease;
 }
 
 .variant-option:hover {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
 .variant-option:hover .variant-icon {
   filter: grayscale(0%);
 }
 
+/* Active = inverted monochrome chip (no green/blue tint) */
 .variant-option.active {
-  color: var(--green);
-  background: rgba(68, 255, 136, 0.1);
+  color: var(--bg);
+  background: var(--accent);
   pointer-events: none;
 }
 
-
 .variant-option.active .variant-icon {
-  filter: grayscale(0%) drop-shadow(0 0 4px var(--green));
-}
-
-.variant-option[data-variant="tech"].active {
-  color: var(--semantic-info);
-  background: rgba(74, 158, 255, 0.1);
-}
-
-.variant-option[data-variant="tech"].active .variant-icon {
-  filter: grayscale(0%) drop-shadow(0 0 4px var(--semantic-info));
+  filter: grayscale(100%) brightness(0);
 }
 
 .variant-divider {
-  width: 1px;
-  height: 12px;
-  background: var(--border);
-  margin: 0 2px;
-}
-
-.variant-switcher:hover .variant-option .variant-label {
-  max-width: 50px;
-  opacity: 1;
+  display: none;
 }
 
 .logo {
@@ -507,26 +528,30 @@ canvas,
 }
 
 .region-select {
-  padding: 4px 24px 4px 10px;
-  background: var(--bg);
+  height: 30px;
+  padding: 0 26px 0 12px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
+  background-position: right 9px center;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .region-select:hover {
-  border-color: var(--green);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .region-select:focus {
   outline: none;
-  border-color: var(--green);
+  border-color: var(--accent);
 }
 
 .header-center {
@@ -577,59 +602,82 @@ canvas,
   gap: 12px;
 }
 
+.header-right .theme-toggle-btn,
+.header-right .fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
 .theme-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  background: transparent;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text-dim);
   cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .theme-toggle-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--text-dim);
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .settings-btn {
-  padding: 4px 8px;
-  background: transparent;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .settings-btn:hover {
-  border-color: var(--text-dim);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .fullscreen-btn {
-  padding: 4px 8px;
-  background: transparent;
+  height: 30px;
+  padding: 0 11px;
+  background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--text);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
   font-family: inherit;
   font-size: 14px;
   cursor: pointer;
   line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .fullscreen-btn:hover {
-  border-color: var(--text-dim);
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .fullscreen-btn.active {
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--bg);
 }
 
 .github-link {
@@ -645,52 +693,59 @@ canvas,
 }
 
 .search-btn {
-  padding: 4px 10px;
-  background: transparent;
+  height: 30px;
+  padding: 0 12px;
+  background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--text);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-right: 8px;
+  gap: 7px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .search-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 
 .copy-link-btn {
-  padding: 4px 10px;
-  background: transparent;
+  height: 30px;
+  padding: 0 12px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .copy-link-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .copy-link-btn.copied {
-  background: var(--text);
+  background: var(--accent);
   color: var(--bg);
-  border-color: var(--text);
+  border-color: var(--accent);
 }
 
 .search-btn kbd {
-  background: var(--bg-secondary);
-  padding: 2px 5px;
-  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
-  font-family: inherit;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
 }
 
 .main-content {
@@ -710,6 +765,8 @@ canvas,
   max-height: 90vh;
   /* Allow resize up to 90% of viewport */
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -763,7 +820,7 @@ canvas,
 }
 
 .map-section.resizing .map-resize-handle::after {
-  background: var(--green);
+  background: var(--accent);
   opacity: 1;
 }
 
@@ -793,13 +850,13 @@ canvas,
 }
 
 .map-pin-btn.active {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--bg);
 }
 
 .map-pin-btn.active:hover {
-  background: var(--green-dim);
+  background: var(--text-secondary);
 }
 
 .panels-grid {
@@ -819,6 +876,7 @@ canvas,
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -859,7 +917,7 @@ canvas,
   right: 0;
   height: 20px;
   cursor: ns-resize;
-  background: linear-gradient(to top, rgba(68, 136, 255, 0.15), transparent);
+  background: linear-gradient(to top, var(--overlay-light), transparent);
   z-index: 100;
   transition: background 0.2s;
   touch-action: none;
@@ -869,7 +927,7 @@ canvas,
 
 .panel-resize-handle:hover,
 .panel-resize-handle.active {
-  background: linear-gradient(to top, rgba(68, 136, 255, 0.5), transparent);
+  background: linear-gradient(to top, var(--overlay-heavy), transparent);
 }
 
 .panel-resize-handle::after {
@@ -904,7 +962,7 @@ canvas,
 .panel.dragging {
   opacity: 0.5;
   transform: scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
 .panel-header {
@@ -938,7 +996,7 @@ canvas,
   left: 50%;
   transform: translateX(-50%);
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   color: var(--text-secondary);
   letter-spacing: 0.5px;
   pointer-events: none;
@@ -960,11 +1018,46 @@ canvas,
 }
 
 .panel-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   color: var(--text-dim);
-  background: var(--border);
-  padding: 2px 6px;
-  border-radius: 2px;
+  background: var(--surface-active);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+/* ============================================================
+   Numeric / data → Geist Mono (one way for every value cell)
+   Labels, headers and body stay Geist Sans. Tabular figures so
+   columns of numbers align — matches @hanzo/ui/world numerics.
+   ============================================================ */
+.value,
+.count,
+.stat-value,
+.market-price,
+.popup-stat,
+.posture-stat,
+.summary-count,
+.hub-news-count,
+[class$="-value"],
+[class$="-count"],
+[class$="-price"],
+[class$="-pct"],
+[class$="-percent"],
+[class$="-change"],
+[class$="-score"],
+[class$="-num"],
+[class$="-amount"],
+[class$="-delta"],
+[class$="-ratio"],
+[class$="-time"],
+[class*="timestamp"],
+[class*="-metric-value"],
+.deckgl-time-slider .time-btn,
+.time-btn {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 
@@ -1199,36 +1292,46 @@ canvas,
 /* Live News Panel */
 .live-news-switcher {
   display: flex;
-  gap: 4px;
-  padding: 6px 8px;
-  background: var(--darken-heavy);
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.live-news-switcher::-webkit-scrollbar {
+  display: none;
 }
 
 .live-channel-btn {
-  padding: 4px 8px;
-  background: transparent;
+  padding: 4px 12px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   color: var(--text-dim);
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
   text-transform: none;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
   white-space: nowrap;
 }
 
 .live-channel-btn:hover {
-  border-color: var(--text-dim);
+  border-color: var(--border-strong);
   color: var(--text);
+  background: var(--surface-hover);
 }
 
 .live-channel-btn.active {
-  background: var(--red);
-  border-color: var(--red);
-  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
 }
 
 .live-channel-btn.loading {
@@ -1269,17 +1372,20 @@ canvas,
 
 .live-offline .offline-retry {
   margin-top: 8px;
-  padding: 6px 12px;
-  background: var(--panel-bg);
+  padding: 7px 14px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
-  border-radius: 4px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .live-offline .offline-retry:hover {
-  border-color: var(--text-dim);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 @keyframes loadingDots {
@@ -1489,7 +1595,7 @@ canvas,
 }
 
 .webcam-city {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
   color: #fff;
@@ -2632,24 +2738,26 @@ body.playback-mode .status-dot {
 }
 
 .time-btn {
-  padding: 3px 6px;
-  background: transparent;
+  padding: 3px 10px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: inherit;
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .time-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 
 .time-btn.active {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--bg);
   font-weight: 600;
 }
@@ -4529,7 +4637,9 @@ a.prediction-link:hover {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -4543,6 +4653,8 @@ a.prediction-link:hover {
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
   padding: 20px;
   max-width: 500px;
   width: 90%;
@@ -4582,33 +4694,38 @@ a.prediction-link:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
+  padding: 9px 10px;
   background: var(--bg);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .panel-toggle-item:hover {
-  border-color: var(--text-dim);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .panel-toggle-item.active {
-  border-color: var(--green);
+  border-color: var(--border-strong);
 }
 
 .panel-toggle-checkbox {
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--border);
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
+  flex-shrink: 0;
 }
 
 .panel-toggle-item.active .panel-toggle-checkbox {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--bg);
 }
 
@@ -4619,17 +4736,24 @@ a.prediction-link:hover {
 
 /* Sources Modal */
 .sources-btn {
-  padding: 4px 8px;
-  background: transparent;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .sources-btn:hover {
-  border-color: var(--text-dim);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .sources-modal {
@@ -6405,7 +6529,7 @@ a.prediction-link:hover {
 .indicator-id {
   font-size: 9px;
   color: var(--text-dim);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .indicator-value {
@@ -6992,14 +7116,14 @@ a.prediction-link:hover {
   white-space: nowrap;
   text-shadow: 0 0 3px var(--shadow-color), 0 0 6px var(--shadow-color);
   font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   opacity: 0.8;
 }
 
 .military-flight-altitude {
   font-size: 6px;
   color: var(--text-dim);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   opacity: 0.6;
   text-shadow: 0 0 2px var(--shadow-color);
 }
@@ -7262,7 +7386,7 @@ a.prediction-link:hover {
   font-size: 12px;
   font-weight: 600;
   color: var(--cluster-color);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   text-shadow: 0 0 4px var(--shadow-color);
   position: relative;
   padding: 4px 8px;
@@ -7299,7 +7423,7 @@ a.prediction-link:hover {
   margin-top: 3px;
   white-space: nowrap;
   font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   text-shadow: 0 0 3px var(--shadow-color);
   opacity: 0.85;
   position: relative;
@@ -10902,24 +11026,26 @@ a.prediction-link:hover {
 }
 
 .deckgl-time-slider .time-btn {
-  padding: 4px 8px;
-  background: transparent;
+  padding: 4px 11px;
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: var(--font-mono);
   font-size: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .deckgl-time-slider .time-btn:hover {
-  border-color: var(--green);
-  color: var(--green);
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 
 .deckgl-time-slider .time-btn.active {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--bg);
   font-weight: 600;
 }
@@ -10932,7 +11058,7 @@ a.prediction-link:hover {
   z-index: 100;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   max-width: 260px;
   max-height: 50vh;
   display: flex;
@@ -13162,7 +13288,7 @@ body.has-critical-banner .panels-grid {
 .stable-price {
   font-size: 12px;
   color: var(--accent);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .stable-peg {

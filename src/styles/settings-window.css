@@ -15,7 +15,7 @@
   height: 100vh;
   background: var(--settings-bg);
   color: var(--settings-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
   padding: 0;
   box-sizing: border-box;
@@ -185,7 +185,7 @@
   color: var(--settings-text);
   padding: 6px 10px;
   font-size: 12px;
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   transition: border-color 0.15s;
 }
 
@@ -444,7 +444,7 @@
 .diag-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
