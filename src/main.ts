@@ -7,8 +7,8 @@ import { App } from './App';
 // Initialize Sentry error tracking (early as possible)
 Sentry.init({
   dsn: 'https://afc9a1c85c6ba49f8464a43f8de74ccd@o4509927897890816.ingest.us.sentry.io/4510906342113280',
-  release: `worldmonitor@${__APP_VERSION__}`,
-  environment: location.hostname === 'worldmonitor.app' ? 'production'
+  release: `hanzo-world@${__APP_VERSION__}`,
+  environment: location.hostname === 'world.hanzo.ai' ? 'production'
     : location.hostname.includes('vercel.app') ? 'preview'
     : 'development',
   enabled: !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
