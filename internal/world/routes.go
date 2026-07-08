@@ -4,7 +4,14 @@ import "net/http"
 
 // Mount registers every /v1/world/* route on mux. All non-/api routes are handled by
 // the static SPA server wired up in cmd/world.
-func (s *Server) Mount(mux *http.ServeMux) {
+func (s *Server) Mount(mux *http.ServeMux) { s.mount(mux) }
+
+// registrar abstracts HandleFunc so routes register once and enumerate for tests.
+type registrar interface {
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+}
+
+func (s *Server) mount(mux registrar) {
 	// health / meta
 	mux.HandleFunc("/v1/world/health", s.handleHealth)
 	mux.HandleFunc("/v1/world/version", s.handleVersion)
@@ -95,4 +102,18 @@ func (s *Server) handleAPINotFound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeError(w, http.StatusNotFound, "Not found: "+r.URL.Path)
+}
+
+// Routes returns every registered /v1/world path (for tests + introspection).
+func (s *Server) Routes() []string {
+	c := &routeCollector{}
+	s.mount(c)
+	return c.paths
+}
+
+// routeCollector implements the minimal registrar interface for enumeration.
+type routeCollector struct{ paths []string }
+
+func (c *routeCollector) HandleFunc(pattern string, _ func(http.ResponseWriter, *http.Request)) {
+	c.paths = append(c.paths, pattern)
 }

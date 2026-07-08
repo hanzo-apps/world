@@ -34,7 +34,7 @@ interface EonetResponse {
   events: EonetEvent[];
 }
 
-const EONET_API_URL = 'https://eonet.gsfc.nasa.gov/v1/world/v3/events';
+const EONET_API_URL = 'https://eonet.gsfc.nasa.gov/api/v3/events';
 
 const CATEGORY_ICONS: Record<NaturalEventCategory, string> = {
   severeStorms: '🌀',

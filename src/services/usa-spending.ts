@@ -24,7 +24,7 @@ export interface SpendingSummary {
   fetchedAt: Date;
 }
 
-const API_BASE = 'https://api.usaspending.gov/v1/world/v2';
+const API_BASE = 'https://api.usaspending.gov/api/v2';
 
 // Award type code mapping
 const AWARD_TYPE_MAP: Record<string, GovernmentAward['awardType']> = {
