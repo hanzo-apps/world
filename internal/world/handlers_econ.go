@@ -209,7 +209,7 @@ func (s *Server) handleEIA(w http.ResponseWriter, r *http.Request) {
 		s.cachedJSON(w, "eia:petroleum", "public, max-age=1800, s-maxage=1800, stale-while-revalidate=300",
 			30*time.Minute, 2*time.Hour,
 			func(ctx context.Context) (any, error) { return s.eiaPetroleum(ctx, key) },
-			func(w http.ResponseWriter, err error) { writeError(w, http.StatusInternalServerError, "Failed to fetch EIA data") })
+			func(w http.ResponseWriter, err error) { writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "series": []any{}}) })
 	default:
 		writeError(w, http.StatusNotFound, "Not found")
 	}
