@@ -80,12 +80,6 @@ import {
   ClimateAnomalyPanel,
   PopulationExposurePanel,
   InvestmentsPanel,
-  RoboticsPanel,
-  QuantumPanel,
-  PostQuantumPanel,
-  WeatherPanel,
-  SportsPanel,
-  SpaceWeatherPanel,
   LanguageSelector,
 } from '@/components';
 import type { SearchResult } from '@/components/SearchModal';
@@ -1612,7 +1606,6 @@ export class App {
               <span class="variant-icon">🌍</span>
               <span class="variant-label">${t('header.world')}</span>
             </a>
-            <span class="variant-divider"></span>
             <a href="?variant=tech"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
@@ -1620,7 +1613,6 @@ export class App {
               <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
             </a>
-            <span class="variant-divider"></span>
             <a href="?variant=finance"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
                data-variant="finance"
@@ -1657,6 +1649,7 @@ export class App {
           ${this.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
           <button class="settings-btn" id="settingsBtn">⚙ ${t('header.settings')}</button>
           <button class="sources-btn" id="sourcesBtn">📡 ${t('header.sources')}</button>
+          <div class="header-account" id="headerAccount"></div>
         </div>
       </div>
       <div class="main-content">
@@ -2126,18 +2119,6 @@ export class App {
     const insightsPanel = new InsightsPanel();
     this.panels['insights'] = insightsPanel;
 
-    // Hanzo World Model domain lenses (available via Panels menu + as feeds
-    // for the /v1/world API). Each self-fetches on construction. Full variant
-    // only — these are part of the default geopolitical world model.
-    if (SITE_VARIANT === 'full') {
-      this.panels['robotics'] = new RoboticsPanel();
-      this.panels['quantum'] = new QuantumPanel();
-      this.panels['post-quantum'] = new PostQuantumPanel();
-      this.panels['weather'] = new WeatherPanel();
-      this.panels['sports'] = new SportsPanel();
-      this.panels['space-weather'] = new SpaceWeatherPanel();
-    }
-
     // Add panels to grid in saved order
     // Use DEFAULT_PANELS keys for variant-aware panel order
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -2398,19 +2379,18 @@ export class App {
     // Sources modal
     this.setupSourcesModal();
 
-    // Variant switcher: switch variant locally on desktop (reload with new config)
-    if (this.isDesktopApp) {
-      this.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
-        link.addEventListener('click', (e) => {
-          const variant = link.dataset.variant;
-          if (variant && variant !== SITE_VARIANT) {
-            e.preventDefault();
-            localStorage.setItem('worldmonitor-variant', variant);
-            window.location.reload();
-          }
-        });
+    // Variant switcher: switch in-place (same origin, no subdomains) — persist
+    // the choice and reload with the new config. Works on web and desktop alike.
+    this.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
+      link.addEventListener('click', (e) => {
+        const variant = link.dataset.variant;
+        if (variant && variant !== SITE_VARIANT) {
+          e.preventDefault();
+          localStorage.setItem('worldmonitor-variant', variant);
+          window.location.reload();
+        }
       });
-    }
+    });
 
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -4260,15 +4240,5 @@ export class App {
       this.cyberThreatsCache = null;
       return this.loadCyberThreats();
     }, 10 * 60 * 1000, () => CYBER_LAYER_ENABLED && this.mapLayers.cyberThreats);
-
-    // Hanzo World Model domain lenses (full variant only). Each panel
-    // self-throttles its own fetch cadence.
-    if (SITE_VARIANT === 'full') {
-      this.scheduleRefresh('robotics', async () => { await (this.panels['robotics'] as RoboticsPanel | undefined)?.refresh(); }, 60 * 60 * 1000);
-      this.scheduleRefresh('quantum', async () => { await (this.panels['quantum'] as QuantumPanel | undefined)?.refresh(); }, 60 * 60 * 1000);
-      this.scheduleRefresh('weather-global', async () => { await (this.panels['weather'] as WeatherPanel | undefined)?.refresh(); }, 10 * 60 * 1000);
-      this.scheduleRefresh('sports', async () => { await (this.panels['sports'] as SportsPanel | undefined)?.refresh(); }, 2 * 60 * 1000);
-      this.scheduleRefresh('space-weather', async () => { await (this.panels['space-weather'] as SpaceWeatherPanel | undefined)?.refresh(); }, 10 * 60 * 1000);
-    }
   }
 }
