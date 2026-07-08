@@ -4,7 +4,7 @@
  */
 import { isMobileDevice } from '@/utils';
 import { MapComponent } from './Map';
-import { DeckGLMap, type DeckMapView, type CountryClickPayload } from './DeckGLMap';
+import { DeckGLMap, type DeckMapView, type CountryClickPayload, type MapProjectionMode } from './DeckGLMap';
 import type {
   MapLayers,
   Hotspot,
@@ -34,12 +34,15 @@ import type { WeatherAlert } from '@/services/weather';
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 
+export type { MapProjectionMode } from './DeckGLMap';
+
 export interface MapContainerState {
   zoom: number;
   pan: { x: number; y: number };
   view: MapView;
   layers: MapLayers;
   timeRange: TimeRange;
+  mode?: MapProjectionMode;
 }
 
 interface TechEventMarker {
@@ -118,6 +121,21 @@ export class MapContainer {
     } else {
       this.svgMap?.setView(view);
     }
+  }
+
+  // Projection mode (2D map <-> 3D globe). Globe is deck.gl-only; the SVG
+  // fallback stays flat, so the toggle is hidden on that path.
+  public setProjectionMode(mode: MapProjectionMode): void {
+    if (this.useDeckGL) {
+      this.deckGLMap?.setProjectionMode(mode);
+    }
+  }
+
+  public getProjectionMode(): MapProjectionMode {
+    if (this.useDeckGL) {
+      return this.deckGLMap?.getProjectionMode() ?? '2d';
+    }
+    return '2d';
   }
 
   public setZoom(zoom: number): void {
