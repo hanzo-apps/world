@@ -11099,6 +11099,45 @@ a.prediction-link:hover {
   font-weight: 600;
 }
 
+/* 2D / 3D projection toggle — map header pill pair (top-center) */
+.deckgl-projection-toggle {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.deckgl-projection-toggle .proj-btn {
+  min-width: 34px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.deckgl-projection-toggle .proj-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.deckgl-projection-toggle .proj-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
 /* deck.gl Layer Toggles */
 .deckgl-layer-toggles {
   position: absolute;
