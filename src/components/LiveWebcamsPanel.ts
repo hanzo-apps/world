@@ -163,7 +163,7 @@ export class LiveWebcamsPanel extends Panel {
         autoplay: '1',
         mute: '1',
       });
-      return `${remoteBase}/api/youtube/embed?${params.toString()}`;
+      return `${remoteBase}/v1/world/youtube/embed?${params.toString()}`;
     }
     return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0`;
   }

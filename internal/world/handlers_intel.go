@@ -110,7 +110,7 @@ func baselineRiskResult(msg string) map[string]any {
 }
 
 func (s *Server) fetchACLEDProtests(ctx context.Context, token string) ([]map[string]any, error) {
-	u := "https://acleddata.com/api/acled/read?_format=json&event_type=Protests&event_type=Riots&event_date=" +
+	u := "https://acleddata.com/v1/world/acled/read?_format=json&event_type=Protests&event_type=Riots&event_date=" +
 		daysAgoUTC(7) + "|" + todayUTC() + "&event_date_where=BETWEEN&limit=500"
 	var raw struct {
 		Data []map[string]any `json:"data"`
@@ -260,7 +260,7 @@ func (s *Server) fetchMilitaryFlights(ctx context.Context) []milFlight {
 	var resp struct {
 		States [][]any `json:"states"`
 	}
-	if err := s.getJSON(ctx, "https://opensky-network.org/api/states/all",
+	if err := s.getJSON(ctx, "https://opensky-network.org/v1/world/states/all",
 		map[string]string{"User-Agent": browserUA}, &resp); err != nil {
 		return nil
 	}
