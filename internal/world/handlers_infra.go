@@ -50,7 +50,7 @@ func (s *Server) handleFAAStatus(w http.ResponseWriter, r *http.Request) {
 		"application/xml", "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
 		map[string]string{"Accept": "application/xml"}, time.Minute, 10*time.Minute,
 		func(w http.ResponseWriter, err error) {
-			writeBytes(w, http.StatusInternalServerError, "application/xml", "", []byte("<error>"+err.Error()+"</error>"))
+			writeBytes(w, http.StatusOK, "application/xml", "", []byte("<AIRPORT_STATUS_INFORMATION/>"))
 		})
 }
 
@@ -66,7 +66,7 @@ func (s *Server) handleNGAWarnings(w http.ResponseWriter, r *http.Request) {
 		"application/json", "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		map[string]string{"Accept": "application/json"}, 5*time.Minute, 30*time.Minute,
 		func(w http.ResponseWriter, err error) {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "data": []any{}})
 		})
 }
 
