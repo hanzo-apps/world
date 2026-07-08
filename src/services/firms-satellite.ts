@@ -1,5 +1,5 @@
 // NASA FIRMS Satellite Fire Data Service
-// Fetches active fire detections via /api/firms-fires edge function
+// Fetches active fire detections via /v1/world/firms-fires edge function
 // Detects thermal anomalies in monitored conflict regions
 
 export interface FireDataPoint {
@@ -25,7 +25,7 @@ export interface FireRegionStats {
   highIntensityCount: number;
 }
 
-const FIRMS_API = '/api/firms-fires';
+const FIRMS_API = '/v1/world/firms-fires';
 
 export interface FiresFetchResult {
   regions: Record<string, FireDataPoint[]>;

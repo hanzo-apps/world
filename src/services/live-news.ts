@@ -11,7 +11,7 @@ export async function fetchLiveVideoId(channelHandle: string): Promise<string | 
 
   try {
     const baseUrl = isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
-    const res = await fetch(`${baseUrl}/api/youtube/live?channel=${encodeURIComponent(channelHandle)}`);
+    const res = await fetch(`${baseUrl}/v1/world/youtube/live?channel=${encodeURIComponent(channelHandle)}`);
     if (!res.ok) throw new Error('API error');
     const data = await res.json();
     const videoId = data.videoId || null;

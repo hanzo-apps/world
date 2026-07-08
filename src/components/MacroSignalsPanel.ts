@@ -85,7 +85,7 @@ export class MacroSignalsPanel extends Panel {
 
   private async fetchData(): Promise<void> {
     try {
-      const res = await fetch('/api/macro-signals');
+      const res = await fetch('/v1/world/macro-signals');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this.data = await res.json();
       this.error = null;

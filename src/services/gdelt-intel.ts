@@ -83,7 +83,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 const articleCache = new Map<string, { articles: GdeltArticle[]; timestamp: number }>();
 
 function buildGdeltDocUrl(query: string, maxrecords = 10, timespan = '24h'): string {
-  return `/api/gdelt-doc?query=${encodeURIComponent(query)}&maxrecords=${maxrecords}&timespan=${timespan}`;
+  return `/v1/world/gdelt-doc?query=${encodeURIComponent(query)}&maxrecords=${maxrecords}&timespan=${timespan}`;
 }
 
 export async function fetchGdeltArticles(
