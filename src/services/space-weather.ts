@@ -44,14 +44,33 @@ function kpSeverity(kp: number | null): WorldFeedSeverity {
   return 'info';
 }
 
-function parseKp(raw: unknown): { kp: number | null; time: Date | null } {
-  if (!Array.isArray(raw) || raw.length < 2) return { kp: null, time: null };
-  const last = raw[raw.length - 1];
-  if (!Array.isArray(last)) return { kp: null, time: null };
-  const kp = Number(last[1]);
-  const time = last[0] ? new Date(String(last[0]).replace(' ', 'T') + 'Z') : null;
-  return { kp: Number.isFinite(kp) ? kp : null, time };
+function toUtcDate(raw: unknown): Date | null {
+  if (!raw) return null;
+  const s = String(raw).replace(' ', 'T');
+  return new Date(s.endsWith('Z') ? s : s + 'Z');
 }
+
+function parseKp(raw: unknown): { kp: number | null; time: Date | null } {
+  if (!Array.isArray(raw) || raw.length === 0) return { kp: null, time: null };
+  const last = raw[raw.length - 1];
+  let kpRaw: unknown;
+  let timeRaw: unknown;
+  if (Array.isArray(last)) {
+    // Legacy [time_tag, Kp, a_running, station_count] rows (with header row).
+    timeRaw = last[0];
+    kpRaw = last[1];
+  } else if (last && typeof last === 'object') {
+    const rec = last as { Kp?: unknown; kp?: unknown; kp_index?: unknown; time_tag?: unknown };
+    kpRaw = rec.Kp ?? rec.kp ?? rec.kp_index;
+    timeRaw = rec.time_tag;
+  } else {
+    return { kp: null, time: null };
+  }
+  const kp = Number(kpRaw);
+  return { kp: Number.isFinite(kp) ? kp : null, time: toUtcDate(timeRaw) };
+}
+
+const DESCRIPTIVE = /^(ALERT|WARNING|WATCH|SUMMARY|EXTENDED WARNING|CANCEL WARNING|CONTINUED ALERT):/i;
 
 function parseAlerts(raw: unknown): SpaceWeatherAlert[] {
   if (!Array.isArray(raw)) return [];
@@ -62,17 +81,26 @@ function parseAlerts(raw: unknown): SpaceWeatherAlert[] {
     const rec = item as { product_id?: string; issue_datetime?: string; message?: string };
     const message = String(rec.message ?? '').trim();
     if (!message || !wanted.test(message)) continue;
-    // First line of the message is the headline.
-    const headline = message.split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? message;
+    // Prefer the descriptive line (e.g. "ALERT: Geomagnetic K-index of 5");
+    // the leading "Space Weather Message Code: ..." line is not human-friendly.
+    const lines = message.split('\n').map((l) => l.trim()).filter(Boolean);
+    const headline = lines.find((l) => DESCRIPTIVE.test(l)) ?? lines[0] ?? message;
     out.push({
       id: `swpc:${rec.product_id ?? headline}:${rec.issue_datetime ?? ''}`,
       message: headline.slice(0, 160),
-      issued: rec.issue_datetime ? new Date(String(rec.issue_datetime).replace(' ', 'T') + 'Z') : new Date(),
+      issued: toUtcDate(rec.issue_datetime) ?? new Date(),
     });
   }
-  return out
-    .sort((a, b) => b.issued.getTime() - a.issued.getTime())
-    .slice(0, 12);
+  const sorted = out.sort((a, b) => b.issued.getTime() - a.issued.getTime());
+  const seen = new Set<string>();
+  const deduped: SpaceWeatherAlert[] = [];
+  for (const a of sorted) {
+    if (seen.has(a.message)) continue;
+    seen.add(a.message);
+    deduped.push(a);
+    if (deduped.length >= 12) break;
+  }
+  return deduped;
 }
 
 export async function fetchSpaceWeather(): Promise<SpaceWeatherState> {
