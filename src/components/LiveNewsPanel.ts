@@ -118,7 +118,7 @@ export class LiveNewsPanel extends Panel {
   }
 
   private get embedOrigin(): string {
-    try { return new URL(getRemoteApiBaseUrl()).origin; } catch { return ''; }
+    try { return new URL(getRemoteApiBaseUrl()).origin; } catch { return (typeof window !== 'undefined' ? window.location.origin : ''); }
   }
 
   private setupBridgeMessageListener(): void {
@@ -146,9 +146,7 @@ export class LiveNewsPanel extends Panel {
   }
 
   private static resolveYouTubeOrigin(): string | null {
-    const fallbackOrigin = SITE_VARIANT === 'tech'
-      ? ''
-      : '';
+    const fallbackOrigin = (typeof window !== 'undefined' ? window.location.origin : '');
 
     try {
       const { protocol, origin, host } = window.location;
