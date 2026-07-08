@@ -182,12 +182,12 @@ func (s *Server) handleClassifyEvent(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	out, _, err := s.ai.chat(ctx, s, bearer, system, title, 0, 50)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, "", map[string]any{"fallback": true})
+		writeJSON(w, http.StatusOK, "", map[string]any{"fallback": true})
 		return
 	}
 	obj := parseClassifyObject(out)
 	if obj == nil {
-		writeJSON(w, http.StatusInternalServerError, "", map[string]any{"fallback": true})
+		writeJSON(w, http.StatusOK, "", map[string]any{"fallback": true})
 		return
 	}
 	writeJSON(w, http.StatusOK, "public, max-age=3600, s-maxage=3600, stale-while-revalidate=600",
