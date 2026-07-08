@@ -1,5 +1,5 @@
 import { API_URLS } from '@/config';
-import { createCircuitBreaker } from '@/utils';
+import { createCircuitBreaker, type CircuitBreaker } from '@/utils';
 
 export interface ArxivPaper {
   id: string;
@@ -13,7 +13,18 @@ export interface ArxivPaper {
   pdfLink: string;
 }
 
-const breaker = createCircuitBreaker<ArxivPaper[]>({ name: 'ArXiv Papers' });
+// One breaker per arXiv category — a single shared breaker caches one result
+// slot and would return the wrong category's papers within its TTL.
+const breakers = new Map<string, CircuitBreaker<ArxivPaper[]>>();
+
+function breakerFor(category: string): CircuitBreaker<ArxivPaper[]> {
+  let breaker = breakers.get(category);
+  if (!breaker) {
+    breaker = createCircuitBreaker<ArxivPaper[]>({ name: `ArXiv ${category}` });
+    breakers.set(category, breaker);
+  }
+  return breaker;
+}
 
 // Parse ArXiv Atom XML response
 function parseArxivXML(xmlText: string): ArxivPaper[] {
@@ -76,7 +87,7 @@ export async function fetchArxivPapers(
   category: string = 'cs.AI',
   maxResults: number = 50
 ): Promise<ArxivPaper[]> {
-  return breaker.execute(async () => {
+  return breakerFor(category).execute(async () => {
     const response = await fetch(API_URLS.arxiv(category, maxResults));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -108,6 +119,6 @@ export async function fetchAllAIPapers(): Promise<ArxivPaper[]> {
   return uniquePapers.slice(0, 50); // Return top 50 most recent
 }
 
-export function getArxivStatus(): string {
-  return breaker.getStatus();
+export function getArxivStatus(category: string = 'cs.AI'): string {
+  return breakerFor(category).getStatus();
 }
