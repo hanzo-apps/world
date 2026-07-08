@@ -33,6 +33,8 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/stablecoin-markets", s.handleStablecoins)
 	mux.HandleFunc("/v1/world/etf-flows", s.handleETFFlows)
 	mux.HandleFunc("/v1/world/macro-signals", s.handleMacroSignals)
+	mux.HandleFunc("/v1/world/indicators", s.handleIndicators)
+	mux.HandleFunc("/v1/world/sentiment", s.handleSentiment)
 
 	// flights / geo / hazards
 	mux.HandleFunc("/v1/world/opensky", s.handleOpenSky)
