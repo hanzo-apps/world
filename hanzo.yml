@@ -1,0 +1,34 @@
+# Canonical CI/CD config for hanzoai/world — read by both the hanzoai/ci
+# reusable workflow (.github/workflows/cicd.yml) and platform.hanzo.ai.
+# One image (the Vite SPA served by hanzoai/static), and a main-branch rollout
+# onto the existing `world` operator Service CR
+# (universe: infra/k8s/operator/crs/world.yaml).
+#
+# No separate `test:` block: the Dockerfile IS the gate — `npm ci && npm run
+# build` fails the image on any type error or build break, so nothing broken
+# ships (same pattern as hanzoai/finance + hanzoai/console).
+
+images:
+  - name: world
+    context: .
+    dockerfile: Dockerfile
+    repo: ghcr.io/hanzoai/world
+
+# Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
+# on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
+# kubeconfig at run time.
+deploy:
+  cluster: do-sfo3-hanzo-k8s
+  namespace: hanzo
+  # Quoted to dodge YAML 1.1 boolean coercion of a bare `on:` key.
+  "on": [main]
+  services:
+    - name: world
+      image: world
+
+# KMS (kms.hanzo.ai, Universal Auth) supplies the GHCR push token and the
+# target kubeconfig at run time. Only KMS_CLIENT_ID/KMS_CLIENT_SECRET live in
+# GitHub; everything else is fetched here.
+kms:
+  path: /deploy
+  environment: prod
