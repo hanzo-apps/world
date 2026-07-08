@@ -49,8 +49,9 @@ func (s *Server) handleSummarize(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Headlines array required")
 		return
 	}
-	if !s.ai.configured() {
-		writeJSON(w, http.StatusOK, "", map[string]any{"summary": nil, "fallback": true, "skipped": true, "reason": "Hanzo AI not configured"})
+	bearer := s.ai.bearerFor(r)
+	if bearer == "" {
+		writeJSON(w, http.StatusOK, "", map[string]any{"summary": nil, "fallback": true, "skipped": true, "reason": "Sign in to enable AI insights"})
 		return
 	}
 	mode := body.Mode
@@ -94,7 +95,7 @@ func (s *Server) handleSummarize(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	out, tokens, err := s.ai.chat(ctx, s, system, user, 0.3, 150)
+	out, tokens, err := s.ai.chat(ctx, s, bearer, system, user, 0.3, 150)
 	if err != nil || out == "" {
 		writeJSON(w, http.StatusOK, "", map[string]any{"summary": nil, "fallback": true, "error": errStr(err)})
 		return
@@ -127,8 +128,9 @@ func (s *Server) handleClassifyBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "titles array required")
 		return
 	}
-	if !s.ai.configured() {
-		writeJSON(w, http.StatusOK, "", map[string]any{"results": []any{}, "fallback": true, "skipped": true, "reason": "Hanzo AI not configured"})
+	bearer := s.ai.bearerFor(r)
+	if bearer == "" {
+		writeJSON(w, http.StatusOK, "", map[string]any{"results": []any{}, "fallback": true, "skipped": true, "reason": "Sign in to enable AI insights"})
 		return
 	}
 	titles := body.Titles
@@ -139,7 +141,7 @@ func (s *Server) handleClassifyBatch(w http.ResponseWriter, r *http.Request) {
 	user := numberLines(titles)
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	out, _, err := s.ai.chat(ctx, s, system, user, 0, len(titles)*60)
+	out, _, err := s.ai.chat(ctx, s, bearer, system, user, 0, len(titles)*60)
 	results := make([]any, len(titles))
 	if err == nil {
 		parsed := parseClassifyArray(out)
@@ -170,14 +172,15 @@ func (s *Server) handleClassifyEvent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "title param required")
 		return
 	}
-	if !s.ai.configured() {
-		writeJSON(w, http.StatusOK, "", map[string]any{"fallback": true, "skipped": true, "reason": "Hanzo AI not configured"})
+	bearer := s.ai.bearerFor(r)
+	if bearer == "" {
+		writeJSON(w, http.StatusOK, "", map[string]any{"fallback": true, "skipped": true, "reason": "Sign in to enable AI insights"})
 		return
 	}
 	system := classifySystemPrompt(r.URL.Query().Get("variant") == "tech", false)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	out, _, err := s.ai.chat(ctx, s, system, title, 0, 50)
+	out, _, err := s.ai.chat(ctx, s, bearer, system, title, 0, 50)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, "", map[string]any{"fallback": true})
 		return
@@ -216,8 +219,9 @@ func (s *Server) handleCountryIntel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "country and code required")
 		return
 	}
-	if !s.ai.configured() {
-		writeJSON(w, http.StatusOK, "", map[string]any{"intel": nil, "fallback": true, "skipped": true, "reason": "Hanzo AI not configured"})
+	bearer := s.ai.bearerFor(r)
+	if bearer == "" {
+		writeJSON(w, http.StatusOK, "", map[string]any{"intel": nil, "fallback": true, "skipped": true, "reason": "Sign in to enable AI insights"})
 		return
 	}
 	system := dateContext(false) + " You are a senior intelligence analyst. Produce a concise country brief with sections: Current Situation; Military & Security Posture; Key Risk Factors; Regional Context; Outlook & Watch Items. 5-6 paragraphs, factual, cite provided headlines as [N] where relevant."
@@ -230,7 +234,7 @@ func (s *Server) handleCountryIntel(w http.ResponseWriter, r *http.Request) {
 	user := "Country: " + body.Country + " (" + body.Code + ")" + dataSection
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
-	brief, _, err := s.ai.chat(ctx, s, system, user, 0.4, 900)
+	brief, _, err := s.ai.chat(ctx, s, bearer, system, user, 0.4, 900)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, "", map[string]any{"error": "AI service error", "fallback": true})
 		return
