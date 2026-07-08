@@ -80,4 +80,19 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	// social share (OpenGraph)
 	mux.HandleFunc("/api/story", s.handleStory)
 	mux.HandleFunc("/api/og-story", s.handleOGStory)
+
+	// Catch-all for any unregistered /api/* path: a JSON 404, never the SPA
+	// shell. Exact and subtree routes above are longer prefixes and win.
+	mux.HandleFunc("/api/", s.handleAPINotFound)
+}
+
+// handleAPINotFound answers unmatched /api/* paths with a JSON 404 so a bad
+// endpoint is visible rather than masked by the static index.html.
+func (s *Server) handleAPINotFound(w http.ResponseWriter, r *http.Request) {
+	setCORS(w, "GET, POST, OPTIONS")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeError(w, http.StatusNotFound, "Not found: "+r.URL.Path)
 }
