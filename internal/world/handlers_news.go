@@ -298,6 +298,10 @@ var ytIsLiveRe = regexp.MustCompile(`"isLive":\s*true`)
 // canonical; fall back to the first videoId only if it's absent.
 var ytCanonicalRe = regexp.MustCompile(`<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})"`)
 
+// videoDetails.videoId in ytInitialPlayerResponse is the video actually loaded
+// in the player — the single most reliable per-channel signal.
+var ytPlayerVideoRe = regexp.MustCompile(`"videoDetails":\{"videoId":"([a-zA-Z0-9_-]{11})"`)
+
 // handleYouTubeLive resolves a channel handle to its current LIVE video id. It
 // scrapes the channel /live page (no key required); when YOUTUBE_API_KEY is set
 // it first tries the Data API for reliability. Degrades to {videoId:null} so the
@@ -337,18 +341,24 @@ func (s *Server) handleYouTubeLive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fallback: scrape the channel /live page.
-	html, err := s.getText(ctx, "https://www.youtube.com/"+handle+"/live", map[string]string{
+	// Fallback: scrape the channel /live page. The SOCS/CONSENT cookies + hl/gl
+	// bypass YouTube's consent interstitial (served to datacenter IPs) — without
+	// them the cluster gets a consent page whose only videoId is a promo clip, so
+	// unrelated channels collapse onto one shared id.
+	html, err := s.getText(ctx, "https://www.youtube.com/"+handle+"/live?hl=en&gl=US", map[string]string{
 		"User-Agent":      browserUA,
 		"Accept-Language": "en-US,en;q=0.9",
+		"Cookie":          "SOCS=CAISNQgDEitib3FfaWRlbnRpdHlfMjAyNDA4MjcuMDFfcDAaAmVuIAEaBgiA_LyxBg; CONSENT=YES+",
 	})
 	res := map[string]any{"videoId": nil, "isLive": false}
 	if err == nil && ytIsLiveRe.MatchString(html) {
 		vid := ""
-		if m := ytCanonicalRe.FindStringSubmatch(html); m != nil {
-			vid = m[1] // authoritative: the canonical live watch URL
+		if m := ytPlayerVideoRe.FindStringSubmatch(html); m != nil {
+			vid = m[1] // authoritative: the player's own videoDetails.videoId
+		} else if m := ytCanonicalRe.FindStringSubmatch(html); m != nil {
+			vid = m[1] // the canonical live watch URL
 		} else if m := ytVideoIDRe.FindStringSubmatch(html); m != nil {
-			vid = m[1] // fallback only when canonical is absent
+			vid = m[1] // last resort — first videoId (may be a recommendation)
 		}
 		if vid != "" {
 			res = map[string]any{"videoId": vid, "isLive": true}
