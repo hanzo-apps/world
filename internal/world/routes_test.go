@@ -37,6 +37,7 @@ func TestRoutesRespond(t *testing.T) {
 		"/v1/world/classify-batch":       true,
 		"/v1/world/classify-event":       true,
 		"/v1/world/country-intel":        true,
+		"/v1/world/analyst":              true,
 		"/v1/world/pizzint/gdelt/batch":  false,
 	}
 
