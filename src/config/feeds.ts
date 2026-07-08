@@ -2,7 +2,7 @@ import type { Feed } from '@/types';
 import { SITE_VARIANT } from './variant';
 
 // Helper to create RSS proxy URL (Vercel)
-const rss = (url: string) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+const rss = (url: string) => `/v1/world/rss-proxy?url=${encodeURIComponent(url)}`;
 
 // Railway proxy for feeds blocked by Vercel IPs (UN News, CISA, etc.)
 // Reuses VITE_WS_RELAY_URL which is already configured for AIS/OpenSky
@@ -559,7 +559,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'Nikkei Asia', url: rss('https://news.google.com/rss/search?q=site:asia.nikkei.com+when:3d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Asahi Shimbun', url: rss('https://www.asahi.com/rss/asahi/newsheadlines.rdf'), lang: 'ja' },
     { name: 'The Hindu', url: rss('https://www.thehindu.com/news/national/feeder/default.rss'), lang: 'en' },
-    { name: 'CNA', url: rss('https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml') },
+    { name: 'CNA', url: rss('https://www.channelnewsasia.com/v1/world/v1/rss-outbound-feed?_format=xml') },
     { name: 'MIIT (China)', url: railwayRss('https://rsshub.app/gov/miit/zcjd'), lang: 'zh' },
     { name: 'MOFCOM (China)', url: railwayRss('https://rsshub.app/gov/mofcom/article/xwfb'), lang: 'zh' },
   ],
@@ -616,7 +616,7 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'VC Insights', url: rss('https://news.google.com/rss/search?q=("venture+capital"+insights+OR+"VC+trends"+OR+"startup+advice")+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Lenny\'s Newsletter', url: rss('https://www.lennysnewsletter.com/feed') },
     { name: 'Stratechery', url: rss('https://stratechery.com/feed/') },
-    { name: 'FwdStart Newsletter', url: '/api/fwdstart' },
+    { name: 'FwdStart Newsletter', url: '/v1/world/fwdstart' },
   ],
   regionalStartups: [
     // Europe

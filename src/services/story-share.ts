@@ -14,7 +14,7 @@ export function generateStoryDeepLink(
   });
   if (score !== undefined) params.set('s', String(score));
   if (level) params.set('l', level);
-  return `/api/story?${params.toString()}`;
+  return `/v1/world/story?${params.toString()}`;
 }
 
 // Parse deep link parameters

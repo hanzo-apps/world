@@ -57,7 +57,7 @@ async function fetchAcledConflictEvents(): Promise<ConflictEvent[]> {
   if (!isFeatureAvailable('acledConflicts')) return [];
 
   return conflictBreaker.execute(async () => {
-    const response = await fetch('/api/acled-conflict', {
+    const response = await fetch('/v1/world/acled-conflict', {
       headers: { Accept: 'application/json' },
     });
 
