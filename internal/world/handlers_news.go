@@ -35,7 +35,7 @@ func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
 	s.cachedJSON(w, key, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		5*time.Minute, 15*time.Minute,
 		func(ctx context.Context) (any, error) {
-			u := "https://api.gdeltproject.org/v1/world/v2/doc/doc?query=" + urlQueryEscape(query) +
+			u := "https://api.gdeltproject.org/api/v2/doc/doc?query=" + urlQueryEscape(query) +
 				"&mode=artlist&maxrecords=" + itoa(maxrecords) + "&format=json&sort=date&timespan=" + urlQueryEscape(timespan)
 			var raw struct {
 				Articles []struct {
@@ -89,13 +89,13 @@ func (s *Server) handleGDELTGeo(w http.ResponseWriter, r *http.Request) {
 	if format == "csv" {
 		ct = "text/csv"
 	}
-	upstream := "https://api.gdeltproject.org/v1/world/v2/geo/geo?query=" + urlQueryEscape(query) +
+	upstream := "https://api.gdeltproject.org/api/v2/geo/geo?query=" + urlQueryEscape(query) +
 		"&format=" + format + "&maxrecords=" + itoa(maxrecords) + "&timespan=" + timespan
 	key := "gdelt-geo:" + query + ":" + format + ":" + itoa(maxrecords) + ":" + timespan
 	s.passthrough(w, key, upstream, ct, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		nil, 5*time.Minute, 15*time.Minute,
 		func(w http.ResponseWriter, err error) {
-			writeError(w, http.StatusBadGateway, "Upstream service unavailable")
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "data": []any{}})
 		})
 }
 
@@ -162,7 +162,7 @@ func (s *Server) handleRSSProxy(w http.ResponseWriter, r *http.Request) {
 			writeBytes(w, http.StatusOK, "application/xml", "public, max-age=300, s-maxage=300, stale-while-revalidate=60", v.([]byte))
 			return
 		}
-		writeError(w, http.StatusBadGateway, "Failed to fetch feed")
+		writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "items": []any{}})
 		return
 	}
 	s.cache.Set(key, body, 5*time.Minute, 15*time.Minute)
@@ -275,7 +275,7 @@ func (s *Server) handleArxiv(w http.ResponseWriter, r *http.Request) {
 	if sortBy == "" {
 		sortBy = "submittedDate"
 	}
-	upstream := "https://export.arxiv.org/v1/world/query?search_query=" + urlQueryEscape("cat:"+category) +
+	upstream := "https://export.arxiv.org/api/query?search_query=" + urlQueryEscape("cat:"+category) +
 		"&start=0&max_results=" + itoa(maxResults) + "&sortBy=" + urlQueryEscape(sortBy) + "&sortOrder=descending"
 	key := "arxiv:" + category + ":" + itoa(maxResults) + ":" + sortBy
 	s.passthrough(w, key, upstream, "application/xml",
@@ -283,7 +283,7 @@ func (s *Server) handleArxiv(w http.ResponseWriter, r *http.Request) {
 		map[string]string{"User-Agent": "Hanzo-World/1.0 (research tracker)"},
 		time.Hour, 3*time.Hour,
 		func(w http.ResponseWriter, err error) {
-			writeError(w, http.StatusBadGateway, "Failed to fetch ArXiv data")
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "entries": []any{}})
 		})
 }
 
@@ -533,7 +533,7 @@ func (s *Server) handleFwdstart(w http.ResponseWriter, r *http.Request) {
 			writeBytes(w, http.StatusOK, "application/xml; charset=utf-8", "public, max-age=1800", v.([]byte))
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, "", map[string]any{"error": "Failed to fetch FwdStart archive", "details": err.Error()})
+		writeJSON(w, http.StatusOK, "", map[string]any{"error": "Failed to fetch FwdStart archive", "details": err.Error()})
 		return
 	}
 	body := buildFwdstartRSS(html)
