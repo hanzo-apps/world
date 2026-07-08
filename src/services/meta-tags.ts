@@ -19,8 +19,8 @@ export function updateMetaTagsForStory(meta: StoryMeta): void {
   // Generate dynamic content
   const title = `${countryName} Intelligence Brief | Hanzo World`;
   const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
-  const storyUrl = `${BASE_URL}/api/story?c=${countryCode}&t=${type}`;
-  let imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
+  const storyUrl = `${BASE_URL}/v1/world/story?c=${countryCode}&t=${type}`;
+  let imageUrl = `${BASE_URL}/v1/world/og-story?c=${countryCode}&t=${type}`;
   if (ciiScore !== undefined) imageUrl += `&s=${ciiScore}`;
   if (ciiLevel) imageUrl += `&l=${ciiLevel}`;
   

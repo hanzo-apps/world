@@ -1,4 +1,4 @@
-// Same-origin by default: the frontend fetches /api/* from whatever host it's
+// Same-origin by default: the frontend fetches /v1/world/* from whatever host it's
 // deployed on (world.hanzo.ai, or any *.hanzo.app fork). No hardcoded upstream —
 // each deployment serves its own backend. Override per-deploy via
 // VITE_REMOTE_API_BASE if a fork points at a shared API host.
@@ -195,7 +195,7 @@ export function installRuntimeFetchPatch(): void {
     const target = getApiTargetFromRequestInput(input);
     const debug = localStorage.getItem('wm-debug-log') === '1';
 
-    if (!target?.startsWith('/api/')) {
+    if (!target?.startsWith('/v1/world/')) {
       if (debug) {
         const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         console.log(`[fetch] passthrough → ${raw.slice(0, 120)}`);

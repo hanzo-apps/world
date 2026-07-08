@@ -3,10 +3,10 @@ import { INTEL_HOTSPOTS } from '@/config';
 import { generateId, createCircuitBreaker } from '@/utils';
 
 // ACLED API - proxied through serverless function (token kept server-side)
-const ACLED_PROXY_URL = '/api/acled';
+const ACLED_PROXY_URL = '/v1/world/acled';
 
 // GDELT GEO 2.0 API - no auth required
-const GDELT_GEO_URL = '/api/gdelt-geo';
+const GDELT_GEO_URL = '/v1/world/gdelt-geo';
 
 const acledBreaker = createCircuitBreaker<SocialUnrestEvent[]>({ name: 'ACLED Protests' });
 const gdeltBreaker = createCircuitBreaker<SocialUnrestEvent[]>({ name: 'GDELT Events' });

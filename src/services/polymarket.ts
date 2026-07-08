@@ -128,7 +128,7 @@ async function polyFetch(endpoint: 'events' | 'markets', params: Record<string, 
 
   // Try Vercel edge function
   try {
-    const resp = await fetch(`/api/polymarket?${proxyQs}`);
+    const resp = await fetch(`/v1/world/polymarket?${proxyQs}`);
     if (resp.ok) {
       const data = await resp.clone().json();
       if (Array.isArray(data) && data.length > 0) return resp;
@@ -136,7 +136,7 @@ async function polyFetch(endpoint: 'events' | 'markets', params: Record<string, 
   } catch { /* local proxy failed */ }
 
   // Final fallback: hit production endpoint directly
-  return fetch(`/api/polymarket?${proxyQs}`);
+  return fetch(`/v1/world/polymarket?${proxyQs}`);
 }
 
 const GEOPOLITICAL_TAGS = [

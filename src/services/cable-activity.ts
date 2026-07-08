@@ -17,7 +17,7 @@ interface NgaWarning {
   authority: string;
 }
 
-const NGA_API_URL = '/api/nga-warnings';
+const NGA_API_URL = '/v1/world/nga-warnings';
 
 const CABLE_KEYWORDS = [
   'CABLE',

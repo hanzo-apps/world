@@ -1,6 +1,6 @@
 // Temporal Anomaly Detection Service
 // Detects when current activity levels deviate from historical baselines
-// Backed by Upstash Redis via /api/temporal-baseline edge function
+// Backed by Upstash Redis via /v1/world/temporal-baseline edge function
 
 export type TemporalEventType =
   | 'military_flights'
@@ -20,7 +20,7 @@ export interface TemporalAnomaly {
   severity: 'medium' | 'high' | 'critical';
 }
 
-const BASELINE_API = '/api/temporal-baseline';
+const BASELINE_API = '/v1/world/temporal-baseline';
 
 const TYPE_LABELS: Record<TemporalEventType, string> = {
   military_flights: 'Military flights',

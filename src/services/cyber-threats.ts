@@ -1,7 +1,7 @@
 import type { CyberThreat, CyberThreatIndicatorType, CyberThreatSeverity, CyberThreatSource, CyberThreatType } from '@/types';
 import { createCircuitBreaker } from '@/utils';
 
-const API_URL = '/api/cyber-threats';
+const API_URL = '/v1/world/cyber-threats';
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 1000;
 const DEFAULT_DAYS = 14;

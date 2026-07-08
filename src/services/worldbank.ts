@@ -44,7 +44,7 @@ export interface IndicatorsResponse {
   defaultCountries: string[];
 }
 
-const API_BASE = '/api/worldbank';
+const API_BASE = '/v1/world/worldbank';
 
 // Railway relay URL for World Bank proxy (World Bank blocks Vercel IPs)
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';

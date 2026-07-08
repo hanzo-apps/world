@@ -6,7 +6,7 @@ const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
 const RAILWAY_SNAPSHOT_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ais/snapshot'
   : '';
-const VERCEL_SNAPSHOT_API = '/api/ais-snapshot';
+const VERCEL_SNAPSHOT_API = '/v1/world/ais-snapshot';
 const LOCAL_SNAPSHOT_FALLBACK = 'http://localhost:3004/ais/snapshot';
 const SNAPSHOT_POLL_INTERVAL_MS = 10 * 1000;
 const SNAPSHOT_STALE_MS = 20 * 1000;
