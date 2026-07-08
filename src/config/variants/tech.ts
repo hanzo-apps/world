@@ -192,6 +192,8 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   hardware: { name: 'Semiconductors & Hardware', enabled: true, priority: 2 },
   cloud: { name: 'Cloud & Infrastructure', enabled: true, priority: 2 },
   dev: { name: 'Developer Community', enabled: true, priority: 2 },
+  sentiment: { name: 'News Sentiment', enabled: true, priority: 2 },
+  'trader-desk': { name: 'Trader Desk', enabled: true, priority: 2 },
   'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },

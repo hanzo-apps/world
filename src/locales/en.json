@@ -102,6 +102,8 @@
     "monitors": "My Monitors",
     "satelliteFires": "Fires",
     "macroSignals": "Market Radar",
+    "sentiment": "News sentiment",
+    "traderDesk": "Trader desk",
     "etfFlows": "BTC ETF Tracker",
     "stablecoins": "Stablecoins",
     "ucdpEvents": "UCDP Conflict Events",
