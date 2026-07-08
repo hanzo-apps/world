@@ -44,6 +44,8 @@ export * from './WeatherPanel';
 export * from './SportsPanel';
 export * from './SpaceWeatherPanel';
 export * from './LanguageSelector';
+export { SentimentPanel } from './SentimentPanel';
+export { TraderDeskPanel } from './TraderDeskPanel';
 export { AiAnalystPanel } from './AiAnalystPanel';
 export { CustomFeedPanel } from './CustomFeedPanel';
 // SaaS / cloud variant panels
