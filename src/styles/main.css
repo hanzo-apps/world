@@ -952,6 +952,14 @@ canvas,
 .panel.resizing {
   cursor: ns-resize;
   user-select: none;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The panel header doubles as the touch drag-grab; stop the browser from
+   scrolling out from under a touch reorder. */
+.panel-header {
+  touch-action: none;
 }
 
 .panel:active {
@@ -962,10 +970,47 @@ canvas,
   display: none;
 }
 
-.panel.dragging {
-  opacity: 0.5;
-  transform: scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+/* Drag: the source panel stays put as the gap that opens where it will land;
+   sibling panels slide into place via a transform FLIP applied inline from JS
+   (see services/panel-drag.ts). */
+.panel-drag-source {
+  opacity: 0.28;
+  pointer-events: none;
+  outline: 2px dashed var(--overlay-heavy);
+  outline-offset: -2px;
+  background: var(--overlay-light);
+  transition: opacity 0.15s ease;
+}
+
+/* The translucent clone that tracks the pointer. */
+.panel-drag-ghost {
+  cursor: grabbing;
+  opacity: 0.92;
+  transform: scale(1.03);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  border-color: var(--accent);
+  will-change: left, top;
+  animation: panelGhostLift 0.16s ease-out;
+}
+
+@keyframes panelGhostLift {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0.92; transform: scale(1.03); }
+}
+
+/* While a drag is in flight: kill selection and let the pointer pass through
+   iframes so drop hit-testing stays accurate. */
+body.panel-drag-active,
+body.panel-drag-active .panel {
+  user-select: none;
+}
+
+body.panel-drag-active {
+  cursor: grabbing;
+}
+
+body.panel-drag-active iframe {
+  pointer-events: none !important;
 }
 
 .panel-header {
