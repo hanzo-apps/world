@@ -59,10 +59,10 @@ interface DlButton { cls: string; href: string; label: string }
 
 function allButtons(): DlButton[] {
   return [
-    { cls: 'mac', href: '/api/download?platform=macos-arm64', label: `\uF8FF ${t('modals.downloadBanner.macSilicon')}` },
-    { cls: 'mac', href: '/api/download?platform=macos-x64', label: `\uF8FF ${t('modals.downloadBanner.macIntel')}` },
-    { cls: 'win', href: '/api/download?platform=windows-exe', label: `\u229E ${t('modals.downloadBanner.windows')}` },
-    { cls: 'linux', href: '/api/download?platform=linux-appimage', label: `\u{1F427} ${t('modals.downloadBanner.linux')}` },
+    { cls: 'mac', href: '/v1/world/download?platform=macos-arm64', label: `\uF8FF ${t('modals.downloadBanner.macSilicon')}` },
+    { cls: 'mac', href: '/v1/world/download?platform=macos-x64', label: `\uF8FF ${t('modals.downloadBanner.macIntel')}` },
+    { cls: 'win', href: '/v1/world/download?platform=windows-exe', label: `\u229E ${t('modals.downloadBanner.windows')}` },
+    { cls: 'linux', href: '/v1/world/download?platform=linux-appimage', label: `\u{1F427} ${t('modals.downloadBanner.linux')}` },
   ];
 }
 

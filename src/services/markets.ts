@@ -196,7 +196,7 @@ export async function fetchStockQuote(
 export async function fetchCrypto(): Promise<CryptoData[]> {
   try {
     const ids = Object.keys(CRYPTO_MAP).join(',');
-    const marketsUrl = `/api/coingecko?ids=${ids}&vs_currencies=usd&endpoint=markets`;
+    const marketsUrl = `/v1/world/coingecko?ids=${ids}&vs_currencies=usd&endpoint=markets`;
     const response = await fetchWithProxy(marketsUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data: CoinGeckoMarketItem[] = await response.json();

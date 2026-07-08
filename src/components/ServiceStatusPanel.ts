@@ -71,7 +71,7 @@ export class ServiceStatusPanel extends Panel {
 
   private async fetchStatus(): Promise<void> {
     try {
-      const res = await fetch('/api/service-status');
+      const res = await fetch('/v1/world/service-status');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data: ServiceStatusResponse = await res.json();

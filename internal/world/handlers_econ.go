@@ -201,7 +201,7 @@ func (s *Server) handleEIA(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, "", map[string]any{"configured": false, "skipped": true, "reason": "EIA_API_KEY not configured"})
 		return
 	}
-	path := trimPrefix(r.URL.Path, "/api/eia")
+	path := trimPrefix(r.URL.Path, "/v1/world/eia")
 	switch path {
 	case "", "/", "/health":
 		writeJSON(w, http.StatusOK, "", map[string]any{"configured": true})

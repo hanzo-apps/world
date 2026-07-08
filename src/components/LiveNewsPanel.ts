@@ -411,7 +411,7 @@ export class LiveNewsPanel extends Panel {
       mute: this.isMuted ? '1' : '0',
     });
     if (origin) params.set('origin', origin);
-    return `/api/youtube/embed?${params.toString()}`;
+    return `/v1/world/youtube/embed?${params.toString()}`;
   }
 
 

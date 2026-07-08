@@ -2,91 +2,91 @@ package world
 
 import "net/http"
 
-// Mount registers every /api/* route on mux. All non-/api routes are handled by
+// Mount registers every /v1/world/* route on mux. All non-/api routes are handled by
 // the static SPA server wired up in cmd/world.
 func (s *Server) Mount(mux *http.ServeMux) {
 	// health / meta
-	mux.HandleFunc("/api/health", s.handleHealth)
-	mux.HandleFunc("/api/version", s.handleVersion)
-	mux.HandleFunc("/api/download", s.handleDownload)
+	mux.HandleFunc("/v1/world/health", s.handleHealth)
+	mux.HandleFunc("/v1/world/version", s.handleVersion)
+	mux.HandleFunc("/v1/world/download", s.handleDownload)
 
 	// conflict
-	mux.HandleFunc("/api/acled", s.handleACLED)
-	mux.HandleFunc("/api/acled-conflict", s.handleACLEDConflict)
-	mux.HandleFunc("/api/ucdp", s.handleUCDP)
-	mux.HandleFunc("/api/ucdp-events", s.handleUCDPEvents)
-	mux.HandleFunc("/api/hapi", s.handleHAPI)
+	mux.HandleFunc("/v1/world/acled", s.handleACLED)
+	mux.HandleFunc("/v1/world/acled-conflict", s.handleACLEDConflict)
+	mux.HandleFunc("/v1/world/ucdp", s.handleUCDP)
+	mux.HandleFunc("/v1/world/ucdp-events", s.handleUCDPEvents)
+	mux.HandleFunc("/v1/world/hapi", s.handleHAPI)
 
 	// markets
-	mux.HandleFunc("/api/coingecko", s.handleCoingecko)
-	mux.HandleFunc("/api/polymarket", s.handlePolymarket)
-	mux.HandleFunc("/api/finnhub", s.handleFinnhub)
-	mux.HandleFunc("/api/yahoo-finance", s.handleYahooFinance)
-	mux.HandleFunc("/api/stock-index", s.handleStockIndex)
-	mux.HandleFunc("/api/stablecoin-markets", s.handleStablecoins)
-	mux.HandleFunc("/api/etf-flows", s.handleETFFlows)
-	mux.HandleFunc("/api/macro-signals", s.handleMacroSignals)
+	mux.HandleFunc("/v1/world/coingecko", s.handleCoingecko)
+	mux.HandleFunc("/v1/world/polymarket", s.handlePolymarket)
+	mux.HandleFunc("/v1/world/finnhub", s.handleFinnhub)
+	mux.HandleFunc("/v1/world/yahoo-finance", s.handleYahooFinance)
+	mux.HandleFunc("/v1/world/stock-index", s.handleStockIndex)
+	mux.HandleFunc("/v1/world/stablecoin-markets", s.handleStablecoins)
+	mux.HandleFunc("/v1/world/etf-flows", s.handleETFFlows)
+	mux.HandleFunc("/v1/world/macro-signals", s.handleMacroSignals)
 
 	// flights / geo / hazards
-	mux.HandleFunc("/api/opensky", s.handleOpenSky)
-	mux.HandleFunc("/api/ais-snapshot", s.handleAISSnapshot)
-	mux.HandleFunc("/api/firms-fires", s.handleFIRMS)
-	mux.HandleFunc("/api/earthquakes", s.handleEarthquakes)
-	mux.HandleFunc("/api/climate-anomalies", s.handleClimate)
-	mux.HandleFunc("/api/wingbits", s.handleWingbits)
-	mux.HandleFunc("/api/wingbits/", s.handleWingbits)
+	mux.HandleFunc("/v1/world/opensky", s.handleOpenSky)
+	mux.HandleFunc("/v1/world/ais-snapshot", s.handleAISSnapshot)
+	mux.HandleFunc("/v1/world/firms-fires", s.handleFIRMS)
+	mux.HandleFunc("/v1/world/earthquakes", s.handleEarthquakes)
+	mux.HandleFunc("/v1/world/climate-anomalies", s.handleClimate)
+	mux.HandleFunc("/v1/world/wingbits", s.handleWingbits)
+	mux.HandleFunc("/v1/world/wingbits/", s.handleWingbits)
 
 	// news / media
-	mux.HandleFunc("/api/gdelt-doc", s.handleGDELTDoc)
-	mux.HandleFunc("/api/gdelt-geo", s.handleGDELTGeo)
-	mux.HandleFunc("/api/rss-proxy", s.handleRSSProxy)
-	mux.HandleFunc("/api/hackernews", s.handleHackerNews)
-	mux.HandleFunc("/api/github-trending", s.handleGitHubTrending)
-	mux.HandleFunc("/api/arxiv", s.handleArxiv)
-	mux.HandleFunc("/api/tech-events", s.handleTechEvents)
-	mux.HandleFunc("/api/fwdstart", s.handleFwdstart)
-	mux.HandleFunc("/api/youtube/live", s.handleYouTubeLive)
-	mux.HandleFunc("/api/youtube/embed", s.handleYouTubeEmbed)
+	mux.HandleFunc("/v1/world/gdelt-doc", s.handleGDELTDoc)
+	mux.HandleFunc("/v1/world/gdelt-geo", s.handleGDELTGeo)
+	mux.HandleFunc("/v1/world/rss-proxy", s.handleRSSProxy)
+	mux.HandleFunc("/v1/world/hackernews", s.handleHackerNews)
+	mux.HandleFunc("/v1/world/github-trending", s.handleGitHubTrending)
+	mux.HandleFunc("/v1/world/arxiv", s.handleArxiv)
+	mux.HandleFunc("/v1/world/tech-events", s.handleTechEvents)
+	mux.HandleFunc("/v1/world/fwdstart", s.handleFwdstart)
+	mux.HandleFunc("/v1/world/youtube/live", s.handleYouTubeLive)
+	mux.HandleFunc("/v1/world/youtube/embed", s.handleYouTubeEmbed)
 
 	// econ / humanitarian
-	mux.HandleFunc("/api/fred-data", s.handleFRED)
-	mux.HandleFunc("/api/worldbank", s.handleWorldBank)
-	mux.HandleFunc("/api/eia", s.handleEIA)
-	mux.HandleFunc("/api/eia/", s.handleEIA)
-	mux.HandleFunc("/api/unhcr-population", s.handleUNHCR)
-	mux.HandleFunc("/api/worldpop-exposure", s.handleWorldPop)
+	mux.HandleFunc("/v1/world/fred-data", s.handleFRED)
+	mux.HandleFunc("/v1/world/worldbank", s.handleWorldBank)
+	mux.HandleFunc("/v1/world/eia", s.handleEIA)
+	mux.HandleFunc("/v1/world/eia/", s.handleEIA)
+	mux.HandleFunc("/v1/world/unhcr-population", s.handleUNHCR)
+	mux.HandleFunc("/v1/world/worldpop-exposure", s.handleWorldPop)
 
 	// infrastructure / status
-	mux.HandleFunc("/api/cyber-threats", s.handleCyberThreats)
-	mux.HandleFunc("/api/cloudflare-outages", s.handleCloudflareOutages)
-	mux.HandleFunc("/api/faa-status", s.handleFAAStatus)
-	mux.HandleFunc("/api/nga-warnings", s.handleNGAWarnings)
-	mux.HandleFunc("/api/service-status", s.handleServiceStatus)
-	mux.HandleFunc("/api/pizzint/dashboard-data", s.handlePizzintDashboard)
-	mux.HandleFunc("/api/pizzint/gdelt/batch", s.handlePizzintGdeltBatch)
+	mux.HandleFunc("/v1/world/cyber-threats", s.handleCyberThreats)
+	mux.HandleFunc("/v1/world/cloudflare-outages", s.handleCloudflareOutages)
+	mux.HandleFunc("/v1/world/faa-status", s.handleFAAStatus)
+	mux.HandleFunc("/v1/world/nga-warnings", s.handleNGAWarnings)
+	mux.HandleFunc("/v1/world/service-status", s.handleServiceStatus)
+	mux.HandleFunc("/v1/world/pizzint/dashboard-data", s.handlePizzintDashboard)
+	mux.HandleFunc("/v1/world/pizzint/gdelt/batch", s.handlePizzintGdeltBatch)
 
 	// computed intelligence
-	mux.HandleFunc("/api/risk-scores", s.handleRiskScores)
-	mux.HandleFunc("/api/theater-posture", s.handleTheaterPosture)
-	mux.HandleFunc("/api/temporal-baseline", s.handleTemporalBaseline)
+	mux.HandleFunc("/v1/world/risk-scores", s.handleRiskScores)
+	mux.HandleFunc("/v1/world/theater-posture", s.handleTheaterPosture)
+	mux.HandleFunc("/v1/world/temporal-baseline", s.handleTemporalBaseline)
 
 	// AI (Hanzo inference)
-	mux.HandleFunc("/api/groq-summarize", s.handleSummarize)
-	mux.HandleFunc("/api/openrouter-summarize", s.handleSummarize)
-	mux.HandleFunc("/api/classify-batch", s.handleClassifyBatch)
-	mux.HandleFunc("/api/classify-event", s.handleClassifyEvent)
-	mux.HandleFunc("/api/country-intel", s.handleCountryIntel)
+	mux.HandleFunc("/v1/world/groq-summarize", s.handleSummarize)
+	mux.HandleFunc("/v1/world/openrouter-summarize", s.handleSummarize)
+	mux.HandleFunc("/v1/world/classify-batch", s.handleClassifyBatch)
+	mux.HandleFunc("/v1/world/classify-event", s.handleClassifyEvent)
+	mux.HandleFunc("/v1/world/country-intel", s.handleCountryIntel)
 
 	// social share (OpenGraph)
-	mux.HandleFunc("/api/story", s.handleStory)
-	mux.HandleFunc("/api/og-story", s.handleOGStory)
+	mux.HandleFunc("/v1/world/story", s.handleStory)
+	mux.HandleFunc("/v1/world/og-story", s.handleOGStory)
 
-	// Catch-all for any unregistered /api/* path: a JSON 404, never the SPA
+	// Catch-all for any unregistered /v1/world/* path: a JSON 404, never the SPA
 	// shell. Exact and subtree routes above are longer prefixes and win.
-	mux.HandleFunc("/api/", s.handleAPINotFound)
+	mux.HandleFunc("/v1/world/", s.handleAPINotFound)
 }
 
-// handleAPINotFound answers unmatched /api/* paths with a JSON 404 so a bad
+// handleAPINotFound answers unmatched /v1/world/* paths with a JSON 404 so a bad
 // endpoint is visible rather than masked by the static index.html.
 func (s *Server) handleAPINotFound(w http.ResponseWriter, r *http.Request) {
 	setCORS(w, "GET, POST, OPTIONS")

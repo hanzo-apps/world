@@ -18,7 +18,7 @@ const countriesBreaker = createCircuitBreaker<CountriesResponse>({ name: 'WorldP
 
 export async function fetchCountryPopulations(): Promise<CountryPopulation[]> {
   const result = await countriesBreaker.execute(async () => {
-    const response = await fetch('/api/worldpop-exposure?mode=countries', {
+    const response = await fetch('/v1/world/worldpop-exposure?mode=countries', {
       headers: { Accept: 'application/json' },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -31,7 +31,7 @@ export async function fetchCountryPopulations(): Promise<CountryPopulation[]> {
 export async function fetchExposure(lat: number, lon: number, radiusKm: number): Promise<ExposureResponse | null> {
   try {
     const response = await fetch(
-      `/api/worldpop-exposure?mode=exposure&lat=${lat}&lon=${lon}&radius=${radiusKm}`,
+      `/v1/world/worldpop-exposure?mode=exposure&lat=${lat}&lon=${lon}&radius=${radiusKm}`,
       { headers: { Accept: 'application/json' } }
     );
     if (!response.ok) return null;

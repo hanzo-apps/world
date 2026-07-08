@@ -40,7 +40,7 @@ export interface OilAnalytics {
 // PET.WCRFPUS2.W - US Crude Oil Production (Weekly)
 // PET.WCESTUS1.W - US Crude Oil Inventory (Weekly)
 
-const EIA_PROXY_URL = '/api/eia';
+const EIA_PROXY_URL = '/v1/world/eia';
 
 // Cache for API responses
 let cachedData: OilAnalytics | null = null;

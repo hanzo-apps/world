@@ -12,7 +12,7 @@ const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
 const RAILWAY_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ucdp-events'
   : '';
-const VERCEL_URL = '/api/ucdp-events';
+const VERCEL_URL = '/v1/world/ucdp-events';
 
 const breaker = createCircuitBreaker<UcdpEventsResponse>({ name: 'UCDP Events' });
 

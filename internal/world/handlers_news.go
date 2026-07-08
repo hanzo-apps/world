@@ -35,7 +35,7 @@ func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
 	s.cachedJSON(w, key, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
 		5*time.Minute, 15*time.Minute,
 		func(ctx context.Context) (any, error) {
-			u := "https://api.gdeltproject.org/api/v2/doc/doc?query=" + urlQueryEscape(query) +
+			u := "https://api.gdeltproject.org/v1/world/v2/doc/doc?query=" + urlQueryEscape(query) +
 				"&mode=artlist&maxrecords=" + itoa(maxrecords) + "&format=json&sort=date&timespan=" + urlQueryEscape(timespan)
 			var raw struct {
 				Articles []struct {
@@ -89,7 +89,7 @@ func (s *Server) handleGDELTGeo(w http.ResponseWriter, r *http.Request) {
 	if format == "csv" {
 		ct = "text/csv"
 	}
-	upstream := "https://api.gdeltproject.org/api/v2/geo/geo?query=" + urlQueryEscape(query) +
+	upstream := "https://api.gdeltproject.org/v1/world/v2/geo/geo?query=" + urlQueryEscape(query) +
 		"&format=" + format + "&maxrecords=" + itoa(maxrecords) + "&timespan=" + timespan
 	key := "gdelt-geo:" + query + ":" + format + ":" + itoa(maxrecords) + ":" + timespan
 	s.passthrough(w, key, upstream, ct, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
@@ -275,7 +275,7 @@ func (s *Server) handleArxiv(w http.ResponseWriter, r *http.Request) {
 	if sortBy == "" {
 		sortBy = "submittedDate"
 	}
-	upstream := "https://export.arxiv.org/api/query?search_query=" + urlQueryEscape("cat:"+category) +
+	upstream := "https://export.arxiv.org/v1/world/query?search_query=" + urlQueryEscape("cat:"+category) +
 		"&start=0&max_results=" + itoa(maxResults) + "&sortBy=" + urlQueryEscape(sortBy) + "&sortOrder=descending"
 	key := "arxiv:" + category + ":" + itoa(maxResults) + ":" + sortBy
 	s.passthrough(w, key, upstream, "application/xml",
@@ -576,7 +576,7 @@ func buildFwdstartRSS(html string) []byte {
 	b.WriteString(`<title>FwdStart Newsletter</title>`)
 	b.WriteString(`<link>https://www.fwdstart.me</link>`)
 	b.WriteString(`<description>FwdStart newsletter archive</description>`)
-	b.WriteString(`<atom:link href="https://world.hanzo.ai/api/fwdstart" rel="self" type="application/rss+xml"/>`)
+	b.WriteString(`<atom:link href="https://world.hanzo.ai/v1/world/fwdstart" rel="self" type="application/rss+xml"/>`)
 	for _, it := range items {
 		b.WriteString(`<item>`)
 		b.WriteString(`<title><![CDATA[` + it.title + `]]></title>`)

@@ -38,7 +38,7 @@ const FRED_SERIES: FredConfig[] = [
   { id: 'VIXCLS', name: 'VIX', unit: '', precision: 2 },
 ];
 
-const FRED_API_BASE = '/api/fred-data';
+const FRED_API_BASE = '/v1/world/fred-data';
 const breaker = createCircuitBreaker<FredSeries[]>({ name: 'FRED Economic' });
 
 async function fetchSeriesData(seriesId: string): Promise<{ date: string; value: number }[]> {

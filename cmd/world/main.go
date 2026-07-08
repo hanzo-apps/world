@@ -1,9 +1,9 @@
 // Command world is the single process baked into the world image. It serves
 // BOTH the static Vite SPA (world.hanzo.ai and every *.hanzo.app fork) and the
-// same-origin /api/* data + live-video backend the SPA fetches.
+// same-origin /v1/world/* data + live-video backend the SPA fetches.
 //
 // One binary, two responsibilities kept orthogonal:
-//   - /api/*      → the Go data backend (internal/world), each endpoint a
+//   - /v1/world/*      → the Go data backend (internal/world), each endpoint a
 //                   faithful port of the original edge function.
 //   - everything  → static files from --root, with SPA fallback to index.html
 //     else          for client-routed paths (never for /api or asset misses).
@@ -37,7 +37,7 @@ func main() {
 
 	srv := world.NewServer()
 	mux := http.NewServeMux()
-	srv.Mount(mux) // /api/* routes
+	srv.Mount(mux) // /v1/world/* routes
 
 	// Static SPA + fallback handles everything not matched by an /api route.
 	mux.Handle("/", newSPAHandler(*root))
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("world: serving SPA from %q and /api/* on %s", *root, *addr)
+		log.Printf("world: serving SPA from %q and /v1/world/* on %s", *root, *addr)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("world: server error: %v", err)
 		}
@@ -148,7 +148,7 @@ func hasExt(rel string) bool {
 
 func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") {
+		if strings.HasPrefix(r.URL.Path, "/v1/world/") {
 			start := time.Now()
 			next.ServeHTTP(w, r)
 			log.Printf("api %s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))

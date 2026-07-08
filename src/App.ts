@@ -693,7 +693,7 @@ export class App {
     const shareUrl = this.getShareUrl();
     if (shareUrl) history.replaceState(null, '', shareUrl);
 
-    const stockPromise = fetch(`/api/stock-index?code=${encodeURIComponent(code)}`)
+    const stockPromise = fetch(`/v1/world/stock-index?code=${encodeURIComponent(code)}`)
       .then((r) => r.json())
       .catch(() => ({ available: false }));
 
@@ -766,7 +766,7 @@ export class App {
 
       let data: Record<string, unknown> | null = null;
       try {
-        const res = await fetch('/api/country-intel', {
+        const res = await fetch('/v1/world/country-intel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ country, code, context }),
@@ -3370,7 +3370,7 @@ export class App {
     }
 
     try {
-      const res = await fetch('/api/tech-events?type=conference&mappable=true&days=90&limit=50');
+      const res = await fetch('/v1/world/tech-events?type=conference&mappable=true&days=90&limit=50');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();

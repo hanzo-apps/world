@@ -17,7 +17,7 @@ const breaker = createCircuitBreaker<ClimateResponse>({ name: 'Climate Anomalies
 
 export async function fetchClimateAnomalies(): Promise<ClimateFetchResult> {
   const result = await breaker.execute(async () => {
-    const response = await fetch('/api/climate-anomalies', {
+    const response = await fetch('/v1/world/climate-anomalies', {
       headers: { Accept: 'application/json' },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

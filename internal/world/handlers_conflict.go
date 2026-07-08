@@ -19,7 +19,7 @@ func (s *Server) fetchACLED(ctx context.Context, token, eventType string) (any, 
 	var raw struct {
 		Data []map[string]any `json:"data"`
 	}
-	b, status, err := s.get(ctx, "https://acleddata.com/api/acled/read?"+params, map[string]string{
+	b, status, err := s.get(ctx, "https://acleddata.com/v1/world/acled/read?"+params, map[string]string{
 		"Accept":        "application/json",
 		"Authorization": "Bearer " + token,
 	})
@@ -109,7 +109,7 @@ func (s *Server) handleUCDP(w http.ResponseWriter, r *http.Request) {
 					TotalPages int              `json:"TotalPages"`
 					Result     []map[string]any `json:"Result"`
 				}
-				b, status, err := s.get(ctx, "https://ucdpapi.pcr.uu.se/api/ucdpprioconflict/24.1?pagesize=100&page="+itoa(page), nil)
+				b, status, err := s.get(ctx, "https://ucdpapi.pcr.uu.se/v1/world/ucdpprioconflict/24.1?pagesize=100&page="+itoa(page), nil)
 				if err != nil {
 					return nil, err
 				}
@@ -182,7 +182,7 @@ func (s *Server) fetchUCDPEvents(ctx context.Context) (any, error) {
 
 	fetchPage := func(version string, page int) (map[string]any, error) {
 		var pg map[string]any
-		b, status, err := s.get(ctx, "https://ucdpapi.pcr.uu.se/api/gedevents/"+version+"?pagesize="+itoa(pageSize)+"&page="+itoa(page), nil)
+		b, status, err := s.get(ctx, "https://ucdpapi.pcr.uu.se/v1/world/gedevents/"+version+"?pagesize="+itoa(pageSize)+"&page="+itoa(page), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +316,7 @@ func (s *Server) handleHAPI(w http.ResponseWriter, r *http.Request) {
 			var raw struct {
 				Data []map[string]any `json:"data"`
 			}
-			b, status, err := s.get(ctx, "https://hapi.humdata.org/api/v2/coordination-context/conflict-events?output_format=json&limit=1000&offset=0&app_identifier="+appID, nil)
+			b, status, err := s.get(ctx, "https://hapi.humdata.org/v1/world/v2/coordination-context/conflict-events?output_format=json&limit=1000&offset=0&app_identifier="+appID, nil)
 			if err != nil {
 				return nil, err
 			}

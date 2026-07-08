@@ -58,7 +58,7 @@ func (s *Server) handleStory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := "https://" + firstNonEmpty(r.Host, "world.hanzo.ai")
-	ogImage := base + "/api/og-story?c=" + urlQueryEscape(code) + "&t=" + urlQueryEscape(typ)
+	ogImage := base + "/v1/world/og-story?c=" + urlQueryEscape(code) + "&t=" + urlQueryEscape(typ)
 	if scoreP != "" {
 		ogImage += "&s=" + urlQueryEscape(scoreP)
 	}

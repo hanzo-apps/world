@@ -64,7 +64,7 @@ export async function fetchCachedRiskScores(): Promise<CachedRiskScores | null> 
 
   fetchPromise = (async () => {
     try {
-      const response = await fetch('/api/risk-scores');
+      const response = await fetch('/v1/world/risk-scores');
       if (!response.ok) {
         console.warn('[CachedRiskScores] API error:', response.status);
         return cachedScores ?? await loadPersistentRiskScores();

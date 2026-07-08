@@ -19,7 +19,7 @@ import { isFeatureAvailable } from './runtime-config';
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
 const OPENSKY_BASE_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/opensky'
-  : '/api/opensky'; // Fallback to Vercel proxy for dev
+  : '/v1/world/opensky'; // Fallback to Vercel proxy for dev
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes - match refresh interval

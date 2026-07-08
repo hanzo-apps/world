@@ -2,7 +2,7 @@ import type { InternetOutage } from '@/types';
 import { createCircuitBreaker } from '@/utils';
 import { isFeatureAvailable } from './runtime-config';
 
-const CLOUDFLARE_API_URL = '/api/cloudflare-outages';
+const CLOUDFLARE_API_URL = '/v1/world/cloudflare-outages';
 const breaker = createCircuitBreaker<InternetOutage[]>({ name: 'Cloudflare Outages' });
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
