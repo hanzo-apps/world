@@ -44,3 +44,5 @@ export * from './WeatherPanel';
 export * from './SportsPanel';
 export * from './SpaceWeatherPanel';
 export * from './LanguageSelector';
+export { AiAnalystPanel } from './AiAnalystPanel';
+export { CustomFeedPanel } from './CustomFeedPanel';
