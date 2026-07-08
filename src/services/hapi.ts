@@ -24,7 +24,7 @@ const hapiBreaker = createCircuitBreaker<Map<string, HapiConflictSummary>>({ nam
 
 export async function fetchHapiSummary(): Promise<Map<string, HapiConflictSummary>> {
   return hapiBreaker.execute(async () => {
-    const response = await fetch('/api/hapi', {
+    const response = await fetch('/v1/world/hapi', {
       headers: { Accept: 'application/json' },
     });
 

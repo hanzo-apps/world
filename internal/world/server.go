@@ -1,6 +1,6 @@
 // Package world is the self-contained data backend baked into the world image.
 //
-// It serves the same-origin /api/* endpoints the SPA fetches (world.hanzo.ai
+// It serves the same-origin /v1/world/* endpoints the SPA fetches (world.hanzo.ai
 // and any *.hanzo.app fork), each a faithful Go port of the original edge
 // function: fetch the real upstream, transform to the shape the frontend
 // expects, cache briefly in-memory, and degrade cleanly (never 5xx) when an

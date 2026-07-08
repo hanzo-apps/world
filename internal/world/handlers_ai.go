@@ -23,7 +23,7 @@ var validCategories = map[string]bool{
 
 // ── Summarize (groq/openrouter → Hanzo inference) ────────────────────────────
 
-// handleSummarize backs both /api/groq-summarize and /api/openrouter-summarize,
+// handleSummarize backs both /v1/world/groq-summarize and /v1/world/openrouter-summarize,
 // routed to Hanzo's own inference instead of a third-party LLM. Ported from
 // api/groq-summarize.js + api/openrouter-summarize.js.
 func (s *Server) handleSummarize(w http.ResponseWriter, r *http.Request) {

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// releasesRepo is the GitHub repo whose latest release backs /api/version and
-// /api/download. Defaults to the Hanzo world repo (the old upstream repo is
+// releasesRepo is the GitHub repo whose latest release backs /v1/world/version and
+// /v1/world/download. Defaults to the Hanzo world repo (the old upstream repo is
 // never referenced). Override with WORLD_RELEASES_REPO=owner/name.
 func releasesRepo() string {
 	if v := env("WORLD_RELEASES_REPO"); v != "" {
