@@ -120,7 +120,9 @@ export class IntelligenceFindingsBadge {
   }
 
   public static getStoredEnabledState(): boolean {
-    return localStorage.getItem(STORAGE_KEY) !== 'hidden';
+    // Default OFF: the intelligence-finding modal must never auto-pop over the
+    // dashboard on load. It's opt-in — the user turns it on from the badge.
+    return localStorage.getItem(STORAGE_KEY) === 'shown';
   }
 
   public isEnabled(): boolean {
@@ -132,14 +134,14 @@ export class IntelligenceFindingsBadge {
     this.enabled = enabled;
 
     if (enabled) {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_KEY, 'shown');
       document.addEventListener('click', this.boundCloseDropdown);
       this.mount();
       this.initAudio();
       this.update();
       this.startRefresh();
     } else {
-      localStorage.setItem(STORAGE_KEY, 'hidden');
+      localStorage.removeItem(STORAGE_KEY);
       document.removeEventListener('click', this.boundCloseDropdown);
       if (this.refreshInterval) {
         clearInterval(this.refreshInterval);
