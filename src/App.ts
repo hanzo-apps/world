@@ -44,6 +44,7 @@ import type { ParsedMapUrlState } from '@/utils';
 import {
   MapContainer,
   type MapView,
+  type MapProjectionMode,
   type TimeRange,
   NewsPanel,
   MarketPanel,
@@ -136,6 +137,7 @@ export interface CountryBriefSignals {
 export class App {
   private container: HTMLElement;
   private readonly PANEL_ORDER_KEY = 'panel-order';
+  private readonly MAP_MODE_STORAGE_KEY = 'hanzo-world-map-mode';
   private map: MapContainer | null = null;
   private panels: Record<string, Panel> = {};
   private newsPanels: Record<string, NewsPanel> = {};
@@ -1884,6 +1886,7 @@ export class App {
       view: this.isMobile ? 'mena' : 'global',
       layers: this.mapLayers,
       timeRange: '7d',
+      mode: this.resolveInitialMapMode(),
     });
 
     // Initialize escalation service with data getters
@@ -2242,6 +2245,13 @@ export class App {
     this.applyPanelSettings();
     this.applyInitialUrlState();
 
+  }
+
+  // Initial 2D/3D map mode: URL (?mode=3d) wins, then persisted preference,
+  // then default flat map.
+  private resolveInitialMapMode(): MapProjectionMode {
+    if (this.initialUrlState?.mode) return this.initialUrlState.mode;
+    return localStorage.getItem(this.MAP_MODE_STORAGE_KEY) === '3d' ? '3d' : '2d';
   }
 
   private applyInitialUrlState(): void {
@@ -2732,6 +2742,10 @@ export class App {
         if (regionSelect.value !== state.view) {
           regionSelect.value = state.view;
         }
+        // Persist 2D/3D choice across sessions.
+        if (state.mode) {
+          localStorage.setItem(this.MAP_MODE_STORAGE_KEY, state.mode);
+        }
       }
     });
     update();
@@ -2749,6 +2763,7 @@ export class App {
       timeRange: state.timeRange,
       layers: state.layers,
       country: this.countryBriefPage?.isVisible() ? (this.countryBriefPage.getCode() ?? undefined) : undefined,
+      mode: state.mode,
     });
   }
 
