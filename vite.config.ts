@@ -90,6 +90,25 @@ const VARIANT_META: Record<string, {
       'Market radar signals',
     ],
   },
+  saas: {
+    title: 'Hanzo Cloud - Live SaaS Platform Metrics & Usage',
+    description: 'Live Hanzo Cloud metrics: platform requests, models served, fleet nodes and GPUs across regions, plus your org usage and bill drill-down.',
+    keywords: 'hanzo cloud, saas metrics, ai inference, model usage, gpu fleet, cloud regions, request volume, usage dashboard, billing, api.hanzo.ai',
+    url: 'https://world.hanzo.ai/?variant=saas',
+    siteName: 'Hanzo Cloud',
+    shortName: 'HanzoCloud',
+    subject: 'Hanzo Cloud Platform Metrics and Org Usage',
+    classification: 'Cloud Dashboard, SaaS Metrics, AI Infrastructure',
+    categories: ['business', 'productivity'],
+    features: [
+      'Platform request volume',
+      'Models served',
+      'Fleet nodes & GPUs',
+      'Region mapping',
+      'Live request-rate ticker',
+      'Org usage & bill drill-down',
+    ],
+  },
 };
 
 const activeVariant = process.env.VITE_VARIANT || 'full';
