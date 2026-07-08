@@ -33,10 +33,10 @@ func (s *Server) handleCoingecko(w http.ResponseWriter, r *http.Request) {
 	}
 	var upstream string
 	if q.Get("endpoint") == "markets" {
-		upstream = "https://api.coingecko.com/v1/world/v3/coins/markets?vs_currency=" + vs +
+		upstream = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=" + vs +
 			"&ids=" + ids + "&order=market_cap_desc&sparkline=true&price_change_percentage=24h"
 	} else {
-		upstream = "https://api.coingecko.com/v1/world/v3/simple/price?ids=" + ids +
+		upstream = "https://api.coingecko.com/api/v3/simple/price?ids=" + ids +
 			"&vs_currencies=" + vs + "&include_24hr_change=" + inc
 	}
 	key := "coingecko:" + ids + ":" + vs + ":" + inc + ":" + q.Get("endpoint")
@@ -218,7 +218,7 @@ func (s *Server) finnhubQuote(ctx context.Context, sym, key string) map[string]a
 		C, D, Dp, H, L, O, Pc float64
 		T                     int64
 	}
-	if err := s.getJSON(ctx, "https://finnhub.io/v1/world/v1/quote?symbol="+urlQueryEscape(sym)+"&token="+key, nil, &d); err != nil {
+	if err := s.getJSON(ctx, "https://finnhub.io/api/v1/quote?symbol="+urlQueryEscape(sym)+"&token="+key, nil, &d); err != nil {
 		return map[string]any{"symbol": sym, "error": err.Error()}
 	}
 	if d.C == 0 && d.H == 0 && d.L == 0 {
@@ -404,7 +404,7 @@ func (s *Server) handleStablecoins(w http.ResponseWriter, r *http.Request) {
 		"public, s-maxage=120, stale-while-revalidate=300", 2*time.Minute, 10*time.Minute,
 		func(ctx context.Context) (any, error) {
 			var data []map[string]any
-			url := "https://api.coingecko.com/v1/world/v3/coins/markets?vs_currency=usd&ids=" + coins +
+			url := "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=" + coins +
 				"&order=market_cap_desc&sparkline=false&price_change_percentage=7d"
 			if err := s.getJSON(ctx, url, map[string]string{"Accept": "application/json"}, &data); err != nil {
 				return nil, err

@@ -27,7 +27,7 @@ func (s *Server) handleOpenSky(w http.ResponseWriter, r *http.Request) {
 			parts = append(parts, k+"="+urlQueryEscape(v))
 		}
 	}
-	upstream := "https://opensky-network.org/v1/world/states/all"
+	upstream := "https://opensky-network.org/api/states/all"
 	if len(parts) > 0 {
 		upstream += "?" + strings.Join(parts, "&")
 	}
@@ -109,7 +109,7 @@ func (s *Server) handleFIRMS(w http.ResponseWriter, r *http.Request) {
 				wg.Add(1)
 				go func(name, bbox string) {
 					defer wg.Done()
-					u := fmt.Sprintf("https://firms.modaps.eosdis.nasa.gov/v1/world/area/csv/%s/%s/%s/%d", key, firmsSource, bbox, days)
+					u := fmt.Sprintf("https://firms.modaps.eosdis.nasa.gov/api/area/csv/%s/%s/%s/%d", key, firmsSource, bbox, days)
 					csv, err := s.getText(ctx, u, map[string]string{"Accept": "text/csv"})
 					if err != nil {
 						return
@@ -343,7 +343,7 @@ func (s *Server) handleAISSnapshot(w http.ResponseWriter, r *http.Request) {
 			return snap, nil
 		},
 		func(w http.ResponseWriter, err error) {
-			writeJSON(w, http.StatusBadGateway, "", map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error()})
 		})
 }
 
