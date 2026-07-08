@@ -1,5 +1,6 @@
 import type { MapLayers } from '@/types';
 import type { MapView, TimeRange } from '@/components/Map';
+import type { MapProjectionMode } from '@/components/MapContainer';
 
 const LAYER_KEYS: (keyof MapLayers)[] = [
   'conflicts',
@@ -45,6 +46,7 @@ export interface ParsedMapUrlState {
   timeRange?: TimeRange;
   layers?: MapLayers;
   country?: string;
+  mode?: MapProjectionMode;
 }
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -78,6 +80,10 @@ export function parseMapUrlState(
   const countryParam = params.get('country');
   const country = countryParam && /^[A-Z]{2}$/i.test(countryParam.trim()) ? countryParam.trim().toUpperCase() : undefined;
 
+  const modeParam = params.get('mode');
+  const mode: MapProjectionMode | undefined =
+    modeParam === '3d' ? '3d' : modeParam === '2d' ? '2d' : undefined;
+
   const layersParam = params.get('layers');
   let layers: MapLayers | undefined;
   if (layersParam !== null) {
@@ -108,6 +114,7 @@ export function parseMapUrlState(
     timeRange,
     layers,
     country,
+    mode,
   };
 }
 
@@ -120,6 +127,7 @@ export function buildMapUrl(
     timeRange: TimeRange;
     layers: MapLayers;
     country?: string;
+    mode?: MapProjectionMode;
   }
 ): string {
   const url = new URL(baseUrl);
@@ -139,6 +147,11 @@ export function buildMapUrl(
 
   if (state.country) {
     params.set('country', state.country);
+  }
+
+  // Only emit mode when in globe (3D) — keeps default 2D share URLs clean.
+  if (state.mode === '3d') {
+    params.set('mode', '3d');
   }
 
   url.search = params.toString();

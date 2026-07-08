@@ -87,6 +87,10 @@ import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+// Projection mode: '2d' = flat Mercator map, '3d' = spinnable globe.
+// deck.gl's MapboxOverlay derives its view (MapView vs _GlobeView) from
+// maplibre's projection each render cycle, so all lat/lon layers are shared.
+export type MapProjectionMode = '2d' | '3d';
 type MapInteractionMode = 'flat' | '3d';
 
 export interface CountryClickPayload {
@@ -102,7 +106,11 @@ interface DeckMapState {
   view: DeckMapView;
   layers: MapLayers;
   timeRange: TimeRange;
+  mode: MapProjectionMode;
 }
+
+// Callers may omit `mode` (defaults to '2d'); everything internal treats it as required.
+type DeckMapInitialState = Omit<DeckMapState, 'mode'> & { mode?: MapProjectionMode };
 
 interface HotspotWithBreaking extends Hotspot {
   hasBreaking?: boolean;
@@ -318,9 +326,18 @@ export class DeckGLMap {
   private rafUpdateLayers: () => void;
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(container: HTMLElement, initialState: DeckMapState) {
+  // Globe auto-rotate (3D idle spin)
+  private static readonly AUTO_ROTATE_DEG_PER_SEC = 4;
+  private static readonly AUTO_ROTATE_IDLE_MS = 5000;
+  private static readonly AUTO_ROTATE_MIN_FRAME_MS = 33; // ~30fps cap
+  private autoRotateRafId: number | null = null;
+  private autoRotateIdleTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoRotateLastTs = 0;
+  private userInteracting = false;
+
+  constructor(container: HTMLElement, initialState: DeckMapInitialState) {
     this.container = container;
-    this.state = initialState;
+    this.state = { ...initialState, mode: initialState.mode ?? '2d' };
     this.hotspots = [...INTEL_HOTSPOTS];
 
     this.rebuildTechHQSupercluster();
@@ -352,12 +369,15 @@ export class DeckGLMap {
     this.maplibreMap?.on('load', () => {
       this.initDeck();
       this.loadCountryBoundaries();
+      this.applyProjection();
       this.render();
+      this.maybeStartAutoRotate();
     });
 
     this.setupResizeObserver();
 
     this.createControls();
+    this.createProjectionToggle();
     this.createTimeSlider();
     this.createLayerToggles();
     this.createLegend();
@@ -411,6 +431,11 @@ export class DeckGLMap {
       console.info('[DeckGLMap] WebGL context restored');
       this.maplibreMap?.triggerRepaint();
     });
+
+    // Any direct manipulation pauses the idle globe spin; it resumes after a quiet period.
+    canvas.addEventListener('mousedown', this.onUserInteract, { passive: true });
+    canvas.addEventListener('wheel', this.onUserInteract, { passive: true });
+    canvas.addEventListener('touchstart', this.onUserInteract, { passive: true });
   }
 
   private initDeck(): void {
@@ -1116,9 +1141,12 @@ export class DeckGLMap {
       layers.push(this.createDisplacementArcsLayer());
     }
 
-    // Climate anomalies heatmap layer
+    // Climate anomalies — HeatmapLayer is screen-space and unsupported on the
+    // globe, so 3D substitutes a graduated-radius scatter that reads the same.
     if (mapLayers.climate && this.climateAnomalies.length > 0) {
-      layers.push(this.createClimateHeatmapLayer());
+      layers.push(this.state.mode === '3d'
+        ? this.createClimateAnomalyPointsLayer()
+        : this.createClimateHeatmapLayer());
     }
 
     // Tech variant layers (Supercluster-based deck.gl layers for HQs and events)
@@ -3093,10 +3121,12 @@ export class DeckGLMap {
     this.renderPaused = paused;
     if (paused) {
       this.stopPulseAnimation();
+      this.stopAutoRotate();
       return;
     }
 
     this.syncPulseAnimation();
+    this.maybeStartAutoRotate();
     if (!paused && this.renderPending) {
       this.renderPending = false;
       this.render();
@@ -3131,6 +3161,134 @@ export class DeckGLMap {
     if (viewSelect) viewSelect.value = view;
 
     this.onStateChange?.(this.state);
+  }
+
+  // ---- Projection mode (2D map <-> 3D globe) --------------------------------
+
+  public getProjectionMode(): MapProjectionMode {
+    return this.state.mode;
+  }
+
+  public setProjectionMode(mode: MapProjectionMode): void {
+    if (this.state.mode === mode) return;
+    this.state.mode = mode;
+    this.applyProjection();
+    this.updateProjectionToggle();
+    this.render(); // rebuild layers (climate heatmap <-> globe-safe scatter)
+    if (mode === '3d') {
+      this.maybeStartAutoRotate();
+    } else {
+      this.stopAutoRotate();
+    }
+    this.onStateChange?.(this.state);
+  }
+
+  // Sync maplibre's projection to the current mode. deck.gl's MapboxOverlay
+  // re-derives MapView vs _GlobeView from map.getProjection() every frame, so
+  // all overlay layers follow automatically — no separate Deck instance.
+  private applyProjection(): void {
+    if (!this.maplibreMap) return;
+    const type = this.state.mode === '3d' ? 'globe' : 'mercator';
+    const current = this.maplibreMap.getProjection?.()?.type;
+    if (current === type) return;
+    this.maplibreMap.setProjection({ type });
+    this.maplibreMap.triggerRepaint();
+  }
+
+  private createProjectionToggle(): void {
+    const toggle = document.createElement('div');
+    toggle.className = 'deckgl-projection-toggle';
+    toggle.innerHTML = `
+      <button class="proj-btn ${this.state.mode === '2d' ? 'active' : ''}" data-mode="2d"
+        title="${t('components.deckgl.projection.flat', { defaultValue: 'Flat map (2D)' })}">2D</button>
+      <button class="proj-btn ${this.state.mode === '3d' ? 'active' : ''}" data-mode="3d"
+        title="${t('components.deckgl.projection.globe', { defaultValue: '3D globe' })}">3D</button>
+    `;
+    this.container.appendChild(toggle);
+
+    toggle.querySelectorAll('.proj-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = (btn as HTMLElement).dataset.mode as MapProjectionMode;
+        this.setProjectionMode(mode);
+      });
+    });
+  }
+
+  private updateProjectionToggle(): void {
+    const toggle = this.container.querySelector('.deckgl-projection-toggle');
+    if (!toggle) return;
+    toggle.querySelectorAll('.proj-btn').forEach((btn) => {
+      const mode = (btn as HTMLElement).dataset.mode;
+      btn.classList.toggle('active', mode === this.state.mode);
+    });
+  }
+
+  // ---- Idle globe spin ------------------------------------------------------
+
+  private prefersReducedMotion(): boolean {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  }
+
+  private onUserInteract = (): void => {
+    this.userInteracting = true;
+    if (this.autoRotateIdleTimer) clearTimeout(this.autoRotateIdleTimer);
+    this.autoRotateIdleTimer = setTimeout(() => {
+      this.userInteracting = false;
+      this.autoRotateLastTs = 0; // avoid a jump on resume
+    }, DeckGLMap.AUTO_ROTATE_IDLE_MS);
+  };
+
+  private maybeStartAutoRotate(): void {
+    if (this.state.mode !== '3d') return;
+    if (this.autoRotateRafId != null) return;
+    if (this.renderPaused || this.webglLost) return;
+    if (this.prefersReducedMotion()) return;
+
+    this.autoRotateLastTs = 0;
+    const step = (ts: number): void => {
+      this.autoRotateRafId = requestAnimationFrame(step);
+      if (!this.autoRotateGateOpen()) {
+        this.autoRotateLastTs = 0; // reset so we don't apply a large jump on resume
+        return;
+      }
+      if (this.autoRotateLastTs === 0) {
+        this.autoRotateLastTs = ts;
+        return;
+      }
+      // Throttle to ~30fps: smooth for a slow background spin, but half the
+      // repaints of a per-frame update — lighter on GPU/CPU and battery.
+      const elapsedMs = ts - this.autoRotateLastTs;
+      if (elapsedMs < DeckGLMap.AUTO_ROTATE_MIN_FRAME_MS) return;
+      this.autoRotateLastTs = ts;
+      this.rotateOneStep(elapsedMs / 1000);
+    };
+    this.autoRotateRafId = requestAnimationFrame(step);
+  }
+
+  // Whether the idle spin should advance on the current frame — pure decision,
+  // no rendering. Closed when flat, interacting, paused, hidden, or GL is lost.
+  private autoRotateGateOpen(): boolean {
+    return this.state.mode === '3d'
+      && !this.userInteracting
+      && !this.renderPaused
+      && !this.webglLost
+      && !this.prefersReducedMotion()
+      && !document.hidden;
+  }
+
+  // Advance the globe's center longitude eastward by dtSec worth of rotation.
+  private rotateOneStep(dtSec: number): void {
+    if (!this.maplibreMap) return;
+    const center = this.maplibreMap.getCenter();
+    const nextLng = ((center.lng + DeckGLMap.AUTO_ROTATE_DEG_PER_SEC * dtSec + 540) % 360) - 180;
+    this.maplibreMap.setCenter([nextLng, center.lat]);
+  }
+
+  private stopAutoRotate(): void {
+    if (this.autoRotateRafId != null) {
+      cancelAnimationFrame(this.autoRotateRafId);
+      this.autoRotateRafId = null;
+    }
   }
 
   public setZoom(zoom: number): void {
@@ -3240,25 +3398,59 @@ export class DeckGLMap {
     });
   }
 
+  private static readonly CLIMATE_RAMP: [number, number, number][] = [
+    [68, 136, 255],
+    [100, 200, 255],
+    [255, 255, 100],
+    [255, 200, 50],
+    [255, 100, 50],
+    [255, 50, 50],
+  ];
+
+  private climateWeight(d: ClimateAnomaly): number {
+    return Math.abs(d.tempDelta) + Math.abs(d.precipDelta) * 0.1;
+  }
+
   private createClimateHeatmapLayer(): HeatmapLayer<ClimateAnomaly> {
     return new HeatmapLayer<ClimateAnomaly>({
       id: 'climate-heatmap-layer',
       data: this.climateAnomalies,
       getPosition: (d) => [d.lon, d.lat],
-      getWeight: (d) => Math.abs(d.tempDelta) + Math.abs(d.precipDelta) * 0.1,
+      getWeight: (d) => this.climateWeight(d),
       radiusPixels: 40,
       intensity: 0.6,
       threshold: 0.15,
       opacity: 0.45,
-      colorRange: [
-        [68, 136, 255],
-        [100, 200, 255],
-        [255, 255, 100],
-        [255, 200, 50],
-        [255, 100, 50],
-        [255, 50, 50],
-      ],
+      colorRange: DeckGLMap.CLIMATE_RAMP,
       pickable: false,
+    });
+  }
+
+  // Globe-safe substitute for the screen-space climate heatmap: soft graduated
+  // discs colored by the same anomaly ramp (cool -> hot). Renders on _GlobeView.
+  private createClimateAnomalyPointsLayer(): ScatterplotLayer<ClimateAnomaly> {
+    const ramp = DeckGLMap.CLIMATE_RAMP;
+    return new ScatterplotLayer<ClimateAnomaly>({
+      id: 'climate-anomaly-points-layer',
+      data: this.climateAnomalies,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => 60000 + this.climateWeight(d) * 45000,
+      getFillColor: (d) => {
+        const idx = Math.min(ramp.length - 1, Math.max(0, Math.floor(this.climateWeight(d))));
+        const [r, g, b] = ramp[idx]!;
+        return [r, g, b, 150];
+      },
+      radiusUnits: 'meters',
+      radiusMinPixels: 6,
+      radiusMaxPixels: 44,
+      stroked: false,
+      filled: true,
+      opacity: 0.5,
+      pickable: false,
+      updateTriggers: {
+        getFillColor: this.climateAnomalies.length,
+        getRadius: this.climateAnomalies.length,
+      },
     });
   }
 
@@ -3862,6 +4054,8 @@ export class DeckGLMap {
     this.countryGeoJsonLoaded = false;
     this.maplibreMap.once('style.load', () => {
       this.loadCountryBoundaries();
+      // A full style swap resets projection to mercator — restore the globe.
+      this.applyProjection();
     });
   }
 
@@ -3879,6 +4073,12 @@ export class DeckGLMap {
     if (this.moveTimeoutId) {
       clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = null;
+    }
+
+    this.stopAutoRotate();
+    if (this.autoRotateIdleTimer) {
+      clearTimeout(this.autoRotateIdleTimer);
+      this.autoRotateIdleTimer = null;
     }
 
     this.stopPulseAnimation();
