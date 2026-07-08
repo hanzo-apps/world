@@ -4,7 +4,7 @@
 //
 // One binary, two responsibilities kept orthogonal:
 //   - /v1/world/*      → the Go data backend (internal/world), each endpoint a
-//                   faithful port of the original edge function.
+//     faithful port of the original edge function.
 //   - everything  → static files from --root, with SPA fallback to index.html
 //     else          for client-routed paths (never for /api or asset misses).
 //
@@ -35,7 +35,13 @@ func main() {
 	)
 	flag.Parse()
 
+	// Root context cancelled on SIGINT/SIGTERM: drives the world-model ingest
+	// loop and triggers graceful HTTP shutdown from one signal source.
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	srv := world.NewServer()
+	srv.StartModel(rootCtx) // continuously-folded world-state engine
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
@@ -57,9 +63,7 @@ func main() {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	<-rootCtx.Done()
 	log.Printf("world: shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
