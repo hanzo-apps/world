@@ -12,6 +12,7 @@ import { SITE_VARIANT } from './variant';
 const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
+  'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
   commodities: { name: 'Metals & Materials', enabled: true, priority: 1 },
   politics: { name: 'World News', enabled: true, priority: 1 },
@@ -150,6 +151,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
 const TECH_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
   'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
+  'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
@@ -278,6 +280,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
 const FINANCE_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Markets Map', enabled: true, priority: 1 },
   'live-news': { name: 'Market Headlines', enabled: true, priority: 1 },
+  'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
   markets: { name: 'Live Markets', enabled: true, priority: 1 },
@@ -396,11 +399,79 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
+// SAAS VARIANT (Hanzo Cloud metrics/usage)
+// ============================================
+// Renders HANZO CLOUD ITSELF, not world intel: dense stat tiles for platform
+// requests/models/nodes/regions (signed-out investor view via the demo-flagged
+// public aggregate) plus the caller's own org usage + bill drill-down (signed
+// in). Map reuses the existing datacenters + cloudRegions layers as the global
+// infrastructure backdrop.
+const SAAS_PANELS: Record<string, PanelConfig> = {
+  map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
+  'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
+  'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
+  fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
+  'live-activity': { name: 'Live Activity', enabled: true, priority: 1 },
+  'my-usage': { name: 'My Usage & Bill', enabled: true, priority: 1 },
+  monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+};
+
+const SAAS_MAP_LAYERS: MapLayers = {
+  conflicts: false,
+  bases: false,
+  cables: true,
+  pipelines: false,
+  hotspots: false,
+  ais: false,
+  nuclear: false,
+  irradiators: false,
+  sanctions: false,
+  weather: false,
+  economic: false,
+  waterways: false,
+  outages: true,
+  cyberThreats: false,
+  datacenters: true,
+  protests: false,
+  flights: false,
+  military: false,
+  natural: false,
+  spaceports: false,
+  minerals: false,
+  fires: false,
+  // Hanzo World Model domain layers
+  robotics: false,
+  quantum: false,
+  // Data source layers
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
+  // Tech layers — cloudRegions on (global infra backdrop)
+  startupHubs: false,
+  cloudRegions: true,
+  accelerators: false,
+  techHQs: false,
+  techEvents: false,
+  // Finance layers (disabled)
+  stockExchanges: false,
+  financialCenters: false,
+  centralBanks: false,
+  commodityHubs: false,
+  gulfInvestments: false,
+};
+
+const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
+  ...SAAS_MAP_LAYERS,
+  cables: false,
+  cloudRegions: false,
+};
+
+// ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'saas' ? SAAS_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [

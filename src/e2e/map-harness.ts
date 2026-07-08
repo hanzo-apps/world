@@ -1,7 +1,7 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../styles/main.css';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { DeckGLMap } from '../components/DeckGLMap';
+import { DeckGLMap, type MapProjectionMode } from '../components/DeckGLMap';
 import {
   SITE_VARIANT,
   INTEL_HOTSPOTS,
@@ -32,6 +32,7 @@ import type {
   AisDisruptionEvent,
   AirportDelayAlert,
   CableAdvisory,
+  ClimateAnomaly,
   CyberThreat,
   Earthquake,
   InternetOutage,
@@ -116,6 +117,10 @@ type MapHarness = {
   getProtestClusterCount: () => number;
   getOverlaySnapshot: () => OverlaySnapshot;
   getCyberTooltipHtml: (indicator: string) => string;
+  seedClimateAnomalies: () => void;
+  setProjectionMode: (mode: MapProjectionMode) => void;
+  getProjectionType: () => string | undefined;
+  getCenterLng: () => number | undefined;
   destroy: () => void;
 };
 
@@ -1228,6 +1233,16 @@ const pollReady = (): void => {
 };
 pollReady();
 
+const seedClimateAnomalies = (): void => {
+  const anomalies: ClimateAnomaly[] = [
+    { zone: 'Harness Arctic', lat: 71.0, lon: -8.0, tempDelta: 4.2, precipDelta: 12, severity: 'extreme', type: 'warm', period: '30d' },
+    { zone: 'Harness Sahel', lat: 15.0, lon: 5.0, tempDelta: 2.1, precipDelta: -30, severity: 'moderate', type: 'dry', period: '30d' },
+    { zone: 'Harness Pacific', lat: -5.0, lon: -150.0, tempDelta: 1.3, precipDelta: 40, severity: 'moderate', type: 'wet', period: '30d' },
+  ];
+  map.setClimateAnomalies(anomalies);
+  map.render();
+};
+
 window.__mapHarness = {
   get ready() {
     return ready;
@@ -1275,6 +1290,18 @@ window.__mapHarness = {
   getProtestClusterCount,
   getOverlaySnapshot,
   getCyberTooltipHtml,
+  seedClimateAnomalies,
+  setProjectionMode: (mode: MapProjectionMode): void => {
+    map.setProjectionMode(mode);
+    map.render();
+  },
+  getProjectionType: (): string | undefined => {
+    const type = internals.maplibreMap?.getProjection?.()?.type;
+    return typeof type === 'string' ? type : undefined;
+  },
+  getCenterLng: (): number | undefined => {
+    return internals.maplibreMap?.getCenter().lng;
+  },
   destroy: (): void => {
     map.destroy();
   },
