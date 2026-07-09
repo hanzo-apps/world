@@ -32,6 +32,8 @@ COPY . .
 # vite.config.ts: default base '/', default outDir 'dist'. VITE_VARIANT defaults
 # to the full layer set; no build-time secrets are required (the runtime API base
 # is same-origin, resolved in the browser).
+ARG VITE_MAPBOX_TOKEN
+ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
 RUN npm run build
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
