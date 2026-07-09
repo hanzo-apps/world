@@ -1,6 +1,6 @@
 import type { Feed, NewsItem } from '@/types';
 import { SITE_VARIANT } from '@/config';
-import { chunkArray, fetchWithProxy } from '@/utils';
+import { chunkArray, fetchWithProxy, proxyUrl } from '@/utils';
 import { classifyByKeyword, classifyWithAI } from './threat-classifier';
 import { inferGeoHubsFromTitle } from './geo-hub-index';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
@@ -201,7 +201,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
     const isAtom = items.length === 0;
     if (isAtom) items = doc.querySelectorAll('entry');
 
-    const parsed = Array.from(items)
+    const raws = Array.from(items)
       .slice(0, 5)
       .map((item) => {
         const title = item.querySelector('title')?.textContent || '';
@@ -218,55 +218,147 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
           : (item.querySelector('pubDate')?.textContent || '');
         const parsedDate = pubDateStr ? new Date(pubDateStr) : new Date();
         const pubDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-        const threat = classifyByKeyword(title, SITE_VARIANT);
-        const isAlert = threat.level === 'critical' || threat.level === 'high';
-        const geoMatches = inferGeoHubsFromTitle(title);
-        const topGeo = geoMatches[0];
-
-        return {
-          source: feed.name,
-          title,
-          link,
-          pubDate,
-          isAlert,
-          threat,
-          ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
-          lang: feed.lang,
-        };
+        return { title, link, pubDate };
       });
 
-    feedCache.set(feedScope, { items: parsed, timestamp: Date.now() });
-    void setPersistentCache(getPersistentFeedKey(feedScope), toSerializable(parsed));
-    recordFeedSuccess(feedScope);
-    ingestHeadlines(parsed.map(item => ({
-      title: item.title,
-      pubDate: item.pubDate,
-      source: item.source,
-      link: item.link,
-    })));
-
-    const aiCandidates = parsed
-      .filter(item => item.threat.source === 'keyword')
-      .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
-      .slice(0, AI_CLASSIFY_MAX_PER_FEED);
-
-    for (const item of aiCandidates) {
-      if (!canQueueAiClassification(item.title)) continue;
-      classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
-        if (aiResult && aiResult.confidence > item.threat.confidence) {
-          item.threat = aiResult;
-          item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
-        }
-      }).catch(() => { });
-    }
-
-    return parsed;
+    return storeFeedItems(feed, feedScope, raws);
   } catch (e) {
     console.error(`Failed to fetch ${feed.name}:`, e);
     recordFeedFailure(feedScope);
     const persistent = await loadPersistentFeed(feedScope);
     return cached?.items || persistent || [];
   }
+}
+
+type RawFeedItem = { title: string; link: string; pubDate: Date };
+
+// Shared enrich+store pipeline for both transports (client-side DOM parse and
+// the server-side /v1/world/feeds-batch): classification, geo inference,
+// caches, trending ingestion and the AI reclassification queue live in ONE
+// place regardless of where the XML got parsed.
+function storeFeedItems(feed: Feed, feedScope: string, raws: RawFeedItem[]): NewsItem[] {
+  const parsed = raws.slice(0, 5).map(({ title, link, pubDate }) => {
+    const threat = classifyByKeyword(title, SITE_VARIANT);
+    const isAlert = threat.level === 'critical' || threat.level === 'high';
+    const geoMatches = inferGeoHubsFromTitle(title);
+    const topGeo = geoMatches[0];
+    return {
+      source: feed.name,
+      title,
+      link,
+      pubDate,
+      isAlert,
+      threat,
+      ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
+      lang: feed.lang,
+    };
+  });
+
+  feedCache.set(feedScope, { items: parsed, timestamp: Date.now() });
+  void setPersistentCache(getPersistentFeedKey(feedScope), toSerializable(parsed));
+  recordFeedSuccess(feedScope);
+  ingestHeadlines(parsed.map(item => ({
+    title: item.title,
+    pubDate: item.pubDate,
+    source: item.source,
+    link: item.link,
+  })));
+
+  const aiCandidates = parsed
+    .filter(item => item.threat.source === 'keyword')
+    .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
+    .slice(0, AI_CLASSIFY_MAX_PER_FEED);
+
+  for (const item of aiCandidates) {
+    if (!canQueueAiClassification(item.title)) continue;
+    classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
+      if (aiResult && aiResult.confidence > item.threat.confidence) {
+        item.threat = aiResult;
+        item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
+      }
+    }).catch(() => { });
+  }
+
+  return parsed;
+}
+
+const RSS_PROXY_PREFIX = '/v1/world/rss-proxy?url=';
+
+function resolveFeedUrl(feed: Feed, lang: string): string {
+  if (typeof feed.url === 'string') return feed.url;
+  return feed.url[lang] || feed.url['en'] || Object.values(feed.url)[0] || '';
+}
+
+function upstreamUrl(proxied: string): string | null {
+  if (!proxied.startsWith(RSS_PROXY_PREFIX)) return null;
+  try {
+    return decodeURIComponent(proxied.slice(RSS_PROXY_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+function canBatchFeeds(feeds: Feed[]): boolean {
+  const lang = getCurrentLanguage();
+  return feeds.length > 1 && feeds.every(f => upstreamUrl(resolveFeedUrl(f, lang)) !== null);
+}
+
+// One POST per category: the server fetches + parses every feed in parallel
+// (sharing the rss-proxy cache), so a category fills in ~1 round trip instead
+// of 5-15 sequential client GETs. Throws on transport failure so the caller
+// can fall back to the classic per-feed path.
+async function fetchFeedsViaBatch(feeds: Feed[]): Promise<NewsItem[][]> {
+  if (feedCache.size > MAX_CACHE_ENTRIES / 2) cleanupCaches();
+  const lang = getCurrentLanguage();
+  const jobs = feeds.map(feed => ({
+    feed,
+    scope: getFeedScope(feed.name, lang),
+    url: upstreamUrl(resolveFeedUrl(feed, lang)),
+  }));
+
+  const results: (NewsItem[] | null)[] = await Promise.all(jobs.map(async ({ scope }) => {
+    const cached = feedCache.get(scope);
+    if (isFeedOnCooldown(scope)) return cached?.items || (await loadPersistentFeed(scope)) || [];
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.items;
+    return null;
+  }));
+
+  const pending = jobs
+    .map((job, i) => ({ ...job, i }))
+    .filter(({ i, url }) => results[i] === null && url !== null);
+  jobs.forEach((job, i) => {
+    if (results[i] === null && job.url === null) results[i] = [];
+  });
+
+  for (const group of chunkArray(pending, 30)) {
+    const res = await fetch(proxyUrl('/v1/world/feeds-batch'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls: group.map(p => p.url) }),
+    });
+    if (!res.ok) throw new Error(`feeds-batch HTTP ${res.status}`);
+    const data = await res.json() as {
+      feeds?: Array<{ url: string; ok: boolean; items?: Array<{ title?: string; link?: string; pubDate?: string }> }>;
+    };
+    const byUrl = new Map((data.feeds || []).map(f => [f.url, f]));
+    await Promise.all(group.map(async ({ feed, scope, url, i }) => {
+      const entry = byUrl.get(url!);
+      if (entry?.ok && entry.items?.length) {
+        const raws = entry.items
+          .filter(it => (it.title || '').trim() !== '')
+          .map(it => {
+            const d = it.pubDate ? new Date(it.pubDate) : new Date();
+            return { title: it.title!, link: it.link || '', pubDate: Number.isNaN(d.getTime()) ? new Date() : d };
+          });
+        results[i] = storeFeedItems(feed, scope, raws);
+      } else {
+        recordFeedFailure(scope);
+        results[i] = feedCache.get(scope)?.items || (await loadPersistentFeed(scope)) || [];
+      }
+    }));
+  }
+
+  return results.map(r => r || []);
 }
 
 export async function fetchCategoryFeeds(
@@ -308,6 +400,25 @@ export async function fetchCategoryFeeds(
       [topItems[i], topItems[i + 1]] = [topItems[i + 1]!, topItems[i]!];
     }
   };
+
+  // Fast path: one server-side batch for the whole category. Any transport
+  // failure (older backend, network) falls back to the per-feed pipeline.
+  if (canBatchFeeds(filteredFeeds)) {
+    try {
+      const perFeed = await fetchFeedsViaBatch(filteredFeeds);
+      perFeed.flat().forEach(insertTopItem);
+      const sorted = ensureSortedDescending();
+      options.onBatch?.(sorted);
+      if (totalItems > 0) {
+        import('./data-freshness').then(({ dataFreshness }) => {
+          dataFreshness.recordUpdate('rss', totalItems);
+        });
+      }
+      return sorted;
+    } catch (e) {
+      console.warn('[RSS] feeds-batch unavailable, using per-feed fetch:', e);
+    }
+  }
 
   for (const batch of batches) {
     const results = await Promise.all(batch.map(fetchFeed));
