@@ -126,6 +126,13 @@ type MapHarness = {
   autoRotateGateOpen: () => boolean;
   rotateOneStep: (dtSec: number) => void;
   stopIdleSpin: () => void;
+  // Deck-overlay renderer introspection — proves the overlay actually reprojects
+  // onto the mapbox globe (the interleaved bug rendered nothing there).
+  getDeckInterleaved: () => boolean | null;
+  getDeckCanvasCount: () => number;
+  getDeckViewportType: () => string | null;
+  getFirstHotspotLngLat: () => { lon: number; lat: number } | null;
+  pickAtLonLat: (lon: number, lat: number, radius?: number) => { found: boolean; layerId: string | null };
   destroy: () => void;
 };
 
@@ -263,6 +270,11 @@ const internals = map as unknown as {
   autoRotateGateOpen?: () => boolean;
   rotateOneStep?: (dtSec: number) => void;
   stopAutoRotate?: () => void;
+  deckOverlay?: {
+    _interleaved?: boolean;
+    _deck?: { getViewports?: () => Array<{ constructor: { name: string } }> };
+    pickObject?: (params: { x: number; y: number; radius?: number }) => { layer?: { id?: string } } | null;
+  } | null;
 };
 
 const buildLayerState = (enabledLayers: HarnessLayerKey[]): MapLayers => {
@@ -1328,6 +1340,28 @@ window.__mapHarness = {
   },
   stopIdleSpin: (): void => {
     internals.stopAutoRotate?.();
+  },
+  getDeckInterleaved: (): boolean | null => {
+    return internals.deckOverlay?._interleaved ?? null;
+  },
+  getDeckCanvasCount: (): number => {
+    return document.querySelectorAll('#deckgl-basemap canvas').length;
+  },
+  getDeckViewportType: (): string | null => {
+    const vps = internals.deckOverlay?._deck?.getViewports?.();
+    return vps && vps.length > 0 ? vps[0]!.constructor.name : null;
+  },
+  getFirstHotspotLngLat: (): { lon: number; lat: number } | null => {
+    const h = INTEL_HOTSPOTS[0];
+    return h ? { lon: h.lon, lat: h.lat } : null;
+  },
+  pickAtLonLat: (lon: number, lat: number, radius = 8): { found: boolean; layerId: string | null } => {
+    const mapboxMap = internals.mapboxMap;
+    const overlay = internals.deckOverlay;
+    if (!mapboxMap || !overlay?.pickObject) return { found: false, layerId: null };
+    const pt = mapboxMap.project([lon, lat]);
+    const info = overlay.pickObject({ x: pt.x, y: pt.y, radius });
+    return { found: !!info, layerId: info?.layer?.id ?? null };
   },
   destroy: (): void => {
     map.destroy();
