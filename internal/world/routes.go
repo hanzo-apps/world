@@ -84,6 +84,14 @@ func (s *Server) mount(mux registrar) {
 	// configured. Org-scoped drill-down goes straight to api.hanzo.ai, not here.
 	mux.HandleFunc("/v1/world/cloud-pulse", s.handleCloudPulse)
 
+	// Cloud console. PUBLIC excitement layer (real, non-sensitive):
+	mux.HandleFunc("/v1/world/cloud/models", s.handleCloudModels)
+	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
+	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
+	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
+	mux.HandleFunc("/v1/world/cloud/analytics", s.handleCloudAnalytics)
+	mux.HandleFunc("/v1/world/cloud/llm", s.handleCloudLLM)
+
 	// AI (Hanzo inference)
 	mux.HandleFunc("/v1/world/groq-summarize", s.handleSummarize)
 	mux.HandleFunc("/v1/world/openrouter-summarize", s.handleSummarize)
