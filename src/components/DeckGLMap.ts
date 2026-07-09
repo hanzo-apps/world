@@ -535,17 +535,36 @@ export class DeckGLMap {
   private initDeck(): void {
     if (!this.mapboxMap) return;
 
+    // OVERLAID, not interleaved. deck.gl 9.2's interleaved MapboxOverlay inserts its
+    // layers as mapbox custom layers drawn in mapbox's projection pass — that pass
+    // does NOT reproject deck geometry onto mapbox-gl v3's *globe*, so on the 3D
+    // globe every overlay silently vanished (verified: bare sphere, 2D fine).
+    // Overlaid mode gives deck its own canvas + its own _GlobeView (derived from
+    // map.getProjection() each frame), so lat/lon layers reproject correctly on both
+    // the flat map AND the globe, and survive setStyle for free (they live outside
+    // the mapbox style). The only trade is a second GL context; for a data-on-top
+    // globe that is the correct, deck-recommended mode.
     this.deckOverlay = new MapboxOverlay({
-      interleaved: true,
+      interleaved: false,
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 10,
-      useDevicePixels: window.devicePixelRatio > 2 ? 2 : true,
+      // Overlaid deck owns its DPR: full retina for crisp dots/arcs on strong GPUs.
+      useDevicePixels: true,
       onError: (error: Error) => console.warn('[DeckGLMap] Render error (non-fatal):', error.message),
     });
 
     this.mapboxMap.addControl(this.deckOverlay as unknown as IControl);
+
+    // Dev/e2e observability: expose the renderer internals so tests can assert
+    // interleaved state, context count, and rendered deck layer ids/feature
+    // counts without shipping any hook to production.
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+      (window as unknown as { __deckMap?: unknown }).__deckMap = this;
+      (window as unknown as { __mapboxMap?: unknown }).__mapboxMap = this.mapboxMap;
+      (window as unknown as { __deckOverlay?: unknown }).__deckOverlay = this.deckOverlay;
+    }
 
     this.mapboxMap.on('movestart', () => {
       if (this.moveTimeoutId) {
