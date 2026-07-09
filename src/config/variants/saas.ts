@@ -20,6 +20,7 @@ export * from './base';
 // Panel configuration for the SaaS / cloud view. Dense stat tiles, not feeds.
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
+  'live-news': { name: 'Hanzo Showcase', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
