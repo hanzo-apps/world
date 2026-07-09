@@ -6,7 +6,9 @@
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer } from '@deck.gl/layers';
-import maplibregl from 'maplibre-gl';
+import mapboxgl from 'mapbox-gl';
+import type { Map as MapboxMap, IControl, FilterSpecification } from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import Supercluster from 'supercluster';
 import type {
   MapLayers,
@@ -98,7 +100,7 @@ export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 // Projection mode: '2d' = flat Mercator map, '3d' = spinnable globe.
 // deck.gl's MapboxOverlay derives its view (MapView vs _GlobeView) from
-// maplibre's projection each render cycle, so all lat/lon layers are shared.
+// mapbox's projection each render cycle, so all lat/lon layers are shared.
 export type MapProjectionMode = '2d' | '3d';
 type MapInteractionMode = 'flat' | '3d';
 
@@ -167,9 +169,31 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 const MAP_INTERACTION_MODE: MapInteractionMode =
   import.meta.env.VITE_MAP_INTERACTION_MODE === 'flat' ? 'flat' : '3d';
 
-// Theme-aware basemap vector style URLs (English labels, no local scripts)
+// Mapbox GL v3 renderer — native globe projection + monochrome atmosphere for a
+// smooth, modern 2D↔3D experience. The token is a publishable (`pk`) key by
+// design; the env override lets deployments swap it. Recommend URL-restricting
+// this token to world.hanzo.ai in the Mapbox dashboard.
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+  || '';
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+// Theme-aware basemap vector style URLs — CartoDB's dark-matter/voyager GL styles
+// render natively in mapbox-gl v3. Dark-matter is a pure monochrome vercel-black
+// basemap (near-black land, faint grey borders, minimal labels), so the renderer
+// swap keeps the exact locked aesthetic while gaining mapbox's fast globe + fog.
 const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+
+// Monochrome atmosphere for the 3D globe — pure-black space, near-black upper sky,
+// a faint cool-grey horizon glow, no stars. Cheap to apply; harmless in mercator.
+const MONOCHROME_FOG = {
+  range: [0.5, 10] as [number, number],
+  color: 'rgb(72, 80, 96)',        // horizon halo — faint cool-white glow
+  'high-color': 'rgb(8, 10, 16)',  // upper atmosphere — near-black
+  'space-color': 'rgb(0, 0, 0)',   // outer space — pure black
+  'horizon-blend': 0.03,           // thin, crisp horizon band
+  'star-intensity': 0.0,           // no stars — keeps it clean/monochrome
+};
 
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
@@ -270,7 +294,7 @@ export class DeckGLMap {
 
   private container: HTMLElement;
   private deckOverlay: MapboxOverlay | null = null;
-  private maplibreMap: maplibregl.Map | null = null;
+  private mapboxMap: MapboxMap | null = null;
   private state: DeckMapState;
   private popup: MapPopup;
 
@@ -383,7 +407,7 @@ export class DeckGLMap {
 
     this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost) return;
-      this.maplibreMap?.resize();
+      this.mapboxMap?.resize();
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
     }, 150);
     this.rafUpdateLayers = rafSchedule(() => {
@@ -402,11 +426,12 @@ export class DeckGLMap {
       }
     });
 
-    this.initMapLibre();
+    this.initBasemap();
 
-    this.maplibreMap?.on('load', () => {
+    this.mapboxMap?.on('load', () => {
       this.initDeck();
       this.loadCountryBoundaries();
+      this.applyAtmosphere();
       this.applyProjection();
       this.render();
       this.maybeStartAutoRotate();
@@ -450,7 +475,7 @@ export class DeckGLMap {
     wrapper.id = 'deckglMapWrapper';
     wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; overflow: hidden;';
 
-    // MapLibre container - deck.gl renders directly into MapLibre via MapboxOverlay
+    // Basemap container - deck.gl renders directly into mapbox-gl via MapboxOverlay
     const mapContainer = document.createElement('div');
     mapContainer.id = 'deckgl-basemap';
     mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
@@ -459,18 +484,26 @@ export class DeckGLMap {
     this.container.appendChild(wrapper);
   }
 
-  private initMapLibre(): void {
+  private initBasemap(): void {
     const preset = VIEW_PRESETS[this.state.view];
     const initialTheme = getCurrentTheme();
 
-    this.maplibreMap = new maplibregl.Map({
+    this.mapboxMap = new mapboxgl.Map({
       container: 'deckgl-basemap',
       style: initialTheme === 'light' ? LIGHT_STYLE : DARK_STYLE,
       center: [preset.longitude, preset.latitude],
       zoom: preset.zoom,
+      // Start already in the correct projection so ?mode=3d loads as a globe
+      // with no post-load reprojection flash.
+      projection: this.state.mode === '3d' ? 'globe' : 'mercator',
       renderWorldCopies: false,
       attributionControl: false,
       interactive: true,
+      // deck.gl draws its own antialiased geometry in the interleaved pass, so we
+      // drop the basemap's MSAA buffer — a real fill-rate win on the globe with no
+      // visible cost on the monochrome vector basemap.
+      antialias: false,
+      // Cap DPR the same way the deck overlay does; retina globes are GPU-bound.
       ...(MAP_INTERACTION_MODE === 'flat'
         ? {
           maxPitch: 0,
@@ -481,7 +514,7 @@ export class DeckGLMap {
         : {}),
     });
 
-    const canvas = this.maplibreMap.getCanvas();
+    const canvas = this.mapboxMap.getCanvas();
     canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       this.webglLost = true;
@@ -490,7 +523,7 @@ export class DeckGLMap {
     canvas.addEventListener('webglcontextrestored', () => {
       this.webglLost = false;
       console.info('[DeckGLMap] WebGL context restored');
-      this.maplibreMap?.triggerRepaint();
+      this.mapboxMap?.triggerRepaint();
     });
 
     // Any direct manipulation pauses the idle globe spin; it resumes after a quiet period.
@@ -500,7 +533,7 @@ export class DeckGLMap {
   }
 
   private initDeck(): void {
-    if (!this.maplibreMap) return;
+    if (!this.mapboxMap) return;
 
     this.deckOverlay = new MapboxOverlay({
       interleaved: true,
@@ -512,21 +545,21 @@ export class DeckGLMap {
       onError: (error: Error) => console.warn('[DeckGLMap] Render error (non-fatal):', error.message),
     });
 
-    this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
+    this.mapboxMap.addControl(this.deckOverlay as unknown as IControl);
 
-    this.maplibreMap.on('movestart', () => {
+    this.mapboxMap.on('movestart', () => {
       if (this.moveTimeoutId) {
         clearTimeout(this.moveTimeoutId);
         this.moveTimeoutId = null;
       }
     });
 
-    this.maplibreMap.on('moveend', () => {
+    this.mapboxMap.on('moveend', () => {
       this.lastSCZoom = -1;
       this.rafUpdateLayers();
     });
 
-    this.maplibreMap.on('move', () => {
+    this.mapboxMap.on('move', () => {
       if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = setTimeout(() => {
         this.lastSCZoom = -1;
@@ -534,7 +567,7 @@ export class DeckGLMap {
       }, 100);
     });
 
-    this.maplibreMap.on('zoom', () => {
+    this.mapboxMap.on('zoom', () => {
       if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = setTimeout(() => {
         this.lastSCZoom = -1;
@@ -542,8 +575,8 @@ export class DeckGLMap {
       }, 100);
     });
 
-    this.maplibreMap.on('zoomend', () => {
-      const currentZoom = Math.floor(this.maplibreMap?.getZoom() || 2);
+    this.mapboxMap.on('zoomend', () => {
+      const currentZoom = Math.floor(this.mapboxMap?.getZoom() || 2);
       const thresholdCrossed = Math.abs(currentZoom - this.lastZoomThreshold) >= 1;
       if (thresholdCrossed) {
         this.lastZoomThreshold = currentZoom;
@@ -554,8 +587,8 @@ export class DeckGLMap {
 
   private setupResizeObserver(): void {
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.maplibreMap) {
-        this.maplibreMap.resize();
+      if (this.mapboxMap) {
+        this.mapboxMap.resize();
       }
     });
     this.resizeObserver.observe(this.container);
@@ -783,8 +816,8 @@ export class DeckGLMap {
   }
 
   private updateClusterData(): void {
-    const zoom = Math.floor(this.maplibreMap?.getZoom() ?? 2);
-    const bounds = this.maplibreMap?.getBounds();
+    const zoom = Math.floor(this.mapboxMap?.getZoom() ?? 2);
+    const bounds = this.mapboxMap?.getBounds();
     if (!bounds) return;
     const bbox: [number, number, number, number] = [
       bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(),
@@ -986,7 +1019,7 @@ export class DeckGLMap {
   private isLayerVisible(layerKey: keyof MapLayers): boolean {
     const threshold = LAYER_ZOOM_THRESHOLDS[layerKey];
     if (!threshold) return true;
-    const zoom = this.maplibreMap?.getZoom() || 2;
+    const zoom = this.mapboxMap?.getZoom() || 2;
     return zoom >= threshold.minZoom;
   }
 
@@ -1061,7 +1094,7 @@ export class DeckGLMap {
     }
 
     // Datacenters layer - SQUARE icons at zoom >= 5, cluster dots at zoom < 5
-    const currentZoom = this.maplibreMap?.getZoom() || 2;
+    const currentZoom = this.mapboxMap?.getZoom() || 2;
     if (mapLayers.datacenters) {
       if (currentZoom >= 5) {
         layers.push(this.createDatacentersLayer());
@@ -1353,7 +1386,7 @@ export class DeckGLMap {
 
     // Base colors by operator type - semi-transparent for layering
     // F: Fade in bases as you zoom — subtle at zoom 3, full at zoom 5+
-    const zoom = this.maplibreMap?.getZoom() || 3;
+    const zoom = this.mapboxMap?.getZoom() || 3;
     const alphaScale = Math.min(1, (zoom - 2.5) / 2.5); // 0.2 at zoom 3, 1.0 at zoom 5
     const a = Math.round(160 * Math.max(0.3, alphaScale));
 
@@ -2064,7 +2097,7 @@ export class DeckGLMap {
   private createTechHQClusterLayers(): Layer[] {
     this.updateClusterData();
     const layers: Layer[] = [];
-    const zoom = this.maplibreMap?.getZoom() || 2;
+    const zoom = this.mapboxMap?.getZoom() || 2;
 
     layers.push(new ScatterplotLayer<MapTechHQCluster>({
       id: 'tech-hq-clusters-layer',
@@ -2210,7 +2243,7 @@ export class DeckGLMap {
   }
 
   private createHotspotsLayers(): Layer[] {
-    const zoom = this.maplibreMap?.getZoom() || 2;
+    const zoom = this.mapboxMap?.getZoom() || 2;
     const zoomScale = Math.min(1, (zoom - 1) / 3);
     const maxPx = 6 + Math.round(14 * zoomScale);
     const baseOpacity = zoom < 2.5 ? 0.5 : zoom < 4 ? 0.7 : 1.0;
@@ -2358,7 +2391,7 @@ export class DeckGLMap {
   }
 
   private createNewsLocationsLayer(): ScatterplotLayer[] {
-    const zoom = this.maplibreMap?.getZoom() || 2;
+    const zoom = this.mapboxMap?.getZoom() || 2;
     const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
     const filteredNewsLocations = this.filterByTime(this.newsLocations, (location) => location.timestamp);
     const THREAT_RGB: Record<string, [number, number, number]> = {
@@ -3243,8 +3276,8 @@ export class DeckGLMap {
     this.state.view = view;
     const preset = VIEW_PRESETS[view];
 
-    if (this.maplibreMap) {
-      this.maplibreMap.flyTo({
+    if (this.mapboxMap) {
+      this.mapboxMap.flyTo({
         center: [preset.longitude, preset.latitude],
         zoom: preset.zoom,
         duration: 1000,
@@ -3277,16 +3310,39 @@ export class DeckGLMap {
     this.onStateChange?.(this.state);
   }
 
-  // Sync maplibre's projection to the current mode. deck.gl's MapboxOverlay
+  // Sync mapbox's projection to the current mode. deck.gl's MapboxOverlay
   // re-derives MapView vs _GlobeView from map.getProjection() every frame, so
   // all overlay layers follow automatically — no separate Deck instance.
+  // mapbox-gl v3 morphs globe↔mercator on its own at low zoom; we pair it with a
+  // gentle easeTo so a switch made while zoomed-in still reads as a smooth glide
+  // rather than a snap.
   private applyProjection(): void {
-    if (!this.maplibreMap) return;
-    const type = this.state.mode === '3d' ? 'globe' : 'mercator';
-    const current = this.maplibreMap.getProjection?.()?.type;
-    if (current === type) return;
-    this.maplibreMap.setProjection({ type });
-    this.maplibreMap.triggerRepaint();
+    if (!this.mapboxMap) return;
+    const name = this.state.mode === '3d' ? 'globe' : 'mercator';
+    const current = this.mapboxMap.getProjection?.()?.name;
+    if (current === name) return;
+    this.mapboxMap.setProjection(name);
+    // Entering the globe from a zoomed-in mercator view: pull the camera back so
+    // the whole sphere frames up, flat and un-pitched. Leaving it: just settle.
+    if (name === 'globe') {
+      const zoom = this.mapboxMap.getZoom();
+      this.mapboxMap.easeTo({
+        zoom: zoom > 3.5 ? 2.6 : zoom,
+        pitch: 0,
+        duration: 900,
+        essential: true,
+      });
+    }
+    this.mapboxMap.triggerRepaint();
+  }
+
+  // Monochrome globe atmosphere (see MONOCHROME_FOG). Re-applied after every style
+  // load since setStyle() clears fog.
+  private applyAtmosphere(): void {
+    if (!this.mapboxMap) return;
+    try {
+      this.mapboxMap.setFog(MONOCHROME_FOG);
+    } catch { /* fog unsupported until style is ready — retried on style.load */ }
   }
 
   private createProjectionToggle(): void {
@@ -3372,10 +3428,10 @@ export class DeckGLMap {
 
   // Advance the globe's center longitude eastward by dtSec worth of rotation.
   private rotateOneStep(dtSec: number): void {
-    if (!this.maplibreMap) return;
-    const center = this.maplibreMap.getCenter();
+    if (!this.mapboxMap) return;
+    const center = this.mapboxMap.getCenter();
     const nextLng = ((center.lng + DeckGLMap.AUTO_ROTATE_DEG_PER_SEC * dtSec + 540) % 360) - 180;
-    this.maplibreMap.setCenter([nextLng, center.lat]);
+    this.mapboxMap.setCenter([nextLng, center.lat]);
   }
 
   private stopAutoRotate(): void {
@@ -3431,14 +3487,14 @@ export class DeckGLMap {
 
   public setZoom(zoom: number): void {
     this.state.zoom = zoom;
-    if (this.maplibreMap) {
-      this.maplibreMap.setZoom(zoom);
+    if (this.mapboxMap) {
+      this.mapboxMap.setZoom(zoom);
     }
   }
 
   public setCenter(lat: number, lon: number, zoom?: number): void {
-    if (this.maplibreMap) {
-      this.maplibreMap.flyTo({
+    if (this.mapboxMap) {
+      this.mapboxMap.flyTo({
         center: [lon, lat],
         ...(zoom != null && { zoom }),
         duration: 500,
@@ -3447,8 +3503,8 @@ export class DeckGLMap {
   }
 
   public getCenter(): { lat: number; lon: number } | null {
-    if (this.maplibreMap) {
-      const center = this.maplibreMap.getCenter();
+    if (this.mapboxMap) {
+      const center = this.mapboxMap.getCenter();
       return { lat: center.lat, lon: center.lng };
     }
     return null;
@@ -3483,14 +3539,14 @@ export class DeckGLMap {
 
   // Zoom controls - public for external access
   public zoomIn(): void {
-    if (this.maplibreMap) {
-      this.maplibreMap.zoomIn();
+    if (this.mapboxMap) {
+      this.mapboxMap.zoomIn();
     }
   }
 
   public zoomOut(): void {
-    if (this.maplibreMap) {
-      this.maplibreMap.zoomOut();
+    if (this.mapboxMap) {
+      this.mapboxMap.zoomOut();
     }
   }
 
@@ -4002,8 +4058,8 @@ export class DeckGLMap {
 
   // Project lat/lon to screen coordinates without moving the map
   private projectToScreen(lat: number, lon: number): { x: number; y: number } | null {
-    if (!this.maplibreMap) return null;
-    const point = this.maplibreMap.project([lon, lat]);
+    if (!this.mapboxMap) return null;
+    const point = this.mapboxMap.project([lon, lat]);
     return { x: point.x, y: point.y };
   }
 
@@ -4155,10 +4211,10 @@ export class DeckGLMap {
   private resolveCountryFromCoordinate(lon: number, lat: number): { code: string; name: string } | null {
     const fromGeometry = getCountryAtCoordinates(lat, lon);
     if (fromGeometry) return fromGeometry;
-    if (!this.maplibreMap || !this.countryGeoJsonLoaded) return null;
+    if (!this.mapboxMap || !this.countryGeoJsonLoaded) return null;
     try {
-      const point = this.maplibreMap.project([lon, lat]);
-      const features = this.maplibreMap.queryRenderedFeatures(point, { layers: ['country-interactive'] });
+      const point = this.mapboxMap.project([lon, lat]);
+      const features = this.mapboxMap.queryRenderedFeatures(point, { layers: ['country-interactive'] });
       const properties = (features?.[0]?.properties ?? {}) as Record<string, unknown>;
       const code = typeof properties['ISO3166-1-Alpha-2'] === 'string'
         ? properties['ISO3166-1-Alpha-2'].trim().toUpperCase()
@@ -4174,17 +4230,17 @@ export class DeckGLMap {
   }
 
   private loadCountryBoundaries(): void {
-    if (!this.maplibreMap || this.countryGeoJsonLoaded) return;
+    if (!this.mapboxMap || this.countryGeoJsonLoaded) return;
     this.countryGeoJsonLoaded = true;
 
     getCountriesGeoJson()
       .then((geojson) => {
-        if (!this.maplibreMap || !geojson) return;
-        this.maplibreMap.addSource('country-boundaries', {
+        if (!this.mapboxMap || !geojson) return;
+        this.mapboxMap.addSource('country-boundaries', {
           type: 'geojson',
           data: geojson,
         });
-        this.maplibreMap.addLayer({
+        this.mapboxMap.addLayer({
           id: 'country-interactive',
           type: 'fill',
           source: 'country-boundaries',
@@ -4193,7 +4249,7 @@ export class DeckGLMap {
             'fill-opacity': 0,
           },
         });
-        this.maplibreMap.addLayer({
+        this.mapboxMap.addLayer({
           id: 'country-hover-fill',
           type: 'fill',
           source: 'country-boundaries',
@@ -4203,7 +4259,7 @@ export class DeckGLMap {
           },
           filter: ['==', ['get', 'name'], ''],
         });
-        this.maplibreMap.addLayer({
+        this.mapboxMap.addLayer({
           id: 'country-highlight-fill',
           type: 'fill',
           source: 'country-boundaries',
@@ -4213,7 +4269,7 @@ export class DeckGLMap {
           },
           filter: ['==', ['get', 'ISO3166-1-Alpha-2'], ''],
         });
-        this.maplibreMap.addLayer({
+        this.mapboxMap.addLayer({
           id: 'country-highlight-border',
           type: 'line',
           source: 'country-boundaries',
@@ -4234,9 +4290,9 @@ export class DeckGLMap {
   }
 
   private setupCountryHover(): void {
-    if (!this.maplibreMap || this.countryHoverSetup) return;
+    if (!this.mapboxMap || this.countryHoverSetup) return;
     this.countryHoverSetup = true;
-    const map = this.maplibreMap;
+    const map = this.mapboxMap;
     let hoveredName: string | null = null;
 
     map.on('mousemove', (e) => {
@@ -4266,43 +4322,44 @@ export class DeckGLMap {
 
   public highlightCountry(code: string): void {
     this.highlightedCountryCode = code;
-    if (!this.maplibreMap || !this.countryGeoJsonLoaded) return;
-    const filter: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], code];
+    if (!this.mapboxMap || !this.countryGeoJsonLoaded) return;
+    const filter: FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], code];
     try {
-      this.maplibreMap.setFilter('country-highlight-fill', filter);
-      this.maplibreMap.setFilter('country-highlight-border', filter);
+      this.mapboxMap.setFilter('country-highlight-fill', filter);
+      this.mapboxMap.setFilter('country-highlight-border', filter);
     } catch { /* layer not ready yet */ }
   }
 
   public clearCountryHighlight(): void {
     this.highlightedCountryCode = null;
-    if (!this.maplibreMap) return;
-    const noMatch: maplibregl.FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], ''];
+    if (!this.mapboxMap) return;
+    const noMatch: FilterSpecification = ['==', ['get', 'ISO3166-1-Alpha-2'], ''];
     try {
-      this.maplibreMap.setFilter('country-highlight-fill', noMatch);
-      this.maplibreMap.setFilter('country-highlight-border', noMatch);
+      this.mapboxMap.setFilter('country-highlight-fill', noMatch);
+      this.mapboxMap.setFilter('country-highlight-border', noMatch);
     } catch { /* layer not ready */ }
   }
 
   private switchBasemap(theme: 'dark' | 'light'): void {
-    if (!this.maplibreMap) return;
-    this.maplibreMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
+    if (!this.mapboxMap) return;
+    this.mapboxMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
     // setStyle() replaces all sources/layers — reset guard so country layers are re-added
     this.countryGeoJsonLoaded = false;
-    this.maplibreMap.once('style.load', () => {
+    this.mapboxMap.once('style.load', () => {
       this.loadCountryBoundaries();
-      // A full style swap resets projection to mercator — restore the globe.
+      // A full style swap clears fog and resets projection to mercator — restore both.
+      this.applyAtmosphere();
       this.applyProjection();
     });
   }
 
   private updateCountryLayerPaint(theme: 'dark' | 'light'): void {
-    if (!this.maplibreMap || !this.countryGeoJsonLoaded) return;
+    if (!this.mapboxMap || !this.countryGeoJsonLoaded) return;
     const hoverOpacity = theme === 'light' ? 0.10 : 0.06;
     const highlightOpacity = theme === 'light' ? 0.18 : 0.12;
     try {
-      this.maplibreMap.setPaintProperty('country-hover-fill', 'fill-opacity', hoverOpacity);
-      this.maplibreMap.setPaintProperty('country-highlight-fill', 'fill-opacity', highlightOpacity);
+      this.mapboxMap.setPaintProperty('country-hover-fill', 'fill-opacity', hoverOpacity);
+      this.mapboxMap.setPaintProperty('country-highlight-fill', 'fill-opacity', highlightOpacity);
     } catch { /* layers may not be ready */ }
   }
 
@@ -4332,7 +4389,7 @@ export class DeckGLMap {
     this.layerCache.clear();
 
     this.deckOverlay?.finalize();
-    this.maplibreMap?.remove();
+    this.mapboxMap?.remove();
 
     this.container.innerHTML = '';
   }
