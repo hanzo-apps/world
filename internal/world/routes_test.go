@@ -32,6 +32,7 @@ func TestRoutesRespond(t *testing.T) {
 		"/v1/world/worldbank":     "?indicator=IT.NET.USER.ZS",
 	}
 	post := map[string]bool{
+		"/v1/world/feeds-batch":          true,
 		"/v1/world/groq-summarize":       true,
 		"/v1/world/openrouter-summarize": true,
 		"/v1/world/classify-batch":       true,
