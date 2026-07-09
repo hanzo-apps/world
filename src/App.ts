@@ -497,6 +497,12 @@ export class App {
   }
 
   private async loadPizzInt(): Promise<void> {
+    // The PizzINT indicator is off by default and variant-gated in
+    // setupPizzIntIndicator — the ONE activation decision. If it wasn't created,
+    // don't fetch. This single guard covers BOTH activation sites (the initial
+    // loadAllData task and the scheduled refresh interval), so a disabled/off-
+    // variant PizzINT makes zero eager upstream requests.
+    if (!this.pizzintIndicator) return;
     try {
       const [status, tensions] = await Promise.all([
         fetchPizzIntStatus(),

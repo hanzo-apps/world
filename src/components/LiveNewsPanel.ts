@@ -75,9 +75,15 @@ const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai' || SITE_
   ? TECH_LIVE_CHANNELS
   : FULL_LIVE_CHANNELS;
 
+// Never-crash default: if a variant ever ships an empty channel list, the panel
+// still constructs (activeChannel stays a valid object) and renders a clean
+// offline state instead of dereferencing undefined. Keeps activeChannel's type
+// non-nullable so no deref site needs a guard.
+const EMPTY_CHANNEL: LiveChannel = { id: 'none', name: '—', handle: '', useFallbackOnly: true };
+
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
-  private activeChannel: LiveChannel = LIVE_CHANNELS[0]!;
+  private activeChannel: LiveChannel = LIVE_CHANNELS[0] ?? EMPTY_CHANNEL;
   private channelSwitcher: HTMLElement | null = null;
   private isMuted = true;
   private isPlaying = true;
