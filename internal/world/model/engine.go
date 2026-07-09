@@ -102,7 +102,9 @@ func (e *Engine) IngestOnce(ctx context.Context) {
 				return
 			}
 			for i := range obs {
-				obs[i].Src = src.Name // stamp the real source label
+				if obs[i].Src == "" {
+					obs[i].Src = src.Name // default to the source name…
+				} // …but honor an adapter that recorded a more specific provenance
 			}
 			mu.Lock()
 			all = append(all, obs...)
