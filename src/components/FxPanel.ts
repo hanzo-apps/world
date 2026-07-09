@@ -5,20 +5,21 @@ import type { MarketData } from '@/types';
 import { quoteRow, changeDir, absFromPct } from '@/utils/market-format';
 
 // FX — the dollar index plus the major pairs. Strictly monochrome, self-polling
-// off the Yahoo passthrough. Per-pair decimal precision (JPY 3dp, DXY 2dp, the
-// rest 4dp) so the value cells read like a terminal tape.
+// off the Yahoo passthrough. Compact pair codes (DXY, EUR/USD, …) as the primary
+// label so nothing ellipsizes at half-panel width. Per-pair decimal precision
+// (JPY 3dp, DXY 2dp, the rest 4dp) so the value cells read like a terminal tape.
 
 interface FxItem { symbol: string; name: string; sub?: string; digits: number }
 
 const ITEMS: FxItem[] = [
-  { symbol: 'DX-Y.NYB', name: 'Dollar index', sub: 'DXY', digits: 2 },
-  { symbol: 'EURUSD=X', name: 'EUR / USD', digits: 4 },
-  { symbol: 'USDJPY=X', name: 'USD / JPY', digits: 3 },
-  { symbol: 'GBPUSD=X', name: 'GBP / USD', digits: 4 },
-  { symbol: 'AUDUSD=X', name: 'AUD / USD', digits: 4 },
-  { symbol: 'USDCHF=X', name: 'USD / CHF', digits: 4 },
-  { symbol: 'USDCAD=X', name: 'USD / CAD', digits: 4 },
-  { symbol: 'USDCNH=X', name: 'USD / CNH', sub: 'offshore', digits: 4 },
+  { symbol: 'DX-Y.NYB', name: 'DXY', digits: 2 },
+  { symbol: 'EURUSD=X', name: 'EUR/USD', digits: 4 },
+  { symbol: 'USDJPY=X', name: 'USD/JPY', digits: 3 },
+  { symbol: 'GBPUSD=X', name: 'GBP/USD', digits: 4 },
+  { symbol: 'AUDUSD=X', name: 'AUD/USD', digits: 4 },
+  { symbol: 'USDCHF=X', name: 'USD/CHF', digits: 4 },
+  { symbol: 'USDCAD=X', name: 'USD/CAD', digits: 4 },
+  { symbol: 'USDCNH=X', name: 'USD/CNH', sub: 'offshore', digits: 4 },
 ];
 
 export class FxPanel extends Panel {

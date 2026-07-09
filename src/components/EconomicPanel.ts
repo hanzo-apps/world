@@ -16,6 +16,7 @@ export class EconomicPanel extends Panel {
   private spendingData: SpendingSummary | null = null;
   private lastUpdate: Date | null = null;
   private activeTab: TabId = 'indicators';
+  private indicatorsNote: string | null = null;
 
   constructor() {
     super({ id: 'economic', title: t('panels.economic') });
@@ -23,7 +24,21 @@ export class EconomicPanel extends Panel {
 
   public update(data: FredSeries[]): void {
     this.fredData = data;
+    this.indicatorsNote = null; // live data clears any degraded note
     this.lastUpdate = new Date();
+    this.render();
+  }
+
+  /**
+   * Quiet degraded state — a missing upstream key or an empty response is NOT a
+   * hard runtime error, so it renders as the calm monochrome empty style with a
+   * short note and explicitly clears the red panel-header-error title (which is
+   * reserved for genuine runtime failures via setErrorState).
+   */
+  public showDegraded(note: string): void {
+    this.setErrorState(false);
+    this.indicatorsNote = note;
+    this.fredData = [];
     this.render();
   }
 
@@ -116,7 +131,7 @@ export class EconomicPanel extends Panel {
 
   private renderIndicators(): string {
     if (this.fredData.length === 0) {
-      return `<div class="economic-empty">${t('components.economic.noIndicatorData')}</div>`;
+      return `<div class="economic-empty">${escapeHtml(this.indicatorsNote ?? t('components.economic.noIndicatorData'))}</div>`;
     }
 
     return `
