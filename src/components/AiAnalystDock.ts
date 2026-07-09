@@ -33,13 +33,13 @@ export class AiAnalystDock {
     this.el.innerHTML = `
       <div class="ai-dock-panel" role="dialog" aria-label="AI analyst" hidden>
         <div class="ai-dock-head">
-          <span class="ai-dock-title">${icon('sparkles', 15)}<span>AI analyst</span></span>
+          <span class="ai-dock-title">${icon('zen', 15)}<span>AI analyst</span></span>
           <button class="ai-dock-close" type="button" aria-label="Close">✕</button>
         </div>
         <div class="ai-dock-body"></div>
       </div>
       <button class="ai-dock-fab" type="button" aria-label="Open AI analyst" aria-expanded="false">
-        ${icon('sparkles', 20)}
+        ${icon('zen', 20)}
       </button>
     `;
     this.bodyEl = this.el.querySelector('.ai-dock-body') as HTMLElement;
