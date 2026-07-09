@@ -26,7 +26,10 @@ func newAIClient() *AIClient {
 	}
 	model := env("HANZO_AI_MODEL")
 	if model == "" {
-		model = "zen"
+		// zen5 = the current flagship general Zen chat model. The bare "zen" alias
+		// is NOT a servable id (api.hanzo.ai/v1/models), so it would 4xx and force
+		// every AI endpoint (analyst included) into its fallback path.
+		model = "zen5"
 	}
 	return &AIClient{
 		base:  strings.TrimRight(base, "/"),
