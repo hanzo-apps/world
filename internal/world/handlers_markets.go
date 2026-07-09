@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hanzoai/world/internal/world/markethours"
 )
 
 // ── CoinGecko ────────────────────────────────────────────────────────────────
@@ -371,6 +373,9 @@ func (s *Server) handleStockIndex(w http.ResponseWriter, r *http.Request) {
 				"available": true, "code": code, "symbol": idx.symbol, "indexName": idx.name,
 				"price": round2s(latest), "weekChangePercent": round2s(week),
 				"currency": cur, "fetchedAt": nowISO(),
+				// Additive metadata: the US market phase at fetch time. Never
+				// touches price fields; consumers can label a snapshot's session.
+				"marketSession": markethours.CurrentSession(time.Now()).String(),
 			}, nil
 		},
 		func(w http.ResponseWriter, err error) {
