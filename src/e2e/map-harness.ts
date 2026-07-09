@@ -1,6 +1,6 @@
-import 'maplibre-gl/dist/maplibre-gl.css';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import '../styles/main.css';
-import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { Map as MapboxMap } from 'mapbox-gl';
 import { DeckGLMap, type MapProjectionMode } from '../components/DeckGLMap';
 import {
   SITE_VARIANT,
@@ -252,7 +252,7 @@ const DETERMINISTIC_BODY_CLASS = 'e2e-deterministic';
 
 const internals = map as unknown as {
   buildLayers?: () => Array<{ id: string; props?: { data?: unknown } }>;
-  maplibreMap?: MapLibreMap;
+  mapboxMap?: MapboxMap;
   getTooltip?: (info: { object?: unknown; layer?: { id?: string } }) => { html?: string } | null;
   newsLocationFirstSeen?: Map<string, number>;
   newsPulseIntervalId?: ReturnType<typeof setInterval> | null;
@@ -278,9 +278,9 @@ const setLayersForSnapshot = (enabledLayers: HarnessLayerKey[]): void => {
 };
 
 const setCamera = (camera: CameraState): void => {
-  const maplibreMap = internals.maplibreMap;
-  if (!maplibreMap) return;
-  maplibreMap.jumpTo({
+  const mapboxMap = internals.mapboxMap;
+  if (!mapboxMap) return;
+  mapboxMap.jumpTo({
     center: [camera.lon, camera.lat],
     zoom: camera.zoom,
   });
@@ -323,8 +323,8 @@ const getLayerDataCount = (layerId: string): number => {
 };
 
 const getLayerFirstScreenTransform = (layerId: string): string | null => {
-  const maplibreMap = internals.maplibreMap;
-  if (!maplibreMap) return null;
+  const mapboxMap = internals.mapboxMap;
+  if (!mapboxMap) return null;
 
   const layers = internals.buildLayers?.() ?? [];
   const target = layers.find((layer) => layer.id === layerId);
@@ -343,7 +343,7 @@ const getLayerFirstScreenTransform = (layerId: string): string | null => {
   const lat = first.lat ?? first.latitude;
   if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
 
-  const point = maplibreMap.project([lon as number, lat as number]);
+  const point = mapboxMap.project([lon as number, lat as number]);
   return `translate(${point.x.toFixed(2)}px, ${point.y.toFixed(2)}px)`;
 };
 
@@ -1142,12 +1142,12 @@ const ensureDeterministicStyles = (): void => {
 };
 
 const hideRasterBasemap = (): void => {
-  const maplibreMap = internals.maplibreMap;
-  if (!maplibreMap) return;
+  const mapboxMap = internals.mapboxMap;
+  if (!mapboxMap) return;
 
   try {
-    if (maplibreMap.getLayer('carto-dark-layer')) {
-      maplibreMap.setPaintProperty('carto-dark-layer', 'raster-opacity', 0);
+    if (mapboxMap.getLayer('carto-dark-layer')) {
+      mapboxMap.setPaintProperty('carto-dark-layer', 'raster-opacity', 0);
     }
   } catch {
     // No-op for harness stability.
@@ -1224,11 +1224,11 @@ const readyStartedAt = Date.now();
 const STYLE_READY_FALLBACK_MS = 12_000;
 const pollReady = (): void => {
   const hasCanvas = Boolean(document.querySelector('#deckgl-basemap canvas'));
-  const maplibreMap = internals.maplibreMap;
-  const styleLoaded = Boolean(maplibreMap?.isStyleLoaded());
+  const mapboxMap = internals.mapboxMap;
+  const styleLoaded = Boolean(mapboxMap?.isStyleLoaded());
   const allowStyleFallback =
     hasCanvas &&
-    Boolean(maplibreMap) &&
+    Boolean(mapboxMap) &&
     Date.now() - readyStartedAt >= STYLE_READY_FALLBACK_MS;
 
   if ((hasCanvas && styleLoaded) || allowStyleFallback) {
@@ -1308,11 +1308,11 @@ window.__mapHarness = {
   getProjectionType: (): string => {
     // Match deck.gl's own semantics (deck-utils getProjection): 'globe' when the
     // globe projection is active, otherwise treat everything as flat 'mercator'.
-    const type = internals.maplibreMap?.getProjection?.()?.type;
+    const type = internals.mapboxMap?.getProjection?.()?.name;
     return type === 'globe' ? 'globe' : 'mercator';
   },
   getCenterLng: (): number | undefined => {
-    return internals.maplibreMap?.getCenter().lng;
+    return internals.mapboxMap?.getCenter().lng;
   },
   isAutoRotateActive: (): boolean => {
     return internals.autoRotateRafId != null;
