@@ -3410,6 +3410,20 @@ export class App {
     });
   }
 
+  // Hybrid ML clustering under a wall-clock budget: on WASM-only machines
+  // BERT embedding of the full corpus can take minutes, and everything
+  // downstream (AI Insights, correlation, CII) would wait on it. Past the
+  // budget we fall back to the fast Jaccard worker; the hybrid promise keeps
+  // warming models in the background for the next cycle.
+  private async clusterNewsBudgeted(news: NewsItem[]): Promise<ClusteredEvent[]> {
+    if (!mlWorker.isAvailable) return analysisWorker.clusterNews(news);
+    const budget = new Promise<null>(resolve => setTimeout(() => resolve(null), 25000));
+    const hybrid = clusterNewsHybrid(news).catch(() => null);
+    const result = await Promise.race([hybrid, budget]);
+    if (result) return result;
+    return analysisWorker.clusterNews(news);
+  }
+
   private async loadNewsCategory(category: string, feeds: typeof FEEDS.politics): Promise<NewsItem[]> {
     try {
       const panel = this.newsPanels[category];
@@ -3590,9 +3604,7 @@ export class App {
 
     // Update clusters for correlation analysis (hybrid: semantic + Jaccard when ML available)
     try {
-      this.latestClusters = mlWorker.isAvailable
-        ? await clusterNewsHybrid(this.allNews)
-        : await analysisWorker.clusterNews(this.allNews);
+      this.latestClusters = await this.clusterNewsBudgeted(this.allNews);
 
       // Update AI Insights panel with new clusters (if ML available)
       {
@@ -4459,9 +4471,7 @@ export class App {
     try {
       // Ensure we have clusters (hybrid: semantic + Jaccard when ML available)
       if (this.latestClusters.length === 0 && this.allNews.length > 0) {
-        this.latestClusters = mlWorker.isAvailable
-          ? await clusterNewsHybrid(this.allNews)
-          : await analysisWorker.clusterNews(this.allNews);
+        this.latestClusters = await this.clusterNewsBudgeted(this.allNews);
       }
 
       // Ingest news clusters for CII
