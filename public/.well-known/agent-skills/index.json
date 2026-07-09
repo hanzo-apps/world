@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "chain-status",
+      "endpoint": "/v1/world/cloud/chain-nodes",
+      "file": "chain-status.SKILL.md",
+      "sha256": "8d4279b92dc9b7b64c17bc431881c5d02c8967d3dfd1e1f53e9b8b27fa9a4531"
+    },
+    {
+      "name": "country-instability",
+      "endpoint": "/v1/world/model/country/",
+      "file": "country-instability.SKILL.md",
+      "sha256": "614d6e924de1dbeb46085f3ce932aa4d190d84464c1911ffad3471ec7abe3d24"
+    },
+    {
+      "name": "market-quotes",
+      "endpoint": "/v1/world/finnhub",
+      "file": "market-quotes.SKILL.md",
+      "sha256": "f7e08ab2ba616e59aa108f75e8782c5a6c3edc4d79ad17e1b5c640e2a675b04b"
+    },
+    {
+      "name": "model-history",
+      "endpoint": "/v1/world/model/history",
+      "file": "model-history.SKILL.md",
+      "sha256": "ad2b799fc579650264f9bbef39e3335aa70dfd090d1d2e7bfd4317a33a9ebc61"
+    },
+    {
+      "name": "traffic-map",
+      "endpoint": "/v1/world/cloud/traffic",
+      "file": "traffic-map.SKILL.md",
+      "sha256": "b0aa05695a45b41db13f2795172f37a7ceba4c541859a589c6db5faa5ce6e373"
+    },
+    {
+      "name": "world-brief",
+      "endpoint": "/v1/world/model/top",
+      "file": "world-brief.SKILL.md",
+      "sha256": "7a1060723361fc4fd1c1781aa559b55bc1f9db8c587480faa20f2dbb181bf92d"
+    }
+  ]
+}
