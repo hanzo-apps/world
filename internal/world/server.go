@@ -243,9 +243,22 @@ func (s *Server) cachedJSON(
 	writeJSON(w, http.StatusOK, cacheControl, v)
 }
 
+// negativeTTL is how long a blank/failed upstream is remembered so a flapping
+// source is not re-hit on every request. Short by design: recovery within one
+// window, never masking a genuinely-recovered upstream for long.
+const negativeTTL = 30 * time.Second
+
+// isBlankBody reports whether an upstream body carries no usable content — empty
+// or whitespace-only. Detection only; the caching POLICY (treat blank as a
+// failure) lives in passthrough. A blank 200 is exactly as useless as a 5xx, so
+// it must never become the cached value.
+func isBlankBody(body []byte) bool { return len(bytes.TrimSpace(body)) == 0 }
+
 // passthrough proxies a fixed upstream URL, returning its body verbatim with a
-// short in-memory TTL cache. Used by the pure pass-through endpoints. On upstream
-// failure a stale body is served if present, else degraded is written.
+// short in-memory TTL cache. Used by the pure pass-through endpoints. A blank
+// 200 is treated as a failure (never cached — it would poison good data for the
+// whole TTL). On any failure a stale body is served if present, else the
+// upstream is negative-cached briefly and degraded is written no-store.
 func (s *Server) passthrough(
 	w http.ResponseWriter,
 	key, upstream, contentType, cacheControl string,
@@ -257,22 +270,48 @@ func (s *Server) passthrough(
 		writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
 		return
 	}
+	// A recent blank/failed fetch: don't re-hit the upstream, serve last-good
+	// stale or degrade cleanly.
+	if s.cache.Negative(key) {
+		s.degradeBytes(w, key, contentType, cacheControl, degraded, fmt.Errorf("upstream recently failed"))
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Second)
 	defer cancel()
 	body, status, err := s.get(ctx, upstream, headers)
-	if err != nil || status < 200 || status >= 300 {
-		if v, ok := s.cache.GetStale(key); ok {
-			writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
-			return
-		}
+	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
 		if err == nil {
-			err = fmt.Errorf("upstream status %d", status)
+			if status < 200 || status >= 300 {
+				err = fmt.Errorf("upstream status %d", status)
+			} else {
+				err = fmt.Errorf("upstream returned empty body")
+			}
 		}
-		degraded(w, err)
+		s.cache.SetNegative(key, negativeTTL)
+		s.degradeBytes(w, key, contentType, cacheControl, degraded, err)
 		return
 	}
 	s.cache.Set(key, body, ttl, staleFor)
 	writeBytes(w, http.StatusOK, contentType, cacheControl, body)
+}
+
+// degradeBytes serves the last-good stale body when present, else the handler's
+// degraded response with Cache-Control: no-store so a transient failure is never
+// cached downstream. The no-store header is set before degraded runs; the
+// degraded callbacks pass "" for cache-control, so writeBytes/writeJSON leave it
+// intact.
+func (s *Server) degradeBytes(
+	w http.ResponseWriter,
+	key, contentType, cacheControl string,
+	degraded func(w http.ResponseWriter, err error),
+	err error,
+) {
+	if v, ok := s.cache.GetStale(key); ok {
+		writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	degraded(w, err)
 }
 
 // ── env ─────────────────────────────────────────────────────────────────────
