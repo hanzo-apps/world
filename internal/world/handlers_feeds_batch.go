@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hanzoai/world/internal/world/ticker"
 )
 
 // feeds-batch: one POST per news category instead of 5-15 client-side
@@ -26,9 +28,10 @@ const (
 )
 
 type feedBatchItem struct {
-	Title   string `json:"title"`
-	Link    string `json:"link"`
-	PubDate string `json:"pubDate,omitempty"` // RFC3339 when parseable, else ""
+	Title   string   `json:"title"`
+	Link    string   `json:"link"`
+	PubDate string   `json:"pubDate,omitempty"` // RFC3339 when parseable, else ""
+	Tickers []string `json:"tickers,omitempty"` // stock/crypto tickers in the title
 }
 
 type feedBatchResult struct {
@@ -145,7 +148,7 @@ func parseFeedItems(body []byte, limit int) []feedBatchItem {
 		if link == "" {
 			link = strings.TrimSpace(it.GUID)
 		}
-		out = append(out, feedBatchItem{Title: title, Link: link, PubDate: normalizeFeedDate(firstNonEmpty(it.PubDate, it.DCDate))})
+		out = append(out, feedBatchItem{Title: title, Link: link, PubDate: normalizeFeedDate(firstNonEmpty(it.PubDate, it.DCDate)), Tickers: ticker.Extract(title)})
 	}
 	for _, e := range doc.Entries {
 		if len(out) >= limit {
@@ -165,7 +168,7 @@ func parseFeedItems(body []byte, limit int) []feedBatchItem {
 		if link == "" && len(e.Links) > 0 {
 			link = e.Links[0].Href
 		}
-		out = append(out, feedBatchItem{Title: title, Link: strings.TrimSpace(link), PubDate: normalizeFeedDate(firstNonEmpty(e.Published, e.Updated))})
+		out = append(out, feedBatchItem{Title: title, Link: strings.TrimSpace(link), PubDate: normalizeFeedDate(firstNonEmpty(e.Published, e.Updated)), Tickers: ticker.Extract(title)})
 	}
 	return out
 }
