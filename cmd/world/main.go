@@ -40,6 +40,11 @@ func main() {
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Fetch secrets from KMS and inject them into the environment BEFORE the
+	// server reads any config. Fail-open: no creds / unreachable KMS logs one
+	// line and continues on plain env (see internal/world/kms.go).
+	world.LoadKMSSecrets(rootCtx)
+
 	srv := world.NewServer()
 	srv.StartModel(rootCtx) // continuously-folded world-state engine
 	mux := http.NewServeMux()
