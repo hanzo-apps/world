@@ -8,6 +8,8 @@
 // survives the cross-site redirect / Safari ITP / SSO bounce — the classic
 // "Missing PKCE code verifier" failure when sessionStorage is used.
 
+import { isDesktopRuntime } from './runtime';
+
 // Brand issuer by host: world.hanzo.ai + variants → hanzo.id. lux/zoo variants
 // resolve to their own IAM so the white-label stays honest.
 function resolveIssuer(): string {
@@ -18,13 +20,28 @@ function resolveIssuer(): string {
 }
 
 // <org>-<app> per convention. hanzo-world is a public PKCE client registered in
-// IAM with redirect https://world.hanzo.ai/auth/callback (+ localhost for dev).
+// IAM with redirect https://world.hanzo.ai/auth/callback (+ localhost for dev)
+// and the desktop loopback below.
 const CLIENT_ID = 'hanzo-world';
 const REDIRECT_PATH = '/auth/callback';
 const SCOPE = 'openid profile email';
 
 const ISSUER = resolveIssuer();
-const REDIRECT_URI = typeof location !== 'undefined' ? `${location.origin}${REDIRECT_PATH}` : '';
+
+// The Tauri desktop shell runs on an app-scheme origin (tauri://localhost) that
+// no OIDC provider can redirect back to, so the desktop build sends the OIDC
+// flow to a fixed loopback the app captures (registered in the hanzo-world
+// client allowlist alongside the web origins). The WEB build ALWAYS uses its own
+// site origin — never a hardcoded host — so world.hanzo.ai and every *.hanzo.app
+// fork are self-consistent. Evaluated per call (not at import) so it reflects the
+// live runtime, including the callback page itself.
+const DESKTOP_REDIRECT_URI = 'http://127.0.0.1:5219/auth/callback';
+
+function redirectUri(): string {
+  if (typeof location === 'undefined') return '';
+  if (isDesktopRuntime()) return DESKTOP_REDIRECT_URI;
+  return `${location.origin}${REDIRECT_PATH}`;
+}
 
 const OIDC = {
   authorize: '/v1/iam/oauth/authorize',
@@ -95,7 +112,7 @@ export async function buildAuthUrl(provider?: string): Promise<string> {
   const u = new URL(ISSUER + OIDC.authorize);
   u.searchParams.set('client_id', CLIENT_ID);
   u.searchParams.set('response_type', 'code');
-  u.searchParams.set('redirect_uri', REDIRECT_URI);
+  u.searchParams.set('redirect_uri', redirectUri());
   u.searchParams.set('scope', SCOPE);
   u.searchParams.set('state', state);
   u.searchParams.set('code_challenge', challenge);
@@ -154,7 +171,7 @@ async function exchangeCode(code: string, verifier: string): Promise<TokenRespon
     grant_type: 'authorization_code',
     client_id: CLIENT_ID,
     code,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri(),
     code_verifier: verifier,
   });
   const r = await fetch(ISSUER + OIDC.token, {
