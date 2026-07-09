@@ -3479,6 +3479,10 @@ export class App {
           if (failedFeeds.length > 0) {
             const names = failedFeeds.map(f => f.name).join(', ');
             panel.showError(`${t('common.noNewsAvailable')} (${names} failed)`);
+          } else {
+            // Never leave a panel on an eternal spinner: zero items with no
+            // recorded failure still resolves to a quiet empty state.
+            panel.showError(t('common.noNewsAvailable'));
           }
         }
 
@@ -3514,7 +3518,10 @@ export class App {
       .map(([key, feeds]) => ({ key, feeds }));
 
     // Stage category fetches to avoid startup bursts and API pressure in all variants.
-    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 3 : SITE_VARIANT === 'tech' ? 4 : 5;
+    // With the server-side feeds-batch each category costs ~1 request, so a
+    // wider pipeline no longer bursts upstream APIs (the old per-feed path
+    // remains the fallback and still honors the per-feed batches below).
+    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 4 : SITE_VARIANT === 'tech' ? 6 : 8;
     const categoryConcurrency = Math.max(1, Math.min(maxCategoryConcurrency, categories.length));
     const categoryResults: PromiseSettledResult<NewsItem[]>[] = [];
     for (let i = 0; i < categories.length; i += categoryConcurrency) {
