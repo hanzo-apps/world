@@ -425,6 +425,7 @@ const SAAS_PANELS: Record<string, PanelConfig> = {
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
   'live-activity': { name: 'Live Activity', enabled: true, priority: 1 },
   'my-usage': { name: 'My Usage & Bill', enabled: true, priority: 1 },
+  'hanzo-status': { name: 'Hanzo Status', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
