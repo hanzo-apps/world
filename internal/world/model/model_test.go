@@ -75,6 +75,32 @@ func TestFoldDeltasAndChanges(t *testing.T) {
 	}
 }
 
+// TestIngestPreservesAdapterProvenance proves the Src contract: the engine
+// stamps its source name when the adapter left Src empty, but honors an
+// adapter-set provenance (e.g. a fallback upstream) so the label stays honest.
+func TestIngestPreservesAdapterProvenance(t *testing.T) {
+	dir := t.TempDir()
+	unlabeled := Source{Name: "acled", Poll: func() ([]Observation, error) {
+		return []Observation{{ID: "US", Kind: KindCountry, Name: "United States",
+			Metrics: map[string]float64{MetricConflictEvents: 3}}}, nil // Src empty
+	}}
+	labeled := Source{Name: "acled-fallback", Poll: func() ([]Observation, error) {
+		return []Observation{{ID: "IR", Kind: KindCountry, Name: "Iran",
+			Metrics: map[string]float64{MetricConflictEvents: 20}, Src: "gdelt-proxy"}}, nil
+	}}
+	e := New([]Source{unlabeled, labeled}, dir, time.Hour)
+	e.IngestOnce(context.Background())
+
+	us, ok := e.Store().Get(KindCountry, "US")
+	if !ok || len(us.Sources) != 1 || us.Sources[0] != "acled" {
+		t.Fatalf("empty Src should default to source name; got %v", us.Sources)
+	}
+	ir, ok := e.Store().Get(KindCountry, "IR")
+	if !ok || len(ir.Sources) != 1 || ir.Sources[0] != "gdelt-proxy" {
+		t.Fatalf("adapter-set Src should be preserved; got %v", ir.Sources)
+	}
+}
+
 // TestSubscribeReceivesDelta proves the SSE substrate: a subscriber gets the
 // change from a moving cycle, and cancel is idempotent.
 func TestSubscribeReceivesDelta(t *testing.T) {
