@@ -300,6 +300,8 @@ body.animations-paused *::after {
 canvas,
 .maplibregl-map,
 .maplibregl-canvas,
+.mapboxgl-map,
+.mapboxgl-canvas,
 .deck-canvas {
   transition: none !important;
 }
@@ -4638,6 +4640,49 @@ body.playback-mode .status-dot {
   padding: 6px 2px 3px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 2px;
+}
+
+/* Collapsible market groups (FX) — native <details>, monochrome disclosure.
+   A currentColor chevron rotates on open; the pair count sits flush-right. */
+details.mkt-group > summary.mkt-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+details.mkt-group > summary.mkt-group-label::-webkit-details-marker {
+  display: none;
+}
+
+details.mkt-group > summary.mkt-group-label::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  opacity: 0.55;
+  transition: transform 0.15s ease;
+}
+
+details.mkt-group[open] > summary.mkt-group-label::before {
+  transform: rotate(90deg);
+}
+
+details.mkt-group > summary.mkt-group-label:hover {
+  color: var(--text);
+}
+
+.mkt-group-count {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 .mkt-row {
@@ -11744,25 +11789,32 @@ a.prediction-link:hover {
   font-weight: 600;
 }
 
-/* MapLibre GL overrides for dark theme */
-.maplibregl-map {
+/* mapbox-gl (and legacy maplibre) GL overrides for dark theme */
+.maplibregl-map,
+.mapboxgl-map {
   font-family: inherit;
   background: transparent !important;
 }
 
 .maplibregl-canvas-container,
-.maplibregl-canvas {
+.maplibregl-canvas,
+.mapboxgl-canvas-container,
+.mapboxgl-canvas {
   background: transparent !important;
 }
 
-/* Override MapLibre GL default grab cursor - use default pointer */
+/* Override GL default grab cursor - use default pointer */
 .maplibregl-canvas-container.maplibregl-interactive,
-.maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas {
+.maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas,
+.mapboxgl-canvas-container.mapboxgl-interactive,
+.mapboxgl-canvas-container.mapboxgl-interactive .mapboxgl-canvas {
   cursor: default !important;
 }
 
 .maplibregl-canvas-container.maplibregl-interactive:active,
-.maplibregl-canvas-container.maplibregl-interactive:active .maplibregl-canvas {
+.maplibregl-canvas-container.maplibregl-interactive:active .maplibregl-canvas,
+.mapboxgl-canvas-container.mapboxgl-interactive:active,
+.mapboxgl-canvas-container.mapboxgl-interactive:active .mapboxgl-canvas {
   cursor: grabbing !important;
 }
 
@@ -11783,7 +11835,8 @@ a.prediction-link:hover {
   cursor: grabbing !important;
 }
 
-.maplibregl-popup-content {
+.maplibregl-popup-content,
+.mapboxgl-popup-content {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -11792,23 +11845,29 @@ a.prediction-link:hover {
   font-size: 11px;
 }
 
-.maplibregl-popup-tip {
+.maplibregl-popup-tip,
+.mapboxgl-popup-tip {
   border-top-color: var(--bg);
 }
 
-.maplibregl-ctrl-attrib {
+.maplibregl-ctrl-attrib,
+.mapboxgl-ctrl-attrib {
   background: var(--bg) !important;
   color: var(--text-dim) !important;
   font-size: 9px !important;
 }
 
-.maplibregl-ctrl-attrib a {
+.maplibregl-ctrl-attrib a,
+.mapboxgl-ctrl-attrib a {
   color: var(--text-dim) !important;
 }
 
-/* Hide MapLibre navigation controls (we use custom ones) */
+/* Hide GL navigation + logo controls (we use custom ones) */
 .maplibregl-ctrl-top-right,
-.maplibregl-ctrl-bottom-right {
+.maplibregl-ctrl-bottom-right,
+.mapboxgl-ctrl-top-right,
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-logo {
   display: none;
 }
 
