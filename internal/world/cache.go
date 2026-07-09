@@ -76,6 +76,26 @@ func (c *Cache) Set(key string, val any, ttl, staleFor time.Duration) {
 	}
 }
 
+// negPrefix namespaces negative-cache markers so they never collide with — or
+// clobber — a key's last-good value, which must stay available as a stale
+// fallback while the upstream is flapping.
+const negPrefix = "\x00neg\x00"
+
+// SetNegative records a short-lived failure marker for key so a flapping or
+// blank upstream is not re-hit on every request. It stores under a separate
+// namespaced key and therefore never touches the key's cached value, so a prior
+// good body remains servable via GetStale. staleFor is 0 (the marker itself is
+// never served, only observed), so it evicts first under memory pressure.
+func (c *Cache) SetNegative(key string, ttl time.Duration) {
+	c.Set(negPrefix+key, struct{}{}, ttl, 0)
+}
+
+// Negative reports whether key has a fresh failure marker (set by SetNegative).
+func (c *Cache) Negative(key string) bool {
+	_, ok := c.Get(negPrefix + key)
+	return ok
+}
+
 // evictLocked drops entries past their stale horizon; if still at the cap, it
 // drops the single oldest entry so a new one can be admitted.
 func (c *Cache) evictLocked(now time.Time) {

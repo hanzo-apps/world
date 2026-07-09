@@ -171,11 +171,14 @@ func (s *Server) handleRSSProxy(w http.ResponseWriter, r *http.Request) {
 		"User-Agent": browserUA,
 		"Accept":     "application/rss+xml, application/xml, text/xml, */*",
 	})
-	if err != nil || status < 200 || status >= 300 {
+	// A blank 200 is a failure, not content: never cache it (it would poison the
+	// shared "rss:" key feedXML reads too). Fall back to last-good stale.
+	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
 		if v, ok := s.cache.GetStale(key); ok {
 			writeBytes(w, http.StatusOK, "application/xml", "public, max-age=300, s-maxage=300, stale-while-revalidate=60", v.([]byte))
 			return
 		}
+		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "items": []any{}})
 		return
 	}
