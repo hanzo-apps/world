@@ -17,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -58,8 +59,24 @@ func NewServer() *Server {
 // once from main after the server is built.
 func (s *Server) StartModel(ctx context.Context) { s.worldModel.Start(ctx) }
 
-// modelDataDir is where the model snapshot is persisted for warm restart.
-func modelDataDir() string { return env2("WORLD_DATA_DIR", "data") }
+// modelDataDir is where the model snapshot + history ring are persisted for warm
+// restart. WORLD_DATA_DIR wins; otherwise prefer the mounted pod volume /data,
+// falling back to a temp dir when it is absent or read-only (local dev, CI) so
+// persistence never fails hard.
+func modelDataDir() string {
+	if v := env("WORLD_DATA_DIR"); v != "" {
+		return v
+	}
+	const prod = "/data"
+	if st, err := os.Stat(prod); err == nil && st.IsDir() {
+		if f, err := os.CreateTemp(prod, ".probe-"); err == nil {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+			return prod
+		}
+	}
+	return filepath.Join(os.TempDir(), "hanzo-world")
+}
 
 // modelInterval is the ingest cadence (WORLD_MODEL_INTERVAL, e.g. "10m"),
 // defaulting to the engine default.
@@ -70,13 +87,6 @@ func modelInterval() time.Duration {
 		}
 	}
 	return model.DefaultInterval
-}
-
-func env2(key, def string) string {
-	if v := env(key); v != "" {
-		return v
-	}
-	return def
 }
 
 // ── upstream fetch ──────────────────────────────────────────────────────────
