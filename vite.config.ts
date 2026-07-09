@@ -259,6 +259,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         globIgnores: ['**/ml-*.js', '**/onnx*.wasm'],
+        // mapbox-gl v3 pushes the map chunk past workbox's 2 MiB default; precache
+        // it so the offline shell still loads the renderer.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/settings/],
         skipWaiting: true,
@@ -350,7 +353,7 @@ export default defineConfig({
             if (id.includes('/@xenova/transformers/') || id.includes('/onnxruntime-web/')) {
               return 'ml';
             }
-            if (id.includes('/@deck.gl/') || id.includes('/maplibre-gl/') || id.includes('/h3-js/')) {
+            if (id.includes('/@deck.gl/') || id.includes('/mapbox-gl/') || id.includes('/maplibre-gl/') || id.includes('/h3-js/')) {
               return 'map';
             }
             if (id.includes('/d3/')) {
