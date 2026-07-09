@@ -3519,9 +3519,9 @@ export class App {
 
     // Stage category fetches to avoid startup bursts and API pressure in all variants.
     // With the server-side feeds-batch each category costs ~1 request, so a
-    // wider pipeline no longer bursts upstream APIs (the old per-feed path
+    // wide pipeline no longer bursts upstream APIs (the old per-feed path
     // remains the fallback and still honors the per-feed batches below).
-    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 4 : SITE_VARIANT === 'tech' ? 6 : 8;
+    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 4 : 12;
     const categoryConcurrency = Math.max(1, Math.min(maxCategoryConcurrency, categories.length));
     const categoryResults: PromiseSettledResult<NewsItem[]>[] = [];
     for (let i = 0; i < categories.length; i += categoryConcurrency) {
