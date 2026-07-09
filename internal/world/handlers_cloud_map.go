@@ -1,0 +1,636 @@
+package world
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"math"
+	"net/http"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Public Cloud MAP data — the three globe layers the signed-out world.hanzo.ai
+// map renders: public-chain nodes, the BYO-GPU fleet, and request-traffic arcs.
+// Same contracts as the rest of the Cloud excitement layer (handlers_cloud.go /
+// handlers_cloud_public.go):
+//   - never 5xx: any upstream failure degrades to a clean 200 body,
+//   - honesty: real telemetry when reachable; anything modeled/demo carries an
+//     explicit flag (demo:true / positionsModeled:true) — never silently faked,
+//   - short-TTL in-memory cache via cachedJSON, CORS preflight + methodNotGet.
+
+// ── SSRF boundary + JSON-RPC POST helper ─────────────────────────────────────
+//
+// getJSON only does GET. The public-chain layer POSTs JSON-RPC to the L1 nodes,
+// so postJSON is the GET-twin for POST. Every destination host is re-validated
+// against an exact-host allowlist before dialing — the SSRF guard for the one
+// fetch path that reaches hosts outside the hanzo.ai family. The allowlist is
+// derived from the chain catalog so registering a network auto-allows its host
+// (one source of truth).
+var chainRPCHosts = func() map[string]bool {
+	m := map[string]bool{}
+	for _, cn := range chainNetworks {
+		if u, err := url.Parse(cn.host); err == nil && u.Hostname() != "" {
+			m[u.Hostname()] = true
+		}
+	}
+	return m
+}()
+
+// postJSON POSTs a JSON body to rawURL and decodes the 2xx JSON response into v.
+// rawURL's host MUST be in allowed (SSRF boundary). A non-2xx status is an error,
+// mirroring getJSON's "success or fail" contract.
+func (s *Server) postJSON(ctx context.Context, rawURL string, allowed map[string]bool, body, v any) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	if !allowed[u.Hostname()] {
+		return fmt.Errorf("host not allowed: %s", u.Hostname())
+	}
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	b, status, err := s.do(ctx, http.MethodPost, rawURL, map[string]string{"Content-Type": "application/json"}, buf)
+	if err != nil {
+		return err
+	}
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("upstream status %d", status)
+	}
+	return json.Unmarshal(b, v)
+}
+
+// jsonRPCReq is the request envelope for both the info API (info.peers, params {})
+// and the C-Chain EVM (eth_*, params []). Params is `any` so each caller supplies
+// the shape the method expects.
+type jsonRPCReq struct {
+	JSONRPC string `json:"jsonrpc"`
+	ID      int    `json:"id"`
+	Method  string `json:"method"`
+	Params  any    `json:"params"`
+}
+
+// ── 1) chain-nodes: public L1 telemetry + modeled node positions ─────────────
+//
+// Real telemetry (per network, from its public API, luxfi/node):
+//   - peers:       POST /ext/info  info.peers  → result.numPeers / len(result.peers)
+//   - blockHeight: POST /ext/bc/C/rpc  eth_blockNumber (hex)
+//   - chainId:     POST /ext/bc/C/rpc  eth_chainId (hex) — verifies the catalog default
+// live:true only when eth_blockNumber actually returned a height. An unreachable
+// network keeps its catalog identity but reports zero counts + live:false — never
+// an invented height.
+//
+// nodes[] positions are MODELED: real per-node IP geolocation needs an IP-geo
+// dependency we don't carry, so the real peer COUNT is spread deterministically
+// across the demoRegions() catalog coords. positionsModeled:true says so plainly.
+
+const maxModeledNodes = 250
+
+type chainNet struct {
+	id, name, host string
+	chainID        int64 // catalog default; overridden by a live eth_chainId
+}
+
+// chainNetworks is the public-chain catalog. Adding a row here also registers its
+// host in chainRPCHosts. Both networks run the same node software (luxfi/node).
+var chainNetworks = []chainNet{
+	{id: "lux", name: "Lux Network", host: "https://api.lux.network", chainID: 96369},
+	{id: "zoo", name: "Zoo Network", host: "https://api.zoo.network", chainID: 0},
+}
+
+type chainNode struct {
+	Lat  float64 `json:"lat"`
+	Lon  float64 `json:"lon"`
+	City string  `json:"city"`
+	Kind string  `json:"kind"`
+}
+
+type chainNetwork struct {
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	ChainID     int64       `json:"chainId"`
+	BlockHeight int64       `json:"blockHeight"`
+	Peers       int         `json:"peers"`
+	Live        bool        `json:"live"`
+	Nodes       []chainNode `json:"nodes"`
+}
+
+type chainNodes struct {
+	UpdatedAt        string         `json:"updatedAt"`
+	PositionsModeled bool           `json:"positionsModeled"`
+	Networks         []chainNetwork `json:"networks"`
+}
+
+func (s *Server) handleCloudChainNodes(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	s.cachedJSON(w, "cloud-chain-nodes", "public, max-age=15, s-maxage=15, stale-while-revalidate=60",
+		15*time.Second, 5*time.Minute,
+		func(ctx context.Context) (any, error) {
+			nets := make([]chainNetwork, len(chainNetworks))
+			var wg sync.WaitGroup
+			for i, cn := range chainNetworks {
+				wg.Add(1)
+				go func(i int, cn chainNet) {
+					defer wg.Done()
+					nets[i] = s.fetchChainNetwork(ctx, cn)
+				}(i, cn)
+			}
+			wg.Wait()
+			return chainNodes{UpdatedAt: nowRFC(), PositionsModeled: true, Networks: nets}, nil
+		},
+		func(w http.ResponseWriter, _ error) {
+			// produce never errors; keep the never-5xx guarantee explicit.
+			writeJSON(w, http.StatusOK, "", chainNodes{UpdatedAt: nowRFC(), PositionsModeled: true, Networks: []chainNetwork{}})
+		},
+	)
+}
+
+// fetchChainNetwork gathers real telemetry for one network, degrading each field
+// independently: any failed call leaves its field at zero (and live:false when the
+// block height is unavailable). It never returns an error.
+func (s *Server) fetchChainNetwork(ctx context.Context, cn chainNet) chainNetwork {
+	out := chainNetwork{ID: cn.id, Name: cn.name, ChainID: cn.chainID}
+	info := cn.host + "/ext/info"
+	rpc := cn.host + "/ext/bc/C/rpc"
+
+	// peers (info.peers) — real count of connected peers, when the info API is exposed.
+	var pr struct {
+		Result struct {
+			NumPeers string            `json:"numPeers"`
+			Peers    []json.RawMessage `json:"peers"`
+		} `json:"result"`
+	}
+	if err := s.postJSON(ctx, info, chainRPCHosts,
+		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "info.peers", Params: struct{}{}}, &pr); err == nil {
+		if n, e := strconv.Atoi(strings.TrimSpace(pr.Result.NumPeers)); e == nil && n >= 0 {
+			out.Peers = n
+		} else {
+			out.Peers = len(pr.Result.Peers)
+		}
+	}
+
+	// blockHeight (eth_blockNumber) — the definitive liveness signal.
+	var br struct {
+		Result string `json:"result"`
+	}
+	if err := s.postJSON(ctx, rpc, chainRPCHosts,
+		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_blockNumber", Params: []any{}}, &br); err == nil {
+		if h, ok := parseHexInt(br.Result); ok && h > 0 {
+			out.BlockHeight = h
+			out.Live = true
+		}
+	}
+
+	// chainId (eth_chainId) — verify / override the catalog default with the real value.
+	var cr struct {
+		Result string `json:"result"`
+	}
+	if err := s.postJSON(ctx, rpc, chainRPCHosts,
+		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_chainId", Params: []any{}}, &cr); err == nil {
+		if id, ok := parseHexInt(cr.Result); ok && id > 0 {
+			out.ChainID = id
+		}
+	}
+
+	out.Nodes = modeledNodes(out.Peers)
+	return out
+}
+
+// modeledNodes spreads a real peer COUNT across the region catalog deterministically
+// (proportional to each region's relative capacity, remainder round-robin). Positions
+// and kind are modeled — hence positionsModeled:true on the envelope; only the count
+// is real. Bounded to maxModeledNodes so a pathological peer count can't bloat the payload.
+func modeledNodes(peers int) []chainNode {
+	regions := demoRegions()
+	nodes := make([]chainNode, 0)
+	if peers <= 0 || len(regions) == 0 {
+		return nodes
+	}
+	if peers > maxModeledNodes {
+		peers = maxModeledNodes
+	}
+	total := 0
+	for _, rg := range regions {
+		total += rg.Nodes
+	}
+	if total <= 0 {
+		total = len(regions)
+	}
+	for _, rg := range regions {
+		for j := 0; j < peers*rg.Nodes/total; j++ {
+			nodes = append(nodes, chainNode{Lat: rg.Lat, Lon: rg.Lon, City: rg.City, Kind: "validator"})
+		}
+	}
+	for i := len(nodes); i < peers; i++ {
+		rg := regions[i%len(regions)]
+		nodes = append(nodes, chainNode{Lat: rg.Lat, Lon: rg.Lon, City: rg.City, Kind: "validator"})
+	}
+	return nodes
+}
+
+// parseHexInt parses a 0x-prefixed hex string (eth_* result) into an int64.
+func parseHexInt(s string) (int64, bool) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "0x")
+	s = strings.TrimPrefix(s, "0X")
+	if s == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(s, 16, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// ── 2) byo-gpu: the GPU fleet placed on the globe ────────────────────────────
+//
+// Real path (service token, mirroring tryServicePulse): read the non-sensitive GPU
+// inventory from api /v1/gpus (+ /v1/machines fallback), aggregate by region+model+
+// status, and place each cluster with the region catalog's coords → demo:false.
+// Without a token we return a small, clearly-flagged demo set (demo:true) built
+// from the same catalog.
+
+type gpuCluster struct {
+	Lat    float64 `json:"lat"`
+	Lon    float64 `json:"lon"`
+	City   string  `json:"city"`
+	Region string  `json:"region"`
+	Model  string  `json:"model"`
+	Count  int     `json:"count"`
+	Status string  `json:"status"`
+}
+
+type byoGPU struct {
+	UpdatedAt string       `json:"updatedAt"`
+	Demo      bool         `json:"demo"`
+	GPUs      []gpuCluster `json:"gpus"`
+}
+
+func (s *Server) handleCloudBYOGPU(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	s.cachedJSON(w, "cloud-byo-gpu", "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
+		30*time.Second, 5*time.Minute,
+		func(ctx context.Context) (any, error) {
+			if clusters, ok := s.tryRealGPUs(ctx); ok {
+				return byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: clusters}, nil
+			}
+			return byoGPU{UpdatedAt: nowRFC(), Demo: true, GPUs: demoGPUs()}, nil
+		},
+		func(w http.ResponseWriter, _ error) {
+			writeJSON(w, http.StatusOK, "", byoGPU{UpdatedAt: nowRFC(), Demo: true, GPUs: demoGPUs()})
+		},
+	)
+}
+
+// tryRealGPUs reads the real GPU inventory when a service token is configured.
+// Returns ok=false (→ demo) when the token is absent, both sources fail, or no GPU
+// maps to a known region. Only non-sensitive fields (region/model/status) are read.
+func (s *Server) tryRealGPUs(ctx context.Context) ([]gpuCluster, bool) {
+	tok := env("HANZO_CLOUD_PULSE_TOKEN")
+	if tok == "" {
+		return nil, false
+	}
+	hdr := map[string]string{"Authorization": "Bearer " + tok}
+	base := apiHost()
+
+	agg := map[string]*gpuCluster{}
+	var order []string
+	add := func(region, model, status string) {
+		rg, ok := resolveRegion(region)
+		if !ok {
+			return // don't fake coords for an unmappable region
+		}
+		if strings.TrimSpace(model) == "" {
+			model = "GPU"
+		}
+		if machineOnline(status) {
+			status = "online"
+		} else if strings.TrimSpace(status) == "" {
+			status = "offline"
+		}
+		key := rg.ID + "|" + model + "|" + status
+		c := agg[key]
+		if c == nil {
+			c = &gpuCluster{Lat: rg.Lat, Lon: rg.Lon, City: rg.City, Region: rg.ID, Model: model, Status: status}
+			agg[key] = c
+			order = append(order, key)
+		}
+		c.Count++
+	}
+
+	// Primary: /v1/gpus — one row per GPU (region, model, status), as handleCloudFleet reads.
+	var gpus struct {
+		Gpus []struct {
+			Model  string `json:"model"`
+			Region string `json:"region"`
+			Status string `json:"status"`
+		} `json:"gpus"`
+	}
+	_ = s.getJSON(ctx, base+"/v1/gpus", hdr, &gpus)
+	for _, g := range gpus.Gpus {
+		add(g.Region, g.Model, g.Status)
+	}
+
+	// Fallback: /v1/machines — BYO machines that report a GPU model but aren't in the pool.
+	if len(order) == 0 {
+		var machines struct {
+			Machines []struct {
+				Region string `json:"region"`
+				Status string `json:"status"`
+				GPU    string `json:"gpu"`
+			} `json:"machines"`
+		}
+		if err := s.getJSON(ctx, base+"/v1/machines", hdr, &machines); err == nil {
+			for _, m := range machines.Machines {
+				if strings.TrimSpace(m.GPU) != "" {
+					add(m.Region, m.GPU, m.Status)
+				}
+			}
+		}
+	}
+
+	if len(order) == 0 {
+		return nil, false
+	}
+	out := make([]gpuCluster, 0, len(order))
+	for _, k := range order {
+		out = append(out, *agg[k])
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Count > out[j].Count })
+	return out, true
+}
+
+// demoGPUs is the flagged illustrative fleet, placed from the region catalog. It
+// carries no live-looking precision — it exists to make the globe legible until a
+// service token is wired.
+func demoGPUs() []gpuCluster {
+	coords := regionCoords()
+	rows := []struct {
+		region, model, status string
+		count                 int
+	}{
+		{"nyc", "GB10", "online", 4},
+		{"sfo", "H100", "online", 8},
+		{"ams", "GB10", "online", 2},
+		{"fra", "H200", "online", 4},
+		{"lon", "GB10", "online", 2},
+		{"sgp", "GB10", "online", 2},
+		{"blr", "A100", "degraded", 6},
+		{"syd", "GB10", "online", 1},
+	}
+	out := make([]gpuCluster, 0, len(rows))
+	for _, r := range rows {
+		rg := coords[r.region]
+		out = append(out, gpuCluster{
+			Lat: rg.Lat, Lon: rg.Lon, City: rg.City,
+			Region: r.region, Model: r.model, Count: r.count, Status: r.status,
+		})
+	}
+	return out
+}
+
+// ── 3) traffic: request arcs from visitor countries to the nearest region ────
+//
+// Real path (service token): read the visitor-COUNTRY breakdown from the same
+// analytics source handleCloudAnalytics uses (analytics.hanzo.ai), arc each country
+// centroid to the nearest catalog region, weight normalized 0..1 → demo:false.
+// Only country counts are read — non-sensitive. If the source is admin-gated,
+// tokenless, or unreachable, we fall back to the diurnal demo arcs (demo:true).
+
+type trafficArc struct {
+	FromLat float64 `json:"fromLat"`
+	FromLon float64 `json:"fromLon"`
+	ToLat   float64 `json:"toLat"`
+	ToLon   float64 `json:"toLon"`
+	Weight  float64 `json:"weight"`
+	Label   string  `json:"label"`
+}
+
+type cloudTraffic struct {
+	UpdatedAt string       `json:"updatedAt"`
+	Demo      bool         `json:"demo"`
+	Arcs      []trafficArc `json:"arcs"`
+}
+
+func (s *Server) handleCloudTraffic(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	s.cachedJSON(w, "cloud-traffic", "public, max-age=20, s-maxage=20, stale-while-revalidate=90",
+		20*time.Second, 5*time.Minute,
+		func(ctx context.Context) (any, error) {
+			if arcs, ok := s.tryRealTraffic(ctx); ok {
+				return cloudTraffic{UpdatedAt: nowRFC(), Demo: false, Arcs: arcs}, nil
+			}
+			return demoTraffic(), nil
+		},
+		func(w http.ResponseWriter, _ error) {
+			writeJSON(w, http.StatusOK, "", demoTraffic())
+		},
+	)
+}
+
+// tryRealTraffic builds arcs from the real visitor-country breakdown. ok=false (→
+// demo) when tokenless, unreachable, or no country data. Reuses mergeMetric so the
+// analytics fan-out lives in exactly one place.
+func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
+	tok := env("HANZO_CLOUD_PULSE_TOKEN")
+	if tok == "" {
+		return nil, false
+	}
+	base := env("HANZO_ANALYTICS_BASE")
+	if base == "" {
+		base = "https://analytics.hanzo.ai"
+	}
+	base = trimSlash(base)
+	hdr := map[string]string{"Authorization": "Bearer " + tok}
+
+	var sites struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := s.getJSON(ctx, base+"/v1/analytics/websites", hdr, &sites); err != nil || len(sites.Data) == 0 {
+		return nil, false
+	}
+	end := time.Now()
+	start := end.Add(-24 * time.Hour)
+	q := "startAt=" + strconv.FormatInt(start.UnixMilli(), 10) + "&endAt=" + strconv.FormatInt(end.UnixMilli(), 10)
+
+	countries := map[string]int64{}
+	var mu sync.Mutex
+	limit := len(sites.Data)
+	if limit > 8 {
+		limit = 8
+	}
+	for _, ws := range sites.Data[:limit] {
+		mergeMetric(ctx, s, base, ws.ID, "country", q, hdr, countries, &mu)
+	}
+	if len(countries) == 0 {
+		return nil, false
+	}
+
+	var maxCount int64 = 1
+	for _, v := range countries {
+		if v > maxCount {
+			maxCount = v
+		}
+	}
+	arcs := make([]trafficArc, 0, len(countries))
+	for code, v := range countries {
+		lat, lon, ok := centroidFor(code)
+		if !ok {
+			continue
+		}
+		rg := nearestRegion(lat, lon)
+		arcs = append(arcs, trafficArc{
+			FromLat: lat, FromLon: lon, ToLat: rg.Lat, ToLon: rg.Lon,
+			Weight: round2s(clampF(float64(v)/float64(maxCount), 0, 1)),
+			Label:  strings.ToUpper(code) + " → " + rg.ID,
+		})
+	}
+	if len(arcs) == 0 {
+		return nil, false
+	}
+	sort.SliceStable(arcs, func(i, j int) bool { return arcs[i].Weight > arcs[j].Weight })
+	if len(arcs) > 20 {
+		arcs = arcs[:20]
+	}
+	return arcs, true
+}
+
+// demoTraffic emits flagged arcs from major country centroids to their nearest
+// region, weighted by a per-country base × the same diurnal load curve as demoPulse
+// so the layer feels alive across refreshes without pretending to be live.
+func demoTraffic() cloudTraffic {
+	now := time.Now().UTC()
+	load := diurnalLoad(now)
+	arcs := make([]trafficArc, 0, 16)
+	for i, c := range countryCentroids {
+		if i >= 16 { // 12–20 arcs; 16 keeps a lively-but-bounded set
+			break
+		}
+		rg := nearestRegion(c.lat, c.lon)
+		wobble := 1 + 0.06*math.Sin(float64(now.Unix()%600)/600*2*math.Pi+float64(i)*0.7)
+		arcs = append(arcs, trafficArc{
+			FromLat: c.lat, FromLon: c.lon, ToLat: rg.Lat, ToLon: rg.Lon,
+			Weight: round2s(clampF(c.weight*load*wobble, 0.05, 1)),
+			Label:  c.code + " → " + rg.ID,
+		})
+	}
+	sort.SliceStable(arcs, func(i, j int) bool { return arcs[i].Weight > arcs[j].Weight })
+	return cloudTraffic{UpdatedAt: now.Format(time.RFC3339), Demo: true, Arcs: arcs}
+}
+
+// countryCentroids is the small in-file centroid table (ISO 3166-1 alpha-2 → point)
+// with a relative traffic base weight, used by both the real and demo traffic paths.
+var countryCentroids = []struct {
+	code     string
+	lat, lon float64
+	weight   float64
+}{
+	{"US", 39.50, -98.35, 0.95},
+	{"IN", 22.00, 79.00, 0.70},
+	{"JP", 36.20, 138.25, 0.60},
+	{"DE", 51.16, 10.45, 0.62},
+	{"GB", 54.00, -2.00, 0.58},
+	{"SG", 1.35, 103.82, 0.55},
+	{"CA", 56.13, -106.35, 0.50},
+	{"FR", 46.60, 2.20, 0.50},
+	{"KR", 36.50, 127.85, 0.48},
+	{"BR", -10.00, -53.00, 0.45},
+	{"NL", 52.13, 5.29, 0.42},
+	{"MX", 23.63, -102.55, 0.40},
+	{"AU", -25.00, 133.00, 0.40},
+	{"ES", 40.00, -4.00, 0.40},
+	{"AE", 23.42, 53.85, 0.38},
+	{"IL", 31.05, 34.85, 0.34},
+	{"SE", 62.20, 17.60, 0.32},
+	{"ZA", -29.00, 24.00, 0.30},
+	{"UA", 48.38, 31.17, 0.30},
+	{"NG", 9.08, 8.68, 0.28},
+}
+
+func centroidFor(code string) (float64, float64, bool) {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	for _, c := range countryCentroids {
+		if c.code == code {
+			return c.lat, c.lon, true
+		}
+	}
+	return 0, 0, false
+}
+
+// ── shared geo / math helpers ────────────────────────────────────────────────
+
+// regionCoords indexes the region catalog by its ID for O(1) coord lookup.
+func regionCoords() map[string]cloudRegion {
+	m := make(map[string]cloudRegion, 8)
+	for _, rg := range demoRegions() {
+		m[rg.ID] = rg
+	}
+	return m
+}
+
+// resolveRegion maps an upstream region string ("nyc", "nyc3", "sfo1", …) to a
+// catalog region by exact ID then prefix. Returns ok=false when it can't be placed
+// (so we never invent coordinates).
+func resolveRegion(region string) (cloudRegion, bool) {
+	region = strings.ToLower(strings.TrimSpace(region))
+	if region == "" {
+		return cloudRegion{}, false
+	}
+	m := regionCoords()
+	if rg, ok := m[region]; ok {
+		return rg, true
+	}
+	for _, rg := range demoRegions() { // ordered: match the highest-capacity region first
+		if strings.HasPrefix(region, rg.ID) {
+			return rg, true
+		}
+	}
+	return cloudRegion{}, false
+}
+
+// nearestRegion returns the catalog region closest to (lat, lon) by great-circle
+// distance. The catalog is non-empty (demoRegions), so the first is a safe seed.
+func nearestRegion(lat, lon float64) cloudRegion {
+	regions := demoRegions()
+	best := regions[0]
+	bestD := math.Inf(1)
+	for _, rg := range regions {
+		if d := haversineKm(lat, lon, rg.Lat, rg.Lon); d < bestD {
+			bestD, best = d, rg
+		}
+	}
+	return best
+}
+
+func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
+	const r = 6371.0
+	const rad = math.Pi / 180
+	dLat := (lat2 - lat1) * rad
+	dLon := (lon2 - lon1) * rad
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*rad)*math.Cos(lat2*rad)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	return 2 * r * math.Asin(math.Min(1, math.Sqrt(a)))
+}
+
+// diurnalLoad is the [0.55, 1.0] load factor from demoPulse (peaks ~16:00 UTC),
+// reused so the traffic layer's liveliness matches the pulse ticker's.
+func diurnalLoad(now time.Time) float64 {
+	hourFrac := float64(now.Hour()) + float64(now.Minute())/60
+	return 0.775 + 0.225*math.Sin((hourFrac-10)/24*2*math.Pi)
+}
+
