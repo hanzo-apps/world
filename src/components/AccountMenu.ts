@@ -6,10 +6,9 @@
 // .header-right, and injects its styles once using the app's theme CSS vars so
 // it tracks dark/light automatically.
 
-import { getUser, login, logout, isAuthenticated, type IamUser } from '../services/iam';
+import { getUser, login, logout, isAuthenticated, setActiveOrg, type IamUser } from '../services/iam';
 import {
   resolveScope,
-  setCurrentOrg,
   setCurrentProject,
   type OrgScope,
 } from '../services/org-scope';
@@ -70,7 +69,7 @@ export class AccountMenu {
   private render(): void {
     const u = this.user!;
     const s = this.scope;
-    const label = s ? `${s.currentOrg}${s.currentProject ? ` / ${projectName(s)}` : ''}` : (u.owner || 'account');
+    const label = s ? `${orgName(s)}${s.currentProject ? ` / ${projectName(s)}` : ''}` : (u.owner || 'account');
 
     this.element.innerHTML = `
       <button class="am-trigger" type="button" aria-haspopup="true">
@@ -105,7 +104,7 @@ export class AccountMenu {
       el.addEventListener('click', () => {
         const org = el.dataset.org!;
         if (org !== this.scope?.currentOrg) {
-          setCurrentOrg(org, this.scope!.homeOrg);
+          setActiveOrg(org);
           location.reload();
         }
       });
@@ -126,14 +125,14 @@ export class AccountMenu {
     if (!s || s.orgs.length <= 1) {
       // Single-org user: show it as context, not a menu.
       return `<div class="am-section"><div class="am-section-title">Organization</div>
-        <div class="am-row am-static">${esc(s?.currentOrg || '')}${s?.isScopedAway ? ' <span class="am-badge">scoped</span>' : ''}</div></div>`;
+        <div class="am-row am-static">${esc(orgName(s))}${s?.isScopedAway ? ' <span class="am-badge">scoped</span>' : ''}</div></div>`;
     }
     return `<div class="am-section"><div class="am-section-title">Organization</div>
       ${s.orgs
         .map(
-          (o) => `<button class="am-row am-org ${o === s.currentOrg ? 'active' : ''}" data-org="${esc(o)}" type="button">
-            <span>${esc(o)}${o === s.homeOrg ? ' <span class="am-tag">home</span>' : ''}</span>
-            ${o === s.currentOrg ? '<span class="am-check">✓</span>' : ''}
+          (o) => `<button class="am-row am-org ${o.id === s.currentOrg ? 'active' : ''}" data-org="${esc(o.id)}" type="button">
+            <span>${esc(o.name)}${o.id === s.homeOrg ? ' <span class="am-tag">home</span>' : ''}</span>
+            ${o.id === s.currentOrg ? '<span class="am-check">✓</span>' : ''}
           </button>`,
         )
         .join('')}</div>`;
@@ -160,6 +159,11 @@ export class AccountMenu {
 
 function projectName(s: OrgScope): string {
   return s.projects.find((p) => p.id === s.currentProject)?.name || s.currentProject;
+}
+
+function orgName(s: OrgScope | null): string {
+  if (!s) return '';
+  return s.orgs.find((o) => o.id === s.currentOrg)?.name || s.currentOrg;
 }
 
 function esc(v: string): string {

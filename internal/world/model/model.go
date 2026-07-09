@@ -269,6 +269,14 @@ func (st *Store) AsOf() time.Time {
 	return st.asOf
 }
 
+// Len returns the number of entities currently held. Cheap — for history points
+// that only need the count, not a full snapshot copy.
+func (st *Store) Len() int {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	return len(st.entities)
+}
+
 // Get returns a single entity by kind+id.
 func (st *Store) Get(kind, id string) (*Entity, bool) {
 	st.mu.RLock()
