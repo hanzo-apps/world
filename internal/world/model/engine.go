@@ -23,12 +23,13 @@ type Engine struct {
 	sources  []Source
 	interval time.Duration
 	snapPath string
+	history  *History
 
 	startOnce sync.Once
 }
 
-// New builds an engine. dataDir is where the snapshot lives; interval<=0 uses
-// DefaultInterval.
+// New builds an engine. dataDir is where the warm-start snapshot and the history
+// ring live; interval<=0 uses DefaultInterval.
 func New(sources []Source, dataDir string, interval time.Duration) *Engine {
 	if interval <= 0 {
 		interval = DefaultInterval
@@ -38,8 +39,12 @@ func New(sources []Source, dataDir string, interval time.Duration) *Engine {
 		sources:  sources,
 		interval: interval,
 		snapPath: filepath.Join(dataDir, "world-model.json"),
+		history:  NewHistory(dataDir, HistoryCap),
 	}
 }
+
+// History exposes the durable snapshot ring (queried by the /history handler).
+func (e *Engine) History() *History { return e.history }
 
 // Store exposes the state store to the API handlers.
 func (e *Engine) Store() *Store { return e.store }
@@ -49,25 +54,33 @@ func (e *Engine) Store() *Store { return e.store }
 func (e *Engine) Start(ctx context.Context) {
 	e.startOnce.Do(func() {
 		e.load()
+		e.history.Load() // keep the 24h chart warm across restarts
 		go e.loop(ctx)
 	})
 }
 
 func (e *Engine) loop(ctx context.Context) {
 	e.IngestOnce(ctx) // populate on boot, don't wait a full interval
-	e.save()
+	e.persist()
 	t := time.NewTicker(e.interval)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			e.save()
+			e.persist()
 			return
 		case <-t.C:
 			e.IngestOnce(ctx)
-			e.save()
+			e.persist()
 		}
 	}
+}
+
+// persist writes both durable artifacts after a fold: the full warm-start
+// snapshot (current state) and one compact history Point (the trajectory).
+func (e *Engine) persist() {
+	e.save()
+	e.history.Record(pointFromStore(e.store, e.store.AsOf()))
 }
 
 // IngestOnce polls every source concurrently and folds the union into the
