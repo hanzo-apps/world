@@ -22,16 +22,40 @@ func (e *Engine) Mount(reg interface {
 	reg.HandleFunc("/v1/world/model/state", e.handleState)
 	reg.HandleFunc("/v1/world/model/top", e.handleTop)
 	reg.HandleFunc("/v1/world/model/changes", e.handleChanges)
+	reg.HandleFunc("/v1/world/model/history", e.handleHistory)
 	reg.HandleFunc("/v1/world/model/stream", e.handleStream)
 	reg.HandleFunc(countryPrefix, e.handleCountry)
 }
 
 // gate is the single authorization point for the model API. Reads are public
 // now, so it always allows. When pro-tier gating lands, enforce it HERE and
-// nowhere else: the gateway (api.hanzo.ai) injects the caller's org via the
-// `X-Hanzo-Owner` header from the IAM `owner` claim — check plan/quota for that
-// org and return false to block, writing a 402/403. One function, one place.
+// nowhere else: the gateway (api.hanzo.ai) pins the caller's org into the
+// `X-Org-Id` header from the validated JWT `owner` claim — check plan/quota for
+// that org and return false to block, writing a 402/403. One function, one place.
 func gate(_ http.ResponseWriter, _ *http.Request) bool { return true }
+
+// handleHistory serves the durable snapshot ring as a downsampled time-series
+// for charts and the analyst: GET /v1/world/model/history?hours=24 →
+// {series:[{t, compositeInstability, topMovers}, ...]}. Public read, never 5xx —
+// an empty ring returns an empty series.
+func (e *Engine) handleHistory(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r) || !gate(w, r) {
+		return
+	}
+	hours := 24
+	if v := r.URL.Query().Get("hours"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			hours = n
+		}
+	}
+	if hours > 168 { // cap at a week; retention is shorter, windowing clamps it
+		hours = 168
+	}
+	series := e.history.Series(hours)
+	writeEnvelope(w, e.store.AsOf(), map[string]any{
+		"hours": hours, "count": len(series), "series": series,
+	})
+}
 
 func (e *Engine) handleState(w http.ResponseWriter, r *http.Request) {
 	if cors(w, r) || !gate(w, r) {

@@ -95,7 +95,7 @@ func (s *Server) handleSummarize(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	out, tokens, err := s.ai.chat(ctx, s, bearer, system, user, 0.3, 150)
+	out, tokens, err := s.ai.chat(ctx, s, bearer, system, user, 0.3, 150, aiForwardHeaders(r))
 	if err != nil || out == "" {
 		writeJSON(w, http.StatusOK, "", map[string]any{"summary": nil, "fallback": true, "error": errStr(err)})
 		return
@@ -141,7 +141,7 @@ func (s *Server) handleClassifyBatch(w http.ResponseWriter, r *http.Request) {
 	user := numberLines(titles)
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	out, _, err := s.ai.chat(ctx, s, bearer, system, user, 0, len(titles)*60)
+	out, _, err := s.ai.chat(ctx, s, bearer, system, user, 0, len(titles)*60, aiForwardHeaders(r))
 	results := make([]any, len(titles))
 	if err == nil {
 		parsed := parseClassifyArray(out)
@@ -180,7 +180,7 @@ func (s *Server) handleClassifyEvent(w http.ResponseWriter, r *http.Request) {
 	system := classifySystemPrompt(r.URL.Query().Get("variant") == "tech", false)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	out, _, err := s.ai.chat(ctx, s, bearer, system, title, 0, 50)
+	out, _, err := s.ai.chat(ctx, s, bearer, system, title, 0, 50, aiForwardHeaders(r))
 	if err != nil {
 		writeJSON(w, http.StatusOK, "", map[string]any{"fallback": true})
 		return
@@ -242,7 +242,7 @@ func (s *Server) handleCountryIntel(w http.ResponseWriter, r *http.Request) {
 	user := "Country: " + body.Country + " (" + body.Code + ")" + dataSection + modelSection
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
-	brief, _, err := s.ai.chat(ctx, s, bearer, system, user, 0.4, 900)
+	brief, _, err := s.ai.chat(ctx, s, bearer, system, user, 0.4, 900, aiForwardHeaders(r))
 	if err != nil {
 		writeJSON(w, http.StatusOK, "", map[string]any{"error": "AI service error", "fallback": true})
 		return
