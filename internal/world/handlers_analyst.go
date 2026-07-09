@@ -66,13 +66,21 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 	}
 
 	system := analystSystemPrompt(body.Context)
+	// Time-scoped questions ("what changed over the last 24h", "trend this week")
+	// get grounded in the durable model history — a compact ≤2KB digest of the
+	// window — so the analyst answers from persisted state, not just the live view.
+	if isTimeQuestion(latestUserContent(msgs)) {
+		if digest := s.worldModel.HistoryDigest(24); digest != "" {
+			system += "\n\n" + digest
+		}
+	}
 	full := make([]chatMessage, 0, len(msgs)+1)
 	full = append(full, chatMessage{Role: "system", Content: system})
 	full = append(full, msgs...)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	out, tokens, err := s.ai.chatMessages(ctx, s, bearer, full, 0.4, 700)
+	out, tokens, err := s.ai.chatMessages(ctx, s, bearer, full, 0.4, 700, aiForwardHeaders(r))
 	if err != nil || out == "" {
 		writeJSON(w, http.StatusOK, "", map[string]any{
 			"reply": "", "actions": []any{}, "fallback": true, "error": errStr(err),
@@ -108,6 +116,37 @@ func sanitizeAnalystMessages(in []chatMessage) []chatMessage {
 		out = out[len(out)-analystMaxTurns:]
 	}
 	return out
+}
+
+// latestUserContent returns the most recent user turn's text (sanitized msgs),
+// or "" — what the digest gate keys on.
+func latestUserContent(msgs []chatMessage) string {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			return msgs[i].Content
+		}
+	}
+	return ""
+}
+
+// timeQuestionCues are phrases that signal a time-scoped question — the only
+// case worth spending the extra digest tokens on.
+var timeQuestionCues = []string{
+	"last ", "past ", "over the", "recent", "trend", "changed", "change",
+	"since", "history", "24h", "24 hour", "48h", "hour", "yesterday",
+	"today", "this week", "this month", "week", "day", "so far", "escalat",
+	"evolv", "developing", "momentum", "trajectory",
+}
+
+// isTimeQuestion reports whether q reads as a question about change over time.
+func isTimeQuestion(q string) bool {
+	q = strings.ToLower(q)
+	for _, cue := range timeQuestionCues {
+		if strings.Contains(q, cue) {
+			return true
+		}
+	}
+	return false
 }
 
 // analystSystemPrompt frames the analyst persona, grounds it in the client
