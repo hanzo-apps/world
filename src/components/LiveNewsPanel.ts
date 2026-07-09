@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
+import { SITE_VARIANT } from '@/config/variant';
 import { t } from '../services/i18n';
 
 // YouTube IFrame Player API types
@@ -49,8 +50,6 @@ interface LiveChannel {
   useFallbackOnly?: boolean; // Skip auto-detection, always use fallback
 }
 
-const SITE_VARIANT = import.meta.env.VITE_VARIANT || 'full';
-
 // Full variant: World news channels (24/7 live streams)
 const FULL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'bloomberg', name: 'Bloomberg', handle: '@markets', fallbackVideoId: 'iEpJwprxDdk' },
@@ -71,7 +70,23 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
 ];
 
-const LIVE_CHANNELS = SITE_VARIANT === 'tech' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
+// SaaS / Cloud variant: HANZO showcase — real @hanzoai uploads (AI-generated
+// media demonstrating our models in the wild). VOD, not live streams, so each
+// is useFallbackOnly with a real videoId. If the channel goes live, drop a
+// live entry here. Never fake: every id is a genuine, embeddable @hanzoai video.
+const SAAS_LIVE_CHANNELS: LiveChannel[] = [
+  { id: 'got-cyberpunk', name: 'GoT · Cyberpunk', handle: '@hanzoai', fallbackVideoId: 'Mp5WmiI9DuA', useFallbackOnly: true },
+  { id: 'lego-got', name: 'LEGO GoT', handle: '@hanzoai', fallbackVideoId: 'L5Z81-QQOik', useFallbackOnly: true },
+  { id: 'hotd-midjourney', name: 'HotD · Midjourney', handle: '@hanzoai', fallbackVideoId: 'VbhGghJAiVI', useFallbackOnly: true },
+  { id: 'hotd-dragons', name: 'HotD · Dragons', handle: '@hanzoai', fallbackVideoId: 'Ot3tcRVuzxQ', useFallbackOnly: true },
+  { id: 'ai-music', name: 'AI Music Video', handle: '@hanzoai', fallbackVideoId: 'tnr0oAZZ-PY', useFallbackOnly: true },
+];
+
+const LIVE_CHANNELS = SITE_VARIANT === 'tech'
+  ? TECH_LIVE_CHANNELS
+  : SITE_VARIANT === 'saas'
+    ? SAAS_LIVE_CHANNELS
+    : FULL_LIVE_CHANNELS;
 
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
@@ -105,7 +120,7 @@ export class LiveNewsPanel extends Panel {
   private boundMessageHandler!: (e: MessageEvent) => void;
 
   constructor() {
-    super({ id: 'live-news', title: t('panels.liveNews') });
+    super({ id: 'live-news', title: SITE_VARIANT === 'saas' ? 'Hanzo Showcase' : t('panels.liveNews') });
     this.youtubeOrigin = LiveNewsPanel.resolveYouTubeOrigin();
     this.playerElementId = `live-news-player-${Date.now()}`;
     this.element.classList.add('panel-wide');
