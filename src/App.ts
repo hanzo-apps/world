@@ -98,7 +98,6 @@ import {
   CloudAnalyticsPanel,
   LlmUsagePanel,
 } from '@/components';
-import { icon } from '@/utils/icons';
 import { isAdmin } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
 import { AccountMenu } from '@/components/AccountMenu';
