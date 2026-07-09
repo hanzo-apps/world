@@ -4425,7 +4425,7 @@ export class App {
         const reason = isFeatureAvailable('economicFred')
           ? 'FRED data temporarily unavailable — will retry'
           : 'FRED_API_KEY not configured — add in Settings';
-        economicPanel?.setErrorState(true, reason);
+        economicPanel?.showDegraded(reason);
         this.statusPanel?.updateApi('FRED', { status: 'error' });
         return;
       }
