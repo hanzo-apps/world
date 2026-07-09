@@ -42,7 +42,11 @@ export class LiveActivityPanel extends Panel {
     if (!this.pulse && this.error) { this.showError(this.error); return; }
     if (!this.pulse) { this.showLoading('Connecting…'); return; }
     const p = this.pulse;
-    this.setDataBadge(p.demo ? 'unavailable' : 'live', p.demo ? 'demo' : 'polled');
+    // Live badge only when the pulse is real. A demo pulse drops the badge instead
+    // of wearing an "UNAVAILABLE · demo" tag — the honest flag stays in the payload
+    // (p.demo) and the quiet footer note, not as header jewelry.
+    if (p.demo) this.clearDataBadge();
+    else this.setDataBadge('live', 'polled');
 
     const topRegions = p.regions
       .slice()
