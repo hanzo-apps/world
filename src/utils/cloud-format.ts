@@ -68,3 +68,18 @@ export function shareBar(fraction: number): string {
 export function demoNote(text = 'demo data'): string {
   return `<span class="cloud-demo-note" title="Illustrative demo data — not live platform metrics. Sign in to see your org's real numbers.">${escapeHtml(text)}</span>`;
 }
+
+/** Milliseconds, compactly: 1234 → "1.2s", 84 → "84ms". */
+export function fmtMs(ms: number): string {
+  if (!isFinite(ms) || ms <= 0) return '—';
+  if (ms >= 1000) return (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's';
+  return Math.round(ms) + 'ms';
+}
+
+/** The clean "admin only" body for a gated Cloud panel (server enforces too). */
+export function adminOnlyState(what: string): string {
+  return `<div class="cloud-admin-gate">
+    <div class="cloud-admin-gate-title">Admin only</div>
+    <div class="cloud-admin-gate-body">${escapeHtml(what)} is available to the platform admin org. Sign in with an admin account to view it.</div>
+  </div>`;
+}
