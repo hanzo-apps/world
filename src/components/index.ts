@@ -47,6 +47,8 @@ export * from './LanguageSelector';
 export { SentimentPanel } from './SentimentPanel';
 export { TraderDeskPanel } from './TraderDeskPanel';
 export { AiAnalystPanel } from './AiAnalystPanel';
+export { AnalystChat } from './AnalystChat';
+export { AiAnalystDock } from './AiAnalystDock';
 export { CustomFeedPanel } from './CustomFeedPanel';
 // SaaS / cloud variant panels
 export * from './CloudOverviewPanel';
@@ -54,3 +56,8 @@ export * from './ModelUsagePanel';
 export * from './FleetPanel';
 export * from './MyUsagePanel';
 export * from './LiveActivityPanel';
+// SaaS / cloud — admin-only deep panels
+export { CloudServicesPanel } from './CloudServicesPanel';
+export { CloudFleetPanel } from './CloudFleetPanel';
+export { CloudAnalyticsPanel } from './CloudAnalyticsPanel';
+export { LlmUsagePanel } from './LlmUsagePanel';
