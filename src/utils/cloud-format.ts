@@ -64,9 +64,14 @@ export function shareBar(fraction: number): string {
   return `<div class="cloud-bar"><div class="cloud-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>`;
 }
 
-/** The "demo data" pill — the visible half of the honesty contract. */
-export function demoNote(text = 'demo data'): string {
-  return `<span class="cloud-demo-note" title="Illustrative demo data — not live platform metrics. Sign in to see your org's real numbers.">${escapeHtml(text)}</span>`;
+/**
+ * Demo/data-source flags stay honest in the payload but are no longer rendered
+ * as a pill chip on widgets (product decision — no jewelry). Kept as a no-op so
+ * the honesty contract has a single, obvious lever if we ever surface it as a
+ * quiet text line instead.
+ */
+export function demoNote(_text = 'demo data'): string {
+  return '';
 }
 
 /** Milliseconds, compactly: 1234 → "1.2s", 84 → "84ms". */
