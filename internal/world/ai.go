@@ -66,6 +66,35 @@ func (a *AIClient) bearerFor(r *http.Request) string {
 	return ""
 }
 
+// Tenant-selector headers the cloud gateway reads to scope a bearer call to a
+// specific org/project. Only X-Org-Id is honored as a requested org, and only
+// for a global-admin token (a normal token is re-pinned to its own owner); the
+// value is otherwise inert but correct to forward. Evidence:
+// hanzo/cloud/middleware_identity.go (Peek "X-Org-Id" / "X-Project-Id").
+const (
+	orgHeader     = "X-Org-Id"
+	projectHeader = "X-Project-Id"
+)
+
+// aiForwardHeaders lifts the caller's active org/project selectors off the
+// inbound request so the same-origin world backend forwards them upstream to
+// api.hanzo.ai — the inference then meters to the org the user is acting in.
+// Absent selectors forward nothing (the gateway falls back to the token owner),
+// so this is backward-compatible with callers that don't send them.
+func aiForwardHeaders(r *http.Request) map[string]string {
+	out := map[string]string{}
+	if v := strings.TrimSpace(r.Header.Get(orgHeader)); v != "" {
+		out[orgHeader] = v
+	}
+	if v := strings.TrimSpace(r.Header.Get(projectHeader)); v != "" {
+		out[projectHeader] = v
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -92,18 +121,20 @@ type chatResponse struct {
 
 // chat runs a single system+user completion and returns the trimmed content.
 // bearer is the Authorization value (the signed-in user's IAM token, so the
-// inference meters to their org/project/billing).
-func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user string, temperature float64, maxTokens int) (string, int, error) {
+// inference meters to their org/project/billing); extra carries the caller's
+// org/project selectors to forward upstream (aiForwardHeaders), nil when absent.
+func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user string, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
 	return a.chatMessages(ctx, s, bearer,
 		[]chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
-		temperature, maxTokens)
+		temperature, maxTokens, extra)
 }
 
 // chatMessages runs a multi-turn completion over a full messages array (system +
 // prior turns) and returns the trimmed content. It is the single completion path;
 // chat is the system+user special case. bearer is the caller's IAM token so the
-// inference meters to their org/project/billing.
-func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, messages []chatMessage, temperature float64, maxTokens int) (string, int, error) {
+// inference meters to their org/project/billing; extra forwards the caller's
+// org/project selectors so it meters to the org the user is acting in.
+func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
 	reqBody, err := json.Marshal(chatRequest{
 		Model:       a.model,
 		Messages:    messages,
@@ -114,12 +145,16 @@ func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, m
 	if err != nil {
 		return "", 0, err
 	}
-	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", map[string]string{
+	headers := map[string]string{
 		"Authorization": bearer,
 		"Content-Type":  "application/json",
-	}, reqBody)
+	}
+	for k, v := range extra {
+		headers[k] = v
+	}
+	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", headers, reqBody)
 	if err != nil {
 		return "", 0, err
 	}
