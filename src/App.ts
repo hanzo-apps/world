@@ -3229,8 +3229,8 @@ export class App {
     if (CYBER_LAYER_ENABLED && this.mapLayers.cyberThreats) tasks.push({ name: 'cyberThreats', task: runGuarded('cyberThreats', () => this.loadCyberThreats()) });
     if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
-    // Tech Readiness panel (tech variant only)
-    if (SITE_VARIANT === 'tech') {
+    // Tech Readiness panel (tech + ai variants — every variant that registers it)
+    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai') {
       tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
     }
 
@@ -3595,9 +3595,15 @@ export class App {
         : await analysisWorker.clusterNews(this.allNews);
 
       // Update AI Insights panel with new clusters (if ML available)
-      if (mlWorker.isAvailable && this.latestClusters.length > 0) {
+      {
+        // Clusters from either worker feed the panel; never leave it on the
+        // boot spinner when clustering yields nothing.
         const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
-        insightsPanel?.updateInsights(this.latestClusters);
+        if (this.latestClusters.length > 0) {
+          insightsPanel?.updateInsights(this.latestClusters);
+        } else {
+          insightsPanel?.showError(t('common.noDataAvailable'));
+        }
       }
 
       // Push geo-located news clusters to map
