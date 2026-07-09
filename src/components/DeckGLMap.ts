@@ -82,6 +82,7 @@ import { ROBOTICS_ORGS, roboticsCategoryColor } from '@/config/robotics';
 import { QUANTUM_PLAYERS, quantumModalityColor } from '@/config/quantum';
 import type { GulfInvestment } from '@/types';
 import { MapPopup, type PopupType } from './MapPopup';
+import { AnimatedArcLayer } from './AnimatedArcLayer';
 import {
   updateHotspotEscalation,
   getHotspotEscalation,
@@ -362,6 +363,15 @@ export class DeckGLMap {
   private autoRotateIdleTimer: ReturnType<typeof setTimeout> | null = null;
   private autoRotateLastTs = 0;
   private userInteracting = false;
+
+  // Cloud-map pulse: one RAF-driven 0→1 clock shared by the traffic arcs (a
+  // travelling white comet) and the chain-node dots (a slow radius breathe).
+  // Gated so it only spends a frame when a cloud layer is actually visible.
+  private static readonly CLOUD_PULSE_PERIOD_MS = 3000;
+  private static readonly CLOUD_PULSE_MIN_FRAME_MS = 33; // ~30fps cap
+  private cloudPulseRafId: number | null = null;
+  private cloudPulseCoef = 0;
+  private cloudPulseLastTs = 0;
 
   constructor(container: HTMLElement, initialState: DeckMapInitialState) {
     this.container = container;
@@ -3201,11 +3211,13 @@ export class DeckGLMap {
     if (paused) {
       this.stopPulseAnimation();
       this.stopAutoRotate();
+      this.stopCloudPulse();
       return;
     }
 
     this.syncPulseAnimation();
     this.maybeStartAutoRotate();
+    this.syncCloudPulse();
     if (!paused && this.renderPending) {
       this.renderPending = false;
       this.render();
@@ -3218,6 +3230,9 @@ export class DeckGLMap {
     if (this.deckOverlay) {
       this.deckOverlay.setProps({ layers: this.buildLayers() });
     }
+    // Single chokepoint for every layer/data change (toggles, polls, setLayers all
+    // route through render→updateLayers), so the cloud pulse starts/stops here.
+    this.syncCloudPulse();
     const elapsed = performance.now() - startTime;
     if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
@@ -3368,6 +3383,50 @@ export class DeckGLMap {
       cancelAnimationFrame(this.autoRotateRafId);
       this.autoRotateRafId = null;
     }
+  }
+
+  // ---- Cloud-map pulse (traffic arcs + chain-node breathe) ------------------
+
+  // Runs only while a cloud layer is visible with data, render is live, and the
+  // user allows motion. requestAnimationFrame is itself paused by the browser
+  // when the tab is hidden, so that case needs no extra handling.
+  private cloudPulseGateOpen(): boolean {
+    if (this.renderPaused || this.webglLost || this.prefersReducedMotion()) return false;
+    const { trafficArcs, chainNodes } = this.state.layers;
+    const arcsLive = trafficArcs && this.trafficArcsData.length > 0;
+    const nodesLive = chainNodes && this.chainNetworks.length > 0;
+    return Boolean(arcsLive || nodesLive);
+  }
+
+  private maybeStartCloudPulse(): void {
+    if (this.cloudPulseRafId != null) return;
+    if (!this.cloudPulseGateOpen()) return;
+    this.cloudPulseLastTs = 0;
+    const step = (ts: number): void => {
+      if (!this.cloudPulseGateOpen()) { this.cloudPulseRafId = null; return; }
+      this.cloudPulseRafId = requestAnimationFrame(step);
+      // ~30fps cap: smooth enough for a calm 3s pulse, half the repaints of 60fps.
+      if (this.cloudPulseLastTs && ts - this.cloudPulseLastTs < DeckGLMap.CLOUD_PULSE_MIN_FRAME_MS) return;
+      this.cloudPulseLastTs = ts;
+      // Derive the phase straight from the timestamp — no accumulation, so it
+      // resumes cleanly after a hidden-tab pause with no jump.
+      this.cloudPulseCoef = (ts % DeckGLMap.CLOUD_PULSE_PERIOD_MS) / DeckGLMap.CLOUD_PULSE_PERIOD_MS;
+      this.rafUpdateLayers();
+    };
+    this.cloudPulseRafId = requestAnimationFrame(step);
+  }
+
+  private stopCloudPulse(): void {
+    if (this.cloudPulseRafId != null) {
+      cancelAnimationFrame(this.cloudPulseRafId);
+      this.cloudPulseRafId = null;
+    }
+  }
+
+  // Start or stop to match the current gate — call after any layer/data/pause change.
+  private syncCloudPulse(): void {
+    if (this.cloudPulseGateOpen()) this.maybeStartCloudPulse();
+    else this.stopCloudPulse();
   }
 
   public setZoom(zoom: number): void {
@@ -3560,6 +3619,10 @@ export class DeckGLMap {
       radiusUnits: 'meters',
       radiusMinPixels: 4,
       radiusMaxPixels: 16,
+      // Slow, subtle breathe (±6%) off the shared cloud-pulse clock. radiusScale
+      // is a plain prop, so re-issuing it each pulse frame is enough — no attribute
+      // recompute. Sits at a steady 1.0 when the pulse RAF isn't running.
+      radiusScale: 1 + 0.06 * Math.sin(this.cloudPulseCoef * Math.PI * 2),
       stroked: true,
       filled: true,
       getLineColor: [120, 120, 120, 200] as [number, number, number, number],
@@ -3602,13 +3665,16 @@ export class DeckGLMap {
   }
 
   // Inter-region traffic: thin monochrome white arcs, opacity scaled by weight
-  // (no rainbow). Works on the globe as-is.
-  private createTrafficArcsLayer(): ArcLayer<TrafficArc> {
+  // (no rainbow). A travelling white pulse (AnimatedArcLayer, coef advanced by
+  // the cloud-pulse RAF) shows flow direction source→target. Works on the globe
+  // as-is (uv.x is the along-arc ratio in both projections).
+  private createTrafficArcsLayer(): AnimatedArcLayer<TrafficArc> {
     const maxWeight = Math.max(1, ...this.trafficArcsData.map((a) => a.weight || 0));
     const alpha = (w: number): number => Math.round(40 + Math.min(1, (w || 0) / maxWeight) * 170);
-    return new ArcLayer<TrafficArc>({
+    return new AnimatedArcLayer<TrafficArc>({
       id: 'trafficArcs',
       data: this.trafficArcsData,
+      coef: this.cloudPulseCoef,
       getSourcePosition: (d) => [d.fromLon, d.fromLat],
       getTargetPosition: (d) => [d.toLon, d.toLat],
       getSourceColor: (d) => [255, 255, 255, alpha(d.weight)] as [number, number, number, number],
@@ -4249,6 +4315,7 @@ export class DeckGLMap {
     for (const id of this.cloudMapTimers) clearInterval(id);
     this.cloudMapTimers = [];
 
+    this.stopCloudPulse();
     this.stopAutoRotate();
     if (this.autoRotateIdleTimer) {
       clearTimeout(this.autoRotateIdleTimer);
