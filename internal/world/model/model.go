@@ -48,8 +48,9 @@ const (
 // Observation is one source's measurement of one entity at ingest time. Metrics
 // carries only what the source actually measured; unset metrics retain their
 // last-known value in the store (sticky state), so a throttled or absent feed
-// degrades to staleness, never to zero. Src is the source label, stamped by the
-// engine at ingest — adapters don't set it.
+// degrades to staleness, never to zero. Src is the source label: the engine
+// stamps it with the source name at ingest, unless the adapter already set a
+// more specific provenance (e.g. a fallback upstream), which is preserved.
 type Observation struct {
 	ID      string
 	Kind    string
