@@ -149,11 +149,17 @@ export class MapComponent {
   private boundVisibilityHandler!: () => void;
   private renderScheduled = false;
   private lastRenderTime = 0;
+  // Cached container size. Reading clientWidth/clientHeight forces a synchronous
+  // layout; the draw paths ran dozens of such reads per frame. These are the
+  // draw-path source of truth, refreshed only by measureContainer().
+  private containerWidth = 0;
+  private containerHeight = 0;
   private readonly MIN_RENDER_INTERVAL_MS = 100;
   private healthCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(container: HTMLElement, initialState: MapState) {
     this.container = container;
+    this.measureContainer(); // prime the cached size before the first render
     this.state = initialState;
     this.hotspots = [...INTEL_HOTSPOTS];
 
@@ -199,6 +205,15 @@ export class MapComponent {
     });
   }
 
+  // measureContainer is the ONLY place the container's size is read live from
+  // the DOM (a layout-forcing read). The constructor primes it and the
+  // ResizeObserver refreshes it; every draw path reads the cached
+  // containerWidth/Height instead, so a frame never forces synchronous layout.
+  private measureContainer(): void {
+    this.containerWidth = this.container.clientWidth;
+    this.containerHeight = this.container.clientHeight;
+  }
+
   private setupResizeObserver(): void {
     let lastWidth = 0;
     let lastHeight = 0;
@@ -208,6 +223,7 @@ export class MapComponent {
         if (width > 0 && height > 0 && (width !== lastWidth || height !== lastHeight)) {
           lastWidth = width;
           lastHeight = height;
+          this.measureContainer(); // refresh the cached size (sole live read site)
           requestAnimationFrame(() => this.render());
         }
       }
@@ -817,8 +833,8 @@ export class MapComponent {
     }
     this.lastRenderTime = now;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
 
     // Skip render if container has no dimensions (tab throttled, hidden, etc.)
     if (width === 0 || height === 0) {
@@ -1908,8 +1924,8 @@ export class MapComponent {
 
     // Tech Events / Conferences (📅 icons) - with clustering
     if (this.state.layers.techEvents && this.techEvents.length > 0) {
-      const mapWidth = this.container.clientWidth;
-      const mapHeight = this.container.clientHeight;
+      const mapWidth = this.containerWidth;
+      const mapHeight = this.containerHeight;
 
       // Map events to have lon property for clustering, filter visible
       const visibleEvents = this.techEvents
@@ -2820,8 +2836,8 @@ export class MapComponent {
   }
 
   public flashLocation(lat: number, lon: number, durationMs = 2000): void {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     if (!width || !height) return;
 
     const projection = this.getProjection(width, height);
@@ -2972,8 +2988,8 @@ export class MapComponent {
     const hotspot = this.hotspots.find(h => h.id === id);
     if (!hotspot) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([hotspot.lon, hotspot.lat]);
     if (!pos) return;
@@ -2994,8 +3010,8 @@ export class MapComponent {
     const conflict = CONFLICT_ZONES.find(c => c.id === id);
     if (!conflict) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection(conflict.center as [number, number]);
     if (!pos) return;
@@ -3012,8 +3028,8 @@ export class MapComponent {
     const base = MILITARY_BASES.find(b => b.id === id);
     if (!base) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([base.lon, base.lat]);
     if (!pos) return;
@@ -3030,8 +3046,8 @@ export class MapComponent {
     const pipeline = PIPELINES.find(p => p.id === id);
     if (!pipeline || pipeline.points.length === 0) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const midPoint = pipeline.points[Math.floor(pipeline.points.length / 2)] as [number, number];
     const pos = projection(midPoint);
@@ -3049,8 +3065,8 @@ export class MapComponent {
     const cable = UNDERSEA_CABLES.find(c => c.id === id);
     if (!cable || cable.points.length === 0) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const midPoint = cable.points[Math.floor(cable.points.length / 2)] as [number, number];
     const pos = projection(midPoint);
@@ -3068,8 +3084,8 @@ export class MapComponent {
     const dc = AI_DATA_CENTERS.find(d => d.id === id);
     if (!dc) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([dc.lon, dc.lat]);
     if (!pos) return;
@@ -3086,8 +3102,8 @@ export class MapComponent {
     const facility = NUCLEAR_FACILITIES.find(n => n.id === id);
     if (!facility) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([facility.lon, facility.lat]);
     if (!pos) return;
@@ -3104,8 +3120,8 @@ export class MapComponent {
     const irradiator = GAMMA_IRRADIATORS.find(i => i.id === id);
     if (!irradiator) return;
 
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([irradiator.lon, irradiator.lat]);
     if (!pos) return;
@@ -3150,8 +3166,8 @@ export class MapComponent {
 
   private clampPan(): void {
     const zoom = this.state.zoom;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
 
     // Allow generous panning - maps should be explorable
     // Scale limits with zoom to allow reaching edges at higher zoom
@@ -3165,8 +3181,8 @@ export class MapComponent {
   private applyTransform(): void {
     this.clampPan();
     const zoom = this.state.zoom;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
 
     // With transform-origin: 0 0, we need to offset to keep center in view
     // Formula: translate first to re-center, then scale
@@ -3297,8 +3313,8 @@ export class MapComponent {
   }
 
   public getCenter(): { lat: number; lon: number } | null {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     if (!projection.invert) return null;
     const zoom = this.state.zoom;
@@ -3345,8 +3361,8 @@ export class MapComponent {
 
   public setCenter(lat: number, lon: number): void {
     console.log('[Map] setCenter called:', { lat, lon });
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
     const projection = this.getProjection(width, height);
     const pos = projection([lon, lat]);
     console.log('[Map] projected pos:', pos, 'container:', { width, height }, 'zoom:', this.state.zoom);
