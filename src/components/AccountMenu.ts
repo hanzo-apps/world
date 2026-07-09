@@ -61,8 +61,10 @@ export class AccountMenu {
   }
 
   private renderSignedOut(): void {
-    this.element.innerHTML = `<button class="am-signin" type="button">${accountIcon()}<span>Sign in</span></button>`;
-    this.element.querySelector('.am-signin')?.addEventListener('click', () => void login());
+    // Primary CTA (shared .hz-cta pill): signed-out users see one clear
+    // "Try Hanzo World" action that runs the same OIDC login the account chip uses.
+    this.element.innerHTML = `<button class="am-cta hz-cta" type="button">Try Hanzo World</button>`;
+    this.element.querySelector('.am-cta')?.addEventListener('click', () => void login());
   }
 
   private render(): void {
@@ -179,10 +181,6 @@ function avatar(u: IamUser, size = 22): string {
   return `<span class="am-avatar am-avatar-initials" style="width:${size}px;height:${size}px;line-height:${size}px;font-size:${Math.round(size * 0.42)}px">${initials}</span>`;
 }
 
-function accountIcon(): string {
-  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-}
-
 function injectStyles(): void {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
@@ -190,13 +188,14 @@ function injectStyles(): void {
   style.textContent = `
 .account-menu { position: relative; display: inline-flex; }
 .account-menu button { font: inherit; cursor: pointer; }
-.am-signin, .am-trigger {
+.am-trigger {
   display: inline-flex; align-items: center; gap: 7px;
   height: 30px; padding: 0 10px; font-size: 13px; font-weight: 500;
-  color: inherit; background: var(--panel-bg, rgba(255,255,255,0.04));
+  color: inherit; background: var(--surface, rgba(255,255,255,0.04));
   border: 1px solid var(--border, rgba(255,255,255,0.14)); border-radius: 6px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
 }
-.am-signin:hover, .am-trigger:hover { background: var(--overlay-medium, rgba(255,255,255,0.08)); }
+.am-trigger:hover { border-color: var(--border-strong, rgba(255,255,255,0.24)); background: var(--surface-hover, rgba(255,255,255,0.08)); }
 .am-scope { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .am-caret { opacity: 0.6; font-size: 10px; }
 .am-avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--accent, #6366f1); }

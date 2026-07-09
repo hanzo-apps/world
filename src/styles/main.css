@@ -25,6 +25,10 @@
   --text-faint: #555;
   --text-ghost: #444;
   --accent: #fff;
+  /* Foreground that sits ON --accent (primary buttons). Must be explicit —
+     never reuse --panel-bg here (it is transparent → invisible text). */
+  --accent-fg: #000;
+  --accent-hover: #e6e6e6;
 
   /* Overlays & shadows */
   --overlay-subtle: rgba(255, 255, 255, 0.03);
@@ -209,6 +213,8 @@
   --text-faint: #aaa;
   --text-ghost: #bbb;
   --accent: #111111;
+  --accent-fg: #ffffff;
+  --accent-hover: #000000;
 
   /* Overlays & shadows */
   --overlay-subtle: rgba(0, 0, 0, 0.02);
@@ -328,6 +334,26 @@ canvas,
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Hanzo H mark — brand anchor at the far left, before the variant switcher. */
+.header-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  text-decoration: none;
+  flex: none;
+  margin-right: 2px;
+  opacity: 0.95;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.header-logo:hover {
+  opacity: 1;
+  transform: scale(1.04);
+}
+.header-logo svg {
+  display: block;
 }
 
 /* Slot reserved for the IAM AccountMenu (injected by a separate branch) */
@@ -751,6 +777,42 @@ canvas,
   color: var(--text-dim);
 }
 
+/* ── Primary CTA — one reusable inverted-monochrome pill (hanzo.ai style) ────
+   White pill + black text (dark) / black pill + white text (light). The single
+   primary-action pattern: header "Try Hanzo World" and every signed-out panel
+   CTA use this class, so there is exactly one way to render a primary button. */
+.hz-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.hz-cta:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.hz-cta:active { transform: translateY(0); }
+.hz-cta:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--overlay-heavy); }
+.hz-cta svg { flex: none; }
+/* Larger, block CTA used inside signed-out panels. */
+.hz-cta-lg { height: 34px; padding: 0 18px; font-size: 13.5px; }
+
 .main-content {
   flex: 1 1 0;
   min-height: 0;
@@ -1017,17 +1079,14 @@ body.panel-drag-active iframe {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--overlay-subtle);
-  border-bottom: 1px solid var(--border);
+  padding: 10px 12px 8px;
+  /* Unified widget: header flows into body — no band, no divider line.
+     One subtle 1px outer outline (on .panel) defines the whole card. */
+  background: transparent;
   flex-shrink: 0;
   position: relative;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.panel-header-error {
-  background: rgba(255, 50, 50, 0.15);
-  border-bottom-color: rgba(255, 80, 80, 0.5);
+  min-height: 34px;
+  transition: color 0.3s ease;
 }
 
 .panel-header-error .panel-title {
@@ -1058,10 +1117,11 @@ body.panel-drag-active iframe {
 }
 
 .panel-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
   text-transform: none;
-  letter-spacing: 1px;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 
@@ -1594,15 +1654,15 @@ body.panel-drag-active iframe {
 }
 
 .webcam-region-btn.active {
-  background: var(--red);
-  border-color: var(--red);
-  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
 
 .webcam-view-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-fg);
 }
 
 .webcam-grid {
@@ -1707,9 +1767,9 @@ body.panel-drag-active iframe {
 }
 
 .webcam-feed-btn.active {
-  background: var(--red);
-  border-color: var(--red);
-  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
 
 .webcam-back-btn {
@@ -4518,19 +4578,23 @@ a.prediction-link:hover {
 
 .monitor-add-btn {
   width: 100%;
-  padding: 6px;
-  background: var(--green);
-  border: none;
-  color: var(--bg);
+  padding: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
   font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
   text-transform: none;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .monitor-add-btn:hover {
-  opacity: 0.9;
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .monitor-tag {
@@ -4721,7 +4785,7 @@ a.prediction-link:hover {
   font-size: 14px;
   font-weight: 600;
   text-transform: none;
-  letter-spacing: 1px;
+  letter-spacing: -0.01em;
 }
 
 .modal-close {
@@ -4778,8 +4842,47 @@ a.prediction-link:hover {
 }
 
 .panel-toggle-label {
-  font-size: 10px;
+  font-size: 12px;
+  letter-spacing: -0.01em;
   text-transform: none;
+}
+
+/* Panels modal footer — hint + one-click Reset layout. Sticks to the modal's
+   bottom edge so Reset is always reachable no matter how long the panel list. */
+.panels-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  bottom: -20px;
+  margin: 14px -20px -20px;
+  padding: 13px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.panels-modal-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: -0.01em;
+}
+.panels-reset-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.panels-reset-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 /* Sources Modal */
@@ -4875,9 +4978,9 @@ a.prediction-link:hover {
 }
 
 .source-toggle-item.active .source-toggle-checkbox {
-  background: var(--green);
-  border-color: var(--green);
-  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
 
 .source-toggle-label {
@@ -8146,6 +8249,44 @@ a.prediction-link:hover {
     display: none;
   }
 
+  /* Compact header at tablet/phone widths: the labeled variant switcher +
+     status + region overflow narrow screens. Collapse the switcher to icons,
+     drop the redundant LIVE chip, and let the whole bar scroll horizontally so
+     every control (incl. the primary CTA) stays reachable without clipping. */
+  .header {
+    gap: 8px;
+    padding: 0 10px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .header::-webkit-scrollbar {
+    display: none;
+  }
+  .header-left,
+  .header-right {
+    gap: 8px;
+    flex: none;
+  }
+  .header-right {
+    margin-left: auto;
+  }
+  .variant-label {
+    display: none;
+  }
+  .variant-option {
+    padding: 5px 8px;
+  }
+  .variant-option .variant-icon {
+    font-size: 13px;
+  }
+  .status-indicator {
+    display: none;
+  }
+
   /* Simplify layer help popup for mobile */
   .layer-help-popup {
     max-width: calc(100vw - 20px);
@@ -8188,22 +8329,10 @@ a.prediction-link:hover {
     right: 8px !important;
   }
 
-  /* Stack header on very small screens */
+  /* Very small screens: keep the single scrollable header row (set up at
+     ≤768px) and just drop non-essential items to shorten the scroll. */
   .header {
-    flex-wrap: wrap;
-    padding: 8px;
-  }
-
-  .header-left,
-  .header-center,
-  .header-right {
-    flex-basis: 100%;
-    justify-content: center;
-  }
-
-  .header-center {
-    order: -1;
-    margin-bottom: 8px;
+    padding: 0 8px;
   }
 
   /* Hide non-essential header items */
@@ -15063,20 +15192,15 @@ a.domain-item:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
 .ai-analyst-input:focus { outline: none; border-color: var(--accent); }
 .ai-analyst-send {
   flex: none; width: 30px; height: 30px; cursor: pointer;
-  font-size: 15px; line-height: 1; color: var(--panel-bg);
+  font-size: 15px; line-height: 1; color: var(--accent-fg);
   background: var(--accent); border: 0; border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
 }
-.ai-analyst-send:hover { opacity: 0.85; }
+.ai-analyst-send:hover { background: var(--accent-hover); }
 
-/* signed-out */
+/* signed-out — CTA uses the shared .hz-cta primary pill (see header CTA). */
 .ai-analyst-signedout { padding: 20px 14px; text-align: center; color: var(--text-dim); }
 .ai-analyst-signedout p { font-size: 13px; margin-bottom: 12px; }
-.ai-analyst-signin {
-  font: inherit; font-size: 13px; cursor: pointer;
-  padding: 7px 16px; color: var(--panel-bg);
-  background: var(--accent); border: 0; border-radius: var(--radius-sm);
-}
-.ai-analyst-signin:hover { opacity: 0.85; }
 
 /* ── Analyst-created custom feed panels ────────────────────────────────── */
 .custom-feed-list { display: flex; flex-direction: column; }
