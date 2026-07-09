@@ -26,8 +26,14 @@ export const COMMODITIES: Commodity[] = [
 
 export const MARKET_SYMBOLS: MarketSymbol[] = [
   { symbol: '^GSPC', name: 'S&P 500', display: 'SPX' },
-  { symbol: '^DJI', name: 'Dow Jones', display: 'DOW' },
   { symbol: '^IXIC', name: 'NASDAQ', display: 'NDX' },
+  { symbol: '^DJI', name: 'Dow Jones', display: 'DOW' },
+  { symbol: '^RUT', name: 'Russell 2000', display: 'RUT' },
+  { symbol: '^VIX', name: 'Volatility', display: 'VIX' },
+  { symbol: '^FTSE', name: 'FTSE 100', display: 'FTSE' },
+  { symbol: '^GDAXI', name: 'DAX', display: 'DAX' },
+  { symbol: '^N225', name: 'Nikkei 225', display: 'N225' },
+  { symbol: '^HSI', name: 'Hang Seng', display: 'HSI' },
   { symbol: 'AAPL', name: 'Apple', display: 'AAPL' },
   { symbol: 'MSFT', name: 'Microsoft', display: 'MSFT' },
   { symbol: 'NVDA', name: 'NVIDIA', display: 'NVDA' },
