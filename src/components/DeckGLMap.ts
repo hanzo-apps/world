@@ -39,6 +39,14 @@ import type {
 } from '@/types';
 import { ArcLayer } from '@deck.gl/layers';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import {
+  getChainNodes,
+  getByoGpu,
+  getTraffic,
+  type ChainNetwork,
+  type ByoGpu,
+  type TrafficArc,
+} from '@/services/cloud-map';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
@@ -127,6 +135,20 @@ interface TechEventMarker {
   endDate: string;
   url: string | null;
   daysUntil: number;
+}
+
+// One chain-node scatter point: a validator node position carrying its network
+// context so the tooltip can read "Lux Network · block 12,345 · 42 peers".
+interface ChainDot {
+  lat: number;
+  lon: number;
+  city: string;
+  kind: string;
+  networkName: string;
+  chainId: number;
+  blockHeight: number;
+  peers: number;
+  live: boolean;
 }
 
 // View presets with longitude, latitude, zoom
@@ -277,6 +299,12 @@ export class DeckGLMap {
   private displacementFlows: DisplacementFlow[] = [];
   private climateAnomalies: ClimateAnomaly[] = [];
 
+  // Hanzo World cloud map layers (chainNodes / byoGpu / trafficArcs)
+  private chainNetworks: ChainNetwork[] = [];
+  private byoGpus: ByoGpu[] = [];
+  private trafficArcsData: TrafficArc[] = [];
+  private cloudMapTimers: ReturnType<typeof setInterval>[] = [];
+
   // Country highlight state
   private countryGeoJsonLoaded = false;
   private countryHoverSetup = false;
@@ -381,6 +409,29 @@ export class DeckGLMap {
     this.createTimeSlider();
     this.createLayerToggles();
     this.createLegend();
+    this.startCloudMapPolling();
+  }
+
+  // Cloud map data — same-origin /v1/world/cloud/* polled on independent cadences
+  // (chain 30s, traffic 15s, gpu 60s). Best-effort: a 404 / failure yields null so
+  // the layer stays empty, never a throw. Skips ticks while paused/offscreen; all
+  // timers are cleared in destroy().
+  private startCloudMapPolling(): void {
+    const pull = <T>(fn: () => Promise<T | null>, apply: (data: T) => void, everyMs: number): void => {
+      const tick = async (): Promise<void> => {
+        if (this.renderPaused || this.webglLost) return;
+        const data = await fn();
+        if (data) {
+          apply(data);
+          this.render();
+        }
+      };
+      void tick();
+      this.cloudMapTimers.push(setInterval(() => void tick(), everyMs));
+    };
+    pull(getChainNodes, (d) => { this.chainNetworks = d.networks ?? []; }, 30_000);
+    pull(getTraffic, (d) => { this.trafficArcsData = d.arcs ?? []; }, 15_000);
+    pull(getByoGpu, (d) => { this.byoGpus = d.gpus ?? []; }, 60_000);
   }
 
   private setupDOM(): void {
@@ -1171,6 +1222,19 @@ export class DeckGLMap {
     // Gulf FDI investments layer
     if (mapLayers.gulfInvestments) {
       layers.push(this.createGulfInvestmentsLayer());
+    }
+
+    // Hanzo World cloud map — chain validator nodes, BYO GPU fleet, traffic arcs.
+    // View-agnostic: Scatterplot (meters radius) + Arc render on both the flat
+    // Mercator map and the 3D globe, so no globe substitution is needed.
+    if (mapLayers.chainNodes && this.chainNetworks.length > 0) {
+      layers.push(this.createChainNodesLayer());
+    }
+    if (mapLayers.byoGpu && this.byoGpus.length > 0) {
+      layers.push(this.createByoGpuLayer());
+    }
+    if (mapLayers.trafficArcs && this.trafficArcsData.length > 0) {
+      layers.push(this.createTrafficArcsLayer());
     }
 
     // News geo-locations (always shown if data exists)
@@ -2491,6 +2555,17 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${t('popups.cyberThreat.title')}</strong><br/>${text(obj.severity || t('components.deckgl.tooltip.medium'))} · ${text(obj.country || t('popups.unknown'))}</div>` };
       case 'news-locations-layer':
         return { html: `<div class="deckgl-tooltip"><strong>📰 ${t('components.deckgl.tooltip.news')}</strong><br/>${text(obj.title?.slice(0, 80) || '')}</div>` };
+      case 'chainNodes': {
+        const block = Number(obj.blockHeight || 0).toLocaleString();
+        const down = obj.live ? '' : ' · down';
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.networkName)}</strong><br/>block ${block} · ${text(obj.peers)} peers${down}</div>` };
+      }
+      case 'byoGpu': {
+        const where = obj.region ? ` · ${text(obj.region)}` : '';
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.model)} ×${text(obj.count)}</strong><br/>${text(obj.city)}${where}</div>` };
+      }
+      case 'trafficArcs':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.label)}</strong><br/>weight ${text(obj.weight)}</div>` };
       case 'gulf-investments-layer': {
         const inv = obj as GulfInvestment;
         const flag = inv.investingCountry === 'SA' ? '🇸🇦' : '🇦🇪';
@@ -2853,6 +2928,10 @@ export class DeckGLMap {
         { key: 'waterways', label: t('components.deckgl.layers.strategicWaterways'), icon: '&#9875;' },
         { key: 'economic', label: t('components.deckgl.layers.economicCenters'), icon: '&#128176;' },
         { key: 'minerals', label: t('components.deckgl.layers.criticalMinerals'), icon: '&#128142;' },
+        // Hanzo World cloud map layers (default OFF in world; ON for saas/crypto via config)
+        { key: 'chainNodes', label: 'Chain nodes', icon: '&#9939;' },
+        { key: 'byoGpu', label: 'BYO GPUs', icon: '&#128187;' },
+        { key: 'trafficArcs', label: 'Traffic', icon: '&#8644;' },
       ];
 
     toggles.innerHTML = `
@@ -3450,6 +3529,98 @@ export class DeckGLMap {
       updateTriggers: {
         getFillColor: this.climateAnomalies.length,
         getRadius: this.climateAnomalies.length,
+      },
+    });
+  }
+
+  // Hanzo World cloud map layers ────────────────────────────────────────────
+
+  // Chain validator nodes: white filled dots with a subtle ring, one per node,
+  // radius scaled by the network's peer share. Down networks render dimmed.
+  private createChainNodesLayer(): ScatterplotLayer<ChainDot> {
+    const maxPeers = Math.max(1, ...this.chainNetworks.map((n) => n.peers || 0));
+    const dots: ChainDot[] = [];
+    for (const net of this.chainNetworks) {
+      for (const node of net.nodes ?? []) {
+        dots.push({
+          lat: node.lat, lon: node.lon, city: node.city, kind: node.kind,
+          networkName: net.name, chainId: net.chainId, blockHeight: net.blockHeight,
+          peers: net.peers, live: net.live,
+        });
+      }
+    }
+    return new ScatterplotLayer<ChainDot>({
+      id: 'chainNodes',
+      data: dots,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => 45000 + (d.peers / maxPeers) * 75000,
+      getFillColor: (d) => d.live
+        ? [240, 240, 240, 235] as [number, number, number, number]
+        : [136, 136, 136, 170] as [number, number, number, number],
+      radiusUnits: 'meters',
+      radiusMinPixels: 4,
+      radiusMaxPixels: 16,
+      stroked: true,
+      filled: true,
+      getLineColor: [120, 120, 120, 200] as [number, number, number, number],
+      getLineWidth: 1,
+      lineWidthMinPixels: 1,
+      pickable: true,
+      updateTriggers: {
+        getRadius: dots.length,
+        getFillColor: dots.length,
+      },
+    });
+  }
+
+  // BYO GPU fleet: hollow stroked rings (deliberately distinct from the filled
+  // chain-node dots), radius scaled by GPU count, dimmed when not online.
+  private createByoGpuLayer(): ScatterplotLayer<ByoGpu> {
+    const maxCount = Math.max(1, ...this.byoGpus.map((g) => g.count || 0));
+    return new ScatterplotLayer<ByoGpu>({
+      id: 'byoGpu',
+      data: this.byoGpus,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => 40000 + (d.count / maxCount) * 60000,
+      radiusUnits: 'meters',
+      radiusMinPixels: 5,
+      radiusMaxPixels: 18,
+      stroked: true,
+      filled: false,
+      getLineColor: (d) => d.status === 'online'
+        ? [255, 255, 255, 220] as [number, number, number, number]
+        : [136, 136, 136, 160] as [number, number, number, number],
+      getLineWidth: 2,
+      lineWidthMinPixels: 1.5,
+      lineWidthMaxPixels: 3,
+      pickable: true,
+      updateTriggers: {
+        getRadius: this.byoGpus.length,
+        getLineColor: this.byoGpus.length,
+      },
+    });
+  }
+
+  // Inter-region traffic: thin monochrome white arcs, opacity scaled by weight
+  // (no rainbow). Works on the globe as-is.
+  private createTrafficArcsLayer(): ArcLayer<TrafficArc> {
+    const maxWeight = Math.max(1, ...this.trafficArcsData.map((a) => a.weight || 0));
+    const alpha = (w: number): number => Math.round(40 + Math.min(1, (w || 0) / maxWeight) * 170);
+    return new ArcLayer<TrafficArc>({
+      id: 'trafficArcs',
+      data: this.trafficArcsData,
+      getSourcePosition: (d) => [d.fromLon, d.fromLat],
+      getTargetPosition: (d) => [d.toLon, d.toLat],
+      getSourceColor: (d) => [255, 255, 255, alpha(d.weight)] as [number, number, number, number],
+      getTargetColor: (d) => [255, 255, 255, Math.round(alpha(d.weight) * 0.55)] as [number, number, number, number],
+      getWidth: (d) => 0.5 + Math.min(1, (d.weight || 0) / maxWeight) * 1.5,
+      widthMinPixels: 0.5,
+      widthMaxPixels: 2,
+      pickable: true,
+      updateTriggers: {
+        getSourceColor: this.trafficArcsData.length,
+        getTargetColor: this.trafficArcsData.length,
+        getWidth: this.trafficArcsData.length,
       },
     });
   }
@@ -4074,6 +4245,9 @@ export class DeckGLMap {
       clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = null;
     }
+
+    for (const id of this.cloudMapTimers) clearInterval(id);
+    this.cloudMapTimers = [];
 
     this.stopAutoRotate();
     if (this.autoRotateIdleTimer) {
