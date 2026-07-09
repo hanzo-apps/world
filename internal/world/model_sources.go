@@ -100,13 +100,50 @@ func gdeltCountryQuery(kws []string) string {
 	return "(" + strings.Join(parts, " OR ") + ")"
 }
 
-// sourceConflict folds ACLED protest/riot counts per country. Key-gated: with no
-// ACLED_ACCESS_TOKEN it contributes nothing and countries keep their baseline.
+// Conflict source modes. ACLED is authoritative when a key is configured; the
+// GDELT proxy fills the signal when it is absent, so the live model never shows
+// a flat-zero conflict dimension just because ACLED is unconfigured.
+const (
+	conflictModeACLED      = "acled"
+	conflictModeGDELTProxy = "gdelt-proxy"
+	// conflictProxySrc is the honest provenance label stamped on proxy
+	// observations so no consumer mistakes them for real ACLED events.
+	conflictProxySrc = conflictModeGDELTProxy
+)
+
+// conflictKeywords stand in for ACLED protest/riot/violence categories when the
+// conflict signal is synthesized from GDELT article volume.
+var conflictKeywords = []string{
+	"protest", "clash", "riot", "attack", "militant", "airstrike", "insurgency", "unrest",
+}
+
+// conflictSourceMode is the ONE selection rule (decomplected from fetching, so it
+// is unit-testable): use real ACLED only when a key is present; otherwise the
+// GDELT proxy. The choice keys off KEY PRESENCE, never off a result being empty —
+// a credentialed ACLED call that legitimately returns zero events stays ACLED
+// (honestly empty), it is not overwritten by proxy noise.
+func conflictSourceMode(acledToken string) string {
+	if strings.TrimSpace(acledToken) != "" {
+		return conflictModeACLED
+	}
+	return conflictModeGDELTProxy
+}
+
+// sourceConflict folds conflict pressure per country. With an ACLED key it uses
+// real ACLED protest/riot counts; without one it falls back to a GDELT proxy
+// (conflict-keyword article volume per country), labeled honestly as
+// "gdelt-proxy" so provenance is never misrepresented.
 func (s *Server) sourceConflict() ([]model.Observation, error) {
 	token := env("ACLED_ACCESS_TOKEN")
-	if token == "" {
-		return nil, nil
+	if conflictSourceMode(token) == conflictModeACLED {
+		return s.sourceConflictACLED(token)
 	}
+	return s.sourceConflictGDELTProxy()
+}
+
+// sourceConflictACLED folds real ACLED protest/riot counts per country. An empty
+// result is honestly empty (countries keep prior conflict state), NOT proxied.
+func (s *Server) sourceConflictACLED(token string) ([]model.Observation, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	protests, err := s.fetchACLEDProtests(ctx, token)
@@ -127,6 +164,68 @@ func (s *Server) sourceConflict() ([]model.Observation, error) {
 		})
 	}
 	return out, nil
+}
+
+// sourceConflictGDELTProxy synthesizes per-country conflict-event counts from
+// GDELT DOC article volume matching conflict keywords, for when no ACLED key is
+// configured. Reuses the shared fetchGDELTArticles helper; concurrency is capped
+// like sourceGDELT so GDELT isn't hammered. Each observation is stamped
+// gdelt-proxy so it is never mistaken for authoritative ACLED data.
+func (s *Server) sourceConflictGDELTProxy() ([]model.Observation, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var (
+		mu  sync.Mutex
+		out []model.Observation
+		wg  sync.WaitGroup
+	)
+	sem := make(chan struct{}, 3)
+	for _, c := range tier1Countries {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(code, name string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			arts, err := s.fetchGDELTArticles(ctx, gdeltConflictQuery(name), "7d", 100)
+			if err != nil || len(arts) == 0 {
+				return
+			}
+			mu.Lock()
+			out = append(out, model.Observation{
+				ID: code, Kind: model.KindCountry, Name: name,
+				Metrics: map[string]float64{model.MetricConflictEvents: gdeltProxyConflictCount(len(arts))},
+				Src:     conflictProxySrc,
+			})
+			mu.Unlock()
+		}(c.code, c.name)
+	}
+	wg.Wait()
+	return out, nil
+}
+
+// gdeltConflictQuery builds a GDELT DOC query for conflict coverage of one
+// country by NAME: "United States" (protest OR clash OR ...).
+func gdeltConflictQuery(country string) string {
+	return `"` + country + `" (` + strings.Join(conflictKeywords, " OR ") + ")"
+}
+
+// GDELT article volume runs far higher and noisier than real ACLED event counts,
+// so the proxy is compressed and capped onto the MetricConflictEvents scale
+// (~0..43 where the composite saturates): a MODERATE, bounded signal that ranks
+// hot vs quiet countries without ever masquerading as authoritative event data.
+const (
+	gdeltProxyArticleWeight = 0.4
+	gdeltProxyMaxEvents     = 40.0
+)
+
+// gdeltProxyConflictCount maps conflict-keyword article volume to an
+// ACLED-event-equivalent count.
+func gdeltProxyConflictCount(articles int) float64 {
+	if articles <= 0 {
+		return 0
+	}
+	return math.Min(gdeltProxyMaxEvents, float64(articles)*gdeltProxyArticleWeight)
 }
 
 // sourceTheaters folds live military-air posture per strategic theater from
