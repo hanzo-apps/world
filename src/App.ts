@@ -1649,28 +1649,28 @@ export class App {
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
                data-variant="full"
                title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">${icon('globe', 15)}</span>
+              <span class="variant-icon">🌍</span>
               <span class="variant-label">${t('header.world')}</span>
             </a>
             <a href="?variant=tech"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
                title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">${icon('cpu', 15)}</span>
+              <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
             </a>
             <a href="?variant=finance"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
                data-variant="finance"
                title="${t('header.finance')}${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">${icon('trending-up', 15)}</span>
+              <span class="variant-icon">📈</span>
               <span class="variant-label">${t('header.finance')}</span>
             </a>
             <a href="?variant=saas"
                class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
                data-variant="saas"
                title="${t('header.cloud')}${SITE_VARIANT === 'saas' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">${icon('cloud', 15)}</span>
+              <span class="variant-icon">☁️</span>
               <span class="variant-label">${t('header.cloud')}</span>
             </a>
           </div>
