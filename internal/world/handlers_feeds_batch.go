@@ -19,9 +19,10 @@ import (
 // endpoint itself always answers 200 to a valid request.
 
 const (
-	feedsBatchMaxURLs  = 30
-	feedsBatchMaxItems = 8
-	feedsBatchParallel = 8
+	feedsBatchMaxURLs      = 30
+	feedsBatchMaxItems     = 8
+	feedsBatchParallel     = 12
+	feedsBatchFetchTimeout = 8 * time.Second // one slow upstream must not hold a category hostage
 )
 
 type feedBatchItem struct {
@@ -94,6 +95,8 @@ func (s *Server) feedXML(ctx context.Context, feedURL string) ([]byte, bool) {
 	if v, ok := s.cache.Get(key); ok {
 		return v.([]byte), true
 	}
+	ctx, cancel := context.WithTimeout(ctx, feedsBatchFetchTimeout)
+	defer cancel()
 	body, status, err := s.getAllowlisted(ctx, feedURL, allowedRSSDomains, map[string]string{
 		"User-Agent": browserUA,
 		"Accept":     "application/rss+xml, application/xml, text/xml, */*",
