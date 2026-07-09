@@ -1860,7 +1860,15 @@ export class App {
     this.criticalBannerEl.querySelector('.banner-dismiss')?.addEventListener('click', () => {
       this.criticalBannerEl?.classList.add('dismissed');
       document.body.classList.remove('has-critical-banner');
+      document.documentElement.style.removeProperty('--critical-banner-h');
       sessionStorage.setItem('banner-dismissed', Date.now().toString());
+    });
+
+    // Pad the grid by the banner's REAL height (it wraps at narrow widths), so the
+    // fixed banner never hides the first row or leaves a gap.
+    requestAnimationFrame(() => {
+      const h = this.criticalBannerEl?.offsetHeight;
+      if (h) document.documentElement.style.setProperty('--critical-banner-h', `${h}px`);
     });
   }
 
@@ -2305,6 +2313,8 @@ export class App {
 
     this.applyPanelSettings();
     this.applyInitialUrlState();
+    // Heal any stale/saved state that left a panel ahead of the full-width map.
+    this.healMapAnchor();
 
     // Floating AI analyst launcher — available on every variant, independent of
     // whether the in-grid analyst panel is shown. Same host, same code path.
@@ -2412,6 +2422,34 @@ export class App {
     localStorage.setItem(this.PANEL_ORDER_KEY, JSON.stringify(order));
   }
 
+  /** True when the map panel currently spans the full grid width (its default). */
+  private mapIsFullWidth(): boolean {
+    const mapSection = document.getElementById('mapSection');
+    if (!mapSection) return false;
+    const gc = mapSection.style.gridColumn;
+    if (!gc || gc === '1 / -1') return true;
+    return this.currentMapCols() >= this.gridColumnCount();
+  }
+
+  /**
+   * Invariant: a FULL-WIDTH map must be the first grid child. CSS Grid otherwise
+   * wraps whatever panel precedes it into row 1 (a thin sliver top-left) and
+   * shoves the full-width map down a row, leaving a black void under the header —
+   * the exact broken layout from the CTO screenshots. This is the single heal
+   * chokepoint: cheap, idempotent, called after every layout mutation (load,
+   * drag-commit, width resize). A half-width map may legitimately share row 1, so
+   * the heal only fires while the map is full-width.
+   */
+  private healMapAnchor(): void {
+    const grid = document.getElementById('panelsGrid');
+    const mapSection = document.getElementById('mapSection');
+    if (!grid || !mapSection || mapSection.parentElement !== grid) return;
+    if (!this.mapIsFullWidth()) return;
+    if (grid.firstElementChild === mapSection) return;
+    grid.insertBefore(mapSection, grid.firstElementChild);
+    this.savePanelOrder();
+  }
+
   // ── AI Analyst host (agentic control surface) ───────────────────────────────
   // The narrow port the AI analyst drives. All dashboard mutation stays here in
   // App; the analyst services only see this interface.
@@ -2471,6 +2509,7 @@ export class App {
       if (anchorKey === 'live-news' && opts.before) return false; // can't sit before live-news
       grid.insertBefore(el, opts.before ? anchor : anchor.nextSibling);
     }
+    this.healMapAnchor();
     this.savePanelOrder();
     return true;
   }
@@ -2669,7 +2708,12 @@ export class App {
     el.dataset.panel = key;
     attachPanelDrag(el, {
       getGrid: () => document.getElementById('panelsGrid'),
-      onReorder: () => this.savePanelOrder(),
+      onReorder: () => {
+        this.healMapAnchor();
+        this.savePanelOrder();
+      },
+      // The full-width map is the leading anchor: no panel may be dropped before it.
+      blockInsertBefore: (panel) => panel.dataset.panel === 'map' && this.mapIsFullWidth(),
     });
   }
 
@@ -2956,6 +3000,8 @@ export class App {
     // sibling panels (live news …) flow in beside the map.
     const applyCols = (cols: number, total: number): void => {
       mapSection.style.gridColumn = cols <= 0 || cols >= total ? '1 / -1' : `span ${cols}`;
+      // Going (back) to full width re-imposes the leading-anchor invariant.
+      this.healMapAnchor();
       this.map?.render();
     };
     const savedCols = this.loadMapCols();
