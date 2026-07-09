@@ -2,25 +2,40 @@ import { Panel } from './Panel';
 import { fetchYahooQuotes } from '@/services/markets';
 import { REFRESH_INTERVALS } from '@/config';
 import type { MarketData } from '@/types';
-import { quoteRow, groupBlock, changeDir } from '@/utils/market-format';
+import { quoteRow, groupBlock, changeDir, absFromPct } from '@/utils/market-format';
 
-// US treasury yields — the CBOE yield indices (^IRX/^FVX/^TNX/^TYX). Yahoo quotes
-// these as yield × 10 (4.25% → 42.5), so we normalise to a real percent. Below the
-// curve we compute a 5s10s spread (10y − 5y; the honest name since a 2y index
-// isn't in this set) and flag an inversion when it goes negative. Monochrome,
-// self-polling, degrades to a quiet unavailable line.
+// Rates & credit — the treasury curve plus a fixed-income/vol block, all off the
+// same Yahoo passthrough. Panel key stays `yields`.
+//
+// Curve: 13w (^IRX), 2y (2YY=F, a futures-implied micro-yield — flagged *), 5y
+// (^FVX), 10y (^TNX), 30y (^TYX). The CBOE yield indices were historically quoted
+// at 10× the yield, so normalizeYield() defensively divides any >20 magnitude —
+// a no-op at today's single-digit values, correct if Yahoo reverts. Below the
+// curve: the 2s10s spread (falling back to 5s10s if the 2y future is absent) with
+// an inversion note. Credit block: TLT (20y+ treasuries), LQD (IG), HYG (high
+// yield), and ^MOVE (rate vol) as price + change. Strictly monochrome; degrades
+// to quiet unavailable rows.
 
 interface Tenor { symbol: string; name: string; sub: string }
+interface Credit { symbol: string; name: string; sub: string; digits: number }
 
 const TENORS: Tenor[] = [
   { symbol: '^IRX', name: '13-week', sub: 'T-bill' },
+  { symbol: '2YY=F', name: '2-year', sub: 'futures*' },
   { symbol: '^FVX', name: '5-year', sub: 'note' },
   { symbol: '^TNX', name: '10-year', sub: 'note' },
   { symbol: '^TYX', name: '30-year', sub: 'bond' },
 ];
 
-// CBOE yield indices are quoted at 10× the yield; realistic yields (0–20%) never
-// reach the ×10 magnitude, so a magnitude test normalises either convention.
+const CREDIT: Credit[] = [
+  { symbol: 'TLT', name: 'TLT', sub: '20y+ treasuries', digits: 2 },
+  { symbol: 'LQD', name: 'LQD', sub: 'IG credit', digits: 2 },
+  { symbol: 'HYG', name: 'HYG', sub: 'high yield', digits: 2 },
+  { symbol: '^MOVE', name: 'MOVE', sub: 'rate vol', digits: 1 },
+];
+
+// CBOE yield indices were once quoted at 10× the yield; real yields (0–20%) never
+// reach that magnitude, so a magnitude test normalises either convention.
 function normalizeYield(raw: number): number {
   return raw > 20 ? raw / 10 : raw;
 }
@@ -29,7 +44,7 @@ export class YieldsPanel extends Panel {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    super({ id: 'yields', title: 'US treasury yields' });
+    super({ id: 'yields', title: 'Rates & credit' });
     void this.fetchData();
     this.timer = setInterval(() => void this.fetchData(), REFRESH_INTERVALS.markets);
   }
@@ -40,11 +55,12 @@ export class YieldsPanel extends Panel {
   }
 
   private async fetchData(): Promise<void> {
+    const items = [...TENORS, ...CREDIT];
     let data: MarketData[];
     try {
-      data = await fetchYahooQuotes(TENORS.map((t) => ({ symbol: t.symbol, name: t.name, display: t.symbol })));
+      data = await fetchYahooQuotes(items.map((i) => ({ symbol: i.symbol, name: i.name, display: i.symbol })));
     } catch {
-      this.setContent('<div class="mkt"><div class="mkt-na">Yields unavailable.</div></div>');
+      this.setContent('<div class="mkt"><div class="mkt-na">Rates & credit unavailable.</div></div>');
       return;
     }
     const bySymbol = new Map(data.map((d) => [d.symbol, d]));
@@ -56,7 +72,7 @@ export class YieldsPanel extends Panel {
       return q && q.price != null ? normalizeYield(q.price) : null;
     };
 
-    const rows = TENORS.map((t) => {
+    const tenorRows = TENORS.map((t) => {
       const q = bySymbol.get(t.symbol);
       if (!q || q.price == null) return quoteRow({ name: t.name, sub: t.sub });
       const y = normalizeYield(q.price);
@@ -73,19 +89,42 @@ export class YieldsPanel extends Panel {
       });
     }).join('');
 
-    // 5s10s spread (10y − 5y): the truthful label given no 2y index in this set.
+    const creditRows = CREDIT.map((c) => {
+      const q = bySymbol.get(c.symbol);
+      if (!q || q.price == null) return quoteRow({ name: c.name, sub: c.sub });
+      const pct = q.change ?? 0;
+      const abs = absFromPct(q.price, pct);
+      const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: c.digits, maximumFractionDigits: c.digits });
+      return quoteRow({
+        name: c.name,
+        sub: c.sub,
+        valueText: fmt(q.price),
+        changeText: `${abs >= 0 ? '+' : ''}${fmt(abs)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
+        dir: changeDir(q.change),
+        sparkline: q.sparkline,
+      });
+    }).join('');
+
+    // 2s10s (10y − 2y); fall back to 5s10s (10y − 5y) when the 2y future is absent.
+    const y2 = yieldOf('2YY=F');
     const y5 = yieldOf('^FVX');
     const y10 = yieldOf('^TNX');
+    const short = y2 ?? y5;
+    const shortLabel = y2 != null ? '2s10s' : '5s10s';
     let spreadHtml = '';
-    if (y5 != null && y10 != null) {
-      const bps = (y10 - y5) * 100;
+    if (short != null && y10 != null) {
+      const bps = (y10 - short) * 100;
       const inverted = bps < 0;
       spreadHtml = `<div class="mkt-spread">
-        <span class="mkt-spread-label">5s10s spread</span>
+        <span class="mkt-spread-label">${shortLabel} spread</span>
         <span class="mkt-spread-val ${inverted ? 'down' : 'up'}">${bps >= 0 ? '+' : ''}${bps.toFixed(0)}bps</span>
-      </div>${inverted ? '<div class="mkt-note">Curve inverted — 10y below 5y.</div>' : ''}`;
+      </div>${inverted ? '<div class="mkt-note">Curve inverted — 10y below the short leg.</div>' : ''}`;
     }
 
-    this.setContent(`<div class="mkt">${groupBlock('Tenor', rows)}${spreadHtml}</div>`);
+    const footnote = y2 != null ? '<div class="mkt-note">* 2-year is futures-implied (2YY).</div>' : '';
+
+    this.setContent(
+      `<div class="mkt">${groupBlock('Treasury curve', tenorRows)}${spreadHtml}${footnote}${groupBlock('Credit & rate vol', creditRows)}</div>`,
+    );
   }
 }

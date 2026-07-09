@@ -95,7 +95,11 @@ export class FleetPanel extends Panel {
     const totalNodes = rows.reduce((s, r) => s + r.nodesTotal, 0);
     const totalGpus = rows.reduce((s, r) => s + r.gpus, 0);
     this.setCount(rows.length);
-    this.setDataBadge(isReal ? 'live' : 'unavailable', isReal ? 'your fleet' : 'demo');
+    // Live badge only for a real fleet. The sample/fallback view drops the badge
+    // rather than wearing an "UNAVAILABLE · demo" tag — the honest flag lives in
+    // the footer note and the payload, not as header jewelry.
+    if (isReal) this.setDataBadge('live', 'your fleet');
+    else this.clearDataBadge();
 
     const list = rows.map((r) => {
       const clickable = r.lat !== undefined && r.lon !== undefined;
