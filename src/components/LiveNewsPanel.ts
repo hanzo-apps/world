@@ -1,7 +1,6 @@
 import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
-import { SITE_VARIANT } from '@/config/variant';
 import { t } from '../services/i18n';
 import { SITE_VARIANT } from '@/config';
 
