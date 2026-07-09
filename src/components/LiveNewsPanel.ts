@@ -107,7 +107,7 @@ export class LiveNewsPanel extends Panel {
   private boundMessageHandler!: (e: MessageEvent) => void;
 
   constructor() {
-    super({ id: 'live-news', title: SITE_VARIANT === 'saas' ? 'Hanzo Showcase' : t('panels.liveNews') });
+    super({ id: 'live-news', title: t('panels.liveNews') });
     this.youtubeOrigin = LiveNewsPanel.resolveYouTubeOrigin();
     this.playerElementId = `live-news-player-${Date.now()}`;
     this.element.classList.add('panel-wide');
