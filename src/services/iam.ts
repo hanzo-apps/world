@@ -44,6 +44,14 @@ const K = {
   exp: 'hanzo_iam_expires_at',
   returnTo: 'hanzo_iam_return_to',
   owner: 'hanzo_iam_owner', // cached owner claim for instant admin-gate paint
+  org: 'hanzo_iam_org',     // active tenant org (blank/absent => home org)
+} as const;
+
+// IAM (Casdoor) API — verb paths, served from the same issuer as OIDC. Used to
+// list the orgs a user belongs to (self-scoped for a normal token; all orgs for
+// a global admin). Projects live under org-scope, one call away.
+const IAM_API = {
+  organizations: '/v1/iam/get-organizations',
 } as const;
 
 // The one org that may see the platform-wide Cloud console. Server-side gates
@@ -235,7 +243,102 @@ export async function logout(): Promise<void> {
     });
   } catch { /* best effort */ }
   cachedUser = null;
+  cachedOrgs = null;
   Object.values(K).forEach((k) => localStorage.removeItem(k));
+}
+
+// ── tenant context (org selection) ──────────────────────────────────────────
+//
+// The active org is a single client-side value (localStorage `hanzo_iam_org`).
+// It scopes bearer-authenticated calls world makes via the `X-Org-Id` header —
+// the ONE tenant header the cloud gateway reads (hanzo/cloud/middleware_identity.go
+// pins X-Org-Id from the validated JWT owner for a normal token, and honors a
+// requested X-Org-Id only for a global admin). So switching is safe: a normal
+// user always resolves to their own org; only a global admin crosses orgs.
+
+export interface OrgInfo {
+  name: string;        // canonical org id (Casdoor org name)
+  displayName: string; // human label
+}
+
+let cachedOrgs: OrgInfo[] | null = null;
+
+/** The user's home org — the cached IAM `owner` claim. */
+export function homeOrg(): string {
+  return cachedOwner();
+}
+
+/** The active org: the explicit selection, else the home org. Sync, for paint. */
+export function getActiveOrg(): string {
+  try {
+    return localStorage.getItem(K.org) || cachedOwner();
+  } catch {
+    return cachedOwner();
+  }
+}
+
+/** Select the active org. Clearing to the home org removes the override. */
+export function setActiveOrg(org: string): void {
+  try {
+    if (!org || org === cachedOwner()) localStorage.removeItem(K.org);
+    else localStorage.setItem(K.org, org);
+  } catch { /* private mode */ }
+}
+
+/** True when the user is acting in an org other than their home org. */
+export function isOrgScopedAway(): boolean {
+  let cur = '';
+  try { cur = localStorage.getItem(K.org) || ''; } catch { /* private mode */ }
+  return !!cur && cur !== cachedOwner();
+}
+
+/**
+ * The orgs the signed-in user belongs to, from IAM get-organizations. A normal
+ * token is server-side scoped to its own org; a global admin sees all. Degrades
+ * to the single home org on any failure so the switcher is always usable.
+ */
+export async function listOrgs(force = false): Promise<OrgInfo[]> {
+  if (cachedOrgs && !force) return cachedOrgs;
+  const home = cachedOwner();
+  const fallback: OrgInfo[] = home ? [{ name: home, displayName: home }] : [];
+  const tok = await getToken();
+  if (!tok) return fallback;
+  try {
+    const u = new URL(ISSUER + IAM_API.organizations);
+    if (home) u.searchParams.set('owner', home);
+    const r = await fetch(u.toString(), { headers: { Authorization: `Bearer ${tok}` } });
+    if (!r.ok) return fallback;
+    const data = await r.json();
+    const arr: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+    const orgs = arr
+      .map((o) => {
+        const rec = o as { name?: unknown; displayName?: unknown };
+        const name = String(rec?.name ?? '');
+        return { name, displayName: String(rec?.displayName ?? name) };
+      })
+      .filter((o) => o.name && o.name !== 'built-in');
+    // Home org first, then the rest, deduped by name.
+    const merged = [...(home ? [{ name: home, displayName: home }] : []), ...orgs];
+    const seen = new Set<string>();
+    cachedOrgs = merged.filter((o) => (seen.has(o.name) ? false : (seen.add(o.name), true)));
+    return cachedOrgs.length ? cachedOrgs : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Headers for a bearer-authenticated call world makes to api.hanzo.ai: the token
+ * plus the active-org selector. The org header is omitted when there is no org
+ * (signed out), so callers can use this unconditionally.
+ */
+export async function orgHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
+  const tok = await getToken();
+  const org = getActiveOrg();
+  const h: Record<string, string> = { ...extra };
+  if (org) h['X-Org-Id'] = org;
+  if (tok) h.Authorization = `Bearer ${tok}`;
+  return h;
 }
 
 export const iamIssuer = ISSUER;
