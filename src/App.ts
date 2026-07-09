@@ -1643,6 +1643,15 @@ export class App {
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
+          <a class="header-logo" href="/" title="Hanzo World" aria-label="Hanzo World — home">
+            <svg viewBox="0 0 67 67" width="19" height="19" fill="currentColor" aria-hidden="true">
+              <path d="M22.21 67V44.6369H0V67H22.21Z"/>
+              <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z"/>
+              <path d="M22.21 0H0V22.3184H22.21V0Z"/>
+              <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/>
+              <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/>
+            </svg>
+          </a>
           <div class="variant-switcher">
             <a href="?variant=full"
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
@@ -1729,6 +1738,10 @@ export class App {
             <button class="modal-close" id="modalClose">×</button>
           </div>
           <div class="panel-toggle-grid" id="panelToggles"></div>
+          <div class="panels-modal-footer">
+            <span class="panels-modal-hint">Drag a panel to reorder · drag its bottom edge to resize</span>
+            <button class="panels-reset-btn" id="resetLayoutBtn" type="button">Reset layout</button>
+          </div>
         </div>
       </div>
       <div class="modal-overlay" id="sourcesModal">
@@ -2460,14 +2473,15 @@ export class App {
   }
 
   private resetPanelLayout(): void {
+    // One click back to the variant default. Clears every layout customization —
+    // panel order, per-panel heights (spans), custom feed panels, and the
+    // enable/disable set — then reloads so the grid rebuilds from the pristine
+    // DEFAULT_PANELS. One reset, one way.
     localStorage.removeItem(this.PANEL_ORDER_KEY);
-    const grid = document.getElementById('panelsGrid');
-    if (!grid) return;
-    const order = ['live-news', ...Object.keys(DEFAULT_PANELS).filter((k) => k !== 'map' && k !== 'live-news')];
-    order.forEach((key) => {
-      const el = this.panels[key]?.getElement();
-      if (el && el.parentElement === grid) grid.appendChild(el);
-    });
+    localStorage.removeItem('worldmonitor-panel-spans');
+    localStorage.removeItem('hanzo-world-custom-panels');
+    saveToStorage(STORAGE_KEYS.panels, { ...DEFAULT_PANELS });
+    window.location.reload();
   }
 
   private customFeedKey(name: string): string {
@@ -2652,6 +2666,11 @@ export class App {
       if ((e.target as HTMLElement)?.classList?.contains('modal-overlay')) {
         document.getElementById('settingsModal')?.classList.remove('active');
       }
+    });
+
+    // Reset layout → pristine variant default (order + spans + custom panels).
+    document.getElementById('resetLayoutBtn')?.addEventListener('click', () => {
+      this.resetPanelLayout();
     });
 
 
