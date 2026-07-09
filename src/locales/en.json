@@ -54,7 +54,9 @@
   },
   "header": {
     "world": "WORLD",
+    "ai": "AI",
     "tech": "TECH",
+    "crypto": "CRYPTO",
     "live": "LIVE",
     "search": "Search",
     "settings": "PANELS",
@@ -74,6 +76,8 @@
     "markets": "Markets",
     "map": "Global Situation",
     "techMap": "Global Tech",
+    "aiMap": "Global AI",
+    "cryptoMap": "Global Crypto",
     "techHubs": "Hot Tech Hubs",
     "status": "System Status",
     "insights": "AI Insights",

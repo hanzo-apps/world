@@ -3,6 +3,7 @@ import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '../services/i18n';
+import { SITE_VARIANT } from '@/config';
 
 // YouTube IFrame Player API types
 type YouTubePlayer = {
@@ -82,7 +83,8 @@ const SAAS_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'ai-music', name: 'AI Music Video', handle: '@hanzoai', fallbackVideoId: 'tnr0oAZZ-PY', useFallbackOnly: true },
 ];
 
-const LIVE_CHANNELS = SITE_VARIANT === 'tech'
+// tech + ai → tech/business channels; saas → Hanzo showcase; crypto/finance/full → world+finance set.
+const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai')
   ? TECH_LIVE_CHANNELS
   : SITE_VARIANT === 'saas'
     ? SAAS_LIVE_CHANNELS
