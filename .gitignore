@@ -22,6 +22,8 @@ test-results/
 src-tauri/sidecar/node/*
 !src-tauri/sidecar/node/.gitkeep
 
-# world-model runtime snapshot (regenerated on boot)
+# world-model runtime snapshot + history ring (regenerated on boot)
 data/world-model.json
 data/world-model.json.tmp
+data/world-model-history.json.gz
+data/world-model-history.json.gz.tmp

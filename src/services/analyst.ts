@@ -11,7 +11,7 @@
  * fusion — the panel just hands the model what the user is already looking at.
  */
 
-import { getToken } from './iam';
+import { scopedHeaders } from './org-scope';
 import type { AnalystAction, AnalystHost } from './analyst-actions';
 
 export interface AnalystMessage {
@@ -27,9 +27,9 @@ export interface AnalystResponse {
 }
 
 export async function askAnalyst(messages: AnalystMessage[], context: string): Promise<AnalystResponse> {
-  const token = await getToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // Bearer + active-org/project selectors: the same-origin backend forwards them
+  // to api.hanzo.ai so inference meters to the org the user is acting in.
+  const headers = await scopedHeaders({ 'Content-Type': 'application/json' });
 
   const res = await fetch('/v1/world/analyst', {
     method: 'POST',
