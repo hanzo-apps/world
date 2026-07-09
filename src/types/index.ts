@@ -557,6 +557,12 @@ export interface MapLayers {
   commodityHubs: boolean;
   // Gulf FDI layers
   gulfInvestments: boolean;
+  // Hanzo World cloud map layers — optional so existing exhaustive variant
+  // literals stay valid; default OFF (world/intel), enabled per-variant
+  // (saas/crypto) via config. Values live in ../config/panels.ts.
+  chainNodes?: boolean;
+  byoGpu?: boolean;
+  trafficArcs?: boolean;
 }
 
 export interface AIDataCenter {

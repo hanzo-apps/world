@@ -3,7 +3,6 @@ import {
   FEEDS,
   INTEL_SOURCES,
   SECTORS,
-  COMMODITIES,
   MARKET_SYMBOLS,
   REFRESH_INTERVALS,
   DEFAULT_PANELS,
@@ -16,7 +15,9 @@ import { BETA_MODE } from '@/config/beta';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
-import { attachPanelDrag } from '@/services/panel-drag';
+import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
+import { installPanelContextMenu } from '@/services/panel-menu';
+import { loadPanelSpans, savePanelSpan, currentSpan, setSpanClass } from '@/components/Panel';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
@@ -50,6 +51,8 @@ import {
   MarketPanel,
   HeatmapPanel,
   CommoditiesPanel,
+  FxPanel,
+  YieldsPanel,
   CryptoPanel,
   PredictionPanel,
   MonitorPanel,
@@ -97,6 +100,7 @@ import {
   CloudFleetPanel,
   CloudAnalyticsPanel,
   LlmUsagePanel,
+  BlockchainPanel,
 } from '@/components';
 import { isAdmin } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
@@ -145,6 +149,7 @@ export class App {
   private readonly PANEL_ORDER_KEY = 'panel-order';
   private readonly MAP_MODE_STORAGE_KEY = 'hanzo-world-map-mode';
   private map: MapContainer | null = null;
+  private mapResizeObserver: ResizeObserver | null = null;
   private panels: Record<string, Panel> = {};
   private newsPanels: Record<string, NewsPanel> = {};
   private allNews: NewsItem[] = [];
@@ -1728,22 +1733,19 @@ export class App {
         </div>
       </div>
       <div class="main-content">
-        <div class="map-section" id="mapSection">
-          <div class="panel-header">
-            <div class="panel-header-left">
-              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'ai' ? t('panels.aiMap') : SITE_VARIANT === 'crypto' ? t('panels.cryptoMap') : t('panels.map')}</span>
+        <div class="panels-grid" id="panelsGrid">
+          <div class="panel map-section map-panel" id="mapSection" data-panel="map">
+            <div class="panel-header">
+              <div class="panel-header-left">
+                <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'ai' ? t('panels.aiMap') : SITE_VARIANT === 'crypto' ? t('panels.cryptoMap') : t('panels.map')}</span>
+              </div>
+              <span class="header-clock" id="headerClock"></span>
             </div>
-            <span class="header-clock" id="headerClock"></span>
-            <button class="map-pin-btn" id="mapPinBtn" title="${t('header.pinMap')}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 17v5M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 1 1 0 001-1V4a1 1 0 00-1-1H8a1 1 0 00-1 1v1a1 1 0 001 1 1 1 0 011 1v3.76z"/>
-              </svg>
-            </button>
+            <div class="map-container" id="mapContainer"></div>
+            <div class="map-resize-handle" id="mapResizeHandle"></div>
+            <div class="panel-col-resize-handle" id="mapColResizeHandle" title="Drag to change map width"></div>
           </div>
-          <div class="map-container" id="mapContainer"></div>
-          <div class="map-resize-handle" id="mapResizeHandle"></div>
         </div>
-        <div class="panels-grid" id="panelsGrid"></div>
       </div>
       <div class="modal-overlay" id="settingsModal">
         <div class="modal">
@@ -1904,6 +1906,8 @@ export class App {
     }
 
     // Clean up map and AIS
+    this.mapResizeObserver?.disconnect();
+    this.mapResizeObserver = null;
     this.map?.destroy();
     disconnectAisStream();
   }
@@ -1960,6 +1964,13 @@ export class App {
 
     const commoditiesPanel = new CommoditiesPanel();
     this.panels['commodities'] = commoditiesPanel;
+
+    // Self-polling monochrome finance data panels (FX + treasury yields).
+    const fxPanel = new FxPanel();
+    this.panels['fx'] = fxPanel;
+
+    const yieldsPanel = new YieldsPanel();
+    this.panels['yields'] = yieldsPanel;
 
     const predictionPanel = new PredictionPanel();
     this.panels['polymarket'] = predictionPanel;
@@ -2179,6 +2190,11 @@ export class App {
       this.panels['fleet'] = fleetPanel;
       this.panels['live-activity'] = new LiveActivityPanel();
       this.panels['my-usage'] = new MyUsagePanel();
+    }
+
+    // Chains widget — live block heights + peers (saas + crypto variants).
+    if (SITE_VARIANT === 'saas' || SITE_VARIANT === 'crypto') {
+      this.panels['chains'] = new BlockchainPanel();
     }
 
     const liveNewsPanel = new LiveNewsPanel();
@@ -2493,6 +2509,7 @@ export class App {
     // DEFAULT_PANELS. One reset, one way.
     localStorage.removeItem(this.PANEL_ORDER_KEY);
     localStorage.removeItem('worldmonitor-panel-spans');
+    localStorage.removeItem(this.MAP_COLS_KEY);
     localStorage.removeItem('hanzo-world-custom-panels');
     saveToStorage(STORAGE_KEYS.panels, { ...DEFAULT_PANELS });
     window.location.reload();
@@ -2687,6 +2704,18 @@ export class App {
       this.resetPanelLayout();
     });
 
+    // Panel hide / reset requests from the hover ✕ and the right-click menu.
+    // Both route through the SAME state owner the AI analyst uses, so a panel
+    // hidden this way restores from the Panels menu identically.
+    document.addEventListener('panel-close-request', (e) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) this.setPanelEnabled(id, false);
+    });
+    document.addEventListener('panel-reset-layout-request', () => {
+      this.resetPanelLayout();
+    });
+    installPanelContextMenu();
+
 
     // Header theme toggle button
     document.getElementById('headerThemeToggle')?.addEventListener('click', () => {
@@ -2740,11 +2769,9 @@ export class App {
     };
     window.addEventListener('resize', this.boundResizeHandler);
 
-    // Map section resize handle
-    this.setupMapResize();
-
-    // Map pin toggle
-    this.setupMapPin();
+    // Map is a first-class grid citizen: header-drag to reorder, bottom handle to
+    // resize height (row span), right handle to resize width (column span).
+    this.setupMapPanel();
 
     // Pause animations when tab is hidden, unload ML models to free memory
     this.boundVisibilityHandler = () => {
@@ -2885,66 +2912,105 @@ export class App {
     }
   }
 
-  private setupMapResize(): void {
-    const mapSection = document.getElementById('mapSection');
-    const resizeHandle = document.getElementById('mapResizeHandle');
-    if (!mapSection || !resizeHandle) return;
+  private readonly MAP_COLS_KEY = 'worldmonitor-panel-cols';
 
-    // Load saved height
-    const savedHeight = localStorage.getItem('map-height');
-    if (savedHeight) {
-      mapSection.style.height = savedHeight;
+  private setupMapPanel(): void {
+    const mapSection = document.getElementById('mapSection');
+    if (!mapSection) return;
+    const rowHandle = document.getElementById('mapResizeHandle');
+    const colHandle = document.getElementById('mapColResizeHandle');
+
+    // Reorder by dragging the map header. Dragging on the canvas pans the map
+    // instead (guarded in panel-drag), so map interaction is never hijacked.
+    this.makeDraggable(mapSection, 'map');
+
+    // Height = grid row span, persisted in the shared panel-spans store. Default
+    // to 2 rows (the map-on-top hero height) when nothing is saved. On mobile the
+    // grid collapses to a flex column and the map uses its own responsive height.
+    if (!this.isMobile) {
+      const spans = loadPanelSpans();
+      setSpanClass(mapSection, spans['map'] && spans['map'] > 1 ? spans['map'] : 2);
+    }
+    if (rowHandle && !this.isMobile) {
+      attachPanelResize(mapSection, rowHandle, {
+        minSpan: 1,
+        maxSpan: 4,
+        rowPx: 200,
+        getStartSpan: () => currentSpan(mapSection),
+        onPreview: (span) => setSpanClass(mapSection, span),
+        onCommit: (span) => savePanelSpan('map', span),
+      });
     }
 
-    let isResizing = false;
-    let startY = 0;
-    let startHeight = 0;
-
-    resizeHandle.addEventListener('mousedown', (e) => {
-      isResizing = true;
-      startY = e.clientY;
-      startHeight = mapSection.offsetHeight;
-      mapSection.classList.add('resizing');
-      document.body.style.cursor = 'ns-resize';
-      e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', (e) => {
-      if (!isResizing) return;
-      const deltaY = e.clientY - startY;
-      const newHeight = Math.max(400, Math.min(startHeight + deltaY, window.innerHeight - 60));
-      mapSection.style.height = `${newHeight}px`;
+    // Width = grid column span. Full width by default; drag the right edge in and
+    // sibling panels (live news …) flow in beside the map.
+    const applyCols = (cols: number, total: number): void => {
+      mapSection.style.gridColumn = cols <= 0 || cols >= total ? '1 / -1' : `span ${cols}`;
       this.map?.render();
+    };
+    const savedCols = this.loadMapCols();
+    requestAnimationFrame(() => {
+      const total = this.gridColumnCount();
+      applyCols(savedCols > 0 ? Math.min(savedCols, total) : total, total || 1);
     });
+    if (colHandle) {
+      attachPanelColResize(mapSection, colHandle, {
+        getGrid: () => document.getElementById('panelsGrid'),
+        getStartCols: () => this.currentMapCols(),
+        onPreview: (cols, total) => applyCols(cols, total),
+        onCommit: (cols, total) => this.saveMapCols(cols >= total ? 0 : cols),
+      });
+    }
 
-    document.addEventListener('mouseup', () => {
-      if (!isResizing) return;
-      isResizing = false;
-      mapSection.classList.remove('resizing');
-      document.body.style.cursor = '';
-      // Save height preference
-      localStorage.setItem('map-height', mapSection.style.height);
-      this.map?.render();
-    });
+    // Re-render the map whenever its container box changes (row/col resize, drag
+    // reflow, window). Guarantees maplibre/deck pick up the new size without
+    // reaching into DeckGLMap.
+    const container = document.getElementById('mapContainer');
+    if (container && 'ResizeObserver' in window) {
+      this.mapResizeObserver?.disconnect();
+      this.mapResizeObserver = new ResizeObserver(() => this.map?.render());
+      this.mapResizeObserver.observe(container);
+    }
   }
 
-  private setupMapPin(): void {
-    const mapSection = document.getElementById('mapSection');
-    const pinBtn = document.getElementById('mapPinBtn');
-    if (!mapSection || !pinBtn) return;
-
-    // Load saved pin state
-    const isPinned = localStorage.getItem('map-pinned') === 'true';
-    if (isPinned) {
-      mapSection.classList.add('pinned');
-      pinBtn.classList.add('active');
+  private loadMapCols(): number {
+    try {
+      const raw = localStorage.getItem(this.MAP_COLS_KEY);
+      const map = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      return typeof map.map === 'number' ? map.map : 0;
+    } catch {
+      return 0;
     }
+  }
 
-    pinBtn.addEventListener('click', () => {
-      const nowPinned = mapSection.classList.toggle('pinned');
-      pinBtn.classList.toggle('active', nowPinned);
-      localStorage.setItem('map-pinned', String(nowPinned));
-    });
+  private saveMapCols(cols: number): void {
+    let map: Record<string, number> = {};
+    try {
+      const raw = localStorage.getItem(this.MAP_COLS_KEY);
+      map = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    } catch {
+      map = {};
+    }
+    if (cols > 0) map.map = cols;
+    else delete map.map;
+    localStorage.setItem(this.MAP_COLS_KEY, JSON.stringify(map));
+  }
+
+  private gridColumnCount(): number {
+    const grid = document.getElementById('panelsGrid');
+    if (!grid) return 1;
+    const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
+    return Math.max(1, cols);
+  }
+
+  private currentMapCols(): number {
+    const total = this.gridColumnCount();
+    const mapSection = document.getElementById('mapSection');
+    if (!mapSection) return total;
+    const gc = mapSection.style.gridColumn;
+    if (!gc || gc === '1 / -1') return total;
+    const m = gc.match(/span\s+(\d+)/);
+    return m && m[1] ? Math.min(total, parseInt(m[1], 10)) : total;
   }
 
   private renderPanelToggles(): void {
@@ -3582,21 +3648,7 @@ export class App {
         );
       }
 
-      const commoditiesResult = await fetchMultipleStocks(COMMODITIES, {
-        onBatch: (partialCommodities) => {
-          (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-            partialCommodities.map((c) => ({
-              display: c.display,
-              price: c.price,
-              change: c.change,
-              sparkline: c.sparkline,
-            }))
-          );
-        },
-      });
-      (this.panels['commodities'] as CommoditiesPanel).renderCommodities(
-        commoditiesResult.data.map((c) => ({ display: c.display, price: c.price, change: c.change, sparkline: c.sparkline }))
-      );
+      // Commodities now render in the self-polling CommoditiesPanel (Yahoo passthrough).
     } catch {
       this.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }

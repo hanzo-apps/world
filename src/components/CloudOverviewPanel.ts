@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { getCloudPulse, type CloudPulse } from '@/services/cloud-pulse';
 import { getCloudModels } from '@/services/cloud-admin';
-import { fmtCompact, fmtInt, fmtPct, statTile, sparkline, demoNote } from '@/utils/cloud-format';
+import { fmtCompact, fmtInt, fmtPct, statTile, sparkline } from '@/utils/cloud-format';
 
 // Platform-wide overview — the investor/customer hero tile. Renders the public
 // aggregate (/v1/world/cloud-pulse): demo-flagged unless a service token is wired
@@ -44,7 +44,8 @@ export class CloudOverviewPanel extends Panel {
     const p = this.pulse;
     const o = p.overview;
 
-    if (p.demo) this.setDataBadge('unavailable', 'demo'); else this.setDataBadge('live', p.source);
+    // No demo/source pill jewelry — a plain live badge only when the feed is live.
+    if (!p.demo) this.setDataBadge('live'); else this.clearDataBadge();
 
     const modelsServed = this.realModels ?? o.modelsServed;
     const tiles = [
@@ -62,7 +63,6 @@ export class CloudOverviewPanel extends Panel {
       <div class="cloud-overview">
         <div class="cloud-overview-head">
           <span class="cloud-scope">Global platform</span>
-          ${p.demo ? demoNote() : `<span class="cloud-live-note">live · ${p.source}</span>`}
         </div>
         <div class="cloud-stat-grid cloud-stat-grid-8">${tiles}</div>
         <div class="cloud-spark-row">
