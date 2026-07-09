@@ -98,6 +98,7 @@ import {
   LiveActivityPanel,
   CloudServicesPanel,
   CloudFleetPanel,
+  HanzoStatusPanel,
   CloudAnalyticsPanel,
   LlmUsagePanel,
   BlockchainPanel,
@@ -2190,6 +2191,9 @@ export class App {
       this.panels['fleet'] = fleetPanel;
       this.panels['live-activity'] = new LiveActivityPanel();
       this.panels['my-usage'] = new MyUsagePanel();
+      // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public —
+      // NOT admin-gated).
+      this.panels['hanzo-status'] = new HanzoStatusPanel();
     }
 
     // Chains widget — live block heights + peers (saas + crypto variants).
