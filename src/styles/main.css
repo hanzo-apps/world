@@ -320,6 +320,20 @@ canvas,
   bottom: 0;
 }
 
+/*
+ * ── Stacking scale (single source of truth) ─────────────────────────────────
+ * ONE ordered z band so chrome never fights the map. Higher wins:
+ *   modals / search / toasts ....... 1000+  (position:fixed, own root context)
+ *   header + its dropdowns ......... 200    (this rule — sits ABOVE the grid)
+ *   map controls (pills/legend) .... 100–200 within the grid's own context
+ *   panels grid + map canvas ....... 1      (.panels-grid)
+ * The header MUST own a stacking context that outranks the grid: it carries a
+ * backdrop-filter (main.css ".header, .deckgl-* { backdrop-filter }") which
+ * silently creates a z-index:auto context; without an explicit z-index the grid
+ * (position:relative; z-index:1) paints over it and header dropdowns render
+ * UNDER the full-width map. position:relative + z-index:200 fixes that once,
+ * for every dropdown, with no per-control arms race.
+ */
 .header {
   display: flex;
   align-items: center;
@@ -330,6 +344,8 @@ canvas,
   height: 46px;
   flex-shrink: 0;
   gap: 12px;
+  position: relative;
+  z-index: 200;
 }
 
 .header-left {
@@ -891,41 +907,6 @@ canvas,
   opacity: 1;
 }
 
-.map-section.pinned {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.map-pin-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.map-pin-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-  border-color: var(--text-dim);
-}
-
-.map-pin-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
-}
-
-.map-pin-btn.active:hover {
-  background: var(--text-secondary);
-}
-
 /* Map as a first-class grid citizen — full width by default, height via the same
    row-span classes as any panel, width via a column-resize handle. Overrides the
    legacy fixed .map-section sizing now that it lives inside the grid. */
@@ -990,8 +971,7 @@ canvas,
   align-items: stretch;
   min-height: 0;
   position: relative;
-  z-index: 1;
-  /* This ensures panels scroll UNDER the pinned map (z-index: 100) */
+  z-index: 1; /* base of the stacking scale — below the header (200) and modals (1000) */
 }
 
 .panel {
@@ -8432,8 +8412,7 @@ a.prediction-link:hover {
     max-height: 50vh !important;
   }
 
-  /* Hide pin button and resize handles on mobile (single-column flex layout) */
-  .map-pin-btn,
+  /* Hide resize handles on mobile (single-column flex layout) */
   .map-resize-handle,
   .panel-resize-handle,
   .panel-col-resize-handle {
@@ -12486,7 +12465,7 @@ a.prediction-link:hover {
 
 .critical-posture-banner {
   position: fixed;
-  top: 50px;
+  top: 46px; /* flush under the 46px header (was a stale 50px → 4px seam) */
   left: 0;
   right: 0;
   z-index: 999;
@@ -12576,9 +12555,11 @@ a.prediction-link:hover {
   }
 }
 
-/* Push content down when critical banner is visible */
+/* Push the grid clear of the FIXED banner. The banner overlays the top of the
+   grid area, so the pad equals the banner's real height (measured at render into
+   --critical-banner-h), not a guessed constant that left a black void. */
 body.has-critical-banner .panels-grid {
-  padding-top: 50px;
+  padding-top: var(--critical-banner-h, 44px);
 }
 
 /* ============ Strategic Posture Panel ============ */

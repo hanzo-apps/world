@@ -101,6 +101,11 @@ async function boot(): Promise<void> {
 
   const app = new App('app');
   await app.init();
+  // Dev/e2e observability: expose the running App so tests can drive layout
+  // invariants (e.g. the full-width-map anchor heal) without any production hook.
+  if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+    (window as unknown as { __app?: unknown }).__app = app;
+  }
   // Live-value flash: changed numbers bump briefly (one observer, zero panel coupling).
   const { installLiveFlash } = await import('@/services/live-flash');
   installLiveFlash();
