@@ -69,6 +69,7 @@
     "deck.gl": "^9.2.6",
     "i18next": "^25.8.10",
     "i18next-browser-languagedetector": "^8.2.1",
+    "mapbox-gl": "^3.26.0",
     "maplibre-gl": "^5.16.0",
     "onnxruntime-web": "^1.23.2",
     "topojson-client": "^3.1.0",
