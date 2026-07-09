@@ -15,7 +15,10 @@ export interface PanelOptions {
 
 const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
 
-function loadPanelSpans(): Record<string, number> {
+// Row-span (height) persistence + class mapping. Exported so non-Panel grid
+// citizens (the map) can reuse the exact same height mechanism — one way to size
+// any grid cell.
+export function loadPanelSpans(): Record<string, number> {
   try {
     const stored = localStorage.getItem(PANEL_SPANS_KEY);
     return stored ? JSON.parse(stored) : {};
@@ -24,20 +27,20 @@ function loadPanelSpans(): Record<string, number> {
   }
 }
 
-function savePanelSpan(panelId: string, span: number): void {
+export function savePanelSpan(panelId: string, span: number): void {
   const spans = loadPanelSpans();
   spans[panelId] = span;
   localStorage.setItem(PANEL_SPANS_KEY, JSON.stringify(spans));
 }
 
-function currentSpan(element: HTMLElement): number {
+export function currentSpan(element: HTMLElement): number {
   if (element.classList.contains('span-4')) return 4;
   if (element.classList.contains('span-3')) return 3;
   if (element.classList.contains('span-2')) return 2;
   return 1;
 }
 
-function setSpanClass(element: HTMLElement, span: number): void {
+export function setSpanClass(element: HTMLElement, span: number): void {
   element.classList.remove('span-1', 'span-2', 'span-3', 'span-4');
   element.classList.add(`span-${span}`);
   element.classList.add('resized');
@@ -111,6 +114,27 @@ export class Panel {
     this.statusBadgeEl.className = 'panel-data-badge';
     this.statusBadgeEl.style.display = 'none';
     this.header.appendChild(this.statusBadgeEl);
+
+    // Hover-revealed hide affordance. Clicking it asks the app to hide this panel
+    // through the SAME path the AI analyst uses (App listens for the event and
+    // calls setPanelEnabled(key,false)), so hidden state lives in one place and
+    // the panel restores from the Panels menu exactly like an analyst-hidden one.
+    // Absolutely positioned so revealing it never reflows the header.
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'panel-close-btn';
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Hide panel');
+    closeBtn.title = 'Hide panel';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.element.dispatchEvent(
+        new CustomEvent('panel-close-request', { bubbles: true, detail: { id: this.panelId } }),
+      );
+    });
+    this.header.appendChild(closeBtn);
 
     if (options.showCount) {
       this.countEl = document.createElement('span');

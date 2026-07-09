@@ -57,9 +57,12 @@ interface CoinGeckoMarketItem {
   sparkline_in_7d?: { price: number[] };
 }
 
-// Symbols that need Yahoo Finance (indices and futures not supported by Finnhub free tier)
+// Symbols that need Yahoo Finance (indices, world indices and futures are not on
+// the Finnhub free tier). FX pairs and treasury yields also resolve via Yahoo but
+// are fetched directly through fetchYahooQuotes, so they need not be listed here.
 const YAHOO_ONLY_SYMBOLS = new Set([
-  '^GSPC', '^DJI', '^IXIC', '^VIX',
+  '^GSPC', '^DJI', '^IXIC', '^VIX', '^RUT',
+  '^FTSE', '^GDAXI', '^N225', '^HSI',
   'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F',
 ]);
 
@@ -191,6 +194,25 @@ export async function fetchStockQuote(
 
   const result = await fetchFromFinnhub([{ symbol, name, display }]);
   return result.data[0] || { symbol, name, display, price: null, change: null };
+}
+
+/**
+ * Fetch an arbitrary list of Yahoo symbols (indices, futures, FX pairs, treasury
+ * yields — anything the /v1/world/yahoo-finance passthrough resolves). Returns
+ * one row per input in the SAME order, price/change null when a symbol fails, so
+ * callers can render a quiet unavailable line without an error wall. Independent
+ * of the Finnhub path and the module-level last-good cache used by
+ * fetchMultipleStocks — each poll stands alone.
+ */
+export async function fetchYahooQuotes(
+  symbols: Array<{ symbol: string; name: string; display: string }>
+): Promise<MarketData[]> {
+  const results = await Promise.all(
+    symbols.map((s) => fetchFromYahoo(s.symbol, s.name, s.display))
+  );
+  return symbols.map(
+    (s, i) => results[i] ?? { symbol: s.symbol, name: s.name, display: s.display, price: null, change: null }
+  );
 }
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
