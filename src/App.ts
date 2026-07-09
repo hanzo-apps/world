@@ -86,13 +86,20 @@ import {
   InvestmentsPanel,
   LanguageSelector,
   AiAnalystPanel,
+  AiAnalystDock,
   CustomFeedPanel,
   CloudOverviewPanel,
   ModelUsagePanel,
   FleetPanel,
   MyUsagePanel,
   LiveActivityPanel,
+  CloudServicesPanel,
+  CloudFleetPanel,
+  CloudAnalyticsPanel,
+  LlmUsagePanel,
 } from '@/components';
+import { icon } from '@/utils/icons';
+import { isAdmin } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
 import { AccountMenu } from '@/components/AccountMenu';
 import type { AnalystHost } from '@/services/analyst-actions';
@@ -153,6 +160,8 @@ export class App {
   private exportPanel: ExportPanel | null = null;
   private languageSelector: LanguageSelector | null = null;
   private accountMenu: AccountMenu | null = null;
+  private analystDock: AiAnalystDock | null = null;
+  private adminCloudMounted = false;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
@@ -1640,28 +1649,28 @@ export class App {
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
                data-variant="full"
                title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">🌍</span>
+              <span class="variant-icon">${icon('globe', 15)}</span>
               <span class="variant-label">${t('header.world')}</span>
             </a>
             <a href="?variant=tech"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
                title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">💻</span>
+              <span class="variant-icon">${icon('cpu', 15)}</span>
               <span class="variant-label">${t('header.tech')}</span>
             </a>
             <a href="?variant=finance"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
                data-variant="finance"
                title="${t('header.finance')}${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">📈</span>
+              <span class="variant-icon">${icon('trending-up', 15)}</span>
               <span class="variant-label">${t('header.finance')}</span>
             </a>
             <a href="?variant=saas"
                class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
                data-variant="saas"
                title="${t('header.cloud')}${SITE_VARIANT === 'saas' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span>
+              <span class="variant-icon">${icon('cloud', 15)}</span>
               <span class="variant-label">${t('header.cloud')}</span>
             </a>
           </div>
@@ -2245,6 +2254,44 @@ export class App {
     this.applyPanelSettings();
     this.applyInitialUrlState();
 
+    // Floating AI analyst launcher — available on every variant, independent of
+    // whether the in-grid analyst panel is shown. Same host, same code path.
+    if (!this.analystDock) {
+      this.analystDock = new AiAnalystDock(this.buildAnalystHost());
+      this.analystDock.attach();
+    }
+
+    // Cloud tab: the deep operator panels are admin-org only (server enforces
+    // 403). Mount them once, only after the owner claim confirms admin.
+    void this.mountAdminCloudPanels();
+  }
+
+  // ── admin-only Cloud console panels ─────────────────────────────────────────
+  // Constructed and appended only for the admin org; non-admins never receive
+  // them (and every backing endpoint fail-closes 403). Idempotent.
+  private async mountAdminCloudPanels(): Promise<void> {
+    if (SITE_VARIANT !== 'saas' || this.adminCloudMounted) return;
+    if (!(await isAdmin())) return;
+    const grid = document.getElementById('panelsGrid');
+    if (!grid) return;
+    this.adminCloudMounted = true;
+    const defs: Array<[string, Panel, string]> = [
+      ['cloud-services', new CloudServicesPanel(), 'Service status'],
+      ['cloud-fleet', new CloudFleetPanel(), 'Fleet & clusters'],
+      ['llm-usage', new LlmUsagePanel(), 'LLM observability'],
+      ['cloud-analytics', new CloudAnalyticsPanel(), 'Web analytics'],
+    ];
+    for (const [key, panel, name] of defs) {
+      if (this.panels[key]) continue;
+      this.panels[key] = panel;
+      if (!this.panelSettings[key]) this.panelSettings[key] = { name, enabled: true, priority: 1 };
+      const el = panel.getElement();
+      this.makeDraggable(el, key);
+      grid.appendChild(el);
+    }
+    saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+    this.applyPanelSettings();
+    this.renderPanelToggles();
   }
 
   // Initial 2D/3D map mode: URL (?mode=3d) wins, then persisted preference,
@@ -2405,7 +2452,7 @@ export class App {
   }
 
   private setSiteVariant(variant: string): boolean {
-    if (!['full', 'tech', 'finance'].includes(variant)) return false;
+    if (!['full', 'tech', 'finance', 'saas'].includes(variant)) return false;
     if (variant === SITE_VARIANT) return true;
     const u = new URL(window.location.href);
     u.searchParams.set('variant', variant);
