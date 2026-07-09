@@ -43,7 +43,12 @@ const K = {
   id: 'hanzo_iam_id_token',
   exp: 'hanzo_iam_expires_at',
   returnTo: 'hanzo_iam_return_to',
+  owner: 'hanzo_iam_owner', // cached owner claim for instant admin-gate paint
 } as const;
+
+// The one org that may see the platform-wide Cloud console. Server-side gates
+// enforce this too (fail-closed 403); the client value is UX only.
+export const ADMIN_ORG = 'admin';
 
 export interface IamUser {
   sub: string;
@@ -199,7 +204,26 @@ export async function getUser(force = false): Promise<IamUser | null> {
     owner: u.owner,
     groups: Array.isArray(u.groups) ? u.groups : [],
   };
+  try { localStorage.setItem(K.owner, cachedUser.owner || ''); } catch { /* private mode */ }
   return cachedUser;
+}
+
+/** The owner (org) claim cached from the last userinfo — sync, for instant paint. */
+export function cachedOwner(): string {
+  try { return localStorage.getItem(K.owner) || ''; } catch { return ''; }
+}
+
+/** Instant, best-effort admin check from the cached owner (UX only). */
+export function cachedIsAdmin(): boolean {
+  return cachedOwner() === ADMIN_ORG;
+}
+
+/** Authoritative admin check: owner claim from userinfo === the admin org.
+ *  The server independently enforces this (fail-closed 403); this is the client
+ *  gate that hides admin-only Cloud panels. */
+export async function isAdmin(): Promise<boolean> {
+  const u = await getUser();
+  return (u?.owner || '') === ADMIN_ORG;
 }
 
 export async function logout(): Promise<void> {

@@ -143,7 +143,7 @@ Action types (use panel/layer keys EXACTLY as they appear in the snapshot):
 - {"type":"move_panel","key":"<panelKey>","position":"top"|"bottom"}   (or "before"/"after":"<otherKey>")
 - {"type":"toggle_layer","key":"<layerKey>","on":true|false}
 - {"type":"set_time_range","range":"1h"|"6h"|"24h"|"48h"|"7d"|"all"}
-- {"type":"set_variant","variant":"full"|"tech"|"finance"}
+- {"type":"set_variant","variant":"full"|"tech"|"finance"|"saas"}
 - {"type":"reset_layout"}
 - {"type":"add_feed_panel","name":"<short title>","url":"<https RSS/Atom URL>"}
 - {"type":"remove_custom_panel","name":"<title used when adding>"}
