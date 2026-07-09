@@ -414,6 +414,7 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 // infrastructure backdrop.
 const SAAS_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
+  'live-news': { name: 'Hanzo Showcase', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
