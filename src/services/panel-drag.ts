@@ -293,6 +293,9 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     const target = e.target as HTMLElement | null;
     if (el.dataset.resizing === 'true') return;
     if (isResizeHandle(target) || isInteractive(target)) return;
+    // Never hijack a drag on the interactive map surface — pointer-pan/right-drag
+    // rotate must win there; the map panel is reordered from its header instead.
+    if (target?.closest('canvas, .map-container')) return;
     // On touch/pen only the header grabs, so panel-content stays scrollable.
     if (e.pointerType !== 'mouse' && !target?.closest('.panel-header')) return;
 
@@ -403,6 +406,123 @@ export function attachPanelResize(
     startHeight = el.getBoundingClientRect().height;
     lastSpan = opts.getStartSpan();
     el.classList.add('resizing');
+    el.dataset.resizing = 'true';
+    handle.classList.add('active');
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  handle.addEventListener('pointerdown', onPointerDown);
+
+  return () => {
+    end();
+    handle.removeEventListener('pointerdown', onPointerDown);
+  };
+}
+
+export interface PanelColResizeOptions {
+  /** Resolve the live grid (its computed columns drive the snap). */
+  getGrid: () => HTMLElement | null;
+  /** Column span at drag start. */
+  getStartCols: () => number;
+  /** Live preview: apply a span of `cols` out of `total` grid columns. */
+  onPreview: (cols: number, total: number) => void;
+  /** Persist the final span (cols out of total). */
+  onCommit: (cols: number, total: number) => void;
+}
+
+/**
+ * Horizontal sibling of attachPanelResize: drag a panel's right edge to set how
+ * many grid COLUMNS it spans, snapping to the live `repeat(auto-fill, …)` track
+ * so a panel (the map) can be pulled down to half width and let others flow in
+ * beside it. The module owns pointer math + column snapping; the caller owns the
+ * cols→style mapping and persistence.
+ */
+export function attachPanelColResize(
+  el: HTMLElement,
+  handle: HTMLElement,
+  opts: PanelColResizeOptions,
+): () => void {
+  let pointerId: number | null = null;
+  let resizing = false;
+  let total = 1;
+  let colStep = 1;
+  let gridLeft = 0;
+  let lastCols = 1;
+
+  // Read the live column geometry: track count + (track width + gap) as the step.
+  const measure = (grid: HTMLElement): void => {
+    const style = getComputedStyle(grid);
+    const tracks = style.gridTemplateColumns.split(' ').filter(Boolean);
+    total = Math.max(1, tracks.length);
+    const gap = parseFloat(style.columnGap || '0') || 0;
+    const rect = grid.getBoundingClientRect();
+    const padLeft = parseFloat(style.paddingLeft || '0') || 0;
+    const padRight = parseFloat(style.paddingRight || '0') || 0;
+    const inner = rect.width - padLeft - padRight;
+    const colW = (inner - gap * (total - 1)) / total;
+    colStep = colW + gap;
+    gridLeft = rect.left + padLeft;
+  };
+
+  const colsFor = (clientX: number): number => {
+    if (colStep <= 0) return total;
+    const cols = Math.round((clientX - gridLeft) / colStep);
+    return Math.min(total, Math.max(1, cols));
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!resizing || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    const cols = colsFor(e.clientX);
+    if (cols !== lastCols) {
+      lastCols = cols;
+      opts.onPreview(cols, total);
+    }
+  };
+
+  const end = () => {
+    if (!resizing) return;
+    resizing = false;
+    el.classList.remove('resizing-col');
+    handle.classList.remove('active');
+    delete el.dataset.resizing;
+    if (pointerId !== null) {
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    pointerId = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    opts.onCommit(lastCols, total);
+  };
+
+  const onPointerUp = (e: PointerEvent) => {
+    if (e.pointerId !== pointerId) return;
+    end();
+  };
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const grid = opts.getGrid();
+    if (!grid) return;
+    e.preventDefault();
+    e.stopPropagation();
+    measure(grid);
+    pointerId = e.pointerId;
+    resizing = true;
+    lastCols = opts.getStartCols();
+    el.classList.add('resizing-col');
     el.dataset.resizing = 'true';
     handle.classList.add('active');
     try {
