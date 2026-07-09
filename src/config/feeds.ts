@@ -884,7 +884,16 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
 };
 
 // Variant-aware exports
-export const FEEDS = SITE_VARIANT === 'tech' ? TECH_FEEDS : SITE_VARIANT === 'finance' ? FINANCE_FEEDS : FULL_FEEDS;
+// The AI variant reuses the tech feed set (ai/tech/policy/hardware/cloud/dev/
+// security/github/layoffs…); the Crypto variant reuses the finance feed set
+// (crypto/markets/economic/regulation/centralbanks…). Panel selection per
+// variant lives in panels.ts — feeds only supply the underlying data.
+export const FEEDS =
+  SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai'
+    ? TECH_FEEDS
+    : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto'
+      ? FINANCE_FEEDS
+      : FULL_FEEDS;
 
 export const INTEL_SOURCES: Feed[] = [
   // Defense & Security (Tier 1)
