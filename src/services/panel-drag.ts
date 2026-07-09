@@ -40,6 +40,14 @@ export interface PanelDragOptions {
   getGrid: () => HTMLElement | null;
   /** Fired once after a committed reorder; the host persists the new order. */
   onReorder: () => void;
+  /**
+   * Optional leading-anchor guard. When it returns true for a panel, a drop is
+   * never allowed to land BEFORE that panel — the ref is redirected to the
+   * panel's nextSibling instead. Used to keep the full-width map pinned as the
+   * first grid child (a stray panel wrapping into row 1 shoves the map into a
+   * black void). A no-op when unset.
+   */
+  blockInsertBefore?: (panel: HTMLElement) => boolean;
 }
 
 /**
@@ -134,6 +142,9 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     if (over && over !== el && over.parentElement === g && !over.classList.contains('hidden')) {
       const r = over.getBoundingClientRect();
       const after = x > r.left + r.width / 2; // right half of the hovered panel → drop after it
+      // A leading-anchor panel (the full-width map) can never be preceded — a
+      // drop on its left half lands AFTER it instead of before it.
+      if (!after && opts.blockInsertBefore?.(over)) return over.nextSibling;
       return after ? over.nextSibling : over;
     }
     // Empty region of the grid, below the last panel → append.
