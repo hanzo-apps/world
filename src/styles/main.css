@@ -15089,6 +15089,51 @@ a.custom-feed-item:hover { background: var(--surface-hover); }
 .custom-feed-title { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
 a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .custom-feed-time { margin-top: 3px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+
+/* ── Floating AI analyst dock (bottom-right launcher) ──────────────────────
+   Always-available launcher on every variant. Subtle round button, pure-black
+   overlay card, monochrome — reuses the .ai-analyst chat styles inside. */
+.ai-dock { position: fixed; right: 20px; bottom: 20px; z-index: 4000; }
+.ai-dock-fab {
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border-strong, var(--border));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.ai-dock-fab:hover { border-color: var(--text-dim); transform: translateY(-1px); background: var(--surface-hover, var(--surface)); }
+.ai-dock-fab:active { transform: translateY(0); }
+.ai-dock.open .ai-dock-fab { border-color: var(--text-dim); }
+.ai-dock-panel {
+  position: absolute; right: 0; bottom: 58px;
+  width: min(380px, calc(100vw - 32px));
+  height: min(520px, calc(100vh - 120px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--border-strong, var(--border));
+  border-radius: 12px; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+}
+.ai-dock-panel[hidden] { display: none; }
+.ai-dock-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.ai-dock-title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.ai-dock-title svg { opacity: 0.9; }
+.ai-dock-close {
+  font: inherit; font-size: 14px; line-height: 1; cursor: pointer;
+  width: 26px; height: 26px; color: var(--text-dim);
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+}
+.ai-dock-close:hover { color: var(--text); border-color: var(--border-strong, var(--border)); }
+.ai-dock-body { flex: 1; min-height: 0; display: flex; }
+.ai-dock-body > .ai-analyst { flex: 1; }
+.ai-dock-body > .ai-analyst-signedout { margin: auto; }
+@media (max-width: 480px) {
+  .ai-dock { right: 14px; bottom: 14px; }
+  .ai-dock-panel { height: min(60vh, 480px); }
+}
+
 /* ============================================================================
    SaaS / Cloud variant panels (?variant=saas)
    Dense stat tiles, Geist Mono numerics, black monochrome. Uses the shared
@@ -15334,3 +15379,75 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-activity-rbar span { display: block; height: 100%; background: var(--text); border-radius: var(--radius-pill); }
 .cloud-activity-rrate { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
 .cloud-activity-foot { margin-top: 12px; margin-bottom: 0; }
+
+/* ── Admin Cloud console panels (services / fleet / analytics / LLM obs) ──── */
+.cloud-stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.cloud-stat-grid-6 { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 620px) { .cloud-stat-grid-6 { grid-template-columns: repeat(6, 1fr); } }
+.cloud-scope svg, .cloud-subhead svg, .cloud-util-note svg { vertical-align: -2px; opacity: 0.8; }
+
+/* admin-only gate state */
+.cloud-admin-gate { padding: 18px 6px; }
+.cloud-admin-gate-title {
+  font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  padding: 2px 9px; display: inline-block; margin-bottom: 8px;
+}
+.cloud-admin-gate-body { font-size: 12px; color: var(--text-dim); line-height: 1.5; max-width: 46ch; }
+
+.cloud-subhead {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-dim); margin: 12px 0 7px;
+}
+
+/* service status board */
+.cloud-svc-list { display: flex; flex-direction: column; }
+.cloud-svc-row { display: flex; align-items: center; gap: 9px; padding: 7px 2px; border-bottom: 1px solid var(--border); }
+.cloud-svc-row:last-child { border-bottom: none; }
+.cloud-svc-name { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.cloud-svc-deploys { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.cloud-svc-metrics { display: flex; gap: 12px; flex: 0 0 auto; }
+.cloud-svc-metric { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-svc-nodata { color: var(--text-muted); font-style: italic; }
+
+/* deep fleet */
+.cloud-fleet-providers { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.cloud-provider-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.cloud-provider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.cloud-provider-name { font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize; }
+.cloud-provider-meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.cloud-region-group { margin-top: 6px; }
+.cloud-region-head { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin: 5px 0 3px; }
+.cloud-region-meta { color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+.cloud-machine-row { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 10px; }
+.cloud-machine-name { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text); display: flex; align-items: baseline; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-machine-type { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.cloud-machine-gpu { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-fleet-workers { margin-top: 4px; }
+.cloud-worker-row { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; }
+.cloud-worker-name { font-size: 12px; color: var(--text); }
+.cloud-worker-gpu { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-worker-caps { grid-column: 2 / 4; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.cloud-util-note { margin-top: 12px; font-size: 10.5px; color: var(--text-muted); line-height: 1.45; }
+
+/* analytics / LLM shared column lists */
+.cloud-an-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 12px; }
+@media (min-width: 560px) { .cloud-an-grid { grid-template-columns: repeat(2, 1fr); } }
+.cloud-analytics .cloud-an-grid { grid-template-columns: 1fr; }
+@media (min-width: 720px) { .cloud-analytics .cloud-an-grid { grid-template-columns: repeat(3, 1fr); } }
+.cloud-an-col { min-width: 0; }
+.cloud-an-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 8px; align-items: center; padding: 4px 0; }
+.cloud-an-label { font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-an-bar { min-width: 0; }
+.cloud-an-val { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; text-align: right; }
+
+/* range switch (LLM obs) */
+.cloud-range { display: inline-flex; gap: 3px; }
+.cloud-range-btn {
+  font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+  color: var(--text-dim); background: transparent;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px 7px;
+}
+.cloud-range-btn:hover { color: var(--text); }
+.cloud-range-btn.active { color: var(--bg); background: var(--text); border-color: var(--text); }
