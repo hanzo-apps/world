@@ -86,6 +86,10 @@ func (s *Server) mount(mux registrar) {
 
 	// Cloud console. PUBLIC excitement layer (real, non-sensitive):
 	mux.HandleFunc("/v1/world/cloud/models", s.handleCloudModels)
+	// PUBLIC map layers (real telemetry when reachable; modeled/demo carries a flag):
+	mux.HandleFunc("/v1/world/cloud/chain-nodes", s.handleCloudChainNodes)
+	mux.HandleFunc("/v1/world/cloud/byo-gpu", s.handleCloudBYOGPU)
+	mux.HandleFunc("/v1/world/cloud/traffic", s.handleCloudTraffic)
 	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
 	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
 	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
