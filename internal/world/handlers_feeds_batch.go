@@ -101,7 +101,9 @@ func (s *Server) feedXML(ctx context.Context, feedURL string) ([]byte, bool) {
 		"User-Agent": browserUA,
 		"Accept":     "application/rss+xml, application/xml, text/xml, */*",
 	})
-	if err != nil || status < 200 || status >= 300 {
+	// A blank 200 is a failure, not content: never cache it (it would poison the
+	// shared "rss:" key handleRSSProxy reads too). Fall back to last-good stale.
+	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
 		if v, ok := s.cache.GetStale(key); ok {
 			return v.([]byte), true
 		}
