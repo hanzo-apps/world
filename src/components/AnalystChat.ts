@@ -74,7 +74,7 @@ export class AnalystChat {
     this.root.innerHTML = `
       <div class="ai-analyst-signedout">
         <p>Sign in to chat with the analyst.</p>
-        <button class="ai-analyst-signin" type="button">Sign in</button>
+        <button class="ai-analyst-signin hz-cta hz-cta-lg" type="button">Sign in</button>
       </div>
     `;
     this.root.querySelector('.ai-analyst-signin')?.addEventListener('click', () => void login());
