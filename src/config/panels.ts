@@ -474,11 +474,170 @@ const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
+// AI VARIANT (AI/ML industry, research & infrastructure)
+// ============================================
+// Composition of existing panels: AI/ML news + AI Insights up top, the tech feed
+// set (ai/tech/policy/hardware/cloud/dev/security/github/layoffs) reused for the
+// body, prediction markets, and a datacenter/cloud-region map. Feeds resolve to
+// TECH_FEEDS (see feeds.ts). The `ai` news panel already carries ArXiv AI/ML +
+// MIT Research, so research surfaces without a bespoke panel.
+const AI_PANELS: Record<string, PanelConfig> = {
+  map: { name: 'Global AI Map', enabled: true, priority: 1 },
+  'live-news': { name: 'AI & Tech Headlines', enabled: true, priority: 1 },
+  insights: { name: 'AI Insights', enabled: true, priority: 1 },
+  ai: { name: 'AI/ML News', enabled: true, priority: 1 },
+  tech: { name: 'Technology', enabled: true, priority: 1 },
+  hardware: { name: 'Chips & Inference', enabled: true, priority: 1 },
+  policy: { name: 'AI Policy & Regulation', enabled: true, priority: 1 },
+  github: { name: 'GitHub Trending', enabled: true, priority: 1 },
+  layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 1 },
+  polymarket: { name: 'AI Predictions', enabled: true, priority: 1 },
+  'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
+  cloud: { name: 'Cloud & Infrastructure', enabled: true, priority: 2 },
+  dev: { name: 'Developer Community', enabled: true, priority: 2 },
+  security: { name: 'Cybersecurity', enabled: true, priority: 2 },
+  startups: { name: 'AI Startups & VC', enabled: true, priority: 2 },
+  funding: { name: 'Funding & VC', enabled: true, priority: 2 },
+  markets: { name: 'Tech Stocks', enabled: true, priority: 2 },
+  'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 2 },
+  events: { name: 'Tech Events', enabled: true, priority: 2 },
+  sentiment: { name: 'News Sentiment', enabled: true, priority: 2 },
+  monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+};
+
+const AI_MAP_LAYERS: MapLayers = {
+  conflicts: false,
+  bases: false,
+  cables: true,
+  pipelines: false,
+  hotspots: false,
+  ais: false,
+  nuclear: false,
+  irradiators: false,
+  sanctions: false,
+  weather: true,
+  economic: true,
+  waterways: false,
+  outages: true,
+  cyberThreats: false,
+  datacenters: true,
+  protests: false,
+  flights: false,
+  military: false,
+  natural: true,
+  spaceports: false,
+  minerals: false,
+  fires: false,
+  robotics: false,
+  quantum: false,
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
+  // Tech layers — AI infrastructure story: datacenters + cloud regions on
+  startupHubs: false,
+  cloudRegions: true,
+  accelerators: false,
+  techHQs: false,
+  techEvents: false,
+  // Finance layers (disabled in AI variant)
+  stockExchanges: false,
+  financialCenters: false,
+  centralBanks: false,
+  commodityHubs: false,
+  gulfInvestments: false,
+};
+
+const AI_MOBILE_MAP_LAYERS: MapLayers = {
+  ...AI_MAP_LAYERS,
+  cables: false,
+  weather: false,
+  economic: false,
+  cloudRegions: false,
+};
+
+// ============================================
+// CRYPTO VARIANT (Digital assets & markets)
+// ============================================
+// Composition of existing panels: CoinGecko prices + crypto news up top, the
+// trader desk (BTC dominance / funding), ETF flows, stablecoins, market radar,
+// sector heatmap, sentiment and predictions. Feeds resolve to FINANCE_FEEDS (see
+// feeds.ts) — the `crypto`/`markets`/`economic` data panels each also spawn a
+// `-news` feed panel via the FEEDS loop in App.ts.
+const CRYPTO_PANELS: Record<string, PanelConfig> = {
+  map: { name: 'Global Crypto Map', enabled: true, priority: 1 },
+  'live-news': { name: 'Crypto & Markets Headlines', enabled: true, priority: 1 },
+  insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
+  crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
+  'crypto-news': { name: 'Crypto News', enabled: true, priority: 1 },
+  'trader-desk': { name: 'Trader Desk', enabled: true, priority: 1 },
+  'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 1 },
+  stablecoins: { name: 'Stablecoins', enabled: true, priority: 1 },
+  'macro-signals': { name: 'Market Radar', enabled: true, priority: 1 },
+  heatmap: { name: 'Sector Heatmap', enabled: true, priority: 1 },
+  polymarket: { name: 'Predictions', enabled: true, priority: 1 },
+  sentiment: { name: 'News Sentiment', enabled: true, priority: 1 },
+  markets: { name: 'Live Markets', enabled: true, priority: 2 },
+  'economic-news': { name: 'Economic News', enabled: true, priority: 2 },
+  regulation: { name: 'Crypto & Financial Regulation', enabled: true, priority: 2 },
+  centralbanks: { name: 'Central Bank Watch', enabled: true, priority: 2 },
+  'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
+  monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+};
+
+const CRYPTO_MAP_LAYERS: MapLayers = {
+  conflicts: false,
+  bases: false,
+  cables: true,
+  pipelines: false,
+  hotspots: false,
+  ais: false,
+  nuclear: false,
+  irradiators: false,
+  sanctions: false,
+  weather: false,
+  economic: true,
+  waterways: false,
+  outages: true,
+  cyberThreats: false,
+  datacenters: false,
+  protests: false,
+  flights: false,
+  military: false,
+  natural: true,
+  spaceports: false,
+  minerals: false,
+  fires: false,
+  robotics: false,
+  quantum: false,
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
+  // Tech layers (disabled in crypto variant)
+  startupHubs: false,
+  cloudRegions: false,
+  accelerators: false,
+  techHQs: false,
+  techEvents: false,
+  // Finance layers — economic + financial centers as the market backdrop
+  stockExchanges: false,
+  financialCenters: true,
+  centralBanks: false,
+  commodityHubs: false,
+  gulfInvestments: false,
+};
+
+const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
+  ...CRYPTO_MAP_LAYERS,
+  cables: false,
+  financialCenters: false,
+};
+
+// ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'saas' ? SAAS_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'saas' ? SAAS_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
