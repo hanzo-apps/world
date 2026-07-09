@@ -304,8 +304,8 @@ export class App {
 
     this.initialUrlState = parseMapUrlState(window.location.search, this.mapLayers);
     if (this.initialUrlState.layers) {
-      // For tech variant, filter out geopolitical layers from URL
-      if (currentVariant === 'tech') {
+      // For tech/AI variants, filter out geopolitical layers from URL
+      if (currentVariant === 'tech' || currentVariant === 'ai') {
         const geoLayers: (keyof MapLayers)[] = ['conflicts', 'bases', 'hotspots', 'nuclear', 'irradiators', 'sanctions', 'military', 'protests', 'pipelines', 'waterways', 'ais', 'flights', 'spaceports', 'minerals'];
         const urlLayers = this.initialUrlState.layers;
         geoLayers.forEach(layer => {
@@ -481,7 +481,7 @@ export class App {
   // route stays for API consumers; re-enable via localStorage hanzo-world-pizzint=1.
   private setupPizzIntIndicator(): void {
     if (localStorage.getItem('hanzo-world-pizzint') !== '1') return;
-    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance') return;
+    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'ai' || SITE_VARIANT === 'crypto') return;
 
     this.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.container.querySelector('.header-left');
@@ -1115,12 +1115,12 @@ export class App {
   }
 
   private setupSearchModal(): void {
-    const searchOptions = SITE_VARIANT === 'tech'
+    const searchOptions = SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai'
       ? {
         placeholder: t('modals.search.placeholderTech'),
         hint: t('modals.search.hintTech'),
       }
-      : SITE_VARIANT === 'finance'
+      : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto'
         ? {
           placeholder: t('modals.search.placeholderFinance'),
           hint: t('modals.search.hintFinance'),
@@ -1131,8 +1131,8 @@ export class App {
         };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
-    if (SITE_VARIANT === 'tech') {
-      // Tech variant: tech-specific sources
+    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai') {
+      // Tech/AI variants: tech-specific sources
       this.searchModal.registerSource('techcompany', TECH_COMPANIES.map(c => ({
         id: c.id,
         title: c.name,
@@ -1242,8 +1242,8 @@ export class App {
       })));
     }
 
-    if (SITE_VARIANT === 'finance') {
-      // Finance variant: market-specific sources
+    if (SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto') {
+      // Finance/Crypto variants: market-specific sources
       this.searchModal.registerSource('exchange', STOCK_EXCHANGES.map(e => ({
         id: e.id,
         title: `${e.shortName} - ${e.name}`,
@@ -1651,6 +1651,13 @@ export class App {
               <span class="variant-icon">🌍</span>
               <span class="variant-label">${t('header.world')}</span>
             </a>
+            <a href="?variant=ai"
+               class="variant-option ${SITE_VARIANT === 'ai' ? 'active' : ''}"
+               data-variant="ai"
+               title="${t('header.ai')}${SITE_VARIANT === 'ai' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">🤖</span>
+              <span class="variant-label">${t('header.ai')}</span>
+            </a>
             <a href="?variant=tech"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
@@ -1664,6 +1671,13 @@ export class App {
                title="${t('header.finance')}${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">📈</span>
               <span class="variant-label">${t('header.finance')}</span>
+            </a>
+            <a href="?variant=crypto"
+               class="variant-option ${SITE_VARIANT === 'crypto' ? 'active' : ''}"
+               data-variant="crypto"
+               title="${t('header.crypto')}${SITE_VARIANT === 'crypto' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">₿</span>
+              <span class="variant-label">${t('header.crypto')}</span>
             </a>
             <a href="?variant=saas"
                class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
@@ -1708,7 +1722,7 @@ export class App {
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
-              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : t('panels.map')}</span>
+              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'ai' ? t('panels.aiMap') : SITE_VARIANT === 'crypto' ? t('panels.cryptoMap') : t('panels.map')}</span>
             </div>
             <span class="header-clock" id="headerClock"></span>
             <button class="map-pin-btn" id="mapPinBtn" title="${t('header.pinMap')}">
@@ -2451,7 +2465,7 @@ export class App {
   }
 
   private setSiteVariant(variant: string): boolean {
-    if (!['full', 'tech', 'finance', 'saas'].includes(variant)) return false;
+    if (!['full', 'tech', 'finance', 'saas', 'ai', 'crypto'].includes(variant)) return false;
     if (variant === SITE_VARIANT) return true;
     const u = new URL(window.location.href);
     u.searchParams.set('variant', variant);
