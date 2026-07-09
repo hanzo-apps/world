@@ -14,7 +14,9 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
-  commodities: { name: 'Metals & Materials', enabled: true, priority: 1 },
+  commodities: { name: 'Commodities & futures', enabled: true, priority: 1 },
+  fx: { name: 'FX & currencies', enabled: true, priority: 2 },
+  yields: { name: 'Treasury yields', enabled: true, priority: 2 },
   politics: { name: 'World News', enabled: true, priority: 1 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   'strategic-posture': { name: 'AI Strategic Posture', enabled: true, priority: 1 },
@@ -292,6 +294,8 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   forex: { name: 'Forex & Currencies', enabled: true, priority: 1 },
   bonds: { name: 'Fixed Income', enabled: true, priority: 1 },
   commodities: { name: 'Commodities & Futures', enabled: true, priority: 1 },
+  fx: { name: 'FX & currencies', enabled: true, priority: 1 },
+  yields: { name: 'Treasury yields', enabled: true, priority: 1 },
   'commodities-news': { name: 'Commodities News', enabled: true, priority: 2 },
   crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
   'crypto-news': { name: 'Crypto News', enabled: true, priority: 2 },
@@ -414,8 +418,9 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 // infrastructure backdrop.
 const SAAS_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
-  'live-news': { name: 'Hanzo Showcase', enabled: true, priority: 1 },
+  'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
+  chains: { name: 'Chains', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
   'live-activity': { name: 'Live Activity', enabled: true, priority: 1 },
@@ -465,6 +470,10 @@ const SAAS_MAP_LAYERS: MapLayers = {
   centralBanks: false,
   commodityHubs: false,
   gulfInvestments: false,
+  // Hanzo World cloud map layers
+  chainNodes: true,
+  byoGpu: true,
+  trafficArcs: true,
 };
 
 const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
@@ -568,6 +577,7 @@ const CRYPTO_PANELS: Record<string, PanelConfig> = {
   'live-news': { name: 'Crypto & Markets Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
   crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
+  chains: { name: 'Chains', enabled: true, priority: 1 },
   'crypto-news': { name: 'Crypto News', enabled: true, priority: 1 },
   'trader-desk': { name: 'Trader Desk', enabled: true, priority: 1 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 1 },
@@ -577,6 +587,8 @@ const CRYPTO_PANELS: Record<string, PanelConfig> = {
   polymarket: { name: 'Predictions', enabled: true, priority: 1 },
   sentiment: { name: 'News Sentiment', enabled: true, priority: 1 },
   markets: { name: 'Live Markets', enabled: true, priority: 2 },
+  fx: { name: 'FX & dollar', enabled: true, priority: 2 },
+  yields: { name: 'Treasury yields', enabled: true, priority: 2 },
   'economic-news': { name: 'Economic News', enabled: true, priority: 2 },
   regulation: { name: 'Crypto & Financial Regulation', enabled: true, priority: 2 },
   centralbanks: { name: 'Central Bank Watch', enabled: true, priority: 2 },
@@ -624,6 +636,10 @@ const CRYPTO_MAP_LAYERS: MapLayers = {
   centralBanks: false,
   commodityHubs: false,
   gulfInvestments: false,
+  // Hanzo World cloud map layers
+  chainNodes: true,
+  byoGpu: true,
+  trafficArcs: true,
 };
 
 const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {

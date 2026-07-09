@@ -84,39 +84,6 @@ export class HeatmapPanel extends Panel {
   }
 }
 
-export class CommoditiesPanel extends Panel {
-  constructor() {
-    super({ id: 'commodities', title: t('panels.commodities') });
-  }
-
-  public renderCommodities(data: Array<{ display: string; price: number | null; change: number | null; sparkline?: number[] }>): void {
-    const validData = data.filter((d) => d.price !== null);
-
-    if (validData.length === 0) {
-      this.showError(t('common.failedCommodities'));
-      return;
-    }
-
-    const html =
-      '<div class="commodities-grid">' +
-      validData
-        .map(
-          (c) => `
-        <div class="commodity-item">
-          <div class="commodity-name">${escapeHtml(c.display)}</div>
-          ${miniSparkline(c.sparkline, c.change, 60, 18)}
-          <div class="commodity-price">${formatPrice(c.price!)}</div>
-          <div class="commodity-change ${getChangeClass(c.change!)}">${formatChange(c.change!)}</div>
-        </div>
-      `
-        )
-        .join('') +
-      '</div>';
-
-    this.setContent(html);
-  }
-}
-
 export class CryptoPanel extends Panel {
   constructor() {
     super({ id: 'crypto', title: t('panels.crypto') });
