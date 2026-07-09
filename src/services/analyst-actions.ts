@@ -51,7 +51,7 @@ export interface AnalystHost {
 }
 
 const TIME_RANGES = ['1h', '6h', '24h', '48h', '7d', 'all'];
-const VARIANTS = ['full', 'tech', 'finance'];
+const VARIANTS = ['full', 'tech', 'finance', 'saas'];
 
 /**
  * Validate + apply each action in order, returning short human-readable echoes to
