@@ -49,6 +49,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/gdelt-doc", s.handleGDELTDoc)
 	mux.HandleFunc("/v1/world/gdelt-geo", s.handleGDELTGeo)
 	mux.HandleFunc("/v1/world/rss-proxy", s.handleRSSProxy)
+	mux.HandleFunc("/v1/world/feeds-batch", s.handleFeedsBatch)
 	mux.HandleFunc("/v1/world/hackernews", s.handleHackerNews)
 	mux.HandleFunc("/v1/world/github-trending", s.handleGitHubTrending)
 	mux.HandleFunc("/v1/world/arxiv", s.handleArxiv)
