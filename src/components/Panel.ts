@@ -2,7 +2,12 @@ import { escapeHtml } from '../utils/sanitize';
 import { isDesktopRuntime, canConfigureKeys } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
 import { t } from '../services/i18n';
-import { attachPanelResize } from '../services/panel-drag';
+import {
+  attachPanelResize,
+  attachPanelColResize,
+  attachPanelCornerResize,
+} from '../services/panel-drag';
+import { getGridCols, setGridCols } from '../services/grid-config';
 
 export interface PanelOptions {
   id: string;
@@ -64,7 +69,9 @@ export class Panel {
   protected panelId: string;
   private tooltipCloseHandler: (() => void) | null = null;
   private resizeHandle: HTMLElement | null = null;
-  private resizeCleanup: (() => void) | null = null;
+  private colResizeHandle: HTMLElement | null = null;
+  private cornerResizeHandle: HTMLElement | null = null;
+  private resizeCleanups: Array<() => void> = [];
 
   constructor(options: PanelOptions) {
     this.panelId = options.id;
@@ -158,12 +165,26 @@ export class Panel {
     this.element.appendChild(this.header);
     this.element.appendChild(this.content);
 
-    // Add resize handle
+    // Resize affordances: bottom edge (height), right edge (width), and the
+    // bottom-right corner (both). Grips are subtle until the panel is hovered.
     this.resizeHandle = document.createElement('div');
     this.resizeHandle.className = 'panel-resize-handle';
-    this.resizeHandle.title = 'Drag to resize (double-click to reset)';
+    this.resizeHandle.title = 'Drag to resize height (double-click to reset)';
     this.resizeHandle.draggable = false; // Prevent parent's drag from capturing
     this.element.appendChild(this.resizeHandle);
+
+    this.colResizeHandle = document.createElement('div');
+    this.colResizeHandle.className = 'panel-col-resize-handle';
+    this.colResizeHandle.title = 'Drag to resize width';
+    this.colResizeHandle.draggable = false;
+    this.element.appendChild(this.colResizeHandle);
+
+    this.cornerResizeHandle = document.createElement('div');
+    this.cornerResizeHandle.className = 'panel-corner-resize-handle';
+    this.cornerResizeHandle.title = 'Drag to resize';
+    this.cornerResizeHandle.draggable = false;
+    this.element.appendChild(this.cornerResizeHandle);
+
     this.setupResizeHandlers();
 
     // Restore saved span. Any saved tier other than the default span-1 is applied,
@@ -178,24 +199,65 @@ export class Panel {
   }
 
   private setupResizeHandlers(): void {
-    if (!this.resizeHandle) return;
-    const handle = this.resizeHandle;
+    if (!this.resizeHandle || !this.colResizeHandle || !this.cornerResizeHandle) return;
+    const el = this.element;
+    const id = this.panelId;
 
-    // Pointer-driven resize (mouse + touch + pen). Height snaps to the nearest
-    // tier in PANEL_SPAN_HEIGHTS — including the new span-0 (120px) tiny tier —
-    // so the panel can go smaller and the low-end steps are finer (~100px). The
-    // module owns pointer math; Panel owns the span→class mapping and persistence.
-    this.resizeCleanup = attachPanelResize(this.element, handle, {
-      minSpan: 0,
-      maxSpan: 4,
-      snapHeights: PANEL_SPAN_HEIGHTS,
-      getStartSpan: () => currentSpan(this.element),
-      onPreview: (span) => setSpanClass(this.element, span),
-      onCommit: (span) => savePanelSpan(this.panelId, span),
-    });
+    // Current grid column-span, read from the live inline style (grid-config
+    // restores it on load) or the persisted store.
+    const startCols = (): number => {
+      const m = el.style.gridColumn.match(/span\s+(\d+)/);
+      if (m && m[1]) return parseInt(m[1], 10);
+      return getGridCols(id) ?? 1;
+    };
+    const previewCols = (cols: number): void => {
+      el.style.gridColumn = cols > 1 ? `span ${cols}` : '';
+    };
 
-    // Double-click the handle to reset to default height.
-    handle.addEventListener('dblclick', () => this.resetHeight());
+    // Bottom edge → height. Grid mode snaps to the PANEL_SPAN_HEIGHTS tier ladder
+    // (span-0 = 120px tiny … span-4 = 800px); free mode is pixel-exact. The module
+    // owns pointer math; Panel owns the span→class mapping and persistence.
+    this.resizeCleanups.push(
+      attachPanelResize(el, this.resizeHandle, {
+        minSpan: 0,
+        maxSpan: 4,
+        snapHeights: PANEL_SPAN_HEIGHTS,
+        getStartSpan: () => currentSpan(el),
+        onPreview: (span) => setSpanClass(el, span),
+        onCommit: (span) => savePanelSpan(id, span),
+      }),
+    );
+
+    // Right edge → width. Grid mode snaps to whole columns (persisted in
+    // grid-config); free mode is pixel-exact.
+    this.resizeCleanups.push(
+      attachPanelColResize(el, this.colResizeHandle, {
+        getGrid: () => document.getElementById('panelsGrid'),
+        getStartCols: startCols,
+        onPreview: (cols) => previewCols(cols),
+        onCommit: (cols) => setGridCols(id, cols),
+      }),
+    );
+
+    // Bottom-right corner → width AND height together.
+    this.resizeCleanups.push(
+      attachPanelCornerResize(el, this.cornerResizeHandle, {
+        getGrid: () => document.getElementById('panelsGrid'),
+        getStartSpan: () => currentSpan(el),
+        getStartCols: startCols,
+        snapHeights: PANEL_SPAN_HEIGHTS,
+        minSpan: 0,
+        maxSpan: 4,
+        onPreviewSpan: (span) => setSpanClass(el, span),
+        onPreviewCols: (cols) => previewCols(cols),
+        onCommitSpan: (span) => savePanelSpan(id, span),
+        onCommitCols: (cols) => setGridCols(id, cols),
+      }),
+    );
+
+    // Double-click either edge handle to reset to default size.
+    this.resizeHandle.addEventListener('dblclick', () => this.resetHeight());
+    this.colResizeHandle.addEventListener('dblclick', () => this.resetWidth());
   }
 
 
@@ -339,6 +401,14 @@ export class Panel {
   }
 
   /**
+   * Reset panel width (grid column-span) to default (single column).
+   */
+  public resetWidth(): void {
+    this.element.style.gridColumn = '';
+    setGridCols(this.panelId, 1);
+  }
+
+  /**
    * Clean up event listeners and resources
    */
   public destroy(): void {
@@ -346,9 +416,7 @@ export class Panel {
       document.removeEventListener('click', this.tooltipCloseHandler);
       this.tooltipCloseHandler = null;
     }
-    if (this.resizeCleanup) {
-      this.resizeCleanup();
-      this.resizeCleanup = null;
-    }
+    for (const cleanup of this.resizeCleanups) cleanup();
+    this.resizeCleanups = [];
   }
 }
