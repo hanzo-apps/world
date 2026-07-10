@@ -99,6 +99,14 @@ type jsonRPCReq struct {
 
 const maxModeledNodes = 250
 
+// perChainTimeout bounds each network's telemetry fetch so one unreachable chain
+// (e.g. an L1 whose public RPC is down) can't stall the whole chain-nodes
+// response. Live chains answer in well under a second; a dead host is dialed for
+// at most this long, then honestly reported live:false. Without it, an
+// unreachable host hangs until the request-wide deadline (~24s) and the Chains /
+// Cloud-Overview widgets sit on a loading spinner for that whole time.
+const perChainTimeout = 4 * time.Second
+
 // chainKind selects how a network's live head is read. Each kind is a distinct,
 // self-contained fetch strategy so adding a network is a data change (one catalog
 // row), never new branching at the call site.
@@ -173,7 +181,9 @@ func (s *Server) handleCloudChainNodes(w http.ResponseWriter, r *http.Request) {
 				wg.Add(1)
 				go func(i int, cn chainNet) {
 					defer wg.Done()
-					nets[i] = s.fetchChainNetwork(ctx, cn)
+					cctx, cancel := context.WithTimeout(ctx, perChainTimeout)
+					defer cancel()
+					nets[i] = s.fetchChainNetwork(cctx, cn)
 				}(i, cn)
 			}
 			wg.Wait()
