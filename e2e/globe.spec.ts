@@ -86,15 +86,16 @@ test.describe('3D globe', () => {
       expect(engaged.active).toBe(true); // loop engaged in 3D
       expect(engaged.gate).toBe(true);   // idle gate open
 
-      // One step (1s worth) rotates the globe eastward ~4 degrees.
+      // One step (1s worth) rotates the globe eastward ~2 degrees (the calmer
+      // background drift — AUTO_ROTATE_DEG_PER_SEC was halved from 4 to 2).
       const moved = await page.evaluate(() => {
         const w = (window as HarnessWindow).__mapHarness!;
         const before = w.getCenterLng() ?? 0;
         w.rotateOneStep(1);
         return Math.abs((w.getCenterLng() ?? 0) - before);
       });
-      expect(moved).toBeGreaterThan(3);
-      expect(moved).toBeLessThan(6);
+      expect(moved).toBeGreaterThan(1);
+      expect(moved).toBeLessThan(3);
 
       // A real pointer interaction closes the gate (spin pauses).
       await page.evaluate(() =>

@@ -16213,3 +16213,251 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   .cb-analyst-resize,
   .cb-analyst-fab { display: none !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SIZING DEFAULTS  (Task 1 — "keep the widgets slightly bigger")
+   ────────────────────────────────────────────────────────────────────────────
+   The grid keeps its fine 160px column FLOOR (so the map's column-resize snaps in
+   small steps), but auto-placed panels now DEFAULT to two tracks (~324px incl. gap)
+   instead of a single 160px sliver. The map keeps its full-width default (it opts
+   out here and sets its own grid-column inline), and the row/height tiers are
+   untouched — users can still shrink height to the span-0 (120px) tier.
+   ════════════════════════════════════════════════════════════════════════════ */
+.panels-grid > .panel:not(.map-section) {
+  grid-column: span 2;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   IMMERSIVE LAYOUT  (Task 2 — "3D can be the BG and panels build on top")
+   ────────────────────────────────────────────────────────────────────────────
+   body.immersive promotes the map to a fixed full-viewport background and floats
+   the panels above it as translucent, blurred cards. The background slot is ONE
+   mechanism: body[data-immersive-bg="map"|"video"]. Escape / the header toggle
+   returns to the normal grid; the header sits above everything as always.
+   ════════════════════════════════════════════════════════════════════════════ */
+body.immersive .map-section {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  min-height: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  z-index: 0;            /* background of the grid's own stacking context */
+}
+
+/* The panels float over the fixed map. z-index:1 lifts them above the map (z:0)
+   and the video background; the translucent surface + blur lets the globe show
+   through. Drag/resize/close all keep working — only the surface changes. */
+body.immersive .panels-grid > .panel:not(.map-section) {
+  position: relative;
+  z-index: 1;
+  background: #0a0a0acc;
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* The panels become a translucent floating COLUMN docked to the right edge — not a
+   full-width grid — so most of the viewport is the live globe/video. `span 2` panels
+   fill this narrow 2-track grid one-per-row, giving the masonry column. */
+body.immersive .panels-grid {
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+  max-width: 460px;
+  align-self: flex-end;
+}
+body.immersive .main-content { background: transparent; }
+
+/* Live-video background slot: a fixed, muted YouTube embed that covers the map. */
+.immersive-video-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000;
+  pointer-events: none;   /* the panels above own interaction; the BG just plays */
+}
+.immersive-video-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* cover the viewport at 16:9 without letterboxing */
+  width: 100vw;
+  height: 56.25vw;
+  min-height: 100vh;
+  min-width: 177.78vh;
+  border: 0;
+}
+
+/* Collapse-to-edge affordance: slide the docked panel column off the right edge so
+   the globe fully breathes. The header's collapse button toggles it back. Transform
+   lives on the panels themselves (never an ancestor of the fixed map). */
+body.immersive.immersive-collapsed .panels-grid > .panel:not(.map-section) {
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* In immersive the map fills the viewport, so nudge its top-anchored controls
+   clear of the header bar. */
+body.immersive .deckgl-projection-toggle { top: 56px; }
+body.immersive .deckgl-style-switcher { top: 92px; }
+body.immersive .map-controls { top: 56px; }
+
+/* ── Header: immersive controls ────────────────────────────────────────────── */
+.immersive-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.immersive-toggle-btn,
+.immersive-collapse-btn {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.immersive-collapse-btn { padding: 0 9px; font-size: 14px; }
+.immersive-toggle-btn:hover,
+.immersive-collapse-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+.immersive-toggle-btn.active,
+.immersive-collapse-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+/* The background selector + collapse only make sense once immersive is on. */
+.immersive-bg-select,
+.immersive-collapse-btn { display: none; }
+body.immersive .immersive-bg-select { display: inline-flex; }
+body.immersive .immersive-collapse-btn { display: inline-flex; }
+.immersive-bg-select {
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.immersive-bg-select .ibg-btn {
+  min-width: 40px;
+  padding: 3px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.immersive-bg-select .ibg-btn:hover { color: var(--text); }
+.immersive-bg-select .ibg-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MAP: BASEMAP STYLE SWITCHER  (Task 5 — "nicer mapbox maps")
+   Small overlaid dark/satellite/terrain switcher just under the 2D/3D toggle.
+   Applies to the 2D mapbox (DeckGLMap) basemap; terrain drapes it over the DEM.
+   ════════════════════════════════════════════════════════════════════════════ */
+.deckgl-style-switcher {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  pointer-events: auto;
+}
+.deckgl-style-switcher .style-btn {
+  min-width: 34px;
+  padding: 3px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.deckgl-style-switcher .style-btn:hover:not(:disabled) { color: var(--text); }
+.deckgl-style-switcher .style-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+.deckgl-style-switcher .style-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Marker halo: over bright satellite/terrain rasters the deck data dots gain a thin
+   dark drop-shadow so they stay legible. Scoped to the deck canvas ONLY (the mapbox
+   basemap canvas keeps the class `mapboxgl-canvas`), and only while a bright basemap
+   is active, so the default dark map pays nothing. */
+.bright-basemap canvas:not(.mapboxgl-canvas) {
+  filter: drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.95));
+}
+
+/* ── MAP: layer panel — draggable + sortable (Task 3) ──────────────────────── */
+.deckgl-layer-toggles.dragging {
+  opacity: 0.95;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  cursor: grabbing;
+}
+.deckgl-layer-toggles .toggle-drag-grip {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  padding-right: 4px;
+  user-select: none;
+  touch-action: none;
+}
+.deckgl-layer-toggles.dragging .toggle-drag-grip { cursor: grabbing; }
+.deckgl-layer-toggles .layer-reorder-grip {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  touch-action: none;
+}
+.deckgl-layer-toggles .layer-toggle:hover .layer-reorder-grip { opacity: 0.7; }
+.deckgl-layer-toggles .layer-toggle.reordering {
+  background: var(--surface-hover);
+  outline: 1px solid var(--border-strong);
+  outline-offset: -1px;
+  cursor: grabbing;
+}
