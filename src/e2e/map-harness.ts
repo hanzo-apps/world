@@ -1145,8 +1145,8 @@ const ensureDeterministicStyles = (): void => {
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-layer-toggles,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-legend,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-timestamp,
-    body.${DETERMINISTIC_BODY_CLASS} .maplibregl-ctrl-bottom-right,
-    body.${DETERMINISTIC_BODY_CLASS} .maplibregl-ctrl-bottom-left {
+    body.${DETERMINISTIC_BODY_CLASS} .mapboxgl-ctrl-bottom-right,
+    body.${DETERMINISTIC_BODY_CLASS} .mapboxgl-ctrl-bottom-left {
       display: none !important;
     }
   `;

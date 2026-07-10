@@ -3004,9 +3004,9 @@ export class DeckGLMap {
       <div class="toggle-header">
         <span>${t('components.deckgl.layersTitle')}</span>
         <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
-        <button class="toggle-collapse">&#9654;</button>
+        <button class="toggle-collapse">&#9660;</button>
       </div>
-      <div class="toggle-list collapsed" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
+      <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
         ${layerConfig.map(({ key, label, icon }) => `
           <label class="layer-toggle" data-layer="${key}">
             <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}>
@@ -3373,6 +3373,15 @@ export class DeckGLMap {
     try {
       this.mapboxMap.setFog(MONOCHROME_FOG);
     } catch { /* fog unsupported until style is ready — retried on style.load */ }
+    // Match the basemap's ocean/void fill to the app's themed map background so the
+    // canvas blends into its container with no edge seam. CartoDB's styles ship a
+    // near-black-grey `background` layer that reads a shade lighter than the shell;
+    // repaint it to --map-bg (theme-aware; re-applied after every setStyle).
+    try {
+      const mapBg = getComputedStyle(document.documentElement)
+        .getPropertyValue('--map-bg').trim();
+      if (mapBg) this.mapboxMap.setPaintProperty('background', 'background-color', mapBg);
+    } catch { /* background layer absent until style ready — retried on style.load */ }
   }
 
   private createProjectionToggle(): void {
@@ -3699,9 +3708,11 @@ export class DeckGLMap {
       data: dots,
       getPosition: (d) => [d.lon, d.lat],
       getRadius: (d) => 45000 + (d.peers / maxPeers) * 75000,
+      // On-brand cloud palette (cyan = live validator, dim slate = offline) —
+      // never a bare white dot, which reads as an unstyled loading placeholder.
       getFillColor: (d) => d.live
-        ? [240, 240, 240, 235] as [number, number, number, number]
-        : [136, 136, 136, 170] as [number, number, number, number],
+        ? [0, 200, 255, 235] as [number, number, number, number]
+        : [110, 120, 130, 170] as [number, number, number, number],
       radiusUnits: 'meters',
       radiusMinPixels: 4,
       radiusMaxPixels: 16,
@@ -3711,7 +3722,7 @@ export class DeckGLMap {
       radiusScale: 1 + 0.06 * Math.sin(this.cloudPulseCoef * Math.PI * 2),
       stroked: true,
       filled: true,
-      getLineColor: [120, 120, 120, 200] as [number, number, number, number],
+      getLineColor: [0, 120, 160, 200] as [number, number, number, number],
       getLineWidth: 1,
       lineWidthMinPixels: 1,
       pickable: true,
@@ -3737,8 +3748,8 @@ export class DeckGLMap {
       stroked: true,
       filled: false,
       getLineColor: (d) => d.status === 'online'
-        ? [255, 255, 255, 220] as [number, number, number, number]
-        : [136, 136, 136, 160] as [number, number, number, number],
+        ? [0, 255, 200, 220] as [number, number, number, number]
+        : [110, 120, 130, 160] as [number, number, number, number],
       getLineWidth: 2,
       lineWidthMinPixels: 1.5,
       lineWidthMaxPixels: 3,
