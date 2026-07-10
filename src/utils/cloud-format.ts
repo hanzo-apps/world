@@ -81,6 +81,20 @@ export function fmtMs(ms: number): string {
   return Math.round(ms) + 'ms';
 }
 
+/** Compact elapsed-since for an ISO timestamp ("3m", "2h", "1d"); the raw string
+ * if unparseable. Purely display — never throws. */
+export function fmtAgo(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  const secs = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (secs < 90) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 90) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 36) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 /** The clean "admin only" body for a gated Cloud panel (server enforces too). */
 export function adminOnlyState(what: string): string {
   return `<div class="cloud-admin-gate">
