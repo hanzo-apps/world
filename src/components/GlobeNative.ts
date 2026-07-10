@@ -1,0 +1,538 @@
+/**
+ * GlobeNative — a pure deck.gl GlobeView renderer for the 3D intelligence globe.
+ *
+ * Decomplected from the 2D path: where DeckGLMap renders data as a deck.gl overlay
+ * on top of a mapbox-gl basemap (two WebGL contexts, mapbox owns the globe), this
+ * module owns ONE Deck instance driving a single `_GlobeView` in ONE canvas / ONE
+ * WebGL context. No mapbox. The basemap (near-black land, thin borders, black space,
+ * a faint atmosphere rim) is drawn as deck layers from the bundled Natural-Earth
+ * `/data/countries.geojson` — the same file the SVG fallback + country hit-testing use.
+ *
+ * Data layers are NOT re-implemented here. They are pulled verbatim from the exact
+ * same builders the 2D map uses via a small `GlobeLayerSource` bridge
+ * (`DeckGLMap.asGlobeSource()`), so all ~30 layers, tooltips and click behaviour stay
+ * defined in one place. Heatmap→scatter substitution is handled inside those builders
+ * (they key on the map's `mode === '3d'`), so it comes for free.
+ *
+ * Perf contract (structural — headless GPU can't be measured):
+ *   - single WebGL context (assert: one <canvas> under the wrapper),
+ *   - layer *instances* are rebuilt only on data change (coalesced), never per frame;
+ *     the idle-spin RAF mutates ONLY the camera view state,
+ *   - device-pixel-ratio capped at 2,
+ *   - no per-frame allocations in accessors (basemap accessors are constants),
+ *   - the idle-spin RAF is gated by reduced-motion / tab-hidden / user-interaction /
+ *     pause — the same gate the mapbox globe uses (see DeckGLMap.autoRotateGateOpen).
+ */
+import {
+  Deck,
+  _GlobeView as GlobeView,
+  COORDINATE_SYSTEM,
+  LinearInterpolator,
+  type PickingInfo,
+  type LayersList,
+} from '@deck.gl/core';
+import { GeoJsonLayer } from '@deck.gl/layers';
+import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
+import { SphereGeometry } from '@luma.gl/engine';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
+import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
+
+/**
+ * The read-only bridge GlobeNative consumes. DeckGLMap implements this (via
+ * `asGlobeSource()`) so the globe reuses its data layers, tooltips and click
+ * handling without duplicating a single builder. Kept structural (no import of
+ * DeckGLMap here) to avoid a dependency cycle.
+ */
+export interface GlobeLayerSource {
+  buildLayers(): LayersList;
+  getTooltip(info: PickingInfo): { html: string } | null;
+  handleClick(info: PickingInfo): void;
+}
+
+export interface GlobeCountryClick {
+  lat: number;
+  lon: number;
+  code?: string;
+  name?: string;
+}
+
+export interface GlobeViewState {
+  longitude: number;
+  latitude: number;
+  zoom: number;
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+export interface GlobeNativeOptions {
+  /** Layer/tooltip/click source — usually `deckGLMap.asGlobeSource()`. */
+  source?: GlobeLayerSource | null;
+  /** Initial camera. */
+  center?: GlobeViewState;
+  /** Fired on an empty-globe click, resolved to a country from the basemap geometry. */
+  onCountryClick?: (payload: GlobeCountryClick) => void;
+  /** Auto-rotate when idle (default true; always suppressed under reduced-motion). */
+  autoRotate?: boolean;
+  /** How often (ms) to re-pull data layers from the source while active (default 500). */
+  syncIntervalMs?: number;
+}
+
+// Monochrome "vercel-black" basemap palette. Land is near-black, borders are the
+// requested #1f grey, space is pure black, the atmosphere rim is the same faint
+// cool-grey as the mapbox path's MONOCHROME_FOG horizon halo.
+const OCEAN_COLOR: [number, number, number, number] = [4, 6, 10, 255];
+const LAND_COLOR: [number, number, number, number] = [17, 21, 28, 255]; // ~#11151c
+const BORDER_COLOR: [number, number, number, number] = [58, 62, 70, 170]; // ~#3a3e46 (#1f-grey borders)
+const ATMOSPHERE_COLOR: [number, number, number, number] = [80, 92, 116, 120];
+
+// deck's GlobeViewport maps CARTESIAN metres onto a 256-unit sphere; a mesh of
+// EARTH_RADIUS sits exactly on the surface where lng/lat layers draw. We seat the
+// ocean sphere just *below* that surface so land polygons float cleanly on top
+// (no z-fighting), and the atmosphere shell just *above* it for the rim glow.
+const EARTH_RADIUS = 6_370_972;
+const OCEAN_RADIUS = EARTH_RADIUS * 0.995;
+const ATMOSPHERE_RADIUS = EARTH_RADIUS * 1.018;
+
+const DEFAULT_VIEW: GlobeViewState = { longitude: 0, latitude: 20, zoom: 0.5, minZoom: 0, maxZoom: 8 };
+
+// Idle-spin tuning — identical feel to the mapbox globe (DeckGLMap).
+const AUTO_ROTATE_DEG_PER_SEC = 4;
+const AUTO_ROTATE_IDLE_MS = 5000;
+const AUTO_ROTATE_MIN_FRAME_MS = 33; // ~30fps: half the repaints of a per-frame spin
+
+const STORAGE_FLAG = 'hanzo-world-globe-native';
+
+/**
+ * Renderer selection for the 3D globe. Native deck.gl GlobeView is now the DEFAULT
+ * 3D renderer (single camera → perfect registration, single WebGL context, far-side
+ * occlusion). The mapbox globe stays available as the escape hatch:
+ *   - `?globe=mapbox` / `?globe=off` / `?globe=0` — force the mapbox globe,
+ *   - `?globe=native` / `?globe=1` — force native (also the default),
+ *   - localStorage `hanzo-world-globe-native = 0` — persistent opt-out to mapbox.
+ * (2D is always the mapbox mercator path, untouched.)
+ */
+export function isNativeGlobeEnabled(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search).get('globe');
+    if (q === 'native' || q === '1') return true;
+    if (q === 'mapbox' || q === 'off' || q === '0') return false;
+    if (localStorage.getItem(STORAGE_FLAG) === '0') return false;
+    return true; // default: native globe
+  } catch {
+    return true;
+  }
+}
+
+export class GlobeNative {
+  private container: HTMLElement;
+  private wrapper: HTMLDivElement;
+  private canvas: HTMLCanvasElement;
+  private deck: Deck<GlobeView>;
+
+  private source: GlobeLayerSource | null;
+  private onCountryClick?: (payload: GlobeCountryClick) => void;
+
+  private viewState: GlobeViewState;
+  private basemapLayers: LayersList = [];
+  private dataLayers: LayersList = [];
+  private countriesGeoJson: FeatureCollection<Geometry> | null = null;
+
+  private readonly reducedMotion: boolean;
+  private autoRotateEnabled: boolean;
+  private autoRotateRafId: number | null = null;
+  private autoRotateLastTs = 0;
+  private autoRotateIdleTimer: ReturnType<typeof setTimeout> | null = null;
+  private userInteracting = false;
+
+  private renderPaused = false;
+  private destroyed = false;
+
+  private syncIntervalMs: number;
+  private syncTimerId: ReturnType<typeof setInterval> | null = null;
+  private refreshScheduled = false;
+
+  constructor(container: HTMLElement, options: GlobeNativeOptions = {}) {
+    this.container = container;
+    this.source = options.source ?? null;
+    this.onCountryClick = options.onCountryClick;
+    this.autoRotateEnabled = options.autoRotate ?? true;
+    this.syncIntervalMs = options.syncIntervalMs ?? 500;
+    this.viewState = { ...DEFAULT_VIEW, ...(options.center ?? {}) };
+    this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'globe-native-wrapper';
+    // z-index 1: above a parked mapbox basemap wrapper (z auto), below the map
+    // controls / projection toggle (z-index 500) so they stay clickable.
+    this.wrapper.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%;background:#000;overflow:hidden;z-index:1;';
+
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'globe-native-canvas';
+    this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+    this.wrapper.appendChild(this.canvas);
+    this.container.appendChild(this.wrapper);
+
+    // DPR capped at 2 — retina globes are GPU-bound and the monochrome basemap shows
+    // no benefit above 2x. A number here sets the exact ratio, so min() = a hard cap.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+    // A SINGLE GlobeView (not an array) gives deck a flat GlobeViewState — no
+    // per-view keying. Black space comes from the wrapper background showing through
+    // deck's transparent clear.
+    this.deck = new Deck<GlobeView>({
+      canvas: this.canvas,
+      views: new GlobeView({
+        controller: this.reducedMotion ? { inertia: false } : { inertia: 300 },
+        // Subdivide flat basemap polygons finely enough to hug the sphere.
+        resolution: 8,
+      }),
+      viewState: this.viewState,
+      controller: true,
+      useDevicePixels: dpr,
+      // No lighting effects — the basemap spheres stay flat vercel-black (no specular
+      // sheen) and every intel layer is unlit (scatter/arc/path/icon/text).
+      effects: [],
+      layers: [],
+      getTooltip: (info: PickingInfo) => this.source?.getTooltip(info) ?? null,
+      onClick: (info: PickingInfo) => this.handleClick(info),
+      onViewStateChange: ({ viewState }) => {
+        this.viewState = viewState;
+        this.deck.setProps({ viewState });
+      },
+      onError: (error: Error) =>
+        console.warn('[GlobeNative] Render error (non-fatal):', error.message),
+    });
+
+    // Pause the idle spin on any direct manipulation; it resumes after a quiet period.
+    this.canvas.addEventListener('pointerdown', this.onUserInteract, { passive: true });
+    this.canvas.addEventListener('wheel', this.onUserInteract, { passive: true });
+    this.canvas.addEventListener('touchstart', this.onUserInteract, { passive: true });
+
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+      (window as unknown as { __globeNative?: GlobeNative }).__globeNative = this;
+    }
+
+    void this.loadBasemap();
+    this.refresh();
+    this.startDataSync();
+    if (this.autoRotateEnabled) this.maybeStartAutoRotate();
+  }
+
+  // ---- Basemap ---------------------------------------------------------------
+
+  private async loadBasemap(): Promise<void> {
+    // Ocean + atmosphere shells render immediately; land/borders follow the fetch.
+    this.rebuildBasemap();
+    try {
+      this.countriesGeoJson = await getCountriesGeoJson();
+    } catch (error) {
+      console.warn('[GlobeNative] country geometry unavailable:', (error as Error).message);
+      this.countriesGeoJson = null;
+    }
+    if (this.destroyed) return;
+    this.rebuildBasemap();
+    this.pushLayers();
+  }
+
+  private rebuildBasemap(): void {
+    // Draw order matters. Atmosphere first (behind), then the depth-writing ocean
+    // sphere, then land. The ocean sphere writing depth is what makes far-side data
+    // features (points/arcs behind the planet) occlude correctly — deck's globe
+    // layers depth-test against it, so nothing renders "through" the Earth.
+    const layers: LayersList = [
+      // Backside shell → a faint atmospheric rim at the silhouette. Depth-tests but
+      // does not write, so it never blocks data near the limb; the near-disc portion
+      // is painted over by the ocean sphere, leaving only the outer halo.
+      new SimpleMeshLayer({
+        id: 'globe-atmosphere',
+        data: SINGLE_DATUM,
+        mesh: new SphereGeometry({ radius: ATMOSPHERE_RADIUS, nlat: 24, nlong: 48 }),
+        coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+        getPosition: ORIGIN,
+        getColor: ATMOSPHERE_COLOR,
+        pickable: false,
+        // Flat faint color — no lighting, keeps the monochrome look.
+        material: false,
+        parameters: {
+          cullMode: 'front',
+          depthWriteEnabled: false,
+          depthCompare: 'less-equal',
+        } as unknown as Record<string, unknown>,
+      }),
+      // Solid globe body — near-black ocean, seated just under the lng/lat surface.
+      // Writes depth so it occludes far-side geometry. Unlit for a flat vercel-black
+      // sphere (no specular highlight); the 3D read comes from curved borders +
+      // atmosphere rim + feature occlusion.
+      new SimpleMeshLayer({
+        id: 'globe-ocean',
+        data: SINGLE_DATUM,
+        mesh: new SphereGeometry({ radius: OCEAN_RADIUS, nlat: 48, nlong: 96 }),
+        coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+        getPosition: ORIGIN,
+        getColor: OCEAN_COLOR,
+        pickable: false,
+        material: false,
+        parameters: {
+          cullMode: 'back',
+          depthWriteEnabled: true,
+          depthCompare: 'less-equal',
+        } as unknown as Record<string, unknown>,
+      }),
+    ];
+
+    if (this.countriesGeoJson) {
+      layers.push(
+        // Land + borders in one pass: near-black fill, thin #1f-grey stroke. Sits on
+        // the surface just above the ocean shell; writes depth so back-face land
+        // (far side) is occluded too.
+        new GeoJsonLayer<Feature>({
+          id: 'globe-land',
+          data: this.countriesGeoJson as unknown as Feature[],
+          filled: true,
+          stroked: true,
+          getFillColor: LAND_COLOR,
+          getLineColor: BORDER_COLOR,
+          lineWidthUnits: 'pixels',
+          getLineWidth: 0.6,
+          lineWidthMinPixels: 0.5,
+          pickable: false,
+          parameters: {
+            cullMode: 'none',
+            depthWriteEnabled: true,
+            depthCompare: 'less-equal',
+          } as unknown as Record<string, unknown>,
+        }),
+      );
+    }
+
+    this.basemapLayers = layers;
+  }
+
+  // ---- Data layers -----------------------------------------------------------
+
+  /** Set/replace the data source and immediately re-pull its layers. */
+  public setSource(source: GlobeLayerSource | null): void {
+    this.source = source;
+    this.refresh();
+  }
+
+  /**
+   * Rebuild the data layers from the source, coalesced to one rebuild per frame.
+   * Called on data change (via the sync tick or explicitly by the host). The idle
+   * spin never calls this — it only moves the camera.
+   */
+  public refresh(): void {
+    if (this.destroyed || this.refreshScheduled) return;
+    this.refreshScheduled = true;
+    requestAnimationFrame(() => {
+      this.refreshScheduled = false;
+      if (this.destroyed) return;
+      this.dataLayers = this.source ? (this.source.buildLayers() ?? []) : [];
+      this.pushLayers();
+    });
+  }
+
+  private pushLayers(): void {
+    if (this.destroyed) return;
+    this.deck.setProps({ layers: [...this.basemapLayers, ...this.dataLayers] });
+  }
+
+  // Re-pull data on a slow cadence so feed updates land without coupling GlobeNative
+  // to the host's ~40 individual setters. deck.gl diffs layers by id, so unchanged
+  // layers cost nothing; this is a 2Hz rebuild, not a per-frame one.
+  private startDataSync(): void {
+    if (this.syncTimerId != null) return;
+    this.syncTimerId = setInterval(() => {
+      if (this.renderPaused || document.hidden || !this.source) return;
+      this.refresh();
+    }, this.syncIntervalMs);
+  }
+
+  private stopDataSync(): void {
+    if (this.syncTimerId != null) {
+      clearInterval(this.syncTimerId);
+      this.syncTimerId = null;
+    }
+  }
+
+  // ---- Interaction -----------------------------------------------------------
+
+  private handleClick(info: PickingInfo): void {
+    if (!info.object) {
+      // Empty-globe click → resolve to a country from the basemap geometry.
+      const coord = info.coordinate;
+      const lon = coord?.[0];
+      const lat = coord?.[1];
+      if (lon != null && lat != null && this.onCountryClick) {
+        const hit = getCountryAtCoordinates(lat, lon);
+        this.onCountryClick({ lat, lon, code: hit?.code, name: hit?.name });
+      }
+      return;
+    }
+    this.source?.handleClick(info);
+  }
+
+  // ---- Camera: fly-to --------------------------------------------------------
+
+  /** Glide the globe camera to a location (mapbox `setCenter`/`flyTo` equivalent). */
+  public setCenter(lat: number, lon: number, zoom?: number): void {
+    this.flyTo(lat, lon, zoom);
+  }
+
+  public flyTo(lat: number, lon: number, zoom?: number): void {
+    if (this.destroyed) return;
+    const target: GlobeViewState = {
+      ...this.viewState,
+      longitude: lon,
+      latitude: lat,
+      zoom: zoom ?? this.viewState.zoom,
+    };
+    this.viewState = target;
+    // GlobeView is great-circle native; a linear interp of lng/lat/zoom reads as a
+    // smooth glide. Reduced-motion jumps instantly. Transition props ride on the
+    // viewState object (deck reads them off it).
+    const transition: GlobeViewState & {
+      transitionDuration?: number;
+      transitionInterpolator?: LinearInterpolator;
+    } = { ...target };
+    if (!this.reducedMotion) {
+      transition.transitionDuration = 1200;
+      transition.transitionInterpolator = new LinearInterpolator(['longitude', 'latitude', 'zoom']);
+    }
+    this.deck.setProps({ viewState: transition });
+  }
+
+  public getCenter(): { lat: number; lon: number } {
+    return { lat: this.viewState.latitude, lon: this.viewState.longitude };
+  }
+
+  public setOnCountryClick(cb: (payload: GlobeCountryClick) => void): void {
+    this.onCountryClick = cb;
+  }
+
+  // ---- Idle spin (camera-only; gated exactly like the mapbox globe) -----------
+
+  private onUserInteract = (): void => {
+    this.userInteracting = true;
+    if (this.autoRotateIdleTimer) clearTimeout(this.autoRotateIdleTimer);
+    this.autoRotateIdleTimer = setTimeout(() => {
+      this.userInteracting = false;
+      this.autoRotateLastTs = 0; // avoid a jump on resume
+    }, AUTO_ROTATE_IDLE_MS);
+  };
+
+  public setAutoRotate(on: boolean): void {
+    this.autoRotateEnabled = on;
+    if (on) this.maybeStartAutoRotate();
+    else this.stopAutoRotate();
+  }
+
+  private maybeStartAutoRotate(): void {
+    if (this.autoRotateRafId != null) return;
+    if (!this.autoRotateEnabled || this.renderPaused || this.reducedMotion || this.destroyed) return;
+
+    this.autoRotateLastTs = 0;
+    const step = (ts: number): void => {
+      this.autoRotateRafId = requestAnimationFrame(step);
+      if (!this.autoRotateGateOpen()) {
+        this.autoRotateLastTs = 0;
+        return;
+      }
+      if (this.autoRotateLastTs === 0) {
+        this.autoRotateLastTs = ts;
+        return;
+      }
+      const elapsedMs = ts - this.autoRotateLastTs;
+      if (elapsedMs < AUTO_ROTATE_MIN_FRAME_MS) return; // throttle to ~30fps
+      this.autoRotateLastTs = ts;
+      this.rotateOneStep(elapsedMs / 1000);
+    };
+    this.autoRotateRafId = requestAnimationFrame(step);
+  }
+
+  // Pure decision, no rendering. Closed when disabled, interacting, paused,
+  // reduced-motion, or the tab is hidden.
+  private autoRotateGateOpen(): boolean {
+    return (
+      this.autoRotateEnabled &&
+      !this.userInteracting &&
+      !this.renderPaused &&
+      !this.reducedMotion &&
+      !this.destroyed &&
+      !document.hidden
+    );
+  }
+
+  /** Advance the camera longitude eastward — mutates ONLY the view state. */
+  public rotateOneStep(dtSec: number): void {
+    const nextLng = ((this.viewState.longitude + AUTO_ROTATE_DEG_PER_SEC * dtSec + 540) % 360) - 180;
+    this.viewState = { ...this.viewState, longitude: nextLng };
+    this.deck.setProps({ viewState: this.viewState });
+  }
+
+  private stopAutoRotate(): void {
+    if (this.autoRotateRafId != null) {
+      cancelAnimationFrame(this.autoRotateRafId);
+      this.autoRotateRafId = null;
+    }
+  }
+
+  // ---- Lifecycle -------------------------------------------------------------
+
+  public setRenderPaused(paused: boolean): void {
+    this.renderPaused = paused;
+    if (paused) {
+      this.stopAutoRotate();
+    } else if (this.autoRotateEnabled) {
+      this.maybeStartAutoRotate();
+    }
+  }
+
+  // e2e introspection — the active viewport is a GlobeViewport in 3D (proves deck
+  // is reprojecting onto the sphere).
+  public getViewportType(): string | null {
+    try {
+      // getViewports asserts before deck's first render (viewManager not yet built),
+      // so guard it — returning null reads as "not ready yet".
+      const vps = (this.deck as unknown as {
+        getViewports?: () => Array<{ constructor: { name: string } }>;
+      }).getViewports?.();
+      return vps && vps.length > 0 ? vps[0]!.constructor.name : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public getCanvasCount(): number {
+    return this.wrapper.querySelectorAll('canvas').length;
+  }
+
+  public getDeck(): Deck<GlobeView> {
+    return this.deck;
+  }
+
+  public destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.stopAutoRotate();
+    if (this.autoRotateIdleTimer) clearTimeout(this.autoRotateIdleTimer);
+    this.stopDataSync();
+    this.canvas.removeEventListener('pointerdown', this.onUserInteract);
+    this.canvas.removeEventListener('wheel', this.onUserInteract);
+    this.canvas.removeEventListener('touchstart', this.onUserInteract);
+    try {
+      this.deck.finalize();
+    } catch (error) {
+      console.warn('[GlobeNative] finalize error:', (error as Error).message);
+    }
+    this.wrapper.remove();
+    if ((window as unknown as { __globeNative?: GlobeNative }).__globeNative === this) {
+      delete (window as unknown as { __globeNative?: GlobeNative }).__globeNative;
+    }
+  }
+}
+
+// Shared frozen constants so basemap accessors allocate nothing per frame.
+const SINGLE_DATUM: [number] = [0];
+const ORIGIN: [number, number, number] = [0, 0, 0];
