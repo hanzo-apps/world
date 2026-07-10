@@ -452,6 +452,147 @@ export class App {
     });
   }
 
+  // Bottom toolbar dock wiring. Buttons moved here from the header (Panels,
+  // Sources, Copy link, Fullscreen, Immersive, region) keep their ids so their
+  // existing handlers still bind; this only wires the dock-native controls:
+  // Layers toggle, layout-mode, widget-size, "+ Add widget", and collapse.
+  private setupDock(): void {
+    // Layers: toggle the map's floating layer panel (hidden by default).
+    const layersBtn = document.getElementById('dockLayersBtn');
+    layersBtn?.addEventListener('click', () => {
+      const open = this.map?.toggleLayerPanel() ?? false;
+      layersBtn.classList.toggle('active', open);
+      layersBtn.setAttribute('aria-pressed', String(open));
+    });
+
+    // Collapse the dock to a slim edge (persisted for the session).
+    const collapse = document.getElementById('dockCollapse');
+    const dock = document.getElementById('worldDock');
+    const collapsed = localStorage.getItem('hanzo-world-dock-collapsed') === '1';
+    if (collapsed) dock?.classList.add('collapsed');
+    if (collapse) {
+      collapse.setAttribute('aria-expanded', String(!collapsed));
+      collapse.addEventListener('click', () => {
+        const isCollapsed = dock?.classList.toggle('collapsed') ?? false;
+        collapse.setAttribute('aria-expanded', String(!isCollapsed));
+        try { localStorage.setItem('hanzo-world-dock-collapsed', isCollapsed ? '1' : '0'); } catch { /* ignore */ }
+        requestAnimationFrame(() => this.map?.render());
+      });
+    }
+
+    // Layout mode (grid ⇄ free) + widget size. Wired to the layout engine
+    // (window.worldGrid, owned by world-layoutengine) when present; otherwise a
+    // self-contained fallback applies the effect so the controls are never dead.
+    const grid = this.gridApi();
+    const mode0 = grid.getLayoutMode();
+    document.querySelectorAll<HTMLButtonElement>('#dockLayoutMode .dock-seg-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.mode === mode0);
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode === 'free' ? 'free' : 'grid';
+        grid.setLayoutMode(mode);
+        document.querySelectorAll('#dockLayoutMode .dock-seg-btn').forEach((b) =>
+          b.classList.toggle('active', (b as HTMLElement).dataset.mode === mode));
+      });
+    });
+    const sizeInput = document.getElementById('dockGridSize') as HTMLInputElement | null;
+    if (sizeInput) {
+      sizeInput.value = String(grid.getCellSize());
+      sizeInput.addEventListener('input', () => grid.setCellSize(parseInt(sizeInput.value, 10)));
+    }
+
+    // "+ Add widget" — a searchable palette over the panel registry.
+    document.getElementById('dockAddWidget')?.addEventListener('click', () => this.openAddWidget());
+    document.getElementById('addWidgetClose')?.addEventListener('click', () => this.closeAddWidget());
+    document.getElementById('addWidgetModal')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) this.closeAddWidget();
+    });
+    const search = document.getElementById('addWidgetSearch') as HTMLInputElement | null;
+    search?.addEventListener('input', () => this.renderAddWidgetGrid(search.value));
+  }
+
+  // Layout-config adapter. Prefers the world-layoutengine API exposed at
+  // window.worldGrid; falls back to a minimal self-contained effect (a body data
+  // attribute for mode, a CSS var for the grid column floor) so the dock controls
+  // work standalone. See src/services/grid-config.ts (world-layoutengine).
+  private gridApi(): {
+    setLayoutMode: (m: 'grid' | 'free') => void;
+    getLayoutMode: () => 'grid' | 'free';
+    setCellSize: (px: number) => void;
+    getCellSize: () => number;
+  } {
+    const g = (window as unknown as { worldGrid?: Partial<ReturnType<App['gridApi']>> }).worldGrid;
+    return {
+      setLayoutMode: (m) => {
+        if (g?.setLayoutMode) { g.setLayoutMode(m); return; }
+        document.body.dataset.layoutMode = m;
+      },
+      getLayoutMode: () => {
+        if (g?.getLayoutMode) return g.getLayoutMode();
+        return document.body.dataset.layoutMode === 'free' ? 'free' : 'grid';
+      },
+      setCellSize: (px) => {
+        const v = Math.max(140, Math.min(360, px));
+        if (g?.setCellSize) { g.setCellSize(v); return; }
+        document.documentElement.style.setProperty('--panel-col-min', `${v}px`);
+        try { localStorage.setItem('hanzo-world-grid-size', String(v)); } catch { /* ignore */ }
+      },
+      getCellSize: () => {
+        if (g?.getCellSize) return g.getCellSize();
+        const saved = parseInt(localStorage.getItem('hanzo-world-grid-size') ?? '', 10);
+        if (Number.isFinite(saved)) {
+          document.documentElement.style.setProperty('--panel-col-min', `${saved}px`);
+          return saved;
+        }
+        return 160;
+      },
+    };
+  }
+
+  // Searchable widget palette: lists the panel registry (same source the Panels
+  // menu toggles); clicking one shows it via the one show/hide path. Works in both
+  // grid and immersive layouts (immersive adds it to the floating column).
+  private openAddWidget(): void {
+    const modal = document.getElementById('addWidgetModal');
+    if (!modal) return;
+    modal.classList.add('active');
+    const search = document.getElementById('addWidgetSearch') as HTMLInputElement | null;
+    if (search) { search.value = ''; }
+    this.renderAddWidgetGrid('');
+    setTimeout(() => search?.focus(), 30);
+  }
+
+  private closeAddWidget(): void {
+    document.getElementById('addWidgetModal')?.classList.remove('active');
+  }
+
+  private renderAddWidgetGrid(filter: string): void {
+    const grid = document.getElementById('addWidgetGrid');
+    if (!grid) return;
+    const q = filter.trim().toLowerCase();
+    const entries = Object.entries(this.panelSettings)
+      .filter(([key]) => key !== 'map')
+      .filter(([key, cfg]) => !q || cfg.name.toLowerCase().includes(q) || key.toLowerCase().includes(q))
+      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+    grid.innerHTML = entries.length === 0
+      ? `<div class="add-widget-empty">No widgets match “${filter}”.</div>`
+      : entries.map(([key, cfg]) => `
+        <button class="add-widget-item ${cfg.enabled ? 'is-on' : ''}" data-key="${key}">
+          <span class="add-widget-name">${cfg.name}</span>
+          <span class="add-widget-state">${cfg.enabled ? 'Shown' : 'Add'}</span>
+        </button>`).join('');
+    grid.querySelectorAll<HTMLButtonElement>('.add-widget-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key!;
+        this.setPanelEnabled(key, true);
+        this.closeAddWidget();
+        const el = this.panels[key]?.getElement();
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el?.classList.add('flash-new');
+        setTimeout(() => el?.classList.remove('flash-new'), 1200);
+      });
+    });
+  }
+
   private handleDeepLinks(): void {
     const url = new URL(window.location.href);
 
@@ -1790,39 +1931,14 @@ export class App {
             <span class="status-dot"></span>
             <span>${t('header.live')}</span>
           </div>
-          <div class="region-selector">
-            <select id="regionSelect" class="region-select">
-              <option value="global">${t('components.deckgl.views.global')}</option>
-              <option value="america">${t('components.deckgl.views.americas')}</option>
-              <option value="mena">${t('components.deckgl.views.mena')}</option>
-              <option value="eu">${t('components.deckgl.views.europe')}</option>
-              <option value="asia">${t('components.deckgl.views.asia')}</option>
-              <option value="latam">${t('components.deckgl.views.latam')}</option>
-              <option value="africa">${t('components.deckgl.views.africa')}</option>
-              <option value="oceania">${t('components.deckgl.views.oceania')}</option>
-            </select>
-          </div>
         </div>
         <div class="header-right">
-          <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
-          ${this.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
+          <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> <span class="btn-label">${t('header.search')}</span></button>
           <button class="theme-toggle-btn" id="headerThemeToggle" title="${t('header.toggleTheme')}">
             ${getCurrentTheme() === 'dark'
         ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
         : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
           </button>
-          ${this.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
-          ${this.isMobile ? '' : `
-          <div class="immersive-controls" id="immersiveControls">
-            <button class="immersive-toggle-btn" id="immersiveToggle" title="${t('header.immersive', { defaultValue: 'Immersive layout — map fills the background, panels float on top' })}" aria-pressed="false">▦ ${t('header.immersive', { defaultValue: 'Immersive' })}</button>
-            <div class="immersive-bg-select" id="immersiveBgSelect" role="group" aria-label="Background">
-              <button class="ibg-btn" data-bg="map" title="${t('header.bgMap', { defaultValue: 'Map background' })}">${t('header.bgMap', { defaultValue: 'Map' })}</button>
-              <button class="ibg-btn" data-bg="video" title="${t('header.bgVideo', { defaultValue: 'Live video background' })}">${t('header.bgVideo', { defaultValue: 'Video' })}</button>
-            </div>
-            <button class="immersive-collapse-btn" id="immersiveCollapse" title="${t('header.collapsePanels', { defaultValue: 'Collapse panels to the edge' })}" aria-pressed="false">⇤</button>
-          </div>`}
-          <button class="settings-btn" id="settingsBtn">⚙ ${t('header.settings')}</button>
-          <button class="sources-btn" id="sourcesBtn">📡 ${t('header.sources')}</button>
           <div class="header-account" id="headerAccount"></div>
         </div>
       </div>
@@ -1840,6 +1956,7 @@ export class App {
           </div>
         </div>
       </div>
+      ${this.renderDock()}
       <div class="modal-overlay" id="settingsModal">
         <div class="modal">
           <div class="modal-header">
@@ -1870,10 +1987,87 @@ export class App {
           </div>
         </div>
       </div>
+      <div class="modal-overlay" id="addWidgetModal">
+        <div class="modal add-widget-modal">
+          <div class="modal-header">
+            <span class="modal-title">Add widget</span>
+            <button class="modal-close" id="addWidgetClose">×</button>
+          </div>
+          <div class="add-widget-search">
+            <input type="text" id="addWidgetSearch" placeholder="Search widgets…" autocomplete="off" />
+          </div>
+          <div class="add-widget-grid" id="addWidgetGrid"></div>
+        </div>
+      </div>
     `;
 
     this.createPanels();
     this.renderPanelToggles();
+    this.setupDock();
+  }
+
+  // Bottom toolbar dock — the single home for operational controls, split out of
+  // the (now identity-only) header. The map mounts its 2D/3D toggle, basemap style
+  // switcher and time-range pills into #dockMapControls; the rest are dock chrome.
+  // Monochrome, sentence-case, collapsible; horizontally scrollable when narrow so
+  // the PAGE never overflows. Layout labels stay literal (dock design language,
+  // matching the codebase's literal control strings).
+  private renderDock(): string {
+    const regionOptions = `
+      <option value="global">${t('components.deckgl.views.global')}</option>
+      <option value="america">${t('components.deckgl.views.americas')}</option>
+      <option value="mena">${t('components.deckgl.views.mena')}</option>
+      <option value="eu">${t('components.deckgl.views.europe')}</option>
+      <option value="asia">${t('components.deckgl.views.asia')}</option>
+      <option value="latam">${t('components.deckgl.views.latam')}</option>
+      <option value="africa">${t('components.deckgl.views.africa')}</option>
+      <option value="oceania">${t('components.deckgl.views.oceania')}</option>`;
+    const immersive = this.isMobile ? '' : `
+      <div class="dock-group immersive-controls" id="immersiveControls">
+        <button class="dock-btn immersive-toggle-btn" id="immersiveToggle" title="Immersive layout — map fills the background, panels float on top" aria-pressed="false"><span class="dock-ico">▦</span> <span class="btn-label">Immersive</span></button>
+        <div class="immersive-bg-select" id="immersiveBgSelect" role="group" aria-label="Background">
+          <button class="ibg-btn" data-bg="map" title="Map background">Map</button>
+          <button class="ibg-btn" data-bg="video" title="Live video background">Video</button>
+        </div>
+        <button class="dock-btn immersive-collapse-btn" id="immersiveCollapse" title="Collapse panels to the edge" aria-pressed="false">⇤</button>
+      </div>`;
+    const share = this.isDesktopApp ? '' : `
+      <div class="dock-group">
+        <button class="dock-btn copy-link-btn" id="copyLinkBtn" title="Copy a shareable link"><span class="dock-ico">🔗</span> <span class="btn-label">Copy link</span></button>
+        <button class="dock-btn fullscreen-btn" id="fullscreenBtn" title="Fullscreen"><span class="dock-ico">⛶</span></button>
+      </div>`;
+    return `
+      <footer class="world-dock" id="worldDock" aria-label="Toolbar">
+        <button class="dock-collapse" id="dockCollapse" title="Collapse toolbar" aria-expanded="true">▾</button>
+        <div class="dock-scroll" id="dockScroll">
+          <div class="dock-group dock-map-controls" id="dockMapControls"></div>
+          <div class="dock-group">
+            <select id="regionSelect" class="region-select" title="Map region" aria-label="Map region">${regionOptions}</select>
+          </div>
+          <div class="dock-group">
+            <button class="dock-btn" id="dockLayersBtn" aria-pressed="false" title="Show or hide map layers"><span class="dock-ico">▤</span> <span class="btn-label">Layers</span></button>
+          </div>
+          ${immersive}
+          <div class="dock-group dock-layout">
+            <div class="dock-seg" id="dockLayoutMode" role="group" aria-label="Layout mode">
+              <button class="dock-seg-btn" data-mode="grid" title="Snap widgets to a grid">Grid</button>
+              <button class="dock-seg-btn" data-mode="free" title="Free-form widget placement">Free</button>
+            </div>
+            <label class="dock-slider" title="Widget size">
+              <span class="dock-ico">▦</span>
+              <input type="range" id="dockGridSize" min="140" max="360" step="20" value="160" aria-label="Widget size" />
+            </label>
+          </div>
+          <div class="dock-group">
+            <button class="dock-btn dock-add" id="dockAddWidget" title="Add a widget"><span class="dock-ico">＋</span> <span class="btn-label">Add widget</span></button>
+          </div>
+          <div class="dock-group">
+            <button class="dock-btn" id="settingsBtn" title="Show or hide panels"><span class="dock-ico">▦</span> <span class="btn-label">Panels</span></button>
+            <button class="dock-btn" id="sourcesBtn" title="Data sources"><span class="dock-ico">📡</span> <span class="btn-label">Sources</span></button>
+          </div>
+          ${share}
+        </div>
+      </footer>`;
   }
 
   /**
@@ -2027,6 +2221,10 @@ export class App {
       layers: this.mapLayers,
       timeRange: '7d',
       mode: this.resolveInitialMapMode(),
+      // Mount the 2D/3D toggle, basemap switcher and time-range pills into the
+      // bottom toolbar dock instead of overlaying the map. Falls back to the map
+      // container if the dock isn't present (e.g. harness).
+      controlsHost: document.getElementById('dockMapControls') ?? undefined,
     });
 
     // Initialize escalation service with data getters
