@@ -63,7 +63,6 @@ import {
   StatusPanel,
   EconomicPanel,
   SearchModal,
-  MobileWarningModal,
   PizzIntIndicator,
   GdeltIntelPanel,
   LiveNewsPanel,
@@ -173,7 +172,6 @@ export class App {
   private analystOrgs: Array<{ id: string; name: string }> = [];
   private adminCloudMounted = false;
   private searchModal: SearchModal | null = null;
-  private mobileWarningModal: MobileWarningModal | null = null;
   private pizzintIndicator: PizzIntIndicator | null = null;
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
@@ -658,11 +656,30 @@ export class App {
     setInterval(tick, 1000);
   }
 
+  // The mobile-view onboarding modal is retired: the layout is now genuinely
+  // responsive down to 390px (single-column stack, scrollable dock), so an
+  // interstitial warning is noise. Intentionally a no-op — one way, no modal.
   private setupMobileWarning(): void {
-    if (MobileWarningModal.shouldShow()) {
-      this.mobileWarningModal = new MobileWarningModal();
-      this.mobileWarningModal.show();
-    }
+    this.applyMapLogoFlag();
+  }
+
+  // Basemap wordmark visibility. Shown by default (ToS); ?maplogo=0 or the stored
+  // preference hides it (a compact "ⓘ" attribution stays, so ToS still holds).
+  private applyMapLogoFlag(): void {
+    let hide = false;
+    try {
+      const url = new URLSearchParams(window.location.search).get('maplogo');
+      if (url === '0' || url === 'off' || url === 'false') {
+        hide = true;
+        localStorage.setItem('hanzo-world-maplogo', '0');
+      } else if (url === '1' || url === 'on' || url === 'true') {
+        hide = false;
+        localStorage.setItem('hanzo-world-maplogo', '1');
+      } else {
+        hide = localStorage.getItem('hanzo-world-maplogo') === '0';
+      }
+    } catch { /* private mode: default to shown */ }
+    document.body.classList.toggle('hide-maplogo', hide);
   }
 
   private setupStatusPanel(): void {
