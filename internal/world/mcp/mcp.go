@@ -272,13 +272,6 @@ func toolResult(body []byte, isErr bool) map[string]any {
 	return res
 }
 
-func toolError(msg string) map[string]any {
-	return map[string]any{
-		"content": []any{map[string]any{"type": "text", "text": msg}},
-		"isError": true,
-	}
-}
-
 // ── http helpers ─────────────────────────────────────────────────────────────
 
 // setMCPCORS mirrors the world backend's wildcard policy (public data, no
