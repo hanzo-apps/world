@@ -258,24 +258,38 @@ export default defineConfig({
 
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        globIgnores: ['**/ml-*.js', '**/onnx*.wasm'],
+        // index.html (+ the settings shell) are deliberately NOT precached. With
+        // several releases a day, a precached shell served a stale index.html that
+        // pointed at hashed bundles the newer deploy had already replaced — the app
+        // flashed the old build, then went black as old and new chunks mixed. They
+        // are served network-first (runtimeCaching below) instead; only immutable,
+        // content-hashed assets live in the precache, so an old-HTML/new-chunk mix
+        // is impossible. offline.html stays precached as the sole offline shell.
+        globIgnores: ['**/ml-*.js', '**/onnx*.wasm', 'index.html', 'settings.html'],
         // mapbox-gl v3 pushes the map chunk past workbox's 2 MiB default; precache
         // it so the offline shell still loads the renderer.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/settings/],
+        // Disable the navigation fallback (vite-plugin-pwa defaults it to
+        // 'index.html'). A fallback is precache/cache-first and would reintroduce
+        // the stale-shell flash; instead navigations go network-first (runtimeCaching
+        // below) and the Go/edge server returns index.html for client-routed paths.
+        // `null` is the workbox-build sentinel for "no navigation fallback".
+        navigateFallback: null,
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
 
         runtimeCaching: [
+          // Data plane + discovery docs: always straight to network, never cached
+          // or intercepted by the SW. Registered first so navigations to these
+          // paths never fall through to the HTML handler below.
           {
-            urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-navigation',
-              networkTimeoutSeconds: 3,
-            },
+            urlPattern: /^https?:\/\/.*\/v1\/world\//i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^https?:\/\/.*\/\.well-known\//i,
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,
@@ -284,6 +298,16 @@ export default defineConfig({
           {
             urlPattern: /^https?:\/\/.*\/rss\/.*/i,
             handler: 'NetworkOnly',
+          },
+          // HTML shell: network-first so the served markup always names the current
+          // hashed bundles; falls back to the last good copy only when offline.
+          {
+            urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-navigation',
+              networkTimeoutSeconds: 3,
+            },
           },
           {
             urlPattern: /^https:\/\/api\.maptiler\.com\//,
