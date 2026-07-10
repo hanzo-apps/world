@@ -9,7 +9,7 @@ import {
   type StatusIncident,
 } from '@/services/cloud-admin';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtCompact, fmtMs, adminOnlyState } from '@/utils/cloud-format';
+import { fmtCompact, fmtMs, fmtAgo, adminOnlyState } from '@/utils/cloud-format';
 import { icon } from '@/utils/icons';
 
 // Status of every service Hanzo runs. Two fused layers:
@@ -110,26 +110,12 @@ export class CloudServicesPanel extends Panel {
     const detail = i.error
       ? `<span class="cloud-svc-metric cloud-svc-nodata">${escapeHtml(i.error)}</span>`
       : '';
-    const since = i.since ? `<span class="cloud-svc-metric">${escapeHtml(this.ago(i.since))}</span>` : '';
+    const since = i.since ? `<span class="cloud-svc-metric">${escapeHtml(fmtAgo(i.since))}</span>` : '';
     return `<div class="cloud-svc-row">
       <span class="cloud-status-dot offline"></span>
       <span class="cloud-svc-name">${escapeHtml(name)}</span>
       <span class="cloud-svc-metrics">${detail}${since}</span>
     </div>`;
-  }
-
-  /** Compact "since" for an incident onset ("3m", "2h", "1d"), degrading to the
-   * raw date if unparseable. Purely display — never throws. */
-  private ago(iso: string): string {
-    const t = Date.parse(iso);
-    if (Number.isNaN(t)) return iso;
-    const secs = Math.max(0, Math.floor((Date.now() - t) / 1000));
-    if (secs < 90) return `${secs}s`;
-    const mins = Math.floor(secs / 60);
-    if (mins < 90) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 36) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
   }
 
   // ── admin o11y RED metrics ─────────────────────────────────────────────────
