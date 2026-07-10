@@ -16798,3 +16798,125 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   .dock-slider input[type="range"] { width: 64px; }
   .dock-group { padding-right: 5px; gap: 5px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT ENGINE  (services/grid-config.ts + services/panel-drag.ts)
+   Free-form pixel positioning + configurable snap-to-grid. APPEND-ONLY section:
+   grid mode above is untouched. Two body states: .layout-grid (default, CSS-grid
+   reflow) and .layout-free (absolute per-panel {x,y,w,h}). .layout-snapping is
+   transient during a grid-mode drag/resize and shows the faint track overlay.
+   Cell size is the base .panels-grid rule's --panel-col-min (default 160px),
+   driven by grid-config / the footer dock — one variable, one way. Wide panels
+   (live-news video, .panel-wide) are never capped: they span up to full width.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Bottom-right corner resize grip (all panels) ────────────────────────── */
+.panel-corner-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  z-index: 160; /* above the bottom (100) + right (150) edge handles */
+  touch-action: none;
+  user-select: none;
+  opacity: 0.32;
+  transition: opacity 0.15s ease;
+}
+.panel-corner-resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transition: border-color 0.2s ease;
+}
+.panel:hover .panel-corner-resize-handle,
+.map-section:hover .panel-corner-resize-handle,
+.panel-corner-resize-handle.active {
+  opacity: 1;
+}
+.panel-corner-resize-handle:hover::after,
+.panel-corner-resize-handle.active::after {
+  border-color: var(--accent);
+}
+
+/* Regular panels now carry the right-edge width grip too (was map-only); keep it
+   quiet until hover, same as the other grips. */
+.panel:hover .panel-col-resize-handle,
+.panel-col-resize-handle.active {
+  opacity: 1;
+}
+
+/* ── Grid-mode snap overlay (transient, during drag/resize only) ─────────── */
+body.layout-grid.layout-snapping .panels-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4; /* above panels, below the fixed drag ghost (10000) */
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: var(--grid-overlay-col, 160px) var(--grid-overlay-row, 160px);
+  background-position: var(--grid-overlay-x, 4px) var(--grid-overlay-y, 4px);
+  opacity: 0.35;
+  animation: layoutOverlayFade 0.14s ease-out;
+}
+@keyframes layoutOverlayFade {
+  from { opacity: 0; }
+  to { opacity: 0.35; }
+}
+
+/* ── Free mode: absolute per-panel positioning ───────────────────────────── */
+body.layout-free .panels-grid {
+  display: block;      /* leave CSS-grid flow; panels are absolutely placed */
+  position: relative;  /* positioning context for the absolute panels */
+  /* height is set inline by grid-config to contain the placed panels */
+}
+
+/* Geometry (position/left/top/width/height) is applied inline by grid-config.
+   Here we only neutralise the grid-mode height floors so a free panel can be
+   made genuinely small (JS clamps to a sane 160×120 minimum instead). The map
+   keeps its larger 240px floor. */
+body.layout-free .panel:not(.map-panel) {
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+/* The panel being dragged in free mode lifts above its neighbours. */
+.panel.panel-free-dragging,
+.map-section.panel-free-dragging {
+  z-index: 50;
+  cursor: grabbing;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  transition: none;
+}
+
+/* No snap overlay in free mode (guarded in JS too, but belt-and-braces). */
+body.layout-free .panels-grid::after {
+  display: none;
+}
+
+/* Mobile is always the single-column flex layout, regardless of a desktop-saved
+   free mode: neutralise the inline absolute geometry so a carried-over mode can
+   never break the phone layout. Matches the mobile breakpoint (768px). */
+@media (max-width: 768px) {
+  body.layout-free .panels-grid {
+    display: flex !important;
+    position: relative;
+    height: auto !important;
+  }
+  body.layout-free .panel,
+  body.layout-free .map-section {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+}
