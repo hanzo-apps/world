@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/sanitize';
-import { isDesktopRuntime } from '../services/runtime';
+import { isDesktopRuntime, canConfigureKeys } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
 import { t } from '../services/i18n';
 import { attachPanelResize } from '../services/panel-drag';
@@ -236,6 +236,15 @@ export class Panel {
   }
 
   public showConfigError(message: string): void {
+    // The raw message names a specific server-side *_API_KEY and says "add in
+    // Settings" — actionable only in the desktop app / a dev build. To a public
+    // web viewer that's noise that leaks internal config for a key they can't
+    // set, so degrade to the same quiet "no data" line every other empty panel
+    // shows. The specific, actionable copy stays for those who can act on it.
+    if (!canConfigureKeys()) {
+      this.showError(t('common.noDataAvailable'));
+      return;
+    }
     const settingsBtn = isDesktopRuntime()
       ? '<button type="button" class="config-error-settings-btn">Open Settings</button>'
       : '';
