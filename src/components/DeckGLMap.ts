@@ -213,6 +213,13 @@ const CARTO_LIGHT_RASTER = [
   'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
 ];
 
+// CartoDB's CJK glyph fonts 403 on CORS and spam the console with failed glyph
+// fetches whenever a Chinese/Korean/Japanese label is in view. We repoint those
+// glyph requests at a CORS-open Latin font already in the style (transformRequest
+// below), so CJK labels fall back cleanly (Latin/tofu) with zero failed requests.
+const CJK_GLYPH_RE = /HanWang|NanumBarun|Noto\s?Sans\s?(?:CJK|JP|KR|SC|TC)|MHei|Hiragino|Yu\s?Gothic|Microsoft\s?YaHei|PingFang|Source\s?Han/i;
+const GLYPH_FALLBACK_STACK = 'Montserrat%20Medium';
+
 // Optional "nicer" Mapbox basemaps, orthogonal to the dark/light theme. `dark`
 // keeps the locked monochrome CartoDB aesthetic (theme-aware); `satellite` and
 // `terrain` are true Mapbox styles and therefore need a configured VITE_MAPBOX_TOKEN.
@@ -590,6 +597,12 @@ export class DeckGLMap {
       // with no post-load reprojection flash.
       projection: this.state.mode === '3d' ? 'globe' : 'mercator',
       renderWorldCopies: false,
+      // Repoint CartoDB's CORS-broken CJK glyph fonts at the CORS-open Latin font
+      // so CJK labels fall back cleanly instead of spamming 403s in the console.
+      transformRequest: (url, resourceType) =>
+        resourceType === 'Glyphs' && CJK_GLYPH_RE.test(url)
+          ? { url: url.replace(/\/fonts\/[^/]+\//, `/fonts/${GLYPH_FALLBACK_STACK}/`) }
+          : { url },
       // We add a COMPACT AttributionControl explicitly below (not the default
       // expanded one) so basemap ToS attribution stays reachable even when the
       // corner wordmark is hidden via ?maplogo=0.

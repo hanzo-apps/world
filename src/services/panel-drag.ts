@@ -84,6 +84,40 @@ function commitFreeGeometry(el: HTMLElement): void {
   });
 }
 
+// Height (px) → grid row-span. Snaps to the fine tier ladder (snapHeights) up to
+// its top tier for precise small sizes, then grows CONTINUOUSLY with NO upper cap:
+// dragging the bottom edge past the top tier keeps adding whole rows, so a panel
+// can be made arbitrarily tall. minSpan is the only floor. One way, both handles.
+function spanForHeight(
+  height: number,
+  minSpan: number,
+  maxSpan: number,
+  rowPx: number,
+  snapHeights?: number[],
+): number {
+  if (snapHeights && snapHeights.length > 0) {
+    const topIdx = Math.min(maxSpan, snapHeights.length - 1);
+    const top = snapHeights[topIdx]!;
+    // Within the fine ladder → snap to the nearest tier.
+    if (height <= top + rowPx * 0.5) {
+      let best = minSpan;
+      let bestDist = Infinity;
+      for (let span = minSpan; span <= topIdx; span++) {
+        const dist = Math.abs(height - snapHeights[span]!);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = span;
+        }
+      }
+      return best;
+    }
+    // Beyond the ladder → continuous whole-row growth, uncapped.
+    return Math.max(topIdx, Math.round(height / rowPx));
+  }
+  // No ladder → continuous, floored at minSpan, uncapped.
+  return Math.max(minSpan, Math.round(height / rowPx));
+}
+
 const isInteractive = (target: Element | null): boolean =>
   !!target?.closest('button, a, input, select, textarea, [contenteditable="true"]');
 
@@ -596,23 +630,8 @@ export function attachPanelResize(
   let freeGesture = false;
   let free: FreeResizeState | null = null;
 
-  const spanFor = (height: number): number => {
-    if (snapHeights && snapHeights.length > 0) {
-      // Snap to the nearest tier height within [minSpan, maxSpan].
-      let best = minSpan;
-      let bestDist = Infinity;
-      for (let span = minSpan; span <= maxSpan && span < snapHeights.length; span++) {
-        const dist = Math.abs(height - snapHeights[span]!);
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = span;
-        }
-      }
-      return best;
-    }
-    const span = Math.round(height / rowPx);
-    return Math.min(maxSpan, Math.max(minSpan, span));
-  };
+  const spanFor = (height: number): number =>
+    spanForHeight(height, minSpan, maxSpan, rowPx, snapHeights);
 
   const onPointerMove = (e: PointerEvent) => {
     if (!resizing || e.pointerId !== pointerId) return;
@@ -920,21 +939,8 @@ export function attachPanelCornerResize(
     return Math.min(total, Math.max(1, Math.round((clientX - originLeft) / colStep)));
   };
 
-  const spanFor = (height: number): number => {
-    if (snapHeights && snapHeights.length > 0) {
-      let best = minSpan;
-      let bestDist = Infinity;
-      for (let span = minSpan; span <= maxSpan && span < snapHeights.length; span++) {
-        const dist = Math.abs(height - snapHeights[span]!);
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = span;
-        }
-      }
-      return best;
-    }
-    return Math.min(maxSpan, Math.max(minSpan, Math.round(height / 200)));
-  };
+  const spanFor = (height: number): number =>
+    spanForHeight(height, minSpan, maxSpan, 200, snapHeights);
 
   const onPointerMove = (e: PointerEvent) => {
     if (!resizing || e.pointerId !== pointerId) return;
