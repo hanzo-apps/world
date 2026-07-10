@@ -122,7 +122,15 @@ interface DeckMapState {
 }
 
 // Callers may omit `mode` (defaults to '2d'); everything internal treats it as required.
-type DeckMapInitialState = Omit<DeckMapState, 'mode'> & { mode?: MapProjectionMode };
+type DeckMapInitialState = Omit<DeckMapState, 'mode'> & {
+  mode?: MapProjectionMode;
+  // Optional host for the chromeless map controls (2D/3D toggle, basemap style
+  // switcher, time-range pills). When supplied — e.g. the bottom toolbar dock —
+  // those three controls mount there instead of overlaying the map. The layer
+  // panel, zoom controls and legend always stay map overlays. Defaults to the
+  // map container, so standalone/harness usage is unchanged.
+  controlsHost?: HTMLElement;
+};
 
 interface HotspotWithBreaking extends Hotspot {
   hasBreaking?: boolean;
@@ -313,6 +321,12 @@ export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
   private container: HTMLElement;
+  // Where the 2D/3D toggle, basemap switcher and time-range pills mount. Defaults
+  // to `container`; the app points it at the bottom toolbar dock.
+  private controlsHost: HTMLElement;
+  // The draggable layer panel (a map overlay). Hidden by default; the dock's
+  // "Layers" button toggles it open.
+  private layerPanelEl: HTMLElement | null = null;
   private deckOverlay: MapboxOverlay | null = null;
   private mapboxMap: MapboxMap | null = null;
   private state: DeckMapState;
@@ -440,7 +454,10 @@ export class DeckGLMap {
 
   constructor(container: HTMLElement, initialState: DeckMapInitialState) {
     this.container = container;
-    this.state = { ...initialState, mode: initialState.mode ?? '2d' };
+    this.controlsHost = initialState.controlsHost ?? container;
+    // controlsHost is a mount hint, not persisted map state — keep it out of state.
+    const { controlsHost: _controlsHost, ...stateInit } = initialState;
+    this.state = { ...stateInit, mode: stateInit.mode ?? '2d' };
     this.hotspots = [...INTEL_HOTSPOTS];
 
     this.rebuildTechHQSupercluster();
@@ -3129,7 +3146,7 @@ export class DeckGLMap {
       </div>
     `;
 
-    this.container.appendChild(slider);
+    this.controlsHost.appendChild(slider);
 
     slider.querySelectorAll('.time-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3140,7 +3157,7 @@ export class DeckGLMap {
   }
 
   private updateTimeSliderButtons(): void {
-    const slider = this.container.querySelector('.deckgl-time-slider');
+    const slider = this.controlsHost.querySelector('.deckgl-time-slider');
     if (!slider) return;
     slider.querySelectorAll('.time-btn').forEach((btn) => {
       const range = (btn as HTMLElement).dataset.range as TimeRange | undefined;
@@ -3150,7 +3167,10 @@ export class DeckGLMap {
 
   private createLayerToggles(): void {
     const toggles = document.createElement('div');
+    // Hidden by default (the `open` class reveals it). The dock's Layers button
+    // toggles it so the panel never covers the map/panels unbidden.
     toggles.className = 'layer-toggles deckgl-layer-toggles';
+    this.layerPanelEl = toggles;
 
     const layerConfig = SITE_VARIANT === 'tech'
       ? [
@@ -3774,7 +3794,7 @@ export class DeckGLMap {
       <button class="proj-btn ${this.state.mode === '3d' ? 'active' : ''}" data-mode="3d"
         title="${t('components.deckgl.projection.globe', { defaultValue: '3D globe' })}">3D</button>
     `;
-    this.container.appendChild(toggle);
+    this.controlsHost.appendChild(toggle);
 
     toggle.querySelectorAll('.proj-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -3785,7 +3805,7 @@ export class DeckGLMap {
   }
 
   private updateProjectionToggle(): void {
-    const toggle = this.container.querySelector('.deckgl-projection-toggle');
+    const toggle = this.controlsHost.querySelector('.deckgl-projection-toggle');
     if (!toggle) return;
     toggle.querySelectorAll('.proj-btn').forEach((btn) => {
       const mode = (btn as HTMLElement).dataset.mode;
@@ -4842,6 +4862,21 @@ export class DeckGLMap {
     return this.basemapStyle;
   }
 
+  // ---- Layer panel open/close (driven by the dock's Layers button) ----------
+  public isLayerPanelOpen(): boolean {
+    return this.layerPanelEl?.classList.contains('open') ?? false;
+  }
+
+  public setLayerPanelOpen(open: boolean): void {
+    this.layerPanelEl?.classList.toggle('open', open);
+  }
+
+  public toggleLayerPanel(): boolean {
+    const open = !this.isLayerPanelOpen();
+    this.setLayerPanelOpen(open);
+    return open;
+  }
+
   // Drape the current style over the Mapbox DEM for real relief when on terrain;
   // otherwise clear terrain. Safe to call once the style has loaded.
   private applyTerrain(): void {
@@ -4888,14 +4923,14 @@ export class DeckGLMap {
         return `<button class="style-btn ${o.style === this.basemapStyle ? 'active' : ''}" data-style="${o.style}"${needsToken ? ' disabled' : ''} title="${title}">${o.label}</button>`;
       })
       .join('');
-    this.container.appendChild(el);
+    this.controlsHost.appendChild(el);
     el.querySelectorAll('.style-btn').forEach((btn) => {
       btn.addEventListener('click', () => this.setBasemapStyle((btn as HTMLElement).dataset.style as BasemapStyle));
     });
   }
 
   private updateStyleSwitcher(): void {
-    const el = this.container.querySelector('.deckgl-style-switcher');
+    const el = this.controlsHost.querySelector('.deckgl-style-switcher');
     if (!el) return;
     el.querySelectorAll('.style-btn').forEach((btn) => {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.style === this.basemapStyle);
