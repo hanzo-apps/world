@@ -123,6 +123,11 @@ export class LiveNewsPanel extends Panel {
     super({ id: 'live-news', title: t('panels.liveNews') });
     this.youtubeOrigin = LiveNewsPanel.resolveYouTubeOrigin();
     this.playerElementId = `live-news-player-${Date.now()}`;
+    // The panel-content / player layout CSS is keyed on `#live-news` (padding:0 +
+    // flex-column so the 16:9 video fills the panel edge-to-edge at any width).
+    // data-panel alone never matched it, leaving the video under the generic 8px
+    // padding — set the id so the intended fill CSS actually applies.
+    this.element.id = 'live-news';
     this.element.classList.add('panel-wide');
     this.createLiveButton();
     this.createMuteButton();

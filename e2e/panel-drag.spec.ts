@@ -4,6 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 // FLIP reflow, snapping resize) through the deterministic harness.
 
 const HARNESS = '/tests/panel-drag-harness.html';
+const LAYOUT_HARNESS = '/tests/layout-harness.html';
+// Screenshots land in a repo-relative artifacts dir (Playwright creates it).
+const SHOTS = 'e2e/layout-shots';
 
 interface PanelDragHarness {
   ready: boolean;
@@ -12,9 +15,31 @@ interface PanelDragHarness {
   order: () => string[];
 }
 
+interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface LayoutHarness {
+  ready: boolean;
+  mode: () => 'grid' | 'free';
+  setMode: (m: 'grid' | 'free') => void;
+  toggle: () => 'grid' | 'free';
+  cell: () => number;
+  setCell: (px: number) => void;
+  rect: (id: string) => Rect | null;
+  colStep: () => { step: number; cols: number; padL: number };
+  order: () => string[];
+  overlayVisible: () => boolean;
+  gridColumnOf: (id: string) => string;
+}
+
 declare global {
   interface Window {
     __panelDragHarness?: PanelDragHarness;
+    __layoutHarness?: LayoutHarness;
   }
 }
 
@@ -101,5 +126,299 @@ test.describe('panel drag + resize', () => {
     await expect(p2).toHaveClass(/span-2/);
     const span = await page.evaluate(() => window.__panelDragHarness!.lastCommittedSpan);
     expect(span).toBe(2);
+  });
+});
+
+// ── Layout engine: grid ⇄ free, corner resize, cell-size, overlay ──────────
+// Drives the real Panel grips + grid-config against the true main.css, at
+// 1440x900 (see playwright.layout.config.ts).
+
+const lh = async (page: Page): Promise<void> => {
+  await page.goto(LAYOUT_HARNESS);
+  await page.waitForFunction(() => window.__layoutHarness?.ready === true);
+  await page.waitForTimeout(60); // let the queued registerPanel microtasks settle
+};
+
+const rect = (page: Page, id: string): Promise<Rect> =>
+  page.evaluate((pid) => window.__layoutHarness!.rect(pid)!, id);
+
+const headerBox = async (page: Page, id: string) =>
+  (await page.locator(`[data-panel="${id}"] .panel-header`).first().boundingBox())!;
+
+test.describe('layout engine', () => {
+  // Gate viewport: 1440x900 (independent of the base config's default size).
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('grid mode: a dropped panel lands on a cell boundary', async ({ page }) => {
+    await lh(page);
+    expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('grid');
+
+    const src = await headerBox(page, 'charlie');
+    const dst = (await page.locator('[data-panel="echo"]').boundingBox())!;
+
+    await page.mouse.move(src.x + 30, src.y + src.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(src.x + 60, src.y + src.height / 2, { steps: 4 });
+    await page.mouse.move(dst.x + dst.width * 0.8, dst.y + dst.height / 2, { steps: 16 });
+    await page.mouse.up();
+
+    // Final resting position is snapped to a grid cell (multiple of the column step).
+    const { step, padL } = await page.evaluate(() => window.__layoutHarness!.colStep());
+    const r = await rect(page, 'charlie');
+    const k = Math.round((r.left - padL) / step);
+    expect(Math.abs(r.left - padL - k * step)).toBeLessThan(4);
+
+    await page.screenshot({ path: `${SHOTS}/grid-snap.png` });
+  });
+
+  test('grid mode: bottom-right corner resizes width + height (snapped)', async ({ page }) => {
+    await lh(page);
+    const corner = (await page
+      .locator('[data-panel="delta"] .panel-corner-resize-handle')
+      .boundingBox())!;
+    const { step } = await page.evaluate(() => window.__layoutHarness!.colStep());
+
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    // Pull out ~1.5 columns wide and ~250px tall.
+    await page.mouse.move(
+      corner.x + corner.width / 2 + step * 1.5,
+      corner.y + corner.height / 2 + 250,
+      { steps: 16 },
+    );
+    await page.mouse.up();
+
+    // Height grew to a taller row-span and width snapped to multiple columns.
+    await expect(page.locator('[data-panel="delta"]')).toHaveClass(/span-2/);
+    const gc = await page.evaluate(() => window.__layoutHarness!.gridColumnOf('delta'));
+    expect(gc).toMatch(/span [2-9]/);
+
+    await page.screenshot({ path: `${SHOTS}/resized-from-corner.png` });
+  });
+
+  test('grid mode: overlay appears only while dragging', async ({ page }) => {
+    await lh(page);
+    expect(await page.evaluate(() => window.__layoutHarness!.overlayVisible())).toBe(false);
+
+    const src = await headerBox(page, 'bravo');
+    await page.mouse.move(src.x + 30, src.y + src.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(src.x + 120, src.y + 40, { steps: 8 });
+
+    // Mid-drag: the faint track overlay is shown.
+    await expect
+      .poll(() => page.evaluate(() => window.__layoutHarness!.overlayVisible()))
+      .toBe(true);
+    await page.screenshot({ path: `${SHOTS}/grid-overlay.png` });
+
+    await page.mouse.up();
+    await expect
+      .poll(() => page.evaluate(() => window.__layoutHarness!.overlayVisible()))
+      .toBe(false);
+  });
+
+  test('grid mode: changing cell size re-snaps the grid', async ({ page }) => {
+    await lh(page);
+    const before = await page.evaluate(() => window.__layoutHarness!.colStep());
+
+    await page.evaluate(() => window.__layoutHarness!.setCell(240));
+    await page.waitForTimeout(50);
+
+    const after = await page.evaluate(() => window.__layoutHarness!.colStep());
+    // Wider cells ⇒ fewer, wider columns: the panels re-snap to a new track grid.
+    expect(after.step).toBeGreaterThan(before.step + 20);
+    expect(after.cols).toBeLessThanOrEqual(before.cols);
+    expect(await page.evaluate(() => window.__layoutHarness!.cell())).toBe(240);
+  });
+
+  test('free mode: pixel drag + corner resize persist across reload', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
+
+    // Drag alpha by an arbitrary (non-cell) pixel delta.
+    const start = await rect(page, 'alpha');
+    const hdr = await headerBox(page, 'alpha');
+    const DX = 223;
+    const DY = -137;
+    await page.mouse.move(hdr.x + 30, hdr.y + hdr.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hdr.x + 40, hdr.y + hdr.height / 2, { steps: 3 });
+    await page.mouse.move(hdr.x + 30 + DX, hdr.y + hdr.height / 2 + DY, { steps: 16 });
+    await page.mouse.up();
+
+    const moved = await rect(page, 'alpha');
+    expect(Math.abs(moved.left - (start.left + DX))).toBeLessThan(6);
+    expect(Math.abs(moved.top - (start.top + DY))).toBeLessThan(6);
+    // Arbitrary pixel position — not snapped to a cell.
+    await page.screenshot({ path: `${SHOTS}/free-form.png` });
+
+    // Resize from the corner to an arbitrary size.
+    const corner = (await page
+      .locator('[data-panel="alpha"] .panel-corner-resize-handle')
+      .boundingBox())!;
+    const WD = 118;
+    const HD = 94;
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      corner.x + corner.width / 2 + WD,
+      corner.y + corner.height / 2 + HD,
+      { steps: 16 },
+    );
+    await page.mouse.up();
+
+    const resized = await rect(page, 'alpha');
+    expect(Math.abs(resized.width - (moved.width + WD))).toBeLessThan(6);
+    expect(Math.abs(resized.height - (moved.height + HD))).toBeLessThan(6);
+
+    // Reload: the mode + exact geometry are restored.
+    await page.reload();
+    await page.waitForFunction(() => window.__layoutHarness?.ready === true);
+    await page.waitForTimeout(80);
+    expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
+    const restored = await rect(page, 'alpha');
+    expect(Math.abs(restored.left - resized.left)).toBeLessThan(3);
+    expect(Math.abs(restored.top - resized.top)).toBeLessThan(3);
+    expect(Math.abs(restored.width - resized.width)).toBeLessThan(3);
+    expect(Math.abs(restored.height - resized.height)).toBeLessThan(3);
+  });
+
+  test('free mode: the map participates with a 240px floor', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    const pos = await page.evaluate(
+      () => getComputedStyle(document.querySelector('[data-panel="map"]')!).position,
+    );
+    expect(pos).toBe('absolute');
+    const r = await rect(page, 'map');
+    expect(r.width).toBeGreaterThanOrEqual(240);
+    expect(r.height).toBeGreaterThanOrEqual(240);
+  });
+
+  test('toggle flips grid ⇄ free and back', async ({ page }) => {
+    await lh(page);
+    expect(await page.evaluate(() => window.__layoutHarness!.toggle())).toBe('free');
+    expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
+    expect(await page.evaluate(() => window.__layoutHarness!.toggle())).toBe('grid');
+    // Back in grid mode the free inline geometry is stripped.
+    const pos = await page.evaluate(
+      () => document.querySelector<HTMLElement>('[data-panel="alpha"]')!.style.position,
+    );
+    expect(pos).toBe('');
+  });
+});
+
+// ── Live News (video) resizes freely; the video fills the panel at any size ──
+// Real app: proves the CTO requirement — Live News can grow to 2-3 cols / full
+// width (grid) or any pixel size (free), and the 16:9 video (`.live-news-player`,
+// width-driven) scales to fill, never capped small. NOTE: in the offline e2e
+// runtime the YouTube embed eventually errors and replaces `.live-news-player`
+// with a message, so the video-fill invariant is asserted where it's reliably
+// present (default size) and the resize is proved via the player's containing
+// block (`.panel-content`, always present), which the player fills 1:1.
+
+const rectW = (page: Page, sel: string): Promise<number> =>
+  page.evaluate((s) => {
+    const el = document.querySelector<HTMLElement>(s);
+    return el ? Math.round(el.getBoundingClientRect().width) : -1;
+  }, sel);
+
+const LN = '[data-panel="live-news"]';
+const LN_CONTENT = `${LN} .panel-content`;
+const LN_PLAYER = `${LN} .live-news-player`;
+
+test.describe('live news video resize (real app)', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('grid: default → 3 cols → full-width; the video fills at every width', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await page.waitForTimeout(500);
+
+    const grid = (await page.locator('#panelsGrid').boundingBox())!;
+    const ln = page.locator(LN);
+    const colHandle = ln.locator('.panel-col-resize-handle');
+
+    // The fill setup is active: the panel-content is a full-bleed flex column
+    // (padding 0) so the width-driven 16:9 `.live-news-player` fills it edge-to-edge
+    // at any width. (Keyed on #live-news — dead until the id fix in LiveNewsPanel.)
+    const setup = await page.evaluate((sel) => {
+      const c = document.querySelector<HTMLElement>(sel);
+      if (!c) return null;
+      const s = getComputedStyle(c);
+      return { display: s.display, dir: s.flexDirection, padLeft: s.paddingLeft };
+    }, LN_CONTENT);
+    expect(setup).toEqual({ display: 'flex', dir: 'column', padLeft: '0px' });
+
+    // The video, while present (offline embed errors after a beat), fills the
+    // container 1:1 at the default width.
+    const startContent = await rectW(page, LN_CONTENT);
+    const startVideo = await rectW(page, LN_PLAYER);
+    if (startVideo > 0) expect(Math.abs(startVideo - startContent)).toBeLessThan(4);
+
+    // Drag the right edge out to ~3 columns.
+    const h1 = (await colHandle.boundingBox())!;
+    await page.mouse.move(h1.x + h1.width / 2, h1.y + h1.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + grid.width * 0.42, h1.y + h1.height / 2, { steps: 14 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const midContent = await rectW(page, LN_CONTENT);
+    expect(midContent).toBeGreaterThan(startContent + 40); // genuinely wider
+
+    // Drag the right edge all the way out → full width. No column cap.
+    const h2 = (await colHandle.boundingBox())!;
+    await page.mouse.move(h2.x + h2.width / 2, h2.y + h2.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + grid.width + 200, h2.y + h2.height / 2, { steps: 16 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const fullContent = await rectW(page, LN_CONTENT);
+    expect(fullContent).toBeGreaterThan(midContent);
+    expect(fullContent).toBeGreaterThan(grid.width * 0.9); // ~full grid width
+    // The video (when present) fills the now-full-width container 1:1.
+    const fullVideo = await rectW(page, LN_PLAYER);
+    if (fullVideo > 0) expect(Math.abs(fullVideo - fullContent)).toBeLessThan(6);
+
+    // Make it tall too (drag the bottom edge down) so the 16:9 video is large.
+    const bottom = ln.locator('.panel-resize-handle');
+    const b = (await bottom.boundingBox())!;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + 520, { steps: 16 });
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+    await page.evaluate(() => document.querySelector('[data-panel="live-news"]')?.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: 'e2e/layout-shots/live-news-fullwidth.png' });
+
+    // Container is now full-width AND tall → a large video area.
+    expect(await rectW(page, LN_CONTENT)).toBeGreaterThan(900);
+  });
+
+  test('free: Live News resizes to an arbitrary pixel size; video fills', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(LN_PLAYER, { timeout: 45000 });
+    await page.waitForTimeout(600);
+    const startContent = await rectW(page, LN_CONTENT);
+    await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('free'));
+    await page.waitForTimeout(200);
+
+    const corner = page.locator(`${LN} .panel-corner-resize-handle`);
+    const c = (await corner.boundingBox())!;
+    await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(c.x + 240, c.y + 260, { steps: 18 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const content = await rectW(page, LN_CONTENT);
+    expect(content).toBeGreaterThan(startContent + 120); // grew to an arbitrary pixel width
+    const video = await rectW(page, LN_PLAYER);
+    if (video > 0) expect(Math.abs(video - content)).toBeLessThan(6); // fills at that size
+    await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'));
   });
 });
