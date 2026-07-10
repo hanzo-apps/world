@@ -12,6 +12,8 @@ export const API_URLS = {
     `/v1/world/finnhub?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`,
   yahooFinance: (symbol: string) =>
     `/v1/world/yahoo-finance?symbol=${encodeURIComponent(symbol)}`,
+  yahooBatch: (symbols: string[]) =>
+    `/v1/world/yahoo-batch?symbols=${symbols.map((s) => encodeURIComponent(s)).join(',')}`,
   coingecko:
     '/v1/world/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true',
   polymarket: '/v1/world/polymarket?closed=false&order=volume&ascending=false&limit=100',
