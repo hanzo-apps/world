@@ -21,8 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hanzoai/world/internal/world/kv"
 	"github.com/hanzoai/world/internal/world/mcp"
 	"github.com/hanzoai/world/internal/world/model"
+	"github.com/hanzoai/world/internal/world/store"
 )
 
 const (
@@ -42,10 +44,18 @@ type Server struct {
 	ai         *AIClient
 	worldModel *model.Engine
 	mcp        *mcp.Server
+
+	// Datastore layer (see datastore.go): kv is the shared hanzo-kv hot cache,
+	// feeds is the two-tier warm feed-body cache in front of it, and store is the
+	// embedded SQLite lake + per-identity settings.
+	kv    *kv.Client
+	store *store.DB
+	feeds *FeedCache
 }
 
-// NewServer constructs the backend and its world-model engine (built from the
-// feed sources in model_sources.go). Call StartModel to begin ingest.
+// NewServer constructs the backend, its world-model engine (built from the feed
+// sources in model_sources.go), and the datastore layer. Call StartModel and
+// StartDatastore to begin the background loops.
 func NewServer() *Server {
 	s := &Server{
 		client: &http.Client{Timeout: 25 * time.Second},
@@ -54,6 +64,7 @@ func NewServer() *Server {
 		mcp:    mcp.New(),
 	}
 	s.worldModel = model.New(s.modelSources(), modelDataDir(), modelInterval())
+	s.initDatastore()
 	return s
 }
 

@@ -65,6 +65,15 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/youtube/live", s.handleYouTubeLive)
 	mux.HandleFunc("/v1/world/youtube/embed", s.handleYouTubeEmbed)
 
+	// ingested-data lake — the "one place to query everything" (search +
+	// analytics across ALL ingested items: news, model observations, …).
+	mux.HandleFunc("/v1/world/search", s.handleSearch)
+	mux.HandleFunc("/v1/world/analytics", s.handleAnalytics)
+
+	// per-identity settings — server-side dashboard sync for signed-in users
+	// (bearer-gated; anonymous keeps localStorage).
+	mux.HandleFunc("/v1/world/settings", s.handleSettings)
+
 	// econ / humanitarian
 	mux.HandleFunc("/v1/world/fred-data", s.handleFRED)
 	mux.HandleFunc("/v1/world/worldbank", s.handleWorldBank)
