@@ -27,3 +27,12 @@ data/world-model.json
 data/world-model.json.tmp
 data/world-model-history.json.gz
 data/world-model-history.json.gz.tmp
+
+# embedded datastore lake + settings (SQLite, WAL mode) — regenerated on boot,
+# lands here only when WORLD_DATA_DIR points at the repo (local dev)
+world.db
+world.db-wal
+world.db-shm
+data/world.db
+data/world.db-wal
+data/world.db-shm
