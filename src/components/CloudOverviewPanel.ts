@@ -31,16 +31,26 @@ export class CloudOverviewPanel extends Panel {
   }
 
   private async fetchData(): Promise<void> {
+    // Primary render depends ONLY on pulse + models (both fast). The chain-scale
+    // tiles come from getChainNodes, which can be slow on a cold cache while
+    // unreachable L1 RPCs time out — so it is fetched independently and folded in
+    // when ready. It must never gate the overview's first paint (that was the
+    // "stuck on Loading" bug: awaiting all three blocked render on the slow one).
     try {
-      const [pulse, models, chains] = await Promise.all([getCloudPulse(), getCloudModels(), getChainNodes()]);
+      const [pulse, models] = await Promise.all([getCloudPulse(), getCloudModels()]);
       this.pulse = pulse;
       this.realModels = models && models.totalModels > 0 ? models.totalModels : null;
-      if (chains) this.chains = chains;
       this.error = null;
     } catch (e) {
       this.error = e instanceof Error ? e.message : 'failed';
     }
     this.render();
+    void this.fetchChains();
+  }
+
+  private async fetchChains(): Promise<void> {
+    const chains = await getChainNodes();
+    if (chains) { this.chains = chains; this.render(); }
   }
 
   /** Real chain-scale tiles from the live chain-nodes feed: chains live (of
@@ -66,16 +76,20 @@ export class CloudOverviewPanel extends Panel {
     if (!p.demo) this.setDataBadge('live'); else this.clearDataBadge();
 
     const modelsServed = this.realModels ?? o.modelsServed;
+    // Order = importance top-left → down. The two REAL chain-scale tiles sit right
+    // after models-served so they land in the panel's first visible rows (the
+    // fixed-height widget scrolls; the demo-modeled nodes/GPUs/regions/uptime are
+    // the ones that fall below the fold, not the real live numbers).
     const tiles = [
       statTile(fmtCompact(o.requestsPerSec), 'requests / sec', p.volumeModeled ? 'modeled' : undefined),
       statTile(fmtCompact(o.requests24h), `requests / ${p.window}`),
       statTile(fmtCompact(o.tokens24h), `tokens / ${p.window}`),
       statTile(fmtInt(modelsServed), 'models served', this.realModels ? 'live' : undefined),
+      this.chainTiles(),
       statTile(`${fmtInt(o.nodesOnline)}/${fmtInt(o.nodesTotal)}`, 'nodes online'),
       statTile(fmtInt(o.gpusOnline), 'GPUs online'),
       statTile(fmtInt(o.regions), 'regions'),
       statTile(fmtPct(o.uptimePct), 'uptime'),
-      this.chainTiles(),
     ].join('');
 
     this.setContent(`
