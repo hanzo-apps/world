@@ -160,30 +160,26 @@ func (s *Server) handleRSSProxy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Domain not allowed")
 		return
 	}
-	key := "rss:" + feedURL
-	if v, ok := s.cache.Get(key); ok {
-		writeBytes(w, http.StatusOK, "application/xml", "public, max-age=300, s-maxage=300, stale-while-revalidate=60", v.([]byte))
+	const cc = "public, max-age=300, s-maxage=300, stale-while-revalidate=60"
+	// Warm cache first (per-pod L1 → shared hanzo-kv L2): instant, and never blocks
+	// on the upstream while ANY cached copy exists (stale-while-revalidate; the
+	// background warmer does the revalidation).
+	if body, _, ok := s.feeds.Get(r.Context(), feedURL); ok {
+		writeBytes(w, http.StatusOK, "application/xml", cc, body)
 		return
 	}
+	// True cold miss: bounded live fetch, write-through to the warm cache + lake.
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	body, status, err := s.getAllowlisted(ctx, feedURL, allowedRSSDomains, map[string]string{
-		"User-Agent": browserUA,
-		"Accept":     "application/rss+xml, application/xml, text/xml, */*",
-	})
-	// A blank 200 is a failure, not content: never cache it (it would poison the
-	// shared "rss:" key feedXML reads too). Fall back to last-good stale.
-	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
-		if v, ok := s.cache.GetStale(key); ok {
-			writeBytes(w, http.StatusOK, "application/xml", "public, max-age=300, s-maxage=300, stale-while-revalidate=60", v.([]byte))
-			return
-		}
+	body, ok := s.fetchFeedBody(ctx, feedURL)
+	if !ok {
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "items": []any{}})
 		return
 	}
-	s.cache.Set(key, body, 5*time.Minute, 15*time.Minute)
-	writeBytes(w, http.StatusOK, "application/xml", "public, max-age=300, s-maxage=300, stale-while-revalidate=60", body)
+	s.feeds.Put(feedURL, body)
+	s.ingestFeedItems(feedURL, body)
+	writeBytes(w, http.StatusOK, "application/xml", cc, body)
 }
 
 // ── Hacker News ──────────────────────────────────────────────────────────────

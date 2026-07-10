@@ -37,10 +37,14 @@ ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
 RUN npm run build
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
-FROM golang:1.23-alpine AS gobuild
+# go 1.25: the embedded datastore (modernc.org/sqlite, pure Go) needs it. The
+# binary stays CGO-free — modernc's SQLite is pure Go, so no C toolchain is added.
+FROM golang:1.25-alpine AS gobuild
 WORKDIR /src
-# stdlib-only module: go.mod has no requires, so there is no go.sum to copy.
-COPY go.mod ./
+# Deps: hanzo-kv client (go-redis) + embedded SQLite (modernc). Download once for
+# a cached layer before the source is copied.
+COPY go.mod go.sum ./
+RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/world ./cmd/world
