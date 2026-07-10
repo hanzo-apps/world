@@ -98,7 +98,7 @@ test.describe('3D globe', () => {
 
       // A real pointer interaction closes the gate (spin pauses).
       await page.evaluate(() =>
-        document.querySelector('.maplibregl-canvas')?.dispatchEvent(
+        document.querySelector('.mapboxgl-canvas')?.dispatchEvent(
           new MouseEvent('mousedown', { bubbles: true })
         )
       );
