@@ -1742,13 +1742,12 @@ export class App {
       <div class="main-content">
         <div class="panels-grid" id="panelsGrid">
           <div class="panel map-section map-panel" id="mapSection" data-panel="map">
-            <div class="panel-header">
-              <div class="panel-header-left">
-                <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'ai' ? t('panels.aiMap') : SITE_VARIANT === 'crypto' ? t('panels.cryptoMap') : t('panels.map')}</span>
-              </div>
-              <span class="header-clock" id="headerClock"></span>
-            </div>
+            <!-- Chromeless map: no title/UTC bar. A slim grip (revealed on hover) is
+                 the map's drag handle — same .panel-header the panel-drag machinery
+                 grabs, just emptied and thinned. Timestamp moved to a corner overlay. -->
+            <div class="panel-header map-drag-grip" aria-label="${t('panels.map')} — drag to move"></div>
             <div class="map-container" id="mapContainer"></div>
+            <div class="map-timestamp" id="headerClock" aria-hidden="true"></div>
             <div class="map-resize-handle" id="mapResizeHandle"></div>
             <div class="panel-col-resize-handle" id="mapColResizeHandle" title="Drag to change map width"></div>
           </div>
