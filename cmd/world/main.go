@@ -46,7 +46,9 @@ func main() {
 	world.LoadKMSSecrets(rootCtx)
 
 	srv := world.NewServer()
+	defer srv.Close()       // release hanzo-kv + embedded datastore handles
 	srv.StartModel(rootCtx) // continuously-folded world-state engine
+	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
