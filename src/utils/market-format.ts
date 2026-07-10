@@ -46,7 +46,9 @@ export function quoteRow(r: QuoteRow): string {
       <span class="mkt-na">unavailable</span>
     </div>`;
   }
-  return `<div class="mkt-row">
+  // data-ctx-* annotations drive the right-click menu (Copy value / Copy symbol) —
+  // the menu logic lives once in panel-menu.ts; the row only declares its data.
+  return `<div class="mkt-row" data-ctx-symbol="${escapeHtml(r.sub || r.name)}" data-ctx-value="${escapeHtml(r.valueText)}">
     <span class="mkt-name">${escapeHtml(r.name)}${r.sub ? `<span class="mkt-sub">${escapeHtml(r.sub)}</span>` : ''}</span>
     <span class="mkt-spark-wrap ${dir}">${monoSparkline(r.sparkline)}</span>
     <span class="mkt-val">${escapeHtml(r.valueText)}</span>

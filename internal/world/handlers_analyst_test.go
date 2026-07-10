@@ -2,10 +2,14 @@ package world
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+
+	"github.com/hanzoai/world/internal/world/mcp"
 )
 
 // canonicalCommands is the command set the SPA registry (app-commands.ts) defines.
@@ -133,6 +137,170 @@ func TestParseAnalystOutput(t *testing.T) {
 	if reply != "hi" || len(actions) != 0 {
 		t.Fatalf("fenced JSON not recovered: reply=%q actions=%+v", reply, actions)
 	}
+}
+
+func TestParseAnalystTurnTools(t *testing.T) {
+	allowed := commandTypes(defaultCommands())
+	toolNames := toolNameSet(mcp.ToolSpecs())
+
+	// A tool round: the model requests a known data tool (+ ignores an unknown one).
+	raw := `{"reply":"","tools":[{"name":"world_brief","arguments":{"n":5}},{"name":"not_a_tool","arguments":{}}]}`
+	reply, actions, calls := parseAnalystTurn(raw, allowed, toolNames)
+	if reply != "" || len(actions) != 0 {
+		t.Fatalf("tool round should have no reply/actions: reply=%q actions=%+v", reply, actions)
+	}
+	if len(calls) != 1 || calls[0].Name != "world_brief" {
+		t.Fatalf("expected 1 valid tool call (world_brief), got %+v", calls)
+	}
+	if n, _ := calls[0].Args["n"].(float64); n != 5 {
+		t.Fatalf("tool args not passed through: %+v", calls[0].Args)
+	}
+
+	// A final answer: reply + actions, no tools.
+	reply, actions, calls = parseAnalystTurn(`{"reply":"done","actions":[{"type":"fly_to","lat":1,"lon":2}]}`, allowed, toolNames)
+	if reply != "done" || len(actions) != 1 || len(calls) != 0 {
+		t.Fatalf("final answer parse wrong: reply=%q actions=%+v calls=%+v", reply, actions, calls)
+	}
+
+	// nil toolNames disables tool extraction (the non-loop path).
+	if _, _, calls = parseAnalystTurn(raw, allowed, nil); calls != nil {
+		t.Fatalf("nil toolNames must not extract tools, got %+v", calls)
+	}
+
+	// Tool calls are capped per round.
+	var many strings.Builder
+	many.WriteString(`{"tools":[`)
+	for i := 0; i < analystMaxToolsPerRound+3; i++ {
+		if i > 0 {
+			many.WriteByte(',')
+		}
+		many.WriteString(`{"name":"world_brief","arguments":{}}`)
+	}
+	many.WriteString(`]}`)
+	if _, _, calls = parseAnalystTurn(many.String(), allowed, toolNames); len(calls) != analystMaxToolsPerRound {
+		t.Fatalf("per-round cap not enforced: got %d, want %d", len(calls), analystMaxToolsPerRound)
+	}
+}
+
+func TestRenderToolContract(t *testing.T) {
+	contract := renderToolContract(mcp.ToolSpecs())
+	// Every data tool must appear as a callable line.
+	for _, want := range []string{"world_brief", "country_instability", "market_quotes", "feeds"} {
+		if !strings.Contains(contract, "- "+want+"(") {
+			t.Errorf("tool contract missing %q:\n%s", want, contract)
+		}
+	}
+	// Required params render bare; optional params carry a trailing ?.
+	if !strings.Contains(contract, "country_instability(iso)") {
+		t.Errorf("required param not rendered bare:\n%s", contract)
+	}
+	if !strings.Contains(contract, "metric?") || !strings.Contains(contract, "n?") {
+		t.Errorf("optional params not marked with ?:\n%s", contract)
+	}
+	// Deterministic across runs.
+	for i := 0; i < 5; i++ {
+		if renderToolContract(mcp.ToolSpecs()) != contract {
+			t.Fatal("renderToolContract is not deterministic")
+		}
+	}
+}
+
+// TestAnalystDataToolLoop drives the full agentic loop end-to-end: a stub
+// inference server first asks for the world_brief data tool, then (after the
+// handler runs it IN-PROCESS through the mcp dispatcher and feeds the result back)
+// returns a final grounded answer. The response must carry the tool trace and the
+// reply, and the inference server must have been called exactly twice.
+func TestAnalystDataToolLoop(t *testing.T) {
+	var calls int32
+	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/chat/completions") {
+			http.Error(w, "unexpected path "+r.URL.Path, http.StatusNotFound)
+			return
+		}
+		n := atomic.AddInt32(&calls, 1)
+		var content string
+		if n == 1 {
+			// Round 1: request the data tool.
+			content = `{"reply":"","tools":[{"name":"world_brief","arguments":{"n":3}}]}`
+		} else {
+			// Round 2: the handler must have injected a TOOL RESULTS turn carrying
+			// the model envelope (asOf marker) before this call.
+			body, _ := readAllString(r)
+			if !strings.Contains(body, "TOOL RESULTS") || !strings.Contains(body, "asOf") {
+				t.Errorf("final turn missing injected tool results: %s", body)
+			}
+			content = `{"reply":"Composite instability is steady; see the ranked movers.","actions":[]}`
+		}
+		writeChatCompletion(w, content)
+	}))
+	defer ai.Close()
+
+	s := NewServer()
+	s.ai.base = ai.URL
+	s.ai.key = "test-key" // no user token → keyed bearer, so the chat path runs
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"messages": []map[string]string{{"role": "user", "content": "What is the state of global instability?"}},
+	})
+	resp, err := http.Post(ts.URL+"/v1/world/analyst", "application/json", strings.NewReader(string(reqBody)))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var out struct {
+		Reply   string           `json:"reply"`
+		Actions []map[string]any `json:"actions"`
+		Traces  []struct {
+			Label  string `json:"label"`
+			OK     bool   `json:"ok"`
+			Result string `json:"result"`
+		} `json:"traces"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("inference calls = %d, want 2 (one tool round + final answer)", got)
+	}
+	if out.Reply == "" {
+		t.Fatal("final reply is empty")
+	}
+	if len(out.Traces) != 1 {
+		t.Fatalf("traces = %d, want 1: %+v", len(out.Traces), out.Traces)
+	}
+	tr := out.Traces[0]
+	if !strings.HasPrefix(tr.Label, "world_brief(") {
+		t.Errorf("trace label = %q, want world_brief(...)", tr.Label)
+	}
+	if !tr.OK {
+		t.Errorf("world_brief trace should be ok=true: %+v", tr)
+	}
+	if !strings.Contains(tr.Result, "asOf") {
+		t.Errorf("trace result should carry the model envelope (asOf): %q", tr.Result)
+	}
+}
+
+// writeChatCompletion writes an OpenAI-shaped chat completion whose assistant
+// content is body (the analyst strict-JSON envelope).
+func writeChatCompletion(w http.ResponseWriter, body string) {
+	resp := map[string]any{
+		"choices": []any{map[string]any{"message": map[string]any{"content": body}}},
+		"usage":   map[string]any{"total_tokens": 12},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func readAllString(r *http.Request) (string, error) {
+	b, err := io.ReadAll(r.Body)
+	return string(b), err
 }
 
 func TestSanitizeModelAndAgentRef(t *testing.T) {

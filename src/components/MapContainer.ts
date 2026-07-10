@@ -3,6 +3,7 @@
  * Renders DeckGLMap (WebGL) on desktop, fallback to D3/SVG MapComponent on mobile
  */
 import { isMobileDevice } from '@/utils';
+import { registerMapContextPort } from '@/services/panel-menu';
 import { MapComponent } from './Map';
 import { DeckGLMap, type DeckMapView, type CountryClickPayload, type MapProjectionMode } from './DeckGLMap';
 import { GlobeNative, isNativeGlobeEnabled } from './GlobeNative';
@@ -91,6 +92,26 @@ export class MapContainer {
     this.nativeGlobeFlag = this.useDeckGL && isNativeGlobeEnabled();
 
     this.init();
+
+    // Expose the map's capabilities to the right-click context menu (Copy
+    // coordinates / Fly here / Toggle 2D-3D) through a narrow port — the menu
+    // never reaches into map internals.
+    registerMapContextPort({
+      getProjectionMode: () => this.getProjectionMode(),
+      setProjectionMode: (mode) => this.setProjectionMode(mode),
+      getCenter: () => this.getCenter(),
+      screenToLngLat: (x, y) => this.screenToLngLat(x, y),
+      flyTo: (lat, lon) => this.setCenter(lat, lon),
+    });
+  }
+
+  /** Viewport point → geographic coords (deck.gl only; null on the SVG fallback,
+   *  where the menu falls back to the current map centre). */
+  public screenToLngLat(clientX: number, clientY: number): { lat: number; lon: number } | null {
+    if (this.useDeckGL) {
+      return this.deckGLMap?.screenToLngLat(clientX, clientY) ?? null;
+    }
+    return null;
   }
 
   private hasWebGLSupport(): boolean {
