@@ -33,10 +33,17 @@ import (
 // (one source of truth).
 var chainRPCHosts = func() map[string]bool {
 	m := map[string]bool{}
-	for _, cn := range chainNetworks {
-		if u, err := url.Parse(cn.host); err == nil && u.Hostname() != "" {
+	add := func(raw string) {
+		if raw == "" {
+			return
+		}
+		if u, err := url.Parse(raw); err == nil && u.Hostname() != "" {
 			m[u.Hostname()] = true
 		}
+	}
+	for _, cn := range chainNetworks {
+		add(cn.host)    // primary RPC / API host (and Bitcoin's height host)
+		add(cn.altHost) // failover host (e.g. rpc.hanzo.network)
 	}
 	return m
 }()
@@ -92,16 +99,42 @@ type jsonRPCReq struct {
 
 const maxModeledNodes = 250
 
+// chainKind selects how a network's live head is read. Each kind is a distinct,
+// self-contained fetch strategy so adding a network is a data change (one catalog
+// row), never new branching at the call site.
+type chainKind int
+
+const (
+	// chainLuxNode: luxfi/node — POST /ext/info (info.peers) + /ext/bc/C/rpc
+	// (eth_blockNumber / eth_chainId). Lux, Zoo, Hanzo.
+	chainLuxNode chainKind = iota
+	// chainEVM: a public EVM JSON-RPC endpoint — POST eth_blockNumber /
+	// eth_chainId directly at host (no /ext/* path, no peer visibility). Ethereum.
+	chainEVM
+	// chainBitcoin: GET a plain-integer block-height URL (host+heightPath). Bitcoin.
+	chainBitcoin
+)
+
 type chainNet struct {
 	id, name, host string
-	chainID        int64 // catalog default; overridden by a live eth_chainId
+	chainID        int64     // catalog default; overridden by a live eth_chainId
+	kind           chainKind // how the live head is read (default chainLuxNode)
+	altHost        string    // failover host tried when host yields no height (luxnode)
+	heightPath     string    // path appended to host for a plain-integer height (bitcoin)
 }
 
 // chainNetworks is the public-chain catalog. Adding a row here also registers its
-// host in chainRPCHosts. Both networks run the same node software (luxfi/node).
+// host(s) in chainRPCHosts (the SSRF allowlist). The first three run luxfi/node
+// (our own L1s); Ethereum and Bitcoin are public reference chains read live from
+// an exact-host-allowlisted public endpoint. An unreachable network keeps its
+// catalog identity and honestly reports live:false with zero counts — never an
+// invented height.
 var chainNetworks = []chainNet{
-	{id: "lux", name: "Lux Network", host: "https://api.lux.network", chainID: 96369},
-	{id: "zoo", name: "Zoo Network", host: "https://api.zoo.network", chainID: 0},
+	{id: "lux", name: "Lux Network", host: "https://api.lux.network", chainID: 96369, kind: chainLuxNode},
+	{id: "zoo", name: "Zoo Network", host: "https://api.zoo.network", chainID: 0, kind: chainLuxNode},
+	{id: "hanzo", name: "Hanzo Network", host: "https://api.hanzo.network", altHost: "https://rpc.hanzo.network", chainID: 0, kind: chainLuxNode},
+	{id: "ethereum", name: "Ethereum", host: "https://ethereum-rpc.publicnode.com", chainID: 1, kind: chainEVM},
+	{id: "bitcoin", name: "Bitcoin", host: "https://blockchain.info", heightPath: "/q/getblockcount", chainID: 0, kind: chainBitcoin},
 }
 
 type chainNode struct {
@@ -153,13 +186,44 @@ func (s *Server) handleCloudChainNodes(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// fetchChainNetwork gathers real telemetry for one network, degrading each field
-// independently: any failed call leaves its field at zero (and live:false when the
-// block height is unavailable). It never returns an error.
+// fetchChainNetwork gathers real telemetry for one network by its kind, degrading
+// each field independently: any failed call leaves its field at zero (and
+// live:false when the block height is unavailable). It never returns an error.
 func (s *Server) fetchChainNetwork(ctx context.Context, cn chainNet) chainNetwork {
+	switch cn.kind {
+	case chainEVM:
+		return s.fetchEVMChain(ctx, cn)
+	case chainBitcoin:
+		return s.fetchBitcoinChain(ctx, cn)
+	default:
+		return s.fetchLuxNodeChain(ctx, cn)
+	}
+}
+
+// fetchLuxNodeChain reads a luxfi/node L1 (peers + block height + chainId). It
+// tries host, then altHost if the primary yields no height, so a failover RPC
+// keeps the network live. peers feed the modeled globe layer.
+func (s *Server) fetchLuxNodeChain(ctx context.Context, cn chainNet) chainNetwork {
 	out := chainNetwork{ID: cn.id, Name: cn.name, ChainID: cn.chainID}
-	info := cn.host + "/ext/info"
-	rpc := cn.host + "/ext/bc/C/rpc"
+	hosts := []string{cn.host}
+	if cn.altHost != "" {
+		hosts = append(hosts, cn.altHost)
+	}
+	for _, host := range hosts {
+		s.fillLuxNode(ctx, host, &out)
+		if out.Live {
+			break // got a head block from this host; no need to try the failover
+		}
+	}
+	out.Nodes = modeledNodes(out.Peers)
+	return out
+}
+
+// fillLuxNode populates peers/blockHeight/chainId from one luxfi/node host,
+// leaving any field that fails at its current value (additive across hosts).
+func (s *Server) fillLuxNode(ctx context.Context, host string, out *chainNetwork) {
+	info := host + "/ext/info"
+	rpc := host + "/ext/bc/C/rpc"
 
 	// peers (info.peers) — real count of connected peers, when the info API is exposed.
 	var pr struct {
@@ -178,30 +242,108 @@ func (s *Server) fetchChainNetwork(ctx context.Context, cn chainNet) chainNetwor
 	}
 
 	// blockHeight (eth_blockNumber) — the definitive liveness signal.
-	var br struct {
-		Result string `json:"result"`
+	if h, ok := s.ethBlockNumber(ctx, rpc); ok {
+		out.BlockHeight = h
+		out.Live = true
 	}
-	if err := s.postJSON(ctx, rpc, chainRPCHosts,
-		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_blockNumber", Params: []any{}}, &br); err == nil {
-		if h, ok := parseHexInt(br.Result); ok && h > 0 {
+
+	// chainId (eth_chainId) — verify / override the catalog default with the real value.
+	if id, ok := s.ethChainID(ctx, rpc); ok {
+		out.ChainID = id
+	}
+}
+
+// fetchEVMChain reads a public EVM JSON-RPC endpoint (Ethereum): eth_blockNumber
+// for the live head and eth_chainId to confirm identity. We do not peer with
+// public chains, so peers stays 0 (and the globe layer places no modeled nodes).
+func (s *Server) fetchEVMChain(ctx context.Context, cn chainNet) chainNetwork {
+	out := chainNetwork{ID: cn.id, Name: cn.name, ChainID: cn.chainID}
+	if h, ok := s.ethBlockNumber(ctx, cn.host); ok {
+		out.BlockHeight = h
+		out.Live = true
+	}
+	if id, ok := s.ethChainID(ctx, cn.host); ok {
+		out.ChainID = id
+	}
+	out.Nodes = modeledNodes(out.Peers) // peers==0 → empty (no invented positions)
+	return out
+}
+
+// fetchBitcoinChain reads Bitcoin's live block height from a plain-integer GET
+// endpoint (host+heightPath), SSRF-guarded by the same exact-host allowlist. No
+// EVM chainId and no peer visibility — height alone is the liveness signal.
+func (s *Server) fetchBitcoinChain(ctx context.Context, cn chainNet) chainNetwork {
+	out := chainNetwork{ID: cn.id, Name: cn.name, ChainID: cn.chainID}
+	txt, err := s.getAllowedText(ctx, cn.host+cn.heightPath, chainRPCHosts)
+	if err == nil {
+		if h, e := strconv.ParseInt(strings.TrimSpace(txt), 10, 64); e == nil && h > 0 {
 			out.BlockHeight = h
 			out.Live = true
 		}
 	}
+	out.Nodes = modeledNodes(out.Peers) // peers==0 → empty slice (never a null nodes array)
+	return out
+}
 
-	// chainId (eth_chainId) — verify / override the catalog default with the real value.
+// ethBlockNumber POSTs eth_blockNumber to an EVM RPC endpoint (SSRF-allowlisted)
+// and returns the decoded height. ok=false on any failure or a non-positive head.
+func (s *Server) ethBlockNumber(ctx context.Context, rpc string) (int64, bool) {
+	var br struct {
+		Result string `json:"result"`
+	}
+	if err := s.postJSON(ctx, rpc, chainRPCHosts,
+		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_blockNumber", Params: []any{}}, &br); err != nil {
+		return 0, false
+	}
+	if h, ok := parseHexInt(br.Result); ok && h > 0 {
+		return h, true
+	}
+	return 0, false
+}
+
+// ethChainID POSTs eth_chainId to an EVM RPC endpoint (SSRF-allowlisted) and
+// returns the decoded chain id. ok=false on any failure or a non-positive id.
+func (s *Server) ethChainID(ctx context.Context, rpc string) (int64, bool) {
 	var cr struct {
 		Result string `json:"result"`
 	}
 	if err := s.postJSON(ctx, rpc, chainRPCHosts,
-		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_chainId", Params: []any{}}, &cr); err == nil {
-		if id, ok := parseHexInt(cr.Result); ok && id > 0 {
-			out.ChainID = id
-		}
+		jsonRPCReq{JSONRPC: "2.0", ID: 1, Method: "eth_chainId", Params: []any{}}, &cr); err != nil {
+		return 0, false
 	}
+	if id, ok := parseHexInt(cr.Result); ok && id > 0 {
+		return id, true
+	}
+	return 0, false
+}
 
-	out.Nodes = modeledNodes(out.Peers)
-	return out
+// getAllowedText GETs a plain-text body from an exact-host-allowlisted URL — the
+// GET twin of postJSON's SSRF boundary, for the one non-JSON public source
+// (Bitcoin's integer height). rawURL's host MUST be in allowed before dialing.
+func (s *Server) getAllowedText(ctx context.Context, rawURL string, allowed map[string]bool) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if !allowed[u.Hostname()] {
+		return "", fmt.Errorf("host not allowed: %s", u.Hostname())
+	}
+	return s.getText(ctx, rawURL, map[string]string{"Accept": "text/plain, */*"})
+}
+
+// getAllowedJSON GETs and decodes a JSON body from an exact-host-allowlisted URL
+// — the GET-JSON twin of postJSON's SSRF boundary. Used by the status-page proxy,
+// whose upstream host is operator-configured (env). rawURL's host MUST be in
+// allowed before dialing.
+func (s *Server) getAllowedJSON(ctx context.Context, rawURL string, allowed map[string]bool, v any) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	if !allowed[u.Hostname()] {
+		return fmt.Errorf("host not allowed: %s", u.Hostname())
+	}
+	return s.getJSON(ctx, rawURL, nil, v)
 }
 
 // modeledNodes spreads a real peer COUNT across the region catalog deterministically
