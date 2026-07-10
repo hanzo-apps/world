@@ -29,6 +29,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/polymarket", s.handlePolymarket)
 	mux.HandleFunc("/v1/world/finnhub", s.handleFinnhub)
 	mux.HandleFunc("/v1/world/yahoo-finance", s.handleYahooFinance)
+	mux.HandleFunc("/v1/world/yahoo-batch", s.handleYahooBatch)
 	mux.HandleFunc("/v1/world/stock-index", s.handleStockIndex)
 	mux.HandleFunc("/v1/world/stablecoin-markets", s.handleStablecoins)
 	mux.HandleFunc("/v1/world/etf-flows", s.handleETFFlows)

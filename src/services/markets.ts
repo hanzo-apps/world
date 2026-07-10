@@ -114,6 +114,28 @@ async function fetchFromFinnhub(
   }
 }
 
+// Extract a MarketData row from a Yahoo chart response — ONE parser shared by the
+// single-symbol and batched fetch paths.
+function extractYahooMarketData(
+  symbol: string,
+  name: string,
+  display: string,
+  data: YahooFinanceResponse | null | undefined
+): MarketData | null {
+  const result = data?.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!meta) return null;
+
+  const price = meta.regularMarketPrice;
+  const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+  const change = ((price - prevClose) / prevClose) * 100;
+
+  const closes = result.indicators?.quote?.[0]?.close;
+  const sparkline = closes?.filter((v): v is number => v != null);
+
+  return { symbol, name, display, price, change, sparkline };
+}
+
 async function fetchFromYahoo(
   symbol: string,
   name: string,
@@ -122,25 +144,49 @@ async function fetchFromYahoo(
   try {
     const url = API_URLS.yahooFinance(symbol);
     const response = await fetchWithProxy(url);
-
     if (!response.ok) return null;
     const data: YahooFinanceResponse = await response.json();
-
-    const result = data.chart.result[0];
-    const meta = result?.meta;
-    if (!meta) return null;
-
-    const price = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
-    const change = ((price - prevClose) / prevClose) * 100;
-
-    const closes = result.indicators?.quote?.[0]?.close;
-    const sparkline = closes?.filter((v): v is number => v != null);
-
-    return { symbol, name, display, price, change, sparkline };
+    return extractYahooMarketData(symbol, name, display, data);
   } catch {
     return null;
   }
+}
+
+interface YahooBatchResponse {
+  // `chart` is the upstream Yahoo body verbatim — the whole { chart: { result } }
+  // envelope, same bytes the single-symbol passthrough returns — so it parses
+  // through the shared extractor exactly like the single path.
+  results?: Array<{ symbol: string; chart?: YahooFinanceResponse; error?: string }>;
+}
+
+// Yahoo symbols in ONE request per chunk instead of one GET per symbol. Returns a
+// row per input in input order, price/change null when a symbol fails, so callers
+// render a quiet unavailable line without an error wall — same contract as the old
+// per-symbol Promise.all, at a fraction of the round trips.
+async function fetchYahooBatch(
+  symbols: Array<{ symbol: string; name: string; display: string }>
+): Promise<MarketData[]> {
+  const BATCH = 60; // must not exceed the server's yahooBatchMaxSymbols
+  const out: MarketData[] = [];
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const chunk = symbols.slice(i, i + BATCH);
+    try {
+      const response = await fetchWithProxy(API_URLS.yahooBatch(chunk.map((s) => s.symbol)));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = (await response.json()) as YahooBatchResponse;
+      const bySymbol = new Map((data.results ?? []).map((r) => [r.symbol.toUpperCase(), r]));
+      for (const s of chunk) {
+        const r = bySymbol.get(s.symbol.toUpperCase());
+        const md = r?.chart ? extractYahooMarketData(s.symbol, s.name, s.display, r.chart) : null;
+        out.push(md ?? { symbol: s.symbol, name: s.name, display: s.display, price: null, change: null });
+      }
+    } catch {
+      for (const s of chunk) {
+        out.push({ symbol: s.symbol, name: s.name, display: s.display, price: null, change: null });
+      }
+    }
+  }
+  return out;
 }
 
 export async function fetchMultipleStocks(
@@ -167,10 +213,8 @@ export async function fetchMultipleStocks(
   }
 
   if (yahooSymbols.length > 0) {
-    const yahooResults = await Promise.all(
-      yahooSymbols.map(s => fetchFromYahoo(s.symbol, s.name, s.display))
-    );
-    results.push(...yahooResults.filter((r): r is MarketData => r !== null));
+    const yahooResults = await fetchYahooBatch(yahooSymbols);
+    results.push(...yahooResults.filter((r) => r.price != null));
     options.onBatch?.(results);
   }
 
@@ -207,12 +251,7 @@ export async function fetchStockQuote(
 export async function fetchYahooQuotes(
   symbols: Array<{ symbol: string; name: string; display: string }>
 ): Promise<MarketData[]> {
-  const results = await Promise.all(
-    symbols.map((s) => fetchFromYahoo(s.symbol, s.name, s.display))
-  );
-  return symbols.map(
-    (s, i) => results[i] ?? { symbol: s.symbol, name: s.name, display: s.display, price: null, change: null }
-  );
+  return fetchYahooBatch(symbols);
 }
 
 export async function fetchCrypto(): Promise<CryptoData[]> {
