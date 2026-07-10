@@ -16999,6 +16999,28 @@ body.layout-free .panel:not(.map-panel) {
   transition: none;
 }
 
+/* Window-manager snap-zone preview: a monochrome translucent target rectangle that
+   fades in during a free-mode drag and glides between zones (halves/quadrants) as
+   the cursor moves. Sits above the static panels, below the dragged card (z:50).
+   Reduced-motion: no glide, opacity only. */
+.panel-snap-preview {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 0.12s ease, left 0.13s cubic-bezier(0.2, 0, 0, 1),
+              top 0.13s cubic-bezier(0.2, 0, 0, 1), width 0.13s cubic-bezier(0.2, 0, 0, 1),
+              height 0.13s cubic-bezier(0.2, 0, 0, 1);
+}
+.panel-snap-preview.visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .panel-snap-preview { transition: opacity 0.12s ease; }
+}
+
 /* No snap overlay in free mode (guarded in JS too, but belt-and-braces). */
 body.layout-free .panels-grid::after {
   display: none;

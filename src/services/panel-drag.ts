@@ -90,6 +90,72 @@ const isInteractive = (target: Element | null): boolean =>
 const isResizeHandle = (target: Element | null): boolean =>
   !!target?.closest('.panel-resize-handle, .panel-col-resize-handle, .panel-corner-resize-handle');
 
+// ── Window-manager snap zones (free mode) ────────────────────────────────────
+// Dragging a free panel near an EDGE previews a half; near a CORNER previews a
+// quadrant; the centre is free placement. A translucent overlay shows the target
+// as the cursor moves between zones; on drop the panel resizes + positions to it.
+// One mechanism: the zone rect (viewport coords) → the panel's grid-relative free
+// geometry on commit. Escape cancels via the drag's own key handler.
+type SnapZoneId =
+  | 'left' | 'right' | 'top' | 'bottom'
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+interface SnapZone { id: SnapZoneId; left: number; top: number; width: number; height: number; }
+
+const SNAP_EDGE_FRAC = 0.14; // how deep from an edge counts as that half
+const SNAP_EDGE_MIN = 48;    // …but at least this many px, for small workspaces
+const SNAP_GAP = 6;          // inset so tiled panels keep a clean gutter
+
+// Visible workspace = the grid's box intersected with its scroll viewport.
+function workspaceRect(grid: HTMLElement): { left: number; top: number; width: number; height: number } {
+  const g = grid.getBoundingClientRect();
+  const scroller = (grid.closest('.main-content') as HTMLElement | null) ?? grid.parentElement;
+  const s = scroller ? scroller.getBoundingClientRect() : g;
+  const top = Math.max(g.top, s.top);
+  const bottom = Math.min(g.bottom, s.bottom);
+  return { left: g.left, top, width: g.width, height: Math.max(0, bottom - top) };
+}
+
+// Cursor (viewport x,y) → the snap zone under it, or null for free placement.
+function computeSnapZone(grid: HTMLElement, x: number, y: number): SnapZone | null {
+  const w = workspaceRect(grid);
+  if (w.width < 220 || w.height < 180) return null; // too small to tile
+  if (x < w.left || x > w.left + w.width || y < w.top || y > w.top + w.height) return null;
+  const ex = Math.max(SNAP_EDGE_MIN, w.width * SNAP_EDGE_FRAC);
+  const ey = Math.max(SNAP_EDGE_MIN, w.height * SNAP_EDGE_FRAC);
+  const nearL = x < w.left + ex, nearR = x > w.left + w.width - ex;
+  const nearT = y < w.top + ey, nearB = y > w.top + w.height - ey;
+  const halfW = Math.round(w.width / 2), halfH = Math.round(w.height / 2);
+  const z = (id: SnapZoneId, left: number, top: number, width: number, height: number): SnapZone =>
+    ({ id, left, top, width, height });
+  if (nearT && nearL) return z('top-left', w.left, w.top, halfW, halfH);
+  if (nearT && nearR) return z('top-right', w.left + halfW, w.top, w.width - halfW, halfH);
+  if (nearB && nearL) return z('bottom-left', w.left, w.top + halfH, halfW, w.height - halfH);
+  if (nearB && nearR) return z('bottom-right', w.left + halfW, w.top + halfH, w.width - halfW, w.height - halfH);
+  if (nearL) return z('left', w.left, w.top, halfW, w.height);
+  if (nearR) return z('right', w.left + halfW, w.top, w.width - halfW, w.height);
+  if (nearT) return z('top', w.left, w.top, w.width, halfH);
+  if (nearB) return z('bottom', w.left, w.top + halfH, w.width, w.height - halfH);
+  return null;
+}
+
+// One translucent preview overlay (viewport-fixed), reused across every drag.
+let snapPreviewEl: HTMLElement | null = null;
+function showSnapPreview(z: SnapZone): void {
+  if (!snapPreviewEl) {
+    snapPreviewEl = document.createElement('div');
+    snapPreviewEl.className = 'panel-snap-preview';
+    document.body.appendChild(snapPreviewEl);
+  }
+  snapPreviewEl.style.left = `${z.left}px`;
+  snapPreviewEl.style.top = `${z.top}px`;
+  snapPreviewEl.style.width = `${z.width}px`;
+  snapPreviewEl.style.height = `${z.height}px`;
+  snapPreviewEl.classList.add('visible');
+}
+function hideSnapPreview(): void {
+  snapPreviewEl?.classList.remove('visible');
+}
+
 /** Panels that participate in reflow — everything in the grid that is a visible panel. */
 function livePanels(grid: HTMLElement, except?: HTMLElement): HTMLElement[] {
   return Array.from(grid.children).filter(
@@ -142,6 +208,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
   let freeGesture = false; // this gesture started in free mode
   let freeStartLeft = 0;
   let freeStartTop = 0;
+  let currentZone: SnapZone | null = null; // active window-manager snap zone (free mode)
 
   const clearFlip = (g: HTMLElement) => {
     for (const p of livePanels(g)) {
@@ -281,6 +348,21 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     el.style.top = `${Math.round(top)}px`;
   };
 
+  // Snap the panel into a window-manager zone: convert the zone's viewport rect to
+  // the grid-relative free geometry (with a small gutter) and apply it inline.
+  const placeInZone = (z: SnapZone) => {
+    if (!grid) return;
+    const g = grid.getBoundingClientRect();
+    const left = Math.max(0, Math.round(z.left - g.left - grid.clientLeft) + SNAP_GAP);
+    const top = Math.max(0, Math.round(z.top - g.top - grid.clientTop) + SNAP_GAP);
+    const width = Math.max(minWidthFor(el), Math.round(z.width) - 2 * SNAP_GAP);
+    const height = Math.max(minHeightFor(el), Math.round(z.height) - 2 * SNAP_GAP);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+  };
+
   const commitFree = () => {
     commitFreeRect(el, {
       x: el.offsetLeft,
@@ -328,6 +410,8 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     if (freeGesture) {
       el.style.left = `${freeStartLeft}px`; // restore original position
       el.style.top = `${freeStartTop}px`;
+      hideSnapPreview();
+      currentZone = null;
       finishVisuals();
       releasePointer();
       return;
@@ -380,6 +464,11 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
       if (!dragging || !grid) return;
       if (freeGesture) {
         moveFree(x, y);
+        // Window-manager tiling: preview the zone under the cursor (halves/quadrants),
+        // or clear it in the free centre.
+        currentZone = grid ? computeSnapZone(grid, x, y) : null;
+        if (currentZone) showSnapPreview(currentZone);
+        else hideSnapPreview();
         return;
       }
       moveGhost(x, y);
@@ -396,7 +485,11 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
       rafId = 0;
     }
     if (wasDragging && freeGesture) {
-      moveFree(lastX, lastY);
+      // Drop into the previewed snap zone if one is active, else free-place.
+      if (currentZone) placeInZone(currentZone);
+      else moveFree(lastX, lastY);
+      hideSnapPreview();
+      currentZone = null;
       dragging = false;
       finishVisuals();
       commitFree();
