@@ -648,6 +648,9 @@ export class App {
   private setupCountryIntel(): void {
     if (!this.map) return;
     this.countryBriefPage = new CountryBriefPage();
+    // [country-view] Dock the analyst chat inside the fullscreen country view —
+    // same capability port the dashboard analyst uses (reused by composition).
+    this.countryBriefPage.setAnalystHost(this.buildAnalystHost());
     this.countryBriefPage.setShareStoryHandler((code, name) => {
       this.countryBriefPage?.hide();
       this.openCountryStory(code, name);
@@ -694,6 +697,21 @@ export class App {
       const shareUrl = this.getShareUrl();
       if (shareUrl) history.replaceState(null, '', shareUrl);
     });
+
+    // [country-view] Browser Back closes the fullscreen view (it was opened with
+    // pushState); Forward re-opens it. Closing via ✕/Escape drops ?country= via
+    // onClose's replaceState, so a plain replace here would never fire — popstate
+    // only runs on real history navigation.
+    window.addEventListener('popstate', () => {
+      const country = new URLSearchParams(window.location.search).get('country');
+      const visible = this.countryBriefPage?.isVisible() ?? false;
+      if (!country && visible) {
+        this.countryBriefPage?.hide();
+      } else if (country && !visible && dataFreshness.hasSufficientData()) {
+        const code = country.toUpperCase();
+        void this.openCountryBriefByCode(code, App.resolveCountryName(code));
+      }
+    });
   }
 
   public async openCountryBrief(lat: number, lon: number): Promise<void> {
@@ -722,6 +740,7 @@ export class App {
 
   public async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
+    const wasVisible = this.countryBriefPage.isVisible(); // [country-view] push vs replace
     this.map?.setRenderPaused(true);
 
     // Normalize to canonical name (GeoJSON may use "United States of America" etc.)
@@ -735,9 +754,18 @@ export class App {
     this.countryBriefPage.show(country, code, score, signals);
     this.map?.highlightCountry(code);
 
-    // Force URL to include ?country= immediately
+    // [country-view] Reflect the view in the URL. A fresh open from a gesture
+    // PUSHES a history entry so browser Back closes the view; switching country
+    // while open, or restoring a ?country= deep link, REPLACES (no phantom entry).
     const shareUrl = this.getShareUrl();
-    if (shareUrl) history.replaceState(null, '', shareUrl);
+    if (shareUrl) {
+      const already = new URLSearchParams(window.location.search).get('country');
+      if (!wasVisible && already?.toUpperCase() !== code.toUpperCase()) {
+        history.pushState(null, '', shareUrl);
+      } else {
+        history.replaceState(null, '', shareUrl);
+      }
+    }
 
     const stockPromise = fetch(`/v1/world/stock-index?code=${encodeURIComponent(code)}`)
       .then((r) => r.json())
@@ -821,7 +849,7 @@ export class App {
       } catch { /* server unreachable */ }
 
       if (data && data.brief && !data.skipped) {
-        this.countryBriefPage!.updateBrief({ ...data, code } as Parameters<typeof this.countryBriefPage.updateBrief>[0]);
+        this.countryBriefPage!.updateBrief({ ...data, code } as Parameters<CountryBriefPage['updateBrief']>[0]); // [country-view] typeof-this → class index (stable under new imports)
       } else {
         const briefHeadlines = (context.headlines as string[] | undefined) || [];
         let fallbackBrief = '';
