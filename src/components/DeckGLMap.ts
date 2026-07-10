@@ -95,6 +95,7 @@ import {
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
+import type { GlobeLayerSource } from './GlobeNative';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -3438,6 +3439,19 @@ export class DeckGLMap {
       this.stopAutoRotate();
     }
     this.onStateChange?.(this.state);
+  }
+
+  // Read-only bridge for the native deck.gl GlobeView renderer (GlobeNative). It
+  // reuses this map's data layers, tooltips and click handling verbatim so the 3D
+  // globe never duplicates a single builder. Additive — the private methods it wraps
+  // are unchanged. Heatmap→scatter substitution comes for free because buildLayers()
+  // keys the swap on this.state.mode === '3d'.
+  public asGlobeSource(): GlobeLayerSource {
+    return {
+      buildLayers: () => this.buildLayers(),
+      getTooltip: (info: PickingInfo) => this.getTooltip(info),
+      handleClick: (info: PickingInfo) => this.handleClick(info),
+    };
   }
 
   // Sync mapbox's projection to the current mode. deck.gl's MapboxOverlay
