@@ -103,7 +103,7 @@ import {
   LlmUsagePanel,
   BlockchainPanel,
 } from '@/components';
-import { isAdmin } from '@/services/iam';
+import { isAdmin, isAuthenticated, listOrgs, setActiveOrg } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
 import { AccountMenu } from '@/components/AccountMenu';
 import type { AnalystHost } from '@/services/analyst-actions';
@@ -166,6 +166,9 @@ export class App {
   private languageSelector: LanguageSelector | null = null;
   private accountMenu: AccountMenu | null = null;
   private analystDock: AiAnalystDock | null = null;
+  // Best-effort sync snapshot of the user's orgs, primed async when the analyst
+  // host is built — grounds the analyst's org context + validates switch_org.
+  private analystOrgs: Array<{ id: string; name: string }> = [];
   private adminCloudMounted = false;
   private searchModal: SearchModal | null = null;
   private mobileWarningModal: MobileWarningModal | null = null;
@@ -2451,23 +2454,103 @@ export class App {
   // The narrow port the AI analyst drives. All dashboard mutation stays here in
   // App; the analyst services only see this interface.
   private buildAnalystHost(): AnalystHost {
+    // Prime the org snapshot once (async) so listOrgs()/switch_org have real ids.
+    if (isAuthenticated() && !this.analystOrgs.length) {
+      void listOrgs().then((orgs) => {
+        this.analystOrgs = orgs.map((o) => ({ id: o.name, name: o.displayName || o.name }));
+      });
+    }
     return {
-      getState: () => ({ variant: SITE_VARIANT, timeRange: this.currentTimeRange }),
+      getState: () => ({
+        variant: SITE_VARIANT,
+        timeRange: this.currentTimeRange,
+        mapMode: this.map?.getProjectionMode(),
+        region: this.map?.getState().view,
+        theme: getCurrentTheme(),
+        authed: isAuthenticated(),
+      }),
       listPanels: () =>
         Object.entries(this.panelSettings)
           .filter(([k]) => k !== 'runtime-config' || this.isDesktopApp)
           .map(([key, cfg]) => ({ key, name: this.getLocalizedPanelName(key, cfg.name), enabled: !!cfg.enabled })),
       listLayers: () => Object.entries(this.mapLayers).map(([key, on]) => ({ key, on: !!on })),
+      listOrgs: () => this.analystOrgs,
+      isAuthed: () => isAuthenticated(),
       showPanel: (key) => this.setPanelEnabled(key, true),
       hidePanel: (key) => this.setPanelEnabled(key, false),
       movePanel: (key, opts) => this.movePanelInGrid(key, opts),
+      resizePanel: (key, span) => this.resizePanelInGrid(key, span),
       toggleLayer: (key, on) => this.setMapLayerEnabled(key, on),
+      setMapMode: (mode) => this.setMapProjection(mode),
+      flyTo: (lat, lon, zoom) => this.flyMapTo(lat, lon, zoom),
+      setRegion: (region) => this.setMapRegion(region),
       setTimeRange: (range) => this.setGlobalTimeRange(range),
       setVariant: (variant) => this.setSiteVariant(variant),
+      setTheme: (theme) => this.setAppTheme(theme),
+      search: (query) => this.runSearch(query),
       resetLayout: () => this.resetPanelLayout(),
       addFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
       removeCustomPanel: (name) => this.removeCustomFeedPanel(name),
+      switchOrg: (org) => this.switchActiveOrg(org),
     };
+  }
+
+  // ── New analyst capabilities (drive existing public APIs; no new plumbing) ──
+
+  private resizePanelInGrid(key: string, span: number): boolean {
+    const s = Math.max(1, Math.min(4, Math.round(span)));
+    const el = key === 'map' ? document.getElementById('mapSection') : this.panels[key]?.getElement();
+    if (!el) return false;
+    setSpanClass(el, s);
+    savePanelSpan(key, s);
+    return true;
+  }
+
+  private setMapProjection(mode: '2d' | '3d'): boolean {
+    if (!this.map) return false;
+    this.map.setProjectionMode(mode);
+    localStorage.setItem(this.MAP_MODE_STORAGE_KEY, mode);
+    // On the SVG fallback the globe is unavailable, so a 3d request stays 2d —
+    // report honestly rather than claiming success.
+    return this.map.getProjectionMode() === mode;
+  }
+
+  private flyMapTo(lat: number, lon: number, zoom?: number): boolean {
+    if (!this.map || !Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+    const z = typeof zoom === 'number' && zoom > 0 ? zoom : undefined;
+    this.map.setCenter(lat, lon, z);
+    return true;
+  }
+
+  private setMapRegion(region: string): boolean {
+    if (!this.map) return false;
+    const valid: MapView[] = ['global', 'america', 'mena', 'eu', 'asia', 'latam', 'africa', 'oceania'];
+    if (!valid.includes(region as MapView)) return false;
+    this.map.setView(region as MapView);
+    const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement | null;
+    if (regionSelect) regionSelect.value = region;
+    return true;
+  }
+
+  private setAppTheme(theme: 'dark' | 'light'): boolean {
+    if (theme !== 'dark' && theme !== 'light') return false;
+    setTheme(theme);
+    return true;
+  }
+
+  private runSearch(query: string): boolean {
+    if (!this.searchModal || !query.trim()) return false;
+    this.searchModal.open(query);
+    return true;
+  }
+
+  private async switchActiveOrg(org: string): Promise<{ ok: boolean; note?: string }> {
+    if (!isAuthenticated()) return { ok: false, note: 'sign in first' };
+    const orgs = await listOrgs();
+    if (!orgs.some((o) => o.name === org)) return { ok: false, note: 'unknown org' };
+    setActiveOrg(org);
+    window.location.reload();
+    return { ok: true };
   }
 
   private setPanelEnabled(key: string, enabled: boolean): boolean {
