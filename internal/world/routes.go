@@ -98,6 +98,8 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/cloud/chain-nodes", s.handleCloudChainNodes)
 	mux.HandleFunc("/v1/world/cloud/byo-gpu", s.handleCloudBYOGPU)
 	mux.HandleFunc("/v1/world/cloud/traffic", s.handleCloudTraffic)
+	// PUBLIC status.hanzo.ai summary (Gatus proxy: per-service up/down + incidents):
+	mux.HandleFunc("/v1/world/cloud/status-page", s.handleCloudStatusPage)
 	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
 	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
 	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
