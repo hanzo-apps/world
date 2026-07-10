@@ -1,6 +1,7 @@
 import type { MapLayers } from '@/types';
 import type { MapView, TimeRange } from '@/components/Map';
 import type { MapProjectionMode } from '@/components/MapContainer';
+import { SITE_VARIANT } from '@/config/variant';
 
 const LAYER_KEYS: (keyof MapLayers)[] = [
   'conflicts',
@@ -132,6 +133,15 @@ export function buildMapUrl(
 ): string {
   const url = new URL(baseUrl);
   const params = new URLSearchParams();
+
+  // Keep the active variant in every synced/shared URL. buildMapUrl rebuilds the
+  // query from scratch, so without this the map-state sync (and Copy Link, which
+  // shares the same builder) would strip ?variant= and silently drop a crypto/
+  // finance/tech/ai/saas viewer back to the default 'full' dashboard on reload.
+  // 'full' is the canonical default and needs no param — keeps default URLs clean.
+  if (SITE_VARIANT && SITE_VARIANT !== 'full') {
+    params.set('variant', SITE_VARIANT);
+  }
 
   if (state.center) {
     params.set('lat', state.center.lat.toFixed(4));
