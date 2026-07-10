@@ -352,6 +352,16 @@ function bootstrap(): void {
   if (g && panelsIn(g).length) applyLayout();
 }
 
+// The footer dock's layout controls (App.gridApi) delegate to this global when
+// present, so the Grid⇄Free toggle + cell-size slider drive the real engine
+// rather than the dock's minimal CSS-var fallback. One way to do everything.
+if (typeof window !== 'undefined') {
+  (window as unknown as { worldGrid?: unknown }).worldGrid = {
+    setLayoutMode, getLayoutMode, toggleLayoutMode,
+    setCellSize, getCellSize, getGridConfig, resetLayout,
+  };
+}
+
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
