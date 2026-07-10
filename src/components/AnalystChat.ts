@@ -1,4 +1,7 @@
+import '@/styles/analyst-chat.css';
 import { escapeHtml } from '@/utils/sanitize';
+import { renderMarkdown } from '@/utils/markdown';
+import { icon, zenLogo } from '@/utils/icons';
 import { isAuthenticated, login } from '@/services/iam';
 import { askAnalyst, collectContext, type AnalystMessage } from '@/services/analyst';
 import type { AnalystTrace } from '@/services/analyst-transport';
@@ -8,20 +11,22 @@ import { fetchRoster, selectedModel, rememberModel, type ModelRoster, type Analy
 /**
  * AnalystChat — the analyst conversation surface, decoupled from where it lives.
  *
- * This is the ONE analyst code path. Both the dockable grid panel (AiAnalystPanel)
- * and the floating launcher (AiAnalystDock) render an AnalystChat into their own
- * root element; neither reimplements the send loop. It talks to the app only
- * through the `AppHost` port and to the backend only through analyst.ts (request
- * composer) → analyst-transport.ts (the wire) and app-commands.ts (the dispatcher).
+ * This is the ONE analyst code path. The floating copilot (AiAnalystDock), the
+ * in-grid panel (AiAnalystPanel) and the country brief all render an AnalystChat
+ * into their own root element; none reimplements the send loop. It talks to the
+ * app only through the `AppHost` port and to the backend only through analyst.ts
+ * (request composer) → analyst-transport.ts (the wire) and app-commands.ts (the
+ * dispatcher). The chrome around it (FAB, header, resize, sidebar/split/fullscreen
+ * modes) belongs to the host — AnalystChat is just the messages + composer.
  *
- * Model picker: a monochrome dropdown (Zen family first, then whatever the signed-in
- * user can serve) sits in the chat toolbar; the choice persists and rides every
- * request. Errors are ALWAYS surfaced — a failed/empty backend reply shows the
- * reason inline, never a silent blank.
+ * Rendering: assistant replies are Markdown, rendered by the tiny XSS-safe
+ * renderer in utils/markdown.ts (bold/italic/lists/headings/code/links, with HTML
+ * entities decoded once so an apostrophe never shows as `&#39;`). Live data-tool
+ * results render as compact tables, not raw JSON. User text is plain (escaped).
  *
- * Auth + billing: every request forwards the caller's IAM token to Hanzo inference,
- * metered to their own org/project — never a shared key. Signed-out users get the
- * same OIDC sign-in prompt the account menu uses (AI is per-user IAM billed).
+ * Auth + billing: every request forwards the caller's IAM token to Hanzo
+ * inference, metered to their own org/project — never a shared key. Signed-out
+ * users get the OIDC sign-in prompt (AI is per-user IAM billed).
  */
 
 export interface AnalystChatOptions {
@@ -30,16 +35,26 @@ export interface AnalystChatOptions {
   placeholder?: string;
 }
 
-const DEFAULT_CHIPS = ['Top risks today', 'Market summary', 'What changed in the last hour?'];
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  content: string;
+  /** Human label of the model that produced an assistant reply (shown as a tag). */
+  model?: string;
+}
+
+const DEFAULT_CHIPS = ['Top risk today', 'Market summary', 'Hide all panels, show news'];
+const THINK_PHASES = ['is thinking…', 'reading live feeds…', 'grounding in market data…', 'composing…'];
 
 export class AnalystChat {
-  private messages: AnalystMessage[] = [];
+  private messages: ChatMsg[] = [];
   private listEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
   private modelSelectEl: HTMLSelectElement | null = null;
+  private sendBtnEl: HTMLButtonElement | null = null;
   private roster: ModelRoster | null = null;
   private model = '';
   private sending = false;
+  private thinkTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -54,24 +69,30 @@ export class AnalystChat {
       return;
     }
     this.root.innerHTML = `
-      <div class="ai-analyst">
-        <div class="ai-analyst-toolbar">
-          <label class="ai-analyst-model-wrap">
-            <span class="ai-analyst-model-label">Model</span>
-            <select class="ai-analyst-model" aria-label="Analyst model"></select>
-          </label>
-        </div>
-        <div class="ai-analyst-messages"></div>
-        <div class="ai-analyst-composer">
-          <textarea class="ai-analyst-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask about the world…')}"></textarea>
-          <button class="ai-analyst-send" type="button" aria-label="Send">↑</button>
-        </div>
-      </div>
-    `;
-    this.listEl = this.root.querySelector('.ai-analyst-messages');
-    this.inputEl = this.root.querySelector('.ai-analyst-input');
-    this.modelSelectEl = this.root.querySelector('.ai-analyst-model');
-    this.root.querySelector('.ai-analyst-send')?.addEventListener('click', () => void this.send());
+      <div class="hzc-chat">
+        <div class="hzc-messages"></div>
+        <form class="hzc-composer" autocomplete="off">
+          <textarea class="hzc-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask about the world, or tell me to change the dashboard…')}"></textarea>
+          <div class="hzc-composer-bar">
+            <span class="hzc-model">
+              ${zenLogo(13, 'hzc-model-mark')}
+              <select class="hzc-model-select" aria-label="Model"></select>
+              ${icon('chevron-down', 12, 'hzc-model-caret')}
+            </span>
+            <button class="hzc-send" type="submit" aria-label="Send">${icon('arrow-up', 17)}</button>
+          </div>
+        </form>
+      </div>`;
+    this.listEl = this.root.querySelector('.hzc-messages');
+    this.inputEl = this.root.querySelector('.hzc-input');
+    this.modelSelectEl = this.root.querySelector('.hzc-model-select');
+    this.sendBtnEl = this.root.querySelector('.hzc-send');
+
+    this.root.querySelector('.hzc-composer')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void this.send();
+    });
+    this.inputEl?.addEventListener('input', () => this.autoGrow());
     this.inputEl?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -85,15 +106,18 @@ export class AnalystChat {
         rememberModel(id);
       }
     });
+
     if (this.roster) this.renderModelOptions(); // instant paint from cache
     void this.loadModels();
-    this.renderMessages();
+    this.renderAll();
   }
 
-  /** Focus the composer (used when the floating dock opens). */
+  /** Focus the composer (used when the copilot opens). */
   public focus(): void {
     this.inputEl?.focus();
   }
+
+  // ── models ─────────────────────────────────────────────────────────────────
 
   private async loadModels(): Promise<void> {
     const roster = await fetchRoster();
@@ -123,76 +147,156 @@ export class AnalystChat {
       .join('');
   }
 
-  private renderSignedOut(): void {
-    this.root.innerHTML = `
-      <div class="ai-analyst-signedout">
-        <p>Sign in to chat with the analyst.</p>
-        <button class="ai-analyst-signin hz-cta hz-cta-lg" type="button">Sign in</button>
-      </div>
-    `;
-    this.root.querySelector('.ai-analyst-signin')?.addEventListener('click', () => void login());
+  /** Human label for a model id (falls back to the id itself). */
+  private modelLabel(id?: string): string {
+    const want = id || this.model;
+    const hit = this.roster?.models.find((m) => m.id === want);
+    return hit?.label || want || 'Zen 5';
   }
 
-  private renderMessages(): void {
+  // ── auth / empty states ─────────────────────────────────────────────────────
+
+  private renderSignedOut(): void {
+    this.root.innerHTML = `
+      <div class="hzc-signedout">
+        <div class="hzc-signedout-mark">${zenLogo(30)}</div>
+        <p class="hzc-signedout-title">Sign in to chat with the analyst</p>
+        <p class="hzc-signedout-sub">Ask about your live world data, or tell the analyst to rearrange the dashboard.</p>
+        <button class="hzc-signin" type="button">Sign in</button>
+      </div>`;
+    this.root.querySelector('.hzc-signin')?.addEventListener('click', () => void login());
+  }
+
+  private renderAll(): void {
     if (!this.listEl) return;
+    this.listEl.innerHTML = '';
     if (!this.messages.length) {
-      const chips = this.opts.chips || DEFAULT_CHIPS;
-      this.listEl.innerHTML = `
-        <div class="ai-analyst-empty">
-          <div class="ai-analyst-empty-title">${escapeHtml(this.opts.emptyTitle || 'Chat with your live world data')}</div>
-          <div class="ai-analyst-chips">
-            ${chips.map((c) => `<button class="ai-analyst-chip" type="button">${escapeHtml(c)}</button>`).join('')}
-          </div>
-        </div>`;
-      this.listEl.querySelectorAll('.ai-analyst-chip').forEach((b) => {
-        b.addEventListener('click', () => {
-          if (this.inputEl) this.inputEl.value = (b as HTMLElement).textContent?.trim() || '';
-          void this.send();
-        });
-      });
+      this.renderEmpty();
       return;
     }
-    this.listEl.innerHTML = this.messages
-      .map((m) => `<div class="ai-analyst-msg ${m.role}">${formatReply(m.content)}</div>`)
-      .join('');
+    for (const m of this.messages) this.appendMessageEl(m);
     this.scrollToEnd();
   }
+
+  private renderEmpty(): void {
+    if (!this.listEl) return;
+    const chips = this.opts.chips || DEFAULT_CHIPS;
+    const wrap = document.createElement('div');
+    wrap.className = 'hzc-empty';
+    wrap.innerHTML = `
+      <div class="hzc-empty-mark">${zenLogo(34)}</div>
+      <div class="hzc-empty-title">${escapeHtml(this.opts.emptyTitle || 'Chat with your live world data')}</div>
+      <div class="hzc-chips">
+        ${chips.map((c) => `<button class="hzc-chip" type="button">${escapeHtml(c)}</button>`).join('')}
+      </div>`;
+    wrap.querySelectorAll('.hzc-chip').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (this.inputEl) this.inputEl.value = (b as HTMLElement).textContent?.trim() || '';
+        void this.send();
+      });
+    });
+    this.listEl.appendChild(wrap);
+  }
+
+  // ── message rows ────────────────────────────────────────────────────────────
+
+  private appendMessageEl(m: ChatMsg): HTMLElement {
+    const row = document.createElement('div');
+    row.className = `hzc-row ${m.role}`;
+    if (m.role === 'assistant') {
+      const avatar = document.createElement('div');
+      avatar.className = 'hzc-avatar';
+      avatar.innerHTML = zenLogo(15);
+      const body = document.createElement('div');
+      body.className = 'hzc-msg';
+      const bubble = document.createElement('div');
+      bubble.className = 'hzc-bubble hzc-md';
+      bubble.innerHTML = renderMarkdown(m.content); // safe: markdown.ts escapes + sanitizes
+      const meta = document.createElement('div');
+      meta.className = 'hzc-meta';
+      if (m.model) {
+        const tag = document.createElement('span');
+        tag.className = 'hzc-model-tag';
+        tag.textContent = m.model;
+        meta.appendChild(tag);
+      }
+      const copy = document.createElement('button');
+      copy.className = 'hzc-copy';
+      copy.type = 'button';
+      copy.setAttribute('aria-label', 'Copy');
+      copy.innerHTML = icon('copy', 13);
+      copy.addEventListener('click', () => this.copyText(copy, m.content));
+      meta.appendChild(copy);
+      body.append(bubble, meta);
+      row.append(avatar, body);
+    } else {
+      const bubble = document.createElement('div');
+      bubble.className = 'hzc-bubble';
+      bubble.textContent = m.content; // plain text, never markup
+      row.appendChild(bubble);
+    }
+    this.listEl?.appendChild(row);
+    return row;
+  }
+
+  private copyText(btn: HTMLButtonElement, text: string): void {
+    void navigator.clipboard?.writeText(text).then(() => {
+      btn.innerHTML = icon('check', 13);
+      btn.classList.add('ok');
+      setTimeout(() => {
+        btn.innerHTML = icon('copy', 13);
+        btn.classList.remove('ok');
+      }, 1200);
+    });
+  }
+
+  // ── send loop ───────────────────────────────────────────────────────────────
 
   private async send(): Promise<void> {
     if (this.sending || !this.inputEl) return;
     const text = this.inputEl.value.trim();
     if (!text) return;
     this.inputEl.value = '';
+    this.autoGrow();
+
+    if (!this.messages.length) this.listEl && (this.listEl.innerHTML = '');
     this.messages.push({ role: 'user', content: text });
-    this.renderMessages();
+    this.appendMessageEl({ role: 'user', content: text });
+    this.scrollToEnd();
+
     this.sending = true;
-    this.showTyping();
+    this.setBusy(true);
+    this.showThinking();
 
     try {
       const context = await collectContext(this.host);
-      const res = await askAnalyst(this.messages, context, this.model);
-      this.clearTyping();
+      const res = await askAnalyst(
+        this.messages.map((m) => ({ role: m.role, content: m.content }) as AnalystMessage),
+        context,
+        this.model,
+      );
+      this.clearThinking();
 
-      // Render the prose reply when present.
+      const usedModel = this.modelLabel(res.model);
       if (res.reply) {
-        this.messages.push({ role: 'assistant', content: res.reply });
-        this.renderMessages();
+        const msg: ChatMsg = { role: 'assistant', content: res.reply, model: usedModel };
+        this.messages.push(msg);
+        this.appendMessageEl(msg);
+        this.scrollToEnd();
       }
 
-      // Surface the live data tools the backend called to ground the answer —
-      // collapsed "🔧 tool(...)" lines. Appended AFTER renderMessages (which
-      // rebuilds the list from innerHTML) so they survive, exactly like the
-      // action log below.
+      // Live data-tool traces the backend called to ground the answer — rendered
+      // as compact tables (JSON) or text, appended as list siblings.
       if (res.traces.length) this.appendToolTraces(res.traces);
 
-      // Execute any commands through the ONE dispatcher; show a per-action log.
+      // Execute any app commands through the ONE dispatcher; show a per-action log
+      // so the dashboard re-aligns visibly with a receipt.
       if (res.actions.length) {
         const log = await dispatch(res.actions, this.host);
         if (log.length) this.appendActionLog(log);
       }
 
-      // ALWAYS surface something — never a silent blank (P0: prod 401 returned
-      // {reply:"",error:"...",fallback:true} and the chat showed nothing).
+      // ALWAYS surface something — never a silent blank.
       if (!res.reply) {
         if (res.reason) this.appendInline(res.reason);
         else if (res.error) this.appendError(`The analyst couldn't answer — ${res.error}.`);
@@ -202,31 +306,63 @@ export class AnalystChat {
         this.appendInline(`Note: ${res.error}`);
       }
     } catch (e) {
-      this.clearTyping();
+      this.clearThinking();
       const detail = e instanceof Error && e.message ? e.message : 'network error';
       this.appendError(`The analyst is unavailable right now — ${detail}.`);
     } finally {
       this.sending = false;
+      this.setBusy(false);
     }
   }
 
-  private showTyping(): void {
+  private setBusy(busy: boolean): void {
+    this.root.querySelector('.hzc-chat')?.classList.toggle('busy', busy);
+    if (this.sendBtnEl) this.sendBtnEl.disabled = busy;
+  }
+
+  private autoGrow(): void {
+    const el = this.inputEl;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }
+
+  // ── streaming / thinking indicator (no SSE yet — a live, honest busy state) ──
+
+  private showThinking(): void {
     if (!this.listEl) return;
     const el = document.createElement('div');
-    el.className = 'ai-analyst-msg assistant ai-analyst-typing';
-    el.innerHTML = '<span></span><span></span><span></span>';
+    el.className = 'hzc-row assistant hzc-thinking';
+    el.innerHTML = `
+      <div class="hzc-avatar hzc-avatar-live">${zenLogo(15)}</div>
+      <div class="hzc-think"><span class="hzc-think-label"></span></div>`;
     this.listEl.appendChild(el);
+    const label = el.querySelector('.hzc-think-label') as HTMLElement | null;
+    const name = this.modelLabel();
+    let i = 0;
+    const paint = () => {
+      if (label) label.textContent = `${name} ${THINK_PHASES[i % THINK_PHASES.length]}`;
+      i++;
+    };
+    paint();
+    this.thinkTimer = setInterval(paint, 2200);
     this.scrollToEnd();
   }
 
-  private clearTyping(): void {
-    this.listEl?.querySelector('.ai-analyst-typing')?.remove();
+  private clearThinking(): void {
+    if (this.thinkTimer) {
+      clearInterval(this.thinkTimer);
+      this.thinkTimer = null;
+    }
+    this.listEl?.querySelector('.hzc-thinking')?.remove();
   }
+
+  // ── inline notices ──────────────────────────────────────────────────────────
 
   private appendInline(text: string): void {
     if (!this.listEl) return;
     const el = document.createElement('div');
-    el.className = 'ai-analyst-inline';
+    el.className = 'hzc-inline';
     el.textContent = text;
     this.listEl.appendChild(el);
     this.scrollToEnd();
@@ -235,29 +371,34 @@ export class AnalystChat {
   private appendError(text: string): void {
     if (!this.listEl) return;
     const el = document.createElement('div');
-    el.className = 'ai-analyst-inline ai-analyst-error';
+    el.className = 'hzc-inline hzc-error';
     el.textContent = text;
     this.listEl.appendChild(el);
     this.scrollToEnd();
   }
 
-  /** Render the backend's data-tool traces as collapsed, monochrome detail lines.
-   *  Server data is written via textContent (never innerHTML) — never trusted markup. */
+  /** Render the backend's data-tool traces as collapsed rows; a JSON result
+   *  becomes a compact table, everything else stays monospaced text. All server
+   *  data is written via textContent — never trusted as markup. */
   private appendToolTraces(traces: AnalystTrace[]): void {
     if (!this.listEl) return;
     const wrap = document.createElement('div');
-    wrap.className = 'ai-analyst-tools';
+    wrap.className = 'hzc-tools';
     for (const tr of traces) {
       const d = document.createElement('details');
-      d.className = `ai-analyst-tool ${tr.ok ? 'ok' : 'err'}`;
+      d.className = `hzc-tool ${tr.ok ? 'ok' : 'err'}`;
+      d.open = true; // data renders inline (a table), not hidden behind a click
       const summary = document.createElement('summary');
-      summary.className = 'ai-analyst-tool-summary';
-      summary.textContent = `🔧 ${tr.label}`;
-      const pre = document.createElement('pre');
-      pre.className = 'ai-analyst-tool-result';
-      pre.textContent = tr.result || (tr.ok ? '(no data returned)' : 'tool call failed');
+      summary.className = 'hzc-tool-summary';
+      const mark = document.createElement('span');
+      mark.className = 'hzc-tool-mark';
+      mark.innerHTML = icon('database', 13);
+      const lab = document.createElement('span');
+      lab.className = 'hzc-tool-label';
+      lab.textContent = tr.label;
+      summary.append(mark, lab);
       d.appendChild(summary);
-      d.appendChild(pre);
+      d.appendChild(renderToolResult(tr));
       wrap.appendChild(d);
     }
     this.listEl.appendChild(wrap);
@@ -267,10 +408,18 @@ export class AnalystChat {
   private appendActionLog(entries: CommandLogEntry[]): void {
     if (!this.listEl) return;
     const el = document.createElement('div');
-    el.className = 'ai-analyst-actionlog';
-    el.innerHTML = entries
-      .map((e) => `<div class="ai-analyst-action ${e.ok ? 'ok' : 'err'}"><span class="ai-analyst-action-mark">${e.ok ? '✓' : '✗'}</span>${escapeHtml(e.message)}</div>`)
-      .join('');
+    el.className = 'hzc-actionlog';
+    for (const e of entries) {
+      const row = document.createElement('div');
+      row.className = `hzc-action ${e.ok ? 'ok' : 'err'}`;
+      const mark = document.createElement('span');
+      mark.className = 'hzc-action-mark';
+      mark.innerHTML = icon(e.ok ? 'check' : 'x', 12);
+      const msg = document.createElement('span');
+      msg.textContent = e.message;
+      row.append(mark, msg);
+      el.appendChild(row);
+    }
     this.listEl.appendChild(el);
     this.scrollToEnd();
   }
@@ -280,9 +429,89 @@ export class AnalystChat {
   }
 }
 
-/** Escape, wrap standalone numbers in Geist Mono, and keep line breaks. */
-function formatReply(text: string): string {
-  return escapeHtml(text)
-    .replace(/(\$?\b\d[\d,]*\.?\d*%?)/g, '<span class="ai-analyst-num">$1</span>')
-    .replace(/\n/g, '<br>');
+// ── tool result → table (safe, textContent only) ──────────────────────────────
+
+function renderToolResult(tr: AnalystTrace): HTMLElement {
+  const raw = tr.result || (tr.ok ? '' : 'tool call failed');
+  const parsed = tryParse(raw);
+  if (parsed !== undefined) {
+    const table = renderJson(parsed);
+    if (table) return table;
+  }
+  const pre = document.createElement('pre');
+  pre.className = 'hzc-tool-pre';
+  pre.textContent = raw || '(no data returned)';
+  return pre;
+}
+
+function tryParse(s: string): unknown {
+  const t = s.trim();
+  if (!t || (t[0] !== '{' && t[0] !== '[')) return undefined;
+  try {
+    return JSON.parse(t);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Best-effort compact table for JSON tool output. Returns null when the shape
+ *  isn't tabular so the caller falls back to text. */
+function renderJson(v: unknown): HTMLElement | null {
+  if (Array.isArray(v) && v.length && v.every((r) => r && typeof r === 'object' && !Array.isArray(r))) {
+    const rows = v as Array<Record<string, unknown>>;
+    const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))].slice(0, 6);
+    const table = el('table', 'hzc-table');
+    const thead = el('thead');
+    const htr = el('tr');
+    for (const c of cols) htr.appendChild(th(c));
+    thead.appendChild(htr);
+    const tbody = el('tbody');
+    for (const r of rows.slice(0, 12)) {
+      const tr = el('tr');
+      for (const c of cols) tr.appendChild(td(cell(r[c])));
+      tbody.appendChild(tr);
+    }
+    table.append(thead, tbody);
+    return wrapScroll(table);
+  }
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const entries = Object.entries(v as Record<string, unknown>).slice(0, 20);
+    if (!entries.length) return null;
+    const table = el('table', 'hzc-table hzc-table-kv');
+    const tbody = el('tbody');
+    for (const [k, val] of entries) {
+      const tr = el('tr');
+      tr.append(th(k), td(cell(val)));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return wrapScroll(table);
+  }
+  return null;
+}
+
+function cell(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+function el(tag: string, cls = ''): HTMLElement {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+function th(text: string): HTMLElement {
+  const e = el('th');
+  e.textContent = text;
+  return e;
+}
+function td(text: string): HTMLElement {
+  const e = el('td');
+  e.textContent = text;
+  return e;
+}
+function wrapScroll(table: HTMLElement): HTMLElement {
+  const w = el('div', 'hzc-table-wrap');
+  w.appendChild(table);
+  return w;
 }
