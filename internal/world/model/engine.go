@@ -53,9 +53,6 @@ func New(sources []Source, dataDir string, interval time.Duration) *Engine {
 	}
 }
 
-// History exposes the durable snapshot ring (queried by the /history handler).
-func (e *Engine) History() *History { return e.history }
-
 // Store exposes the state store to the API handlers.
 func (e *Engine) Store() *Store { return e.store }
 
@@ -186,41 +183,6 @@ func (e *Engine) save() {
 
 // ── AI grounding (ModelContext) ──────────────────────────────────────────────
 
-// Context returns a compact plain-text briefing of the current world state —
-// the top movers and highest-instability entities — for grounding AI answers in
-// the model instead of raw feeds. One helper, called by the AI handlers.
-func (e *Engine) Context() string {
-	top := e.store.Top(KindCountry, MetricInstability, 8)
-	movers := e.store.Top(KindCountry, "velocity", 6)
-	theaters := e.store.Top(KindTheater, MetricInstability, 4)
-	asOf := e.store.AsOf()
-
-	var b strings.Builder
-	b.WriteString("WORLD MODEL (as of ")
-	b.WriteString(asOf.Format(time.RFC3339))
-	b.WriteString(")\nHighest instability:\n")
-	for _, ent := range top {
-		b.WriteString("  - " + ent.Name + " (" + ent.ID + "): instability " +
-			ftoa(ent.Metrics[MetricInstability]) + " [" + ent.Level + "]" + toneNote(ent) + "\n")
-	}
-	b.WriteString("Biggest news movers:\n")
-	for _, ent := range movers {
-		v := ent.Metrics[MetricNewsVelocity]
-		if v == 0 {
-			continue
-		}
-		b.WriteString("  - " + ent.Name + ": news velocity " + signed(v) + "\n")
-	}
-	if len(theaters) > 0 {
-		b.WriteString("Active theaters:\n")
-		for _, ent := range theaters {
-			b.WriteString("  - " + ent.Name + ": " + ent.Level + " (" +
-				ftoa(ent.Metrics[MetricMilitaryActivity]) + " mil. aircraft)\n")
-		}
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
 // CountryContext returns the state vector for one country (ISO alpha-2) as a
 // JSON-friendly map, or false if the model has no such entity. AI country
 // briefs merge this so the narrative matches the numbers.
@@ -234,14 +196,6 @@ func (e *Engine) CountryContext(iso string) (map[string]any, bool) {
 		"metrics": ent.Metrics, "deltas": ent.Deltas,
 		"updatedAt": ent.UpdatedAt.Format(time.RFC3339),
 	}, true
-}
-
-func toneNote(e *Entity) string {
-	t, ok := e.Metrics[MetricSentiment]
-	if !ok {
-		return ""
-	}
-	return ", tone " + ftoa(t)
 }
 
 func ftoa(f float64) string {
