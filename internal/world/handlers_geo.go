@@ -33,7 +33,7 @@ func (s *Server) handleOpenSky(w http.ResponseWriter, r *http.Request) {
 	}
 	s.passthrough(w, "opensky:"+strings.Join(parts, "&"), upstream, "application/json",
 		"public, max-age=30, s-maxage=30, stale-while-revalidate=15",
-		map[string]string{"User-Agent": browserUA, "Accept-Language": "en-US,en;q=0.9"},
+		s.openSkyAuthHeaders(r.Context()),
 		30*time.Second, 2*time.Minute,
 		func(w http.ResponseWriter, err error) {
 			writeJSON(w, http.StatusOK, "", map[string]any{
