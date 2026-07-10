@@ -570,6 +570,9 @@ export class DeckGLMap {
       // with no post-load reprojection flash.
       projection: this.state.mode === '3d' ? 'globe' : 'mercator',
       renderWorldCopies: false,
+      // We add a COMPACT AttributionControl explicitly below (not the default
+      // expanded one) so basemap ToS attribution stays reachable even when the
+      // corner wordmark is hidden via ?maplogo=0.
       attributionControl: false,
       interactive: true,
       // deck.gl draws its own antialiased geometry in the interleaved pass, so we
@@ -631,6 +634,10 @@ export class DeckGLMap {
     });
 
     this.mapboxMap.addControl(this.deckOverlay as unknown as IControl);
+
+    // Compact "ⓘ" attribution (bottom-right) — always present so basemap ToS
+    // attribution is reachable independent of the corner wordmark (?maplogo=0).
+    this.mapboxMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
 
     // Dev/e2e observability: expose the renderer internals so tests can assert
     // interleaved state, context count, and rendered deck layer ids/feature
