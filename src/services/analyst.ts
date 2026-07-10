@@ -1,57 +1,43 @@
 /**
- * AI Analyst — API client + client-side grounding.
+ * AI Analyst — request composer + client-side grounding.
  *
- * askAnalyst() forwards the multi-turn conversation to the same-origin backend
- * route, attaching the signed-in user's IAM token so the inference meters to THEIR
- * org/project/billing (no shared key — same pattern as the summarize/classify calls).
+ * askAnalyst() builds an AnalystRequest — the conversation, a compact grounding
+ * snapshot, the CHOSEN model, and the command-registry manifest (so the backend
+ * derives its tool contract from the client's single source of truth) — and hands
+ * it to the active transport (analyst-transport.ts). It is transport-agnostic: it
+ * does not know or care whether the wire is HTTP or ZAP.
  *
- * collectContext() composes a compact grounding snapshot entirely on the client:
- * the current dashboard state (from the AnalystHost) plus a best-effort read of the
- * existing live feeds (top headlines, crypto, macro). There is no server-side data
- * fusion — the panel just hands the model what the user is already looking at.
+ * collectContext() composes the snapshot entirely on the client: the current
+ * dashboard state (from the AppHost) plus a best-effort read of the live feeds
+ * (top headlines, crypto, macro). No server-side data fusion — the model gets what
+ * the user is already looking at.
  */
 
-import { scopedHeaders } from './org-scope';
-import type { AnalystAction, AnalystHost } from './analyst-actions';
+import { analystTransport, type AnalystResponse } from './analyst-transport';
+import { commandManifest, type AppHost } from './app-commands';
 
 export interface AnalystMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-export interface AnalystResponse {
-  reply: string;
-  actions: AnalystAction[];
-  fallback: boolean;
-  reason?: string;
+export type { AnalystResponse };
+
+/** Ask the analyst. `model` is the user's dropdown choice; the backend falls back
+ *  to its default when empty. The command manifest travels with every request. */
+export async function askAnalyst(messages: AnalystMessage[], context: string, model?: string): Promise<AnalystResponse> {
+  return analystTransport().ask({ messages, context, commands: commandManifest(), model });
 }
 
-export async function askAnalyst(messages: AnalystMessage[], context: string): Promise<AnalystResponse> {
-  // Bearer + active-org/project selectors: the same-origin backend forwards them
-  // to api.hanzo.ai so inference meters to the org the user is acting in.
-  const headers = await scopedHeaders({ 'Content-Type': 'application/json' });
-
-  const res = await fetch('/v1/world/analyst', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ messages, context }),
-  });
-  if (!res.ok) throw new Error(`analyst ${res.status}`);
-
-  const data = await res.json();
-  return {
-    reply: typeof data.reply === 'string' ? data.reply : '',
-    actions: Array.isArray(data.actions) ? data.actions : [],
-    fallback: !!data.fallback,
-    reason: typeof data.reason === 'string' ? data.reason : undefined,
-  };
-}
-
-export async function collectContext(host: AnalystHost): Promise<string> {
+export async function collectContext(host: AppHost): Promise<string> {
   const parts: string[] = [];
 
   const st = host.getState();
-  parts.push(`Variant: ${st.variant}. Map time range: ${st.timeRange}.`);
+  const bits = [`Variant: ${st.variant}`, `Map time range: ${st.timeRange}`];
+  if (st.mapMode) bits.push(`Map mode: ${st.mapMode}`);
+  if (st.region) bits.push(`Region: ${st.region}`);
+  if (st.theme) bits.push(`Theme: ${st.theme}`);
+  parts.push(bits.join('. ') + '.');
 
   const panels = host.listPanels();
   if (panels.length) {
@@ -64,6 +50,11 @@ export async function collectContext(host: AnalystHost): Promise<string> {
   const layers = host.listLayers();
   if (layers.length) {
     parts.push('MAP LAYERS: ' + layers.map((l) => `${l.key}=${l.on ? 'on' : 'off'}`).join(', '));
+  }
+
+  const orgs = host.isAuthed() ? host.listOrgs() : [];
+  if (orgs.length > 1) {
+    parts.push('ORGS (id = name): ' + orgs.map((o) => `${o.id}=${o.name}`).join(', '));
   }
 
   const [headlines, crypto, macro] = await Promise.all([topHeadlines(), cryptoSnapshot(), macroSnapshot()]);
