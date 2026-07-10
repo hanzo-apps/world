@@ -931,9 +931,17 @@ canvas,
    grip that is invisible until you hover the map, then shows a small drag pill. It
    is still the .panel-header the panel-drag machinery grabs (mouse + touch), so
    reorder is unchanged — it just carries no chrome. */
+/* Overlaid, NOT in flow: an absolute strip across the top so the map canvas fills
+   the panel edge-to-edge (no black gap/border between the header bar and the map).
+   It still IS the .panel-header the drag machinery grabs — just floating on top. */
 .map-panel .panel-header.map-drag-grip {
-  height: 14px;
-  min-height: 14px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  min-height: 16px;
+  z-index: 6;
   padding: 0;
   margin: 0;
   border: none;
@@ -1044,11 +1052,18 @@ canvas,
   /* 160px column floor packs tiny widgets densely and gives many width tracks, so
      a column-resize drag snaps in fine steps (was 280px → only ~4 coarse tracks).
      The floor is a variable so the dock's widget-size slider (and world-layoutengine)
-     can retune it live without touching this rule. */
-  grid-template-columns: repeat(auto-fill, minmax(var(--panel-col-min, 160px), 1fr));
-  /* 120px row floor lets a panel be genuinely short (span-0); the 380px cap is
-     unchanged so untouched panels keep their comfortable height. */
-  grid-auto-rows: minmax(120px, 380px);
+     can retune it live without touching this rule. auto-FIT (not auto-fill) so the
+     real columns always stretch to consume 100% of the width — no dead right-hand
+     gutter at any window size when the last row is only partly filled. */
+  grid-template-columns: repeat(auto-fit, minmax(var(--panel-col-min, 160px), 1fr));
+  /* Rows are a DEFINITE unit (not minmax) so a multi-row span reserves exactly its
+     height: span-N = N × --panel-row. The old minmax(120,380) collapsed every
+     implicit track to its 120px floor, so span-2 panels (min-height 400) — the map
+     included — overflowed ~150px onto the row below and OVERLAPPED it. A definite
+     200px row makes span-1=200, span-2≈404, span-3≈608, span-4≈812, matching the
+     .panel.span-* min-heights and the map's rowPx:200 exactly. Content that exceeds
+     a panel's box scrolls INSIDE the panel, never onto its neighbours. */
+  grid-auto-rows: var(--panel-row, 200px);
   gap: 4px;
   padding: 4px;
   align-content: start;
@@ -1075,10 +1090,13 @@ canvas,
 /* .panel.resized: Custom height set - use grid-row span for height */
 
 /* Row span classes for resizable panels */
-/* span-0: the tiny tier — one row at the 120px floor, for compact widgets. */
+/* span-0: the tiny tier — a compact 120px card, top-aligned inside its (now
+   definite 200px) row track so it stays genuinely short instead of stretching. */
 .panel.span-0 {
   grid-row: span 1 !important;
   min-height: 120px !important;
+  height: 120px !important;
+  align-self: start;
 }
 
 .panel.span-1 {
@@ -11971,13 +11989,27 @@ a.prediction-link:hover {
   color: var(--text-dim) !important;
 }
 
-/* Hide GL navigation + logo controls (we use custom ones) */
+/* Hide the GL navigation controls (we use our own zoom/home buttons). The basemap
+   LOGO stays (bottom-left) and a COMPACT attribution "ⓘ" stays (bottom-right) so
+   basemap ToS is satisfied by default. */
 .maplibregl-ctrl-top-right,
-.maplibregl-ctrl-bottom-right,
-.mapboxgl-ctrl-top-right,
-.mapboxgl-ctrl-bottom-right,
-.mapboxgl-ctrl-logo {
+.mapboxgl-ctrl-top-right {
   display: none;
+}
+/* Keep the bottom-right compact attribution, but suppress any nav button groups
+   GL might place there. */
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group,
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+  display: none;
+}
+
+/* ?maplogo=0 (or localStorage hanzo-world-maplogo=0) hides the corner wordmark.
+   The compact "ⓘ" attribution above remains reachable, so basemap ToS still holds.
+   Higher specificity + !important beats mapbox-gl's own injected stylesheet, which
+   otherwise re-shows the logo (its rule loads after main.css). */
+body.hide-maplogo .mapboxgl-ctrl-logo,
+body.hide-maplogo .maplibregl-ctrl-logo {
+  display: none !important;
 }
 
 /* deck.gl mode indicator */
