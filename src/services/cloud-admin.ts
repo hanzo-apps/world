@@ -129,6 +129,44 @@ export interface CloudServices {
 
 export const getCloudServices = (): Promise<CloudServices | null> => adminGet<CloudServices>('/v1/world/cloud/services');
 
+// ── public: status.hanzo.ai summary (Gatus proxy) ───────────────────────────
+// Non-sensitive per-service up/down board + active incidents, proxied by the
+// world backend from the public status page. No auth. `available:false` (page
+// unreachable) is honest signal, not an error — the panel renders it quietly.
+
+export interface StatusPageService {
+  name: string;
+  group?: string;
+  up: boolean;
+  latencyMs: number;
+  checked?: string;
+}
+export interface StatusIncident {
+  name: string;
+  group?: string;
+  since?: string;
+  error?: string;
+}
+export interface StatusPage {
+  updatedAt: string;
+  available: boolean;
+  source: string;
+  total: number;
+  up: number;
+  services: StatusPageService[];
+  incidents: StatusIncident[];
+}
+
+export async function getStatusPage(): Promise<StatusPage | null> {
+  try {
+    const res = await fetch('/v1/world/cloud/status-page');
+    if (!res.ok) return null;
+    return (await res.json()) as StatusPage;
+  } catch {
+    return null;
+  }
+}
+
 // ── admin: web analytics (Umami / analytics.hanzo.ai) ────────────────────────
 
 export interface AnalyticsMetric { x: string; y: number }
