@@ -58,10 +58,17 @@ export class SearchModal {
     this.onSelect = callback;
   }
 
-  public open(): void {
+  public open(prefill?: string): void {
     if (this.overlay) return;
     this.createModal();
     this.input?.focus();
+    // Optional prefilled query (used by the AI analyst's `search` command): seed
+    // the input and run the same search path a keystroke would.
+    if (prefill && prefill.trim() && this.input) {
+      this.input.value = prefill.trim();
+      this.handleSearch();
+      return;
+    }
     this.showRecentOrEmpty();
   }
 
