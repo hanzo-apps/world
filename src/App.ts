@@ -1,3 +1,4 @@
+import './styles/try-hanzo.css';
 import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetOutage, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, CyberThreat } from '@/types';
 import {
   FEEDS,
@@ -366,6 +367,7 @@ export class App {
     this.setupPizzIntIndicator();
     this.setupExportPanel();
     this.setupLanguageSelector();
+    this.setupTryHanzoMenu();
     this.setupAccountMenu();
     this.setupSearchModal();
     this.setupMapLayerHandlers();
@@ -785,6 +787,96 @@ export class App {
     } else if (headerRight) {
       headerRight.insertBefore(this.languageSelector.getElement(), headerRight.firstChild);
     }
+  }
+
+  // "Try Hanzo" product switcher — the hanzo.ai "Try" menu, rebuilt for the World
+  // header. A white .hz-cta pill (the site's one primary-action style) that drops a
+  // monochrome menu of Hanzo products; the current product (world.hanzo.ai) is
+  // highlighted with a "Current" chip. Opens below the pill, closes on click-away
+  // or Escape. The menu is portaled to <body> and position:fixed so it never widens
+  // the header/page and is never clipped by the header's mobile overflow.
+  private setupTryHanzoMenu(): void {
+    const headerRight = this.container.querySelector('.header-right');
+    if (!headerRight) return;
+
+    const products: ReadonlyArray<{ name: string; desc: string; url: string; current?: boolean }> = [
+      { name: 'Hanzo World', desc: 'Real-time world intelligence', url: 'https://world.hanzo.ai', current: true },
+      { name: 'Hanzo Chat', desc: 'AI chat', url: 'https://hanzo.chat' },
+      { name: 'Hanzo Dev', desc: 'AI coding', url: 'https://hanzo.ai/code' },
+      { name: 'Hanzo App', desc: 'Build with AI', url: 'https://hanzo.app' },
+      { name: 'Hanzo Cloud', desc: 'Console & infra', url: 'https://console.hanzo.ai' },
+      { name: 'Hanzo Desktop', desc: 'Desktop app', url: 'https://hanzo.ai/desktop' },
+    ];
+    const esc = (v: string): string =>
+      v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+    const wrap = document.createElement('div');
+    wrap.className = 'try-hanzo';
+    wrap.innerHTML = `
+      <button class="hz-cta try-hanzo-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tryHanzoMenu">
+        <svg class="try-hanzo-ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>
+        <span class="try-hanzo-label">Try Hanzo</span>
+        <span class="try-hanzo-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="try-hanzo-menu" id="tryHanzoMenu" role="menu">
+        ${products
+          .map(
+            (p) => `<a class="try-hanzo-item${p.current ? ' is-current' : ''}" role="menuitem" href="${esc(p.url)}"${
+              p.current ? ' aria-current="page"' : ' target="_blank" rel="noopener noreferrer"'
+            }>
+              <span class="try-hanzo-item-body">
+                <span class="try-hanzo-name">${esc(p.name)}${p.current ? '<span class="try-hanzo-chip">Current</span>' : ''}</span>
+                <span class="try-hanzo-desc">${esc(p.desc)}</span>
+              </span>
+            </a>`,
+          )
+          .join('')}
+      </div>
+    `;
+
+    const trigger = wrap.querySelector<HTMLButtonElement>('.try-hanzo-trigger')!;
+    const menu = wrap.querySelector<HTMLElement>('.try-hanzo-menu')!;
+    // Portal the menu to <body>: the mobile header sets overflow-y:hidden for its
+    // horizontal tab scroller, which would clip a menu nested inside it. As a body
+    // child the fixed menu is anchored to the viewport and never clipped.
+    document.body.appendChild(menu);
+
+    const isOpen = (): boolean => menu.classList.contains('open');
+    const setOpen = (open: boolean): void => {
+      if (open) {
+        // Anchor the fixed menu under the trigger, right-aligned to it.
+        const r = trigger.getBoundingClientRect();
+        menu.style.top = `${Math.round(r.bottom + 8)}px`;
+        menu.style.right = `${Math.round(Math.max(8, window.innerWidth - r.right))}px`;
+      }
+      menu.classList.toggle('open', open);
+      wrap.classList.toggle('open', open); // caret rotation
+      trigger.setAttribute('aria-expanded', String(open));
+    };
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setOpen(!isOpen());
+    });
+    menu.addEventListener('click', (e) => {
+      const item = (e.target as HTMLElement).closest('.try-hanzo-item');
+      if (!item) return;
+      if (item.classList.contains('is-current')) e.preventDefault(); // already here
+      setOpen(false);
+    });
+    document.addEventListener('click', (e) => {
+      const target = e.target as Node;
+      if (isOpen() && !wrap.contains(target) && !menu.contains(target)) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isOpen()) {
+        setOpen(false);
+        trigger.focus();
+      }
+    });
+
+    // Trigger sits to the left of the account/identity control (appended right after).
+    headerRight.appendChild(wrap);
   }
 
   // Hanzo IAM: show the logged-in user + org/project switcher (or "Sign in").

@@ -60,10 +60,11 @@ export class AccountMenu {
   }
 
   private renderSignedOut(): void {
-    // Primary CTA (shared .hz-cta pill): signed-out users see one clear
-    // "Try Hanzo World" action that runs the same OIDC login the account chip uses.
-    this.element.innerHTML = `<button class="am-cta hz-cta" type="button">Try Hanzo World</button>`;
-    this.element.querySelector('.am-cta')?.addEventListener('click', () => void login());
+    // Secondary identity control: a "Sign in" button. The primary header CTA is now
+    // the "Try Hanzo" product switcher, so this stays understated and runs the same
+    // hanzo.id OIDC login the account chip uses.
+    this.element.innerHTML = `<button class="am-signin" type="button">Sign in</button>`;
+    this.element.querySelector('.am-signin')?.addEventListener('click', () => void login());
   }
 
   private render(): void {
@@ -200,6 +201,14 @@ function injectStyles(): void {
   cursor: pointer; transition: border-color 0.15s, background 0.15s;
 }
 .am-trigger:hover { border-color: var(--border-strong, rgba(255,255,255,0.24)); background: var(--surface-hover, rgba(255,255,255,0.08)); }
+.am-signin {
+  display: inline-flex; align-items: center;
+  height: 30px; padding: 0 14px; font-size: 13px; font-weight: 500;
+  color: inherit; background: var(--surface, rgba(255,255,255,0.04));
+  border: 1px solid var(--border, rgba(255,255,255,0.14)); border-radius: 6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.am-signin:hover { border-color: var(--border-strong, rgba(255,255,255,0.24)); background: var(--surface-hover, rgba(255,255,255,0.08)); }
 .am-scope { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .am-caret { opacity: 0.6; font-size: 10px; }
 .am-avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--accent, #6366f1); }
