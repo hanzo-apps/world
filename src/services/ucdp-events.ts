@@ -1,4 +1,4 @@
-import { createCircuitBreaker } from '@/utils';
+import { createCircuitBreaker, fetchWithTimeout } from '@/utils';
 import type { UcdpGeoEvent } from '@/types';
 
 interface UcdpEventsResponse {
@@ -17,7 +17,11 @@ const VERCEL_URL = '/v1/world/ucdp-events';
 const breaker = createCircuitBreaker<UcdpEventsResponse>({ name: 'UCDP Events' });
 
 async function fetchFromUrl(url: string): Promise<UcdpEventsResponse> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  // Hard deadline so an upstream 502 held open by the ingress can't leave the
+  // panel spinning: on timeout the circuit breaker returns its empty fallback and
+  // the panel resolves to an honest empty state (the Go handler already degrades
+  // to 200 with {error, data:[]} + stale-cache fallback).
+  const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
