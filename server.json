@@ -1,0 +1,12 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.hanzo/world",
+  "description": "Read-only Model Context Protocol server over Hanzo World's public planetary-intelligence data: world-model instability rankings, per-country risk, market quotes, cloud chain + traffic status, and curated news feeds. Ships two MCP apps (world-brief, market-radar).",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://world.hanzo.ai/v1/world/mcp"
+    }
+  ]
+}
