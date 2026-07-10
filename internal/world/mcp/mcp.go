@@ -21,9 +21,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 )
 
 // maxRPCBody caps a single JSON-RPC request body (abuse guard).
@@ -188,36 +190,71 @@ func (s *Server) toolsCall(ctx context.Context, params json.RawMessage) rpcRespo
 	if err := json.Unmarshal(params, &call); err != nil {
 		return fail(codeInvalidArgs, "invalid params")
 	}
-	t, ok := toolByName[call.Name]
-	if !ok {
-		return fail(codeInvalidArgs, "unknown tool: "+call.Name)
-	}
 	// gate(): every tool is a public read today, so access is anonymous. When
 	// pro-tier gating lands it attaches HERE, once, per tool — mirroring
 	// internal/world/model.gate(): the gateway pins the caller's org into a header
 	// from the validated JWT, and this is the single place to check plan/quota and
 	// return an isError result. No gate is braided into the data handlers.
-	path, reqBody, err := t.build(call.Arguments)
+	body, isErr, err := s.dispatchTool(ctx, call.Name, call.Arguments)
 	if err != nil {
-		return result(toolError(err.Error()))
+		// Protocol-level failures (unknown tool → invalid-args; unconfigured
+		// dispatcher → internal). Argument/route errors are ordinary tool results.
+		if strings.HasPrefix(err.Error(), "unknown tool") {
+			return fail(codeInvalidArgs, err.Error())
+		}
+		return fail(codeInternal, err.Error())
+	}
+	return result(toolResult(body, isErr))
+}
+
+// dispatchTool is the ONE in-process execution path for a data tool: it builds the
+// tool's (path, body) and dispatches it through the injected world mux with an
+// httptest recorder — no socket, no self-HTTP. Both the JSON-RPC tools/call above
+// and the in-app analyst loop (CallTool) go through here, so a tool behaves
+// identically whichever caller invokes it. A missing tool or unconfigured
+// dispatcher is returned as err (protocol-level); an argument/route error is a
+// normal tool result (body carries the message, isErr=true).
+func (s *Server) dispatchTool(ctx context.Context, name string, args map[string]any) (body []byte, isErr bool, err error) {
+	t, ok := toolByName[name]
+	if !ok {
+		return nil, false, errors.New("unknown tool: " + name)
 	}
 	if s.dispatch == nil {
-		return fail(codeInternal, "dispatcher not configured")
+		return nil, false, errors.New("dispatcher not configured")
+	}
+	path, reqBody, berr := t.build(args)
+	if berr != nil {
+		return []byte(berr.Error()), true, nil
 	}
 	var rdr io.Reader
 	if reqBody != nil {
 		rdr = bytes.NewReader(reqBody)
 	}
-	hr, err := http.NewRequestWithContext(ctx, t.Method, path, rdr)
-	if err != nil {
-		return result(toolError(err.Error()))
+	hr, herr := http.NewRequestWithContext(ctx, t.Method, path, rdr)
+	if herr != nil {
+		return []byte(herr.Error()), true, nil
 	}
 	if reqBody != nil {
 		hr.Header.Set("Content-Type", "application/json")
 	}
 	rec := httptest.NewRecorder()
 	s.dispatch.ServeHTTP(rec, hr) // in-process; reuses the exact route handler
-	return result(toolResult(rec.Body.Bytes(), rec.Code >= 400))
+	return rec.Body.Bytes(), rec.Code >= 400, nil
+}
+
+// CallTool executes a data tool IN-PROCESS and returns its raw route body plus
+// whether the call succeeded. It is the in-app analyst loop's single entry point
+// into the tool plane — the SAME dispatch path as JSON-RPC tools/call
+// (dispatchTool), so there is exactly one way a tool runs and the analyst can
+// never drift from an MCP client. An unknown tool, unconfigured dispatcher, or a
+// non-2xx route yields ok=false with the reason/body as text, which the caller
+// surfaces as a failed tool trace rather than a hard error.
+func (s *Server) CallTool(ctx context.Context, name string, args map[string]any) (out string, ok bool) {
+	body, isErr, err := s.dispatchTool(ctx, name, args)
+	if err != nil {
+		return err.Error(), false
+	}
+	return string(body), !isErr
 }
 
 // toolResult wraps a data-route body as an MCP tool result: a text block always,

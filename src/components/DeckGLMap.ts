@@ -3931,6 +3931,16 @@ export class DeckGLMap {
     return null;
   }
 
+  // Convert a viewport (clientX, clientY) point to geographic lng/lat, or null if
+  // the map isn't ready. Feeds the right-click context menu (Copy coordinates /
+  // Fly here) — read-only, no state change.
+  public screenToLngLat(clientX: number, clientY: number): { lat: number; lon: number } | null {
+    if (!this.mapboxMap) return null;
+    const rect = this.mapboxMap.getContainer().getBoundingClientRect();
+    const ll = this.mapboxMap.unproject([clientX - rect.left, clientY - rect.top]);
+    return { lat: ll.lat, lon: ll.lng };
+  }
+
   public setTimeRange(range: TimeRange): void {
     this.state.timeRange = range;
     this.rebuildProtestSupercluster();
