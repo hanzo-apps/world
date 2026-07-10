@@ -11,23 +11,46 @@ import (
 // status.hanzo.ai integration — a PUBLIC, non-sensitive health summary of the
 // Hanzo platform, proxied from the status page (Gatus, github.com/hanzoai/status).
 //
-// Gatus exposes the live board at GET /v1/status/endpoints/statuses: one object
-// per monitored endpoint with its recent results and health-transition events. We
-// distill that into a compact per-service up/down board + an active-incidents
-// list. Same contracts as the rest of the Cloud layer:
+// Gatus exposes a board of one object per monitored endpoint (recent results +
+// health-transition events). We distill that into a compact per-service up/down
+// board + an active-incidents list. Same contracts as the rest of the Cloud
+// layer:
 //   - allowlisted: the upstream host (operator-configured) is validated before we
 //     dial (getAllowedJSON SSRF boundary),
 //   - cached briefly in-memory,
 //   - never 5xx: an unreachable/empty status page degrades to a clean 200 with
 //     available:false — the page being down is itself honest signal, not an error.
+//
+// The board's API route differs by Gatus build: the live status.hanzo.ai
+// deployment answers the upstream-standard /api/v1/endpoints/statuses, while the
+// hanzoai/status source exposes it at /v1/status/endpoints/statuses (house "no
+// /api/ prefix" convention). We probe both and use whichever answers with a
+// non-empty board, so the proxy is correct against either deployment.
+var gatusStatusPaths = []string{
+	"/api/v1/endpoints/statuses",    // upstream-standard Gatus (live status.hanzo.ai)
+	"/v1/status/endpoints/statuses", // hanzoai/status house route
+}
 
 // statusBase returns the status-page origin (HANZO_STATUS_BASE override, else
-// status.hanzo.ai). No /v1 suffix — the Gatus path is composed below.
+// status.hanzo.ai). No path suffix — the Gatus route is probed from statusBase.
 func statusBase() string {
 	if v := env("HANZO_STATUS_BASE"); v != "" {
 		return trimSlash(v)
 	}
 	return "https://status.hanzo.ai"
+}
+
+// fetchGatusBoard probes the candidate Gatus routes in order and returns the
+// first non-empty board. ok=false when none answer (page down or path unknown).
+func (s *Server) fetchGatusBoard(ctx context.Context, base, host string) ([]gatusStatus, bool) {
+	allowed := map[string]bool{host: true}
+	for _, p := range gatusStatusPaths {
+		var raw []gatusStatus
+		if err := s.getAllowedJSON(ctx, base+p, allowed, &raw); err == nil && len(raw) > 0 {
+			return raw, true
+		}
+	}
+	return nil, false
 }
 
 // gatusStatus is the subset of Gatus's endpoint.Status DTO we read. Fields we do
@@ -92,10 +115,8 @@ func (s *Server) handleCloudStatusPage(w http.ResponseWriter, r *http.Request) {
 			if u, err := url.Parse(base); err == nil {
 				host = u.Hostname()
 			}
-			var raw []gatusStatus
-			err := s.getAllowedJSON(ctx, base+"/v1/status/endpoints/statuses",
-				map[string]bool{host: true}, &raw)
-			if err != nil || len(raw) == 0 {
+			raw, ok := s.fetchGatusBoard(ctx, base, host)
+			if !ok {
 				// Page unreachable/empty: honest "available:false", never a 5xx.
 				return statusPage{UpdatedAt: nowRFC(), Available: false, Source: host,
 					Services: []statusPageService{}, Incidents: []statusIncident{}}, nil
