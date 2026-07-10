@@ -421,7 +421,6 @@ export class App {
       },
     });
 
-    document.getElementById('immersiveToggle')?.addEventListener('click', () => this.immersive?.toggle());
     document.getElementById('immersiveCollapse')?.addEventListener('click', () => this.immersive?.toggleCollapsed());
     document.querySelectorAll('#immersiveBgSelect .ibg-btn').forEach((btn) => {
       btn.addEventListener('click', () =>
@@ -439,15 +438,42 @@ export class App {
   }
 
   private reflectImmersiveUi(state: ImmersiveState): void {
-    const toggle = document.getElementById('immersiveToggle');
-    toggle?.classList.toggle('active', state.enabled);
-    toggle?.setAttribute('aria-pressed', String(state.enabled));
     const collapse = document.getElementById('immersiveCollapse');
     collapse?.classList.toggle('active', state.collapsed);
     collapse?.setAttribute('aria-pressed', String(state.collapsed));
     document.querySelectorAll('#immersiveBgSelect .ibg-btn').forEach((btn) => {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.bg === state.background);
     });
+    // Keep the single mode dropdown in sync — immersive wins as the shown value,
+    // otherwise it reflects the snap mode (grid/free). Covers Escape-to-exit too.
+    this.syncModeSelect();
+  }
+
+  // The dock's one mode control shows the layout MODE as a 3-way choice over two
+  // orthogonal states: background (normal vs immersive) and snap (grid vs free).
+  //   Grid       → normal background, snap to grid
+  //   Free       → normal background, free-form pixels
+  //   Immersive  → map fills the viewport, panels float freestyle over it
+  private syncModeSelect(): void {
+    const sel = document.getElementById('dockModeSelect') as HTMLSelectElement | null;
+    if (!sel) return;
+    const mode = this.immersive?.getState().enabled ? 'immersive' : this.gridApi().getLayoutMode();
+    if (sel.value !== mode) sel.value = mode;
+  }
+
+  // Apply a 3-way mode pick, decomplecting background from snap. Entering immersive
+  // defaults the floating panels to freestyle (free snap); leaving it drops back to
+  // the normal background at whatever snap the user last had.
+  private setDockMode(mode: 'grid' | 'free' | 'immersive'): void {
+    const grid = this.gridApi();
+    if (mode === 'immersive') {
+      grid.setLayoutMode('free');
+      this.immersive?.setEnabled(true);
+    } else {
+      this.immersive?.setEnabled(false);
+      grid.setLayoutMode(mode);
+    }
+    this.syncModeSelect();
   }
 
   // Bottom toolbar dock wiring. Buttons moved here from the header (Panels,
@@ -478,20 +504,19 @@ export class App {
       });
     }
 
-    // Layout mode (grid ⇄ free) + widget size. Wired to the layout engine
-    // (window.worldGrid, owned by world-layoutengine) when present; otherwise a
-    // self-contained fallback applies the effect so the controls are never dead.
+    // Layout mode (grid / free / immersive) + widget size. The one dropdown drives
+    // the layout engine (window.worldGrid) for snap and the immersive controller for
+    // the background — see setDockMode. It stays in sync via syncModeSelect (also on
+    // Escape-to-exit immersive and programmatic grid-config changes).
     const grid = this.gridApi();
-    const mode0 = grid.getLayoutMode();
-    document.querySelectorAll<HTMLButtonElement>('#dockLayoutMode .dock-seg-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.mode === mode0);
-      btn.addEventListener('click', () => {
-        const mode = btn.dataset.mode === 'free' ? 'free' : 'grid';
-        grid.setLayoutMode(mode);
-        document.querySelectorAll('#dockLayoutMode .dock-seg-btn').forEach((b) =>
-          b.classList.toggle('active', (b as HTMLElement).dataset.mode === mode));
-      });
-    });
+    const modeSelect = document.getElementById('dockModeSelect') as HTMLSelectElement | null;
+    if (modeSelect) {
+      modeSelect.addEventListener('change', () =>
+        this.setDockMode(modeSelect.value as 'grid' | 'free' | 'immersive'));
+      // grid-config broadcasts programmatic snap changes (analyst / reset); reflect them.
+      document.addEventListener('layout-mode-change', () => this.syncModeSelect());
+      this.syncModeSelect();
+    }
     const sizeInput = document.getElementById('dockGridSize') as HTMLInputElement | null;
     if (sizeInput) {
       sizeInput.value = String(grid.getCellSize());
@@ -2041,8 +2066,8 @@ export class App {
       <option value="oceania">${t('components.deckgl.views.oceania')}</option>`;
     const immersive = this.isMobile ? '' : `
       <div class="dock-group immersive-controls" id="immersiveControls">
-        <button class="dock-btn immersive-toggle-btn" id="immersiveToggle" title="Immersive layout — map fills the background, panels float on top" aria-pressed="false"><span class="dock-ico">▦</span> <span class="btn-label">Immersive</span></button>
-        <div class="immersive-bg-select" id="immersiveBgSelect" role="group" aria-label="Background">
+        <span class="dock-sublabel">Background</span>
+        <div class="immersive-bg-select" id="immersiveBgSelect" role="group" aria-label="Immersive background">
           <button class="ibg-btn" data-bg="map" title="Map background">Map</button>
           <button class="ibg-btn" data-bg="video" title="Live video background">Video</button>
         </div>
@@ -2064,17 +2089,20 @@ export class App {
           <div class="dock-group">
             <button class="dock-btn" id="dockLayersBtn" aria-pressed="false" title="Show or hide map layers"><span class="dock-ico">▤</span> <span class="btn-label">Layers</span></button>
           </div>
-          ${immersive}
           <div class="dock-group dock-layout">
-            <div class="dock-seg" id="dockLayoutMode" role="group" aria-label="Layout mode">
-              <button class="dock-seg-btn" data-mode="grid" title="Snap widgets to a grid">Grid</button>
-              <button class="dock-seg-btn" data-mode="free" title="Free-form widget placement">Free</button>
-            </div>
+            <label class="dock-select-wrap" title="Layout mode — Grid snaps widgets to the grid, Free is pixel-perfect, Immersive floats them over a full-screen map">
+              <select id="dockModeSelect" class="dock-select" aria-label="Layout mode">
+                <option value="grid">Grid</option>
+                <option value="free">Free</option>
+                <option value="immersive">Immersive</option>
+              </select>
+            </label>
             <label class="dock-slider" title="Widget size">
               <span class="dock-ico">▦</span>
               <input type="range" id="dockGridSize" min="140" max="360" step="20" value="160" aria-label="Widget size" />
             </label>
           </div>
+          ${immersive}
           <div class="dock-group">
             <button class="dock-btn dock-add" id="dockAddWidget" title="Add a widget"><span class="dock-ico">＋</span> <span class="btn-label">Add widget</span></button>
           </div>

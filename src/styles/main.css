@@ -2319,6 +2319,9 @@ body.panel-drag-active .map-container {
   border: 1px solid;
   text-transform: none;
   letter-spacing: 0.3px;
+  /* Text stays on the normal token for WCAG contrast; the threat colour is carried
+     by the border + translucent background only (set inline), never the text. */
+  color: var(--text);
 }
 
 .item-title {
@@ -16299,14 +16302,17 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
    mechanism: body[data-immersive-bg="map"|"video"]. Escape / the header toggle
    returns to the normal grid; the header sits above everything as always.
    ════════════════════════════════════════════════════════════════════════════ */
+/* !important beats the inline {position:absolute; left/top/width/height} that the
+   free-snap engine writes onto every panel — in immersive the map is NOT a floating
+   card, it's the fixed full-viewport backdrop, regardless of the snap mode. */
 body.immersive .map-section {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  max-height: none;
-  min-height: 0;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  min-height: 0 !important;
   margin: 0;
   border: none;
   border-radius: 0;
@@ -16329,12 +16335,16 @@ body.immersive .panels-grid > .panel:not(.map-section) {
 /* The panels become a translucent floating COLUMN docked to the right edge — not a
    full-width grid — so most of the viewport is the live globe/video. `span 2` panels
    fill this narrow 2-track grid one-per-row, giving the masonry column. */
+/* Immersive floats the cards over the FULL map, freestyle — not the old narrow
+   right-docked column (which collapsed once free-mode made the cards absolute and
+   left the grid with no in-flow content to size it). Full width, own scroll. */
 body.immersive .panels-grid {
   gap: 12px;
   padding: 12px;
   background: transparent;
-  max-width: 460px;
-  align-self: flex-end;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
 }
 body.immersive .main-content { background: transparent; }
 
@@ -16376,10 +16386,20 @@ body.immersive .deckgl-style-switcher { top: 92px; }
 body.immersive .map-controls { top: 56px; }
 
 /* ── Header: immersive controls ────────────────────────────────────────────── */
+/* The immersive sub-controls (background Map/Video + collapse) only exist while
+   immersive is the active background mode — the mode dropdown owns entering it. */
 .immersive-controls {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
+}
+body.immersive .immersive-controls {
+  display: inline-flex;
+}
+.dock-sublabel {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 .immersive-toggle-btn,
 .immersive-collapse-btn {
@@ -16705,6 +16725,32 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 }
 .dock-seg-btn:hover { color: var(--text); }
 .dock-seg-btn.active { background: var(--accent); color: var(--bg); font-weight: 600; }
+
+/* Layout-mode dropdown (Grid / Free / Immersive) — the single home for the
+   layout mode. Monochrome, sentence case, sized to the dock bar. */
+.dock-select-wrap { display: inline-flex; align-items: center; }
+.dock-select {
+  height: 28px;
+  padding: 0 26px 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+                    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: right 12px center, right 7px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.dock-select:hover { border-color: var(--border-strong); }
+.dock-select:focus { outline: none; border-color: var(--accent); }
 
 /* Widget-size slider. */
 .dock-slider {
