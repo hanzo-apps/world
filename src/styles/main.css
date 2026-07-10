@@ -15991,3 +15991,204 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .ai-analyst-action.ok .ai-analyst-action-mark { color: var(--text); }
 .ai-analyst-action.err { color: var(--text-muted); }
 .ai-analyst-action.err .ai-analyst-action-mark { color: var(--red); }
+
+/* ============================================================
+   Country view — fullscreen application layout + analyst sidebar
+   (APPEND-ONLY; supersedes the earlier centered-card country brief)
+   Clicking a country opens a proper application view: intel content
+   fills the canvas on the left, a docked AI analyst chat on the right.
+   ============================================================ */
+.country-brief-overlay {
+  background: var(--bg);
+  backdrop-filter: none;
+  overflow: hidden; /* the intel column scrolls internally, not the whole page */
+}
+
+.country-brief-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  background: var(--bg);
+  --cb-analyst-w: 380px;
+}
+.country-brief-overlay.active .country-brief-page { transform: none; }
+
+.country-brief-page .cb-header {
+  position: static;
+  flex: 0 0 auto;
+  border-radius: 0;
+  padding: 16px 28px;
+}
+
+/* content row: intel main | resize handle | analyst sidebar */
+.cb-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.cb-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+}
+.cb-main::-webkit-scrollbar { width: 8px; }
+.cb-main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.country-brief-page .cb-body {
+  padding: 28px 32px 56px;
+}
+.country-brief-page .cb-grid {
+  max-width: 1440px; /* readable measure without a hard straitjacket */
+  gap: 32px;
+}
+
+/* resize handle between main + sidebar */
+.cb-analyst-resize {
+  flex: 0 0 auto;
+  width: 7px;
+  cursor: col-resize;
+  background: transparent;
+  border-left: 1px solid var(--overlay-medium);
+  transition: background 0.15s ease;
+  touch-action: none;
+}
+.cb-analyst-resize:hover,
+.cb-analyst-resize.dragging { background: var(--overlay-medium); }
+
+/* docked analyst sidebar */
+.cb-analyst-sidebar {
+  flex: 0 0 var(--cb-analyst-w);
+  width: var(--cb-analyst-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+}
+.cb-analyst-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--overlay-medium);
+}
+.cb-analyst-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+}
+.cb-analyst-title svg { opacity: 0.9; flex: 0 0 auto; }
+.cb-analyst-sub {
+  font-weight: 400;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cb-analyst-collapse {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--overlay-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 15px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+.cb-analyst-collapse:hover { color: var(--text); border-color: var(--overlay-heavy); }
+.cb-analyst-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+.cb-analyst-mount > .ai-analyst { flex: 1; min-width: 0; }
+
+/* reopen affordance — shown only when the sidebar is collapsed */
+.cb-analyst-fab {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--overlay-medium);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 24px var(--shadow-color);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.cb-analyst-fab:hover { border-color: var(--overlay-heavy); transform: translateY(-1px); }
+.cb-analyst-fab svg { opacity: 0.9; }
+
+/* collapsed (desktop): hide sidebar + handle, surface the reopen pill */
+.country-brief-page.cb-analyst-collapsed .cb-analyst-sidebar { display: none; }
+.country-brief-page.cb-analyst-collapsed .cb-analyst-resize { display: none; }
+.country-brief-page.cb-analyst-collapsed .cb-analyst-fab { display: inline-flex; }
+
+/* Mobile: sidebar becomes a bottom sheet toggled by the reopen pill. */
+@media (max-width: 768px) {
+  .country-brief-page .cb-header { padding: 12px 16px; }
+  .country-brief-page .cb-body { padding: 16px 16px 40px; }
+  .cb-view { flex-direction: column; }
+  .cb-main { flex: 1 1 auto; }
+  .cb-analyst-resize { display: none; }
+
+  .cb-analyst-sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 74dvh;
+    max-height: 82dvh;
+    border-top: 1px solid var(--overlay-medium);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -12px 40px var(--shadow-color);
+    transform: translateY(0);
+    transition: transform 0.25s ease;
+    z-index: 6;
+  }
+  /* keep the sheet in the DOM so it slides rather than snaps */
+  .country-brief-page.cb-analyst-collapsed .cb-analyst-sidebar {
+    display: flex;
+    transform: translateY(101%);
+  }
+}
+
+@media print {
+  /* Restore the print-friendly, full-content flow (the fullscreen app rules
+     above would otherwise clip the brief to one 100dvh viewport). */
+  .country-brief-overlay { position: static; overflow: visible; }
+  .country-brief-page { height: auto; display: block; }
+  .cb-view { display: block; }
+  .cb-main { overflow: visible; }
+  .cb-analyst-sidebar,
+  .cb-analyst-resize,
+  .cb-analyst-fab { display: none !important; }
+}
