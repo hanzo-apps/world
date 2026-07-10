@@ -5,6 +5,7 @@
 import { isMobileDevice } from '@/utils';
 import { MapComponent } from './Map';
 import { DeckGLMap, type DeckMapView, type CountryClickPayload, type MapProjectionMode } from './DeckGLMap';
+import { GlobeNative, isNativeGlobeEnabled } from './GlobeNative';
 import type {
   MapLayers,
   Hotspot,
@@ -70,6 +71,16 @@ export class MapContainer {
   private initialState: MapContainerState;
   private useDeckGL: boolean;
 
+  // Native deck.gl GlobeView renderer — a flag-gated alternate for the 3D globe
+  // (URL ?globe=native or localStorage hanzo-world-globe-native=1). Default off;
+  // the mapbox globe stays the shipping 3D path. When active, DeckGLMap is parked
+  // as the data authority (its buildLayers()/tooltips/clicks feed the globe) while
+  // GlobeNative owns the on-screen 3D render.
+  private nativeGlobeFlag: boolean;
+  private globeNative: GlobeNative | null = null;
+  private countryClickCb: ((country: CountryClickPayload) => void) | null = null;
+  private appStateCb: ((state: MapContainerState) => void) | null = null;
+
   constructor(container: HTMLElement, initialState: MapContainerState) {
     this.container = container;
     this.initialState = initialState;
@@ -77,6 +88,7 @@ export class MapContainer {
 
     // Use deck.gl on desktop with WebGL support, SVG on mobile
     this.useDeckGL = !this.isMobile && this.hasWebGLSupport();
+    this.nativeGlobeFlag = this.useDeckGL && isNativeGlobeEnabled();
 
     this.init();
   }
@@ -99,11 +111,63 @@ export class MapContainer {
         ...this.initialState,
         view: this.initialState.view as DeckMapView,
       });
+
+      if (this.nativeGlobeFlag) {
+        console.log('[MapContainer] Native deck.gl GlobeView enabled (flag)');
+        // One handler owns native activation: both the in-map 2D/3D toggle and any
+        // external setProjectionMode() funnel through DeckGLMap's state change.
+        this.deckGLMap.setOnStateChange((state) => this.handleDeckState(state));
+        if (this.initialState.mode === '3d') this.activateNativeGlobe();
+      }
     } else {
       console.log('[MapContainer] Initializing SVG map (mobile/fallback mode)');
       this.container.classList.add('svg-mode');
       this.svgMap = new MapComponent(this.container, this.initialState);
     }
+  }
+
+  // ---- Native deck.gl GlobeView (flag-gated) --------------------------------
+
+  private handleDeckState(state: MapContainerState & { view: DeckMapView }): void {
+    if (this.nativeGlobeFlag) {
+      if (state.mode === '3d' && !this.globeNative) this.activateNativeGlobe();
+      else if (state.mode === '2d' && this.globeNative) this.deactivateNativeGlobe();
+    }
+    this.appStateCb?.({ ...state, view: state.view as MapView });
+  }
+
+  private get deckWrapper(): HTMLElement | null {
+    return this.container.querySelector('.deckgl-map-wrapper');
+  }
+
+  private activateNativeGlobe(): void {
+    if (!this.deckGLMap || this.globeNative) return;
+    // Park the mapbox map: it stays the data authority (buildLayers/tooltips/clicks
+    // via asGlobeSource) but stops rendering, and is hidden behind the globe.
+    this.deckGLMap.setRenderPaused(true);
+    const wrapper = this.deckWrapper;
+    if (wrapper) wrapper.style.visibility = 'hidden';
+
+    const center = this.deckGLMap.getCenter();
+    const zoom = this.deckGLMap.getState().zoom;
+    this.globeNative = new GlobeNative(this.container, {
+      source: this.deckGLMap.asGlobeSource(),
+      center: center
+        ? { longitude: center.lon, latitude: center.lat, zoom: Math.max(0, Math.min(zoom, 6)) }
+        : undefined,
+      onCountryClick: this.countryClickCb ?? undefined,
+    });
+  }
+
+  private deactivateNativeGlobe(): void {
+    if (this.globeNative) {
+      this.globeNative.destroy();
+      this.globeNative = null;
+    }
+    const wrapper = this.deckWrapper;
+    if (wrapper) wrapper.style.visibility = '';
+    this.deckGLMap?.setRenderPaused(false);
+    this.deckGLMap?.render();
   }
 
   // Unified public API - delegates to active map implementation
@@ -149,6 +213,7 @@ export class MapContainer {
   public setCenter(lat: number, lon: number, zoom?: number): void {
     if (this.useDeckGL) {
       this.deckGLMap?.setCenter(lat, lon, zoom);
+      this.globeNative?.setCenter(lat, lon, zoom);
     } else {
       this.svgMap?.setCenter(lat, lon);
       if (zoom != null) this.svgMap?.setZoom(zoom);
@@ -157,6 +222,7 @@ export class MapContainer {
 
   public getCenter(): { lat: number; lon: number } | null {
     if (this.useDeckGL) {
+      if (this.globeNative) return this.globeNative.getCenter();
       return this.deckGLMap?.getCenter() ?? null;
     }
     return this.svgMap?.getCenter() ?? null;
@@ -382,9 +448,15 @@ export class MapContainer {
 
   public onStateChanged(callback: (state: MapContainerState) => void): void {
     if (this.useDeckGL) {
-      this.deckGLMap?.setOnStateChange((state) => {
-        callback({ ...state, view: state.view as MapView });
-      });
+      if (this.nativeGlobeFlag) {
+        // The combined handler (registered in init) owns DeckGLMap's state change and
+        // chains to this app callback, so native activation is never bypassed.
+        this.appStateCb = callback;
+      } else {
+        this.deckGLMap?.setOnStateChange((state) => {
+          callback({ ...state, view: state.view as MapView });
+        });
+      }
     } else {
       this.svgMap?.onStateChanged(callback);
     }
@@ -529,7 +601,9 @@ export class MapContainer {
   // Country click + highlight (deck.gl only)
   public onCountryClicked(callback: (country: CountryClickPayload) => void): void {
     if (this.useDeckGL) {
+      this.countryClickCb = callback;
       this.deckGLMap?.setOnCountryClick(callback);
+      this.globeNative?.setOnCountryClick(callback);
     }
   }
 
@@ -562,6 +636,8 @@ export class MapContainer {
 
   public destroy(): void {
     if (this.useDeckGL) {
+      this.globeNative?.destroy();
+      this.globeNative = null;
       this.deckGLMap?.destroy();
     } else {
       this.svgMap?.destroy();
