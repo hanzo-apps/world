@@ -24,6 +24,8 @@ type GlobeHarness = {
   setCamera: (lon: number, lat: number, zoom: number) => void;
   stopSpin: () => void;
   pickAtLonLat: (lon: number, lat: number, radius?: number) => PickResult;
+  setBasemapStyle: (style: 'dark' | 'satellite' | 'terrain') => void;
+  getBasemapStyle: () => string;
   destroy: () => void;
 };
 
@@ -110,5 +112,25 @@ test.describe('native deck.gl GlobeView', () => {
     expect(
       await page.evaluate(() => (window as HarnessWindow).__globeHarness!.nativeEnabled),
     ).toBe(false);
+  });
+
+  test('basemap style switches dark/satellite/terrain, stays single-context, data still picks', async ({
+    page,
+  }) => {
+    await ready(page, '?globe=native');
+
+    const setStyle = (s: 'dark' | 'satellite' | 'terrain') =>
+      page.evaluate((style) => (window as HarnessWindow).__globeHarness!.setBasemapStyle(style), s);
+    const getStyle = () =>
+      page.evaluate(() => (window as HarnessWindow).__globeHarness!.getBasemapStyle());
+
+    for (const style of ['satellite', 'terrain', 'dark'] as const) {
+      await setStyle(style);
+      expect(await getStyle()).toBe(style);
+      // Draping imagery must not spawn a second WebGL context...
+      expect(await page.evaluate(() => document.querySelectorAll('canvas').length)).toBe(1);
+      // ...and the data layers keep rendering ON TOP (still pickable on the sphere).
+      await expect.poll(async () => (await pickHotspot(page)).found, { timeout: 15000 }).toBe(true);
+    }
   });
 });

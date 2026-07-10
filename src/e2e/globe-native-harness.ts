@@ -26,6 +26,8 @@ type GlobeHarness = {
   setCamera: (lon: number, lat: number, zoom: number) => void;
   stopSpin: () => void;
   pickAtLonLat: (lon: number, lat: number, radius?: number) => PickResult;
+  setBasemapStyle: (style: 'dark' | 'satellite' | 'terrain') => void;
+  getBasemapStyle: () => string;
   destroy: () => void;
 };
 
@@ -120,5 +122,7 @@ window.__globeHarness = {
     const info = deck.pickObject({ x, y, radius });
     return { found: !!info, layerId: info?.layer?.id ?? null };
   },
+  setBasemapStyle: (style) => globe.setBasemapStyle(style),
+  getBasemapStyle: () => globe.getBasemapStyle(),
   destroy: () => globe.destroy(),
 };

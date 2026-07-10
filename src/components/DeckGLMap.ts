@@ -95,7 +95,7 @@ import {
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
-import type { GlobeLayerSource } from './GlobeNative';
+import { isNativeGlobeEnabled, type GlobeLayerSource } from './GlobeNative';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -4816,9 +4816,11 @@ export class DeckGLMap {
     try {
       const raw = localStorage.getItem(BASEMAP_STYLE_KEY);
       const style = (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : 'dark';
-      // satellite/terrain are Mapbox styles — without a token they never load, so
-      // fall back to the always-available dark basemap rather than a blank void.
-      return isBrightBasemap(style) && !MAPBOX_TOKEN ? 'dark' : style;
+      // satellite/terrain are Mapbox styles that need a token in 2D — but the native
+      // deck GlobeView renders them from keyless ESRI imagery, so when native is the
+      // 3D renderer they're always available. Only fall back to dark when neither a
+      // token nor the native globe can serve them.
+      return isBrightBasemap(style) && !MAPBOX_TOKEN && !isNativeGlobeEnabled() ? 'dark' : style;
     } catch {
       return 'dark';
     }
@@ -4854,7 +4856,13 @@ export class DeckGLMap {
     this.basemapStyle = style;
     try { localStorage.setItem(BASEMAP_STYLE_KEY, style); } catch { /* storage full/blocked */ }
     this.updateStyleSwitcher();
-    this.applyBasemapStyle();
+    // Tell the native deck GlobeView first so it re-drapes live — and even if the
+    // parked 2D mapbox can't apply the style (satellite/terrain need a token; setStyle
+    // throws synchronously without one), the globe still switches.
+    window.dispatchEvent(new CustomEvent('basemap-style-changed', { detail: { style } }));
+    try {
+      this.applyBasemapStyle();
+    } catch { /* mapbox satellite/terrain need a token; the native globe already handled it */ }
     this.render(); // deck dot colours re-evaluate against the new backdrop
   }
 
@@ -4914,9 +4922,10 @@ export class DeckGLMap {
     ];
     el.innerHTML = opts
       .map((o) => {
-        // Bright Mapbox styles need a token; disable (don't hide) them when absent so
-        // the option is discoverable but can't break the map.
-        const needsToken = isBrightBasemap(o.style) && !MAPBOX_TOKEN;
+        // Bright Mapbox styles need a token for the 2D map; the native 3D globe
+        // serves them from keyless ESRI imagery, so they stay enabled when native is
+        // the 3D renderer. Only disable when neither path can render them.
+        const needsToken = isBrightBasemap(o.style) && !MAPBOX_TOKEN && !isNativeGlobeEnabled();
         const title = needsToken
           ? t('components.deckgl.basemap.needsToken', { defaultValue: 'Requires a Mapbox token' })
           : o.title;
