@@ -81,6 +81,13 @@ const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai' || SITE_
 // non-nullable so no deref site needs a guard.
 const EMPTY_CHANNEL: LiveChannel = { id: 'none', name: '—', handle: '', useFallbackOnly: true };
 
+// The variant's primary live channel, reused by the immersive video background so
+// the "live-news YouTube embed" is defined in exactly one place (this channel list).
+export function getDefaultLiveChannel(): { handle: string; videoId: string; name: string } {
+  const c = LIVE_CHANNELS[0] ?? EMPTY_CHANNEL;
+  return { handle: c.handle, videoId: c.fallbackVideoId ?? '', name: c.name };
+}
+
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
   private activeChannel: LiveChannel = LIVE_CHANNELS[0] ?? EMPTY_CHANNEL;
