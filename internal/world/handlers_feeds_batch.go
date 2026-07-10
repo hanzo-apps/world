@@ -77,9 +77,12 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if body, ok := s.feedXML(ctx, feedURL); ok {
+			if body, ok, fresh := s.feedXML(ctx, feedURL); ok {
 				results[i].OK = true
 				results[i].Items = parseFeedItems(body, feedsBatchMaxItems)
+				if fresh {
+					s.ingestFeedItems(feedURL, body) // fold a cold-miss fetch into the lake
+				}
 			}
 		}()
 	}
@@ -91,29 +94,22 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// feedXML returns the raw feed body, sharing handleRSSProxy's cache keys and
-// stale-fallback behavior.
-func (s *Server) feedXML(ctx context.Context, feedURL string) ([]byte, bool) {
-	key := "rss:" + feedURL
-	if v, ok := s.cache.Get(key); ok {
-		return v.([]byte), true
+// feedXML returns a feed body from the shared warm cache (instant, never blocks
+// on upstream), falling through to a bounded live fetch only on a true cold miss
+// and write-through-ing the result. fresh reports whether the body came from that
+// live fetch (so the caller folds it into the lake exactly once). The warm cache
+// is the same one handleRSSProxy reads, so either path warms the other.
+func (s *Server) feedXML(ctx context.Context, feedURL string) (body []byte, ok, fresh bool) {
+	if b, _, hit := s.feeds.Get(ctx, feedURL); hit {
+		return b, true, false // any cached copy → serve instantly (stale-while-revalidate)
 	}
-	ctx, cancel := context.WithTimeout(ctx, feedsBatchFetchTimeout)
+	fctx, cancel := context.WithTimeout(ctx, feedsBatchFetchTimeout)
 	defer cancel()
-	body, status, err := s.getAllowlisted(ctx, feedURL, allowedRSSDomains, map[string]string{
-		"User-Agent": browserUA,
-		"Accept":     "application/rss+xml, application/xml, text/xml, */*",
-	})
-	// A blank 200 is a failure, not content: never cache it (it would poison the
-	// shared "rss:" key handleRSSProxy reads too). Fall back to last-good stale.
-	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
-		if v, ok := s.cache.GetStale(key); ok {
-			return v.([]byte), true
-		}
-		return nil, false
+	if b, okk := s.fetchFeedBody(fctx, feedURL); okk {
+		s.feeds.Put(feedURL, b)
+		return b, true, true
 	}
-	s.cache.Set(key, body, 5*time.Minute, 15*time.Minute)
-	return body, true
+	return nil, false, false
 }
 
 // parseFeedItems handles RSS 2.0 (channel>item), RDF/RSS 1.0 (root-level

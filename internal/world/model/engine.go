@@ -25,8 +25,18 @@ type Engine struct {
 	snapPath string
 	history  *History
 
+	// sink, when set, receives every cycle's raw observations after they fold.
+	// It lets an owner (package world) dump observations into the queryable data
+	// lake WITHOUT this package knowing anything about storage — the engine stays
+	// decomplected from the datastore; it just calls a value-in hook.
+	sink func([]Observation)
+
 	startOnce sync.Once
 }
+
+// SetObservationSink registers a hook called with each cycle's observations after
+// they are folded. Set once before Start; nil (the default) is a no-op.
+func (e *Engine) SetObservationSink(fn func([]Observation)) { e.sink = fn }
 
 // New builds an engine. dataDir is where the warm-start snapshot and the history
 // ring live; interval<=0 uses DefaultInterval.
@@ -114,6 +124,9 @@ func (e *Engine) IngestOnce(ctx context.Context) {
 	wg.Wait()
 	changes := e.store.Apply(all, time.Now().UTC())
 	log.Printf("world-model: ingest folded %d observations, %d changes", len(all), len(changes))
+	if e.sink != nil && len(all) > 0 {
+		e.sink(all)
+	}
 }
 
 // ── snapshot ─────────────────────────────────────────────────────────────────
