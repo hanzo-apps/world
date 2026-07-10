@@ -2,8 +2,6 @@ package world
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
@@ -58,29 +56,12 @@ func iamIssuer() string {
 	return "https://hanzo.id"
 }
 
-// introspectOwner resolves the caller's IAM `owner` claim from userinfo, memoized
-// by token hash for a short TTL so the gate does not hit IAM on every request.
-func (s *Server) introspectOwner(ctx context.Context, bearer string) (string, error) {
-	sum := sha256.Sum256([]byte(bearer))
-	key := "cloud-owner:" + hex.EncodeToString(sum[:12])
-	if v, ok := s.cache.Get(key); ok {
-		return v.(string), nil
-	}
-	var u struct {
-		Owner string `json:"owner"`
-	}
-	if err := s.getJSON(ctx, iamIssuer()+"/v1/iam/oauth/userinfo",
-		map[string]string{"Authorization": bearer}, &u); err != nil {
-		return "", err
-	}
-	s.cache.Set(key, u.Owner, 60*time.Second, 60*time.Second)
-	return u.Owner, nil
-}
-
 // requireAdmin gates an admin-only Cloud endpoint. It returns the caller's bearer
 // (to forward upstream) and true only for a validated admin-org owner; otherwise
 // it writes the fail-closed response (401 without a token, 403 otherwise) and
-// returns false. Every admin handler calls this after preflight.
+// returns false. Every admin handler calls this after preflight. Identity is
+// resolved through the single IAM-userinfo path (introspectIdentity); the gate
+// reads only the authoritative owner claim.
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (string, bool) {
 	bearer := userBearer(r)
 	if bearer == "" {
@@ -89,8 +70,8 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (string, b
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	owner, err := s.introspectOwner(ctx, bearer)
-	if err != nil || !isAdminOrg(owner) {
+	id, err := s.introspectIdentity(ctx, bearer)
+	if err != nil || !isAdminOrg(id.Org) {
 		writeError(w, http.StatusForbidden, "Admin only — sign in with the admin org")
 		return "", false
 	}
