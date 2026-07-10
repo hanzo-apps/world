@@ -3346,15 +3346,22 @@ export class DeckGLMap {
     if (current === name) return;
     this.mapboxMap.setProjection(name);
     // Entering the globe from a zoomed-in mercator view: pull the camera back so
-    // the whole sphere frames up, flat and un-pitched. Leaving it: just settle.
+    // the whole sphere frames up, flat and un-pitched — a ~1.1s choreographed glide
+    // the overlaid deck layers reproject through frame-by-frame. Reduced-motion
+    // snaps instantly. Leaving it: mapbox morphs the projection itself; we settle.
     if (name === 'globe') {
       const zoom = this.mapboxMap.getZoom();
-      this.mapboxMap.easeTo({
-        zoom: zoom > 3.5 ? 2.6 : zoom,
-        pitch: 0,
-        duration: 900,
-        essential: true,
-      });
+      const targetZoom = zoom > 3.5 ? 2.6 : zoom;
+      if (this.prefersReducedMotion()) {
+        this.mapboxMap.jumpTo({ zoom: targetZoom, pitch: 0 });
+      } else {
+        this.mapboxMap.easeTo({
+          zoom: targetZoom,
+          pitch: 0,
+          duration: 1100,
+          essential: true,
+        });
+      }
     }
     this.mapboxMap.triggerRepaint();
   }
