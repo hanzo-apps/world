@@ -4,7 +4,13 @@ import "net/http"
 
 // Mount registers every /v1/world/* route on mux. All non-/api routes are handled by
 // the static SPA server wired up in cmd/world.
-func (s *Server) Mount(mux *http.ServeMux) { s.mount(mux) }
+func (s *Server) Mount(mux *http.ServeMux) {
+	s.mount(mux)
+	// The MCP server dispatches its read-only tool calls IN-PROCESS through this
+	// same mux (the /v1/world/mcp route is registered in mount, above). Tool paths
+	// only ever target data routes, never /v1/world/mcp, so there is no recursion.
+	s.mcp.SetDispatcher(mux)
+}
 
 // registrar abstracts HandleFunc so routes register once and enumerate for tests.
 type registrar interface {
@@ -113,6 +119,11 @@ func (s *Server) mount(mux registrar) {
 
 	// world model (continuously-folded world-state engine)
 	s.worldModel.Mount(mux)
+
+	// MCP server (streamable-HTTP, JSON-RPC 2.0): a read-only projection of the
+	// routes above. Registered here so it enumerates in Routes(); its dispatcher
+	// is wired in Mount. Exact path beats the /v1/world/ catch-all below.
+	mux.HandleFunc("/v1/world/mcp", s.mcp.ServeHTTP)
 
 	// Catch-all for any unregistered /v1/world/* path: a JSON 404, never the SPA
 	// shell. Exact and subtree routes above are longer prefixes and win.
