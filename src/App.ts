@@ -1682,12 +1682,12 @@ export class App {
               <span class="variant-icon">🤖</span>
               <span class="variant-label">${t('header.ai')}</span>
             </a>
-            <a href="?variant=tech"
-               class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
-               data-variant="tech"
-               title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">💻</span>
-              <span class="variant-label">${t('header.tech')}</span>
+            <a href="?variant=crypto"
+               class="variant-option ${SITE_VARIANT === 'crypto' ? 'active' : ''}"
+               data-variant="crypto"
+               title="${t('header.crypto')}${SITE_VARIANT === 'crypto' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">₿</span>
+              <span class="variant-label">${t('header.crypto')}</span>
             </a>
             <a href="?variant=finance"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
@@ -1696,12 +1696,12 @@ export class App {
               <span class="variant-icon">📈</span>
               <span class="variant-label">${t('header.finance')}</span>
             </a>
-            <a href="?variant=crypto"
-               class="variant-option ${SITE_VARIANT === 'crypto' ? 'active' : ''}"
-               data-variant="crypto"
-               title="${t('header.crypto')}${SITE_VARIANT === 'crypto' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">₿</span>
-              <span class="variant-label">${t('header.crypto')}</span>
+            <a href="?variant=tech"
+               class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
+               data-variant="tech"
+               title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">💻</span>
+              <span class="variant-label">${t('header.tech')}</span>
             </a>
             <a href="?variant=saas"
                class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
