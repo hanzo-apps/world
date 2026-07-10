@@ -2842,6 +2842,7 @@ export class App {
       } else {
         this.resetIdleTimer();
       }
+      this.syncMapRenderActive();
     };
     document.addEventListener('visibilitychange', this.boundVisibilityHandler);
 
@@ -2860,12 +2861,22 @@ export class App {
     this.setupIdleDetection();
   }
 
+  // Single chokepoint for whether the map's render loop (2Hz news pulse, idle
+  // globe spin, cloud-poll re-renders) should run. Off whenever the tab is hidden
+  // or the user has gone idle — that is the residual main-thread/GPU cost the CPU
+  // profile flagged on saas/crypto. setRenderPaused is idempotent + drains a
+  // pending render on resume, so this is safe to call on every signal edge.
+  private syncMapRenderActive(): void {
+    this.map?.setRenderPaused(document.hidden || this.isIdle);
+  }
+
   private setupIdleDetection(): void {
     this.boundIdleResetHandler = () => {
       // User is active - resume animations if we were idle
       if (this.isIdle) {
         this.isIdle = false;
         document.body.classList.remove('animations-paused');
+        this.syncMapRenderActive();
       }
       this.resetIdleTimer();
     };
@@ -2887,7 +2898,7 @@ export class App {
       if (!document.hidden) {
         this.isIdle = true;
         document.body.classList.add('animations-paused');
-        console.log('[App] User idle - pausing animations to save resources');
+        this.syncMapRenderActive();
       }
     }, this.IDLE_PAUSE_MS);
   }
