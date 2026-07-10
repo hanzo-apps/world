@@ -2,6 +2,7 @@ package world
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"net/http"
 	"sort"
@@ -179,6 +180,106 @@ func validateSymbol(sym string) string {
 		}
 	}
 	return sym
+}
+
+// ── Yahoo Finance (batched symbols) ──────────────────────────────────────────
+
+const (
+	yahooBatchMaxSymbols = 60
+	yahooBatchParallel   = 12
+	yahooBatchFetchTO    = 8 * time.Second // one slow symbol must not hold the batch hostage
+)
+
+// handleYahooBatch resolves many Yahoo chart symbols in ONE request. The client
+// (FX / commodities / yields / market-index panels) otherwise fires one GET per
+// symbol — ~80 round trips per refresh cycle. This collapses each panel's list to
+// a single call. Per-symbol chart bodies share the exact "yahoo:<sym>" cache key
+// with the single-symbol passthrough, so either path warms the other. Never-5xx:
+// an unresolved symbol carries error:"unavailable"; the endpoint always answers 200.
+func (s *Server) handleYahooBatch(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	symbols := validateYahooSymbols(r.URL.Query().Get("symbols"))
+	if len(symbols) == 0 {
+		writeError(w, http.StatusBadRequest, "Invalid or missing symbols parameter")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	type yahooBatchResult struct {
+		Symbol string          `json:"symbol"`
+		Chart  json.RawMessage `json:"chart,omitempty"`
+		Error  string          `json:"error,omitempty"`
+	}
+	results := make([]yahooBatchResult, len(symbols))
+	sem := make(chan struct{}, yahooBatchParallel)
+	var wg sync.WaitGroup
+	for i, sym := range symbols {
+		i, sym := i, sym
+		results[i].Symbol = sym
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if body, ok := s.yahooChartBytes(ctx, sym); ok {
+				results[i].Chart = json.RawMessage(body)
+			} else {
+				results[i].Error = "unavailable"
+			}
+		}()
+	}
+	wg.Wait()
+
+	writeJSON(w, http.StatusOK, "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
+		map[string]any{"results": results})
+}
+
+// yahooChartBytes returns the raw Yahoo chart body for one symbol, sharing the
+// single-symbol passthrough's "yahoo:<sym>" cache key + TTL and its stale-fallback
+// on failure. A blank 200 is a failure (never cached — it would poison good data).
+func (s *Server) yahooChartBytes(ctx context.Context, sym string) ([]byte, bool) {
+	key := "yahoo:" + sym
+	if v, ok := s.cache.Get(key); ok {
+		return v.([]byte), true
+	}
+	fctx, cancel := context.WithTimeout(ctx, yahooBatchFetchTO)
+	defer cancel()
+	body, status, err := s.get(fctx,
+		"https://query1.finance.yahoo.com/v8/finance/chart/"+urlQueryEscape(sym),
+		map[string]string{"User-Agent": browserUA})
+	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
+		if v, ok := s.cache.GetStale(key); ok {
+			return v.([]byte), true
+		}
+		return nil, false
+	}
+	s.cache.Set(key, body, 60*time.Second, 5*time.Minute)
+	return body, true
+}
+
+// validateYahooSymbols parses a comma list, validating + de-duplicating each so a
+// panel that repeats a symbol (or two panels sharing one) costs a single fetch.
+func validateYahooSymbols(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var out []string
+	seen := make(map[string]bool)
+	for _, s := range splitComma(raw) {
+		sym := validateSymbol(s)
+		if sym == "" || seen[sym] {
+			continue
+		}
+		seen[sym] = true
+		out = append(out, sym)
+		if len(out) >= yahooBatchMaxSymbols {
+			break
+		}
+	}
+	return out
 }
 
 // ── Finnhub (parallel quotes) ────────────────────────────────────────────────

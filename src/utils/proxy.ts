@@ -17,6 +17,34 @@ export function proxyUrl(localPath: string): string {
   return localPath;
 }
 
-export async function fetchWithProxy(url: string): Promise<Response> {
-  return fetch(proxyUrl(url));
+// Default network deadline. A stalled connection (server accepts but never
+// answers, or a mid-body stall) must never hold a panel on an eternal spinner —
+// every data fetch has a hard ceiling so a panel always resolves to data or an
+// honest empty note.
+export const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
+
+// fetch with a hard timeout. Aborts the request (freeing the socket) when the
+// deadline passes; callers see a rejected promise they can degrade on. If the
+// caller supplies its own signal it wins — we only install ours when absent.
+export async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS
+): Promise<Response> {
+  if (init.signal) return fetch(input, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function fetchWithProxy(
+  url: string,
+  init?: RequestInit,
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS
+): Promise<Response> {
+  return fetchWithTimeout(proxyUrl(url), init, timeoutMs);
 }
