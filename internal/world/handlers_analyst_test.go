@@ -237,7 +237,6 @@ func TestAnalystDataToolLoop(t *testing.T) {
 
 	s := NewServer()
 	s.ai.base = ai.URL
-	s.ai.key = "test-key" // no user token → keyed bearer, so the chat path runs
 	mux := http.NewServeMux()
 	s.Mount(mux)
 	ts := httptest.NewServer(mux)
@@ -246,7 +245,13 @@ func TestAnalystDataToolLoop(t *testing.T) {
 	reqBody, _ := json.Marshal(map[string]any{
 		"messages": []map[string]string{{"role": "user", "content": "What is the state of global instability?"}},
 	})
-	resp, err := http.Post(ts.URL+"/v1/world/analyst", "application/json", strings.NewReader(string(reqBody)))
+	// A signed-in caller drives the chat: their IAM bearer is forwarded upstream and
+	// meters to their org. Chat requires a user bearer — the funded key backs only the
+	// anonymous auto-insight endpoints (see TestAnalystChatRequiresUserBearer).
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/world/analyst", strings.NewReader(string(reqBody)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer user-token")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -388,5 +393,44 @@ func TestHandleModelsCuratedRoster(t *testing.T) {
 	}
 	if !hasZen5 {
 		t.Error("roster missing zen5")
+	}
+}
+
+// TestAnalystChatRequiresUserBearer pins the pro-model contract: the analyst CHAT
+// is paid usage, metered to the signed-in user's org via their OWN IAM bearer —
+// NEVER the funded service key. The funded key (a.key / HANZO_AI_KEY) backs only
+// the anonymous auto-insight endpoints (summarize/classify/country-intel). So even
+// with a funded key configured, an unauthenticated chat call must be refused with a
+// quiet sign-in prompt (200, skipped) — not silently answered on the shared key.
+//
+// Regression guard: if handleAnalyst reverts to bearerFor(r), the funded key would
+// satisfy the bearer, the handler would fall through to a real upstream call, and
+// this test would hang/fail instead of returning the deterministic skip below.
+func TestAnalystChatRequiresUserBearer(t *testing.T) {
+	s := NewServer()
+	s.ai.key = "hk-test-funded" // funded key present (backs anonymous auto-insights only)
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	body := `{"messages":[{"role":"user","content":"hi"}],"context":""}`
+	resp, err := http.Post(ts.URL+"/v1/world/analyst", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (quiet sign-in prompt, never 5xx)", resp.StatusCode)
+	}
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out["skipped"] != true {
+		t.Fatalf("anonymous chat not refused — funded key leaked into paid chat path: %+v", out)
+	}
+	if reason, _ := out["reason"].(string); !strings.Contains(reason, "Sign in") {
+		t.Errorf("reason = %q, want a sign-in prompt", reason)
 	}
 }
