@@ -25,6 +25,7 @@ func TestRoutesRespond(t *testing.T) {
 		"/v1/world/gdelt-geo":     "?query=conflict",
 		"/v1/world/rss-proxy":     "?url=https%3A%2F%2Ffeeds.bbci.co.uk%2Fnews%2Fworld%2Frss.xml",
 		"/v1/world/yahoo-finance": "?symbol=SPY",
+		"/v1/world/yahoo-batch":   "?symbols=SPY,%5EGSPC",
 		"/v1/world/fred-data":     "?series_id=DGS10",
 		"/v1/world/youtube/live":  "?channel=@SkyNews",
 		"/v1/world/youtube/embed": "?videoId=dQw4w9WgXcQ",
