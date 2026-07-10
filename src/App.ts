@@ -120,7 +120,7 @@ import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } from '@/config/finance-geo';
-import { isDesktopRuntime } from '@/services/runtime';
+import { isDesktopRuntime, canConfigureKeys } from '@/services/runtime';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
 import { initI18n, t, changeLanguage } from '@/services/i18n';
@@ -4666,7 +4666,7 @@ export class App {
       if (data.length === 0) {
         const reason = isFeatureAvailable('economicFred')
           ? 'FRED data temporarily unavailable — will retry'
-          : 'FRED_API_KEY not configured — add in Settings';
+          : (canConfigureKeys() ? 'FRED_API_KEY not configured — add in Settings' : t('common.noDataAvailable'));
         economicPanel?.showDegraded(reason);
         this.statusPanel?.updateApi('FRED', { status: 'error' });
         return;

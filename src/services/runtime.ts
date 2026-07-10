@@ -66,6 +66,16 @@ export function isDesktopRuntime(): boolean {
   });
 }
 
+// canConfigureKeys reports whether internal configuration hints — specific
+// *_API_KEY names and the "add in Settings" affordance — may be surfaced to the
+// viewer. Only where they are actionable: the desktop app (which has a Settings
+// window for keys) or a dev build. Public web viewers can't set server keys, so
+// they get a neutral "no data" line instead of a leaked env-var name — one honest
+// choke point for every config-gated panel (Panel.showConfigError).
+export function canConfigureKeys(): boolean {
+  return isDesktopRuntime() || import.meta.env.DEV === true;
+}
+
 export function getApiBaseUrl(): string {
   if (!isDesktopRuntime()) {
     return '';
