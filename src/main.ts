@@ -1,7 +1,6 @@
 import './styles/main.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
-import { inject } from '@vercel/analytics';
 import { App } from './App';
 
 // Initialize Sentry error tracking (early as possible)
@@ -71,9 +70,6 @@ import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chun
 
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
-
-// Initialize Vercel Analytics
-inject();
 
 // Initialize dynamic meta tags for sharing
 initMetaTags();

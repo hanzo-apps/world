@@ -1,6 +1,6 @@
 import type { Feed, NewsItem } from '@/types';
 import { SITE_VARIANT } from '@/config';
-import { chunkArray, fetchWithProxy, proxyUrl } from '@/utils';
+import { chunkArray, fetchWithProxy } from '@/utils';
 import { classifyByKeyword, classifyWithAI } from './threat-classifier';
 import { inferGeoHubsFromTitle } from './geo-hub-index';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
@@ -331,11 +331,14 @@ async function fetchFeedsViaBatch(feeds: Feed[]): Promise<NewsItem[][]> {
   });
 
   for (const group of chunkArray(pending, 30)) {
-    const res = await fetch(proxyUrl('/v1/world/feeds-batch'), {
+    // Hard deadline: the server bounds itself to ~25s, so a request outliving
+    // that is a stalled connection — abort and let the caller fall back to the
+    // per-feed path rather than hang the category's panel forever.
+    const res = await fetchWithProxy('/v1/world/feeds-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls: group.map(p => p.url) }),
-    });
+    }, 28_000);
     if (!res.ok) throw new Error(`feeds-batch HTTP ${res.status}`);
     const data = await res.json() as {
       feeds?: Array<{ url: string; ok: boolean; items?: Array<{ title?: string; link?: string; pubDate?: string }> }>;
