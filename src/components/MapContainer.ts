@@ -45,6 +45,9 @@ export interface MapContainerState {
   layers: MapLayers;
   timeRange: TimeRange;
   mode?: MapProjectionMode;
+  // Optional mount for the chromeless map controls (2D/3D, basemap, time-range);
+  // the app points this at the bottom toolbar dock. See DeckGLMap.
+  controlsHost?: HTMLElement;
 }
 
 interface TechEventMarker {
@@ -131,6 +134,7 @@ export class MapContainer {
       this.deckGLMap = new DeckGLMap(this.container, {
         ...this.initialState,
         view: this.initialState.view as DeckMapView,
+        controlsHost: this.initialState.controlsHost,
       });
 
       if (this.nativeGlobeFlag) {
@@ -278,6 +282,16 @@ export class MapContainer {
       return state ? { ...state, view: state.view as MapView } : this.initialState;
     }
     return this.svgMap?.getState() ?? this.initialState;
+  }
+
+  // Layer panel (deck.gl overlay) — the dock's Layers button drives this. No-op
+  // on the SVG fallback, which has no floating layer panel.
+  public toggleLayerPanel(): boolean {
+    return this.deckGLMap?.toggleLayerPanel() ?? false;
+  }
+
+  public isLayerPanelOpen(): boolean {
+    return this.deckGLMap?.isLayerPanelOpen() ?? false;
   }
 
   // Data setters
