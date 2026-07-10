@@ -2368,10 +2368,6 @@ export class App {
 
     const { view, zoom, lat, lon, timeRange, layers } = this.initialUrlState;
 
-    if (view) {
-      this.map.setView(view);
-    }
-
     if (timeRange) {
       this.map.setTimeRange(timeRange);
     }
@@ -2382,18 +2378,20 @@ export class App {
       this.map.setLayers(layers);
     }
 
-    // Only apply custom lat/lon/zoom if NO view preset is specified
-    // When a view is specified (eu, mena, etc.), use the preset's positioning
-    if (!view) {
-      if (zoom !== undefined) {
-        this.map.setZoom(zoom);
-      }
-
-      // Only apply lat/lon if user has zoomed in significantly (zoom > 2)
-      // At default zoom (~1-1.5), show centered global view to avoid clipping issues
-      if (lat !== undefined && lon !== undefined && zoom !== undefined && zoom > 2) {
-        this.map.setCenter(lat, lon);
-      }
+    // A real REGION preset (america/mena/eu/…) owns the camera; 'global' is the
+    // free-camera default (share links + variant-switch restore both emit it), so
+    // it must NOT reset — honor the URL's exact zoom/center instead. Calling
+    // setView('global') here would snap back to the preset and lose the position,
+    // which is exactly why a shared/pinned camera never restored.
+    const isRegionPreset = !!view && view !== 'global';
+    if (isRegionPreset) {
+      this.map.setView(view);
+    } else if (lat !== undefined && lon !== undefined && zoom !== undefined && zoom > 2) {
+      // At default zoom (~1-1.5) the centre barely matters and off-centre globes
+      // clip oddly; restore the exact camera in one move once the user was zoomed in.
+      this.map.setCenter(lat, lon, zoom);
+    } else if (zoom !== undefined) {
+      this.map.setZoom(zoom);
     }
 
     // Sync header region selector with initial view
@@ -2542,12 +2540,22 @@ export class App {
     return true;
   }
 
+  // The single variant-switch path (header tabs + analyst set_variant both route
+  // here). SITE_VARIANT is an import-time const woven through ~30 modules, so a
+  // true zero-reload in-place swap is out of scope for this release (see report).
+  // The pragmatic switch instead makes the reload feel like only the panels
+  // changed: it FLUSHES the exact live map view (camera + 2D/3D mode + layers +
+  // time range) into the URL synchronously — closing the 250ms URL-sync debounce
+  // gap — and stamps ?variant, so the post-reload restore is pixel-for-pixel and
+  // the URL is shareable. PWA-precached, content-hashed assets keep the reload
+  // sub-second.
   private setSiteVariant(variant: string): boolean {
     if (!['full', 'tech', 'finance', 'saas', 'ai', 'crypto'].includes(variant)) return false;
     if (variant === SITE_VARIANT) return true;
-    const u = new URL(window.location.href);
+    localStorage.setItem('worldmonitor-variant', variant); // survives even a trimmed URL
+    const u = new URL(this.getShareUrl() ?? window.location.href);
     u.searchParams.set('variant', variant);
-    window.location.href = u.toString(); // reload picks up the new SITE_VARIANT
+    window.location.href = u.toString();
     return true;
   }
 
@@ -2788,8 +2796,7 @@ export class App {
         const variant = link.dataset.variant;
         if (variant && variant !== SITE_VARIANT) {
           e.preventDefault();
-          localStorage.setItem('worldmonitor-variant', variant);
-          window.location.reload();
+          this.setSiteVariant(variant); // one switch path: exact map-state restore + ?variant
         }
       });
     });
@@ -2924,6 +2931,7 @@ export class App {
       layers: state.layers,
       country: this.countryBriefPage?.isVisible() ? (this.countryBriefPage.getCode() ?? undefined) : undefined,
       mode: state.mode,
+      variant: SITE_VARIANT,
     });
   }
 

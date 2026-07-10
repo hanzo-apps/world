@@ -574,6 +574,10 @@ export class DeckGLMap {
     });
 
     this.mapboxMap.on('moveend', () => {
+      // Keep state.zoom in step with direct wheel/pinch/drag zoom (which bypasses
+      // setZoom) so getState()/getShareUrl capture the LIVE camera — otherwise a
+      // shared or variant-switch URL restores a stale zoom.
+      this.state.zoom = this.mapboxMap?.getZoom() ?? this.state.zoom;
       this.lastSCZoom = -1;
       this.rafUpdateLayers();
     });
