@@ -397,6 +397,24 @@ export class DeckGLMap {
   private cloudPulseCoef = 0;
   private cloudPulseLastTs = 0;
 
+  // Perf: the layer instances from the last full buildLayers(). Animation ticks
+  // (news pulse, cloud pulse) reuse these verbatim and swap in only the 1-3
+  // layers that actually animate — deck.gl's same-instance fast path
+  // (Layer._transferState: `this === oldLayer` → return) then skips the other
+  // ~28 with no allocation and no GPU attribute recompute.
+  private lastFullLayers: Layer[] = [];
+  private pulseDirty = { news: false, cloud: false };
+  private rafUpdatePulse: () => void;
+  private static readonly NEWS_PULSE_LAYER_IDS = ['news-pulse-layer', 'hotspots-pulse', 'protest-clusters-pulse'];
+  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs'];
+
+  // Chain-node dots derive from chainNetworks; cache them by source reference so
+  // the cloud-pulse breathe (a radiusScale-only change) reuses the same data
+  // array and deck.gl skips the per-frame attribute upload.
+  private chainDotsSource: ChainNetwork[] | null = null;
+  private chainDots: ChainDot[] = [];
+  private chainMaxPeers = 1;
+
   constructor(container: HTMLElement, initialState: DeckMapInitialState) {
     this.container = container;
     this.state = { ...initialState, mode: initialState.mode ?? '2d' };
@@ -413,6 +431,19 @@ export class DeckGLMap {
     this.rafUpdateLayers = rafSchedule(() => {
       if (this.renderPaused || this.webglLost) return;
       this.deckOverlay?.setProps({ layers: this.buildLayers() });
+    });
+    // Animation-only update: rebuild just the pulsing layers, reuse everything
+    // else. Coalesced per frame; the pulseDirty flags record which clocks ticked.
+    this.rafUpdatePulse = rafSchedule(() => {
+      const news = this.pulseDirty.news;
+      const cloud = this.pulseDirty.cloud;
+      this.pulseDirty.news = false;
+      this.pulseDirty.cloud = false;
+      if (this.renderPaused || this.webglLost || !this.deckOverlay) return;
+      const ids = new Set<string>();
+      if (news) for (const id of DeckGLMap.NEWS_PULSE_LAYER_IDS) ids.add(id);
+      if (cloud) for (const id of DeckGLMap.CLOUD_PULSE_LAYER_IDS) ids.add(id);
+      this.deckOverlay.setProps({ layers: this.buildAnimationLayers(ids) });
     });
 
     this.setupDOM();
@@ -550,8 +581,10 @@ export class DeckGLMap {
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo) => this.handleClick(info),
       pickingRadius: 10,
-      // Overlaid deck owns its DPR: full retina for crisp dots/arcs on strong GPUs.
-      useDevicePixels: true,
+      // Overlaid deck owns its DPR. Cap at 2 so a HiDPI (DPR 3+) display on a
+      // large window doesn't quadruple the per-frame fill of the second canvas —
+      // the freeze the CTO hit on real hardware. 2× keeps dots/text crisp.
+      useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
       onError: (error: Error) => console.warn('[DeckGLMap] Render error (non-fatal):', error.message),
     });
 
@@ -1308,12 +1341,43 @@ export class DeckGLMap {
       layers.push(...this.createNewsLocationsLayer());
     }
 
-    const result = layers.filter(Boolean) as LayersList;
+    const result = layers.filter((l): l is Layer => Boolean(l));
+    this.lastFullLayers = result;
     const elapsed = performance.now() - startTime;
     if (import.meta.env.DEV && elapsed > 16) {
       console.warn(`[DeckGLMap] buildLayers took ${elapsed.toFixed(2)}ms (>16ms budget), ${result.length} layers`);
     }
     return result;
+  }
+
+  // Animation-tick layer list: reuse the instances from the last full build and
+  // rebuild only the layers in `animatedIds`. Every other entry is passed back by
+  // reference so deck.gl's diff skips it entirely (no alloc, no attribute upload).
+  // Falls back to a full build before the first one has run.
+  private buildAnimationLayers(animatedIds: Set<string>): LayersList {
+    if (this.lastFullLayers.length === 0 || animatedIds.size === 0) return this.buildLayers();
+    const out: Layer[] = [];
+    for (const layer of this.lastFullLayers) {
+      if (animatedIds.has(layer.id)) {
+        const rebuilt = this.rebuildAnimatedLayer(layer.id);
+        if (rebuilt) out.push(rebuilt); // dropped when the pulse has faded out
+      } else {
+        out.push(layer);
+      }
+    }
+    this.lastFullLayers = out;
+    return out;
+  }
+
+  private rebuildAnimatedLayer(id: string): Layer | null {
+    switch (id) {
+      case 'news-pulse-layer': return this.createNewsPulseLayer();
+      case 'hotspots-pulse': return this.createHotspotsPulseLayer();
+      case 'protest-clusters-pulse': return this.createProtestClustersPulseLayer();
+      case 'chainNodes': return this.createChainNodesLayer();
+      case 'trafficArcs': return this.createTrafficArcsLayer();
+      default: return null;
+    }
   }
 
   // Layer creation methods
@@ -2094,27 +2158,35 @@ export class DeckGLMap {
       }));
     }
 
-    const pulseClusters = this.protestClusters.filter(c => c.maxSeverity === 'high' || c.hasRiot);
-    if (pulseClusters.length > 0) {
-      const pulse = 1.0 + 0.8 * (0.5 + 0.5 * Math.sin((this.pulseTime || Date.now()) / 400));
-      layers.push(new ScatterplotLayer<MapProtestCluster>({
-        id: 'protest-clusters-pulse',
-        data: pulseClusters,
-        getPosition: d => [d.lon, d.lat],
-        getRadius: d => 15000 + d.count * 2000,
-        radiusScale: pulse,
-        radiusMinPixels: 8,
-        radiusMaxPixels: 30,
-        stroked: true,
-        filled: false,
-        getLineColor: d => d.hasRiot ? [220, 40, 40, 120] as [number, number, number, number] : [255, 80, 60, 100] as [number, number, number, number],
-        lineWidthMinPixels: 1.5,
-        pickable: false,
-        updateTriggers: { radiusScale: this.pulseTime },
-      }));
-    }
+    const protestPulse = this.createProtestClustersPulseLayer();
+    if (protestPulse) layers.push(protestPulse);
 
     return layers;
+  }
+
+  // The pulsing ring over high-severity/riot protest clusters. Rebuilt in
+  // isolation each news-pulse tick (radiusScale only — data reference is the
+  // already-clustered array, so deck.gl issues no attribute upload).
+  private createProtestClustersPulseLayer(): ScatterplotLayer<MapProtestCluster> | null {
+    const pulseClusters = this.protestClusters.filter(c => c.maxSeverity === 'high' || c.hasRiot);
+    if (pulseClusters.length === 0) return null;
+    // ~8s calm breathe — clear of the 2s pulse-tick sample interval (see news pulse).
+    const pulse = 1.0 + 0.8 * (0.5 + 0.5 * Math.sin((this.pulseTime || Date.now()) / 1300));
+    return new ScatterplotLayer<MapProtestCluster>({
+      id: 'protest-clusters-pulse',
+      data: pulseClusters,
+      getPosition: d => [d.lon, d.lat],
+      getRadius: d => 15000 + d.count * 2000,
+      radiusScale: pulse,
+      radiusMinPixels: 8,
+      radiusMaxPixels: 30,
+      stroked: true,
+      filled: false,
+      getLineColor: d => d.hasRiot ? [220, 40, 40, 120] as [number, number, number, number] : [255, 80, 60, 100] as [number, number, number, number],
+      lineWidthMinPixels: 1.5,
+      pickable: false,
+      updateTriggers: { radiusScale: this.pulseTime },
+    });
   }
 
   private createTechHQClusterLayers(): Layer[] {
@@ -2298,34 +2370,43 @@ export class DeckGLMap {
 
     layers.push(this.createGhostLayer('hotspots-layer', this.hotspots, d => [d.lon, d.lat], { radiusMinPixels: 14 }));
 
-    const highHotspots = this.hotspots.filter(h => h.level === 'high' || h.hasBreaking);
-    if (highHotspots.length > 0) {
-      const pulse = 1.0 + 0.8 * (0.5 + 0.5 * Math.sin((this.pulseTime || Date.now()) / 400));
-      layers.push(new ScatterplotLayer({
-        id: 'hotspots-pulse',
-        data: highHotspots,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => {
-          const score = d.escalationScore || 1;
-          return 10000 + score * 5000;
-        },
-        radiusScale: pulse,
-        radiusMinPixels: 6,
-        radiusMaxPixels: 30,
-        stroked: true,
-        filled: false,
-        getLineColor: (d) => {
-          const a = Math.round(120 * baseOpacity);
-          return d.hasBreaking ? [255, 50, 50, a] as [number, number, number, number] : [255, 165, 0, a] as [number, number, number, number];
-        },
-        lineWidthMinPixels: 1.5,
-        pickable: false,
-        updateTriggers: { radiusScale: this.pulseTime },
-      }));
-
-    }
+    const hotspotsPulse = this.createHotspotsPulseLayer();
+    if (hotspotsPulse) layers.push(hotspotsPulse);
 
     return layers;
+  }
+
+  // The pulsing ring over high/breaking hotspots. Rebuilt in isolation each
+  // news-pulse tick; zoom-derived baseOpacity is recomputed but unchanged while
+  // idle, so only radiusScale moves.
+  private createHotspotsPulseLayer(): ScatterplotLayer<HotspotWithBreaking> | null {
+    const highHotspots = this.hotspots.filter(h => h.level === 'high' || h.hasBreaking);
+    if (highHotspots.length === 0) return null;
+    const zoom = this.mapboxMap?.getZoom() || 2;
+    const baseOpacity = zoom < 2.5 ? 0.5 : zoom < 4 ? 0.7 : 1.0;
+    // ~8s calm breathe — clear of the 2s pulse-tick sample interval (see news pulse).
+    const pulse = 1.0 + 0.8 * (0.5 + 0.5 * Math.sin((this.pulseTime || Date.now()) / 1300));
+    return new ScatterplotLayer<HotspotWithBreaking>({
+      id: 'hotspots-pulse',
+      data: highHotspots,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => {
+        const score = d.escalationScore || 1;
+        return 10000 + score * 5000;
+      },
+      radiusScale: pulse,
+      radiusMinPixels: 6,
+      radiusMaxPixels: 30,
+      stroked: true,
+      filled: false,
+      getLineColor: (d) => {
+        const a = Math.round(120 * baseOpacity);
+        return d.hasBreaking ? [255, 50, 50, a] as [number, number, number, number] : [255, 165, 0, a] as [number, number, number, number];
+      },
+      lineWidthMinPixels: 1.5,
+      pickable: false,
+      updateTriggers: { radiusScale: this.pulseTime },
+    });
   }
 
   private createGulfInvestmentsLayer(): ScatterplotLayer {
@@ -2389,20 +2470,31 @@ export class DeckGLMap {
     }
   }
 
+  // Schedule a targeted animation update: only the layers driven by `source`'s
+  // clock are rebuilt this frame; every other layer is reused by reference.
+  private schedulePulse(source: 'news' | 'cloud'): void {
+    this.pulseDirty[source] = true;
+    this.rafUpdatePulse();
+  }
+
   private startPulseAnimation(): void {
     if (this.newsPulseIntervalId !== null) return;
-    const PULSE_UPDATE_INTERVAL_MS = 500;
+    // 2s cadence (was 500ms): a calm ring, and — paired with the targeted rebuild
+    // below — a quarter of the retina redraws. Skips work entirely when paused or
+    // once nothing needs pulsing.
+    const PULSE_UPDATE_INTERVAL_MS = 2000;
 
     this.newsPulseIntervalId = setInterval(() => {
+      if (this.renderPaused || this.webglLost) return;
       const now = Date.now();
       if (!this.needsPulseAnimation(now)) {
         this.pulseTime = now;
         this.stopPulseAnimation();
-        this.rafUpdateLayers();
+        this.schedulePulse('news');
         return;
       }
       this.pulseTime = now;
-      this.rafUpdateLayers();
+      this.schedulePulse('news');
     }, PULSE_UPDATE_INTERVAL_MS);
   }
 
@@ -2413,17 +2505,20 @@ export class DeckGLMap {
     }
   }
 
+  private static readonly NEWS_THREAT_RGB: Record<string, [number, number, number]> = {
+    critical: [239, 68, 68],
+    high: [249, 115, 22],
+    medium: [234, 179, 8],
+    low: [34, 197, 94],
+    info: [59, 130, 246],
+  };
+  private static readonly NEWS_PULSE_DURATION_MS = 30_000;
+
   private createNewsLocationsLayer(): ScatterplotLayer[] {
     const zoom = this.mapboxMap?.getZoom() || 2;
     const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
     const filteredNewsLocations = this.filterByTime(this.newsLocations, (location) => location.timestamp);
-    const THREAT_RGB: Record<string, [number, number, number]> = {
-      critical: [239, 68, 68],
-      high: [249, 115, 22],
-      medium: [234, 179, 8],
-      low: [34, 197, 94],
-      info: [59, 130, 246],
-    };
+    const THREAT_RGB = DeckGLMap.NEWS_THREAT_RGB;
     const THREAT_ALPHA: Record<string, number> = {
       critical: 220,
       high: 190,
@@ -2431,9 +2526,6 @@ export class DeckGLMap {
       low: 120,
       info: 80,
     };
-
-    const now = this.pulseTime || Date.now();
-    const PULSE_DURATION = 30_000;
 
     const layers: ScatterplotLayer[] = [
       new ScatterplotLayer({
@@ -2452,39 +2544,54 @@ export class DeckGLMap {
       }),
     ];
 
+    const pulseLayer = this.createNewsPulseLayer();
+    if (pulseLayer) layers.push(pulseLayer);
+
+    return layers;
+  }
+
+  // The travelling ring over just-arrived news markers. Rebuilt in isolation each
+  // news-pulse tick (radiusScale + the pulseTime updateTrigger); the base marker
+  // layer above it never rebuilds during a pulse.
+  private createNewsPulseLayer(): ScatterplotLayer | null {
+    const zoom = this.mapboxMap?.getZoom() || 2;
+    const alphaScale = zoom < 2.5 ? 0.4 : zoom < 4 ? 0.7 : 1.0;
+    const now = this.pulseTime || Date.now();
+    const PULSE_DURATION = DeckGLMap.NEWS_PULSE_DURATION_MS;
+    const THREAT_RGB = DeckGLMap.NEWS_THREAT_RGB;
+    const filteredNewsLocations = this.filterByTime(this.newsLocations, (location) => location.timestamp);
     const recentNews = filteredNewsLocations.filter(d => {
       const firstSeen = this.newsLocationFirstSeen.get(d.title);
       return firstSeen && (now - firstSeen) < PULSE_DURATION;
     });
+    if (recentNews.length === 0) return null;
 
-    if (recentNews.length > 0) {
-      const pulse = 1.0 + 1.5 * (0.5 + 0.5 * Math.sin(now / 318));
-
-      layers.push(new ScatterplotLayer({
-        id: 'news-pulse-layer',
-        data: recentNews,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: 18000,
-        radiusScale: pulse,
-        radiusMinPixels: 6,
-        radiusMaxPixels: 30,
-        pickable: false,
-        stroked: true,
-        filled: false,
-        getLineColor: (d) => {
-          const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
-          const firstSeen = this.newsLocationFirstSeen.get(d.title) || now;
-          const age = now - firstSeen;
-          const fadeOut = Math.max(0, 1 - age / PULSE_DURATION);
-          const a = Math.round(150 * fadeOut * alphaScale);
-          return [...rgb, a] as [number, number, number, number];
-        },
-        lineWidthMinPixels: 1.5,
-        updateTriggers: { pulseTime: now },
-      }));
-    }
-
-    return layers;
+    // ~8s breathe period. The pulse tick samples every 2s (see startPulseAnimation),
+    // so the period must stay well clear of 2s or the ring aliases to a static
+    // circle; ~8s gives ~4 samples/cycle — a calm, clearly-moving breathe.
+    const pulse = 1.0 + 1.5 * (0.5 + 0.5 * Math.sin(now / 1300));
+    return new ScatterplotLayer({
+      id: 'news-pulse-layer',
+      data: recentNews,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 18000,
+      radiusScale: pulse,
+      radiusMinPixels: 6,
+      radiusMaxPixels: 30,
+      pickable: false,
+      stroked: true,
+      filled: false,
+      getLineColor: (d) => {
+        const rgb = THREAT_RGB[d.threatLevel] || [59, 130, 246];
+        const firstSeen = this.newsLocationFirstSeen.get(d.title) || now;
+        const age = now - firstSeen;
+        const fadeOut = Math.max(0, 1 - age / PULSE_DURATION);
+        const a = Math.round(150 * fadeOut * alphaScale);
+        return [...rgb, a] as [number, number, number, number];
+      },
+      lineWidthMinPixels: 1.5,
+      updateTriggers: { pulseTime: now },
+    });
   }
 
   private getTooltip(info: PickingInfo): { html: string } | null {
@@ -3506,7 +3613,8 @@ export class DeckGLMap {
       // Derive the phase straight from the timestamp — no accumulation, so it
       // resumes cleanly after a hidden-tab pause with no jump.
       this.cloudPulseCoef = (ts % DeckGLMap.CLOUD_PULSE_PERIOD_MS) / DeckGLMap.CLOUD_PULSE_PERIOD_MS;
-      this.rafUpdateLayers();
+      // Rebuild only the arc + chain-node layers this frame — never the other ~28.
+      this.schedulePulse('cloud');
     };
     this.cloudPulseRafId = requestAnimationFrame(step);
   }
@@ -3691,8 +3799,13 @@ export class DeckGLMap {
 
   // Chain validator nodes: white filled dots with a subtle ring, one per node,
   // radius scaled by the network's peer share. Down networks render dimmed.
-  private createChainNodesLayer(): ScatterplotLayer<ChainDot> {
-    const maxPeers = Math.max(1, ...this.chainNetworks.map((n) => n.peers || 0));
+  // Flatten chainNetworks → per-node dots, memoized by the source array reference.
+  // The cloud-pulse breathe re-issues this layer ~30×/s; keeping `data` stable
+  // means deck.gl only diffs the radiusScale prop, never re-uploads attributes.
+  private ensureChainDots(): void {
+    if (this.chainDotsSource === this.chainNetworks) return;
+    this.chainDotsSource = this.chainNetworks;
+    this.chainMaxPeers = Math.max(1, ...this.chainNetworks.map((n) => n.peers || 0));
     const dots: ChainDot[] = [];
     for (const net of this.chainNetworks) {
       for (const node of net.nodes ?? []) {
@@ -3703,6 +3816,13 @@ export class DeckGLMap {
         });
       }
     }
+    this.chainDots = dots;
+  }
+
+  private createChainNodesLayer(): ScatterplotLayer<ChainDot> {
+    this.ensureChainDots();
+    const dots = this.chainDots;
+    const maxPeers = this.chainMaxPeers;
     return new ScatterplotLayer<ChainDot>({
       id: 'chainNodes',
       data: dots,
@@ -4428,6 +4548,9 @@ export class DeckGLMap {
     }
 
     this.layerCache.clear();
+    this.lastFullLayers = [];
+    this.chainDots = [];
+    this.chainDotsSource = null;
 
     this.deckOverlay?.finalize();
     this.mapboxMap?.remove();
