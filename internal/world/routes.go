@@ -105,6 +105,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/classify-event", s.handleClassifyEvent)
 	mux.HandleFunc("/v1/world/country-intel", s.handleCountryIntel)
 	mux.HandleFunc("/v1/world/analyst", s.handleAnalyst)
+	mux.HandleFunc("/v1/world/models", s.handleModels)
 
 	// social share (OpenGraph)
 	mux.HandleFunc("/v1/world/story", s.handleStory)

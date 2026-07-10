@@ -1,0 +1,349 @@
+[
+  {
+    "name": "show_panel",
+    "description": "Show a hidden dashboard panel by its key.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "panel key exactly as it appears in the snapshot"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "hide_panel",
+    "description": "Hide a visible dashboard panel by its key.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "panel key"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "move_panel",
+    "description": "Reorder a panel: to the top/bottom, or before/after another panel.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "panel to move"
+        },
+        "position": {
+          "type": "string",
+          "enum": [
+            "top",
+            "bottom"
+          ],
+          "description": "move to the top or bottom"
+        },
+        "before": {
+          "type": "string",
+          "description": "place above this panel key"
+        },
+        "after": {
+          "type": "string",
+          "description": "place below this panel key"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "resize_panel",
+    "description": "Set a panel height in grid rows (1 = short, 4 = tall).",
+    "params": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "panel key"
+        },
+        "span": {
+          "type": "integer",
+          "description": "height in rows, 1-4",
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "key",
+        "span"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "toggle_layer",
+    "description": "Turn a map data layer on or off by its key.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "map layer key"
+        },
+        "on": {
+          "type": "boolean",
+          "description": "true to enable, false to disable"
+        }
+      },
+      "required": [
+        "key",
+        "on"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "set_map_mode",
+    "description": "Switch the map between 2D flat and 3D globe.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "2d",
+            "3d"
+          ],
+          "description": "2d flat map or 3d globe"
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "fly_to",
+    "description": "Move the map camera to a latitude/longitude, optionally at a zoom (1-12).",
+    "params": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "latitude",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lon": {
+          "type": "number",
+          "description": "longitude",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "zoom": {
+          "type": "number",
+          "description": "zoom level 1-12",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "set_region",
+    "description": "Jump the map to a named region preset.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "enum": [
+            "global",
+            "america",
+            "mena",
+            "eu",
+            "asia",
+            "latam",
+            "africa",
+            "oceania"
+          ],
+          "description": "region preset"
+        }
+      },
+      "required": [
+        "region"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "set_time_range",
+    "description": "Set the global time window for the map and feeds.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "range": {
+          "type": "string",
+          "enum": [
+            "1h",
+            "6h",
+            "24h",
+            "48h",
+            "7d",
+            "all"
+          ],
+          "description": "time window"
+        }
+      },
+      "required": [
+        "range"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "set_variant",
+    "description": "Switch the dashboard variant (reloads to the chosen view).",
+    "params": {
+      "type": "object",
+      "properties": {
+        "variant": {
+          "type": "string",
+          "enum": [
+            "full",
+            "tech",
+            "finance",
+            "saas",
+            "ai",
+            "crypto"
+          ],
+          "description": "dashboard variant"
+        }
+      },
+      "required": [
+        "variant"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "set_theme",
+    "description": "Switch the colour theme between dark and light.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "description": "colour theme"
+        }
+      },
+      "required": [
+        "theme"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "search",
+    "description": "Open the global search and run a query (countries, markets, hotspots, …).",
+    "params": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "search text"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "reset_layout",
+    "description": "Reset all panels to the variant default layout (reloads).",
+    "params": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "authed": false
+  },
+  {
+    "name": "add_feed_panel",
+    "description": "Add a custom RSS/Atom feed panel (server allowlist enforced).",
+    "params": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "short panel title"
+        },
+        "url": {
+          "type": "string",
+          "description": "https RSS/Atom feed URL"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "remove_custom_panel",
+    "description": "Remove a custom feed panel by the title it was added with.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "title used when adding"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "authed": false
+  },
+  {
+    "name": "switch_org",
+    "description": "Switch the active organization (reloads scoped data). Sign-in required.",
+    "params": {
+      "type": "object",
+      "properties": {
+        "org": {
+          "type": "string",
+          "description": "organization id from the snapshot"
+        }
+      },
+      "required": [
+        "org"
+      ]
+    },
+    "authed": true
+  }
+]
