@@ -32,7 +32,16 @@ export type IconName =
   | 'zen'
   | 'bot'
   | 'zap'
-  | 'globe-lock';
+  | 'globe-lock'
+  | 'x'
+  | 'arrow-up'
+  | 'copy'
+  | 'check'
+  | 'chevron-down'
+  | 'panel-right'
+  | 'columns-2'
+  | 'maximize'
+  | 'pip';
 
 // Inner markup only (the <svg> wrapper is added by icon()).
 const PATHS: Record<IconName, string> = {
@@ -71,20 +80,41 @@ const PATHS: Record<IconName, string> = {
     '<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>',
   sparkles:
     '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
-  // Zen ensō — a single open brush-ring with the traditional gap at the top. Not
-  // a lucide glyph; a house Zen mark that inherits currentColor + the round caps
-  // (brush tips) of the shared wrapper, so it sits in the icon system as one of us.
-  zen: '<path d="M14.91 4.01 A8.5 8.5 0 1 1 9.09 4.01"/>',
+  // The canonical Zen mark — the notched open ring from ~/work/zen/logo/dist
+  // (logo-mono.svg: `M66.22 83.26 A37 37 0 1 1 85.57 60.20` on a 100-box),
+  // scaled ×0.24 into this 24-box so icon('zen') is the REAL logo everywhere.
+  // For brand surfaces (FAB / header / spinner) use zenLogo() — same geometry at
+  // the logo's native stroke weight.
+  zen: '<path d="M15.89 19.98 A8.88 8.88 0 1 1 20.54 14.45"/>',
   bot:
     '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
   zap:
     '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
   'globe-lock':
     '<path d="M15.686 15A14.5 14.5 0 0 1 12 22a14.5 14.5 0 0 1 0-20 10 10 0 1 0 9.542 13"/><path d="M2 12h8.5"/><path d="M20 6V4a2 2 0 1 0-4 0v2"/><rect width="8" height="5" x="14" y="6" rx="1"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'arrow-up': '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  copy:
+    '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'panel-right': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
+  'columns-2': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  pip: '<path d="M2 10h6V4"/><path d="m2 4 6 6"/><path d="M21 10V7a2 2 0 0 0-2-2h-7"/><path d="M3 14v2a2 2 0 0 0 2 2h3"/><rect width="10" height="7" x="12" y="13" rx="2"/>',
 };
 
 /** Inline a canonical lucide icon as an SVG string. Inherits color (currentColor)
  *  and takes an explicit pixel size. Extra classes land on the <svg>. */
 export function icon(name: IconName, size = 16, cls = ''): string {
   return `<svg class="lucide lucide-${name}${cls ? ' ' + cls : ''}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PATHS[name]}</svg>`;
+}
+
+// The canonical Zen brand mark — verbatim geometry from ~/work/zen/logo/dist
+// (logo-mono.svg): the notched open ring on a 100-box at the logo's native
+// stroke weight (11) + round cap. Monochrome (currentColor), so it reads on
+// vercel-black. Use this for brand surfaces — the FAB, the chat header, and the
+// "generating" spinner — instead of the thinner icon('zen') glyph.
+export function zenLogo(size = 20, cls = ''): string {
+  return `<svg class="zen-logo${cls ? ' ' + cls : ''}" width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" aria-hidden="true"><path d="M66.22 83.26 A37 37 0 1 1 85.57 60.20"/></svg>`;
 }

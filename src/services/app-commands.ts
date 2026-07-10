@@ -133,6 +133,43 @@ export const COMMANDS: AppCommand[] = [
     run: (h, a, c) => bool(h.hidePanel(a.key as string), `Hid ${c.label(a.key as string)}.`, `No panel called "${a.key}".`),
   },
   {
+    name: 'hide_all',
+    description: 'Hide every visible dashboard panel at once (clears the board).',
+    params: obj({}, []),
+    run: (h) => {
+      let n = 0;
+      for (const p of h.listPanels()) if (p.enabled && h.hidePanel(p.key)) n++;
+      return { ok: true, message: n ? `Hid ${n} panel${n === 1 ? '' : 's'}.` : 'No panels were showing.' };
+    },
+  },
+  {
+    name: 'show_only',
+    description: 'Show only the named panels and hide the rest — e.g. keys "news" or "markets,news". Keys are panel keys from the snapshot.',
+    params: obj({ keys: str('one or more panel keys, comma- or space-separated') }, ['keys']),
+    run: (h, a, c) => {
+      const want = new Set(
+        String(a.keys)
+          .split(/[,\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      if (!want.size) return { ok: false, message: 'Which panels should I keep?' };
+      const panels = h.listPanels();
+      const known = new Set(panels.map((p) => p.key));
+      let hidden = 0;
+      for (const p of panels) {
+        if (want.has(p.key)) h.showPanel(p.key);
+        else if (p.enabled && h.hidePanel(p.key)) hidden++;
+      }
+      const kept = [...want].filter((k) => known.has(k));
+      const missing = [...want].filter((k) => !known.has(k));
+      const note = missing.length ? ` (couldn't find ${missing.join(', ')})` : '';
+      if (!kept.length) return { ok: false, message: `No matching panels${note}.` };
+      const label = kept.map((k) => c.label(k)).join(', ');
+      return { ok: true, message: `Showing only ${label}; hid ${hidden}.${note}` };
+    },
+  },
+  {
     name: 'move_panel',
     description: 'Reorder a panel: to the top/bottom, or before/after another panel.',
     params: obj(
