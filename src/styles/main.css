@@ -1775,19 +1775,30 @@ body.panel-drag-active .map-container {
   padding: 0;
   flex: 1;
   display: flex;
+  /* Column + top-align so the player takes its natural 16:9 height instead of
+     being stretched to fill the panel (which broke the aspect ratio). */
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .live-news-player {
   width: 100%;
-  flex: 1;
-  background: var(--bg);
+  /* Responsive 16:9: width drives height. flex:0 0 auto stops the flex parent
+     from stretching it vertically, so the ratio is preserved as it scales. */
+  flex: 0 0 auto;
   aspect-ratio: 16 / 9;
+  max-height: 100%;
+  background: var(--bg);
 }
 
 .live-news-player iframe {
   width: 100%;
   height: 100%;
   display: block;
+  border: 0;
 }
 
 /* Live Webcams Panel */
@@ -8654,6 +8665,16 @@ a.prediction-link:hover {
   .conflict-click-area {
     cursor: pointer;
     pointer-events: auto;
+  }
+
+  /* Keep the centered map legend inside the viewport on narrow screens: cap its
+     width and let items wrap to a second row instead of spilling past the edges. */
+  .map-legend {
+    max-width: calc(100vw - 12px);
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+    gap: 10px;
   }
 }
 
