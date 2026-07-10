@@ -1,7 +1,8 @@
 import { escapeHtml } from '@/utils/sanitize';
 import { isAuthenticated, login } from '@/services/iam';
 import { askAnalyst, collectContext, type AnalystMessage } from '@/services/analyst';
-import { applyActions, type AnalystHost } from '@/services/analyst-actions';
+import { dispatch, type AppHost, type CommandLogEntry } from '@/services/app-commands';
+import { fetchRoster, selectedModel, rememberModel, type ModelRoster, type AnalystModel } from '@/services/analyst-models';
 
 /**
  * AnalystChat — the analyst conversation surface, decoupled from where it lives.
@@ -9,9 +10,13 @@ import { applyActions, type AnalystHost } from '@/services/analyst-actions';
  * This is the ONE analyst code path. Both the dockable grid panel (AiAnalystPanel)
  * and the floating launcher (AiAnalystDock) render an AnalystChat into their own
  * root element; neither reimplements the send loop. It talks to the app only
- * through the `AnalystHost` port and to the backend only through analyst.ts /
- * analyst-actions.ts — exactly like before, just hoisted out of the Panel so a
- * second surface can reuse it verbatim.
+ * through the `AppHost` port and to the backend only through analyst.ts (request
+ * composer) → analyst-transport.ts (the wire) and app-commands.ts (the dispatcher).
+ *
+ * Model picker: a monochrome dropdown (Zen family first, then whatever the signed-in
+ * user can serve) sits in the chat toolbar; the choice persists and rides every
+ * request. Errors are ALWAYS surfaced — a failed/empty backend reply shows the
+ * reason inline, never a silent blank.
  *
  * Auth + billing: every request forwards the caller's IAM token to Hanzo inference,
  * metered to their own org/project — never a shared key. Signed-out users get the
@@ -30,11 +35,14 @@ export class AnalystChat {
   private messages: AnalystMessage[] = [];
   private listEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
+  private modelSelectEl: HTMLSelectElement | null = null;
+  private roster: ModelRoster | null = null;
+  private model = '';
   private sending = false;
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly host: AnalystHost,
+    private readonly host: AppHost,
     private readonly opts: AnalystChatOptions = {},
   ) {}
 
@@ -46,6 +54,12 @@ export class AnalystChat {
     }
     this.root.innerHTML = `
       <div class="ai-analyst">
+        <div class="ai-analyst-toolbar">
+          <label class="ai-analyst-model-wrap">
+            <span class="ai-analyst-model-label">Model</span>
+            <select class="ai-analyst-model" aria-label="Analyst model"></select>
+          </label>
+        </div>
         <div class="ai-analyst-messages"></div>
         <div class="ai-analyst-composer">
           <textarea class="ai-analyst-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask about the world…')}"></textarea>
@@ -55,6 +69,7 @@ export class AnalystChat {
     `;
     this.listEl = this.root.querySelector('.ai-analyst-messages');
     this.inputEl = this.root.querySelector('.ai-analyst-input');
+    this.modelSelectEl = this.root.querySelector('.ai-analyst-model');
     this.root.querySelector('.ai-analyst-send')?.addEventListener('click', () => void this.send());
     this.inputEl?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -62,12 +77,49 @@ export class AnalystChat {
         void this.send();
       }
     });
+    this.modelSelectEl?.addEventListener('change', () => {
+      const id = this.modelSelectEl?.value || '';
+      if (id) {
+        this.model = id;
+        rememberModel(id);
+      }
+    });
+    if (this.roster) this.renderModelOptions(); // instant paint from cache
+    void this.loadModels();
     this.renderMessages();
   }
 
   /** Focus the composer (used when the floating dock opens). */
   public focus(): void {
     this.inputEl?.focus();
+  }
+
+  private async loadModels(): Promise<void> {
+    const roster = await fetchRoster();
+    this.roster = roster;
+    if (!this.model || !roster.models.some((m) => m.id === this.model)) {
+      this.model = selectedModel(roster);
+    }
+    this.renderModelOptions();
+  }
+
+  private renderModelOptions(): void {
+    const sel = this.modelSelectEl;
+    if (!sel || !this.roster) return;
+    const groups = new Map<string, AnalystModel[]>();
+    for (const m of this.roster.models) {
+      const g = groups.get(m.group) || [];
+      g.push(m);
+      groups.set(m.group, g);
+    }
+    sel.innerHTML = [...groups.entries()]
+      .map(
+        ([group, ms]) =>
+          `<optgroup label="${escapeHtml(group)}">${ms
+            .map((m) => `<option value="${escapeHtml(m.id)}"${m.id === this.model ? ' selected' : ''}>${escapeHtml(m.label)}</option>`)
+            .join('')}</optgroup>`,
+      )
+      .join('');
   }
 
   private renderSignedOut(): void {
@@ -117,25 +169,35 @@ export class AnalystChat {
 
     try {
       const context = await collectContext(this.host);
-      const res = await askAnalyst(this.messages, context);
+      const res = await askAnalyst(this.messages, context, this.model);
       this.clearTyping();
 
-      if (res.fallback && res.reason) {
-        this.appendInline(res.reason);
-        return;
+      // Render the prose reply when present.
+      if (res.reply) {
+        this.messages.push({ role: 'assistant', content: res.reply });
+        this.renderMessages();
       }
 
-      const reply = res.reply || '…';
-      this.messages.push({ role: 'assistant', content: reply });
-      this.renderMessages();
-
+      // Execute any commands through the ONE dispatcher; show a per-action log.
       if (res.actions.length) {
-        const echoes = await applyActions(res.actions, this.host);
-        if (echoes.length) this.appendInline(echoes.join('  ·  '));
+        const log = await dispatch(res.actions, this.host);
+        if (log.length) this.appendActionLog(log);
       }
-    } catch {
+
+      // ALWAYS surface something — never a silent blank (P0: prod 401 returned
+      // {reply:"",error:"...",fallback:true} and the chat showed nothing).
+      if (!res.reply) {
+        if (res.reason) this.appendInline(res.reason);
+        else if (res.error) this.appendError(`The analyst couldn't answer — ${res.error}.`);
+        else if (res.fallback) this.appendError('The analyst is unavailable right now — please try again.');
+        else if (!res.actions.length) this.appendInline('No response from the analyst.');
+      } else if (res.error) {
+        this.appendInline(`Note: ${res.error}`);
+      }
+    } catch (e) {
       this.clearTyping();
-      this.appendInline('The analyst is unavailable right now.');
+      const detail = e instanceof Error && e.message ? e.message : 'network error';
+      this.appendError(`The analyst is unavailable right now — ${detail}.`);
     } finally {
       this.sending = false;
     }
@@ -159,6 +221,26 @@ export class AnalystChat {
     const el = document.createElement('div');
     el.className = 'ai-analyst-inline';
     el.textContent = text;
+    this.listEl.appendChild(el);
+    this.scrollToEnd();
+  }
+
+  private appendError(text: string): void {
+    if (!this.listEl) return;
+    const el = document.createElement('div');
+    el.className = 'ai-analyst-inline ai-analyst-error';
+    el.textContent = text;
+    this.listEl.appendChild(el);
+    this.scrollToEnd();
+  }
+
+  private appendActionLog(entries: CommandLogEntry[]): void {
+    if (!this.listEl) return;
+    const el = document.createElement('div');
+    el.className = 'ai-analyst-actionlog';
+    el.innerHTML = entries
+      .map((e) => `<div class="ai-analyst-action ${e.ok ? 'ok' : 'err'}"><span class="ai-analyst-action-mark">${e.ok ? '✓' : '✗'}</span>${escapeHtml(e.message)}</div>`)
+      .join('');
     this.listEl.appendChild(el);
     this.scrollToEnd();
   }

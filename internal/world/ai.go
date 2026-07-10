@@ -138,8 +138,19 @@ func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user str
 // inference meters to their org/project/billing; extra forwards the caller's
 // org/project selectors so it meters to the org the user is acting in.
 func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
+	return a.chatMessagesModel(ctx, s, bearer, a.model, messages, temperature, maxTokens, extra)
+}
+
+// chatMessagesModel is chatMessages with an explicit model override — the single
+// completion path once a caller (the analyst's model dropdown) chooses the model.
+// An empty model falls back to the client default (a.model). Everything else —
+// auth forwarding, org/project selectors, degrade semantics — is identical.
+func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, model string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
+	if strings.TrimSpace(model) == "" {
+		model = a.model
+	}
 	reqBody, err := json.Marshal(chatRequest{
-		Model:       a.model,
+		Model:       model,
 		Messages:    messages,
 		Temperature: temperature,
 		MaxTokens:   maxTokens,

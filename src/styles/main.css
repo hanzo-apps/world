@@ -15910,3 +15910,47 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 }
 .cloud-range-btn:hover { color: var(--text); }
 .cloud-range-btn.active { color: var(--bg); background: var(--text); border-color: var(--text); }
+
+/* ── AI analyst — model picker + command action log (appended) ─────────────── */
+.ai-analyst-toolbar {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.ai-analyst-model-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.ai-analyst-model-label {
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-analyst-model {
+  appearance: none; -webkit-appearance: none;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text);
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 3px 22px 3px 8px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: right 10px center, right 6px center;
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+  max-width: 180px;
+}
+.ai-analyst-model:hover { border-color: var(--border-strong); }
+.ai-analyst-model:focus { outline: none; border-color: var(--text-dim); }
+.ai-analyst-model option, .ai-analyst-model optgroup { background: var(--bg); color: var(--text); }
+
+/* honest error line — distinct from the neutral inline note */
+.ai-analyst-error { color: var(--red); }
+
+/* per-command action log (✓ moved markets panel to top / ✗ no panel …) */
+.ai-analyst-actionlog {
+  align-self: stretch; display: flex; flex-direction: column; gap: 2px;
+  margin: 2px 0 4px; padding: 6px 10px;
+  border-left: 2px solid var(--border-strong);
+}
+.ai-analyst-action {
+  display: flex; gap: 6px; align-items: baseline;
+  font-size: 11.5px; color: var(--text-dim); line-height: 1.4;
+}
+.ai-analyst-action-mark { font-family: var(--font-mono); flex: 0 0 auto; }
+.ai-analyst-action.ok .ai-analyst-action-mark { color: var(--text); }
+.ai-analyst-action.err { color: var(--text-muted); }
+.ai-analyst-action.err .ai-analyst-action-mark { color: var(--red); }
