@@ -2942,7 +2942,6 @@ export class App {
       layers: state.layers,
       country: this.countryBriefPage?.isVisible() ? (this.countryBriefPage.getCode() ?? undefined) : undefined,
       mode: state.mode,
-      variant: SITE_VARIANT,
     });
   }
 
