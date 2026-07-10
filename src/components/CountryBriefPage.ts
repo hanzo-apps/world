@@ -11,6 +11,9 @@ import { PORTS } from '@/config/ports';
 import type { Port } from '@/config/ports';
 import { exportCountryBriefJSON, exportCountryBriefCSV } from '@/utils/export';
 import type { CountryBriefExport } from '@/utils/export';
+import { AnalystChat } from '@/components/AnalystChat';
+import { icon } from '@/utils/icons';
+import type { AppHost } from '@/services/app-commands';
 
 type BriefAssetType = AssetType | 'port';
 
@@ -75,6 +78,9 @@ export class CountryBriefPage {
   private onExportImage?: (code: string, name: string) => void;
   private boundExportMenuClose: (() => void) | null = null;
   private boundCitationClick: ((e: Event) => void) | null = null;
+  private analystHost: AppHost | null = null;
+  private analystChat: AnalystChat | null = null;
+  private sidebarCollapsed = false;
 
   constructor() {
     this.overlay = document.createElement('div');
@@ -185,6 +191,13 @@ export class CountryBriefPage {
     this.onShareStory = handler;
   }
 
+  /** Provide the analyst capability port so the fullscreen view can dock a chat
+   *  sidebar. Reuses the ONE analyst code path (AnalystChat) by composition —
+   *  no forked logic, no new plumbing. */
+  public setAnalystHost(host: AppHost): void {
+    this.analystHost = host;
+  }
+
   public setExportImageHandler(handler: (code: string, name: string) => void): void {
     this.onExportImage = handler;
   }
@@ -258,6 +271,8 @@ export class CountryBriefPage {
             <button class="cb-close" aria-label="${t('components.newsPanel.close')}">×</button>
           </div>
         </div>
+        <div class="cb-view">
+          <div class="cb-main">
         <div class="cb-body">
           <div class="cb-grid">
             <div class="cb-col-left">
@@ -326,6 +341,17 @@ export class CountryBriefPage {
             </div>
           </div>
         </div>
+          </div>
+          <div class="cb-analyst-resize" role="separator" aria-orientation="vertical" aria-label="Resize analyst panel"></div>
+          <aside class="cb-analyst-sidebar" aria-label="AI analyst">
+            <div class="cb-analyst-head">
+              <span class="cb-analyst-title">${icon('zen', 15)}<span>AI analyst</span><span class="cb-analyst-sub">${escapeHtml(country)}</span></span>
+              <button class="cb-analyst-collapse" type="button" aria-label="Collapse analyst" title="Collapse">›</button>
+            </div>
+            <div class="cb-analyst-mount"></div>
+          </aside>
+          <button class="cb-analyst-fab" type="button" aria-label="Open AI analyst">${icon('zen', 16)}<span>AI analyst</span></button>
+        </div>
       </div>`;
 
     this.overlay.querySelector('.cb-close')?.addEventListener('click', () => this.hide());
@@ -379,7 +405,71 @@ export class CountryBriefPage {
     };
     this.overlay.addEventListener('click', this.boundCitationClick);
 
+    this.mountAnalyst(country, code);
+    this.wireAnalystControls();
+
     this.overlay.classList.add('active');
+  }
+
+  /** Dock a country-grounded analyst chat in the right sidebar. Same AnalystChat
+   *  component the dashboard uses (model picker + command registry intact); the
+   *  only difference is a host that reports THIS country as the active region so
+   *  the seeded context rides every request. */
+  private mountAnalyst(country: string, code: string): void {
+    const mount = this.overlay.querySelector('.cb-analyst-mount') as HTMLElement | null;
+    if (!mount || !this.analystHost) return;
+    const base = this.analystHost;
+    const seeded: AppHost = {
+      ...base,
+      getState: () => ({ ...base.getState(), region: `${country} (${code})` }),
+    };
+    this.analystChat = new AnalystChat(mount, seeded, {
+      emptyTitle: `Ask about ${country}`,
+      placeholder: `Ask about ${country}…`,
+      chips: [
+        `What's driving instability in ${country}?`,
+        'Summarize the latest developments',
+        'What should I watch next?',
+      ],
+    });
+    this.analystChat.mount();
+  }
+
+  private wireAnalystControls(): void {
+    const page = this.overlay.querySelector('.country-brief-page') as HTMLElement | null;
+    if (!page) return;
+
+    // Lead with the intel content on small screens; the analyst opens on demand.
+    this.sidebarCollapsed = window.matchMedia('(max-width: 768px)').matches;
+    page.classList.toggle('cb-analyst-collapsed', this.sidebarCollapsed);
+
+    const setCollapsed = (v: boolean): void => {
+      this.sidebarCollapsed = v;
+      page.classList.toggle('cb-analyst-collapsed', v);
+      if (!v) requestAnimationFrame(() => this.analystChat?.focus());
+    };
+    page.querySelector('.cb-analyst-collapse')?.addEventListener('click', () => setCollapsed(true));
+    page.querySelector('.cb-analyst-fab')?.addEventListener('click', () => setCollapsed(false));
+
+    const handle = page.querySelector('.cb-analyst-resize') as HTMLElement | null;
+    if (handle) {
+      const MIN = 300, MAX = 620;
+      const onMove = (e: PointerEvent): void => {
+        const w = Math.min(MAX, Math.max(MIN, window.innerWidth - e.clientX));
+        page.style.setProperty('--cb-analyst-w', `${w}px`);
+      };
+      const onUp = (): void => {
+        handle.classList.remove('dragging');
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      handle.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handle.classList.add('dragging');
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+    }
   }
 
   public updateBrief(data: CountryIntelData): void {
@@ -612,6 +702,7 @@ export class CountryBriefPage {
     this.overlay.classList.remove('active');
     this.currentCode = null;
     this.currentName = null;
+    this.analystChat = null; // DOM is replaced on next show(); drop the reference
     this.onCloseCallback?.();
   }
 
