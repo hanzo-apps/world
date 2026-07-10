@@ -918,12 +918,63 @@ canvas,
   cursor: default;
 }
 
-.map-panel .panel-header {
+/* Chromeless map: the old "Global Situation" + UTC title bar is replaced by a slim
+   grip that is invisible until you hover the map, then shows a small drag pill. It
+   is still the .panel-header the panel-drag machinery grabs (mouse + touch), so
+   reorder is unchanged — it just carries no chrome. */
+.map-panel .panel-header.map-drag-grip {
+  height: 14px;
+  min-height: 14px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.map-panel.panel-drag-source .panel-header {
+.map-panel:hover .panel-header.map-drag-grip {
+  opacity: 1;
+}
+
+.map-panel .panel-header.map-drag-grip::after {
+  content: '';
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-dim);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.map-panel .panel-header.map-drag-grip:hover::after {
+  opacity: 0.9;
+}
+
+.map-panel.panel-drag-source .panel-header.map-drag-grip {
   cursor: grabbing;
+  opacity: 1;
+}
+
+/* Timestamp as a small, readable corner overlay (bottom-right, clear of the time
+   pills top-left / legend bottom-centre / layers bottom-left). Halo keeps it
+   legible over bright satellite/terrain basemaps. */
+.map-timestamp {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 3;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  opacity: 0.8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 /* Horizontal (width) resize handle — right edge, ew-resize. */
@@ -1136,17 +1187,6 @@ body.panel-drag-active .map-container {
   color: var(--semantic-critical);
 }
 
-.header-clock {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  letter-spacing: 0.5px;
-  pointer-events: none;
-  text-transform: none;
-}
 
 .panel-header-left {
   display: flex;
