@@ -68,18 +68,30 @@ export class BlockchainPanel extends Panel {
 
     const rows = nets.map((n, i) => {
       const dot = n.live ? '#ededed' : '#3a3a3a';
-      const sub = `chain ${escapeHtml(String(n.chainId))}${modeled ? ' · positions modeled' : ''}`;
+      // Sub line: chain id only when it is a real EVM id (>0), and "positions
+      // modeled" only for chains that actually place modeled globe nodes (peers>0).
+      // Public reference chains (Ethereum/Bitcoin) show neither — nothing faked.
+      const subParts: string[] = [];
+      if (n.chainId > 0) subParts.push(`chain ${escapeHtml(String(n.chainId))}`);
+      if (modeled && n.peers > 0) subParts.push('positions modeled');
+      const sub = subParts.join(' · ');
+      // Peers are shown only where we have peer visibility (our own nodes via
+      // info.peers). We don't peer with public chains, so we omit it rather than
+      // print a misleading "0 peers" beside a live head block.
+      const peersCell = n.peers > 0
+        ? `<span style="color:#555;">·</span>
+           <span data-net-peers="${i}" style="font-family:var(--font-mono);color:#888;min-width:2.5em;text-align:right;">${n.peers}</span>
+           <span style="color:#888;">peers</span>`
+        : '';
       return `
         <div class="chains-row" style="padding:6px 0;border-bottom:1px solid #1f1f1f;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="color:${dot};font-size:9px;line-height:1;">&#9679;</span>
             <span style="flex:1;color:#ededed;font-weight:500;">${escapeHtml(n.name)}</span>
             <span data-net-block="${i}" style="font-family:var(--font-mono);color:#ededed;">${n.blockHeight.toLocaleString()}</span>
-            <span style="color:#555;">·</span>
-            <span data-net-peers="${i}" style="font-family:var(--font-mono);color:#888;min-width:2.5em;text-align:right;">${n.peers}</span>
-            <span style="color:#888;">peers</span>
+            ${peersCell}
           </div>
-          <div style="color:#888;font-size:11px;padding-left:17px;">${sub}</div>
+          ${sub ? `<div style="color:#888;font-size:11px;padding-left:17px;">${sub}</div>` : ''}
         </div>`;
     }).join('');
 
