@@ -33,15 +33,23 @@ export function savePanelSpan(panelId: string, span: number): void {
   localStorage.setItem(PANEL_SPANS_KEY, JSON.stringify(spans));
 }
 
+// Row-span tier heights (px), index === span. span-0 is the tiny tier (120px);
+// span-1..4 keep the established 200/400/600/800 ladder. These are the snap
+// targets the height-resize drag lands on, and they mirror the CSS min-heights.
+export const PANEL_SPAN_HEIGHTS = [120, 200, 400, 600, 800];
+
+const SPAN_CLASSES = ['span-0', 'span-1', 'span-2', 'span-3', 'span-4'];
+
 export function currentSpan(element: HTMLElement): number {
   if (element.classList.contains('span-4')) return 4;
   if (element.classList.contains('span-3')) return 3;
   if (element.classList.contains('span-2')) return 2;
+  if (element.classList.contains('span-0')) return 0;
   return 1;
 }
 
 export function setSpanClass(element: HTMLElement, span: number): void {
-  element.classList.remove('span-1', 'span-2', 'span-3', 'span-4');
+  element.classList.remove(...SPAN_CLASSES);
   element.classList.add(`span-${span}`);
   element.classList.add('resized');
 }
@@ -158,10 +166,11 @@ export class Panel {
     this.element.appendChild(this.resizeHandle);
     this.setupResizeHandlers();
 
-    // Restore saved span
+    // Restore saved span. Any saved tier other than the default span-1 is applied,
+    // including the new span-0 tiny tier (value 0).
     const savedSpans = loadPanelSpans();
     const savedSpan = savedSpans[this.panelId];
-    if (savedSpan && savedSpan > 1) {
+    if (savedSpan !== undefined && savedSpan !== 1) {
       setSpanClass(this.element, savedSpan);
     }
 
@@ -172,14 +181,14 @@ export class Panel {
     if (!this.resizeHandle) return;
     const handle = this.resizeHandle;
 
-    // Pointer-driven resize (mouse + touch + pen). Height snaps to a discrete
-    // row-span on a 200px grid — the same unit the CSS min-heights use — so the
-    // panel grows in step with the cursor. The module owns pointer math; Panel
-    // owns the span→class mapping and persistence.
+    // Pointer-driven resize (mouse + touch + pen). Height snaps to the nearest
+    // tier in PANEL_SPAN_HEIGHTS — including the new span-0 (120px) tiny tier —
+    // so the panel can go smaller and the low-end steps are finer (~100px). The
+    // module owns pointer math; Panel owns the span→class mapping and persistence.
     this.resizeCleanup = attachPanelResize(this.element, handle, {
-      minSpan: 1,
+      minSpan: 0,
       maxSpan: 4,
-      rowPx: 200,
+      snapHeights: PANEL_SPAN_HEIGHTS,
       getStartSpan: () => currentSpan(this.element),
       onPreview: (span) => setSpanClass(this.element, span),
       onCommit: (span) => savePanelSpan(this.panelId, span),
@@ -314,7 +323,7 @@ export class Panel {
    * Reset panel height to default
    */
   public resetHeight(): void {
-    this.element.classList.remove('resized', 'span-1', 'span-2', 'span-3', 'span-4');
+    this.element.classList.remove('resized', ...SPAN_CLASSES);
     const spans = loadPanelSpans();
     delete spans[this.panelId];
     localStorage.setItem(PANEL_SPANS_KEY, JSON.stringify(spans));

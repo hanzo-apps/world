@@ -338,6 +338,13 @@ export interface PanelResizeOptions {
   minSpan?: number; // default 1
   maxSpan?: number; // default 4
   rowPx?: number; // px per row-span unit for snapping (default 200, matches CSS min-heights)
+  /**
+   * Optional per-span target heights (index === span). When present, the drag
+   * snaps to whichever tier is closest to the live height instead of a uniform
+   * rowPx grid — this is how a panel reaches the finer, irregular ladder
+   * (span-0 = 120px tiny … span-4 = 800px) with a ~100px feel at the small end.
+   */
+  snapHeights?: number[];
   /** Height at drag start → the panel's current span. */
   getStartSpan: () => number;
   /** Live: apply the given span while dragging (Panel owns the span→class mapping). */
@@ -359,6 +366,7 @@ export function attachPanelResize(
   const minSpan = opts.minSpan ?? 1;
   const maxSpan = opts.maxSpan ?? 4;
   const rowPx = opts.rowPx ?? 200;
+  const snapHeights = opts.snapHeights;
 
   let pointerId: number | null = null;
   let resizing = false;
@@ -367,6 +375,19 @@ export function attachPanelResize(
   let lastSpan = minSpan;
 
   const spanFor = (height: number): number => {
+    if (snapHeights && snapHeights.length > 0) {
+      // Snap to the nearest tier height within [minSpan, maxSpan].
+      let best = minSpan;
+      let bestDist = Infinity;
+      for (let span = minSpan; span <= maxSpan && span < snapHeights.length; span++) {
+        const dist = Math.abs(height - snapHeights[span]!);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = span;
+        }
+      }
+      return best;
+    }
     const span = Math.round(height / rowPx);
     return Math.min(maxSpan, Math.max(minSpan, span));
   };
