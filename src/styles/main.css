@@ -1313,10 +1313,25 @@ body.panel-drag-active .map-container {
   color: var(--text);
 }
 
+/* Live = a single subtle pulsing dot, no "LIVE" text (it's all live by default and
+   a static chip misleads while a feed is loading). Empty content → just the dot. */
 .panel-data-badge.live {
-  color: var(--status-live);
-  border-color: rgba(86, 217, 130, 0.45);
-  background: rgba(86, 217, 130, 0.12);
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--status-live);
+  opacity: 0.7;
+  align-self: center;
+  animation: panelLiveDotPulse 2.4s ease-in-out infinite;
+}
+@keyframes panelLiveDotPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-data-badge.live { animation: none; opacity: 0.6; }
 }
 
 .panel-data-badge.cached {
@@ -1431,21 +1446,30 @@ body.panel-drag-active .map-container {
 
 /* Panel Summarize Button */
 .panel-summarize-btn {
-  background: var(--overlay-medium);
-  border: 1px solid var(--overlay-medium);
-  border-radius: 3px;
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
   font-size: 11px;
-  padding: 2px 6px;
-  margin-right: 6px;
-  opacity: 0.85;
-  transition: opacity 0.15s, transform 0.15s, background 0.15s;
+  line-height: 1;
+  padding: 3px 8px;
+  /* Clears the hover-✕ (absolute, top:8px right:10px, 18px wide) so the summarize
+     control and the close control never collide on the header's right edge. */
+  margin-right: 28px;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
 }
+.panel-summarize-btn .summarize-ico { font-size: 11px; line-height: 1; }
 
 .panel-summarize-btn:hover {
   opacity: 1;
-  background: var(--overlay-medium);
-  transform: scale(1.05);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .panel-summarize-btn:disabled {
