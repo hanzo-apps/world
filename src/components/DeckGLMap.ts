@@ -5,7 +5,8 @@
  */
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
-import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, BitmapLayer } from '@deck.gl/layers';
+import { TileLayer } from '@deck.gl/geo-layers';
 import mapboxgl from 'mapbox-gl';
 import type { Map as MapboxMap, IControl, FilterSpecification } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -192,6 +193,25 @@ mapboxgl.accessToken = MAPBOX_TOKEN;
 // swap keeps the exact locked aesthetic while gaining mapbox's fast globe + fog.
 const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+
+// Keyless RASTER basemap tiles (CartoDB, CORS-enabled) rendered by DECK — the
+// fallback when no Mapbox token is configured. mapbox-gl v3 refuses to paint ANY
+// basemap without a token (the whole canvas goes black even though third-party
+// tiles fetch fine), so we drape a deck raster basemap under the data layers,
+// token-free, exactly like the data dots and the native ESRI globe. Subdomains
+// a–d round-robin to spread the tile fan-out.
+const CARTO_DARK_RASTER = [
+  'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+];
+const CARTO_LIGHT_RASTER = [
+  'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+  'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+  'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+  'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+];
 
 // Optional "nicer" Mapbox basemaps, orthogonal to the dark/light theme. `dark`
 // keeps the locked monochrome CartoDB aesthetic (theme-aware); `satellite` and
@@ -1134,6 +1154,14 @@ export class DeckGLMap {
     COLORS = getOverlayColors();
     const layers: (Layer | null | false)[] = [];
     const { layers: mapLayers } = this.state;
+
+    // Bottom of the stack: a keyless deck raster basemap when no Mapbox token is
+    // configured, so the map is NEVER a black void (mapbox-gl won't paint without
+    // a token). No-op when a token is present — the mapbox vector basemap stands.
+    if (!MAPBOX_TOKEN) {
+      const basemap = this.buildBasemapLayer();
+      if (basemap) layers.push(basemap);
+    }
     const filteredEarthquakes = this.filterByTime(this.earthquakes, (eq) => eq.time);
     const filteredNaturalEvents = this.filterByTime(this.naturalEvents, (event) => event.date);
     const filteredWeatherAlerts = this.filterByTime(this.weatherAlerts, (alert) => alert.onset);
@@ -4839,6 +4867,35 @@ export class DeckGLMap {
     if (this.basemapStyle === 'satellite') return SATELLITE_STYLE;
     if (this.basemapStyle === 'terrain') return TERRAIN_STYLE;
     return getCurrentTheme() === 'light' ? LIGHT_STYLE : DARK_STYLE;
+  }
+
+  // Keyless deck raster basemap (CartoDB), used only when no Mapbox token exists so
+  // the map never blacks out. Theme-aware; renders in both the flat MapView and the
+  // deck _GlobeView (deck drapes the LNGLAT-bounded bitmaps for us). Data layers,
+  // which push after this in buildLayers(), always draw on top.
+  private buildBasemapLayer(): TileLayer {
+    const data = getCurrentTheme() === 'light' ? CARTO_LIGHT_RASTER : CARTO_DARK_RASTER;
+    return new TileLayer({
+      id: 'keyless-raster-basemap',
+      data,
+      tileSize: 256,
+      minZoom: 0,
+      maxZoom: 18,
+      maxRequests: 8,
+      pickable: false,
+      renderSubLayers: (props) => {
+        const bbox = (props.tile as unknown as { boundingBox: number[][] }).boundingBox;
+        const west = bbox[0]?.[0] ?? -180;
+        const south = bbox[0]?.[1] ?? -90;
+        const east = bbox[1]?.[0] ?? 180;
+        const north = bbox[1]?.[1] ?? 90;
+        return new BitmapLayer({
+          id: `${props.id}-bitmap`,
+          image: props.data as string,
+          bounds: [west, south, east, north],
+        });
+      },
+    });
   }
 
   // One and only one setStyle path. setStyle() replaces every source/layer AND
