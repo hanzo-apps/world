@@ -129,7 +129,6 @@ export function buildMapUrl(
     layers: MapLayers;
     country?: string;
     mode?: MapProjectionMode;
-    variant?: string;
   }
 ): string {
   const url = new URL(baseUrl);
@@ -163,12 +162,6 @@ export function buildMapUrl(
   // Only emit mode when in globe (3D) — keeps default 2D share URLs clean.
   if (state.mode === '3d') {
     params.set('mode', '3d');
-  }
-
-  // Keep the active non-default variant in the URL so it survives every sync and
-  // shared links open the same view (WORLD is the clean default, so it is omitted).
-  if (state.variant && state.variant !== 'full') {
-    params.set('variant', state.variant);
   }
 
   url.search = params.toString();
