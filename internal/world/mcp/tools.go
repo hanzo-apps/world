@@ -187,6 +187,33 @@ var toolByName = func() map[string]*Tool {
 	return m
 }()
 
+// ToolSpec is the public, dispatch-free descriptor of one data tool — enough for
+// an in-process caller (the analyst) to advertise it to a model and validate a
+// call against its name, without importing the private tool registry.
+type ToolSpec struct {
+	Name        string
+	Title       string
+	Description string
+	InputSchema map[string]any
+}
+
+// ToolSpecs returns the data-tool descriptors in registry order — the single
+// source of truth the analyst renders its data-tool contract from (mirroring how
+// it derives the app-command contract from the client manifest). Deterministic.
+func ToolSpecs() []ToolSpec {
+	out := make([]ToolSpec, 0, len(tools))
+	for i := range tools {
+		t := &tools[i]
+		out = append(out, ToolSpec{
+			Name:        t.Name,
+			Title:       t.Title,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+		})
+	}
+	return out
+}
+
 // toolsList renders the live tools/list response from the registry.
 func toolsList() map[string]any {
 	out := make([]any, 0, len(tools))
