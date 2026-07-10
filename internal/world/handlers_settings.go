@@ -34,8 +34,10 @@ type wIdentity struct {
 }
 
 // introspectIdentity resolves the caller's org (owner claim) + subject from IAM
-// userinfo, memoized by token hash for a short TTL (mirrors introspectOwner). It
-// is the authoritative, IAM-signed identity — never a client-supplied header.
+// userinfo, memoized by token hash for a short TTL. It is world's ONE identity
+// path — the admin gate (requireAdmin) and per-identity settings both resolve
+// through here, so a token's userinfo is fetched and cached once. Authoritative,
+// IAM-signed identity — never a client-supplied header.
 func (s *Server) introspectIdentity(ctx context.Context, bearer string) (wIdentity, error) {
 	sum := sha256.Sum256([]byte(bearer))
 	key := "identity:" + hex.EncodeToString(sum[:12])
