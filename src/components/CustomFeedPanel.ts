@@ -83,8 +83,8 @@ function renderItem(i: FeedItem): string {
     `<div class="custom-feed-title">${escapeHtml(i.title)}</div>` +
     (ago ? `<div class="custom-feed-time">${escapeHtml(ago)}</div>` : '');
   return i.link
-    ? `<a class="custom-feed-item" href="${sanitizeUrl(i.link)}" target="_blank" rel="noopener">${inner}</a>`
-    : `<div class="custom-feed-item">${inner}</div>`;
+    ? `<a class="custom-feed-item" href="${sanitizeUrl(i.link)}" target="_blank" rel="noopener" data-ctx-url="${sanitizeUrl(i.link)}" data-ctx-headline="${escapeHtml(i.title)}">${inner}</a>`
+    : `<div class="custom-feed-item" data-ctx-headline="${escapeHtml(i.title)}">${inner}</div>`;
 }
 
 function relTime(d: Date): string {

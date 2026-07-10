@@ -1,6 +1,7 @@
 import { escapeHtml } from '@/utils/sanitize';
 import { isAuthenticated, login } from '@/services/iam';
 import { askAnalyst, collectContext, type AnalystMessage } from '@/services/analyst';
+import type { AnalystTrace } from '@/services/analyst-transport';
 import { dispatch, type AppHost, type CommandLogEntry } from '@/services/app-commands';
 import { fetchRoster, selectedModel, rememberModel, type ModelRoster, type AnalystModel } from '@/services/analyst-models';
 
@@ -178,6 +179,12 @@ export class AnalystChat {
         this.renderMessages();
       }
 
+      // Surface the live data tools the backend called to ground the answer —
+      // collapsed "🔧 tool(...)" lines. Appended AFTER renderMessages (which
+      // rebuilds the list from innerHTML) so they survive, exactly like the
+      // action log below.
+      if (res.traces.length) this.appendToolTraces(res.traces);
+
       // Execute any commands through the ONE dispatcher; show a per-action log.
       if (res.actions.length) {
         const log = await dispatch(res.actions, this.host);
@@ -231,6 +238,29 @@ export class AnalystChat {
     el.className = 'ai-analyst-inline ai-analyst-error';
     el.textContent = text;
     this.listEl.appendChild(el);
+    this.scrollToEnd();
+  }
+
+  /** Render the backend's data-tool traces as collapsed, monochrome detail lines.
+   *  Server data is written via textContent (never innerHTML) — never trusted markup. */
+  private appendToolTraces(traces: AnalystTrace[]): void {
+    if (!this.listEl) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ai-analyst-tools';
+    for (const tr of traces) {
+      const d = document.createElement('details');
+      d.className = `ai-analyst-tool ${tr.ok ? 'ok' : 'err'}`;
+      const summary = document.createElement('summary');
+      summary.className = 'ai-analyst-tool-summary';
+      summary.textContent = `🔧 ${tr.label}`;
+      const pre = document.createElement('pre');
+      pre.className = 'ai-analyst-tool-result';
+      pre.textContent = tr.result || (tr.ok ? '(no data returned)' : 'tool call failed');
+      d.appendChild(summary);
+      d.appendChild(pre);
+      wrap.appendChild(d);
+    }
+    this.listEl.appendChild(wrap);
     this.scrollToEnd();
   }
 

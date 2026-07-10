@@ -1374,9 +1374,33 @@ body.panel-drag-active .map-container {
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.panel-context-menu-item:hover {
+.panel-context-menu-item:hover,
+.panel-context-menu-item:focus-visible {
   background: var(--surface-hover);
   color: var(--text);
+  outline: none;
+}
+
+.panel-context-menu-item[disabled] {
+  color: var(--text-muted);
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Thin rule between groups (component actions · panel actions). */
+.panel-context-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* Quiet uppercase group label (e.g. SIZE). */
+.panel-context-menu-label {
+  padding: 6px 10px 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /* Data-source jewelry on cloud widgets — removed everywhere in one place. */
@@ -16460,4 +16484,31 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   outline: 1px solid var(--border-strong);
   outline-offset: -1px;
   cursor: grabbing;
+}
+
+/* World MCP data-tool traces — collapsed "🔧 tool(...)" lines the analyst ran to
+   ground its answer. Monochrome, quiet; the detail body reveals the raw result. */
+.ai-analyst-tools {
+  align-self: stretch; display: flex; flex-direction: column; gap: 2px;
+  margin: 2px 0 4px; padding: 4px 10px;
+  border-left: 2px solid var(--border-strong);
+}
+.ai-analyst-tool { font-size: 11.5px; color: var(--text-dim); }
+.ai-analyst-tool-summary {
+  cursor: pointer; list-style: none; line-height: 1.5;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  transition: color 0.12s ease;
+}
+.ai-analyst-tool-summary::-webkit-details-marker { display: none; }
+.ai-analyst-tool[open] > .ai-analyst-tool-summary,
+.ai-analyst-tool-summary:hover { color: var(--text); }
+.ai-analyst-tool.err > .ai-analyst-tool-summary { color: var(--text-muted); }
+.ai-analyst-tool-result {
+  margin: 3px 0 4px; padding: 6px 8px;
+  max-height: 220px; overflow: auto;
+  font-family: var(--font-mono); font-size: 10.5px; line-height: 1.45;
+  color: var(--text-dim);
+  white-space: pre-wrap; word-break: break-word;
+  background: var(--overlay-medium); border-radius: 4px;
 }

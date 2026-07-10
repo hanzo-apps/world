@@ -2942,6 +2942,12 @@ export class App {
     document.addEventListener('panel-reset-layout-request', () => {
       this.resetPanelLayout();
     });
+    // Right-click "Move to top" reorders through the SAME grid mover the analyst
+    // uses, so order + persistence stay owned in one place.
+    document.addEventListener('panel-move-request', (e) => {
+      const d = (e as CustomEvent<{ id?: string; position?: 'top' | 'bottom' }>).detail;
+      if (d?.id && d.position) this.movePanelInGrid(d.id, { position: d.position });
+    });
     installPanelContextMenu();
 
 

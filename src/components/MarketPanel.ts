@@ -34,7 +34,7 @@ export class MarketPanel extends Panel {
     const html = data
       .map(
         (stock) => `
-      <div class="market-item">
+      <div class="market-item" data-ctx-symbol="${escapeHtml(stock.display)}" data-ctx-value="${escapeHtml(formatPrice(stock.price!))}">
         <div class="market-info">
           <span class="market-name">${escapeHtml(stock.name)}</span>
           <span class="market-symbol">${escapeHtml(stock.display)}</span>
@@ -98,7 +98,7 @@ export class CryptoPanel extends Panel {
     const html = data
       .map(
         (coin) => `
-      <div class="market-item">
+      <div class="market-item" data-ctx-symbol="${escapeHtml(coin.symbol)}" data-ctx-value="$${escapeHtml(coin.price.toLocaleString())}">
         <div class="market-info">
           <span class="market-name">${escapeHtml(coin.name)}</span>
           <span class="market-symbol">${escapeHtml(coin.symbol)}</span>
