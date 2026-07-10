@@ -17,6 +17,7 @@ import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
 import { installPanelContextMenu } from '@/services/panel-menu';
+import { ImmersiveController, type ImmersiveBackground, type ImmersiveState } from '@/services/immersive';
 import { loadPanelSpans, savePanelSpan, currentSpan, setSpanClass } from '@/components/Panel';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
@@ -151,6 +152,7 @@ export class App {
   private readonly MAP_MODE_STORAGE_KEY = 'hanzo-world-map-mode';
   private map: MapContainer | null = null;
   private mapResizeObserver: ResizeObserver | null = null;
+  private immersive: ImmersiveController | null = null;
   private panels: Record<string, Panel> = {};
   private newsPanels: Record<string, NewsPanel> = {};
   private allNews: NewsItem[] = [];
@@ -371,6 +373,7 @@ export class App {
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
     this.setupEventListeners();
+    this.setupImmersive();
     // Capture ?country= BEFORE URL sync overwrites it
     const initState = parseMapUrlState(window.location.search, this.mapLayers);
     this.pendingDeepLinkCountry = initState.country ?? null;
@@ -403,6 +406,50 @@ export class App {
     if (this.isDesktopApp) {
       setTimeout(() => this.checkForUpdate(), 5000);
     }
+  }
+
+  // Immersive layout: map (or live video) as a fixed full-viewport background with
+  // panels floating above. One controller owns the state; App only wires the header
+  // chrome to it and reflects the resulting state back onto the buttons.
+  private setupImmersive(): void {
+    if (this.isMobile) return;
+    this.immersive = new ImmersiveController({
+      getBackgroundHost: () => document.getElementById('panelsGrid'),
+      onChange: (state) => {
+        this.reflectImmersiveUi(state);
+        // The map's box changes when it becomes / leaves the fixed background, so
+        // nudge a re-render on the next frame (after CSS has settled the new size).
+        requestAnimationFrame(() => this.map?.render());
+      },
+    });
+
+    document.getElementById('immersiveToggle')?.addEventListener('click', () => this.immersive?.toggle());
+    document.getElementById('immersiveCollapse')?.addEventListener('click', () => this.immersive?.toggleCollapsed());
+    document.querySelectorAll('#immersiveBgSelect .ibg-btn').forEach((btn) => {
+      btn.addEventListener('click', () =>
+        this.immersive?.setBackground((btn as HTMLElement).dataset.bg as ImmersiveBackground));
+    });
+
+    // Escape leaves immersive — but never steals Escape from an open modal or search.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !this.immersive?.getState().enabled) return;
+      if (document.querySelector('.modal-overlay.active') || this.searchModal?.isOpen()) return;
+      this.immersive.setEnabled(false);
+    });
+
+    this.immersive.apply();
+  }
+
+  private reflectImmersiveUi(state: ImmersiveState): void {
+    const toggle = document.getElementById('immersiveToggle');
+    toggle?.classList.toggle('active', state.enabled);
+    toggle?.setAttribute('aria-pressed', String(state.enabled));
+    const collapse = document.getElementById('immersiveCollapse');
+    collapse?.classList.toggle('active', state.collapsed);
+    collapse?.setAttribute('aria-pressed', String(state.collapsed));
+    document.querySelectorAll('#immersiveBgSelect .ibg-btn').forEach((btn) => {
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.bg === state.background);
+    });
   }
 
   private handleDeepLinks(): void {
@@ -1765,6 +1812,15 @@ export class App {
         : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'}
           </button>
           ${this.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
+          ${this.isMobile ? '' : `
+          <div class="immersive-controls" id="immersiveControls">
+            <button class="immersive-toggle-btn" id="immersiveToggle" title="${t('header.immersive', { defaultValue: 'Immersive layout — map fills the background, panels float on top' })}" aria-pressed="false">▦ ${t('header.immersive', { defaultValue: 'Immersive' })}</button>
+            <div class="immersive-bg-select" id="immersiveBgSelect" role="group" aria-label="Background">
+              <button class="ibg-btn" data-bg="map" title="${t('header.bgMap', { defaultValue: 'Map background' })}">${t('header.bgMap', { defaultValue: 'Map' })}</button>
+              <button class="ibg-btn" data-bg="video" title="${t('header.bgVideo', { defaultValue: 'Live video background' })}">${t('header.bgVideo', { defaultValue: 'Video' })}</button>
+            </div>
+            <button class="immersive-collapse-btn" id="immersiveCollapse" title="${t('header.collapsePanels', { defaultValue: 'Collapse panels to the edge' })}" aria-pressed="false">⇤</button>
+          </div>`}
           <button class="settings-btn" id="settingsBtn">⚙ ${t('header.settings')}</button>
           <button class="sources-btn" id="sourcesBtn">📡 ${t('header.sources')}</button>
           <div class="header-account" id="headerAccount"></div>

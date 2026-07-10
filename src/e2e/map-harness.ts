@@ -1143,6 +1143,7 @@ const ensureDeterministicStyles = (): void => {
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-controls,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-time-slider,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-layer-toggles,
+    body.${DETERMINISTIC_BODY_CLASS} .deckgl-style-switcher,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-legend,
     body.${DETERMINISTIC_BODY_CLASS} .deckgl-timestamp,
     body.${DETERMINISTIC_BODY_CLASS} .mapboxgl-ctrl-bottom-right,
