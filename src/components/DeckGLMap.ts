@@ -185,6 +185,25 @@ mapboxgl.accessToken = MAPBOX_TOKEN;
 const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
+// Optional "nicer" Mapbox basemaps, orthogonal to the dark/light theme. `dark`
+// keeps the locked monochrome CartoDB aesthetic (theme-aware); `satellite` and
+// `terrain` are true Mapbox styles and therefore need a configured VITE_MAPBOX_TOKEN.
+// Terrain additionally drapes the outdoors style over the Mapbox DEM for real relief.
+const SATELLITE_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
+const TERRAIN_STYLE = 'mapbox://styles/mapbox/outdoors-v12';
+const TERRAIN_DEM_SOURCE_ID = 'mapbox-dem';
+const TERRAIN_DEM_URL = 'mapbox://mapbox.mapbox-terrain-dem-v1';
+const TERRAIN_EXAGGERATION = 1.4;
+const BASEMAP_STYLE_KEY = 'hanzo-world-basemap-style';
+export type BasemapStyle = 'dark' | 'satellite' | 'terrain';
+const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'satellite', 'terrain'];
+// `satellite`/`terrain` are bright rasters: data dots need a thin dark halo to stay
+// legible. Persisted position/order for the draggable layer panel live here too so
+// there is one place per concern.
+const isBrightBasemap = (s: BasemapStyle): boolean => s === 'satellite' || s === 'terrain';
+const LAYER_PANEL_POS_KEY = 'hanzo-world-layers-pos';
+const LAYER_PANEL_ORDER_KEY = 'hanzo-world-layers-order';
+
 // Monochrome atmosphere for the 3D globe — pure-black space, near-black upper sky,
 // a faint cool-grey horizon glow, no stars. Cheap to apply; harmless in mercator.
 const MONOCHROME_FOG = {
@@ -298,6 +317,8 @@ export class DeckGLMap {
   private mapboxMap: MapboxMap | null = null;
   private state: DeckMapState;
   private popup: MapPopup;
+  // Chosen basemap (dark | satellite | terrain), orthogonal to the light/dark theme.
+  private basemapStyle: BasemapStyle = DeckGLMap.loadBasemapStyle();
 
   // Data stores
   private hotspots: HotspotWithBreaking[];
@@ -380,8 +401,9 @@ export class DeckGLMap {
   private rafUpdateLayers: () => void;
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  // Globe auto-rotate (3D idle spin)
-  private static readonly AUTO_ROTATE_DEG_PER_SEC = 4;
+  // Globe auto-rotate (3D idle spin). 2°/s is a calm, cinematic drift — half the
+  // former 4°/s, which read as "spinning a bit too fast" as a background globe.
+  private static readonly AUTO_ROTATE_DEG_PER_SEC = 2;
   private static readonly AUTO_ROTATE_IDLE_MS = 5000;
   private static readonly AUTO_ROTATE_MIN_FRAME_MS = 33; // ~30fps cap
   private autoRotateRafId: number | null = null;
@@ -465,6 +487,8 @@ export class DeckGLMap {
       this.loadCountryBoundaries();
       this.applyAtmosphere();
       this.applyProjection();
+      this.applyTerrain();
+      this.applyBrightBasemapClass();
       this.render();
       this.maybeStartAutoRotate();
     });
@@ -473,6 +497,7 @@ export class DeckGLMap {
 
     this.createControls();
     this.createProjectionToggle();
+    this.createStyleSwitcher();
     this.createTimeSlider();
     this.createLayerToggles();
     this.createLegend();
@@ -518,11 +543,10 @@ export class DeckGLMap {
 
   private initBasemap(): void {
     const preset = VIEW_PRESETS[this.state.view];
-    const initialTheme = getCurrentTheme();
 
     this.mapboxMap = new mapboxgl.Map({
       container: 'deckgl-basemap',
-      style: initialTheme === 'light' ? LIGHT_STYLE : DARK_STYLE,
+      style: this.resolveStyleUrl(),
       center: [preset.longitude, preset.latitude],
       zoom: preset.zoom,
       // Start already in the correct projection so ?mode=3d loads as a globe
@@ -3191,15 +3215,21 @@ export class DeckGLMap {
         { key: 'trafficArcs', label: 'Traffic', icon: '&#8644;' },
       ];
 
+    // Apply the user's persisted cosmetic ordering of the toggle rows (drag to
+    // reorder). Unknown/removed keys are dropped; new keys append in config order.
+    const orderedConfig = this.applyPersistedLayerOrder(layerConfig);
+
     toggles.innerHTML = `
       <div class="toggle-header">
+        <span class="toggle-drag-grip" title="${t('components.deckgl.dragPanel', { defaultValue: 'Drag to move' })}">⠿</span>
         <span>${t('components.deckgl.layersTitle')}</span>
         <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
         <button class="toggle-collapse">&#9660;</button>
       </div>
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
-        ${layerConfig.map(({ key, label, icon }) => `
+        ${orderedConfig.map(({ key, label, icon }) => `
           <label class="layer-toggle" data-layer="${key}">
+            <span class="layer-reorder-grip" title="${t('components.deckgl.dragReorder', { defaultValue: 'Drag to reorder' })}" aria-hidden="true">⠿</span>
             <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}>
             <span class="toggle-icon">${icon}</span>
             <span class="toggle-label">${label}</span>
@@ -3243,6 +3273,153 @@ export class DeckGLMap {
       toggleList?.classList.toggle('collapsed');
       if (collapseBtn) collapseBtn.innerHTML = toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
     });
+
+    // Task 3 UX: the panel is draggable by its header (position persisted), and the
+    // rows drag-reorder within the list (order persisted, purely cosmetic).
+    const header = toggles.querySelector('.toggle-header') as HTMLElement | null;
+    if (header) this.makeLayerPanelDraggable(toggles, header);
+    if (toggleList) this.makeLayerListSortable(toggleList as HTMLElement);
+    this.restoreLayerPanelPosition(toggles);
+  }
+
+  // ---- Layer panel: draggable + sortable (persisted) ------------------------
+
+  private layerOrderStore(): string[] {
+    try {
+      const raw = localStorage.getItem(LAYER_PANEL_ORDER_KEY);
+      const arr = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(arr) ? arr.filter((k): k is string => typeof k === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private applyPersistedLayerOrder<T extends { key: string }>(config: T[]): T[] {
+    const order = this.layerOrderStore();
+    if (order.length === 0) return config;
+    const byKey = new Map(config.map((c) => [c.key, c]));
+    const out: T[] = [];
+    for (const key of order) {
+      const item = byKey.get(key);
+      if (item) { out.push(item); byKey.delete(key); }
+    }
+    // Any keys not covered by the saved order keep their config position at the end.
+    for (const c of config) if (byKey.has(c.key)) out.push(c);
+    return out;
+  }
+
+  private saveLayerOrder(list: HTMLElement): void {
+    const order = Array.from(list.querySelectorAll('.layer-toggle'))
+      .map((el) => (el as HTMLElement).dataset.layer)
+      .filter((k): k is string => Boolean(k));
+    try { localStorage.setItem(LAYER_PANEL_ORDER_KEY, JSON.stringify(order)); } catch { /* ignore */ }
+  }
+
+  // Pointer-driven row reordering, initiated only from the row's grip so the
+  // checkbox/label stay clickable. Reorders the DOM live; commits order on release.
+  private makeLayerListSortable(list: HTMLElement): void {
+    let dragging: HTMLElement | null = null;
+    list.querySelectorAll('.layer-reorder-grip').forEach((gripNode) => {
+      const grip = gripNode as HTMLElement;
+      const row = grip.closest('.layer-toggle') as HTMLElement | null;
+      if (!row) return;
+      grip.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = row;
+        row.classList.add('reordering');
+        grip.setPointerCapture(e.pointerId);
+      });
+      grip.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const rows = Array.from(list.querySelectorAll('.layer-toggle')) as HTMLElement[];
+        const after = rows.find((r) => {
+          if (r === dragging) return false;
+          const box = r.getBoundingClientRect();
+          return e.clientY < box.top + box.height / 2;
+        });
+        if (after && after !== dragging.nextElementSibling) list.insertBefore(dragging, after);
+        else if (!after && dragging !== list.lastElementChild) list.appendChild(dragging);
+      });
+      const end = (e: PointerEvent): void => {
+        if (!dragging) return;
+        dragging.classList.remove('reordering');
+        dragging = null;
+        try { grip.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
+        this.saveLayerOrder(list);
+      };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+    });
+  }
+
+  private loadLayerPanelPos(): { x: number; y: number } | null {
+    try {
+      const raw = localStorage.getItem(LAYER_PANEL_POS_KEY);
+      if (!raw) return null;
+      const p = JSON.parse(raw) as { x?: unknown; y?: unknown };
+      return typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Clamp so the panel can never be dragged fully off-screen (leave a grabbable strip).
+  private clampPanelPos(panel: HTMLElement, x: number, y: number): { x: number; y: number } {
+    const parent = panel.parentElement?.getBoundingClientRect();
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxX = (parent?.width ?? window.innerWidth) - Math.min(w, 80);
+    const maxY = (parent?.height ?? window.innerHeight) - Math.min(h, 40);
+    return { x: Math.max(0, Math.min(x, maxX)), y: Math.max(0, Math.min(y, maxY)) };
+  }
+
+  private positionLayerPanel(panel: HTMLElement, x: number, y: number): void {
+    const { x: cx, y: cy } = this.clampPanelPos(panel, x, y);
+    // Switch from the default bottom-left anchor to explicit top-left placement.
+    panel.style.left = `${cx}px`;
+    panel.style.top = `${cy}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
+  private restoreLayerPanelPosition(panel: HTMLElement): void {
+    const pos = this.loadLayerPanelPos();
+    if (pos) requestAnimationFrame(() => this.positionLayerPanel(panel, pos.x, pos.y));
+  }
+
+  private makeLayerPanelDraggable(panel: HTMLElement, header: HTMLElement): void {
+    const grip = header.querySelector('.toggle-drag-grip') as HTMLElement | null;
+    if (!grip) return;
+    let startX = 0, startY = 0, baseX = 0, baseY = 0, dragging = false;
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      const box = panel.getBoundingClientRect();
+      const parent = panel.parentElement?.getBoundingClientRect();
+      baseX = box.left - (parent?.left ?? 0);
+      baseY = box.top - (parent?.top ?? 0);
+      startX = e.clientX;
+      startY = e.clientY;
+      panel.classList.add('dragging');
+      grip.setPointerCapture(e.pointerId);
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      this.positionLayerPanel(panel, baseX + (e.clientX - startX), baseY + (e.clientY - startY));
+    });
+    const end = (e: PointerEvent): void => {
+      if (!dragging) return;
+      dragging = false;
+      panel.classList.remove('dragging');
+      try { grip.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
+      const parent = panel.parentElement?.getBoundingClientRect();
+      const box = panel.getBoundingClientRect();
+      const pos = { x: box.left - (parent?.left ?? 0), y: box.top - (parent?.top ?? 0) };
+      try { localStorage.setItem(LAYER_PANEL_POS_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
   }
 
   /** Show layer help popup explaining each layer */
@@ -4598,16 +4775,120 @@ export class DeckGLMap {
     } catch { /* layer not ready */ }
   }
 
-  private switchBasemap(theme: 'dark' | 'light'): void {
+  // Theme (light/dark) only affects the monochrome `dark` basemap; a light-swap
+  // while on satellite/terrain is a no-op for the raster but still refreshes deck
+  // colours via the caller. Both theme and style changes funnel through one setStyle.
+  private switchBasemap(_theme: 'dark' | 'light'): void {
+    if (this.basemapStyle === 'dark') this.applyBasemapStyle();
+  }
+
+  private static loadBasemapStyle(): BasemapStyle {
+    try {
+      const raw = localStorage.getItem(BASEMAP_STYLE_KEY);
+      const style = (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : 'dark';
+      // satellite/terrain are Mapbox styles — without a token they never load, so
+      // fall back to the always-available dark basemap rather than a blank void.
+      return isBrightBasemap(style) && !MAPBOX_TOKEN ? 'dark' : style;
+    } catch {
+      return 'dark';
+    }
+  }
+
+  // The effective mapbox style URL: `dark` stays theme-aware CartoDB (the locked
+  // monochrome look), satellite/terrain are their own Mapbox styles.
+  private resolveStyleUrl(): string {
+    if (this.basemapStyle === 'satellite') return SATELLITE_STYLE;
+    if (this.basemapStyle === 'terrain') return TERRAIN_STYLE;
+    return getCurrentTheme() === 'light' ? LIGHT_STYLE : DARK_STYLE;
+  }
+
+  // One and only one setStyle path. setStyle() replaces every source/layer AND
+  // clears fog + terrain + resets projection to mercator, so the once('style.load')
+  // restores all of them. The overlaid deck lives outside the style, so it survives.
+  private applyBasemapStyle(): void {
     if (!this.mapboxMap) return;
-    this.mapboxMap.setStyle(theme === 'light' ? LIGHT_STYLE : DARK_STYLE);
-    // setStyle() replaces all sources/layers — reset guard so country layers are re-added
+    this.mapboxMap.setStyle(this.resolveStyleUrl());
     this.countryGeoJsonLoaded = false;
     this.mapboxMap.once('style.load', () => {
       this.loadCountryBoundaries();
-      // A full style swap clears fog and resets projection to mercator — restore both.
       this.applyAtmosphere();
       this.applyProjection();
+      this.applyTerrain();
+      this.applyBrightBasemapClass();
+    });
+  }
+
+  // Public: switch basemap style (dark | satellite | terrain), persist, reflect UI.
+  public setBasemapStyle(style: BasemapStyle): void {
+    if (!BASEMAP_STYLES.includes(style) || style === this.basemapStyle) return;
+    this.basemapStyle = style;
+    try { localStorage.setItem(BASEMAP_STYLE_KEY, style); } catch { /* storage full/blocked */ }
+    this.updateStyleSwitcher();
+    this.applyBasemapStyle();
+    this.render(); // deck dot colours re-evaluate against the new backdrop
+  }
+
+  public getBasemapStyle(): BasemapStyle {
+    return this.basemapStyle;
+  }
+
+  // Drape the current style over the Mapbox DEM for real relief when on terrain;
+  // otherwise clear terrain. Safe to call once the style has loaded.
+  private applyTerrain(): void {
+    if (!this.mapboxMap) return;
+    try {
+      if (this.basemapStyle === 'terrain') {
+        if (!this.mapboxMap.getSource(TERRAIN_DEM_SOURCE_ID)) {
+          this.mapboxMap.addSource(TERRAIN_DEM_SOURCE_ID, {
+            type: 'raster-dem',
+            url: TERRAIN_DEM_URL,
+            tileSize: 512,
+            maxzoom: 14,
+          });
+        }
+        this.mapboxMap.setTerrain({ source: TERRAIN_DEM_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
+      } else {
+        this.mapboxMap.setTerrain(null);
+      }
+    } catch { /* DEM source needs a Mapbox token; harmless without one */ }
+  }
+
+  // Toggle the thin-dark-halo class on the map wrapper so data dots stay legible on
+  // bright satellite/terrain rasters (CSS drop-shadow on the deck canvas only).
+  private applyBrightBasemapClass(): void {
+    this.container.classList.toggle('bright-basemap', isBrightBasemap(this.basemapStyle));
+  }
+
+  private createStyleSwitcher(): void {
+    const el = document.createElement('div');
+    el.className = 'deckgl-style-switcher';
+    const opts: Array<{ style: BasemapStyle; label: string; title: string }> = [
+      { style: 'dark', label: 'Dark', title: t('components.deckgl.basemap.dark', { defaultValue: 'Dark basemap' }) },
+      { style: 'satellite', label: 'Sat', title: t('components.deckgl.basemap.satellite', { defaultValue: 'Satellite imagery' }) },
+      { style: 'terrain', label: 'Terrain', title: t('components.deckgl.basemap.terrain', { defaultValue: 'Terrain relief' }) },
+    ];
+    el.innerHTML = opts
+      .map((o) => {
+        // Bright Mapbox styles need a token; disable (don't hide) them when absent so
+        // the option is discoverable but can't break the map.
+        const needsToken = isBrightBasemap(o.style) && !MAPBOX_TOKEN;
+        const title = needsToken
+          ? t('components.deckgl.basemap.needsToken', { defaultValue: 'Requires a Mapbox token' })
+          : o.title;
+        return `<button class="style-btn ${o.style === this.basemapStyle ? 'active' : ''}" data-style="${o.style}"${needsToken ? ' disabled' : ''} title="${title}">${o.label}</button>`;
+      })
+      .join('');
+    this.container.appendChild(el);
+    el.querySelectorAll('.style-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.setBasemapStyle((btn as HTMLElement).dataset.style as BasemapStyle));
+    });
+  }
+
+  private updateStyleSwitcher(): void {
+    const el = this.container.querySelector('.deckgl-style-switcher');
+    if (!el) return;
+    el.querySelectorAll('.style-btn').forEach((btn) => {
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.style === this.basemapStyle);
     });
   }
 
