@@ -117,20 +117,19 @@ export class NewsPanel extends Panel {
     this.summaryContainer.style.display = 'none';
     this.element.insertBefore(this.summaryContainer, this.content);
 
-    // Create summarize button
+    // Create summarize button — a clear, labelled affordance (not a cryptic ✨):
+    // the ensō/sparkle mark + a "Summarize" word so its purpose is obvious. The
+    // label collapses to icon-only on very narrow panels via CSS.
     this.summaryBtn = document.createElement('button');
     this.summaryBtn.className = 'panel-summarize-btn';
-    this.summaryBtn.innerHTML = '✨';
+    this.summaryBtn.type = 'button';
+    this.summaryBtn.innerHTML = '<span class="summarize-ico">✨</span><span class="summarize-label">Summarize</span>';
     this.summaryBtn.title = t('components.newsPanel.summarize');
+    this.summaryBtn.setAttribute('aria-label', t('components.newsPanel.summarize'));
+    this.summaryBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.summaryBtn.addEventListener('click', () => this.handleSummarize());
-
-    // Insert before count element (use inherited this.header directly)
-    const countEl = this.header.querySelector('.panel-count');
-    if (countEl) {
-      this.header.insertBefore(this.summaryBtn, countEl);
-    } else {
-      this.header.appendChild(this.summaryBtn);
-    }
+    // Right side of the header, clear of the left-aligned title/count.
+    this.header.appendChild(this.summaryBtn);
   }
 
   private async handleSummarize(): Promise<void> {
@@ -167,7 +166,7 @@ export class NewsPanel extends Panel {
       setTimeout(() => this.hideSummary(), 3000);
     } finally {
       this.isSummarizing = false;
-      this.summaryBtn.innerHTML = '✨';
+      this.summaryBtn.innerHTML = '<span class="summarize-ico">✨</span><span class="summarize-label">Summarize</span>';
       this.summaryBtn.disabled = false;
     }
   }

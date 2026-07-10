@@ -154,8 +154,12 @@ export class Panel {
     if (options.showCount) {
       this.countEl = document.createElement('span');
       this.countEl.className = 'panel-count';
-      this.countEl.textContent = '0';
-      this.header.appendChild(this.countEl);
+      // Inline after the title (left side) so it never collides with the hover-✕
+      // that lives top-right. Hidden until there's a real count — a "0" while the
+      // feed is still loading reads as broken.
+      this.countEl.textContent = '';
+      this.countEl.style.display = 'none';
+      headerLeft.appendChild(this.countEl);
     }
 
     this.content = document.createElement('div');
@@ -263,8 +267,17 @@ export class Panel {
 
   protected setDataBadge(state: 'live' | 'cached' | 'unavailable', detail?: string): void {
     if (!this.statusBadgeEl) return;
+    // The "LIVE" text chip is retired: everything here is live by default, and a
+    // static "LIVE" badge is misleading while a feed is loading/empty. Live state
+    // shows only a subtle pulsing dot (no text); cached/unavailable keep their
+    // informative labels — those actually tell the user something.
+    if (state === 'live') {
+      this.statusBadgeEl.textContent = '';
+      this.statusBadgeEl.className = 'panel-data-badge live';
+      this.statusBadgeEl.style.display = 'inline-flex';
+      return;
+    }
     const labels = {
-      live: t('common.live'),
       cached: t('common.cached'),
       unavailable: t('common.unavailable'),
     } as const;
@@ -320,7 +333,11 @@ export class Panel {
 
   public setCount(count: number): void {
     if (this.countEl) {
-      this.countEl.textContent = count.toString();
+      // Only show a real count; a "0" (loading / empty) is hidden so it never
+      // looks broken and never crowds the hover-✕.
+      const show = Number.isFinite(count) && count > 0;
+      this.countEl.textContent = show ? count.toString() : '';
+      this.countEl.style.display = show ? '' : 'none';
     }
   }
 
