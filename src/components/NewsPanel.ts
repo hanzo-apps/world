@@ -309,7 +309,7 @@ export class NewsPanel extends Panel {
     const html = items
       .map(
         (item) => `
-      <div class="item ${item.isAlert ? 'alert' : ''}" ${item.monitorColor ? `style="border-inline-start-color: ${escapeHtml(item.monitorColor)}"` : ''}>
+      <div class="item ${item.isAlert ? 'alert' : ''}" ${item.monitorColor ? `style="border-inline-start-color: ${escapeHtml(item.monitorColor)}"` : ''} data-ctx-url="${sanitizeUrl(item.link)}" data-ctx-headline="${escapeHtml(item.title)}">
         <div class="item-source">
           ${escapeHtml(item.source)}
           ${item.lang && item.lang !== getCurrentLanguage() ? `<span class="lang-badge">${item.lang.toUpperCase()}</span>` : ''}
@@ -486,7 +486,7 @@ export class NewsPanel extends Panel {
     ].filter(Boolean).join(' ');
 
     return `
-      <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-inline-start-color: ${escapeHtml(cluster.monitorColor)}"` : ''} data-cluster-id="${escapeHtml(cluster.id)}" data-news-id="${escapeHtml(cluster.primaryLink)}">
+      <div class="${itemClasses}" ${cluster.monitorColor ? `style="border-inline-start-color: ${escapeHtml(cluster.monitorColor)}"` : ''} data-cluster-id="${escapeHtml(cluster.id)}" data-news-id="${escapeHtml(cluster.primaryLink)}" data-ctx-url="${sanitizeUrl(cluster.primaryLink)}" data-ctx-headline="${escapeHtml(cluster.primaryTitle)}">
         <div class="item-source">
           ${tierBadge}
           ${escapeHtml(cluster.primarySource)}

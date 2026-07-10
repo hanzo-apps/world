@@ -49,6 +49,16 @@ export interface AnalystRequest {
   model?: string;
 }
 
+/** One data-tool call the backend ran in its agentic loop, surfaced as a
+ *  collapsed trace in the chat so answers visibly cite live data. */
+export interface AnalystTrace {
+  /** Pre-rendered call, e.g. `world_brief({"n":5})`. */
+  label: string;
+  ok: boolean;
+  /** The (capped) tool result body — shown in the collapsed detail. */
+  result: string;
+}
+
 export interface AnalystResponse {
   reply: string;
   actions: AnalystAction[];
@@ -58,6 +68,8 @@ export interface AnalystResponse {
   model?: string;
   /** Upstream error detail when the backend degraded — surfaced honestly in the chat. */
   error?: string;
+  /** World MCP data tools the backend called to ground the answer (may be empty). */
+  traces: AnalystTrace[];
 }
 
 export interface AnalystTransport {
@@ -91,7 +103,7 @@ const httpTransport: AnalystTransport = {
       data = {};
     }
     if (!res.ok && !('reply' in data) && !('error' in data)) {
-      return { reply: '', actions: [], fallback: true, error: `HTTP ${res.status}` };
+      return { reply: '', actions: [], fallback: true, error: `HTTP ${res.status}`, traces: [] };
     }
     return normalize(data);
   },
@@ -105,7 +117,20 @@ function normalize(data: Record<string, unknown>): AnalystResponse {
     reason: typeof data.reason === 'string' ? data.reason : undefined,
     model: typeof data.model === 'string' ? data.model : undefined,
     error: typeof data.error === 'string' && data.error ? data.error : undefined,
+    traces: normalizeTraces(data.traces),
   };
+}
+
+function normalizeTraces(raw: unknown): AnalystTrace[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AnalystTrace[] = [];
+  for (const t of raw) {
+    if (!t || typeof t !== 'object') continue;
+    const r = t as Record<string, unknown>;
+    if (typeof r.label !== 'string' || !r.label) continue;
+    out.push({ label: r.label, ok: !!r.ok, result: typeof r.result === 'string' ? r.result : '' });
+  }
+  return out;
 }
 
 // ── Transport selection (the one switch point) ───────────────────────────────
