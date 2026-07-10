@@ -67,6 +67,7 @@ import { isCallback, handleCallback } from '@/services/iam';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chunk-reload';
+import { installServiceWorker } from '@/services/sw-update';
 
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
@@ -137,20 +138,6 @@ Object.defineProperty(window, 'beta', {
   },
 });
 
-if (!('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window)) {
-  import('virtual:pwa-register').then(({ registerSW }) => {
-    registerSW({
-      onRegisteredSW(_swUrl, registration) {
-        if (registration) {
-          setInterval(async () => {
-            if (!navigator.onLine) return;
-            try { await registration.update(); } catch {}
-          }, 60 * 60 * 1000);
-        }
-      },
-      onOfflineReady() {
-        console.log('[PWA] App ready for offline use');
-      },
-    });
-  });
-}
+// Register the service worker and keep long-lived tabs on the latest build. All
+// SW lifecycle lives in one place; see src/services/sw-update.ts.
+installServiceWorker();
