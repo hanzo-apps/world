@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "name": "hanzo-world",
+  "title": "Hanzo World",
+  "description": "Read-only Model Context Protocol server over Hanzo World's public planetary-intelligence data: world-model instability rankings, per-country risk, market quotes, cloud chain + traffic status, and curated news feeds. Ships two MCP apps (world-brief, market-radar).",
+  "version": "1.0.0",
+  "endpoint": "/v1/world/mcp",
+  "transport": "streamable-http",
+  "protocolVersion": "2025-06-18",
+  "tools": [
+    {
+      "name": "world_brief",
+      "title": "World Brief",
+      "description": "Ranked snapshot of the highest-instability entities from the Hanzo World model — the fastest \"what is going on in the world right now\" brief.",
+      "method": "GET",
+      "endpoint": "/v1/world/model/top",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "default": "country",
+            "description": "entity kind to rank",
+            "enum": [
+              "country",
+              "theater",
+              "market"
+            ],
+            "type": "string"
+          },
+          "metric": {
+            "default": "instability",
+            "description": "ranking signal",
+            "enum": [
+              "instability",
+              "velocity",
+              "sentiment"
+            ],
+            "type": "string"
+          },
+          "n": {
+            "default": 10,
+            "description": "number of entities to return",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "app": "ui://world/world-brief"
+    },
+    {
+      "name": "country_instability",
+      "title": "Country Instability",
+      "description": "Instability, news-velocity and sentiment profile for one country by ISO code, from the Hanzo World model.",
+      "method": "GET",
+      "endpoint": "/v1/world/model/country/",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "iso": {
+            "description": "ISO 3166 country code, e.g. US, RU, CN, UA",
+            "type": "string"
+          }
+        },
+        "required": [
+          "iso"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "model_history",
+      "title": "Model History",
+      "description": "Downsampled time-series of composite world instability and top movers over the last N hours (max 168).",
+      "method": "GET",
+      "endpoint": "/v1/world/model/history",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "hours": {
+            "default": 24,
+            "description": "look-back window in hours",
+            "maximum": 168,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "name": "market_quotes",
+      "title": "Market Quotes",
+      "description": "Live quotes (price, change, %change, high/low/open/previous-close) for up to 20 symbols — stocks, indices, FX, commodities, crypto. Returns skipped:true when no quote provider is configured.",
+      "method": "GET",
+      "endpoint": "/v1/world/finnhub",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "symbols": {
+            "description": "ticker symbols, e.g. [\"AAPL\",\"^GSPC\",\"BTC-USD\"]",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "type": "object"
+      },
+      "app": "ui://world/market-radar"
+    },
+    {
+      "name": "chain_status",
+      "title": "Chain Status",
+      "description": "Public chain-node telemetry for the Hanzo Cloud map: node locations, health and per-region counts.",
+      "method": "GET",
+      "endpoint": "/v1/world/cloud/chain-nodes",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    {
+      "name": "traffic_map",
+      "title": "Traffic Map",
+      "description": "Public request-traffic snapshot for the Hanzo Cloud map: origin→edge flows and regional volume.",
+      "method": "GET",
+      "endpoint": "/v1/world/cloud/traffic",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    {
+      "name": "feeds",
+      "title": "News Feeds",
+      "description": "Latest headlines for one news category, fetched server-side from a curated set of reputable RSS feeds. Categories: world, tech, markets, security, ai.",
+      "method": "POST",
+      "endpoint": "/v1/world/feeds-batch",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "default": "world",
+            "description": "news category",
+            "enum": [
+              "world",
+              "tech",
+              "markets",
+              "security",
+              "ai"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ],
+  "apps": [
+    {
+      "uri": "ui://world/world-brief",
+      "name": "world-brief",
+      "title": "World Brief",
+      "description": "Ranked list of the highest-instability entities from the Hanzo World model.",
+      "tool": "world_brief",
+      "mimeType": "text/html;profile=mcp-app",
+      "sha256": "0051db196f80843c370663cd95bbcf836df79dfd60750991efc7a27e5b6e2e01"
+    },
+    {
+      "uri": "ui://world/market-radar",
+      "name": "market-radar",
+      "title": "Market Radar",
+      "description": "Compact quote board for a watchlist of market symbols.",
+      "tool": "market_quotes",
+      "mimeType": "text/html;profile=mcp-app",
+      "sha256": "1ee47b12414bf01cf4311d9182541a427dc7e43fe0609eb4709047eb37c3ef14"
+    }
+  ]
+}

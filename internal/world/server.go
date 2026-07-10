@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hanzoai/world/internal/world/mcp"
 	"github.com/hanzoai/world/internal/world/model"
 )
 
@@ -40,6 +41,7 @@ type Server struct {
 	cache      *Cache
 	ai         *AIClient
 	worldModel *model.Engine
+	mcp        *mcp.Server
 }
 
 // NewServer constructs the backend and its world-model engine (built from the
@@ -49,6 +51,7 @@ func NewServer() *Server {
 		client: &http.Client{Timeout: 25 * time.Second},
 		cache:  NewCache(4096),
 		ai:     newAIClient(),
+		mcp:    mcp.New(),
 	}
 	s.worldModel = model.New(s.modelSources(), modelDataDir(), modelInterval())
 	return s
