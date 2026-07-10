@@ -3,26 +3,92 @@
 // One module owns all pointer math and drag/resize visuals; callers own state
 // (App persists panel order, Panel owns the row-span class ↔ storage mapping).
 //
-// Drag: unified Pointer Events (mouse + touch + pen), a small press threshold so
-// clicks and scrolls are never hijacked, a custom translucent ghost that follows
-// the pointer, and a live gap that opens where the panel will land — sibling
-// panels slide into their new positions with a transform-based FLIP animation
-// (no layout jank, no OS drag image). Escape cancels and restores.
+// The module is layout-mode aware (see services/grid-config.ts):
+//   • "grid" mode — the original behaviour, untouched. Drag reorders panels with
+//     a custom ghost + FLIP reflow; resize snaps to grid tracks / row-spans. A
+//     faint track overlay is shown for the duration of the gesture.
+//   • "free" mode — the grid is a positioned block and each panel is absolutely
+//     placed. Drag moves the panel directly under the cursor; resize is
+//     pixel-exact from the right edge, bottom edge, or bottom-right corner.
+//     Nothing snaps; the new {x,y,w,h} is persisted via grid-config.
 //
-// Resize: the same pointer plumbing drives the bottom handle. Height maps to a
-// discrete grid row-span on a clean rowPx grid, so the snap points line up with
-// the cursor instead of the old mismatched thresholds.
+// Drag (grid): unified Pointer Events (mouse + touch + pen), a small press
+// threshold so clicks and scrolls are never hijacked, a custom translucent ghost
+// that follows the pointer, and a live gap that opens where the panel will land.
+// Escape cancels and restores.
+//
+// Resize (grid): the same pointer plumbing drives the handles. Height maps to a
+// discrete grid row-span on a clean rowPx grid; width maps to a column span on
+// the live track grid, so the snap points line up with the cursor.
+
+import {
+  getLayoutMode,
+  registerPanel,
+  commitFreeRect,
+  showSnapOverlay,
+  hideSnapOverlay,
+} from './grid-config';
 
 const DRAG_THRESHOLD = 6; // px of pointer travel before a press becomes a drag
 const FLIP_MS = 180; // sibling reflow duration
 const DROP_SETTLE_MS = 160; // ghost easing into its final slot on release
 const FLIP_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 
+// Sane pixel floors for free-mode geometry. The map keeps a larger floor so it
+// never collapses to an unreadable sliver.
+const FREE_MIN_W = 160;
+const FREE_MIN_H = 120;
+const MAP_MIN = 240;
+
+const minWidthFor = (el: HTMLElement, opt?: number): number =>
+  el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_W;
+const minHeightFor = (el: HTMLElement, opt?: number): number =>
+  el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_H;
+
+type ResizeAxis = 'x' | 'y' | 'xy';
+
+// Free-mode pixel resize, shared by the right / bottom / corner handles. The
+// panel is top-left anchored (absolute), so only its width/height change.
+interface FreeResizeState {
+  startX: number;
+  startY: number;
+  startW: number;
+  startH: number;
+  minW: number;
+  minH: number;
+}
+
+function applyFreeResize(
+  el: HTMLElement,
+  axis: ResizeAxis,
+  s: FreeResizeState,
+  clientX: number,
+  clientY: number,
+): void {
+  if (axis === 'x' || axis === 'xy') {
+    const w = Math.max(s.minW, s.startW + (clientX - s.startX));
+    el.style.width = `${Math.round(w)}px`;
+  }
+  if (axis === 'y' || axis === 'xy') {
+    const h = Math.max(s.minH, s.startH + (clientY - s.startY));
+    el.style.height = `${Math.round(h)}px`;
+  }
+}
+
+function commitFreeGeometry(el: HTMLElement): void {
+  commitFreeRect(el, {
+    x: el.offsetLeft,
+    y: el.offsetTop,
+    w: el.offsetWidth,
+    h: el.offsetHeight,
+  });
+}
+
 const isInteractive = (target: Element | null): boolean =>
   !!target?.closest('button, a, input, select, textarea, [contenteditable="true"]');
 
 const isResizeHandle = (target: Element | null): boolean =>
-  !!target?.closest('.panel-resize-handle, .panel-col-resize-handle');
+  !!target?.closest('.panel-resize-handle, .panel-col-resize-handle, .panel-corner-resize-handle');
 
 /** Panels that participate in reflow — everything in the grid that is a visible panel. */
 function livePanels(grid: HTMLElement, except?: HTMLElement): HTMLElement[] {
@@ -70,6 +136,12 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
   let lastX = 0;
   let lastY = 0;
   let onKeyDown: ((e: KeyboardEvent) => void) | null = null;
+
+  // Free-mode drag bookkeeping: the panel is already position:absolute, so a drag
+  // just tracks its top-left under the cursor (no ghost, no reflow).
+  let freeGesture = false; // this gesture started in free mode
+  let freeStartLeft = 0;
+  let freeStartTop = 0;
 
   const clearFlip = (g: HTMLElement) => {
     for (const p of livePanels(g)) {
@@ -176,20 +248,53 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     grid = opts.getGrid();
     if (!grid) return;
     dragging = true;
-    originalNext = el.nextSibling;
-    ghost = makeGhost();
-    el.classList.add('panel-drag-source');
-    document.body.classList.add('panel-drag-active');
     onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') cancelDrag();
     };
     document.addEventListener('keydown', onKeyDown, true);
+
+    if (freeGesture) {
+      // Pixel-follow drag: lift the panel above its siblings, no ghost/FLIP.
+      freeStartLeft = el.offsetLeft;
+      freeStartTop = el.offsetTop;
+      el.classList.add('panel-free-dragging');
+      document.body.classList.add('panel-drag-active');
+      return;
+    }
+
+    originalNext = el.nextSibling;
+    ghost = makeGhost();
+    el.classList.add('panel-drag-source');
+    document.body.classList.add('panel-drag-active');
+    showSnapOverlay();
+  };
+
+  // Free-mode: place the panel's top-left under the pointer, clamped into the
+  // grid, then persist. Grid origin is re-read each frame so page scroll during
+  // a drag never introduces drift.
+  const moveFree = (x: number, y: number) => {
+    if (!grid) return;
+    const gr = grid.getBoundingClientRect();
+    const left = Math.max(0, x - offsetX - gr.left - grid.clientLeft);
+    const top = Math.max(0, y - offsetY - gr.top - grid.clientTop);
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(top)}px`;
+  };
+
+  const commitFree = () => {
+    commitFreeRect(el, {
+      x: el.offsetLeft,
+      y: el.offsetTop,
+      w: el.offsetWidth,
+      h: el.offsetHeight,
+    });
   };
 
   const finishVisuals = () => {
     if (grid) clearFlip(grid);
-    el.classList.remove('panel-drag-source');
+    el.classList.remove('panel-drag-source', 'panel-free-dragging');
     document.body.classList.remove('panel-drag-active');
+    hideSnapOverlay();
     if (onKeyDown) {
       document.removeEventListener('keydown', onKeyDown, true);
       onKeyDown = null;
@@ -219,6 +324,13 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = 0;
+    }
+    if (freeGesture) {
+      el.style.left = `${freeStartLeft}px`; // restore original position
+      el.style.top = `${freeStartTop}px`;
+      finishVisuals();
+      releasePointer();
+      return;
     }
     if (grid) grid.insertBefore(el, originalNext); // restore original slot
     finishVisuals();
@@ -266,6 +378,10 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     rafId = requestAnimationFrame(() => {
       rafId = 0;
       if (!dragging || !grid) return;
+      if (freeGesture) {
+        moveFree(x, y);
+        return;
+      }
       moveGhost(x, y);
       const ref = referenceNodeAt(grid, x, y);
       if (ref !== undefined) reorderTo(grid, ref);
@@ -279,7 +395,12 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
       cancelAnimationFrame(rafId);
       rafId = 0;
     }
-    if (wasDragging && grid) {
+    if (wasDragging && freeGesture) {
+      moveFree(lastX, lastY);
+      dragging = false;
+      finishVisuals();
+      commitFree();
+    } else if (wasDragging && grid) {
       const ref = referenceNodeAt(grid, lastX, lastY);
       if (ref !== undefined) reorderTo(grid, ref);
       const slot = el.getBoundingClientRect();
@@ -313,6 +434,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     pointerId = e.pointerId;
     pressing = true;
     dragging = false;
+    freeGesture = getLayoutMode() === 'free';
     startX = e.clientX;
     startY = e.clientY;
     const rect = el.getBoundingClientRect();
@@ -325,6 +447,9 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
   };
 
   el.addEventListener('pointerdown', onPointerDown);
+
+  // Self-apply this panel's saved geometry for the active mode once it mounts.
+  registerPanel(el);
 
   return () => {
     if (dragging) cancelDrag();
@@ -345,6 +470,8 @@ export interface PanelResizeOptions {
    * (span-0 = 120px tiny … span-4 = 800px) with a ~100px feel at the small end.
    */
   snapHeights?: number[];
+  /** Pixel floor for free-mode height (default 120). */
+  minH?: number;
   /** Height at drag start → the panel's current span. */
   getStartSpan: () => number;
   /** Live: apply the given span while dragging (Panel owns the span→class mapping). */
@@ -355,8 +482,8 @@ export interface PanelResizeOptions {
 
 /**
  * Drive a panel's bottom resize handle with the same pointer plumbing as drag.
- * Height snaps to a discrete row-span on a clean rowPx grid, so snap points line
- * up with the cursor. Returns a cleanup fn.
+ * In grid mode height snaps to a discrete row-span on a clean rowPx grid; in free
+ * mode it is pixel-exact and persisted via grid-config. Returns a cleanup fn.
  */
 export function attachPanelResize(
   el: HTMLElement,
@@ -373,6 +500,8 @@ export function attachPanelResize(
   let startY = 0;
   let startHeight = 0;
   let lastSpan = minSpan;
+  let freeGesture = false;
+  let free: FreeResizeState | null = null;
 
   const spanFor = (height: number): number => {
     if (snapHeights && snapHeights.length > 0) {
@@ -395,6 +524,10 @@ export function attachPanelResize(
   const onPointerMove = (e: PointerEvent) => {
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
+    if (freeGesture && free) {
+      applyFreeResize(el, 'y', free, e.clientX, e.clientY);
+      return;
+    }
     const height = startHeight + (e.clientY - startY);
     const span = spanFor(height);
     if (span !== lastSpan) {
@@ -420,7 +553,12 @@ export function attachPanelResize(
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
-    opts.onCommit(lastSpan);
+    if (freeGesture) {
+      commitFreeGeometry(el);
+    } else {
+      hideSnapOverlay();
+      opts.onCommit(lastSpan);
+    }
   };
 
   const onPointerUp = (e: PointerEvent) => {
@@ -434,9 +572,23 @@ export function attachPanelResize(
     e.stopPropagation();
     pointerId = e.pointerId;
     resizing = true;
+    freeGesture = getLayoutMode() === 'free';
+    const rect = el.getBoundingClientRect();
     startY = e.clientY;
-    startHeight = el.getBoundingClientRect().height;
+    startHeight = rect.height;
     lastSpan = opts.getStartSpan();
+    if (freeGesture) {
+      free = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startW: rect.width,
+        startH: rect.height,
+        minW: minWidthFor(el),
+        minH: minHeightFor(el, opts.minH),
+      };
+    } else {
+      showSnapOverlay();
+    }
     el.classList.add('resizing');
     el.dataset.resizing = 'true';
     handle.classList.add('active');
@@ -463,6 +615,8 @@ export interface PanelColResizeOptions {
   getGrid: () => HTMLElement | null;
   /** Column span at drag start. */
   getStartCols: () => number;
+  /** Pixel floor for free-mode width (default 160). */
+  minW?: number;
   /** Live preview: apply a span of `cols` out of `total` grid columns. */
   onPreview: (cols: number, total: number) => void;
   /** Persist the final span (cols out of total). */
@@ -470,11 +624,10 @@ export interface PanelColResizeOptions {
 }
 
 /**
- * Horizontal sibling of attachPanelResize: drag a panel's right edge to set how
- * many grid COLUMNS it spans, snapping to the live `repeat(auto-fill, …)` track
- * so a panel (the map) can be pulled down to half width and let others flow in
- * beside it. The module owns pointer math + column snapping; the caller owns the
- * cols→style mapping and persistence.
+ * Horizontal sibling of attachPanelResize: drag a panel's right edge. In grid
+ * mode it sets how many grid COLUMNS the panel spans, snapping to the live
+ * `repeat(auto-fill, …)` track. In free mode it sets a pixel width, persisted via
+ * grid-config. The module owns pointer math; the caller owns the cols→style map.
  */
 export function attachPanelColResize(
   el: HTMLElement,
@@ -485,10 +638,14 @@ export function attachPanelColResize(
   let resizing = false;
   let total = 1;
   let colStep = 1;
-  let gridLeft = 0;
+  let originLeft = 0; // the panel's own left edge — span is measured from here
   let lastCols = 1;
+  let freeGesture = false;
+  let free: FreeResizeState | null = null;
 
   // Read the live column geometry: track count + (track width + gap) as the step.
+  // The span origin is the panel's own left edge, so a mid-grid panel snaps to the
+  // right number of columns (for the col-0 map this equals the grid's left edge).
   const measure = (grid: HTMLElement): void => {
     const style = getComputedStyle(grid);
     const tracks = style.gridTemplateColumns.split(' ').filter(Boolean);
@@ -500,18 +657,22 @@ export function attachPanelColResize(
     const inner = rect.width - padLeft - padRight;
     const colW = (inner - gap * (total - 1)) / total;
     colStep = colW + gap;
-    gridLeft = rect.left + padLeft;
+    originLeft = el.getBoundingClientRect().left;
   };
 
   const colsFor = (clientX: number): number => {
     if (colStep <= 0) return total;
-    const cols = Math.round((clientX - gridLeft) / colStep);
+    const cols = Math.round((clientX - originLeft) / colStep);
     return Math.min(total, Math.max(1, cols));
   };
 
   const onPointerMove = (e: PointerEvent) => {
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
+    if (freeGesture && free) {
+      applyFreeResize(el, 'x', free, e.clientX, e.clientY);
+      return;
+    }
     const cols = colsFor(e.clientX);
     if (cols !== lastCols) {
       lastCols = cols;
@@ -536,7 +697,12 @@ export function attachPanelColResize(
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
-    opts.onCommit(lastCols, total);
+    if (freeGesture) {
+      commitFreeGeometry(el);
+    } else {
+      hideSnapOverlay();
+      opts.onCommit(lastCols, total);
+    }
   };
 
   const onPointerUp = (e: PointerEvent) => {
@@ -547,14 +713,216 @@ export function attachPanelColResize(
   const onPointerDown = (e: PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const grid = opts.getGrid();
-    if (!grid) return;
     e.preventDefault();
     e.stopPropagation();
-    measure(grid);
     pointerId = e.pointerId;
     resizing = true;
-    lastCols = opts.getStartCols();
+    freeGesture = getLayoutMode() === 'free';
+    if (freeGesture) {
+      const rect = el.getBoundingClientRect();
+      free = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startW: rect.width,
+        startH: rect.height,
+        minW: minWidthFor(el, opts.minW),
+        minH: minHeightFor(el),
+      };
+    } else {
+      if (!grid) {
+        resizing = false;
+        return;
+      }
+      measure(grid);
+      lastCols = opts.getStartCols();
+      showSnapOverlay();
+    }
     el.classList.add('resizing-col');
+    el.dataset.resizing = 'true';
+    handle.classList.add('active');
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  handle.addEventListener('pointerdown', onPointerDown);
+
+  return () => {
+    end();
+    handle.removeEventListener('pointerdown', onPointerDown);
+  };
+}
+
+export interface PanelCornerResizeOptions {
+  /** Resolve the live grid (grid mode: its tracks drive the column snap). */
+  getGrid: () => HTMLElement | null;
+  /** Row-span at drag start. */
+  getStartSpan: () => number;
+  /** Column-span at drag start. */
+  getStartCols: () => number;
+  /** Per-span target heights (index === span) for the vertical snap. */
+  snapHeights?: number[];
+  minSpan?: number; // default 0
+  maxSpan?: number; // default 4
+  minW?: number; // free-mode width floor (default 160)
+  minH?: number; // free-mode height floor (default 120)
+  /** Grid preview: apply row-span. */
+  onPreviewSpan: (span: number) => void;
+  /** Grid preview: apply column-span (cols out of total). */
+  onPreviewCols: (cols: number, total: number) => void;
+  /** Grid commit: persist row-span. */
+  onCommitSpan: (span: number) => void;
+  /** Grid commit: persist column-span (cols out of total). */
+  onCommitCols: (cols: number, total: number) => void;
+}
+
+/**
+ * Bottom-right corner handle: resizes width AND height at once. In grid mode it
+ * drives both the column-span and row-span snaps (reusing the exact track /
+ * tier math of the edge handles); in free mode it is a pixel resize on both
+ * axes. One gesture, both dimensions.
+ */
+export function attachPanelCornerResize(
+  el: HTMLElement,
+  handle: HTMLElement,
+  opts: PanelCornerResizeOptions,
+): () => void {
+  const minSpan = opts.minSpan ?? 0;
+  const maxSpan = opts.maxSpan ?? 4;
+  const snapHeights = opts.snapHeights;
+
+  let pointerId: number | null = null;
+  let resizing = false;
+  let freeGesture = false;
+  let free: FreeResizeState | null = null;
+  // Grid geometry.
+  let total = 1;
+  let colStep = 1;
+  let originLeft = 0; // the panel's own left edge — span origin
+  let startTop = 0;
+  let lastCols = 1;
+  let lastSpan = minSpan;
+
+  const measure = (grid: HTMLElement): void => {
+    const style = getComputedStyle(grid);
+    const tracks = style.gridTemplateColumns.split(' ').filter(Boolean);
+    total = Math.max(1, tracks.length);
+    const gap = parseFloat(style.columnGap || '0') || 0;
+    const rect = grid.getBoundingClientRect();
+    const padLeft = parseFloat(style.paddingLeft || '0') || 0;
+    const padRight = parseFloat(style.paddingRight || '0') || 0;
+    const inner = rect.width - padLeft - padRight;
+    const colW = (inner - gap * (total - 1)) / total;
+    colStep = colW + gap;
+    originLeft = el.getBoundingClientRect().left;
+  };
+
+  const colsFor = (clientX: number): number => {
+    if (colStep <= 0) return total;
+    return Math.min(total, Math.max(1, Math.round((clientX - originLeft) / colStep)));
+  };
+
+  const spanFor = (height: number): number => {
+    if (snapHeights && snapHeights.length > 0) {
+      let best = minSpan;
+      let bestDist = Infinity;
+      for (let span = minSpan; span <= maxSpan && span < snapHeights.length; span++) {
+        const dist = Math.abs(height - snapHeights[span]!);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = span;
+        }
+      }
+      return best;
+    }
+    return Math.min(maxSpan, Math.max(minSpan, Math.round(height / 200)));
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!resizing || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    if (freeGesture && free) {
+      applyFreeResize(el, 'xy', free, e.clientX, e.clientY);
+      return;
+    }
+    const cols = colsFor(e.clientX);
+    if (cols !== lastCols) {
+      lastCols = cols;
+      opts.onPreviewCols(cols, total);
+    }
+    const span = spanFor(e.clientY - startTop);
+    if (span !== lastSpan) {
+      lastSpan = span;
+      opts.onPreviewSpan(span);
+    }
+  };
+
+  const end = () => {
+    if (!resizing) return;
+    resizing = false;
+    el.classList.remove('resizing', 'resizing-col');
+    handle.classList.remove('active');
+    delete el.dataset.resizing;
+    if (pointerId !== null) {
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    pointerId = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    if (freeGesture) {
+      commitFreeGeometry(el);
+    } else {
+      hideSnapOverlay();
+      opts.onCommitCols(lastCols, total);
+      opts.onCommitSpan(lastSpan);
+    }
+  };
+
+  const onPointerUp = (e: PointerEvent) => {
+    if (e.pointerId !== pointerId) return;
+    end();
+  };
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const grid = opts.getGrid();
+    e.preventDefault();
+    e.stopPropagation();
+    pointerId = e.pointerId;
+    resizing = true;
+    freeGesture = getLayoutMode() === 'free';
+    const rect = el.getBoundingClientRect();
+    if (freeGesture) {
+      free = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startW: rect.width,
+        startH: rect.height,
+        minW: minWidthFor(el, opts.minW),
+        minH: minHeightFor(el, opts.minH),
+      };
+    } else {
+      if (!grid) {
+        resizing = false;
+        return;
+      }
+      measure(grid);
+      startTop = rect.top;
+      lastCols = opts.getStartCols();
+      lastSpan = opts.getStartSpan();
+      showSnapOverlay();
+    }
+    el.classList.add('resizing', 'resizing-col');
     el.dataset.resizing = 'true';
     handle.classList.add('active');
     try {
