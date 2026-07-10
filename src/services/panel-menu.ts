@@ -139,6 +139,32 @@ function mapItems(event: MouseEvent): MenuEntry[] {
   return items;
 }
 
+// Workspace menu — shown on a right-click over the empty background (no panel, no
+// map). Guarantees there is ALWAYS a way back: switch layout mode, add a widget,
+// or reset — even if the user has hidden every panel and the map.
+function setWorkspaceMode(mode: 'grid' | 'free' | 'immersive'): void {
+  const sel = document.getElementById('dockModeSelect') as HTMLSelectElement | null;
+  if (!sel) return;
+  sel.value = mode;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function workspaceItems(): MenuEntry[] {
+  const cur = document.body.classList.contains('immersive')
+    ? 'immersive'
+    : document.body.classList.contains('layout-free')
+      ? 'free'
+      : 'grid';
+  return [
+    { label: 'Grid layout', disabled: cur === 'grid', run: () => setWorkspaceMode('grid') },
+    { label: 'Free layout', disabled: cur === 'free', run: () => setWorkspaceMode('free') },
+    { label: 'Immersive layout', disabled: cur === 'immersive', run: () => setWorkspaceMode('immersive') },
+    { kind: 'sep' },
+    { label: 'Add widget', run: () => (document.getElementById('dockAddWidget') as HTMLElement | null)?.click() },
+    { label: 'Reset layout', run: () => document.dispatchEvent(new CustomEvent('panel-reset-layout-request')) },
+  ];
+}
+
 function panelBaseline(panel: HTMLElement): MenuEntry[] {
   const key = panel.dataset.panel;
   const items: MenuEntry[] = [];
@@ -319,9 +345,20 @@ export function installPanelContextMenu(): void {
       entries.push(...panelBaseline(panel));
     }
 
-    // Nothing matched → leave the native menu alone.
+    // Nothing panel/map-specific matched. Over the app workspace (grid / content
+    // background) show the WORKSPACE menu so a right-click ALWAYS offers a way back
+    // — even with every panel and the map hidden. Over the chrome (header, dock,
+    // modals) leave the native menu alone.
     if (!entries.length) {
-      close();
+      const inWorkspace =
+        !!target?.closest('.main-content, .panels-grid') || target === document.body;
+      const inChrome = !!target?.closest('.header, .world-dock, .modal-overlay, .search-modal');
+      if (inWorkspace && !inChrome) {
+        e.preventDefault();
+        open(e.clientX, e.clientY, workspaceItems());
+      } else {
+        close();
+      }
       return;
     }
 
