@@ -44,8 +44,14 @@ export function savePanelSpan(panelId: string, span: number): void {
 export const PANEL_SPAN_HEIGHTS = [120, 200, 400, 600, 800];
 
 const SPAN_CLASSES = ['span-0', 'span-1', 'span-2', 'span-3', 'span-4'];
+// px per row-span beyond the CSS ladder — matches --panel-row (grid-auto-rows).
+const PANEL_ROW_PX = 200;
 
 export function currentSpan(element: HTMLElement): number {
+  // The live span is the source of truth (covers the uncapped span>4 tiers that
+  // have no CSS class); fall back to the class ladder for legacy/first paint.
+  const d = parseInt(element.dataset.span ?? '', 10);
+  if (Number.isFinite(d) && d >= 0) return d;
   if (element.classList.contains('span-4')) return 4;
   if (element.classList.contains('span-3')) return 3;
   if (element.classList.contains('span-2')) return 2;
@@ -55,7 +61,19 @@ export function currentSpan(element: HTMLElement): number {
 
 export function setSpanClass(element: HTMLElement, span: number): void {
   element.classList.remove(...SPAN_CLASSES);
-  element.classList.add(`span-${span}`);
+  element.dataset.span = String(span);
+  if (span >= 0 && span <= 4) {
+    // The common tiers own their height via the .panel.span-N CSS (with !important);
+    // clear any inline geometry a previous tall size left behind.
+    element.classList.add(`span-${span}`);
+    element.style.gridRow = '';
+    element.style.minHeight = '';
+  } else {
+    // Beyond the CSS ladder — no capped class, so drive the (arbitrarily tall)
+    // size inline. No !important is in play here, so inline wins cleanly.
+    element.style.gridRow = `span ${span}`;
+    element.style.minHeight = `${span * PANEL_ROW_PX}px`;
+  }
   element.classList.add('resized');
 }
 
@@ -412,6 +430,11 @@ export class Panel {
    */
   public resetHeight(): void {
     this.element.classList.remove('resized', ...SPAN_CLASSES);
+    // Also drop the uncapped-span inline geometry + tracked span so a previously
+    // very-tall panel returns to the default tier.
+    delete this.element.dataset.span;
+    this.element.style.gridRow = '';
+    this.element.style.minHeight = '';
     const spans = loadPanelSpans();
     delete spans[this.panelId];
     localStorage.setItem(PANEL_SPANS_KEY, JSON.stringify(spans));
