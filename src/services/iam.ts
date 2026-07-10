@@ -253,15 +253,31 @@ export async function isAdmin(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   const tok = localStorage.getItem(K.access);
-  try {
-    await fetch(ISSUER + OIDC.logout, {
-      method: 'POST',
-      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
-    });
-  } catch { /* best effort */ }
+  const idTok = localStorage.getItem(K.id);
+  // Sign-out clears the local session FIRST — it must never be blocked by, or
+  // depend on, the network. Once the tokens are gone the app is signed out on
+  // the next paint regardless of what the IdP does.
   cachedUser = null;
   cachedOrgs = null;
   Object.values(K).forEach((k) => localStorage.removeItem(k));
+  localStorage.removeItem('hanzo_iam_org');
+  // Best-effort IdP session end, hard-bounded so it can never hang the reload
+  // (the old unbounded await was the bug: a slow/blocked logout call left the
+  // UI stuck "signed in"). RP-initiated logout with id_token_hint ends the SSO
+  // session so a later sign-in isn't silently re-authenticated from the cookie.
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2500);
+    const u = new URL(ISSUER + OIDC.logout);
+    if (idTok) u.searchParams.set('id_token_hint', idTok);
+    await fetch(u.toString(), {
+      method: 'POST',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      signal: ctrl.signal,
+      keepalive: true,
+    }).catch(() => { /* best effort */ });
+    clearTimeout(timer);
+  } catch { /* best effort */ }
 }
 
 // ── tenant context (org selection) ──────────────────────────────────────────
