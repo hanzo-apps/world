@@ -31,7 +31,8 @@ import {
   type PickingInfo,
   type LayersList,
 } from '@deck.gl/core';
-import { GeoJsonLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, BitmapLayer } from '@deck.gl/layers';
+import { TileLayer } from '@deck.gl/geo-layers';
 import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
 import { SphereGeometry } from '@luma.gl/engine';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -75,15 +76,43 @@ export interface GlobeNativeOptions {
   autoRotate?: boolean;
   /** How often (ms) to re-pull data layers from the source while active (default 500). */
   syncIntervalMs?: number;
+  /** Initial basemap style; defaults to the persisted 2D switcher selection. */
+  basemapStyle?: BasemapStyle;
 }
 
 // Monochrome "vercel-black" basemap palette. Land is near-black, borders are the
 // requested #1f grey, space is pure black, the atmosphere rim is the same faint
 // cool-grey as the mapbox path's MONOCHROME_FOG horizon halo.
 const OCEAN_COLOR: [number, number, number, number] = [4, 6, 10, 255];
+// On bright imagery styles the sphere backing shows only where tiles don't reach
+// (the Web-Mercator polar caps above ~85°) — a dark slate-blue there blends with the
+// oceans instead of reading as a black hole.
+const OCEAN_COLOR_BRIGHT: [number, number, number, number] = [16, 28, 42, 255];
 const LAND_COLOR: [number, number, number, number] = [17, 21, 28, 255]; // ~#11151c
 const BORDER_COLOR: [number, number, number, number] = [58, 62, 70, 170]; // ~#3a3e46 (#1f-grey borders)
+// Thin border overlay kept on the bright imagery styles for intel orientation.
+const BRIGHT_BORDER_COLOR: [number, number, number, number] = [235, 240, 250, 90];
 const ATMOSPHERE_COLOR: [number, number, number, number] = [80, 92, 116, 120];
+
+// Basemap style — mirrors DeckGLMap's switcher. Read from the SAME localStorage key
+// so the 2D switcher drives the globe; kept as literals here to avoid importing the
+// giant DeckGLMap module for two constants (contract: keep in sync with it).
+export type BasemapStyle = 'dark' | 'satellite' | 'terrain';
+const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'satellite', 'terrain'];
+const BASEMAP_STYLE_KEY = 'hanzo-world-basemap-style';
+const isBrightBasemap = (s: BasemapStyle): boolean => s === 'satellite' || s === 'terrain';
+
+// Keyless ESRI ArcGIS raster tiles (ACAO:* — CORS-safe for WebGL textures). Note the
+// {z}/{y}/{x} order ArcGIS uses. World_Imagery = real satellite; World_Physical_Map =
+// a natural physical/terrain relief that reads unmistakably as "terrain".
+const ESRI_SATELLITE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_TERRAIN_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}';
+// Draw imagery slightly transparent over the near-black ocean sphere so it reads a
+// touch darker — data dots stay legible without a per-marker halo (the single-canvas
+// globe can't isolate a CSS drop-shadow to markers the way the 2D overlay can).
+const IMAGERY_OPACITY = 0.86;
 
 // deck's GlobeViewport maps CARTESIAN metres onto a 256-unit sphere; a mesh of
 // EARTH_RADIUS sits exactly on the surface where lng/lat layers draw. We seat the
@@ -124,6 +153,16 @@ export function isNativeGlobeEnabled(): boolean {
   }
 }
 
+/** Current basemap style from the SAME key the 2D switcher writes (defaults dark). */
+export function readBasemapStyle(): BasemapStyle {
+  try {
+    const raw = localStorage.getItem(BASEMAP_STYLE_KEY);
+    return (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
 export class GlobeNative {
   private container: HTMLElement;
   private wrapper: HTMLDivElement;
@@ -134,6 +173,7 @@ export class GlobeNative {
   private onCountryClick?: (payload: GlobeCountryClick) => void;
 
   private viewState: GlobeViewState;
+  private basemapStyle: BasemapStyle;
   private basemapLayers: LayersList = [];
   private dataLayers: LayersList = [];
   private countriesGeoJson: FeatureCollection<Geometry> | null = null;
@@ -159,6 +199,7 @@ export class GlobeNative {
     this.autoRotateEnabled = options.autoRotate ?? true;
     this.syncIntervalMs = options.syncIntervalMs ?? 500;
     this.viewState = { ...DEFAULT_VIEW, ...(options.center ?? {}) };
+    this.basemapStyle = options.basemapStyle ?? readBasemapStyle();
     this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
     this.wrapper = document.createElement('div');
@@ -210,6 +251,10 @@ export class GlobeNative {
     this.canvas.addEventListener('wheel', this.onUserInteract, { passive: true });
     this.canvas.addEventListener('touchstart', this.onUserInteract, { passive: true });
 
+    // React live to the 2D switcher (dark | satellite | terrain) — DeckGLMap fires
+    // this whenever its basemap style changes.
+    window.addEventListener('basemap-style-changed', this.onBasemapStyleChanged);
+
     if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
       (window as unknown as { __globeNative?: GlobeNative }).__globeNative = this;
     }
@@ -238,9 +283,10 @@ export class GlobeNative {
 
   private rebuildBasemap(): void {
     // Draw order matters. Atmosphere first (behind), then the depth-writing ocean
-    // sphere, then land. The ocean sphere writing depth is what makes far-side data
-    // features (points/arcs behind the planet) occlude correctly — deck's globe
+    // sphere, then imagery/land. The ocean sphere writing depth is what makes far-side
+    // data features (points/arcs behind the planet) occlude correctly — deck's globe
     // layers depth-test against it, so nothing renders "through" the Earth.
+    const bright = isBrightBasemap(this.basemapStyle);
     const layers: LayersList = [
       // Backside shell → a faint atmospheric rim at the silhouette. Depth-tests but
       // does not write, so it never blocks data near the limb; the near-disc portion
@@ -271,7 +317,7 @@ export class GlobeNative {
         mesh: new SphereGeometry({ radius: OCEAN_RADIUS, nlat: 48, nlong: 96 }),
         coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
         getPosition: ORIGIN,
-        getColor: OCEAN_COLOR,
+        getColor: bright ? OCEAN_COLOR_BRIGHT : OCEAN_COLOR,
         pickable: false,
         material: false,
         parameters: {
@@ -282,25 +328,31 @@ export class GlobeNative {
       }),
     ];
 
+    if (bright) {
+      // Real earth imagery draped on the sphere (satellite or physical/terrain relief).
+      layers.push(this.buildImageryLayer(this.basemapStyle));
+    }
+
     if (this.countriesGeoJson) {
       layers.push(
-        // Land + borders in one pass: near-black fill, thin #1f-grey stroke. Sits on
-        // the surface just above the ocean shell; writes depth so back-face land
-        // (far side) is occluded too.
+        // Dark styling: near-black land fill + thin #1f-grey borders in one pass.
+        // Bright styling: borders only (imagery is the fill), a faint light stroke for
+        // orientation. Sits just above the ocean shell; writes depth so far-side land
+        // is occluded too.
         new GeoJsonLayer<Feature>({
           id: 'globe-land',
           data: this.countriesGeoJson as unknown as Feature[],
-          filled: true,
+          filled: !bright,
           stroked: true,
           getFillColor: LAND_COLOR,
-          getLineColor: BORDER_COLOR,
+          getLineColor: bright ? BRIGHT_BORDER_COLOR : BORDER_COLOR,
           lineWidthUnits: 'pixels',
-          getLineWidth: 0.6,
-          lineWidthMinPixels: 0.5,
+          getLineWidth: bright ? 0.5 : 0.6,
+          lineWidthMinPixels: 0.4,
           pickable: false,
           parameters: {
             cullMode: 'none',
-            depthWriteEnabled: true,
+            depthWriteEnabled: !bright, // imagery already writes depth on bright styles
             depthCompare: 'less-equal',
           } as unknown as Record<string, unknown>,
         }),
@@ -308,6 +360,62 @@ export class GlobeNative {
     }
 
     this.basemapLayers = layers;
+  }
+
+  // A deck TileLayer of keyless ESRI raster tiles draped onto the globe. Back-facing
+  // tile geometry is culled so the far hemisphere never bleeds through; the near-black
+  // ocean sphere beneath supplies depth + fills poles/gaps and darkens the imagery
+  // slightly (via IMAGERY_OPACITY) so data dots stay legible.
+  private buildImageryLayer(style: BasemapStyle): TileLayer {
+    const url = style === 'terrain' ? ESRI_TERRAIN_URL : ESRI_SATELLITE_URL;
+    return new TileLayer({
+      id: `globe-imagery-${style}`,
+      data: url,
+      tileSize: 256,
+      minZoom: 0,
+      maxZoom: 7, // globe view never needs street-level tiles; caps tile fan-out
+      maxRequests: 8,
+      opacity: IMAGERY_OPACITY,
+      pickable: false,
+      renderSubLayers: (props) => {
+        const bbox = (props.tile as unknown as { boundingBox: number[][] }).boundingBox;
+        const west = bbox[0]?.[0] ?? -180;
+        const south = bbox[0]?.[1] ?? -90;
+        const east = bbox[1]?.[0] ?? 180;
+        const north = bbox[1]?.[1] ?? 90;
+        return new BitmapLayer({
+          id: `${props.id}-bitmap`,
+          image: props.data as string,
+          bounds: [west, south, east, north],
+          // Project the flat tile onto the sphere and cull its far-hemisphere faces.
+          _imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
+          parameters: {
+            cullMode: 'back',
+            depthWriteEnabled: true,
+            depthCompare: 'less-equal',
+          } as unknown as Record<string, unknown>,
+        });
+      },
+    });
+  }
+
+  // ---- Basemap style (dark | satellite | terrain) ---------------------------
+
+  private onBasemapStyleChanged = (e: Event): void => {
+    const style = (e as CustomEvent<{ style?: BasemapStyle }>).detail?.style;
+    if (style) this.setBasemapStyle(style);
+  };
+
+  /** Re-drape the globe for a new basemap style; safe to call before geometry loads. */
+  public setBasemapStyle(style: BasemapStyle): void {
+    if (this.destroyed || style === this.basemapStyle) return;
+    this.basemapStyle = style;
+    this.rebuildBasemap();
+    this.pushLayers();
+  }
+
+  public getBasemapStyle(): BasemapStyle {
+    return this.basemapStyle;
   }
 
   // ---- Data layers -----------------------------------------------------------
@@ -522,6 +630,7 @@ export class GlobeNative {
     this.canvas.removeEventListener('pointerdown', this.onUserInteract);
     this.canvas.removeEventListener('wheel', this.onUserInteract);
     this.canvas.removeEventListener('touchstart', this.onUserInteract);
+    window.removeEventListener('basemap-style-changed', this.onBasemapStyleChanged);
     try {
       this.deck.finalize();
     } catch (error) {
