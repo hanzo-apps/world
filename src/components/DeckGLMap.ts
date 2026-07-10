@@ -1342,7 +1342,7 @@ export class DeckGLMap {
       layers.push(...this.createNewsLocationsLayer());
     }
 
-    const result = layers.filter((l): l is Layer => Boolean(l));
+    const result = this.occludeFarSide(layers.filter((l): l is Layer => Boolean(l)));
     this.lastFullLayers = result;
     const elapsed = performance.now() - startTime;
     if (import.meta.env.DEV && elapsed > 16) {
@@ -1361,7 +1361,13 @@ export class DeckGLMap {
     for (const layer of this.lastFullLayers) {
       if (animatedIds.has(layer.id)) {
         const rebuilt = this.rebuildAnimatedLayer(layer.id);
-        if (rebuilt) out.push(rebuilt); // dropped when the pulse has faded out
+        // Occlude the freshly rebuilt animated layer too, so far-side pulses/arcs
+        // don't shine through the globe. Reused layers were already occluded by
+        // the last full build and pass through by reference in the else branch.
+        if (rebuilt) {
+          const [culled] = this.occludeFarSide([rebuilt]);
+          out.push(culled ?? rebuilt); // dropped when the pulse has faded out
+        }
       } else {
         out.push(layer);
       }
@@ -1379,6 +1385,83 @@ export class DeckGLMap {
       case 'trafficArcs': return this.createTrafficArcsLayer();
       default: return null;
     }
+  }
+
+  // Back-hemisphere marker occlusion for the 3D globe. Overlaid deck.gl renders
+  // in its own canvas with no depth buffer shared with mapbox's globe, so point
+  // markers on the FAR side project through the near side and look like they
+  // "float" off the sphere. Cull them by alpha: a surface point at (lon,lat) is
+  // visible only when its normal faces the camera — i.e. its dot product with
+  // the sub-camera point (the map center) is positive. A small positive bias
+  // hides the grazing limb, where perspective already sees less than a full
+  // hemisphere. Only Scatterplot/Icon (point) layers need this — filled polygons
+  // drape on the sphere and are occluded by the horizon for free. Re-evaluated
+  // every buildLayers() (move is debounced to ~10 Hz) so it tracks both manual
+  // rotation and the idle spin; a 2D map is a no-op.
+  private occludeFarSide(layers: Layer[]): Layer[] {
+    if (this.state.mode !== '3d' || !this.mapboxMap) return layers;
+    const RAD = Math.PI / 180;
+    const c = this.mapboxMap.getCenter();
+    const clat = c.lat * RAD;
+    const clng = c.lng * RAD;
+    const cx = Math.cos(clat) * Math.cos(clng);
+    const cy = Math.cos(clat) * Math.sin(clng);
+    const cz = Math.sin(clat);
+    // updateTriggers key: forces the wrapped color accessors to re-run when the
+    // camera moves far enough to change which hemisphere a marker is on.
+    const key = `${c.lng.toFixed(1)}|${c.lat.toFixed(1)}`;
+    const facesCamera = (lon: number, lat: number): boolean => {
+      const rlat = lat * RAD;
+      const rlng = lon * RAD;
+      const x = Math.cos(rlat) * Math.cos(rlng);
+      const y = Math.cos(rlat) * Math.sin(rlng);
+      const z = Math.sin(rlat);
+      return x * cx + y * cy + z * cz > 0.05;
+    };
+    type Rgba = [number, number, number, number];
+    type ColorAcc = Rgba | ((d: unknown, info?: unknown) => Rgba);
+    type GetPos = (d: unknown, info?: unknown) => number[];
+    // Wrap a color accessor so back-hemisphere data become fully transparent.
+    // Radius/size can't be used to hide markers (radiusMinPixels/sizeMinPixels
+    // clamp a 0 back up); alpha is not clamped, so it is the correct lever.
+    const cull = (orig: ColorAcc | undefined, getPos: GetPos) =>
+      (d: unknown, info?: unknown): Rgba => {
+        const base: Rgba = typeof orig === 'function' ? orig(d, info) : (orig ?? [0, 0, 0, 0]);
+        const p = getPos(d, info);
+        const lon = p?.[0];
+        const lat = p?.[1];
+        if (lon === undefined || lat === undefined || !facesCamera(lon, lat)) {
+          return [base[0], base[1], base[2], 0];
+        }
+        return base;
+      };
+    type CloneProps = Record<string, unknown>;
+    type Cloneable = { clone: (props: CloneProps) => Layer; props: Record<string, unknown> };
+    return layers.map((layer) => {
+      const props = (layer as unknown as Cloneable).props;
+      const getPos = props.getPosition;
+      if (typeof getPos !== 'function') return layer;
+      const gp = getPos as GetPos;
+      const triggers = (props.updateTriggers as Record<string, unknown>) ?? {};
+      if (layer instanceof ScatterplotLayer) {
+        return (layer as unknown as Cloneable).clone({
+          getFillColor: cull(props.getFillColor as ColorAcc, gp),
+          getLineColor: cull(props.getLineColor as ColorAcc, gp),
+          updateTriggers: {
+            ...triggers,
+            getFillColor: [triggers.getFillColor, key],
+            getLineColor: [triggers.getLineColor, key],
+          },
+        });
+      }
+      if (layer instanceof IconLayer) {
+        return (layer as unknown as Cloneable).clone({
+          getColor: cull(props.getColor as ColorAcc, gp),
+          updateTriggers: { ...triggers, getColor: [triggers.getColor, key] },
+        });
+      }
+      return layer;
+    });
   }
 
   // Layer creation methods
