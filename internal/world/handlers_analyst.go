@@ -125,9 +125,13 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-user billing: forward the signed-in caller's IAM token, never a shared
-	// key. Signed-out callers get a quiet prompt to sign in (never a 5xx).
-	bearer := s.ai.bearerFor(r)
+	// Paid usage: the analyst chat is metered to the signed-in user's org, so it
+	// requires the caller's OWN IAM bearer — never the funded service key. That key
+	// (a.key / HANZO_AI_KEY) backs ONLY the anonymous auto-insight endpoints
+	// (summarize/classify/country-intel via bearerFor); chat must not silently burn
+	// it, or "paid usage" would never actually meter. Signed-out callers get a quiet
+	// sign-in prompt (never a 5xx).
+	bearer := userBearer(r)
 	if bearer == "" {
 		writeJSON(w, http.StatusOK, "", map[string]any{
 			"reply": "", "actions": []any{}, "fallback": true, "skipped": true,
