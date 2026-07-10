@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>World Brief</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; color: #ededed; padding: 16px;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h1 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: #8f8f8f; font-weight: 500; margin-bottom: 12px; }
+  ol { list-style: none; }
+  li { display: flex; align-items: baseline; gap: 10px; padding: 7px 0;
+    border-bottom: 1px solid #171717; }
+  li:last-child { border-bottom: 0; }
+  .rank { color: #5a5a5a; width: 1.7em; flex: 0 0 auto; text-align: right; }
+  .name { color: #ededed; flex: 1 1 auto; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .score { color: #fff; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+  .empty { color: #5a5a5a; padding: 7px 0; }
+  .asof { color: #5a5a5a; font-size: 11px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1 id="title">World Brief</h1>
+  <ol id="list"><li class="empty">Awaiting data.</li></ol>
+  <p class="asof" id="asof"></p>
+<script>
+(function () {
+  "use strict";
+  var list = document.getElementById("list");
+  var asof = document.getElementById("asof");
+
+  function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+
+  function cell(cls, text) {
+    var s = document.createElement("span");
+    s.className = cls;
+    s.textContent = text;
+    return s;
+  }
+
+  function scoreOf(ent) {
+    if (ent && ent.metrics && typeof ent.metrics.instability === "number") {
+      return ent.metrics.instability.toFixed(1);
+    }
+    if (ent && typeof ent.score === "number") { return ent.score.toFixed(1); }
+    return "";
+  }
+
+  function render(data) {
+    if (!data || typeof data !== "object") { return; }
+    var entities = Array.isArray(data.entities) ? data.entities : [];
+    clear(list);
+    if (entities.length === 0) {
+      list.appendChild(cell("empty", "No entities yet."));
+    } else {
+      for (var i = 0; i < entities.length; i++) {
+        var ent = entities[i] || {};
+        var li = document.createElement("li");
+        li.appendChild(cell("rank", String(i + 1)));
+        li.appendChild(cell("name", String(ent.name || ent.id || "—")));
+        li.appendChild(cell("score", scoreOf(ent)));
+        list.appendChild(li);
+      }
+    }
+    asof.textContent = data.asOf ? ("as of " + String(data.asOf)) : "";
+  }
+
+  // Data arrives post-load over the host bridge; the shell itself is data-free.
+  window.addEventListener("message", function (ev) {
+    var msg = ev.data;
+    if (!msg || typeof msg !== "object") { return; }
+    if (msg.type === "mcp:ui:render" && msg.app === "world-brief") { render(msg.data); }
+  });
+
+  // Two-phase: announce we are mounted; the host answers by calling the linked
+  // tool (world_brief) and posting {type:"mcp:ui:render", app, data}.
+  function ready() {
+    if (window.parent) {
+      window.parent.postMessage({ type: "mcp:ui:ready", app: "world-brief" }, "*");
+    }
+  }
+  if (document.readyState !== "loading") { ready(); }
+  else { document.addEventListener("DOMContentLoaded", ready); }
+})();
+</script>
+</body>
+</html>
