@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Market Radar</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; color: #ededed; padding: 16px;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  h1 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: #8f8f8f; font-weight: 500; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: right; color: #5a5a5a; font-weight: 400; font-size: 11px;
+    padding: 4px 0; border-bottom: 1px solid #171717; }
+  th.sym { text-align: left; }
+  td { padding: 7px 0; border-bottom: 1px solid #171717;
+    font-variant-numeric: tabular-nums; text-align: right; }
+  td.sym { text-align: left; color: #ededed; }
+  td.px { color: #fff; }
+  .up { color: #ededed; }
+  .down { color: #8f8f8f; }
+  .empty { color: #5a5a5a; padding: 7px 0; }
+</style>
+</head>
+<body>
+  <h1 id="title">Market Radar</h1>
+  <table>
+    <thead>
+      <tr><th class="sym">Symbol</th><th>Price</th><th>Chg</th><th>%</th></tr>
+    </thead>
+    <tbody id="rows"><tr><td class="empty" colspan="4">Awaiting data.</td></tr></tbody>
+  </table>
+<script>
+(function () {
+  "use strict";
+  var rows = document.getElementById("rows");
+
+  function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+
+  function td(cls, text) {
+    var c = document.createElement("td");
+    c.className = cls;
+    c.textContent = text;
+    return c;
+  }
+
+  function num(v, digits) {
+    return typeof v === "number" ? v.toFixed(digits) : "";
+  }
+
+  function note(text) {
+    clear(rows);
+    var tr = document.createElement("tr");
+    var c = document.createElement("td");
+    c.className = "empty";
+    c.colSpan = 4;
+    c.textContent = text;
+    tr.appendChild(c);
+    rows.appendChild(tr);
+  }
+
+  function render(data) {
+    if (!data || typeof data !== "object") { return; }
+    var quotes = Array.isArray(data.quotes) ? data.quotes : [];
+    if (quotes.length === 0) {
+      note(data.reason ? String(data.reason) : "No quotes.");
+      return;
+    }
+    clear(rows);
+    for (var i = 0; i < quotes.length; i++) {
+      var q = quotes[i] || {};
+      var dir = typeof q.change === "number" && q.change < 0 ? "down" : "up";
+      var tr = document.createElement("tr");
+      tr.appendChild(td("sym", String(q.symbol || "—")));
+      tr.appendChild(td("px", num(q.price, 2)));
+      tr.appendChild(td(dir, num(q.change, 2)));
+      tr.appendChild(td(dir, num(q.changePercent, 2)));
+      rows.appendChild(tr);
+    }
+  }
+
+  // Data arrives post-load over the host bridge; the shell itself is data-free.
+  window.addEventListener("message", function (ev) {
+    var msg = ev.data;
+    if (!msg || typeof msg !== "object") { return; }
+    if (msg.type === "mcp:ui:render" && msg.app === "market-radar") { render(msg.data); }
+  });
+
+  // Two-phase: announce we are mounted; the host answers by calling the linked
+  // tool (market_quotes) and posting {type:"mcp:ui:render", app, data}.
+  function ready() {
+    if (window.parent) {
+      window.parent.postMessage({ type: "mcp:ui:ready", app: "market-radar" }, "*");
+    }
+  }
+  if (document.readyState !== "loading") { ready(); }
+  else { document.addEventListener("DOMContentLoaded", ready); }
+})();
+</script>
+</body>
+</html>
