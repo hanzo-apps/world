@@ -95,8 +95,9 @@ const ATMOSPHERE_RADIUS = EARTH_RADIUS * 1.018;
 
 const DEFAULT_VIEW: GlobeViewState = { longitude: 0, latitude: 20, zoom: 0.5, minZoom: 0, maxZoom: 8 };
 
-// Idle-spin tuning — identical feel to the mapbox globe (DeckGLMap).
-const AUTO_ROTATE_DEG_PER_SEC = 4;
+// Idle-spin tuning — identical feel to the mapbox globe (DeckGLMap). 2°/s is the
+// calm, cinematic drift (halved from 4°/s, which read as "spinning a bit too fast").
+const AUTO_ROTATE_DEG_PER_SEC = 2;
 const AUTO_ROTATE_IDLE_MS = 5000;
 const AUTO_ROTATE_MIN_FRAME_MS = 33; // ~30fps: half the repaints of a per-frame spin
 
