@@ -1,0 +1,129 @@
+/* ── "Try Hanzo" product switcher — header dropdown (hanzo.ai "Try" menu) ──────
+   Monochrome, Geist, sentence case. The trigger reuses the shared .hz-cta white
+   pill (+ a caret); the menu opens below the pill, closes on click-away / Escape,
+   and is absolutely positioned so it can never widen the header or the page.
+   Kept in its own stylesheet so it never touches main.css. */
+
+.try-hanzo {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+/* Trigger inherits the .hz-cta pill; only the extras live here. */
+.try-hanzo-trigger {
+  gap: 6px;
+}
+.try-hanzo-ico {
+  display: none; /* desktop shows the word; mobile swaps in this apps glyph */
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.try-hanzo-caret {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+.try-hanzo.open .try-hanzo-caret {
+  transform: rotate(180deg);
+}
+
+/* Menu — position:fixed (coords set from the trigger rect in JS) so it never
+   affects header/page width AND is never clipped by the header's overflow
+   (the mobile header sets overflow-y:hidden for its horizontal tab scroller;
+   an absolutely-positioned menu would be cropped, a fixed one escapes it). */
+.try-hanzo-menu {
+  position: fixed;
+  top: 54px;
+  right: 8px;
+  z-index: 1000;
+  display: none;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg-secondary, #000);
+  border: 1px solid var(--border-strong, #3a3a3a);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+/* Menu is portaled to <body> (out of the header, which clips overflow on mobile),
+   so the open state is toggled on the menu itself, not via the .try-hanzo wrapper. */
+.try-hanzo-menu.open {
+  display: block;
+}
+
+.try-hanzo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--text, #e8e8e8);
+  text-decoration: none;
+}
+.try-hanzo-item:hover,
+.try-hanzo-item:focus-visible {
+  background: var(--overlay-medium, rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+.try-hanzo-item-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.try-hanzo-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.try-hanzo-desc {
+  font-size: 11.5px;
+  color: var(--text-dim, #888);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Current product (world.hanzo.ai) — subtle highlight + chip. */
+.try-hanzo-item.is-current {
+  background: var(--overlay-medium, rgba(255, 255, 255, 0.06));
+}
+.try-hanzo-chip {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-fg, #000);
+  background: var(--accent, #fff);
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.5;
+}
+
+/* Mobile: icon-only trigger; the menu still hugs the right edge and never
+   overflows the viewport (max-width caps it, position:absolute keeps it in flow). */
+@media (max-width: 680px) {
+  .try-hanzo-trigger {
+    padding: 0 10px;
+  }
+  .try-hanzo-label {
+    display: none;
+  }
+  .try-hanzo-ico {
+    display: inline-flex;
+  }
+  .try-hanzo-menu {
+    width: min(300px, calc(100vw - 16px));
+  }
+}
