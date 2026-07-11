@@ -46,14 +46,16 @@ func main() {
 	world.LoadKMSSecrets(rootCtx)
 
 	srv := world.NewServer()
-	defer srv.Close()       // release hanzo-kv + embedded datastore handles
-	srv.StartModel(rootCtx) // continuously-folded world-state engine
+	defer srv.Close()           // release hanzo-kv + embedded datastore handles
+	srv.StartModel(rootCtx)     // continuously-folded world-state engine
 	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
 	// Static SPA + fallback handles everything not matched by an /api route.
-	mux.Handle("/", newSPAHandler(*root))
+	// gzipStatic wraps ONLY this handler — /v1/world/* keeps its streaming
+	// endpoints unbuffered.
+	mux.Handle("/", gzipStatic(newSPAHandler(*root)))
 
 	httpSrv := &http.Server{
 		Addr:              *addr,
@@ -125,6 +127,7 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	info, err := os.Stat(full)
 	switch {
 	case err == nil && !info.IsDir():
+		setCacheHeaders(w, rel)
 		h.fileSrv.ServeHTTP(w, r) // real file
 	case errors.Is(err, fs.ErrNotExist) && !hasExt(rel):
 		h.serveIndex(w, r) // client-routed path → SPA shell
@@ -147,6 +150,17 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodHead {
 		_, _ = w.Write(h.indexHTML)
 	}
+}
+
+// setCacheHeaders makes Vite's content-hashed bundles cacheable forever while
+// keeping every unhashed file (favicons, manifest, service worker) revalidated
+// so SW updates and icon swaps are never stuck behind a stale cache.
+func setCacheHeaders(w http.ResponseWriter, rel string) {
+	if strings.HasPrefix(rel, "assets/") {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
 }
 
 // hasExt reports whether the last path segment has a file extension, used to
