@@ -1790,6 +1790,35 @@ body.panel-drag-active .map-container {
   color: var(--green);
 }
 
+.live-fullscreen-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.live-fullscreen-btn:hover {
+  color: var(--text);
+}
+
+/* In fullscreen the player container is the fullscreen root: let the iframe
+   fill it edge to edge (the grid layout constrains it otherwise). */
+.live-news-player:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.live-news-player:fullscreen iframe {
+  width: 100%;
+  height: 100%;
+}
+
 .live-indicator-btn {
   background: transparent;
   border: none;

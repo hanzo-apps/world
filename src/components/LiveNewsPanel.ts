@@ -131,6 +131,7 @@ export class LiveNewsPanel extends Panel {
     this.element.classList.add('panel-wide');
     this.createLiveButton();
     this.createMuteButton();
+    this.createFullscreenButton();
     this.createChannelSwitcher();
     this.setupBridgeMessageListener();
     this.renderPlayer();
@@ -307,6 +308,27 @@ export class LiveNewsPanel extends Panel {
 
     const header = this.element.querySelector('.panel-header');
     header?.appendChild(this.muteBtn);
+  }
+
+  // Enlarge the video to true fullscreen. Targets the player container (the
+  // iframe's parent) so the YouTube embed fills the screen; the header controls
+  // go along with it. Falls back to a no-op if the browser denies the request.
+  private createFullscreenButton(): void {
+    const btn = document.createElement('button');
+    btn.className = 'live-fullscreen-btn';
+    btn.title = 'Fullscreen';
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = this.playerContainer ?? this.element;
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => { /* ignore */ });
+      } else {
+        void target.requestFullscreen?.().catch(() => { /* ignore */ });
+      }
+    });
+    const header = this.element.querySelector('.panel-header');
+    header?.appendChild(btn);
   }
 
   private updateMuteIcon(): void {
