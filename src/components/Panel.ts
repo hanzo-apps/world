@@ -6,6 +6,7 @@ import {
   attachPanelResize,
   attachPanelColResize,
   attachPanelCornerResize,
+  type CornerId,
 } from '../services/panel-drag';
 import { getGridCols, setGridCols } from '../services/grid-config';
 
@@ -89,6 +90,7 @@ export class Panel {
   private resizeHandle: HTMLElement | null = null;
   private colResizeHandle: HTMLElement | null = null;
   private cornerResizeHandle: HTMLElement | null = null;
+  private cornerHandles: HTMLElement[] = [];
   private resizeCleanups: Array<() => void> = [];
 
   constructor(options: PanelOptions) {
@@ -201,11 +203,20 @@ export class Panel {
     this.colResizeHandle.draggable = false;
     this.element.appendChild(this.colResizeHandle);
 
-    this.cornerResizeHandle = document.createElement('div');
-    this.cornerResizeHandle.className = 'panel-corner-resize-handle';
-    this.cornerResizeHandle.title = 'Drag to resize';
-    this.cornerResizeHandle.draggable = false;
-    this.element.appendChild(this.cornerResizeHandle);
+    // Corner grips at all four corners. In free mode each resizes the panel while
+    // pinning the opposite corner; grid mode shows only the bottom-right (top/left
+    // resize has no meaning in grid flow — the others are hidden via CSS).
+    const corners: CornerId[] = ['se', 'sw', 'ne', 'nw'];
+    for (const corner of corners) {
+      const h = document.createElement('div');
+      h.className = `panel-corner-resize-handle ${corner}`;
+      h.dataset.corner = corner;
+      h.title = 'Drag to resize';
+      h.draggable = false;
+      this.element.appendChild(h);
+      this.cornerHandles.push(h);
+    }
+    this.cornerResizeHandle = this.cornerHandles[0]!; // 'se' — the grid-mode grip
 
     this.setupResizeHandlers();
 
@@ -261,21 +272,26 @@ export class Panel {
       }),
     );
 
-    // Bottom-right corner → width AND height together.
-    this.resizeCleanups.push(
-      attachPanelCornerResize(el, this.cornerResizeHandle, {
-        getGrid: () => document.getElementById('panelsGrid'),
-        getStartSpan: () => currentSpan(el),
-        getStartCols: startCols,
-        snapHeights: PANEL_SPAN_HEIGHTS,
-        minSpan: 0,
-        maxSpan: 4,
-        onPreviewSpan: (span) => setSpanClass(el, span),
-        onPreviewCols: (cols) => previewCols(cols),
-        onCommitSpan: (span) => savePanelSpan(id, span),
-        onCommitCols: (cols) => setGridCols(id, cols),
-      }),
-    );
+    // Corner grips → width AND height together. Free mode resizes from any of the
+    // four corners (opposite corner pinned); grid mode span/column snapping runs
+    // only from the bottom-right (attachPanelCornerResize no-ops the rest in grid).
+    for (const handle of this.cornerHandles) {
+      this.resizeCleanups.push(
+        attachPanelCornerResize(el, handle, {
+          corner: (handle.dataset.corner as CornerId) ?? 'se',
+          getGrid: () => document.getElementById('panelsGrid'),
+          getStartSpan: () => currentSpan(el),
+          getStartCols: startCols,
+          snapHeights: PANEL_SPAN_HEIGHTS,
+          minSpan: 0,
+          maxSpan: 4,
+          onPreviewSpan: (span) => setSpanClass(el, span),
+          onPreviewCols: (cols) => previewCols(cols),
+          onCommitSpan: (span) => savePanelSpan(id, span),
+          onCommitCols: (cols) => setGridCols(id, cols),
+        }),
+      );
+    }
 
     // Double-click either edge handle to reset to default size.
     this.resizeHandle.addEventListener('dblclick', () => this.resetHeight());
