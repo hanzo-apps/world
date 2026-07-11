@@ -305,6 +305,14 @@ export class LiveWebcamsPanel extends Panel {
         if (this.isVisible) this.render();
       }
       this.idleTimeout = setTimeout(() => {
+        // A visible panel means the user is watching the live feeds — passive
+        // viewing fires no input events, so input-idle must not tear them down.
+        // Reschedule; the IntersectionObserver + visibilitychange handle the
+        // real off-screen / hidden-tab cases.
+        if (this.isVisible && !document.hidden) {
+          this.boundIdleResetHandler();
+          return;
+        }
         this.isIdle = true;
         this.destroyIframes();
         this.content.innerHTML = '<div class="webcam-placeholder">Webcams paused — move mouse to resume</div>';

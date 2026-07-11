@@ -215,6 +215,15 @@ export class LiveNewsPanel extends Panel {
   }
 
   private pauseForIdle(): void {
+    // A visible, actively-playing video means the user IS watching — passive
+    // viewing fires no mousedown/keydown/scroll, so the input-idle heuristic
+    // must never tear it down (that was the "video disappears after a few
+    // minutes" bug). Reschedule instead; the visibilitychange handler already
+    // covers the genuine "tab hidden / walked away" case.
+    if (this.isPlaying && !document.hidden) {
+      this.boundIdleResetHandler();
+      return;
+    }
     if (this.isPlaying) {
       this.wasPlayingBeforeIdle = true;
       this.isPlaying = false;
