@@ -45,13 +45,25 @@ const minWidthFor = (el: HTMLElement, opt?: number): number =>
 const minHeightFor = (el: HTMLElement, opt?: number): number =>
   el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_H;
 
-type ResizeAxis = 'x' | 'y' | 'xy';
+// Which edges a resize gesture drives. The OPPOSITE edge stays pinned: e/s grow
+// from a fixed top-left (the classic bottom-right drag), while w/n grow from a
+// fixed bottom-right by shifting the panel's left/top as its size changes — so a
+// panel can be resized from any edge or corner and the far side never moves.
+interface ResizeEdges {
+  n?: boolean;
+  s?: boolean;
+  e?: boolean;
+  w?: boolean;
+}
 
-// Free-mode pixel resize, shared by the right / bottom / corner handles. The
-// panel is top-left anchored (absolute), so only its width/height change.
+// Free-mode pixel resize, shared by every edge and corner handle. The panel is
+// absolutely placed; startLeft/startTop are its offset origin so w/n resizes can
+// hold the opposite edge by moving left/top in lock-step with the size.
 interface FreeResizeState {
   startX: number;
   startY: number;
+  startLeft: number;
+  startTop: number;
   startW: number;
   startH: number;
   minW: number;
@@ -60,19 +72,52 @@ interface FreeResizeState {
 
 function applyFreeResize(
   el: HTMLElement,
-  axis: ResizeAxis,
+  edges: ResizeEdges,
   s: FreeResizeState,
   clientX: number,
   clientY: number,
 ): void {
-  if (axis === 'x' || axis === 'xy') {
-    const w = Math.max(s.minW, s.startW + (clientX - s.startX));
+  const dx = clientX - s.startX;
+  const dy = clientY - s.startY;
+  if (edges.e) {
+    el.style.width = `${Math.round(Math.max(s.minW, s.startW + dx))}px`;
+  } else if (edges.w) {
+    const w = Math.max(s.minW, s.startW - dx);
     el.style.width = `${Math.round(w)}px`;
+    el.style.left = `${Math.round(s.startLeft + (s.startW - w))}px`; // pin the right edge
   }
-  if (axis === 'y' || axis === 'xy') {
-    const h = Math.max(s.minH, s.startH + (clientY - s.startY));
+  if (edges.s) {
+    el.style.height = `${Math.round(Math.max(s.minH, s.startH + dy))}px`;
+  } else if (edges.n) {
+    const h = Math.max(s.minH, s.startH - dy);
     el.style.height = `${Math.round(h)}px`;
+    el.style.top = `${Math.round(s.startTop + (s.startH - h))}px`; // pin the bottom edge
   }
+}
+
+// A corner handle drives its two adjacent edges. Free-mode resize supports all
+// four; grid-mode span/column snapping is only meaningful from the bottom-right.
+export type CornerId = 'nw' | 'ne' | 'sw' | 'se';
+const EDGES_FOR_CORNER: Record<CornerId, ResizeEdges> = {
+  se: { e: true, s: true },
+  sw: { w: true, s: true },
+  ne: { e: true, n: true },
+  nw: { w: true, n: true },
+};
+
+// Build the free-resize start state from the panel's live geometry.
+function freeStateFor(el: HTMLElement, e: PointerEvent, minW: number, minH: number): FreeResizeState {
+  const rect = el.getBoundingClientRect();
+  return {
+    startX: e.clientX,
+    startY: e.clientY,
+    startLeft: el.offsetLeft,
+    startTop: el.offsetTop,
+    startW: rect.width,
+    startH: rect.height,
+    minW,
+    minH,
+  };
 }
 
 function commitFreeGeometry(el: HTMLElement): void {
@@ -290,7 +335,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     clone.querySelectorAll('iframe, video, canvas, script').forEach((n) => n.remove());
     clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
     clone
-      .querySelectorAll('.panel-resize-handle, .panel-col-resize-handle')
+      .querySelectorAll('.panel-resize-handle, .panel-col-resize-handle, .panel-corner-resize-handle')
       .forEach((n) => n.remove());
     clone.classList.remove('panel-drag-source', 'dragging');
     clone.classList.add('panel-drag-ghost');
@@ -637,7 +682,7 @@ export function attachPanelResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, 'y', free, e.clientX, e.clientY);
+      applyFreeResize(el, { s: true }, free, e.clientX, e.clientY);
       return;
     }
     const height = startHeight + (e.clientY - startY);
@@ -690,14 +735,7 @@ export function attachPanelResize(
     startHeight = rect.height;
     lastSpan = opts.getStartSpan();
     if (freeGesture) {
-      free = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: rect.width,
-        startH: rect.height,
-        minW: minWidthFor(el),
-        minH: minHeightFor(el, opts.minH),
-      };
+      free = freeStateFor(el, e, minWidthFor(el), minHeightFor(el, opts.minH));
     } else {
       showSnapOverlay();
     }
@@ -782,7 +820,7 @@ export function attachPanelColResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, 'x', free, e.clientX, e.clientY);
+      applyFreeResize(el, { e: true }, free, e.clientX, e.clientY);
       return;
     }
     const cols = colsFor(e.clientX);
@@ -831,15 +869,7 @@ export function attachPanelColResize(
     resizing = true;
     freeGesture = getLayoutMode() === 'free';
     if (freeGesture) {
-      const rect = el.getBoundingClientRect();
-      free = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: rect.width,
-        startH: rect.height,
-        minW: minWidthFor(el, opts.minW),
-        minH: minHeightFor(el),
-      };
+      free = freeStateFor(el, e, minWidthFor(el, opts.minW), minHeightFor(el));
     } else {
       if (!grid) {
         resizing = false;
@@ -871,6 +901,12 @@ export function attachPanelColResize(
 }
 
 export interface PanelCornerResizeOptions {
+  /**
+   * Which corner this handle sits at (default 'se'). All four resize freely in
+   * free mode (the opposite corner stays pinned); only 'se' also drives grid-mode
+   * span/column snapping — top/left grid resize has no meaning in grid flow.
+   */
+  corner?: CornerId;
   /** Resolve the live grid (grid mode: its tracks drive the column snap). */
   getGrid: () => HTMLElement | null;
   /** Row-span at drag start. */
@@ -907,6 +943,8 @@ export function attachPanelCornerResize(
   const minSpan = opts.minSpan ?? 0;
   const maxSpan = opts.maxSpan ?? 4;
   const snapHeights = opts.snapHeights;
+  const corner = opts.corner ?? 'se';
+  const edges = EDGES_FOR_CORNER[corner];
 
   let pointerId: number | null = null;
   let resizing = false;
@@ -946,7 +984,7 @@ export function attachPanelCornerResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, 'xy', free, e.clientX, e.clientY);
+      applyFreeResize(el, edges, free, e.clientX, e.clientY);
       return;
     }
     const cols = colsFor(e.clientX);
@@ -1000,23 +1038,17 @@ export function attachPanelCornerResize(
     pointerId = e.pointerId;
     resizing = true;
     freeGesture = getLayoutMode() === 'free';
-    const rect = el.getBoundingClientRect();
     if (freeGesture) {
-      free = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: rect.width,
-        startH: rect.height,
-        minW: minWidthFor(el, opts.minW),
-        minH: minHeightFor(el, opts.minH),
-      };
+      free = freeStateFor(el, e, minWidthFor(el, opts.minW), minHeightFor(el, opts.minH));
     } else {
-      if (!grid) {
+      // Grid-mode span/column snapping only makes sense from the bottom-right; the
+      // other three corners are free-mode-only (and hidden in grid mode by CSS).
+      if (!grid || corner !== 'se') {
         resizing = false;
         return;
       }
       measure(grid);
-      startTop = rect.top;
+      startTop = el.getBoundingClientRect().top;
       lastCols = opts.getStartCols();
       lastSpan = opts.getStartSpan();
       showSnapOverlay();

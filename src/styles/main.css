@@ -16915,27 +16915,47 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 /* ── Bottom-right corner resize grip (all panels) ────────────────────────── */
 .panel-corner-resize-handle {
   position: absolute;
-  right: 0;
-  bottom: 0;
   width: 18px;
   height: 18px;
-  cursor: nwse-resize;
   z-index: 160; /* above the bottom (100) + right (150) edge handles */
   touch-action: none;
   user-select: none;
   opacity: 0.32;
   transition: opacity 0.15s ease;
 }
+/* Corner positions + native diagonal cursors. */
+.panel-corner-resize-handle.se { right: 0; bottom: 0; cursor: nwse-resize; }
+.panel-corner-resize-handle.sw { left: 0; bottom: 0; cursor: nesw-resize; }
+.panel-corner-resize-handle.ne { right: 0; top: 0; cursor: nesw-resize; }
+.panel-corner-resize-handle.nw { left: 0; top: 0; cursor: nwse-resize; }
+
+/* The little corner bracket, oriented to its corner. */
 .panel-corner-resize-handle::after {
   content: '';
   position: absolute;
-  right: 3px;
-  bottom: 3px;
   width: 8px;
   height: 8px;
+  transition: border-color 0.2s ease;
+}
+.panel-corner-resize-handle.se::after {
+  right: 3px; bottom: 3px;
   border-right: 2px solid var(--text-dim);
   border-bottom: 2px solid var(--text-dim);
-  transition: border-color 0.2s ease;
+}
+.panel-corner-resize-handle.sw::after {
+  left: 3px; bottom: 3px;
+  border-left: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+}
+.panel-corner-resize-handle.ne::after {
+  right: 3px; top: 3px;
+  border-right: 2px solid var(--text-dim);
+  border-top: 2px solid var(--text-dim);
+}
+.panel-corner-resize-handle.nw::after {
+  left: 3px; top: 3px;
+  border-left: 2px solid var(--text-dim);
+  border-top: 2px solid var(--text-dim);
 }
 .panel:hover .panel-corner-resize-handle,
 .map-section:hover .panel-corner-resize-handle,
@@ -16945,6 +16965,21 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .panel-corner-resize-handle:hover::after,
 .panel-corner-resize-handle.active::after {
   border-color: var(--accent);
+}
+/* Top/left corners are free-mode only — grid flow can't resize from them, so the
+   grid layout keeps just the bottom-right grip (matching the edge handles). */
+body.layout-grid .panel-corner-resize-handle.nw,
+body.layout-grid .panel-corner-resize-handle.ne,
+body.layout-grid .panel-corner-resize-handle.sw {
+  display: none;
+}
+/* Header controls must always win the pointer over the top corner grips (z 160),
+   so the close/info buttons stay clickable where a grip overlaps them. */
+.panel-close-btn { z-index: 170; }
+.panel-info-wrapper,
+.panel-info-btn {
+  position: relative;
+  z-index: 170;
 }
 
 /* Regular panels now carry the right-edge width grip too (was map-only); keep it
