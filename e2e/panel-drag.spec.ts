@@ -174,7 +174,7 @@ test.describe('layout engine', () => {
   test('grid mode: bottom-right corner resizes width + height (snapped)', async ({ page }) => {
     await lh(page);
     const corner = (await page
-      .locator('[data-panel="delta"] .panel-corner-resize-handle')
+      .locator('[data-panel="delta"] .panel-corner-resize-handle.se')
       .boundingBox())!;
     const { step } = await page.evaluate(() => window.__layoutHarness!.colStep());
 
@@ -256,7 +256,7 @@ test.describe('layout engine', () => {
 
     // Resize from the corner to an arbitrary size.
     const corner = (await page
-      .locator('[data-panel="alpha"] .panel-corner-resize-handle')
+      .locator('[data-panel="alpha"] .panel-corner-resize-handle.se')
       .boundingBox())!;
     const WD = 118;
     const HD = 94;
@@ -283,6 +283,61 @@ test.describe('layout engine', () => {
     expect(Math.abs(restored.top - resized.top)).toBeLessThan(3);
     expect(Math.abs(restored.width - resized.width)).toBeLessThan(3);
     expect(Math.abs(restored.height - resized.height)).toBeLessThan(3);
+  });
+
+  test('free mode: all four corners resize and pin the opposite corner', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
+
+    const D = 60; // drag each corner inward (toward the panel centre) — always in-bounds
+    // corner → inward drag sign + which opposite corner must stay pinned.
+    const cases = [
+      { panel: 'alpha', corner: 'nw', sx: 1, sy: 1, fix: 'br' },
+      { panel: 'bravo', corner: 'ne', sx: -1, sy: 1, fix: 'bl' },
+      { panel: 'charlie', corner: 'sw', sx: 1, sy: -1, fix: 'tr' },
+      { panel: 'delta', corner: 'se', sx: -1, sy: -1, fix: 'tl' },
+    ] as const;
+
+    for (const c of cases) {
+      const b = await rect(page, c.panel);
+      const h = (await page
+        .locator(`[data-panel="${c.panel}"] .panel-corner-resize-handle.${c.corner}`)
+        .boundingBox())!;
+      const px = h.x + h.width / 2;
+      const py = h.y + h.height / 2;
+      await page.mouse.move(px, py);
+      await page.mouse.down();
+      await page.mouse.move(px + c.sx * D, py + c.sy * D, { steps: 12 });
+      await page.mouse.up();
+      const a = await rect(page, c.panel);
+
+      // The grabbed corner pulled inward on both axes → the panel shrank.
+      expect(a.width).toBeLessThan(b.width - 20);
+      expect(a.height).toBeLessThan(b.height - 20);
+
+      // The OPPOSITE corner never moved — proof the resize is anchor-aware
+      // (nw/ne/sw shift left/top to hold the far edge, not just grow w/h).
+      const bR = b.left + b.width;
+      const bB = b.top + b.height;
+      const aR = a.left + a.width;
+      const aB = a.top + a.height;
+      if (c.fix === 'br') {
+        expect(Math.abs(aR - bR)).toBeLessThan(4);
+        expect(Math.abs(aB - bB)).toBeLessThan(4);
+      } else if (c.fix === 'bl') {
+        expect(Math.abs(a.left - b.left)).toBeLessThan(4);
+        expect(Math.abs(aB - bB)).toBeLessThan(4);
+      } else if (c.fix === 'tr') {
+        expect(Math.abs(aR - bR)).toBeLessThan(4);
+        expect(Math.abs(a.top - b.top)).toBeLessThan(4);
+      } else {
+        expect(Math.abs(a.left - b.left)).toBeLessThan(4);
+        expect(Math.abs(a.top - b.top)).toBeLessThan(4);
+      }
+    }
+    await page.screenshot({ path: `${SHOTS}/free-all-corners.png` });
   });
 
   test('free mode: the map participates with a 240px floor', async ({ page }) => {
@@ -407,7 +462,7 @@ test.describe('live news video resize (real app)', () => {
     await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('free'));
     await page.waitForTimeout(200);
 
-    const corner = page.locator(`${LN} .panel-corner-resize-handle`);
+    const corner = page.locator(`${LN} .panel-corner-resize-handle.se`);
     const c = (await corner.boundingBox())!;
     await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
     await page.mouse.down();
