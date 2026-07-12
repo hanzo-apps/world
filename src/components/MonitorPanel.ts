@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import type { Monitor, NewsItem } from '@/types';
+import type { MonitorMatch } from '@/services/monitors';
 import { MONITOR_COLORS } from '@/config';
 import { generateId, formatTime, getCSSColor } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
@@ -92,6 +93,47 @@ export class MonitorPanel extends Panel {
         if (id) this.removeMonitor(id);
       });
     });
+  }
+
+  /**
+   * Render matches computed by the Go backend against the whole lake. Signed-in
+   * users get this instead of renderResults(): the server sees every ingested
+   * item, not just the headlines this tab loaded.
+   */
+  public renderServerMatches(matches: MonitorMatch[]): void {
+    const results = document.getElementById('monitorsResults');
+    if (!results) return;
+
+    if (this.monitors.length === 0) {
+      results.innerHTML =
+        `<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">${t('components.monitor.addKeywords')}</div>`;
+      return;
+    }
+    if (matches.length === 0) {
+      results.innerHTML =
+        `<div style="color: var(--text-dim); font-size: 10px; margin-top: 12px;">${t('components.monitor.noMatches', { count: '—' })}</div>`;
+      return;
+    }
+
+    const countText = matches.length > 10
+      ? t('components.monitor.showingMatches', { count: '10', total: String(matches.length) })
+      : `${matches.length} ${matches.length === 1 ? t('components.monitor.match') : t('components.monitor.matches')}`;
+
+    results.innerHTML = `
+      <div style="color: var(--text-dim); font-size: 10px; margin: 12px 0 8px;">${countText}</div>
+      ${matches
+        .slice(0, 10)
+        .map(
+          (m) => `
+        <div class="item" style="border-left: 2px solid ${escapeHtml(m.color || '')}; padding-left: 8px; margin-left: -8px;"
+             data-ctx-url="${sanitizeUrl(m.link)}" data-ctx-headline="${escapeHtml(m.title)}">
+          <div class="item-source">${escapeHtml(m.source)}</div>
+          <a class="item-title" href="${sanitizeUrl(m.link)}" target="_blank" rel="noopener">${escapeHtml(m.title)}</a>
+          <div class="item-time">${formatTime(new Date(m.ts))}</div>
+        </div>
+      `
+        )
+        .join('')}`;
   }
 
   public renderResults(news: NewsItem[]): void {
