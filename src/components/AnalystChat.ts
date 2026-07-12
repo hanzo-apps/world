@@ -113,6 +113,13 @@ export class AnalystChat {
   }
 
   /** Focus the composer (used when the copilot opens). */
+  /** Ask a question programmatically — drives the SAME send path as typing. */
+  public ask(text: string): void {
+    if (!this.inputEl) return;
+    this.inputEl.value = text;
+    void this.send();
+  }
+
   public focus(): void {
     this.inputEl?.focus();
   }
