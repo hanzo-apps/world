@@ -42,15 +42,25 @@ export class AccountMenu {
       this.user = null;
       this.scope = null;
       this.renderSignedOut();
+      this.announce(false);
       return;
     }
     this.user = await getUser();
     if (!this.user) {
       this.renderSignedOut();
+      this.announce(false);
       return;
     }
     this.scope = await resolveScope();
     this.render();
+    this.announce(true);
+  }
+
+  // The ONE signal that identity resolved. Anything that depends on signed-in
+  // state (e.g. hiding the "Try Hanzo" acquisition CTA) listens for this rather
+  // than polling isAuthenticated().
+  private announce(authed: boolean): void {
+    document.dispatchEvent(new CustomEvent('hanzo:auth', { detail: { authed } }));
   }
 
   private close(): void {

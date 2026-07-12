@@ -239,6 +239,12 @@ export class AiAnalystDock {
     }
   }
 
+  /** Open the dock and ask the analyst a question (used by the Summarize menu). */
+  public askInDock(text: string): void {
+    if (!this.open) this.openDock();
+    this.chat.ask(text);
+  }
+
   public destroy(): void {
     document.removeEventListener('click', this.onDocClick);
     document.removeEventListener('keydown', this.onKey);
