@@ -1,0 +1,621 @@
+{
+  "exclusions": [
+    "protein",
+    "couples",
+    "relationship",
+    "dating",
+    "diet",
+    "fitness",
+    "recipe",
+    "cooking",
+    "shopping",
+    "fashion",
+    "celebrity",
+    "movie",
+    "tv show",
+    "sports",
+    "game",
+    "concert",
+    "festival",
+    "wedding",
+    "vacation",
+    "travel tips",
+    "life hack",
+    "self-care",
+    "wellness"
+  ],
+  "shortKeywords": [
+    "war",
+    "coup",
+    "ban",
+    "vote",
+    "riot",
+    "riots",
+    "hack",
+    "talks",
+    "ipo",
+    "gdp",
+    "virus",
+    "disease",
+    "flood"
+  ],
+  "tiers": [
+    {
+      "level": "critical",
+      "confidence": 0.9,
+      "variant": "any",
+      "keywords": [
+        {
+          "keyword": "nuclear strike",
+          "category": "military"
+        },
+        {
+          "keyword": "nuclear attack",
+          "category": "military"
+        },
+        {
+          "keyword": "nuclear war",
+          "category": "military"
+        },
+        {
+          "keyword": "invasion",
+          "category": "conflict"
+        },
+        {
+          "keyword": "declaration of war",
+          "category": "conflict"
+        },
+        {
+          "keyword": "martial law",
+          "category": "military"
+        },
+        {
+          "keyword": "coup",
+          "category": "military"
+        },
+        {
+          "keyword": "coup attempt",
+          "category": "military"
+        },
+        {
+          "keyword": "genocide",
+          "category": "conflict"
+        },
+        {
+          "keyword": "ethnic cleansing",
+          "category": "conflict"
+        },
+        {
+          "keyword": "chemical attack",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "biological attack",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "dirty bomb",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "mass casualty",
+          "category": "conflict"
+        },
+        {
+          "keyword": "pandemic declared",
+          "category": "health"
+        },
+        {
+          "keyword": "health emergency",
+          "category": "health"
+        },
+        {
+          "keyword": "nato article 5",
+          "category": "military"
+        },
+        {
+          "keyword": "evacuation order",
+          "category": "disaster"
+        },
+        {
+          "keyword": "meltdown",
+          "category": "disaster"
+        },
+        {
+          "keyword": "nuclear meltdown",
+          "category": "disaster"
+        }
+      ]
+    },
+    {
+      "level": "high",
+      "confidence": 0.8,
+      "variant": "any",
+      "keywords": [
+        {
+          "keyword": "war",
+          "category": "conflict"
+        },
+        {
+          "keyword": "armed conflict",
+          "category": "conflict"
+        },
+        {
+          "keyword": "airstrike",
+          "category": "conflict"
+        },
+        {
+          "keyword": "air strike",
+          "category": "conflict"
+        },
+        {
+          "keyword": "drone strike",
+          "category": "conflict"
+        },
+        {
+          "keyword": "missile",
+          "category": "military"
+        },
+        {
+          "keyword": "missile launch",
+          "category": "military"
+        },
+        {
+          "keyword": "troops deployed",
+          "category": "military"
+        },
+        {
+          "keyword": "military escalation",
+          "category": "military"
+        },
+        {
+          "keyword": "bombing",
+          "category": "conflict"
+        },
+        {
+          "keyword": "casualties",
+          "category": "conflict"
+        },
+        {
+          "keyword": "hostage",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "terrorist",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "terror attack",
+          "category": "terrorism"
+        },
+        {
+          "keyword": "assassination",
+          "category": "crime"
+        },
+        {
+          "keyword": "cyber attack",
+          "category": "cyber"
+        },
+        {
+          "keyword": "ransomware",
+          "category": "cyber"
+        },
+        {
+          "keyword": "data breach",
+          "category": "cyber"
+        },
+        {
+          "keyword": "sanctions",
+          "category": "economic"
+        },
+        {
+          "keyword": "embargo",
+          "category": "economic"
+        },
+        {
+          "keyword": "earthquake",
+          "category": "disaster"
+        },
+        {
+          "keyword": "tsunami",
+          "category": "disaster"
+        },
+        {
+          "keyword": "hurricane",
+          "category": "disaster"
+        },
+        {
+          "keyword": "typhoon",
+          "category": "disaster"
+        }
+      ]
+    },
+    {
+      "level": "high",
+      "confidence": 0.75,
+      "variant": "tech",
+      "keywords": [
+        {
+          "keyword": "major outage",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "service down",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "global outage",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "zero-day",
+          "category": "cyber"
+        },
+        {
+          "keyword": "critical vulnerability",
+          "category": "cyber"
+        },
+        {
+          "keyword": "supply chain attack",
+          "category": "cyber"
+        },
+        {
+          "keyword": "mass layoff",
+          "category": "economic"
+        }
+      ]
+    },
+    {
+      "level": "medium",
+      "confidence": 0.7,
+      "variant": "any",
+      "keywords": [
+        {
+          "keyword": "protest",
+          "category": "protest"
+        },
+        {
+          "keyword": "protests",
+          "category": "protest"
+        },
+        {
+          "keyword": "riot",
+          "category": "protest"
+        },
+        {
+          "keyword": "riots",
+          "category": "protest"
+        },
+        {
+          "keyword": "unrest",
+          "category": "protest"
+        },
+        {
+          "keyword": "demonstration",
+          "category": "protest"
+        },
+        {
+          "keyword": "strike action",
+          "category": "protest"
+        },
+        {
+          "keyword": "military exercise",
+          "category": "military"
+        },
+        {
+          "keyword": "naval exercise",
+          "category": "military"
+        },
+        {
+          "keyword": "arms deal",
+          "category": "military"
+        },
+        {
+          "keyword": "weapons sale",
+          "category": "military"
+        },
+        {
+          "keyword": "diplomatic crisis",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "ambassador recalled",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "expel diplomats",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "trade war",
+          "category": "economic"
+        },
+        {
+          "keyword": "tariff",
+          "category": "economic"
+        },
+        {
+          "keyword": "recession",
+          "category": "economic"
+        },
+        {
+          "keyword": "inflation",
+          "category": "economic"
+        },
+        {
+          "keyword": "market crash",
+          "category": "economic"
+        },
+        {
+          "keyword": "flood",
+          "category": "disaster"
+        },
+        {
+          "keyword": "flooding",
+          "category": "disaster"
+        },
+        {
+          "keyword": "wildfire",
+          "category": "disaster"
+        },
+        {
+          "keyword": "volcano",
+          "category": "disaster"
+        },
+        {
+          "keyword": "eruption",
+          "category": "disaster"
+        },
+        {
+          "keyword": "outbreak",
+          "category": "health"
+        },
+        {
+          "keyword": "epidemic",
+          "category": "health"
+        },
+        {
+          "keyword": "infection spread",
+          "category": "health"
+        },
+        {
+          "keyword": "oil spill",
+          "category": "environmental"
+        },
+        {
+          "keyword": "pipeline explosion",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "blackout",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "power outage",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "internet outage",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "derailment",
+          "category": "infrastructure"
+        }
+      ]
+    },
+    {
+      "level": "medium",
+      "confidence": 0.65,
+      "variant": "tech",
+      "keywords": [
+        {
+          "keyword": "outage",
+          "category": "infrastructure"
+        },
+        {
+          "keyword": "breach",
+          "category": "cyber"
+        },
+        {
+          "keyword": "hack",
+          "category": "cyber"
+        },
+        {
+          "keyword": "vulnerability",
+          "category": "cyber"
+        },
+        {
+          "keyword": "layoff",
+          "category": "economic"
+        },
+        {
+          "keyword": "layoffs",
+          "category": "economic"
+        },
+        {
+          "keyword": "antitrust",
+          "category": "economic"
+        },
+        {
+          "keyword": "monopoly",
+          "category": "economic"
+        },
+        {
+          "keyword": "ban",
+          "category": "economic"
+        },
+        {
+          "keyword": "shutdown",
+          "category": "infrastructure"
+        }
+      ]
+    },
+    {
+      "level": "low",
+      "confidence": 0.6,
+      "variant": "any",
+      "keywords": [
+        {
+          "keyword": "election",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "vote",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "referendum",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "summit",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "treaty",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "agreement",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "negotiation",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "talks",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "peacekeeping",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "humanitarian aid",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "ceasefire",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "peace treaty",
+          "category": "diplomatic"
+        },
+        {
+          "keyword": "climate change",
+          "category": "environmental"
+        },
+        {
+          "keyword": "emissions",
+          "category": "environmental"
+        },
+        {
+          "keyword": "pollution",
+          "category": "environmental"
+        },
+        {
+          "keyword": "deforestation",
+          "category": "environmental"
+        },
+        {
+          "keyword": "drought",
+          "category": "environmental"
+        },
+        {
+          "keyword": "vaccine",
+          "category": "health"
+        },
+        {
+          "keyword": "vaccination",
+          "category": "health"
+        },
+        {
+          "keyword": "disease",
+          "category": "health"
+        },
+        {
+          "keyword": "virus",
+          "category": "health"
+        },
+        {
+          "keyword": "public health",
+          "category": "health"
+        },
+        {
+          "keyword": "covid",
+          "category": "health"
+        },
+        {
+          "keyword": "interest rate",
+          "category": "economic"
+        },
+        {
+          "keyword": "gdp",
+          "category": "economic"
+        },
+        {
+          "keyword": "unemployment",
+          "category": "economic"
+        },
+        {
+          "keyword": "regulation",
+          "category": "economic"
+        }
+      ]
+    },
+    {
+      "level": "low",
+      "confidence": 0.55,
+      "variant": "tech",
+      "keywords": [
+        {
+          "keyword": "ipo",
+          "category": "economic"
+        },
+        {
+          "keyword": "funding",
+          "category": "economic"
+        },
+        {
+          "keyword": "acquisition",
+          "category": "economic"
+        },
+        {
+          "keyword": "merger",
+          "category": "economic"
+        },
+        {
+          "keyword": "launch",
+          "category": "tech"
+        },
+        {
+          "keyword": "release",
+          "category": "tech"
+        },
+        {
+          "keyword": "update",
+          "category": "tech"
+        },
+        {
+          "keyword": "partnership",
+          "category": "economic"
+        },
+        {
+          "keyword": "startup",
+          "category": "tech"
+        },
+        {
+          "keyword": "ai model",
+          "category": "tech"
+        },
+        {
+          "keyword": "open source",
+          "category": "tech"
+        }
+      ]
+    }
+  ]
+}
