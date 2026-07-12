@@ -340,7 +340,8 @@ canvas,
   justify-content: space-between;
   padding: 0 14px;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  /* No divider: the header shares the app background, so an underline just cuts
+     the page in half. The layout defines the header, not a rule. */
   height: 46px;
   flex-shrink: 0;
   gap: 12px;
@@ -958,19 +959,8 @@ canvas,
   opacity: 1;
 }
 
-.map-panel .panel-header.map-drag-grip::after {
-  content: '';
-  width: 34px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--text-dim);
-  opacity: 0.55;
-  transition: opacity 0.2s ease;
-}
-
-.map-panel .panel-header.map-drag-grip:hover::after {
-  opacity: 0.9;
-}
+/* No visible drag pill: the top strip is still the drag target (cursor:grab),
+   it just carries no indicator — the map stays chromeless. */
 
 .map-panel.panel-drag-source .panel-header.map-drag-grip {
   cursor: grabbing;

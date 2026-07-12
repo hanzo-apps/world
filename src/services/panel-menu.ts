@@ -44,6 +44,16 @@ export interface MapContextPort {
 
 let mapPort: MapContextPort | null = null;
 
+/** Ask the analyst to summarize a headline — registered by App, so the menu
+ *  never reaches into the AI dock. Null until the dock exists. */
+export type SummarizePort = (headline: string, url?: string) => void;
+let summarizePort: SummarizePort | null = null;
+
+/** Install (or clear) the summarize capability. The one wiring point App uses. */
+export function registerSummarizePort(port: SummarizePort | null): void {
+  summarizePort = port;
+}
+
 /** Install (or clear) the map capability port. The one wiring point the map uses. */
 export function registerMapContextPort(port: MapContextPort | null): void {
   mapPort = port;
@@ -114,7 +124,17 @@ function componentItems(el: HTMLElement): MenuEntry[] {
     items.push({ label: 'Open link', run: () => window.open(url, '_blank', 'noopener') });
     items.push({ label: 'Copy link', run: () => copyText(url) });
   }
-  if (d.ctxHeadline) items.push({ label: 'Copy headline', run: () => copyText(d.ctxHeadline!) });
+  if (d.ctxHeadline) {
+    const headline = d.ctxHeadline;
+    const url = d.ctxUrl;
+    // AI summary sits at the TOP of an item's menu — it is the action you want
+    // on a headline; copy/open stay below it.
+    if (summarizePort) {
+      items.unshift({ kind: 'sep' });
+      items.unshift({ label: 'Summarize with AI', run: () => summarizePort?.(headline, url) });
+    }
+    items.push({ label: 'Copy headline', run: () => copyText(headline) });
+  }
   if (d.ctxValue) items.push({ label: 'Copy value', run: () => copyText(d.ctxValue!) });
   if (d.ctxSymbol) items.push({ label: 'Copy symbol', run: () => copyText(d.ctxSymbol!) });
   if (d.ctxLatest) items.push({ label: 'Copy latest value', run: () => copyText(d.ctxLatest!) });
