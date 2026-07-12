@@ -52,6 +52,9 @@ export interface AppHost {
   setTheme(theme: 'dark' | 'light'): boolean;
   search(query: string): boolean;
   resetLayout(): void;
+  // watch queue — find a video and add it to the persistent watch queue (the
+  // queue survives reload, so surfaced content isn't lost on refresh).
+  queueVideo(query: string): Promise<{ ok: boolean; note?: string; title?: string }>;
   // custom feeds
   addFeedPanel(name: string, url: string): Promise<{ ok: boolean; note?: string }>;
   removeCustomPanel(name: string): boolean;
@@ -251,6 +254,17 @@ export const COMMANDS: AppCommand[] = [
     description: 'Open the global search and run a query (countries, markets, hotspots, …).',
     params: obj({ query: str('search text') }, ['query']),
     run: (h, a) => bool(h.search(a.query as string), `Searching for "${a.query}".`, 'Search is unavailable right now.'),
+  },
+  {
+    name: 'queue_video',
+    description: 'Find a video (e.g. "Milken Institute Jensen Huang 2025") and add it to the persistent Watch Queue, then open it. The queue survives reload and tracks what you have watched.',
+    params: obj({ query: str('what to search for — a talk, interview or topic') }, ['query']),
+    run: async (h, a) => {
+      const res = await h.queueVideo(a.query as string);
+      return res.ok
+        ? { ok: true, message: `Queued "${res.title || (a.query as string)}" in the Watch Queue.` }
+        : { ok: false, message: `Couldn't queue that — ${res.note || 'no video found'}.` };
+    },
   },
   {
     name: 'reset_layout',
