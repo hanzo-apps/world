@@ -172,6 +172,7 @@ export const FEEDS: Record<string, Feed[]> = {
 
 // Panel configuration for tech/AI analysis
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
+  watch: { name: 'Watch Queue', enabled: true, priority: 2 },
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
   'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
   events: { name: 'Tech Events', enabled: true, priority: 1 },
