@@ -140,6 +140,7 @@ export const FEEDS: Record<string, Feed[]> = {
 
 // Panel configuration for finance/trading
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
+  watch: { name: 'Watch Queue', enabled: true, priority: 2 },
   map: { name: 'Global Markets Map', enabled: true, priority: 1 },
   'live-news': { name: 'Market Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },

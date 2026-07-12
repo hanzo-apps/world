@@ -26,6 +26,9 @@ import { signalAggregator } from '@/services/signal-aggregator';
 import { updateAndCheck } from '@/services/temporal-baseline';
 import { fetchAllFires, flattenFires, computeRegionStats } from '@/services/firms-satellite';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
+import { WatchQueuePanel } from '@/components/WatchQueuePanel';
+import { watchQueue } from '@/services/watch-queue';
+import { searchYouTube } from '@/services/youtube-search';
 import { analyzeFlightsForSurge, surgeAlertToSignal, detectForeignMilitaryPresence, foreignPresenceToSignal, type TheaterPostureSummary } from '@/services/military-surge';
 import { fetchCachedTheaterPosture } from '@/services/cached-theater-posture';
 import { ingestProtestsForCII, ingestMilitaryForCII, ingestNewsForCII, ingestOutagesForCII, ingestConflictsForCII, ingestUcdpForCII, ingestHapiForCII, ingestDisplacementForCII, ingestClimateForCII, startLearning, isInLearningMode, calculateCII, getCountryData, TIER1_COUNTRIES } from '@/services/country-instability';
@@ -2398,6 +2401,8 @@ export class App {
       this.updateMonitorResults();
     });
 
+    this.panels['watch'] = new WatchQueuePanel();
+
     const commoditiesPanel = new CommoditiesPanel();
     this.panels['commodities'] = commoditiesPanel;
 
@@ -2908,6 +2913,7 @@ export class App {
       setTheme: (theme) => this.setAppTheme(theme),
       search: (query) => this.runSearch(query),
       resetLayout: () => this.resetPanelLayout(),
+      queueVideo: (query) => this.queueVideoToWatch(query),
       addFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
       removeCustomPanel: (name) => this.removeCustomFeedPanel(name),
       switchOrg: (org) => this.switchActiveOrg(org),
@@ -2915,6 +2921,29 @@ export class App {
   }
 
   // ── New analyst capabilities (drive existing public APIs; no new plumbing) ──
+
+  // Resolve a free-text query to a video and put it in the persistent Watch
+  // Queue (survives reload — the whole point), then show the panel and play it.
+  private async queueVideoToWatch(query: string): Promise<{ ok: boolean; note?: string; title?: string }> {
+    try {
+      const [hit] = await searchYouTube(query);
+      if (!hit) return { ok: false, note: 'no video found' };
+      watchQueue.enqueue({
+        id: `yt:${hit.id}`,
+        kind: 'video',
+        title: hit.title,
+        source: hit.channel,
+        ref: hit.id,
+        thumbnail: hit.thumbnail,
+        link: `https://www.youtube.com/watch?v=${hit.id}`,
+      });
+      watchQueue.select(`yt:${hit.id}`);
+      this.setPanelEnabled('watch', true);
+      return { ok: true, title: hit.title };
+    } catch {
+      return { ok: false, note: 'search is unavailable' };
+    }
+  }
 
   private resizePanelInGrid(key: string, span: number): boolean {
     const s = Math.max(1, Math.min(4, Math.round(span)));
