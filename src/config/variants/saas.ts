@@ -19,6 +19,7 @@ export * from './base';
 
 // Panel configuration for the SaaS / cloud view. Dense stat tiles, not feeds.
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
+  watch: { name: 'Watch Queue', enabled: true, priority: 2 },
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },

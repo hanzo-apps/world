@@ -64,6 +64,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/fwdstart", s.handleFwdstart)
 	mux.HandleFunc("/v1/world/youtube/live", s.handleYouTubeLive)
 	mux.HandleFunc("/v1/world/youtube/embed", s.handleYouTubeEmbed)
+	mux.HandleFunc("/v1/world/youtube/search", s.handleYouTubeSearch)
 
 	// ingested-data lake — the "one place to query everything" (search +
 	// analytics across ALL ingested items: news, model observations, …).
