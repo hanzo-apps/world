@@ -17,7 +17,7 @@ import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, 
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
-import { installPanelContextMenu } from '@/services/panel-menu';
+import { installPanelContextMenu, registerSummarizePort } from '@/services/panel-menu';
 import { ImmersiveController, type ImmersiveBackground, type ImmersiveState } from '@/services/immersive';
 import { loadPanelSpans, savePanelSpan, currentSpan, setSpanClass } from '@/components/Panel';
 import { clusterNewsHybrid } from '@/services/clustering';
@@ -837,12 +837,24 @@ export class App {
       </div>
     `;
 
+    // "Try Hanzo" is an ACQUISITION CTA — it only makes sense to a visitor who
+    // hasn't signed in. Once identity resolves as signed-in, it disappears (and
+    // its portaled menu closes with it). Driven by the one 'hanzo:auth' signal.
+    const syncCta = (authed: boolean): void => {
+      wrap.hidden = authed;
+      if (authed) menu.classList.remove('open');
+    };
+
     const trigger = wrap.querySelector<HTMLButtonElement>('.try-hanzo-trigger')!;
     const menu = wrap.querySelector<HTMLElement>('.try-hanzo-menu')!;
     // Portal the menu to <body>: the mobile header sets overflow-y:hidden for its
     // horizontal tab scroller, which would clip a menu nested inside it. As a body
     // child the fixed menu is anchored to the viewport and never clipped.
     document.body.appendChild(menu);
+    syncCta(isAuthenticated()); // instant paint; refined when identity resolves
+    document.addEventListener('hanzo:auth', (e) => {
+      syncCta(!!(e as CustomEvent<{ authed: boolean }>).detail?.authed);
+    });
 
     const isOpen = (): boolean => menu.classList.contains('open');
     const setOpen = (open: boolean): void => {
@@ -2747,6 +2759,14 @@ export class App {
     if (!this.analystDock) {
       this.analystDock = new AiAnalystDock(this.buildAnalystHost());
       this.analystDock.attach();
+      // Right-click → "Summarize with AI" on any headline routes into the SAME
+      // analyst dock (no second AI path, no bespoke summarizer).
+      registerSummarizePort((headline, url) => {
+        const q = url
+          ? `Summarize this story and why it matters: "${headline}" (${url})`
+          : `Summarize this story and why it matters: "${headline}"`;
+        this.analystDock?.askInDock(q);
+      });
     }
 
     // Cloud tab: the deep operator panels are admin-org only (server enforces
