@@ -18,6 +18,7 @@ import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
 import { installPanelContextMenu, registerSummarizePort } from '@/services/panel-menu';
+import { loadMonitors as loadUserMonitors, saveMonitors as saveUserMonitors, fetchMonitorMatches } from '@/services/monitors';
 import { ImmersiveController, type ImmersiveBackground, type ImmersiveState } from '@/services/immersive';
 import { loadPanelSpans, savePanelSpan, currentSpan, setSpanClass } from '@/components/Panel';
 import { clusterNewsHybrid } from '@/services/clustering';
@@ -853,7 +854,10 @@ export class App {
     document.body.appendChild(menu);
     syncCta(isAuthenticated()); // instant paint; refined when identity resolves
     document.addEventListener('hanzo:auth', (e) => {
-      syncCta(!!(e as CustomEvent<{ authed: boolean }>).detail?.authed);
+      const authed = !!(e as CustomEvent<{ authed: boolean }>).detail?.authed;
+      syncCta(authed);
+      // Identity resolved → pull this user's server-side monitors.
+      if (authed) void this.syncMonitorsFromServer();
     });
 
     const isOpen = (): boolean => menu.classList.contains('open');
@@ -2409,7 +2413,7 @@ export class App {
     this.panels['monitors'] = monitorPanel;
     monitorPanel.onChanged((monitors) => {
       this.monitors = monitors;
-      saveToStorage(STORAGE_KEYS.monitors, monitors);
+      void saveUserMonitors(monitors); // localStorage + the Go backend when signed in
       this.updateMonitorResults();
     });
 
@@ -5094,7 +5098,24 @@ export class App {
 
   private updateMonitorResults(): void {
     const monitorPanel = this.panels['monitors'] as MonitorPanel;
-    monitorPanel.renderResults(this.allNews);
+    if (!monitorPanel) return;
+    // Signed in, the Go backend matches against the whole lake — every item it
+    // ingested, not just the headlines this tab loaded. Signed out (or server
+    // unreachable), match locally exactly as before.
+    void fetchMonitorMatches().then((matches) => {
+      if (matches) monitorPanel.renderServerMatches(matches);
+      else monitorPanel.renderResults(this.allNews);
+    });
+  }
+
+  // Adopt the signed-in user's server-side monitors once identity resolves, so a
+  // second device shows the monitors you made on the first.
+  private async syncMonitorsFromServer(): Promise<void> {
+    const monitors = await loadUserMonitors();
+    if (!monitors.length && !this.monitors.length) return;
+    this.monitors = monitors;
+    (this.panels['monitors'] as MonitorPanel | undefined)?.setMonitors(monitors);
+    this.updateMonitorResults();
   }
 
   private async runCorrelationAnalysis(): Promise<void> {
