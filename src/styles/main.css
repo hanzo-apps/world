@@ -17108,3 +17108,37 @@ body.layout-free .panels-grid::after {
     height: auto !important;
   }
 }
+
+/* ── Watch Queue ─────────────────────────────────────────────────────────────
+   Stage (current item) over a compact list of the rest. The queue itself is the
+   source of truth (services/watch-queue.ts); this is only its skin. */
+.wq-stage { display: flex; flex-direction: column; gap: 6px; }
+.wq-player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+.wq-player:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; }
+.wq-frame, .wq-img { width: 100%; height: 100%; border: 0; object-fit: contain; display: block; }
+.wq-story { display: flex; flex-direction: column; width: 100%; height: 100%; }
+.wq-story-blank { flex: 1; background: var(--bg-alt, #111); }
+.wq-story-head { padding: 6px 8px; }
+.wq-story-link { color: var(--text); font-size: 12px; text-decoration: none; }
+.wq-story-link:hover { text-decoration: underline; }
+.wq-empty { padding: 16px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+.wq-stage-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wq-stage-meta { display: flex; flex-direction: column; min-width: 0; }
+.wq-src { color: var(--text-dim); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }
+.wq-title { color: var(--text); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wq-controls { display: flex; gap: 4px; flex-shrink: 0; }
+.wq-btn { background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer;
+  font-size: 10px; padding: 3px 7px; transition: color 0.2s, border-color 0.2s; }
+.wq-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.wq-finish { color: var(--text); }
+.wq-list { display: flex; flex-direction: column; margin-top: 4px; }
+.wq-row { display: flex; align-items: center; gap: 6px; padding: 4px 2px; cursor: pointer;
+  border-bottom: 1px solid var(--border); font-size: 11px; }
+.wq-row:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
+.wq-row.current { border-left: 2px solid var(--status-live, #0f0); padding-left: 4px; }
+.wq-row.watched { opacity: 0.45; }
+.wq-row-icon { color: var(--text-dim); font-size: 9px; flex-shrink: 0; }
+.wq-row-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.wq-row-src { color: var(--text-dim); font-size: 9px; flex-shrink: 0; }
+.wq-row-x { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0 3px; font-size: 12px; }
+.wq-row-x:hover { color: var(--red, #f55); }
