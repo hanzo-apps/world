@@ -26,6 +26,15 @@ export interface AppState {
   theme?: 'dark' | 'light';
   region?: string;
   authed?: boolean;
+  /** grid | free | immersive — the layout mode the dock select drives. */
+  layoutMode?: 'grid' | 'free' | 'immersive';
+  /** What fills the immersive background. */
+  immersiveBg?: 'map' | 'video';
+  language?: string;
+  /** The user's keyword monitors, so the analyst can reason about them. */
+  monitors?: Array<{ id: string; keywords: string[] }>;
+  /** Watch-queue depth + what is playing. */
+  queue?: { total: number; unwatched: number; current?: string };
 }
 
 /** The dashboard capabilities the analyst is allowed to drive. App implements it. */
@@ -52,6 +61,17 @@ export interface AppHost {
   setTheme(theme: 'dark' | 'light'): boolean;
   search(query: string): boolean;
   resetLayout(): void;
+  // layout mode + immersive background
+  setLayoutMode(mode: 'grid' | 'free' | 'immersive'): boolean;
+  setImmersiveBackground(bg: 'map' | 'video'): boolean;
+  // language
+  setLanguage(code: string): boolean;
+  // keyword monitors — "add a topic to scan for"
+  addMonitor(keywords: string): { ok: boolean; id?: string };
+  removeMonitor(id: string): boolean;
+  // watch queue
+  queueNext(): { ok: boolean; title?: string };
+  queuePrev(): { ok: boolean; title?: string };
   // watch queue — find a video and add it to the persistent watch queue (the
   // queue survives reload, so surfaced content isn't lost on refresh).
   queueVideo(query: string): Promise<{ ok: boolean; note?: string; title?: string }>;
@@ -264,6 +284,71 @@ export const COMMANDS: AppCommand[] = [
       return res.ok
         ? { ok: true, message: `Queued "${res.title || (a.query as string)}" in the Watch Queue.` }
         : { ok: false, message: `Couldn't queue that — ${res.note || 'no video found'}.` };
+    },
+  },
+  {
+    name: 'set_layout_mode',
+    description: 'Set the layout mode: "grid" (snap to grid), "free" (free-form pixel placement), or "immersive" (map/video fills the viewport, panels float over it).',
+    params: obj({ mode: enumStr(['grid', 'free', 'immersive'], 'layout mode') }, ['mode']),
+    run: (h, a) => bool(
+      h.setLayoutMode(a.mode as 'grid' | 'free' | 'immersive'),
+      `Switched to the ${a.mode} layout.`,
+      `Couldn't switch to the ${a.mode} layout.`,
+    ),
+  },
+  {
+    name: 'set_immersive_background',
+    description: 'Choose what fills the immersive background: the map, or live video.',
+    params: obj({ background: enumStr(['map', 'video'], 'background source') }, ['background']),
+    run: (h, a) => bool(
+      h.setImmersiveBackground(a.background as 'map' | 'video'),
+      `Immersive background is now ${a.background}.`,
+      'Immersive mode is off — turn it on first with set_layout_mode.',
+    ),
+  },
+  {
+    name: 'set_language',
+    description: 'Switch the interface language (ISO code from the snapshot, e.g. "en", "es", "ja").',
+    params: obj({ language: str('ISO language code') }, ['language']),
+    run: (h, a) => bool(h.setLanguage(a.language as string), `Language set to ${a.language}.`, `Unsupported language "${a.language}".`),
+  },
+  {
+    name: 'add_monitor',
+    description: 'Watch for a topic: add a keyword monitor (comma-separate several keywords). Signed-in monitors are matched server-side against everything the backend ingests.',
+    params: obj({ keywords: str('keyword, or comma-separated keywords') }, ['keywords']),
+    run: (h, a) => {
+      const res = h.addMonitor(a.keywords as string);
+      return res.ok
+        ? { ok: true, message: `Now monitoring "${a.keywords}".` }
+        : { ok: false, message: `Couldn't add a monitor for "${a.keywords}".` };
+    },
+  },
+  {
+    name: 'remove_monitor',
+    description: 'Stop watching a topic — remove a keyword monitor by its id (from the snapshot).',
+    params: obj({ id: str('monitor id from the snapshot') }, ['id']),
+    run: (h, a) => bool(h.removeMonitor(a.id as string), 'Removed that monitor.', 'No monitor with that id.'),
+  },
+  {
+    name: 'queue_next',
+    description: 'Finish the current Watch Queue item and play the next one.',
+    params: obj({}, []),
+    run: (h) => {
+      const res = h.queueNext();
+      return res.ok
+        ? { ok: true, message: res.title ? `Playing "${res.title}".` : 'Queue finished — nothing left to watch.' }
+        : { ok: false, message: 'The Watch Queue is empty.' };
+    },
+  },
+  {
+    name: 'queue_prev',
+    description: 'Go back to the previous item in the Watch Queue.',
+    params: obj({}, []),
+    run: (h) => {
+      const res = h.queuePrev();
+      return res.ok
+        ? { ok: true, message: res.title ? `Playing "${res.title}".` : 'Already at the start of the queue.' }
+        : { ok: false, message: 'The Watch Queue is empty.' };
     },
   },
   {
