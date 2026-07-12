@@ -11,6 +11,7 @@ import {
   MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
   SITE_VARIANT,
+  MONITOR_COLORS,
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
@@ -42,7 +43,7 @@ import { fetchUcdpEvents, deduplicateAgainstAcled } from '@/services/ucdp-events
 import { fetchUnhcrPopulation } from '@/services/unhcr';
 import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
-import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice, setTheme, getCurrentTheme } from '@/utils';
+import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice, setTheme, getCurrentTheme, generateId, getCSSColor } from '@/utils';
 import { reverseGeocode } from '@/utils/reverse-geocode';
 import { CountryBriefPage } from '@/components/CountryBriefPage';
 import { CountryTimeline, type TimelineEvent } from '@/components/CountryTimeline';
@@ -127,7 +128,7 @@ import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } fro
 import { isDesktopRuntime, canConfigureKeys } from '@/services/runtime';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
-import { initI18n, t, changeLanguage } from '@/services/i18n';
+import { initI18n, t, changeLanguage, getCurrentLanguage, LANGUAGES } from '@/services/i18n';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
@@ -2916,6 +2917,15 @@ export class App {
         region: this.map?.getState().view,
         theme: getCurrentTheme(),
         authed: isAuthenticated(),
+        layoutMode: this.immersive?.getState().enabled ? 'immersive' : this.gridApi().getLayoutMode(),
+        immersiveBg: this.immersive?.getState().background,
+        language: getCurrentLanguage(),
+        monitors: this.monitors.map((m) => ({ id: m.id, keywords: m.keywords })),
+        queue: {
+          total: watchQueue.length,
+          unwatched: watchQueue.unwatchedCount(),
+          current: watchQueue.current()?.title,
+        },
       }),
       listPanels: () =>
         Object.entries(this.panelSettings)
@@ -2938,6 +2948,19 @@ export class App {
       search: (query) => this.runSearch(query),
       resetLayout: () => this.resetPanelLayout(),
       queueVideo: (query) => this.queueVideoToWatch(query),
+      setLayoutMode: (mode) => this.setLayoutModeFromCommand(mode),
+      setImmersiveBackground: (bg) => this.setImmersiveBackgroundFromCommand(bg),
+      setLanguage: (code) => this.setLanguageFromCommand(code),
+      addMonitor: (keywords) => this.addMonitorFromCommand(keywords),
+      removeMonitor: (id) => this.removeMonitorFromCommand(id),
+      queueNext: () => {
+        if (!watchQueue.length) return { ok: false };
+        return { ok: true, title: watchQueue.next()?.title };
+      },
+      queuePrev: () => {
+        if (!watchQueue.length) return { ok: false };
+        return { ok: true, title: watchQueue.prev()?.title };
+      },
       addFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
       removeCustomPanel: (name) => this.removeCustomFeedPanel(name),
       switchOrg: (org) => this.switchActiveOrg(org),
@@ -2967,6 +2990,54 @@ export class App {
     } catch {
       return { ok: false, note: 'search is unavailable' };
     }
+  }
+
+  // Layout mode: the analyst drives the SAME setDockMode the dock select drives,
+  // so the select and the AI can never disagree about the mode.
+  private setLayoutModeFromCommand(mode: 'grid' | 'free' | 'immersive'): boolean {
+    this.setDockMode(mode);
+    this.syncModeSelect();
+    const now = this.immersive?.getState().enabled ? 'immersive' : this.gridApi().getLayoutMode();
+    return now === mode;
+  }
+
+  private setImmersiveBackgroundFromCommand(bg: 'map' | 'video'): boolean {
+    if (!this.immersive?.getState().enabled) return false; // honest: immersive is off
+    this.immersive.setBackground(bg);
+    return this.immersive.getState().background === bg;
+  }
+
+  private setLanguageFromCommand(code: string): boolean {
+    if (!LANGUAGES.some((l) => l.code === code)) return false;
+    changeLanguage(code);
+    return true;
+  }
+
+  // "Watch for X" — the same path the Monitors panel takes, so a monitor added by
+  // the analyst is persisted (and matched server-side) exactly like a typed one.
+  private addMonitorFromCommand(keywords: string): { ok: boolean; id?: string } {
+    const list = keywords.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);
+    if (!list.length) return { ok: false };
+    const monitor: Monitor = {
+      id: generateId(),
+      keywords: list,
+      color: MONITOR_COLORS[this.monitors.length % MONITOR_COLORS.length] ?? getCSSColor('--status-live'),
+    };
+    this.monitors = [...this.monitors, monitor];
+    (this.panels['monitors'] as MonitorPanel | undefined)?.setMonitors(this.monitors);
+    void saveUserMonitors(this.monitors);
+    this.updateMonitorResults();
+    return { ok: true, id: monitor.id };
+  }
+
+  private removeMonitorFromCommand(id: string): boolean {
+    const next = this.monitors.filter((m) => m.id !== id);
+    if (next.length === this.monitors.length) return false;
+    this.monitors = next;
+    (this.panels['monitors'] as MonitorPanel | undefined)?.setMonitors(next);
+    void saveUserMonitors(next);
+    this.updateMonitorResults();
+    return true;
   }
 
   private resizePanelInGrid(key: string, span: number): boolean {
