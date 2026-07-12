@@ -262,6 +262,14 @@ export class WatchQueue {
         this.items.some((i) => i.id === data.currentId)
         ? data.currentId
         : null;
+      // Restore the invariant: the current item IS the one being watched. A blob
+      // where currentId and status disagree (an older write, a hand-edit) would
+      // otherwise silently lose tracking — next() only finishes a 'watching' item,
+      // so leaving it would never mark it watched.
+      if (this.currentId) {
+        const cur = this.items.find((i) => i.id === this.currentId);
+        if (cur && cur.status === 'queued') cur.status = 'watching';
+      }
     } catch {
       /* corrupt storage — start clean */
     }
