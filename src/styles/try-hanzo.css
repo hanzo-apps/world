@@ -10,6 +10,12 @@
   flex: none;
 }
 
+/* An explicit display value beats the [hidden] attribute's UA rule, so the CTA
+   must opt back in — otherwise hiding it when signed in silently does nothing. */
+.try-hanzo[hidden] {
+  display: none;
+}
+
 /* Trigger inherits the .hz-cta pill; only the extras live here. */
 .try-hanzo-trigger {
   gap: 6px;
