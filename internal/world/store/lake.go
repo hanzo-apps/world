@@ -101,6 +101,32 @@ func (l *Lake) Run(ctx context.Context) {
 	}
 }
 
+// Flush drains everything queued by Add and writes it synchronously, reusing the
+// same insert path Run uses. Run() is the steady-state consumer; Flush exists for
+// the callers that need the write to be VISIBLE before they continue — tests, and
+// a shutdown that wants the buffer on disk.
+func (l *Lake) Flush() {
+	if l == nil || l.db == nil {
+		return
+	}
+	batch := make([]Item, 0, 256)
+	for {
+		select {
+		case it := <-l.ch:
+			batch = append(batch, it)
+			continue
+		default:
+		}
+		break
+	}
+	if len(batch) == 0 {
+		return
+	}
+	if err := l.insert(batch); err != nil {
+		logStore("lake flush (%d items): %v", len(batch), err)
+	}
+}
+
 // insert upserts a batch in one transaction. On conflict it refreshes the
 // mutable fields but preserves created_at (first-seen) so retention measures
 // true age. The FTS index follows via triggers.
