@@ -32,6 +32,38 @@ type feedBatchItem struct {
 	Link    string   `json:"link"`
 	PubDate string   `json:"pubDate,omitempty"` // RFC3339 when parseable, else ""
 	Tickers []string `json:"tickers,omitempty"` // stock/crypto tickers in the title
+	// Enrichment computed HERE, once, instead of on every client on every
+	// render (see enrich.go — proven identical to the old browser code).
+	Threat *ThreatClassification `json:"threat,omitempty"`
+	Geo    *feedItemGeo          `json:"geo,omitempty"`
+}
+
+// feedItemGeo is the top inferred hub, already resolved to coordinates so the
+// client needs no hub table of its own.
+type feedItemGeo struct {
+	HubID      string  `json:"hubId"`
+	Name       string  `json:"name"`
+	Lat        float64 `json:"lat"`
+	Lon        float64 `json:"lon"`
+	Confidence float64 `json:"confidence"`
+}
+
+// enrichFeedItems classifies + geo-locates parsed items. Kept separate from
+// parseFeedItems: parsing is about XML, enrichment is about meaning.
+func enrichFeedItems(items []feedBatchItem, variant string) []feedBatchItem {
+	for i := range items {
+		c := ClassifyByKeyword(items[i].Title, variant)
+		items[i].Threat = &c
+		if m := InferGeoHubs(items[i].Title); len(m) > 0 {
+			if hub := GeoHubByID(m[0].HubID); hub != nil {
+				items[i].Geo = &feedItemGeo{
+					HubID: hub.ID, Name: hub.Name, Lat: hub.Lat, Lon: hub.Lon,
+					Confidence: m[0].Confidence,
+				}
+			}
+		}
+	}
+	return items
 }
 
 type feedBatchResult struct {
@@ -49,7 +81,8 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		URLs []string `json:"urls"`
+		URLs    []string `json:"urls"`
+		Variant string   `json:"variant,omitempty"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil || len(req.URLs) == 0 {
 		writeError(w, http.StatusBadRequest, "Body must be {\"urls\":[...]}")
@@ -57,6 +90,12 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.URLs) > feedsBatchMaxURLs {
 		req.URLs = req.URLs[:feedsBatchMaxURLs]
+	}
+	// Only 'tech' unlocks the tech keyword tiers; every other variant classifies
+	// against the base tables (same rule the frontend used).
+	variant := req.Variant
+	if variant == "" {
+		variant = "full"
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
@@ -79,7 +118,7 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 			defer func() { <-sem }()
 			if body, ok, fresh := s.feedXML(ctx, feedURL); ok {
 				results[i].OK = true
-				results[i].Items = parseFeedItems(body, feedsBatchMaxItems)
+				results[i].Items = enrichFeedItems(parseFeedItems(body, feedsBatchMaxItems), variant)
 				if fresh {
 					s.ingestFeedItems(feedURL, body) // fold a cold-miss fetch into the lake
 				}
