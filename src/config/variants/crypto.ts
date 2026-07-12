@@ -17,6 +17,7 @@ import type { VariantConfig } from './base';
 export * from './base';
 
 export const DEFAULT_PANELS: Record<string, PanelConfig> = {
+  watch: { name: 'Watch Queue', enabled: true, priority: 2 },
   map: { name: 'Global Crypto Map', enabled: true, priority: 1 },
   'live-news': { name: 'Crypto & Markets Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
