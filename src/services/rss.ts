@@ -2,7 +2,6 @@ import type { Feed, NewsItem } from '@/types';
 import { SITE_VARIANT } from '@/config';
 import { chunkArray, fetchWithProxy } from '@/utils';
 import { classifyByKeyword, classifyWithAI } from './threat-classifier';
-import { inferGeoHubsFromTitle } from './geo-hub-index';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { ingestHeadlines } from './trending-keywords';
 import { getCurrentLanguage } from './i18n';
@@ -230,18 +229,29 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
   }
 }
 
-type RawFeedItem = { title: string; link: string; pubDate: Date };
+type ServerThreat = { level: string; category: string; confidence: number; source: string };
+type ServerGeo = { hubId: string; name: string; lat: number; lon: number; confidence: number };
+type RawFeedItem = {
+  title: string;
+  link: string;
+  pubDate: Date;
+  // Enrichment from the Go backend (feeds-batch). Present for every item the
+  // server parsed; the browser no longer classifies or geo-locates anything.
+  threat?: ServerThreat;
+  geo?: ServerGeo;
+};
 
 // Shared enrich+store pipeline for both transports (client-side DOM parse and
 // the server-side /v1/world/feeds-batch): classification, geo inference,
 // caches, trending ingestion and the AI reclassification queue live in ONE
 // place regardless of where the XML got parsed.
 function storeFeedItems(feed: Feed, feedScope: string, raws: RawFeedItem[]): NewsItem[] {
-  const parsed = raws.slice(0, 5).map(({ title, link, pubDate }) => {
-    const threat = classifyByKeyword(title, SITE_VARIANT);
-    const isAlert = threat.level === 'critical' || threat.level === 'high';
-    const geoMatches = inferGeoHubsFromTitle(title);
-    const topGeo = geoMatches[0];
+  const parsed = raws.slice(0, 5).map(({ title, link, pubDate, threat: srvThreat, geo }) => {
+    // The Go backend classifies and geo-locates (internal/world/enrich.go, proven
+    // identical to the old browser code). Falling back to the local classifier
+    // keeps a feed usable if it ever arrives unenriched.
+    const threat = (srvThreat as NewsItem['threat']) ?? classifyByKeyword(title, SITE_VARIANT);
+    const isAlert = threat!.level === 'critical' || threat!.level === 'high';
     return {
       source: feed.name,
       title,
@@ -249,7 +259,7 @@ function storeFeedItems(feed: Feed, feedScope: string, raws: RawFeedItem[]): New
       pubDate,
       isAlert,
       threat,
-      ...(topGeo && { lat: topGeo.hub.lat, lon: topGeo.hub.lon, locationName: topGeo.hub.name }),
+      ...(geo && { lat: geo.lat, lon: geo.lon, locationName: geo.name }),
       lang: feed.lang,
     };
   });
@@ -298,9 +308,12 @@ function upstreamUrl(proxied: string): string | null {
   }
 }
 
+// The Go backend is the transport for every proxied feed — a single feed batches
+// just as well as ten. The per-feed browser path survives ONLY for feeds that are
+// not proxy-shaped (nothing for the server to fetch upstream).
 function canBatchFeeds(feeds: Feed[]): boolean {
   const lang = getCurrentLanguage();
-  return feeds.length > 1 && feeds.every(f => upstreamUrl(resolveFeedUrl(f, lang)) !== null);
+  return feeds.length > 0 && feeds.every(f => upstreamUrl(resolveFeedUrl(f, lang)) !== null);
 }
 
 // One POST per category: the server fetches + parses every feed in parallel
@@ -337,11 +350,15 @@ async function fetchFeedsViaBatch(feeds: Feed[]): Promise<NewsItem[][]> {
     const res = await fetchWithProxy('/v1/world/feeds-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: group.map(p => p.url) }),
+      body: JSON.stringify({ urls: group.map(p => p.url), variant: SITE_VARIANT }),
     }, 28_000);
     if (!res.ok) throw new Error(`feeds-batch HTTP ${res.status}`);
     const data = await res.json() as {
-      feeds?: Array<{ url: string; ok: boolean; items?: Array<{ title?: string; link?: string; pubDate?: string }> }>;
+      feeds?: Array<{
+        url: string;
+        ok: boolean;
+        items?: Array<{ title?: string; link?: string; pubDate?: string; threat?: ServerThreat; geo?: ServerGeo }>;
+      }>;
     };
     const byUrl = new Map((data.feeds || []).map(f => [f.url, f]));
     await Promise.all(group.map(async ({ feed, scope, url, i }) => {
@@ -351,7 +368,13 @@ async function fetchFeedsViaBatch(feeds: Feed[]): Promise<NewsItem[][]> {
           .filter(it => (it.title || '').trim() !== '')
           .map(it => {
             const d = it.pubDate ? new Date(it.pubDate) : new Date();
-            return { title: it.title!, link: it.link || '', pubDate: Number.isNaN(d.getTime()) ? new Date() : d };
+            return {
+              title: it.title!,
+              link: it.link || '',
+              pubDate: Number.isNaN(d.getTime()) ? new Date() : d,
+              threat: it.threat,
+              geo: it.geo,
+            };
           });
         results[i] = storeFeedItems(feed, scope, raws);
       } else {
