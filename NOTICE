@@ -1,8 +1,31 @@
-World Monitor — Hanzo fork
-Copyright (c) 2026 Hanzo AI. Licensed under the MIT License (see LICENSE).
+Hanzo World — Hanzo fork
+Copyright (c) 2026 Hanzo AI, Inc. Licensed under the MIT License (see LICENSE).
 
 Forked from koala73/worldmonitor (https://github.com/koala73/worldmonitor) at
 v2.4.0 (commit 572f3808) — the last release under the MIT License. This fork
 tracks only the MIT-era code and develops forward independently.
 
 Original work © 2024-2026 Elie Habib, used under the MIT License.
+
+DEVIATIONS
+Changes made by Hanzo AI, Inc. relative to the upstream v2.4.0 baseline:
+
+- Rebranded the product to "Hanzo World": index.html <title>/meta/OpenGraph,
+  the vite.config full variant (siteName "Hanzo World"), and canonical host
+  world.hanzo.ai.
+- Added a single Go binary (cmd/world, internal/world; go.mod module
+  github.com/hanzoai/world) that serves the Vite SPA with SPA fallback AND
+  ports each upstream Vercel edge function to same-origin /v1/world/* (and
+  legacy /api/*) in Go. Upstream shipped a Vite SPA plus Vercel edge functions.
+- Added Hanzo deploy variants beyond upstream full/tech/finance:
+  src/config/variants/saas.ts (Hanzo Cloud platform metrics/usage), ai.ts, and
+  crypto.ts, with matching vite.config entries.
+- Added Hanzo CI/CD manifest hanzo.yml: image ghcr.io/hanzoai/world built via
+  hanzoai/ci, rolled onto the "world" operator Service CR on DOKS
+  do-sfo3-hanzo-k8s, with secrets fetched from KMS (kms.hanzo.ai).
+- Reworked Dockerfile to build the Go binary serving the SPA plus the API
+  endpoints (replacing the static-only image), built on Hanzo hardware
+  (platform.hanzo.ai / on-cluster BuildKit) rather than GitHub builders.
+- Rebranded package.json (name @hanzo/world, added description) and the
+  primary Tauri desktop app (productName and window title "Hanzo World").
+- Added Copyright (c) 2026 Hanzo AI, Inc. to LICENSE alongside the original.
