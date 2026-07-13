@@ -537,7 +537,11 @@ body.hzc-mode-fullscreen .hzc-resize {
   color: inherit;
   font: 500 12px var(--font-body, sans-serif);
   cursor: pointer;
-  max-width: 160px;
+  /* Compact: the pill should read as a small chip, not a wide bar. The selected
+     model label is truncated to keep the footer tidy; the full list is still in
+     the dropdown. */
+  max-width: 104px;
+  text-overflow: ellipsis;
   padding-right: 2px;
 }
 .hzc-model-select optgroup,
