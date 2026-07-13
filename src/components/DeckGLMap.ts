@@ -3755,6 +3755,14 @@ export class DeckGLMap {
     return this.state.mode;
   }
 
+  // On the 3D globe, arcs must follow the great circle and hug the sphere.
+  // A plain ArcLayer arches by ~1x the straight-line chord, which on a globe
+  // launches long arcs far off the silhouette (the "off-globe" glitch). Layers
+  // key their greatCircle/getHeight on this.
+  private get onGlobe(): boolean {
+    return this.state.mode === '3d';
+  }
+
   public setProjectionMode(mode: MapProjectionMode): void {
     if (this.state.mode === mode) return;
     this.state.mode = mode;
@@ -4080,6 +4088,10 @@ export class DeckGLMap {
     return new ArcLayer<DisplacementFlow>({
       id: 'displacement-arcs-layer',
       data: top50,
+      // Globe: follow the great circle, flat on the surface (no off-globe balloon).
+      greatCircle: this.onGlobe,
+      getHeight: this.onGlobe ? 0 : 1,
+      updateTriggers: { greatCircle: this.onGlobe, getHeight: this.onGlobe },
       getSourcePosition: (d) => [d.originLon!, d.originLat!],
       getTargetPosition: (d) => [d.asylumLon!, d.asylumLat!],
       getSourceColor: getCurrentTheme() === 'light' ? [50, 80, 180, 220] : [100, 150, 255, 180],
@@ -4244,6 +4256,10 @@ export class DeckGLMap {
       id: 'trafficArcs',
       data: this.trafficArcsData,
       coef: this.cloudPulseCoef,
+      // Globe: great-circle, surface-hugging — these long cross-continent arcs
+      // are the worst off-globe offenders as plain chord-arches.
+      greatCircle: this.onGlobe,
+      getHeight: this.onGlobe ? 0 : 1,
       getSourcePosition: (d) => [d.fromLon, d.fromLat],
       getTargetPosition: (d) => [d.toLon, d.toLat],
       getSourceColor: (d) => [255, 255, 255, alpha(d.weight)] as [number, number, number, number],
