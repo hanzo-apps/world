@@ -14,6 +14,28 @@ import (
 
 // ── GDELT ────────────────────────────────────────────────────────────────────
 
+// Shared GDELT cache policy + key/URL construction — defined ONCE so the doc and
+// geo handlers and the boot warmer (cache_warmer.go) all read/write the exact
+// same cache keys and hit the same upstream. 5m fresh / 15m stale.
+const (
+	gdeltCC    = "public, max-age=300, s-maxage=300, stale-while-revalidate=60"
+	gdeltTTL   = 5 * time.Minute
+	gdeltStale = 15 * time.Minute
+)
+
+func gdeltDocKey(query string, maxrecords int, timespan string) string {
+	return "gdelt-doc:" + query + ":" + itoa(maxrecords) + ":" + timespan
+}
+
+func gdeltGeoKey(query, format string, maxrecords int, timespan string) string {
+	return "gdelt-geo:" + query + ":" + format + ":" + itoa(maxrecords) + ":" + timespan
+}
+
+func gdeltGeoURL(query, format string, maxrecords int, timespan string) string {
+	return "https://api.gdeltproject.org/api/v2/geo/geo?query=" + urlQueryEscape(query) +
+		"&format=" + format + "&maxrecords=" + itoa(maxrecords) + "&timespan=" + timespan
+}
+
 // handleGDELTDoc queries the GDELT DOC 2.0 article list and maps it to the
 // compact {articles,query} shape. Ported from api/gdelt-doc.js.
 func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
@@ -31,26 +53,28 @@ func (s *Server) handleGDELTDoc(w http.ResponseWriter, r *http.Request) {
 	if timespan == "" {
 		timespan = "72h"
 	}
-	key := "gdelt-doc:" + query + ":" + itoa(maxrecords) + ":" + timespan
-	s.cachedJSON(w, key, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
-		5*time.Minute, 15*time.Minute,
-		func(ctx context.Context) (any, error) {
-			arts, err := s.fetchGDELTArticles(ctx, query, timespan, maxrecords)
-			if err != nil {
-				return nil, err
-			}
-			articles := make([]map[string]any, 0, len(arts))
-			for _, a := range arts {
-				articles = append(articles, map[string]any{
-					"title": a.Title, "url": a.URL, "source": a.Domain,
-					"date": a.SeenDate, "image": a.SocialImage, "language": a.Language, "tone": a.Tone,
-				})
-			}
-			return map[string]any{"articles": articles, "query": query}, nil
-		},
+	s.cachedJSON(w, gdeltDocKey(query, maxrecords, timespan), gdeltCC, gdeltTTL, gdeltStale,
+		func(ctx context.Context) (any, error) { return s.produceGDELTDoc(ctx, query, timespan, maxrecords) },
 		func(w http.ResponseWriter, err error) {
 			writeJSON(w, http.StatusOK, "", map[string]any{"error": err.Error(), "articles": []any{}})
 		})
+}
+
+// produceGDELTDoc fetches and shapes the gdelt-doc payload — the single produce
+// path shared by the handler and the boot warmer, so the transform lives once.
+func (s *Server) produceGDELTDoc(ctx context.Context, query, timespan string, maxrecords int) (any, error) {
+	arts, err := s.fetchGDELTArticles(ctx, query, timespan, maxrecords)
+	if err != nil {
+		return nil, err
+	}
+	articles := make([]map[string]any, 0, len(arts))
+	for _, a := range arts {
+		articles = append(articles, map[string]any{
+			"title": a.Title, "url": a.URL, "source": a.Domain,
+			"date": a.SeenDate, "image": a.SocialImage, "language": a.Language, "tone": a.Tone,
+		})
+	}
+	return map[string]any{"articles": articles, "query": query}, nil
 }
 
 // gdeltArticle is one GDELT DOC 2.0 artlist row. The shared decode target for
@@ -103,11 +127,9 @@ func (s *Server) handleGDELTGeo(w http.ResponseWriter, r *http.Request) {
 	if format == "csv" {
 		ct = "text/csv"
 	}
-	upstream := "https://api.gdeltproject.org/api/v2/geo/geo?query=" + urlQueryEscape(query) +
-		"&format=" + format + "&maxrecords=" + itoa(maxrecords) + "&timespan=" + timespan
-	key := "gdelt-geo:" + query + ":" + format + ":" + itoa(maxrecords) + ":" + timespan
-	s.passthrough(w, key, upstream, ct, "public, max-age=300, s-maxage=300, stale-while-revalidate=60",
-		nil, 5*time.Minute, 15*time.Minute,
+	s.passthrough(w, gdeltGeoKey(query, format, maxrecords, timespan),
+		gdeltGeoURL(query, format, maxrecords, timespan), ct, gdeltCC,
+		nil, gdeltTTL, gdeltStale,
 		func(w http.ResponseWriter, err error) {
 			writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "data": []any{}})
 		})
