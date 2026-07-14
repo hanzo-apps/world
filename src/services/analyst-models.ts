@@ -24,14 +24,15 @@ export interface ModelRoster {
 
 const CHOICE_KEY = 'hanzo-world-analyst-model';
 
-// Curated Zen fallback — used only when the backend roster is unreachable, so the
-// picker is never empty. Mirrors the server default (ai.go model = "zen5").
+// Curated fallback — used only when the backend roster is unreachable, so the
+// picker is never empty. Mirrors the server default (ai.go model = "best": the
+// gateway's routing alias, the one id that survives upstream catalog shifts).
 const ZEN_FALLBACK: AnalystModel[] = [
+  { id: 'best', label: 'Best (auto)', group: 'Zen' },
   { id: 'zen5', label: 'Zen 5', group: 'Zen' },
-  { id: 'zen5-flash', label: 'Zen 5 Flash', group: 'Zen' },
 ];
 
-const FALLBACK_ROSTER: ModelRoster = { models: ZEN_FALLBACK, default: 'zen5' };
+const FALLBACK_ROSTER: ModelRoster = { models: ZEN_FALLBACK, default: 'best' };
 
 export async function fetchRoster(): Promise<ModelRoster> {
   try {
