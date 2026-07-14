@@ -376,14 +376,17 @@ func TestHandleModelsCuratedRoster(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Default != "zen5" {
-		t.Errorf("default = %q, want zen5", body.Default)
+	if body.Default != "best" {
+		t.Errorf("default = %q, want best", body.Default)
 	}
 	if len(body.Data) == 0 {
 		t.Fatal("empty model roster")
 	}
-	var hasZen5 bool
+	var hasBest, hasZen5 bool
 	for _, m := range body.Data {
+		if m.ID == "best" {
+			hasBest = true
+		}
 		if m.ID == "zen5" {
 			hasZen5 = true
 		}
@@ -391,8 +394,8 @@ func TestHandleModelsCuratedRoster(t *testing.T) {
 			t.Errorf("model entry missing label/group: %+v", m)
 		}
 	}
-	if !hasZen5 {
-		t.Error("roster missing zen5")
+	if !hasBest || !hasZen5 {
+		t.Error("roster missing best/zen5")
 	}
 }
 
