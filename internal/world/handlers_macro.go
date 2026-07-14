@@ -232,17 +232,17 @@ func (s *Server) computeMacroSignals(ctx context.Context) (any, error) {
 	return map[string]any{
 		"timestamp": nowISO(), "verdict": verdict, "bullishCount": bullish, "totalCount": total,
 		"signals": map[string]any{
-			"liquidity":     map[string]any{"status": liquidity, "value": ptr2(jpyRoc30), "sparkline": tailN(jpyP, 30)},
+			"liquidity":     map[string]any{"status": liquidity, "value": ptr2(jpyRoc30), "sparkline": sparkline(jpyP, 30)},
 			"flowStructure": map[string]any{"status": flow, "btcReturn5": ptr2(btcRet5), "qqqReturn5": ptr2(qqqRet5)},
 			"macroRegime":   map[string]any{"status": regime, "qqqRoc20": ptr2(qqqRoc20), "xlpRoc20": ptr2(xlpRoc20)},
 			"technicalTrend": map[string]any{"status": trend, "btcPrice": ptrf(btcCur),
 				"sma50": ptr0(btcSma50), "sma200": ptr0(btcSma200), "vwap30d": ptrf(btcVwap),
-				"mayerMultiple": ptrf(mayer), "sparkline": tailN(btcP, 30)},
+				"mayerMultiple": ptrf(mayer), "sparkline": sparkline(btcP, 30)},
 			"hashRate":  map[string]any{"status": hashStatus, "change30d": ptrf(hashChange)},
 			"miningCost": map[string]any{"status": mining},
 			"fearGreed": map[string]any{"status": fgLabel, "value": ptri(fgValue), "history": fgHistory},
 		},
-		"meta": map[string]any{"qqqSparkline": tailN(qqqP, 30)},
+		"meta": map[string]any{"qqqSparkline": sparkline(qqqP, 30)},
 	}, nil
 }
 
@@ -290,11 +290,22 @@ func sma(prices []float64, period int) *float64 {
 	return &v
 }
 
-func tailN(a []float64, n int) []float64 {
-	if len(a) <= n {
+// sparkline returns the last n closes rounded to 7 significant digits — the wire
+// form emitted to clients. Scalars (price/change) are computed from the raw
+// closes upstream of this call, so they keep full precision; only the emitted
+// curve is rounded. A nil input passes through as nil.
+func sparkline(a []float64, n int) []float64 {
+	if len(a) == 0 {
 		return a
 	}
-	return a[len(a)-n:]
+	if len(a) > n {
+		a = a[len(a)-n:]
+	}
+	out := make([]float64, len(a))
+	for i, v := range a {
+		out[i] = roundSig(v)
+	}
+	return out
 }
 
 func ptr2(p *float64) any {
