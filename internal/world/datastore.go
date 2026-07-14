@@ -80,6 +80,7 @@ func (s *Server) StartDatastore(ctx context.Context) {
 	}
 	go s.store.Lake.Run(ctx)
 	s.startFeedWarmer(ctx)
+	s.startCacheWarmer(ctx)
 }
 
 // Close releases the datastore handles. Safe to call once on shutdown.
