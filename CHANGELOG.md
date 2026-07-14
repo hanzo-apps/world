@@ -2,6 +2,27 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.1]
+
+### Added
+
+- **Western Pacific cyclones**: cross-agency tropical-cyclone attribution (GDACS + HKO warnings via new `/v1/world/hko-warnings` proxy) with per-agency wind observations, canonical dedup, and map popup detail rows
+- **China macro snapshot**: `/v1/world/china-macro` — CPI/CLI (OECD), policy rate, USD/CNY (FRED), HKMA context, NBS release calendar + PBoC LPR dates, surfaced with staleness-honest indicator tiles
+- **Model roster**: `Best (auto)` leads the analyst model picker — the gateway routing alias that always resolves
+
+### Changed
+
+- **AI default model**: `zen5` → `best`; a pinned family id goes dark when the inference plane's claim catalog shifts, the routing alias never does
+- **Server cache is now stale-while-revalidate**: `cachedJSON`/`passthrough` serve stale instantly and refresh in the background (single-flight); GDELT/theater-posture no longer stall requests ~10s on TTL expiry
+- **GDELT cache warmers**: hot keys (analyst grounding, protests layer) refreshed every ~4min so no user ever eats a cold miss
+- **Sparkline payloads**: close arrays rounded to 7 significant digits (float32-widening noise stripped, ~40% smaller; scalars untouched)
+
+### Fixed
+
+- **News first paint**: panels no longer gate their first DOM write on a 65MB ML sentiment model download — headlines paint immediately, sentiment refines in place
+- **Analyst grounding snapshot**: context fetches bounded at 2.5s so a cold endpoint can't hold the chat send hostage
+- **AI errors are honest**: upstream error codes (`insufficient_balance`, `spend_cap_exceeded`, …) surface in the chat instead of a bare `status 402`
+
 ## [2.4.0] - 2026-02-19
 
 ### Added
