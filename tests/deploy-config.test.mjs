@@ -27,12 +27,15 @@ describe('deploy/cache configuration guardrails', () => {
     );
   });
 
-  it('keeps PWA precache glob free of HTML files', () => {
+  it('precaches offline.html but never the app shells', () => {
+    // html stays in the glob so offline.html is precached; the shells are
+    // excluded via globIgnores so a stale index/settings can never be served.
     assert.match(
       viteConfigSource,
-      /globPatterns:\s*\['\*\*\/\*\.\{js,css,ico,png,svg,woff2\}'\]/
+      /globPatterns:\s*\['\*\*\/\*\.\{js,css,html,ico,png,svg,woff2\}'\]/
     );
-    assert.doesNotMatch(viteConfigSource, /globPatterns:\s*\['\*\*\/\*\.\{js,css,html/);
+    assert.match(viteConfigSource, /globIgnores:\s*\[[^\]]*'index\.html'/);
+    assert.match(viteConfigSource, /globIgnores:\s*\[[^\]]*'settings\.html'/);
   });
 
   it('uses network-first runtime caching for navigation requests', () => {
