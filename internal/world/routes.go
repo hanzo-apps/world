@@ -48,6 +48,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/ais-snapshot", s.handleAISSnapshot)
 	mux.HandleFunc("/v1/world/firms-fires", s.handleFIRMS)
 	mux.HandleFunc("/v1/world/earthquakes", s.handleEarthquakes)
+	mux.HandleFunc("/v1/world/hko-warnings", s.handleHKOWarnings)
 	mux.HandleFunc("/v1/world/climate-anomalies", s.handleClimate)
 	mux.HandleFunc("/v1/world/wingbits", s.handleWingbits)
 	mux.HandleFunc("/v1/world/wingbits/", s.handleWingbits)
