@@ -420,7 +420,7 @@ func quoteOf(closes []float64) map[string]any {
 		"r1d":       round2s(pctChange(last, prev)),
 		"r5d":       ptr2(rateOfChange(closes, 5)),
 		"r1m":       ptr2(rateOfChange(closes, minInt(len(closes)-1, 21))),
-		"sparkline": tailN(closes, 30),
+		"sparkline": sparkline(closes, 30),
 	}
 }
 
