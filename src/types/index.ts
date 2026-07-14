@@ -933,6 +933,24 @@ export type NaturalEventCategory =
   | 'waterColor'
   | 'manmade';
 
+// One agency's raw observation of a tropical cyclone, preserved verbatim so the
+// popup can show per-agency winds side by side (each agency uses its own wind
+// averaging period, so they are never reconciled into a single number).
+export interface CycloneAgencyObservation {
+  agency: string;
+  agencyId: string;
+  observedAt: number;
+  lat: number;
+  lon: number;
+  windKt?: number | null;
+  windAveragingPeriodMinutes?: number;
+  pressureMb?: number | null;
+  classification?: string;
+  status?: 'active' | 'cancelled';
+  sourceName?: string;
+  sourceUrl?: string;
+}
+
 export interface NaturalEvent {
   id: string;
   title: string;
@@ -947,6 +965,12 @@ export interface NaturalEvent {
   sourceUrl?: string;
   sourceName?: string;
   closed: boolean;
+  // Western-Pacific tropical-cyclone attribution (multi-agency canonicalization).
+  canonicalId?: string;
+  matchingConfidence?: string;
+  canonicalAliases?: string[];
+  windAveragingPeriodMinutes?: number;
+  agencyObservations?: CycloneAgencyObservation[];
 }
 
 // Infrastructure Cascade Types

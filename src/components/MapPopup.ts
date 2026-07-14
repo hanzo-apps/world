@@ -2242,9 +2242,48 @@ export class MapPopup {
           </div>
           ` : ''}
         </div>
+        ${event.agencyObservations?.length ? this.renderTcDetails(event) : ''}
         ${event.description ? `<p class="popup-description">${escapeHtml(event.description)}</p>` : ''}
         ${event.sourceUrl ? `<a href="${sanitizeUrl(event.sourceUrl)}" target="_blank" class="popup-link">${t('popups.naturalEvent.viewOnSource', { source: escapeHtml(event.sourceName || t('popups.source')) })} →</a>` : ''}
         <div class="popup-attribution">${t('popups.naturalEvent.attribution')}</div>
+      </div>
+    `;
+  }
+
+  // Per-agency tropical-cyclone attribution: each agency's own wind reading (with
+  // its averaging period) side by side, plus the canonical-match confidence. Wind
+  // is never reconciled across agencies — a 1-minute JTWC gust and a 10-minute JMA
+  // mean are different measurements of the same storm.
+  private renderTcDetails(event: NaturalEvent): string {
+    const observations = event.agencyObservations ?? [];
+    if (observations.length === 0) return '';
+    const rows = observations.map((o) => {
+      const wind = o.windKt != null
+        ? `${o.windKt} kt${o.windAveragingPeriodMinutes ? ` (${o.windAveragingPeriodMinutes}-minute mean)` : ''}`
+        : 'Wind not reported';
+      const name = o.sourceName || o.agency;
+      const agencyId = o.agencyId ? ` · ${o.agencyId}` : '';
+      const status = o.status ? ` · ${o.status}` : '';
+      return `<div class="popup-stat" style="grid-column: 1 / -1"><span class="stat-label">${escapeHtml(name)}${escapeHtml(agencyId)}</span><span class="stat-value">${escapeHtml(wind + status)}</span></div>`;
+    }).join('');
+
+    return `
+      <div class="popup-stats">
+        ${event.matchingConfidence ? `
+        <div class="popup-stat">
+          <span class="stat-label">Canonical match</span>
+          <span class="stat-value">${escapeHtml(event.matchingConfidence)}</span>
+        </div>` : ''}
+        ${event.windAveragingPeriodMinutes != null ? `
+        <div class="popup-stat">
+          <span class="stat-label">Wind average</span>
+          <span class="stat-value">${event.windAveragingPeriodMinutes}-minute mean</span>
+        </div>` : ''}
+        <div class="popup-stat" style="grid-column: 1 / -1">
+          <span class="stat-label">Agency observations</span>
+          <span class="stat-value">${observations.length}</span>
+        </div>
+        ${rows}
       </div>
     `;
   }
