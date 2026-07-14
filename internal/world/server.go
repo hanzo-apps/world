@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hanzoai/world/internal/world/kv"
@@ -41,6 +42,7 @@ const (
 type Server struct {
 	client     *http.Client
 	cache      *Cache
+	flight     *flightGroup
 	ai         *AIClient
 	worldModel *model.Engine
 	mcp        *mcp.Server
@@ -60,6 +62,7 @@ func NewServer() *Server {
 	s := &Server{
 		client: &http.Client{Timeout: 25 * time.Second},
 		cache:  NewCache(4096),
+		flight: newFlightGroup(),
 		ai:     newAIClient(),
 		mcp:    mcp.New(),
 	}
@@ -227,10 +230,80 @@ func methodNotGet(w http.ResponseWriter, r *http.Request) bool {
 
 // ── caching helpers ─────────────────────────────────────────────────────────
 
-// cachedJSON serves a JSON endpoint through the shared cache. produce returns
-// the value to cache and return; on error, a stale cached value is served if
-// available, otherwise onError decides the response. This captures the dominant
-// "check cache → fetch → transform → cache → fallback" pattern once.
+// flightGroup coalesces concurrent work on a cache key so N simultaneous misses
+// cause ONE upstream fetch. It is the single-flight guard shared by cachedJSON
+// and passthrough: a blocking caller (do) leads or waits-and-shares; a
+// background revalidation (tryGo) leads or skips when a leader is already
+// running. Keyed by the cache key, so different endpoints never collide.
+type flightGroup struct {
+	mu sync.Mutex
+	m  map[string]*flightCall
+}
+
+type flightCall struct {
+	done chan struct{}
+	val  any
+	err  error
+}
+
+func newFlightGroup() *flightGroup { return &flightGroup{m: map[string]*flightCall{}} }
+
+// do runs fn for key, coalescing concurrent callers: the first (leader) runs fn
+// once; the rest block on it and share its (val, err).
+func (g *flightGroup) do(key string, fn func() (any, error)) (any, error) {
+	g.mu.Lock()
+	if c, ok := g.m[key]; ok {
+		g.mu.Unlock()
+		<-c.done
+		return c.val, c.err
+	}
+	c := &flightCall{done: make(chan struct{})}
+	g.m[key] = c
+	g.mu.Unlock()
+	g.run(key, c, fn)
+	return c.val, c.err
+}
+
+// tryGo runs fn in the background for key unless a call is already in flight,
+// so concurrent misses don't stack refreshes. Reports whether it started one.
+func (g *flightGroup) tryGo(key string, fn func() (any, error)) bool {
+	g.mu.Lock()
+	if _, ok := g.m[key]; ok {
+		g.mu.Unlock()
+		return false
+	}
+	c := &flightCall{done: make(chan struct{})}
+	g.m[key] = c
+	g.mu.Unlock()
+	go g.run(key, c, fn)
+	return true
+}
+
+// run executes fn, records its result, then releases the key and wakes waiters.
+// A panic in fn is converted to an error (never crashes the background refresh
+// goroutine) so a failed produce degrades cleanly like any other error.
+func (g *flightGroup) run(key string, c *flightCall, fn func() (any, error)) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.err = fmt.Errorf("panic: %v", r)
+		}
+		g.mu.Lock()
+		delete(g.m, key)
+		g.mu.Unlock()
+		close(c.done)
+	}()
+	c.val, c.err = fn()
+}
+
+// cachedJSON serves a JSON endpoint through the shared cache with
+// stale-while-revalidate. produce returns the value to cache and return.
+//   - Fresh hit: served immediately.
+//   - Stale hit (TTL lapsed, still within the stale window): the stale value is
+//     served INSTANTLY and a single coalesced background refresh is kicked, so a
+//     lapsed TTL never blocks a request on the ~10s upstream.
+//   - True cold miss: blocks on produce, but single-flighted so N cold callers
+//     cause one upstream fetch; on error a stale value is served if one appeared,
+//     otherwise onError decides the response.
 func (s *Server) cachedJSON(
 	w http.ResponseWriter,
 	key, cacheControl string,
@@ -242,9 +315,22 @@ func (s *Server) cachedJSON(
 		writeJSON(w, http.StatusOK, cacheControl, v)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Second)
-	defer cancel()
-	v, err := produce(ctx)
+	fetch := func() (any, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 24*time.Second)
+		defer cancel()
+		v, err := produce(ctx)
+		if err != nil {
+			return nil, err
+		}
+		s.cache.Set(key, v, ttl, staleFor)
+		return v, nil
+	}
+	if stale, ok := s.cache.GetStale(key); ok {
+		s.flight.tryGo(key, fetch)
+		writeJSON(w, http.StatusOK, cacheControl, stale)
+		return
+	}
+	v, err := s.flight.do(key, fetch)
 	if err != nil {
 		if stale, ok := s.cache.GetStale(key); ok {
 			writeJSON(w, http.StatusOK, cacheControl, stale)
@@ -253,7 +339,6 @@ func (s *Server) cachedJSON(
 		onError(w, err)
 		return
 	}
-	s.cache.Set(key, v, ttl, staleFor)
 	writeJSON(w, http.StatusOK, cacheControl, v)
 }
 
@@ -268,11 +353,39 @@ const negativeTTL = 30 * time.Second
 // it must never become the cached value.
 func isBlankBody(body []byte) bool { return len(bytes.TrimSpace(body)) == 0 }
 
+// fetchAndCache fetches upstream for key and applies the pass-through caching
+// POLICY once: a good body is cached fresh (Set); a blank 200 or non-2xx is a
+// failure that is never cached (it would poison good data) and instead sets a
+// short negative marker so a flapping source is not re-hit every request. Shared
+// by passthrough and the boot warmer so the policy lives in exactly one place.
+func (s *Server) fetchAndCache(ctx context.Context, key, upstream string, headers map[string]string, ttl, staleFor time.Duration) ([]byte, error) {
+	body, status, err := s.get(ctx, upstream, headers)
+	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
+		if err == nil {
+			if status < 200 || status >= 300 {
+				err = fmt.Errorf("upstream status %d", status)
+			} else {
+				err = fmt.Errorf("upstream returned empty body")
+			}
+		}
+		s.cache.SetNegative(key, negativeTTL)
+		return nil, err
+	}
+	s.cache.Set(key, body, ttl, staleFor)
+	return body, nil
+}
+
 // passthrough proxies a fixed upstream URL, returning its body verbatim with a
-// short in-memory TTL cache. Used by the pure pass-through endpoints. A blank
-// 200 is treated as a failure (never cached — it would poison good data for the
-// whole TTL). On any failure a stale body is served if present, else the
-// upstream is negative-cached briefly and degraded is written no-store.
+// short in-memory TTL cache and stale-while-revalidate. Used by the pure
+// pass-through endpoints.
+//   - Fresh hit: served immediately.
+//   - Recent failure (negative marker): serve last-good stale or degrade — the
+//     upstream is not re-hit.
+//   - Stale hit: the stale body is served INSTANTLY and a single coalesced
+//     background refresh is kicked, so a lapsed TTL never blocks the request.
+//   - Cold miss: blocks on the fetch, single-flighted so N cold callers cause one
+//     upstream hit; on failure a stale body is served if present, else the
+//     upstream is negative-cached briefly and degraded is written no-store.
 func (s *Server) passthrough(
 	w http.ResponseWriter,
 	key, upstream, contentType, cacheControl string,
@@ -284,29 +397,30 @@ func (s *Server) passthrough(
 		writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
 		return
 	}
-	// A recent blank/failed fetch: don't re-hit the upstream, serve last-good
-	// stale or degrade cleanly.
 	if s.cache.Negative(key) {
 		s.degradeBytes(w, key, contentType, cacheControl, degraded, fmt.Errorf("upstream recently failed"))
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Second)
-	defer cancel()
-	body, status, err := s.get(ctx, upstream, headers)
-	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
-		if err == nil {
-			if status < 200 || status >= 300 {
-				err = fmt.Errorf("upstream status %d", status)
-			} else {
-				err = fmt.Errorf("upstream returned empty body")
-			}
+	fetch := func() (any, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 24*time.Second)
+		defer cancel()
+		body, err := s.fetchAndCache(ctx, key, upstream, headers, ttl, staleFor)
+		if err != nil {
+			return nil, err
 		}
-		s.cache.SetNegative(key, negativeTTL)
+		return body, nil
+	}
+	if v, ok := s.cache.GetStale(key); ok {
+		s.flight.tryGo(key, fetch)
+		writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
+		return
+	}
+	v, err := s.flight.do(key, fetch)
+	if err != nil {
 		s.degradeBytes(w, key, contentType, cacheControl, degraded, err)
 		return
 	}
-	s.cache.Set(key, body, ttl, staleFor)
-	writeBytes(w, http.StatusOK, contentType, cacheControl, body)
+	writeBytes(w, http.StatusOK, contentType, cacheControl, v.([]byte))
 }
 
 // degradeBytes serves the last-good stale body when present, else the handler's
