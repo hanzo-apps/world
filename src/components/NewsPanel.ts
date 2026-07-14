@@ -4,7 +4,7 @@ import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAss
 import { THREAT_PRIORITY } from '@/services/threat-classifier';
 import { formatTime, getCSSColor } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
+import { analysisWorker, enrichWithVelocity, enrichWithVelocityML, getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 import { SITE_VARIANT } from '@/config';
 import { t, getCurrentLanguage } from '@/services/i18n';
@@ -293,8 +293,15 @@ export class NewsPanel extends Panel {
     try {
       const clusters = await analysisWorker.clusterNews(items);
       if (requestId !== this.renderRequestId) return;
-      const enriched = await enrichWithVelocityML(clusters);
-      this.renderClusters(enriched);
+      // Paint headlines immediately with fast keyword-based velocity. The ML
+      // sentiment model lazy-loads on first use (a ~65MB download, 15-25s), and
+      // must never gate first paint — upgrade sentiment in the background once
+      // the model is warm, re-rendering only if this render is still current.
+      this.renderClusters(enrichWithVelocity(clusters));
+      void enrichWithVelocityML(clusters).then((enriched) => {
+        if (requestId !== this.renderRequestId) return;
+        this.renderClusters(enriched);
+      }).catch(() => { });
     } catch (error) {
       if (requestId !== this.renderRequestId) return;
       console.error('[NewsPanel] Failed to cluster news:', error);

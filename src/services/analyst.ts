@@ -15,6 +15,11 @@
 
 import { analystTransport, type AnalystResponse } from './analyst-transport';
 import { commandManifest, type AppHost } from './app-commands';
+import { fetchWithTimeout } from '@/utils';
+
+// The grounding snapshot is best-effort garnish. Cap each read so a cold server
+// (gdelt-doc can take ~10s cold) never delays the user's chat send.
+const SNAPSHOT_TIMEOUT_MS = 2500;
 
 export interface AnalystMessage {
   role: 'user' | 'assistant';
@@ -67,7 +72,7 @@ export async function collectContext(host: AppHost): Promise<string> {
 
 async function topHeadlines(): Promise<string> {
   try {
-    const r = await fetch('/v1/world/gdelt-doc?query=world&maxrecords=8');
+    const r = await fetchWithTimeout('/v1/world/gdelt-doc?query=world&maxrecords=8', {}, SNAPSHOT_TIMEOUT_MS);
     if (!r.ok) return '';
     const d = await r.json();
     const arts = Array.isArray(d.articles) ? d.articles : [];
@@ -83,7 +88,7 @@ async function topHeadlines(): Promise<string> {
 
 async function cryptoSnapshot(): Promise<string> {
   try {
-    const r = await fetch('/v1/world/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true');
+    const r = await fetchWithTimeout('/v1/world/coingecko?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true', {}, SNAPSHOT_TIMEOUT_MS);
     if (!r.ok) return '';
     const d = await r.json();
     const one = (id: string, label: string): string => {
@@ -100,7 +105,7 @@ async function cryptoSnapshot(): Promise<string> {
 
 async function macroSnapshot(): Promise<string> {
   try {
-    const r = await fetch('/v1/world/macro-signals');
+    const r = await fetchWithTimeout('/v1/world/macro-signals', {}, SNAPSHOT_TIMEOUT_MS);
     if (!r.ok) return '';
     const d = await r.json();
     if (!d || d.unavailable || !d.verdict) return '';
