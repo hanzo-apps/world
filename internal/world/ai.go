@@ -3,6 +3,7 @@ package world
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,10 +27,11 @@ func newAIClient() *AIClient {
 	}
 	model := env("HANZO_AI_MODEL")
 	if model == "" {
-		// zen5 = the current flagship general Zen chat model. The bare "zen" alias
-		// is NOT a servable id (api.hanzo.ai/v1/models), so it would 4xx and force
-		// every AI endpoint (analyst included) into its fallback path.
-		model = "zen5"
+		// "best" is the gateway's own routing alias (owned_by hanzo in /v1/models):
+		// it always resolves to a servable model. A pinned family id (zen5) goes
+		// dark whenever the plane's claim catalog shifts — an unclaimed id falls
+		// through to a proxy that rejects every credential, killing all AI here.
+		model = "best"
 	}
 	return &AIClient{
 		base:  strings.TrimRight(base, "/"),
@@ -173,7 +175,7 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 		return "", 0, err
 	}
 	if status < 200 || status >= 300 {
-		return "", status, fmt.Errorf("hanzo ai status %d", status)
+		return "", status, aiStatusError(status, body)
 	}
 	var cr chatResponse
 	if err := json.Unmarshal(body, &cr); err != nil {
@@ -183,6 +185,72 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 		return "", status, fmt.Errorf("empty response")
 	}
 	return strings.TrimSpace(cr.Choices[0].Message.Content), cr.Usage.TotalTokens, nil
+}
+
+// aiStatusError turns a non-2xx inference response into an ACTIONABLE error:
+// "hanzo ai status <n>" plus the upstream error code (or a short message) when
+// the body carries one. The SPA renders res.error verbatim in chat, so surfacing
+// e.g. "insufficient_balance" turns a dead chat into a fixable one instead of an
+// opaque status. It parses leniently across the shapes the gateway/billing layers
+// emit; a body it can't parse degrades to the bare status.
+//
+//	{"error":{"code":"insufficient_balance","message":…}} → code
+//	{"error":"unauthorized","message":…}                  → "unauthorized"
+//	{"id":"Unauthorized","message":…}                     → "Unauthorized"
+//	{"detail":…}                                          → message
+func aiStatusError(status int, body []byte) error {
+	base := fmt.Sprintf("hanzo ai status %d", status)
+	var p struct {
+		Error   json.RawMessage `json:"error"`
+		Detail  string          `json:"detail"`
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+	}
+	if json.Unmarshal(body, &p) != nil {
+		return errors.New(base)
+	}
+	code, msg := "", strings.TrimSpace(p.Message)
+	if len(p.Error) > 0 {
+		// error is either a nested {code,message} object or a bare string.
+		var eo struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(p.Error, &eo) == nil {
+			code = strings.TrimSpace(eo.Code)
+			if msg == "" {
+				msg = strings.TrimSpace(eo.Message)
+			}
+		} else {
+			var es string
+			if json.Unmarshal(p.Error, &es) == nil {
+				code = strings.TrimSpace(es)
+			}
+		}
+	}
+	if code == "" {
+		code = strings.TrimSpace(p.ID)
+	}
+	if msg == "" {
+		msg = strings.TrimSpace(p.Detail)
+	}
+	switch {
+	case code != "":
+		return fmt.Errorf("%s: %s", base, code)
+	case msg != "":
+		return fmt.Errorf("%s: %s", base, trim80(msg))
+	}
+	return errors.New(base)
+}
+
+// trim80 trims s to at most 80 characters (runes, never splitting UTF-8) so a
+// long upstream message stays a compact one-liner in the chat error.
+func trim80(s string) string {
+	r := []rune(strings.TrimSpace(s))
+	if len(r) > 80 {
+		return strings.TrimSpace(string(r[:80]))
+	}
+	return string(r)
 }
 
 // dateContext mirrors the original prompts' current-date grounding.

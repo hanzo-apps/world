@@ -295,10 +295,12 @@ func toolNameSet(specs []mcp.ToolSpec) map[string]bool {
 
 // ── Model / agent roster (drives the chat's model dropdown) ──────────────────
 
-// zenRoster is the curated Zen family — always offered first so the dropdown
-// works even before upstream /v1/models is reachable. Ids are the real served
-// families (api.hanzo.ai). The default (ai.go model = "zen5") leads.
+// zenRoster is the curated roster — always offered first so the dropdown
+// works even before upstream /v1/models is reachable. "best" leads: it is the
+// gateway's own routing alias and the only id guaranteed servable across
+// catalog shifts (matches the ai.go default). Zen family ids follow.
 var zenRoster = []map[string]string{
+	{"id": "best", "label": "Best (auto)", "group": "Zen"},
 	{"id": "zen5", "label": "Zen 5", "group": "Zen"},
 	{"id": "zen5-flash", "label": "Zen 5 Flash", "group": "Zen"},
 	{"id": "zen5-mini", "label": "Zen 5 Mini", "group": "Zen"},
