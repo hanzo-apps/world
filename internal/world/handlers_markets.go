@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -410,6 +411,21 @@ func compact(in []*float64) []float64 {
 		}
 	}
 	return out
+}
+
+// roundSig rounds v to 7 significant digits — the wire precision for emitted
+// sparkline closes. Yahoo returns float32-widened closes (17.209999084472656
+// for 17.21); serializing that noise verbatim ~doubles the sparkline payload
+// for a curve the renderer draws identically. Significant digits, not fixed
+// decimals, so a sub-1.0 FX rate keeps its precision. Non-finite values pass
+// through unchanged. Applied only where close ARRAYS ship (see sparkline);
+// price/change scalars are derived from the raw closes and stay exact.
+func roundSig(v float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return v
+	}
+	f, _ := strconv.ParseFloat(strconv.FormatFloat(v, 'g', 7, 64), 64)
+	return f
 }
 
 // ── Stock index (country → weekly % change) ──────────────────────────────────
