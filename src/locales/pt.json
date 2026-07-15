@@ -662,6 +662,18 @@
       }
     },
     "economic": {
+      "china": {
+        "observed": "Em:",
+        "source": "Fonte:",
+        "sourceUnavailable": "Fonte indisponível",
+        "status": {
+          "loading": "Carregando",
+          "available": "Disponível",
+          "partial": "Parcial",
+          "stale": "Desatualizado",
+          "unavailable": "Indisponível"
+        }
+      },
       "noIndicatorData": "Ainda não há dados do indicador - FRED pode estar carregando",
       "noOilDataRetry": "Dados de petróleo temporariamente indisponíveis - tentarei novamente",
       "vsPreviousWeek": "versus semana anterior",

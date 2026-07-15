@@ -391,6 +391,18 @@
       "updated": "Aktualisiert"
     },
     "economic": {
+      "china": {
+        "observed": "Stand:",
+        "source": "Quelle:",
+        "sourceUnavailable": "Quelle nicht verfügbar",
+        "status": {
+          "loading": "Wird geladen",
+          "available": "Verfügbar",
+          "partial": "Teilweise",
+          "stale": "Veraltet",
+          "unavailable": "Nicht verfügbar"
+        }
+      },
       "indicators": "Indikatoren",
       "oil": "Öl",
       "gov": "Gouverneur",
