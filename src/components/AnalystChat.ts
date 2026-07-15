@@ -348,14 +348,71 @@ export class AnalystChat {
     this.setBusy(true);
     this.showThinking();
 
+    // Live streaming surface — built lazily on the FIRST event so the thinking
+    // indicator covers the silent tool rounds. Purely cosmetic: the resolved
+    // response below re-renders the final message through the normal path.
+    const stream: { row: HTMLElement | null; text: HTMLElement | null; think: HTMLElement | null; tools: HTMLElement | null } = {
+      row: null,
+      text: null,
+      think: null,
+      tools: null,
+    };
+    const ensureStreamRow = () => {
+      if (stream.row || !this.listEl) return;
+      this.clearThinking();
+      const row = document.createElement('div');
+      row.className = 'hzc-row assistant hzc-streaming';
+      row.innerHTML = `
+        <div class="hzc-avatar hzc-avatar-live">${modelMark(this.model, 15)}</div>
+        <div class="hzc-msg">
+          <div class="hzc-live-tools"></div>
+          <div class="hzc-stream-think"></div>
+          <div class="hzc-bubble hzc-stream-text"></div>
+        </div>`;
+      stream.row = row;
+      stream.text = row.querySelector('.hzc-stream-text');
+      stream.think = row.querySelector('.hzc-stream-think');
+      stream.tools = row.querySelector('.hzc-live-tools');
+      this.listEl.appendChild(row);
+    };
+
     try {
       const context = await collectContext(this.host);
       const res = await askAnalyst(
         this.messages.map((m) => ({ role: m.role, content: m.content }) as AnalystMessage),
         context,
         this.model,
+        {
+          onRound: () => {
+            if (stream.text) stream.text.textContent = '';
+            if (stream.think) stream.think.textContent = '';
+          },
+          onDelta: (t) => {
+            ensureStreamRow();
+            // Real answer text supersedes the thinking preamble.
+            if (stream.think?.textContent) stream.think.textContent = '';
+            if (stream.text) stream.text.textContent += t;
+            this.scrollToEnd();
+          },
+          onThink: (t) => {
+            ensureStreamRow();
+            if (stream.think) stream.think.textContent += t;
+            this.scrollToEnd();
+          },
+          onTool: (tr) => {
+            ensureStreamRow();
+            if (stream.tools) {
+              const chip = document.createElement('span');
+              chip.className = `hzc-live-tool${tr.ok ? '' : ' err'}`;
+              chip.innerHTML = `${icon('database', 11)} ${escapeHtml(tr.label.split('(')[0] || tr.label)}`;
+              stream.tools.appendChild(chip);
+            }
+            this.scrollToEnd();
+          },
+        },
       );
       this.clearThinking();
+      stream.row?.remove(); // the final render below is the source of truth
 
       const usedModel = this.modelLabel(res.model);
       if (res.reply) {
@@ -387,6 +444,7 @@ export class AnalystChat {
       }
     } catch (e) {
       this.clearThinking();
+      stream.row?.remove();
       const detail = e instanceof Error && e.message ? e.message : 'network error';
       this.appendError(`The analyst is unavailable right now — ${detail}.`);
     } finally {

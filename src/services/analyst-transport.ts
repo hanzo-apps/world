@@ -72,27 +72,43 @@ export interface AnalystResponse {
   traces: AnalystTrace[];
 }
 
+/** Live callbacks for a streaming ask — all cosmetic: the resolved
+ *  AnalystResponse (the server's `done` event) stays the source of truth. */
+export interface AnalystLiveHandlers {
+  /** A new model turn began — any partial text streamed so far belonged to an
+   *  intermediate (tool) round and should be cleared. */
+  onRound?(): void;
+  /** The growing reply text (already unescaped server-side). */
+  onDelta?(text: string): void;
+  /** Pre-envelope reasoning text (a thinking model working out loud). */
+  onThink?(text: string): void;
+  /** A data tool just ran server-side. */
+  onTool?(trace: AnalystTrace): void;
+}
+
 export interface AnalystTransport {
   readonly name: string;
   ask(req: AnalystRequest): Promise<AnalystResponse>;
+  /** Streaming ask (SSE). Optional — callers fall back to ask(). */
+  askStream?(req: AnalystRequest, live: AnalystLiveHandlers): Promise<AnalystResponse>;
 }
 
 // ── HTTP transport (real, default) ───────────────────────────────────────────
+
+function requestBody(req: AnalystRequest): string {
+  return JSON.stringify({
+    messages: req.messages,
+    context: req.context,
+    commands: req.commands,
+    model: req.model || undefined,
+  });
+}
 
 const httpTransport: AnalystTransport = {
   name: 'http',
   async ask(req: AnalystRequest): Promise<AnalystResponse> {
     const headers = await scopedHeaders({ 'Content-Type': 'application/json' });
-    const res = await fetch('/v1/world/analyst', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        messages: req.messages,
-        context: req.context,
-        commands: req.commands,
-        model: req.model || undefined,
-      }),
-    });
+    const res = await fetch('/v1/world/analyst', { method: 'POST', headers, body: requestBody(req) });
     // Read the body even on non-2xx: the backend answers 200 with {fallback,error}
     // for auth/degrade, but a proxy/edge 4xx/5xx must still surface as a message,
     // never a blank chat.
@@ -106,6 +122,71 @@ const httpTransport: AnalystTransport = {
       return { reply: '', actions: [], fallback: true, error: `HTTP ${res.status}`, traces: [] };
     }
     return normalize(data);
+  },
+
+  async askStream(req: AnalystRequest, live: AnalystLiveHandlers): Promise<AnalystResponse> {
+    const headers = await scopedHeaders({ 'Content-Type': 'application/json', Accept: 'text/event-stream' });
+    const res = await fetch('/v1/world/analyst', { method: 'POST', headers, body: requestBody(req) });
+    // Anything that isn't an event stream (older backend, the sign-in gate, the
+    // agent path, proxy errors) is exactly the non-streaming contract — reuse it.
+    if (!res.ok || !res.headers.get('content-type')?.includes('text/event-stream') || !res.body) {
+      let data: Record<string, unknown> = {};
+      try {
+        data = (await res.json()) as Record<string, unknown>;
+      } catch {
+        data = {};
+      }
+      if (!res.ok && !('reply' in data) && !('error' in data)) {
+        return { reply: '', actions: [], fallback: true, error: `HTTP ${res.status}`, traces: [] };
+      }
+      return normalize(data);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let done: AnalystResponse | null = null;
+    for (;;) {
+      const { value, done: eof } = await reader.read();
+      if (eof) break;
+      buf += decoder.decode(value, { stream: true });
+      // SSE frames are separated by a blank line; each carries one `data:` line.
+      let sep;
+      while ((sep = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        const line = frame.split('\n').find((l) => l.startsWith('data:'));
+        if (!line) continue;
+        let ev: Record<string, unknown>;
+        try {
+          ev = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        switch (ev.type) {
+          case 'round':
+            live.onRound?.();
+            break;
+          case 'delta':
+            if (typeof ev.text === 'string' && ev.text) live.onDelta?.(ev.text);
+            break;
+          case 'think':
+            if (typeof ev.text === 'string' && ev.text) live.onThink?.(ev.text);
+            break;
+          case 'tool': {
+            const tr = normalizeTraces([ev])[0];
+            if (tr) live.onTool?.(tr);
+            break;
+          }
+          case 'done':
+            done = normalize(ev);
+            break;
+        }
+      }
+      if (done) break;
+    }
+    void reader.cancel().catch(() => undefined);
+    return done ?? { reply: '', actions: [], fallback: true, error: 'stream ended early', traces: [] };
   },
 };
 
