@@ -13,7 +13,7 @@
  * the user is already looking at.
  */
 
-import { analystTransport, type AnalystResponse } from './analyst-transport';
+import { analystTransport, type AnalystLiveHandlers, type AnalystResponse } from './analyst-transport';
 import { commandManifest, type AppHost } from './app-commands';
 import { fetchWithTimeout } from '@/utils';
 
@@ -29,9 +29,18 @@ export interface AnalystMessage {
 export type { AnalystResponse };
 
 /** Ask the analyst. `model` is the user's dropdown choice; the backend falls back
- *  to its default when empty. The command manifest travels with every request. */
-export async function askAnalyst(messages: AnalystMessage[], context: string, model?: string): Promise<AnalystResponse> {
-  return analystTransport().ask({ messages, context, commands: commandManifest(), model });
+ *  to its default when empty. The command manifest travels with every request.
+ *  With `live` handlers the answer STREAMS (SSE) when the transport supports it;
+ *  the resolved response is identical either way. */
+export async function askAnalyst(
+  messages: AnalystMessage[],
+  context: string,
+  model?: string,
+  live?: AnalystLiveHandlers,
+): Promise<AnalystResponse> {
+  const t = analystTransport();
+  const req = { messages, context, commands: commandManifest(), model };
+  return live && t.askStream ? t.askStream(req, live) : t.ask(req);
 }
 
 export async function collectContext(host: AppHost): Promise<string> {
