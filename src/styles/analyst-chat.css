@@ -503,6 +503,11 @@ body.hzc-mode-fullscreen .hzc-resize {
 }
 .hzc-input::placeholder {
   color: var(--text-muted, #666);
+  /* One line in the ~360px composer: the default placeholder is long enough to
+     wrap at 14px, which shifts the box. The placeholder sits in the input's
+     1.5 line-box (unitless, pegged to the 14px input), so a smaller font never
+     moves the row vertically — it just stops the text from wrapping. */
+  font-size: 12.5px;
 }
 .hzc-composer-bar {
   display: flex;
