@@ -215,10 +215,10 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 			}
 			reply, actions, traces, tokens, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, emit)
 			if err != nil || reply == "" && len(actions) == 0 {
-				emit(map[string]any{
+				emit(addBillingCTA(map[string]any{
 					"type": "done", "reply": reply, "actions": emptyIfNil(actions), "fallback": err != nil,
 					"error": errStr(err), "traces": traces, "model": served,
-				})
+				}, err))
 				return
 			}
 			emit(map[string]any{
@@ -234,9 +234,9 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 		// Surface the upstream reason honestly — the SPA renders it instead of a
 		// blank chat (e.g. a 401 when aud=hanzo-world isn't allow-listed upstream).
 		// Any tool traces gathered so far still ride along so partial work shows.
-		writeJSON(w, http.StatusOK, "", map[string]any{
+		writeJSON(w, http.StatusOK, "", addBillingCTA(map[string]any{
 			"reply": "", "actions": []any{}, "fallback": true, "error": errStr(err), "traces": traces,
-		})
+		}, err))
 		return
 	}
 	writeJSON(w, http.StatusOK, "", map[string]any{
@@ -250,6 +250,30 @@ func emptyIfNil(a []map[string]any) any {
 		return []any{}
 	}
 	return a
+}
+
+// billingURL / usageURL are the canonical Hanzo billing surfaces the analyst
+// links to when a user's AI credits are exhausted. One contract, so every
+// surface (world here, and console/commerce/cms via the same payload shape)
+// renders the SAME wallet CTA instead of an opaque failure.
+const (
+	billingURL = "https://console.hanzo.ai/billing"
+	usageURL   = "https://console.hanzo.ai/billing/usage"
+)
+
+// addBillingCTA augments an analyst response payload in place when err signals an
+// exhausted balance/quota (balanceErrorFrom), turning a dead chat into an
+// actionable top-up prompt. The SPA keys off topup==true to render "You're out
+// of AI credits → Add credits / View usage". Returns the same map for chaining.
+func addBillingCTA(m map[string]any, err error) map[string]any {
+	if balanceErrorFrom(err) {
+		m["topup"] = true
+		m["error"] = "insufficient_balance"
+		m["billingUrl"] = billingURL
+		m["usageUrl"] = usageURL
+		m["reason"] = "You're out of AI credits"
+	}
+	return m
 }
 
 // runAnalystLoop is THE agentic loop (shared by the JSON and SSE paths): each
