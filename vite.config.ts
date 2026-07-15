@@ -404,6 +404,13 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // Same-origin data backend (/v1/world/*): npm run dev has no local Go
+      // server, so proxy to production (override with VITE_DEV_API_PROXY to
+      // point at a local `go run ./cmd/world`).
+      '/v1': {
+        target: process.env.VITE_DEV_API_PROXY || 'https://world.hanzo.ai',
+        changeOrigin: true,
+      },
       // Yahoo Finance API
       '/api/yahoo': {
         target: 'https://query1.finance.yahoo.com',

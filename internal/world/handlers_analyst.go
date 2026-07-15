@@ -300,7 +300,7 @@ func toolNameSet(specs []mcp.ToolSpec) map[string]bool {
 // gateway's own routing alias and the only id guaranteed servable across
 // catalog shifts (matches the ai.go default). Zen family ids follow.
 var zenRoster = []map[string]string{
-	{"id": "best", "label": "Best (auto)", "group": "Zen"},
+	{"id": "best", "label": "Best (auto)", "group": "Auto"},
 	{"id": "zen5", "label": "Zen 5", "group": "Zen"},
 	{"id": "zen5-flash", "label": "Zen 5 Flash", "group": "Zen"},
 	{"id": "zen5-mini", "label": "Zen 5 Mini", "group": "Zen"},
@@ -342,7 +342,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 			}
 			if id != "" && !seen[id] {
 				seen[id] = true
-				roster = append(roster, map[string]string{"id": id, "label": id, "group": "Models"})
+				roster = append(roster, map[string]string{"id": id, "label": id, "group": modelGroup(id)})
 			}
 		}
 		for _, ag := range s.ai.upstreamAgents(ctx, s, bearer, extra) {
@@ -362,6 +362,26 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, "no-store", map[string]any{"data": roster, "default": s.ai.model})
+}
+
+// modelGroup buckets a served model id into its family for the dropdown — the
+// server-side mirror of the client's modelFamily (src/utils/model-marks.ts), so
+// e.g. gpt-oss never files under Zen.
+func modelGroup(id string) string {
+	m := strings.ToLower(id)
+	switch {
+	case m == "best":
+		return "Auto"
+	case strings.HasPrefix(m, "zen"):
+		return "Zen"
+	case strings.HasPrefix(m, "gpt"):
+		return "GPT"
+	case strings.HasPrefix(m, "llama") || strings.Contains(m, "llama"):
+		return "Llama"
+	case strings.HasPrefix(m, "claude") || strings.HasPrefix(m, "anthropic"):
+		return "Claude"
+	}
+	return "Models"
 }
 
 var modelIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,79}$`)
