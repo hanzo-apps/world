@@ -189,49 +189,123 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 	full = append(full, chatMessage{Role: "system", Content: system})
 	full = append(full, msgs...)
 
-	// Agentic loop: each turn the model may (a) request data tools, which we run
-	// in-process and feed back, or (b) answer. It runs at most analystMaxToolRounds
-	// tool rounds before a final answer is forced. Tool traces accumulate for the
-	// chat UI. When the model needs no data, this collapses to a single call —
-	// byte-for-byte the prior behaviour.
-	var (
-		reply   string
-		actions []map[string]any
-		traces  = make([]map[string]any, 0, analystMaxToolRounds)
-		tokens  int
-	)
-	for round := 0; ; round++ {
-		out, tk, err := s.ai.chatMessagesModel(ctx, s, bearer, model, full, 0.4, 700, extra)
-		if err != nil || out == "" {
-			// Surface the upstream reason honestly — the SPA renders it instead of a
-			// blank chat (e.g. a 401 when aud=hanzo-world isn't allow-listed upstream).
-			// Any tool traces gathered so far still ride along so partial work shows.
-			writeJSON(w, http.StatusOK, "", map[string]any{
-				"reply": "", "actions": []any{}, "fallback": true, "error": errStr(err), "traces": traces,
-			})
-			return
-		}
-		tokens += tk
-		r, acts, calls := parseAnalystTurn(out, allowed, toolNames)
-		if len(calls) == 0 || round >= analystMaxToolRounds {
-			reply, actions = r, acts
-			break
-		}
-		// Execute the requested tools in-process and feed the results back as the
-		// next turn's grounding. The model's raw request rides as the assistant turn
-		// so the transcript stays coherent.
-		full = append(full, chatMessage{Role: "assistant", Content: out})
-		last := round == analystMaxToolRounds-1
-		full = append(full, chatMessage{Role: "user", Content: s.runAnalystTools(ctx, calls, &traces, last)})
-	}
-
 	served := model
 	if served == "" {
 		served = s.ai.model
 	}
+
+	// Streaming variant: the SPA asks with Accept: text/event-stream and gets
+	// live SSE events (round / delta / tool / done) instead of one JSON body.
+	// The done event carries EXACTLY the JSON path's payload, so the client
+	// treats deltas as cosmetic and done as the source of truth.
+	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+		if f, ok := w.(http.Flusher); ok {
+			h := w.Header()
+			h.Set("Content-Type", "text/event-stream; charset=utf-8")
+			h.Set("Cache-Control", "no-cache")
+			h.Set("X-Accel-Buffering", "no")
+			setCORS(w, "POST, OPTIONS")
+			w.WriteHeader(http.StatusOK)
+			emit := func(v map[string]any) {
+				b, _ := json.Marshal(v)
+				_, _ = w.Write([]byte("data: "))
+				_, _ = w.Write(b)
+				_, _ = w.Write([]byte("\n\n"))
+				f.Flush()
+			}
+			reply, actions, traces, tokens, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, emit)
+			if err != nil || reply == "" && len(actions) == 0 {
+				emit(map[string]any{
+					"type": "done", "reply": reply, "actions": emptyIfNil(actions), "fallback": err != nil,
+					"error": errStr(err), "traces": traces, "model": served,
+				})
+				return
+			}
+			emit(map[string]any{
+				"type": "done", "reply": reply, "actions": emptyIfNil(actions),
+				"model": served, "tokens": tokens, "traces": traces,
+			})
+			return
+		}
+	}
+
+	reply, actions, traces, tokens, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, nil)
+	if err != nil {
+		// Surface the upstream reason honestly — the SPA renders it instead of a
+		// blank chat (e.g. a 401 when aud=hanzo-world isn't allow-listed upstream).
+		// Any tool traces gathered so far still ride along so partial work shows.
+		writeJSON(w, http.StatusOK, "", map[string]any{
+			"reply": "", "actions": []any{}, "fallback": true, "error": errStr(err), "traces": traces,
+		})
+		return
+	}
 	writeJSON(w, http.StatusOK, "", map[string]any{
 		"reply": reply, "actions": actions, "model": served, "tokens": tokens, "traces": traces,
 	})
+}
+
+// emptyIfNil keeps the wire contract's empty array (never null) for actions.
+func emptyIfNil(a []map[string]any) any {
+	if a == nil {
+		return []any{}
+	}
+	return a
+}
+
+// runAnalystLoop is THE agentic loop (shared by the JSON and SSE paths): each
+// turn the model may (a) request data tools, which run in-process and feed
+// back, or (b) answer. At most analystMaxToolRounds tool rounds before a final
+// answer is forced. When emit is non-nil, live events stream out as the loop
+// runs: {"type":"round"} at each model turn (so the client resets any partial
+// text from a prior tool round), {"type":"delta","text":…} for the growing
+// "reply" value (via replyExtractor — tool rounds stream nothing), and
+// {"type":"tool",…} per executed tool. When the model needs no data, this
+// collapses to a single call — byte-for-byte the prior behaviour.
+func (s *Server) runAnalystLoop(ctx context.Context, bearer, model string, full []chatMessage, allowed, toolNames map[string]bool, extra map[string]string, emit func(map[string]any)) (reply string, actions []map[string]any, traces []map[string]any, tokens int, err error) {
+	traces = make([]map[string]any, 0, analystMaxToolRounds)
+	for round := 0; ; round++ {
+		var out string
+		var tk int
+		if emit != nil {
+			emit(map[string]any{"type": "round", "n": round})
+			rx := newReplyExtractor(func(text string) {
+				emit(map[string]any{"type": "delta", "text": text})
+			})
+			rx.emitThink = func(text string) {
+				emit(map[string]any{"type": "think", "text": text})
+			}
+			out, tk, err = s.ai.chatMessagesModelStream(ctx, s, bearer, model, full, 0.4, 700, extra, rx.Feed)
+		} else {
+			out, tk, err = s.ai.chatMessagesModel(ctx, s, bearer, model, full, 0.4, 700, extra)
+		}
+		if err != nil || out == "" {
+			if err == nil {
+				err = fmt.Errorf("empty response")
+			}
+			return "", nil, traces, tokens, err
+		}
+		tokens += tk
+		r, acts, calls := parseAnalystTurn(out, allowed, toolNames)
+		if len(calls) == 0 || round >= analystMaxToolRounds {
+			return r, acts, traces, tokens, nil
+		}
+		// Execute the requested tools in-process and feed the results back as the
+		// next turn's grounding. The model's raw request rides as the assistant turn
+		// so the transcript stays coherent.
+		var onTrace func(map[string]any)
+		if emit != nil {
+			onTrace = func(tr map[string]any) {
+				ev := map[string]any{"type": "tool"}
+				for k, v := range tr {
+					ev[k] = v
+				}
+				emit(ev)
+			}
+		}
+		full = append(full, chatMessage{Role: "assistant", Content: out})
+		last := round == analystMaxToolRounds-1
+		full = append(full, chatMessage{Role: "user", Content: s.runAnalystTools(ctx, calls, &traces, last, onTrace)})
+	}
 }
 
 // runAnalystTools executes a round's tool calls IN-PROCESS through the mcp
@@ -239,7 +313,7 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 // trace per call for the chat UI, and returns the tool-results block injected back
 // into the conversation as the next user turn. Results are capped on both the
 // model-facing (analystToolResultCap) and UI-facing (analystTraceResultCap) sides.
-func (s *Server) runAnalystTools(ctx context.Context, calls []analystToolCall, traces *[]map[string]any, lastRound bool) string {
+func (s *Server) runAnalystTools(ctx context.Context, calls []analystToolCall, traces *[]map[string]any, lastRound bool, onTrace func(map[string]any)) string {
 	var b strings.Builder
 	b.WriteString("TOOL RESULTS (live data — ground your answer in these; do not repeat the same call):\n")
 	for _, c := range calls {
@@ -255,11 +329,15 @@ func (s *Server) runAnalystTools(ctx context.Context, calls []analystToolCall, t
 		}
 		b.WriteString(capString(body, analystToolResultCap))
 		b.WriteString("\n\n")
-		*traces = append(*traces, map[string]any{
+		tr := map[string]any{
 			"label":  label,
 			"ok":     ok,
 			"result": capString(body, analystTraceResultCap),
-		})
+		}
+		*traces = append(*traces, tr)
+		if onTrace != nil {
+			onTrace(tr) // live SSE trace — the chat shows the tool as it runs
+		}
 	}
 	if lastRound {
 		b.WriteString("This was the final tool round. Answer the user now in prose using the data above; do not request more tools.\n")
