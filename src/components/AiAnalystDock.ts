@@ -85,7 +85,7 @@ export class AiAnalystDock {
     this.bodyEl = this.el.querySelector('.hzc-body') as HTMLElement;
     this.chat = new AnalystChat(this.bodyEl, host, {
       emptyTitle: 'Ask about this dashboard — or tell me to change it',
-      placeholder: 'Ask the analyst, or say “hide all panels, show news”…',
+      placeholder: 'Ask anything. Update your world.',
     });
 
     this.el.querySelector('.hzc-fab')?.addEventListener('click', (e) => {
