@@ -391,6 +391,18 @@
       "updated": "مُحدّث"
     },
     "economic": {
+      "china": {
+        "observed": "اعتبارًا من:",
+        "source": "المصدر:",
+        "sourceUnavailable": "المصدر غير متاح",
+        "status": {
+          "loading": "جارٍ التحميل",
+          "available": "متاح",
+          "partial": "جزئي",
+          "stale": "قديم",
+          "unavailable": "غير متاح"
+        }
+      },
       "indicators": "المؤشرات",
       "oil": "النفط",
       "gov": "الحكومة",
