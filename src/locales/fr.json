@@ -391,6 +391,18 @@
             "updated": "Mis à jour"
         },
         "economic": {
+            "china": {
+                "observed": "Au :",
+                "source": "Source :",
+                "sourceUnavailable": "Source indisponible",
+                "status": {
+                    "loading": "Chargement",
+                    "available": "Disponible",
+                    "partial": "Partiel",
+                    "stale": "Obsolète",
+                    "unavailable": "Indisponible"
+                }
+            },
             "indicators": "Indicateurs",
             "oil": "Pétrole",
             "gov": "Gouv",
