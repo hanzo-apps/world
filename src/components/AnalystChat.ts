@@ -2,6 +2,7 @@ import '@/styles/analyst-chat.css';
 import { escapeHtml } from '@/utils/sanitize';
 import { renderMarkdown } from '@/utils/markdown';
 import { icon, zenLogo } from '@/utils/icons';
+import { modelMark } from '@/utils/model-marks';
 import { isAuthenticated, login } from '@/services/iam';
 import { askAnalyst, collectContext, type AnalystMessage } from '@/services/analyst';
 import type { AnalystTrace } from '@/services/analyst-transport';
@@ -49,7 +50,9 @@ export class AnalystChat {
   private messages: ChatMsg[] = [];
   private listEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
-  private modelSelectEl: HTMLSelectElement | null = null;
+  private modelBtnEl: HTMLButtonElement | null = null;
+  private modelMenuEl: HTMLElement | null = null;
+  private closeModelMenu: (() => void) | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private roster: ModelRoster | null = null;
   private model = '';
@@ -74,18 +77,18 @@ export class AnalystChat {
         <form class="hzc-composer" autocomplete="off">
           <textarea class="hzc-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask about the world, or tell me to change the dashboard…')}"></textarea>
           <div class="hzc-composer-bar">
-            <span class="hzc-model">
-              ${zenLogo(13, 'hzc-model-mark')}
-              <select class="hzc-model-select" aria-label="Model"></select>
+            <button class="hzc-model" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Model">
+              <span class="hzc-model-mark"></span>
+              <span class="hzc-model-name"></span>
               ${icon('chevron-down', 12, 'hzc-model-caret')}
-            </span>
+            </button>
             <button class="hzc-send" type="submit" aria-label="Send">${icon('arrow-up', 17)}</button>
           </div>
         </form>
       </div>`;
     this.listEl = this.root.querySelector('.hzc-messages');
     this.inputEl = this.root.querySelector('.hzc-input');
-    this.modelSelectEl = this.root.querySelector('.hzc-model-select');
+    this.modelBtnEl = this.root.querySelector('.hzc-model');
     this.sendBtnEl = this.root.querySelector('.hzc-send');
 
     this.root.querySelector('.hzc-composer')?.addEventListener('submit', (e) => {
@@ -99,13 +102,7 @@ export class AnalystChat {
         void this.send();
       }
     });
-    this.modelSelectEl?.addEventListener('change', () => {
-      const id = this.modelSelectEl?.value || '';
-      if (id) {
-        this.model = id;
-        rememberModel(id);
-      }
-    });
+    this.modelBtnEl?.addEventListener('click', () => this.toggleModelMenu());
 
     if (this.roster) this.renderModelOptions(); // instant paint from cache
     void this.loadModels();
@@ -136,29 +133,105 @@ export class AnalystChat {
   }
 
   private renderModelOptions(): void {
-    const sel = this.modelSelectEl;
-    if (!sel || !this.roster) return;
+    const btn = this.modelBtnEl;
+    if (!btn) return;
+    const mark = btn.querySelector('.hzc-model-mark');
+    const name = btn.querySelector('.hzc-model-name');
+    if (mark) mark.innerHTML = modelMark(this.model, 13);
+    if (name) name.textContent = this.modelLabel();
+    if (this.modelMenuEl) this.renderModelMenu(); // repaint an open menu in place
+  }
+
+  /** The grouped model menu — a listbox popover above the pill (a native
+   *  <select> can't render per-model marks). One row per model: mark, label,
+   *  check on the active id. */
+  private toggleModelMenu(): void {
+    if (this.closeModelMenu) {
+      this.closeModelMenu();
+      return;
+    }
+    const btn = this.modelBtnEl;
+    if (!btn || !this.roster) return;
+    const menu = document.createElement('div');
+    menu.className = 'hzc-model-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.setAttribute('aria-label', 'Model');
+    this.modelMenuEl = menu;
+    this.renderModelMenu();
+    // Fixed-position above the pill: panels clip overflow, so an absolutely
+    // positioned child could never escape the composer. Anchored once on open;
+    // any scroll/resize just closes it (outside-pointer handler).
+    const r = btn.getBoundingClientRect();
+    menu.style.left = `${Math.round(r.left)}px`;
+    menu.style.bottom = `${Math.round(window.innerHeight - r.top + 6)}px`;
+    document.body.appendChild(menu);
+    btn.setAttribute('aria-expanded', 'true');
+
+    const onDoc = (e: Event) => {
+      if (e.target instanceof Node && (menu.contains(e.target) || btn.contains(e.target))) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    const close = () => {
+      document.removeEventListener('pointerdown', onDoc, true);
+      document.removeEventListener('keydown', onKey, true);
+      menu.remove();
+      this.modelMenuEl = null;
+      this.closeModelMenu = null;
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    this.closeModelMenu = close;
+    document.addEventListener('pointerdown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+  }
+
+  private renderModelMenu(): void {
+    const menu = this.modelMenuEl;
+    if (!menu || !this.roster) return;
     const groups = new Map<string, AnalystModel[]>();
     for (const m of this.roster.models) {
       const g = groups.get(m.group) || [];
       g.push(m);
       groups.set(m.group, g);
     }
-    sel.innerHTML = [...groups.entries()]
+    menu.innerHTML = [...groups.entries()]
       .map(
-        ([group, ms]) =>
-          `<optgroup label="${escapeHtml(group)}">${ms
-            .map((m) => `<option value="${escapeHtml(m.id)}"${m.id === this.model ? ' selected' : ''}>${escapeHtml(m.label)}</option>`)
-            .join('')}</optgroup>`,
+        ([group, ms]) => `
+          <div class="hzc-model-group">${escapeHtml(group)}</div>
+          ${ms
+            .map(
+              (m) => `
+            <button class="hzc-model-opt${m.id === this.model ? ' active' : ''}" type="button" role="option"
+              aria-selected="${m.id === this.model}" data-id="${escapeHtml(m.id)}">
+              <span class="hzc-model-opt-mark">${modelMark(m.id, 14)}</span>
+              <span class="hzc-model-opt-label">${escapeHtml(m.label)}</span>
+              ${m.id === this.model ? icon('check', 13, 'hzc-model-opt-check') : ''}
+            </button>`,
+            )
+            .join('')}`,
       )
       .join('');
+    menu.querySelectorAll<HTMLButtonElement>('.hzc-model-opt').forEach((b) => {
+      b.addEventListener('click', () => {
+        const id = b.dataset.id || '';
+        if (id) {
+          this.model = id;
+          rememberModel(id);
+          this.renderModelOptions();
+        }
+        this.closeModelMenu?.();
+        this.inputEl?.focus();
+      });
+    });
   }
 
   /** Human label for a model id (falls back to the id itself). */
   private modelLabel(id?: string): string {
     const want = id || this.model;
     const hit = this.roster?.models.find((m) => m.id === want);
-    return hit?.label || want || 'Zen 5';
+    return hit?.label || want || 'Best (auto)';
   }
 
   // ── auth / empty states ─────────────────────────────────────────────────────
@@ -213,7 +286,7 @@ export class AnalystChat {
     if (m.role === 'assistant') {
       const avatar = document.createElement('div');
       avatar.className = 'hzc-avatar';
-      avatar.innerHTML = zenLogo(15);
+      avatar.innerHTML = modelMark(m.model || this.model, 15); // the SERVING model's mark — never the Zen ring on a non-zen model
       const body = document.createElement('div');
       body.className = 'hzc-msg';
       const bubble = document.createElement('div');
@@ -341,7 +414,7 @@ export class AnalystChat {
     const el = document.createElement('div');
     el.className = 'hzc-row assistant hzc-thinking';
     el.innerHTML = `
-      <div class="hzc-avatar hzc-avatar-live">${zenLogo(15)}</div>
+      <div class="hzc-avatar hzc-avatar-live">${modelMark(this.model, 15)}</div>
       <div class="hzc-think"><span class="hzc-think-label"></span></div>`;
     this.listEl.appendChild(el);
     const label = el.querySelector('.hzc-think-label') as HTMLElement | null;
