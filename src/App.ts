@@ -14,7 +14,7 @@ import {
   MONITOR_COLORS,
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
-import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchCyberThreats, drainTrendingSignals } from '@/services';
+import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchChinaMacro, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
@@ -3914,6 +3914,7 @@ export class App {
       { name: 'fred', task: runGuarded('fred', () => this.loadFredData()) },
       { name: 'oil', task: runGuarded('oil', () => this.loadOilAnalytics()) },
       { name: 'spending', task: runGuarded('spending', () => this.loadGovernmentSpending()) },
+      { name: 'china', task: runGuarded('china', () => this.loadChinaMacro()) },
     ];
 
     // Load intelligence signals for CII calculation (protests, military, outages)
@@ -5167,6 +5168,18 @@ export class App {
     }
   }
 
+  private async loadChinaMacro(): Promise<void> {
+    const economicPanel = this.panels['economic'] as EconomicPanel;
+    try {
+      const data = await fetchChinaMacro();
+      economicPanel?.updateChina(data);
+      this.statusPanel?.updateApi('ChinaMacro', { status: data.unavailable ? 'error' : 'ok' });
+    } catch (e) {
+      console.error('[App] China macro failed:', e);
+      this.statusPanel?.updateApi('ChinaMacro', { status: 'error' });
+    }
+  }
+
   private updateMonitorResults(): void {
     const monitorPanel = this.panels['monitors'] as MonitorPanel;
     if (!monitorPanel) return;
@@ -5341,6 +5354,7 @@ export class App {
     this.scheduleRefresh('fred', () => this.loadFredData(), 30 * 60 * 1000);
     this.scheduleRefresh('oil', () => this.loadOilAnalytics(), 30 * 60 * 1000);
     this.scheduleRefresh('spending', () => this.loadGovernmentSpending(), 60 * 60 * 1000);
+    this.scheduleRefresh('china', () => this.loadChinaMacro(), 30 * 60 * 1000);
 
     // Refresh intelligence signals for CII (geopolitical variant only)
     // This handles outages, protests, military - updates map when layers enabled

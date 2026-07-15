@@ -662,6 +662,18 @@
       }
     },
     "economic": {
+      "china": {
+        "observed": "Per:",
+        "source": "Bron:",
+        "sourceUnavailable": "Bron niet beschikbaar",
+        "status": {
+          "loading": "Laden",
+          "available": "Beschikbaar",
+          "partial": "Gedeeltelijk",
+          "stale": "Verouderd",
+          "unavailable": "Niet beschikbaar"
+        }
+      },
       "noIndicatorData": "Nog geen indicatorgegevens - FRED wordt mogelijk geladen",
       "noOilDataRetry": "Oliegegevens tijdelijk niet beschikbaar - zal het opnieuw proberen",
       "vsPreviousWeek": "versus vorige week",
