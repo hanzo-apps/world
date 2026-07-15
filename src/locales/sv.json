@@ -662,6 +662,18 @@
       }
     },
     "economic": {
+      "china": {
+        "observed": "Per:",
+        "source": "Källa:",
+        "sourceUnavailable": "Källa saknas",
+        "status": {
+          "loading": "Läser in",
+          "available": "Tillgänglig",
+          "partial": "Delvis",
+          "stale": "Inaktuell",
+          "unavailable": "Otillgänglig"
+        }
+      },
       "noIndicatorData": "Inga indikatordata ännu - FRED kanske laddar",
       "noOilDataRetry": "Oljedata är tillfälligt otillgänglig - kommer att försöka igen",
       "vsPreviousWeek": "mot föregående vecka",
