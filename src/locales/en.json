@@ -398,6 +398,31 @@
       "updated": "Updated"
     },
     "economic": {
+      "china": {
+        "tab": "China",
+        "indicators": "Indicators",
+        "releases": "Upcoming Releases",
+        "noData": "China macro snapshot unavailable",
+        "noReleases": "No upcoming releases",
+        "prior": "prior",
+        "context": "Context",
+        "notConfigured": "Not configured",
+        "observed": "As of:",
+        "source": "Source:",
+        "sourceUnavailable": "Source unavailable",
+        "status": {
+          "loading": "Loading",
+          "available": "Available",
+          "partial": "Partial",
+          "stale": "Stale",
+          "unavailable": "Unavailable"
+        },
+        "eventStatus": {
+          "scheduled": "Scheduled",
+          "provisional": "Provisional",
+          "verified": "Verified"
+        }
+      },
       "indicators": "Indicators",
       "oil": "Oil",
       "gov": "Gov",
