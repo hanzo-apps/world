@@ -75,7 +75,7 @@ export class AnalystChat {
       <div class="hzc-chat">
         <div class="hzc-messages"></div>
         <form class="hzc-composer" autocomplete="off">
-          <textarea class="hzc-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask about the world, or tell me to change the dashboard…')}"></textarea>
+          <textarea class="hzc-input" rows="1" placeholder="${escapeHtml(this.opts.placeholder || 'Ask anything. Update your world.')}"></textarea>
           <div class="hzc-composer-bar">
             <button class="hzc-model" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Model">
               <span class="hzc-model-mark"></span>
@@ -435,7 +435,8 @@ export class AnalystChat {
 
       // ALWAYS surface something — never a silent blank.
       if (!res.reply) {
-        if (res.reason) this.appendInline(res.reason);
+        if (res.topup) this.appendTopupCTA(res);
+        else if (res.reason) this.appendInline(res.reason);
         else if (res.error) this.appendError(`The analyst couldn't answer — ${res.error}.`);
         else if (res.fallback) this.appendError('The analyst is unavailable right now — please try again.');
         else if (!res.actions.length) this.appendInline('No response from the analyst.');
@@ -512,6 +513,44 @@ export class AnalystChat {
     el.className = 'hzc-inline hzc-error';
     el.textContent = text;
     this.listEl.appendChild(el);
+    this.scrollToEnd();
+  }
+
+  /** Out-of-credits prompt: the backend saw the ONE 402 insufficient_balance
+   *  contract and set topup. Render a wallet CTA (Add credits → billing, and a
+   *  usage link) in place of a dead bubble. Links carry the backend-provided
+   *  URLs so the destination stays owned by one place (console.hanzo.ai/billing),
+   *  never hardcoded per-surface. */
+  private appendTopupCTA(res: { reason?: string; billingUrl?: string; usageUrl?: string }): void {
+    if (!this.listEl) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'hzc-inline hzc-topup';
+
+    const msg = document.createElement('div');
+    msg.className = 'hzc-topup-msg';
+    msg.textContent = res.reason || "You're out of AI credits";
+    wrap.appendChild(msg);
+
+    const actions = document.createElement('div');
+    actions.className = 'hzc-topup-actions';
+    const add = document.createElement('a');
+    add.className = 'hzc-topup-btn';
+    add.textContent = 'Add credits';
+    add.href = res.billingUrl || 'https://console.hanzo.ai/billing';
+    add.target = '_blank';
+    add.rel = 'noopener';
+    actions.appendChild(add);
+    if (res.usageUrl) {
+      const usage = document.createElement('a');
+      usage.className = 'hzc-topup-link';
+      usage.textContent = 'View usage';
+      usage.href = res.usageUrl;
+      usage.target = '_blank';
+      usage.rel = 'noopener';
+      actions.appendChild(usage);
+    }
+    wrap.appendChild(actions);
+    this.listEl.appendChild(wrap);
     this.scrollToEnd();
   }
 

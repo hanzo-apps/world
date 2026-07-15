@@ -810,6 +810,47 @@ body.hzc-mode-fullscreen .hzc-resize {
   color: var(--text-secondary, #ccc);
 }
 
+/* ── out-of-credits top-up CTA (monochrome, matches the dock) ─────────────── */
+.hzc-topup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-strong, #3a3a3a);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-hover, #0a0a0a);
+}
+.hzc-topup-msg {
+  font: 500 12.5px/1.4 var(--font-body, sans-serif);
+  color: var(--text, #e8e8e8);
+}
+.hzc-topup-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hzc-topup-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--text, #e8e8e8);
+  color: var(--bg, #000);
+  font: 600 12px/1 var(--font-body, sans-serif);
+  text-decoration: none;
+}
+.hzc-topup-btn:hover {
+  background: #fff;
+}
+.hzc-topup-link {
+  color: var(--text-dim, #888);
+  font: 400 12px/1 var(--font-body, sans-serif);
+  text-decoration: none;
+}
+.hzc-topup-link:hover {
+  color: var(--text, #e8e8e8);
+  text-decoration: underline;
+}
+
 /* ── empty + signed-out states ────────────────────────────────────────────── */
 
 .hzc-empty,

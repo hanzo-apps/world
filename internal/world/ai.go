@@ -172,34 +172,68 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 	defer cancel()
 	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", headers, reqBody)
 	if err != nil {
+		logf("world: ai request error: model=%s: %v", model, err)
 		return "", 0, err
 	}
 	if status < 200 || status >= 300 {
-		return "", status, aiStatusError(status, body)
+		e := newAIError(status, body)
+		logf("world: ai non-success: status=%d code=%q model=%s", status, e.code, model)
+		return "", status, e
 	}
 	var cr chatResponse
 	if err := json.Unmarshal(body, &cr); err != nil {
+		logf("world: ai decode error: status=%d model=%s: %v", status, model, err)
 		return "", status, err
 	}
 	if len(cr.Choices) == 0 {
+		// The gateway answers some failures — notably insufficient balance — with a
+		// 2xx AND an error envelope carrying NO choices. Parse that envelope with the
+		// SAME lenient logic aiStatusError uses so an out-of-credits user gets a typed,
+		// actionable error (→ top-up CTA) instead of an opaque "empty response".
+		if e := newAIError(status, body); e.code != "" || e.msg != "" {
+			logf("world: ai 2xx empty-choices error: status=%d code=%q model=%s", status, e.code, model)
+			return "", status, e
+		}
+		logf("world: ai 2xx empty response: status=%d model=%s", status, model)
 		return "", status, fmt.Errorf("empty response")
 	}
 	return strings.TrimSpace(cr.Choices[0].Message.Content), cr.Usage.TotalTokens, nil
 }
 
-// aiStatusError turns a non-2xx inference response into an ACTIONABLE error:
-// "hanzo ai status <n>" plus the upstream error code (or a short message) when
-// the body carries one. The SPA renders res.error verbatim in chat, so surfacing
-// e.g. "insufficient_balance" turns a dead chat into a fixable one instead of an
-// opaque status. It parses leniently across the shapes the gateway/billing layers
-// emit; a body it can't parse degrades to the bare status.
+// aiError is a typed inference error carrying the upstream HTTP status plus the
+// error {code,message} parsed from the response body, so callers can branch on
+// the code (isBalanceError) instead of string-matching the rendered message. Its
+// Error() reproduces the actionable one-liner the SPA renders verbatim in chat:
+// "hanzo ai status <n>" plus the upstream code (or a short message) when present.
+type aiError struct {
+	status int
+	code   string
+	msg    string
+}
+
+func (e *aiError) Error() string {
+	base := fmt.Sprintf("hanzo ai status %d", e.status)
+	switch {
+	case e.code != "":
+		return base + ": " + e.code
+	case e.msg != "":
+		return base + ": " + trim80(e.msg)
+	}
+	return base
+}
+
+// parseAIErrorBody leniently extracts an error {code, message} from an inference
+// or billing response body, across every shape the gateway/billing layers emit.
+// It is the SINGLE parse shared by the non-2xx path (newAIError) and the 2xx
+// empty-choices path (chatMessagesModel): the gateway answers some failures —
+// notably insufficient balance — with HTTP 2xx and an error envelope carrying no
+// choices, so both must read the same envelope. Empty strings ⇒ no error found.
 //
 //	{"error":{"code":"insufficient_balance","message":…}} → code
 //	{"error":"unauthorized","message":…}                  → "unauthorized"
 //	{"id":"Unauthorized","message":…}                     → "Unauthorized"
 //	{"detail":…}                                          → message
-func aiStatusError(status int, body []byte) error {
-	base := fmt.Sprintf("hanzo ai status %d", status)
+func parseAIErrorBody(body []byte) (code, msg string) {
 	var p struct {
 		Error   json.RawMessage `json:"error"`
 		Detail  string          `json:"detail"`
@@ -207,9 +241,9 @@ func aiStatusError(status int, body []byte) error {
 		Message string          `json:"message"`
 	}
 	if json.Unmarshal(body, &p) != nil {
-		return errors.New(base)
+		return "", ""
 	}
-	code, msg := "", strings.TrimSpace(p.Message)
+	msg = strings.TrimSpace(p.Message)
 	if len(p.Error) > 0 {
 		// error is either a nested {code,message} object or a bare string.
 		var eo struct {
@@ -234,13 +268,34 @@ func aiStatusError(status int, body []byte) error {
 	if msg == "" {
 		msg = strings.TrimSpace(p.Detail)
 	}
-	switch {
-	case code != "":
-		return fmt.Errorf("%s: %s", base, code)
-	case msg != "":
-		return fmt.Errorf("%s: %s", base, trim80(msg))
+	return code, msg
+}
+
+// newAIError builds a typed aiError from a response status + body.
+func newAIError(status int, body []byte) *aiError {
+	code, msg := parseAIErrorBody(body)
+	return &aiError{status: status, code: code, msg: msg}
+}
+
+// aiStatusError turns a non-2xx inference response into an ACTIONABLE error. The
+// SPA renders it verbatim in chat, so surfacing e.g. "insufficient_balance" turns
+// a dead chat into a fixable one; a body it can't parse degrades to the bare status.
+func aiStatusError(status int, body []byte) error {
+	return newAIError(status, body)
+}
+
+// balanceErrorFrom reports whether err is the canonical "out of credits" signal
+// the ONE AI gateway emits — HTTP 402 with code=insufficient_balance
+// (hanzo/ai routers/filter_balance.go, the single balance-enforcement point).
+// World is a thin client of that contract: it neither re-derives balance
+// semantics (no message keyword-matching) nor invents codes the backend never
+// sends. The analyst renders a top-up CTA for exactly this case.
+func balanceErrorFrom(err error) bool {
+	var ae *aiError
+	if errors.As(err, &ae) {
+		return ae.status == http.StatusPaymentRequired || ae.code == "insufficient_balance"
 	}
-	return errors.New(base)
+	return false
 }
 
 // trim80 trims s to at most 80 characters (runes, never splitting UTF-8) so a
