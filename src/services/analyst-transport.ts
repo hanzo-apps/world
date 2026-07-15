@@ -68,6 +68,11 @@ export interface AnalystResponse {
   model?: string;
   /** Upstream error detail when the backend degraded — surfaced honestly in the chat. */
   error?: string;
+  /** Out-of-credits signal: the backend saw the ONE 402 insufficient_balance
+   * contract from the AI gateway and asks the UI to render a wallet top-up CTA. */
+  topup?: boolean;
+  billingUrl?: string;
+  usageUrl?: string;
   /** World MCP data tools the backend called to ground the answer (may be empty). */
   traces: AnalystTrace[];
 }
@@ -198,6 +203,9 @@ function normalize(data: Record<string, unknown>): AnalystResponse {
     reason: typeof data.reason === 'string' ? data.reason : undefined,
     model: typeof data.model === 'string' ? data.model : undefined,
     error: typeof data.error === 'string' && data.error ? data.error : undefined,
+    topup: !!data.topup,
+    billingUrl: typeof data.billingUrl === 'string' ? data.billingUrl : undefined,
+    usageUrl: typeof data.usageUrl === 'string' ? data.usageUrl : undefined,
     traces: normalizeTraces(data.traces),
   };
 }
