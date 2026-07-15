@@ -28,7 +28,7 @@ const CHOICE_KEY = 'hanzo-world-analyst-model';
 // picker is never empty. Mirrors the server default (ai.go model = "best": the
 // gateway's routing alias, the one id that survives upstream catalog shifts).
 const ZEN_FALLBACK: AnalystModel[] = [
-  { id: 'best', label: 'Best (auto)', group: 'Zen' },
+  { id: 'best', label: 'Best (auto)', group: 'Auto' },
   { id: 'zen5', label: 'Zen 5', group: 'Zen' },
 ];
 
