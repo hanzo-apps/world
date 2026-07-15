@@ -608,6 +608,64 @@ body.hzc-mode-fullscreen .hzc-resize {
   flex: 0 0 auto;
   opacity: 0.85;
 }
+/* Live streaming answer — plain text growing in place with a breathing caret;
+   swapped for the markdown render when the done event lands. */
+.hzc-stream-text {
+  white-space: pre-wrap;
+}
+/* Pre-envelope reasoning from a thinking model — dim, small, replaced the
+   moment real answer text starts. */
+.hzc-stream-think {
+  white-space: pre-wrap;
+  margin-bottom: 4px;
+  font: 400 11.5px var(--font-body, sans-serif);
+  font-style: italic;
+  color: var(--text-muted, #666);
+}
+.hzc-stream-think:empty {
+  display: none;
+}
+.hzc-stream-text:empty {
+  display: none;
+}
+.hzc-stream-text::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: currentColor;
+  opacity: 0.7;
+  animation: hzc-caret 0.9s steps(1) infinite;
+}
+@keyframes hzc-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.hzc-live-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.hzc-live-tools:empty {
+  display: none;
+}
+.hzc-live-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--border, #1e1e1e);
+  border-radius: var(--radius-pill, 999px);
+  font: 500 10.5px var(--font-mono, monospace);
+  color: var(--text-dim, #999);
+}
+.hzc-live-tool.err {
+  color: var(--red, #e5484d);
+}
 .hzc-send {
   flex: 0 0 auto;
   width: 32px;
