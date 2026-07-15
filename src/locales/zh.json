@@ -391,6 +391,31 @@
       "updated": "已更新"
     },
     "economic": {
+      "china": {
+        "tab": "中国",
+        "indicators": "指标",
+        "releases": "近期发布",
+        "noData": "中国宏观快照不可用",
+        "noReleases": "暂无近期发布",
+        "prior": "前值",
+        "context": "参考",
+        "notConfigured": "未配置",
+        "observed": "数据日期：",
+        "source": "来源：",
+        "sourceUnavailable": "来源不可用",
+        "status": {
+          "loading": "加载中",
+          "available": "可用",
+          "partial": "部分",
+          "stale": "过期",
+          "unavailable": "不可用"
+        },
+        "eventStatus": {
+          "scheduled": "计划",
+          "provisional": "暂定",
+          "verified": "已确认"
+        }
+      },
       "indicators": "指标",
       "oil": "石油",
       "gov": "政府",
