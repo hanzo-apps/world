@@ -77,6 +77,7 @@ func (s *Server) mount(mux registrar) {
 
 	// econ / humanitarian
 	mux.HandleFunc("/v1/world/fred-data", s.handleFRED)
+	mux.HandleFunc("/v1/world/china-macro", s.handleChinaMacro)
 	mux.HandleFunc("/v1/world/worldbank", s.handleWorldBank)
 	mux.HandleFunc("/v1/world/eia", s.handleEIA)
 	mux.HandleFunc("/v1/world/eia/", s.handleEIA)

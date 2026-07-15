@@ -391,6 +391,18 @@
       "updated": "更新済"
     },
     "economic": {
+      "china": {
+        "observed": "基準日:",
+        "source": "出典:",
+        "sourceUnavailable": "出典不明",
+        "status": {
+          "loading": "読み込み中",
+          "available": "利用可能",
+          "partial": "一部利用可能",
+          "stale": "古いデータ",
+          "unavailable": "利用不可"
+        }
+      },
       "indicators": "指標",
       "oil": "石油",
       "gov": "政府",

@@ -6,14 +6,17 @@ import type { SpendingSummary } from '@/services/usa-spending';
 import { getChangeClass, formatChange } from '@/services/fred';
 import { formatOilValue, getTrendIndicator, getTrendColor } from '@/services/oil-analytics';
 import { formatAwardAmount, getAwardTypeIcon } from '@/services/usa-spending';
+import type { ChinaMacroSnapshot, ChinaMacroIndicator, ChinaReleaseEvent } from '@/services/china-macro';
+import { chinaSummaryState, toObservedDate, type ChinaCountrySummarySignal } from '@/app/china-summary-state';
 import { escapeHtml } from '@/utils/sanitize';
 
-type TabId = 'indicators' | 'oil' | 'spending';
+type TabId = 'indicators' | 'oil' | 'spending' | 'china';
 
 export class EconomicPanel extends Panel {
   private fredData: FredSeries[] = [];
   private oilData: OilAnalytics | null = null;
   private spendingData: SpendingSummary | null = null;
+  private chinaData: ChinaMacroSnapshot | null = null;
   private lastUpdate: Date | null = null;
   private activeTab: TabId = 'indicators';
   private indicatorsNote: string | null = null;
@@ -52,6 +55,11 @@ export class EconomicPanel extends Panel {
     this.render();
   }
 
+  public updateChina(data: ChinaMacroSnapshot): void {
+    this.chinaData = data;
+    this.render();
+  }
+
   public setLoading(loading: boolean): void {
     if (loading) {
       this.showLoading();
@@ -61,6 +69,7 @@ export class EconomicPanel extends Panel {
   private render(): void {
     const hasOil = this.oilData && (this.oilData.wtiPrice || this.oilData.brentPrice);
     const hasSpending = this.spendingData && this.spendingData.awards.length > 0;
+    const hasChina = !!this.chinaData;
 
     // Build tabs HTML
     const tabsHtml = `
@@ -78,6 +87,11 @@ export class EconomicPanel extends Panel {
             🏛️ ${t('components.economic.gov')}
           </button>
         ` : ''}
+        ${hasChina ? `
+          <button class="economic-tab ${this.activeTab === 'china' ? 'active' : ''}" data-tab="china">
+            🇨🇳 ${t('components.economic.china.tab')}
+          </button>
+        ` : ''}
       </div>
     `;
 
@@ -92,6 +106,9 @@ export class EconomicPanel extends Panel {
         break;
       case 'spending':
         contentHtml = this.renderSpending();
+        break;
+      case 'china':
+        contentHtml = this.renderChina();
         break;
     }
 
@@ -126,6 +143,7 @@ export class EconomicPanel extends Panel {
       case 'indicators': return 'FRED';
       case 'oil': return 'EIA';
       case 'spending': return 'USASpending.gov';
+      case 'china': return 'OECD · FRED · NBS · PBoC';
     }
   }
 
@@ -231,5 +249,97 @@ export class EconomicPanel extends Panel {
         `).join('')}
       </div>
     `;
+  }
+
+  private renderChina(): string {
+    const snap = this.chinaData;
+    if (!snap || (snap.indicators.length === 0 && snap.releaseEvents.length === 0)) {
+      return `<div class="economic-empty">${escapeHtml(t('components.economic.china.noData'))}</div>`;
+    }
+
+    // Panel state is derived from the required (non-context) indicators that
+    // carry a value, via the ported four-state contract.
+    const requiredSignals: ChinaCountrySummarySignal[] = snap.indicators
+      .filter(ind => !ind.contextOnly && ind.value !== null)
+      .map(ind => ({ stale: ind.stale }));
+    const state = chinaSummaryState(requiredSignals, 4);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = snap.releaseEvents
+      .filter(ev => ev.releaseDate >= today)
+      .slice(0, 8);
+
+    return `
+      <div class="cn-summary">
+        <div class="cn-summary-head">
+          <span class="cn-status cn-status--${escapeHtml(state)}">${escapeHtml(t('components.economic.china.status.' + state))}</span>
+        </div>
+        <div class="economic-indicators cn-indicators">
+          ${snap.indicators.map(ind => this.renderChinaIndicator(ind)).join('')}
+        </div>
+        <div class="cn-releases">
+          <div class="cn-releases-head">${escapeHtml(t('components.economic.china.releases'))}</div>
+          ${upcoming.length === 0
+            ? `<div class="economic-empty">${escapeHtml(t('components.economic.china.noReleases'))}</div>`
+            : upcoming.map(ev => this.renderChinaRelease(ev)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderChinaIndicator(ind: ChinaMacroIndicator): string {
+    const hasValue = ind.value !== null && Number.isFinite(ind.value);
+    const valueStr = hasValue
+      ? `${escapeHtml(String(ind.value))}${ind.unit ? ' ' + escapeHtml(ind.unit) : ''}`
+      : '—';
+    const prior = hasValue && ind.priorValue !== null && Number.isFinite(ind.priorValue)
+      ? `<span class="cn-prior">${escapeHtml(t('components.economic.china.prior'))} ${escapeHtml(String(ind.priorValue))}</span>`
+      : '';
+    const badges: string[] = [];
+    if (ind.contextOnly) {
+      badges.push(`<span class="cn-badge cn-badge--context">${escapeHtml(t('components.economic.china.context'))}</span>`);
+    }
+    if (ind.stale) {
+      badges.push(`<span class="cn-badge cn-badge--stale">${escapeHtml(t('components.economic.china.status.stale'))}</span>`);
+    }
+    // An unavailable series stays honestly empty with a labeled reason rather
+    // than a fabricated value.
+    const reason = (!hasValue && ind.unavailableReason)
+      ? `<span class="cn-reason" title="${escapeHtml(ind.unavailableReason)}">${escapeHtml(this.chinaReasonLabel(ind.unavailableReason))}</span>`
+      : '';
+    const observed = ind.observationDate
+      ? `<span class="cn-observed">${escapeHtml(t('components.economic.china.observed'))} ${escapeHtml(toObservedDate(ind.observationDate))}</span>`
+      : '';
+
+    return `
+      <div class="economic-indicator cn-indicator" data-id="${escapeHtml(ind.id)}">
+        <div class="indicator-header">
+          <span class="indicator-name">${escapeHtml(ind.label)}</span>
+          ${badges.join('')}
+        </div>
+        <div class="indicator-value">
+          <span class="value">${valueStr}</span>
+          ${prior}
+          ${reason}
+        </div>
+        <div class="indicator-date">${observed}${observed && ind.source ? ' · ' : ''}${escapeHtml(ind.source)}</div>
+      </div>
+    `;
+  }
+
+  private renderChinaRelease(ev: ChinaReleaseEvent): string {
+    const statusLabel = t('components.economic.china.eventStatus.' + ev.status, { defaultValue: ev.status });
+    return `
+      <div class="cn-release">
+        <span class="cn-release-date">${escapeHtml(ev.releaseDate)}</span>
+        <span class="cn-release-event">${escapeHtml(ev.event)}</span>
+        <span class="cn-release-status cn-release-status--${escapeHtml(ev.status)}">${escapeHtml(statusLabel)}</span>
+      </div>
+    `;
+  }
+
+  private chinaReasonLabel(reason: string): string {
+    if (reason === 'not_configured') return t('components.economic.china.notConfigured');
+    return t('components.economic.china.sourceUnavailable');
   }
 }

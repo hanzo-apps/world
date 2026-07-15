@@ -7227,6 +7227,64 @@ a.prediction-link:hover {
   font-size: 11px;
 }
 
+/* China macro snapshot */
+.cn-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+.cn-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+.cn-status--available { color: #44ff88; }
+.cn-status--partial,
+.cn-status--stale { color: #ffcc44; }
+.cn-status--unavailable,
+.cn-status--loading { color: var(--text-dim); }
+.cn-indicator .indicator-header { gap: 6px; }
+.cn-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.cn-badge--stale { color: #ffcc44; border: 1px solid #ffcc44; }
+.cn-badge--context { color: var(--text-dim); border: 1px solid var(--text-dim); }
+.cn-prior,
+.cn-observed,
+.cn-reason { color: var(--text-dim); font-size: 10px; margin-left: 6px; }
+.cn-reason { font-style: italic; }
+.cn-releases { margin-top: 10px; border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)); padding-top: 8px; }
+.cn-releases-head {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 8px 6px;
+}
+.cn-release {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.cn-release-date { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cn-release-event { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-release-status { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cn-release-status--verified { color: #44ff88; }
+.cn-release-status--provisional { color: #ffcc44; }
+.cn-release-status--scheduled { color: var(--text-dim); }
+
 /* Government Spending */
 .spending-summary {
   padding: 8px;
