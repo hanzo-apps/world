@@ -2,6 +2,18 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.2]
+
+### Added
+
+- **Streaming analyst**: answers flow in live over SSE — reasoning shows as dim thinking text, tool calls appear as chips the moment they run, the reply types itself in; the final render and command dispatch are unchanged (done event = the old JSON contract)
+- **Model menu**: the composer pill opens a grouped popover (Auto / Zen / GPT / Llama / Claude / Agents) with per-family marks and an active check
+
+### Fixed
+
+- **Model identity**: the Zen ring appears only on zen* models — gpt-oss/llama/claude get their own marks on the pill, menu rows, avatars, and the thinking row
+- **Dev server**: `npm run dev` proxies /v1 to production by default (VITE_DEV_API_PROXY overrides)
+
 ## [2.4.1]
 
 ### Added
