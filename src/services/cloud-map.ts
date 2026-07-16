@@ -81,3 +81,39 @@ export function getByoGpu(): Promise<ByoGpuData | null> {
 export function getTraffic(): Promise<TrafficData | null> {
   return getJson<TrafficData>('/v1/world/cloud/traffic');
 }
+
+// Native request-geo globe (points + throughput) — the ai backend's own aggregate
+// (/v1/traffic/globe), proxied same-origin. Aggregates only: country/region points
+// with per-service counts + headline rates, never an IP. `live:false` with an empty
+// points array is the HONEST empty state (no traffic yet / release not landed).
+export interface TrafficGlobePoint {
+  country: string;
+  region?: string;
+  lat: number;
+  lon: number;
+  count: number;
+  byService: Record<string, number>;
+}
+
+export interface TrafficGlobeCountry {
+  country: string;
+  count: number;
+}
+
+export interface TrafficGlobeTotals {
+  rps_1m: number;
+  rpm_60m: number;
+  top_countries: TrafficGlobeCountry[];
+}
+
+export interface TrafficGlobeData {
+  updatedAt: string;
+  live: boolean;
+  window: { minutes: number; since: string; until: string };
+  points: TrafficGlobePoint[];
+  totals: TrafficGlobeTotals;
+}
+
+export function getTrafficGlobe(): Promise<TrafficGlobeData | null> {
+  return getJson<TrafficGlobeData>('/v1/world/cloud/traffic-globe');
+}
