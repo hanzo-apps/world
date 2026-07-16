@@ -19,11 +19,14 @@ import (
 //     world data). So by default this route returns a clearly-labeled DEMO
 //     dataset with demo:true — the flag travels in the payload and the UI shows a
 //     "demo data" note. We never fake platform numbers silently.
-//   - When an operator wires a service token (HANZO_CLOUD_PULSE_TOKEN, from KMS),
-//     we make SERVICE-side calls to the real cloud for non-sensitive COUNTS only
-//     (models served, node/region/GPU counts) and set demo:false. Request/token
-//     VOLUME still has no aggregate source, so it stays modeled and is flagged
-//     volumeModeled:true — again, never silently faked.
+//   - When an operator wires the service token (serviceToken, from KMS), we make
+//     SERVICE-side calls to the real cloud for non-sensitive COUNTS (models
+//     served, node/region/GPU counts) and set demo:false. With a super-admin
+//     token we also read the platform-wide 24h request/token VOLUME from the
+//     ClickHouse-backed usage ledger (get-cloud-usages ?org=all) and clear
+//     volumeModeled. If only the counts resolve (e.g. a non-admin token), volume
+//     stays modeled and is flagged volumeModeled:true — again, never silently
+//     faked.
 //
 // Signed-in, org-scoped drill-down (the user's own fleet / models / bill) does
 // NOT come through here — those panels call api.hanzo.ai directly with the
@@ -99,21 +102,21 @@ func (s *Server) handleCloudPulse(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// tryServicePulse overlays REAL non-sensitive counts onto the demo scaffold when
-// a service token is configured (HANZO_CLOUD_PULSE_TOKEN, KMS-injected). It
-// returns ok=false — leaving the honest demo dataset in place — when the token is
-// absent or any required call fails. Only counts are read; no spend, no names.
+// tryServicePulse overlays REAL platform data onto the demo scaffold when a
+// service token is configured (serviceToken, KMS-injected). It returns ok=false —
+// leaving the honest demo dataset in place — when the token is absent or the core
+// counts calls fail. It reads two honest sources: non-sensitive COUNTS (models
+// served, node/region/GPU counts from the ai catalog + visor) and, when the
+// super-admin usage ledger is reachable, the platform-wide 24h request/token
+// VOLUME (get-cloud-usages ?org=all). When volume is real, demo:false AND
+// volumeModeled:false; when only counts are real, volume stays modeled and
+// volumeModeled:true — never silently faked.
 func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPulse, bool) {
-	tok := env("HANZO_CLOUD_PULSE_TOKEN")
-	if tok == "" {
+	hdr := serviceAuth()
+	if hdr == nil {
 		return cloudPulse{}, false
 	}
-	apiBase := env("HANZO_API_BASE", "HANZO_AI_BASE")
-	if apiBase == "" {
-		apiBase = "https://api.hanzo.ai"
-	}
-	apiBase = trimSlash(apiBase)
-	hdr := map[string]string{"Authorization": "Bearer " + tok}
+	host := apiHost()
 
 	// Models served (ai gateway, OpenAI-compatible list).
 	var models struct {
@@ -121,7 +124,7 @@ func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPul
 			ID string `json:"id"`
 		} `json:"data"`
 	}
-	if err := s.getJSON(ctx, apiBase+"/v1/models", hdr, &models); err != nil || len(models.Data) == 0 {
+	if err := s.getJSON(ctx, host+"/v1/models", hdr, &models); err != nil || len(models.Data) == 0 {
 		return cloudPulse{}, false
 	}
 
@@ -132,7 +135,7 @@ func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPul
 			Status string `json:"status"`
 		} `json:"machines"`
 	}
-	if err := s.getJSON(ctx, apiBase+"/v1/machines", hdr, &machines); err != nil {
+	if err := s.getJSON(ctx, host+"/v1/machines", hdr, &machines); err != nil {
 		return cloudPulse{}, false
 	}
 	var gpus struct {
@@ -141,7 +144,7 @@ func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPul
 		} `json:"gpus"`
 	}
 	// GPUs are a bonus count; a failure here should not sink real machine data.
-	_ = s.getJSON(ctx, apiBase+"/v1/gpus", hdr, &gpus)
+	_ = s.getJSON(ctx, host+"/v1/gpus", hdr, &gpus)
 
 	regionSet := map[string]int{}
 	online := 0
@@ -156,9 +159,7 @@ func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPul
 
 	p := base
 	p.Demo = false
-	p.VolumeModeled = true
 	p.Source = "service"
-	p.Note = "Live counts from Hanzo Cloud (models/nodes/regions). Request & token volume is modeled — no aggregate volume endpoint is exposed."
 	p.Overview.ModelsServed = len(models.Data)
 	p.Overview.NodesTotal = len(machines.Machines)
 	p.Overview.NodesOnline = online
@@ -166,7 +167,71 @@ func (s *Server) tryServicePulse(ctx context.Context, base cloudPulse) (cloudPul
 	if len(regionSet) > 0 {
 		p.Overview.Regions = len(regionSet)
 	}
+
+	// Real platform VOLUME from the ClickHouse-backed usage ledger (all orgs).
+	// When it lands, it replaces the modeled headline/series/top-models and clears
+	// volumeModeled; when the read fails (e.g. a non-super-admin token, or the
+	// ledger is unreachable) the modeled volume stays and the flag stays true.
+	if ov, err := s.fetchCloudUsage(ctx, "24h"); err == nil && ov.Totals.Requests > 0 {
+		applyUsageToPulse(&p, ov)
+	} else {
+		p.VolumeModeled = true
+		p.Note = "Live counts from Hanzo Cloud (models/nodes/regions). Request & token volume is modeled — the platform usage ledger was not reachable with this token."
+	}
 	return p, true
+}
+
+// applyUsageToPulse folds the real platform-wide usage overview into p: the
+// headline rate (recent series bucket, else 24h average), 24h totals, the real
+// hourly request/token series, and the top models by real spend. It clears
+// volumeModeled — these are measured, not modeled.
+func applyUsageToPulse(p *cloudPulse, ov *cloudUsageOverview) {
+	p.VolumeModeled = false
+	p.Window = ov.Range
+	if p.Window == "" {
+		p.Window = "24h"
+	}
+	p.Overview.Requests24h = ov.Totals.Requests
+	p.Overview.Tokens24h = ov.Totals.Tokens
+
+	// Headline rate: the most recent complete bucket is the freshest honest rate;
+	// fall back to the 24h average when there is no usable interval.
+	const windowSecs = 86400.0
+	rps := float64(ov.Totals.Requests) / windowSecs
+	if n := len(ov.Series); n > 0 {
+		if iv := intervalSeconds(ov.Interval); iv > 0 {
+			rps = float64(ov.Series[n-1].Requests) / iv
+		}
+	}
+	p.Overview.RequestsPerSec = round1(rps)
+
+	// Real hourly buckets (chronological) drive both sparklines.
+	if n := len(ov.Series); n > 0 {
+		reqs := make([]int64, n)
+		toks := make([]int64, n)
+		for i, pt := range ov.Series {
+			reqs[i] = pt.Requests
+			toks[i] = pt.Tokens
+		}
+		p.RequestSeries = reqs
+		p.TokenSeries = toks
+	}
+
+	// Top models by real spend/volume (ledger byModel items, already ranked).
+	if len(ov.ByModel.Items) > 0 {
+		out := make([]cloudModel, 0, len(ov.ByModel.Items))
+		for _, m := range ov.ByModel.Items {
+			out = append(out, cloudModel{
+				ID:          m.Model,
+				Name:        m.Model,
+				Requests24h: m.Requests,
+				Tokens24h:   m.Tokens,
+				Share:       m.Pct / 100,
+			})
+		}
+		p.Models = out
+	}
+	p.Note = "Live platform aggregate from Hanzo Cloud — models, fleet, and measured 24h request/token volume across all orgs."
 }
 
 func machineOnline(status string) bool {

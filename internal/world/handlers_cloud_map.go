@@ -449,7 +449,7 @@ func (s *Server) handleCloudBYOGPU(w http.ResponseWriter, r *http.Request) {
 // Returns ok=false (→ demo) when the token is absent, both sources fail, or no GPU
 // maps to a known region. Only non-sensitive fields (region/model/status) are read.
 func (s *Server) tryRealGPUs(ctx context.Context) ([]gpuCluster, bool) {
-	tok := env("HANZO_CLOUD_PULSE_TOKEN")
+	tok := serviceToken()
 	if tok == "" {
 		return nil, false
 	}
@@ -597,7 +597,7 @@ func (s *Server) handleCloudTraffic(w http.ResponseWriter, r *http.Request) {
 // demo) when tokenless, unreachable, or no country data. Reuses mergeMetric so the
 // analytics fan-out lives in exactly one place.
 func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
-	tok := env("HANZO_CLOUD_PULSE_TOKEN")
+	tok := serviceToken()
 	if tok == "" {
 		return nil, false
 	}
