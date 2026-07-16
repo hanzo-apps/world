@@ -124,6 +124,9 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/cloud/traffic", s.handleCloudTraffic)
 	// PUBLIC status.hanzo.ai summary (Gatus proxy: per-service up/down + incidents):
 	mux.HandleFunc("/v1/world/cloud/status-page", s.handleCloudStatusPage)
+	// PUBLIC Enso Live Training — ai gateway /v1/router/stats?scope=platform proxy
+	// (aggregates only; arms already opaque "arm-N" upstream — no vendor names):
+	mux.HandleFunc("/v1/world/cloud/router-stats", s.handleCloudRouterStats)
 	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
 	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
 	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
