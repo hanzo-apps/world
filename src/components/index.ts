@@ -61,6 +61,7 @@ export * from './MyUsagePanel';
 export * from './LiveActivityPanel';
 // AI variant — live Hanzo compute + enso training telemetry
 export { AiComputePanel } from './AiComputePanel';
+export { EnsoFlywheelPanel } from './EnsoFlywheelPanel';
 // SaaS / cloud — admin-only deep panels
 export { CloudServicesPanel } from './CloudServicesPanel';
 export { CloudFleetPanel } from './CloudFleetPanel';

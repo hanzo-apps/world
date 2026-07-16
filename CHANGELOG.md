@@ -2,6 +2,12 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.6]
+
+### Added
+
+- **Enso Flywheel panel (AI variant)**: the router self-improvement loop made visible. New `/v1/world/enso-training` folds the routing-decision ledger tail + reward tail (`export-routing-ledger` / `export-routing-rewards`, super-admin) into ledger growth, engine-vs-heuristic mix, a routing-confidence histogram, and task/model distributions, alongside the latest enso-bench eval scores (an embedded `results/summary.json` snapshot, overridable live via `ENSO_BENCH_URL`). The response is event-typed so future retrain/deploy milestones slot into the same timeline. Eval scores render even signed-out; `state` (live/partial/demo) says which live sources resolved.
+
 ## [2.4.5]
 
 ### Added
