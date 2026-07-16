@@ -61,7 +61,21 @@ func (s *Server) handleCloudRouterStats(w http.ResponseWriter, r *http.Request) 
 			if status < 200 || status >= 300 {
 				return nil, httpErr(status)
 			}
-			return json.RawMessage(body), nil
+			// ai wraps the aggregate in the casibase envelope {status,data:{…}};
+			// unwrap `data` so the client (and our unavailable fallback) see the
+			// bare RouterStats shape. A missing/null data or a non-ok status is a
+			// soft failure → the honest unavailable payload, never a 5xx.
+			var env struct {
+				Status string          `json:"status"`
+				Data   json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal(body, &env); err != nil {
+				return nil, httpErr(http.StatusBadGateway)
+			}
+			if env.Status != "ok" || len(env.Data) == 0 || string(env.Data) == "null" {
+				return nil, httpErr(http.StatusBadGateway)
+			}
+			return env.Data, nil
 		},
 		func(w http.ResponseWriter, _ error) {
 			// Degrade cleanly (never 5xx): an honest empty payload flagged
