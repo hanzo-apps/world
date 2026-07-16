@@ -11,6 +11,7 @@ import {
   MOBILE_DEFAULT_MAP_LAYERS,
   STORAGE_KEYS,
   SITE_VARIANT,
+  isHanzoBrandHost,
   MONITOR_COLORS,
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
@@ -98,6 +99,7 @@ import {
   AiAnalystDock,
   CustomFeedPanel,
   CloudOverviewPanel,
+  TrafficGlobePanel,
   EnsoTrainingPanel,
   ModelUsagePanel,
   FleetPanel,
@@ -2028,20 +2030,37 @@ export class App {
   }
 
   private renderLayout(): void {
+    // Hanzo mode: the H logo is a TOGGLE that reveals the variant switcher, and the
+    // Hanzo entry + gated switcher appear ONLY on hanzo brand hosts (white-label
+    // rule). Off-brand (OSS) hosts keep the plain home-link logo + an always-on
+    // switcher. The canonical Hanzo "H" paths (viewBox 0 0 67 67) are reused as-is.
+    const hanzoHost = isHanzoBrandHost();
+    const logoSvg = `
+      <svg viewBox="0 0 67 67" width="19" height="19" fill="currentColor" aria-hidden="true">
+        <path d="M22.21 67V44.6369H0V67H22.21Z"/>
+        <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z"/>
+        <path d="M22.21 0H0V22.3184H22.21V0Z"/>
+        <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/>
+        <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/>
+      </svg>`;
+    const logo = hanzoHost
+      ? `<button class="header-logo" type="button" data-hanzo-toggle aria-expanded="false" aria-controls="variantSwitcher" title="Toggle Hanzo mode" aria-label="Toggle Hanzo mode — view switcher">${logoSvg}</button>`
+      : `<a class="header-logo" href="/" title="Hanzo World" aria-label="Hanzo World — home">${logoSvg}</a>`;
+    const hanzoTab = hanzoHost
+      ? `<a href="?variant=hanzo"
+               class="variant-option ${SITE_VARIANT === 'hanzo' ? 'active' : ''}"
+               data-variant="hanzo" role="tab" aria-selected="${SITE_VARIANT === 'hanzo'}"
+               title="Hanzo${SITE_VARIANT === 'hanzo' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon"><svg viewBox="0 0 67 67" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M22.21 67V44.6369H0V67H22.21Z"/><path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z"/><path d="M22.21 0H0V22.3184H22.21V0Z"/><path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/><path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/></svg></span>
+              <span class="variant-label">Hanzo</span>
+            </a>`
+      : '';
     this.container.innerHTML = `
       <div class="header">
         <div class="header-left">
-          <a class="header-logo" href="/" title="Hanzo World" aria-label="Hanzo World — home">
-            <svg viewBox="0 0 67 67" width="19" height="19" fill="currentColor" aria-hidden="true">
-              <path d="M22.21 67V44.6369H0V67H22.21Z"/>
-              <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z"/>
-              <path d="M22.21 0H0V22.3184H22.21V0Z"/>
-              <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/>
-              <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/>
-            </svg>
-          </a>
-          <div class="variant-switcher">
-            <a href="?variant=full"
+          ${logo}
+          <div class="variant-switcher${hanzoHost ? ' hanzo-gated' : ''}" id="variantSwitcher" role="tablist" aria-label="View switcher">
+            ${hanzoTab}<a href="?variant=full"
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
                data-variant="full"
                title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
@@ -2075,13 +2094,6 @@ export class App {
                title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
-            </a>
-            <a href="?variant=saas"
-               class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
-               data-variant="saas"
-               title="${t('header.cloud')}${SITE_VARIANT === 'saas' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">☁️</span>
-              <span class="variant-label">${t('header.cloud')}</span>
             </a>
           </div>
           <div class="status-indicator">
@@ -2640,10 +2652,15 @@ export class App {
       this.panels['gcc-investments'] = investmentsPanel;
     }
 
-    // SaaS / cloud panels — Hanzo Cloud metrics + org drill-down (saas variant).
-    if (SITE_VARIANT === 'saas') {
+    // Hanzo flagship panels — the live-traffic globe's companion tiles: Cloud
+    // metrics, router/Enso training + flywheel, AI compute, model mix, fleet,
+    // uptime, and the caller's own org usage + bill.
+    if (SITE_VARIANT === 'hanzo') {
       this.panels['cloud-overview'] = new CloudOverviewPanel();
+      this.panels['traffic-globe'] = new TrafficGlobePanel();
       this.panels['enso-training'] = new EnsoTrainingPanel();
+      this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
+      this.panels['ai-compute'] = new AiComputePanel();
       this.panels['model-usage'] = new ModelUsagePanel();
       const fleetPanel = new FleetPanel();
       fleetPanel.setLocationClickHandler((lat, lon) => {
@@ -2666,8 +2683,8 @@ export class App {
       this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
     }
 
-    // Chains widget — live block heights + peers (saas + crypto variants).
-    if (SITE_VARIANT === 'saas' || SITE_VARIANT === 'crypto') {
+    // Chains widget — live block heights + peers (hanzo + crypto variants).
+    if (SITE_VARIANT === 'hanzo' || SITE_VARIANT === 'crypto') {
       this.panels['chains'] = new BlockchainPanel();
     }
 
@@ -3188,7 +3205,7 @@ export class App {
   // the URL is shareable. PWA-precached, content-hashed assets keep the reload
   // sub-second.
   private setSiteVariant(variant: string): boolean {
-    if (!['full', 'tech', 'finance', 'saas', 'ai', 'crypto'].includes(variant)) return false;
+    if (!['full', 'tech', 'finance', 'hanzo', 'saas', 'ai', 'crypto'].includes(variant)) return false;
     if (variant === SITE_VARIANT) return true;
     localStorage.setItem('worldmonitor-variant', variant); // survives even a trimmed URL
     const u = new URL(this.getShareUrl() ?? window.location.href);
@@ -3444,6 +3461,32 @@ export class App {
         }
       });
     });
+
+    // Hanzo mode: the H logo toggles the variant switcher's visibility. State is
+    // persisted so it survives the reload a variant switch triggers (the switcher
+    // stays open across switches; click the H again to collapse). Only present on
+    // hanzo brand hosts (the toggle button is rendered there — see renderLayout).
+    const hanzoToggle = this.container.querySelector<HTMLElement>('[data-hanzo-toggle]');
+    const switcherEl = this.container.querySelector<HTMLElement>('#variantSwitcher');
+    if (hanzoToggle && switcherEl) {
+      const header = hanzoToggle.closest('.header');
+      const setMode = (on: boolean): void => {
+        header?.classList.toggle('hanzo-mode', on);
+        hanzoToggle.setAttribute('aria-expanded', String(on));
+        try { localStorage.setItem('worldmonitor-hanzo-mode', on ? '1' : '0'); } catch { /* non-fatal */ }
+      };
+      // Restore: reopen if previously opened; also open when the current view is NOT
+      // the Hanzo default, so a deep-linked visitor can still reach the switcher.
+      const stored = (() => { try { return localStorage.getItem('worldmonitor-hanzo-mode'); } catch { return null; } })();
+      setMode(stored === '1' || (stored === null && SITE_VARIANT !== 'hanzo'));
+      hanzoToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        setMode(!header?.classList.contains('hanzo-mode'));
+      });
+      hanzoToggle.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && header?.classList.contains('hanzo-mode')) setMode(false);
+      });
+    }
 
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenBtn');
