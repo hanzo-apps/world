@@ -106,6 +106,11 @@ func (s *Server) mount(mux registrar) {
 	// configured. Org-scoped drill-down goes straight to api.hanzo.ai, not here.
 	mux.HandleFunc("/v1/world/cloud-pulse", s.handleCloudPulse)
 
+	// AI Compute pulse (AI variant): live inference volume + serving fleet, pushed
+	// over SSE (EventSource) with a plain-GET JSON snapshot as the poll fallback.
+	// Same honest platform aggregate as cloud-pulse; "unavailable" without a token.
+	mux.HandleFunc("/v1/world/ai-pulse", s.handleAIPulse)
+
 	// Cloud console. PUBLIC excitement layer (real, non-sensitive):
 	mux.HandleFunc("/v1/world/cloud/models", s.handleCloudModels)
 	// PUBLIC map layers (real telemetry when reachable; modeled/demo carries a flag):
