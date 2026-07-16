@@ -55,6 +55,7 @@ export { AiAnalystDock } from './AiAnalystDock';
 export { CustomFeedPanel } from './CustomFeedPanel';
 // SaaS / cloud variant panels
 export * from './CloudOverviewPanel';
+export * from './TrafficGlobePanel';
 export * from './EnsoTrainingPanel';
 export * from './ModelUsagePanel';
 export * from './FleetPanel';

@@ -593,10 +593,150 @@ func (s *Server) handleCloudTraffic(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+// ── native request-geo globe (points + throughput) ───────────────────────────
+//
+// The Hanzo-mode globe plots WHERE api.hanzo.ai traffic comes from, from the ai
+// backend's OWN in-process aggregate (GET /v1/traffic/globe — public, aggregates
+// only, no IPs). This same-origin proxy passes those points + totals through, and
+// degrades to an HONEST EMPTY state (no points, zero rates) — never demo — because
+// "no traffic recorded yet" is a real answer the UI should show truthfully.
+
+type trafficGlobePoint struct {
+	Country   string         `json:"country"`
+	Region    string         `json:"region,omitempty"`
+	Lat       float64        `json:"lat"`
+	Lon       float64        `json:"lon"`
+	Count     int            `json:"count"`
+	ByService map[string]int `json:"byService"`
+}
+
+type trafficGlobeCountry struct {
+	Country string `json:"country"`
+	Count   int    `json:"count"`
+}
+
+type trafficGlobeTotals struct {
+	RPS1m        float64               `json:"rps_1m"`
+	RPM60m       float64               `json:"rpm_60m"`
+	TopCountries []trafficGlobeCountry `json:"top_countries"`
+}
+
+type trafficGlobeWindow struct {
+	Minutes int    `json:"minutes"`
+	Since   string `json:"since"`
+	Until   string `json:"until"`
+}
+
+type trafficGlobe struct {
+	UpdatedAt string              `json:"updatedAt"`
+	Live      bool                `json:"live"` // reached the native endpoint (even if 0 points)
+	Window    trafficGlobeWindow  `json:"window"`
+	Points    []trafficGlobePoint `json:"points"`
+	Totals    trafficGlobeTotals  `json:"totals"`
+}
+
+// emptyGlobe is the honest zero payload: reachable-but-no-data and unreachable both
+// render as an empty globe with zero throughput — we never fabricate traffic.
+func emptyGlobe() trafficGlobe {
+	return trafficGlobe{
+		UpdatedAt: nowRFC(),
+		Live:      false,
+		Window:    trafficGlobeWindow{Minutes: 60},
+		Points:    []trafficGlobePoint{},
+		Totals:    trafficGlobeTotals{TopCountries: []trafficGlobeCountry{}},
+	}
+}
+
+// fetchNativeGlobe reads the ai backend's public /v1/traffic/globe (no token) and
+// unwraps the {status,data} envelope. ok=false when the endpoint is unreachable.
+func (s *Server) fetchNativeGlobe(ctx context.Context, windowMin int) (trafficGlobe, bool) {
+	url := apiHost() + "/v1/traffic/globe?window=" + strconv.Itoa(windowMin)
+	var envlp struct {
+		Data struct {
+			Window trafficGlobeWindow  `json:"window"`
+			Points []trafficGlobePoint `json:"points"`
+			Totals trafficGlobeTotals  `json:"totals"`
+		} `json:"data"`
+	}
+	if err := s.getJSON(ctx, url, nil, &envlp); err != nil {
+		return trafficGlobe{}, false
+	}
+	g := trafficGlobe{
+		UpdatedAt: nowRFC(),
+		Live:      true,
+		Window:    envlp.Data.Window,
+		Points:    envlp.Data.Points,
+		Totals:    envlp.Data.Totals,
+	}
+	if g.Points == nil {
+		g.Points = []trafficGlobePoint{}
+	}
+	if g.Totals.TopCountries == nil {
+		g.Totals.TopCountries = []trafficGlobeCountry{}
+	}
+	return g, true
+}
+
+// handleCloudTrafficGlobe serves the native request-geo aggregate. It never 5xxes:
+// an unreachable backend degrades to the honest empty globe.
+func (s *Server) handleCloudTrafficGlobe(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	s.cachedJSON(w, "cloud-traffic-globe", "public, max-age=10, s-maxage=10, stale-while-revalidate=45",
+		12*time.Second, 2*time.Minute,
+		func(ctx context.Context) (any, error) {
+			if g, ok := s.fetchNativeGlobe(ctx, 60); ok {
+				return g, nil
+			}
+			return emptyGlobe(), nil
+		},
+		func(w http.ResponseWriter, _ error) {
+			writeJSON(w, http.StatusOK, "", emptyGlobe())
+		},
+	)
+}
+
+// arcsFromGlobe turns native request-geo points into origin→nearest-region arcs, so
+// the animated arc layer and the points layer share ONE source (native LB geo).
+func arcsFromGlobe(g trafficGlobe) []trafficArc {
+	maxC := 1
+	for _, p := range g.Points {
+		if p.Count > maxC {
+			maxC = p.Count
+		}
+	}
+	arcs := make([]trafficArc, 0, len(g.Points))
+	for _, p := range g.Points {
+		rg := nearestRegion(p.Lat, p.Lon)
+		label := p.Country
+		if p.Region != "" {
+			label += "-" + p.Region
+		}
+		arcs = append(arcs, trafficArc{
+			FromLat: p.Lat, FromLon: p.Lon, ToLat: rg.Lat, ToLon: rg.Lon,
+			Weight: round2s(clampF(float64(p.Count)/float64(maxC), 0.05, 1)),
+			Label:  label + " → " + rg.ID,
+		})
+	}
+	sort.SliceStable(arcs, func(i, j int) bool { return arcs[i].Weight > arcs[j].Weight })
+	if len(arcs) > 20 {
+		arcs = arcs[:20]
+	}
+	return arcs
+}
+
 // tryRealTraffic builds arcs from the real visitor-country breakdown. ok=false (→
 // demo) when tokenless, unreachable, or no country data. Reuses mergeMetric so the
 // analytics fan-out lives in exactly one place.
 func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
+	// Native LB request-geo first (public, no token): arcs from the real
+	// /v1/traffic/globe points → nearest region — one source of truth with the
+	// traffic-globe layer. The analytics fallback below runs only when the native
+	// aggregate is empty (e.g. no traffic yet, or the ai release hasn't landed).
+	if g, ok := s.fetchNativeGlobe(ctx, 60); ok && len(g.Points) > 0 {
+		return arcsFromGlobe(g), true
+	}
 	tok := serviceToken()
 	if tok == "" {
 		return nil, false
@@ -785,4 +925,3 @@ func diurnalLoad(now time.Time) float64 {
 	hourFrac := float64(now.Hour()) + float64(now.Minute())/60
 	return 0.775 + 0.225*math.Sin((hourFrac-10)/24*2*math.Pi)
 }
-
