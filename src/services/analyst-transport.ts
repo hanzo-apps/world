@@ -64,6 +64,10 @@ export interface AnalystResponse {
   actions: AnalystAction[];
   fallback: boolean;
   reason?: string;
+  /** The gateway response id (OpenAI chat.completion `id`) the reply came from —
+   *  the stable key a content-free reward signal (thumbs / regenerate) attaches
+   *  to. Absent for the agent path / non-completion answers. */
+  id?: string;
   /** The model the backend actually served (echoed for the UI). */
   model?: string;
   /** Upstream error detail when the backend degraded — surfaced honestly in the chat. */
@@ -201,6 +205,7 @@ function normalize(data: Record<string, unknown>): AnalystResponse {
     actions: Array.isArray(data.actions) ? (data.actions as AnalystAction[]) : [],
     fallback: !!data.fallback,
     reason: typeof data.reason === 'string' ? data.reason : undefined,
+    id: typeof data.id === 'string' && data.id ? data.id : undefined,
     model: typeof data.model === 'string' ? data.model : undefined,
     error: typeof data.error === 'string' && data.error ? data.error : undefined,
     topup: !!data.topup,
