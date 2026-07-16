@@ -1,0 +1,177 @@
+{
+ "measured": {
+  "gpqa_diamond": {
+   "enso-ultra": {
+    "accuracy_pct": 89.9,
+    "stderr_pct": 2.1,
+    "n": 198,
+    "correct": 178,
+    "errors": 0,
+    "tokens": {
+     "prompt": 205635,
+     "completion": 612706,
+     "reasoning": 319290,
+     "calls": 601
+    },
+    "usd_est": 16.4333,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "enso": {
+    "accuracy_pct": 87.9,
+    "stderr_pct": 2.3,
+    "n": 198,
+    "correct": 174,
+    "errors": 0,
+    "tokens": {
+     "prompt": 74531,
+     "completion": 152519,
+     "reasoning": 29387,
+     "calls": 198
+    },
+    "usd_est": 10.0211,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "opus-4.8": {
+    "accuracy_pct": 86.9,
+    "stderr_pct": 2.4,
+    "n": 198,
+    "correct": 172,
+    "errors": 0,
+    "tokens": {
+     "prompt": 78121,
+     "completion": 126069,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 10.627,
+    "wall_seconds": 241.3,
+    "run_tag": "v1"
+   },
+   "fable-5": {
+    "accuracy_pct": 81.3,
+    "stderr_pct": 2.8,
+    "n": 198,
+    "correct": 161,
+    "errors": 0,
+    "tokens": {
+     "prompt": 78121,
+     "completion": 199072,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 3.2204,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "gpt-5.5": {
+    "accuracy_pct": 90.4,
+    "stderr_pct": 2.1,
+    "n": 198,
+    "correct": 179,
+    "errors": 0,
+    "tokens": {
+     "prompt": 54916,
+     "completion": 362128,
+     "reasoning": 326158,
+     "calls": 198
+    },
+    "usd_est": 3.6899,
+    "wall_seconds": 2396.2,
+    "run_tag": "v1"
+   },
+   "deepseek-v4-pro": {
+    "accuracy_pct": 76.3,
+    "stderr_pct": 3.0,
+    "n": 198,
+    "correct": 151,
+    "errors": 0,
+    "tokens": {
+     "prompt": 52523,
+     "completion": 108318,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.2076,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   }
+  },
+  "livecodebench": {
+   "deepseek-v4-pro": {
+    "accuracy_pct": 48.0,
+    "stderr_pct": 3.8,
+    "n": 175,
+    "correct": 84,
+    "errors": 0,
+    "tokens": {
+     "prompt": 92354,
+     "completion": 76407,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.1769,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   }
+  }
+ },
+ "grading": {},
+ "fugu_reported": {
+  "SWE-Bench Pro": {
+   "Fugu-Ultra": 73.7,
+   "Fugu": 59.0,
+   "Opus-4.8": 69.2,
+   "Gemini-3.1": 54.2,
+   "GPT-5.5": 58.6
+  },
+  "Terminal Bench 2.1": {
+   "Fugu-Ultra": 82.1,
+   "Fugu": 80.2,
+   "Opus-4.8": 74.6,
+   "Gemini-3.1": 70.3,
+   "GPT-5.5": 78.2
+  },
+  "LiveCodeBench": {
+   "Fugu-Ultra": 93.2,
+   "Fugu": 92.9,
+   "Opus-4.8": 87.8,
+   "Gemini-3.1": 88.5,
+   "GPT-5.5": 85.3
+  },
+  "LiveCodeBench Pro": {
+   "Fugu-Ultra": 90.8,
+   "Fugu": 87.8,
+   "Opus-4.8": 84.8,
+   "Gemini-3.1": 82.9,
+   "GPT-5.5": 88.4
+  },
+  "Humanity's Last Exam": {
+   "Fugu-Ultra": 50.0,
+   "Fugu": 47.2,
+   "Opus-4.8": 49.8,
+   "Gemini-3.1": 44.4,
+   "GPT-5.5": 41.4
+  },
+  "CharXiv Reasoning": {
+   "Fugu-Ultra": 86.6,
+   "Fugu": 85.1,
+   "Opus-4.8": 84.2,
+   "Gemini-3.1": 83.3,
+   "GPT-5.5": 84.1
+  },
+  "GPQA Diamond": {
+   "Fugu-Ultra": 95.5,
+   "Fugu": 95.5,
+   "Opus-4.8": 92.0,
+   "Gemini-3.1": 94.3,
+   "GPT-5.5": 93.6
+  }
+ },
+ "pending": [
+  "swebench_pro",
+  "terminal_bench"
+ ],
+ "total_usd_est": 44.38
+}

@@ -494,6 +494,7 @@ const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
 const AI_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global AI Map', enabled: true, priority: 1 },
   'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
+  'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
   'live-news': { name: 'AI & Tech Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
