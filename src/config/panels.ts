@@ -13,6 +13,10 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
+  // Hanzo platform telemetry — visible on the DEFAULT world, not just ?variant=ai:
+  // live AI compute/usage (SSE) + the enso router training flywheel.
+  'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
+  'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
   commodities: { name: 'Commodities & futures', enabled: true, priority: 1 },
   fx: { name: 'FX & currencies', enabled: true, priority: 2 },
