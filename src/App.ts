@@ -108,6 +108,7 @@ import {
   CloudAnalyticsPanel,
   LlmUsagePanel,
   BlockchainPanel,
+  AiComputePanel,
 } from '@/components';
 import { isAdmin, isAuthenticated, listOrgs, setActiveOrg } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
@@ -2651,6 +2652,11 @@ export class App {
       // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public —
       // NOT admin-gated).
       this.panels['hanzo-status'] = new HanzoStatusPanel();
+    }
+
+    // AI variant — live Hanzo inference telemetry: AI Compute (ai-pulse SSE).
+    if (SITE_VARIANT === 'ai') {
+      this.panels['ai-compute'] = new AiComputePanel();
     }
 
     // Chains widget — live block heights + peers (saas + crypto variants).
