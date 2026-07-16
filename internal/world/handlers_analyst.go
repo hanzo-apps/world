@@ -213,7 +213,7 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("\n\n"))
 				f.Flush()
 			}
-			reply, actions, traces, tokens, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, emit)
+			reply, actions, traces, tokens, id, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, emit)
 			if err != nil || reply == "" && len(actions) == 0 {
 				emit(addBillingCTA(map[string]any{
 					"type": "done", "reply": reply, "actions": emptyIfNil(actions), "fallback": err != nil,
@@ -223,13 +223,13 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 			}
 			emit(map[string]any{
 				"type": "done", "reply": reply, "actions": emptyIfNil(actions),
-				"model": served, "tokens": tokens, "traces": traces,
+				"model": served, "tokens": tokens, "traces": traces, "id": id,
 			})
 			return
 		}
 	}
 
-	reply, actions, traces, tokens, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, nil)
+	reply, actions, traces, tokens, id, err := s.runAnalystLoop(ctx, bearer, model, full, allowed, toolNames, extra, nil)
 	if err != nil {
 		// Surface the upstream reason honestly — the SPA renders it instead of a
 		// blank chat (e.g. a 401 when aud=hanzo-world isn't allow-listed upstream).
@@ -240,7 +240,7 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, "", map[string]any{
-		"reply": reply, "actions": actions, "model": served, "tokens": tokens, "traces": traces,
+		"reply": reply, "actions": actions, "model": served, "tokens": tokens, "traces": traces, "id": id,
 	})
 }
 
@@ -285,10 +285,10 @@ func addBillingCTA(m map[string]any, err error) map[string]any {
 // "reply" value (via replyExtractor — tool rounds stream nothing), and
 // {"type":"tool",…} per executed tool. When the model needs no data, this
 // collapses to a single call — byte-for-byte the prior behaviour.
-func (s *Server) runAnalystLoop(ctx context.Context, bearer, model string, full []chatMessage, allowed, toolNames map[string]bool, extra map[string]string, emit func(map[string]any)) (reply string, actions []map[string]any, traces []map[string]any, tokens int, err error) {
+func (s *Server) runAnalystLoop(ctx context.Context, bearer, model string, full []chatMessage, allowed, toolNames map[string]bool, extra map[string]string, emit func(map[string]any)) (reply string, actions []map[string]any, traces []map[string]any, tokens int, id string, err error) {
 	traces = make([]map[string]any, 0, analystMaxToolRounds)
 	for round := 0; ; round++ {
-		var out string
+		var out, rid string
 		var tk int
 		if emit != nil {
 			emit(map[string]any{"type": "round", "n": round})
@@ -298,20 +298,25 @@ func (s *Server) runAnalystLoop(ctx context.Context, bearer, model string, full 
 			rx.emitThink = func(text string) {
 				emit(map[string]any{"type": "think", "text": text})
 			}
-			out, tk, err = s.ai.chatMessagesModelStream(ctx, s, bearer, model, full, 0.4, 700, extra, rx.Feed)
+			out, tk, rid, err = s.ai.chatMessagesModelStream(ctx, s, bearer, model, full, 0.4, 700, extra, rx.Feed)
 		} else {
-			out, tk, err = s.ai.chatMessagesModel(ctx, s, bearer, model, full, 0.4, 700, extra)
+			out, tk, rid, err = s.ai.chatMessagesModel(ctx, s, bearer, model, full, 0.4, 700, extra)
 		}
 		if err != nil || out == "" {
 			if err == nil {
 				err = fmt.Errorf("empty response")
 			}
-			return "", nil, traces, tokens, err
+			return "", nil, traces, tokens, id, err
 		}
 		tokens += tk
+		// The id of the round that produces the FINAL answer is the one the reward
+		// signal keys on — each round overwrites, so the last (answering) round wins.
+		if rid != "" {
+			id = rid
+		}
 		r, acts, calls := parseAnalystTurn(out, allowed, toolNames)
 		if len(calls) == 0 || round >= analystMaxToolRounds {
-			return r, acts, traces, tokens, nil
+			return r, acts, traces, tokens, id, nil
 		}
 		// Execute the requested tools in-process and feed the results back as the
 		// next turn's grounding. The model's raw request rides as the assistant turn

@@ -5,6 +5,7 @@ import { icon, zenLogo } from '@/utils/icons';
 import { modelMark } from '@/utils/model-marks';
 import { isAuthenticated, login } from '@/services/iam';
 import { askAnalyst, collectContext, type AnalystMessage } from '@/services/analyst';
+import { emitFeedback } from '@/services/analyst-feedback';
 import type { AnalystTrace } from '@/services/analyst-transport';
 import { dispatch, type AppHost, type CommandLogEntry } from '@/services/app-commands';
 import { fetchRoster, selectedModel, rememberModel, type ModelRoster, type AnalystModel } from '@/services/analyst-models';
@@ -41,6 +42,12 @@ interface ChatMsg {
   content: string;
   /** Human label of the model that produced an assistant reply (shown as a tag). */
   model?: string;
+  /** Gateway response id this assistant reply came from — the key a content-free
+   *  reward signal (thumbs / regenerate) attaches to. Absent ⇒ no feedback affordance. */
+  id?: string;
+  /** The user prompt that produced this assistant reply, so regenerate can re-ask
+   *  it. Client-side only — never sent in a feedback payload. */
+  prompt?: string;
 }
 
 const DEFAULT_CHIPS = ['Top risk today', 'Market summary', 'Hide all panels, show news'];
@@ -307,6 +314,28 @@ export class AnalystChat {
       copy.innerHTML = icon('copy', 13);
       copy.addEventListener('click', () => this.copyText(copy, m.content));
       meta.appendChild(copy);
+
+      // Content-free reward signals, keyed on the gateway response id (m.id) via
+      // the @hanzo/ai SDK. Thumbs are mutually-exclusive with a pressed state;
+      // regenerate re-asks the prompt AND signals the prior generation.
+      const up = this.metaButton('thumbs-up', 'Good response');
+      const down = this.metaButton('thumbs-down', 'Bad response');
+      up.addEventListener('click', () => {
+        up.classList.add('active');
+        down.classList.remove('active');
+        emitFeedback(m.id, 'up');
+      });
+      down.addEventListener('click', () => {
+        down.classList.add('active');
+        up.classList.remove('active');
+        emitFeedback(m.id, 'down');
+      });
+      const regen = this.metaButton('refresh-cw', 'Regenerate');
+      regen.addEventListener('click', () => {
+        emitFeedback(m.id, 'regenerate');
+        if (m.prompt) this.ask(m.prompt);
+      });
+      meta.append(up, down, regen);
       body.append(bubble, meta);
       row.append(avatar, body);
     } else {
@@ -317,6 +346,17 @@ export class AnalystChat {
     }
     this.listEl?.appendChild(row);
     return row;
+  }
+
+  /** A meta-row icon button, built exactly like the copy button (same .hzc-copy
+   *  styling via .hzc-fb). The caller wires the click. */
+  private metaButton(iconName: 'thumbs-up' | 'thumbs-down' | 'refresh-cw', label: string): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.className = 'hzc-fb';
+    b.type = 'button';
+    b.setAttribute('aria-label', label);
+    b.innerHTML = icon(iconName, 13);
+    return b;
   }
 
   private copyText(btn: HTMLButtonElement, text: string): void {
@@ -416,7 +456,7 @@ export class AnalystChat {
 
       const usedModel = this.modelLabel(res.model);
       if (res.reply) {
-        const msg: ChatMsg = { role: 'assistant', content: res.reply, model: usedModel };
+        const msg: ChatMsg = { role: 'assistant', content: res.reply, model: usedModel, id: res.id, prompt: text };
         this.messages.push(msg);
         this.appendMessageEl(msg);
         this.scrollToEnd();
