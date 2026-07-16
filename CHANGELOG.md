@@ -2,6 +2,12 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.5]
+
+### Added
+
+- **AI Compute panel (AI variant)**: live Hanzo inference-plane telemetry over SSE — tokens/s, requests/s, 24h spend, top models by real spend, and the serving fleet (GPUs, machines online, models served). New `/v1/world/ai-pulse` pushes typed `usage`/`fleet`/`status` frames (EventSource) and answers a plain GET with one JSON snapshot as the poll fallback. Honest "connecting"/"unavailable" states — never a zero dressed up as live; the service bearer stays server-side.
+
 ## [2.4.4]
 
 ### Changed
