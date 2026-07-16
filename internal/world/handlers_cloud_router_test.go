@@ -11,13 +11,16 @@ import (
 )
 
 // TestCloudRouterStatsProxy verifies the Enso Live Training proxy:
-//   - it passes the upstream body through verbatim,
+//   - it UNWRAPS the ai casibase envelope {status,data:{…}} to the bare RouterStats,
 //   - scope is HARD-PINNED to "platform" (the arm-opacity / no-vendor contract),
 //   - ?hours= is forwarded and clamped to [1,168],
 //   - an upstream failure degrades to a 200 flagged unavailable:true (honest
 //     "connecting…", never fabricated, never 5xx).
 func TestCloudRouterStatsProxy(t *testing.T) {
-	const canned = `{"scope":"platform","window":{"events":1234},"quality":{"engine_share":0.62,"shadow_agreement":null},"by_model":{"arm-1":700,"arm-2":534},"cost":{"saved_pct":21.5}}`
+	// The bare aggregate the client must ultimately see...
+	const inner = `{"scope":"platform","window":{"events":1234},"quality":{"engine_share":0.62,"shadow_agreement":null},"by_model":{"arm-1":700,"arm-2":534},"cost":{"saved_pct":21.5}}`
+	// ...delivered by ai inside its casibase envelope, which the proxy unwraps.
+	const canned = `{"status":"ok","msg":"","data":` + inner + `,"data2":null}`
 
 	var gotScope, gotHours string
 	fail := false
@@ -68,11 +71,11 @@ func TestCloudRouterStatsProxy(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode proxied body: %v", err)
 	}
-	if err := json.Unmarshal([]byte(canned), &want); err != nil {
-		t.Fatalf("decode canned: %v", err)
+	if err := json.Unmarshal([]byte(inner), &want); err != nil {
+		t.Fatalf("decode inner: %v", err)
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("body not passed through verbatim:\n got=%v\nwant=%v", got, want)
+		t.Fatalf("envelope not unwrapped to bare RouterStats:\n got=%v\nwant=%v", got, want)
 	}
 
 	// 2) A client-supplied scope cannot override the pin.
