@@ -482,7 +482,10 @@ const HANZO_MAP_LAYERS: MapLayers = {
   // Hanzo World cloud map layers
   chainNodes: true,
   byoGpu: true,
-  trafficArcs: true,
+  // Arcs OFF by default: the arc feed carries a demo fallback, so the flagship
+  // default leads with the ALWAYS-honest native points layer (empty until real
+  // traffic lands, never demo). Toggle arcs on for the animated flow lines.
+  trafficArcs: false,
   // Native LB request-geo points — the Hanzo-mode globe centerpiece.
   traffic: true,
 };
@@ -491,8 +494,6 @@ const HANZO_MOBILE_MAP_LAYERS: MapLayers = {
   ...HANZO_MAP_LAYERS,
   cables: false,
   cloudRegions: false,
-  // Points stay on mobile (cheap); the heavier animated arcs come off.
-  trafficArcs: false,
   traffic: true,
 };
 

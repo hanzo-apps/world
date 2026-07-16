@@ -75,7 +75,8 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   gulfInvestments: false,
   chainNodes: true,
   byoGpu: true,
-  trafficArcs: true,
+  // Arcs OFF by default (demo fallback); lead with the always-honest native points.
+  trafficArcs: false,
   traffic: true,
 };
 
@@ -83,7 +84,6 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   ...DEFAULT_MAP_LAYERS,
   cables: false,
   cloudRegions: false,
-  trafficArcs: false,
   traffic: true,
 };
 
