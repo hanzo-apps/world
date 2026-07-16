@@ -98,6 +98,7 @@ import {
   AiAnalystDock,
   CustomFeedPanel,
   CloudOverviewPanel,
+  EnsoTrainingPanel,
   ModelUsagePanel,
   FleetPanel,
   MyUsagePanel,
@@ -2642,6 +2643,7 @@ export class App {
     // SaaS / cloud panels — Hanzo Cloud metrics + org drill-down (saas variant).
     if (SITE_VARIANT === 'saas') {
       this.panels['cloud-overview'] = new CloudOverviewPanel();
+      this.panels['enso-training'] = new EnsoTrainingPanel();
       this.panels['model-usage'] = new ModelUsagePanel();
       const fleetPanel = new FleetPanel();
       fleetPanel.setLocationClickHandler((lat, lon) => {
