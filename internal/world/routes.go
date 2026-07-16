@@ -111,6 +111,11 @@ func (s *Server) mount(mux registrar) {
 	// Same honest platform aggregate as cloud-pulse; "unavailable" without a token.
 	mux.HandleFunc("/v1/world/ai-pulse", s.handleAIPulse)
 
+	// Enso flywheel (AI variant): the router self-improvement loop — routing-ledger
+	// tail + reward tail (super-admin) folded with the latest enso-bench eval
+	// scores (embedded snapshot / ENSO_BENCH_URL). Event-typed; evals-only degrade.
+	mux.HandleFunc("/v1/world/enso-training", s.handleEnsoTraining)
+
 	// Cloud console. PUBLIC excitement layer (real, non-sensitive):
 	mux.HandleFunc("/v1/world/cloud/models", s.handleCloudModels)
 	// PUBLIC map layers (real telemetry when reachable; modeled/demo carries a flag):
