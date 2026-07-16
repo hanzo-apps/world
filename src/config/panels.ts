@@ -413,28 +413,31 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
-// SAAS VARIANT (Hanzo Cloud metrics/usage)
+// HANZO VARIANT (flagship — Hanzo Cloud + live-traffic globe)
 // ============================================
-// Renders HANZO CLOUD ITSELF, not world intel: dense stat tiles for platform
-// requests/models/nodes/regions (signed-out investor view via the demo-flagged
-// public aggregate) plus the caller's own org usage + bill drill-down (signed
-// in). Map reuses the existing datacenters + cloudRegions layers as the global
-// infrastructure backdrop.
-const SAAS_PANELS: Record<string, PanelConfig> = {
+// The world.hanzo.ai default. Renders HANZO ITSELF: the live-traffic globe (where
+// requests hit api.hanzo.ai from) as the centerpiece, plus platform metrics —
+// router/Enso training, throughput, model mix, fleet, uptime — and the caller's own
+// org usage + bill when signed in. Folds the former `saas` variant (kept as an
+// alias). Map reuses datacenters + cloudRegions as the global infra backdrop.
+const HANZO_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
-  'live-news': { name: 'Live News', enabled: true, priority: 1 },
+  'traffic-globe': { name: 'Live Traffic', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
   'enso-training': { name: 'Enso Live Training', enabled: true, priority: 1 },
+  'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
+  'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
   chains: { name: 'Chains', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
   'live-activity': { name: 'Live Activity', enabled: true, priority: 1 },
   'my-usage': { name: 'My Usage & Bill', enabled: true, priority: 1 },
   'hanzo-status': { name: 'Hanzo Status', enabled: true, priority: 2 },
+  'live-news': { name: 'Live News', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
-const SAAS_MAP_LAYERS: MapLayers = {
+const HANZO_MAP_LAYERS: MapLayers = {
   conflicts: false,
   bases: false,
   cables: true,
@@ -480,12 +483,17 @@ const SAAS_MAP_LAYERS: MapLayers = {
   chainNodes: true,
   byoGpu: true,
   trafficArcs: true,
+  // Native LB request-geo points — the Hanzo-mode globe centerpiece.
+  traffic: true,
 };
 
-const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
-  ...SAAS_MAP_LAYERS,
+const HANZO_MOBILE_MAP_LAYERS: MapLayers = {
+  ...HANZO_MAP_LAYERS,
   cables: false,
   cloudRegions: false,
+  // Points stay on mobile (cheap); the heavier animated arcs come off.
+  trafficArcs: false,
+  traffic: true,
 };
 
 // ============================================
@@ -659,9 +667,9 @@ const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'saas' ? SAAS_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'hanzo' ? HANZO_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'hanzo' ? HANZO_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'hanzo' ? HANZO_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
