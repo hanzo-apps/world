@@ -2657,9 +2657,11 @@ export class App {
       this.panels['hanzo-status'] = new HanzoStatusPanel();
     }
 
-    // AI variant — live Hanzo inference telemetry: AI Compute (ai-pulse SSE) +
-    // Enso Flywheel (routing ledger + evals).
-    if (SITE_VARIANT === 'ai') {
+    // Live Hanzo inference telemetry: AI Compute (ai-pulse SSE) + Enso Flywheel
+    // (routing ledger + evals). On the AI variant AND the default (full) world —
+    // the platform's own compute/training pulse is front-page telemetry, not a
+    // variant-only easter egg.
+    if (SITE_VARIANT === 'ai' || SITE_VARIANT === 'full') {
       this.panels['ai-compute'] = new AiComputePanel();
       this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
     }
