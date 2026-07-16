@@ -108,3 +108,40 @@ func intervalSeconds(d string) float64 {
 	}
 	return v.Seconds()
 }
+
+// usageRate returns the freshest honest per-second rate for a metric: the most
+// recent complete series bucket over its interval, falling back to the 24h
+// average when there is no usable interval/series. sel picks the metric from a
+// bucket. Shared by cloud-pulse and ai-pulse so the rate is derived one way.
+func usageRate(total24h int64, series []cloudUsageSeriesPoint, interval string, sel func(cloudUsageSeriesPoint) int64) float64 {
+	if n := len(series); n > 0 {
+		if iv := intervalSeconds(interval); iv > 0 {
+			return float64(sel(series[n-1])) / iv
+		}
+	}
+	const windowSecs = 86400.0
+	return float64(total24h) / windowSecs
+}
+
+// seriesRequests / seriesTokens are the bucket selectors for usageRate.
+func seriesRequests(p cloudUsageSeriesPoint) int64 { return p.Requests }
+func seriesTokens(p cloudUsageSeriesPoint) int64   { return p.Tokens }
+
+// topModelsFromUsage maps the ledger's ranked byModel spend into the shared
+// cloudModel shape (share normalized 0..1). nil when the ledger listed none.
+func topModelsFromUsage(ov *cloudUsageOverview) []cloudModel {
+	if len(ov.ByModel.Items) == 0 {
+		return nil
+	}
+	out := make([]cloudModel, 0, len(ov.ByModel.Items))
+	for _, m := range ov.ByModel.Items {
+		out = append(out, cloudModel{
+			ID:          m.Model,
+			Name:        m.Model,
+			Requests24h: m.Requests,
+			Tokens24h:   m.Tokens,
+			Share:       m.Pct / 100,
+		})
+	}
+	return out
+}
