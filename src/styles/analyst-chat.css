@@ -315,7 +315,8 @@ body.hzc-mode-fullscreen .hzc-resize {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.hzc-copy {
+.hzc-copy,
+.hzc-fb {
   display: inline-grid;
   place-items: center;
   width: 22px;
@@ -326,11 +327,13 @@ body.hzc-mode-fullscreen .hzc-resize {
   color: var(--text-muted, #666);
   cursor: pointer;
 }
-.hzc-copy:hover {
+.hzc-copy:hover,
+.hzc-fb:hover {
   color: var(--text, #e8e8e8);
   background: var(--surface-hover, #0a0a0a);
 }
-.hzc-copy.ok {
+.hzc-copy.ok,
+.hzc-fb.active {
   color: var(--text, #e8e8e8);
 }
 
