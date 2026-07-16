@@ -375,6 +375,34 @@ canvas,
   display: block;
 }
 
+/* Hanzo mode: on hanzo brand hosts the logo is a <button> toggle — shed the native
+   button chrome so it reads as the logo, and reveal the gated switcher when open.
+   Off-brand hosts render the switcher without .hanzo-gated, so it stays visible. */
+button.header-logo {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+button.header-logo[aria-expanded="true"] { opacity: 1; }
+.variant-switcher.hanzo-gated { display: none; }
+.header.hanzo-mode .variant-switcher.hanzo-gated { display: flex; }
+
+/* Live Traffic panel — top-origins list under the throughput tiles. */
+.traffic-top { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.traffic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.traffic-row:nth-child(odd) { background: var(--surface); }
+.traffic-cc { color: var(--text); }
+.traffic-cnt { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
 /* Slot reserved for the IAM AccountMenu (injected by a separate branch) */
 .header-account {
   display: flex;
