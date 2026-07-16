@@ -2,6 +2,12 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.4]
+
+### Changed
+
+- **Cloud Pulse is real when a service token is wired**: `/v1/world/cloud-pulse` now folds MEASURED platform-wide 24h request/token volume from the ClickHouse-backed usage ledger (`get-cloud-usages ?org=all`, super-admin) on top of the live model/node/GPU/region counts — dropping both `demo:true` and `volumeModeled:true`. Top models come from real ledger spend. Without a token, or with a non-admin token, it stays honestly demo/modeled — platform numbers are never faked silently. The service bearer stays server-side (never sent to the browser).
+
 ## [2.4.2]
 
 ### Added
