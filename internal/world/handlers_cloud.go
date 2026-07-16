@@ -196,14 +196,7 @@ func applyUsageToPulse(p *cloudPulse, ov *cloudUsageOverview) {
 
 	// Headline rate: the most recent complete bucket is the freshest honest rate;
 	// fall back to the 24h average when there is no usable interval.
-	const windowSecs = 86400.0
-	rps := float64(ov.Totals.Requests) / windowSecs
-	if n := len(ov.Series); n > 0 {
-		if iv := intervalSeconds(ov.Interval); iv > 0 {
-			rps = float64(ov.Series[n-1].Requests) / iv
-		}
-	}
-	p.Overview.RequestsPerSec = round1(rps)
+	p.Overview.RequestsPerSec = round1(usageRate(ov.Totals.Requests, ov.Series, ov.Interval, seriesRequests))
 
 	// Real hourly buckets (chronological) drive both sparklines.
 	if n := len(ov.Series); n > 0 {
@@ -218,18 +211,8 @@ func applyUsageToPulse(p *cloudPulse, ov *cloudUsageOverview) {
 	}
 
 	// Top models by real spend/volume (ledger byModel items, already ranked).
-	if len(ov.ByModel.Items) > 0 {
-		out := make([]cloudModel, 0, len(ov.ByModel.Items))
-		for _, m := range ov.ByModel.Items {
-			out = append(out, cloudModel{
-				ID:          m.Model,
-				Name:        m.Model,
-				Requests24h: m.Requests,
-				Tokens24h:   m.Tokens,
-				Share:       m.Pct / 100,
-			})
-		}
-		p.Models = out
+	if m := topModelsFromUsage(ov); m != nil {
+		p.Models = m
 	}
 	p.Note = "Live platform aggregate from Hanzo Cloud — models, fleet, and measured 24h request/token volume across all orgs."
 }

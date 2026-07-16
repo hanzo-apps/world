@@ -493,6 +493,7 @@ const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
 // MIT Research, so research surfaces without a bespoke panel.
 const AI_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global AI Map', enabled: true, priority: 1 },
+  'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
   'live-news': { name: 'AI & Tech Headlines', enabled: true, priority: 1 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
