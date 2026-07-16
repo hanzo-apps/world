@@ -109,6 +109,7 @@ import {
   LlmUsagePanel,
   BlockchainPanel,
   AiComputePanel,
+  EnsoFlywheelPanel,
 } from '@/components';
 import { isAdmin, isAuthenticated, listOrgs, setActiveOrg } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
@@ -2654,9 +2655,11 @@ export class App {
       this.panels['hanzo-status'] = new HanzoStatusPanel();
     }
 
-    // AI variant — live Hanzo inference telemetry: AI Compute (ai-pulse SSE).
+    // AI variant — live Hanzo inference telemetry: AI Compute (ai-pulse SSE) +
+    // Enso Flywheel (routing ledger + evals).
     if (SITE_VARIANT === 'ai') {
       this.panels['ai-compute'] = new AiComputePanel();
+      this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
     }
 
     // Chains widget — live block heights + peers (saas + crypto variants).
