@@ -420,6 +420,7 @@ const SAAS_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
+  'enso-training': { name: 'Enso Live Training', enabled: true, priority: 1 },
   chains: { name: 'Chains', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
