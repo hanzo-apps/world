@@ -141,6 +141,10 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/country-intel", s.handleCountryIntel)
 	mux.HandleFunc("/v1/world/analyst", s.handleAnalyst)
 	mux.HandleFunc("/v1/world/models", s.handleModels)
+	// Content-free AI reward-signal BFF. BARE /v1/feedback (matching the gateway
+	// path) so the @hanzo/ai SDK's same-origin baseUrl:'' → POST /v1/feedback
+	// reaches it. An exact pattern, so it beats the "/" SPA catch-all.
+	mux.HandleFunc("/v1/feedback", s.handleFeedback)
 
 	// social share (OpenGraph)
 	mux.HandleFunc("/v1/world/story", s.handleStory)

@@ -29,9 +29,11 @@ import (
 )
 
 // chatMessagesModelStream runs one completion with streaming, calling onDelta
-// for every content chunk. Returns the full accumulated content. A nil onDelta
-// degrades to a plain buffered call semantically identical to chatMessagesModel.
-func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, bearer, model string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string, onDelta func(string)) (string, int, error) {
+// for every content chunk. Returns the full accumulated content, the token count,
+// and the gateway response id (first non-empty per-chunk id wins) so the analyst
+// can key a content-free reward signal to it. A nil onDelta degrades to a plain
+// buffered call semantically identical to chatMessagesModel.
+func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, bearer, model string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string, onDelta func(string)) (string, int, string, error) {
 	if strings.TrimSpace(model) == "" {
 		model = a.model
 	}
@@ -43,13 +45,13 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 		Stream:      true,
 	})
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(cctx, http.MethodPost, a.base+"/chat/completions", bytes.NewReader(reqBody))
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	req.Header.Set("Authorization", bearer)
 	req.Header.Set("Content-Type", "application/json")
@@ -59,12 +61,12 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		return "", resp.StatusCode, aiStatusError(resp.StatusCode, body)
+		return "", resp.StatusCode, "", aiStatusError(resp.StatusCode, body)
 	}
 
 	// Some gateways answer a stream request with a plain JSON body (model or
@@ -72,24 +74,25 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "event-stream") {
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 		if err != nil {
-			return "", resp.StatusCode, err
+			return "", resp.StatusCode, "", err
 		}
 		var cr chatResponse
 		if err := json.Unmarshal(body, &cr); err != nil {
-			return "", resp.StatusCode, err
+			return "", resp.StatusCode, "", err
 		}
 		if len(cr.Choices) == 0 {
-			return "", resp.StatusCode, fmt.Errorf("empty response")
+			return "", resp.StatusCode, "", fmt.Errorf("empty response")
 		}
 		out := strings.TrimSpace(cr.Choices[0].Message.Content)
 		if onDelta != nil && out != "" {
 			onDelta(out)
 		}
-		return out, cr.Usage.TotalTokens, nil
+		return out, cr.Usage.TotalTokens, cr.ID, nil
 	}
 
 	var full strings.Builder
 	tokens := 0
+	id := ""
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 0, 64<<10), 1<<20)
 	for sc.Scan() {
@@ -102,6 +105,7 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 			continue
 		}
 		var frame struct {
+			ID      string `json:"id"`
 			Choices []struct {
 				Delta struct {
 					Content string `json:"content"`
@@ -113,6 +117,9 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 		}
 		if json.Unmarshal([]byte(data), &frame) != nil {
 			continue // tolerate keep-alives / vendor frames
+		}
+		if id == "" && frame.ID != "" {
+			id = frame.ID // first non-empty id wins (every chunk repeats it)
 		}
 		if frame.Usage != nil {
 			tokens = frame.Usage.TotalTokens
@@ -129,10 +136,10 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 	if err := sc.Err(); err != nil {
 		// A mid-stream drop still yields whatever arrived; the caller decides.
 		if full.Len() == 0 {
-			return "", resp.StatusCode, err
+			return "", resp.StatusCode, "", err
 		}
 	}
-	return strings.TrimSpace(full.String()), tokens, nil
+	return strings.TrimSpace(full.String()), tokens, id, nil
 }
 
 // ── incremental "reply" extraction ───────────────────────────────────────────
