@@ -114,6 +114,10 @@ type chatRequest struct {
 }
 
 type chatResponse struct {
+	// ID is the gateway's response id (OpenAI chat.completion `id`). It is the
+	// stable key a content-free reward signal is attributed to (POST /v1/feedback),
+	// so it is threaded back out of every completion — never the prompt/response.
+	ID      string `json:"id"`
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
@@ -138,16 +142,21 @@ func (a *AIClient) chat(ctx context.Context, s *Server, bearer, system, user str
 // prior turns) and returns the trimmed content. It is the single completion path;
 // chat is the system+user special case. bearer is the caller's IAM token so the
 // inference meters to their org/project/billing; extra forwards the caller's
-// org/project selectors so it meters to the org the user is acting in.
+// org/project selectors so it meters to the org the user is acting in. It drops
+// the gateway response id — only the analyst's reward-signal path
+// (runAnalystLoop → chatMessagesModel) needs it.
 func (a *AIClient) chatMessages(ctx context.Context, s *Server, bearer string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
-	return a.chatMessagesModel(ctx, s, bearer, a.model, messages, temperature, maxTokens, extra)
+	out, tokens, _, err := a.chatMessagesModel(ctx, s, bearer, a.model, messages, temperature, maxTokens, extra)
+	return out, tokens, err
 }
 
 // chatMessagesModel is chatMessages with an explicit model override — the single
 // completion path once a caller (the analyst's model dropdown) chooses the model.
 // An empty model falls back to the client default (a.model). Everything else —
-// auth forwarding, org/project selectors, degrade semantics — is identical.
-func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, model string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, error) {
+// auth forwarding, org/project selectors, degrade semantics — is identical. It
+// also returns the gateway response id (chatResponse.ID) so the analyst can key a
+// content-free reward signal to it; "" when the gateway omits one.
+func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, model string, messages []chatMessage, temperature float64, maxTokens int, extra map[string]string) (string, int, string, error) {
 	if strings.TrimSpace(model) == "" {
 		model = a.model
 	}
@@ -159,7 +168,7 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 		TopP:        0.9,
 	})
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 	headers := map[string]string{
 		"Authorization": bearer,
@@ -173,17 +182,17 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", headers, reqBody)
 	if err != nil {
 		logf("world: ai request error: model=%s: %v", model, err)
-		return "", 0, err
+		return "", 0, "", err
 	}
 	if status < 200 || status >= 300 {
 		e := newAIError(status, body)
 		logf("world: ai non-success: status=%d code=%q model=%s", status, e.code, model)
-		return "", status, e
+		return "", status, "", e
 	}
 	var cr chatResponse
 	if err := json.Unmarshal(body, &cr); err != nil {
 		logf("world: ai decode error: status=%d model=%s: %v", status, model, err)
-		return "", status, err
+		return "", status, "", err
 	}
 	if len(cr.Choices) == 0 {
 		// The gateway answers some failures — notably insufficient balance — with a
@@ -192,12 +201,12 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 		// actionable error (→ top-up CTA) instead of an opaque "empty response".
 		if e := newAIError(status, body); e.code != "" || e.msg != "" {
 			logf("world: ai 2xx empty-choices error: status=%d code=%q model=%s", status, e.code, model)
-			return "", status, e
+			return "", status, "", e
 		}
 		logf("world: ai 2xx empty response: status=%d model=%s", status, model)
-		return "", status, fmt.Errorf("empty response")
+		return "", status, "", fmt.Errorf("empty response")
 	}
-	return strings.TrimSpace(cr.Choices[0].Message.Content), cr.Usage.TotalTokens, nil
+	return strings.TrimSpace(cr.Choices[0].Message.Content), cr.Usage.TotalTokens, cr.ID, nil
 }
 
 // aiError is a typed inference error carrying the upstream HTTP status plus the
