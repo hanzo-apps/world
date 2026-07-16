@@ -46,9 +46,11 @@ import {
   getChainNodes,
   getByoGpu,
   getTraffic,
+  getTrafficGlobe,
   type ChainNetwork,
   type ByoGpu,
   type TrafficArc,
+  type TrafficGlobePoint,
 } from '@/services/cloud-map';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
@@ -391,6 +393,7 @@ export class DeckGLMap {
   private chainNetworks: ChainNetwork[] = [];
   private byoGpus: ByoGpu[] = [];
   private trafficArcsData: TrafficArc[] = [];
+  private trafficPoints: TrafficGlobePoint[] = [];
   private cloudMapTimers: ReturnType<typeof setInterval>[] = [];
 
   // Country highlight state
@@ -470,7 +473,7 @@ export class DeckGLMap {
   private pulseDirty = { news: false, cloud: false };
   private rafUpdatePulse: () => void;
   private static readonly NEWS_PULSE_LAYER_IDS = ['news-pulse-layer', 'hotspots-pulse', 'protest-clusters-pulse'];
-  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs'];
+  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs', 'traffic'];
 
   // Chain-node dots derive from chainNetworks; cache them by source reference so
   // the cloud-pulse breathe (a radiusScale-only change) reuses the same data
@@ -567,6 +570,7 @@ export class DeckGLMap {
     };
     pull(getChainNodes, (d) => { this.chainNetworks = d.networks ?? []; }, 30_000);
     pull(getTraffic, (d) => { this.trafficArcsData = d.arcs ?? []; }, 15_000);
+    pull(getTrafficGlobe, (d) => { this.trafficPoints = d.points ?? []; }, 12_000);
     pull(getByoGpu, (d) => { this.byoGpus = d.gpus ?? []; }, 60_000);
   }
 
@@ -1425,6 +1429,9 @@ export class DeckGLMap {
     if (mapLayers.trafficArcs && this.trafficArcsData.length > 0) {
       layers.push(this.createTrafficArcsLayer());
     }
+    if (mapLayers.traffic && this.trafficPoints.length > 0) {
+      layers.push(this.createTrafficLayer());
+    }
 
     // News geo-locations (always shown if data exists)
     if (this.newsLocations.length > 0) {
@@ -1472,6 +1479,7 @@ export class DeckGLMap {
       case 'protest-clusters-pulse': return this.createProtestClustersPulseLayer();
       case 'chainNodes': return this.createChainNodesLayer();
       case 'trafficArcs': return this.createTrafficArcsLayer();
+      case 'traffic': return this.createTrafficLayer();
       default: return null;
     }
   }
@@ -3280,7 +3288,8 @@ export class DeckGLMap {
         // Hanzo World cloud map layers (default OFF in world; ON for saas/crypto via config)
         { key: 'chainNodes', label: 'Chain nodes', icon: '&#9939;' },
         { key: 'byoGpu', label: 'BYO GPUs', icon: '&#128187;' },
-        { key: 'trafficArcs', label: 'Traffic', icon: '&#8644;' },
+        { key: 'trafficArcs', label: 'Traffic arcs', icon: '&#8644;' },
+        { key: 'traffic', label: 'Live traffic', icon: '&#127760;' },
       ];
 
     // Apply the user's persisted cosmetic ordering of the toggle rows (drag to
@@ -4213,6 +4222,41 @@ export class DeckGLMap {
       updateTriggers: {
         getRadius: dots.length,
         getFillColor: dots.length,
+      },
+    });
+  }
+
+  // Live request-geo: WHERE api.hanzo.ai traffic comes from (native LB aggregate).
+  // Filled dots at country/region centroids, radius + heat scaled by request count,
+  // breathing on the shared cloud-pulse clock. A warm amber→magenta ramp keeps it
+  // distinct from the cyan chain-node dots. Empty (honest) until traffic is recorded.
+  private createTrafficLayer(): ScatterplotLayer<TrafficGlobePoint> {
+    const maxCount = Math.max(1, ...this.trafficPoints.map((p) => p.count || 0));
+    const heat = (c: number): [number, number, number, number] => {
+      const tt = Math.min(1, (c || 0) / maxCount); // 0..1 intensity
+      return [255, Math.round(180 - tt * 120), Math.round(70 + tt * 90), 230];
+    };
+    return new ScatterplotLayer<TrafficGlobePoint>({
+      id: 'traffic',
+      data: this.trafficPoints,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => 45000 + ((d.count || 0) / maxCount) * 95000,
+      getFillColor: (d) => heat(d.count),
+      radiusUnits: 'meters',
+      radiusMinPixels: 4,
+      radiusMaxPixels: 22,
+      // Slightly deeper breathe (±8%) than the chain dots so the traffic layer reads
+      // as the live centerpiece. radiusScale is a plain prop re-issued each pulse.
+      radiusScale: 1 + 0.08 * Math.sin(this.cloudPulseCoef * Math.PI * 2),
+      stroked: true,
+      filled: true,
+      getLineColor: [255, 210, 140, 200] as [number, number, number, number],
+      getLineWidth: 1,
+      lineWidthMinPixels: 1,
+      pickable: true,
+      updateTriggers: {
+        getRadius: this.trafficPoints.length,
+        getFillColor: this.trafficPoints.length,
       },
     });
   }

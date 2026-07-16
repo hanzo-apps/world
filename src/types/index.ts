@@ -563,6 +563,9 @@ export interface MapLayers {
   chainNodes?: boolean;
   byoGpu?: boolean;
   trafficArcs?: boolean;
+  // Native LB request-geo points (pulsing scatter sized by count) — the Hanzo-mode
+  // globe centerpiece, fed by /v1/world/cloud/traffic-globe.
+  traffic?: boolean;
 }
 
 export interface AIDataCenter {

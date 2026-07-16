@@ -122,6 +122,9 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/cloud/chain-nodes", s.handleCloudChainNodes)
 	mux.HandleFunc("/v1/world/cloud/byo-gpu", s.handleCloudBYOGPU)
 	mux.HandleFunc("/v1/world/cloud/traffic", s.handleCloudTraffic)
+	// Native LB request-geo aggregate (points + throughput) for the Hanzo-mode globe.
+	// Proxies the ai backend's public /v1/traffic/globe; honest empty state, no demo.
+	mux.HandleFunc("/v1/world/cloud/traffic-globe", s.handleCloudTrafficGlobe)
 	// PUBLIC status.hanzo.ai summary (Gatus proxy: per-service up/down + incidents):
 	mux.HandleFunc("/v1/world/cloud/status-page", s.handleCloudStatusPage)
 	// PUBLIC Enso Live Training — ai gateway /v1/router/stats?scope=platform proxy
