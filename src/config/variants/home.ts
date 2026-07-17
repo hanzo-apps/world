@@ -1,4 +1,4 @@
-// SaaS / Cloud variant — world.hanzo.ai/?variant=saas
+// Home variant — world.hanzo.ai/?variant=home
 //
 // Instead of world intelligence, this variant renders HANZO CLOUD ITSELF: live
 // platform metrics (requests, models served, nodes/GPUs, regions) for an

@@ -54,6 +54,7 @@
   },
   "header": {
     "world": "WORLD",
+    "home": "HOME",
     "ai": "AI",
     "tech": "TECH",
     "crypto": "CRYPTO",

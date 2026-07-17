@@ -71,7 +71,7 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
 ];
 
 // tech + ai + saas → tech/business channels; crypto/finance/full → world+finance set.
-const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai' || SITE_VARIANT === 'saas')
+const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai' || SITE_VARIANT === 'home')
   ? TECH_LIVE_CHANNELS
   : FULL_LIVE_CHANNELS;
 

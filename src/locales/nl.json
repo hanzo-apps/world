@@ -1438,6 +1438,7 @@
   },
   "header": {
     "world": "WERELD",
+    "home": "HOME",
     "tech": "TECH",
     "viewOnGitHub": "Bekijk op GitHub",
     "live": "LIVE",

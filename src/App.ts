@@ -2040,12 +2040,12 @@ export class App {
             </svg>
           </a>
           <div class="variant-switcher">
-            <a href="?variant=full"
-               class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
-               data-variant="full"
-               title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">🌍</span>
-              <span class="variant-label">${t('header.world')}</span>
+            <a href="?variant=home"
+               class="variant-option ${SITE_VARIANT === 'home' ? 'active' : ''}"
+               data-variant="home"
+               title="${t('header.home')}${SITE_VARIANT === 'home' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">🏠</span>
+              <span class="variant-label">${t('header.home')}</span>
             </a>
             <a href="?variant=ai"
                class="variant-option ${SITE_VARIANT === 'ai' ? 'active' : ''}"
@@ -2075,12 +2075,12 @@ export class App {
               <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
             </a>
-            <a href="?variant=saas"
-               class="variant-option ${SITE_VARIANT === 'saas' ? 'active' : ''}"
-               data-variant="saas"
-               title="${t('header.cloud')}${SITE_VARIANT === 'saas' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">☁️</span>
-              <span class="variant-label">${t('header.cloud')}</span>
+            <a href="?variant=full"
+               class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
+               data-variant="full"
+               title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">🌍</span>
+              <span class="variant-label">${t('header.world')}</span>
             </a>
           </div>
           <div class="status-indicator">
@@ -2640,7 +2640,7 @@ export class App {
     }
 
     // SaaS / cloud panels — Hanzo Cloud metrics + org drill-down (saas variant).
-    if (SITE_VARIANT === 'saas') {
+    if (SITE_VARIANT === 'home') {
       this.panels['cloud-overview'] = new CloudOverviewPanel();
       this.panels['model-usage'] = new ModelUsagePanel();
       const fleetPanel = new FleetPanel();
@@ -2663,7 +2663,7 @@ export class App {
     }
 
     // Chains widget — live block heights + peers (saas + crypto variants).
-    if (SITE_VARIANT === 'saas' || SITE_VARIANT === 'crypto') {
+    if (SITE_VARIANT === 'home' || SITE_VARIANT === 'crypto') {
       this.panels['chains'] = new BlockchainPanel();
     }
 
@@ -2792,7 +2792,7 @@ export class App {
   // Constructed and appended only for the admin org; non-admins never receive
   // them (and every backing endpoint fail-closes 403). Idempotent.
   private async mountAdminCloudPanels(): Promise<void> {
-    if (SITE_VARIANT !== 'saas' || this.adminCloudMounted) return;
+    if (SITE_VARIANT !== 'home' || this.adminCloudMounted) return;
     if (!(await isAdmin())) return;
     const grid = document.getElementById('panelsGrid');
     if (!grid) return;
@@ -3184,7 +3184,7 @@ export class App {
   // the URL is shareable. PWA-precached, content-hashed assets keep the reload
   // sub-second.
   private setSiteVariant(variant: string): boolean {
-    if (!['full', 'tech', 'finance', 'saas', 'ai', 'crypto'].includes(variant)) return false;
+    if (!['full', 'tech', 'finance', 'home', 'ai', 'crypto'].includes(variant)) return false;
     if (variant === SITE_VARIANT) return true;
     localStorage.setItem('worldmonitor-variant', variant); // survives even a trimmed URL
     const u = new URL(this.getShareUrl() ?? window.location.href);
