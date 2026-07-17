@@ -5,4 +5,4 @@
 // an alias so existing ?variant=saas links keep working: variant.ts normalizes
 // saas→hanzo at runtime, and this file re-exports the hanzo config for any tooling
 // that still imports './variants/saas'. Do not add config here — edit ./hanzo.ts.
-export * from './hanzo';
+export * from './cloud';

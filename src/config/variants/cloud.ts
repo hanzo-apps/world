@@ -1,4 +1,4 @@
-// Hanzo variant (flagship) — world.hanzo.ai/?variant=hanzo
+// Cloud variant (flagship) — world.hanzo.ai/?variant=cloud
 //
 // The world.hanzo.ai DEFAULT view. Renders HANZO ITSELF, not world intel: the live-
 // traffic globe (WHERE requests hit api.hanzo.ai from — native LB telemetry via
@@ -88,7 +88,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
 };
 
 export const VARIANT_CONFIG: VariantConfig = {
-  name: 'hanzo',
+  name: 'cloud',
   description: 'Hanzo — flagship: live-traffic globe + cloud/SaaS platform metrics',
   panels: DEFAULT_PANELS,
   mapLayers: DEFAULT_MAP_LAYERS,
