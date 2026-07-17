@@ -100,3 +100,52 @@ func TestParseHexInt(t *testing.T) {
 		}
 	}
 }
+
+// TestBYOGPUAdminReal proves the globe's GPU layer is REAL (not demo) for a
+// signed-in admin: the caller's own bearer reads /v1/gpus, clusters carry demo:false
+// and the response is no-store (never the shared public/demo cache).
+func TestBYOGPUAdminReal(t *testing.T) {
+	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/iam/oauth/userinfo" || r.Header.Get("Authorization") == "" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"owner":"hanzo","sub":"z@hanzo.ai"}`))
+	}))
+	t.Cleanup(iam.Close)
+
+	api := http.NewServeMux()
+	api.HandleFunc("/v1/gpus", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-token" {
+			t.Errorf("GPU inventory must be read with the caller's bearer, got %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"gpus":[{"model":"GB10","region":"nyc","status":"online"},{"model":"H100","region":"sfo","status":"online"}]}`))
+	})
+	up := httptest.NewServer(api)
+	t.Cleanup(up.Close)
+
+	t.Setenv("HANZO_CLOUD_PULSE_TOKEN", "") // no service token — the admin's bearer drives it
+	t.Setenv("HANZO_API_BASE", up.URL)
+	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
+
+	req, _ := http.NewRequest(http.MethodGet, serveWorld(t)+"/v1/world/cloud/byo-gpu", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if cc := resp.Header.Get("Cache-Control"); cc != "private, no-store" {
+		t.Fatalf("admin GPU layer must be no-store, got %q", cc)
+	}
+	var g byoGPU
+	if err := json.NewDecoder(resp.Body).Decode(&g); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if g.Demo {
+		t.Fatalf("signed-in admin must get real GPUs, not demo")
+	}
+	if len(g.GPUs) != 2 {
+		t.Fatalf("want 2 real GPU clusters (nyc GB10 + sfo H100), got %d: %+v", len(g.GPUs), g.GPUs)
+	}
+}
