@@ -1437,10 +1437,10 @@
     "currentVariant": "(huidig)"
   },
   "header": {
-    "world": "WERELD",
-    "tech": "TECH",
+    "world": "Wereld",
+    "tech": "Tech",
     "viewOnGitHub": "Bekijk op GitHub",
-    "live": "LIVE",
+    "live": "Live",
     "search": "Zoekopdracht",
     "copyLink": "Kopieer link",
     "fullscreen": "Volledig scherm",

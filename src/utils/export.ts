@@ -150,7 +150,7 @@ export class ExportPanel {
     this.element = document.createElement('div');
     this.element.className = 'export-panel-container';
     this.element.innerHTML = `
-      <button class="export-btn" title="${t('common.exportData')}">⬇</button>
+      <button class="export-btn" title="${t('common.exportData')}" aria-label="${t('common.exportData')}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
       <div class="export-menu hidden">
         <button class="export-option" data-format="csv">${t('common.exportCsv')}</button>
         <button class="export-option" data-format="json">${t('common.exportJson')}</button>
