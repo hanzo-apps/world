@@ -5,6 +5,8 @@
 // of throwing. The Go backend is built to these frozen contracts and may 404 in
 // dev until merged.
 
+import { getToken } from './iam';
+
 export interface ChainNode {
   lat: number;
   lon: number;
@@ -60,9 +62,9 @@ export interface TrafficData {
 }
 
 /** GET a same-origin JSON path. Resolves to null on any HTTP/network/parse error. */
-async function getJson<T>(path: string): Promise<T | null> {
+async function getJson<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(path);
+    const res = await fetch(path, init);
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -74,8 +76,13 @@ export function getChainNodes(): Promise<ChainNodesData | null> {
   return getJson<ChainNodesData>('/v1/world/cloud/chain-nodes');
 }
 
-export function getByoGpu(): Promise<ByoGpuData | null> {
-  return getJson<ByoGpuData>('/v1/world/cloud/byo-gpu');
+/** BYO-GPU globe layer. Signed in, we send the caller's bearer so an admin
+ * (z@hanzo.ai) gets the REAL GPU fleet placed on the globe (no-store) instead of
+ * the flagged demo sample the anonymous investor globe shows. */
+export async function getByoGpu(): Promise<ByoGpuData | null> {
+  const tok = await getToken();
+  return getJson<ByoGpuData>('/v1/world/cloud/byo-gpu',
+    tok ? { headers: { Authorization: `Bearer ${tok}` }, cache: 'no-store' } : undefined);
 }
 
 export function getTraffic(): Promise<TrafficData | null> {
