@@ -130,6 +130,16 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/cloud/analytics", s.handleCloudAnalytics)
 	mux.HandleFunc("/v1/world/cloud/llm", s.handleCloudLLM)
 
+	// DeFi dashboard (crypto→DeFi variant). PUBLIC, real Lux-ecosystem data: the
+	// 184-chain bridge-supported universe merged with live per-chain metrics from
+	// explorer.lux.network (block height, txns, addresses, computed TPS). USD
+	// figures the explorer hardcodes to null (TVL/prices) stay null — tvlProvenance
+	// says so; nothing is fabricated. Bridge-flow arcs are modeled (modeled:true).
+	mux.HandleFunc("/v1/world/defi/overview", s.handleDefiOverview)
+	mux.HandleFunc("/v1/world/defi/chains", s.handleDefiChains)
+	mux.HandleFunc("/v1/world/defi/flows", s.handleDefiFlows)
+	mux.HandleFunc("/v1/world/defi/protocols", s.handleDefiProtocols)
+
 	// AI (Hanzo inference)
 	mux.HandleFunc("/v1/world/groq-summarize", s.handleSummarize)
 	mux.HandleFunc("/v1/world/openrouter-summarize", s.handleSummarize)

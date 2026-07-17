@@ -1,0 +1,2202 @@
+[
+  {
+    "slug": "acala",
+    "name": "Acala",
+    "symbol": "ACA",
+    "decimals": 12,
+    "explorer": "https://acala.subscan.io",
+    "website": "https://acala.network",
+    "logo": "https://assets.lux.network/blockchains/acala/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "acalaevm",
+    "name": "Acala EVM",
+    "symbol": "ACA",
+    "decimals": 18,
+    "explorer": "https://blockscout.acala.network",
+    "website": "https://acala.network",
+    "logo": "https://assets.lux.network/blockchains/acalaevm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "aeternity",
+    "name": "Aeternity",
+    "symbol": "AE",
+    "decimals": 18,
+    "explorer": "https://www.aeknow.org",
+    "website": "https://aeternity.com",
+    "logo": "https://assets.lux.network/blockchains/aeternity/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "agoric",
+    "name": "Agoric",
+    "symbol": "BLD",
+    "decimals": 6,
+    "explorer": "https://atomscan.com/agoric",
+    "website": "https://agoric.com",
+    "logo": "https://assets.lux.network/blockchains/agoric/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "aion",
+    "name": "Aion",
+    "symbol": "AION",
+    "decimals": 18,
+    "explorer": "https://mainnet.aion.network",
+    "website": "https://theoan.com",
+    "logo": "https://assets.lux.network/blockchains/aion/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "akash",
+    "name": "Akash Network",
+    "symbol": "AKT",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/akash",
+    "website": "https://akash.network",
+    "logo": "https://assets.lux.network/blockchains/akash/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "algorand",
+    "name": "Algorand",
+    "symbol": "ALGO",
+    "decimals": 6,
+    "explorer": "https://algoexplorer.io",
+    "website": "http://algorand.foundation",
+    "logo": "https://assets.lux.network/blockchains/algorand/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "aptos",
+    "name": "Aptos",
+    "symbol": "APT",
+    "decimals": 8,
+    "explorer": "https://explorer.aptoslabs.com",
+    "website": "https://aptoslabs.com",
+    "logo": "https://assets.lux.network/blockchains/aptos/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi",
+      "dapp"
+    ]
+  },
+  {
+    "slug": "arbitrum",
+    "name": "Arbitrum",
+    "symbol": "ARETH",
+    "decimals": 18,
+    "explorer": "https://arbiscan.io",
+    "website": "https://offchainlabs.com",
+    "logo": "https://assets.lux.network/blockchains/arbitrum/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "arbitrumgoerli",
+    "name": "Arbitrum Goerli Testnet",
+    "symbol": "TAGOR",
+    "decimals": 18,
+    "explorer": "https://goerli.arbiscan.io",
+    "website": "https://goerlifaucet.com",
+    "logo": "https://assets.lux.network/blockchains/arbitrumgoerli/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ark",
+    "name": "Ark",
+    "symbol": "ARK",
+    "decimals": 8,
+    "explorer": "https://explorer.ark.io",
+    "website": "http://ark.io",
+    "logo": "https://assets.lux.network/blockchains/ark/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "aryacoin",
+    "name": "Aryacoin",
+    "symbol": "AYA",
+    "decimals": 8,
+    "explorer": "https://explorer2.aryacoin.io",
+    "website": "https://aryacoin.io",
+    "logo": "https://assets.lux.network/blockchains/aryacoin/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "aurora",
+    "name": "Aurora",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://explorer.mainnet.aurora.dev",
+    "website": "https://aurora.dev",
+    "logo": "https://assets.lux.network/blockchains/aurora/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "avalanchec",
+    "name": "Avalanche C-Chain",
+    "symbol": "AVAX",
+    "decimals": 18,
+    "explorer": "https://explorer.avax.network",
+    "website": "http://avax.network",
+    "logo": "https://assets.lux.network/blockchains/avalanchec/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi",
+      "dapp"
+    ]
+  },
+  {
+    "slug": "avalanchecfuji",
+    "name": "Avalanche C-Chain Fuji Testnet",
+    "symbol": "TAVAX",
+    "decimals": 18,
+    "explorer": "https://testnet.snowtrace.io",
+    "website": "https://avax.network",
+    "logo": "https://assets.lux.network/blockchains/avalanchecfuji/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "avalanchex",
+    "name": "Avalanche X-Chain",
+    "symbol": "AVAX",
+    "decimals": 9,
+    "explorer": "https://explorer.avax.network",
+    "website": "http://avax.network",
+    "logo": "https://assets.lux.network/blockchains/avalanchex/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "axelar",
+    "name": "Axelar",
+    "symbol": "AXL",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/axelar",
+    "website": "https://axelar.network",
+    "logo": "https://assets.lux.network/blockchains/axelar/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "governance",
+      "staking",
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "band",
+    "name": "BandChain",
+    "symbol": "BAND",
+    "decimals": 6,
+    "explorer": "https://cosmoscan.io",
+    "website": "https://bandprotocol.com",
+    "logo": "https://assets.lux.network/blockchains/band/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "base",
+    "name": "Base",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://basescan.org",
+    "website": "https://base.org",
+    "logo": "https://assets.lux.network/blockchains/base/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "binance",
+    "name": "BNB Beacon Chain",
+    "symbol": "BNB",
+    "decimals": 8,
+    "explorer": "https://explorer.binance.org",
+    "website": "https://binance.org",
+    "logo": "https://assets.lux.network/blockchains/binance/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "bitcoin",
+    "name": "Bitcoin",
+    "symbol": "BTC",
+    "decimals": 8,
+    "explorer": "https://blockchain.info",
+    "website": "https://bitcoin.org",
+    "logo": "https://assets.lux.network/blockchains/bitcoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "bitcoincash",
+    "name": "Bitcoin Cash",
+    "symbol": "BCH",
+    "decimals": 8,
+    "explorer": "https://blockchair.com/bitcoin-cash",
+    "website": "https://bitcoincash.org",
+    "logo": "https://assets.lux.network/blockchains/bitcoincash/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "bitcoingold",
+    "name": "Bitcoin Gold",
+    "symbol": "BTG",
+    "decimals": 8,
+    "explorer": "https://explorer.bitcoingold.org/insight",
+    "website": "https://bitcoingold.org",
+    "logo": "https://assets.lux.network/blockchains/bitcoingold/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "blast",
+    "name": "Blast",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://blastscan.io",
+    "website": "https://blast.io/en",
+    "logo": "https://assets.lux.network/blockchains/blast/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "bluzelle",
+    "name": "Bluzelle",
+    "symbol": "BLZ",
+    "decimals": 6,
+    "explorer": "http://bigdipper.net.bluzelle.com",
+    "website": "https://bluzelle.com",
+    "logo": "https://assets.lux.network/blockchains/bluzelle/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "bnbt",
+    "name": "Binance Smart Chain Testnet",
+    "symbol": "TBNB",
+    "decimals": 18,
+    "explorer": "https://testnet.bscscan.com",
+    "website": "https://testnet.binance.org",
+    "logo": "https://assets.lux.network/blockchains/bnbt/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "boba",
+    "name": "Boba",
+    "symbol": "BOBAETH",
+    "decimals": 18,
+    "explorer": "https://blockexplorer.boba.network",
+    "website": "https://boba.network",
+    "logo": "https://assets.lux.network/blockchains/boba/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "bouncebit",
+    "name": "BounceBit",
+    "symbol": "BB",
+    "decimals": 18,
+    "explorer": "https://blastscan.io",
+    "website": "https://bouncebit.io",
+    "logo": "https://assets.lux.network/blockchains/bouncebit/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "btcdiamond",
+    "name": "Bitcoin Diamond",
+    "symbol": "BCD",
+    "decimals": 8,
+    "explorer": "http://explorer.btcd.io/#",
+    "website": "https://www.bitcoindiamond.org",
+    "logo": "https://assets.lux.network/blockchains/btcdiamond/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "callisto",
+    "name": "Callisto Network",
+    "symbol": "CLO",
+    "decimals": 18,
+    "explorer": "https://explorer2.callisto.network",
+    "website": "https://callisto.network",
+    "logo": "https://assets.lux.network/blockchains/callisto/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "cardano",
+    "name": "Cardano",
+    "symbol": "ADA",
+    "decimals": 6,
+    "explorer": "https://cardanoexplorer.com",
+    "website": "https://cardano.org",
+    "logo": "https://assets.lux.network/blockchains/cardano/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "celo",
+    "name": "Celo",
+    "symbol": "CELO",
+    "decimals": 18,
+    "explorer": "https://explorer.celo.org",
+    "website": "https://celo.org",
+    "logo": "https://assets.lux.network/blockchains/celo/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "cfxevm",
+    "name": "Conflux eSpace",
+    "symbol": "CFX",
+    "decimals": 18,
+    "explorer": "https://evm.confluxscan.net",
+    "website": "https://confluxnetwork.org",
+    "logo": "https://assets.lux.network/blockchains/cfxevm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "classic",
+    "name": "Ethereum Classic",
+    "symbol": "ETC",
+    "decimals": 18,
+    "explorer": "https://blockscout.com/etc/mainnet",
+    "website": "https://ethereumclassic.org",
+    "logo": "https://assets.lux.network/blockchains/classic/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "comdex",
+    "name": "Comdex",
+    "symbol": "CMDX",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/comdex",
+    "website": "https://comdex.one",
+    "logo": "https://assets.lux.network/blockchains/comdex/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "coreum",
+    "name": "Coreum",
+    "symbol": "CORE",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/coreum",
+    "website": "https://www.coreum.com",
+    "logo": "https://assets.lux.network/blockchains/coreum/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "cosmos",
+    "name": "Cosmos",
+    "symbol": "ATOM",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io",
+    "website": "https://cosmos.network",
+    "logo": "https://assets.lux.network/blockchains/cosmos/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "crescent",
+    "name": "Crescent",
+    "symbol": "CRE",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/crescent",
+    "website": "https://crescent.network",
+    "logo": "https://assets.lux.network/blockchains/crescent/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "cronos",
+    "name": "Cronos",
+    "symbol": "CRO",
+    "decimals": 18,
+    "explorer": "https://cronoscan.com",
+    "website": "https://crypto.com",
+    "logo": "https://assets.lux.network/blockchains/cronos/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "cryptoorg",
+    "name": "Crypto.org",
+    "symbol": "CRO",
+    "decimals": 8,
+    "explorer": "https://crypto.org/explorer",
+    "website": "https://crypto.org",
+    "logo": "https://assets.lux.network/blockchains/cryptoorg/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "dash",
+    "name": "Dash",
+    "symbol": "DASH",
+    "decimals": 8,
+    "explorer": "https://blockchair.com/dash",
+    "website": "https://dash.org",
+    "logo": "https://assets.lux.network/blockchains/dash/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "decred",
+    "name": "Decred",
+    "symbol": "DCR",
+    "decimals": 8,
+    "explorer": "https://dcrdata.decred.org",
+    "website": "https://decred.org",
+    "logo": "https://assets.lux.network/blockchains/decred/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "digibyte",
+    "name": "DigiByte",
+    "symbol": "DGB",
+    "decimals": 8,
+    "explorer": "https://digiexplorer.info",
+    "website": "http://digibyte.io",
+    "logo": "https://assets.lux.network/blockchains/digibyte/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "doge",
+    "name": "Dogecoin",
+    "symbol": "DOGE",
+    "decimals": 8,
+    "explorer": "https://blockchair.com/dogecoin",
+    "website": "http://dogecoin.com",
+    "logo": "https://assets.lux.network/blockchains/doge/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ecash",
+    "name": "eCash",
+    "symbol": "XEC",
+    "decimals": 2,
+    "explorer": "https://explorer.bitcoinabc.org",
+    "website": "https://e.cash",
+    "logo": "https://assets.lux.network/blockchains/ecash/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ellaism",
+    "name": "Ellaism",
+    "symbol": "ELLA",
+    "decimals": 8,
+    "explorer": "https://limax-explorer.outdoordevs.com/home",
+    "website": "https://ellaism.org",
+    "logo": "https://assets.lux.network/blockchains/ellaism/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "elrond",
+    "name": "MultiversX",
+    "symbol": "EGLD",
+    "decimals": 18,
+    "explorer": "https://explorer.multiversx.com",
+    "website": "https://multiversx.com",
+    "logo": "https://assets.lux.network/blockchains/elrond/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "energyweb",
+    "name": "Energy Web Token",
+    "symbol": "EWT",
+    "decimals": 18,
+    "explorer": "https://explorer.energyweb.org",
+    "website": "https://energyweb.org",
+    "logo": "https://assets.lux.network/blockchains/energyweb/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "eos",
+    "name": "EOS",
+    "symbol": "EOS",
+    "decimals": 4,
+    "explorer": "https://bloks.io",
+    "website": "https://eos.io",
+    "logo": "https://assets.lux.network/blockchains/eos/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ether-1",
+    "name": "Ether-1",
+    "symbol": "ETHO",
+    "decimals": 18,
+    "explorer": "https://explorer.ether1.org",
+    "website": "https://ether1.org",
+    "logo": "https://assets.lux.network/blockchains/ether-1/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "ethereum",
+    "name": "Ethereum",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://etherscan.io",
+    "website": "https://ethereum.org",
+    "logo": "https://assets.lux.network/blockchains/ethereum/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp",
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "ethereumpow",
+    "name": "EthereumPoW",
+    "symbol": "ETHW",
+    "decimals": 18,
+    "explorer": "https://www.oklink.com/en/ethw",
+    "website": "https://ethereumpow.org",
+    "logo": "https://assets.lux.network/blockchains/ethereumpow/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "pow"
+    ]
+  },
+  {
+    "slug": "everscale",
+    "name": "Everscale",
+    "symbol": "EVER",
+    "decimals": 9,
+    "explorer": "https://everscan.io",
+    "website": "https://everscale.network",
+    "logo": "https://assets.lux.network/blockchains/everscale/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "evmos",
+    "name": "Evmos",
+    "symbol": "EVMOS",
+    "decimals": 18,
+    "explorer": "https://evm.evmos.org",
+    "website": "https://evmos.org",
+    "logo": "https://assets.lux.network/blockchains/evmos/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "fantom",
+    "name": "Fantom",
+    "symbol": "FTM",
+    "decimals": 18,
+    "explorer": "https://ftmscan.com",
+    "website": "https://fantom.foundation",
+    "logo": "https://assets.lux.network/blockchains/fantom/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "fetch",
+    "name": "FETCH.AI",
+    "symbol": "FET",
+    "decimals": 18,
+    "explorer": "https://www.mintscan.io/fetchai",
+    "website": "https://fetch.ai",
+    "logo": "https://assets.lux.network/blockchains/fetch/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "filecoin",
+    "name": "Filecoin",
+    "symbol": "FIL",
+    "decimals": 18,
+    "explorer": "https://filfox.info",
+    "website": "https://filecoin.io",
+    "logo": "https://assets.lux.network/blockchains/filecoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "fio",
+    "name": "FIO Protocol",
+    "symbol": "FIO",
+    "decimals": 9,
+    "explorer": "https://fio.bloks.io",
+    "website": "https://fioprotocol.io",
+    "logo": "https://assets.lux.network/blockchains/fio/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "firo",
+    "name": "Firo",
+    "symbol": "FIRO",
+    "decimals": 8,
+    "explorer": "http://explorer.firo.org",
+    "website": "https://firo.org",
+    "logo": "https://assets.lux.network/blockchains/firo/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "fusion",
+    "name": "Fusion",
+    "symbol": "FSN",
+    "decimals": 18,
+    "explorer": "https://blocks.fusionnetwork.io/#",
+    "website": "https://fusion.org",
+    "logo": "https://assets.lux.network/blockchains/fusion/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "gbnb",
+    "name": "BNB Greenfield",
+    "symbol": "GBNB",
+    "decimals": 18,
+    "explorer": "https://greenfieldscan.com",
+    "website": "https://greenfield.bnbchain.org/en",
+    "logo": "https://assets.lux.network/blockchains/gbnb/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "gochain",
+    "name": "GoChain",
+    "symbol": "GO",
+    "decimals": 18,
+    "explorer": "https://explorer.gochain.io/home",
+    "website": "https://gochain.io",
+    "logo": "https://assets.lux.network/blockchains/gochain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "goerlitestnet",
+    "name": "Goerli Testnet",
+    "symbol": "TETH",
+    "decimals": 18,
+    "explorer": "https://goerli.etherscan.io",
+    "website": "https://goerlifaucet.com",
+    "logo": "https://assets.lux.network/blockchains/goerlitestnet/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "greenfield",
+    "name": "BNB Greenfield",
+    "symbol": "BNB",
+    "decimals": 18,
+    "explorer": "https://greenfieldscan.com",
+    "website": "https://greenfield.bnbchain.org/en",
+    "logo": "https://assets.lux.network/blockchains/greenfield/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "groestlcoin",
+    "name": "Groestlcoin",
+    "symbol": "GRS",
+    "decimals": 8,
+    "explorer": "https://grs.tokenview.com",
+    "website": "http://groestlcoin.org",
+    "logo": "https://assets.lux.network/blockchains/groestlcoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "harmony",
+    "name": "Harmony",
+    "symbol": "ONE",
+    "decimals": 18,
+    "explorer": "https://explorer.harmony.one",
+    "website": "https://harmony.one",
+    "logo": "https://assets.lux.network/blockchains/harmony/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "heco",
+    "name": "Huobi ECO Chain",
+    "symbol": "HT",
+    "decimals": 18,
+    "explorer": "https://hecoinfo.com",
+    "website": "https://www.hecochain.com/en-us",
+    "logo": "https://assets.lux.network/blockchains/heco/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "hedera",
+    "name": "Hedera",
+    "symbol": "HBAR",
+    "decimals": 8,
+    "explorer": "https://hashscan.io/mainnet/dashboard",
+    "website": "https://hedera.com",
+    "logo": "https://assets.lux.network/blockchains/hedera/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "hoo",
+    "name": "Hoo Token",
+    "symbol": "HOO",
+    "decimals": 18,
+    "explorer": "https://hooscan.com",
+    "website": "https://hoosmartchain.com",
+    "logo": "https://assets.lux.network/blockchains/hoo/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "icon",
+    "name": "ICON",
+    "symbol": "ICX",
+    "decimals": 18,
+    "explorer": "https://tracker.icon.foundation",
+    "website": "https://icon.foundation",
+    "logo": "https://assets.lux.network/blockchains/icon/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "internet_computer",
+    "name": "Internet Computer",
+    "symbol": "ICP",
+    "decimals": 8,
+    "explorer": "https://dashboard.internetcomputer.org",
+    "website": "https://internetcomputer.org",
+    "logo": "https://assets.lux.network/blockchains/internet_computer/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "iost",
+    "name": "IOST",
+    "symbol": "IOST",
+    "decimals": 2,
+    "explorer": "https://explorer.iost.io",
+    "website": "http://iost.io",
+    "logo": "https://assets.lux.network/blockchains/iost/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "iotex",
+    "name": "IoTeX",
+    "symbol": "IOTX",
+    "decimals": 18,
+    "explorer": "https://iotexscan.io",
+    "website": "https://iotex.io",
+    "logo": "https://assets.lux.network/blockchains/iotex/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "iotexevm",
+    "name": "IoTeX Network Mainnet",
+    "symbol": "IOTX",
+    "decimals": 18,
+    "explorer": "https://iotexscan.io",
+    "website": "https://iotex.io",
+    "logo": "https://assets.lux.network/blockchains/iotexevm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "iris",
+    "name": "IRISnet",
+    "symbol": "IRIS",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/iris",
+    "website": "https://www.irisnet.org",
+    "logo": "https://assets.lux.network/blockchains/iris/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "juno",
+    "name": "Juno",
+    "symbol": "JUNO",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/juno",
+    "website": "https://www.junonetwork.io",
+    "logo": "https://assets.lux.network/blockchains/juno/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "kava",
+    "name": "Kava",
+    "symbol": "KAVA",
+    "decimals": 6,
+    "explorer": "https://kava.mintscan.io",
+    "website": "https://kava.io",
+    "logo": "https://assets.lux.network/blockchains/kava/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "kavaevm",
+    "name": "KavaEvm",
+    "symbol": "KAVA",
+    "decimals": 18,
+    "explorer": "https://explorer.kava.io",
+    "website": "https://kava.io",
+    "logo": "https://assets.lux.network/blockchains/kavaevm/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi",
+      "dapp"
+    ]
+  },
+  {
+    "slug": "kcc",
+    "name": "KuCoin Community Chain",
+    "symbol": "KCS",
+    "decimals": 18,
+    "explorer": "https://explorer.kcc.io",
+    "website": "https://www.kcc.io",
+    "logo": "https://assets.lux.network/blockchains/kcc/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "kin",
+    "name": "Kin",
+    "symbol": "KIN",
+    "decimals": 5,
+    "explorer": "https://www.kin.org/blockchainExplorer",
+    "website": "https://kin.org",
+    "logo": "https://assets.lux.network/blockchains/kin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "klaytn",
+    "name": "kaia",
+    "symbol": "KAIA",
+    "decimals": 18,
+    "explorer": "https://kaiascan.io",
+    "website": "https://kaia.io",
+    "logo": "https://assets.lux.network/blockchains/klaytn/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "komodo",
+    "name": "Komodo",
+    "symbol": "KMD",
+    "decimals": 8,
+    "explorer": "https://kmdexplorer.io",
+    "website": "https://komodoplatform.com",
+    "logo": "https://assets.lux.network/blockchains/komodo/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "kujira",
+    "name": "Kujira",
+    "symbol": "KUJI",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/kujira",
+    "website": "https://kujira.app",
+    "logo": "https://assets.lux.network/blockchains/kujira/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "kusama",
+    "name": "Kusama",
+    "symbol": "KSM",
+    "decimals": 12,
+    "explorer": "https://assethub-kusama.subscan.io",
+    "website": "https://kusama.network",
+    "logo": "https://assets.lux.network/blockchains/kusama/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "linea",
+    "name": "Linea",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://explorer.linea.build",
+    "website": "https://linea.build",
+    "logo": "https://assets.lux.network/blockchains/linea/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "litecoin",
+    "name": "Litecoin",
+    "symbol": "LTC",
+    "decimals": 8,
+    "explorer": "https://blockchair.com/litecoin",
+    "website": "https://litecoin.org",
+    "logo": "https://assets.lux.network/blockchains/litecoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "loom",
+    "name": "Loom Network",
+    "symbol": "LOOM",
+    "decimals": 8,
+    "explorer": "https://etherscan.io/token/0xa4e8c3ec456107ea67d3075bf9e3df3a75823db0",
+    "website": "https://loomx.io",
+    "logo": "https://assets.lux.network/blockchains/loom/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "manta",
+    "name": "Manta Pacific",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://pacific-explorer.manta.network",
+    "website": "https://pacific.manta.network",
+    "logo": "https://assets.lux.network/blockchains/manta/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "mantle",
+    "name": "Mantle Chain",
+    "symbol": "MNT",
+    "decimals": 18,
+    "explorer": "https://explorer.mantle.xyz/blocks",
+    "website": "https://www.mantle.xyz",
+    "logo": "https://assets.lux.network/blockchains/mantle/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "mars",
+    "name": "Mars Protocol",
+    "symbol": "MARS",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/mars-protocol",
+    "website": "https://www.sommelier.finance",
+    "logo": "https://assets.lux.network/blockchains/mars/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "megaeth",
+    "name": "MegaETH",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://megaeth.blockscout.com",
+    "website": "https://www.megaeth.com",
+    "logo": "https://assets.lux.network/blockchains/megaeth/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "merlin",
+    "name": "Merlin Mainnet",
+    "symbol": "BTC",
+    "decimals": 18,
+    "explorer": "https://scan.merlinchain.io",
+    "website": "https://merlinchain.iov",
+    "logo": "https://assets.lux.network/blockchains/merlin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "meter",
+    "name": "Meter",
+    "symbol": "MTRG",
+    "decimals": 18,
+    "explorer": "https://scan.meter.io",
+    "website": "https://meter.io",
+    "logo": "https://assets.lux.network/blockchains/meter/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "metis",
+    "name": "Metis",
+    "symbol": "METIS",
+    "decimals": 18,
+    "explorer": "https://andromeda-explorer.metis.io",
+    "website": "https://www.metis.io",
+    "logo": "https://assets.lux.network/blockchains/metis/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "monad",
+    "name": "Monad",
+    "symbol": "MON",
+    "decimals": 18,
+    "explorer": "https://monvision.io",
+    "website": "https://www.monad.xyz",
+    "logo": "https://assets.lux.network/blockchains/monad/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "moonbasealpha",
+    "name": "Moonbase Alpha Testnet",
+    "symbol": "DEV",
+    "decimals": 18,
+    "explorer": "https://moonbase.moonscan.io",
+    "website": "https://moonbeam.network",
+    "logo": "https://assets.lux.network/blockchains/moonbasealpha/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "moonbeam",
+    "name": "Moonbeam",
+    "symbol": "GLMR",
+    "decimals": 18,
+    "explorer": "https://moonscan.io",
+    "website": "https://moonbeam.network",
+    "logo": "https://assets.lux.network/blockchains/moonbeam/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "moonriver",
+    "name": "Moonriver",
+    "symbol": "MOVR",
+    "decimals": 18,
+    "explorer": "https://moonriver.moonscan.io",
+    "website": "https://moonbeam.network/networks/moonriver",
+    "logo": "https://assets.lux.network/blockchains/moonriver/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nano",
+    "name": "Nano",
+    "symbol": "XNO",
+    "decimals": 30,
+    "explorer": "https://nanocrawler.cc",
+    "website": "http://nano.org/en",
+    "logo": "https://assets.lux.network/blockchains/nano/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nativecanto",
+    "name": "Native Canto",
+    "symbol": "CANTO",
+    "decimals": 18,
+    "explorer": "https://www.mintscan.io/canto",
+    "website": "https://canto.io",
+    "logo": "https://assets.lux.network/blockchains/nativecanto/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "nativeevmos",
+    "name": "Native Evmos",
+    "symbol": "EVMOS",
+    "decimals": 18,
+    "explorer": "https://www.mintscan.io/evmos",
+    "website": "https://evmos.org",
+    "logo": "https://assets.lux.network/blockchains/nativeevmos/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "nativeinjective",
+    "name": "NativeInjective",
+    "symbol": "INJ",
+    "decimals": 18,
+    "explorer": "https://explorer.injective.network",
+    "website": "https://injective.com",
+    "logo": "https://assets.lux.network/blockchains/nativeinjective/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "near",
+    "name": "NEAR Protocol",
+    "symbol": "NEAR",
+    "decimals": 24,
+    "explorer": "https://explorer.near.org",
+    "website": "https://near.org",
+    "logo": "https://assets.lux.network/blockchains/near/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "neblio",
+    "name": "Neblio",
+    "symbol": "NEBL",
+    "decimals": 8,
+    "explorer": "https://explorer.nebl.io",
+    "website": "https://nebl.io",
+    "logo": "https://assets.lux.network/blockchains/neblio/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nebulas",
+    "name": "Nebulas",
+    "symbol": "NAS",
+    "decimals": 18,
+    "explorer": "https://explorer.nebulas.io",
+    "website": "https://nebulas.io",
+    "logo": "https://assets.lux.network/blockchains/nebulas/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "neo",
+    "name": "Neo",
+    "symbol": "NEO",
+    "decimals": 8,
+    "explorer": "https://neoscan.io",
+    "website": "https://neo.org",
+    "logo": "https://assets.lux.network/blockchains/neo/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "neon",
+    "name": "Neon EVM",
+    "symbol": "NEON",
+    "decimals": 18,
+    "explorer": "https://neonscan.org",
+    "website": "https://neonevm.org",
+    "logo": "https://assets.lux.network/blockchains/neon/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nervos",
+    "name": "Nervos Network",
+    "symbol": "CKB",
+    "decimals": 8,
+    "explorer": "https://explorer.nervos.org",
+    "website": "http://nervos.org",
+    "logo": "https://assets.lux.network/blockchains/nervos/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "neutron",
+    "name": "Neutron",
+    "symbol": "NTRN",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/neutron",
+    "website": "https://neutron.org",
+    "logo": "https://assets.lux.network/blockchains/neutron/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "neutrontestnet",
+    "name": "Neutron Testnet",
+    "symbol": "TNTRN",
+    "decimals": 6,
+    "explorer": "https://testnet.mintscan.io/neutron-testnet",
+    "website": "https://neutron.org",
+    "logo": "https://assets.lux.network/blockchains/neutrontestnet/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nimiq",
+    "name": "Nimiq",
+    "symbol": "NIM",
+    "decimals": 5,
+    "explorer": "https://nimiq.watch",
+    "website": "https://nimiq.com",
+    "logo": "https://assets.lux.network/blockchains/nimiq/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "noble",
+    "name": "Noble",
+    "symbol": "USDC",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/noble",
+    "website": "https://nobleassets.xyz",
+    "logo": "https://assets.lux.network/blockchains/noble/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "nuls",
+    "name": "NULS",
+    "symbol": "NULS",
+    "decimals": 8,
+    "explorer": "https://nulscan.io",
+    "website": "https://nuls.io",
+    "logo": "https://assets.lux.network/blockchains/nuls/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "oasis",
+    "name": "Oasis Network",
+    "symbol": "ROSE",
+    "decimals": 8,
+    "explorer": "https://www.oasisscan.com",
+    "website": "https://oasisprotocol.org",
+    "logo": "https://assets.lux.network/blockchains/oasis/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "okc",
+    "name": "OKX Chain",
+    "symbol": "OKT",
+    "decimals": 18,
+    "explorer": "https://www.oklink.com/en/okc",
+    "website": "https://www.okx.com/okc",
+    "logo": "https://assets.lux.network/blockchains/okc/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "okx",
+    "name": "OKXChain Mainnet",
+    "symbol": "OKT",
+    "decimals": 18,
+    "explorer": "https://www.oklink.com/oktc",
+    "website": "https://www.okx.com",
+    "logo": "https://assets.lux.network/blockchains/okx/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "okxchain",
+    "name": "OKC Token",
+    "symbol": "OKT",
+    "decimals": 18,
+    "explorer": "https://www.oklink.com/en",
+    "website": "https://www.okx.com/okc",
+    "logo": "https://assets.lux.network/blockchains/okxchain/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "ontology",
+    "name": "Ontology",
+    "symbol": "ONT",
+    "decimals": 0,
+    "explorer": "https://explorer.ont.io",
+    "website": "https://ont.io",
+    "logo": "https://assets.lux.network/blockchains/ontology/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "opbnb",
+    "name": "opBNB",
+    "symbol": "BNB",
+    "decimals": 18,
+    "explorer": "https://opbnbscan.com",
+    "website": "https://opbnb.bnbchain.org/en",
+    "logo": "https://assets.lux.network/blockchains/opbnb/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "optimism",
+    "name": "Optimistic Ethereum",
+    "symbol": "OETH",
+    "decimals": 18,
+    "explorer": "https://optimistic.etherscan.io",
+    "website": "https://optimism.io",
+    "logo": "https://assets.lux.network/blockchains/optimism/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "optimismgoerli",
+    "name": "Optimism Goerli Testnet",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://blockscout.com/optimism/goerli",
+    "website": "https://goerlifaucet.com",
+    "logo": "https://assets.lux.network/blockchains/optimismgoerli/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "osmosis",
+    "name": "Osmosis",
+    "symbol": "OSMO",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/osmosis",
+    "website": "https://osmosis.zone",
+    "logo": "https://assets.lux.network/blockchains/osmosis/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "pactus",
+    "name": "Pactus",
+    "symbol": "PAC",
+    "decimals": 9,
+    "explorer": "https://pacviewer.com",
+    "website": "https://pactus.org",
+    "logo": "https://assets.lux.network/blockchains/pactus/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "persistence",
+    "name": "Persistence",
+    "symbol": "XPRT",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/persistence",
+    "website": "https://persistence.one",
+    "logo": "https://assets.lux.network/blockchains/persistence/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "pivx",
+    "name": "PIVX",
+    "symbol": "PIVX",
+    "decimals": 8,
+    "explorer": "https://chainz.cryptoid.info/pivx",
+    "website": "https://pivx.org",
+    "logo": "https://assets.lux.network/blockchains/pivx/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "plasma",
+    "name": "Plasma",
+    "symbol": "XPL",
+    "decimals": 18,
+    "explorer": "https://plasmascan.to",
+    "website": "https://www.plasma.to",
+    "logo": "https://assets.lux.network/blockchains/plasma/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi"
+    ]
+  },
+  {
+    "slug": "platon",
+    "name": "PlatON",
+    "symbol": "LAT",
+    "decimals": 18,
+    "explorer": "https://scan.platon.network",
+    "website": "https://www.platon.network",
+    "logo": "https://assets.lux.network/blockchains/platon/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "poa",
+    "name": "POA",
+    "symbol": "POA",
+    "decimals": 18,
+    "explorer": "https://blockscout.com/poa/core",
+    "website": "https://poa.network",
+    "logo": "https://assets.lux.network/blockchains/poa/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "polkadot",
+    "name": "Polkadot",
+    "symbol": "DOT",
+    "decimals": 10,
+    "explorer": "https://assethub-polkadot.subscan.io",
+    "website": "https://polkadot.com",
+    "logo": "https://assets.lux.network/blockchains/polkadot/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "polygon",
+    "name": "POL (ex-MATIC)",
+    "symbol": "POL",
+    "decimals": 18,
+    "explorer": "https://polygonscan.com",
+    "website": "https://polygon.technology",
+    "logo": "https://assets.lux.network/blockchains/polygon/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "polygonmumbai",
+    "name": "Polygon Mumbai Testnet",
+    "symbol": "TMATIC",
+    "decimals": 18,
+    "explorer": "https://mumbai.polygonscan.com",
+    "website": "https://polygon.technology",
+    "logo": "https://assets.lux.network/blockchains/polygonmumbai/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "polygonzkevm",
+    "name": "Polygon zkEVM",
+    "symbol": "TETH",
+    "decimals": 18,
+    "explorer": "https://polygon.technology/polygon-zkevm",
+    "website": "https://www.polygon.technology",
+    "logo": "https://assets.lux.network/blockchains/polygonzkevm/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "qtum",
+    "name": "Qtum",
+    "symbol": "QTUM",
+    "decimals": 8,
+    "explorer": "https://qtum.info",
+    "website": "https://qtum.org",
+    "logo": "https://assets.lux.network/blockchains/qtum/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "quasar",
+    "name": "Quasar",
+    "symbol": "QSR",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/quasar",
+    "website": "https://www.quasar.fi",
+    "logo": "https://assets.lux.network/blockchains/quasar/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ravencoin",
+    "name": "Ravencoin",
+    "symbol": "RVN",
+    "decimals": 8,
+    "explorer": "https://ravencoin.network",
+    "website": "https://ravencoin.org",
+    "logo": "https://assets.lux.network/blockchains/ravencoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ripple",
+    "name": "XRP",
+    "symbol": "XRP",
+    "decimals": 6,
+    "explorer": "https://xrpcharts.ripple.com/#/graph",
+    "website": "https://ripple.com/xrp",
+    "logo": "https://assets.lux.network/blockchains/ripple/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ronin",
+    "name": "Ronin",
+    "symbol": "RON",
+    "decimals": 18,
+    "explorer": "https://explorer.roninchain.com",
+    "website": "https://skymavis.com",
+    "logo": "https://assets.lux.network/blockchains/ronin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "rootstock",
+    "name": "Rootstock",
+    "symbol": "ROOTSTOCK",
+    "decimals": 18,
+    "explorer": "https://explorer.rootstock.io",
+    "website": "https://rootstock.io",
+    "logo": "https://assets.lux.network/blockchains/rootstock/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "scroll",
+    "name": "Scroll",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://blockscout.scroll.io",
+    "website": "https://scroll.io",
+    "logo": "https://assets.lux.network/blockchains/scroll/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "secret",
+    "name": "Secret",
+    "symbol": "SCRT",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/secret",
+    "website": "https://scrt.network",
+    "logo": "https://assets.lux.network/blockchains/secret/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "sei",
+    "name": "Sei",
+    "symbol": "SEI",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/sei",
+    "website": "https://sei.io",
+    "logo": "https://assets.lux.network/blockchains/sei/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "sepolia",
+    "name": "Sepolia Testnet",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://sepolia.etherscan.io",
+    "website": "https://sepolia.dev",
+    "logo": "https://assets.lux.network/blockchains/sepolia/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "smartbch",
+    "name": "smartBCH",
+    "symbol": "BCH",
+    "decimals": 18,
+    "explorer": "http://smartscan.cash",
+    "website": "https://smartbch.org",
+    "logo": "https://assets.lux.network/blockchains/smartbch/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "smartchain",
+    "name": "BNB Smart Chain",
+    "symbol": "BNB",
+    "decimals": 18,
+    "explorer": "https://bscscan.com",
+    "website": "https://www.bnbchain.world/en/smartChain",
+    "logo": "https://assets.lux.network/blockchains/smartchain/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native",
+      "dapp"
+    ]
+  },
+  {
+    "slug": "solana",
+    "name": "Solana",
+    "symbol": "SOL",
+    "decimals": 9,
+    "explorer": "https://explorer.solana.com",
+    "website": "https://solana.com",
+    "logo": "https://assets.lux.network/blockchains/solana/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "sommelier",
+    "name": "Sommelier",
+    "symbol": "SOMM",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/sommelier",
+    "website": "https://www.sommelier.finance",
+    "logo": "https://assets.lux.network/blockchains/sommelier/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "sonic",
+    "name": "Sonic",
+    "symbol": "S",
+    "decimals": 18,
+    "explorer": "https://sonicscan.org",
+    "website": "https://www.soniclabs.com",
+    "logo": "https://assets.lux.network/blockchains/sonic/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  },
+  {
+    "slug": "stargaze",
+    "name": "Stargaze",
+    "symbol": "STARS",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/stargaze",
+    "website": "https://www.stargaze.zone",
+    "logo": "https://assets.lux.network/blockchains/stargaze/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "steem",
+    "name": "Steem",
+    "symbol": "STEEM",
+    "decimals": 8,
+    "explorer": "https://steemd.com",
+    "website": "https://steem.com",
+    "logo": "https://assets.lux.network/blockchains/steem/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "stellar",
+    "name": "Stellar",
+    "symbol": "XLM",
+    "decimals": 7,
+    "explorer": "https://dashboard.stellar.org",
+    "website": "https://stellar.org",
+    "logo": "https://assets.lux.network/blockchains/stellar/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "stratis",
+    "name": "Stratis",
+    "symbol": "STRAX",
+    "decimals": 8,
+    "explorer": "https://chainz.cryptoid.info/strax/#",
+    "website": "https://www.stratisplatform.com",
+    "logo": "https://assets.lux.network/blockchains/stratis/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "stride",
+    "name": "Stride",
+    "symbol": "STRD",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/stride",
+    "website": "https://app.stride.zone",
+    "logo": "https://assets.lux.network/blockchains/stride/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "sui",
+    "name": "Sui",
+    "symbol": "SUI",
+    "decimals": 9,
+    "explorer": "https://explorer.sui.io",
+    "website": "https://sui.io",
+    "logo": "https://assets.lux.network/blockchains/sui/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "defi",
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "syscoin",
+    "name": "Syscoin",
+    "symbol": "SYS",
+    "decimals": 8,
+    "explorer": "https://explorer.syscoin.org",
+    "website": "http://syscoin.org",
+    "logo": "https://assets.lux.network/blockchains/syscoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "teritori",
+    "name": "Teritori",
+    "symbol": "TORI",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/teritori",
+    "website": "https://teritori.com",
+    "logo": "https://assets.lux.network/blockchains/teritori/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "terra",
+    "name": "Terra Classic",
+    "symbol": "LUNC",
+    "decimals": 6,
+    "explorer": "https://finder.terra.money",
+    "website": "https://terra.money",
+    "logo": "https://assets.lux.network/blockchains/terra/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "terrav2",
+    "name": "Terra",
+    "symbol": "LUNA",
+    "decimals": 6,
+    "explorer": "https://finder.terra.money",
+    "website": "https://terra.money",
+    "logo": "https://assets.lux.network/blockchains/terrav2/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "tezos",
+    "name": "Tezos",
+    "symbol": "XTZ",
+    "decimals": 6,
+    "explorer": "https://tezos.id",
+    "website": "https://tezos.com",
+    "logo": "https://assets.lux.network/blockchains/tezos/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "tftm",
+    "name": "Fantom Testnet",
+    "symbol": "TFTM",
+    "decimals": 18,
+    "explorer": "https://testnet.ftmscan.com",
+    "website": "http://fantom.foundation",
+    "logo": "https://assets.lux.network/blockchains/tftm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "theta",
+    "name": "THETA",
+    "symbol": "THETA",
+    "decimals": 18,
+    "explorer": "https://explorer.thetatoken.org",
+    "website": "https://thetatoken.org",
+    "logo": "https://assets.lux.network/blockchains/theta/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "thorchain",
+    "name": "THORChain",
+    "symbol": "RUNE",
+    "decimals": 8,
+    "explorer": "https://viewblock.io/thorchain",
+    "website": "https://thorchain.org",
+    "logo": "https://assets.lux.network/blockchains/thorchain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "thundertoken",
+    "name": "ThunderCore (TT)",
+    "symbol": "TT",
+    "decimals": 18,
+    "explorer": "https://scan.thundercore.com",
+    "website": "https://thundercore.com",
+    "logo": "https://assets.lux.network/blockchains/thundertoken/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "tia",
+    "name": "Celestia",
+    "symbol": "TIA",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/celestia",
+    "website": "https://celestia.org",
+    "logo": "https://assets.lux.network/blockchains/tia/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "tomochain",
+    "name": "Viction",
+    "symbol": "VIC",
+    "decimals": 18,
+    "explorer": "https://scan.tomochain.com",
+    "website": "https://viction.xyz",
+    "logo": "https://assets.lux.network/blockchains/tomochain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "ton",
+    "name": "The Open Network",
+    "symbol": "TON",
+    "decimals": 9,
+    "explorer": "https://tonscan.org",
+    "website": "https://ton.org",
+    "logo": "https://assets.lux.network/blockchains/ton/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "tron",
+    "name": "TRON",
+    "symbol": "TRX",
+    "decimals": 6,
+    "explorer": "https://tronscan.io/#",
+    "website": "https://tron.network",
+    "logo": "https://assets.lux.network/blockchains/tron/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "staking-native"
+    ]
+  },
+  {
+    "slug": "umee",
+    "name": "Umee",
+    "symbol": "UMEE",
+    "decimals": 6,
+    "explorer": "https://www.mintscan.io/umee",
+    "website": "https://www.umee.cc",
+    "logo": "https://assets.lux.network/blockchains/umee/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "vechain",
+    "name": "VeChain",
+    "symbol": "VET",
+    "decimals": 18,
+    "explorer": "https://insight.vecha.in",
+    "website": "https://vechain.org",
+    "logo": "https://assets.lux.network/blockchains/vechain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "verge",
+    "name": "Verge",
+    "symbol": "XVG",
+    "decimals": 6,
+    "explorer": "https://verge-blockchain.info",
+    "website": "https://vergecurrency.com",
+    "logo": "https://assets.lux.network/blockchains/verge/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "viacoin",
+    "name": "Viacoin",
+    "symbol": "VIA",
+    "decimals": 8,
+    "explorer": "https://chainz.cryptoid.info/via",
+    "website": "http://viacoin.org",
+    "logo": "https://assets.lux.network/blockchains/viacoin/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "wanchain",
+    "name": "Wanchain",
+    "symbol": "WAN",
+    "decimals": 18,
+    "explorer": "https://www.wanscan.org",
+    "website": "https://wanchain.org",
+    "logo": "https://assets.lux.network/blockchains/wanchain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "waves",
+    "name": "Waves",
+    "symbol": "WAVES",
+    "decimals": 8,
+    "explorer": "http://wavesexplorer.com",
+    "website": "https://wavesplatform.com",
+    "logo": "https://assets.lux.network/blockchains/waves/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "wemix",
+    "name": "WEMIX",
+    "symbol": "WEMIX",
+    "decimals": 18,
+    "explorer": "https://wemixscan.com",
+    "website": "https://wemix.com",
+    "logo": "https://assets.lux.network/blockchains/wemix/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "xdai",
+    "name": "Gnosis Chain",
+    "symbol": "XDAI",
+    "decimals": 18,
+    "explorer": "https://blockscout.com/poa/xdai",
+    "website": "https://xdaichain.com",
+    "logo": "https://assets.lux.network/blockchains/xdai/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "xdc",
+    "name": "XinFin Network",
+    "symbol": "XDC",
+    "decimals": 10,
+    "explorer": "https://explorer.xinfin.network",
+    "website": "https://xinfin.network",
+    "logo": "https://assets.lux.network/blockchains/xdc/info/logo.png",
+    "type": "coin",
+    "status": "abandoned"
+  },
+  {
+    "slug": "xrplevm",
+    "name": "XRPL EVM Sidechain",
+    "symbol": "XRP",
+    "decimals": 18,
+    "explorer": "https://explorer.xrplevm.org",
+    "website": "https://xrplevm.org",
+    "logo": "https://assets.lux.network/blockchains/xrplevm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zcash",
+    "name": "Zcash",
+    "symbol": "ZEC",
+    "decimals": 8,
+    "explorer": "https://explorer.zcha.in",
+    "website": "https://z.cash",
+    "logo": "https://assets.lux.network/blockchains/zcash/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zelcash",
+    "name": "Flux",
+    "symbol": "FLUX",
+    "decimals": 8,
+    "explorer": "https://explorer.runonflux.io",
+    "website": "https://runonflux.io",
+    "logo": "https://assets.lux.network/blockchains/zelcash/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zen",
+    "name": "Horizen",
+    "symbol": "ZEN",
+    "decimals": 8,
+    "explorer": "https://explorer.horizen.io",
+    "website": "https://www.horizen.io",
+    "logo": "https://assets.lux.network/blockchains/zen/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zetachain",
+    "name": "Native ZetaChain",
+    "symbol": "ZETA",
+    "decimals": 18,
+    "explorer": "https://explorer.zetachain.com/cosmos/tx",
+    "website": "https://www.zetachain.com",
+    "logo": "https://assets.lux.network/blockchains/zetachain/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zetaevm",
+    "name": "ZetaChain",
+    "symbol": "ZETA",
+    "decimals": 18,
+    "explorer": "https://explorer.zetachain.com/evm/tx",
+    "website": "https://www.zetachain.com",
+    "logo": "https://assets.lux.network/blockchains/zetaevm/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zilliqa",
+    "name": "Zilliqa",
+    "symbol": "ZIL",
+    "decimals": 12,
+    "explorer": "https://viewblock.io/zilliqa",
+    "website": "https://zilliqa.com",
+    "logo": "https://assets.lux.network/blockchains/zilliqa/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zklink",
+    "name": "zkLink",
+    "symbol": "ZKL",
+    "decimals": 18,
+    "explorer": "https://explorer.zklink.io",
+    "website": "https://zklink.io",
+    "logo": "https://assets.lux.network/blockchains/zklink/info/logo.png",
+    "type": "coin",
+    "status": "active"
+  },
+  {
+    "slug": "zksync",
+    "name": "ZkSync Era",
+    "symbol": "ETH",
+    "decimals": 18,
+    "explorer": "https://explorer.zksync.io",
+    "website": "https://zksync.io",
+    "logo": "https://assets.lux.network/blockchains/zksync/info/logo.png",
+    "type": "coin",
+    "status": "active",
+    "tags": [
+      "dapp"
+    ]
+  }
+]

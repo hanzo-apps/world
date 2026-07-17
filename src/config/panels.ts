@@ -568,35 +568,32 @@ const AI_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
-// CRYPTO VARIANT (Digital assets & markets)
+// CRYPTO → DeFi VARIANT (Lux DeFi dashboard)
 // ============================================
-// Composition of existing panels: CoinGecko prices + crypto news up top, the
-// trader desk (BTC dominance / funding), ETF flows, stablecoins, market radar,
-// sector heatmap, sentiment and predictions. Feeds resolve to FINANCE_FEEDS (see
-// feeds.ts) — the `crypto`/`markets`/`economic` data panels each also spawn a
-// `-news` feed panel via the FEEDS loop in App.ts.
+// The DefiLlama-shaped board leads: the bridge-supported chain universe (bridge.
+// lux.network) merged with live Lux-ecosystem metrics from explorer.lux.network,
+// plus bridge-flow arcs on the globe. Crypto/markets panels remain available but
+// off by default (enabled:false) so the view is a DeFi dashboard, not a trad-
+// markets desk — they stay one toggle away in the Panels menu.
 const CRYPTO_PANELS: Record<string, PanelConfig> = {
-  map: { name: 'Global Crypto Map', enabled: true, priority: 1 },
-  'live-news': { name: 'Crypto & Markets Headlines', enabled: true, priority: 1 },
-  insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
-  crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
+  'defi-board': { name: 'DeFi', enabled: true, priority: 1 },
+  map: { name: 'Bridge Flows Map', enabled: true, priority: 1 },
   chains: { name: 'Chains', enabled: true, priority: 1 },
-  'crypto-news': { name: 'Crypto News', enabled: true, priority: 1 },
-  'trader-desk': { name: 'Trader Desk', enabled: true, priority: 1 },
-  'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 1 },
-  stablecoins: { name: 'Stablecoins', enabled: true, priority: 1 },
-  'macro-signals': { name: 'Market Radar', enabled: true, priority: 1 },
-  heatmap: { name: 'Sector Heatmap', enabled: true, priority: 1 },
-  polymarket: { name: 'Predictions', enabled: true, priority: 1 },
-  sentiment: { name: 'News Sentiment', enabled: true, priority: 1 },
-  markets: { name: 'Live Markets', enabled: true, priority: 2 },
-  fx: { name: 'FX & dollar', enabled: true, priority: 2 },
-  yields: { name: 'Rates & credit', enabled: true, priority: 2 },
-  'economic-news': { name: 'Economic News', enabled: true, priority: 2 },
-  regulation: { name: 'Crypto & Financial Regulation', enabled: true, priority: 2 },
-  centralbanks: { name: 'Central Bank Watch', enabled: true, priority: 2 },
+  'live-news': { name: 'Crypto & DeFi Headlines', enabled: true, priority: 1 },
+  'crypto-news': { name: 'Crypto News', enabled: true, priority: 2 },
+  insights: { name: 'AI Market Insights', enabled: true, priority: 2 },
   'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  // Available but off by default in the DeFi view.
+  crypto: { name: 'Crypto & Digital Assets', enabled: false, priority: 2 },
+  'trader-desk': { name: 'Trader Desk', enabled: false, priority: 2 },
+  'etf-flows': { name: 'BTC ETF Tracker', enabled: false, priority: 2 },
+  stablecoins: { name: 'Stablecoins', enabled: false, priority: 2 },
+  'macro-signals': { name: 'Market Radar', enabled: false, priority: 2 },
+  heatmap: { name: 'Sector Heatmap', enabled: false, priority: 2 },
+  polymarket: { name: 'Predictions', enabled: false, priority: 2 },
+  sentiment: { name: 'News Sentiment', enabled: false, priority: 2 },
+  markets: { name: 'Live Markets', enabled: false, priority: 2 },
 };
 
 const CRYPTO_MAP_LAYERS: MapLayers = {
@@ -639,10 +636,12 @@ const CRYPTO_MAP_LAYERS: MapLayers = {
   centralBanks: false,
   commodityHubs: false,
   gulfInvestments: false,
-  // Hanzo World cloud map layers
+  // Hanzo World cloud map layers. The DeFi view's arcs are BRIDGE FLOWS (Lux hub
+  // ↔ counterparties), not request traffic — so trafficArcs off, bridgeFlows on.
   chainNodes: true,
-  byoGpu: true,
-  trafficArcs: true,
+  byoGpu: false,
+  trafficArcs: false,
+  bridgeFlows: true,
 };
 
 const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
