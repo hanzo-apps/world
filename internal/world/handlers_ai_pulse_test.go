@@ -158,3 +158,54 @@ func TestAIPulseSSEFrames(t *testing.T) {
 		}
 	}
 }
+
+// TestAIPulseAdminPoll proves the authed poll: a signed-in admin (z@hanzo.ai) with
+// NO server-side service token gets the FULL measured compute pulse built with their
+// OWN bearer, served no-store. EventSource can't carry auth, so this poll is the
+// admin's live transport.
+func TestAIPulseAdminPoll(t *testing.T) {
+	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/iam/oauth/userinfo" || r.Header.Get("Authorization") == "" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"owner":"hanzo","sub":"z@hanzo.ai"}`))
+	}))
+	t.Cleanup(iam.Close)
+	up := aiPulseUpstream(t)
+
+	t.Setenv("HANZO_CLOUD_PULSE_TOKEN", "") // no service token — the admin's bearer drives it
+	t.Setenv("HANZO_API_BASE", up.URL)
+	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
+
+	s := NewServer()
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/ai-pulse", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	req.Header.Set("Accept", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if cc := resp.Header.Get("Cache-Control"); cc != "private, no-store" {
+		t.Fatalf("admin ai-pulse poll must be no-store, got %q", cc)
+	}
+	var p aiPulse
+	if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if p.State != "live" {
+		t.Fatalf("admin poll must be live with the caller's bearer, got %q (%s)", p.State, p.Reason)
+	}
+	if p.Usage == nil || p.Usage.Requests24h != 1_000_000 {
+		t.Fatalf("admin must see measured usage, got %+v", p.Usage)
+	}
+	if p.Fleet == nil || p.Fleet.Gpus != 3 {
+		t.Fatalf("admin must see the live fleet, got %+v", p.Fleet)
+	}
+}
