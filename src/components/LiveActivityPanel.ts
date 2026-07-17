@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { getCloudPulse, type CloudPulse } from '@/services/cloud-pulse';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtCompact, fmtInt, sparkline, demoNote } from '@/utils/cloud-format';
+import { fmtCompact, fmtInt, sparkline } from '@/utils/cloud-format';
 
 // Live request-rate ticker. No request-rate SSE/WS endpoint exists (verified),
 // so it polls /v1/world/cloud-pulse and keeps a client-side rolling buffer so
@@ -30,8 +30,12 @@ export class LiveActivityPanel extends Panel {
     try {
       this.pulse = await getCloudPulse();
       this.error = null;
-      this.buffer.push(this.pulse.overview.requestsPerSec);
-      if (this.buffer.length > LiveActivityPanel.BUF) this.buffer.shift();
+      // Only buffer a REAL rate — an empty/warming pulse must not seed the ticker
+      // with fabricated-looking zeros.
+      if (!this.pulse.demo) {
+        this.buffer.push(this.pulse.overview.requestsPerSec);
+        if (this.buffer.length > LiveActivityPanel.BUF) this.buffer.shift();
+      }
     } catch (e) {
       this.error = e instanceof Error ? e.message : 'failed';
     }
@@ -42,40 +46,49 @@ export class LiveActivityPanel extends Panel {
     if (!this.pulse && this.error) { this.showError(this.error); return; }
     if (!this.pulse) { this.showLoading('Connecting…'); return; }
     const p = this.pulse;
-    // Live badge only when the pulse is real. A demo pulse drops the badge instead
-    // of wearing an "UNAVAILABLE · demo" tag — the honest flag stays in the payload
-    // (p.demo) and the quiet footer note, not as header jewelry.
-    if (p.demo) this.clearDataBadge();
-    else this.setDataBadge('live', 'polled');
+    // Live badge only when the rate is the exact MEASURED ledger volume. demo
+    // (nothing measured) OR volumeModeled (real public rate, but not the full
+    // ledger) both drop it — never a live tag over a not-fully-measured number.
+    const live = !p.demo && !p.volumeModeled;
+    if (live) this.setDataBadge('live', 'polled');
+    else this.clearDataBadge();
 
+    // Region breakdown = REAL fleet-by-region from the visor (node counts). There is
+    // no measured per-region request rate, so we never invent one; an empty region
+    // set (no service token) hides the section instead of showing zeros.
     const topRegions = p.regions
       .slice()
-      .sort((a, b) => b.requestsPerSec - a.requestsPerSec)
+      .sort((a, b) => b.nodes - a.nodes)
       .slice(0, 5);
-    const maxR = Math.max(...topRegions.map((r) => r.requestsPerSec), 1);
+    const maxR = Math.max(...topRegions.map((r) => r.nodes), 1);
     const regionRows = topRegions.map((r) => `
       <div class="cloud-activity-region">
         <span class="cloud-activity-rname">${escapeHtml(r.name)}</span>
-        <span class="cloud-activity-rbar"><span style="width:${((r.requestsPerSec / maxR) * 100).toFixed(0)}%"></span></span>
-        <span class="cloud-activity-rrate">${fmtCompact(r.requestsPerSec)}/s</span>
+        <span class="cloud-activity-rbar"><span style="width:${((r.nodes / maxR) * 100).toFixed(0)}%"></span></span>
+        <span class="cloud-activity-rrate">${fmtInt(r.nodes)} nodes</span>
       </div>`).join('');
 
     const spark = this.buffer.length >= 2 ? sparkline(this.buffer, 240, 34) : '';
+    // Headline shows a real rate or an honest "—" (never a fabricated 0).
+    const big = p.demo ? '—' : fmtInt(p.overview.requestsPerSec);
+    const foot = live
+      ? `<span class="cloud-live-note">live · ${escapeHtml(p.source)}</span>`
+      : (p.demo ? '' : `<span class="cloud-live-note">measured · ${escapeHtml(p.source)}</span>`);
 
     this.setContent(`
       <div class="cloud-activity">
         <div class="cloud-activity-head">
           <div class="cloud-activity-big">
-            <span class="cloud-activity-num" id="cloudRps">${fmtInt(p.overview.requestsPerSec)}</span>
+            <span class="cloud-activity-num" id="cloudRps">${big}</span>
             <span class="cloud-activity-unit">requests / sec</span>
           </div>
-          <span class="cloud-activity-pulse${p.demo ? '' : ' on'}"></span>
+          <span class="cloud-activity-pulse${live ? ' on' : ''}"></span>
         </div>
         <div class="cloud-activity-spark">${spark}</div>
         <div class="cloud-activity-regions">${regionRows}</div>
         <div class="cloud-overview-head cloud-activity-foot">
-          <span class="cloud-scope">${fmtCompact(p.overview.requests24h)} requests · ${p.window}</span>
-          ${p.demo ? demoNote() : `<span class="cloud-live-note">live · ${p.source}</span>`}
+          <span class="cloud-scope">${p.demo ? 'warming up' : `${fmtCompact(p.overview.requests24h)} requests · ${p.window}`}</span>
+          ${foot}
         </div>
       </div>
     `);

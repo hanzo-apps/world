@@ -53,9 +53,14 @@ export class TrafficGlobePanel extends Panel {
       statTile(fmtInt(d.points.length), 'active regions'),
     ].join('');
 
-    const rows = (t.top_countries ?? []).slice(0, 8).map((c) => `
+    // Only real ISO-3166 alpha-2 codes: upstream geo occasionally leaks malformed
+    // tokens (`u=`, `ᐢN`, bare digits) — drop them rather than render garbage flags.
+    const rows = (t.top_countries ?? [])
+      .filter((c) => /^[A-Za-z]{2}$/.test(c.country))
+      .slice(0, 8)
+      .map((c) => `
       <div class="traffic-row">
-        <span class="traffic-cc">${this.flag(c.country)} ${c.country}</span>
+        <span class="traffic-cc">${this.flag(c.country)} ${c.country.toUpperCase()}</span>
         <span class="traffic-cnt">${fmtInt(c.count)}</span>
       </div>`).join('');
 
