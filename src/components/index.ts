@@ -56,6 +56,7 @@ export { CustomFeedPanel } from './CustomFeedPanel';
 // SaaS / cloud variant panels
 export * from './CloudOverviewPanel';
 export * from './TrafficGlobePanel';
+export * from './ModelImprovementPanel';
 export * from './EnsoTrainingPanel';
 export * from './ModelUsagePanel';
 export * from './FleetPanel';
