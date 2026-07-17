@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -253,18 +254,27 @@ func (s *Server) applyServiceCounts(ctx context.Context, p *cloudPulse, hdr map[
 	// (name/city/coords), counting nodes + GPUs. rps stays 0 — no invented rate.
 	agg := map[string]*cloudRegion{}
 	var order []string
+	// Resolve to the geo catalog for coords/name when the region is known; otherwise
+	// keep the RAW region string as its own region (a real region, just without
+	// catalog coordinates) so EVERY real region shows — never dropped just because
+	// it's outside the 8-city catalog (e.g. tor1, GCP/AWS regions).
 	region := func(raw string) *cloudRegion {
-		rg, ok := resolveRegion(raw)
-		if !ok {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
 			return nil
 		}
-		if c := agg[rg.ID]; c != nil {
+		id := raw
+		nc := cloudRegion{ID: raw, Name: raw, City: raw, Status: "online"}
+		if rg, ok := resolveRegion(raw); ok {
+			id = rg.ID
+			nc = rg
+			nc.Nodes, nc.Gpus, nc.RequestsPerSec, nc.Status = 0, 0, 0, "online"
+		}
+		if c := agg[id]; c != nil {
 			return c
 		}
-		nc := rg
-		nc.Nodes, nc.Gpus, nc.RequestsPerSec, nc.Status = 0, 0, 0, "online"
-		agg[rg.ID] = &nc
-		order = append(order, rg.ID)
+		agg[id] = &nc
+		order = append(order, id)
 		return &nc
 	}
 
