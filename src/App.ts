@@ -2063,14 +2063,7 @@ export class App {
         <div class="header-left">
           ${logo}
           <div class="variant-switcher${hanzoHost ? ' hanzo-gated' : ''}" id="variantSwitcher" role="tablist" aria-label="View switcher">
-            ${cloudTab}<a href="?variant=full"
-               class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
-               data-variant="full"
-               title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">🌍</span>
-              <span class="variant-label">${t('header.world')}</span>
-            </a>
-            <a href="?variant=ai"
+            ${cloudTab}<a href="?variant=ai"
                class="variant-option ${SITE_VARIANT === 'ai' ? 'active' : ''}"
                data-variant="ai"
                title="${t('header.ai')}${SITE_VARIANT === 'ai' ? ` ${t('common.currentVariant')}` : ''}">
@@ -2097,6 +2090,13 @@ export class App {
                title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">💻</span>
               <span class="variant-label">${t('header.tech')}</span>
+            </a>
+            <a href="?variant=full"
+               class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
+               data-variant="full"
+               title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">🌍</span>
+              <span class="variant-label">${t('header.world')}</span>
             </a>
           </div>
           <div class="status-indicator">
