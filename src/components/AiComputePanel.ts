@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { streamAiPulse, getAiPulse, type AiUsage, type AiFleet } from '@/services/ai-pulse';
+import { isAuthenticated } from '@/services/iam';
 import { escapeHtml } from '@/utils/sanitize';
 import { fmtCompact, fmtInt, fmtUsd, statTile, sparkline, shareBar } from '@/utils/cloud-format';
 
@@ -31,9 +32,11 @@ export class AiComputePanel extends Panel {
     super.destroy();
   }
 
-  // SSE first; a stream error drops us to polling the JSON snapshot (one transport
-  // at a time — no double feed).
+  // Signed in → the AUTHED poll (the caller's bearer; EventSource can't send it), so
+  // an admin sees the full real compute pulse even with no server-side service token.
+  // Signed out → the public SSE stream; a stream error drops to the poll snapshot.
   private connect(): void {
+    if (isAuthenticated()) { this.startPolling(); return; }
     this.stop = streamAiPulse({
       onUsage: (u) => { this.usage = u; this.pushRate(u.requestsPerSec); this.state = 'live'; this.reason = undefined; this.render(); },
       onFleet: (f) => { this.fleet = f; this.render(); },

@@ -14,6 +14,8 @@
 // Honesty: state is "unavailable" (with a reason) when no service token is wired
 // or the upstream is unreachable — the panel says so rather than paint a zero.
 
+import { getToken } from './iam';
+
 function num(v: unknown): number {
   return typeof v === 'number' && isFinite(v) ? v : 0;
 }
@@ -119,9 +121,15 @@ export function streamAiPulse(h: AiPulseHandlers): () => void {
   return () => es.close();
 }
 
-/** Poll fallback: one JSON snapshot (same shape). Throws only on network/parse. */
+/** Poll snapshot (same shape). When signed in we send the caller's bearer, so an
+ * admin (z@hanzo.ai) gets the FULL measured compute pulse built server-side with
+ * their own token — EventSource can't carry auth, so this is the authed transport.
+ * Throws only on network/parse. */
 export async function getAiPulse(): Promise<AiPulse> {
-  const res = await fetch('/v1/world/ai-pulse');
+  const tok = await getToken();
+  const res = await fetch('/v1/world/ai-pulse', tok
+    ? { headers: { Authorization: `Bearer ${tok}` }, cache: 'no-store' }
+    : undefined);
   if (!res.ok) throw new Error(`ai-pulse HTTP ${res.status}`);
   const d = (await res.json()) as Record<string, unknown>;
   const state = d.state;
