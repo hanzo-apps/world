@@ -563,6 +563,8 @@ export interface MapLayers {
   chainNodes?: boolean;
   byoGpu?: boolean;
   trafficArcs?: boolean;
+  // Bridge-flow arcs (crypto→DeFi variant): Lux hub ↔ bridge counterparties.
+  bridgeFlows?: boolean;
 }
 
 export interface AIDataCenter {

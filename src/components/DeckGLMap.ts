@@ -50,6 +50,7 @@ import {
   type ByoGpu,
   type TrafficArc,
 } from '@/services/cloud-map';
+import { getDefiFlows, type DefiFlow } from '@/services/defi';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
@@ -391,6 +392,9 @@ export class DeckGLMap {
   private chainNetworks: ChainNetwork[] = [];
   private byoGpus: ByoGpu[] = [];
   private trafficArcsData: TrafficArc[] = [];
+  // Bridge-flow arcs (crypto→DeFi variant): Lux hub ↔ counterparty chains from
+  // /v1/world/defi/flows. Positions/weights are modeled (chains aren't geographic).
+  private bridgeFlowsData: DefiFlow[] = [];
   private cloudMapTimers: ReturnType<typeof setInterval>[] = [];
 
   // Country highlight state
@@ -470,7 +474,7 @@ export class DeckGLMap {
   private pulseDirty = { news: false, cloud: false };
   private rafUpdatePulse: () => void;
   private static readonly NEWS_PULSE_LAYER_IDS = ['news-pulse-layer', 'hotspots-pulse', 'protest-clusters-pulse'];
-  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs'];
+  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs', 'bridgeFlows'];
 
   // Chain-node dots derive from chainNetworks; cache them by source reference so
   // the cloud-pulse breathe (a radiusScale-only change) reuses the same data
@@ -568,6 +572,7 @@ export class DeckGLMap {
     pull(getChainNodes, (d) => { this.chainNetworks = d.networks ?? []; }, 30_000);
     pull(getTraffic, (d) => { this.trafficArcsData = d.arcs ?? []; }, 15_000);
     pull(getByoGpu, (d) => { this.byoGpus = d.gpus ?? []; }, 60_000);
+    pull(getDefiFlows, (d) => { this.bridgeFlowsData = d.flows ?? []; }, 60_000);
   }
 
   private setupDOM(): void {
@@ -1425,6 +1430,9 @@ export class DeckGLMap {
     if (mapLayers.trafficArcs && this.trafficArcsData.length > 0) {
       layers.push(this.createTrafficArcsLayer());
     }
+    if (mapLayers.bridgeFlows && this.bridgeFlowsData.length > 0) {
+      layers.push(this.createBridgeFlowsLayer());
+    }
 
     // News geo-locations (always shown if data exists)
     if (this.newsLocations.length > 0) {
@@ -1472,6 +1480,7 @@ export class DeckGLMap {
       case 'protest-clusters-pulse': return this.createProtestClustersPulseLayer();
       case 'chainNodes': return this.createChainNodesLayer();
       case 'trafficArcs': return this.createTrafficArcsLayer();
+      case 'bridgeFlows': return this.createBridgeFlowsLayer();
       default: return null;
     }
   }
@@ -2912,6 +2921,8 @@ export class DeckGLMap {
       }
       case 'trafficArcs':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.label)}</strong><br/>weight ${text(obj.weight)}</div>` };
+      case 'bridgeFlows':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.label)}</strong><br/>${obj.realFlow ? 'activity-weighted' : 'bridge route (modeled)'}</div>` };
       case 'gulf-investments-layer': {
         const inv = obj as GulfInvestment;
         const flag = inv.investingCountry === 'SA' ? '🇸🇦' : '🇦🇪';
@@ -3281,6 +3292,7 @@ export class DeckGLMap {
         { key: 'chainNodes', label: 'Chain nodes', icon: '&#9939;' },
         { key: 'byoGpu', label: 'BYO GPUs', icon: '&#128187;' },
         { key: 'trafficArcs', label: 'Traffic', icon: '&#8644;' },
+        { key: 'bridgeFlows', label: 'Bridge flows', icon: '&#8652;' },
       ];
 
     // Apply the user's persisted cosmetic ordering of the toggle rows (drag to
@@ -3944,10 +3956,11 @@ export class DeckGLMap {
   // when the tab is hidden, so that case needs no extra handling.
   private cloudPulseGateOpen(): boolean {
     if (this.renderPaused || this.webglLost || this.prefersReducedMotion()) return false;
-    const { trafficArcs, chainNodes } = this.state.layers;
+    const { trafficArcs, chainNodes, bridgeFlows } = this.state.layers;
     const arcsLive = trafficArcs && this.trafficArcsData.length > 0;
     const nodesLive = chainNodes && this.chainNetworks.length > 0;
-    return Boolean(arcsLive || nodesLive);
+    const flowsLive = bridgeFlows && this.bridgeFlowsData.length > 0;
+    return Boolean(arcsLive || nodesLive || flowsLive);
   }
 
   private maybeStartCloudPulse(): void {
@@ -4272,6 +4285,38 @@ export class DeckGLMap {
         getSourceColor: this.trafficArcsData.length,
         getTargetColor: this.trafficArcsData.length,
         getWidth: this.trafficArcsData.length,
+      },
+    });
+  }
+
+  // Bridge-flow arcs (crypto→DeFi variant): Lux hub → counterparty chains. A Lux
+  // cyan travelling pulse (same AnimatedArcLayer + cloud-pulse coef as the traffic
+  // arcs). Real activity-weighted flows (native counterparties) read brighter than
+  // the modeled external routes, so the honest distinction is visible on the globe.
+  private createBridgeFlowsLayer(): AnimatedArcLayer<DefiFlow> {
+    const maxWeight = Math.max(1, ...this.bridgeFlowsData.map((f) => f.weight || 0));
+    const alpha = (w: number): number => Math.round(40 + Math.min(1, (w || 0) / maxWeight) * 180);
+    // Lux accent cyan (#5cf) for real flows; a cooler slate for modeled routes.
+    const color = (d: DefiFlow, a: number): [number, number, number, number] =>
+      d.realFlow ? [92, 207, 255, a] : [120, 150, 180, Math.round(a * 0.7)];
+    return new AnimatedArcLayer<DefiFlow>({
+      id: 'bridgeFlows',
+      data: this.bridgeFlowsData,
+      coef: this.cloudPulseCoef,
+      greatCircle: this.onGlobe,
+      getHeight: this.onGlobe ? 0 : 1,
+      getSourcePosition: (d) => [d.fromLon, d.fromLat],
+      getTargetPosition: (d) => [d.toLon, d.toLat],
+      getSourceColor: (d) => color(d, alpha(d.weight)),
+      getTargetColor: (d) => color(d, Math.round(alpha(d.weight) * 0.55)),
+      getWidth: (d) => 0.6 + Math.min(1, (d.weight || 0) / maxWeight) * 1.8,
+      widthMinPixels: 0.5,
+      widthMaxPixels: 2.4,
+      pickable: true,
+      updateTriggers: {
+        getSourceColor: this.bridgeFlowsData.length,
+        getTargetColor: this.bridgeFlowsData.length,
+        getWidth: this.bridgeFlowsData.length,
       },
     });
   }

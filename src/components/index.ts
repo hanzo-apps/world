@@ -69,3 +69,4 @@ export { HanzoStatusPanel } from './HanzoStatusPanel';
 export { CloudAnalyticsPanel } from './CloudAnalyticsPanel';
 export { LlmUsagePanel } from './LlmUsagePanel';
 export { BlockchainPanel } from './BlockchainPanel';
+export { DefiBoardPanel } from './DefiBoardPanel';
