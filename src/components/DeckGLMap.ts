@@ -346,6 +346,19 @@ const MARKER_ICONS = {
   star: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16,2 20,12 30,12 22,19 25,30 16,23 7,30 10,19 2,12 12,12" fill="white"/></svg>`),
 };
 
+// UNDERSEA_CABLES filtered to valid PathLayer input: ≥2 vertices, each a finite
+// [lon,lat]. Precomputed once (the source is static) so createCablesLayer never feeds
+// deck.gl a malformed path — a single bad cable makes PathLayer assert at init and
+// drop the WHOLE layer ("[GlobeNative] cables-layer assertion": enabled yet blank).
+const cablesWithValidPaths = UNDERSEA_CABLES.filter(
+  (c) =>
+    Array.isArray(c.points) &&
+    c.points.length >= 2 &&
+    c.points.every(
+      (p) => Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]),
+    ),
+);
+
 export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
@@ -1571,7 +1584,11 @@ export class DeckGLMap {
 
     const layer = new PathLayer({
       id: cacheKey,
-      data: UNDERSEA_CABLES,
+      // Guard the PathLayer contract: every path needs ≥2 finite [lon,lat] vertices.
+      // A single malformed cable (short/NaN path) makes deck.gl assert at init and
+      // silently drop the WHOLE layer (the "[GlobeNative] cables-layer assertion" —
+      // enabled yet never drawing). Filtering keeps the good cables rendering.
+      data: cablesWithValidPaths,
       getPath: (d) => d.points,
       getColor: (d) =>
         highlightedCables.has(d.id) ? COLORS.cableHighlight : COLORS.cable,
@@ -2920,6 +2937,21 @@ export class DeckGLMap {
       }
       case 'trafficArcs':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.label)}</strong><br/>weight ${text(obj.weight)}</div>` };
+      case 'traffic': {
+        // Regional activity: WHERE + WHAT. Prefer the router task mix (code/reasoning/
+        // chat/vision — what customers here are DOING); fall back to the coarse service
+        // class. Percentages of the resolved dimension's total.
+        const rg = obj.region ? ` · ${text(obj.region)}` : '';
+        const mixObj: Record<string, number> =
+          obj.byTask && Object.keys(obj.byTask).length ? obj.byTask : (obj.byService || {});
+        const total = Object.values(mixObj).reduce<number>((a, b) => a + Number(b), 0) || 1;
+        const mix = Object.entries(mixObj)
+          .sort((a, b) => Number(b[1]) - Number(a[1]))
+          .slice(0, 3)
+          .map(([k, v]) => `${text(k)} ${Math.round((Number(v) / total) * 100)}%`)
+          .join(' · ');
+        return { html: `<div class="deckgl-tooltip"><strong>🌐 ${text(obj.country)}${rg}</strong><br/>${text(obj.count)} req · last window${mix ? `<br/>${mix}` : ''}</div>` };
+      }
       case 'gulf-investments-layer': {
         const inv = obj as GulfInvestment;
         const flag = inv.investingCountry === 'SA' ? '🇸🇦' : '🇦🇪';
@@ -3655,10 +3687,24 @@ export class DeckGLMap {
       triangle: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,10 1,10" fill="${color}"/></svg>`,
       square: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1" fill="${color}"/></svg>`,
       hexagon: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 10.5,3.5 10.5,8.5 6,11 1.5,8.5 1.5,3.5" fill="${color}"/></svg>`,
+      // Warm heat ramp (amber→magenta) matching the traffic ScatterplotLayer: colour
+      // AND size encode request volume, so one swatch reads as "origin by volume".
+      heat: () => `<svg width="14" height="12" viewBox="0 0 14 12"><defs><linearGradient id="legendHeat" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgb(255,180,70)"/><stop offset="1" stop-color="rgb(255,60,140)"/></linearGradient></defs><circle cx="6" cy="6" r="5" fill="url(#legendHeat)"/></svg>`,
     };
 
     const isLight = getCurrentTheme() === 'light';
-    const legendItems = SITE_VARIANT === 'tech'
+    // Cloud (flagship) legend MUST match what the globe plots — the Hanzo Cloud data
+    // classes, not the geopolitical default (which would mislabel traffic dots as
+    // "high alert" etc.). Order mirrors visual prominence on the globe.
+    const legendItems = SITE_VARIANT === 'cloud'
+      ? [
+          { shape: shapes.heat(), label: 'Request origin · volume' },
+          { shape: shapes.circle('rgb(0, 200, 255)'), label: 'Validator node' },
+          { shape: shapes.circle('rgb(0, 230, 190)'), label: 'GPU fleet' },
+          { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud region' },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter · PoP' },
+        ]
+      : SITE_VARIANT === 'tech'
       ? [
           { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
           { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
