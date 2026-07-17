@@ -413,16 +413,17 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
-// HANZO VARIANT (flagship — Hanzo Cloud + live-traffic globe)
+// CLOUD VARIANT (flagship — Hanzo Cloud + live-traffic globe)
 // ============================================
 // The world.hanzo.ai default. Renders HANZO ITSELF: the live-traffic globe (where
 // requests hit api.hanzo.ai from) as the centerpiece, plus platform metrics —
 // router/Enso training, throughput, model mix, fleet, uptime — and the caller's own
 // org usage + bill when signed in. Folds the former `saas` variant (kept as an
 // alias). Map reuses datacenters + cloudRegions as the global infra backdrop.
-const HANZO_PANELS: Record<string, PanelConfig> = {
+const CLOUD_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
   'traffic-globe': { name: 'Live Traffic', enabled: true, priority: 1 },
+  'model-improvement': { name: 'Model Improvement', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
   'enso-training': { name: 'Enso Live Training', enabled: true, priority: 1 },
   'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
@@ -437,10 +438,13 @@ const HANZO_PANELS: Record<string, PanelConfig> = {
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
-const HANZO_MAP_LAYERS: MapLayers = {
+const CLOUD_MAP_LAYERS: MapLayers = {
   conflicts: false,
   bases: false,
-  cables: true,
+  // Cables OFF: geopolitical backbone, not a Hanzo Cloud data class, and absent from
+  // the Cloud legend — keep the globe to the plotted classes (traffic/nodes/GPU/
+  // region/datacenter) so the legend matches exactly.
+  cables: false,
   pipelines: false,
   hotspots: false,
   ais: false,
@@ -490,8 +494,8 @@ const HANZO_MAP_LAYERS: MapLayers = {
   traffic: true,
 };
 
-const HANZO_MOBILE_MAP_LAYERS: MapLayers = {
-  ...HANZO_MAP_LAYERS,
+const CLOUD_MOBILE_MAP_LAYERS: MapLayers = {
+  ...CLOUD_MAP_LAYERS,
   cables: false,
   cloudRegions: false,
   traffic: true,
@@ -668,9 +672,9 @@ const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'hanzo' ? HANZO_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'hanzo' ? HANZO_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'hanzo' ? HANZO_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'cloud' ? CLOUD_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
