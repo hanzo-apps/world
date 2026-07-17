@@ -94,17 +94,38 @@ type cloudPulse struct {
 // status page) so a single slow/unreachable host can't stall the pulse produce.
 const publicVolumeTimeout = 5 * time.Second
 
-// handleCloudPulse serves the platform aggregate. It never 5xxes: any upstream
-// failure degrades to the honest empty pulse (all zeros/empty, flagged) — never
-// fabricated numbers.
+// handleCloudPulse serves the platform aggregate. Two honest representations:
+//
+//   - SIGNED-IN ADMIN (z@hanzo.ai / the admin org): the FULL real aggregate, with
+//     the token-plane reads (all-org usage ledger + visor fleet) made using the
+//     CALLER's OWN bearer, never edge-cached. The upstream independently authorizes
+//     the bearer, so a non-super-admin simply degrades to the public sources —
+//     never a fabricated number.
+//   - EVERYONE ELSE (public teaser): cached; service-token counts + real public
+//     volume/uptime.
+//
+// It never 5xxes: any upstream failure degrades to the honest empty pulse.
 func (s *Server) handleCloudPulse(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
 		return
 	}
+	// Authed responses must never be served from (or stored in) the shared public
+	// cache: vary on Authorization so an anonymous cache entry is never handed to a
+	// signed-in caller, and vice-versa.
+	w.Header().Set("Vary", "Authorization")
+
+	if bearer, ok := s.adminIdentity(r); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		p := s.producePulse(ctx, map[string]string{"Authorization": bearer})
+		writeJSON(w, http.StatusOK, "private, no-store", p)
+		return
+	}
+
 	s.cachedJSON(w, "cloud-pulse", "public, max-age=15, s-maxage=15, stale-while-revalidate=60",
 		20*time.Second, 5*time.Minute,
 		func(ctx context.Context) (any, error) {
-			return s.producePulse(ctx), nil
+			return s.producePulse(ctx, serviceAuth()), nil
 		},
 		func(w http.ResponseWriter, _ error) {
 			writeJSON(w, http.StatusOK, "", emptyPulse())
@@ -131,22 +152,24 @@ func emptyPulse() cloudPulse {
 }
 
 // producePulse assembles the pulse from ONLY real sources (see the file header for
-// the honesty ladder). demo:true iff nothing real resolved; every field is real or
-// an honest zero/empty.
-func (s *Server) producePulse(ctx context.Context) cloudPulse {
+// the honesty ladder). auth is the token-plane header (the KMS service bearer on the
+// public path, or the signed-in admin's own bearer on the flagship admin path); nil
+// leaves the token-plane reads out and the pulse falls back to the public sources.
+// demo:true iff nothing real resolved; every field is real or an honest zero/empty.
+func (s *Server) producePulse(ctx context.Context, auth map[string]string) cloudPulse {
 	p := emptyPulse()
 	real := false
 	volSrc := ""
 
-	// 1) Fleet COUNTS + REGION breakdown (service token → visor + ai catalog).
-	countsReal := s.applyServiceCounts(ctx, &p)
+	// 1) Fleet COUNTS + REGION breakdown (auth → visor + ai catalog).
+	countsReal := s.applyServiceCounts(ctx, &p, auth)
 	if countsReal {
 		real = true
 	}
 
-	// 2) VOLUME — measured ledger first (super-admin, exact); else the real public
-	//    request rate + throughput + model mix; else empty. Never modeled.
-	if ov, err := s.fetchCloudUsage(ctx, "24h"); err == nil && ov.Totals.Requests > 0 {
+	// 2) VOLUME — measured ledger first (super-admin ?org=all, exact); else the real
+	//    public request rate + throughput + model mix; else empty. Never modeled.
+	if ov, err := s.fetchCloudUsage(ctx, "24h", auth); err == nil && ov.Totals.Requests > 0 {
 		applyUsageToPulse(&p, ov) // clears volumeModeled, fills tokens/series/models
 		real, volSrc = true, "ledger"
 	} else if s.applyPublicVolume(ctx, &p) {
@@ -179,9 +202,10 @@ func (s *Server) producePulse(ctx context.Context) cloudPulse {
 // are derived from the machines' OWN region strings (resolved to the geo catalog for
 // name/city/coords) — an empty fleet yields an empty regions list, never the geo
 // catalog as if it were live; per-region rate stays 0 (no real per-region source).
-// Returns false (leaving zeros) when no service token is set or the core reads fail.
-func (s *Server) applyServiceCounts(ctx context.Context, p *cloudPulse) bool {
-	hdr := serviceAuth()
+// Returns false (leaving zeros) when no auth header is supplied or the core reads
+// fail. auth is the KMS service bearer (public path) or the caller's own admin
+// bearer (admin path).
+func (s *Server) applyServiceCounts(ctx context.Context, p *cloudPulse, hdr map[string]string) bool {
 	if hdr == nil {
 		return false
 	}
