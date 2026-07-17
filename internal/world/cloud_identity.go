@@ -24,16 +24,29 @@ import (
 // or non-admin owner → 403. The caller's bearer is returned to forward upstream,
 // where cloud independently re-verifies — defense in depth.
 
-// isAdminOrg reports whether an owner claim is one of the admin orgs. Kept in
-// sync with the cloud deploy's globalAdminOrgs (admin,built-in).
-func isAdminOrg(owner string) bool {
-	switch strings.TrimSpace(owner) {
-	case "admin", "built-in":
-		return true
-	default:
-		return false
+// adminOrgs is the set of IAM owner claims world treats as a global admin: the
+// base {admin, built-in} (in sync with the cloud deploy's globalAdminOrgs) plus the
+// deployment's OPERATOR org, so the seeded superuser (z@hanzo.ai, owner "hanzo")
+// sees the full internal dashboard. Override per deployment with WORLD_ADMIN_ORGS
+// (comma-separated); unset defaults the operator org to "hanzo". The upstream cloud
+// subsystems independently re-verify the bearer, so this gate only decides which
+// callers world will ATTEMPT the full/admin reads for — never the final authz.
+func adminOrgs() map[string]bool {
+	m := map[string]bool{"admin": true, "built-in": true}
+	extra := env("WORLD_ADMIN_ORGS")
+	if extra == "" {
+		extra = "hanzo" // operator org: z@hanzo.ai is the seeded superuser
 	}
+	for _, o := range strings.Split(extra, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			m[o] = true
+		}
+	}
+	return m
 }
+
+// isAdminOrg reports whether an owner claim is one of the admin orgs.
+func isAdminOrg(owner string) bool { return adminOrgs()[strings.TrimSpace(owner)] }
 
 // apiHost returns the api.hanzo.ai origin (no /v1 suffix) that the cloud
 // subsystems are served from. HANZO_AI_BASE may legitimately carry a /v1 suffix
@@ -56,22 +69,36 @@ func iamIssuer() string {
 	return "https://hanzo.id"
 }
 
-// requireAdmin gates an admin-only Cloud endpoint. It returns the caller's bearer
-// (to forward upstream) and true only for a validated admin-org owner; otherwise
-// it writes the fail-closed response (401 without a token, 403 otherwise) and
-// returns false. Every admin handler calls this after preflight. Identity is
-// resolved through the single IAM-userinfo path (introspectIdentity); the gate
-// reads only the authoritative owner claim.
-func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (string, bool) {
+// adminIdentity is the NON-writing admin probe: it returns the caller's bearer and
+// true iff a valid IAM identity resolves to an admin-org owner. It short-circuits
+// (no IAM call) when the request carries no bearer, so anonymous requests stay cheap.
+// Used by endpoints that have a public fallback (cloud-pulse): they upgrade to the
+// full admin view when the caller is an admin, and otherwise serve the public path.
+func (s *Server) adminIdentity(r *http.Request) (string, bool) {
 	bearer := userBearer(r)
 	if bearer == "" {
-		writeError(w, http.StatusUnauthorized, "Sign in required")
 		return "", false
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	id, err := s.introspectIdentity(ctx, bearer)
 	if err != nil || !isAdminOrg(id.Org) {
+		return "", false
+	}
+	return bearer, true
+}
+
+// requireAdmin gates an admin-ONLY Cloud endpoint (no public fallback). It returns
+// the caller's bearer (to forward upstream) and true only for a validated admin-org
+// owner; otherwise it writes the fail-closed response (401 without a token, 403
+// otherwise) and returns false. Every admin handler calls this after preflight.
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if userBearer(r) == "" {
+		writeError(w, http.StatusUnauthorized, "Sign in required")
+		return "", false
+	}
+	bearer, ok := s.adminIdentity(r)
+	if !ok {
 		writeError(w, http.StatusForbidden, "Admin only — sign in with the admin org")
 		return "", false
 	}
