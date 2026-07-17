@@ -103,8 +103,16 @@ func (s *Server) handleAIPulse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Poll fallback: one JSON snapshot (never cached downstream — it is live).
+	// EventSource cannot send Authorization, so the AUTHED transport is this poll:
+	// a signed-in admin gets a fresh per-caller snapshot built with THEIR OWN bearer
+	// (full measured usage + fleet), never the shared service-token snapshot.
+	w.Header().Set("Vary", "Authorization")
 	sctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
+	if bearer, ok := s.adminIdentity(r); ok {
+		writeJSON(w, http.StatusOK, "private, no-store", s.produceAIPulse(sctx, map[string]string{"Authorization": bearer}))
+		return
+	}
 	writeJSON(w, http.StatusOK, "no-store", s.aiPulseSnapshot(sctx))
 }
 
@@ -141,7 +149,7 @@ func (s *Server) aiPulseSnapshot(ctx context.Context) aiPulse {
 		return v.(aiPulse)
 	}
 	v, _ := s.flight.do(aiPulseKey, func() (any, error) {
-		p := s.produceAIPulse(ctx)
+		p := s.produceAIPulse(ctx, serviceAuth())
 		ttl := aiPulseTTL
 		if p.State != "live" {
 			ttl = aiPulseFailTTL
@@ -152,15 +160,17 @@ func (s *Server) aiPulseSnapshot(ctx context.Context) aiPulse {
 	return v.(aiPulse)
 }
 
-// produceAIPulse reads both honest halves. It is "live" when either resolves;
-// "unavailable" (with a reason) when there is no token or every upstream fails.
-func (s *Server) produceAIPulse(ctx context.Context) aiPulse {
+// produceAIPulse reads both honest halves using auth (the KMS service bearer for the
+// public SSE, or a signed-in admin's OWN bearer for the authed poll). It is "live"
+// when either resolves; "unavailable" (with a reason) when there is no auth or every
+// upstream fails.
+func (s *Server) produceAIPulse(ctx context.Context, auth map[string]string) aiPulse {
 	now := nowRFC()
-	if serviceToken() == "" {
-		return aiPulse{State: "unavailable", Reason: "service token not configured", UpdatedAt: now}
+	if auth == nil {
+		return aiPulse{State: "unavailable", Reason: "sign in for live compute telemetry (or wire the service token)", UpdatedAt: now}
 	}
-	usage := s.buildAIUsage(ctx)
-	fleet := s.buildAIFleet(ctx)
+	usage := s.buildAIUsage(ctx, auth)
+	fleet := s.buildAIFleet(ctx, auth)
 	if usage == nil && fleet == nil {
 		return aiPulse{State: "unavailable", Reason: "compute plane unreachable", UpdatedAt: now}
 	}
@@ -168,10 +178,10 @@ func (s *Server) produceAIPulse(ctx context.Context) aiPulse {
 }
 
 // buildAIUsage maps the measured platform usage ledger into the compute-panel
-// shape. nil when the ledger is unreachable (no token / non-admin / upstream
-// down) so the panel degrades honestly.
-func (s *Server) buildAIUsage(ctx context.Context) *aiUsage {
-	ov, err := s.fetchCloudUsage(ctx, "24h", serviceAuth())
+// shape, read with auth. nil when the ledger is unreachable (no auth / non-admin /
+// upstream down) so the panel degrades honestly.
+func (s *Server) buildAIUsage(ctx context.Context, auth map[string]string) *aiUsage {
+	ov, err := s.fetchCloudUsage(ctx, "24h", auth)
 	if err != nil {
 		return nil
 	}
@@ -191,10 +201,9 @@ func (s *Server) buildAIUsage(ctx context.Context) *aiUsage {
 }
 
 // buildAIFleet reads the live serving fleet (visor machines/gpus + ai model
-// catalog). nil only when the machines read fails; gpus/models are best-effort
-// bonus counts.
-func (s *Server) buildAIFleet(ctx context.Context) *aiFleet {
-	hdr := serviceAuth()
+// catalog) with auth. nil only when the machines read fails; gpus/models are
+// best-effort bonus counts.
+func (s *Server) buildAIFleet(ctx context.Context, hdr map[string]string) *aiFleet {
 	if hdr == nil {
 		return nil
 	}
