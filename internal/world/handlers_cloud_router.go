@@ -85,3 +85,61 @@ func (s *Server) handleCloudRouterStats(w http.ResponseWriter, r *http.Request) 
 		},
 	)
 }
+
+// routerHistoryUnavailable is the honest empty payload for the flywheel history: no
+// series, no retrains — flat/empty charts, never a fabricated curve. Structurally
+// valid so the panels bind identically whether live or empty.
+var routerHistoryUnavailable = json.RawMessage(`{"scope":"platform","unavailable":true,"window":{"since":"","until":"","days":0},"daily":[],"retrains":[],"totals":{"events":0,"cumulative_cost_saved":0,"reward_rate":0,"days_active":0}}`)
+
+// clampDays parses ?days= and clamps to [1,90] (default 30).
+func clampDays(raw string) int {
+	d, err := strconv.Atoi(raw)
+	if err != nil || d < 1 {
+		return 30
+	}
+	if d > 90 {
+		return 90
+	}
+	return d
+}
+
+// handleCloudRouterHistory proxies the ai gateway's PUBLIC /v1/router/history?scope=
+// platform (daily reward-rate + cumulative cost-saved + adoption curve + the retrain
+// timeline). Same discipline as router-stats: scope HARD-PINNED to platform, raw
+// pass-through of the arm-opaque `data`, honest empty (unavailable:true) on any soft
+// failure, never a 5xx. The flywheel is only barely lit today — the series start
+// empty and GROW with real data; we never invent history.
+func (s *Server) handleCloudRouterHistory(w http.ResponseWriter, r *http.Request) {
+	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
+		return
+	}
+	days := clampDays(r.URL.Query().Get("days"))
+	daysStr := strconv.Itoa(days)
+	s.cachedJSON(w, "router-history:"+daysStr, "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
+		90*time.Second, 10*time.Minute,
+		func(ctx context.Context) (any, error) {
+			url := apiHost() + "/v1/router/history?scope=platform&days=" + daysStr
+			body, status, err := s.get(ctx, url, nil)
+			if err != nil {
+				return nil, err
+			}
+			if status < 200 || status >= 300 {
+				return nil, httpErr(status)
+			}
+			var env struct {
+				Status string          `json:"status"`
+				Data   json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal(body, &env); err != nil {
+				return nil, httpErr(http.StatusBadGateway)
+			}
+			if env.Status != "ok" || len(env.Data) == 0 || string(env.Data) == "null" {
+				return nil, httpErr(http.StatusBadGateway)
+			}
+			return env.Data, nil
+		},
+		func(w http.ResponseWriter, _ error) {
+			writeJSON(w, http.StatusOK, "no-store", routerHistoryUnavailable)
+		},
+	)
+}
