@@ -108,6 +108,7 @@ import {
   CloudAnalyticsPanel,
   LlmUsagePanel,
   BlockchainPanel,
+  DefiBoardPanel,
   AiComputePanel,
   EnsoFlywheelPanel,
 } from '@/components';
@@ -2665,6 +2666,13 @@ export class App {
     // Chains widget — live block heights + peers (saas + crypto variants).
     if (SITE_VARIANT === 'saas' || SITE_VARIANT === 'crypto') {
       this.panels['chains'] = new BlockchainPanel();
+    }
+
+    // DeFi variant (crypto) — the DefiLlama-shaped board leads the view: the
+    // bridge-supported chain universe + live Lux-ecosystem metrics (block height,
+    // txns, TPS) from explorer.lux.network, with honest "—" where USD is absent.
+    if (SITE_VARIANT === 'crypto') {
+      this.panels['defi-board'] = new DefiBoardPanel();
     }
 
     const liveNewsPanel = new LiveNewsPanel();
