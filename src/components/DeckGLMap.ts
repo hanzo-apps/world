@@ -2937,6 +2937,21 @@ export class DeckGLMap {
       }
       case 'trafficArcs':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.label)}</strong><br/>weight ${text(obj.weight)}</div>` };
+      case 'traffic': {
+        // Regional activity: WHERE + WHAT. Prefer the router task mix (code/reasoning/
+        // chat/vision — what customers here are DOING); fall back to the coarse service
+        // class. Percentages of the resolved dimension's total.
+        const rg = obj.region ? ` · ${text(obj.region)}` : '';
+        const mixObj: Record<string, number> =
+          obj.byTask && Object.keys(obj.byTask).length ? obj.byTask : (obj.byService || {});
+        const total = Object.values(mixObj).reduce<number>((a, b) => a + Number(b), 0) || 1;
+        const mix = Object.entries(mixObj)
+          .sort((a, b) => Number(b[1]) - Number(a[1]))
+          .slice(0, 3)
+          .map(([k, v]) => `${text(k)} ${Math.round((Number(v) / total) * 100)}%`)
+          .join(' · ');
+        return { html: `<div class="deckgl-tooltip"><strong>🌐 ${text(obj.country)}${rg}</strong><br/>${text(obj.count)} req · last window${mix ? `<br/>${mix}` : ''}</div>` };
+      }
       case 'gulf-investments-layer': {
         const inv = obj as GulfInvestment;
         const flag = inv.investingCountry === 'SA' ? '🇸🇦' : '🇦🇪';

@@ -93,6 +93,10 @@ export interface TrafficGlobePoint {
   lon: number;
   count: number;
   byService: Record<string, number>;
+  // Router task classification (code/reasoning/chat/vision/…) for this origin — what
+  // customers here are DOING. Present once the ai release with per-geo task recording
+  // lands; omitempty until then (the tooltip falls back to byService).
+  byTask?: Record<string, number>;
 }
 
 export interface TrafficGlobeCountry {
