@@ -12,8 +12,8 @@ export class PlaybackControl {
     this.element = document.createElement('div');
     this.element.className = 'playback-control';
     this.element.innerHTML = `
-      <button class="playback-toggle" title="${t('components.playback.toggleMode')}">
-        <span class="playback-icon">⏪</span>
+      <button class="playback-toggle" title="${t('components.playback.toggleMode')}" aria-label="${t('components.playback.historicalPlayback')}">
+        <span class="playback-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
       </button>
       <div class="playback-panel hidden">
         <div class="playback-header">
@@ -25,11 +25,11 @@ export class PlaybackControl {
           <div class="playback-time">${t('components.playback.live')}</div>
         </div>
         <div class="playback-controls">
-          <button class="playback-btn" data-action="start">⏮</button>
-          <button class="playback-btn" data-action="prev">◀</button>
+          <button class="playback-btn" data-action="start" title="Start" aria-label="Start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg></button>
+          <button class="playback-btn" data-action="prev" title="Previous" aria-label="Previous"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
           <button class="playback-btn playback-live" data-action="live">${t('components.playback.live')}</button>
-          <button class="playback-btn" data-action="next">▶</button>
-          <button class="playback-btn" data-action="end">⏭</button>
+          <button class="playback-btn" data-action="next" title="Next" aria-label="Next"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+          <button class="playback-btn" data-action="end" title="End" aria-label="End"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>
         </div>
       </div>
     `;
