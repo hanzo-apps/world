@@ -95,13 +95,22 @@ export class CloudOverviewPanel extends Panel {
       o.gpusOnline > 0 ? statTile(fmtInt(o.gpusOnline), 'GPUs online') : '',
       o.regions > 0 ? statTile(fmtInt(o.regions), 'regions') : '',
       o.uptimePct > 0 ? statTile(fmtPct(o.uptimePct), 'uptime') : '',
+      // Real platform users/signups/active — present only for a signed-in admin.
+      p.users ? statTile(fmtCompact(p.users.total), 'users', p.users.signups24h > 0 ? `+${fmtInt(p.users.signups24h)} / 24h` : undefined) : '',
+      p.users && p.users.activeNow > 0 ? statTile(fmtInt(p.users.activeNow), 'active now') : '',
     ].join('');
 
-    // Sparkline only when there is a real series — never a flat line over empties.
+    // Sparklines only when there is a real series — never a flat line over empties.
     const sparkRow = p.requestSeries.length >= 2
       ? `<div class="cloud-spark-row">
           <span class="cloud-spark-label">requests · last ${p.requestSeries.length}h</span>
           <span class="cloud-spark-wrap">${sparkline(p.requestSeries, 220, 30)}</span>
+        </div>`
+      : '';
+    const signupRow = p.users && p.users.signupSeries.some((v) => v > 0)
+      ? `<div class="cloud-spark-row">
+          <span class="cloud-spark-label">new users · last ${p.users.signupSeries.length}d</span>
+          <span class="cloud-spark-wrap">${sparkline(p.users.signupSeries, 220, 30)}</span>
         </div>`
       : '';
 
@@ -112,6 +121,7 @@ export class CloudOverviewPanel extends Panel {
         </div>
         <div class="cloud-stat-grid cloud-stat-grid-8">${tiles}</div>
         ${sparkRow}
+        ${signupRow}
       </div>
     `);
   }
