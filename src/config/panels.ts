@@ -409,14 +409,14 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
-// SAAS VARIANT (Hanzo Cloud metrics/usage)
+// HOME VARIANT (Hanzo Cloud metrics/usage)
 // ============================================
 // Renders HANZO CLOUD ITSELF, not world intel: dense stat tiles for platform
 // requests/models/nodes/regions (signed-out investor view via the demo-flagged
 // public aggregate) plus the caller's own org usage + bill drill-down (signed
 // in). Map reuses the existing datacenters + cloudRegions layers as the global
 // infrastructure backdrop.
-const SAAS_PANELS: Record<string, PanelConfig> = {
+const HOME_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Cloud Infrastructure', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
@@ -429,7 +429,7 @@ const SAAS_PANELS: Record<string, PanelConfig> = {
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
-const SAAS_MAP_LAYERS: MapLayers = {
+const HOME_MAP_LAYERS: MapLayers = {
   conflicts: false,
   bases: false,
   cables: true,
@@ -477,8 +477,8 @@ const SAAS_MAP_LAYERS: MapLayers = {
   trafficArcs: true,
 };
 
-const SAAS_MOBILE_MAP_LAYERS: MapLayers = {
-  ...SAAS_MAP_LAYERS,
+const HOME_MOBILE_MAP_LAYERS: MapLayers = {
+  ...HOME_MAP_LAYERS,
   cables: false,
   cloudRegions: false,
 };
@@ -654,9 +654,9 @@ const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'saas' ? SAAS_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'saas' ? SAAS_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'home' ? HOME_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'home' ? HOME_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'home' ? HOME_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
