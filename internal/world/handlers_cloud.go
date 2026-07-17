@@ -88,6 +88,10 @@ type cloudPulse struct {
 	TokenSeries   []int64       `json:"tokenSeries"`
 	Models        []cloudModel  `json:"models"`
 	Regions       []cloudRegion `json:"regions"`
+	// Users is populated ONLY on the signed-in admin path (real IAM aggregates:
+	// total users, signups, active now, daily-signup series). omitempty ⇒ the public
+	// teaser never carries it.
+	Users *userMetrics `json:"users,omitempty"`
 }
 
 // publicVolumeTimeout bounds each public fallback fetch (traffic-globe, router-stats,
@@ -117,7 +121,13 @@ func (s *Server) handleCloudPulse(w http.ResponseWriter, r *http.Request) {
 	if bearer, ok := s.adminIdentity(r); ok {
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		p := s.producePulse(ctx, map[string]string{"Authorization": bearer})
+		hdr := map[string]string{"Authorization": bearer}
+		p := s.producePulse(ctx, hdr)
+		// Real platform user metrics (IAM global-users) — admin path only; aggregates
+		// only, never PII. Omitted honestly if the caller isn't a global admin upstream.
+		if um, err := s.fetchUserMetrics(ctx, hdr); err == nil {
+			p.Users = um
+		}
 		writeJSON(w, http.StatusOK, "private, no-store", p)
 		return
 	}
