@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { getCloudPulse, getMyModels, type CloudPulse, type ServedModel } from '@/services/cloud-pulse';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtCompact, shareBar, demoNote } from '@/utils/cloud-format';
+import { fmtCompact, shareBar } from '@/utils/cloud-format';
 
 // Per-model usage. The ranked usage bars come from the platform aggregate
 // (/v1/world/cloud-pulse) — demo-flagged, because no public per-model usage
@@ -44,28 +44,43 @@ export class ModelUsagePanel extends Panel {
     const mineIds = new Set((this.mine ?? []).map((m) => m.id));
     const max = Math.max(...p.models.map((m) => m.requests24h), 1);
 
-    const rows = p.models.map((m) => {
-      const yours = mineIds.has(m.id);
-      return `<div class="cloud-model-row">
-        <div class="cloud-model-head">
-          <span class="cloud-model-name">${escapeHtml(m.name)}${yours ? '<span class="cloud-tag">yours</span>' : ''}</span>
-          <span class="cloud-model-req">${fmtCompact(m.requests24h)}<span class="cloud-unit">req</span></span>
-        </div>
-        ${shareBar(m.requests24h / max)}
-        <div class="cloud-model-sub">${fmtCompact(m.tokens24h)} tokens · ${(m.share * 100).toFixed(0)}% share</div>
-      </div>`;
-    }).join('');
+    const rows = p.models.length
+      ? p.models.map((m) => {
+        const yours = mineIds.has(m.id);
+        // Token volume is only measured on the exact ledger path; on the public
+        // request-mix fallback (volumeModeled) show share alone — never a 0-token line.
+        const sub = p.volumeModeled
+          ? `${(m.share * 100).toFixed(0)}% of requests`
+          : `${fmtCompact(m.tokens24h)} tokens · ${(m.share * 100).toFixed(0)}% share`;
+        return `<div class="cloud-model-row">
+          <div class="cloud-model-head">
+            <span class="cloud-model-name">${escapeHtml(m.name)}${yours ? '<span class="cloud-tag">yours</span>' : ''}</span>
+            <span class="cloud-model-req">${fmtCompact(m.requests24h)}<span class="cloud-unit">req</span></span>
+          </div>
+          ${shareBar(m.requests24h / max)}
+          <div class="cloud-model-sub">${sub}</div>
+        </div>`;
+      }).join('')
+      : '<div class="cloud-empty">Model mix is warming up — measured usage appears as requests are routed.</div>';
 
     const available = this.mine !== null
       ? `<span class="cloud-live-note">${this.mine.length} available to you</span>`
       : '';
+    // Honest source note: nothing measured (demo) vs real request mix without the
+    // token ledger (volumeModeled) vs fully-measured usage (no note needed).
+    const note = p.demo
+      ? '<span class="cloud-live-note">warming up</span>'
+      : (p.volumeModeled ? '<span class="cloud-live-note">request mix · measured</span>' : '');
+    const scope = p.overview.modelsServed > 0
+      ? `${p.overview.modelsServed} models served${p.window ? ` · ${p.window}` : ''}`
+      : 'Model usage';
 
     this.setContent(`
       <div class="cloud-models">
         <div class="cloud-overview-head">
-          <span class="cloud-scope">${p.overview.modelsServed} models served${p.window ? ` · ${p.window}` : ''}</span>
+          <span class="cloud-scope">${escapeHtml(scope)}</span>
           ${available}
-          ${p.demo ? demoNote('usage: demo') : ''}
+          ${note}
         </div>
         <div class="cloud-model-list">${rows}</div>
       </div>
