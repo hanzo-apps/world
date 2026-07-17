@@ -2818,7 +2818,7 @@ export class App {
   // Constructed and appended only for the admin org; non-admins never receive
   // them (and every backing endpoint fail-closes 403). Idempotent.
   private async mountAdminCloudPanels(): Promise<void> {
-    if (SITE_VARIANT !== 'saas' || this.adminCloudMounted) return;
+    if (SITE_VARIANT !== 'cloud' || this.adminCloudMounted) return;
     if (!(await isAdmin())) return;
     const grid = document.getElementById('panelsGrid');
     if (!grid) return;
