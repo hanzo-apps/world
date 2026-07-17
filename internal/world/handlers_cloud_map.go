@@ -451,10 +451,12 @@ func (s *Server) handleCloudBYOGPU(w http.ResponseWriter, r *http.Request) {
 			if clusters, ok := s.tryRealGPUs(ctx, serviceAuth()); ok {
 				return byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: clusters}, nil
 			}
-			return byoGPU{UpdatedAt: nowRFC(), Demo: true, GPUs: demoGPUs()}, nil
+			// No service token → honest empty (no fabricated clusters). Real GPUs show
+			// for a signed-in admin (above) or when the service token is wired.
+			return byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: []gpuCluster{}}, nil
 		},
 		func(w http.ResponseWriter, _ error) {
-			writeJSON(w, http.StatusOK, "", byoGPU{UpdatedAt: nowRFC(), Demo: true, GPUs: demoGPUs()})
+			writeJSON(w, http.StatusOK, "", byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: []gpuCluster{}})
 		},
 	)
 }
@@ -536,35 +538,6 @@ func (s *Server) tryRealGPUs(ctx context.Context, hdr map[string]string) ([]gpuC
 	return out, true
 }
 
-// demoGPUs is the flagged illustrative fleet, placed from the region catalog. It
-// carries no live-looking precision — it exists to make the globe legible until a
-// service token is wired.
-func demoGPUs() []gpuCluster {
-	coords := regionCoords()
-	rows := []struct {
-		region, model, status string
-		count                 int
-	}{
-		{"nyc", "GB10", "online", 4},
-		{"sfo", "H100", "online", 8},
-		{"ams", "GB10", "online", 2},
-		{"fra", "H200", "online", 4},
-		{"lon", "GB10", "online", 2},
-		{"sgp", "GB10", "online", 2},
-		{"blr", "A100", "degraded", 6},
-		{"syd", "GB10", "online", 1},
-	}
-	out := make([]gpuCluster, 0, len(rows))
-	for _, r := range rows {
-		rg := coords[r.region]
-		out = append(out, gpuCluster{
-			Lat: rg.Lat, Lon: rg.Lon, City: rg.City,
-			Region: r.region, Model: r.model, Count: r.count, Status: r.status,
-		})
-	}
-	return out
-}
-
 // ── 3) traffic: request arcs from visitor countries to the nearest region ────
 //
 // Real path (service token): read the visitor-COUNTRY breakdown from the same
@@ -598,10 +571,13 @@ func (s *Server) handleCloudTraffic(w http.ResponseWriter, r *http.Request) {
 			if arcs, ok := s.tryRealTraffic(ctx); ok {
 				return cloudTraffic{UpdatedAt: nowRFC(), Demo: false, Arcs: arcs}, nil
 			}
-			return demoTraffic(), nil
+			// Honest empty — no fabricated arcs. The native request-geo globe
+			// (traffic-globe) carries the real traffic layer; arcs fill from real
+			// visitor geo when analytics is wired.
+			return cloudTraffic{UpdatedAt: nowRFC(), Demo: false, Arcs: []trafficArc{}}, nil
 		},
 		func(w http.ResponseWriter, _ error) {
-			writeJSON(w, http.StatusOK, "", demoTraffic())
+			writeJSON(w, http.StatusOK, "", cloudTraffic{UpdatedAt: nowRFC(), Demo: false, Arcs: []trafficArc{}})
 		},
 	)
 }
@@ -815,29 +791,6 @@ func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
 	return arcs, true
 }
 
-// demoTraffic emits flagged arcs from major country centroids to their nearest
-// region, weighted by a per-country base × the diurnal load curve (diurnalLoad) so
-// the layer feels alive across refreshes without pretending to be live (demo:true).
-func demoTraffic() cloudTraffic {
-	now := time.Now().UTC()
-	load := diurnalLoad(now)
-	arcs := make([]trafficArc, 0, 16)
-	for i, c := range countryCentroids {
-		if i >= 16 { // 12–20 arcs; 16 keeps a lively-but-bounded set
-			break
-		}
-		rg := nearestRegion(c.lat, c.lon)
-		wobble := 1 + 0.06*math.Sin(float64(now.Unix()%600)/600*2*math.Pi+float64(i)*0.7)
-		arcs = append(arcs, trafficArc{
-			FromLat: c.lat, FromLon: c.lon, ToLat: rg.Lat, ToLon: rg.Lon,
-			Weight: round2s(clampF(c.weight*load*wobble, 0.05, 1)),
-			Label:  c.code + " → " + rg.ID,
-		})
-	}
-	sort.SliceStable(arcs, func(i, j int) bool { return arcs[i].Weight > arcs[j].Weight })
-	return cloudTraffic{UpdatedAt: now.Format(time.RFC3339), Demo: true, Arcs: arcs}
-}
-
 // countryCentroids is the small in-file centroid table (ISO 3166-1 alpha-2 → point)
 // with a relative traffic base weight, used by both the real and demo traffic paths.
 var countryCentroids = []struct {
@@ -930,11 +883,4 @@ func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
 		math.Cos(lat1*rad)*math.Cos(lat2*rad)*math.Sin(dLon/2)*math.Sin(dLon/2)
 	return 2 * r * math.Asin(math.Min(1, math.Sqrt(a)))
-}
-
-// diurnalLoad is the [0.55, 1.0] diurnal load factor (peaks ~16:00 UTC) the demo
-// traffic arcs use so the layer feels alive across refreshes without faking a rate.
-func diurnalLoad(now time.Time) float64 {
-	hourFrac := float64(now.Hour()) + float64(now.Minute())/60
-	return 0.775 + 0.225*math.Sin((hourFrac-10)/24*2*math.Pi)
 }
