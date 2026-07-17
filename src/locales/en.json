@@ -53,11 +53,11 @@
     }
   },
   "header": {
-    "world": "WORLD",
+    "world": "World",
     "ai": "AI",
-    "tech": "TECH",
-    "crypto": "CRYPTO",
-    "live": "LIVE",
+    "tech": "Tech",
+    "crypto": "Crypto",
+    "live": "Live",
     "search": "Search",
     "settings": "PANELS",
     "sources": "SOURCES",
@@ -67,8 +67,8 @@
     "viewOnGitHub": "View on GitHub",
     "filterSources": "Filter sources...",
     "sourcesEnabled": "{{enabled}}/{{total}} enabled",
-    "finance": "FINANCE",
-    "cloud": "CLOUD",
+    "finance": "Finance",
+    "cloud": "Cloud",
     "toggleTheme": "Toggle dark/light mode"
   },
   "panels": {
