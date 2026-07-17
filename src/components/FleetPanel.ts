@@ -3,7 +3,8 @@ import { getCloudPulse, getMyFleet, type CloudPulse, type CloudRegion, type MyFl
 import { getCloudFleet, type CloudFleet } from '@/services/cloud-admin';
 import { isAdmin, isAuthenticated } from '@/services/iam';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtInt, statTile } from '@/utils/cloud-format';
+import { fmtInt } from '@/utils/cloud-format';
+import { fleetTiles, fleetProviders, fleetWorkers } from '@/utils/cloud-fleet-view';
 
 interface FleetRow {
   id: string;
@@ -72,26 +73,6 @@ export class FleetPanel extends Panel {
     this.render();
   }
 
-  /** Platform fleet rolled up by region (across every provider). Real visor data. */
-  private platformRows(d: CloudFleet): FleetRow[] {
-    const byRegion = new Map<string, FleetRow>();
-    for (const p of d.providers) {
-      for (const rg of p.regions) {
-        let row = byRegion.get(rg.region);
-        if (!row) {
-          row = { id: rg.region, name: rg.region, sub: 'region', nodesOnline: 0, nodesTotal: 0, gpus: 0, status: 'online' };
-          byRegion.set(rg.region, row);
-        }
-        row.gpus += rg.gpus;
-        for (const m of rg.machines) {
-          row.nodesTotal++;
-          if (online(m.status)) row.nodesOnline++; else row.status = 'degraded';
-        }
-      }
-    }
-    return [...byRegion.values()].sort((a, b) => b.nodesTotal - a.nodesTotal);
-  }
-
   /** The caller's own fleet grouped by region; coords borrowed from the pulse set. */
   private realRows(fleet: MyFleet, pulse: CloudPulse | null): FleetRow[] {
     const byRegion = new Map<string, FleetRow>();
@@ -118,7 +99,8 @@ export class FleetPanel extends Panel {
   private render(): void {
     if (!this.loaded) { this.showLoading('Loading fleet…'); return; }
 
-    // Admin → real platform fleet, or an honest "unavailable" state (never demo).
+    // Admin → the REAL platform fleet: every machine by provider/region + BYO GPU
+    // workers with specs. Honest "unavailable" if visor didn't answer (never demo).
     if (this.admin) {
       const d = this.platform;
       if (!d || !d.available) {
@@ -127,26 +109,19 @@ export class FleetPanel extends Panel {
         this.setContent(`<div class="cloud-empty">Platform fleet is unavailable right now — visor did not answer for this session.</div>`);
         return;
       }
-      const rows = this.platformRows(d);
       this.setCount(d.totals.machines);
       this.setDataBadge('live', 'platform');
-      const tiles = [
-        statTile(`${fmtInt(d.totals.online)}/${fmtInt(d.totals.machines)}`, 'machines online'),
-        statTile(fmtInt(d.totals.gpus), 'GPUs'),
-        statTile(fmtInt(d.totals.providers), 'providers'),
-        statTile(fmtInt(d.totals.regions), 'regions'),
-      ].join('');
       this.setContent(`
-        <div class="cloud-fleet">
+        <div class="cloud-fleet-deep">
           <div class="cloud-overview-head">
             <span class="cloud-scope">DO · GCP · AWS · BYO</span>
             <span class="cloud-live-note">live · visor</span>
           </div>
-          <div class="cloud-stat-grid cloud-stat-grid-4">${tiles}</div>
-          <div class="cloud-fleet-list">${this.rowsHtml(rows)}</div>
+          <div class="cloud-stat-grid cloud-stat-grid-4">${fleetTiles(d.totals)}</div>
+          <div class="cloud-fleet-providers">${fleetProviders(d.providers)}</div>
+          ${fleetWorkers(d.workers)}
         </div>
       `);
-      this.wireClicks();
       return;
     }
 
