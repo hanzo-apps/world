@@ -181,6 +181,13 @@ export class MapContainer {
         ? { longitude: center.lon, latitude: center.lat, zoom: Math.max(0, Math.min(zoom, 6)) }
         : undefined,
       onCountryClick: this.countryClickCb ?? undefined,
+      // Idle auto-rotate OFF: a continuous ~2°/s spin keeps the thin on-sphere vector
+      // features (borders/coastlines/markers) perpetually sub-pixel-moving, which on
+      // real GPUs re-rasterizes coplanar geometry every frame → limb shimmer/flicker.
+      // A settled globe redraws only on data-sync/interaction, so the shimmer stops.
+      // (Drag-to-rotate still works; re-enable the idle spin only with a coplanar
+      // depth/polygonOffset fix so it no longer z-fights the sphere.)
+      autoRotate: false,
     });
   }
 
