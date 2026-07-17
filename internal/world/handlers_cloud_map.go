@@ -431,10 +431,24 @@ func (s *Server) handleCloudBYOGPU(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
 		return
 	}
+	w.Header().Set("Vary", "Authorization")
+	// Signed-in admin (z@hanzo.ai / the operator org): the REAL GPU fleet placed on
+	// the globe, read with the caller's OWN bearer, never edge-cached. No fabricated
+	// demo clusters for a signed-in operator — an empty read shows an empty globe.
+	if bearer, ok := s.adminIdentity(r); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		clusters, _ := s.tryRealGPUs(ctx, map[string]string{"Authorization": bearer})
+		if clusters == nil {
+			clusters = []gpuCluster{}
+		}
+		writeJSON(w, http.StatusOK, "private, no-store", byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: clusters})
+		return
+	}
 	s.cachedJSON(w, "cloud-byo-gpu", "public, max-age=30, s-maxage=30, stale-while-revalidate=120",
 		30*time.Second, 5*time.Minute,
 		func(ctx context.Context) (any, error) {
-			if clusters, ok := s.tryRealGPUs(ctx); ok {
+			if clusters, ok := s.tryRealGPUs(ctx, serviceAuth()); ok {
 				return byoGPU{UpdatedAt: nowRFC(), Demo: false, GPUs: clusters}, nil
 			}
 			return byoGPU{UpdatedAt: nowRFC(), Demo: true, GPUs: demoGPUs()}, nil
@@ -445,15 +459,14 @@ func (s *Server) handleCloudBYOGPU(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// tryRealGPUs reads the real GPU inventory when a service token is configured.
-// Returns ok=false (→ demo) when the token is absent, both sources fail, or no GPU
-// maps to a known region. Only non-sensitive fields (region/model/status) are read.
-func (s *Server) tryRealGPUs(ctx context.Context) ([]gpuCluster, bool) {
-	tok := serviceToken()
-	if tok == "" {
+// tryRealGPUs reads the real GPU inventory using the supplied auth header (the KMS
+// service bearer on the public path, or the caller's own admin bearer). Returns
+// ok=false when auth is absent, both sources fail, or no GPU maps to a known region.
+// Only non-sensitive fields (region/model/status) are read.
+func (s *Server) tryRealGPUs(ctx context.Context, hdr map[string]string) ([]gpuCluster, bool) {
+	if hdr == nil {
 		return nil, false
 	}
-	hdr := map[string]string{"Authorization": "Bearer " + tok}
 	base := apiHost()
 
 	agg := map[string]*gpuCluster{}
