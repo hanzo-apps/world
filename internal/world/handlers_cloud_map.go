@@ -95,7 +95,7 @@ type jsonRPCReq struct {
 //
 // nodes[] positions are MODELED: real per-node IP geolocation needs an IP-geo
 // dependency we don't carry, so the real peer COUNT is spread deterministically
-// across the demoRegions() catalog coords. positionsModeled:true says so plainly.
+// across the regionCatalog() catalog coords. positionsModeled:true says so plainly.
 
 const maxModeledNodes = 250
 
@@ -361,7 +361,7 @@ func (s *Server) getAllowedJSON(ctx context.Context, rawURL string, allowed map[
 // and kind are modeled — hence positionsModeled:true on the envelope; only the count
 // is real. Bounded to maxModeledNodes so a pathological peer count can't bloat the payload.
 func modeledNodes(peers int) []chainNode {
-	regions := demoRegions()
+	regions := regionCatalog()
 	nodes := make([]chainNode, 0)
 	if peers <= 0 || len(regions) == 0 {
 		return nodes
@@ -803,8 +803,8 @@ func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
 }
 
 // demoTraffic emits flagged arcs from major country centroids to their nearest
-// region, weighted by a per-country base × the same diurnal load curve as demoPulse
-// so the layer feels alive across refreshes without pretending to be live.
+// region, weighted by a per-country base × the diurnal load curve (diurnalLoad) so
+// the layer feels alive across refreshes without pretending to be live (demo:true).
 func demoTraffic() cloudTraffic {
 	now := time.Now().UTC()
 	load := diurnalLoad(now)
@@ -869,7 +869,7 @@ func centroidFor(code string) (float64, float64, bool) {
 // regionCoords indexes the region catalog by its ID for O(1) coord lookup.
 func regionCoords() map[string]cloudRegion {
 	m := make(map[string]cloudRegion, 8)
-	for _, rg := range demoRegions() {
+	for _, rg := range regionCatalog() {
 		m[rg.ID] = rg
 	}
 	return m
@@ -887,7 +887,7 @@ func resolveRegion(region string) (cloudRegion, bool) {
 	if rg, ok := m[region]; ok {
 		return rg, true
 	}
-	for _, rg := range demoRegions() { // ordered: match the highest-capacity region first
+	for _, rg := range regionCatalog() { // ordered: match the highest-capacity region first
 		if strings.HasPrefix(region, rg.ID) {
 			return rg, true
 		}
@@ -896,9 +896,9 @@ func resolveRegion(region string) (cloudRegion, bool) {
 }
 
 // nearestRegion returns the catalog region closest to (lat, lon) by great-circle
-// distance. The catalog is non-empty (demoRegions), so the first is a safe seed.
+// distance. The catalog is non-empty (regionCatalog), so the first is a safe seed.
 func nearestRegion(lat, lon float64) cloudRegion {
-	regions := demoRegions()
+	regions := regionCatalog()
 	best := regions[0]
 	bestD := math.Inf(1)
 	for _, rg := range regions {
@@ -919,8 +919,8 @@ func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	return 2 * r * math.Asin(math.Min(1, math.Sqrt(a)))
 }
 
-// diurnalLoad is the [0.55, 1.0] load factor from demoPulse (peaks ~16:00 UTC),
-// reused so the traffic layer's liveliness matches the pulse ticker's.
+// diurnalLoad is the [0.55, 1.0] diurnal load factor (peaks ~16:00 UTC) the demo
+// traffic arcs use so the layer feels alive across refreshes without faking a rate.
 func diurnalLoad(now time.Time) float64 {
 	hourFrac := float64(now.Hour()) + float64(now.Minute())/60
 	return 0.775 + 0.225*math.Sin((hourFrac-10)/24*2*math.Pi)
