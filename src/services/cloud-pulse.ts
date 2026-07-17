@@ -56,6 +56,15 @@ export interface CloudRegion {
   requestsPerSec: number;
 }
 
+/** Real platform user aggregates from IAM (admin path only; aggregates, never PII). */
+export interface UserMetrics {
+  total: number;
+  signups24h: number;
+  signups7d: number;
+  activeNow: number;
+  signupSeries: number[]; // new users/day, last 14 days, chronological
+}
+
 export interface CloudPulse {
   demo: boolean;
   volumeModeled: boolean;
@@ -68,6 +77,7 @@ export interface CloudPulse {
   tokenSeries: number[];
   models: CloudModel[];
   regions: CloudRegion[];
+  users?: UserMetrics; // present only when a signed-in admin's bearer resolved it
 }
 
 /**
