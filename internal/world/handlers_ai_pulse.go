@@ -171,7 +171,7 @@ func (s *Server) produceAIPulse(ctx context.Context) aiPulse {
 // shape. nil when the ledger is unreachable (no token / non-admin / upstream
 // down) so the panel degrades honestly.
 func (s *Server) buildAIUsage(ctx context.Context) *aiUsage {
-	ov, err := s.fetchCloudUsage(ctx, "24h")
+	ov, err := s.fetchCloudUsage(ctx, "24h", serviceAuth())
 	if err != nil {
 		return nil
 	}
