@@ -79,11 +79,12 @@ type cloudUsageByModel struct {
 }
 
 // fetchCloudUsage reads the platform-wide usage overview (?org=all) for a range
-// label ("24h" | "7d" | "30d"). It requires a super-admin service token; it
-// returns errNoServiceToken when none is set and the upstream error otherwise, so
-// callers keep their honest modeled/demo fallback.
-func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string) (*cloudUsageOverview, error) {
-	hdr := serviceAuth()
+// label ("24h" | "7d" | "30d") using the supplied auth header — the KMS service
+// bearer (public path) or the signed-in admin's OWN bearer (the flagship admin
+// path). Either way the upstream independently authorizes ?org=all (super-admin),
+// so a non-admin bearer 4xxes and the caller keeps its honest fallback. Returns
+// errNoServiceToken when no auth is available at all.
+func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string, hdr map[string]string) (*cloudUsageOverview, error) {
 	if hdr == nil {
 		return nil, errNoServiceToken
 	}

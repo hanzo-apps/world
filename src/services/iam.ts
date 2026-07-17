@@ -71,9 +71,16 @@ const IAM_API = {
   organizations: '/v1/iam/get-organizations',
 } as const;
 
-// The one org that may see the platform-wide Cloud console. Server-side gates
-// enforce this too (fail-closed 403); the client value is UX only.
+// Orgs that may see the platform-wide Cloud console: the base {admin, built-in}
+// plus the deployment's OPERATOR org, so the seeded superuser (z@hanzo.ai, owner
+// "hanzo") sees the internal dashboard. Mirrors the world server's admin set
+// (WORLD_ADMIN_ORGS). Server-side gates + the upstream subsystems enforce the real
+// authz (fail-closed 403); this client value is UX only (which panels to reveal).
 export const ADMIN_ORG = 'admin';
+const ADMIN_ORGS = new Set(['admin', 'built-in', 'hanzo']);
+function ownerIsAdmin(owner: string | undefined): boolean {
+  return ADMIN_ORGS.has((owner || '').trim());
+}
 
 export interface IamUser {
   sub: string;
@@ -240,15 +247,15 @@ export function cachedOwner(): string {
 
 /** Instant, best-effort admin check from the cached owner (UX only). */
 export function cachedIsAdmin(): boolean {
-  return cachedOwner() === ADMIN_ORG;
+  return ownerIsAdmin(cachedOwner());
 }
 
-/** Authoritative admin check: owner claim from userinfo === the admin org.
+/** Authoritative admin check: owner claim from userinfo is an admin org.
  *  The server independently enforces this (fail-closed 403); this is the client
  *  gate that hides admin-only Cloud panels. */
 export async function isAdmin(): Promise<boolean> {
   const u = await getUser();
-  return (u?.owner || '') === ADMIN_ORG;
+  return ownerIsAdmin(u?.owner);
 }
 
 export async function logout(): Promise<void> {

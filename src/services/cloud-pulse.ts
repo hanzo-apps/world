@@ -70,9 +70,17 @@ export interface CloudPulse {
   regions: CloudRegion[];
 }
 
-/** Public platform aggregate (same-origin). Throws only on hard network/parse failure. */
+/**
+ * Platform aggregate (same-origin). When signed in we send the caller's IAM bearer:
+ * an admin (z@hanzo.ai / the operator org) then gets the FULL real aggregate fetched
+ * server-side with their OWN token (all-org ledger + fleet), served no-store; anyone
+ * else gets the cached public teaser. Throws only on hard network/parse failure.
+ */
 export async function getCloudPulse(): Promise<CloudPulse> {
-  const res = await fetch('/v1/world/cloud-pulse');
+  const tok = await getToken();
+  const res = await fetch('/v1/world/cloud-pulse', tok
+    ? { headers: { Authorization: `Bearer ${tok}` }, cache: 'no-store' }
+    : undefined);
   if (!res.ok) throw new Error(`cloud-pulse HTTP ${res.status}`);
   return (await res.json()) as CloudPulse;
 }
