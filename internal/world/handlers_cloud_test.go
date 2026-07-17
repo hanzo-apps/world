@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // gatusBoard3of4 is a Gatus statuses board with 3 of 4 endpoints healthy → the
@@ -257,14 +258,28 @@ func TestCloudPulseRouterFallback(t *testing.T) {
 // OWN bearer — the all-org usage ledger + visor — with NO server-side service token
 // wired, served no-store (never the shared public cache) and Vary: Authorization.
 func TestCloudPulseAdminBearer(t *testing.T) {
-	// IAM userinfo → the caller resolves to the operator org (admin).
-	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/iam/oauth/userinfo" || r.Header.Get("Authorization") == "" {
-			http.NotFound(w, r)
+	// IAM: userinfo → the caller resolves to the operator org (admin); global-users →
+	// the real platform user list (2 signups in the last 24h, 1 online, 1 old).
+	now := time.Now().UTC()
+	iamMux := http.NewServeMux()
+	iamMux.HandleFunc("/v1/iam/oauth/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			http.Error(w, "no auth", http.StatusUnauthorized)
 			return
 		}
 		_, _ = w.Write([]byte(`{"owner":"hanzo","sub":"z@hanzo.ai"}`))
-	}))
+	})
+	iamMux.HandleFunc("/v1/iam/global-users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-token" {
+			t.Errorf("global-users must be read with the caller's bearer, got %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`[
+			{"createdTime":"` + now.Add(-2*time.Hour).Format(time.RFC3339) + `","isOnline":true},
+			{"createdTime":"` + now.Add(-20*time.Hour).Format(time.RFC3339) + `","isOnline":false},
+			{"createdTime":"` + now.Add(-10*24*time.Hour).Format(time.RFC3339) + `","isOnline":false},
+			{"createdTime":"` + now.Add(-40*24*time.Hour).Format(time.RFC3339) + `","isOnline":false,"isDeleted":true}]`))
+	})
+	iam := httptest.NewServer(iamMux)
 	t.Cleanup(iam.Close)
 
 	// api.hanzo.ai — the caller's bearer must reach the all-org ledger + visor.
@@ -329,5 +344,21 @@ func TestCloudPulseAdminBearer(t *testing.T) {
 	}
 	if p.Overview.ModelsServed != 2 || len(p.Models) != 1 || p.Models[0].ID != "zen-omni-30b" {
 		t.Fatalf("admin must see real catalog + ledger models, got served=%d models=%+v", p.Overview.ModelsServed, p.Models)
+	}
+	// Real platform user metrics from IAM global-users (admin path only).
+	if p.Users == nil {
+		t.Fatalf("admin must see real user metrics from IAM global-users")
+	}
+	if p.Users.Total != 3 { // 4 rows, 1 deleted → 3 live
+		t.Fatalf("want 3 users (deleted excluded), got %d", p.Users.Total)
+	}
+	if p.Users.Signups24h != 2 {
+		t.Fatalf("want 2 signups in 24h, got %d", p.Users.Signups24h)
+	}
+	if p.Users.ActiveNow != 1 {
+		t.Fatalf("want 1 active-now (isOnline), got %d", p.Users.ActiveNow)
+	}
+	if len(p.Users.SignupSeries) != userSignupDays {
+		t.Fatalf("want a %d-day signup series, got %d", userSignupDays, len(p.Users.SignupSeries))
 	}
 }
