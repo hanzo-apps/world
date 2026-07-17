@@ -72,25 +72,38 @@ export class CloudOverviewPanel extends Panel {
     const p = this.pulse;
     const o = p.overview;
 
-    // No demo/source pill jewelry — a plain live badge only when the feed is live.
-    if (!p.demo) this.setDataBadge('live'); else this.clearDataBadge();
+    // Live badge only when the volume is the exact MEASURED ledger. Real-but-partial
+    // (public rate/throughput, no token volume) and empty both drop it — never a live
+    // badge over a number that is not fully measured (keys on demo AND volumeModeled).
+    const live = !p.demo && !p.volumeModeled;
+    if (live) this.setDataBadge('live'); else this.clearDataBadge();
 
     const modelsServed = this.realModels ?? o.modelsServed;
-    // Order = importance top-left → down. The two REAL chain-scale tiles sit right
-    // after models-served so they land in the panel's first visible rows (the
-    // fixed-height widget scrolls; the demo-modeled nodes/GPUs/regions/uptime are
-    // the ones that fall below the fold, not the real live numbers).
+    const fallback = !p.demo && p.volumeModeled; // real rate/throughput, tokens unmeasured
+    const dash = '—';
+    // Volume tiles show a real number or an honest "—": nothing when nothing is
+    // measured (demo), and no token count on the public fallback (volumeModeled ⇒
+    // tokens blank). Count/uptime tiles render only when they carry a real value
+    // (>0) — an unmeasured metric is honestly omitted, never shown as a 0.
     const tiles = [
-      statTile(fmtCompact(o.requestsPerSec), 'requests / sec', p.volumeModeled ? 'modeled' : undefined),
-      statTile(fmtCompact(o.requests24h), `requests / ${p.window}`),
-      statTile(fmtCompact(o.tokens24h), `tokens / ${p.window}`),
-      statTile(fmtInt(modelsServed), 'models served', this.realModels ? 'live' : undefined),
+      statTile(p.demo ? dash : fmtCompact(o.requestsPerSec), 'requests / sec', fallback ? 'measured' : undefined),
+      statTile(p.demo ? dash : fmtCompact(o.requests24h), `requests / ${p.window}`),
+      statTile(p.volumeModeled ? dash : fmtCompact(o.tokens24h), `tokens / ${p.window}`, fallback ? 'ledger only' : undefined),
+      modelsServed > 0 ? statTile(fmtInt(modelsServed), 'models served', this.realModels ? 'live' : undefined) : '',
       this.chainTiles(),
-      statTile(`${fmtInt(o.nodesOnline)}/${fmtInt(o.nodesTotal)}`, 'nodes online'),
-      statTile(fmtInt(o.gpusOnline), 'GPUs online'),
-      statTile(fmtInt(o.regions), 'regions'),
-      statTile(fmtPct(o.uptimePct), 'uptime'),
+      o.nodesTotal > 0 ? statTile(`${fmtInt(o.nodesOnline)}/${fmtInt(o.nodesTotal)}`, 'nodes online') : '',
+      o.gpusOnline > 0 ? statTile(fmtInt(o.gpusOnline), 'GPUs online') : '',
+      o.regions > 0 ? statTile(fmtInt(o.regions), 'regions') : '',
+      o.uptimePct > 0 ? statTile(fmtPct(o.uptimePct), 'uptime') : '',
     ].join('');
+
+    // Sparkline only when there is a real series — never a flat line over empties.
+    const sparkRow = p.requestSeries.length >= 2
+      ? `<div class="cloud-spark-row">
+          <span class="cloud-spark-label">requests · last ${p.requestSeries.length}h</span>
+          <span class="cloud-spark-wrap">${sparkline(p.requestSeries, 220, 30)}</span>
+        </div>`
+      : '';
 
     this.setContent(`
       <div class="cloud-overview">
@@ -98,10 +111,7 @@ export class CloudOverviewPanel extends Panel {
           <span class="cloud-scope">Global platform</span>
         </div>
         <div class="cloud-stat-grid cloud-stat-grid-8">${tiles}</div>
-        <div class="cloud-spark-row">
-          <span class="cloud-spark-label">requests · last ${p.requestSeries.length}h</span>
-          <span class="cloud-spark-wrap">${sparkline(p.requestSeries, 220, 30)}</span>
-        </div>
+        ${sparkRow}
       </div>
     `);
   }
