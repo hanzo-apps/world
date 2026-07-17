@@ -251,3 +251,83 @@ func TestCloudPulseRouterFallback(t *testing.T) {
 		t.Fatalf("want 2 real regions from the visor fleet, got %d", p.Overview.Regions)
 	}
 }
+
+// TestCloudPulseAdminBearer proves the flagship admin path: a signed-in admin
+// (z@hanzo.ai, owner "hanzo") gets the FULL measured aggregate fetched with their
+// OWN bearer — the all-org usage ledger + visor — with NO server-side service token
+// wired, served no-store (never the shared public cache) and Vary: Authorization.
+func TestCloudPulseAdminBearer(t *testing.T) {
+	// IAM userinfo → the caller resolves to the operator org (admin).
+	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/iam/oauth/userinfo" || r.Header.Get("Authorization") == "" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"owner":"hanzo","sub":"z@hanzo.ai"}`))
+	}))
+	t.Cleanup(iam.Close)
+
+	// api.hanzo.ai — the caller's bearer must reach the all-org ledger + visor.
+	upstream := http.NewServeMux()
+	upstream.HandleFunc("/v1/models", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-token" {
+			t.Errorf("caller bearer must be forwarded to /v1/models, got %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"zen-1"},{"id":"zen-omni-30b"}]}`))
+	})
+	upstream.HandleFunc("/v1/machines", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"machines":[{"region":"nyc","status":"active"}]}`))
+	})
+	upstream.HandleFunc("/v1/gpus", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"gpus":[{"region":"nyc"}]}`))
+	})
+	upstream.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-token" {
+			t.Errorf("all-org ledger must be read with the caller's bearer, got %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"range":"24h","interval":"1h",
+			"totals":{"tokens":1180000000,"requests":1000000,"spendCents":42000,"models":2},
+			"series":[{"t":"2026-07-16T00:00:00Z","tokens":40000000,"requests":34000}],
+			"byModel":{"items":[{"model":"zen-omni-30b","tokens":600000000,"requests":520000,"pct":60}]}}`))
+	})
+	up := httptest.NewServer(upstream)
+	t.Cleanup(up.Close)
+
+	t.Setenv("HANZO_CLOUD_PULSE_TOKEN", "") // NO service token — the admin's own bearer drives it
+	t.Setenv("HANZO_API_BASE", up.URL)
+	t.Setenv("HANZO_STATUS_BASE", up.URL)
+	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
+
+	s := NewServer()
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/cloud-pulse", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if cc := resp.Header.Get("Cache-Control"); cc != "private, no-store" {
+		t.Fatalf("admin pulse must be no-store/private, got Cache-Control %q", cc)
+	}
+	if v := resp.Header.Get("Vary"); v != "Authorization" {
+		t.Fatalf("must Vary: Authorization to isolate the public cache, got %q", v)
+	}
+	var p cloudPulse
+	if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if p.Demo || p.VolumeModeled {
+		t.Fatalf("admin ledger path must be fully measured (demo=%v volumeModeled=%v)", p.Demo, p.VolumeModeled)
+	}
+	if p.Overview.Requests24h != 1_000_000 || p.Overview.Tokens24h != 1_180_000_000 {
+		t.Fatalf("admin must see measured all-org volume, got req=%d tok=%d", p.Overview.Requests24h, p.Overview.Tokens24h)
+	}
+	if p.Overview.ModelsServed != 2 || len(p.Models) != 1 || p.Models[0].ID != "zen-omni-30b" {
+		t.Fatalf("admin must see real catalog + ledger models, got served=%d models=%+v", p.Overview.ModelsServed, p.Models)
+	}
+}
