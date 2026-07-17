@@ -130,6 +130,10 @@ func (s *Server) mount(mux registrar) {
 	// PUBLIC Enso Live Training — ai gateway /v1/router/stats?scope=platform proxy
 	// (aggregates only; arms already opaque "arm-N" upstream — no vendor names):
 	mux.HandleFunc("/v1/world/cloud/router-stats", s.handleCloudRouterStats)
+	// PUBLIC flywheel history — ai gateway /v1/router/history?scope=platform proxy:
+	// daily reward-rate + cumulative cost-saved + adoption + retrain timeline. Honest
+	// empty until the ledger fills; never a fabricated curve.
+	mux.HandleFunc("/v1/world/cloud/router-history", s.handleCloudRouterHistory)
 	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
 	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
 	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
