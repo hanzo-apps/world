@@ -13,6 +13,12 @@ images:
     context: .
     dockerfile: Dockerfile
     repo: ghcr.io/hanzoai/world
+    # Publishable Mapbox token (pk, URL-restricted to world.hanzo.ai) baked into
+    # the Vite SPA at build so the Satellite/Terrain basemaps load (Dark stays
+    # keyless CartoDB). Sourced from KMS (hanzo/deploy/VITE_MAPBOX_TOKEN,
+    # env=prod) by hanzoai/ci — the key name IS the build-arg. Never in git.
+    build_secrets:
+      - VITE_MAPBOX_TOKEN
 
 # Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
 # on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
