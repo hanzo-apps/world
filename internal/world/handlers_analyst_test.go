@@ -1,6 +1,7 @@
 package world
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -306,6 +307,149 @@ func writeChatCompletion(w http.ResponseWriter, body string) {
 func readAllString(r *http.Request) (string, error) {
 	b, err := io.ReadAll(r.Body)
 	return string(b), err
+}
+
+// writeChatMessage writes an OpenAI-shaped completion whose single choice carries
+// the given assistant message object verbatim — used to model a reasoning model that
+// leaves `content` empty and puts its answer on `reasoning_content`.
+func writeChatMessage(w http.ResponseWriter, message map[string]any) {
+	resp := map[string]any{
+		"id":      "resp_test",
+		"choices": []any{map[string]any{"message": message}},
+		"usage":   map[string]any{"total_tokens": 7},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// postAnalyst drives the non-streaming analyst path with a signed-in bearer and
+// returns the decoded response envelope.
+func postAnalyst(t *testing.T, ts *httptest.Server, prompt string) map[string]any {
+	t.Helper()
+	reqBody, _ := json.Marshal(map[string]any{
+		"messages": []map[string]string{{"role": "user", "content": prompt}},
+	})
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/world/analyst", strings.NewReader(string(reqBody)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer user-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (never 5xx)", resp.StatusCode)
+	}
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return out
+}
+
+// TestAnalystRecoversReasoningWhenNoContent is the regression guard for the "empty
+// response" break: a reasoning model (gpt-oss-120b / harmony) returns a 2xx with an
+// EMPTY content channel and its answer on `reasoning_content`. The completion path
+// must fall back to that channel so the analyst recovers the reply — not blank out.
+func TestAnalystRecoversReasoningWhenNoContent(t *testing.T) {
+	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeChatMessage(w, map[string]any{
+			"content":           "",
+			"reasoning_content": `{"reply":"Markets are steady.","actions":[]}`,
+		})
+	}))
+	defer ai.Close()
+
+	s := NewServer()
+	s.ai.base = ai.URL
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	out := postAnalyst(t, ts, "Reply with strict JSON only")
+	if got, _ := out["reply"].(string); got != "Markets are steady." {
+		t.Fatalf("reasoning-channel answer not recovered: reply=%q full=%+v", got, out)
+	}
+	if out["error"] != nil {
+		t.Errorf("recovered answer should carry no error: %+v", out["error"])
+	}
+}
+
+// TestAnalystEmptyAnswerNamesModel pins the honest-error contract: a genuinely empty
+// 2xx (a real choice, no content AND no reasoning) surfaces "the <model> model
+// returned an empty answer" — never an opaque "empty response", and never a balance
+// top-up (that is a distinct 402 contract).
+func TestAnalystEmptyAnswerNamesModel(t *testing.T) {
+	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeChatMessage(w, map[string]any{"content": ""})
+	}))
+	defer ai.Close()
+
+	s := NewServer() // default model "best"
+	s.ai.base = ai.URL
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	out := postAnalyst(t, ts, "hi")
+	if got, _ := out["reply"].(string); got != "" {
+		t.Fatalf("expected empty reply, got %q", got)
+	}
+	errStr, _ := out["error"].(string)
+	if strings.Contains(errStr, "empty response") {
+		t.Fatalf("still surfacing the opaque 'empty response': %q", errStr)
+	}
+	if !strings.Contains(errStr, "empty answer") || !strings.Contains(errStr, "best") {
+		t.Fatalf("empty error not honest/model-named: %q", errStr)
+	}
+	if out["topup"] == true {
+		t.Fatalf("empty answer must not be a balance/top-up error: %+v", out)
+	}
+	if out["fallback"] != true {
+		t.Errorf("empty answer should mark fallback=true: %+v", out)
+	}
+}
+
+// TestChatStreamRecoversReasoning covers the SSE path: a model that streams only
+// `reasoning_content` deltas (no content channel) must still yield an answer, and the
+// reasoning must be forwarded live (onDelta) so the UI shows the model working.
+func TestChatStreamRecoversReasoning(t *testing.T) {
+	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fl, _ := w.(http.Flusher)
+		for _, f := range []string{
+			`{"id":"resp_1","choices":[{"delta":{"reasoning_content":"thinking… "}}]}`,
+			`{"id":"resp_1","choices":[{"delta":{"reasoning_content":"{\"reply\":\"from reasoning\"}"}}]}`,
+			`[DONE]`,
+		} {
+			_, _ = io.WriteString(w, "data: "+f+"\n\n")
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+	}))
+	defer ai.Close()
+
+	s := NewServer()
+	s.ai.base = ai.URL
+	var streamed strings.Builder
+	out, _, id, err := s.ai.chatMessagesModelStream(context.Background(), s, "Bearer u", "gpt-oss-120b",
+		[]chatMessage{{Role: "user", Content: "hi"}}, 0.4, 700, nil, func(tok string) { streamed.WriteString(tok) })
+	if err != nil {
+		t.Fatalf("stream err: %v", err)
+	}
+	if id != "resp_1" {
+		t.Errorf("id = %q, want resp_1", id)
+	}
+	want := `thinking… {"reply":"from reasoning"}`
+	if out != want {
+		t.Fatalf("stream reasoning fallback wrong:\n got=%q\nwant=%q", out, want)
+	}
+	if streamed.String() != want {
+		t.Errorf("reasoning deltas not forwarded live: %q", streamed.String())
+	}
 }
 
 func TestSanitizeModelAndAgentRef(t *testing.T) {
