@@ -42,10 +42,20 @@ RUN npm run build
 # modernc backend (FTS5 built in), so no C toolchain is added and FTS5 works.
 FROM golang:1.26-alpine AS gobuild
 WORKDIR /src
+# git: go resolves the PRIVATE indirect dep github.com/hanzoai/csqlite 'direct'
+# (not via the module proxy), which needs the git binary + an https credential.
+# alpine ships neither, so add git and mount the gh_token BuildKit secret that
+# hanzoai/ci passes (--secret id=gh_token); the mount is a no-op for public builds.
+RUN apk add --no-cache git
+ENV GOPRIVATE=github.com/hanzoai,github.com/luxfi,github.com/zooai
 # Deps: hanzo-kv client (go-redis) + embedded SQLite (modernc). Download once for
 # a cached layer before the source is copied.
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=secret,id=gh_token \
+    if [ -s /run/secrets/gh_token ]; then \
+      git config --global url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf "https://github.com/"; \
+    fi; \
+    go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/world ./cmd/world
