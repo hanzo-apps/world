@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -81,16 +80,21 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 			return "", resp.StatusCode, "", err
 		}
 		if len(cr.Choices) == 0 {
-			return "", resp.StatusCode, "", fmt.Errorf("empty response")
+			return "", resp.StatusCode, "", emptyAnswerErr(model)
 		}
-		out := strings.TrimSpace(cr.Choices[0].Message.Content)
-		if onDelta != nil && out != "" {
+		msg := cr.Choices[0].Message
+		out := firstNonEmpty(strings.TrimSpace(msg.Content), strings.TrimSpace(msg.ReasoningContent), strings.TrimSpace(msg.Reasoning))
+		if out == "" {
+			return "", resp.StatusCode, cr.ID, emptyAnswerErr(model)
+		}
+		if onDelta != nil {
 			onDelta(out)
 		}
 		return out, cr.Usage.TotalTokens, cr.ID, nil
 	}
 
 	var full strings.Builder
+	var reasoning strings.Builder
 	tokens := 0
 	id := ""
 	sc := bufio.NewScanner(resp.Body)
@@ -108,7 +112,9 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 			ID      string `json:"id"`
 			Choices []struct {
 				Delta struct {
-					Content string `json:"content"`
+					Content          string `json:"content"`
+					ReasoningContent string `json:"reasoning_content"`
+					Reasoning        string `json:"reasoning"`
 				} `json:"delta"`
 			} `json:"choices"`
 			Usage *struct {
@@ -125,6 +131,20 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 			tokens = frame.Usage.TotalTokens
 		}
 		for _, c := range frame.Choices {
+			// Reasoning deltas (gpt-oss/harmony, deepseek-r1) ride a separate channel.
+			// Forward them too — the replyExtractor routes this pre-envelope prose to the
+			// live "thinking" line — and keep them as the answer fallback for a model that
+			// never emits a content channel. (Not trimmed: preserve inter-chunk spacing.)
+			rc := c.Delta.ReasoningContent
+			if rc == "" {
+				rc = c.Delta.Reasoning
+			}
+			if rc != "" {
+				reasoning.WriteString(rc)
+				if onDelta != nil {
+					onDelta(rc)
+				}
+			}
 			if c.Delta.Content != "" {
 				full.WriteString(c.Delta.Content)
 				if onDelta != nil {
@@ -135,11 +155,17 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 	}
 	if err := sc.Err(); err != nil {
 		// A mid-stream drop still yields whatever arrived; the caller decides.
-		if full.Len() == 0 {
+		if full.Len() == 0 && reasoning.Len() == 0 {
 			return "", resp.StatusCode, "", err
 		}
 	}
-	return strings.TrimSpace(full.String()), tokens, id, nil
+	// The content channel is the answer; fall back to the reasoning channel only when
+	// the model emitted no content at all (mirrors the buffered path above).
+	out := strings.TrimSpace(full.String())
+	if out == "" {
+		out = strings.TrimSpace(reasoning.String())
+	}
+	return out, tokens, id, nil
 }
 
 // ── incremental "reply" extraction ───────────────────────────────────────────
