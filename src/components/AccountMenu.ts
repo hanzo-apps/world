@@ -84,7 +84,7 @@ export class AccountMenu {
 
     this.element.innerHTML = `
       <button class="am-trigger" type="button" aria-haspopup="true">
-        ${avatar(u)}
+        ${orgAvatar(s, u)}
         <span class="am-scope" title="${label}">${label}</span>
         <span class="am-caret">▾</span>
       </button>
@@ -185,7 +185,23 @@ function avatar(u: IamUser, size = 22): string {
   if (u.picture) {
     return `<img class="am-avatar" src="${esc(u.picture)}" width="${size}" height="${size}" alt="" referrerpolicy="no-referrer" />`;
   }
-  const src = u.name || u.email || u.sub || '?';
+  return initialsAvatar(u.name || u.email || u.sub || '?', size);
+}
+
+// The trigger's leading glyph is the ORG (the label is org / project), so it shows
+// the active org's logo when IAM provides one — the "hanzo org image" — and falls
+// back to org initials. The dropdown's user row keeps the user avatar. Square-ish
+// radius distinguishes an org from the round user avatar.
+function orgAvatar(s: OrgScope | null, u: IamUser, size = 22): string {
+  const org = s?.orgs.find((o) => o.id === s.currentOrg);
+  if (org?.logo) {
+    return `<img class="am-avatar am-avatar-org" src="${esc(org.logo)}" width="${size}" height="${size}" alt="" referrerpolicy="no-referrer" />`;
+  }
+  // No org logo → org initials if we have an org, else the user avatar (signed-out/no-scope).
+  return org ? initialsAvatar(org.name || org.id, size, true) : avatar(u, size);
+}
+
+function initialsAvatar(src: string, size: number, org = false): string {
   const initials = src
     .replace(/[^a-zA-Z0-9 ]/g, ' ')
     .trim()
@@ -193,7 +209,7 @@ function avatar(u: IamUser, size = 22): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join('') || '?';
-  return `<span class="am-avatar am-avatar-initials" style="width:${size}px;height:${size}px;line-height:${size}px;font-size:${Math.round(size * 0.42)}px">${initials}</span>`;
+  return `<span class="am-avatar am-avatar-initials${org ? ' am-avatar-org' : ''}" style="width:${size}px;height:${size}px;line-height:${size}px;font-size:${Math.round(size * 0.42)}px">${initials}</span>`;
 }
 
 function injectStyles(): void {
@@ -223,6 +239,8 @@ function injectStyles(): void {
 .am-caret { opacity: 0.6; font-size: 10px; }
 .am-avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--accent, #6366f1); }
 .am-avatar-initials { display: inline-block; text-align: center; color: #fff; font-weight: 600; }
+/* Org avatar (logo or org initials) reads as an org, not a person: rounded-square. */
+.am-avatar-org { border-radius: 6px; background: var(--surface, #1a1a1a); }
 .am-dropdown {
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 1000; min-width: 240px;
   background: var(--bg-secondary, var(--panel-bg, #16181d));
