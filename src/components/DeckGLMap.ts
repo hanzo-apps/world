@@ -86,6 +86,7 @@ import {
 } from '@/config';
 import { ROBOTICS_ORGS, roboticsCategoryColor } from '@/config/robotics';
 import { QUANTUM_PLAYERS, quantumModalityColor } from '@/config/quantum';
+import { DEFAULT_BASEMAP_STYLE } from '@/config/variant';
 import type { GulfInvestment } from '@/types';
 import { MapPopup, type PopupType } from './MapPopup';
 import { AnimatedArcLayer } from './AnimatedArcLayer';
@@ -99,6 +100,7 @@ import {
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
+import { getLandDots, type LandDot } from '@/services/land-dots';
 import { isNativeGlobeEnabled, type GlobeLayerSource } from './GlobeNative';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
@@ -233,12 +235,13 @@ const TERRAIN_DEM_SOURCE_ID = 'mapbox-dem';
 const TERRAIN_DEM_URL = 'mapbox://mapbox.mapbox-terrain-dem-v1';
 const TERRAIN_EXAGGERATION = 1.4;
 const BASEMAP_STYLE_KEY = 'hanzo-world-basemap-style';
-export type BasemapStyle = 'dark' | 'satellite' | 'terrain';
-const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'satellite', 'terrain'];
+export type BasemapStyle = 'dark' | 'dot' | 'satellite' | 'terrain';
+const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'dot', 'satellite', 'terrain'];
 // `satellite`/`terrain` are bright rasters: data dots need a thin dark halo to stay
 // legible. Persisted position/order for the draggable layer panel live here too so
 // there is one place per concern.
 const isBrightBasemap = (s: BasemapStyle): boolean => s === 'satellite' || s === 'terrain';
+const isDotBasemap = (s: BasemapStyle): boolean => s === 'dot';
 const LAYER_PANEL_POS_KEY = 'hanzo-world-layers-pos';
 const LAYER_PANEL_ORDER_KEY = 'hanzo-world-layers-order';
 
@@ -430,6 +433,9 @@ export class DeckGLMap {
   private weatherAlerts: WeatherAlert[] = [];
   private outages: InternetOutage[] = [];
   private cyberThreats: CyberThreat[] = [];
+  // Dotted-land basemap lattice (2D + shared with the native globe). Cached per
+  // session by land-dots.ts; empty until the country geojson loads.
+  private landDots: LandDot[] = [];
   private aisDisruptions: AisDisruptionEvent[] = [];
   private aisDensity: AisDensityZone[] = [];
   private cableAdvisories: CableAdvisory[] = [];
@@ -1283,6 +1289,12 @@ export class DeckGLMap {
       const basemap = this.buildBasemapLayer();
       if (basemap) layers.push(basemap);
     }
+    // Dot basemap (2D): a lattice of land dots over the near-black map. Drawn as
+    // the first data layer so every real layer sits on top. The dot cloud is the
+    // same one the native globe uses (land-dots.ts), so 2D ↔ 3D stay in sync.
+    if (isDotBasemap(this.basemapStyle) && this.landDots.length > 0) {
+      layers.push(this.createLandDotsLayer());
+    }
     const filteredEarthquakes = this.filterByTime(this.earthquakes, (eq) => eq.time);
     const filteredNaturalEvents = this.filterByTime(this.naturalEvents, (event) => event.date);
     const filteredWeatherAlerts = this.filterByTime(this.weatherAlerts, (alert) => alert.onset);
@@ -2108,6 +2120,22 @@ export class DeckGLMap {
       stroked: true,
       getLineColor: [255, 255, 255, 160] as [number, number, number, number],
       lineWidthMinPixels: 1,
+    });
+  }
+
+  // The dotted-land basemap (2D): a lattice of land dots over the near-black map.
+  // Same lattice + colour the native globe uses, so 2D ↔ 3D read as one surface.
+  private createLandDotsLayer(): ScatterplotLayer<LandDot> {
+    return new ScatterplotLayer<LandDot>({
+      id: 'land-dots-layer',
+      data: this.landDots,
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 16000, // ~1.6° in metres; a tight dot at world zoom
+      radiusUnits: 'meters',
+      radiusMinPixels: 0.7,
+      radiusMaxPixels: 3,
+      getFillColor: [120, 150, 185, 165] as [number, number, number, number],
+      pickable: false,
     });
   }
 
@@ -5033,6 +5061,13 @@ export class DeckGLMap {
     getCountriesGeoJson()
       .then((geojson) => {
         if (!this.mapboxMap || !geojson) return;
+        // The dot basemap samples a land lattice off the SAME geojson; cached per
+        // session by land-dots.ts. Loaded here so it's ready when the dot style is
+        // selected; a re-render pushes the dots layer once they land.
+        void getLandDots().then((dots) => {
+          this.landDots = dots;
+          this.render();
+        });
         this.mapboxMap.addSource('country-boundaries', {
           type: 'geojson',
           data: geojson,
@@ -5147,19 +5182,21 @@ export class DeckGLMap {
   private static loadBasemapStyle(): BasemapStyle {
     try {
       const raw = localStorage.getItem(BASEMAP_STYLE_KEY);
-      const style = (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : 'dark';
+      const style = (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : DEFAULT_BASEMAP_STYLE;
       // satellite/terrain are Mapbox styles that need a token in 2D — but the native
       // deck GlobeView renders them from keyless ESRI imagery, so when native is the
       // 3D renderer they're always available. Only fall back to dark when neither a
       // token nor the native globe can serve them.
-      return isBrightBasemap(style) && !MAPBOX_TOKEN && !isNativeGlobeEnabled() ? 'dark' : style;
+      if (isBrightBasemap(style) && !MAPBOX_TOKEN && !isNativeGlobeEnabled()) return 'dark';
+      return style;
     } catch {
-      return 'dark';
+      return DEFAULT_BASEMAP_STYLE;
     }
   }
 
-  // The effective mapbox style URL: `dark` stays theme-aware CartoDB (the locked
-  // monochrome look), satellite/terrain are their own Mapbox styles.
+  // The effective mapbox style URL: `dark`/`dot` stay theme-aware CartoDB (the
+  // locked monochrome look — dot overlays a land-dot lattice on top), satellite/
+  // terrain are their own Mapbox styles.
   private resolveStyleUrl(): string {
     if (this.basemapStyle === 'satellite') return SATELLITE_STYLE;
     if (this.basemapStyle === 'terrain') return TERRAIN_STYLE;
@@ -5278,6 +5315,7 @@ export class DeckGLMap {
     el.className = 'deckgl-style-switcher';
     const opts: Array<{ style: BasemapStyle; label: string; title: string }> = [
       { style: 'dark', label: 'Dark', title: t('components.deckgl.basemap.dark', { defaultValue: 'Dark basemap' }) },
+      { style: 'dot', label: 'Dot', title: t('components.deckgl.basemap.dot', { defaultValue: 'Dotted-land cybermap' }) },
       { style: 'satellite', label: 'Sat', title: t('components.deckgl.basemap.satellite', { defaultValue: 'Satellite imagery' }) },
       { style: 'terrain', label: 'Terrain', title: t('components.deckgl.basemap.terrain', { defaultValue: 'Terrain relief' }) },
     ];
