@@ -1081,7 +1081,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
      200px row makes span-1=200, span-2≈404, span-3≈608, span-4≈812, matching the
      .panel.span-* min-heights and the map's rowPx:200 exactly. Content that exceeds
      a panel's box scrolls INSIDE the panel, never onto its neighbours. */
-  grid-auto-rows: var(--panel-row, 200px);
+  grid-auto-rows: var(--panel-row, 16px);
   gap: 4px;
   padding: 4px;
   align-content: start;
@@ -1099,7 +1099,12 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   flex-direction: column;
   overflow: hidden;
   height: 100%;
-  min-height: 200px;
+  /* Fine 16px row grid: height = grid-row span. The DEFAULT is span-10 (≈200px) —
+     a starting point for a fresh panel, NOT a hard floor. min-height is a small
+     48px so a panel can be dragged genuinely short to fit its content (the old
+     200px floor was the "can't shrink / big vertical jump" complaint). */
+  min-height: 48px;
+  grid-row: span 10;
   cursor: grab;
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
@@ -1107,34 +1112,29 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
 
 /* .panel.resized: Custom height set - use grid-row span for height */
 
-/* Row span classes for resizable panels */
-/* span-0: the tiny tier — a compact 120px card, top-aligned inside its (now
-   definite 200px) row track so it stays genuinely short instead of stretching. */
+/* Row-span TIERS (the size menu / map presets), redefined on the 16px grid so
+   span-N ≈ 120/200/400/600/800px. Height comes from the grid-row span (× 16px +
+   gaps) with the panel's height:100% filling it — no min-height floor to fight a
+   short drag. Fine per-panel resize lands on spans >4 (inline), never these. */
 .panel.span-0 {
-  grid-row: span 1 !important;
-  min-height: 120px !important;
-  height: 120px !important;
+  grid-row: span 6 !important; /* tiny ≈ 120px */
   align-self: start;
 }
 
 .panel.span-1 {
-  grid-row: span 1 !important;
-  min-height: 200px !important;
+  grid-row: span 10 !important; /* ≈ 200px (default) */
 }
 
 .panel.span-2 {
-  grid-row: span 2 !important;
-  min-height: 400px !important;
+  grid-row: span 20 !important; /* ≈ 400px */
 }
 
 .panel.span-3 {
-  grid-row: span 3 !important;
-  min-height: 600px !important;
+  grid-row: span 30 !important; /* ≈ 600px */
 }
 
 .panel.span-4 {
-  grid-row: span 4 !important;
-  min-height: 800px !important;
+  grid-row: span 40 !important; /* ≈ 800px */
 }
 
 .panel-resize-handle {
