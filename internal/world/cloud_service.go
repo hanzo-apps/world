@@ -96,12 +96,25 @@ func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string, hdr map
 	return &ov, nil
 }
 
-// intervalSeconds parses a Go duration string (the usage series bucket width,
-// e.g. "1h") to seconds; 0 when unparseable so callers fall back to a window
-// average instead of dividing by a bogus interval.
+// intervalSeconds resolves the usage-series bucket width to seconds; 0 when
+// unresolvable so callers fall back to a window average instead of dividing by a
+// bogus interval. The upstream get-cloud-usages emits the width as a WORD enum
+// ("hour"/"day"/"minute"), NOT a Go duration — time.ParseDuration fails on those
+// ("hour" needs to be "1h"), which silently forced usageRate to the flat 24h mean
+// (the "AI Compute usage is dead flat" bug). Handle the enum first, then still
+// accept a real duration string for any caller that sends one.
 func intervalSeconds(d string) float64 {
-	if d == "" {
+	switch d {
+	case "":
 		return 0
+	case "minute":
+		return 60
+	case "hour":
+		return 3600
+	case "day":
+		return 86400
+	case "week":
+		return 604800
 	}
 	v, err := time.ParseDuration(d)
 	if err != nil || v <= 0 {
