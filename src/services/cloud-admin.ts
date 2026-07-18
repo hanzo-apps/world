@@ -66,6 +66,7 @@ export interface FleetMachineRow {
   gpus: number;
   vram: string;
   vcpu: number;
+  mem: string;
   os: string;
 }
 export interface FleetRegionGroup {
