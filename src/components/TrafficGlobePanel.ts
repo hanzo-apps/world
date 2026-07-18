@@ -47,10 +47,14 @@ export class TrafficGlobePanel extends Panel {
     if (live) this.setDataBadge('live'); else this.clearDataBadge();
 
     const t = d.totals;
+    // Distinct countries with real traffic (valid ISO alpha-2 only) — a real 4th metric
+    // so the tiles read as a symmetric 2×2 instead of 3 + a lone box.
+    const countries = (t.top_countries ?? []).filter((c) => /^[A-Za-z]{2}$/.test(c.country)).length;
     const tiles = [
       statTile(this.fmtRate(t.rps_1m), 'requests / sec', '1m'),
       statTile(this.fmtRate(t.rpm_60m), 'requests / min', '60m avg'),
       statTile(fmtInt(d.points.length), 'active regions'),
+      statTile(fmtInt(countries), 'countries'),
     ].join('');
 
     // Only real ISO-3166 alpha-2 codes: upstream geo occasionally leaks malformed
@@ -71,7 +75,7 @@ export class TrafficGlobePanel extends Panel {
     this.setContent(`
       <div class="cloud-overview">
         <div class="cloud-overview-head"><span class="cloud-scope">api.hanzo.ai · last ${d.window.minutes || 60}m</span></div>
-        <div class="cloud-stat-grid cloud-stat-grid-3">${tiles}</div>
+        <div class="cloud-stat-grid cloud-stat-grid-2">${tiles}</div>
         ${body}
       </div>
     `);
