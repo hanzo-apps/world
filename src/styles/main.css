@@ -17252,3 +17252,27 @@ body.layout-free .panels-grid::after {
 .wq-row-src { color: var(--text-dim); font-size: 9px; flex-shrink: 0; }
 .wq-row-x { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0 3px; font-size: 12px; }
 .wq-row-x:hover { color: var(--red, #f55); }
+
+/* ── Enso Benchmark Suite (admin-only head-to-head) ─────────────────────────
+   Theme-safe via var(--*) tokens (flip light/dark automatically). Wide tables
+   scroll INSIDE .enso-bm-wrap (overflow-x) so the page body never scrolls. */
+.enso-bm-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 6px 0 2px; }
+.enso-bm-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+.enso-bm-table th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 5px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.enso-bm-table td { padding: 5px 9px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); white-space: nowrap; vertical-align: top; }
+.enso-bm-table td.num, .enso-bm-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.enso-bm-row-enso td { color: var(--text); background: var(--bg-secondary); }
+.enso-bm-sys { color: var(--text); }
+.enso-bm-sys .cloud-tag { margin-left: 6px; }
+.enso-bm-se { color: var(--text-muted); font-size: 10px; }
+.enso-bm-pre { color: var(--text-faint); font-style: italic; }
+.enso-bm-bar { margin-top: 3px; min-width: 56px; }
+.enso-bm-bar .cloud-bar { height: 3px; }
+.enso-bm-tag-arm { opacity: 0.6; }
+.enso-bm-abl { margin: 8px 0 4px; }
+.enso-bm-abl-name { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
+.enso-bm-delta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 4px; font-family: var(--font-mono); font-size: 11px; }
+.enso-bm-up { color: var(--green); }
+.enso-bm-down { color: var(--text-dim); }
+.enso-bm-foot { margin: 6px 0 2px; padding-left: 16px; color: var(--text-muted); font-size: 10.5px; line-height: 1.55; }
+.enso-bm-foot li { margin: 3px 0; }

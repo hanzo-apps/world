@@ -128,6 +128,13 @@ func (s *Server) handleCloudPulse(w http.ResponseWriter, r *http.Request) {
 		if um, err := s.fetchUserMetrics(ctx, hdr); err == nil {
 			p.Users = um
 		}
+		// Real platform USAGE + per-model mix from LLM observability (measured requests,
+		// tokens, and REAL model names — not the opaque router arms), when the exact
+		// usage ledger was not available to this caller. Fixes an empty "Model Usage"
+		// and 0-token totals for an operator who can read platform observability.
+		if p.VolumeModeled || len(p.Models) == 0 {
+			s.applyLLMObservability(ctx, &p, hdr)
+		}
 		writeJSON(w, http.StatusOK, "private, no-store", p)
 		return
 	}
