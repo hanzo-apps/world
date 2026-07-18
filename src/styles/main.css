@@ -869,7 +869,12 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   overflow-x: hidden;
   background: var(--bg);
   width: 100%;
+  /* Hide the page's right-edge scrollbar — it read as a stray "sidebar scroller"
+     over the map. Wheel/trackpad scroll still works; same treatment the header,
+     switchers and layer panel already use. */
+  scrollbar-width: none;
 }
+.main-content::-webkit-scrollbar { width: 0; height: 0; }
 
 .map-section {
   height: 50vh;
@@ -11836,7 +11841,8 @@ a.prediction-link:hover {
    height-capped so it never spills onto the panels below (drag repositions it). */
 .deckgl-layer-toggles {
   position: absolute;
-  top: 10px;
+  /* Opens just below the top-left Layers button that toggles it. */
+  top: 48px;
   left: 10px;
   z-index: 100;
   background: var(--bg);
@@ -11844,7 +11850,7 @@ a.prediction-link:hover {
   border-radius: var(--radius);
   max-width: 260px;
   /* Stay within the map box (its own height minus the top/bottom insets). */
-  max-height: calc(100% - 20px);
+  max-height: calc(100% - 58px);
   display: none;
   flex-direction: column;
   overflow: hidden;
@@ -16942,10 +16948,10 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .world-dock .deckgl-style-switcher,
 .world-dock .deckgl-time-slider,
 .world-dock .time-slider,
-.deckgl-bottom-dock .deckgl-projection-toggle,
-.deckgl-bottom-dock .deckgl-style-switcher,
-.deckgl-bottom-dock .deckgl-time-slider,
-.deckgl-bottom-dock .time-slider {
+.deckgl-top-dock .deckgl-projection-toggle,
+.deckgl-top-dock .deckgl-style-switcher,
+.deckgl-top-dock .deckgl-time-slider,
+.deckgl-top-dock .time-slider {
   position: static;
   transform: none;
   top: auto; left: auto; right: auto; bottom: auto;
@@ -16958,17 +16964,17 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 }
 .world-dock .deckgl-projection-toggle,
 .world-dock .deckgl-style-switcher,
-.deckgl-bottom-dock .deckgl-projection-toggle,
-.deckgl-bottom-dock .deckgl-style-switcher { gap: 4px; }
+.deckgl-top-dock .deckgl-projection-toggle,
+.deckgl-top-dock .deckgl-style-switcher { gap: 4px; }
 
-/* Map-anchored bottom control dock — ONE tidy strip along the map's bottom border
-   holding the 2D/3D toggle, basemap switcher and time-range pills. Children reset to
-   in-flow by the shared rule above (reused, not duplicated). Sits just above the
-   legend row so both stay centered and clear of the corner zoom/layer overlays. */
-.deckgl-bottom-dock {
+/* Map-anchored TOP control dock — ONE tidy row across the map's top holding the
+   2D/3D toggle, basemap switcher and time-range pills, side by side. Children reset
+   to in-flow by the shared rule above (reused, not duplicated). Centered between the
+   top-left Layers button and the top-right zoom controls. */
+.deckgl-top-dock {
   position: absolute;
   left: 50%;
-  bottom: 42px;
+  top: 12px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -16981,9 +16987,35 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border-radius: var(--radius-pill);
   z-index: 500;
   pointer-events: none;
-  max-width: calc(100% - 96px);
+  max-width: calc(100% - 220px);
 }
-.deckgl-bottom-dock > * { pointer-events: auto; }
+.deckgl-top-dock > * { pointer-events: auto; }
+
+/* Map Layers button — top-left, toggles the layer panel (which opens just below it).
+   Gives the map its own layers control so it no longer needs the page footer. */
+.deckgl-layers-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  pointer-events: auto;
+}
+.deckgl-layers-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.deckgl-layers-btn.active { border-color: var(--accent); color: var(--text); }
+.deckgl-layers-btn svg { opacity: 0.85; }
 
 /* Immersive controls sit inline in the dock (moved from the header). */
 .world-dock .immersive-controls { border-right: 1px solid var(--border); padding-right: 6px; }
