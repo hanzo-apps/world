@@ -26,8 +26,9 @@ export interface Project {
 }
 
 export interface OrgOption {
-  id: string;   // canonical org id (Casdoor org name)
-  name: string; // human label (displayName)
+  id: string;    // canonical org id (Casdoor org name)
+  name: string;  // human label (displayName)
+  logo?: string; // org logo URL (Casdoor `logo`); undefined when unset
 }
 
 export interface OrgScope {
@@ -96,7 +97,7 @@ export async function resolveScope(): Promise<OrgScope | null> {
   const orgInfos = await listOrgs();
   const home = homeOrg();
   if (!home && orgInfos.length === 0) return null;
-  const orgs: OrgOption[] = orgInfos.map((o) => ({ id: o.name, name: o.displayName || o.name }));
+  const orgs: OrgOption[] = orgInfos.map((o) => ({ id: o.name, name: o.displayName || o.name, logo: o.logo }));
   const cur = getActiveOrg() || home || orgs[0]?.id || '';
   const projects = await listProjects(cur);
   const proj = currentProject(cur);
