@@ -3697,9 +3697,11 @@ export class App {
     }
     if (rowHandle && !this.isMobile) {
       attachPanelResize(mapSection, rowHandle, {
-        minSpan: 1,
-        maxSpan: 4,
-        rowPx: 200,
+        // SMOOTH fine snapping (matches every other panel): ~20px steps on the 16px
+        // row grid, uncapped, instead of the old coarse 200px tiers.
+        minSpan: 5,
+        maxSpan: 400,
+        rowPx: 20,
         getStartSpan: () => currentSpan(mapSection),
         onPreview: (span) => setSpanClass(mapSection, span),
         onCommit: (span) => savePanelSpan('map', span),
