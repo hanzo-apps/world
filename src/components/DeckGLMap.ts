@@ -457,6 +457,11 @@ export class DeckGLMap {
   private trafficPoints: TrafficGlobePoint[] = [];
   private cloudMapTimers: ReturnType<typeof setInterval>[] = [];
 
+  // Camera the far-side billboard cull (occludeFarSide) faces, in lng/lat. The native
+  // GlobeView feeds its own live camera here (mapbox is parked/frozen behind it); null
+  // falls back to the live mapbox center for the ?globe=mapbox escape path and 2D.
+  private occlusionCenter: { lng: number; lat: number } | null = null;
+
   // Country highlight state
   private countryGeoJsonLoaded = false;
   private countryHoverSetup = false;
@@ -620,7 +625,11 @@ export class DeckGLMap {
   private startCloudMapPolling(): void {
     const pull = <T>(fn: () => Promise<T | null>, apply: (data: T) => void, everyMs: number): void => {
       const tick = async (): Promise<void> => {
-        if (this.renderPaused || this.webglLost) return;
+        // Gate on tab visibility, NOT renderPaused: when the native GlobeView takes
+        // over (the default 3D view) this map is render-paused but its data still
+        // feeds the live globe, so the request-geo dots MUST keep polling. Only a
+        // hidden tab (or a lost context) should stop the fetch.
+        if (this.webglLost || document.hidden) return;
         const data = await fn();
         if (data) {
           apply(data);
@@ -1592,8 +1601,17 @@ export class DeckGLMap {
   // rotation and the idle spin; a 2D map is a no-op.
   private occludeFarSide(layers: Layer[]): Layer[] {
     if (this.state.mode !== '3d' || !this.mapboxMap) return layers;
+    // Billboard layers (Scatter/Icon/Text) don't reliably depth-occlude against the
+    // globe on a single GlobeView pass — a back-hemisphere point projects onto the
+    // near disc and a pixel-offset text badge pokes above the silhouette. So cull them
+    // deterministically by facing: a surface point is drawn only when its normal faces
+    // the camera. The camera longitude/latitude comes from `occlusionCenter` when the
+    // native GlobeView drives the render (its own live camera — mapbox is parked and
+    // frozen there), else from the live mapbox center (the ?globe=mapbox escape path).
+    // Paths/arcs/polygons are occluded by the GPU depth buffer instead (GlobeNative
+    // seats a depth-writing ocean sphere), so this only touches billboards.
     const RAD = Math.PI / 180;
-    const c = this.mapboxMap.getCenter();
+    const c = this.occlusionCenter ?? this.mapboxMap.getCenter();
     const clat = c.lat * RAD;
     const clng = c.lng * RAD;
     const cx = Math.cos(clat) * Math.cos(clng);
@@ -1650,6 +1668,19 @@ export class DeckGLMap {
         return (layer as unknown as Cloneable).clone({
           getColor: cull(props.getColor as ColorAcc, gp),
           updateTriggers: { ...triggers, getColor: [triggers.getColor, key] },
+        });
+      }
+      if (layer instanceof TextLayer) {
+        // Cull both the glyph colour and the pill background so a back-side count
+        // badge ("36") disappears entirely instead of floating over the globe.
+        return (layer as unknown as Cloneable).clone({
+          getColor: cull(props.getColor as ColorAcc, gp),
+          getBackgroundColor: cull(props.getBackgroundColor as ColorAcc, gp),
+          updateTriggers: {
+            ...triggers,
+            getColor: [triggers.getColor, key],
+            getBackgroundColor: [triggers.getBackgroundColor, key],
+          },
         });
       }
       return layer;
@@ -3928,7 +3959,15 @@ export class DeckGLMap {
       buildLayers: () => this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       handleClick: (info: PickingInfo) => this.handleClick(info),
+      setOcclusionCenter: (lng: number, lat: number) => this.setOcclusionCenter(lng, lat),
     };
+  }
+
+  // The native GlobeView calls this with its live camera before each layer rebuild so
+  // the far-side billboard cull tracks the globe's own rotation (mapbox is parked).
+  // Passing null restores the live-mapbox-center fallback (escape path / 2D).
+  public setOcclusionCenter(lng: number | null, lat?: number): void {
+    this.occlusionCenter = lng == null ? null : { lng, lat: lat ?? 0 };
   }
 
   // Sync mapbox's projection to the current mode. deck.gl's MapboxOverlay
