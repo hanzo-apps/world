@@ -198,6 +198,8 @@ export class MapContainer {
     }
     const wrapper = this.deckWrapper;
     if (wrapper) wrapper.style.visibility = '';
+    // Restore the live-mapbox-center fallback for the far-side cull (2D / escape path).
+    this.deckGLMap?.setOcclusionCenter(null);
     this.deckGLMap?.setRenderPaused(false);
     this.deckGLMap?.render();
   }

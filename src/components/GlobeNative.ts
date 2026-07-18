@@ -48,6 +48,9 @@ export interface GlobeLayerSource {
   buildLayers(): LayersList;
   getTooltip(info: PickingInfo): { html: string } | null;
   handleClick(info: PickingInfo): void;
+  /** Feed the globe's live camera (lng/lat) so the source can cull far-side billboards
+   *  against the rotation the user sees, not the parked mapbox center. */
+  setOcclusionCenter?(lng: number, lat: number): void;
 }
 
 export interface GlobeCountryClick {
@@ -191,6 +194,10 @@ export class GlobeNative {
   private syncIntervalMs: number;
   private syncTimerId: ReturnType<typeof setInterval> | null = null;
   private refreshScheduled = false;
+  // Camera the far-side cull last faced; a drag past ~2° re-pulls layers so occlusion
+  // tracks rotation without a per-frame rebuild.
+  private cullLng = 0;
+  private cullLat = 0;
 
   constructor(container: HTMLElement, options: GlobeNativeOptions = {}) {
     this.container = container;
@@ -241,6 +248,12 @@ export class GlobeNative {
       onViewStateChange: ({ viewState }) => {
         this.viewState = viewState;
         this.deck.setProps({ viewState });
+        // Re-pull layers (coalesced) once the camera has rotated far enough that the
+        // visible hemisphere changed, so the far-side billboard cull keeps up with a
+        // drag. deck.gl diffs by id, so unchanged layers cost nothing.
+        if (Math.abs(viewState.longitude - this.cullLng) > 2 || Math.abs(viewState.latitude - this.cullLat) > 2) {
+          this.refresh();
+        }
       },
       onError: (error: Error) =>
         console.warn('[GlobeNative] Render error (non-fatal):', error.message),
@@ -391,7 +404,12 @@ export class GlobeNative {
           _imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
           parameters: {
             cullMode: 'back',
-            depthWriteEnabled: true,
+            // Do NOT write depth. Adjacent imagery tiles are coplanar on the sphere;
+            // if each writes depth they z-fight at the shared tile seams under any
+            // depth-precision jitter → the horizontal "striping" glitch. The ocean
+            // sphere beneath owns the depth buffer (it writes), so far-side features
+            // still occlude correctly; the tiles only need to depth-TEST against it.
+            depthWriteEnabled: false,
             depthCompare: 'less-equal',
           } as unknown as Record<string, unknown>,
         });
@@ -437,6 +455,11 @@ export class GlobeNative {
     requestAnimationFrame(() => {
       this.refreshScheduled = false;
       if (this.destroyed) return;
+      // Face the far-side cull at the globe's OWN live camera before the source builds
+      // its layers, so back-hemisphere markers/badges are hidden for the view we render.
+      this.cullLng = this.viewState.longitude;
+      this.cullLat = this.viewState.latitude;
+      this.source?.setOcclusionCenter?.(this.viewState.longitude, this.viewState.latitude);
       this.dataLayers = this.source ? (this.source.buildLayers() ?? []) : [];
       this.pushLayers();
     });
@@ -444,7 +467,27 @@ export class GlobeNative {
 
   private pushLayers(): void {
     if (this.destroyed) return;
-    this.deck.setProps({ layers: [...this.basemapLayers, ...this.dataLayers] });
+    this.deck.setProps({ layers: [...this.basemapLayers, ...this.withSurfaceDepth(this.dataLayers)] });
+  }
+
+  // Occlusion, in ONE place. The data-layer builders (shared with the 2D map) set no
+  // depth parameters, so on the single-context globe they'd draw over the sphere and
+  // the far hemisphere would show through ("layers above the globe"). Here we make
+  // every data layer depth-TEST against the depth-writing ocean sphere (radius 0.995R,
+  // seated just under the lng/lat surface): a fragment on the FAR side sits behind the
+  // near ocean surface in the depth buffer and is culled by the GPU — real back-of-globe
+  // occlusion for points, icons, text badges, paths and arcs alike. We do NOT write
+  // depth (depthWriteEnabled:false) so coincident surface markers don't z-fight each
+  // other. A layer that already declared parameters keeps them (spread last).
+  private withSurfaceDepth(layers: LayersList): LayersList {
+    return (layers as unknown[]).map((l) => {
+      const layer = l as { clone?: (p: Record<string, unknown>) => unknown; props?: { parameters?: Record<string, unknown> } } | null;
+      if (!layer?.clone) return l as never;
+      const existing = layer.props?.parameters ?? {};
+      return layer.clone({
+        parameters: { depthCompare: 'less-equal', depthWriteEnabled: false, ...existing },
+      }) as never;
+    }) as unknown as LayersList;
   }
 
   // Re-pull data on a slow cadence so feed updates land without coupling GlobeNative
