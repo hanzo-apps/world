@@ -54,6 +54,7 @@ import {
 } from '@/services/cloud-map';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
+import { icon } from '@/utils/icons';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
 import {
@@ -607,6 +608,7 @@ export class DeckGLMap {
     this.createStyleSwitcher();
     this.createTimeSlider();
     this.createLayerToggles();
+    this.createLayersButton();
     this.createLegend();
     this.startCloudMapPolling();
   }
@@ -648,23 +650,38 @@ export class DeckGLMap {
 
     this.container.appendChild(wrapper);
 
-    // Bottom control dock. When no external host was supplied (App passes none for
-    // the flagship map), the chromeless controls — 2D/3D, basemap switcher and the
-    // time-range pills — dock in ONE tidy strip along the map's bottom border
-    // instead of scattering across the overlay (top-center, mid-left, …). Zoom, the
-    // hidden layer panel and the legend stay corner overlays. Matches the CTO's
-    // "controls in the bottom border of the map" direction.
+    // Top control dock. When no external host was supplied (App passes none for the
+    // flagship map), the chromeless controls — 2D/3D toggle, basemap switcher and the
+    // time-range pills — sit in ONE tidy row across the map's TOP, side by side,
+    // instead of scattering across the overlay or hiding in the footer. Layers (top-
+    // left), zoom (top-right) and the legend (bottom) stay corner overlays.
     //
     // It mounts on `container`, a SIBLING of the deck wrapper — NOT inside it —
     // because 3D mode parks the wrapper with `visibility:hidden` and renders via
     // GlobeNative; a dock inside the wrapper would vanish on the globe. The legend
-    // sits on `container` for the same reason.
+    // and the layers button sit on `container` for the same reason.
     if (this.controlsHost === this.container) {
       const dock = document.createElement('div');
-      dock.className = 'deckgl-bottom-dock';
+      dock.className = 'deckgl-top-dock';
       this.container.appendChild(dock);
       this.controlsHost = dock;
     }
+  }
+
+  // A small "Layers" button pinned top-left that shows/hides the layer panel (which
+  // itself anchors top-left). Gives the map its own layers control instead of relying
+  // on the page footer. Only mounted for the flagship map (dock-owned controls host).
+  private createLayersButton(): void {
+    if (this.controlsHost === this.container) return; // harness map: no dock, no button
+    const btn = document.createElement('button');
+    btn.className = 'deckgl-layers-btn';
+    btn.type = 'button';
+    btn.innerHTML = `${icon('layers', 13)}<span>Layers</span>`;
+    btn.addEventListener('click', () => {
+      const open = this.toggleLayerPanel();
+      btn.classList.toggle('active', open);
+    });
+    this.container.appendChild(btn);
   }
 
   private initBasemap(): void {
