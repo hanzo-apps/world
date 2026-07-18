@@ -69,10 +69,14 @@ export class MyUsagePanel extends Panel {
           : typeof u.metadata?.description === 'string' ? u.metadata.description
             : 'usage';
         const when = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '';
+        // The ledger carries integer cents, so a real sub-cent inference charge (< $0.005)
+        // rounds to 0 and would render a bare "$0.00" that reads as "not billed". Show
+        // "< $0.01" for a real row that rounded to zero — honest about a tiny real charge.
+        const amt = u.amount > 0 ? fmtUsd(u.amount) : (u.amount === 0 ? '< $0.01' : fmtUsd(u.amount));
         return `<div class="cloud-usage-row">
           <span class="cloud-usage-label">${escapeHtml(String(label))}</span>
           <span class="cloud-usage-when">${escapeHtml(when)}</span>
-          <span class="cloud-usage-amt">${fmtUsd(u.amount)}</span>
+          <span class="cloud-usage-amt">${escapeHtml(amt)}</span>
         </div>`;
       }).join('');
 
