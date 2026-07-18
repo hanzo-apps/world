@@ -1664,11 +1664,15 @@ body.panel-drag-active .map-container {
   border-radius: 2px;
 }
 
-/* Wide panel (spans 2 columns and 2 rows for video content) */
+/* Wide panel: 2 columns, and a DEFAULT height on the fine 16px row grid (span 18 ≈
+   356px). The old `grid-row: span 2` assumed the coarse 200px grid and, after the
+   move to 16px rows, reserved only ~36px while the panel was 350px tall — so wide
+   panels overflowed their grid cell and painted over their neighbours. min-height
+   drops to the shared 48px floor so a wide panel can still be dragged short. */
 .panel-wide {
   grid-column: span 2;
-  grid-row: span 2;
-  min-height: 350px;
+  grid-row: span 18;
+  min-height: 48px;
   max-height: none;
 }
 
