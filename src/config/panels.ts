@@ -486,10 +486,11 @@ const CLOUD_MAP_LAYERS: MapLayers = {
   // Hanzo World cloud map layers
   chainNodes: true,
   byoGpu: true,
-  // Arcs OFF by default: the arc feed carries a demo fallback, so the flagship
-  // default leads with the ALWAYS-honest native points layer (empty until real
-  // traffic lands, never demo). Toggle arcs on for the animated flow lines.
-  trafficArcs: false,
+  // Animated request-origin → serving-region arcs. REAL + honest: the /cloud/traffic
+  // feed now derives arcs from the same native request-geo points as the dots (origin
+  // country → nearest Hanzo region) and degrades to an EMPTY array — never demo — when
+  // there's no traffic. Paired with the points layer it shows flow, not just presence.
+  trafficArcs: true,
   // Native LB request-geo points — the Hanzo-mode globe centerpiece.
   traffic: true,
 };

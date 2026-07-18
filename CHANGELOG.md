@@ -2,6 +2,18 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.13]
+
+### Fixed
+
+- **Globe overlays now sit ON the sphere with correct occlusion** (the "map spazzes" report). On the native deck.gl GlobeView, data layers (shared with the 2D map) carried no depth parameters, so the far hemisphere showed through and count badges floated above the limb. GlobeNative now seats every data layer against the depth-writing ocean sphere (test, don't write — no inter-marker z-fight), and the far-side billboard cull (`occludeFarSide`) faces the globe's OWN live camera instead of the parked (frozen) mapbox center — extended to `TextLayer` so a back-side "36" count badge disappears instead of hovering over the planet.
+- **Terrain striping on the globe**: the draped ESRI imagery tiles each wrote depth, so coplanar neighbours z-fought at the tile seams (horizontal stripes / partial render). Tiles now depth-TEST only; the ocean sphere owns the depth buffer.
+- **Live request-geo dots kept polling on the 3D globe**: the `/v1/world/cloud/*` poll was gated on `renderPaused`, which the native GlobeView sets on activation — so the realtime dots froze the moment you entered the default 3D view. It now gates on tab visibility, so the dots stay live (and fade) on the globe.
+
+### Changed
+
+- **Request-origin → serving-region arcs on by default** in the Cloud view: the `/cloud/traffic` arcs derive from the same real native request-geo points as the dots (origin country → nearest Hanzo region) and degrade to empty — never demo.
+
 ## [2.4.6]
 
 ### Added
