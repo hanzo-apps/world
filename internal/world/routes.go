@@ -80,6 +80,12 @@ func (s *Server) mount(mux registrar) {
 	// (bearer-gated; anonymous keeps localStorage).
 	mux.HandleFunc("/v1/world/settings", s.handleSettings)
 
+	// per-identity DASHBOARD composition — the signed-in user's full dashboard
+	// (panels, order, spans/cols, layers, sources, custom widgets) that the AI
+	// analyst and toolbar compose on the fly, persisted so it follows them across
+	// devices. Same per-identity store as settings/monitors, 'dashboard' namespace.
+	mux.HandleFunc("/v1/world/dashboard", s.handleDashboard)
+
 	// econ / humanitarian
 	mux.HandleFunc("/v1/world/fred-data", s.handleFRED)
 	mux.HandleFunc("/v1/world/china-macro", s.handleChinaMacro)
