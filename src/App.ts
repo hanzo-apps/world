@@ -107,7 +107,6 @@ import {
   MyUsagePanel,
   LiveActivityPanel,
   CloudServicesPanel,
-  CloudFleetPanel,
   HanzoStatusPanel,
   CloudAnalyticsPanel,
   LlmUsagePanel,
@@ -2826,7 +2825,9 @@ export class App {
     this.adminCloudMounted = true;
     const defs: Array<[string, Panel, string]> = [
       ['cloud-services', new CloudServicesPanel(), 'Service status'],
-      ['cloud-fleet', new CloudFleetPanel(), 'Fleet & clusters'],
+      // Fleet lives in ONE panel now — the always-mounted "Fleet & GPUs" (FleetPanel)
+      // renders the full platform fleet for admins. The old admin-only "Fleet &
+      // clusters" (CloudFleetPanel) was a byte-for-byte duplicate and was removed.
       ['llm-usage', new LlmUsagePanel(), 'LLM observability'],
       ['cloud-analytics', new CloudAnalyticsPanel(), 'Web analytics'],
       ['enso-benchmarks', new EnsoBenchmarkPanel(), 'Enso benchmarks'],
