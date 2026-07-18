@@ -362,16 +362,21 @@ func (s *Server) applyPublicVolume(ctx context.Context, p *cloudPulse) bool {
 	return got
 }
 
-// applyLLMObservability overlays REAL platform usage from the LLM observability
-// aggregate (/v1/admin/o11y — measured requests, tokens, and top models by REAL
-// name, all orgs) read with the admin's own bearer. This is the canonical "which
-// models is the platform using" source (the opaque router arms are never shown).
-// It clears volumeModeled when it lands real numbers; a caller not authorized for
-// platform observability upstream simply keeps the honest fallback. Keeps the
-// freshest rate (globe rps) if already set.
-func (s *Server) applyLLMObservability(ctx context.Context, p *cloudPulse, auth map[string]string) {
+// llmUsage is the measured platform usage from LLM observability (/v1/admin/o11y):
+// 24h request/token totals + top models by REAL name. ONE place shapes the o11y read
+// so cloud-pulse and ai-pulse share it (DRY) — the opaque router arms are never used.
+type llmUsage struct {
+	Requests int64
+	Tokens   int64
+	Models   []cloudModel
+}
+
+// fetchLLMUsage reads the platform LLM observability aggregate with the admin's own
+// bearer. ok=false when the caller isn't authorized upstream or it's unreachable, so
+// callers keep their honest fallback.
+func (s *Server) fetchLLMUsage(ctx context.Context, auth map[string]string) (*llmUsage, bool) {
 	if auth == nil {
-		return
+		return nil, false
 	}
 	var resp struct {
 		Totals struct {
@@ -385,45 +390,52 @@ func (s *Server) applyLLMObservability(ctx context.Context, p *cloudPulse, auth 
 		} `json:"topModels"`
 	}
 	if err := s.getJSON(ctx, apiHost()+"/v1/admin/o11y?range=24h", auth, &resp); err != nil {
-		return
+		return nil, false
 	}
-
-	got := false
-	if resp.Totals.Requests > 0 {
-		p.Overview.Requests24h = resp.Totals.Requests
-		p.Overview.Tokens24h = resp.Totals.Tokens
-		if p.Overview.RequestsPerSec == 0 { // keep the globe's live rate when we have it
-			p.Overview.RequestsPerSec = round1(float64(resp.Totals.Requests) / 86400)
-		}
-		got = true
-	}
-
+	u := &llmUsage{Requests: resp.Totals.Requests, Tokens: resp.Totals.Tokens}
 	var total int64
 	for _, m := range resp.TopModels {
 		total += m.Requests
 	}
 	if total > 0 {
-		models := make([]cloudModel, 0, len(resp.TopModels))
 		for _, m := range resp.TopModels {
 			if m.Model == "" {
 				continue
 			}
-			models = append(models, cloudModel{
+			u.Models = append(u.Models, cloudModel{
 				ID: m.Model, Name: m.Model, Requests24h: m.Requests, Tokens24h: m.Tokens,
 				Share: float64(m.Requests) / float64(total),
 			})
 		}
-		if len(models) > 0 {
-			p.Models = models
-			got = true
+	}
+	if u.Requests == 0 && len(u.Models) == 0 {
+		return nil, false
+	}
+	return u, true
+}
+
+// applyLLMObservability overlays REAL platform usage (fetchLLMUsage) onto the pulse:
+// measured requests/tokens + the real model mix (never the opaque router arms). It
+// clears volumeModeled when real numbers land and keeps the freshest rate (globe rps)
+// if already set. No-op (honest fallback kept) when the caller can't read o11y.
+func (s *Server) applyLLMObservability(ctx context.Context, p *cloudPulse, auth map[string]string) {
+	u, ok := s.fetchLLMUsage(ctx, auth)
+	if !ok {
+		return
+	}
+	if u.Requests > 0 {
+		p.Overview.Requests24h = u.Requests
+		p.Overview.Tokens24h = u.Tokens
+		if p.Overview.RequestsPerSec == 0 { // keep the globe's live rate when we have it
+			p.Overview.RequestsPerSec = round1(float64(u.Requests) / 86400)
 		}
 	}
-
-	if got {
-		p.VolumeModeled = false
-		p.Window = "24h"
-		p.Note = "Live platform usage from Hanzo LLM observability — measured requests, tokens and model mix across all orgs."
+	if len(u.Models) > 0 {
+		p.Models = u.Models
 	}
+	p.VolumeModeled = false
+	p.Window = "24h"
+	p.Note = "Live platform usage from Hanzo LLM observability — measured requests, tokens and model mix across all orgs."
 }
 
 // routerStatsVolume is the subset of the public router-stats aggregate we fold into
