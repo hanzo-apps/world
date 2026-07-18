@@ -304,7 +304,7 @@ func (s *Server) runAnalystLoop(ctx context.Context, bearer, model string, full 
 		}
 		if err != nil || out == "" {
 			if err == nil {
-				err = fmt.Errorf("empty response")
+				err = emptyAnswerErr(firstNonEmpty(model, s.ai.model))
 			}
 			return "", nil, traces, tokens, id, err
 		}
