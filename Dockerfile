@@ -38,8 +38,10 @@ RUN npm run build
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
 # go 1.26: go.mod requires >= 1.26.4 (github.com/hanzoai/sqlite drop-in). The
-# binary stays CGO-free — with CGO_ENABLED=0, hanzoai/sqlite selects its pure-Go
-# modernc backend (FTS5 built in), so no C toolchain is added and FTS5 works.
+# binary stays CGO-free — with CGO_ENABLED=0, hanzoai/sqlite selects its vendored
+# pure-Go engine (zero modernc.org/* in the module graph). That engine gates FTS5
+# behind the `sqlite_fts5` build tag, which the store's items_fts virtual table
+# needs — so the build below MUST carry `-tags sqlite_fts5` or Open degrades.
 FROM golang:1.26-alpine AS gobuild
 WORKDIR /src
 # git: go resolves the PRIVATE indirect dep github.com/hanzoai/csqlite 'direct'
@@ -58,7 +60,7 @@ RUN --mount=type=secret,id=gh_token \
     go mod download
 COPY cmd ./cmd
 COPY internal ./internal
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/world ./cmd/world
+RUN CGO_ENABLED=0 GOOS=linux go build -tags sqlite_fts5 -trimpath -ldflags="-s -w" -o /out/world ./cmd/world
 
 # ---- final stage: minimal image running the Go binary --------------------
 FROM alpine:3.20
