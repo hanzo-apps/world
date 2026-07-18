@@ -111,6 +111,7 @@ import {
   HanzoStatusPanel,
   CloudAnalyticsPanel,
   LlmUsagePanel,
+  EnsoBenchmarkPanel,
   BlockchainPanel,
   AiComputePanel,
   EnsoFlywheelPanel,
@@ -2828,6 +2829,7 @@ export class App {
       ['cloud-fleet', new CloudFleetPanel(), 'Fleet & clusters'],
       ['llm-usage', new LlmUsagePanel(), 'LLM observability'],
       ['cloud-analytics', new CloudAnalyticsPanel(), 'Web analytics'],
+      ['enso-benchmarks', new EnsoBenchmarkPanel(), 'Enso benchmarks'],
     ];
     for (const [key, panel, name] of defs) {
       if (this.panels[key]) continue;
