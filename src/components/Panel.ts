@@ -45,8 +45,6 @@ export function savePanelSpan(panelId: string, span: number): void {
 export const PANEL_SPAN_HEIGHTS = [120, 200, 400, 600, 800];
 
 const SPAN_CLASSES = ['span-0', 'span-1', 'span-2', 'span-3', 'span-4'];
-// px per row-span beyond the CSS ladder — matches --panel-row (grid-auto-rows).
-const PANEL_ROW_PX = 200;
 
 export function currentSpan(element: HTMLElement): number {
   // The live span is the source of truth (covers the uncapped span>4 tiers that
@@ -70,10 +68,11 @@ export function setSpanClass(element: HTMLElement, span: number): void {
     element.style.gridRow = '';
     element.style.minHeight = '';
   } else {
-    // Beyond the CSS ladder — no capped class, so drive the (arbitrarily tall)
-    // size inline. No !important is in play here, so inline wins cleanly.
+    // Fine grid (span >4): height is the grid-row span alone (each row = 16px).
+    // No inline min-height floor, so the panel is exactly as tall as the drag and
+    // can hug its content — no forced blank space, smooth ~16px steps.
     element.style.gridRow = `span ${span}`;
-    element.style.minHeight = `${span * PANEL_ROW_PX}px`;
+    element.style.minHeight = '';
   }
   element.classList.add('resized');
 }
@@ -247,14 +246,15 @@ export class Panel {
       el.style.gridColumn = cols > 1 ? `span ${cols}` : '';
     };
 
-    // Bottom edge → height. Grid mode snaps to the PANEL_SPAN_HEIGHTS tier ladder
-    // (span-0 = 120px tiny … span-4 = 800px); free mode is pixel-exact. The module
-    // owns pointer math; Panel owns the span→class mapping and persistence.
+    // Bottom edge → height. SMOOTH fine snapping: ~20px steps (16px row + 4px gap)
+    // with no coarse tier ladder, so a panel drags to hug its content. minSpan 5
+    // (≈100px) keeps it out of the 0–4 tier classes; height is uncapped. Free mode
+    // is pixel-exact. The module owns pointer math; Panel owns span→class + persist.
     this.resizeCleanups.push(
       attachPanelResize(el, this.resizeHandle, {
-        minSpan: 0,
-        maxSpan: 4,
-        snapHeights: PANEL_SPAN_HEIGHTS,
+        minSpan: 5,
+        maxSpan: 400,
+        rowPx: 20,
         getStartSpan: () => currentSpan(el),
         onPreview: (span) => setSpanClass(el, span),
         onCommit: (span) => savePanelSpan(id, span),
@@ -282,9 +282,9 @@ export class Panel {
           getGrid: () => document.getElementById('panelsGrid'),
           getStartSpan: () => currentSpan(el),
           getStartCols: startCols,
-          snapHeights: PANEL_SPAN_HEIGHTS,
-          minSpan: 0,
-          maxSpan: 4,
+          minSpan: 5,
+          maxSpan: 400,
+          rowPx: 20,
           onPreviewSpan: (span) => setSpanClass(el, span),
           onPreviewCols: (cols) => previewCols(cols),
           onCommitSpan: (span) => savePanelSpan(id, span),

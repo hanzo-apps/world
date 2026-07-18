@@ -37,7 +37,7 @@ const FLIP_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 // Sane pixel floors for free-mode geometry. The map keeps a larger floor so it
 // never collapses to an unreadable sliver.
 const FREE_MIN_W = 160;
-const FREE_MIN_H = 120;
+const FREE_MIN_H = 48;
 const MAP_MIN = 240;
 
 const minWidthFor = (el: HTMLElement, opt?: number): number =>
@@ -915,6 +915,7 @@ export interface PanelCornerResizeOptions {
   getStartCols: () => number;
   /** Per-span target heights (index === span) for the vertical snap. */
   snapHeights?: number[];
+  rowPx?: number; // px per row-span for the vertical snap (default 200)
   minSpan?: number; // default 0
   maxSpan?: number; // default 4
   minW?: number; // free-mode width floor (default 160)
@@ -942,6 +943,7 @@ export function attachPanelCornerResize(
 ): () => void {
   const minSpan = opts.minSpan ?? 0;
   const maxSpan = opts.maxSpan ?? 4;
+  const rowPx = opts.rowPx ?? 200;
   const snapHeights = opts.snapHeights;
   const corner = opts.corner ?? 'se';
   const edges = EDGES_FOR_CORNER[corner];
@@ -978,7 +980,7 @@ export function attachPanelCornerResize(
   };
 
   const spanFor = (height: number): number =>
-    spanForHeight(height, minSpan, maxSpan, 200, snapHeights);
+    spanForHeight(height, minSpan, maxSpan, rowPx, snapHeights);
 
   const onPointerMove = (e: PointerEvent) => {
     if (!resizing || e.pointerId !== pointerId) return;
