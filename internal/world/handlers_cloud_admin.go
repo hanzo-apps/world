@@ -34,6 +34,7 @@ type fleetMachineRow struct {
 	GPUs     int    `json:"gpus"`
 	VRAM     string `json:"vram"` // BYO GPUs report VRAM total; "" when unknown
 	VCPU     int    `json:"vcpu"` // vCPU count (visor MachineView.vcpu); 0 when unknown
+	Mem      string `json:"mem"`  // system RAM, e.g. "8 GB"; "" when unknown
 	OS       string `json:"os"`
 }
 
@@ -96,8 +97,8 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 
 	var machines struct {
 		Machines []struct {
-			ID, Name, Region, Type, Status, Provider, GPU, OS string
-			Vcpu                                              int `json:"vcpu"`
+			ID, Name, Region, Type, Status, Provider, GPU, OS, Mem string
+			Vcpu                                                   int `json:"vcpu"`
 		} `json:"machines"`
 	}
 	if err := s.getJSON(ctx, base+"/v1/machines", hdr, &machines); err != nil {
@@ -158,7 +159,7 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 			regIdx[prov][region] = rg
 		}
 		ga := byMachine[m.ID]
-		row := fleetMachineRow{ID: m.ID, Name: orDash(m.Name), Type: m.Type, Status: m.Status, GPUModel: m.GPU, VCPU: m.Vcpu, OS: m.OS}
+		row := fleetMachineRow{ID: m.ID, Name: orDash(m.Name), Type: m.Type, Status: m.Status, GPUModel: m.GPU, VCPU: m.Vcpu, Mem: m.Mem, OS: m.OS}
 		if ga != nil {
 			row.GPUs = ga.count
 			row.VRAM = ga.vram
