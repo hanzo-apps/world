@@ -57,8 +57,10 @@ type MonitorMatch struct {
 	TS        time.Time `json:"ts"`
 }
 
-// identityFor resolves the caller, or writes 401 and reports false.
-func (s *Server) identityFor(w http.ResponseWriter, r *http.Request) (store.Identity, bool) {
+// identityForDoc resolves the caller under a per-identity store namespace (doc),
+// or writes 401 and reports false. It is world's ONE bearer→identity gate for the
+// namespaced settings store — monitors and dashboard both resolve through here.
+func (s *Server) identityForDoc(w http.ResponseWriter, r *http.Request, doc string) (store.Identity, bool) {
 	bearer := userBearer(r)
 	if bearer == "" {
 		writeError(w, http.StatusUnauthorized, "Sign in required")
@@ -71,7 +73,12 @@ func (s *Server) identityFor(w http.ResponseWriter, r *http.Request) (store.Iden
 		writeError(w, http.StatusUnauthorized, "Sign in required")
 		return store.Identity{}, false
 	}
-	return store.Identity{Org: id.Org, UserSub: id.Sub, Project: monitorsDoc}, true
+	return store.Identity{Org: id.Org, UserSub: id.Sub, Project: doc}, true
+}
+
+// identityFor resolves the caller for the monitors namespace.
+func (s *Server) identityFor(w http.ResponseWriter, r *http.Request) (store.Identity, bool) {
+	return s.identityForDoc(w, r, monitorsDoc)
 }
 
 func (s *Server) handleMonitors(w http.ResponseWriter, r *http.Request) {
