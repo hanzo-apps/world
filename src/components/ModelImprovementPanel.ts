@@ -121,8 +121,9 @@ export class ModelImprovementPanel extends Panel {
           <div class="fw-hero-value" id="fwHero">0</div>
           <div class="fw-hero-label">${heroLabel}</div>
         </div>
-        <div class="cloud-stat-grid cloud-stat-grid-3">
-          ${statTile(rewardPct, 'reward rate', `${fmtInt(events)} scored`)}
+        <div class="cloud-stat-grid cloud-stat-grid-2">
+          ${statTile(rewardPct, 'reward rate', `${d.window.days || 30}d`)}
+          ${statTile(fmtInt(events), 'requests scored')}
           ${statTile(fmtInt(daysActive), 'active days')}
           ${statTile(fmtInt(d.retrains.length), 'retrains')}
         </div>

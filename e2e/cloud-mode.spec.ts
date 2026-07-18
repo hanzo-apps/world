@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickMapControl } from './helpers/map-controls';
 
 // Cloud mode: on world.hanzo.ai (and local dev — a hanzo brand host) the H logo is a
 // toggle that reveals the [Hanzo | World | AI | Crypto | Finance | Tech] switcher,
@@ -126,7 +127,7 @@ test.describe('Cloud mode', () => {
     }
 
     // Switch to the 3D globe (GlobeNative is exposed on window in dev/e2e).
-    await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click();
+    await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
     await expect
       .poll(() => page.evaluate(() => Boolean((window as unknown as { __globeNative?: unknown }).__globeNative)), { timeout: 20000 })
       .toBe(true);

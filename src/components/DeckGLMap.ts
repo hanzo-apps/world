@@ -3351,14 +3351,13 @@ export class DeckGLMap {
       </div>
     `;
 
-    this.controlsHost.appendChild(slider);
-
     slider.querySelectorAll('.time-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const range = (btn as HTMLElement).dataset.range as TimeRange;
         this.setTimeRange(range);
       });
     });
+    this.mountDropdown('time', slider, t('components.deckgl.timeRange', { defaultValue: 'Time range' }));
   }
 
   private updateTimeSliderButtons(): void {
@@ -3368,6 +3367,7 @@ export class DeckGLMap {
       const range = (btn as HTMLElement).dataset.range as TimeRange | undefined;
       btn.classList.toggle('active', range === this.state.timeRange);
     });
+    this.syncDropdownLabel(slider.closest('.deckgl-dd'));
   }
 
   private createLayerToggles(): void {
@@ -4030,14 +4030,13 @@ export class DeckGLMap {
       <button class="proj-btn ${this.state.mode === '3d' ? 'active' : ''}" data-mode="3d"
         title="${t('components.deckgl.projection.globe', { defaultValue: '3D globe' })}">3D</button>
     `;
-    this.controlsHost.appendChild(toggle);
-
     toggle.querySelectorAll('.proj-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = (btn as HTMLElement).dataset.mode as MapProjectionMode;
         this.setProjectionMode(mode);
       });
     });
+    this.mountDropdown('projection', toggle, t('components.deckgl.projection.globe', { defaultValue: '3D globe' }));
   }
 
   private updateProjectionToggle(): void {
@@ -4047,6 +4046,60 @@ export class DeckGLMap {
       const mode = (btn as HTMLElement).dataset.mode;
       btn.classList.toggle('active', mode === this.state.mode);
     });
+    this.syncDropdownLabel(toggle.closest('.deckgl-dd'));
+  }
+
+  // ---- Compact control dropdowns -------------------------------------------
+  // Each map control (projection, basemap, time-range) collapses to ONE trigger
+  // showing the active option + caret; its original option-buttons live in a popover
+  // that opens on click. Keeping the exact inner buttons means their click handlers,
+  // active-state updates and selectors are unchanged — only the chrome collapses, so
+  // the top dock is one tidy row instead of two wrapping rows.
+  private dropdownOutsideBound = false;
+
+  private mountDropdown(key: string, menu: HTMLElement, title: string): void {
+    const wrap = document.createElement('div');
+    wrap.className = 'deckgl-dd';
+    wrap.dataset.dd = key;
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'dd-trigger';
+    trigger.title = title;
+    trigger.setAttribute('aria-haspopup', 'true');
+    menu.classList.add('dd-menu');
+    wrap.append(trigger, menu);
+    this.controlsHost.appendChild(wrap);
+    this.syncDropdownLabel(wrap);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = !wrap.classList.contains('open');
+      this.closeDropdowns();
+      wrap.classList.toggle('open', open);
+    });
+    // Picking an option closes the menu; the label re-syncs from the new active button.
+    menu.addEventListener('click', () => {
+      wrap.classList.remove('open');
+      this.syncDropdownLabel(wrap);
+    });
+
+    if (!this.dropdownOutsideBound) {
+      this.dropdownOutsideBound = true;
+      document.addEventListener('click', () => this.closeDropdowns());
+    }
+  }
+
+  private syncDropdownLabel(wrap: Element | null): void {
+    if (!wrap) return;
+    const active = wrap.querySelector('.dd-menu .active') as HTMLElement | null;
+    const trigger = wrap.querySelector('.dd-trigger');
+    if (trigger) {
+      trigger.innerHTML = `<span class="dd-label">${escapeHtml(active?.textContent?.trim() || '—')}</span><span class="dd-caret" aria-hidden="true">▾</span>`;
+    }
+  }
+
+  private closeDropdowns(): void {
+    this.controlsHost.querySelectorAll('.deckgl-dd.open').forEach((d) => d.classList.remove('open'));
   }
 
   // ---- Idle globe spin ------------------------------------------------------
@@ -5240,10 +5293,10 @@ export class DeckGLMap {
         return `<button class="style-btn ${o.style === this.basemapStyle ? 'active' : ''}" data-style="${o.style}"${needsToken ? ' disabled' : ''} title="${title}">${o.label}</button>`;
       })
       .join('');
-    this.controlsHost.appendChild(el);
     el.querySelectorAll('.style-btn').forEach((btn) => {
       btn.addEventListener('click', () => this.setBasemapStyle((btn as HTMLElement).dataset.style as BasemapStyle));
     });
+    this.mountDropdown('basemap', el, t('components.deckgl.basemap.dark', { defaultValue: 'Basemap' }));
   }
 
   private updateStyleSwitcher(): void {
@@ -5252,6 +5305,7 @@ export class DeckGLMap {
     el.querySelectorAll('.style-btn').forEach((btn) => {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.style === this.basemapStyle);
     });
+    this.syncDropdownLabel(el.closest('.deckgl-dd'));
   }
 
   private updateCountryLayerPaint(theme: 'dark' | 'light'): void {
