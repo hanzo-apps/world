@@ -245,8 +245,11 @@ func TestCloudPulseRouterFallback(t *testing.T) {
 	if len(p.TokenSeries) != 0 {
 		t.Fatalf("token series is unmeasured → must be empty, got %v", p.TokenSeries)
 	}
-	if len(p.Models) != 3 || p.Models[0].ID != "zen-omni-30b" || p.Models[0].Requests24h != 520 || p.Models[0].Tokens24h != 0 {
-		t.Fatalf("want real router by_model mix (tokens blank), got %+v", p.Models)
+	// router by_model is opaque "arm-N" on platform scope, NOT real model names, so
+	// the model mix must stay EMPTY on the public fallback (never "arm-8") — real
+	// per-model usage comes only from the measured ledger (admin path).
+	if len(p.Models) != 0 {
+		t.Fatalf("router fallback must not surface opaque arm ids as models, got %+v", p.Models)
 	}
 	if p.Overview.Regions != 2 {
 		t.Fatalf("want 2 real regions from the visor fleet, got %d", p.Overview.Regions)
