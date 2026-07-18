@@ -299,6 +299,7 @@ export async function logout(): Promise<void> {
 export interface OrgInfo {
   name: string;        // canonical org id (Casdoor org name)
   displayName: string; // human label
+  logo?: string;       // org logo URL (Casdoor `logo`); undefined when unset
 }
 
 let cachedOrgs: OrgInfo[] | null = null;
@@ -352,9 +353,10 @@ export async function listOrgs(force = false): Promise<OrgInfo[]> {
     const arr: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
     const orgs = arr
       .map((o) => {
-        const rec = o as { name?: unknown; displayName?: unknown };
+        const rec = o as { name?: unknown; displayName?: unknown; logo?: unknown };
         const name = String(rec?.name ?? '');
-        return { name, displayName: String(rec?.displayName ?? name) };
+        const logo = typeof rec?.logo === 'string' && rec.logo ? rec.logo : undefined;
+        return { name, displayName: String(rec?.displayName ?? name), logo };
       })
       .filter((o) => o.name && o.name !== 'built-in');
     // Home org first, then the rest, deduped by name.
