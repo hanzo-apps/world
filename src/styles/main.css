@@ -16941,7 +16941,11 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .world-dock .deckgl-projection-toggle,
 .world-dock .deckgl-style-switcher,
 .world-dock .deckgl-time-slider,
-.world-dock .time-slider {
+.world-dock .time-slider,
+.deckgl-bottom-dock .deckgl-projection-toggle,
+.deckgl-bottom-dock .deckgl-style-switcher,
+.deckgl-bottom-dock .deckgl-time-slider,
+.deckgl-bottom-dock .time-slider {
   position: static;
   transform: none;
   top: auto; left: auto; right: auto; bottom: auto;
@@ -16953,7 +16957,33 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border-radius: 0;
 }
 .world-dock .deckgl-projection-toggle,
-.world-dock .deckgl-style-switcher { gap: 4px; }
+.world-dock .deckgl-style-switcher,
+.deckgl-bottom-dock .deckgl-projection-toggle,
+.deckgl-bottom-dock .deckgl-style-switcher { gap: 4px; }
+
+/* Map-anchored bottom control dock — ONE tidy strip along the map's bottom border
+   holding the 2D/3D toggle, basemap switcher and time-range pills. Children reset to
+   in-flow by the shared rule above (reused, not duplicated). Sits just above the
+   legend row so both stay centered and clear of the corner zoom/layer overlays. */
+.deckgl-bottom-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 42px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 5px 15px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  z-index: 500;
+  pointer-events: none;
+  max-width: calc(100% - 96px);
+}
+.deckgl-bottom-dock > * { pointer-events: auto; }
 
 /* Immersive controls sit inline in the dock (moved from the header). */
 .world-dock .immersive-controls { border-right: 1px solid var(--border); padding-right: 6px; }
