@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { clickMapControl } from './helpers/map-controls';
 
 // Capture the CTO-facing proof screenshots for the layout/style batch. These drive
 // the REAL app (not a harness) so they show the shipped chrome + layout. They are
@@ -33,7 +34,7 @@ test.describe('layout/style batch — deliverable screenshots', () => {
     await boot(page);
 
     // Globe on.
-    await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click().catch(() => {});
+    await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]').catch(() => {});
     await page.waitForTimeout(1200);
 
     // Enter immersive.
@@ -59,19 +60,22 @@ test.describe('layout/style batch — deliverable screenshots', () => {
   test('basemap style switcher (dark / satellite / terrain)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await boot(page);
+    // The basemap control collapsed into a dropdown: assert its trigger, then open it.
+    await expect(page.locator('.deckgl-dd[data-dd="basemap"] .dd-trigger')).toBeVisible();
+    await page.locator('.deckgl-dd[data-dd="basemap"] .dd-trigger').click();
     await expect(page.locator('.deckgl-style-switcher')).toBeVisible();
     await shot(page, 'style-switcher-dark.png');
 
     // Satellite + terrain need a Mapbox token (VITE_MAPBOX_TOKEN); the buttons are
     // disabled without one. When a token is configured, actually switch and let the
-    // relief render before capturing.
+    // relief render before capturing. clickMapControl reopens the dropdown each time
+    // (picking an option closes it).
     const sat = page.locator('.deckgl-style-switcher .style-btn[data-style="satellite"]');
     if (!(await sat.isDisabled())) {
-      await sat.click();
+      await clickMapControl(page, '.deckgl-style-switcher .style-btn[data-style="satellite"]');
       await page.waitForTimeout(4000);
       await shot(page, 'style-switcher-satellite.png');
-      const terrain = page.locator('.deckgl-style-switcher .style-btn[data-style="terrain"]');
-      await terrain.click();
+      await clickMapControl(page, '.deckgl-style-switcher .style-btn[data-style="terrain"]');
       await page.waitForTimeout(4000);
       await shot(page, 'style-switcher-terrain.png');
     }

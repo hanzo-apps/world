@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickMapControl } from './helpers/map-controls';
 
 type LayerSnapshot = { id: string; dataCount: number };
 
@@ -160,7 +161,7 @@ test.describe('3D globe', () => {
       }
 
       // Click the real 3D pill in the map header.
-      await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click();
+      await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
       await expect.poll(() => projectionType(page), { timeout: 30000 }).toBe('globe');
       await expect(page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]')).toHaveClass(/active/);
 
@@ -186,7 +187,7 @@ test.describe('3D globe', () => {
       }
 
       // Flip back to the flat map.
-      await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="2d"]').click();
+      await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="2d"]');
       await expect.poll(() => projectionType(page), { timeout: 20000 }).toBe('mercator');
 
       expect(pageErrors.filter((e) => !ignorable.some((p) => p.test(e)))).toEqual([]);

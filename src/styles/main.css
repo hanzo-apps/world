@@ -15915,6 +15915,8 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
 }
 .cloud-stat-grid-8 { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+/* Exactly two columns — four tiles read as a symmetric 2×2 (not 3+1 wrap). */
+.cloud-stat-grid-2 { grid-template-columns: repeat(2, 1fr); }
 .cloud-stat-grid-3 { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .cloud-stat {
   background: var(--bg);
@@ -16990,6 +16992,38 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   max-width: calc(100% - 220px);
 }
 .deckgl-top-dock > * { pointer-events: auto; }
+
+/* Compact control dropdowns — each map control (projection · basemap · time) is ONE
+   trigger showing the active option + caret; its option-buttons live in a popover that
+   opens on click. Collapses the two wrapping rows into a single tidy row of three.
+   Global (not host-scoped) so the ONE dropdown treatment applies in every map host;
+   placed after the inline-reset rules so it wins on equal specificity by source order. */
+.deckgl-dd { position: relative; display: inline-flex; }
+.deckgl-dd .dd-trigger {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text); font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.04em; cursor: pointer; transition: all .15s ease; white-space: nowrap;
+}
+.deckgl-dd .dd-trigger:hover { border-color: var(--border-strong); }
+.deckgl-dd.open .dd-trigger { border-color: var(--accent); color: var(--text); }
+.deckgl-dd .dd-caret { color: var(--text-dim); font-size: 8px; line-height: 1; }
+/* Popover holding the original option-buttons — hidden until .open; a vertical stack.
+   The double-class selector (.dd-menu is co-classed with .deckgl-{projection-toggle,
+   style-switcher,time-slider}) lifts specificity above the host inline-reset rules. */
+.deckgl-dd .dd-menu {
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  display: none; flex-direction: column; gap: 4px; align-items: stretch;
+  margin: 0; padding: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  z-index: 600; min-width: max-content; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.deckgl-dd.open .dd-menu { display: flex; }
+/* Time-range's extra .time-options wrapper stacks too; all option buttons go full-width. */
+.deckgl-dd .dd-menu .time-options { flex-direction: column; gap: 4px; width: 100%; }
+.deckgl-dd .dd-menu button { width: 100%; text-align: center; }
 
 /* Map Layers button — top-left, toggles the layer panel (which opens just below it).
    Gives the map its own layers control so it no longer needs the page footer. */

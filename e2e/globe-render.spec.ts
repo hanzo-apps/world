@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickMapControl } from './helpers/map-controls';
 
 // Globe render-fix acceptance suite (world.hanzo.ai Hanzo-Cloud view).
 //
@@ -61,7 +62,7 @@ const layerIds = (page: import('@playwright/test').Page): Promise<string[]> =>
   });
 
 const go3D = async (page: import('@playwright/test').Page): Promise<void> => {
-  await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click();
+  await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
   await expect
     .poll(() => page.evaluate(() => Boolean((window as unknown as { __globeNative?: unknown }).__globeNative)), { timeout: 25000 })
     .toBe(true);
