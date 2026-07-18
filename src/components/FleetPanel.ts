@@ -127,7 +127,7 @@ export class FleetPanel extends Panel {
             <span class="cloud-live-note">live · visor</span>
           </div>
           <div class="cloud-stat-grid cloud-stat-grid-4">${fleetTiles(d.totals)}</div>
-          <div class="cloud-fleet-providers">${fleetProviders(d.providers)}</div>
+          <div class="cloud-fleet-providers">${fleetProviders(d.providers.filter((p) => p.provider.toLowerCase() !== 'byo'))}</div>
           ${fleetWorkers(d.workers)}
           ${d.utilNote ? `<div class="cloud-util-note" title="${escapeHtml(d.utilNote)}">${icon('gauge', 11)} ${escapeHtml(d.utilNote)}</div>` : ''}
         </div>
