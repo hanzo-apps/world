@@ -93,7 +93,7 @@ export class CloudOverviewPanel extends Panel {
       this.chainTiles(),
       o.nodesTotal > 0 ? statTile(`${fmtInt(o.nodesOnline)}/${fmtInt(o.nodesTotal)}`, 'nodes online') : '',
       o.gpusOnline > 0 ? statTile(fmtInt(o.gpusOnline), 'GPUs online') : '',
-      o.regions > 0 ? statTile(fmtInt(o.regions), 'regions') : '',
+      // 'regions' tile dropped per CTO — the fleet panel already carries region detail.
       o.uptimePct > 0 ? statTile(fmtPct(o.uptimePct), 'uptime') : '',
       // Real platform users/signups/active — present only for a signed-in admin.
       p.users ? statTile(fmtCompact(p.users.total), 'users', p.users.signups24h > 0 ? `+${fmtInt(p.users.signups24h)} / 24h` : undefined) : '',
