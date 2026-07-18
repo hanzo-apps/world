@@ -494,13 +494,8 @@ export class App {
   // existing handlers still bind; this only wires the dock-native controls:
   // Layers toggle, layout-mode, widget-size, "+ Add widget", and collapse.
   private setupDock(): void {
-    // Layers: toggle the map's floating layer panel (hidden by default).
-    const layersBtn = document.getElementById('dockLayersBtn');
-    layersBtn?.addEventListener('click', () => {
-      const open = this.map?.toggleLayerPanel() ?? false;
-      layersBtn.classList.toggle('active', open);
-      layersBtn.setAttribute('aria-pressed', String(open));
-    });
+    // Layers now lives on the map itself (top-left button → floating panel); the
+    // footer no longer carries a Layers toggle.
 
     // Collapse the dock to a slim edge (persisted for the session).
     const collapse = document.getElementById('dockCollapse');
@@ -2215,9 +2210,6 @@ export class App {
           <div class="dock-group dock-map-controls" id="dockMapControls"></div>
           <div class="dock-group">
             <select id="regionSelect" class="region-select" title="Map region" aria-label="Map region">${regionOptions}</select>
-          </div>
-          <div class="dock-group">
-            <button class="dock-btn" id="dockLayersBtn" aria-pressed="false" title="Show or hide map layers"><span class="dock-ico">▤</span> <span class="btn-label">Layers</span></button>
           </div>
           <div class="dock-group dock-layout">
             <label class="dock-select-wrap" title="Layout mode — Grid snaps widgets to the grid, Free is pixel-perfect, Immersive floats them over a full-screen map">
