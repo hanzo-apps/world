@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickMapControl } from './helpers/map-controls';
 
 // P0-1: deck.gl overlays must actually RENDER on the mapbox-gl v3 globe.
 //
@@ -110,7 +111,7 @@ test.describe('P0-1 deck overlay renders on the globe', () => {
 
     // → 3D globe. Deck's active viewport must be a GlobeViewport (proves deck is
     // reprojecting onto the sphere) and the dot must still pick on the globe.
-    await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click();
+    await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
     await expect.poll(() => projection(page), { timeout: 30000 }).toBe('globe');
     await page.evaluate(() => (window as HarnessWindow).__mapHarness!.stopIdleSpin());
     await expect.poll(() => viewportType(page), { timeout: 20000 }).toMatch(/Globe/i);
@@ -128,10 +129,10 @@ test.describe('P0-1 deck overlay renders on the globe', () => {
     await testInfo.attach('globe-3d-dots', { body: shot, contentType: 'image/png' });
 
     // Round-trip 2D → 3D again; picks must survive each transition.
-    await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="2d"]').click();
+    await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="2d"]');
     await expect.poll(() => projection(page), { timeout: 20000 }).toBe('mercator');
     await pollPickFound(page);
-    await page.locator('.deckgl-projection-toggle .proj-btn[data-mode="3d"]').click();
+    await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
     await expect.poll(() => projection(page), { timeout: 20000 }).toBe('globe');
     await page.evaluate(() => (window as HarnessWindow).__mapHarness!.stopIdleSpin());
     await pollPickFound(page);
