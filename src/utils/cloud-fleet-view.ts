@@ -20,12 +20,13 @@ export function fleetTiles(t: CloudFleet['totals']): string {
   ].join('');
 }
 
-/** One machine's spec line: GPUs · VRAM · vCPU · OS (only the parts that are real). */
+/** One machine's spec line: GPUs · VRAM · vCPU · RAM · OS (only the parts that are real). */
 function machineSpec(m: FleetMachineRow): string {
   const parts: string[] = [];
   parts.push(m.gpus ? `${fmtInt(m.gpus)}× ${escapeHtml(m.gpuModel || 'GPU')}` : escapeHtml(m.gpuModel || '—'));
   if (m.vram) parts.push(escapeHtml(m.vram));
   if (m.vcpu) parts.push(`${fmtInt(m.vcpu)} vCPU`);
+  if (m.mem) parts.push(escapeHtml(m.mem));
   if (m.os) parts.push(escapeHtml(m.os));
   return parts.join(' · ');
 }
