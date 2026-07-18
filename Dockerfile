@@ -37,9 +37,10 @@ ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
 RUN npm run build
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
-# go 1.25: the embedded datastore (modernc.org/sqlite, pure Go) needs it. The
-# binary stays CGO-free — modernc's SQLite is pure Go, so no C toolchain is added.
-FROM golang:1.25-alpine AS gobuild
+# go 1.26: go.mod requires >= 1.26.4 (github.com/hanzoai/sqlite drop-in). The
+# binary stays CGO-free — with CGO_ENABLED=0, hanzoai/sqlite selects its pure-Go
+# modernc backend (FTS5 built in), so no C toolchain is added and FTS5 works.
+FROM golang:1.26-alpine AS gobuild
 WORKDIR /src
 # Deps: hanzo-kv client (go-redis) + embedded SQLite (modernc). Download once for
 # a cached layer before the source is copied.
