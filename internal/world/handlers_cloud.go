@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -325,8 +324,12 @@ func (s *Server) applyPublicVolume(ctx context.Context, p *cloudPulse) bool {
 		got = true
 	}
 
-	// Routed-request volume + hourly throughput + per-model mix — real, from the
-	// public learned-router stats (arms already opaque upstream; no vendor names).
+	// Routed-request volume + hourly throughput — real, from the public learned-router
+	// stats (the Enso Training source). NOTE: on platform scope the router relabels
+	// models to OPAQUE "arm-N" ids (a privacy measure), so by_model is NOT real model
+	// names — we never present it as the model mix. Real per-model usage comes only
+	// from the measured ledger (admin path); otherwise Models stays empty and the
+	// panel honestly shows "warming up" rather than "arm-8".
 	if rs, ok := s.fetchRouterStats(cctx, 24); ok {
 		events := rs.Window.Events
 		if events == 0 {
@@ -343,15 +346,11 @@ func (s *Server) applyPublicVolume(ctx context.Context, p *cloudPulse) bool {
 			p.RequestSeries = append([]int64{}, rs.Throughput.PerHour...)
 			got = true
 		}
-		if m := modelsFromRouterStats(rs.ByModel); len(m) > 0 {
-			p.Models = m
-			got = true
-		}
 	}
 
 	if got {
 		p.Window = "24h"
-		p.Note = "Live platform request rate, throughput and model mix — measured across all orgs (traffic globe + learned router). Token volume needs the usage ledger and appears when a super-admin service token is wired."
+		p.Note = "Live platform request rate and throughput — measured across all orgs (traffic globe + learned router). Per-model usage and token volume come from the usage ledger (sign in as an admin)."
 	}
 	return got
 }
@@ -365,11 +364,12 @@ type routerStatsVolume struct {
 		Until  string `json:"until"`
 		Events int64  `json:"events"`
 	} `json:"window"`
-	ByModel    map[string]int64 `json:"by_model"`
 	Throughput struct {
 		PerHour     []int64 `json:"per_hour"`
 		TotalWindow int64   `json:"total_window"`
 	} `json:"throughput"`
+	// by_model is intentionally NOT decoded: on platform scope it is opaque "arm-N"
+	// ids, never real model names, so it is never used as the model mix.
 }
 
 // fetchRouterStats reads the PUBLIC learned-router aggregate (no token) and unwraps
@@ -406,31 +406,6 @@ func routerWindowSecs(rs *routerStatsVolume) float64 {
 		}
 	}
 	return 86400
-}
-
-// modelsFromRouterStats maps the router's per-model REQUEST counts into the shared
-// cloudModel shape (share = count/total, ranked desc then by id for stability).
-// Tokens are not measured on this path, so Tokens24h stays 0 — honestly blank,
-// never fabricated. nil when the router listed no models.
-func modelsFromRouterStats(byModel map[string]int64) []cloudModel {
-	var total int64
-	for _, c := range byModel {
-		total += c
-	}
-	if total <= 0 {
-		return nil
-	}
-	out := make([]cloudModel, 0, len(byModel))
-	for id, c := range byModel {
-		out = append(out, cloudModel{ID: id, Name: id, Requests24h: c, Share: float64(c) / float64(total)})
-	}
-	sort.SliceStable(out, func(a, b int) bool {
-		if out[a].Requests24h != out[b].Requests24h {
-			return out[a].Requests24h > out[b].Requests24h
-		}
-		return out[a].ID < out[b].ID
-	})
-	return out
 }
 
 // fetchUptimePct derives a real platform uptime from the PUBLIC status page (Gatus):
