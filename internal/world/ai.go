@@ -121,7 +121,13 @@ type chatResponse struct {
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
+			// A reasoning model (gpt-oss / harmony, deepseek-r1) surfaces its working
+			// on a SEPARATE channel; when it emits no final content we fall back to
+			// this so the analyst still recovers an answer, not a blank "empty response".
+			ReasoningContent string `json:"reasoning_content"`
+			Reasoning        string `json:"reasoning"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		TotalTokens int `json:"total_tokens"`
@@ -203,10 +209,36 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 			logf("world: ai 2xx empty-choices error: status=%d code=%q model=%s", status, e.code, model)
 			return "", status, "", e
 		}
-		logf("world: ai 2xx empty response: status=%d model=%s", status, model)
-		return "", status, "", fmt.Errorf("empty response")
+		logf("world: ai 2xx no choices: status=%d model=%s", status, model)
+		return "", status, "", emptyAnswerErr(model)
 	}
-	return strings.TrimSpace(cr.Choices[0].Message.Content), cr.Usage.TotalTokens, cr.ID, nil
+	// Prefer the answer (content) channel; fall back to the reasoning channel a
+	// reasoning model (gpt-oss/harmony, deepseek-r1) uses when it returns no content —
+	// so the analyst recovers its envelope/prose instead of a blank "empty response".
+	msg := cr.Choices[0].Message
+	// Pre-trim so a whitespace-only content channel falls through to reasoning.
+	out := firstNonEmpty(strings.TrimSpace(msg.Content), strings.TrimSpace(msg.ReasoningContent), strings.TrimSpace(msg.Reasoning))
+	if out == "" {
+		// A 2xx with a real but content-free choice (e.g. a reasoning model that hit the
+		// token cap before emitting content). The body IS a normal completion here — do
+		// NOT run it through newAIError (its top-level `id` would be misread as an error
+		// code); surface the model + stop reason honestly instead.
+		logf("world: ai 2xx empty answer: status=%d model=%s finish=%s", status, model, cr.Choices[0].FinishReason)
+		return "", status, cr.ID, emptyAnswerErr(model)
+	}
+	return out, cr.Usage.TotalTokens, cr.ID, nil
+}
+
+// emptyAnswerErr is the honest error for a 2xx completion that carried no usable
+// answer (neither a content nor a reasoning channel). It names the served model so
+// the chat surfaces "the <model> model returned an empty answer" — actionable (switch
+// model) — instead of an opaque "empty response". Not a balance error, so it never
+// trips the top-up CTA.
+func emptyAnswerErr(model string) error {
+	if model = strings.TrimSpace(model); model != "" {
+		return fmt.Errorf("the %s model returned an empty answer", model)
+	}
+	return fmt.Errorf("the model returned an empty answer")
 }
 
 // aiError is a typed inference error carrying the upstream HTTP status plus the
