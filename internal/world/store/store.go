@@ -1,6 +1,6 @@
 // Package store is world's embedded, CGO-free datastore: the queryable
 // ingested-data LAKE (full-text searchable) and per-identity SETTINGS, both in
-// ONE SQLite database (modernc.org/sqlite — pure Go, FTS5 built in).
+// ONE SQLite database (github.com/hanzoai/sqlite — pure Go, FTS5 built in).
 //
 // It is decomplected from HTTP and from the shared feed hot-cache: this package
 // only holds durable, queryable rows and answers value queries. The instant
@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/hanzoai/sqlite"
 )
 
 // DB owns the embedded SQLite handle and the two logical stores layered on it.
