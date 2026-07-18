@@ -183,6 +183,19 @@ func (s *Server) produceAIPulse(ctx context.Context, auth map[string]string) aiP
 func (s *Server) buildAIUsage(ctx context.Context, auth map[string]string) *aiUsage {
 	ov, err := s.fetchCloudUsage(ctx, "24h", auth)
 	if err != nil {
+		// Exact ledger denied → REAL platform usage from LLM observability (measured
+		// requests/tokens + real model names), so AI Compute shows live numbers for an
+		// operator instead of zeros. nil only when that is also unauthorized.
+		if u, ok := s.fetchLLMUsage(ctx, auth); ok {
+			return &aiUsage{
+				Window:         "24h",
+				RequestsPerSec: round1(float64(u.Requests) / 86400),
+				TokensPerSec:   round1(float64(u.Tokens) / 86400),
+				Requests24h:    u.Requests,
+				Tokens24h:      u.Tokens,
+				Models:         u.Models,
+			}
+		}
 		return nil
 	}
 	window := ov.Range
