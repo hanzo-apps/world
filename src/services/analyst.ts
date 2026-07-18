@@ -16,6 +16,10 @@
 import { analystTransport, type AnalystLiveHandlers, type AnalystResponse } from './analyst-transport';
 import { commandManifest, type AppHost } from './app-commands';
 import { fetchWithTimeout } from '@/utils';
+import { getTrafficGlobe } from './cloud-map';
+import { getCloudPulse, getMyBilling } from './cloud-pulse';
+import { getRouterStats } from './router-stats';
+import { getEnsoTraining } from './enso-training';
 
 // The grounding snapshot is best-effort garnish. Cap each read so a cold server
 // (gdelt-doc can take ~10s cold) never delays the user's chat send.
@@ -71,12 +75,58 @@ export async function collectContext(host: AppHost): Promise<string> {
     parts.push('ORGS (id = name): ' + orgs.map((o) => `${o.id}=${o.name}`).join(', '));
   }
 
-  const [headlines, crypto, macro] = await Promise.all([topHeadlines(), cryptoSnapshot(), macroSnapshot()]);
+  // On the cloud board, ground the model in the LIVE platform metrics too, so it can
+  // answer "what's my spend / how many nodes / is Enso saving money" from real data —
+  // not just describe which panels exist. Best-effort + parallel with the news feeds.
+  const wantCloud = st.variant === 'cloud';
+  const [headlines, crypto, macro, cloud] = await Promise.all([
+    topHeadlines(),
+    cryptoSnapshot(),
+    macroSnapshot(),
+    wantCloud ? cloudSnapshot() : Promise.resolve(''),
+  ]);
+  if (cloud) parts.push(cloud);
   if (headlines) parts.push('TOP HEADLINES:\n' + headlines);
   if (crypto) parts.push('CRYPTO: ' + crypto);
   if (macro) parts.push('MACRO SIGNALS: ' + macro);
 
   return parts.join('\n\n');
+}
+
+// Live Hanzo-cloud metrics for the analyst's grounding: traffic, platform 24h, the
+// Enso router (cost saved / reward / engine share / models routed), the flywheel
+// ledger, and the caller's billing. Each read is best-effort (null on failure) so a
+// slow feed never blocks the answer. REAL data only — mirrors the panels verbatim.
+async function cloudSnapshot(): Promise<string> {
+  const n = (v: number, d = 0): string => (Number.isFinite(v) ? v.toFixed(d) : '0');
+  const [traffic, pulse, stats, enso, bill] = await Promise.all([
+    getTrafficGlobe().catch(() => null),
+    getCloudPulse().catch(() => null),
+    getRouterStats(24).catch(() => null),
+    getEnsoTraining().catch(() => null),
+    getMyBilling().catch(() => null),
+  ]);
+  const lines: string[] = [];
+  if (traffic?.totals) {
+    lines.push(`Live traffic: ${n(traffic.totals.rps_1m, 2)} req/s (1m), ${n(traffic.totals.rpm_60m, 1)} req/min (60m avg), ${traffic.points?.length ?? 0} active regions.`);
+  }
+  if (pulse?.overview) {
+    const o = pulse.overview;
+    lines.push(`Platform 24h: ${n(o.requests24h)} requests, ${n(o.tokens24h)} tokens, ${n(o.modelsServed)} models served, ${n(o.nodesOnline)} nodes online, ${n(o.gpusOnline)} GPUs, ${n(o.regions)} regions, ${n(o.uptimePct, 2)}% uptime.`);
+  }
+  if (stats && !stats.unavailable) {
+    const models = Object.keys(stats.by_model || {});
+    lines.push(`Enso router (24h): cost saved ${n(stats.cost.saved_pct, 1)}% vs premium (baseline ${stats.cost.baseline_model || '—'}), reward rate ${n(stats.quality.reward_rate * 100)}%, engine share ${n(stats.quality.engine_share * 100)}%, avg confidence ${n(stats.quality.avg_confidence * 100)}%${models.length ? `. Models routed: ${models.join(', ')}` : ''}.`);
+  }
+  if (enso?.ledger?.available) {
+    const l = enso.ledger;
+    lines.push(`Enso flywheel: ${n(l.total)} routing decisions, ${n(l.enginePct)}% engine-routed (${n(l.heuristic)} heuristic), ${n(l.rewarded)} rewarded, avg confidence ${n(l.avgConfidence, 2)}${l.models?.length ? `. Top models: ${l.models.slice(0, 4).map((m) => `${m.name} ${m.count}`).join(', ')}` : ''}.`);
+  }
+  if (bill) {
+    const bal = bill.balance ? `, $${n(bill.balance.balance / 100, 2)} balance` : '';
+    lines.push(`Your billing: $${n(bill.spend30dCents / 100, 2)} spend/30d${bal}, ${bill.usage?.length ?? 0} billable events.`);
+  }
+  return lines.length ? 'HANZO CLOUD (live):\n' + lines.join('\n') : '';
 }
 
 async function topHeadlines(): Promise<string> {
