@@ -365,3 +365,71 @@ func TestCloudPulseAdminBearer(t *testing.T) {
 		t.Fatalf("want a %d-day signup series, got %d", userSignupDays, len(p.Users.SignupSeries))
 	}
 }
+
+// TestCloudPulseAdminLLMObservability proves the fix for an empty "Model Usage":
+// when the exact usage ledger is NOT available to a signed-in admin, cloud-pulse
+// folds REAL platform usage + per-model mix (real names) from LLM observability
+// (/v1/admin/o11y) — never the opaque router arms, never zeros.
+func TestCloudPulseAdminLLMObservability(t *testing.T) {
+	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/iam/oauth/userinfo" || r.Header.Get("Authorization") == "" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"owner":"hanzo","sub":"z@hanzo.ai"}`))
+	}))
+	t.Cleanup(iam.Close)
+
+	api := http.NewServeMux()
+	api.HandleFunc("/v1/models", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"zen-1"},{"id":"zen-omni-30b"}]}`))
+	})
+	api.HandleFunc("/v1/machines", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"machines":[{"region":"nyc","status":"active"}]}`))
+	})
+	api.HandleFunc("/v1/gpus", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"gpus":[]}`)) })
+	api.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
+	// LLM observability: real platform usage + top models by REAL name.
+	api.HandleFunc("/v1/admin/o11y", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-token" {
+			t.Errorf("o11y must be read with the caller's bearer, got %q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"totals":{"requests":500000,"tokens":900000000},
+			"topModels":[{"model":"zen-omni-30b","requests":300000,"tokens":600000000},
+			             {"model":"zen-1","requests":200000,"tokens":300000000}]}`))
+	})
+	up := httptest.NewServer(api)
+	t.Cleanup(up.Close)
+
+	t.Setenv("HANZO_CLOUD_PULSE_TOKEN", "")
+	t.Setenv("HANZO_API_BASE", up.URL)
+	t.Setenv("HANZO_STATUS_BASE", up.URL)
+	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
+
+	s := NewServer()
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/cloud-pulse", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	var p cloudPulse
+	if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(p.Models) != 2 || p.Models[0].ID != "zen-omni-30b" || p.Models[0].Requests24h != 300000 {
+		t.Fatalf("want real o11y top models (real names), got %+v", p.Models)
+	}
+	if p.Overview.Requests24h != 500000 || p.Overview.Tokens24h != 900000000 {
+		t.Fatalf("want measured o11y usage, got req=%d tok=%d", p.Overview.Requests24h, p.Overview.Tokens24h)
+	}
+	if p.VolumeModeled {
+		t.Fatalf("measured o11y usage must clear volumeModeled")
+	}
+}

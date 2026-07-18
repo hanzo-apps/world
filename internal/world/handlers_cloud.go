@@ -362,6 +362,70 @@ func (s *Server) applyPublicVolume(ctx context.Context, p *cloudPulse) bool {
 	return got
 }
 
+// applyLLMObservability overlays REAL platform usage from the LLM observability
+// aggregate (/v1/admin/o11y — measured requests, tokens, and top models by REAL
+// name, all orgs) read with the admin's own bearer. This is the canonical "which
+// models is the platform using" source (the opaque router arms are never shown).
+// It clears volumeModeled when it lands real numbers; a caller not authorized for
+// platform observability upstream simply keeps the honest fallback. Keeps the
+// freshest rate (globe rps) if already set.
+func (s *Server) applyLLMObservability(ctx context.Context, p *cloudPulse, auth map[string]string) {
+	if auth == nil {
+		return
+	}
+	var resp struct {
+		Totals struct {
+			Requests int64 `json:"requests"`
+			Tokens   int64 `json:"tokens"`
+		} `json:"totals"`
+		TopModels []struct {
+			Model    string `json:"model"`
+			Requests int64  `json:"requests"`
+			Tokens   int64  `json:"tokens"`
+		} `json:"topModels"`
+	}
+	if err := s.getJSON(ctx, apiHost()+"/v1/admin/o11y?range=24h", auth, &resp); err != nil {
+		return
+	}
+
+	got := false
+	if resp.Totals.Requests > 0 {
+		p.Overview.Requests24h = resp.Totals.Requests
+		p.Overview.Tokens24h = resp.Totals.Tokens
+		if p.Overview.RequestsPerSec == 0 { // keep the globe's live rate when we have it
+			p.Overview.RequestsPerSec = round1(float64(resp.Totals.Requests) / 86400)
+		}
+		got = true
+	}
+
+	var total int64
+	for _, m := range resp.TopModels {
+		total += m.Requests
+	}
+	if total > 0 {
+		models := make([]cloudModel, 0, len(resp.TopModels))
+		for _, m := range resp.TopModels {
+			if m.Model == "" {
+				continue
+			}
+			models = append(models, cloudModel{
+				ID: m.Model, Name: m.Model, Requests24h: m.Requests, Tokens24h: m.Tokens,
+				Share: float64(m.Requests) / float64(total),
+			})
+		}
+		if len(models) > 0 {
+			p.Models = models
+			got = true
+		}
+	}
+
+	if got {
+		p.VolumeModeled = false
+		p.Window = "24h"
+		p.Note = "Live platform usage from Hanzo LLM observability — measured requests, tokens and model mix across all orgs."
+	}
+}
+
 // routerStatsVolume is the subset of the public router-stats aggregate we fold into
 // the pulse: total routed events (requests), the hourly throughput series, and the
 // per-model event mix. Same upstream the Enso Training panel proxies.
