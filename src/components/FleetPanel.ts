@@ -4,6 +4,7 @@ import { getCloudFleet, type CloudFleet } from '@/services/cloud-admin';
 import { isAdmin, isAuthenticated } from '@/services/iam';
 import { escapeHtml } from '@/utils/sanitize';
 import { fmtInt } from '@/utils/cloud-format';
+import { icon } from '@/utils/icons';
 import { fleetTiles, fleetProviders, fleetWorkers } from '@/utils/cloud-fleet-view';
 
 interface FleetRow {
@@ -38,7 +39,7 @@ export class FleetPanel extends Panel {
   private onLocationClick: ((lat: number, lon: number) => void) | null = null;
 
   constructor() {
-    super({ id: 'fleet', title: 'Fleet & GPUs', showCount: true, className: 'cloud-panel' });
+    super({ id: 'fleet', title: 'Fleet & GPUs', showCount: true, className: 'panel-wide cloud-panel' });
     void this.fetchData();
     this.timer = setInterval(() => void this.fetchData(), 30_000);
   }
@@ -96,6 +97,14 @@ export class FleetPanel extends Panel {
     return [...byRegion.values()].sort((a, b) => b.nodesTotal - a.nodesTotal);
   }
 
+  /** Scope label from the providers actually reporting — not a hardcoded four, so
+   *  it reads honestly ("BYO" when only BYO answered, "DO · GCP · BYO" as they join). */
+  private providerScope(d: CloudFleet): string {
+    const names = [...new Set(d.providers.map((p) => p.provider.trim()).filter(Boolean))]
+      .map((p) => (p.length <= 4 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1)));
+    return names.length ? names.join(' · ') : 'No providers reporting';
+  }
+
   private render(): void {
     if (!this.loaded) { this.showLoading('Loading fleet…'); return; }
 
@@ -114,12 +123,13 @@ export class FleetPanel extends Panel {
       this.setContent(`
         <div class="cloud-fleet-deep">
           <div class="cloud-overview-head">
-            <span class="cloud-scope">DO · GCP · AWS · BYO</span>
+            <span class="cloud-scope">${icon('server', 13)} ${escapeHtml(this.providerScope(d))}</span>
             <span class="cloud-live-note">live · visor</span>
           </div>
           <div class="cloud-stat-grid cloud-stat-grid-4">${fleetTiles(d.totals)}</div>
           <div class="cloud-fleet-providers">${fleetProviders(d.providers)}</div>
           ${fleetWorkers(d.workers)}
+          ${d.utilNote ? `<div class="cloud-util-note" title="${escapeHtml(d.utilNote)}">${icon('gauge', 11)} ${escapeHtml(d.utilNote)}</div>` : ''}
         </div>
       `);
       return;

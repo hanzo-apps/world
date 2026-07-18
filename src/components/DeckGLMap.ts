@@ -359,6 +359,53 @@ const cablesWithValidPaths = UNDERSEA_CABLES.filter(
     ),
 );
 
+// Great-circle densifier. deck.gl's PathLayer draws STRAIGHT segments between a
+// path's vertices — fine on the flat map, but on the 3D globe a straight segment
+// between two far-apart vertices is a chord that slices across/through the sphere
+// instead of following the surface (the "cables slicing across the globe" glitch
+// the arcs already dodge via `greatCircle`). PathLayer has no great-circle option,
+// so we pre-resample each path along its great circle into short hops (≤ one
+// GC_MAX_SEG_DEG arc each); the many tiny chords then visually hug the sphere. The
+// source paths are static, so the densified (globe) form is precomputed once.
+const GC_MAX_SEG_DEG = 4;
+type LonLat = [number, number];
+
+function gcInterpolate(a: LonLat, b: LonLat, f: number): LonLat {
+  const d2r = Math.PI / 180, r2d = 180 / Math.PI;
+  const lon1 = a[0] * d2r, lat1 = a[1] * d2r, lon2 = b[0] * d2r, lat2 = b[1] * d2r;
+  const x1 = Math.cos(lat1) * Math.cos(lon1), y1 = Math.cos(lat1) * Math.sin(lon1), z1 = Math.sin(lat1);
+  const x2 = Math.cos(lat2) * Math.cos(lon2), y2 = Math.cos(lat2) * Math.sin(lon2), z2 = Math.sin(lat2);
+  const dot = Math.max(-1, Math.min(1, x1 * x2 + y1 * y2 + z1 * z2));
+  const omega = Math.acos(dot);
+  if (omega < 1e-9) return [a[0], a[1]];
+  const s = Math.sin(omega);
+  const k1 = Math.sin((1 - f) * omega) / s, k2 = Math.sin(f * omega) / s;
+  const x = k1 * x1 + k2 * x2, y = k1 * y1 + k2 * y2, z = k1 * z1 + k2 * z2;
+  return [Math.atan2(y, x) * r2d, Math.atan2(z, Math.hypot(x, y)) * r2d];
+}
+
+function densifyGreatCircle(points: LonLat[]): LonLat[] {
+  if (points.length < 2) return points;
+  const d2r = Math.PI / 180;
+  const out: LonLat[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]!, b = points[i + 1]!;
+    out.push(a);
+    const lat1 = a[1] * d2r, lat2 = b[1] * d2r, dLon = (b[0] - a[0]) * d2r;
+    const cosd = Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const deg = Math.acos(Math.max(-1, Math.min(1, cosd))) * 180 / Math.PI;
+    const n = Math.max(1, Math.ceil(deg / GC_MAX_SEG_DEG));
+    for (let k = 1; k < n; k++) out.push(gcInterpolate(a, b, k / n));
+  }
+  out.push(points[points.length - 1]!);
+  return out;
+}
+
+// Globe forms of the static line layers: each path resampled to short great-circle
+// hops so it hugs the sphere. The flat map keeps the raw (sparse) vertices.
+const cablesGreatCircle = cablesWithValidPaths.map((c) => ({ ...c, points: densifyGreatCircle(c.points as LonLat[]) }));
+const pipelinesGreatCircle = PIPELINES.map((p) => ({ ...p, points: densifyGreatCircle(p.points as LonLat[]) }));
+
 export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
@@ -600,6 +647,24 @@ export class DeckGLMap {
     wrapper.appendChild(mapContainer);
 
     this.container.appendChild(wrapper);
+
+    // Bottom control dock. When no external host was supplied (App passes none for
+    // the flagship map), the chromeless controls — 2D/3D, basemap switcher and the
+    // time-range pills — dock in ONE tidy strip along the map's bottom border
+    // instead of scattering across the overlay (top-center, mid-left, …). Zoom, the
+    // hidden layer panel and the legend stay corner overlays. Matches the CTO's
+    // "controls in the bottom border of the map" direction.
+    //
+    // It mounts on `container`, a SIBLING of the deck wrapper — NOT inside it —
+    // because 3D mode parks the wrapper with `visibility:hidden` and renders via
+    // GlobeNative; a dock inside the wrapper would vanish on the globe. The legend
+    // sits on `container` for the same reason.
+    if (this.controlsHost === this.container) {
+      const dock = document.createElement('div');
+      dock.className = 'deckgl-bottom-dock';
+      this.container.appendChild(dock);
+      this.controlsHost = dock;
+    }
   }
 
   private initBasemap(): void {
@@ -1579,7 +1644,8 @@ export class DeckGLMap {
     const highlightedCables = this.highlightedAssets.cable;
     const cacheKey = 'cables-layer';
     const cached = this.layerCache.get(cacheKey) as PathLayer | undefined;
-    const highlightSignature = this.getSetSignature(highlightedCables);
+    const onGlobe = this.onGlobe;
+    const highlightSignature = this.getSetSignature(highlightedCables) + (onGlobe ? '|g' : '|f');
     if (cached && highlightSignature === this.lastCableHighlightSignature) return cached;
 
     const layer = new PathLayer({
@@ -1587,8 +1653,9 @@ export class DeckGLMap {
       // Guard the PathLayer contract: every path needs ≥2 finite [lon,lat] vertices.
       // A single malformed cable (short/NaN path) makes deck.gl assert at init and
       // silently drop the WHOLE layer (the "[GlobeNative] cables-layer assertion" —
-      // enabled yet never drawing). Filtering keeps the good cables rendering.
-      data: cablesWithValidPaths,
+      // enabled yet never drawing). Filtering keeps the good cables rendering. On the
+      // globe use the great-circle-densified form so cables hug the sphere.
+      data: onGlobe ? cablesGreatCircle : cablesWithValidPaths,
       getPath: (d) => d.points,
       getColor: (d) =>
         highlightedCables.has(d.id) ? COLORS.cableHighlight : COLORS.cable,
@@ -1608,12 +1675,14 @@ export class DeckGLMap {
     const highlightedPipelines = this.highlightedAssets.pipeline;
     const cacheKey = 'pipelines-layer';
     const cached = this.layerCache.get(cacheKey) as PathLayer | undefined;
-    const highlightSignature = this.getSetSignature(highlightedPipelines);
+    const onGlobe = this.onGlobe;
+    const highlightSignature = this.getSetSignature(highlightedPipelines) + (onGlobe ? '|g' : '|f');
     if (cached && highlightSignature === this.lastPipelineHighlightSignature) return cached;
 
     const layer = new PathLayer({
       id: cacheKey,
-      data: PIPELINES,
+      // Globe: great-circle-densified so pipelines hug the sphere (see cables).
+      data: onGlobe ? pipelinesGreatCircle : PIPELINES,
       getPath: (d) => d.points,
       getColor: (d) => {
         if (highlightedPipelines.has(d.id)) {
