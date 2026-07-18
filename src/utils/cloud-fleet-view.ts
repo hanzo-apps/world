@@ -1,5 +1,5 @@
 // Shared fleet renderer — ONE source of truth for the "machines by provider/region
-// + BYO GPU workers" markup, used by both CloudFleetPanel (deep) and FleetPanel
+// + BYO GPU workers" markup, used by FleetPanel (admin platform fleet + your-fleet)
 // (flagship "Fleet & GPUs"). Real visor data only: every machine and BYO worker is
 // a real row with its real region, GPU model, VRAM, vCPU and capabilities — no demo.
 import { escapeHtml } from './sanitize';
