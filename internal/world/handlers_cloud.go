@@ -178,8 +178,17 @@ func (s *Server) producePulse(ctx context.Context, auth map[string]string) cloud
 	real := false
 	volSrc := ""
 
-	// 1) Fleet COUNTS + REGION breakdown (auth → visor + ai catalog).
+	// 1) Fleet COUNTS + REGION breakdown. Best source is the multi-cloud visor plane
+	//    (auth → /v1/machines + /v1/gpus). When that is not wired, fall back to the
+	//    REAL DigitalOcean fleet enumerated directly (DOKS clusters + nodes + droplets)
+	//    so the public dashboard shows the live infra either way — never an empty fleet.
+	fleetSrc := ""
 	countsReal := s.applyServiceCounts(ctx, &p, auth)
+	if countsReal {
+		fleetSrc = "service"
+	} else if s.applyDOFleet(ctx, &p) {
+		countsReal, fleetSrc = true, "digitalocean"
+	}
 	if countsReal {
 		real = true
 	}
@@ -201,8 +210,8 @@ func (s *Server) producePulse(ctx context.Context, auth map[string]string) cloud
 
 	p.Demo = !real
 	switch {
-	case countsReal:
-		p.Source = "service" // the service-token plane resolved (counts, and usually ledger volume)
+	case fleetSrc != "":
+		p.Source = fleetSrc // "service" (visor plane) or "digitalocean" (direct DO fleet)
 	case real:
 		p.Source = "public" // tokenless, but real public volume/uptime landed
 	default:
