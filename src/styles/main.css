@@ -16759,16 +16759,22 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .header-right { flex: 0 0 auto; min-width: 0; }
 .variant-switcher { min-width: 0; overflow: hidden; }
 .search-btn .btn-label { display: inline; }
+/* The magnifier is the search button's ONE always-present affordance: it appears
+   once the ⌘K hint collapses (≤900px) so the button is never an empty box at any
+   width — the word then drops at ≤680px, leaving just the icon. */
+.search-btn .search-ico { display: none; align-items: center; }
+.search-btn .search-ico svg { display: block; }
 
 /* ≤1180px: variant tabs go icon-only (drops ~250px). */
 @media (max-width: 1180px) {
   .variant-option .variant-label { display: none; }
   .variant-option { padding: 5px 8px; }
 }
-/* ≤900px: hide the LIVE badge text + the ⌘K hint; search keeps its word. */
+/* ≤900px: hide the LIVE badge text + the ⌘K hint; search keeps its word + gains its icon. */
 @media (max-width: 900px) {
   .status-indicator span:last-child { display: none; }
   .search-btn kbd { display: none; }
+  .search-btn .search-ico { display: inline-flex; }
 }
 /* ≤680px: the tab strip becomes an internal horizontal scroller so it can never
    push the page wider; the page itself still fits. */
