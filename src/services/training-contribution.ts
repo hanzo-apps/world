@@ -7,16 +7,21 @@ import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 // (/v1/world/training-contribution → ai get-/update-training-contribution), which
 // forwards the caller's org-scoped bearer; ai self-scopes to the caller's OWN org.
 //
-// Privacy-safe by construction: a signed-out caller, an org that never opted in, or
-// ANY error all read `false` (OFF). Turning it on only lets an automated judge score
-// response QUALITY into a scalar reward — prompts/outputs are never stored.
+// Privacy-safe by construction: a signed-out caller or ANY error reads `false` (OFF),
+// so a broken read never implies consent. A signed-in caller reads ai's GEO-AWARE
+// effective value — opt-in/default-OFF in the EU, UK & EEA; opt-out/default-ON,
+// disclosed at signup, elsewhere — and reflects it verbatim rather than assuming a
+// default. Turning it on only lets an automated judge score response QUALITY into a
+// scalar reward — prompts/outputs are never stored.
 
 function base(): string {
   return isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
 }
 
-/** The caller's own-org opt-in. Returns false when signed out or on any failure —
- *  the privacy-safe default OFF, so a broken read never implies consent. */
+/** The caller's own-org EFFECTIVE consent as ai resolves it — including ai's
+ *  geo-aware default when the org never set one explicitly (ON for non-EU, OFF for
+ *  EU/UK/EEA). Returns false when signed out or on any failure — the privacy-safe
+ *  fallback, so a broken read never implies consent. */
 export async function getTrainingContribution(): Promise<boolean> {
   if (!isAuthenticated()) return false;
   try {
