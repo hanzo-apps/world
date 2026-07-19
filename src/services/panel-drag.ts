@@ -27,6 +27,7 @@ import {
   commitFreeRect,
   showSnapOverlay,
   hideSnapOverlay,
+  freeSnap,
 } from './grid-config';
 
 const DRAG_THRESHOLD = 6; // px of pointer travel before a press becomes a drag
@@ -45,6 +46,23 @@ const minWidthFor = (el: HTMLElement, opt?: number): number =>
   el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_W;
 const minHeightFor = (el: HTMLElement, opt?: number): number =>
   el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_H;
+
+// ── Logical-grid snapping (free mode) ────────────────────────────────────────
+// Free mode aligns to the SAME grid grid mode uses (grid-config.freeSnap): {x,y}
+// snap to grid-line origins, {w,h} to whole-cell multiples. This is what makes
+// dragging feel logical instead of loose. Holding Alt bypasses it for fine px work.
+
+/** Snap a free coordinate to the nearest grid line (origin k*pitch), clamped ≥0. */
+function snapLine(v: number, pitch: number): number {
+  return pitch > 0 ? Math.max(0, Math.round(v / pitch) * pitch) : Math.max(0, v);
+}
+/** Snap a free size to a whole number of cells (N cells + (N-1) gaps), never below min. */
+function snapCells(v: number, unit: number, gap: number, min: number): number {
+  const pitch = unit + gap;
+  if (pitch <= 0) return Math.max(min, v);
+  const n = Math.max(1, Math.round((v + gap) / pitch));
+  return Math.max(min, n * unit + (n - 1) * gap);
+}
 
 // Which edges a resize gesture drives. The OPPOSITE edge stays pinned: e/s grow
 // from a fixed top-left (the classic bottom-right drag), while w/n grow from a
@@ -77,20 +95,28 @@ function applyFreeResize(
   s: FreeResizeState,
   clientX: number,
   clientY: number,
+  snap: boolean,
 ): void {
   const dx = clientX - s.startX;
   const dy = clientY - s.startY;
+  const g = snap ? freeSnap() : null;
   if (edges.e) {
-    el.style.width = `${Math.round(Math.max(s.minW, s.startW + dx))}px`;
+    let w = Math.max(s.minW, s.startW + dx);
+    if (g) w = snapCells(w, g.cell, g.gap, s.minW);
+    el.style.width = `${Math.round(w)}px`;
   } else if (edges.w) {
-    const w = Math.max(s.minW, s.startW - dx);
+    let w = Math.max(s.minW, s.startW - dx);
+    if (g) w = snapCells(w, g.cell, g.gap, s.minW);
     el.style.width = `${Math.round(w)}px`;
     el.style.left = `${Math.round(s.startLeft + (s.startW - w))}px`; // pin the right edge
   }
   if (edges.s) {
-    el.style.height = `${Math.round(Math.max(s.minH, s.startH + dy))}px`;
+    let h = Math.max(s.minH, s.startH + dy);
+    if (g) h = snapCells(h, g.row, g.gap, s.minH);
+    el.style.height = `${Math.round(h)}px`;
   } else if (edges.n) {
-    const h = Math.max(s.minH, s.startH - dy);
+    let h = Math.max(s.minH, s.startH - dy);
+    if (g) h = snapCells(h, g.row, g.gap, s.minH);
     el.style.height = `${Math.round(h)}px`;
     el.style.top = `${Math.round(s.startTop + (s.startH - h))}px`; // pin the bottom edge
   }
@@ -281,6 +307,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
   let rafId = 0;
   let lastX = 0;
   let lastY = 0;
+  let lastAlt = false; // Alt held on the last pointer move → bypass grid snapping
   let onKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
   // Free-mode drag bookkeeping: the panel is already position:absolute, so a drag
@@ -419,11 +446,16 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
   // Free-mode: place the panel's top-left under the pointer, clamped into the
   // grid, then persist. Grid origin is re-read each frame so page scroll during
   // a drag never introduces drift.
-  const moveFree = (x: number, y: number) => {
+  const moveFree = (x: number, y: number, snap: boolean) => {
     if (!grid) return;
     const gr = grid.getBoundingClientRect();
-    const left = Math.max(0, x - offsetX - gr.left - grid.clientLeft);
-    const top = Math.max(0, y - offsetY - gr.top - grid.clientTop);
+    let left = Math.max(0, x - offsetX - gr.left - grid.clientLeft);
+    let top = Math.max(0, y - offsetY - gr.top - grid.clientTop);
+    if (snap) {
+      const g = freeSnap();
+      left = snapLine(left, g.cell + g.gap);
+      top = snapLine(top, g.row + g.gap);
+    }
     el.style.left = `${Math.round(left)}px`;
     el.style.top = `${Math.round(top)}px`;
   };
@@ -521,6 +553,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     if (!pressing || e.pointerId !== pointerId) return;
     lastX = e.clientX;
     lastY = e.clientY;
+    lastAlt = e.altKey;
 
     if (!dragging) {
       if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) {
@@ -543,7 +576,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
       rafId = 0;
       if (!dragging || !grid) return;
       if (freeGesture) {
-        moveFree(x, y);
+        moveFree(x, y, !lastAlt);
         // Window-manager tiling: preview the zone under the cursor (halves/quadrants),
         // or clear it in the free centre.
         currentZone = grid ? computeSnapZone(grid, x, y) : null;
@@ -567,7 +600,7 @@ export function attachPanelDrag(el: HTMLElement, opts: PanelDragOptions): () => 
     if (wasDragging && freeGesture) {
       // Drop into the previewed snap zone if one is active, else free-place.
       if (currentZone) placeInZone(currentZone);
-      else moveFree(lastX, lastY);
+      else moveFree(lastX, lastY, !lastAlt);
       hideSnapPreview();
       currentZone = null;
       dragging = false;
@@ -683,7 +716,7 @@ export function attachPanelResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, { s: true }, free, e.clientX, e.clientY);
+      applyFreeResize(el, { s: true }, free, e.clientX, e.clientY, !e.altKey);
       return;
     }
     const height = startHeight + (e.clientY - startY);
@@ -821,7 +854,7 @@ export function attachPanelColResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, { e: true }, free, e.clientX, e.clientY);
+      applyFreeResize(el, { e: true }, free, e.clientX, e.clientY, !e.altKey);
       return;
     }
     const cols = colsFor(e.clientX);
@@ -987,7 +1020,7 @@ export function attachPanelCornerResize(
     if (!resizing || e.pointerId !== pointerId) return;
     e.preventDefault();
     if (freeGesture && free) {
-      applyFreeResize(el, edges, free, e.clientX, e.clientY);
+      applyFreeResize(el, edges, free, e.clientX, e.clientY, !e.altKey);
       return;
     }
     const cols = colsFor(e.clientX);
