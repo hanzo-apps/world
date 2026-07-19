@@ -59,19 +59,20 @@ var kmsBootTimeout = 5 * time.Second
 // are resolved by env() at read time and are NOT fetched — only the canonical
 // name is stored in KMS. A key absent from KMS simply 404s and is skipped.
 var worldSecretKeys = []string{
-	"HANZO_CLOUD_PULSE_TOKEN", // cloud-map pulse backend service token
-	"HANZO_AI_KEY",            // AI endpoints (gateway key)
-	"HANZO_AI_BASE",           // AI gateway base URL override
-	"HANZO_AI_MODEL",          // AI default model override
-	"YOUTUBE_API_KEY",         // live-video reliability
-	"FRED_API_KEY",            // macro / econ series
-	"FINNHUB_API_KEY",         // market quotes
-	"EIA_API_KEY",             // energy data
-	"NASA_FIRMS_API_KEY",      // wildfire hotspots
-	"ACLED_ACCESS_TOKEN",      // conflict / risk events
-	"CLOUDFLARE_API_TOKEN",    // infra telemetry
-	"WINGBITS_API_KEY",        // ADS-B feed
-	"WS_RELAY_URL",            // live websocket relay
+	"HANZO_CLOUD_PULSE_TOKEN",   // cloud-map pulse backend service token
+	"DIGITALOCEAN_ACCESS_TOKEN", // real DO fleet enumeration (DOKS clusters + nodes + droplets)
+	"HANZO_AI_KEY",              // AI endpoints (gateway key)
+	"HANZO_AI_BASE",             // AI gateway base URL override
+	"HANZO_AI_MODEL",            // AI default model override
+	"YOUTUBE_API_KEY",           // live-video reliability
+	"FRED_API_KEY",              // macro / econ series
+	"FINNHUB_API_KEY",           // market quotes
+	"EIA_API_KEY",               // energy data
+	"NASA_FIRMS_API_KEY",        // wildfire hotspots
+	"ACLED_ACCESS_TOKEN",        // conflict / risk events
+	"CLOUDFLARE_API_TOKEN",      // infra telemetry
+	"WINGBITS_API_KEY",          // ADS-B feed
+	"WS_RELAY_URL",              // live websocket relay
 }
 
 // kmsConfig is the resolved fetch scope. host has no trailing slash; path has
