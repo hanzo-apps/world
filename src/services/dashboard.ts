@@ -1,40 +1,57 @@
 import { isAuthenticated, orgHeaders } from '@/services/iam';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 
-// Dashboard sync — the ONE path between the composed dashboard and where it lives.
-//
-// Signed in, the Go backend owns the dashboard: the full composition — panel
-// order, visibility, spans, map cols/layers/mode, custom feed panels, disabled
-// sources, AND the layout-engine geometry (free {x,y,w,h} / mode / cellSize /
-// gridCols) — is persisted per identity, so it follows the user across devices and
-// every change the AI analyst or toolbar makes survives a reload anywhere. Signed
-// out, everything stays in localStorage exactly as before (no server state).
-//
-// It is DECOUPLED from the writers: the dashboard is nothing more than a fixed set
-// of localStorage keys, so we OBSERVE writes to those keys (one setItem/removeItem
-// interceptor) and debounce a single server save. App, grid-config and Panel never
-// learn about the server — they just write localStorage as they always did. The
-// blob is opaque (each value stored verbatim); this module never interprets it, and
-// it holds layout only — NEVER secrets.
+// Per-identity sync — the ONE path between the signed-in user's browser state and
+// where it lives on the server. Two concerns, ONE mechanism:
+//   • DASHBOARD  (/v1/world/dashboard) — panels/order/spans, map cols/layers/mode,
+//     custom feeds, disabled sources, the free-layout geometry, text/grid size.
+//   • HISTORY    (/v1/world/history)   — the user's REAL actions: recent searches,
+//     watch queue.
+// Each is nothing more than a fixed set of localStorage keys, so we OBSERVE writes to
+// those keys (one setItem/removeItem interceptor) and debounce a save to the RIGHT
+// endpoint. The writers (App, grid-config, Panel, SearchModal, watch-queue) never
+// learn about the server — they just use localStorage. Blobs are opaque (each value
+// stored verbatim); this module never interprets them, and they hold layout/usage
+// state only — NEVER secrets. Signed out, everything stays local (no server state).
 
-// The keys that together ARE the dashboard. Fixed keys + the per-variant layout
-// family (worldmonitor-layout:<variant> holds v2.4.19's free geometry + mode).
-const FIXED_KEYS = [
-  'panel-order',
-  'worldmonitor-panels',
-  'worldmonitor-layers',
-  'worldmonitor-disabled-feeds',
-  'worldmonitor-panel-spans',
-  'worldmonitor-panel-cols',
-  'hanzo-world-custom-panels',
-  'hanzo-world-map-mode',
-  'hanzo-world-ui-scale', // text-size / UI scale (accessibility)
-  'hanzo-world-grid-size', // dock cell-size fallback (when window.worldGrid is absent)
+interface SyncGroup {
+  endpoint: string;
+  fixed: string[];
+  prefix?: string;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+// One group per namespace; keys are disjoint across groups.
+const GROUPS: SyncGroup[] = [
+  {
+    endpoint: '/v1/world/dashboard',
+    fixed: [
+      'panel-order',
+      'worldmonitor-panels',
+      'worldmonitor-layers',
+      'worldmonitor-disabled-feeds',
+      'worldmonitor-panel-spans',
+      'worldmonitor-panel-cols',
+      'hanzo-world-custom-panels',
+      'hanzo-world-map-mode',
+      'hanzo-world-ui-scale', // text-size / UI scale (accessibility)
+      'hanzo-world-grid-size', // dock cell-size fallback
+    ],
+    prefix: 'worldmonitor-layout:', // per-variant free geometry + mode
+    timer: null,
+  },
+  {
+    endpoint: '/v1/world/history',
+    fixed: [
+      'worldmonitor_recent_searches', // SearchModal recent searches
+      'hanzo-world-watch-queue', // watch queue + watched status
+    ],
+    timer: null,
+  },
 ];
-const LAYOUT_PREFIX = 'worldmonitor-layout:';
-const SAVE_DEBOUNCE_MS = 800;
 
-type DashboardConfig = Record<string, string>;
+const SAVE_DEBOUNCE_MS = 800;
+type SyncDoc = Record<string, string>;
 
 // Pristine setItem captured before we patch the prototype, so apply()/hydrate write
 // to localStorage WITHOUT re-firing a save.
@@ -44,35 +61,40 @@ function base(): string {
   return isDesktopRuntime() ? getRemoteApiBaseUrl() : '';
 }
 
-function isDashboardKey(key: string): boolean {
-  return FIXED_KEYS.includes(key) || key.startsWith(LAYOUT_PREFIX);
+function inGroup(g: SyncGroup, key: string): boolean {
+  return g.fixed.includes(key) || (!!g.prefix && key.startsWith(g.prefix));
+}
+function groupFor(key: string): SyncGroup | null {
+  for (const g of GROUPS) if (inGroup(g, key)) return g;
+  return null;
 }
 
-// The dashboard keys currently present in localStorage (fixed set + every layout
-// variant), so multi-variant layouts all persist together.
-function presentKeys(): string[] {
-  const keys = new Set<string>(FIXED_KEYS.filter((k) => localStorage.getItem(k) !== null));
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith(LAYOUT_PREFIX)) keys.add(k);
+// The group's keys currently present in localStorage (fixed set + prefix family).
+function presentKeys(g: SyncGroup): string[] {
+  const keys = new Set<string>(g.fixed.filter((k) => localStorage.getItem(k) !== null));
+  if (g.prefix) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(g.prefix)) keys.add(k);
+    }
   }
   return [...keys];
 }
 
-function snapshot(): DashboardConfig {
-  const cfg: DashboardConfig = {};
-  for (const k of presentKeys()) {
+function snapshot(g: SyncGroup): SyncDoc {
+  const doc: SyncDoc = {};
+  for (const k of presentKeys(g)) {
     const v = localStorage.getItem(k);
-    if (v !== null) cfg[k] = v;
+    if (v !== null) doc[k] = v;
   }
-  return cfg;
+  return doc;
 }
 
-// Restore a server config into localStorage verbatim (server precedence). Uses the
-// raw writer so hydration never echoes straight back to the server.
-function apply(cfg: DashboardConfig): void {
-  for (const [k, v] of Object.entries(cfg)) {
-    if (!isDashboardKey(k) || typeof v !== 'string') continue;
+// Restore a server blob into localStorage verbatim (server precedence). Only keys
+// that belong to the group are applied, via the raw writer (never re-fires a save).
+function apply(g: SyncGroup, doc: SyncDoc): void {
+  for (const [k, v] of Object.entries(doc)) {
+    if (!inGroup(g, k) || typeof v !== 'string') continue;
     try {
       rawSetItem(k, v);
     } catch {
@@ -81,51 +103,49 @@ function apply(cfg: DashboardConfig): void {
   }
 }
 
-function isEmpty(cfg: DashboardConfig): boolean {
-  return Object.keys(cfg).length === 0;
+function isEmpty(doc: SyncDoc): boolean {
+  return Object.keys(doc).length === 0;
 }
 
 /**
- * Boot hook: when signed in, pull this identity's dashboard from the server and
- * write it into localStorage BEFORE the app reads it (server precedence across
- * devices), then observe further changes so any dashboard mutation auto-syncs.
- * Bounded + best-effort — a slow or failed server never blocks boot. No-op when
- * signed out (the anonymous, localStorage-only experience is unchanged).
+ * Boot hook: when signed in, pull each per-identity blob from the server and write it
+ * into localStorage BEFORE the app reads it (server precedence across devices), then
+ * observe further changes so any mutation auto-syncs to the right namespace. Bounded +
+ * best-effort — a slow or failed server never blocks boot. No-op when signed out (the
+ * anonymous, localStorage-only experience is unchanged).
  */
 export async function initDashboardSync(): Promise<void> {
   if (!isAuthenticated()) return;
-  await hydrate();
+  await Promise.all(GROUPS.map(hydrate));
   install();
 }
 
-async function hydrate(): Promise<void> {
+async function hydrate(g: SyncGroup): Promise<void> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(`${base()}/v1/world/dashboard`, { headers: await orgHeaders(), signal: ctrl.signal });
+    const res = await fetch(`${base()}${g.endpoint}`, { headers: await orgHeaders(), signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) return;
-    const data = (await res.json()) as { config?: DashboardConfig };
+    const data = (await res.json()) as { config?: SyncDoc };
     const server = data.config ?? {};
     if (isEmpty(server)) {
       // Nothing on the server yet — adopt whatever this device already has (first
       // sign-in) rather than leaving it stranded in localStorage only.
-      const local = snapshot();
-      if (!isEmpty(local)) void put(local);
+      const local = snapshot(g);
+      if (!isEmpty(local)) void put(g, local);
       return;
     }
-    apply(server);
+    apply(g, server);
   } catch {
     /* offline / slow — boot from local, and the first change re-syncs */
   }
 }
 
 let installed = false;
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Intercept writes to the dashboard keys (from App, grid-config or Panel — any
-// writer) and debounce ONE server save. Installed after hydrate so restoring the
-// server blob doesn't bounce straight back.
+// Intercept writes to any synced key and debounce a save to its group's endpoint.
+// Installed after hydrate so restoring a server blob doesn't bounce straight back.
 function install(): void {
   if (installed) return;
   installed = true;
@@ -137,29 +157,31 @@ function install(): void {
   const protoRemove = proto.removeItem;
   proto.setItem = function (key: string, value: string): void {
     protoSet.call(this, key, value);
-    if (this === localStorage && isDashboardKey(key)) schedule();
+    if (this === localStorage) scheduleFor(key);
   };
   proto.removeItem = function (key: string): void {
     protoRemove.call(this, key);
-    if (this === localStorage && isDashboardKey(key)) schedule();
+    if (this === localStorage) scheduleFor(key);
   };
 }
 
-function schedule(): void {
+function scheduleFor(key: string): void {
   if (!isAuthenticated()) return; // signed out mid-session — stop syncing
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    void put(snapshot());
+  const g = groupFor(key);
+  if (!g) return;
+  if (g.timer) clearTimeout(g.timer);
+  g.timer = setTimeout(() => {
+    g.timer = null;
+    void put(g, snapshot(g));
   }, SAVE_DEBOUNCE_MS);
 }
 
-async function put(cfg: DashboardConfig): Promise<void> {
+async function put(g: SyncGroup, doc: SyncDoc): Promise<void> {
   try {
-    await fetch(`${base()}/v1/world/dashboard`, {
+    await fetch(`${base()}${g.endpoint}`, {
       method: 'PUT',
       headers: await orgHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(cfg),
+      body: JSON.stringify(doc),
     });
   } catch {
     /* offline — localStorage already has it; the next change re-syncs */
