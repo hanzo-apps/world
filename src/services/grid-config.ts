@@ -54,7 +54,7 @@ const DEFAULT_GAP = 4; // matches .panels-grid gap
 // Column-track floor range for the widget-size slider. 120 (was 140) lets grid
 // columns pack tighter so panels can be narrower — the "constrained on min width"
 // complaint. Free mode has its own, lower px floor (panel-drag FREE_MIN_W).
-const MIN_CELL_SIZE = 120;
+const MIN_CELL_SIZE = 80;
 const MAX_CELL_SIZE = 360;
 // The CSS custom property that drives the grid column floor. Owned by the base
 // .panels-grid rule (origin/main); the dock's fallback sets the same one — one
