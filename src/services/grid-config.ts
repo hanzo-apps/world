@@ -132,6 +132,19 @@ export function getGap(): number {
   return DEFAULT_GAP;
 }
 
+// px — the logical row height of the grid (matches the CSS --panel-row that drives
+// grid-auto-rows). Paired with cellSize + gap it defines ONE grid that both grid
+// mode and free-mode snapping align to — no second magic number.
+const ROW_UNIT = 16;
+
+/** The logical snap grid shared by grid mode and free mode: a column is cellSize
+ *  wide, a row is ROW_UNIT tall, both separated by gap. Free-mode drag/resize snaps
+ *  {x,y} to these grid lines and {w,h} to whole-cell multiples, so free panels land
+ *  on the SAME tracks grid mode uses. */
+export function freeSnap(): { cell: number; row: number; gap: number } {
+  return { cell: getCellSize(), row: ROW_UNIT, gap: DEFAULT_GAP };
+}
+
 /** Switch layout mode: persist, restyle the body, re-lay out every panel. The
  *  `user` flag records a deliberate pick so applyDefaultLayout never overrides it. */
 function switchMode(mode: LayoutMode, user: boolean): void {
