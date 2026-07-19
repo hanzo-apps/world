@@ -99,7 +99,7 @@ import {
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
-import { isNativeGlobeEnabled, type GlobeLayerSource } from './GlobeNative';
+import { isNativeGlobeEnabled, isNonLeftClick, type GlobeLayerSource, type MapClickEvent } from './GlobeNative';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -765,7 +765,7 @@ export class DeckGLMap {
       interleaved: false,
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
-      onClick: (info: PickingInfo) => this.handleClick(info),
+      onClick: (info: PickingInfo, event) => this.handleClick(info, event as MapClickEvent),
       pickingRadius: 10,
       // Overlaid deck owns its DPR. Cap at 2 so a HiDPI (DPR 3+) display on a
       // large window doesn't quadruple the per-frame fill of the second canvas —
@@ -3091,17 +3091,19 @@ export class DeckGLMap {
     }
   }
 
-  private handleClick(info: PickingInfo): void {
+  private handleClick(info: PickingInfo, event?: MapClickEvent): void {
+    // Only a LEFT click selects. Right/middle click (deck.gl's tap recognizer fires
+    // onClick for those too) must never pick-and-select — right-click stays free.
+    if (isNonLeftClick(event)) return;
     if (!info.object) {
-      // Empty map click → country detection
+      // Empty map click → country detection. If the click is NOT on a country
+      // (ocean / empty space), show nothing — no "identifying country" interstitial.
       if (info.coordinate && this.onCountryClick) {
         const [lon, lat] = info.coordinate as [number, number];
         const country = this.resolveCountryFromCoordinate(lon, lat);
-        this.onCountryClick({
-          lat,
-          lon,
-          ...(country ? { code: country.code, name: country.name } : {}),
-        });
+        if (country) {
+          this.onCountryClick({ lat, lon, code: country.code, name: country.name });
+        }
       }
       return;
     }
@@ -3958,7 +3960,7 @@ export class DeckGLMap {
     return {
       buildLayers: () => this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
-      handleClick: (info: PickingInfo) => this.handleClick(info),
+      handleClick: (info: PickingInfo, event?: MapClickEvent) => this.handleClick(info, event),
       setOcclusionCenter: (lng: number, lat: number) => this.setOcclusionCenter(lng, lat),
     };
   }

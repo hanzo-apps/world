@@ -46,10 +46,28 @@ import { DEFAULT_BASEMAP_STYLE } from '@/config/variant';
  * handling without duplicating a single builder. Kept structural (no import of
  * DeckGLMap here) to avoid a dependency cycle.
  */
+/** The click's mouse-button info — deck.gl passes a mjolnir event as onClick's 2nd
+ *  argument. Only a LEFT click selects; right/middle must never pick-and-select. */
+export interface MapClickEvent {
+  leftButton?: boolean;
+  middleButton?: boolean;
+  rightButton?: boolean;
+  srcEvent?: { button?: number };
+}
+
+/** True when the click was NOT the left button (right/middle) — those never select.
+ *  A missing event (touch / programmatic) is treated as a left click. */
+export function isNonLeftClick(e?: MapClickEvent): boolean {
+  if (!e) return false;
+  if (e.rightButton || e.middleButton) return true;
+  const b = e.srcEvent?.button;
+  return typeof b === 'number' && b !== 0;
+}
+
 export interface GlobeLayerSource {
   buildLayers(): LayersList;
   getTooltip(info: PickingInfo): { html: string } | null;
-  handleClick(info: PickingInfo): void;
+  handleClick(info: PickingInfo, event?: MapClickEvent): void;
   /** Feed the globe's live camera (lng/lat) so the source can cull far-side billboards
    *  against the rotation the user sees, not the parked mapbox center. */
   setOcclusionCenter?(lng: number, lat: number): void;
@@ -253,7 +271,7 @@ export class GlobeNative {
       effects: [],
       layers: [],
       getTooltip: (info: PickingInfo) => this.source?.getTooltip(info) ?? null,
-      onClick: (info: PickingInfo) => this.handleClick(info),
+      onClick: (info: PickingInfo, event) => this.handleClick(info, event as MapClickEvent),
       onViewStateChange: ({ viewState }) => {
         this.viewState = viewState;
         this.deck.setProps({ viewState });
@@ -554,19 +572,23 @@ export class GlobeNative {
 
   // ---- Interaction -----------------------------------------------------------
 
-  private handleClick(info: PickingInfo): void {
+  private handleClick(info: PickingInfo, event?: MapClickEvent): void {
+    // Only a LEFT click selects. Right/middle click (deck.gl's tap recognizer fires
+    // onClick for those too) must never pick-and-select — right-click stays free.
+    if (isNonLeftClick(event)) return;
     if (!info.object) {
-      // Empty-globe click → resolve to a country from the basemap geometry.
+      // Empty-globe click → resolve to a country from the basemap geometry. If the
+      // click is NOT on a country (ocean / empty space), show nothing — no popup.
       const coord = info.coordinate;
       const lon = coord?.[0];
       const lat = coord?.[1];
       if (lon != null && lat != null && this.onCountryClick) {
         const hit = getCountryAtCoordinates(lat, lon);
-        this.onCountryClick({ lat, lon, code: hit?.code, name: hit?.name });
+        if (hit) this.onCountryClick({ lat, lon, code: hit.code, name: hit.name });
       }
       return;
     }
-    this.source?.handleClick(info);
+    this.source?.handleClick(info, event);
   }
 
   // ---- Camera: fly-to --------------------------------------------------------
