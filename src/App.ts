@@ -562,7 +562,7 @@ export class App {
         return document.body.dataset.layoutMode === 'free' ? 'free' : 'grid';
       },
       setCellSize: (px) => {
-        const v = Math.max(140, Math.min(360, px));
+        const v = Math.max(120, Math.min(360, px));
         if (g?.setCellSize) { g.setCellSize(v); return; }
         document.documentElement.style.setProperty('--panel-col-min', `${v}px`);
         try { localStorage.setItem('hanzo-world-grid-size', String(v)); } catch { /* ignore */ }
@@ -2221,7 +2221,7 @@ export class App {
             </label>
             <label class="dock-slider" title="Widget size">
               <span class="dock-ico">▦</span>
-              <input type="range" id="dockGridSize" min="140" max="360" step="20" value="160" aria-label="Widget size" />
+              <input type="range" id="dockGridSize" min="120" max="360" step="20" value="160" aria-label="Widget size" />
             </label>
           </div>
           ${immersive}
@@ -3136,6 +3136,10 @@ export class App {
     saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
     this.applyPanelSettings();
     this.renderPanelToggles();
+    // Re-apply the layout so a panel just SHOWN in free mode seeds a real rect
+    // (a tidy default slot) instead of flowing full-width under its absolute
+    // siblings. No-op in grid mode. See grid-config.applyLayout.
+    (window as unknown as { worldGrid?: { applyLayout?: () => void } }).worldGrid?.applyLayout?.();
     return true;
   }
 
@@ -3523,6 +3527,22 @@ export class App {
     // Map is a first-class grid citizen: header-drag to reorder, bottom handle to
     // resize height (row span), right handle to resize width (column span).
     this.setupMapPanel();
+
+    // Default the dashboard to FREE layout once the panels + map have laid out:
+    // every panel then owns its own {x,y,w,h}, so moving/resizing one never shifts
+    // the others. The current grid arrangement is frozen as the starting geometry,
+    // so the flip is invisible. Skipped if the user has explicitly picked a mode
+    // (grid-config records that) and on mobile (a fixed single-column flow). Two
+    // rAFs so the map's column/height application (itself deferred a frame) lands
+    // first and the freeze captures the real on-screen boxes.
+    if (!this.isMobile) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          (window as unknown as { worldGrid?: { applyDefaultLayout?: () => void } })
+            .worldGrid?.applyDefaultLayout?.(),
+        ),
+      );
+    }
 
     // Pause animations when tab is hidden, unload ML models to free memory
     this.boundVisibilityHandler = () => {
