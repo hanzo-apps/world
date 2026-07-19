@@ -1,15 +1,18 @@
 import { Panel } from './Panel';
 import { getRouterStats, type RouterStats } from '@/services/router-stats';
+import { getCloudModels, type CloudModels } from '@/services/cloud-admin';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtCompact, fmtPct, fmtAgo, statTile, sparkline, shareBar } from '@/utils/cloud-format';
+import { fmtCompact, fmtPct, fmtAgo, statTile, sparkline } from '@/utils/cloud-format';
 
 // Enso Live Training — a live window into the learned router that Hanzo trains on
-// its own routing decisions. Data is the PUBLIC platform aggregate
+// its own routing decisions. The AGGREGATES are the PUBLIC platform telemetry
 // (/v1/world/cloud/router-stats → ai /v1/router/stats?scope=platform): throughput,
-// learned-engine share, per-arm routing mix, cost-saved proxy and the last retrain
-// gate. Enso is a PRIVATE closed family — the arms arrive already opaque ("arm-N"),
-// so this surface only ever labels them "Enso arm N"; no vendor name is shown or
-// inferred. Never fabricates: an unreachable feed shows a muted "connecting…".
+// learned-engine share, a blended-price cost-saved proxy and the last retrain gate.
+// The MODELS it serves and trains across are the REAL served catalog
+// (/v1/world/cloud/models → ai /v1/models): real model names, tiers, context and
+// pricing — never opaque "arm-N" labels or fabricated numbers (the platform relabels
+// per-arm routing to opaque ids upstream, so we show the real catalog instead of a
+// meaningless arm mix). An unreachable feed shows a muted "connecting…".
 
 /** Normalize a metric that may arrive as a 0..1 fraction OR an already-scaled
  * percent into a 0..100 percent. engine_share/shadow_agreement are fractions;
@@ -18,20 +21,21 @@ function pctOf(v: number): number {
   return Math.abs(v) <= 1 ? v * 100 : v;
 }
 
-/** "arm-1" → 1; anything without a trailing index sorts last. */
-function armIndex(key: string): number {
-  const m = key.match(/(\d+)\s*$/);
-  return m ? parseInt(m[1]!, 10) : Number.MAX_SAFE_INTEGER;
-}
-
 /** A gate number: keep a little precision for sub-1 metrics, trim otherwise. */
 function fmtGate(v: number): string {
   if (!Number.isFinite(v)) return '—';
   return Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(2);
 }
 
+/** $/M-token price, compact but honest (0 = not priced). */
+function fmtPrice(v: number): string {
+  if (!Number.isFinite(v) || v <= 0) return '';
+  return v < 10 ? v.toFixed(2) : v.toFixed(0);
+}
+
 export class EnsoTrainingPanel extends Panel {
   private stats: RouterStats | null = null;
+  private models: CloudModels | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly hours = 24;
 
@@ -42,7 +46,7 @@ export class EnsoTrainingPanel extends Panel {
       showCount: false,
       className: 'cloud-panel',
       infoTooltip:
-        'Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions: throughput, learned-engine share, per-arm routing mix, a blended-price cost-saved proxy, and the latest retrain gate. Enso is a private model family — arms are shown opaquely as "Enso arm N".',
+        'Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions (throughput, learned-engine share, a blended-price cost-saved proxy, the latest retrain gate), plus the REAL model catalog it serves and trains across — real names, tiers, context and pricing from the public /v1/models. No fabricated numbers.',
     });
     void this.fetchData();
     this.timer = setInterval(() => void this.fetchData(), 30_000);
@@ -54,38 +58,55 @@ export class EnsoTrainingPanel extends Panel {
   }
 
   private async fetchData(): Promise<void> {
-    try {
-      const next = await getRouterStats(this.hours);
-      // Keep last-good data across a transient outage (the proxy flags an
-      // unreachable upstream with unavailable:true). Only real payloads are
-      // stored, so render() never sees fabricated zeros.
-      if (!next.unavailable) this.stats = next;
-    } catch (e) {
-      // Live ticker: log and keep last-good data; render() holds the muted
-      // "connecting…" state when nothing has landed yet. Never fabricate.
-      console.error('[EnsoTraining] refresh failed:', e);
+    // Router-stats throws on failure; the models catalog returns null. Fetch them
+    // independently (allSettled) so one being down never blanks the other, and only
+    // store real payloads — render() never sees fabricated numbers.
+    const [statsRes, modelsRes] = await Promise.allSettled([
+      getRouterStats(this.hours),
+      getCloudModels(),
+    ]);
+    if (statsRes.status === 'fulfilled' && !statsRes.value.unavailable) {
+      this.stats = statsRes.value;
+    } else if (statsRes.status === 'rejected') {
+      console.error('[EnsoTraining] router-stats refresh failed:', statsRes.reason);
+    }
+    if (modelsRes.status === 'fulfilled' && modelsRes.value && modelsRes.value.models.length) {
+      this.models = modelsRes.value;
     }
     this.render();
   }
 
-  private armRows(): string {
-    const s = this.stats!;
-    const arms = Object.entries(s.by_model)
-      .map(([k, n]) => ({ idx: armIndex(k), n: Number(n) || 0 }))
-      .sort((a, b) => a.idx - b.idx);
-    const total = arms.reduce((sum, a) => sum + a.n, 0) || 1;
-    return arms.map((a) => {
-      const label = a.idx === Number.MAX_SAFE_INTEGER ? 'Enso arm' : `Enso arm ${a.idx}`;
-      const premium = a.idx === 1 ? '<span class="cloud-tag">premium</span>' : '';
+  /** The REAL served models — the catalog the router trains across. Real names,
+   *  tiers, providers, context and pricing; never opaque arms or fake amounts. */
+  private modelRows(): string {
+    const m = this.models;
+    if (!m) return '';
+    return m.models.map((mod) => {
+      const tier = mod.tier ? `<span class="cloud-tag">${escapeHtml(mod.tier)}</span>` : '';
+      const parts: string[] = [];
+      if (mod.provider) parts.push(escapeHtml(mod.provider));
+      if (mod.context > 0) parts.push(`${fmtCompact(mod.context)} ctx`);
+      const inP = fmtPrice(mod.inPrice);
+      const outP = fmtPrice(mod.outPrice);
+      if (inP && outP) parts.push(`$${inP} / $${outP} per M`);
+      const sub = parts.join(' · ');
       return `<div class="cloud-model-row">
         <div class="cloud-model-head">
-          <span class="cloud-model-name">${escapeHtml(label)}${premium}</span>
-          <span class="cloud-model-req">${fmtPct((a.n / total) * 100, 1)}<span class="cloud-unit">share</span></span>
+          <span class="cloud-model-name">${escapeHtml(mod.name)}${tier}</span>
         </div>
-        ${shareBar(a.n / total)}
-        <div class="cloud-model-sub">${fmtCompact(a.n)} routed</div>
+        ${sub ? `<div class="cloud-model-sub">${sub}</div>` : ''}
       </div>`;
     }).join('');
+  }
+
+  private modelsSection(): string {
+    const m = this.models;
+    if (!m || !m.models.length) {
+      return `<div class="cloud-util-note">Loading the served-model catalog…</div>`;
+    }
+    const zen = m.zenModels > 0 ? ` · ${fmtCompact(m.zenModels)} Zen` : '';
+    return `<div class="cloud-live-note">${fmtCompact(m.totalModels)} models served${zen}</div>
+      <div class="cloud-model-list">${this.modelRows()}</div>`;
   }
 
   private retrainLine(): string {
@@ -134,8 +155,8 @@ export class EnsoTrainingPanel extends Panel {
           <span class="cloud-spark-wrap">${sparkline(s.throughput.per_hour, 220, 30)}</span>
         </div>
 
-        <div class="cloud-subhead">Per-arm routing share</div>
-        <div class="cloud-model-list">${this.armRows()}</div>
+        <div class="cloud-subhead">Models served &amp; trained across</div>
+        ${this.modelsSection()}
 
         <div class="cloud-subhead">Last retrain &amp; gate</div>
         ${this.retrainLine()}
