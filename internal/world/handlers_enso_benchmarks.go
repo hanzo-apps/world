@@ -358,28 +358,51 @@ func buildEnso(enso map[string]map[string]float64) []ensoTable {
 func ensoCaveats(benches []benchTable, ablation []ablationTable, agentic *agenticTable) []string {
 	caveats := []string{}
 
+	// LiveCodeBench headline — every number computed from the parsed table (no
+	// literal drifts when the snapshot refreshes); the premium-arm reference is
+	// read from the table's own Opus row when present.
 	if lcb := findBench(benches, "livecodebench"); lcb != nil && lcb.EnsoPct > 0 {
+		ref := ""
+		if op := findSystemRow(lcb, "opus-4.8"); op != nil && !op.Preflight {
+			ref = fmt.Sprintf("; the premium arm Opus-4.8 scores %.1f%% at $%.2f", op.AccuracyPct, op.UsdEst)
+		}
 		caveats = append(caveats, fmt.Sprintf(
-			"Enso matches the best single frontier arm at a fraction of the cost — LiveCodeBench %.1f%% @ $%.2f (best arm %s %.1f%%; Opus 72.0%% @ $39.43). GPQA ties the top arm within noise. It does NOT beat every SOTA.",
-			lcb.EnsoPct, lcb.EnsoUsd, lcb.BestArm, lcb.BestArmPct))
+			"On LiveCodeBench, Enso scores %.1f%% @ $%.2f — tracking the best single arm (%s %.1f%%)%s. It does NOT beat every SOTA; we read each row on its own, never as an aggregate that hides a regression.",
+			lcb.EnsoPct, lcb.EnsoUsd, lcb.BestArm, lcb.BestArmPct, ref))
+	}
+
+	// HLE note is emitted ONLY when HLE is genuinely a preflight (n≤1) in the
+	// snapshot — so it can never claim "not scored" over a real scored run.
+	if hle := findBench(benches, "hle"); hle != nil && len(hle.Systems) > 0 && hle.Systems[0].Preflight {
+		caveats = append(caveats,
+			"HLE here is a preflight only (n≤1) — not a scored run; treat it as not-yet-measured, not a real 0%.")
 	}
 
 	caveats = append(caveats,
-		"HLE is a preflight only (n=1) — not a scored run. Enso routes HLE to Opus, which underperforms there, so treat HLE as not-yet-measured, not a real 0%.",
 		"Every number here is MEASURED live against real APIs through the Hanzo gateway — with the per-system cost shown. Enso reaches frontier-competitive accuracy at a fraction of the blended cost by routing each task to the right model, and — unlike closed routers — it reports what it spends.")
 
 	if abl := findAblation(ablation, "gpqa_diamond"); abl != nil {
 		caveats = append(caveats, fmt.Sprintf(
-			"The decisive wins are cost-efficiency and the verify-then-select ablation — better AND cheaper on GPQA (%+.1f pts at %.1f%% lower cost).",
+			"The verify-then-select ablation is better AND cheaper on GPQA (%+.1f pts at %.1f%% lower cost).",
 			abl.DeltaPts, abl.CostDropPct))
 	}
 	if agentic != nil {
 		caveats = append(caveats, fmt.Sprintf(
-			"Agentic step-routing wins too: SWE-Bench Pro pilot %.1f%% resolved vs single-Opus %.1f%%, and cheaper ($%.2f vs $%.2f). Pilot n=%d; full 731-instance run pending.",
+			"Agentic step-routing wins too: SWE-Bench Pro pilot %.1f%% resolved vs single-Opus %.1f%%, and cheaper ($%.2f vs $%.2f). Pilot n=%d; full run pending.",
 			agentic.StepRouted.ResolvedRate*100, agentic.SingleOpus.ResolvedRate*100,
 			agentic.StepRouted.UsdEst, agentic.SingleOpus.UsdEst, agentic.StepRouted.N))
 	}
 	return caveats
+}
+
+// findSystemRow returns a system's row in a bench table, or nil.
+func findSystemRow(t *benchTable, system string) *benchSystemRow {
+	for i := range t.Systems {
+		if t.Systems[i].System == system {
+			return &t.Systems[i]
+		}
+	}
+	return nil
 }
 
 // ── small helpers ────────────────────────────────────────────────────────────
