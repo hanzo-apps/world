@@ -142,6 +142,13 @@ func (s *Server) mount(mux registrar) {
 	// daily reward-rate + cumulative cost-saved + adoption + retrain timeline. Honest
 	// empty until the ledger fills; never a fabricated curve.
 	mux.HandleFunc("/v1/world/cloud/router-history", s.handleCloudRouterHistory)
+	// Enso Router controls: ORG cost↔quality preference (GET|PUT, caller bearer
+	// forwarded → ai /v1/router/preference) + the PUBLIC mean-field judge panel
+	// (GET, scope=platform → ai /v1/router/judge-panel). Both degrade to a
+	// well-formed {available:false} on any upstream failure — including a 404 while
+	// the gateway route is not yet deployed — never a 5xx.
+	mux.HandleFunc("/v1/world/cloud/router-preference", s.handleCloudRouterPreference)
+	mux.HandleFunc("/v1/world/cloud/judge-panel", s.handleCloudJudgePanel)
 	// ADMIN-only aggregates (requireAdmin, fail-closed 403; forward caller bearer):
 	mux.HandleFunc("/v1/world/cloud/fleet", s.handleCloudFleet)
 	mux.HandleFunc("/v1/world/cloud/services", s.handleCloudServices)
