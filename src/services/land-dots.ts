@@ -19,6 +19,14 @@ export interface LandDot {
   lat: number;
 }
 
+// Shared cybermap dot palette — the VALUE lives in one home; both renderers
+// (GlobeNative 3D sphere, DeckGLMap 2D mercator) import it so the lattice reads
+// as one surface. A bright cool ice-blue (near/front) over a dim back-lattice
+// gives the translucent "glowing dot-globe" look: front dots vivid, the far side
+// showing faintly through the sphere. RGBA 0-255.
+export const LAND_DOT_NEAR: [number, number, number, number] = [182, 218, 252, 248];
+export const LAND_DOT_FAR: [number, number, number, number] = [104, 140, 192, 74];
+
 // Lattice step in degrees. 1.6° balances density vs. cost: ~25k candidate points
 // over the sphere, of which roughly 7–9k land — enough to read every continent
 // at globe zoom without dissolving into a solid mass or a sparse scatter.

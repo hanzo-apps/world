@@ -2397,7 +2397,10 @@ export class App {
     // Uses deck.gl (WebGL) on desktop, falls back to D3/SVG on mobile
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.map = new MapContainer(mapContainer, {
-      zoom: this.isMobile ? 2.5 : 1.0,
+      // Desktop opens a touch tighter so the 3D globe reads as a cinematic hero that
+      // fills the immersive viewport (the native GlobeView inherits this zoom on
+      // activation); mobile keeps its MENA-focused framing.
+      zoom: this.isMobile ? 2.5 : 1.35,
       pan: { x: 0, y: 0 },  // Centered view to show full world
       view: this.isMobile ? 'mena' : 'global',
       layers: this.mapLayers,
