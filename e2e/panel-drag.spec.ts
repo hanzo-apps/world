@@ -243,6 +243,9 @@ test.describe('layout engine', () => {
     await page.waitForTimeout(40);
     expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
 
+    // Hold Alt to bypass grid snapping — this test asserts that exact arbitrary-pixel
+    // geometry survives a reload (snapping has its own tests below).
+    await page.keyboard.down('Alt');
     // Drag alpha by an arbitrary (non-cell) pixel delta.
     const start = await rect(page, 'alpha');
     const hdr = await headerBox(page, 'alpha');
@@ -279,6 +282,7 @@ test.describe('layout engine', () => {
     expect(Math.abs(resized.width - (moved.width + WD))).toBeLessThan(6);
     expect(Math.abs(resized.height - (moved.height + HD))).toBeLessThan(6);
 
+    await page.keyboard.up('Alt');
     // Reload: the mode + exact geometry are restored.
     await page.reload();
     await page.waitForFunction(() => window.__layoutHarness?.ready === true);
@@ -297,6 +301,9 @@ test.describe('layout engine', () => {
     await page.waitForTimeout(40);
     expect(await page.evaluate(() => window.__layoutHarness!.mode())).toBe('free');
 
+    // Alt bypasses snapping so the shrink is exactly the drag delta; this test is
+    // about the anchor-pinning invariant, which holds with or without snapping.
+    await page.keyboard.down('Alt');
     const D = 60; // drag each corner inward (toward the panel centre) — always in-bounds
     // corner → inward drag sign + which opposite corner must stay pinned.
     const cases = [
@@ -343,6 +350,7 @@ test.describe('layout engine', () => {
         expect(Math.abs(a.top - b.top)).toBeLessThan(4);
       }
     }
+    await page.keyboard.up('Alt');
     await page.screenshot({ path: `${SHOTS}/free-all-corners.png` });
   });
 
@@ -386,11 +394,14 @@ test.describe('layout engine', () => {
     const corner = (await page
       .locator('[data-panel="bravo"] .panel-corner-resize-handle.se')
       .boundingBox())!;
-    // Pull the SE corner far left → collapse width toward the low floor.
+    // Pull the SE corner far left → collapse width toward the low floor. Hold Alt for
+    // fine (un-snapped) sizing — snapping would otherwise land on a whole cell (≥160).
+    await page.keyboard.down('Alt');
     await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
     await page.mouse.down();
     await page.mouse.move(corner.x - before.width, corner.y + corner.height / 2, { steps: 18 });
     await page.mouse.up();
+    await page.keyboard.up('Alt');
 
     const after = await rect(page, 'bravo');
     expect(after.width).toBeLessThan(150); // narrower than the old 160px floor
@@ -408,6 +419,66 @@ test.describe('layout engine', () => {
     const r = await rect(page, 'map');
     expect(r.width).toBeGreaterThanOrEqual(240);
     expect(r.height).toBeGreaterThanOrEqual(240);
+  });
+
+  test('free mode: dragging snaps to logical grid lines (panels align to shared tracks)', async ({ page }) => {
+    // The owner's feedback: "the snap is not logical." Two panels dragged to targets
+    // less than half a cell apart must land on the SAME grid line — proof placement is
+    // quantised to the logical grid, not arbitrary px.
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    const cell = await page.evaluate(() => window.__layoutHarness!.cell());
+    const colPitch = cell + 4; // + gap
+    const rowPitch = 16 + 4; // ROW_UNIT + gap
+
+    const dragTo = async (id: string, x: number, y: number) => {
+      const hdr = await headerBox(page, id);
+      await page.mouse.move(hdr.x + 20, hdr.y + hdr.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(hdr.x + 30, hdr.y + hdr.height / 2, { steps: 3 });
+      await page.mouse.move(x, y, { steps: 16 });
+      await page.mouse.up();
+    };
+
+    const gridBox = (await page.locator('#panelsGrid').boundingBox())!;
+    const tx = gridBox.x + colPitch * 2 + 20;
+    const ty = gridBox.y + rowPitch * 8 + 30;
+    await dragTo('alpha', tx, ty);
+    await dragTo('bravo', tx + 30, ty + 8); // < half a cell/row from alpha's target
+
+    const a = await rect(page, 'alpha');
+    const b = await rect(page, 'bravo');
+    // Both snapped to the SAME grid line instead of sitting 30/8px apart.
+    expect(Math.abs(a.left - b.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(a.top - b.top)).toBeLessThanOrEqual(1);
+  });
+
+  test('free mode: resizing snaps width to whole cells and pins the opposite edge', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    const cell = await page.evaluate(() => window.__layoutHarness!.cell());
+    const GAP = 4;
+
+    const before = await rect(page, 'alpha');
+    const corner = (await page
+      .locator('[data-panel="alpha"] .panel-corner-resize-handle.se')
+      .boundingBox())!;
+    // Pull the SE corner out by a non-cell amount; width must land on a whole-cell size.
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(corner.x + corner.width / 2 + 210, corner.y + corner.height / 2, { steps: 16 });
+    await page.mouse.up();
+
+    const after = await rect(page, 'alpha');
+    // width == N*cell + (N-1)*gap for some integer N ≥ 1.
+    const n = Math.round((after.width + GAP) / (cell + GAP));
+    expect(n).toBeGreaterThanOrEqual(1);
+    expect(Math.abs(after.width - (n * cell + (n - 1) * GAP))).toBeLessThanOrEqual(2);
+    // The SE resize pins the top-left corner — it must not have moved.
+    expect(Math.abs(after.left - before.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(1);
   });
 
   test('toggle flips grid ⇄ free and back', async ({ page }) => {
