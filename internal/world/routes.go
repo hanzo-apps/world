@@ -134,6 +134,8 @@ func (s *Server) mount(mux registrar) {
 	// PUBLIC map layers (real telemetry when reachable; modeled/demo carries a flag):
 	mux.HandleFunc("/v1/world/cloud/chain-nodes", s.handleCloudChainNodes)
 	mux.HandleFunc("/v1/world/cloud/byo-gpu", s.handleCloudBYOGPU)
+	// Real DigitalOcean fleet: DOKS clusters + nodes + standalone droplets, geo-located.
+	mux.HandleFunc("/v1/world/cloud/nodes", s.handleCloudNodes)
 	mux.HandleFunc("/v1/world/cloud/traffic", s.handleCloudTraffic)
 	// Native LB request-geo aggregate (points + throughput) for the Hanzo-mode globe.
 	// Proxies the ai backend's public /v1/traffic/globe; honest empty state, no demo.
