@@ -117,6 +117,7 @@ import {
   BlockchainPanel,
   AiComputePanel,
   EnsoFlywheelPanel,
+  EnsoRouterPanel,
 } from '@/components';
 import { isAdmin, isAuthenticated, listOrgs, setActiveOrg } from '@/services/iam';
 import type { SearchResult } from '@/components/SearchModal';
@@ -2671,6 +2672,7 @@ export class App {
       this.panels['model-improvement'] = new ModelImprovementPanel();
       this.panels['enso-training'] = new EnsoTrainingPanel();
       this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
+      this.panels['enso-router'] = new EnsoRouterPanel();
       this.panels['ai-compute'] = new AiComputePanel();
       this.panels['model-usage'] = new ModelUsagePanel();
       const fleetPanel = new FleetPanel();
