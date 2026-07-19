@@ -1,0 +1,30 @@
+# Build the image from source only — never copy host-built artifacts or deps.
+#
+# The web stage runs `npm ci` + `npm run build` itself and the go stage copies
+# go.mod/cmd/internal explicitly (see Dockerfile), so the host must NOT ship its
+# own node_modules/dist into the context: at `COPY . .` a host node_modules
+# clobbers the image's fresh `npm ci` tree and poisons BuildKit's node_modules
+# cache-mount ("cannot replace directory with file"), which breaks every build.
+node_modules
+**/node_modules
+dist
+**/dist
+build
+out
+.next
+
+.git
+.gitignore
+.github
+
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.vscode
+.idea
+coverage
+*.tsbuildinfo
