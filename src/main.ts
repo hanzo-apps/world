@@ -64,6 +64,7 @@ import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/g
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
 import { isCallback, handleCallback } from '@/services/iam';
+import { initDashboardSync } from '@/services/dashboard';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { applyStoredUiScale } from '@/utils/ui-scale';
@@ -103,6 +104,11 @@ async function boot(): Promise<void> {
       history.replaceState({}, '', '/');
     }
   }
+
+  // Signed in? Pull this identity's dashboard from the server into localStorage
+  // before the app reads it (server precedence, cross-device), then observe further
+  // changes so they auto-sync. Anonymous is untouched. Best-effort, never blocks boot.
+  await initDashboardSync();
 
   const app = new App('app');
   // Dev/e2e observability: expose the running App so tests can drive layout
