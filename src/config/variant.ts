@@ -52,3 +52,9 @@ export const SITE_VARIANT: string = (() => {
   const build = import.meta.env.VITE_VARIANT;
   return build === 'saas' || build === 'hanzo' ? 'cloud' : build || 'full';
 })();
+
+// Default basemap style when the user has not picked one. Cloud + AI lead with
+// the dotted-land "cybermap" globe (the live Hanzo-traffic surface); every other
+// variant keeps the near-black dark basemap. Persisted choice always wins.
+export const DEFAULT_BASEMAP_STYLE: 'dark' | 'dot' | 'satellite' | 'terrain' =
+  SITE_VARIANT === 'cloud' || SITE_VARIANT === 'ai' ? 'dot' : 'dark';

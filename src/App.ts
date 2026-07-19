@@ -2838,10 +2838,13 @@ export class App {
   }
 
   // Initial 2D/3D map mode: URL (?mode=3d) wins, then persisted preference,
-  // then default flat map.
+  // then the variant default. Cloud + AI lead with the live 3D globe (the
+  // Hanzo-traffic centerpiece); every other variant still opens flat.
   private resolveInitialMapMode(): MapProjectionMode {
     if (this.initialUrlState?.mode) return this.initialUrlState.mode;
-    return localStorage.getItem(this.MAP_MODE_STORAGE_KEY) === '3d' ? '3d' : '2d';
+    const stored = localStorage.getItem(this.MAP_MODE_STORAGE_KEY);
+    if (stored === '3d' || stored === '2d') return stored;
+    return SITE_VARIANT === 'cloud' || SITE_VARIANT === 'ai' ? '3d' : '2d';
   }
 
   private applyInitialUrlState(): void {
