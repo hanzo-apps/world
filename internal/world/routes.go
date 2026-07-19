@@ -86,6 +86,11 @@ func (s *Server) mount(mux registrar) {
 	// devices. Same per-identity store as settings/monitors, 'dashboard' namespace.
 	mux.HandleFunc("/v1/world/dashboard", s.handleDashboard)
 
+	// per-identity USAGE HISTORY — the signed-in user's real actions (recent
+	// searches, watch queue) persisted so they follow them across devices. Same
+	// per-identity store, 'history' namespace; opaque blob, never fabricated.
+	mux.HandleFunc("/v1/world/history", s.handleHistory)
+
 	// econ / humanitarian
 	mux.HandleFunc("/v1/world/fred-data", s.handleFRED)
 	mux.HandleFunc("/v1/world/china-macro", s.handleChinaMacro)
