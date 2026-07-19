@@ -188,8 +188,13 @@ test.describe('layout engine', () => {
     );
     await page.mouse.up();
 
-    // Height grew to a taller row-span and width snapped to multiple columns.
-    await expect(page.locator('[data-panel="delta"]')).toHaveClass(/span-2/);
+    // Height grew to a taller row-span and width snapped to multiple columns. The
+    // bottom edge snaps on the FINE ladder (Panel uses rowPx 20 / minSpan 5), so a
+    // ~250px pull adds many rows — assert data-span climbed well past the start.
+    const span = await page.evaluate(
+      () => Number(document.querySelector('[data-panel="delta"]')!.getAttribute('data-span') || '0'),
+    );
+    expect(span).toBeGreaterThanOrEqual(8);
     const gc = await page.evaluate(() => window.__layoutHarness!.gridColumnOf('delta'));
     expect(gc).toMatch(/span [2-9]/);
 
@@ -340,7 +345,7 @@ test.describe('layout engine', () => {
     await page.screenshot({ path: `${SHOTS}/free-all-corners.png` });
   });
 
-  test('free mode: the map participates with a 240px floor', async ({ page }) => {
+  test('free mode: the map drags narrower than the old 240px floor (new ~160 min)', async ({ page }) => {
     await lh(page);
     await page.evaluate(() => window.__layoutHarness!.setMode('free'));
     await page.waitForTimeout(40);
@@ -348,9 +353,75 @@ test.describe('layout engine', () => {
       () => getComputedStyle(document.querySelector('[data-panel="map"]')!).position,
     );
     expect(pos).toBe('absolute');
+
+    // The map starts full-width; drag its right-edge width grip well inside the old
+    // floor. It must now shrink PAST 240 (the user's "make things less wide" ask)
+    // and settle at the new ~160px hard-minimum, not the old 240.
+    const grid = (await page.locator('#panelsGrid').boundingBox())!;
+    const handle = (await page.locator('#mapColResizeHandle').boundingBox())!;
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + 80, handle.y + handle.height / 2, { steps: 20 });
+    await page.mouse.up();
+
     const r = await rect(page, 'map');
-    expect(r.width).toBeGreaterThanOrEqual(240);
-    expect(r.height).toBeGreaterThanOrEqual(240);
+    expect(r.width).toBeLessThan(240); // past the OLD floor — impossible before this release
+    expect(r.width).toBeGreaterThanOrEqual(150); // …but not below the new ~160 hard-min
+  });
+
+  test('free mode: resizing one panel never moves the others (no reflow)', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+
+    // Snapshot every OTHER panel before we resize alpha hard.
+    const ids = ['bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'map'];
+    const before: Record<string, Rect> = {};
+    for (const id of ids) before[id] = await rect(page, id);
+
+    const corner = (await page
+      .locator('[data-panel="alpha"] .panel-corner-resize-handle.se')
+      .boundingBox())!;
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(corner.x + corner.width / 2 + 150, corner.y + corner.height / 2 + 120, { steps: 16 });
+    await page.mouse.up();
+
+    // Not one sibling moved or resized — free mode has no reflow (the user's #2:
+    // "when I shift the map it shifts all other components" must NOT happen).
+    for (const id of ids) {
+      const a = await rect(page, id);
+      expect(Math.abs(a.left - before[id].left)).toBeLessThan(2);
+      expect(Math.abs(a.top - before[id].top)).toBeLessThan(2);
+      expect(Math.abs(a.width - before[id].width)).toBeLessThan(2);
+      expect(Math.abs(a.height - before[id].height)).toBeLessThan(2);
+    }
+  });
+
+  test('free mode: shrinking the viewport keeps panels within the visible width', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+
+    // Push foxtrot far to the right so it would hang off a narrower viewport.
+    const hdr = await headerBox(page, 'foxtrot');
+    await page.mouse.move(hdr.x + 30, hdr.y + hdr.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hdr.x + 30 + 520, hdr.y + hdr.height / 2, { steps: 12 });
+    await page.mouse.up();
+
+    // Shrink the window (still desktop-width, so free mode stays active — the
+    // mobile flex fallback only kicks in ≤768px).
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.waitForTimeout(140); // rAF-coalesced viewport clamp
+
+    const gridW = await page.evaluate(() => document.getElementById('panelsGrid')!.clientWidth);
+    // Every panel's right edge is now inside the visible grid — content stays reachable.
+    for (const id of ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'map']) {
+      const r = await rect(page, id);
+      expect(r.left).toBeGreaterThanOrEqual(-1);
+      expect(r.left + r.width).toBeLessThanOrEqual(gridW + 24);
+    }
   });
 
   test('toggle flips grid ⇄ free and back', async ({ page }) => {
@@ -388,9 +459,15 @@ const LN_PLAYER = `${LN} .live-news-player`;
 test.describe('live news video resize (real app)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('grid: default → 3 cols → full-width; the video fills at every width', async ({ page }) => {
+  test('grid mode: live-news → 3 cols → full-width; the video fills at every width', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector(LN, { timeout: 45000 });
+    // This exercises GRID-mode column resize specifically. The app now defaults to
+    // free mode (first-run adopt-free), so opt into grid explicitly here; free-mode
+    // live-news pixel resize is covered by the sibling test below.
+    await page.evaluate(() =>
+      (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'),
+    );
     await page.waitForTimeout(500);
 
     const grid = (await page.locator('#panelsGrid').boundingBox())!;
@@ -475,5 +552,41 @@ test.describe('live news video resize (real app)', () => {
     const video = await rectW(page, LN_PLAYER);
     if (video > 0) expect(Math.abs(video - content)).toBeLessThan(6); // fills at that size
     await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'));
+  });
+});
+
+// ── Default layout (real app): first run adopts free mode ───────────────────
+// The headline of this release: a user with no saved layout lands in FREE mode —
+// every panel individually resizable/positionable — instead of being stuck in the
+// reflowing grid they hate. An explicit choice is always respected.
+test.describe('layout default (real app)', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  type WG = { worldGrid?: { setLayoutMode(m: string): void } };
+  const isFree = (page: Page) => page.evaluate(() => document.body.classList.contains('layout-free'));
+  const isGrid = (page: Page) => page.evaluate(() => document.body.classList.contains('layout-grid'));
+
+  test('first run (no saved layout) adopts free mode, and it persists across reload', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    // adopt-free runs in a post-init rAF — poll for the body state.
+    await expect.poll(() => isFree(page), { timeout: 8000 }).toBe(true);
+    // It persisted the choice, so a reload stays free (idempotent — no re-freeze).
+    await page.reload();
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect.poll(() => isFree(page), { timeout: 8000 }).toBe(true);
+  });
+
+  test('an explicit grid choice is respected on reload (adopt-free never overrides it)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect.poll(() => isFree(page), { timeout: 8000 }).toBe(true); // adopt-free settled first
+    // User explicitly picks grid — this writes a saved layout.
+    await page.evaluate(() => (window as unknown as WG).worldGrid?.setLayoutMode('grid'));
+    await expect.poll(() => isGrid(page), { timeout: 8000 }).toBe(true);
+    // Reload: the saved grid choice wins; first-run adopt-free only acts when
+    // nothing has been saved, so it must not flip an explicit choice back to free.
+    await page.reload();
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect.poll(() => isGrid(page), { timeout: 8000 }).toBe(true);
   });
 });

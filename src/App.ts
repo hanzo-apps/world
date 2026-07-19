@@ -19,6 +19,7 @@ import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, 
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
+import { adoptFreeIfFirstRun } from '@/services/grid-config';
 import { installPanelContextMenu, registerSummarizePort } from '@/services/panel-menu';
 import { loadMonitors as loadUserMonitors, saveMonitors as saveUserMonitors, fetchMonitorMatches } from '@/services/monitors';
 import { ImmersiveController, type ImmersiveBackground, type ImmersiveState } from '@/services/immersive';
@@ -356,6 +357,12 @@ export class App {
     }
 
     this.renderLayout();
+    // First run (no saved layout) → adopt free mode so every panel is individually
+    // resizable and positionable, seeded from the grid the layout just rendered.
+    // Scheduled HERE — right after the panels mount, not at the end of init() — so a
+    // later async init step can never skip it; one rAF lets the grid settle first.
+    // A no-op once the user has customized a layout, or on a phone-width viewport.
+    requestAnimationFrame(() => adoptFreeIfFirstRun());
     this.startHeaderClock();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
@@ -562,7 +569,7 @@ export class App {
         return document.body.dataset.layoutMode === 'free' ? 'free' : 'grid';
       },
       setCellSize: (px) => {
-        const v = Math.max(140, Math.min(360, px));
+        const v = Math.max(120, Math.min(360, px));
         if (g?.setCellSize) { g.setCellSize(v); return; }
         document.documentElement.style.setProperty('--panel-col-min', `${v}px`);
         try { localStorage.setItem('hanzo-world-grid-size', String(v)); } catch { /* ignore */ }
@@ -2221,7 +2228,7 @@ export class App {
             </label>
             <label class="dock-slider" title="Widget size">
               <span class="dock-ico">▦</span>
-              <input type="range" id="dockGridSize" min="140" max="360" step="20" value="160" aria-label="Widget size" />
+              <input type="range" id="dockGridSize" min="120" max="360" step="20" value="160" aria-label="Widget size" />
             </label>
           </div>
           ${immersive}
