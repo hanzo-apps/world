@@ -16514,34 +16514,83 @@ body.immersive .map-section {
   z-index: 0;            /* background of the grid's own stacking context */
 }
 
-/* The panels float over the fixed map. z-index:1 lifts them above the map (z:0)
-   and the video background; the translucent surface + blur lets the globe show
-   through. Drag/resize/close all keep working — only the surface changes. */
-body.immersive .panels-grid > .panel:not(.map-section) {
-  position: relative;
-  z-index: 1;
-  background: #0a0a0acc;
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  backdrop-filter: blur(10px) saturate(1.1);
-  border-color: rgba(255, 255, 255, 0.09);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-/* The panels become a translucent floating COLUMN docked to the right edge — not a
-   full-width grid — so most of the viewport is the live globe/video. `span 2` panels
-   fill this narrow 2-track grid one-per-row, giving the masonry column. */
-/* Immersive floats the cards over the FULL map, freestyle — not the old narrow
-   right-docked column (which collapsed once free-mode made the cards absolute and
-   left the grid with no in-flow content to size it). Full width, own scroll. */
+/* THE data rail. Immersive makes the globe the cinematic hero, so the panels dock
+   to a single translucent GLASS COLUMN on the right — the centre stays clear for the
+   live dot-globe ("the map dominates; data frames it"). Immersive always runs free-
+   snap mode, so every card carries an inline `position:absolute` rect AND the grid is
+   `display:block`; we re-assert a docked flex flow with !important to beat both — the
+   very same technique the .map-section backdrop above uses to beat its inline rect.
+   Drag is intentionally parked in immersive; the Grid / Free modes own arranging. */
 body.immersive .panels-grid {
-  gap: 12px;
-  padding: 12px;
+  display: flex !important;
+  flex-direction: column;
+  position: fixed !important;
+  top: 52px;                 /* clear the header bar */
+  right: 0;
+  bottom: 46px;              /* clear the bottom dock (44–46px) */
+  left: auto;
+  width: clamp(300px, 23vw, 376px);
+  height: auto !important;   /* top+bottom drive the height; beat free-mode's inline height */
+  gap: 10px;
+  padding: 4px 12px 18px;
+  margin: 0;
   background: transparent;
-  width: 100%;
-  max-width: none;
-  align-self: stretch;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  z-index: 1;
+  /* CRITICAL: NO transform / mask / filter / backdrop-filter on the rail. `.map-section`
+     is a CHILD of `.panels-grid`, and any of those properties would make the rail the
+     containing block for the globe's `position:fixed`, trapping the full-viewport globe
+     inside this 376px column. Every glass effect lives on the sibling cards instead. */
+}
+body.immersive .panels-grid::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Each floating card → premium glass. `!important` re-flows it (the inline absolute
+   rect the free-snap engine writes is NOT !important, so this wins cleanly). */
+body.immersive .panels-grid > .panel:not(.map-section) {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 44vh;
+  flex: 0 0 auto;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(17, 20, 27, 0.62), rgba(9, 11, 16, 0.74));
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 body.immersive .main-content { background: transparent; }
+
+/* Light theme: frosted-white glass so the (dark, always-space) globe still reads as
+   the hero while panel text (var(--text) → dark) stays legible on the card. */
+:root[data-theme="light"] body.immersive .panels-grid > .panel:not(.map-section) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(246, 248, 250, 0.84));
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* The legend becomes glass too, so it sits over the globe as one material, and lifts
+   clear of the bottom dock (it is pinned to the map, which is now full-viewport). */
+body.immersive .map-legend {
+  bottom: 58px;
+  background: rgba(9, 11, 16, 0.62);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme="light"] body.immersive .map-legend {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(0, 0, 0, 0.1);
+}
 
 /* Live-video background slot: a fixed, muted YouTube embed that covers the map. */
 .immersive-video-bg {
@@ -16567,13 +16616,40 @@ body.immersive .main-content { background: transparent; }
   border: 0;
 }
 
-/* Collapse-to-edge affordance: slide the docked panel column off the right edge so
-   the globe fully breathes. The header's collapse button toggles it back. Transform
-   lives on the panels themselves (never an ancestor of the fixed map). */
+/* Collapse-to-edge: slide the glass CARDS off the right so the globe fully breathes.
+   The transform lives on the cards (siblings of the fixed map), NEVER on their shared
+   `.panels-grid` ancestor — a transform there would trap the fixed globe. */
 body.immersive.immersive-collapsed .panels-grid > .panel:not(.map-section) {
   transform: translateX(calc(100% + 24px));
   opacity: 0;
   pointer-events: none;
+}
+
+/* ── Immersive on phones: globe fills the screen, data is a glass bottom sheet ──
+   The narrow right rail would be cramped on a phone, so dock the panels to the
+   bottom as a translucent sheet — the map stays the hero in the top ~42vh. */
+@media (max-width: 768px) {
+  body.immersive .panels-grid {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 46px;                 /* clear the dock */
+    width: 100%;
+    height: 56vh !important;
+    padding: 12px 12px 16px;
+    border-radius: 20px 20px 0 0;
+    /* Gradient scrim only — NO backdrop-filter here (it would trap the fixed globe
+       child). The per-card blur below supplies the glass; the individual cards float
+       over the globe that fills the top ~42vh. */
+    background: linear-gradient(180deg, rgba(6, 8, 12, 0) 0, rgba(6, 8, 12, 0.52) 44px, rgba(6, 8, 12, 0.86) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  body.immersive .panels-grid > .panel:not(.map-section) { max-height: none; }
+  /* Collapse slides the CARDS down (siblings of the map), leaving the globe full-bleed. */
+  body.immersive.immersive-collapsed .panels-grid > .panel:not(.map-section) {
+    transform: translateY(130%);
+    opacity: 0;
+  }
 }
 
 /* In immersive the map fills the viewport, so nudge its top-anchored controls

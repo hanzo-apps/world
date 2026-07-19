@@ -37,7 +37,7 @@ import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
 import { SphereGeometry } from '@luma.gl/engine';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
-import { getLandDots, type LandDot } from '@/services/land-dots';
+import { getLandDots, type LandDot, LAND_DOT_NEAR, LAND_DOT_FAR } from '@/services/land-dots';
 import { DEFAULT_BASEMAP_STYLE } from '@/config/variant';
 
 /**
@@ -115,11 +115,20 @@ const LAND_COLOR: [number, number, number, number] = [17, 21, 28, 255]; // ~#111
 const BORDER_COLOR: [number, number, number, number] = [58, 62, 70, 170]; // ~#3a3e46 (#1f-grey borders)
 // Thin border overlay kept on the bright imagery styles for intel orientation.
 const BRIGHT_BORDER_COLOR: [number, number, number, number] = [235, 240, 250, 90];
-const ATMOSPHERE_COLOR: [number, number, number, number] = [80, 92, 116, 120];
-// Dot basemap land dots — a cool dim cyan-white, brighter than the dark style's
-// near-black land so the lattice reads as a glowing cybermap surface, dim enough
-// that live traffic dots/arcs stay the focal layer on top.
-const LAND_DOT_COLOR: [number, number, number, number] = [120, 150, 185, 165];
+// Cool ice-blue rim glow at the silhouette — bright enough to read as a premium
+// atmosphere halo, still monochrome (no coloured haze).
+const ATMOSPHERE_COLOR: [number, number, number, number] = [112, 142, 184, 172];
+// Additive blend (luma.gl v9 params): overlapping fragments SUM instead of alpha-
+// compositing, so where the dot lattice is dense (continents) the glow builds to a
+// bright bloom — the "alive" cybermap look. Applied to the bright near-dot pass.
+const ADDITIVE_BLEND = {
+  blendColorOperation: 'add',
+  blendColorSrcFactor: 'src-alpha',
+  blendColorDstFactor: 'one',
+  blendAlphaOperation: 'add',
+  blendAlphaSrcFactor: 'one',
+  blendAlphaDstFactor: 'one',
+};
 
 // Basemap style — mirrors DeckGLMap's switcher. Read from the SAME localStorage key
 // so the 2D switcher drives the globe; kept as literals here to avoid importing the
@@ -240,8 +249,12 @@ export class GlobeNative {
     this.wrapper.className = 'globe-native-wrapper';
     // z-index 1: above a parked mapbox basemap wrapper (z auto), below the map
     // controls / projection toggle (z-index 500) so they stay clickable.
+    // A faint cool vignette behind the sphere: reads as deep space with a hint of
+    // nebula, and — since it paints instantly — is the premium loading state before
+    // the WebGL sphere's first frame (never a dead flat-black hole).
     this.wrapper.style.cssText =
-      'position:absolute;inset:0;width:100%;height:100%;background:#000;overflow:hidden;z-index:1;';
+      'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;z-index:1;' +
+      'background:radial-gradient(ellipse 130% 115% at 50% 44%, #0b111b 0%, #06090f 45%, #000 100%);';
 
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'globe-native-canvas';
@@ -385,28 +398,14 @@ export class GlobeNative {
     if (isDotBasemap(this.basemapStyle)) {
       // Dot basemap: land is ONLY a lattice of glowing dots on the black ocean — no
       // country fills, no borders. The dot cloud is sampled from the SAME geojson as
-      // the dark style (see land-dots.ts) and cached per session. Sits just above the
-      // ocean shell; writes no depth (the ocean sphere owns depth), depth-tests so
-      // far-side dots are occluded by the near hemisphere — real back-of-globe cull.
+      // the dark style (see land-dots.ts) and cached per session. Two passes give the
+      // translucent glowing dot-globe: a DIM far pass drawn regardless of depth (the
+      // back-of-sphere lattice showing faintly THROUGH the planet) + a BRIGHT near
+      // pass depth-tested against the ocean sphere so only the front hemisphere draws
+      // (real back-of-globe occlusion), additively blended so dense land blooms.
       if (this.landDots.length > 0) {
-        layers.push(
-          new ScatterplotLayer<LandDot>({
-            id: 'globe-land-dots',
-            data: this.landDots,
-            getPosition: (d) => [d.lon, d.lat],
-            getRadius: 16000, // ~1.6° in metres; reads as a tight dot at globe zoom
-            radiusUnits: 'meters',
-            radiusMinPixels: 0.7,
-            radiusMaxPixels: 3,
-            getFillColor: LAND_DOT_COLOR,
-            pickable: false,
-            parameters: {
-              cullMode: 'none',
-              depthWriteEnabled: false,
-              depthCompare: 'less-equal',
-            } as unknown as Record<string, unknown>,
-          }),
-        );
+        layers.push(this.landDotLayer('globe-land-dots-far', LAND_DOT_FAR, 2.4, false, false));
+        layers.push(this.landDotLayer('globe-land-dots-near', LAND_DOT_NEAR, 3.3, true, true));
       }
     } else if (this.countriesGeoJson) {
       layers.push(
@@ -476,6 +475,38 @@ export class GlobeNative {
           } as unknown as Record<string, unknown>,
         });
       },
+    });
+  }
+
+  // One pass of the cybermap dot lattice. `nearOnly` depth-tests against the depth-
+  // writing ocean sphere so only the front hemisphere draws (the far side is culled
+  // by the GPU) — real back-of-globe occlusion; otherwise the pass ignores depth and
+  // paints the whole lattice front+back (the faint see-through back layer). `additive`
+  // sums overlapping dots so clustered continents bloom. Writes no depth either way,
+  // so coincident dots never z-fight. Accessors are constants → zero per-frame alloc.
+  private landDotLayer(
+    id: string,
+    color: [number, number, number, number],
+    radiusMaxPixels: number,
+    nearOnly: boolean,
+    additive: boolean,
+  ): ScatterplotLayer<LandDot> {
+    return new ScatterplotLayer<LandDot>({
+      id,
+      data: this.landDots,
+      getPosition: dotPosition,
+      getRadius: 15000, // ~1.5° in metres; a tight dot at globe zoom
+      radiusUnits: 'meters',
+      radiusMinPixels: nearOnly ? 0.85 : 0.7,
+      radiusMaxPixels,
+      getFillColor: color,
+      pickable: false,
+      parameters: {
+        cullMode: 'none',
+        depthWriteEnabled: false,
+        depthCompare: nearOnly ? 'less-equal' : 'always',
+        ...(additive ? ADDITIVE_BLEND : {}),
+      } as unknown as Record<string, unknown>,
     });
   }
 
@@ -755,3 +786,5 @@ export class GlobeNative {
 // Shared frozen constants so basemap accessors allocate nothing per frame.
 const SINGLE_DATUM: [number] = [0];
 const ORIGIN: [number, number, number] = [0, 0, 0];
+// One shared land-dot position accessor (both dot passes use it → no per-layer closure).
+const dotPosition = (d: LandDot): [number, number] => [d.lon, d.lat];
