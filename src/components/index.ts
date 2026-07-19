@@ -68,6 +68,7 @@ export { OrgInsightsPanel } from './OrgInsightsPanel';
 // AI variant — live Hanzo compute + enso training telemetry
 export { AiComputePanel } from './AiComputePanel';
 export { EnsoFlywheelPanel } from './EnsoFlywheelPanel';
+export { EnsoRouterPanel } from './EnsoRouterPanel';
 // SaaS / cloud — admin-only deep panels
 export { CloudServicesPanel } from './CloudServicesPanel';
 export { HanzoStatusPanel } from './HanzoStatusPanel';
