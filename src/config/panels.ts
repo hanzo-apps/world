@@ -427,6 +427,7 @@ const CLOUD_PANELS: Record<string, PanelConfig> = {
   'cloud-overview': { name: 'Cloud Overview', enabled: true, priority: 1 },
   'enso-training': { name: 'Enso Live Training', enabled: true, priority: 1 },
   'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
+  'enso-router': { name: 'Enso Router', enabled: true, priority: 1 },
   'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
   chains: { name: 'Chains', enabled: true, priority: 1 },
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
