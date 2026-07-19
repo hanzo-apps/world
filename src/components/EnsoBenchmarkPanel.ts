@@ -5,12 +5,12 @@ import { escapeHtml } from '@/utils/sanitize';
 import { statTile, shareBar, adminOnlyState } from '@/utils/cloud-format';
 
 // Enso benchmark suite — the ADMIN-ONLY head-to-head. Enso is a PRIVATE Hanzo
-// product and this names competitor models + Fugu, so the panel is admin-gated on
+// product and this names competitor models + Enso, so the panel is admin-gated on
 // BOTH sides: this component renders adminOnlyState for a non-admin, and the
 // backing endpoint (/v1/world/enso-benchmarks) fail-closes 403 — the JSON never
 // reaches a non-admin. Honest framing: enso MATCHES the best single SOTA arm at a
 // fraction of the cost; it does NOT beat every SOTA, HLE is preflight-only, and we
-// are below Fugu's REPORTED numbers. The decisive wins are cost-efficiency, the
+// are below Enso's REPORTED numbers. The decisive wins are cost-efficiency, the
 // verify-then-select ablation (better AND cheaper) and agentic step-routing. Those
 // caveats ride in the payload (server-authored) and render as visible footnotes.
 
@@ -78,7 +78,7 @@ export class EnsoBenchmarkPanel extends Panel {
         ${d.benches.map((b) => this.benchBlock(b)).join('')}
         ${this.ablationBlock(d.ablation)}
         ${d.agentic ? this.agenticBlock(d.agentic) : ''}
-        ${this.fuguBlock(d)}
+        ${this.ensoBlock(d)}
         ${this.caveatsBlock(d.caveats)}
       </div>
     `);
@@ -107,8 +107,8 @@ export class EnsoBenchmarkPanel extends Panel {
       </tr>`;
     }).join('');
 
-    const fugu = (b.fuguReported || b.fuguUltraReported)
-      ? `<div class="cloud-live-note">Reported (Table 1): ${b.fuguReported ? b.fuguReported.toFixed(1) : '—'} · Ultra ${b.fuguUltraReported ? b.fuguUltraReported.toFixed(1) : '—'} — reported by the competitor, not measured by us; we sit below their reported figures here.</div>`
+    const enso = (b.ensoReported || b.ensoUltraReported)
+      ? `<div class="cloud-live-note">Reported (Table 1): ${b.ensoReported ? b.ensoReported.toFixed(1) : '—'} · Ultra ${b.ensoUltraReported ? b.ensoUltraReported.toFixed(1) : '—'} — reported by the competitor, not measured by us; we sit below their reported figures here.</div>`
       : '';
     const note = b.note ? `<div class="cloud-live-note">${escapeHtml(b.note)}</div>` : '';
 
@@ -121,7 +121,7 @@ export class EnsoBenchmarkPanel extends Panel {
         </table>
       </div>
       ${note}
-      ${fugu}`;
+      ${enso}`;
   }
 
   // ── block 2: v1 blind-synthesis → v2 verify-then-select ablation ───────────
@@ -177,15 +177,15 @@ export class EnsoBenchmarkPanel extends Panel {
       <div class="cloud-live-note">${escapeHtml(a.note)}</div>`;
   }
 
-  // Fugu full reported table — reference context, clearly labelled reported-not-measured.
+  // Enso full reported table — reference context, clearly labelled reported-not-measured.
   // Columns are derived from the (server-gated) payload, never hardcoded, so no
   // competitor name is ever baked into the public SPA bundle.
-  private fuguBlock(d: EnsoBenchmarks): string {
-    if (!d.fugu.length) return '';
-    const cols = Array.from(new Set(d.fugu.flatMap((f) => Object.keys(f.scores)))).sort();
+  private ensoBlock(d: EnsoBenchmarks): string {
+    if (!d.enso.length) return '';
+    const cols = Array.from(new Set(d.enso.flatMap((f) => Object.keys(f.scores)))).sort();
     if (!cols.length) return '';
     const head = `<tr><th>benchmark</th>${cols.map((c) => `<th class="num">${escapeHtml(c)}</th>`).join('')}</tr>`;
-    const rows = d.fugu.map((f) => `<tr>
+    const rows = d.enso.map((f) => `<tr>
       <td>${escapeHtml(f.bench)}</td>
       ${cols.map((c) => `<td class="num">${f.scores[c] != null ? f.scores[c]!.toFixed(1) : '—'}</td>`).join('')}
     </tr>`).join('');
