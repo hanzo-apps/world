@@ -207,7 +207,11 @@ export class LiveNewsPanel extends Panel {
       this.idleTimeout = setTimeout(() => this.pauseForIdle(), this.IDLE_PAUSE_MS);
     };
 
-    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+    // fullscreenchange counts as activity: entering/exiting fullscreen the player is
+    // the user actively engaging with it (fullscreen video swallows mouse/keyboard,
+    // so those idle-reset events never fire while watching — the "exited fullscreen
+    // and stopped it" bug).
+    ['mousedown', 'keydown', 'scroll', 'touchstart', 'fullscreenchange'].forEach(event => {
       document.addEventListener(event, this.boundIdleResetHandler, { passive: true });
     });
 
@@ -221,7 +225,15 @@ export class LiveNewsPanel extends Panel {
     // must never tear it down (that was the "video disappears after a few
     // minutes" bug). Reschedule instead; the visibilitychange handler already
     // covers the genuine "tab hidden / walked away" case.
-    if (this.isPlaying && !document.hidden) {
+    //
+    // Fullscreen is the strongest "actively watching" signal: fullscreen video
+    // captures input so no idle-reset event fires, and tearing down the player
+    // element FORCES an exit from fullscreen AND stops playback — the exact
+    // "listening fullscreen and it exited + stopped" report. Never idle-kill it.
+    const el = document.fullscreenElement;
+    const playerFullscreen = !!el && !!this.playerContainer &&
+      (el === this.playerContainer || this.playerContainer.contains(el) || el.contains(this.playerContainer));
+    if ((this.isPlaying || playerFullscreen) && !document.hidden) {
       this.boundIdleResetHandler();
       return;
     }
