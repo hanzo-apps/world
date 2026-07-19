@@ -28,6 +28,8 @@ const FIXED_KEYS = [
   'worldmonitor-panel-cols',
   'hanzo-world-custom-panels',
   'hanzo-world-map-mode',
+  'hanzo-world-ui-scale', // text-size / UI scale (accessibility)
+  'hanzo-world-grid-size', // dock cell-size fallback (when window.worldGrid is absent)
 ];
 const LAYOUT_PREFIX = 'worldmonitor-layout:';
 const SAVE_DEBOUNCE_MS = 800;
