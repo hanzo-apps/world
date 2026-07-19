@@ -6,32 +6,40 @@ import (
 	"net/http"
 )
 
-// Per-identity DASHBOARD composition.
+// Per-identity opaque JSON blobs — the ONE mechanism behind both the composed
+// DASHBOARD and the user's USAGE HISTORY.
 //
-// The AI analyst and the toolbar compose the dashboard on the fly — add/remove
-// widgets and data sources, rearrange panels, create custom feed panels. That
-// composition used to live only in the browser's localStorage (per-device). Here
-// it is server state, persisted per identity, so a signed-in user's dashboard —
-// and every change the analyst makes — follows them across devices and survives a
-// reload anywhere. Anonymous callers get 401 and keep the localStorage-only
-// dashboard; nothing about the signed-out experience changes.
+// The AI analyst and the toolbar compose the dashboard on the fly (add/remove
+// widgets and data sources, rearrange panels, create custom feed panels), and the
+// app records real usage (recent searches, watch queue). Both used to live only in
+// the browser's localStorage (per-device). Here each is server state, persisted per
+// identity, so a signed-in user's dashboard AND history follow them across devices.
+// Anonymous callers get 401 and keep their localStorage-only state; nothing about
+// the signed-out experience changes.
 //
-// ONE store, namespaced: this reuses the SAME per-identity settings store the
-// dashboard-settings and monitors already use (store.Settings), under the
-// 'dashboard' namespace — there is no second table. The blob is an OPAQUE JSON
-// object (a verbatim mirror of the dashboard's localStorage keys). The backend
-// validates it is a JSON object at the boundary and never interprets it. It holds
-// layout only — NEVER secrets.
+// ONE store, namespaced: this reuses the SAME per-identity settings store that
+// monitors already use (store.Settings), under a `project` namespace per concern —
+// there is no second table. The blob is an OPAQUE JSON object (a verbatim mirror of
+// the client's localStorage keys). The backend validates it is a JSON object at the
+// boundary and never interprets it. It holds layout / usage state only — NEVER secrets.
 //
-//	GET /v1/world/dashboard → { config: {...} }   (the stored blob, or {} when unset)
-//	PUT /v1/world/dashboard → { ok: true }         (body: the config object)
+//	GET /v1/world/dashboard → { config: {...} }   ·   PUT → { ok: true }   (body: the object)
+//	GET /v1/world/history   → { config: {...} }   ·   PUT → { ok: true }   (body: the object)
 
-const dashboardDoc = "dashboard" // per-identity store namespace
+const dashboardDoc = "dashboard" // per-identity store namespace: composed dashboard
 
-// dashboardMaxBytes bounds a stored dashboard config (layout only — small).
-const dashboardMaxBytes = 256 << 10
+// identityBlobMaxBytes bounds a stored per-identity blob (layout/usage — small).
+const identityBlobMaxBytes = 256 << 10
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	s.handleIdentityBlob(w, r, dashboardDoc)
+}
+
+// handleIdentityBlob serves GET (read this identity's blob under `doc`) and PUT
+// (upsert it), both bearer-gated. Body + response are an opaque JSON object under
+// "config". Never 5xx: a degraded store returns {} on GET and ok:false on PUT so the
+// client falls back to localStorage.
+func (s *Server) handleIdentityBlob(w http.ResponseWriter, r *http.Request, doc string) {
 	setCORS(w, "GET, PUT, OPTIONS")
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
@@ -41,7 +49,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "GET or PUT")
 		return
 	}
-	ident, ok := s.identityForDoc(w, r, dashboardDoc)
+	ident, ok := s.identityForDoc(w, r, doc)
 	if !ok {
 		return
 	}
@@ -56,7 +64,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// PUT: validate the body is a JSON object at the boundary, then upsert verbatim.
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, dashboardMaxBytes))
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, identityBlobMaxBytes))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Body too large")
 		return

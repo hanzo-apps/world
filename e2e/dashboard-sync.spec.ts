@@ -10,6 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 // is stubbed, so no real backend or identity is needed.
 
 const DASH = '**/v1/world/dashboard';
+const HIST = '**/v1/world/history';
 const LN = '[data-panel="live-news"]';
 
 async function fakeAuth(page: Page): Promise<void> {
@@ -23,6 +24,9 @@ async function fakeAuth(page: Page): Promise<void> {
   await page.route('**/v1/iam/oauth/userinfo', (r) =>
     r.fulfill({ json: { sub: 'u1', owner: 'acme', email: 'u@acme.test' } }),
   );
+  // Default empty history so boot's history hydrate never hits the real backend;
+  // tests that assert on history override this with a later page.route (last wins).
+  await page.route(HIST, (r) => r.fulfill({ json: { config: {} } }));
 }
 
 test.describe('dashboard sync (real app)', () => {
@@ -78,5 +82,47 @@ test.describe('dashboard sync (real app)', () => {
     await page.evaluate(() => localStorage.setItem('worldmonitor-layers', '{"a":1}'));
     await page.waitForTimeout(1200);
     expect(hit).toBe(false);
+  });
+
+  test('history keys sync to /v1/world/history, not /dashboard', async ({ page }) => {
+    await fakeAuth(page);
+    const dashPuts: string[] = [];
+    const histPuts: Array<Record<string, string>> = [];
+    await page.route(DASH, async (route) => {
+      if (route.request().method() === 'GET') await route.fulfill({ json: { config: {} } });
+      else {
+        dashPuts.push(route.request().postData() || '');
+        await route.fulfill({ json: { ok: true } });
+      }
+    });
+    await page.route(HIST, async (route) => {
+      if (route.request().method() === 'GET') await route.fulfill({ json: { config: {} } });
+      else {
+        histPuts.push(route.request().postDataJSON() as Record<string, string>);
+        await route.fulfill({ json: { ok: true } });
+      }
+    });
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await page.waitForTimeout(2000); // flush boot writes first
+
+    // A real user action (a recent search) is a HISTORY key → PUT to /history.
+    await page.evaluate(() => localStorage.setItem('worldmonitor_recent_searches', '["nvidia"]'));
+    await expect
+      .poll(() => histPuts.some((p) => p && p['worldmonitor_recent_searches'] === '["nvidia"]'), { timeout: 8000 })
+      .toBe(true);
+    // …and it was NOT mixed into a dashboard PUT (clean namespace separation).
+    expect(dashPuts.some((b) => b.includes('worldmonitor_recent_searches'))).toBe(false);
+  });
+
+  test('boot hydrates history from /v1/world/history (server precedence)', async ({ page }) => {
+    await fakeAuth(page);
+    await page.route(DASH, (r) => r.fulfill({ json: { config: {} } }));
+    await page.route(HIST, (r) => r.fulfill({ json: { config: { 'hanzo-world-watch-queue': '{"items":[7]}' } } }));
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('hanzo-world-watch-queue')), { timeout: 8000 })
+      .toBe('{"items":[7]}');
   });
 });
