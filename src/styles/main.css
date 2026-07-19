@@ -17264,6 +17264,16 @@ body.layout-free .panel:not(.map-panel) {
   max-height: none !important;
 }
 
+/* The map, too, can be sized freely in free mode: drop its 240px grid floor so a
+   free {x,y,w,h} can go smaller. The only floor is then panel-drag's MAP_MIN,
+   which clamps the resize — one source of truth for the map's minimum. */
+body.layout-free .map-panel,
+body.layout-free .map-panel.span-0,
+body.layout-free .map-panel.span-1 {
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
 /* The panel being dragged in free mode lifts above its neighbours. */
 .panel.panel-free-dragging,
 .map-section.panel-free-dragging {
