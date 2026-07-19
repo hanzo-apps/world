@@ -58,8 +58,10 @@ type fleetWorker struct {
 	Provider     string   `json:"provider"`
 	Location     string   `json:"location"`
 	Status       string   `json:"status"`
+	Arch         string   `json:"arch"` // CPU arch label, e.g. "x86-64" / "ARM64"; "" when unknown
 	GPU          string   `json:"gpu"`
-	VRAM         string   `json:"vram"`
+	VRAM         string   `json:"vram"` // GPU VRAM total; "" when unknown
+	Mem          string   `json:"mem"`  // system RAM, e.g. "128 GB"; "" when unknown
 	Capabilities []string `json:"capabilities"`
 	Version      string   `json:"version"`
 }
@@ -119,6 +121,37 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 		} `json:"workers"`
 	}
 	_ = s.getJSON(ctx, base+"/v1/fleet/workers", hdr, &workers)
+
+	// Enrich BYO workers with CPU arch + system memory from the unified fleet board
+	// (/v1/fleet). The worker inventory (/v1/fleet/workers) carries neither — only
+	// per-GPU VRAM — but a box that is ALSO a run-target reports os/arch/memory on the
+	// board, so we join by hostname. Best-effort: a degraded/absent board simply leaves
+	// those fields empty (honest omit, never fabricated).
+	var board struct {
+		Units []struct {
+			Host string `json:"host"`
+			Spec *struct {
+				Arch   string `json:"arch"`
+				Memory int64  `json:"memory"` // total RAM, bytes
+			} `json:"spec"`
+		} `json:"units"`
+	}
+	_ = s.getJSON(ctx, base+"/v1/fleet", hdr, &board)
+	type hostSpec struct{ arch, mem string }
+	byHost := map[string]hostSpec{}
+	for _, u := range board.Units {
+		if u.Host == "" || u.Spec == nil {
+			continue
+		}
+		hs := byHost[u.Host]
+		if hs.arch == "" && u.Spec.Arch != "" {
+			hs.arch = archLabel(u.Spec.Arch)
+		}
+		if hs.mem == "" && u.Spec.Memory > 0 {
+			hs.mem = fmtGiB(u.Spec.Memory)
+		}
+		byHost[u.Host] = hs
+	}
 
 	// Index GPUs by machine: count + a representative VRAM string.
 	type gAgg struct {
@@ -196,6 +229,10 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 				fw.VRAM = wk.GPUs[0].MemoryTotal
 			}
 		}
+		if hs, ok := byHost[wk.Hostname]; ok {
+			fw.Arch = hs.arch
+			fw.Mem = hs.mem
+		}
 		f.Workers = append(f.Workers, fw)
 	}
 
@@ -207,6 +244,30 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 func isRealVRAM(s string) bool {
 	s = strings.TrimSpace(s)
 	return s != "" && s != "[N/A]" && !strings.EqualFold(s, "n/a")
+}
+
+// archLabel maps a reporter's arch token to a friendly label. The agent reporter
+// emits Rust tokens (x86_64 / aarch64); Visor/Go paths may emit amd64 / arm64. Both
+// a Strix-Halo APU (x86_64) and a GB10 (aarch64) resolve to the right label.
+func archLabel(a string) string {
+	switch strings.ToLower(strings.TrimSpace(a)) {
+	case "x86_64", "amd64", "x86-64":
+		return "x86-64"
+	case "aarch64", "arm64":
+		return "ARM64"
+	default:
+		return strings.TrimSpace(a)
+	}
+}
+
+// fmtGiB renders a byte count as whole gibibytes, e.g. 137438953472 -> "128 GB".
+// Real telemetry only: 0/absent yields "" so the UI omits it rather than showing 0.
+func fmtGiB(b int64) string {
+	if b <= 0 {
+		return ""
+	}
+	const gib = 1024 * 1024 * 1024
+	return strconv.FormatInt((b+gib/2)/gib, 10) + " GB"
 }
 
 // ── services: per-subsystem health + RED metrics ─────────────────────────────

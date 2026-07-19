@@ -6,15 +6,16 @@
 // already replaced — the app flashed the old build, then went black when old and
 // new chunks mixed. The cure lives in one place across two files:
 //
-//   1. vite.config PWA — registerType 'autoUpdate' + workbox skipWaiting/clientsClaim
-//      make a freshly-deployed worker activate immediately, and index.html is served
-//      network-first (never precached) so the shell always names current bundles.
-//   2. This module — register the worker and, through vite-plugin-pwa's autoUpdate
-//      flow (workbox-window), reload the tab exactly once when a NEW worker takes
-//      control: only on a real update, never on first install, never in a loop. It
-//      also asks the worker to re-check for a deploy whenever the tab becomes
-//      visible, so a day-old tab picks up a new build on the user's next glance
-//      rather than waiting out the hourly poll.
+//   1. vite.config PWA — registerType 'prompt' + workbox skipWaiting/clientsClaim +
+//      cleanupOutdatedCaches make a freshly-deployed worker take over on next load
+//      and purge stale precache, and index.html is served network-first (never
+//      precached) so the shell always names current bundles.
+//   2. This module — register the worker, aggressively re-check for a deploy
+//      (immediately on load, on every tab-focus, hourly), and when a NEW worker is
+//      ready show a subtle "new version — reload" toast (never a surprise reload,
+//      never a loop). A stranded tab still self-heals via the network-first shell +
+//      the stale-chunk reload guard (see bootstrap/chunk-reload); the toast just
+//      offers a clean one-tap reload.
 
 // Hourly backstop for a tab left in the foreground; visibilitychange covers the
 // far more common "tab was hidden, now it's looked at again" case.
@@ -29,11 +30,7 @@ export function installServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
 
   void import('virtual:pwa-register').then(({ registerSW }) => {
-    // autoUpdate: vite-plugin-pwa (via workbox-window) reloads the page exactly
-    // once when a new worker activates as an update — the guarded controllerchange
-    // reload, done correctly (fires on `activated`/isUpdate, so it skips the
-    // first-install claim and cannot loop). We add only the update *checks*.
-    registerSW({
+    const updateSW = registerSW({
       onRegisteredSW(_swUrl, registration) {
         if (!registration) return;
 
@@ -42,14 +39,26 @@ export function installServiceWorker(): void {
           registration.update().catch(() => {});
         };
 
-        // Long-lived foreground tab: poll hourly as a backstop.
+        // Heal a tab stuck on a pre-fix worker as early as possible: re-check the
+        // instant we register, then on every foreground and hourly as a backstop.
+        checkForUpdate();
         setInterval(checkForUpdate, UPDATE_POLL_MS);
-
-        // The instant a backgrounded tab is foregrounded, learn about any deploy
-        // that shipped while it was hidden — before the user interacts and triggers
-        // a lazy chunk import the server may have already purged.
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') checkForUpdate();
+        });
+
+        // Framework-agnostic "new worker ready" detection — robust even with
+        // skipWaiting (which never enters the classic `waiting` state): a freshly
+        // INSTALLED worker while a controller already exists means a new build
+        // shipped. Offer a one-tap reload rather than yanking the page.
+        registration.addEventListener('updatefound', () => {
+          const sw = registration.installing;
+          if (!sw) return;
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateToast(() => updateSW(true));
+            }
+          });
         });
       },
       onOfflineReady() {
@@ -57,4 +66,28 @@ export function installServiceWorker(): void {
       },
     });
   });
+}
+
+// A single, subtle "new version — reload" toast. Bottom-center, theme-aware, and
+// interactive (the shared .toast-notification is pointer-events:none). Shown at most
+// once per page life; Reload triggers the guarded skip-waiting reload.
+let updateToastShown = false;
+function showUpdateToast(reload: () => void): void {
+  if (updateToastShown) return;
+  updateToastShown = true;
+  const el = document.createElement('div');
+  el.className = 'sw-update-toast';
+  el.setAttribute('role', 'status');
+  el.innerHTML =
+    '<span class="sw-update-msg">A new version is available.</span>' +
+    '<button type="button" class="sw-update-reload">Reload</button>' +
+    '<button type="button" class="sw-update-dismiss" aria-label="Dismiss">×</button>';
+  el.querySelector('.sw-update-reload')?.addEventListener('click', () => reload());
+  el.querySelector('.sw-update-dismiss')?.addEventListener('click', () => {
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 300);
+    updateToastShown = false;
+  });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('visible'));
 }

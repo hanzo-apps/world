@@ -55,6 +55,7 @@ import {
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { icon } from '@/utils/icons';
+import { fmtCompact } from '@/utils/cloud-format';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
 import {
@@ -239,7 +240,6 @@ const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'satellite', 'terrain'];
 // legible. Persisted position/order for the draggable layer panel live here too so
 // there is one place per concern.
 const isBrightBasemap = (s: BasemapStyle): boolean => s === 'satellite' || s === 'terrain';
-const LAYER_PANEL_POS_KEY = 'hanzo-world-layers-pos';
 const LAYER_PANEL_ORDER_KEY = 'hanzo-world-layers-order';
 
 // Monochrome atmosphere for the 3D globe — pure-black space, near-black upper sky,
@@ -417,6 +417,9 @@ export class DeckGLMap {
   // The draggable layer panel (a map overlay). Hidden by default; the dock's
   // "Layers" button toggles it open.
   private layerPanelEl: HTMLElement | null = null;
+  // Info/about popover (top-left cluster) + its document-listener cleanup.
+  private infoPopoverEl: HTMLElement | null = null;
+  private infoPopoverCleanup: (() => void) | null = null;
   private deckOverlay: MapboxOverlay | null = null;
   private mapboxMap: MapboxMap | null = null;
   private state: DeckMapState;
@@ -639,10 +642,37 @@ export class DeckGLMap {
       void tick();
       this.cloudMapTimers.push(setInterval(() => void tick(), everyMs));
     };
-    pull(getChainNodes, (d) => { this.chainNetworks = d.networks ?? []; }, 30_000);
+    // Infrastructure (validators/chains + GPU fleet) is KNOWN-REAL inventory, not
+    // fluctuating traffic: seed from the last real set we saw and KEEP it when a poll
+    // momentarily returns 0, so the map never goes flat between ticks. CLOUD_REGIONS
+    // (real DO regions / serving PoPs) is already static. Request-origin traffic below
+    // stays live (it should ebb and flow). Only ever real data we actually received —
+    // never demo.
+    this.chainNetworks = this.loadInfraCache<ChainNetwork>('chainNodes');
+    this.byoGpus = this.loadInfraCache<ByoGpu>('byoGpu');
+    pull(getChainNodes, (d) => {
+      const v = d.networks ?? [];
+      if (v.length) { this.chainNetworks = v; this.saveInfraCache('chainNodes', v); }
+    }, 30_000);
     pull(getTraffic, (d) => { this.trafficArcsData = d.arcs ?? []; }, 15_000);
     pull(getTrafficGlobe, (d) => { this.trafficPoints = d.points ?? []; }, 12_000);
-    pull(getByoGpu, (d) => { this.byoGpus = d.gpus ?? []; }, 60_000);
+    pull(getByoGpu, (d) => {
+      const v = d.gpus ?? [];
+      if (v.length) { this.byoGpus = v; this.saveInfraCache('byoGpu', v); }
+    }, 60_000);
+  }
+
+  // Persist the last non-empty infra set so the map opens rich and never blanks when
+  // a poll momentarily returns 0. Real data only — exactly what the live feed sent.
+  private loadInfraCache<T>(key: string): T[] {
+    try {
+      const raw = localStorage.getItem(`hanzo-world-infra-${key}`);
+      const v = raw ? JSON.parse(raw) : [];
+      return Array.isArray(v) ? (v as T[]) : [];
+    } catch { return []; }
+  }
+  private saveInfraCache(key: string, v: unknown[]): void {
+    try { localStorage.setItem(`hanzo-world-infra-${key}`, JSON.stringify(v)); } catch { /* quota — skip */ }
   }
 
   private setupDOM(): void {
@@ -682,6 +712,9 @@ export class DeckGLMap {
   // on the page footer. Only mounted for the flagship map (dock-owned controls host).
   private createLayersButton(): void {
     if (this.controlsHost === this.container) return; // harness map: no dock, no button
+    const cluster = document.createElement('div');
+    cluster.className = 'deckgl-topleft-cluster';
+
     const btn = document.createElement('button');
     btn.className = 'deckgl-layers-btn';
     btn.type = 'button';
@@ -690,7 +723,71 @@ export class DeckGLMap {
       const open = this.toggleLayerPanel();
       btn.classList.toggle('active', open);
     });
-    this.container.appendChild(btn);
+
+    // Info (i): a compact about/legend popover, sat next to Layers.
+    const info = document.createElement('button');
+    info.className = 'deckgl-info-btn';
+    info.type = 'button';
+    info.title = t('components.deckgl.about.title', { defaultValue: 'About this map' });
+    info.setAttribute('aria-label', info.title);
+    info.innerHTML = icon('info', 15);
+    info.addEventListener('click', (e) => {
+      e.stopPropagation();
+      info.classList.toggle('active', this.toggleInfoPopover(info));
+    });
+
+    cluster.append(btn, info);
+    this.container.appendChild(cluster);
+  }
+
+  // Compact about/legend popover for the top-left cluster: what the map shows, what
+  // each dot means, and where the data comes from. Theme-aware (CSS vars); closes on
+  // outside-click or Esc. Returns the new open state so the caller can flag the button.
+  private toggleInfoPopover(anchor: HTMLElement): boolean {
+    if (this.infoPopoverEl) { this.closeInfoPopover(); return false; }
+    const swatch = (color: string, ring = false): string =>
+      `<span class="deckgl-info-dot${ring ? ' ring' : ''}" style="${ring ? 'border-color' : 'background'}:${color}"></span>`;
+    const rowHtml = (sw: string, name: string, desc: string): string =>
+      `<div class="deckgl-info-row">${sw}<span><b>${name}</b> — ${desc}</span></div>`;
+    const pop = document.createElement('div');
+    pop.className = 'deckgl-info-popover';
+    pop.innerHTML = `
+      <div class="deckgl-info-head">${icon('globe', 14)}<span>${t('components.deckgl.about.title', { defaultValue: 'Hanzo World — live map' })}</span></div>
+      <p class="deckgl-info-lead">${t('components.deckgl.about.lead', { defaultValue: 'Live request traffic and infrastructure across the Hanzo cloud, in real time. Origins pulse as requests arrive; arcs flow to the serving region.' })}</p>
+      <div class="deckgl-info-legend">
+        ${rowHtml(swatch('#ff8a3d'), t('components.deckgl.about.origin', { defaultValue: 'Request origin' }), t('components.deckgl.about.originD', { defaultValue: 'live API traffic by source — dot size = volume' }))}
+        ${rowHtml(swatch('#00c8ff'), t('components.deckgl.about.validator', { defaultValue: 'Validator / chain node' }), t('components.deckgl.about.validatorD', { defaultValue: 'Lux network validators' }))}
+        ${rowHtml(swatch('#00ffc8', true), t('components.deckgl.about.gpu', { defaultValue: 'GPU fleet' }), t('components.deckgl.about.gpuD', { defaultValue: 'BYO + cloud GPU workers' }))}
+        ${rowHtml(swatch('#9a6bff'), t('components.deckgl.about.region', { defaultValue: 'Cloud region' }), t('components.deckgl.about.regionD', { defaultValue: 'Hanzo serving PoPs' }))}
+        ${rowHtml(swatch('#50a0ff'), t('components.deckgl.about.datacenter', { defaultValue: 'Datacenter' }), t('components.deckgl.about.datacenterD', { defaultValue: 'AI datacenters' }))}
+      </div>
+      <p class="deckgl-info-src">${t('components.deckgl.about.sources', { defaultValue: 'Live from Hanzo cloud (api.hanzo.ai), visor fleet telemetry and the Lux chain — real data, no demo.' })}</p>
+    `;
+    this.container.appendChild(pop);
+    this.infoPopoverEl = pop;
+    const onDoc = (e: Event): void => {
+      const target = e.target as Node;
+      if (!pop.contains(target) && !anchor.contains(target)) this.closeInfoPopover();
+    };
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') this.closeInfoPopover(); };
+    this.infoPopoverCleanup = (): void => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+      anchor.classList.remove('active');
+    };
+    // Defer binding so THIS click doesn't immediately close it.
+    requestAnimationFrame(() => {
+      document.addEventListener('mousedown', onDoc);
+      document.addEventListener('keydown', onKey);
+    });
+    return true;
+  }
+
+  private closeInfoPopover(): void {
+    this.infoPopoverCleanup?.();
+    this.infoPopoverCleanup = null;
+    this.infoPopoverEl?.remove();
+    this.infoPopoverEl = null;
   }
 
   private initBasemap(): void {
@@ -1535,6 +1632,7 @@ export class DeckGLMap {
     }
     if (mapLayers.traffic && this.trafficPoints.length > 0) {
       layers.push(this.createTrafficLayer());
+      layers.push(this.createTrafficBadgesLayer());
     }
 
     // News geo-locations (always shown if data exists)
@@ -3445,14 +3543,11 @@ export class DeckGLMap {
     // reorder). Unknown/removed keys are dropped; new keys append in config order.
     const orderedConfig = this.applyPersistedLayerOrder(layerConfig);
 
+    // No in-panel header: the top-left Layers button is the single show/hide control
+    // (an in-panel title + minimize would just double it). The panel is the toggle
+    // list alone, anchored under that button.
     toggles.innerHTML = `
-      <div class="toggle-header">
-        <span class="toggle-drag-grip" title="${t('components.deckgl.dragPanel', { defaultValue: 'Drag to move' })}">⠿</span>
-        <span>${t('components.deckgl.layersTitle')}</span>
-        <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
-        <button class="toggle-collapse">&#9660;</button>
-      </div>
-      <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
+      <div class="toggle-list" style="max-height: 42vh; overflow-y: auto; scrollbar-width: thin;">
         ${orderedConfig.map(({ key, label, icon }) => `
           <label class="layer-toggle" data-layer="${key}">
             <span class="layer-reorder-grip" title="${t('components.deckgl.dragReorder', { defaultValue: 'Drag to reorder' })}" aria-hidden="true">⠿</span>
@@ -3478,15 +3573,8 @@ export class DeckGLMap {
       });
     });
 
-    // Help button
-    const helpBtn = toggles.querySelector('.layer-help-btn');
-    helpBtn?.addEventListener('click', () => this.showLayerHelp());
-
-    // Collapse toggle
-    const collapseBtn = toggles.querySelector('.toggle-collapse');
+    // Manual scroll: intercept wheel, prevent map zoom, scroll the list ourselves.
     const toggleList = toggles.querySelector('.toggle-list');
-
-    // Manual scroll: intercept wheel, prevent map zoom, scroll the list ourselves
     if (toggleList) {
       toggles.addEventListener('wheel', (e) => {
         e.stopPropagation();
@@ -3494,18 +3582,9 @@ export class DeckGLMap {
         toggleList.scrollTop += e.deltaY;
       }, { passive: false });
       toggles.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+      // Rows drag-reorder within the list (order persisted, purely cosmetic).
+      this.makeLayerListSortable(toggleList as HTMLElement);
     }
-    collapseBtn?.addEventListener('click', () => {
-      toggleList?.classList.toggle('collapsed');
-      if (collapseBtn) collapseBtn.innerHTML = toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
-    });
-
-    // Task 3 UX: the panel is draggable by its header (position persisted), and the
-    // rows drag-reorder within the list (order persisted, purely cosmetic).
-    const header = toggles.querySelector('.toggle-header') as HTMLElement | null;
-    if (header) this.makeLayerPanelDraggable(toggles, header);
-    if (toggleList) this.makeLayerListSortable(toggleList as HTMLElement);
-    this.restoreLayerPanelPosition(toggles);
   }
 
   // ---- Layer panel: draggable + sortable (persisted) ------------------------
@@ -3577,221 +3656,6 @@ export class DeckGLMap {
       grip.addEventListener('pointerup', end);
       grip.addEventListener('pointercancel', end);
     });
-  }
-
-  private loadLayerPanelPos(): { x: number; y: number } | null {
-    try {
-      const raw = localStorage.getItem(LAYER_PANEL_POS_KEY);
-      if (!raw) return null;
-      const p = JSON.parse(raw) as { x?: unknown; y?: unknown };
-      return typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : null;
-    } catch {
-      return null;
-    }
-  }
-
-  // Clamp so the panel can never be dragged fully off-screen (leave a grabbable strip).
-  private clampPanelPos(panel: HTMLElement, x: number, y: number): { x: number; y: number } {
-    const parent = panel.parentElement?.getBoundingClientRect();
-    const w = panel.offsetWidth, h = panel.offsetHeight;
-    const maxX = (parent?.width ?? window.innerWidth) - Math.min(w, 80);
-    const maxY = (parent?.height ?? window.innerHeight) - Math.min(h, 40);
-    return { x: Math.max(0, Math.min(x, maxX)), y: Math.max(0, Math.min(y, maxY)) };
-  }
-
-  private positionLayerPanel(panel: HTMLElement, x: number, y: number): void {
-    const { x: cx, y: cy } = this.clampPanelPos(panel, x, y);
-    // Switch from the default bottom-left anchor to explicit top-left placement.
-    panel.style.left = `${cx}px`;
-    panel.style.top = `${cy}px`;
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-  }
-
-  private restoreLayerPanelPosition(panel: HTMLElement): void {
-    const pos = this.loadLayerPanelPos();
-    if (pos) requestAnimationFrame(() => this.positionLayerPanel(panel, pos.x, pos.y));
-  }
-
-  private makeLayerPanelDraggable(panel: HTMLElement, header: HTMLElement): void {
-    const grip = header.querySelector('.toggle-drag-grip') as HTMLElement | null;
-    if (!grip) return;
-    let startX = 0, startY = 0, baseX = 0, baseY = 0, dragging = false;
-    grip.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragging = true;
-      const box = panel.getBoundingClientRect();
-      const parent = panel.parentElement?.getBoundingClientRect();
-      baseX = box.left - (parent?.left ?? 0);
-      baseY = box.top - (parent?.top ?? 0);
-      startX = e.clientX;
-      startY = e.clientY;
-      panel.classList.add('dragging');
-      grip.setPointerCapture(e.pointerId);
-    });
-    grip.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      this.positionLayerPanel(panel, baseX + (e.clientX - startX), baseY + (e.clientY - startY));
-    });
-    const end = (e: PointerEvent): void => {
-      if (!dragging) return;
-      dragging = false;
-      panel.classList.remove('dragging');
-      try { grip.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
-      const parent = panel.parentElement?.getBoundingClientRect();
-      const box = panel.getBoundingClientRect();
-      const pos = { x: box.left - (parent?.left ?? 0), y: box.top - (parent?.top ?? 0) };
-      try { localStorage.setItem(LAYER_PANEL_POS_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
-    };
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
-  }
-
-  /** Show layer help popup explaining each layer */
-  private showLayerHelp(): void {
-    const existing = this.container.querySelector('.layer-help-popup');
-    if (existing) {
-      existing.remove();
-      return;
-    }
-
-    const popup = document.createElement('div');
-    popup.className = 'layer-help-popup';
-
-    const label = (layerKey: string): string => t(`components.deckgl.layers.${layerKey}`).toUpperCase();
-    const staticLabel = (labelKey: string): string => t(`components.deckgl.layerHelp.labels.${labelKey}`).toUpperCase();
-    const helpItem = (layerLabel: string, descriptionKey: string): string =>
-      `<div class="layer-help-item"><span>${layerLabel}</span> ${t(`components.deckgl.layerHelp.descriptions.${descriptionKey}`)}</div>`;
-    const helpSection = (titleKey: string, items: string[], noteKey?: string): string => `
-      <div class="layer-help-section">
-        <div class="layer-help-title">${t(`components.deckgl.layerHelp.sections.${titleKey}`)}</div>
-        ${items.join('')}
-        ${noteKey ? `<div class="layer-help-note">${t(`components.deckgl.layerHelp.notes.${noteKey}`)}</div>` : ''}
-      </div>
-    `;
-    const helpHeader = `
-      <div class="layer-help-header">
-        <span>${t('components.deckgl.layerHelp.title')}</span>
-        <button class="layer-help-close">×</button>
-      </div>
-    `;
-
-    const techHelpContent = `
-      ${helpHeader}
-      <div class="layer-help-content">
-        ${helpSection('techEcosystem', [
-          helpItem(label('startupHubs'), 'techStartupHubs'),
-          helpItem(label('cloudRegions'), 'techCloudRegions'),
-          helpItem(label('techHQs'), 'techHQs'),
-          helpItem(label('accelerators'), 'techAccelerators'),
-        ])}
-        ${helpSection('infrastructure', [
-          helpItem(label('underseaCables'), 'infraCables'),
-          helpItem(label('aiDataCenters'), 'infraDatacenters'),
-          helpItem(label('internetOutages'), 'infraOutages'),
-        ])}
-        ${helpSection('naturalEconomic', [
-          helpItem(label('naturalEvents'), 'naturalEventsTech'),
-          helpItem(label('weatherAlerts'), 'weatherAlerts'),
-          helpItem(label('economicCenters'), 'economicCenters'),
-          helpItem(staticLabel('countries'), 'countriesOverlay'),
-        ])}
-      </div>
-    `;
-
-    const financeHelpContent = `
-      ${helpHeader}
-      <div class="layer-help-content">
-        ${helpSection('financeCore', [
-          helpItem(label('stockExchanges'), 'financeExchanges'),
-          helpItem(label('financialCenters'), 'financeCenters'),
-          helpItem(label('centralBanks'), 'financeCentralBanks'),
-          helpItem(label('commodityHubs'), 'financeCommodityHubs'),
-        ])}
-        ${helpSection('infrastructureRisk', [
-          helpItem(label('underseaCables'), 'financeCables'),
-          helpItem(label('pipelines'), 'financePipelines'),
-          helpItem(label('internetOutages'), 'financeOutages'),
-          helpItem(label('cyberThreats'), 'financeCyberThreats'),
-        ])}
-        ${helpSection('macroContext', [
-          helpItem(label('economicCenters'), 'economicCenters'),
-          helpItem(label('strategicWaterways'), 'macroWaterways'),
-          helpItem(label('weatherAlerts'), 'weatherAlertsMarket'),
-          helpItem(label('naturalEvents'), 'naturalEventsMacro'),
-        ])}
-      </div>
-    `;
-
-    const fullHelpContent = `
-      ${helpHeader}
-      <div class="layer-help-content">
-        ${helpSection('timeFilter', [
-          helpItem(staticLabel('timeRecent'), 'timeRecent'),
-          helpItem(staticLabel('timeExtended'), 'timeExtended'),
-        ], 'timeAffects')}
-        ${helpSection('geopolitical', [
-          helpItem(label('conflictZones'), 'geoConflicts'),
-          helpItem(label('intelHotspots'), 'geoHotspots'),
-          helpItem(staticLabel('sanctions'), 'geoSanctions'),
-          helpItem(label('protests'), 'geoProtests'),
-        ])}
-        ${helpSection('militaryStrategic', [
-          helpItem(label('militaryBases'), 'militaryBases'),
-          helpItem(label('nuclearSites'), 'militaryNuclear'),
-          helpItem(label('gammaIrradiators'), 'militaryIrradiators'),
-          helpItem(label('militaryActivity'), 'militaryActivity'),
-        ])}
-        ${helpSection('infrastructure', [
-          helpItem(label('underseaCables'), 'infraCablesFull'),
-          helpItem(label('pipelines'), 'infraPipelinesFull'),
-          helpItem(label('internetOutages'), 'infraOutages'),
-          helpItem(label('aiDataCenters'), 'infraDatacentersFull'),
-        ])}
-        ${helpSection('transport', [
-          helpItem(staticLabel('shipping'), 'transportShipping'),
-          helpItem(label('flightDelays'), 'transportDelays'),
-        ])}
-        ${helpSection('naturalEconomic', [
-          helpItem(label('naturalEvents'), 'naturalEventsFull'),
-          helpItem(label('weatherAlerts'), 'weatherAlerts'),
-          helpItem(label('economicCenters'), 'economicCenters'),
-        ])}
-        ${helpSection('labels', [
-          helpItem(staticLabel('countries'), 'countriesOverlay'),
-          helpItem(label('strategicWaterways'), 'waterwaysLabels'),
-        ])}
-      </div>
-    `;
-
-    popup.innerHTML = SITE_VARIANT === 'tech'
-      ? techHelpContent
-      : SITE_VARIANT === 'finance'
-      ? financeHelpContent
-      : fullHelpContent;
-
-    popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
-
-    // Prevent scroll events from propagating to map
-    const content = popup.querySelector('.layer-help-content');
-    if (content) {
-      content.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
-      content.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
-    }
-
-    // Close on click outside
-    setTimeout(() => {
-      const closeHandler = (e: MouseEvent) => {
-        if (!popup.contains(e.target as Node)) {
-          popup.remove();
-          document.removeEventListener('click', closeHandler);
-        }
-      };
-      document.addEventListener('click', closeHandler);
-    }, 100);
-
-    this.container.appendChild(popup);
   }
 
   private createLegend(): void {
@@ -4456,32 +4320,73 @@ export class DeckGLMap {
   // distinct from the cyan chain-node dots. Empty (honest) until traffic is recorded.
   private createTrafficLayer(): ScatterplotLayer<TrafficGlobePoint> {
     const maxCount = Math.max(1, ...this.trafficPoints.map((p) => p.count || 0));
+    const bright = isBrightBasemap(this.basemapStyle);
+    // Warm amber→magenta heat by request volume; a near-opaque core so each origin
+    // reads as a crisp point rather than a smear.
     const heat = (c: number): [number, number, number, number] => {
       const tt = Math.min(1, (c || 0) / maxCount); // 0..1 intensity
-      return [255, Math.round(180 - tt * 120), Math.round(70 + tt * 90), 230];
+      return [255, Math.round(180 - tt * 120), Math.round(70 + tt * 90), 235];
     };
+    // Contrast ring: on the bright satellite/terrain rasters a thin dark halo keeps
+    // every dot legible against imagery; on the dark basemap a warm ring reads as a
+    // soft glow. This is the one place the traffic dots adapt to the basemap.
+    const ring: [number, number, number, number] = bright ? [6, 10, 18, 235] : [255, 214, 150, 205];
     return new ScatterplotLayer<TrafficGlobePoint>({
       id: 'traffic',
       data: this.trafficPoints,
       getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => 45000 + ((d.count || 0) / maxCount) * 95000,
+      getRadius: (d) => 42000 + ((d.count || 0) / maxCount) * 108000,
       getFillColor: (d) => heat(d.count),
       radiusUnits: 'meters',
       radiusMinPixels: 4,
-      radiusMaxPixels: 22,
-      // Slightly deeper breathe (±8%) than the chain dots so the traffic layer reads
-      // as the live centerpiece. radiusScale is a plain prop re-issued each pulse.
-      radiusScale: 1 + 0.08 * Math.sin(this.cloudPulseCoef * Math.PI * 2),
+      radiusMaxPixels: 24,
+      // Subtle ±6% breathe so the live layer feels alive without distracting; the
+      // coef is advanced by the cloud-pulse RAF and re-issued each tick.
+      radiusScale: 1 + 0.06 * Math.sin(this.cloudPulseCoef * Math.PI * 2),
       stroked: true,
       filled: true,
-      getLineColor: [255, 210, 140, 200] as [number, number, number, number],
-      getLineWidth: 1,
-      lineWidthMinPixels: 1,
+      getLineColor: ring,
+      lineWidthUnits: 'pixels',
+      getLineWidth: bright ? 2 : 1.25,
+      lineWidthMinPixels: bright ? 1.5 : 1,
+      lineWidthMaxPixels: 3,
       pickable: true,
       updateTriggers: {
         getRadius: this.trafficPoints.length,
         getFillColor: this.trafficPoints.length,
+        getLineColor: this.basemapStyle,
+        getLineWidth: this.basemapStyle,
       },
+    });
+  }
+
+  // Volume badges for the busiest request origins — a compact count in a dark pill
+  // (legible on dark, satellite AND terrain), matching the cluster-count badges. Only
+  // the significant origins are labelled so the map stays readable; smaller origins
+  // stay as sized/heat dots. Static (not pulsed): passes by reference through the RAF
+  // ticks, and occludeFarSide() culls the back-hemisphere badges on the globe.
+  private createTrafficBadgesLayer(): TextLayer<TrafficGlobePoint> {
+    const maxCount = Math.max(1, ...this.trafficPoints.map((p) => p.count || 0));
+    const floor = Math.max(2, maxCount * 0.06);
+    const labelled = this.trafficPoints
+      .filter((p) => (p.count || 0) >= floor)
+      .sort((a, b) => (b.count || 0) - (a.count || 0))
+      .slice(0, 14);
+    return new TextLayer<TrafficGlobePoint>({
+      id: 'traffic-badges',
+      data: labelled,
+      getText: (d) => fmtCompact(d.count || 0),
+      getPosition: (d) => [d.lon, d.lat],
+      background: true,
+      getBackgroundColor: [0, 0, 0, 180],
+      backgroundPadding: [4, 2, 4, 2],
+      getColor: [255, 255, 255, 255],
+      getSize: 12,
+      getPixelOffset: [0, -15],
+      pickable: false,
+      fontFamily: 'system-ui, sans-serif',
+      fontWeight: 700,
+      updateTriggers: { getText: this.trafficPoints.length },
     });
   }
 
@@ -5319,6 +5224,7 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
+    this.closeInfoPopover();
     if (this.moveTimeoutId) {
       clearTimeout(this.moveTimeoutId);
       this.moveTimeoutId = null;

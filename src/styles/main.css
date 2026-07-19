@@ -2232,6 +2232,50 @@ body.panel-drag-active .map-container {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Interactive "new version — reload" toast (SW update). Bottom-center, theme-aware,
+   pointer-events:auto (unlike the plain .toast-notification above). */
+.sw-update-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-active);
+  color: var(--text);
+  padding: 10px 12px 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  z-index: 10003;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.sw-update-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.sw-update-toast .sw-update-reload {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sw-update-toast .sw-update-reload:hover { filter: brightness(1.08); }
+.sw-update-toast .sw-update-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.sw-update-toast .sw-update-dismiss:hover { color: var(--text); }
+
 /* Story Modal */
 .story-modal-overlay {
   position: fixed;
@@ -17050,6 +17094,99 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .deckgl-layers-btn:hover { border-color: var(--border-strong); color: var(--text); }
 .deckgl-layers-btn.active { border-color: var(--accent); color: var(--text); }
 .deckgl-layers-btn svg { opacity: 0.85; }
+
+/* Top-left control cluster: Layers + (i) info side by side. The cluster owns the
+   top-left anchor so the buttons flow inline; each keeps its own pill chrome. */
+.deckgl-topleft-cluster {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.deckgl-topleft-cluster > * { pointer-events: auto; }
+.deckgl-topleft-cluster .deckgl-layers-btn { position: static; top: auto; left: auto; z-index: auto; }
+
+/* (i) info button — round icon sibling of Layers, same theme-aware chrome. */
+.deckgl-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.deckgl-info-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.deckgl-info-btn.active { border-color: var(--accent); color: var(--text); }
+.deckgl-info-btn svg { opacity: 0.9; }
+
+/* About/legend popover — anchored under the cluster, theme-aware. */
+.deckgl-info-popover {
+  position: absolute;
+  top: 46px;
+  left: 10px;
+  z-index: 600;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 12px 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.deckgl-info-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.deckgl-info-head svg { opacity: 0.85; }
+.deckgl-info-lead { margin: 0 0 9px; color: var(--text-dim); }
+.deckgl-info-legend { display: flex; flex-direction: column; gap: 5px; margin-bottom: 9px; }
+.deckgl-info-row { display: flex; align-items: flex-start; gap: 8px; }
+.deckgl-info-row b { color: var(--text); font-weight: 650; }
+.deckgl-info-row span { color: var(--text-dim); }
+.deckgl-info-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.12);
+}
+.deckgl-info-dot.ring { background: transparent !important; border: 2px solid; box-shadow: none; }
+.deckgl-info-src { margin: 0; color: var(--text-dim); font-size: 10.5px; opacity: 0.85; }
+
+/* ── Scrollbar chrome hidden, scroll kept ───────────────────────────────────
+   HIDE ugly scrollbars dashboard-wide but keep every container fully scrollable
+   (wheel + trackpad). No layout shift. Three surfaces, one concern:
+     • .scroll-hidden — opt-in utility for any container.
+     • .panel-content (+ its scroll descendants: tables, lists, benchmark rows) —
+       every panel, automatically. DRY: no per-panel one-offs.
+     • .scroll-x — a horizontally-scrolling row; installHorizontalWheelScroll()
+       (utils/scroll.ts) maps vertical wheel → scrollLeft so wide rows wheel-scroll. */
+.scroll-hidden,
+.panel-content, .panel-content *,
+.scroll-x { scrollbar-width: none; -ms-overflow-style: none; }
+.scroll-hidden::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar, .panel-content *::-webkit-scrollbar,
+.scroll-x::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* Immersive controls sit inline in the dock (moved from the header). */
 .world-dock .immersive-controls { border-right: 1px solid var(--border); padding-right: 6px; }

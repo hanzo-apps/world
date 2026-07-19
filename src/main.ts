@@ -68,6 +68,7 @@ import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chunk-reload';
 import { installServiceWorker } from '@/services/sw-update';
+import { installHorizontalWheelScroll } from '@/utils/scroll';
 
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
@@ -141,3 +142,6 @@ Object.defineProperty(window, 'beta', {
 // Register the service worker and keep long-lived tabs on the latest build. All
 // SW lifecycle lives in one place; see src/services/sw-update.ts.
 installServiceWorker();
+
+// Wheel → horizontal scroll for wide, bar-hidden rows (benchmark tables etc.).
+installHorizontalWheelScroll();
