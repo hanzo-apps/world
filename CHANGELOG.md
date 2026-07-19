@@ -2,6 +2,18 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.19]
+
+### Fixed
+
+- **Moving/resizing a panel no longer shifts the others** (the "when I shift the 3D map it shifts all other components" report). The dashboard now DEFAULTS to the free layout: every panel owns its own {x,y,w,h}, so a drag or resize leaves every sibling exactly where it was — no more grid reflow. The switch is invisible: the current grid arrangement is frozen as the starting geometry (`grid-config.applyDefaultLayout`), and Grid stays one dropdown-click away for anyone who wants snap-to-grid back.
+- **Panels resize granularly** — pixel-exact width AND height from any edge or corner, instead of jumping between coarse column/row spans.
+- **Panels can be made much narrower/smaller** ("constrained on min width"): the free-mode floors drop to 96×40px (map 140px), and the grid widget-size slider now reaches a 120px column track (was 140).
+
+### Changed
+
+- A panel shown from the Panels menu / "+ Add widget" while in free mode seeds a tidy default slot below the placed panels (never a full-width block under its absolute siblings). Hidden panels no longer persist 0×0 geometry.
+
 ## [2.4.13]
 
 ### Fixed

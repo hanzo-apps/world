@@ -32,6 +32,10 @@ export interface FreeRect {
 
 interface LayoutState {
   mode: LayoutMode;
+  // True once the user has EXPLICITLY picked a mode (dock dropdown / analyst /
+  // toggle). Until then the app defaults to FREE (see applyDefaultLayout) without
+  // overwriting a deliberate choice. Absent in pre-migration state → false.
+  userSet: boolean;
   cellSize: number;
   free: Record<string, FreeRect>;
   gridCols: Record<string, number>;
@@ -47,7 +51,10 @@ const STORAGE_KEY = `worldmonitor-layout:${SITE_VARIANT}`;
 // never shrunk by default. Range mirrors the dock slider (140–360).
 export const DEFAULT_CELL_SIZE = 160;
 const DEFAULT_GAP = 4; // matches .panels-grid gap
-const MIN_CELL_SIZE = 140;
+// Column-track floor range for the widget-size slider. 120 (was 140) lets grid
+// columns pack tighter so panels can be narrower — the "constrained on min width"
+// complaint. Free mode has its own, lower px floor (panel-drag FREE_MIN_W).
+const MIN_CELL_SIZE = 120;
 const MAX_CELL_SIZE = 360;
 // The CSS custom property that drives the grid column floor. Owned by the base
 // .panels-grid rule (origin/main); the dock's fallback sets the same one — one
@@ -63,13 +70,14 @@ export const LAYOUT_CELL_EVENT = 'layout-cell-change';
 const GRID_SELECTOR = '.panels-grid';
 
 function readState(): LayoutState {
-  const base: LayoutState = { mode: 'grid', cellSize: DEFAULT_CELL_SIZE, free: {}, gridCols: {} };
+  const base: LayoutState = { mode: 'grid', userSet: false, cellSize: DEFAULT_CELL_SIZE, free: {}, gridCols: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
     const parsed = JSON.parse(raw) as Partial<LayoutState>;
     return {
       mode: parsed.mode === 'free' ? 'free' : 'grid',
+      userSet: parsed.userSet === true,
       cellSize:
         typeof parsed.cellSize === 'number'
           ? clampCell(parsed.cellSize)
@@ -124,10 +132,15 @@ export function getGap(): number {
   return DEFAULT_GAP;
 }
 
-/** Switch layout mode: persist, restyle the body, re-lay out every panel. */
-export function setLayoutMode(mode: LayoutMode): void {
+/** Switch layout mode: persist, restyle the body, re-lay out every panel. The
+ *  `user` flag records a deliberate pick so applyDefaultLayout never overrides it. */
+function switchMode(mode: LayoutMode, user: boolean): void {
   if (mode !== 'grid' && mode !== 'free') return;
   if (mode === state.mode) {
+    if (user && !state.userSet) {
+      state = { ...state, userSet: true };
+      writeState(state);
+    }
     applyLayout();
     return;
   }
@@ -136,7 +149,7 @@ export function setLayoutMode(mode: LayoutMode): void {
   // to a block container. Otherwise the still-relative panels collapse to block
   // flow and we'd freeze the wrong positions (the map balloons to full-viewport).
   const frozen = mode === 'free' && g ? freezeAll(g) : null;
-  state = { ...state, mode };
+  state = { ...state, mode, userSet: state.userSet || user };
   writeState(state);
   applyBodyMode();
   applyCellVar();
@@ -145,6 +158,28 @@ export function setLayoutMode(mode: LayoutMode): void {
     updateContainerHeight(g);
   }
   document.dispatchEvent(new CustomEvent(LAYOUT_MODE_EVENT, { detail: { mode } }));
+}
+
+/** Switch layout mode (explicit user choice). */
+export function setLayoutMode(mode: LayoutMode): void {
+  switchMode(mode, true);
+}
+
+/**
+ * The dashboard's DEFAULT layout. Unless the user has explicitly chosen a mode,
+ * it defaults to FREE — every panel owns its own {x,y,w,h} so moving or resizing
+ * one never reflows the others (the #1 complaint about the grid). The current grid
+ * arrangement is FROZEN as the starting geometry, so the switch is visually
+ * invisible: panels stay exactly where the grid put them, just independently
+ * positioned from then on. Called once by App after the panels + map have laid
+ * out. Idempotent, and a no-op override once the user picks a mode.
+ */
+export function applyDefaultLayout(): void {
+  if (state.userSet) {
+    applyLayout();
+    return;
+  }
+  switchMode('free', false);
 }
 
 export function toggleLayoutMode(): LayoutMode {
@@ -171,7 +206,7 @@ export function resetLayout(): void {
   } catch {
     /* ignore */
   }
-  state = { mode: 'grid', cellSize: DEFAULT_CELL_SIZE, free: {}, gridCols: {} };
+  state = { mode: 'grid', userSet: false, cellSize: DEFAULT_CELL_SIZE, free: {}, gridCols: {} };
 }
 
 // ── per-panel geometry persistence (used by panel-drag) ─────────────────────
@@ -239,6 +274,27 @@ function clearFreeInline(el: HTMLElement): void {
 }
 
 /**
+ * A sensible free-mode rect for a panel that has no saved geometry yet (one shown
+ * from the Panels menu / added via "+ Add widget", or an analyst-created feed).
+ * A tidy ~480×260 card tucked below every currently-placed panel, so it appears
+ * in a predictable spot without overlapping anything (never a full-width block
+ * flowing under the absolute siblings).
+ */
+function defaultFreeRectFor(g: HTMLElement): FreeRect {
+  const style = getComputedStyle(g);
+  const padL = parseFloat(style.paddingLeft || '0') || 0;
+  const padR = parseFloat(style.paddingRight || '0') || 0;
+  const innerW = Math.max(0, g.clientWidth - padL - padR);
+  let bottom = 0;
+  for (const p of panelsIn(g)) {
+    if (p.classList.contains('hidden')) continue;
+    const r = getFreeRect(p.dataset.panel ?? '');
+    if (r) bottom = Math.max(bottom, r.y + r.h);
+  }
+  return { x: 0, y: bottom + DEFAULT_GAP, w: Math.min(innerW || 480, 480), h: 260 };
+}
+
+/**
  * Apply the active mode to a single panel. In free mode: place it at its saved
  * rect, or — on the first-ever switch — freeze it exactly where the grid put it
  * (measured by the caller and passed in) so the transition never jumps. In grid
@@ -248,9 +304,14 @@ function applyPanelInMode(g: HTMLElement, el: HTMLElement, frozen?: FreeRect): v
   const id = el.dataset.panel;
   if (!id) return;
   if (state.mode === 'free') {
+    // Never position a hidden panel — it would persist a 0×0 rect and come back
+    // broken. It seeds a real rect when the user shows it (App re-applies layout).
+    if (el.classList.contains('hidden')) return;
     let rect = getFreeRect(id);
     if (!rect) {
-      rect = frozen ?? measureRect(g, el);
+      // frozen = the exact grid geometry captured on a mode switch (invisible flip);
+      // otherwise a tidy default slot for a freshly shown/added panel.
+      rect = frozen ?? defaultFreeRectFor(g);
       setFreeRect(id, rect);
     }
     applyFreeRect(el, rect);
@@ -279,10 +340,14 @@ function updateContainerHeight(g: HTMLElement): void {
   g.style.height = `${bottom + DEFAULT_GAP}px`;
 }
 
-/** Snapshot every panel's current geometry (measured in whatever layout is live). */
+/** Snapshot every VISIBLE panel's current geometry (measured in whatever layout is
+ *  live). Hidden panels are skipped — they seed a real rect when first shown. */
 function freezeAll(g: HTMLElement): Map<HTMLElement, FreeRect> {
   const m = new Map<HTMLElement, FreeRect>();
-  for (const el of panelsIn(g)) m.set(el, measureRect(g, el));
+  for (const el of panelsIn(g)) {
+    if (el.classList.contains('hidden')) continue;
+    m.set(el, measureRect(g, el));
+  }
   return m;
 }
 
@@ -367,7 +432,7 @@ function bootstrap(): void {
 // rather than the dock's minimal CSS-var fallback. One way to do everything.
 if (typeof window !== 'undefined') {
   (window as unknown as { worldGrid?: unknown }).worldGrid = {
-    setLayoutMode, getLayoutMode, toggleLayoutMode,
+    setLayoutMode, getLayoutMode, toggleLayoutMode, applyDefaultLayout, applyLayout,
     setCellSize, getCellSize, getGridConfig, resetLayout,
   };
 }
