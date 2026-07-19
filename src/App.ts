@@ -49,6 +49,7 @@ import { reverseGeocode } from '@/utils/reverse-geocode';
 import { CountryBriefPage } from '@/components/CountryBriefPage';
 import { CountryTimeline, type TimelineEvent } from '@/components/CountryTimeline';
 import { escapeHtml } from '@/utils/sanitize';
+import { getUiScale, setUiScale } from '@/utils/ui-scale';
 import type { ParsedMapUrlState } from '@/utils';
 import {
   MapContainer,
@@ -532,6 +533,13 @@ export class App {
       sizeInput.value = String(grid.getCellSize());
       sizeInput.addEventListener('input', () => grid.setCellSize(parseInt(sizeInput.value, 10)));
     }
+    // Text size (UI scale) — accessibility. Scales the readable panel content via
+    // --ui-scale; persisted per browser (utils/ui-scale.ts).
+    const fontInput = document.getElementById('dockFontSize') as HTMLInputElement | null;
+    if (fontInput) {
+      fontInput.value = String(getUiScale());
+      fontInput.addEventListener('input', () => setUiScale(parseFloat(fontInput.value)));
+    }
 
     // "+ Add widget" — a searchable palette over the panel registry.
     document.getElementById('dockAddWidget')?.addEventListener('click', () => this.openAddWidget());
@@ -564,7 +572,7 @@ export class App {
         return document.body.dataset.layoutMode === 'free' ? 'free' : 'grid';
       },
       setCellSize: (px) => {
-        const v = Math.max(120, Math.min(360, px));
+        const v = Math.max(80, Math.min(360, px));
         if (g?.setCellSize) { g.setCellSize(v); return; }
         document.documentElement.style.setProperty('--panel-col-min', `${v}px`);
         try { localStorage.setItem('hanzo-world-grid-size', String(v)); } catch { /* ignore */ }
@@ -2223,7 +2231,11 @@ export class App {
             </label>
             <label class="dock-slider" title="Widget size">
               <span class="dock-ico">▦</span>
-              <input type="range" id="dockGridSize" min="120" max="360" step="20" value="160" aria-label="Widget size" />
+              <input type="range" id="dockGridSize" min="80" max="360" step="10" value="160" aria-label="Widget size" />
+            </label>
+            <label class="dock-slider" title="Text size">
+              <span class="dock-ico">A</span>
+              <input type="range" id="dockFontSize" min="0.8" max="1.6" step="0.1" value="1" aria-label="Text size" />
             </label>
           </div>
           ${immersive}
