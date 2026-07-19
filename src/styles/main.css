@@ -1178,6 +1178,24 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   color: var(--accent);
 }
 
+/* Owner request: no visible corner/edge resize glyphs on any panel. The handles stay
+   as invisible hit areas — dragging from any edge or corner still resizes; the resize
+   cursor is the only affordance. */
+.panel-corner-resize-handle::after,
+.panel-col-resize-handle::after,
+.panel-resize-handle::after,
+.map-resize-handle::after {
+  content: none;
+  display: none;
+}
+
+/* User text-size / UI-scale (accessibility). --ui-scale (set by the dock control, see
+   utils/ui-scale.ts) zooms the readable CONTENT only — never the panels-grid — so the
+   free-mode drag/snap coordinate space is untouched. */
+.panel-content {
+  zoom: var(--ui-scale, 1);
+}
+
 .panel.resizing {
   cursor: ns-resize;
   user-select: none;
