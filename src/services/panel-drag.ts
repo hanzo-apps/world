@@ -36,9 +36,9 @@ const FLIP_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 
 // Sane pixel floors for free-mode geometry. The map keeps a larger floor so it
 // never collapses to an unreadable sliver.
-const FREE_MIN_W = 160;
+const FREE_MIN_W = 120;
 const FREE_MIN_H = 48;
-const MAP_MIN = 240;
+const MAP_MIN = 160;
 
 const minWidthFor = (el: HTMLElement, opt?: number): number =>
   el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_W;

@@ -47,7 +47,7 @@ const STORAGE_KEY = `worldmonitor-layout:${SITE_VARIANT}`;
 // never shrunk by default. Range mirrors the dock slider (140–360).
 export const DEFAULT_CELL_SIZE = 160;
 const DEFAULT_GAP = 4; // matches .panels-grid gap
-const MIN_CELL_SIZE = 140;
+const MIN_CELL_SIZE = 120;
 const MAX_CELL_SIZE = 360;
 // The CSS custom property that drives the grid column floor. Owned by the base
 // .panels-grid rule (origin/main); the dock's fallback sets the same one — one
@@ -143,6 +143,7 @@ export function setLayoutMode(mode: LayoutMode): void {
   if (g) {
     for (const el of panelsIn(g)) applyPanelInMode(g, el, frozen?.get(el));
     updateContainerHeight(g);
+    clampFreeToViewport();
   }
   document.dispatchEvent(new CustomEvent(LAYOUT_MODE_EVENT, { detail: { mode } }));
 }
@@ -151,6 +152,28 @@ export function toggleLayoutMode(): LayoutMode {
   const next: LayoutMode = state.mode === 'grid' ? 'free' : 'grid';
   setLayoutMode(next);
   return next;
+}
+
+/**
+ * First-run default: when the user has never customized the layout (no saved
+ * state) and is on a desktop-width viewport, adopt FREE mode ONCE — seeded from
+ * the grid positions just laid out — so every panel is individually resizable and
+ * positionable out of the box (grid mode's reflow-on-resize was the pain). Anyone
+ * who has explicitly chosen a mode, or is on a phone, is left exactly as they
+ * were. setLayoutMode persists the choice, so this is a one-time migration.
+ */
+export function adoptFreeIfFirstRun(): void {
+  if (typeof window === 'undefined') return;
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return; // private mode — leave the default grid layout untouched
+  }
+  if (saved !== null) return; // already customized (a mode or geometry was saved)
+  if (state.mode !== 'grid') return;
+  if (window.innerWidth <= 768) return; // phones use the single-column flex layout
+  setLayoutMode('free'); // freezes from the current grid geometry — no visual jump
 }
 
 /** Set the grid cell size (px). Grid mode re-snaps as tracks resize. Persisted. */
@@ -279,6 +302,41 @@ function updateContainerHeight(g: HTMLElement): void {
   g.style.height = `${bottom + DEFAULT_GAP}px`;
 }
 
+/**
+ * Keep free-mode panels inside the visible width: a panel wider than the grid is
+ * narrowed to fit, and one positioned past the right edge is pulled back in, so
+ * content stays visible when the window shrinks. Widths are preserved wherever
+ * they still fit — we only ever move x, or shrink a panel wider than the whole
+ * grid. Persists the adjusted geometry. No-op outside free mode.
+ */
+function clampFreeToViewport(): void {
+  if (state.mode !== 'free') return;
+  const g = grid();
+  if (!g) return;
+  const maxW = g.clientWidth;
+  if (maxW <= 0) return;
+  let changed = false;
+  const nextFree: Record<string, FreeRect> = { ...state.free };
+  for (const el of panelsIn(g)) {
+    const id = el.dataset.panel;
+    if (!id) continue;
+    const r = nextFree[id];
+    if (!r) continue;
+    const w = Math.min(r.w, maxW);
+    const x = Math.max(0, Math.min(r.x, maxW - w));
+    if (w !== r.w || x !== r.x) {
+      nextFree[id] = { ...r, w, x };
+      applyFreeRect(el, nextFree[id]);
+      changed = true;
+    }
+  }
+  if (changed) {
+    state = { ...state, free: nextFree };
+    writeState(state);
+    updateContainerHeight(g);
+  }
+}
+
 /** Snapshot every panel's current geometry (measured in whatever layout is live). */
 function freezeAll(g: HTMLElement): Map<HTMLElement, FreeRect> {
   const m = new Map<HTMLElement, FreeRect>();
@@ -294,6 +352,7 @@ export function applyLayout(): void {
   applyCellVar();
   for (const el of panelsIn(g)) applyPanelInMode(g, el);
   updateContainerHeight(g);
+  clampFreeToViewport();
 }
 
 /** Called by panel-drag when a panel mounts, so it self-applies its geometry. */
@@ -370,6 +429,18 @@ if (typeof window !== 'undefined') {
     setLayoutMode, getLayoutMode, toggleLayoutMode,
     setCellSize, getCellSize, getGridConfig, resetLayout,
   };
+
+  // Free mode is absolute px, so a viewport shrink can push panels out of view.
+  // Re-clamp them into the visible width on resize (rAF-coalesced; a no-op in grid
+  // mode) so content stays reachable at any window size.
+  let resizeRaf = 0;
+  window.addEventListener('resize', () => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      clampFreeToViewport();
+    });
+  });
 }
 
 if (typeof document !== 'undefined') {
