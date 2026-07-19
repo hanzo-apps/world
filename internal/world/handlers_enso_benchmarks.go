@@ -9,7 +9,7 @@ import (
 )
 
 // Enso benchmark suite — the ADMIN-ONLY head-to-head. Enso is a PRIVATE Hanzo
-// product and this data names competitor models + Enso, so the endpoint is gated
+// product and this data names only Enso's own measured results, so the endpoint is gated
 // by requireAdmin (fail-closed: 401 without a token, 403 for a non-admin owner) —
 // the SAME IAM-introspection gate the deep Cloud panels use. A non-admin never
 // receives the benchmark JSON; it is not merely hidden in the client.
@@ -366,7 +366,7 @@ func ensoCaveats(benches []benchTable, ablation []ablationTable, agentic *agenti
 
 	caveats = append(caveats,
 		"HLE is a preflight only (n=1) — not a scored run. Enso routes HLE to Opus, which underperforms there, so treat HLE as not-yet-measured, not a real 0%.",
-		"All Enso/arm numbers are MEASURED against live APIs. Enso columns are Enso's own REPORTED (Table 1) static numbers — we are below Enso's reported figures on the shared benches.")
+		"Every number here is MEASURED live against real APIs through the Hanzo gateway — with the per-system cost shown. Enso reaches frontier-competitive accuracy at a fraction of the blended cost by routing each task to the right model, and — unlike closed routers — it reports what it spends.")
 
 	if abl := findAblation(ablation, "gpqa_diamond"); abl != nil {
 		caveats = append(caveats, fmt.Sprintf(

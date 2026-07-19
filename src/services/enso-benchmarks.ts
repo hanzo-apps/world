@@ -1,6 +1,6 @@
 // Enso benchmark suite — the ADMIN-ONLY head-to-head, served same-origin by the
 // world backend at /v1/world/enso-benchmarks. Enso is a PRIVATE Hanzo product and
-// this data names competitor models + Enso, so the endpoint is server-gated
+// this data names only Enso's own measured results, so the endpoint is server-gated
 // (requireAdmin, fail-closed 403). This client attaches the caller's IAM bearer;
 // a non-admin / signed-out caller gets null (401/403) and the panel renders the
 // clean "admin only" state — the client mirror of the server gate. The JSON never
