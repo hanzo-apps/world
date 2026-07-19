@@ -17410,3 +17410,55 @@ body.layout-free .panels-grid::after {
 .enso-bm-down { color: var(--text-dim); }
 .enso-bm-foot { margin: 6px 0 2px; padding-left: 16px; color: var(--text-muted); font-size: 10.5px; line-height: 1.55; }
 .enso-bm-foot li { margin: 3px 0; }
+
+/* ── Enso Router — cost↔quality slider (Section A) + judge panel (Section B).
+   Reuses the cloud-* theme tokens so it flips light/dark with everything else. */
+.enso-router-copy {
+  margin: 0 0 12px; font-size: 11.5px; line-height: 1.5;
+  color: var(--text-muted); max-width: 64ch;
+}
+.enso-slider-row { display: flex; align-items: center; gap: 12px; }
+.enso-slider-end {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-dim); flex: 0 0 auto; white-space: nowrap;
+}
+.enso-slider {
+  -webkit-appearance: none; appearance: none;
+  flex: 1 1 auto; min-width: 0; height: 6px; margin: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right,
+    var(--text) 0%, var(--text) var(--val, 50%),
+    var(--border) var(--val, 50%), var(--border) 100%);
+  outline: none; cursor: pointer;
+}
+.enso-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--text); border: 2px solid var(--bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); cursor: grab;
+}
+.enso-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+.enso-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--text); border: 2px solid var(--bg); cursor: grab;
+}
+.enso-slider:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 30%, transparent); }
+.enso-slider:disabled { opacity: 0.4; cursor: not-allowed; }
+.enso-slider-meta {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-top: 8px;
+}
+.enso-slider-val {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.enso-slider-saved {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.03em; opacity: 0; transition: opacity 0.2s ease; white-space: nowrap;
+}
+.enso-slider-saved.show { opacity: 1; }
+.enso-slider-saved.ok { color: var(--green); }
+.enso-slider-saved.warn { color: var(--text-dim); }
+.enso-router-note { font-size: 10.5px; line-height: 1.45; color: var(--text-muted); margin-top: 8px; }
+.enso-router-note:empty { display: none; margin: 0; }
+.enso-router-judge { margin-top: 6px; }
