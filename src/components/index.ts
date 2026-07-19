@@ -62,6 +62,9 @@ export * from './ModelUsagePanel';
 export * from './FleetPanel';
 export * from './MyUsagePanel';
 export * from './LiveActivityPanel';
+// Per-org event-platform cards (analytics + insights), org-scoped to the caller.
+export { OrgAnalyticsPanel } from './OrgAnalyticsPanel';
+export { OrgInsightsPanel } from './OrgInsightsPanel';
 // AI variant — live Hanzo compute + enso training telemetry
 export { AiComputePanel } from './AiComputePanel';
 export { EnsoFlywheelPanel } from './EnsoFlywheelPanel';
