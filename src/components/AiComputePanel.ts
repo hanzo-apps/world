@@ -78,10 +78,18 @@ export class AiComputePanel extends Panel {
     if (!this.usage && !this.fleet) {
       if (this.state === 'unavailable') {
         this.clearDataBadge();
-        this.setContent(`<div class="cloud-admin-gate">
-          <div class="cloud-admin-gate-title">Compute telemetry unavailable</div>
-          <div class="cloud-admin-gate-body">${escapeHtml(this.reason || 'The inference plane is not reachable right now.')}</div>
-        </div>`);
+        // Signed-out: the live compute pulse is account-scoped, so this is a sign-in
+        // gate — say so honestly (like Fleet / My Usage), NOT a scary "unreachable"
+        // that reads as a backend outage. The error copy is reserved for a genuine
+        // failure while signed in.
+        if (!isAuthenticated()) {
+          this.setContent(`<div class="cloud-empty">Sign in to see the live inference plane — tokens/sec, requests, spend and GPUs, metered to your org.</div>`);
+        } else {
+          this.setContent(`<div class="cloud-admin-gate">
+            <div class="cloud-admin-gate-title">Compute telemetry unavailable</div>
+            <div class="cloud-admin-gate-body">${escapeHtml(this.reason || 'The inference plane is not reachable right now.')}</div>
+          </div>`);
+        }
         return;
       }
       this.showLoading('Connecting…');
