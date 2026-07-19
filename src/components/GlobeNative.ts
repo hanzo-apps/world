@@ -31,12 +31,14 @@ import {
   type PickingInfo,
   type LayersList,
 } from '@deck.gl/core';
-import { GeoJsonLayer, BitmapLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, BitmapLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
 import { SphereGeometry } from '@luma.gl/engine';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
+import { getLandDots, type LandDot } from '@/services/land-dots';
+import { DEFAULT_BASEMAP_STYLE } from '@/config/variant';
 
 /**
  * The read-only bridge GlobeNative consumes. DeckGLMap implements this (via
@@ -96,14 +98,19 @@ const BORDER_COLOR: [number, number, number, number] = [58, 62, 70, 170]; // ~#3
 // Thin border overlay kept on the bright imagery styles for intel orientation.
 const BRIGHT_BORDER_COLOR: [number, number, number, number] = [235, 240, 250, 90];
 const ATMOSPHERE_COLOR: [number, number, number, number] = [80, 92, 116, 120];
+// Dot basemap land dots — a cool dim cyan-white, brighter than the dark style's
+// near-black land so the lattice reads as a glowing cybermap surface, dim enough
+// that live traffic dots/arcs stay the focal layer on top.
+const LAND_DOT_COLOR: [number, number, number, number] = [120, 150, 185, 165];
 
 // Basemap style — mirrors DeckGLMap's switcher. Read from the SAME localStorage key
 // so the 2D switcher drives the globe; kept as literals here to avoid importing the
 // giant DeckGLMap module for two constants (contract: keep in sync with it).
-export type BasemapStyle = 'dark' | 'satellite' | 'terrain';
-const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'satellite', 'terrain'];
+export type BasemapStyle = 'dark' | 'dot' | 'satellite' | 'terrain';
+const BASEMAP_STYLES: BasemapStyle[] = ['dark', 'dot', 'satellite', 'terrain'];
 const BASEMAP_STYLE_KEY = 'hanzo-world-basemap-style';
 const isBrightBasemap = (s: BasemapStyle): boolean => s === 'satellite' || s === 'terrain';
+const isDotBasemap = (s: BasemapStyle): boolean => s === 'dot';
 
 // Keyless ESRI ArcGIS raster tiles (ACAO:* — CORS-safe for WebGL textures). Note the
 // {z}/{y}/{x} order ArcGIS uses. World_Imagery = real satellite; World_Physical_Map =
@@ -156,13 +163,14 @@ export function isNativeGlobeEnabled(): boolean {
   }
 }
 
-/** Current basemap style from the SAME key the 2D switcher writes (defaults dark). */
+/** Current basemap style from the SAME key the 2D switcher writes (defaults to
+ *  the variant default — dotted-land for cloud/ai, near-black dark elsewhere). */
 export function readBasemapStyle(): BasemapStyle {
   try {
     const raw = localStorage.getItem(BASEMAP_STYLE_KEY);
-    return (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : 'dark';
+    return (BASEMAP_STYLES as string[]).includes(raw ?? '') ? (raw as BasemapStyle) : DEFAULT_BASEMAP_STYLE;
   } catch {
-    return 'dark';
+    return DEFAULT_BASEMAP_STYLE;
   }
 }
 
@@ -180,6 +188,7 @@ export class GlobeNative {
   private basemapLayers: LayersList = [];
   private dataLayers: LayersList = [];
   private countriesGeoJson: FeatureCollection<Geometry> | null = null;
+  private landDots: LandDot[] = [];
 
   private readonly reducedMotion: boolean;
   private autoRotateEnabled: boolean;
@@ -289,6 +298,15 @@ export class GlobeNative {
       console.warn('[GlobeNative] country geometry unavailable:', (error as Error).message);
       this.countriesGeoJson = null;
     }
+    // The dot basemap samples a land lattice off the SAME geojson; cheap to fetch
+    // (cached per session) and generates once. Empty until geometry lands — the
+    // dot layer then renders nothing, matching the dark style's pre-load state.
+    void getLandDots().then((dots) => {
+      if (this.destroyed) return;
+      this.landDots = dots;
+      this.rebuildBasemap();
+      this.pushLayers();
+    });
     if (this.destroyed) return;
     this.rebuildBasemap();
     this.pushLayers();
@@ -346,7 +364,33 @@ export class GlobeNative {
       layers.push(this.buildImageryLayer(this.basemapStyle));
     }
 
-    if (this.countriesGeoJson) {
+    if (isDotBasemap(this.basemapStyle)) {
+      // Dot basemap: land is ONLY a lattice of glowing dots on the black ocean — no
+      // country fills, no borders. The dot cloud is sampled from the SAME geojson as
+      // the dark style (see land-dots.ts) and cached per session. Sits just above the
+      // ocean shell; writes no depth (the ocean sphere owns depth), depth-tests so
+      // far-side dots are occluded by the near hemisphere — real back-of-globe cull.
+      if (this.landDots.length > 0) {
+        layers.push(
+          new ScatterplotLayer<LandDot>({
+            id: 'globe-land-dots',
+            data: this.landDots,
+            getPosition: (d) => [d.lon, d.lat],
+            getRadius: 16000, // ~1.6° in metres; reads as a tight dot at globe zoom
+            radiusUnits: 'meters',
+            radiusMinPixels: 0.7,
+            radiusMaxPixels: 3,
+            getFillColor: LAND_DOT_COLOR,
+            pickable: false,
+            parameters: {
+              cullMode: 'none',
+              depthWriteEnabled: false,
+              depthCompare: 'less-equal',
+            } as unknown as Record<string, unknown>,
+          }),
+        );
+      }
+    } else if (this.countriesGeoJson) {
       layers.push(
         // Dark styling: near-black land fill + thin #1f-grey borders in one pass.
         // Bright styling: borders only (imagery is the fill), a faint light stroke for
