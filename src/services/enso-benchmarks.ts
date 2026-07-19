@@ -1,6 +1,6 @@
 // Enso benchmark suite — the ADMIN-ONLY head-to-head, served same-origin by the
 // world backend at /v1/world/enso-benchmarks. Enso is a PRIVATE Hanzo product and
-// this data names competitor models + Fugu, so the endpoint is server-gated
+// this data names competitor models + Enso, so the endpoint is server-gated
 // (requireAdmin, fail-closed 403). This client attaches the caller's IAM bearer;
 // a non-admin / signed-out caller gets null (401/403) and the panel renders the
 // clean "admin only" state — the client mirror of the server gate. The JSON never
@@ -19,7 +19,7 @@ export interface BenchSystemRow {
   preflight?: boolean; // n<=1 / preflight run ⇒ not a scored result
 }
 
-/** Per-bench measured head-to-head, with the best single arm + Fugu-reported. */
+/** Per-bench measured head-to-head, with the best single arm + Enso-reported. */
 export interface BenchTable {
   key: string;
   name: string;
@@ -28,8 +28,8 @@ export interface BenchTable {
   bestArmPct: number;
   ensoPct: number;
   ensoUsd: number;
-  fuguReported?: number;
-  fuguUltraReported?: number;
+  ensoReported?: number;
+  ensoUltraReported?: number;
   note?: string;
 }
 
@@ -69,8 +69,8 @@ export interface AgenticTable {
   note: string;
 }
 
-/** Fugu's own reported (Table 1) figures — reference only, never conflated. */
-export interface FuguTable {
+/** Enso's own reported (Table 1) figures — reference only, never conflated. */
+export interface EnsoTable {
   bench: string;
   scores: Record<string, number>;
 }
@@ -81,7 +81,7 @@ export interface EnsoBenchmarks {
   benches: BenchTable[];
   ablation: AblationTable[];
   agentic?: AgenticTable;
-  fugu: FuguTable[];
+  enso: EnsoTable[];
   pending: string[];
   totalUsdEst: number;
   caveats: string[];
