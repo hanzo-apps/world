@@ -106,6 +106,8 @@ import {
   FleetPanel,
   MyUsagePanel,
   LiveActivityPanel,
+  OrgAnalyticsPanel,
+  OrgInsightsPanel,
   CloudServicesPanel,
   HanzoStatusPanel,
   CloudAnalyticsPanel,
@@ -2665,6 +2667,10 @@ export class App {
       });
       this.panels['fleet'] = fleetPanel;
       this.panels['live-activity'] = new LiveActivityPanel();
+      // Per-org event-platform cards — the caller's own analytics + product
+      // insights (api.hanzo.ai /v1/analytics + /v1/insights, org-scoped by bearer).
+      this.panels['org-analytics'] = new OrgAnalyticsPanel();
+      this.panels['org-insights'] = new OrgInsightsPanel();
       this.panels['my-usage'] = new MyUsagePanel();
       // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public —
       // NOT admin-gated).
