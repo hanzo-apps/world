@@ -432,6 +432,8 @@ const CLOUD_PANELS: Record<string, PanelConfig> = {
   'model-usage': { name: 'Model Usage', enabled: true, priority: 1 },
   fleet: { name: 'Fleet & GPUs', enabled: true, priority: 1 },
   'live-activity': { name: 'Live Activity', enabled: true, priority: 1 },
+  'org-analytics': { name: 'Analytics', enabled: true, priority: 1 },
+  'org-insights': { name: 'Insights', enabled: true, priority: 1 },
   'my-usage': { name: 'My Usage & Bill', enabled: true, priority: 1 },
   'hanzo-status': { name: 'Hanzo Status', enabled: true, priority: 2 },
   'live-news': { name: 'Live News', enabled: true, priority: 2 },
