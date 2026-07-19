@@ -77,7 +77,7 @@ func TestEnsoBenchmarksGate(t *testing.T) {
 
 // TestEnsoBenchmarksAdminPayload: the admin response carries the real reshaped
 // snapshot — measured head-to-head, the verify-then-select ablation, the agentic
-// pilot, Fugu-reported columns, and server-authored caveats.
+// pilot, Enso-reported columns, and server-authored caveats.
 func TestEnsoBenchmarksAdminPayload(t *testing.T) {
 	resp, body := getEnsoBenchmarks(t, 200, `{"owner":"admin","sub":"z"}`, "Bearer good")
 	if resp.StatusCode != http.StatusOK {
@@ -110,8 +110,8 @@ func TestEnsoBenchmarksAdminPayload(t *testing.T) {
 			t.Fatalf("systems not sorted desc: %+v", lcb.Systems)
 		}
 	}
-	if lcb.FuguReported == 0 || lcb.FuguUltraReported == 0 {
-		t.Fatalf("LiveCodeBench must carry Fugu-reported columns, got %+v", lcb)
+	if lcb.EnsoReported == 0 || lcb.EnsoUltraReported == 0 {
+		t.Fatalf("LiveCodeBench must carry Enso-reported columns, got %+v", lcb)
 	}
 	// enso row must be flagged family=enso for the highlight.
 	var sawEnsoFamily bool
@@ -158,8 +158,8 @@ func TestEnsoBenchmarksAdminPayload(t *testing.T) {
 	if len(eb.Caveats) < 3 {
 		t.Fatalf("caveats must be present (honest framing), got %d", len(eb.Caveats))
 	}
-	if len(eb.Fugu) == 0 {
-		t.Fatalf("Fugu-reported reference table must be present")
+	if len(eb.Enso) == 0 {
+		t.Fatalf("Enso-reported reference table must be present")
 	}
 	if eb.TotalUsdEst <= 0 {
 		t.Fatalf("total spend must be reported, got %v", eb.TotalUsdEst)
