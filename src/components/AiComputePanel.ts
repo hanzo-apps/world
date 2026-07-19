@@ -75,21 +75,26 @@ export class AiComputePanel extends Panel {
   }
 
   private render(): void {
+    // The inference plane is ORG-scoped ("metered to your org"). Signed out there is
+    // no org, so the public pulse can only ever return a zero-stub (spend $0, 0 GPUs,
+    // 0/0 machines) — rendering that as a "live" grid of zeros is exactly the "zero
+    // dressed up as live traffic" this panel promises never to show, and reads as a
+    // dead/broken platform. Honestly gate it instead (same affordance as Fleet / My
+    // Usage), regardless of the zero-stub the endpoint hands back.
+    if (!isAuthenticated()) {
+      this.clearDataBadge();
+      this.setContent(`<div class="cloud-empty">Sign in to see the live inference plane — tokens/sec, requests, spend and GPUs, metered to your org.</div>`);
+      return;
+    }
     if (!this.usage && !this.fleet) {
       if (this.state === 'unavailable') {
         this.clearDataBadge();
-        // Signed-out: the live compute pulse is account-scoped, so this is a sign-in
-        // gate — say so honestly (like Fleet / My Usage), NOT a scary "unreachable"
-        // that reads as a backend outage. The error copy is reserved for a genuine
-        // failure while signed in.
-        if (!isAuthenticated()) {
-          this.setContent(`<div class="cloud-empty">Sign in to see the live inference plane — tokens/sec, requests, spend and GPUs, metered to your org.</div>`);
-        } else {
-          this.setContent(`<div class="cloud-admin-gate">
-            <div class="cloud-admin-gate-title">Compute telemetry unavailable</div>
-            <div class="cloud-admin-gate-body">${escapeHtml(this.reason || 'The inference plane is not reachable right now.')}</div>
-          </div>`);
-        }
+        // Signed IN but the plane is unreachable — a genuine failure (signed-out is
+        // gated above). Reserve this error copy for exactly that case.
+        this.setContent(`<div class="cloud-admin-gate">
+          <div class="cloud-admin-gate-title">Compute telemetry unavailable</div>
+          <div class="cloud-admin-gate-body">${escapeHtml(this.reason || 'The inference plane is not reachable right now.')}</div>
+        </div>`);
         return;
       }
       this.showLoading('Connecting…');
