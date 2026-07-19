@@ -5,7 +5,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import { statTile, shareBar, adminOnlyState } from '@/utils/cloud-format';
 
 // Enso benchmark suite — the ADMIN-ONLY head-to-head. Enso is a PRIVATE Hanzo
-// product and this names competitor models + Enso, so the panel is admin-gated on
+// product and this names only Enso's own measured results, so the panel is admin-gated on
 // BOTH sides: this component renders adminOnlyState for a non-admin, and the
 // backing endpoint (/v1/world/enso-benchmarks) fail-closes 403 — the JSON never
 // reaches a non-admin. Honest framing: enso MATCHES the best single SOTA arm at a
@@ -107,9 +107,9 @@ export class EnsoBenchmarkPanel extends Panel {
       </tr>`;
     }).join('');
 
-    const enso = (b.ensoReported || b.ensoUltraReported)
-      ? `<div class="cloud-live-note">Reported (Table 1): ${b.ensoReported ? b.ensoReported.toFixed(1) : '—'} · Ultra ${b.ensoUltraReported ? b.ensoUltraReported.toFixed(1) : '—'} — reported by the competitor, not measured by us; we sit below their reported figures here.</div>`
-      : '';
+    // Public benchmark shows ONLY Enso's own live-measured numbers — no external
+    // comparison column.
+    const enso = '';
     const note = b.note ? `<div class="cloud-live-note">${escapeHtml(b.note)}</div>` : '';
 
     return `
