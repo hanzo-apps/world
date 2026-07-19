@@ -188,8 +188,14 @@ test.describe('layout engine', () => {
     );
     await page.mouse.up();
 
-    // Height grew to a taller row-span and width snapped to multiple columns.
-    await expect(page.locator('[data-panel="delta"]')).toHaveClass(/span-2/);
+    // Height grew (fine 16px row grid → a data-span well above the ~100px min) and
+    // width snapped to multiple columns. Resize lands on the fine grid, not the
+    // coarse span-N tier classes, so the panel carries `resized` + a data-span.
+    await expect(page.locator('[data-panel="delta"]')).toHaveClass(/resized/);
+    const span = await page.evaluate(() =>
+      parseInt(document.querySelector<HTMLElement>('[data-panel="delta"]')!.dataset.span ?? '0', 10),
+    );
+    expect(span).toBeGreaterThan(5); // taller than its start via the fine row grid
     const gc = await page.evaluate(() => window.__layoutHarness!.gridColumnOf('delta'));
     expect(gc).toMatch(/span [2-9]/);
 
@@ -340,6 +346,57 @@ test.describe('layout engine', () => {
     await page.screenshot({ path: `${SHOTS}/free-all-corners.png` });
   });
 
+  test('free mode: moving one panel never shifts its siblings (no reflow)', async ({ page }) => {
+    // The owner's #1 complaint: dragging the map/one panel "shifts all other
+    // components". In free mode each panel is independent — this proves a big drag
+    // of one leaves every sibling byte-for-byte where it was.
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+
+    const siblings = ['bravo', 'charlie', 'delta', 'echo'] as const;
+    const before: Record<string, Rect> = {};
+    for (const id of siblings) before[id] = await rect(page, id);
+
+    const hdr = await headerBox(page, 'alpha');
+    await page.mouse.move(hdr.x + 30, hdr.y + hdr.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hdr.x + 40, hdr.y + hdr.height / 2, { steps: 3 });
+    await page.mouse.move(hdr.x + 300, hdr.y + hdr.height / 2 + 200, { steps: 18 });
+    await page.mouse.up();
+
+    for (const id of siblings) {
+      const a = await rect(page, id);
+      const b = before[id]!;
+      expect(Math.abs(a.left - b.left)).toBeLessThan(2);
+      expect(Math.abs(a.top - b.top)).toBeLessThan(2);
+      expect(Math.abs(a.width - b.width)).toBeLessThan(2);
+      expect(Math.abs(a.height - b.height)).toBeLessThan(2);
+    }
+  });
+
+  test('free mode: a panel resizes narrower than the old 160px min width', async ({ page }) => {
+    // The owner's #3 complaint: panels are "constrained on min width". Free mode's
+    // floor is now ~96px, so a panel can be pulled well under the old 160px track.
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+
+    const before = await rect(page, 'bravo');
+    const corner = (await page
+      .locator('[data-panel="bravo"] .panel-corner-resize-handle.se')
+      .boundingBox())!;
+    // Pull the SE corner far left → collapse width toward the low floor.
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(corner.x - before.width, corner.y + corner.height / 2, { steps: 18 });
+    await page.mouse.up();
+
+    const after = await rect(page, 'bravo');
+    expect(after.width).toBeLessThan(150); // narrower than the old 160px floor
+    expect(after.width).toBeGreaterThanOrEqual(90); // …but not past the new ~96px floor
+  });
+
   test('free mode: the map participates with a 240px floor', async ({ page }) => {
     await lh(page);
     await page.evaluate(() => window.__layoutHarness!.setMode('free'));
@@ -392,6 +449,11 @@ test.describe('live news video resize (real app)', () => {
     await page.goto('/');
     await page.waitForSelector(LN, { timeout: 45000 });
     await page.waitForTimeout(500);
+    // The app defaults to free layout now; this test asserts GRID column-span
+    // semantics, so pin grid explicitly (setLayoutMode marks it an explicit choice
+    // so the deferred default-to-free won't re-flip it).
+    await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'));
+    await page.waitForTimeout(80);
 
     const grid = (await page.locator('#panelsGrid').boundingBox())!;
     const ln = page.locator(LN);
