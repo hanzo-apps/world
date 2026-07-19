@@ -8682,18 +8682,20 @@ a.prediction-link:hover {
     display: none !important;
   }
 
-  /* Single-column panel layout on mobile */
+  /* Denser multi-column panel grid on mobile (≥2-up), adaptive to the viewport AND to
+     the cell-size control (--panel-col-min) — show more per screen, not one giant
+     column. The min(...,46vw) floor guarantees at least two columns on any phone
+     width, while a smaller --panel-col-min (the slider) packs in more. */
   .panels-grid {
-    display: flex !important;
-    flex-direction: column;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--panel-col-min, 150px), 46vw), 1fr));
     gap: 8px;
     padding: 8px;
   }
 
   .panel {
-    width: 100% !important;
-    min-height: 300px;
-    max-height: 400px;
+    min-height: 200px;
+    max-height: 360px;
   }
 
   /* Make map section smaller on mobile to show panels */
@@ -16544,7 +16546,9 @@ body.immersive .main-content { background: transparent; }
 /* Live-video background slot: a fixed, muted YouTube embed that covers the map. */
 .immersive-video-bg {
   position: fixed;
-  inset: 0;
+  /* Reserve the footer dock's height so the immersive video is NEVER covered by the
+     bottom controls bar — the full video sits ABOVE the footer, nothing occluded. */
+  inset: 0 0 44px 0;
   z-index: 0;
   overflow: hidden;
   background: #000;
