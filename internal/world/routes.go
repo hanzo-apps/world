@@ -68,6 +68,8 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/youtube/search", s.handleYouTubeSearch)
 	mux.HandleFunc("/v1/world/monitors", s.handleMonitors)
 	mux.HandleFunc("/v1/world/monitors/matches", s.handleMonitorMatches)
+	// model-improvement consent opt-in (proxied to ai's OrgSettings, the source of truth)
+	mux.HandleFunc("/v1/world/training-contribution", s.handleTrainingContribution)
 
 	// ingested-data lake — the "one place to query everything" (search +
 	// analytics across ALL ingested items: news, model observations, …).

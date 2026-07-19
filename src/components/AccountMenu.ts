@@ -12,6 +12,7 @@ import {
   setCurrentProject,
   type OrgScope,
 } from '../services/org-scope';
+import { getTrainingContribution, setTrainingContribution } from '../services/training-contribution';
 
 const STYLE_ID = 'account-menu-styles';
 
@@ -20,6 +21,9 @@ export class AccountMenu {
   private user: IamUser | null = null;
   private scope: OrgScope | null = null;
   private open = false;
+  // Model-improvement opt-in, mirrored from ai's OrgSettings. null = not yet loaded;
+  // painted OFF until the async read lands, so the default is never a false "on".
+  private trainingOptIn: boolean | null = null;
   private onDocClick = (e: MouseEvent) => {
     if (this.open && !this.element.contains(e.target as Node)) this.close();
   };
@@ -53,6 +57,7 @@ export class AccountMenu {
     }
     this.scope = await resolveScope();
     this.render();
+    void this.loadConsent(); // fills the opt-in toggle in place once ai answers
     this.announce(true);
   }
 
@@ -98,6 +103,7 @@ export class AccountMenu {
         </div>
         ${this.orgSection()}
         ${this.projectSection()}
+        ${this.consentSection()}
         <button class="am-signout" type="button">Sign out</button>
       </div>
     `;
@@ -129,6 +135,68 @@ export class AccountMenu {
         }
       });
     });
+
+    const toggle = this.element.querySelector<HTMLInputElement>('.am-consent-toggle');
+    toggle?.addEventListener('change', async () => {
+      // Explicit user action only — no pre-checking, no nagging. Optimistic flip,
+      // reverted if the server refuses, so the toggle never claims a state ai didn't
+      // accept.
+      const want = toggle.checked;
+      const prev = this.trainingOptIn === true;
+      toggle.disabled = true;
+      this.setConsentStatus('Saving…');
+      try {
+        const now = await setTrainingContribution(want);
+        this.trainingOptIn = now;
+        toggle.checked = now;
+        this.setConsentStatus(now ? 'On — thanks for helping improve routing.' : 'Off.');
+      } catch {
+        this.trainingOptIn = prev;
+        toggle.checked = prev;
+        this.setConsentStatus('Could not save — please try again.');
+      } finally {
+        toggle.disabled = false;
+      }
+    });
+  }
+
+  // "Help improve Hanzo AI" — the opt-in consent surface. Default OFF, honest
+  // microcopy, no dark patterns: rating keeps only a numeric score, never prompts or
+  // outputs, and runs confidentially/anonymously. The app is identical when OFF.
+  private consentSection(): string {
+    const on = this.trainingOptIn === true;
+    return `<div class="am-section am-consent">
+      <div class="am-section-title">Data &amp; privacy</div>
+      <div class="am-consent-row">
+        <span class="am-consent-title">Help improve Hanzo AI <span class="am-consent-opt">(optional)</span></span>
+        <label class="am-switch" title="Optional — off by default. Turn on to help improve routing quality.">
+          <input type="checkbox" class="am-consent-toggle" ${on ? 'checked' : ''} aria-label="Help improve Hanzo AI" />
+          <span class="am-switch-track"><span class="am-switch-thumb"></span></span>
+        </label>
+      </div>
+      <div class="am-consent-body">Turn this on to let Hanzo use your AI usage to improve routing quality. An automated judge rates how good each response was and keeps only a numeric score — we never store your prompts or outputs, and rating runs in a confidential/anonymous way. You can turn this off anytime.</div>
+      <div class="am-consent-status" role="status" aria-live="polite"></div>
+    </div>`;
+  }
+
+  // Load the current opt-in from ai and reflect it in the (already-painted) toggle
+  // without a full re-render, so an open dropdown / its handlers survive. Failure
+  // leaves the privacy-safe OFF default in place.
+  private async loadConsent(): Promise<void> {
+    let on = false;
+    try {
+      on = await getTrainingContribution();
+    } catch {
+      on = false;
+    }
+    this.trainingOptIn = on;
+    const toggle = this.element.querySelector<HTMLInputElement>('.am-consent-toggle');
+    if (toggle && !toggle.disabled) toggle.checked = on;
+  }
+
+  private setConsentStatus(msg: string): void {
+    const el = this.element.querySelector<HTMLElement>('.am-consent-status');
+    if (el) el.textContent = msg;
   }
 
   private orgSection(): string {
@@ -271,6 +339,28 @@ button.am-row:hover { background: var(--overlay-medium, rgba(255,255,255,0.08));
   border-radius: 0 0 6px 6px; text-align: left;
 }
 .am-signout:hover { background: var(--overlay-medium, rgba(255,255,255,0.08)); color: var(--red, #ef4444); }
+.am-consent { max-width: 280px; }
+.am-consent-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 8px; }
+.am-consent-title { font-size: 13px; font-weight: 600; }
+.am-consent-opt { font-size: 11px; font-weight: 400; opacity: 0.55; }
+.am-consent-body { padding: 4px 8px 2px; font-size: 11px; line-height: 1.45; opacity: 0.62; }
+.am-consent-status { padding: 0 8px; font-size: 11px; min-height: 14px; color: var(--accent, #818cf8); }
+.am-consent-status:empty { display: none; }
+/* Accessible switch: a real checkbox drives the styled track/thumb. */
+.am-switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
+.am-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.am-switch-track {
+  width: 34px; height: 20px; border-radius: 999px; background: var(--overlay-medium, rgba(255,255,255,0.16));
+  transition: background 0.15s; display: inline-flex; align-items: center; padding: 2px; box-sizing: border-box;
+}
+.am-switch-thumb {
+  width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+}
+.am-switch input:checked + .am-switch-track { background: var(--accent, #6366f1); }
+.am-switch input:checked + .am-switch-track .am-switch-thumb { transform: translateX(14px); }
+.am-switch input:disabled + .am-switch-track { opacity: 0.5; }
+.am-switch input:focus-visible + .am-switch-track { outline: 2px solid var(--accent, #818cf8); outline-offset: 2px; }
 `;
   document.head.appendChild(style);
 }
