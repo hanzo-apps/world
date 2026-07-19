@@ -34,11 +34,12 @@ const FLIP_MS = 180; // sibling reflow duration
 const DROP_SETTLE_MS = 160; // ghost easing into its final slot on release
 const FLIP_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 
-// Sane pixel floors for free-mode geometry. The map keeps a larger floor so it
-// never collapses to an unreadable sliver.
-const FREE_MIN_W = 160;
-const FREE_MIN_H = 48;
-const MAP_MIN = 240;
+// Sane pixel floors for free-mode geometry — low so a panel can be dragged much
+// narrower/smaller than the old grid track allowed ("constrained on min width").
+// The map keeps a slightly larger floor so the globe never collapses to a sliver.
+const FREE_MIN_W = 96;
+const FREE_MIN_H = 40;
+const MAP_MIN = 140;
 
 const minWidthFor = (el: HTMLElement, opt?: number): number =>
   el.classList.contains('map-panel') ? MAP_MIN : opt ?? FREE_MIN_W;

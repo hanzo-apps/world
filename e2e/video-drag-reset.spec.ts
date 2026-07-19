@@ -19,6 +19,14 @@ async function appReady(page: Page): Promise<void> {
     undefined,
     { timeout: 45000 },
   );
+  // The app now DEFAULTS to free layout (independent, non-reflowing panels). These
+  // specs exercise the GRID reorder/ghost/row-span/reset machinery specifically, so
+  // pin grid mode (still a first-class, dropdown-selectable mode). setLayoutMode
+  // marks the choice explicit, so the deferred default-to-free never re-flips it.
+  await page.evaluate(() =>
+    (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'),
+  );
+  await page.waitForTimeout(80);
 }
 
 function gridOrder(page: Page): Promise<(string | undefined)[]> {
@@ -94,7 +102,12 @@ test.describe('video panel drag + reset (live app)', () => {
     await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 230, { steps: 14 });
     await page.mouse.up();
 
-    await expect(panel).toHaveClass(/span-2/);
+    // Height resize lands on the fine 16px row grid (smooth ~20px steps), so the
+    // panel carries `resized` + a data-span well above the ~100px minSpan — not the
+    // coarse span-2 tier class the old assertion expected.
+    await expect(panel).toHaveClass(/resized/);
+    const span = await panel.evaluate((el) => parseInt((el as HTMLElement).dataset.span ?? '0', 10));
+    expect(span).toBeGreaterThan(5);
   });
 
   test('Reset layout returns the grid to the default order', async ({ page }) => {
