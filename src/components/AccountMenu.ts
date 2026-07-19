@@ -21,8 +21,12 @@ export class AccountMenu {
   private user: IamUser | null = null;
   private scope: OrgScope | null = null;
   private open = false;
-  // Model-improvement opt-in, mirrored from ai's OrgSettings. null = not yet loaded;
-  // painted OFF until the async read lands, so the default is never a false "on".
+  // Model-improvement consent, mirrored from ai's OrgSettings via its GEO-AWARE
+  // effective default (opt-in / default-OFF in the EU, UK & EEA; opt-out /
+  // default-ON, disclosed at signup, elsewhere). null = not yet loaded; painted OFF
+  // until the async read lands so we never flash a false "on", then reconciled to
+  // whatever ai reports — including an ON default for a non-EU org. We never
+  // hardcode the default; the toggle is a mirror of ai's answer.
   private trainingOptIn: boolean | null = null;
   private onDocClick = (e: MouseEvent) => {
     if (this.open && !this.element.contains(e.target as Node)) this.close();
@@ -160,28 +164,32 @@ export class AccountMenu {
     });
   }
 
-  // "Help improve Hanzo AI" — the opt-in consent surface. Default OFF, honest
+  // "Help improve Hanzo AI" — the model-improvement consent surface. Reflects ai's
+  // geo-aware effective state (never a hardcoded default); honest, state-neutral
   // microcopy, no dark patterns: rating keeps only a numeric score, never prompts or
-  // outputs, and runs confidentially/anonymously. The app is identical when OFF.
+  // outputs, and runs confidentially/anonymously. The app is identical when OFF, and
+  // it can be turned off (or on) anytime.
   private consentSection(): string {
     const on = this.trainingOptIn === true;
     return `<div class="am-section am-consent">
       <div class="am-section-title">Data &amp; privacy</div>
       <div class="am-consent-row">
         <span class="am-consent-title">Help improve Hanzo AI <span class="am-consent-opt">(optional)</span></span>
-        <label class="am-switch" title="Optional — off by default. Turn on to help improve routing quality.">
+        <label class="am-switch" title="Optional — you're always in control. Turn it off (or on) anytime.">
           <input type="checkbox" class="am-consent-toggle" ${on ? 'checked' : ''} aria-label="Help improve Hanzo AI" />
           <span class="am-switch-track"><span class="am-switch-thumb"></span></span>
         </label>
       </div>
-      <div class="am-consent-body">Turn this on to let Hanzo use your AI usage to improve routing quality. An automated judge rates how good each response was and keeps only a numeric score — we never store your prompts or outputs, and rating runs in a confidential/anonymous way. You can turn this off anytime.</div>
+      <div class="am-consent-body">When on, Hanzo uses your AI usage to improve routing quality. An automated judge rates how good each response was and keeps only a numeric score — we never store your prompts or outputs, and rating runs in a confidential, anonymous way. You're always in control: turning it off changes nothing else about how Hanzo works for you.</div>
       <div class="am-consent-status" role="status" aria-live="polite"></div>
     </div>`;
   }
 
-  // Load the current opt-in from ai and reflect it in the (already-painted) toggle
-  // without a full re-render, so an open dropdown / its handlers survive. Failure
-  // leaves the privacy-safe OFF default in place.
+  // Load the current EFFECTIVE consent from ai (its geo-aware default when the org
+  // never set one explicitly) and reflect it in the already-painted toggle without a
+  // full re-render, so an open dropdown / its handlers survive. An ON effective
+  // default (non-EU) therefore shows checked once ai answers. Failure leaves the
+  // privacy-safe OFF in place — a broken read never implies consent.
   private async loadConsent(): Promise<void> {
     let on = false;
     try {
