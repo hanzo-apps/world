@@ -87,8 +87,10 @@ export interface FleetWorker {
   provider: string;
   location: string;
   status: string;
+  arch: string;
   gpu: string;
   vram: string;
+  mem: string;
   capabilities: string[];
   version: string;
 }

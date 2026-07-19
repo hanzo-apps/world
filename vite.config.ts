@@ -229,7 +229,12 @@ export default defineConfig({
     htmlVariantPlugin(),
     youtubeLivePlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': we own the update UX (a subtle "new version — reload" toast in
+      // sw-update.ts) instead of a surprise auto-reload. skipWaiting + clientsClaim
+      // (workbox, below) still make the new worker take over on next load; the toast
+      // just offers an immediate, clean reload, and index stays network-first so any
+      // reload always names the current bundles.
+      registerType: 'prompt',
       injectRegister: false,
 
       includeAssets: [

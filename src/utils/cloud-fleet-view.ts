@@ -62,8 +62,8 @@ export function fleetWorkers(workers: FleetWorker[]): string {
     <div class="cloud-subhead">${icon('cpu', 12)} BYO GPU workers</div>
     ${workers.map((wk) => `<div class="cloud-worker-row">
       <span class="cloud-status-dot ${wk.status === 'online' ? 'online' : 'offline'}"></span>
-      <span class="cloud-worker-name">${escapeHtml(wk.hostname || wk.id)}${wk.location ? `<span class="cloud-machine-type">${escapeHtml(wk.location)}</span>` : ''}</span>
-      <span class="cloud-worker-gpu">${escapeHtml(wk.gpu || '—')}${wk.vram ? ` · ${escapeHtml(wk.vram)}` : ''}${wk.version ? ` · v${escapeHtml(wk.version)}` : ''}</span>
+      <span class="cloud-worker-name">${escapeHtml(wk.hostname || wk.id)}</span>
+      <span class="cloud-worker-gpu">${escapeHtml(wk.gpu || '—')}${wk.vram ? ` · ${escapeHtml(wk.vram)}` : ''}${wk.mem ? ` · ${escapeHtml(wk.mem)}` : ''}${wk.arch ? ` · ${escapeHtml(wk.arch)}` : ''}${wk.version ? ` · v${escapeHtml(wk.version)}` : ''}</span>
       <span class="cloud-worker-caps">${escapeHtml((wk.capabilities || []).join(', '))}</span>
     </div>`).join('')}
   </div>`;

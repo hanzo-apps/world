@@ -44,7 +44,8 @@ export type IconName =
   | 'panel-right'
   | 'columns-2'
   | 'maximize'
-  | 'pip';
+  | 'pip'
+  | 'info';
 
 // Inner markup only (the <svg> wrapper is added by icon()).
 const PATHS: Record<IconName, string> = {
@@ -111,6 +112,7 @@ const PATHS: Record<IconName, string> = {
   'columns-2': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
   maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
   pip: '<path d="M2 10h6V4"/><path d="m2 4 6 6"/><path d="M21 10V7a2 2 0 0 0-2-2h-7"/><path d="M3 14v2a2 2 0 0 0 2 2h3"/><rect width="10" height="7" x="12" y="13" rx="2"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
 };
 
 /** Inline a canonical lucide icon as an SVG string. Inherits color (currentColor)
