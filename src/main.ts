@@ -66,6 +66,7 @@ import { installRuntimeFetchPatch } from '@/services/runtime';
 import { isCallback, handleCallback } from '@/services/iam';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
+import { applyStoredUiScale } from '@/utils/ui-scale';
 import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chunk-reload';
 import { installServiceWorker } from '@/services/sw-update';
 
@@ -81,6 +82,9 @@ void loadDesktopSecrets();
 
 // Apply stored theme preference before app initialization (safety net for inline script)
 applyStoredTheme();
+
+// Apply the user's saved text-size / UI scale before first paint (accessibility).
+applyStoredUiScale();
 
 // Remove no-transition class after first paint to enable smooth theme transitions
 requestAnimationFrame(() => {

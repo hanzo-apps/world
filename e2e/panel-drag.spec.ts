@@ -481,6 +481,47 @@ test.describe('layout engine', () => {
     expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(1);
   });
 
+  test('resize handles show no visible glyphs (owner request) but still resize', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setMode('free'));
+    await page.waitForTimeout(40);
+    // The corner/edge resize glyphs are hidden (display:none on the ::after marks) —
+    // no visible "< >" chevrons — while the handles stay live.
+    const displays = await page.evaluate(() => {
+      const d = (sel: string) => {
+        const el = document.querySelector(sel);
+        return el ? getComputedStyle(el, '::after').display : 'missing';
+      };
+      return {
+        corner: d('[data-panel="alpha"] .panel-corner-resize-handle.se'),
+        col: d('[data-panel="alpha"] .panel-col-resize-handle'),
+        row: d('[data-panel="alpha"] .panel-resize-handle'),
+      };
+    });
+    expect(displays.corner).toBe('none');
+    expect(displays.col).toBe('none');
+    expect(displays.row).toBe('none');
+    // Functionality intact: the (now glyph-less) SE corner still resizes.
+    const before = await rect(page, 'alpha');
+    const corner = (await page.locator('[data-panel="alpha"] .panel-corner-resize-handle.se').boundingBox())!;
+    await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(corner.x + 180, corner.y + 120, { steps: 12 });
+    await page.mouse.up();
+    expect((await rect(page, 'alpha')).width).toBeGreaterThan(before.width + 40);
+  });
+
+  test('cell size can go down to the finer 80px floor', async ({ page }) => {
+    await lh(page);
+    await page.evaluate(() => window.__layoutHarness!.setCell(80));
+    await page.waitForTimeout(30);
+    expect(await page.evaluate(() => window.__layoutHarness!.cell())).toBe(80);
+    // Clamped: a request below the floor snaps back up to 80, never lower.
+    await page.evaluate(() => window.__layoutHarness!.setCell(40));
+    await page.waitForTimeout(30);
+    expect(await page.evaluate(() => window.__layoutHarness!.cell())).toBe(80);
+  });
+
   test('toggle flips grid ⇄ free and back', async ({ page }) => {
     await lh(page);
     expect(await page.evaluate(() => window.__layoutHarness!.toggle())).toBe('free');
@@ -608,5 +649,33 @@ test.describe('live news video resize (real app)', () => {
     const video = await rectW(page, LN_PLAYER);
     if (video > 0) expect(Math.abs(video - content)).toBeLessThan(6); // fills at that size
     await page.evaluate(() => (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'));
+  });
+});
+
+// Text size / UI scale (accessibility) — real app.
+test.describe('text size control (real app)', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test('the dock text-size slider scales panel content and persists across reload', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('[data-panel="live-news"]', { timeout: 45000 });
+    // Drive the dock "Text size" slider to 1.4.
+    await page.evaluate(() => {
+      const el = document.getElementById('dockFontSize') as HTMLInputElement;
+      el.value = '1.4';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim()))
+      .toBe('1.4');
+    expect(await page.evaluate(() => localStorage.getItem('hanzo-world-ui-scale'))).toBe('1.4');
+    const zoom = await page.evaluate(() => {
+      const c = document.querySelector('.panel-content');
+      return c ? getComputedStyle(c).zoom : '';
+    });
+    expect(parseFloat(zoom)).toBeCloseTo(1.4, 1);
+    // Persists across reload (applyStoredUiScale runs at boot).
+    await page.reload();
+    await page.waitForSelector('[data-panel="live-news"]', { timeout: 45000 });
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim())).toBe('1.4');
   });
 });
