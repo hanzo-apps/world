@@ -142,7 +142,7 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/cloud/analytics", s.handleCloudAnalytics)
 	mux.HandleFunc("/v1/world/cloud/llm", s.handleCloudLLM)
 	// ADMIN-only Enso benchmark suite: private, competitive head-to-head (names
-	// competitor models + Fugu). Same requireAdmin gate (401/403 fail-closed);
+	// competitor models + Enso). Same requireAdmin gate (401/403 fail-closed);
 	// reshapes the embedded enso-bench snapshot — never leaks to a non-admin.
 	mux.HandleFunc("/v1/world/enso-benchmarks", s.handleEnsoBenchmarks)
 

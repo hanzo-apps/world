@@ -9,7 +9,7 @@ import (
 )
 
 // Enso benchmark suite — the ADMIN-ONLY head-to-head. Enso is a PRIVATE Hanzo
-// product and this data names competitor models + Fugu, so the endpoint is gated
+// product and this data names competitor models + Enso, so the endpoint is gated
 // by requireAdmin (fail-closed: 401 without a token, 403 for a non-admin owner) —
 // the SAME IAM-introspection gate the deep Cloud panels use. A non-admin never
 // receives the benchmark JSON; it is not merely hidden in the client.
@@ -19,13 +19,13 @@ import (
 // honest blocks the panel renders:
 //
 //  1. per-bench measured head-to-head (each system's accuracy ± stderr + cost,
-//     with the best single arm and the Fugu-reported figure alongside),
+//     with the best single arm and the Enso-reported figure alongside),
 //  2. the enso-ultra v1→v2 verify-then-select ablation (Δ accuracy + cost drop),
 //  3. the agentic SWE-Bench Pro pilot (step-routed vs single-Opus),
 //
 // plus server-authored caveats so the honest framing travels WITH the data and
-// cannot be stripped in the client. Numbers are measured; Fugu columns are
-// Fugu's own reported (Table 1) figures — never conflated.
+// cannot be stripped in the client. Numbers are measured; Enso columns are
+// Enso's own reported (Table 1) figures — never conflated.
 
 // ── snapshot shape (superset of the flywheel's minimal read) ─────────────────
 
@@ -54,7 +54,7 @@ type agenticEntry struct {
 
 type benchSnapshot struct {
 	Measured      map[string]map[string]benchFullRow  `json:"measured"`
-	FuguReported  map[string]map[string]float64       `json:"fugu_reported"`
+	EnsoReported  map[string]map[string]float64       `json:"enso_reported"`
 	UltraAblation map[string]map[string]ablationEntry `json:"ultra_ablation"`
 	Pending       []string                            `json:"pending"`
 	TotalUsdEst   float64                             `json:"total_usd_est"`
@@ -87,8 +87,8 @@ type benchTable struct {
 	BestArmPct        float64          `json:"bestArmPct"`
 	EnsoPct           float64          `json:"ensoPct"`
 	EnsoUsd           float64          `json:"ensoUsd"`
-	FuguReported      float64          `json:"fuguReported,omitempty"`
-	FuguUltraReported float64          `json:"fuguUltraReported,omitempty"`
+	EnsoReported      float64          `json:"ensoReported,omitempty"`
+	EnsoUltraReported float64          `json:"ensoUltraReported,omitempty"`
 	Note              string           `json:"note,omitempty"`
 }
 
@@ -126,7 +126,7 @@ type agenticTable struct {
 	Note       string           `json:"note"`
 }
 
-type fuguTable struct {
+type ensoTable struct {
 	Bench  string             `json:"bench"`
 	Scores map[string]float64 `json:"scores"`
 }
@@ -137,17 +137,17 @@ type ensoBenchmarks struct {
 	Benches     []benchTable    `json:"benches"`
 	Ablation    []ablationTable `json:"ablation"`
 	Agentic     *agenticTable   `json:"agentic,omitempty"`
-	Fugu        []fuguTable     `json:"fugu"`
+	Enso        []ensoTable     `json:"enso"`
 	Pending     []string        `json:"pending"`
 	TotalUsdEst float64         `json:"totalUsdEst"`
 	Caveats     []string        `json:"caveats"`
 }
 
-// benchDisplay maps a measured bench key to its display name and the Fugu Table-1
-// label for the same benchmark (empty ⇒ no Fugu counterpart). The slice order is
+// benchDisplay maps a measured bench key to its display name and the Enso Table-1
+// label for the same benchmark (empty ⇒ no Enso counterpart). The slice order is
 // the panel's display order (agentic-adjacent code benches first).
 var benchDisplay = []struct {
-	Key, Name, Fugu string
+	Key, Name, Enso string
 }{
 	{"livecodebench", "LiveCodeBench", "LiveCodeBench"},
 	{"gpqa_diamond", "GPQA Diamond", "GPQA Diamond"},
@@ -188,7 +188,7 @@ func (s *Server) ensoBenchmarksSource(ctx context.Context) ([]byte, string) {
 // order-stable: an unparseable snapshot yields an empty-but-valid response rather
 // than an error, so the admin panel degrades honestly instead of 5xxing.
 func buildEnsoBenchmarks(data []byte, source string) ensoBenchmarks {
-	out := ensoBenchmarks{UpdatedAt: nowRFC(), Source: source, Pending: []string{}, Benches: []benchTable{}, Ablation: []ablationTable{}, Fugu: []fuguTable{}}
+	out := ensoBenchmarks{UpdatedAt: nowRFC(), Source: source, Pending: []string{}, Benches: []benchTable{}, Ablation: []ablationTable{}, Enso: []ensoTable{}}
 	var snap benchSnapshot
 	if json.Unmarshal(data, &snap) != nil {
 		out.Caveats = ensoCaveats(out.Benches, out.Ablation, out.Agentic)
@@ -198,7 +198,7 @@ func buildEnsoBenchmarks(data []byte, source string) ensoBenchmarks {
 	out.Benches = buildBenchTables(snap)
 	out.Ablation = buildAblation(snap.UltraAblation)
 	out.Agentic = buildAgentic(snap)
-	out.Fugu = buildFugu(snap.FuguReported)
+	out.Enso = buildEnso(snap.EnsoReported)
 	if snap.Pending != nil {
 		out.Pending = snap.Pending
 	}
@@ -244,10 +244,10 @@ func buildBenchTables(snap benchSnapshot) []benchTable {
 		if er, ok := sysMap["enso"]; ok {
 			t.EnsoPct, t.EnsoUsd = er.AccuracyPct, er.UsdEst
 		}
-		if bd.Fugu != "" {
-			if fr, ok := snap.FuguReported[bd.Fugu]; ok {
-				t.FuguReported = fr["Fugu"]
-				t.FuguUltraReported = fr["Fugu-Ultra"]
+		if bd.Enso != "" {
+			if fr, ok := snap.EnsoReported[bd.Enso]; ok {
+				t.EnsoReported = fr["Enso"]
+				t.EnsoUltraReported = fr["Enso-Ultra"]
 			}
 		}
 		if allPreflight(t.Systems) {
@@ -336,18 +336,18 @@ func buildAgentic(snap benchSnapshot) *agenticTable {
 	}
 }
 
-func buildFugu(fugu map[string]map[string]float64) []fuguTable {
-	if len(fugu) == 0 {
-		return []fuguTable{}
+func buildEnso(enso map[string]map[string]float64) []ensoTable {
+	if len(enso) == 0 {
+		return []ensoTable{}
 	}
-	keys := make([]string, 0, len(fugu))
-	for k := range fugu {
+	keys := make([]string, 0, len(enso))
+	for k := range enso {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	out := make([]fuguTable, 0, len(keys))
+	out := make([]ensoTable, 0, len(keys))
 	for _, k := range keys {
-		out = append(out, fuguTable{Bench: k, Scores: fugu[k]})
+		out = append(out, ensoTable{Bench: k, Scores: enso[k]})
 	}
 	return out
 }
@@ -366,7 +366,7 @@ func ensoCaveats(benches []benchTable, ablation []ablationTable, agentic *agenti
 
 	caveats = append(caveats,
 		"HLE is a preflight only (n=1) — not a scored run. Enso routes HLE to Opus, which underperforms there, so treat HLE as not-yet-measured, not a real 0%.",
-		"All Enso/arm numbers are MEASURED against live APIs. Fugu columns are Fugu's own REPORTED (Table 1) static numbers — we are below Fugu's reported figures on the shared benches.")
+		"All Enso/arm numbers are MEASURED against live APIs. Enso columns are Enso's own REPORTED (Table 1) static numbers — we are below Enso's reported figures on the shared benches.")
 
 	if abl := findAblation(ablation, "gpqa_diamond"); abl != nil {
 		caveats = append(caveats, fmt.Sprintf(
