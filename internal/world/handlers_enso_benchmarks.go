@@ -35,6 +35,11 @@ type benchFullRow struct {
 	N           int     `json:"n"`
 	UsdEst      float64 `json:"usd_est"`
 	RunTag      string  `json:"run_tag"`
+	// Degraded marks a run that lost most of its items to zero-token blanks. Blanks are
+	// not missing-at-random -- they land on the hard items the model gets wrong -- so the
+	// accuracy over the survivors is inflated and must not be shown as a score. A degraded
+	// row is dropped from the table rather than displayed with a misleading number.
+	Degraded bool `json:"degraded"`
 }
 
 type ablationEntry struct {
@@ -216,6 +221,9 @@ func buildBenchTables(snap benchSnapshot) []benchTable {
 		}
 		t := benchTable{Key: bd.Key, Name: bd.Name}
 		for sys, row := range sysMap {
+			if row.Degraded {
+				continue // most of the run was blank; not a trustworthy measurement
+			}
 			pre := row.N <= 1 || row.RunTag == "preflight"
 			t.Systems = append(t.Systems, benchSystemRow{
 				System:      sys,
