@@ -113,8 +113,12 @@ func TestEnsoBenchmarksAdminPayload(t *testing.T) {
 			t.Fatalf("systems not sorted desc: %+v", lcb.Systems)
 		}
 	}
-	if lcb.EnsoReported == 0 || lcb.EnsoUltraReported == 0 {
-		t.Fatalf("LiveCodeBench must carry Enso-reported columns, got %+v", lcb)
+	// No "reported" reference columns: the dashboard shows only our own corrected
+	// MEASURED standing. The prior snapshot carried aspirational Enso figures that did not
+	// match measurement (and named other vendors); those were removed, so a live table must
+	// NOT surface a reported column.
+	if lcb.EnsoReported != 0 || lcb.EnsoUltraReported != 0 {
+		t.Fatalf("LiveCodeBench must not carry reported columns anymore, got %+v", lcb)
 	}
 	// enso row must be flagged family=enso for the highlight.
 	var sawEnsoFamily bool
@@ -166,8 +170,11 @@ func TestEnsoBenchmarksAdminPayload(t *testing.T) {
 	if len(eb.Caveats) < 3 {
 		t.Fatalf("caveats must be present (honest framing), got %d", len(eb.Caveats))
 	}
-	if len(eb.Enso) == 0 {
-		t.Fatalf("Enso-reported reference table must be present")
+	// The aspirational "Enso-reported" reference table is gone: it carried figures that
+	// did not match measurement and named other vendors. The dashboard stands on its own
+	// corrected measured tables, so this must be empty.
+	if len(eb.Enso) != 0 {
+		t.Fatalf("reported reference table must be empty now, got %d entries", len(eb.Enso))
 	}
 	if eb.TotalUsdEst <= 0 {
 		t.Fatalf("total spend must be reported, got %v", eb.TotalUsdEst)

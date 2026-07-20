@@ -630,57 +630,7 @@
    "judge_completion_tokens": 36
   }
  },
- "enso_reported": {
-  "SWE-Bench Pro": {
-   "Enso-Ultra": 73.7,
-   "Enso": 59.0,
-   "Opus-4.8": 69.2,
-   "Gemini-3.1": 54.2,
-   "GPT-5.5": 58.6
-  },
-  "Terminal Bench 2.1": {
-   "Enso-Ultra": 82.1,
-   "Enso": 80.2,
-   "Opus-4.8": 74.6,
-   "Gemini-3.1": 70.3,
-   "GPT-5.5": 78.2
-  },
-  "LiveCodeBench": {
-   "Enso-Ultra": 93.2,
-   "Enso": 92.9,
-   "Opus-4.8": 87.8,
-   "Gemini-3.1": 88.5,
-   "GPT-5.5": 85.3
-  },
-  "LiveCodeBench Pro": {
-   "Enso-Ultra": 90.8,
-   "Enso": 87.8,
-   "Opus-4.8": 84.8,
-   "Gemini-3.1": 82.9,
-   "GPT-5.5": 88.4
-  },
-  "Humanity's Last Exam": {
-   "Enso-Ultra": 50.0,
-   "Enso": 47.2,
-   "Opus-4.8": 49.8,
-   "Gemini-3.1": 44.4,
-   "GPT-5.5": 41.4
-  },
-  "CharXiv Reasoning": {
-   "Enso-Ultra": 86.6,
-   "Enso": 85.1,
-   "Opus-4.8": 84.2,
-   "Gemini-3.1": 83.3,
-   "GPT-5.5": 84.1
-  },
-  "GPQA Diamond": {
-   "Enso-Ultra": 95.5,
-   "Enso": 95.5,
-   "Opus-4.8": 92.0,
-   "Gemini-3.1": 94.3,
-   "GPT-5.5": 93.6
-  }
- },
+ "enso_reported": {},
  "pending": [
   "swebench_pro",
   "terminal_bench"
