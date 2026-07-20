@@ -118,7 +118,9 @@
     },
     "usd_est": 0.0,
     "wall_seconds": null,
-    "run_tag": "max"
+    "run_tag": "max",
+    "degraded": true,
+    "blank_rate_pct": 65.2
    },
    "enso": {
     "accuracy_pct": 87.9,
@@ -188,6 +190,25 @@
     "wall_seconds": null,
     "run_tag": "k3-max"
    },
+   "glm-5.2@openrouter": {
+    "accuracy_pct": 79.8,
+    "stderr_pct": 3.7,
+    "n": 119,
+    "correct": 95,
+    "errors": 79,
+    "infra_excluded": 79,
+    "tokens": {
+     "prompt": 32982,
+     "completion": 1228859,
+     "reasoning": 983679,
+     "calls": 119
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "glm-true",
+    "degraded": true,
+    "blank_rate_pct": 39.9
+   },
    "opus-4.8": {
     "accuracy_pct": 86.9,
     "stderr_pct": 2.4,
@@ -256,7 +277,9 @@
     },
     "usd_est": 0.0,
     "wall_seconds": null,
-    "run_tag": "v2"
+    "run_tag": "v2",
+    "degraded": true,
+    "blank_rate_pct": 17.7
    },
    "deepseek-v4-pro": {
     "accuracy_pct": 51.4,
@@ -358,7 +381,9 @@
     },
     "usd_est": 0.0,
     "wall_seconds": null,
-    "run_tag": "v2"
+    "run_tag": "v2",
+    "degraded": true,
+    "blank_rate_pct": 10.9
    },
    "enso-ultra": {
     "accuracy_pct": 85.1,
