@@ -1,323 +1,771 @@
 {
-  "measured": {
-    "livecodebench": {
-      "enso-ultra": {
-        "accuracy_pct": 81.1,
-        "stderr_pct": 3.0,
-        "n": 175,
-        "correct": 142,
-        "errors": 1,
-        "tokens": {
-          "prompt": 777022,
-          "completion": 1611092,
-          "reasoning": 452206,
-          "calls": 696
-        },
-        "usd_est": 90.682,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "fable-5": {
-        "accuracy_pct": 82.9,
-        "stderr_pct": 2.9,
-        "n": 175,
-        "correct": 145,
-        "errors": 0,
-        "tokens": {
-          "prompt": 125867,
-          "completion": 544855,
-          "reasoning": 0,
-          "calls": 175
-        },
-        "usd_est": 8.5504,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "enso": {
-        "accuracy_pct": 91.4,
-        "stderr_pct": 2.1,
-        "n": 175,
-        "correct": 160,
-        "errors": 1,
-        "tokens": {
-          "prompt": 92002,
-          "completion": 512599,
-          "reasoning": 454741,
-          "calls": 174
-        },
-        "usd_est": 5.241,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "opus-4.8": {
-        "accuracy_pct": 72.0,
-        "stderr_pct": 3.4,
-        "n": 175,
-        "correct": 126,
-        "errors": 2,
-        "tokens": {
-          "prompt": 124432,
-          "completion": 500884,
-          "reasoning": 0,
-          "calls": 173
-        },
-        "usd_est": 39.4328,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "deepseek-v4-pro": {
-        "accuracy_pct": 48.0,
-        "stderr_pct": 3.8,
-        "n": 175,
-        "correct": 84,
-        "errors": 0,
-        "tokens": {
-          "prompt": 92354,
-          "completion": 76407,
-          "reasoning": 0,
-          "calls": 175
-        },
-        "usd_est": 0.1769,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "gpt-5.5": {
-        "accuracy_pct": 91.4,
-        "stderr_pct": 2.1,
-        "n": 175,
-        "correct": 160,
-        "errors": 1,
-        "tokens": {
-          "prompt": 92002,
-          "completion": 504668,
-          "reasoning": 444424,
-          "calls": 174
-        },
-        "usd_est": 5.1617,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      }
+ "measured": {
+  "gpqa_diamond": {
+   "gpt-5.6-terra": {
+    "accuracy_pct": 91.1,
+    "stderr_pct": 2.1,
+    "n": 191,
+    "correct": 174,
+    "errors": 0,
+    "infra_excluded": 7,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 25529,
+     "reasoning": 0,
+     "calls": 198
     },
-    "gpqa_diamond": {
-      "enso-ultra": {
-        "accuracy_pct": 89.9,
-        "stderr_pct": 2.1,
-        "n": 198,
-        "correct": 178,
-        "errors": 0,
-        "tokens": {
-          "prompt": 205635,
-          "completion": 612706,
-          "reasoning": 319290,
-          "calls": 601
-        },
-        "usd_est": 16.4333,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "enso": {
-        "accuracy_pct": 87.9,
-        "stderr_pct": 2.3,
-        "n": 198,
-        "correct": 174,
-        "errors": 0,
-        "tokens": {
-          "prompt": 74531,
-          "completion": 152519,
-          "reasoning": 29387,
-          "calls": 198
-        },
-        "usd_est": 10.0211,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "fable-5": {
-        "accuracy_pct": 81.3,
-        "stderr_pct": 2.8,
-        "n": 198,
-        "correct": 161,
-        "errors": 0,
-        "tokens": {
-          "prompt": 78121,
-          "completion": 199072,
-          "reasoning": 0,
-          "calls": 198
-        },
-        "usd_est": 3.2204,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      },
-      "opus-4.8": {
-        "accuracy_pct": 86.9,
-        "stderr_pct": 2.4,
-        "n": 198,
-        "correct": 172,
-        "errors": 0,
-        "tokens": {
-          "prompt": 78121,
-          "completion": 126069,
-          "reasoning": 0,
-          "calls": 198
-        },
-        "usd_est": 10.627,
-        "wall_seconds": 241.3,
-        "run_tag": "v1"
-      },
-      "gpt-5.5": {
-        "accuracy_pct": 90.4,
-        "stderr_pct": 2.1,
-        "n": 198,
-        "correct": 179,
-        "errors": 0,
-        "tokens": {
-          "prompt": 54916,
-          "completion": 362128,
-          "reasoning": 326158,
-          "calls": 198
-        },
-        "usd_est": 3.6899,
-        "wall_seconds": 2396.2,
-        "run_tag": "v1"
-      },
-      "deepseek-v4-pro": {
-        "accuracy_pct": 76.3,
-        "stderr_pct": 3.0,
-        "n": 198,
-        "correct": 151,
-        "errors": 0,
-        "tokens": {
-          "prompt": 52523,
-          "completion": 108318,
-          "reasoning": 0,
-          "calls": 198
-        },
-        "usd_est": 0.2076,
-        "wall_seconds": null,
-        "run_tag": "v1"
-      }
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "deepseek-4-flash": {
+    "accuracy_pct": 76.9,
+    "stderr_pct": 3.1,
+    "n": 182,
+    "correct": 140,
+    "errors": 16,
+    "infra_excluded": 16,
+    "tokens": {
+     "prompt": 56442,
+     "completion": 101277,
+     "reasoning": 0,
+     "calls": 182
     },
-    "hle": {
-      "enso": {
-        "accuracy_pct": 0.0,
-        "stderr_pct": 0.0,
-        "n": 1,
-        "correct": 0,
-        "errors": 0,
-        "tokens": {
-          "prompt": 148,
-          "completion": 1443,
-          "reasoning": 0,
-          "calls": 1
-        },
-        "usd_est": 0.1104,
-        "wall_seconds": null,
-        "run_tag": "preflight"
-      }
-    }
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "enso-flash": {
+    "accuracy_pct": 75.8,
+    "stderr_pct": 3.0,
+    "n": 198,
+    "correct": 150,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 361936,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "fable-5": {
+    "accuracy_pct": 81.3,
+    "stderr_pct": 2.8,
+    "n": 198,
+    "correct": 161,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 78121,
+     "completion": 199072,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 3.2204,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "deepseek-v4-pro": {
+    "accuracy_pct": 75.3,
+    "stderr_pct": 3.1,
+    "n": 198,
+    "correct": 149,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 107808,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.2113,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "gpt-5.5": {
+    "accuracy_pct": 90.4,
+    "stderr_pct": 2.1,
+    "n": 198,
+    "correct": 179,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 54916,
+     "completion": 362128,
+     "reasoning": 326158,
+     "calls": 198
+    },
+    "usd_est": 3.6899,
+    "wall_seconds": 2396.2,
+    "run_tag": "v1"
+   },
+   "glm-5.2": {
+    "accuracy_pct": 87.0,
+    "stderr_pct": 4.1,
+    "n": 69,
+    "correct": 60,
+    "errors": 0,
+    "infra_excluded": 129,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 26595,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "max"
+   },
+   "enso": {
+    "accuracy_pct": 87.9,
+    "stderr_pct": 2.3,
+    "n": 198,
+    "correct": 174,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 74531,
+     "completion": 152519,
+     "reasoning": 29387,
+     "calls": 198
+    },
+    "usd_est": 10.0211,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "gpt-5.6-sol": {
+    "accuracy_pct": 94.8,
+    "stderr_pct": 1.6,
+    "n": 193,
+    "correct": 183,
+    "errors": 0,
+    "infra_excluded": 5,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 34023,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "max"
+   },
+   "enso-ultra": {
+    "accuracy_pct": 90.4,
+    "stderr_pct": 2.1,
+    "n": 198,
+    "correct": 179,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 217469,
+     "completion": 603501,
+     "reasoning": 325464,
+     "calls": 605
+    },
+    "usd_est": 15.8887,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "kimi-k3": {
+    "accuracy_pct": 92.5,
+    "stderr_pct": 4.2,
+    "n": 40,
+    "correct": 37,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 13917,
+     "completion": 90614,
+     "reasoning": 81847,
+     "calls": 40
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "k3-max"
+   },
+   "opus-4.8": {
+    "accuracy_pct": 86.9,
+    "stderr_pct": 2.4,
+    "n": 198,
+    "correct": 172,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 78121,
+     "completion": 126069,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 10.627,
+    "wall_seconds": 241.3,
+    "run_tag": "v1"
+   },
+   "deepseek-3.2": {
+    "accuracy_pct": 73.7,
+    "stderr_pct": 3.1,
+    "n": 198,
+    "correct": 146,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 367921,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "gpt-5.6-luna": {
+    "accuracy_pct": 89.6,
+    "stderr_pct": 2.3,
+    "n": 183,
+    "correct": 164,
+    "errors": 0,
+    "infra_excluded": 15,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 31104,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   }
   },
-  "grading": {
-    "hle": {
-      "judge_arm": "gpt-5.5",
-      "judge_calls": 1,
-      "judge_usd_est": 0.0006,
-      "judge_prompt_tokens": 159,
-      "judge_completion_tokens": 36
-    }
+  "livecodebench": {
+   "gpt-5.6-sol": {
+    "accuracy_pct": 90.3,
+    "stderr_pct": 2.5,
+    "n": 144,
+    "correct": 130,
+    "errors": 17,
+    "infra_excluded": 31,
+    "tokens": {
+     "prompt": 87763,
+     "completion": 43002,
+     "reasoning": 0,
+     "calls": 158
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "deepseek-v4-pro": {
+    "accuracy_pct": 51.4,
+    "stderr_pct": 3.8,
+    "n": 175,
+    "correct": 90,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 75242,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.1777,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "deepseek-3.2": {
+    "accuracy_pct": 56.0,
+    "stderr_pct": 3.8,
+    "n": 175,
+    "correct": 98,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 353896,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "fable-5": {
+    "accuracy_pct": 82.9,
+    "stderr_pct": 2.8,
+    "n": 175,
+    "correct": 145,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 125867,
+     "completion": 544855,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 8.5504,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "enso": {
+    "accuracy_pct": 92.0,
+    "stderr_pct": 2.1,
+    "n": 174,
+    "correct": 160,
+    "errors": 1,
+    "infra_excluded": 1,
+    "tokens": {
+     "prompt": 92002,
+     "completion": 512599,
+     "reasoning": 454741,
+     "calls": 174
+    },
+    "usd_est": 5.241,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "opus-4.8": {
+    "accuracy_pct": 72.8,
+    "stderr_pct": 3.4,
+    "n": 173,
+    "correct": 126,
+    "errors": 2,
+    "infra_excluded": 2,
+    "tokens": {
+     "prompt": 124432,
+     "completion": 500884,
+     "reasoning": 0,
+     "calls": 173
+    },
+    "usd_est": 39.4328,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "gpt-5.6-luna": {
+    "accuracy_pct": 86.5,
+    "stderr_pct": 2.7,
+    "n": 156,
+    "correct": 135,
+    "errors": 0,
+    "infra_excluded": 19,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 41596,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "enso-ultra": {
+    "accuracy_pct": 85.1,
+    "stderr_pct": 2.7,
+    "n": 175,
+    "correct": 149,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 975812,
+     "completion": 1329941,
+     "reasoning": 474476,
+     "calls": 693
+    },
+    "usd_est": 71.731,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "gpt-5.5": {
+    "accuracy_pct": 92.0,
+    "stderr_pct": 2.1,
+    "n": 174,
+    "correct": 160,
+    "errors": 1,
+    "infra_excluded": 1,
+    "tokens": {
+     "prompt": 92002,
+     "completion": 504668,
+     "reasoning": 444424,
+     "calls": 174
+    },
+    "usd_est": 5.1617,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "gpt-5.6-terra": {
+    "accuracy_pct": 88.3,
+    "stderr_pct": 2.5,
+    "n": 162,
+    "correct": 143,
+    "errors": 0,
+    "infra_excluded": 13,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 49002,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "enso-flash": {
+    "accuracy_pct": 49.1,
+    "stderr_pct": 3.8,
+    "n": 175,
+    "correct": 86,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 367521,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   }
   },
-  "enso_reported": {
-    "SWE-Bench Pro": {
-      "Enso-Ultra": 73.7,
-      "Enso": 59.0,
-      "Opus-4.8": 69.2,
-      "Gemini-3.1": 54.2,
-      "GPT-5.5": 58.6
+  "hle": {
+   "gpt-5.5": {
+    "accuracy_pct": 35.4,
+    "stderr_pct": 2.1,
+    "n": 500,
+    "correct": 177,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 139619,
+     "completion": 2240161,
+     "reasoning": 2061227,
+     "calls": 500
     },
-    "Terminal Bench 2.1": {
-      "Enso-Ultra": 82.1,
-      "Enso": 80.2,
-      "Opus-4.8": 74.6,
-      "Gemini-3.1": 70.3,
-      "GPT-5.5": 78.2
+    "usd_est": 22.5761,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "deepseek-v4-pro": {
+    "accuracy_pct": 7.2,
+    "stderr_pct": 1.2,
+    "n": 500,
+    "correct": 36,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 134104,
+     "completion": 383371,
+     "reasoning": 0,
+     "calls": 500
     },
-    "LiveCodeBench": {
-      "Enso-Ultra": 93.2,
-      "Enso": 92.9,
-      "Opus-4.8": 87.8,
-      "Gemini-3.1": 88.5,
-      "GPT-5.5": 85.3
+    "usd_est": 0.7063,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "opus-4.8": {
+    "accuracy_pct": 27.9,
+    "stderr_pct": 2.0,
+    "n": 498,
+    "correct": 139,
+    "errors": 2,
+    "infra_excluded": 2,
+    "tokens": {
+     "prompt": 204638,
+     "completion": 1265083,
+     "reasoning": 0,
+     "calls": 498
     },
-    "LiveCodeBench Pro": {
-      "Enso-Ultra": 90.8,
-      "Enso": 87.8,
-      "Opus-4.8": 84.8,
-      "Gemini-3.1": 82.9,
-      "GPT-5.5": 88.4
+    "usd_est": 97.9508,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "enso-ultra": {
+    "accuracy_pct": 34.6,
+    "stderr_pct": 2.1,
+    "n": 500,
+    "correct": 173,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 1457803,
+     "completion": 4095530,
+     "reasoning": 2052639,
+     "calls": 1819
     },
-    "Humanity's Last Exam": {
-      "Enso-Ultra": 50.0,
-      "Enso": 47.2,
-      "Opus-4.8": 49.8,
-      "Gemini-3.1": 44.4,
-      "GPT-5.5": 41.4
+    "usd_est": 151.7767,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "enso": {
+    "accuracy_pct": 29.4,
+    "stderr_pct": 2.0,
+    "n": 500,
+    "correct": 147,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 180835,
+     "completion": 1429013,
+     "reasoning": 436163,
+     "calls": 500
     },
-    "CharXiv Reasoning": {
-      "Enso-Ultra": 86.6,
-      "Enso": 85.1,
-      "Opus-4.8": 84.2,
-      "Gemini-3.1": 83.3,
-      "GPT-5.5": 84.1
+    "usd_est": 76.5405,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "fable-5": {
+    "accuracy_pct": 38.2,
+    "stderr_pct": 2.2,
+    "n": 500,
+    "correct": 191,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 205132,
+     "completion": 1660596,
+     "reasoning": 0,
+     "calls": 500
     },
-    "GPQA Diamond": {
-      "Enso-Ultra": 95.5,
-      "Enso": 95.5,
-      "Opus-4.8": 92.0,
-      "Gemini-3.1": 94.3,
-      "GPT-5.5": 93.6
-    }
+    "usd_est": 25.5243,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   }
   },
-  "pending": [
-    "swebench_pro",
-    "terminal_bench"
-  ],
-  "ultra_ablation": {
-    "gpqa_diamond": {
-      "v1": {
-        "accuracy_pct": 89.9,
-        "n": 198,
-        "usd_est": 16.4333,
-        "logic": "blind-synthesis"
-      },
-      "overnight": {
-        "accuracy_pct": 90.9,
-        "n": 198,
-        "usd_est": 15.9312,
-        "logic": "overnight"
-      }
-    }
-  },
-  "total_usd_est": 193.56,
-  "agentic": {
-    "swebench_pro": {
-      "bench": "SWE-Bench Pro",
-      "metric": "% resolved (agentic, Mini-SWE-Agent)",
-      "n_items": 25,
-      "systems": {
-        "step-routed": {
-          "n": 18,
-          "resolved": 7,
-          "resolved_rate": 0.3889,
-          "usd": 19.696,
-          "calls": 256
-        },
-        "single-opus": {
-          "n": 18,
-          "resolved": 3,
-          "resolved_rate": 0.1667,
-          "usd": 27.561,
-          "calls": 321
-        }
-      },
-      "note": "Agentic pilot: n=18 per system from the agent harness (agent pass/fail); official cross-scoring done on a small common set (results/agentic). Full 731-instance run pending (amd64-only task images + shared-key serialization)."
-    }
+  "charxiv": {
+   "opus-4.8": {
+    "accuracy_pct": 78.0,
+    "stderr_pct": 2.9,
+    "n": 200,
+    "correct": 156,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 204206,
+     "completion": 5650,
+     "reasoning": 0,
+     "calls": 200
+    },
+    "usd_est": 3.4868,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "enso-ultra": {
+    "accuracy_pct": 85.5,
+    "stderr_pct": 2.5,
+    "n": 200,
+    "correct": 171,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 631448,
+     "completion": 85689,
+     "reasoning": 54757,
+     "calls": 636
+    },
+    "usd_est": 6.2855,
+    "wall_seconds": null,
+    "run_tag": "v2"
+   },
+   "gpt-5.5": {
+    "accuracy_pct": 85.5,
+    "stderr_pct": 2.5,
+    "n": 200,
+    "correct": 171,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 181387,
+     "completion": 50493,
+     "reasoning": 47582,
+     "calls": 200
+    },
+    "usd_est": 0.7317,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "fable-5": {
+    "accuracy_pct": 76.0,
+    "stderr_pct": 3.0,
+    "n": 200,
+    "correct": 152,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 204206,
+     "completion": 13961,
+     "reasoning": 0,
+     "calls": 200
+    },
+    "usd_est": 0.822,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   },
+   "enso": {
+    "accuracy_pct": 78.0,
+    "stderr_pct": 2.9,
+    "n": 200,
+    "correct": 156,
+    "errors": 0,
+    "infra_excluded": 0,
+    "tokens": {
+     "prompt": 204206,
+     "completion": 5424,
+     "reasoning": 0,
+     "calls": 200
+    },
+    "usd_est": 3.4699,
+    "wall_seconds": null,
+    "run_tag": "v1"
+   }
   }
+ },
+ "grading": {
+  "hle": {
+   "judge_arm": "gpt-5.5",
+   "judge_calls": 1,
+   "judge_usd_est": 0.0006,
+   "judge_prompt_tokens": 159,
+   "judge_completion_tokens": 36
+  }
+ },
+ "enso_reported": {
+  "SWE-Bench Pro": {
+   "Enso-Ultra": 73.7,
+   "Enso": 59.0,
+   "Opus-4.8": 69.2,
+   "Gemini-3.1": 54.2,
+   "GPT-5.5": 58.6
+  },
+  "Terminal Bench 2.1": {
+   "Enso-Ultra": 82.1,
+   "Enso": 80.2,
+   "Opus-4.8": 74.6,
+   "Gemini-3.1": 70.3,
+   "GPT-5.5": 78.2
+  },
+  "LiveCodeBench": {
+   "Enso-Ultra": 93.2,
+   "Enso": 92.9,
+   "Opus-4.8": 87.8,
+   "Gemini-3.1": 88.5,
+   "GPT-5.5": 85.3
+  },
+  "LiveCodeBench Pro": {
+   "Enso-Ultra": 90.8,
+   "Enso": 87.8,
+   "Opus-4.8": 84.8,
+   "Gemini-3.1": 82.9,
+   "GPT-5.5": 88.4
+  },
+  "Humanity's Last Exam": {
+   "Enso-Ultra": 50.0,
+   "Enso": 47.2,
+   "Opus-4.8": 49.8,
+   "Gemini-3.1": 44.4,
+   "GPT-5.5": 41.4
+  },
+  "CharXiv Reasoning": {
+   "Enso-Ultra": 86.6,
+   "Enso": 85.1,
+   "Opus-4.8": 84.2,
+   "Gemini-3.1": 83.3,
+   "GPT-5.5": 84.1
+  },
+  "GPQA Diamond": {
+   "Enso-Ultra": 95.5,
+   "Enso": 95.5,
+   "Opus-4.8": 92.0,
+   "Gemini-3.1": 94.3,
+   "GPT-5.5": 93.6
+  }
+ },
+ "pending": [
+  "swebench_pro",
+  "terminal_bench"
+ ],
+ "ultra_ablation": {
+  "livecodebench": {
+   "v1": {
+    "accuracy_pct": 81.1,
+    "n": 175,
+    "usd_est": 90.682,
+    "logic": "blind-synthesis"
+   },
+   "v2": {
+    "accuracy_pct": 85.1,
+    "n": 175,
+    "usd_est": 71.731,
+    "logic": "verify-then-select"
+   }
+  },
+  "hle": {
+   "v1": {
+    "accuracy_pct": 29.2,
+    "n": 500,
+    "usd_est": 191.4856,
+    "logic": "blind-synthesis"
+   },
+   "v2": {
+    "accuracy_pct": 34.6,
+    "n": 500,
+    "usd_est": 151.7767,
+    "logic": "verify-then-select"
+   }
+  },
+  "charxiv": {
+   "v2": {
+    "accuracy_pct": 85.5,
+    "n": 200,
+    "usd_est": 6.2855,
+    "logic": "verify-then-select"
+   },
+   "v1": {
+    "accuracy_pct": 81.5,
+    "n": 200,
+    "usd_est": 10.1498,
+    "logic": "blind-synthesis"
+   }
+  },
+  "gpqa_diamond": {
+   "v2": {
+    "accuracy_pct": 90.4,
+    "n": 198,
+    "usd_est": 15.8887,
+    "logic": "verify-then-select"
+   },
+   "v1": {
+    "accuracy_pct": 89.9,
+    "n": 198,
+    "usd_est": 16.4333,
+    "logic": "blind-synthesis"
+   }
+  }
+ },
+ "total_usd_est": 564.25,
+ "agentic": {
+  "swebench_pro": {
+   "bench": "SWE-Bench Pro",
+   "metric": "% resolved (agentic, Mini-SWE-Agent)",
+   "n_items": 25,
+   "systems": {
+    "step-routed": {
+     "n": 18,
+     "resolved": 7,
+     "resolved_rate": 0.3889,
+     "usd": 19.696,
+     "calls": 256
+    },
+    "single-opus": {
+     "n": 18,
+     "resolved": 3,
+     "resolved_rate": 0.1667,
+     "usd": 27.561,
+     "calls": 321
+    }
+   },
+   "note": "Agentic pilot: n=18 per system from the agent harness (agent pass/fail); official cross-scoring done on a small common set (results/agentic). Full 731-instance run pending (amd64-only task images + shared-key serialization)."
+  }
+ }
 }
