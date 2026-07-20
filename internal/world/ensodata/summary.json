@@ -104,8 +104,8 @@
     "run_tag": "v1"
    },
    "glm-5.2": {
-    "accuracy_pct": 87.0,
-    "stderr_pct": 4.1,
+    "accuracy_pct": null,
+    "stderr_pct": null,
     "n": 69,
     "correct": 60,
     "errors": 0,
@@ -139,23 +139,6 @@
     "wall_seconds": null,
     "run_tag": "v1"
    },
-   "gpt-5.6-sol": {
-    "accuracy_pct": 94.8,
-    "stderr_pct": 1.6,
-    "n": 193,
-    "correct": 183,
-    "errors": 0,
-    "infra_excluded": 5,
-    "tokens": {
-     "prompt": 60695,
-     "completion": 34023,
-     "reasoning": 0,
-     "calls": 198
-    },
-    "usd_est": 0.0,
-    "wall_seconds": null,
-    "run_tag": "max"
-   },
    "enso-ultra": {
     "accuracy_pct": 90.4,
     "stderr_pct": 2.1,
@@ -172,6 +155,23 @@
     "usd_est": 15.8887,
     "wall_seconds": null,
     "run_tag": "v2"
+   },
+   "gpt-5.6-sol": {
+    "accuracy_pct": 94.8,
+    "stderr_pct": 1.6,
+    "n": 193,
+    "correct": 183,
+    "errors": 0,
+    "infra_excluded": 5,
+    "tokens": {
+     "prompt": 60695,
+     "completion": 34023,
+     "reasoning": 0,
+     "calls": 198
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "max"
    },
    "kimi-k3": {
     "accuracy_pct": 92.5,
@@ -191,8 +191,8 @@
     "run_tag": "k3-max"
    },
    "glm-5.2@openrouter": {
-    "accuracy_pct": 79.8,
-    "stderr_pct": 3.7,
+    "accuracy_pct": null,
+    "stderr_pct": null,
     "n": 119,
     "correct": 95,
     "errors": 79,
@@ -263,8 +263,8 @@
   },
   "livecodebench": {
    "gpt-5.6-sol": {
-    "accuracy_pct": 90.3,
-    "stderr_pct": 2.5,
+    "accuracy_pct": null,
+    "stderr_pct": null,
     "n": 144,
     "correct": 130,
     "errors": 17,
@@ -367,8 +367,8 @@
     "run_tag": "v1"
    },
    "gpt-5.6-luna": {
-    "accuracy_pct": 86.5,
-    "stderr_pct": 2.7,
+    "accuracy_pct": null,
+    "stderr_pct": null,
     "n": 156,
     "correct": 135,
     "errors": 0,
@@ -418,6 +418,25 @@
     "usd_est": 5.1617,
     "wall_seconds": null,
     "run_tag": "v1"
+   },
+   "glm-5.2": {
+    "accuracy_pct": null,
+    "stderr_pct": null,
+    "n": 60,
+    "correct": 49,
+    "errors": 0,
+    "infra_excluded": 115,
+    "tokens": {
+     "prompt": 97404,
+     "completion": 14943,
+     "reasoning": 0,
+     "calls": 175
+    },
+    "usd_est": 0.0,
+    "wall_seconds": null,
+    "run_tag": "v2",
+    "degraded": true,
+    "blank_rate_pct": 65.7
    },
    "gpt-5.6-terra": {
     "accuracy_pct": 88.3,
@@ -661,6 +680,26 @@
   "terminal_bench"
  ],
  "ultra_ablation": {
+  "gpqa_diamond": {
+   "k3fix": {
+    "accuracy_pct": 32.8,
+    "n": 198,
+    "usd_est": 0.0,
+    "logic": "k3fix"
+   },
+   "v2": {
+    "accuracy_pct": 90.4,
+    "n": 198,
+    "usd_est": 15.8887,
+    "logic": "verify-then-select"
+   },
+   "v1": {
+    "accuracy_pct": 89.9,
+    "n": 198,
+    "usd_est": 16.4333,
+    "logic": "blind-synthesis"
+   }
+  },
   "livecodebench": {
    "v1": {
     "accuracy_pct": 81.1,
@@ -700,20 +739,6 @@
     "accuracy_pct": 81.5,
     "n": 200,
     "usd_est": 10.1498,
-    "logic": "blind-synthesis"
-   }
-  },
-  "gpqa_diamond": {
-   "v2": {
-    "accuracy_pct": 90.4,
-    "n": 198,
-    "usd_est": 15.8887,
-    "logic": "verify-then-select"
-   },
-   "v1": {
-    "accuracy_pct": 89.9,
-    "n": 198,
-    "usd_est": 16.4333,
     "logic": "blind-synthesis"
    }
   }
