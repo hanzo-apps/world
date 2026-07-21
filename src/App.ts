@@ -12,6 +12,7 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
   isHanzoBrandHost,
+  isLuxFundHost,
   MONITOR_COLORS,
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
@@ -87,6 +88,7 @@ import {
   TechReadinessPanel,
   MacroSignalsPanel,
   RotationScannerPanel,
+  LuxBookPanel,
   ETFFlowsPanel,
   StablecoinPanel,
   SentimentPanel,
@@ -2053,7 +2055,12 @@ export class App {
         <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/>
         <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/>
       </svg>`;
-    const logo = hanzoHost
+    // lux.fund is a Lux white-label: the Lux wordmark replaces the Hanzo mark
+    // entirely (white-label rule — never the Hanzo H on a Lux host).
+    const luxHost = isLuxFundHost();
+    const logo = luxHost
+      ? `<a class="header-logo header-logo-lux" href="/" title="Lux Macro" aria-label="Lux Macro — home"><span class="lux-wordmark">LUX<span class="lux-wordmark-sub">MACRO</span></span></a>`
+      : hanzoHost
       ? `<button class="header-logo" type="button" data-hanzo-toggle aria-expanded="false" aria-controls="variantSwitcher" title="Hanzo — toggle views" aria-label="Hanzo — toggle view switcher">${logoSvg}</button>`
       : `<a class="header-logo" href="/" title="Hanzo World" aria-label="Hanzo World — home">${logoSvg}</a>`;
     const cloudTab = hanzoHost
@@ -2734,6 +2741,7 @@ export class App {
     // Crypto & Market Intelligence Panels
     this.panels['macro-signals'] = new MacroSignalsPanel();
     this.panels['rotation'] = new RotationScannerPanel();
+    this.panels['lux-book'] = new LuxBookPanel();
     this.panels['etf-flows'] = new ETFFlowsPanel();
     this.panels['stablecoins'] = new StablecoinPanel();
     this.panels['sentiment'] = new SentimentPanel();
