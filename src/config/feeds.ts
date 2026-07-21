@@ -891,7 +891,7 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
 export const FEEDS =
   SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai'
     ? TECH_FEEDS
-    : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto'
+    : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto' || SITE_VARIANT === 'fund'
       ? FINANCE_FEEDS
       : FULL_FEEDS;
 
