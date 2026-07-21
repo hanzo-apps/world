@@ -81,8 +81,12 @@ export class RotationScannerPanel extends Panel {
 
   private async fetchData(): Promise<void> {
     this.controller?.abort();
-    this.controller = new AbortController();
-    const snap = await fetchRotation(this.controller.signal);
+    const controller = new AbortController();
+    this.controller = controller;
+    const snap = await fetchRotation(controller.signal);
+    // A newer refresh (or destroy) aborted this one — drop it silently rather than
+    // flashing "unavailable" over the still-valid current render.
+    if (controller.signal.aborted) return;
     if (!snap || snap.unavailable) {
       this.clearDataBadge();
       this.setContent('<div class="rot"><div class="rot-na">Rotation data unavailable.</div></div>');
