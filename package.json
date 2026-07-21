@@ -40,7 +40,10 @@
     "desktop:package:macos:tech:sign": "node scripts/desktop-package.mjs --os macos --variant tech --sign",
     "desktop:package:windows:full:sign": "node scripts/desktop-package.mjs --os windows --variant full --sign",
     "desktop:package:windows:tech:sign": "node scripts/desktop-package.mjs --os windows --variant tech --sign",
-    "desktop:package": "node scripts/desktop-package.mjs"
+    "desktop:package": "node scripts/desktop-package.mjs",
+    "dev:fund": "VITE_VARIANT=fund vite",
+    "build:fund": "VITE_VARIANT=fund tsc && VITE_VARIANT=fund vite build",
+    "test:e2e:fund": "VITE_VARIANT=fund playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
