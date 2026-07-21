@@ -601,6 +601,19 @@ export class DeckGLMap {
 
     this.initBasemap();
 
+    // Dev/e2e observability: expose the renderer as soon as it is FUNCTIONAL — right
+    // after initBasemap() creates this.mapboxMap — not on the async mapbox 'load'.
+    // buildLayers()/asGlobeSource()/setOcclusionCenter()/occludeFarSide() are all live
+    // at this point (occludeFarSide only needs this.mapboxMap to exist, not its style
+    // to have loaded). When the flagship Cloud view opens straight into the parked-
+    // mapbox native globe, 'load' can trail the globe by several seconds; gating the
+    // hook on it made the globe e2e read an undefined __deckMap right after go3D.
+    // (__deckOverlay is exposed in initDeck once it is constructed.)
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+      (window as unknown as { __deckMap?: unknown }).__deckMap = this;
+      (window as unknown as { __mapboxMap?: unknown }).__mapboxMap = this.mapboxMap;
+    }
+
     this.mapboxMap?.on('load', () => {
       this.initDeck();
       this.loadCountryBoundaries();
@@ -792,12 +805,10 @@ export class DeckGLMap {
     // attribution is reachable independent of the corner wordmark (?maplogo=0).
     this.mapboxMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
 
-    // Dev/e2e observability: expose the renderer internals so tests can assert
-    // interleaved state, context count, and rendered deck layer ids/feature
-    // counts without shipping any hook to production.
+    // Dev/e2e observability: __deckMap/__mapboxMap are already exposed in the
+    // constructor (as soon as the instance is functional); here we add the overlay,
+    // which only exists once initDeck() has constructed it.
     if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-      (window as unknown as { __deckMap?: unknown }).__deckMap = this;
-      (window as unknown as { __mapboxMap?: unknown }).__mapboxMap = this.mapboxMap;
       (window as unknown as { __deckOverlay?: unknown }).__deckOverlay = this.deckOverlay;
     }
 
