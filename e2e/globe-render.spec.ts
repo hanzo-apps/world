@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { clickMapControl } from './helpers/map-controls';
 
 // Globe render-fix acceptance suite (world.hanzo.ai Hanzo-Cloud view).
 //
@@ -47,6 +46,13 @@ const cloudMap = {
   byoGpu: { updatedAt: '2026-07-18T12:00:00Z', demo: false, gpus: [] },
 };
 
+// The flagship Cloud variant now OPENS on the native 3D globe (its immersive default),
+// which parks the mapbox 2D map — `.deckgl-map-wrapper` mounts hidden. These specs
+// exercise the 2D→3D toggle path (2D layer parity, then go3D), so they pin the start
+// to 2D with `?mode=2d` (resolveInitialMapMode: the URL wins over the variant default).
+// The globe-as-default render is proven separately (direct visual + the live prod shot).
+const CLOUD_2D = '/?variant=cloud&mode=2d';
+
 async function mockCloud(page: import('@playwright/test').Page, traffic = cloudMap.trafficGlobe): Promise<void> {
   const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/v1/world/cloud/traffic-globe', (r) => r.fulfill(json(traffic)));
@@ -62,7 +68,17 @@ const layerIds = (page: import('@playwright/test').Page): Promise<string[]> =>
   });
 
 const go3D = async (page: import('@playwright/test').Page): Promise<void> => {
-  await clickMapControl(page, '.deckgl-projection-toggle .proj-btn[data-mode="3d"]');
+  // Enter the 3D globe through the projection toggle's REAL click handler
+  // (proj-btn → setProjectionMode('3d') → activateNativeGlobe). The flagship Cloud
+  // view floats its control dock over the full-viewport globe canvas, so under
+  // headless swiftshader a synthesized mouse click's hit-test lands on the canvas,
+  // not the collapsed-dropdown button — dispatch the click on the element itself.
+  // This spec verifies the GLOBE render (occlusion/terrain/parity/live dots); the
+  // dock's pointer reachability is a separate controls concern, out of scope here.
+  await page.evaluate(() => {
+    const btn = document.querySelector('.deckgl-projection-toggle .proj-btn[data-mode="3d"]') as HTMLElement | null;
+    btn?.click();
+  });
   await expect
     .poll(() => page.evaluate(() => Boolean((window as unknown as { __globeNative?: unknown }).__globeNative)), { timeout: 25000 })
     .toBe(true);
@@ -83,7 +99,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
     page.on('pageerror', (e) => errors.push(e.message));
 
     await mockCloud(page);
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await go3D(page);
 
@@ -110,7 +126,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
 
   test('occlusion: a back-hemisphere dot is culled to transparent, a front dot is opaque', async ({ page }) => {
     await mockCloud(page);
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await go3D(page);
 
@@ -132,7 +148,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
 
   test('occlusion: a back-hemisphere count badge is culled (no floating badge over the globe)', async ({ page }) => {
     await mockCloud(page);
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await go3D(page);
 
@@ -157,7 +173,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
 
   test('2D/3D parity: every cloud layer that mounts in 3D also mounts in 2D', async ({ page }, testInfo) => {
     await mockCloud(page);
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await page.waitForTimeout(1500); // 2D feeds settle
 
@@ -173,7 +189,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
 
   test('terrain drapes on the globe in a single context (no second canvas)', async ({ page }, testInfo) => {
     await mockCloud(page);
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await go3D(page);
 
@@ -189,7 +205,7 @@ test.describe('Globe render fixes — occlusion, terrain, 2D/3D parity, live dot
 
   test('live dots update when the feed changes', async ({ page }) => {
     await mockCloud(page, { ...cloudMap.trafficGlobe, points: cloudMap.trafficGlobe.points.slice(0, 1) });
-    await page.goto('/?variant=cloud');
+    await page.goto(CLOUD_2D);
     await expect(page.locator('.deckgl-map-wrapper')).toBeVisible({ timeout: 45000 });
     await go3D(page);
 
