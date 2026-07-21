@@ -163,6 +163,44 @@ func TestGreatRotationRequiresBothLegs(t *testing.T) {
 	}
 }
 
+func TestPositiveClosesDropsBadBars(t *testing.T) {
+	got := positiveCloses([]float64{10, 0, 11, -3, 12})
+	want := []float64{10, 11, 12}
+	if len(got) != len(want) {
+		t.Fatalf("len = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+// A single spurious 0 bar in the benchmark must not survive to the RRG math (it
+// would otherwise corrupt the relative line and could flip a theme's quadrant).
+// After sanitising, a series with a bad bar reads the SAME quadrant as the clean one.
+func TestZeroBarDoesNotFlipQuadrant(t *testing.T) {
+	n := 140
+	clean := ramp(100, 0.4, n)   // steady outperformer
+	bench := ramp(100, 0.05, n)
+	pClean, ok := rrgLatest(relSeries(clean, bench))
+	if !ok {
+		t.Fatal("expected a clean point")
+	}
+	// inject a 0 three bars from the end of the benchmark, then sanitise as the
+	// fetch path does
+	bad := append([]float64(nil), bench...)
+	bad[n-3] = 0
+	pSan, ok := rrgLatest(relSeries(clean, positiveCloses(bad)))
+	if !ok {
+		t.Fatal("expected a sanitised point")
+	}
+	if pClean.quadrant() != pSan.quadrant() {
+		t.Fatalf("sanitised quadrant %q != clean %q — a 0 bar still moved the read",
+			pSan.quadrant(), pClean.quadrant())
+	}
+}
+
 func TestMeanStd(t *testing.T) {
 	m, sd := meanStd([]float64{2, 4, 4, 4, 5, 5, 7, 9})
 	if math.Abs(m-5) > 1e-9 {
