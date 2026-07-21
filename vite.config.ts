@@ -373,6 +373,16 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
+          // Vite's dynamic-import preload helper (exported as `_`, imported at boot
+          // for the service-worker register + live-flash + dataFreshness dynamic
+          // imports). Left to Rollup's default chunking it landed inside a lazily
+          // evaluated app chunk (RuntimeConfigPanel), so those early top-level calls
+          // ran before the binding initialized → an uncaught "hi is not defined"
+          // (the minified `_`). Pin it to its own dependency-free leaf chunk so it is
+          // always fully evaluated before any entry that imports it.
+          if (id.includes('vite/preload-helper')) {
+            return 'vite-preload';
+          }
           if (id.includes('node_modules')) {
             if (id.includes('/@xenova/transformers/') || id.includes('/onnxruntime-web/')) {
               return 'ml';

@@ -200,6 +200,10 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 	// treats deltas as cosmetic and done as the source of truth.
 	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 		if f, ok := w.(http.Flusher); ok {
+			// Clear the server's 60s WriteTimeout (cmd/world/main.go) so a long analyst
+			// completion streams to the end instead of the socket being reset
+			// mid-response (which the browser reports as net::ERR_HTTP2_PROTOCOL_ERROR).
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 			h := w.Header()
 			h.Set("Content-Type", "text/event-stream; charset=utf-8")
 			h.Set("Cache-Control", "no-cache")
