@@ -718,6 +718,15 @@ func parseETF(yc *yahooChart, e etfInfo) (map[string]any, bool) {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func nowISO() string      { return time.Now().UTC().Format(time.RFC3339) }
-func round2s(f float64) float64 { return math.Round(f*100) / 100 }
+func nowISO() string { return time.Now().UTC().Format(time.RFC3339) }
+
+// round2s rounds to 2 decimals, returning 0 for a non-finite input so a stray
+// NaN/Inf can never reach json.Marshal (a marshal error after cachedJSON has
+// already cached the value would stick a 500 for the whole cache window).
+func round2s(f float64) float64 {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0
+	}
+	return math.Round(f*100) / 100
+}
 func round3s(f float64) float64 { return math.Round(f*1000) / 1000 }
