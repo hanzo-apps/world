@@ -43,6 +43,8 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/rotation", s.handleRotation)
 	mux.HandleFunc("/v1/world/indicators", s.handleIndicators)
 	mux.HandleFunc("/v1/world/sentiment", s.handleSentiment)
+	mux.HandleFunc("/v1/world/defi", s.handleDefi)
+	mux.HandleFunc("/v1/world/insider", s.handleInsider)
 
 	// flights / geo / hazards
 	mux.HandleFunc("/v1/world/opensky", s.handleOpenSky)
