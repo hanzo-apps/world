@@ -49,6 +49,7 @@ func main() {
 	defer srv.Close()           // release hanzo-kv + embedded datastore handles
 	srv.StartModel(rootCtx)     // continuously-folded world-state engine
 	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
+	srv.StartFund(rootCtx)      // autonomous PAPER-only multi-asset fund brain
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
