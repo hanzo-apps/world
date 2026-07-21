@@ -4,7 +4,7 @@
 // VITE_VARIANT=full → worldmonitor.app (geopolitical)
 // VITE_VARIANT=finance → finance.worldmonitor.app (markets/trading)
 
-export { SITE_VARIANT, isHanzoBrandHost } from './variant';
+export { SITE_VARIANT, isHanzoBrandHost, isLuxFundHost } from './variant';
 
 // Shared base configuration (always included)
 export {
