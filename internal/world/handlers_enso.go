@@ -15,10 +15,10 @@ import (
 // Enso flywheel — the router's self-improvement loop, made visible for the AI
 // variant. It folds THREE honest sources into one event-typed payload:
 //
-//  1. the routing-decision ledger tail (export-routing-ledger ?since=, super-admin
+//  1. the routing-decision ledger tail (router/ledger ?since=, super-admin
 //     JSONL): how many decisions, the engine-vs-heuristic mix, a confidence
 //     histogram, and the task / routed-model distribution;
-//  2. the reward tail (export-routing-rewards ?since=, JSONL): how many decisions
+//  2. the reward tail (router/rewards ?since=, JSONL): how many decisions
 //     have been scored and their mean reward — the per-request training labels;
 //  3. the latest enso-bench eval scores (an embedded snapshot of the enso-bench
 //     results summary, or a live ENSO_BENCH_URL when configured).
@@ -181,7 +181,7 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 		return ensoLedgerStats{Available: false}, false
 	}
 	host := apiHost()
-	body, err := s.getText(ctx, host+"/v1/export-routing-ledger?since="+url.QueryEscape(since), hdr)
+	body, err := s.getText(ctx, host+"/v1/router/ledger?since="+url.QueryEscape(since), hdr)
 	if err != nil {
 		return ensoLedgerStats{Available: false}, false
 	}
@@ -225,7 +225,7 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 	stats.Models = topCounts(models, 6)
 
 	// Rewards are a bonus signal; their absence must not sink the ledger stats.
-	if rbody, rerr := s.getText(ctx, host+"/v1/export-routing-rewards?since="+url.QueryEscape(since), hdr); rerr == nil {
+	if rbody, rerr := s.getText(ctx, host+"/v1/router/rewards?since="+url.QueryEscape(since), hdr); rerr == nil {
 		var sum float64
 		n := 0
 		for _, line := range strings.Split(rbody, "\n") {
