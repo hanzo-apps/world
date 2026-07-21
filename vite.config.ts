@@ -386,6 +386,31 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  // Pre-bundle the deck.gl / luma.gl / mapbox graph at server start. These are
+  // heavy, deeply-nested deps; left to on-demand discovery vite finds a leaf like
+  // @luma.gl/webgl's `webgl-device` only when the globe first imports it mid-load,
+  // then re-optimizes and force-reloads. That reload races GlobeNative's `new Deck()`
+  // on a cold dev/e2e server, so the 3D globe intermittently never initializes (its
+  // `__globeNative` hook never appears and the render e2e times out at go3D). Listing
+  // the graph here — including the transitive luma leaves that carry the device
+  // adapter — makes the optimize pass complete before the first page load, so a
+  // cold-start dev server and the globe e2e are deterministic. Prod is unaffected
+  // (a production build bundles with Rollup and never runs the dep optimizer).
+  optimizeDeps: {
+    include: [
+      'deck.gl',
+      '@deck.gl/core',
+      '@deck.gl/layers',
+      '@deck.gl/geo-layers',
+      '@deck.gl/mesh-layers',
+      '@deck.gl/aggregation-layers',
+      '@deck.gl/mapbox',
+      '@luma.gl/core',
+      '@luma.gl/engine',
+      '@luma.gl/webgl',
+      'mapbox-gl',
+    ],
+  },
   build: {
     rollupOptions: {
       input: {
