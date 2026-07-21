@@ -86,6 +86,7 @@ import {
   InsightsPanel,
   TechReadinessPanel,
   MacroSignalsPanel,
+  RotationScannerPanel,
   ETFFlowsPanel,
   StablecoinPanel,
   SentimentPanel,
@@ -2732,6 +2733,7 @@ export class App {
 
     // Crypto & Market Intelligence Panels
     this.panels['macro-signals'] = new MacroSignalsPanel();
+    this.panels['rotation'] = new RotationScannerPanel();
     this.panels['etf-flows'] = new ETFFlowsPanel();
     this.panels['stablecoins'] = new StablecoinPanel();
     this.panels['sentiment'] = new SentimentPanel();

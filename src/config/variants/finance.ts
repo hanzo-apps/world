@@ -160,6 +160,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   'trader-desk': { name: 'Trader Desk', enabled: true, priority: 1 },
   sentiment: { name: 'News Sentiment', enabled: true, priority: 1 },
   'macro-signals': { name: 'Market Radar', enabled: true, priority: 1 },
+  rotation: { name: 'Rotation Scanner', enabled: true, priority: 1 },
   derivatives: { name: 'Derivatives & Options', enabled: true, priority: 2 },
   fintech: { name: 'Fintech & Trading Tech', enabled: true, priority: 2 },
   regulation: { name: 'Financial Regulation', enabled: true, priority: 2 },
