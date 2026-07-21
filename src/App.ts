@@ -2076,7 +2076,7 @@ export class App {
       <div class="header">
         <div class="header-left">
           ${logo}
-          <div class="variant-switcher${hanzoHost ? ' hanzo-gated' : ''}" id="variantSwitcher" role="tablist" aria-label="View switcher">
+          <div class="variant-switcher${hanzoHost ? ' hanzo-gated' : ''}${luxHost ? ' lux-hidden' : ''}" id="variantSwitcher" role="tablist" aria-label="View switcher">
             ${cloudTab}<a href="?variant=ai"
                class="variant-option ${SITE_VARIANT === 'ai' ? 'active' : ''}"
                data-variant="ai"
