@@ -694,7 +694,16 @@ func (s *Server) handleChinaMacro(w http.ResponseWriter, r *http.Request) {
 	s.cachedJSON(w, "china:macro:v1",
 		"public, max-age=1800, s-maxage=1800, stale-while-revalidate=600",
 		30*time.Minute, 6*time.Hour,
-		func(ctx context.Context) (any, error) { return s.chinaMacro(ctx) },
+		func(ctx context.Context) (any, error) {
+			// Bound the whole live aggregation so a slow/unreachable required source
+			// (OECD et al., often laggy from the cluster) can't hold the request — and
+			// the SPA's 20s fetch deadline — hostage for ~24s. On timeout the produce
+			// fails and cachedJSON serves the honest-empty fallback below; the feed
+			// warmer refills the cache in the background for the next caller.
+			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+			return s.chinaMacro(ctx)
+		},
 		func(w http.ResponseWriter, _ error) { writeJSON(w, http.StatusOK, "", chinaUnavailable()) })
 }
 
