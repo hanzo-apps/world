@@ -285,6 +285,52 @@ func (s *Server) handleCloudServices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, "", out)
 }
 
+// livenessURL maps a cloud subsystem to a real reachability endpoint, used to
+// decide `up` when o11y carries no per-deployment telemetry for it. Each path is
+// GET-able and answers (2xx/3xx or an auth gate) whenever the subsystem is live;
+// an empty string means "no liveness probe" (leave up as whatever o11y said).
+func livenessURL(name string) string {
+	api := apiHost()
+	switch name {
+	case "ai":
+		return api + "/v1/models"
+	case "gateway":
+		return api + "/health"
+	case "iam":
+		return api + "/v1/iam/.well-known/openid-configuration"
+	case "kms":
+		return api + "/v1/kms/health"
+	case "s3":
+		return api + "/v1/s3"
+	case "analytics":
+		return api + "/v1/analytics/overview"
+	case "o11y":
+		return api + "/v1/o11y"
+	case "commerce":
+		return api + "/v1/plans"
+	case "billing":
+		return api + "/v1/billing/balance"
+	case "tasks":
+		return api + "/v1/tasks"
+	case "websearch":
+		return api + "/v1/search"
+	case "docdb":
+		return api + "/v1/docdb"
+	case "sql":
+		return api + "/v1/sql"
+	case "paas":
+		return api + "/v1/platform/health"
+	case "visor":
+		return api + "/v1/machines"
+	case "world":
+		return "https://world.hanzo.ai/v1/world/health"
+	case "registry":
+		return "https://registry.hanzo.ai/v2/"
+	default:
+		return ""
+	}
+}
+
 func (s *Server) probeService(ctx context.Context, base, name string, hdr map[string]string) serviceRow {
 	row := serviceRow{Product: name}
 	var st struct {
@@ -297,7 +343,10 @@ func (s *Server) probeService(ctx context.Context, base, name string, hdr map[st
 			Up       bool   `json:"up"`
 		} `json:"deployments"`
 	}
-	if err := s.getJSON(ctx, base+"/v1/o11y/status?product="+name, hdr, &st); err == nil {
+	o11yKnows := false
+	if err := s.getJSON(ctx, base+"/v1/o11y/status?product="+name, hdr, &st); err == nil && len(st.Deployments) > 0 {
+		// o11y has real per-deployment telemetry for this subsystem — trust it.
+		o11yKnows = true
 		row.Up = st.Up
 		row.LatencyMs = st.LatencyMs
 		row.Source = st.Source
@@ -305,6 +354,19 @@ func (s *Server) probeService(ctx context.Context, base, name string, hdr map[st
 		for _, d := range st.Deployments {
 			if d.Up {
 				row.DeploymentsUp++
+			}
+		}
+	}
+	// Liveness is authoritative when o11y has no opinion. A subsystem that simply
+	// isn't wired into o11y is NOT down — probing its real endpoint keeps the board
+	// honest (a live-but-uninstrumented service shows UP with no metrics, never a
+	// false "down"). Any answer through the gateway (2xx/3xx, or an auth gate) means
+	// the service is alive; only a transport error or a 5xx is truly down.
+	if !o11yKnows {
+		if u := livenessURL(name); u != "" {
+			if _, code, err := s.get(ctx, u, hdr); err == nil {
+				row.Up = code > 0 && code < 500
+				row.Source = "liveness"
 			}
 		}
 	}
