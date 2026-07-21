@@ -24,8 +24,10 @@ import (
 //  3. the agentic SWE-Bench Pro pilot (step-routed vs single-Opus),
 //
 // plus server-authored caveats so the honest framing travels WITH the data and
-// cannot be stripped in the client. Numbers are measured; Enso columns are
-// Enso's own reported (Table 1) figures — never conflated.
+// cannot be stripped in the client. Numbers in `measured` are ours (live-measured
+// via the gateway); the reference block is EXTERNAL reported-by-others figures
+// (provider single-model baselines + a prior published router's two reported
+// SKUs) — labelled as such and NEVER conflated with, or relabelled as, Enso.
 
 // ── snapshot shape (superset of the flywheel's minimal read) ─────────────────
 
@@ -87,8 +89,6 @@ type benchTable struct {
 	BestArmPct        float64          `json:"bestArmPct"`
 	EnsoPct           float64          `json:"ensoPct"`
 	EnsoUsd           float64          `json:"ensoUsd"`
-	EnsoReported      float64          `json:"ensoReported,omitempty"`
-	EnsoUltraReported float64          `json:"ensoUltraReported,omitempty"`
 	Note              string           `json:"note,omitempty"`
 }
 
@@ -147,11 +147,12 @@ type ensoBenchmarks struct {
 // label for the same benchmark (empty ⇒ no Enso counterpart). The slice order is
 // the panel's display order (agentic-adjacent code benches first).
 var benchDisplay = []struct {
-	Key, Name, Enso string
+	Key, Name string
 }{
-	{"livecodebench", "LiveCodeBench", "LiveCodeBench"},
-	{"gpqa_diamond", "GPQA Diamond", "GPQA Diamond"},
-	{"hle", "Humanity's Last Exam", "Humanity's Last Exam"},
+	{"livecodebench", "LiveCodeBench"},
+	{"gpqa_diamond", "GPQA Diamond"},
+	{"hle", "Humanity's Last Exam"},
+	{"charxiv", "CharXiv Reasoning"},
 }
 
 // ── handler ──────────────────────────────────────────────────────────────────
@@ -243,12 +244,6 @@ func buildBenchTables(snap benchSnapshot) []benchTable {
 		}
 		if er, ok := sysMap["enso"]; ok {
 			t.EnsoPct, t.EnsoUsd = er.AccuracyPct, er.UsdEst
-		}
-		if bd.Enso != "" {
-			if fr, ok := snap.EnsoReported[bd.Enso]; ok {
-				t.EnsoReported = fr["Enso"]
-				t.EnsoUltraReported = fr["Enso-Ultra"]
-			}
 		}
 		if allPreflight(t.Systems) {
 			t.Note = "Preflight only (n≤1) — not a scored run."
