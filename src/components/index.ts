@@ -34,6 +34,7 @@ export * from './TechReadinessPanel';
 export * from './SatelliteFiresPanel';
 export * from './MacroSignalsPanel';
 export * from './RotationScannerPanel';
+export * from './LuxBookPanel';
 export * from './ETFFlowsPanel';
 export * from './StablecoinPanel';
 export * from './UcdpEventsPanel';
