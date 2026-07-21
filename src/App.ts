@@ -113,6 +113,8 @@ import {
   OrgAnalyticsPanel,
   OrgInsightsPanel,
   CloudServicesPanel,
+  ClusterPanel,
+  QueuePanel,
   HanzoStatusPanel,
   CloudAnalyticsPanel,
   LlmUsagePanel,
@@ -2853,6 +2855,10 @@ export class App {
       // Fleet lives in ONE panel now — the always-mounted "Fleet & GPUs" (FleetPanel)
       // renders the full platform fleet for admins. The old admin-only "Fleet &
       // clusters" (CloudFleetPanel) was a byte-for-byte duplicate and was removed.
+      // Clusters & Nodes (DOKS nodes per cluster) + GPU Queue (gpu-jobs depth + what
+      // each worker is serving) complete the SuperAdmin fleet view alongside it.
+      ['cloud-clusters', new ClusterPanel(), 'Clusters & Nodes'],
+      ['cloud-queue', new QueuePanel(), 'GPU Queue'],
       ['llm-usage', new LlmUsagePanel(), 'LLM observability'],
       ['cloud-analytics', new CloudAnalyticsPanel(), 'Web analytics'],
       ['enso-benchmarks', new EnsoBenchmarkPanel(), 'Enso benchmarks'],
