@@ -47,6 +47,13 @@ const cloudMap = {
   byoGpu: { updatedAt: '2026-07-18T12:00:00Z', demo: false, gpus: [] },
 };
 
+// The flagship Cloud variant now OPENS on the native 3D globe (its immersive default),
+// which parks the mapbox 2D map — `.deckgl-map-wrapper` mounts hidden. These specs
+// exercise the 2D→3D toggle path (2D layer parity, then go3D), so they pin the start
+// to 2D with `?mode=2d` (resolveInitialMapMode: the URL wins over the variant default).
+// The globe-as-default render is proven separately (direct visual + the live prod shot).
+const CLOUD_2D = '/?variant=cloud&mode=2d';
+
 async function mockCloud(page: import('@playwright/test').Page, traffic = cloudMap.trafficGlobe): Promise<void> {
   const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/v1/world/cloud/traffic-globe', (r) => r.fulfill(json(traffic)));
