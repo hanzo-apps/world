@@ -26,6 +26,8 @@ func TestCloudAdminGateFailsClosed(t *testing.T) {
 		"/v1/world/cloud/services",
 		"/v1/world/cloud/analytics",
 		"/v1/world/cloud/llm",
+		"/v1/world/cloud/clusters",
+		"/v1/world/cloud/queue",
 	}
 	for _, route := range adminRoutes {
 		t.Run(route, func(t *testing.T) {
@@ -48,7 +50,7 @@ func TestCloudAdminGateFailsClosed(t *testing.T) {
 				t.Fatalf("expected an error field, got %v", body)
 			}
 			// The aggregate payload keys must NOT be present in a gated response.
-			for _, leak := range []string{"providers", "services", "topPages", "data", "workers"} {
+			for _, leak := range []string{"providers", "services", "topPages", "data", "workers", "clusters", "depth", "running"} {
 				if _, ok := body[leak]; ok {
 					t.Fatalf("gated response leaked %q: %v", leak, body)
 				}
