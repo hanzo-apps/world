@@ -17616,3 +17616,6 @@ body.layout-free .panels-grid::after {
 .header-logo-lux { display: inline-flex; align-items: center; text-decoration: none; }
 .lux-wordmark { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--font-body); font-weight: 700; font-size: 15px; letter-spacing: 0.14em; color: var(--text); }
 .lux-wordmark-sub { font-weight: 500; font-size: 10px; letter-spacing: 0.28em; color: var(--text-dim); }
+
+/* Lux Fund is a focused, academic terminal — no multi-view switcher, no emoji. */
+.variant-switcher.lux-hidden { display: none; }
