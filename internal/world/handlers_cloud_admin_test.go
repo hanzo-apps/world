@@ -1,6 +1,7 @@
 package world
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -53,5 +54,44 @@ func TestCloudAdminGateFailsClosed(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestProbeServiceLivenessFallback proves a subsystem that o11y has no telemetry
+// for is reported UP (from a real liveness probe) rather than a false "down", and
+// stays uninstrumented. A subsystem o11y DOES know about keeps o11y's verdict.
+func TestProbeServiceLivenessFallback(t *testing.T) {
+	// Upstream: o11y status/metrics 404 (no telemetry); a liveness path answers 200.
+	live := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v1/o11y/") {
+			http.Error(w, "no data", http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK) // liveness endpoint is alive
+	}))
+	t.Cleanup(live.Close)
+	t.Setenv("HANZO_API_BASE", live.URL) // apiHost() reads this
+
+	s := newTestServer(t)
+	row := s.probeService(context.Background(), live.URL, "kms", map[string]string{})
+	if !row.Up {
+		t.Fatalf("live-but-uninstrumented subsystem must be UP via liveness, got down (%+v)", row)
+	}
+	if row.Instrumented {
+		t.Fatalf("no o11y metrics ⇒ Instrumented must stay false, got true")
+	}
+	if row.Source != "liveness" {
+		t.Fatalf("Source should mark the liveness fallback, got %q", row.Source)
+	}
+}
+
+// TestLivenessURLCoversSubsystems proves every hardcoded cloudSubsystem has a
+// liveness probe URL, so none can silently fall through to a false "down".
+func TestLivenessURLCoversSubsystems(t *testing.T) {
+	t.Setenv("HANZO_API_BASE", "https://api.hanzo.ai")
+	for _, name := range cloudSubsystems {
+		if livenessURL(name) == "" {
+			t.Errorf("subsystem %q has no liveness URL — it can render a false 'down'", name)
+		}
 	}
 }
