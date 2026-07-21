@@ -45,6 +45,8 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/sentiment", s.handleSentiment)
 	mux.HandleFunc("/v1/world/defi", s.handleDefi)
 	mux.HandleFunc("/v1/world/insider", s.handleInsider)
+	mux.HandleFunc("/v1/world/layoffs", s.handleLayoffs)
+	mux.HandleFunc("/v1/world/congress", s.handleCongress)
 
 	// flights / geo / hazards
 	mux.HandleFunc("/v1/world/opensky", s.handleOpenSky)
