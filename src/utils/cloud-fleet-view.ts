@@ -55,16 +55,26 @@ export function fleetProviders(providers: FleetProviderGroup[]): string {
   }).join('');
 }
 
-/** BYO GPU workers (your Spark / Evo / dbc boxes): hostname + GPU + VRAM + caps. */
+/** BYO GPU workers (your Spark / Evo / dbc boxes): hostname + GPU + VRAM + what
+ *  it's serving. A worker running a hanzo-engine model server (engine.serve)
+ *  advertises the model ids it serves; those lead the row over the raw caps. */
 export function fleetWorkers(workers: FleetWorker[]): string {
   if (!workers.length) return '';
+  const detail = (wk: FleetWorker): string => {
+    const serving = (wk.serving || []).filter(Boolean);
+    if (serving.length) {
+      const ready = wk.engineStatus && wk.engineStatus !== 'ready' ? ` (${escapeHtml(wk.engineStatus)})` : '';
+      return `<span class="cloud-worker-serving">${icon('zap', 10)} serving ${escapeHtml(serving.slice(0, 3).join(', '))}${serving.length > 3 ? ` +${serving.length - 3}` : ''}${ready}</span>`;
+    }
+    return `<span class="cloud-worker-caps">${escapeHtml((wk.capabilities || []).join(', '))}</span>`;
+  };
   return `<div class="cloud-fleet-workers">
     <div class="cloud-subhead">${icon('cpu', 12)} BYO GPU workers</div>
     ${workers.map((wk) => `<div class="cloud-worker-row">
       <span class="cloud-status-dot ${wk.status === 'online' ? 'online' : 'offline'}"></span>
       <span class="cloud-worker-name">${escapeHtml(wk.hostname || wk.id)}${wk.location ? `<span class="cloud-machine-type">${escapeHtml(wk.location)}</span>` : ''}</span>
       <span class="cloud-worker-gpu">${escapeHtml(wk.gpu || '—')}${wk.vram ? ` · ${escapeHtml(wk.vram)}` : ''}${wk.version ? ` · v${escapeHtml(wk.version)}` : ''}</span>
-      <span class="cloud-worker-caps">${escapeHtml((wk.capabilities || []).join(', '))}</span>
+      ${detail(wk)}
     </div>`).join('')}
   </div>`;
 }

@@ -62,6 +62,13 @@ type fleetWorker struct {
 	VRAM         string   `json:"vram"`
 	Capabilities []string `json:"capabilities"`
 	Version      string   `json:"version"`
+	// Serving is the model ids this worker's hanzo-engine advertises (engine.serve),
+	// EngineStatus its reachability, JobQueue the gpu-jobs queue it claims from —
+	// the "what this GPU is serving" the fleet view surfaces. Empty when the worker
+	// runs only the studio.render job loop and no model server.
+	Serving      []string `json:"serving"`
+	EngineStatus string   `json:"engineStatus"`
+	JobQueue     string   `json:"jobQueue"`
 }
 
 type cloudFleet struct {
@@ -114,8 +121,14 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 	var workers struct {
 		Workers []struct {
 			ID, Hostname, Provider, Location, Status, Version string
+			JobQueue                                          string                               `json:"jobQueue"`
 			GPUs                                              []struct{ Name, MemoryTotal string } `json:"gpus"`
 			Capabilities                                      []string                             `json:"capabilities"`
+			Engine                                            *struct {
+				URL    string   `json:"url"`
+				Models []string `json:"models"`
+				Status string   `json:"status"`
+			} `json:"engine"`
 		} `json:"workers"`
 	}
 	_ = s.getJSON(ctx, base+"/v1/fleet/workers", hdr, &workers)
@@ -189,12 +202,16 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 	f.Totals.Regions = len(regionSet)
 
 	for _, wk := range workers.Workers {
-		fw := fleetWorker{ID: wk.ID, Hostname: wk.Hostname, Provider: wk.Provider, Location: wk.Location, Status: wk.Status, Version: wk.Version, Capabilities: wk.Capabilities}
+		fw := fleetWorker{ID: wk.ID, Hostname: wk.Hostname, Provider: wk.Provider, Location: wk.Location, Status: wk.Status, Version: wk.Version, Capabilities: wk.Capabilities, JobQueue: wk.JobQueue}
 		if len(wk.GPUs) > 0 {
 			fw.GPU = wk.GPUs[0].Name
 			if isRealVRAM(wk.GPUs[0].MemoryTotal) {
 				fw.VRAM = wk.GPUs[0].MemoryTotal
 			}
+		}
+		if wk.Engine != nil {
+			fw.Serving = wk.Engine.Models
+			fw.EngineStatus = wk.Engine.Status
 		}
 		f.Workers = append(f.Workers, fw)
 	}
