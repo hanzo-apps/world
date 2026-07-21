@@ -3,13 +3,23 @@
 // `saas` variant and the interim `hanzo` id — both are ALIASES that normalize to
 // `cloud`, so existing ?variant=saas / ?variant=hanzo links and stored prefs keep
 // working. The BRAND is Hanzo (the H mark); the VIEW is Cloud.
-const VALID_VARIANTS = ['full', 'tech', 'finance', 'cloud', 'ai', 'crypto'] as const;
+const VALID_VARIANTS = ['full', 'tech', 'finance', 'cloud', 'ai', 'crypto', 'fund'] as const;
 
 // normVariant maps a raw value to a canonical variant (aliasing saas/hanzo→cloud),
 // or null when it is unknown.
 function normVariant(v: string | null | undefined): string | null {
   if (v === 'saas' || v === 'hanzo') return 'cloud';
   return v && (VALID_VARIANTS as readonly string[]).includes(v) ? v : null;
+}
+
+// isLuxFundHost reports whether we are serving the Lux Fund white-label surface
+// (lux.fund). White-label rule: the Lux brand + the `fund` macro terminal appear
+// here — never the Hanzo mark. The whole app is the same World engine; only the
+// brand and the default view differ by host.
+export function isLuxFundHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === 'lux.fund' || h.endsWith('.lux.fund');
 }
 
 // isHanzoBrandHost reports whether the Hanzo brand surface (the H-logo toggle + the
@@ -44,6 +54,10 @@ export const SITE_VARIANT: string = (() => {
     }
     const stored = normVariant(localStorage.getItem('worldmonitor-variant'));
     if (stored) return stored;
+    // lux.fund leads with the `fund` macro terminal (rotation + the Lux book on the
+    // globe) — same guard as the Cloud default: only when the build didn't pin a
+    // variant, so per-variant builds and tests are never overridden.
+    if (isLuxFundHost() && !import.meta.env.VITE_VARIANT) return 'fund';
     // Host default: world.hanzo.ai leads with the Cloud view — but ONLY when the
     // build did not pin a variant (so `VITE_VARIANT=full playwright test` and the
     // OSS per-variant builds are never overridden).
