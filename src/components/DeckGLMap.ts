@@ -708,8 +708,14 @@ export class DeckGLMap {
       center: [preset.longitude, preset.latitude],
       zoom: preset.zoom,
       // Start already in the correct projection so ?mode=3d loads as a globe
-      // with no post-load reprojection flash.
-      projection: this.state.mode === '3d' ? 'globe' : 'mercator',
+      // with no post-load reprojection flash. BUT: mapbox-gl v3.26 throws
+      // "Missing theme" when a plain (non-Standard) style loads in GLOBE projection,
+      // which blanks the entire map. When the native deck.gl globe is on (the
+      // default), this mapbox map is only a parked, invisible basemap behind
+      // GlobeNative — it never needs globe projection — so keep it mercator (safe)
+      // and let GlobeNative render the 3D sphere. mapbox renders the globe itself
+      // only when the native globe is explicitly disabled (?globe=off).
+      projection: this.mapboxProjection(),
       renderWorldCopies: false,
       // Repoint CartoDB's CORS-broken CJK glyph fonts at the CORS-open Latin font
       // so CJK labels fall back cleanly instead of spamming 403s in the console.
@@ -4017,9 +4023,18 @@ export class DeckGLMap {
   // mapbox-gl v3 morphs globe↔mercator on its own at low zoom; we pair it with a
   // gentle easeTo so a switch made while zoomed-in still reads as a smooth glide
   // rather than a snap.
+  // The mapbox basemap's projection. Globe ONLY when 3D AND the native deck.gl
+  // globe is off (so mapbox is the visible globe). With the native globe on (the
+  // default) mapbox is a parked, invisible basemap, so it stays mercator — this
+  // dodges the mapbox-gl v3.26 "Missing theme" crash that a plain style in globe
+  // projection triggers, which otherwise blanks the whole map (globe included).
+  private mapboxProjection(): 'globe' | 'mercator' {
+    return this.state.mode === '3d' && !isNativeGlobeEnabled() ? 'globe' : 'mercator';
+  }
+
   private applyProjection(): void {
     if (!this.mapboxMap) return;
-    const name = this.state.mode === '3d' ? 'globe' : 'mercator';
+    const name = this.mapboxProjection();
     const current = this.mapboxMap.getProjection?.()?.name;
     if (current === name) return;
     this.mapboxMap.setProjection(name);
