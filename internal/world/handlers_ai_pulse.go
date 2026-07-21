@@ -85,6 +85,12 @@ func (s *Server) handleAIPulse(w http.ResponseWriter, r *http.Request) {
 
 	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 		if f, ok := w.(http.Flusher); ok {
+			// The HTTP server sets a 60s WriteTimeout (cmd/world/main.go). A long-lived
+			// SSE stream trips it, and the mid-stream connection reset surfaces in the
+			// browser as net::ERR_HTTP2_PROTOCOL_ERROR followed by an EventSource
+			// reconnect storm. Clear the write deadline so the stream lives until the
+			// client disconnects (ctx cancellation ends the emit loop).
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 			h := w.Header()
 			h.Set("Content-Type", "text/event-stream; charset=utf-8")
 			h.Set("Cache-Control", "no-cache")

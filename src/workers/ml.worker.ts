@@ -205,19 +205,28 @@ async function extractEntities(texts: string[]): Promise<NEREntity[][]> {
   const results: NEREntity[][] = [];
   for (const text of texts) {
     const output = await pipe(text);
+    // transformers.js 2.17 token-classification emits per-token rows keyed `entity`
+    // (e.g. "B-LOC"); an aggregated pipeline would use `entity_group`. Accept either,
+    // coerce every field to a safe value, and DROP rows missing a token or a type —
+    // NEREntity declares `text`/`type` as non-optional strings, and a downstream
+    // `.type.includes(...)` / `.replace(...)` on an undefined here is exactly what
+    // crashed entity scoring and trending-keyword enrichment.
     const entities = (output as Array<{
-      entity_group: string;
-      score: number;
-      word: string;
-      start: number;
-      end: number;
-    }>).map(e => ({
-      text: e.word,
-      type: e.entity_group,
-      confidence: e.score,
-      start: e.start,
-      end: e.end,
-    }));
+      entity_group?: string;
+      entity?: string;
+      score?: number;
+      word?: string;
+      start?: number;
+      end?: number;
+    }>)
+      .map(e => ({
+        text: typeof e.word === 'string' ? e.word : '',
+        type: typeof e.entity_group === 'string' ? e.entity_group : typeof e.entity === 'string' ? e.entity : '',
+        confidence: typeof e.score === 'number' ? e.score : 0,
+        start: typeof e.start === 'number' ? e.start : 0,
+        end: typeof e.end === 'number' ? e.end : 0,
+      }))
+      .filter(e => e.text !== '' && e.type !== '');
     results.push(entities);
   }
 
