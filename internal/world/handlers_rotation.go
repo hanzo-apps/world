@@ -219,7 +219,7 @@ func (s *Server) fetchCloses(ctx context.Context, symbols []string) map[string][
 			if err != nil {
 				return
 			}
-			if c := yc.closes(); len(c) > 1 {
+			if c := positiveCloses(yc.closes()); len(c) > 1 {
 				mu.Lock()
 				out[sym] = c
 				mu.Unlock()
@@ -253,6 +253,22 @@ func (p rrgPoint) quadrant() string {
 	default:
 		return "lagging"
 	}
+}
+
+// positiveCloses drops non-positive (0 / negative) bars. Yahoo emits spurious
+// zero ticks on thin symbols (NG=F, URNM, FCG, SMCI); a single 0 close silently
+// corrupts the relative-strength line and can flip a theme's quadrant — and with
+// it the public Great Rotation signal. Prices are strictly positive: a 0 is always
+// bad data, never a real level. The shared compact() stays untouched so volume
+// series (where 0 is legitimate) are unaffected.
+func positiveCloses(in []float64) []float64 {
+	out := make([]float64, 0, len(in))
+	for _, v := range in {
+		if v > 0 {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // pctReturn is the percent change over the last n bars (0 when the series is too
