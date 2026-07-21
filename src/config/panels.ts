@@ -416,6 +416,25 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
+// FUND VARIANT (lux.fund — Lux macro terminal)
+// ============================================
+// The Lux Fund white-label. Same World 3D-globe engine as finance, sharpened for
+// the fund's macro read: the Lux Book (top-10 algo allocation) and the rotation
+// scanner lead, the globe carries the fund's bets over the commodity/energy hubs
+// they anchor to. Feeds reuse the finance set (markets/commodities/energy/
+// centralbanks/economic/analysis/institutional).
+const FUND_PANELS: Record<string, PanelConfig> = {
+  'lux-book': { name: 'Lux Book · Top 10', enabled: true, priority: 1 },
+  rotation: { name: 'Rotation Scanner', enabled: true, priority: 1 },
+  'macro-signals': { name: 'Market Radar', enabled: true, priority: 1 },
+  ...FINANCE_PANELS,
+};
+
+// Energy/commodity hubs join the finance globe — the fund's bets anchor to them.
+const FUND_MAP_LAYERS: MapLayers = { ...FINANCE_MAP_LAYERS, commodityHubs: true };
+const FUND_MOBILE_MAP_LAYERS: MapLayers = { ...FINANCE_MOBILE_MAP_LAYERS };
+
+// ============================================
 // CLOUD VARIANT (flagship — Hanzo Cloud + live-traffic globe)
 // ============================================
 // The world.hanzo.ai default. Renders HANZO ITSELF: the live-traffic globe (where
@@ -679,9 +698,9 @@ const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'cloud' ? CLOUD_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'fund' ? FUND_PANELS : SITE_VARIANT === 'cloud' ? CLOUD_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'fund' ? FUND_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'fund' ? FUND_MOBILE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [
