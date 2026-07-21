@@ -51,7 +51,7 @@ func TestEnsoTrainingEvalsOnly(t *testing.T) {
 // JSONL fold into the mix, confidence histogram, and reward stats.
 func TestEnsoTrainingLiveFold(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/export-routing-ledger", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/router/ledger", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("since") == "" {
 			t.Errorf("ledger export must carry a since cursor")
 		}
@@ -62,7 +62,7 @@ func TestEnsoTrainingLiveFold(t *testing.T) {
 				`{"task":"code","routed_model":"zen-coder","confidence":0.88,"source":"engine"}` + "\n" +
 				`{"task":"math","routed_model":"zen-1","confidence":0.15,"source":"heuristic"}` + "\n"))
 	})
-	mux.HandleFunc("/v1/export-routing-rewards", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/v1/router/rewards", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		_, _ = w.Write([]byte(
 			`{"model":"zen-coder","task":"code","reward":0.8,"at":"2026-07-16T00:00:00Z"}` + "\n" +
