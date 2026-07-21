@@ -16208,7 +16208,23 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-worker-name { font-size: 12px; color: var(--text); }
 .cloud-worker-gpu { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
 .cloud-worker-caps { grid-column: 2 / 4; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.cloud-worker-serving { grid-column: 2 / 4; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim); display: inline-flex; align-items: center; gap: 4px; }
 .cloud-util-note { margin-top: 12px; font-size: 10.5px; color: var(--text-muted); line-height: 1.45; }
+
+/* clusters (DOKS nodes by cluster) + gpu-jobs queue — SuperAdmin fleet view */
+.cloud-cluster-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; }
+.cloud-cluster-head { display: flex; align-items: center; gap: 8px; }
+.cloud-cluster-name { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: var(--text); font-weight: 600; }
+.cloud-cluster-kind { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-left: 6px; }
+.cloud-cluster-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
+.cloud-cluster-pools { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); margin: 4px 0 2px; }
+.cloud-queue-job { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.cloud-queue-job:last-child { border-bottom: none; }
+.cloud-queue-what { min-width: 0; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-queue-svc { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-right: 6px; }
+.cloud-queue-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
+.cloud-pulse-dot { animation: cloud-pulse 1.6s ease-in-out infinite; }
+@keyframes cloud-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* analytics / LLM shared column lists */
 .cloud-an-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 12px; }
