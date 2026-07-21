@@ -33,6 +33,7 @@ export * from './InsightsPanel';
 export * from './TechReadinessPanel';
 export * from './SatelliteFiresPanel';
 export * from './MacroSignalsPanel';
+export * from './RotationScannerPanel';
 export * from './ETFFlowsPanel';
 export * from './StablecoinPanel';
 export * from './UcdpEventsPanel';
