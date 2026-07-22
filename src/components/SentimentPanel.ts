@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
+import { sparkline as baseSparkline } from '@/utils/market-format';
 
 // Realtime news-sentiment panel — consumes /v1/world/sentiment (GDELT tone).
 // Global gauge + per-topic tiles + per-region bars, all 0-100 sentiment index
@@ -51,18 +52,7 @@ function velArrow(v: number | null): string {
 }
 
 function sparkline(data: number[], w = 120, h = 28): string {
-  if (!data || data.length < 2) return '';
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const pts = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((v - min) / range) * (h - 2) - 1;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  return `<svg class="sent-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  return baseSparkline(data, { w, h, className: 'sent-spark', strokeWidth: 1.5, ariaHidden: false });
 }
 
 export class SentimentPanel extends Panel {

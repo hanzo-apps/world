@@ -48,7 +48,7 @@ export class MyUsagePanel extends Panel {
     const b = this.billing;
     if (!b) {
       this.setDataBadge('unavailable');
-      this.setContent(`<div class="cloud-empty">Billing is not available for this account yet. <a href="${CONSOLE_BILLING_URL}" target="_blank" rel="noopener">Open billing console →</a></div>`);
+      this.setContent(`<div class="panel-empty">Billing is not available for this account yet. <a href="${CONSOLE_BILLING_URL}" target="_blank" rel="noopener">Open billing console →</a></div>`);
       return;
     }
     this.setDataBadge('live', 'your org');
@@ -83,7 +83,7 @@ export class MyUsagePanel extends Panel {
     this.setContent(`
       <div class="cloud-usage">
         <div class="cloud-stat-grid cloud-stat-grid-3">${tiles}</div>
-        <div class="cloud-usage-list">${recent || '<div class="cloud-empty">No usage in the last 30 days.</div>'}</div>
+        <div class="cloud-usage-list">${recent || this.emptyStateHtml('No usage in the last 30 days.')}</div>
         <a class="cloud-bill-link" href="${CONSOLE_BILLING_URL}" target="_blank" rel="noopener">View full bill on console.hanzo.ai →</a>
       </div>
     `);
