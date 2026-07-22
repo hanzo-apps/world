@@ -31,6 +31,11 @@ import (
 type wIdentity struct {
 	Org string `json:"owner"`
 	Sub string `json:"sub"`
+	// Admin is IAM's own owner/admin flag for the identity, honored when the
+	// userinfo carries it — so an org's admin may publish that org's shared doc
+	// even when the org is not a global-admin org. Absent claim → false (the
+	// global-admin-org gate still applies). See isOrgAdmin.
+	Admin bool `json:"isAdmin"`
 }
 
 // introspectIdentity resolves the caller's org (owner claim) + subject from IAM
