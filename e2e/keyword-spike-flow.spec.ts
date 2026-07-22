@@ -10,10 +10,21 @@ test.describe('keyword spike modal/badge flow', () => {
       const trending = await import('/src/services/trending-keywords.ts');
       const correlation = await import('/src/services/correlation.ts');
 
+      // The badge/modal render through i18n (t()); the app bootstrap initializes it
+      // before any component mounts. This isolated harness must do the same, else
+      // t() returns undefined and getSignalContext().actionableInsight.split() throws.
+      const { initI18n } = await import('/src/services/i18n.ts');
+      await initI18n();
+
       const previousConfig = trending.getTrendingConfig();
       const headerRight = document.createElement('div');
       headerRight.className = 'header-right';
       document.body.appendChild(headerRight);
+
+      // The findings badge is opt-in (default OFF): its constructor only mounts and
+      // renders when the user has enabled it. Simulate an opted-in session so the
+      // badge mounts into .header-right and its count/dropdown render.
+      localStorage.setItem('worldmonitor-intel-findings', 'shown');
 
       const modal = new SignalModal();
       const badge = new IntelligenceGapBadge();
@@ -27,13 +38,18 @@ test.describe('keyword spike modal/badge flow', () => {
       });
 
       const now = new Date();
+      // Keep the trending proper noun ("Iran") mid-sentence and capitalized: the
+      // significance filter (isLikelyProperNoun) only counts capitalization for
+      // tokens that appear past position 0, so a sentence-leading term reads as an
+      // ordinary word and gets suppressed. Mid-sentence, it registers as a genuine
+      // entity spiking across sources — no ML worker required.
       const headlines = [
-        { source: 'Reuters', title: 'Iran sanctions pressure rises amid talks', link: 'https://example.com/reuters/1' },
-        { source: 'AP', title: 'Iran sanctions debate intensifies in Washington', link: 'https://example.com/ap/1' },
-        { source: 'BBC', title: 'Iran sanctions trigger fresh market concerns', link: 'https://example.com/bbc/1' },
-        { source: 'Reuters', title: 'Iran sanctions package draws regional response', link: 'https://example.com/reuters/2' },
-        { source: 'AP', title: 'Iran sanctions proposal gains momentum', link: 'https://example.com/ap/2' },
-        { source: 'BBC', title: 'Iran sanctions timeline shortens after warnings', link: 'https://example.com/bbc/2' },
+        { source: 'Reuters', title: 'Talks on Iran sanctions stall in Washington', link: 'https://example.com/reuters/1' },
+        { source: 'AP', title: 'New Iran sanctions debate intensifies among allies', link: 'https://example.com/ap/1' },
+        { source: 'BBC', title: 'Markets watch Iran sanctions with fresh concern', link: 'https://example.com/bbc/1' },
+        { source: 'Reuters', title: 'Regional powers weigh Iran sanctions package', link: 'https://example.com/reuters/2' },
+        { source: 'AP', title: 'Momentum grows for Iran sanctions proposal', link: 'https://example.com/ap/2' },
+        { source: 'BBC', title: 'Analysts see Iran sanctions timeline shortening', link: 'https://example.com/bbc/2' },
       ].map(item => ({
         ...item,
         pubDate: now,
@@ -101,6 +117,7 @@ test.describe('keyword spike modal/badge flow', () => {
       if (store?.previousConfig) {
         trending.updateTrendingConfig(store.previousConfig);
       }
+      localStorage.removeItem('worldmonitor-intel-findings');
       delete (window as unknown as Record<string, unknown>).__keywordSpikeTest;
     });
   });
