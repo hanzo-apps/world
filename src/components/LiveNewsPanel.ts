@@ -2,96 +2,10 @@ import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
-import { getSiteVariant } from '@/config';
-
-// YouTube IFrame Player API types
-type YouTubePlayer = {
-  mute(): void;
-  unMute(): void;
-  playVideo(): void;
-  pauseVideo(): void;
-  loadVideoById(videoId: string): void;
-  cueVideoById(videoId: string): void;
-  getIframe?(): HTMLIFrameElement;
-  destroy(): void;
-};
-
-type YouTubePlayerConstructor = new (
-  elementId: string | HTMLElement,
-  options: {
-    videoId: string;
-    host?: string;
-    playerVars: Record<string, number | string>;
-    events: {
-      onReady: () => void;
-      onError?: (event: { data: number }) => void;
-    };
-  },
-) => YouTubePlayer;
-
-type YouTubeNamespace = {
-  Player: YouTubePlayerConstructor;
-};
-
-declare global {
-  interface Window {
-    YT?: YouTubeNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-interface LiveChannel {
-  id: string;
-  name: string;
-  handle: string; // YouTube channel handle (e.g., @bloomberg)
-  fallbackVideoId?: string; // Fallback if no live stream detected
-  videoId?: string; // Dynamically fetched live video ID
-  isLive?: boolean;
-  useFallbackOnly?: boolean; // Skip auto-detection, always use fallback
-}
-
-// Full variant: World news channels (24/7 live streams)
-const FULL_LIVE_CHANNELS: LiveChannel[] = [
-  { id: 'bloomberg', name: 'Bloomberg', handle: '@markets', fallbackVideoId: 'iEpJwprxDdk' },
-  { id: 'sky', name: 'SkyNews', handle: '@SkyNews', fallbackVideoId: 'YDvsBbKfLPA' },
-  { id: 'euronews', name: 'Euronews', handle: '@euronews', fallbackVideoId: 'pykpO5kQJ98' },
-  { id: 'dw', name: 'DW', handle: '@DWNews', fallbackVideoId: 'LuKwFajn37U' },
-  { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
-  { id: 'france24', name: 'France24', handle: '@FRANCE24English', fallbackVideoId: 'Ap-UM1O9RBU' },
-  { id: 'alarabiya', name: 'AlArabiya', handle: '@AlArabiya', fallbackVideoId: 'n7eQejkXbnM', useFallbackOnly: true },
-  { id: 'aljazeera', name: 'AlJazeera', handle: '@AlJazeeraEnglish', fallbackVideoId: 'gCNeDWCI0vo', useFallbackOnly: true },
-];
-
-// Tech variant: Tech & business channels
-const TECH_LIVE_CHANNELS: LiveChannel[] = [
-  { id: 'bloomberg', name: 'Bloomberg', handle: '@markets', fallbackVideoId: 'iEpJwprxDdk' },
-  { id: 'yahoo', name: 'Yahoo Finance', handle: '@YahooFinance', fallbackVideoId: 'KQp-e_XQnDE' },
-  { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
-  { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
-];
-
-// tech + ai → tech/business channels; crypto/finance/cloud/full → world+finance set.
-// Read live (getSiteVariant) so the channel set reflects the current variant.
-function liveChannels(): LiveChannel[] {
-  const v = getSiteVariant();
-  return v === 'tech' || v === 'ai' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
-}
-
-// Never-crash default: if a variant ever ships an empty channel list, the panel
-// still constructs (activeChannel stays a valid object) and renders a clean
-// offline state instead of dereferencing undefined. Keeps activeChannel's type
-// non-nullable so no deref site needs a guard.
-const EMPTY_CHANNEL: LiveChannel = { id: 'none', name: '—', handle: '', useFallbackOnly: true };
-
-// The variant's primary live channel, reused by the immersive video background so
-// the "live-news YouTube embed" is defined in exactly one place (this channel list).
-export function getDefaultLiveChannel(): { handle: string; videoId: string; name: string } {
-  const c = liveChannels()[0] ?? EMPTY_CHANNEL;
-  return { handle: c.handle, videoId: c.fallbackVideoId ?? '', name: c.name };
-}
+import { loadYouTubeAPI, type YouTubePlayer } from '@/services/youtube';
+import { liveChannels, EMPTY_CHANNEL, type LiveChannel } from '@/config/live-channels';
 
 export class LiveNewsPanel extends Panel {
-  private static apiPromise: Promise<void> | null = null;
   private activeChannel: LiveChannel = liveChannels()[0] ?? EMPTY_CHANNEL;
   private channelSwitcher: HTMLElement | null = null;
   // Pause the embed while the panel is off-screen (hidden by a variant switch, or
@@ -576,54 +490,6 @@ export class LiveNewsPanel extends Panel {
     this.desktopEmbedIframe = iframe;
   }
 
-  private static loadYouTubeApi(): Promise<void> {
-    if (LiveNewsPanel.apiPromise) return LiveNewsPanel.apiPromise;
-
-    LiveNewsPanel.apiPromise = new Promise((resolve) => {
-      if (window.YT?.Player) {
-        resolve();
-        return;
-      }
-
-      const existingScript = document.querySelector<HTMLScriptElement>(
-        'script[data-youtube-iframe-api="true"]',
-      );
-
-      if (existingScript) {
-        if (window.YT?.Player) {
-          resolve();
-          return;
-        }
-        const previousReady = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => {
-          previousReady?.();
-          resolve();
-        };
-        return;
-      }
-
-      const previousReady = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        previousReady?.();
-        resolve();
-      };
-
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      script.dataset.youtubeIframeApi = 'true';
-      script.onerror = () => {
-        console.warn('[LiveNews] YouTube IFrame API failed to load (ad blocker or network issue)');
-        LiveNewsPanel.apiPromise = null;
-        script.remove();
-        resolve();
-      };
-      document.head.appendChild(script);
-    });
-
-    return LiveNewsPanel.apiPromise;
-  }
-
   private async initializePlayer(): Promise<void> {
     if (!this.useDesktopEmbedProxy && this.player) return;
 
@@ -641,7 +507,7 @@ export class LiveNewsPanel extends Panel {
       return;
     }
 
-    await LiveNewsPanel.loadYouTubeApi();
+    await loadYouTubeAPI();
     if (this.player || !this.playerElement || !window.YT?.Player) return;
 
     this.player = new window.YT!.Player(this.playerElement, {
