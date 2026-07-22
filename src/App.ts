@@ -2,6 +2,8 @@ import './styles/try-hanzo.css';
 import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetOutage, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, CyberThreat } from '@/types';
 import {
   FEEDS,
+  feedsFor,
+  ALL_FEED_KEYS,
   INTEL_SOURCES,
   SECTORS,
   MARKET_SYMBOLS,
@@ -9,8 +11,11 @@ import {
   DEFAULT_PANELS,
   DEFAULT_MAP_LAYERS,
   MOBILE_DEFAULT_MAP_LAYERS,
+  variantConfig,
   STORAGE_KEYS,
   SITE_VARIANT,
+  getSiteVariant,
+  setSiteVariantRuntime,
   isHanzoBrandHost,
   isLuxFundHost,
   MONITOR_COLORS,
@@ -380,7 +385,7 @@ export class App {
     // Finance variant → the Bloomberg-style terminal (charts ≫ news), code-split
     // so its TradingView embeds never bloat the entry bundle. Mounts over the
     // shell; the map is skipped for this variant (mountMap early-returns).
-    if (SITE_VARIANT === 'finance') void this.mountFinanceTerminal();
+    if (getSiteVariant() === 'finance') void this.mountFinanceTerminal();
     this.startHeaderClock();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
@@ -406,12 +411,17 @@ export class App {
     this.setupTryHanzoMenu();
     this.setupAccountMenu();
     this.setupSearchModal();
+    // Header/modal controls are map-independent — wire them BEFORE the map await so
+    // the shell (H-toggle view switcher, search, settings, reset) is interactive on
+    // first paint, exactly the "interactive while the map loads" intent below. Wiring
+    // them after `await this.mapReady` left every header control dead until the ~2.7 MB
+    // map chunk finished (a cold click on the H-toggle was silently lost).
+    this.setupEventListeners();
     // The map-dependent wiring below needs the map mounted. Awaiting here lets
     // the shell paint and become interactive while the map chunk loads in parallel.
     await this.mapReady;
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
-    this.setupEventListeners();
     this.setupImmersive();
     // Capture ?country= BEFORE URL sync overwrites it
     const initState = parseMapUrlState(window.location.search, this.mapLayers);
@@ -763,7 +773,7 @@ export class App {
   // route stays for API consumers; re-enable via localStorage hanzo-world-pizzint=1.
   private setupPizzIntIndicator(): void {
     if (localStorage.getItem('hanzo-world-pizzint') !== '1') return;
-    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'ai' || SITE_VARIANT === 'crypto') return;
+    if (getSiteVariant() === 'tech' || getSiteVariant() === 'finance' || getSiteVariant() === 'ai' || getSiteVariant() === 'crypto') return;
 
     this.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.container.querySelector('.header-left');
@@ -1536,12 +1546,12 @@ export class App {
   }
 
   private setupSearchModal(): void {
-    const searchOptions = SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai'
+    const searchOptions = getSiteVariant() === 'tech' || getSiteVariant() === 'ai'
       ? {
         placeholder: t('modals.search.placeholderTech'),
         hint: t('modals.search.hintTech'),
       }
-      : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto'
+      : getSiteVariant() === 'finance' || getSiteVariant() === 'crypto'
         ? {
           placeholder: t('modals.search.placeholderFinance'),
           hint: t('modals.search.hintFinance'),
@@ -1552,7 +1562,7 @@ export class App {
         };
     this.searchModal = new SearchModal(this.container, searchOptions);
 
-    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai') {
+    if (getSiteVariant() === 'tech' || getSiteVariant() === 'ai') {
       // Tech/AI variants: tech-specific sources
       this.searchModal.registerSource('techcompany', TECH_COMPANIES.map(c => ({
         id: c.id,
@@ -1663,7 +1673,7 @@ export class App {
       })));
     }
 
-    if (SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto') {
+    if (getSiteVariant() === 'finance' || getSiteVariant() === 'crypto') {
       // Finance/Crypto variants: market-specific sources
       this.searchModal.registerSource('exchange', STOCK_EXCHANGES.map(e => ({
         id: e.id,
@@ -2600,12 +2610,15 @@ export class App {
     this.newsPanels['energy'] = energyPanel;
     this.panels['energy'] = energyPanel;
 
-    // Dynamically create NewsPanel instances for any FEEDS category.
-    // If a category key collides with an existing data panel key (e.g. markets),
-    // create a separate `${key}-news` panel to avoid clobbering the data panel.
-    for (const key of Object.keys(FEEDS)) {
+    // Dynamically create NewsPanel instances for EVERY variant's feed categories
+    // (ALL_FEED_KEYS), not just the boot variant's — so an in-place variant switch
+    // already has the target's feed panels mounted (they stay idle until their
+    // category is loaded). If a category key collides with an existing data panel
+    // key (e.g. markets), create a separate `${key}-news` panel to avoid clobbering it.
+    for (const key of ALL_FEED_KEYS) {
       if (this.newsPanels[key]) continue;
-      if (!Array.isArray((FEEDS as Record<string, unknown>)[key])) continue;
+      // Every ALL_FEED_KEYS entry is a real feed array by construction (union of the
+      // three feed maps), so no per-key array guard against the boot FEEDS is needed.
       const panelKey = this.panels[key] && !this.newsPanels[key] ? `${key}-news` : key;
       if (this.panels[panelKey]) continue;
       const panelConfig = DEFAULT_PANELS[panelKey] ?? DEFAULT_PANELS[key];
@@ -2616,107 +2629,12 @@ export class App {
       this.panels[panelKey] = panel;
     }
 
-    // Geopolitical-only panels (not needed for tech variant)
-    if (SITE_VARIANT === 'full') {
-      const gdeltIntelPanel = new GdeltIntelPanel();
-      this.panels['gdelt-intel'] = gdeltIntelPanel;
-
-      const ciiPanel = new CIIPanel();
-      ciiPanel.setShareStoryHandler((code, name) => {
-        this.openCountryStory(code, name);
-      });
-      this.panels['cii'] = ciiPanel;
-
-      const cascadePanel = new CascadePanel();
-      this.panels['cascade'] = cascadePanel;
-
-      const satelliteFiresPanel = new SatelliteFiresPanel();
-      this.panels['satellite-fires'] = satelliteFiresPanel;
-
-      const strategicRiskPanel = new StrategicRiskPanel();
-      strategicRiskPanel.setLocationClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon, 4);
-      });
-      this.panels['strategic-risk'] = strategicRiskPanel;
-
-      const strategicPosturePanel = new StrategicPosturePanel();
-      strategicPosturePanel.setLocationClickHandler((lat, lon) => {
-        console.log('[App] StrategicPosture handler called:', { lat, lon, hasMap: !!this.map });
-        this.map?.setCenter(lat, lon, 4);
-      });
-      this.panels['strategic-posture'] = strategicPosturePanel;
-
-      const ucdpEventsPanel = new UcdpEventsPanel();
-      ucdpEventsPanel.setEventClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon, 5);
-      });
-      this.panels['ucdp-events'] = ucdpEventsPanel;
-
-      const displacementPanel = new DisplacementPanel();
-      displacementPanel.setCountryClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon, 4);
-      });
-      this.panels['displacement'] = displacementPanel;
-
-      const climatePanel = new ClimateAnomalyPanel();
-      climatePanel.setZoneClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon, 4);
-      });
-      this.panels['climate'] = climatePanel;
-
-      const populationExposurePanel = new PopulationExposurePanel();
-      this.panels['population-exposure'] = populationExposurePanel;
-    }
-
-    // GCC Investments Panel (finance variant)
-    if (SITE_VARIANT === 'finance') {
-      const investmentsPanel = new InvestmentsPanel((inv) => {
-        focusInvestmentOnMap(this.map, this.mapLayers, inv.lat, inv.lon);
-      });
-      this.panels['gcc-investments'] = investmentsPanel;
-    }
-
-    // Cloud flagship panels — the live-traffic globe's companion tiles: Cloud
-    // metrics, router/Enso training + flywheel, AI compute, model mix, fleet,
-    // uptime, and the caller's own org usage + bill.
-    if (SITE_VARIANT === 'cloud') {
-      this.panels['cloud-overview'] = new CloudOverviewPanel();
-      this.panels['traffic-globe'] = new TrafficGlobePanel();
-      this.panels['model-improvement'] = new ModelImprovementPanel();
-      this.panels['enso-training'] = new EnsoTrainingPanel();
-      this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
-      this.panels['enso-router'] = new EnsoRouterPanel();
-      this.panels['ai-compute'] = new AiComputePanel();
-      this.panels['model-usage'] = new ModelUsagePanel();
-      const fleetPanel = new FleetPanel();
-      fleetPanel.setLocationClickHandler((lat, lon) => {
-        this.map?.setCenter(lat, lon, 4);
-      });
-      this.panels['fleet'] = fleetPanel;
-      this.panels['live-activity'] = new LiveActivityPanel();
-      // Per-org event-platform cards — the caller's own analytics + product
-      // insights (api.hanzo.ai /v1/analytics + /v1/insights, org-scoped by bearer).
-      this.panels['org-analytics'] = new OrgAnalyticsPanel();
-      this.panels['org-insights'] = new OrgInsightsPanel();
-      this.panels['my-usage'] = new MyUsagePanel();
-      // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public —
-      // NOT admin-gated).
-      this.panels['hanzo-status'] = new HanzoStatusPanel();
-    }
-
-    // Live Hanzo inference telemetry: AI Compute (ai-pulse SSE) + Enso Flywheel
-    // (routing ledger + evals). On the AI variant AND the default (full) world —
-    // the platform's own compute/training pulse is front-page telemetry, not a
-    // variant-only easter egg.
-    if (SITE_VARIANT === 'ai' || SITE_VARIANT === 'full') {
-      this.panels['ai-compute'] = new AiComputePanel();
-      this.panels['enso-flywheel'] = new EnsoFlywheelPanel();
-    }
-
-    // Chains widget — live block heights + peers (hanzo + crypto variants).
-    if (SITE_VARIANT === 'cloud' || SITE_VARIANT === 'crypto') {
-      this.panels['chains'] = new BlockchainPanel();
-    }
+    // Variant-specific panels (geopolitical / finance / cloud / ai / crypto). These
+    // self-poll on construction (cloud SSE, chain RPCs…), so they are created LAZILY
+    // per variant — never a boot-time union that would hammer every backend from the
+    // wrong view. ensureVariantPanels is called here for the boot variant and again
+    // by setSiteVariant for an in-place switch (deduped + kept alive on return).
+    this.ensureVariantPanels(getSiteVariant());
 
     const liveNewsPanel = new LiveNewsPanel();
     this.panels['live-news'] = liveNewsPanel;
@@ -2835,10 +2753,104 @@ export class App {
     void this.mountAdminCloudPanels();
   }
 
-  // Code-split map mount. The MapContainer value (→ the ~2.7 MB mapbox-gl +
-  // deck.gl "map" chunk) is loaded via dynamic import() so it never blocks first
-  // paint. init() kicks this off after the shell paints and awaits it before any
-  // map-dependent wiring runs. Idempotent: a second call is a no-op.
+  // The variant → panel-set factory, in ONE place. Instantiates the panels a
+  // variant owns, deduped (created at most once, then kept alive across switches)
+  // and — when a grid already exists (an in-place switch, not boot) — appended so
+  // they show. Panels shared by several variants (ai-compute, enso-flywheel,
+  // chains) live under an OR just like the layers config, so each is created once.
+  private ensureVariantPanels(variant: string): void {
+    // Create + register only (deduped). Placement into the grid is done by the
+    // ONE ordered-append path both callers already run afterward — createPanels'
+    // panelOrder loop at boot, appendPanelsInOrder on a switch — so a panel is
+    // never appended (or made draggable) twice.
+    const add = (key: string, make: () => Panel): void => {
+      if (this.panels[key]) return; // already mounted — keep it alive
+      this.panels[key] = make();
+    };
+
+    if (variant === 'full') {
+      add('gdelt-intel', () => new GdeltIntelPanel());
+      add('cii', () => {
+        const p = new CIIPanel();
+        p.setShareStoryHandler((code, name) => this.openCountryStory(code, name));
+        return p;
+      });
+      add('cascade', () => new CascadePanel());
+      add('satellite-fires', () => new SatelliteFiresPanel());
+      add('strategic-risk', () => {
+        const p = new StrategicRiskPanel();
+        p.setLocationClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 4));
+        return p;
+      });
+      add('strategic-posture', () => {
+        const p = new StrategicPosturePanel();
+        p.setLocationClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 4));
+        return p;
+      });
+      add('ucdp-events', () => {
+        const p = new UcdpEventsPanel();
+        p.setEventClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 5));
+        return p;
+      });
+      add('displacement', () => {
+        const p = new DisplacementPanel();
+        p.setCountryClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 4));
+        return p;
+      });
+      add('climate', () => {
+        const p = new ClimateAnomalyPanel();
+        p.setZoneClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 4));
+        return p;
+      });
+      add('population-exposure', () => new PopulationExposurePanel());
+    }
+
+    // GCC Investments Panel (finance variant)
+    if (variant === 'finance') {
+      add('gcc-investments', () => new InvestmentsPanel((inv) => {
+        focusInvestmentOnMap(this.map, this.mapLayers, inv.lat, inv.lon);
+      }));
+    }
+
+    // Cloud flagship panels — the live-traffic globe's companion tiles: Cloud
+    // metrics, router/Enso training + flywheel, AI compute, model mix, fleet,
+    // uptime, and the caller's own org usage + bill.
+    if (variant === 'cloud') {
+      add('cloud-overview', () => new CloudOverviewPanel());
+      add('traffic-globe', () => new TrafficGlobePanel());
+      add('model-improvement', () => new ModelImprovementPanel());
+      add('enso-training', () => new EnsoTrainingPanel());
+      add('enso-router', () => new EnsoRouterPanel());
+      add('model-usage', () => new ModelUsagePanel());
+      add('fleet', () => {
+        const p = new FleetPanel();
+        p.setLocationClickHandler((lat, lon) => this.map?.setCenter(lat, lon, 4));
+        return p;
+      });
+      add('live-activity', () => new LiveActivityPanel());
+      // Per-org event-platform cards — the caller's own analytics + product
+      // insights (api.hanzo.ai /v1/analytics + /v1/insights, org-scoped by bearer).
+      add('org-analytics', () => new OrgAnalyticsPanel());
+      add('org-insights', () => new OrgInsightsPanel());
+      add('my-usage', () => new MyUsagePanel());
+      // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public — NOT admin-gated).
+      add('hanzo-status', () => new HanzoStatusPanel());
+    }
+
+    // Live Hanzo inference telemetry: AI Compute (ai-pulse SSE) + Enso Flywheel
+    // (routing ledger + evals). On cloud + AI + the default (full) world — the
+    // platform's own compute/training pulse is front-page telemetry.
+    if (variant === 'cloud' || variant === 'ai' || variant === 'full') {
+      add('ai-compute', () => new AiComputePanel());
+      add('enso-flywheel', () => new EnsoFlywheelPanel());
+    }
+
+    // Chains widget — live block heights + peers (cloud + crypto variants).
+    if (variant === 'cloud' || variant === 'crypto') {
+      add('chains', () => new BlockchainPanel());
+    }
+  }
+
   // Code-split Bloomberg-style finance terminal — dynamic import() so its
   // TradingView embeds + terminal CSS never ship in the entry bundle. Mounts a
   // full-viewport terminal over the shell for the finance variant.
@@ -2852,11 +2864,15 @@ export class App {
     }
   }
 
+  // Code-split map mount. The MapContainer value (→ the ~2.7 MB mapbox-gl +
+  // deck.gl "map" chunk) is loaded via dynamic import() so it never blocks first
+  // paint. init() kicks this off after the shell paints and awaits it before any
+  // map-dependent wiring runs. Idempotent: a second call is a no-op.
   private async mountMap(): Promise<void> {
     if (this.map) return;
     // The finance variant renders the terminal (FinanceTerminal), not the globe —
     // skip the ~2.7 MB map load entirely there.
-    if (SITE_VARIANT === 'finance') return;
+    if (getSiteVariant() === 'finance') return;
     const mapContainer = document.getElementById('mapContainer') as HTMLElement | null;
     if (!mapContainer) return;
     const { MapContainer } = await import('@/components/MapContainer');
@@ -2891,26 +2907,43 @@ export class App {
   // Constructed and appended only for the admin org; non-admins never receive
   // them (and every backing endpoint fail-closes 403). Idempotent.
   private async mountAdminCloudPanels(): Promise<void> {
-    if (SITE_VARIANT !== 'cloud' || this.adminCloudMounted) return;
+    if (getSiteVariant() !== 'cloud') return;
+    // Panel key → label + lazy factory (one declaration, used by both the re-assert
+    // branch and the initial-mount loop below). Lazy so a panel is constructed only
+    // when actually mounted — the loop `continue`s on an already-present key, so
+    // re-entry never re-news a heavy panel. Fleet lives in ONE panel now — the
+    // always-mounted "Fleet & GPUs" (FleetPanel) renders the full platform fleet for
+    // admins; the old admin-only CloudFleetPanel duplicate was removed. Clusters &
+    // Nodes (DOKS nodes per cluster) + GPU Queue (gpu-jobs depth + what each worker is
+    // serving) complete the SuperAdmin fleet view alongside it.
+    const defs: Array<[string, string, () => Panel]> = [
+      ['cloud-services', 'Service status', () => new CloudServicesPanel()],
+      ['cloud-clusters', 'Clusters & Nodes', () => new ClusterPanel()],
+      ['cloud-queue', 'GPU Queue', () => new QueuePanel()],
+      ['llm-usage', 'LLM observability', () => new LlmUsagePanel()],
+      ['cloud-analytics', 'Web analytics', () => new CloudAnalyticsPanel()],
+      ['enso-benchmarks', 'Enso benchmarks', () => new EnsoBenchmarkPanel()],
+    ];
+
+    // Already mounted (e.g. switching back to cloud after the panelSettings reset):
+    // re-assert their settings so the in-place switch keeps them, then re-apply.
+    if (this.adminCloudMounted) {
+      for (const [key, name] of defs) {
+        if (this.panels[key] && !this.panelSettings[key]) this.panelSettings[key] = { name, enabled: true, priority: 1 };
+      }
+      saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+      this.applyPanelSettings();
+      this.renderPanelToggles();
+      return;
+    }
+
     if (!(await isAdmin())) return;
     const grid = document.getElementById('panelsGrid');
     if (!grid) return;
     this.adminCloudMounted = true;
-    const defs: Array<[string, Panel, string]> = [
-      ['cloud-services', new CloudServicesPanel(), 'Service status'],
-      // Fleet lives in ONE panel now — the always-mounted "Fleet & GPUs" (FleetPanel)
-      // renders the full platform fleet for admins. The old admin-only "Fleet &
-      // clusters" (CloudFleetPanel) was a byte-for-byte duplicate and was removed.
-      // Clusters & Nodes (DOKS nodes per cluster) + GPU Queue (gpu-jobs depth + what
-      // each worker is serving) complete the SuperAdmin fleet view alongside it.
-      ['cloud-clusters', new ClusterPanel(), 'Clusters & Nodes'],
-      ['cloud-queue', new QueuePanel(), 'GPU Queue'],
-      ['llm-usage', new LlmUsagePanel(), 'LLM observability'],
-      ['cloud-analytics', new CloudAnalyticsPanel(), 'Web analytics'],
-      ['enso-benchmarks', new EnsoBenchmarkPanel(), 'Enso benchmarks'],
-    ];
-    for (const [key, panel, name] of defs) {
+    for (const [key, name, make] of defs) {
       if (this.panels[key]) continue;
+      const panel = make();
       this.panels[key] = panel;
       if (!this.panelSettings[key]) this.panelSettings[key] = { name, enabled: true, priority: 1 };
       const el = panel.getElement();
@@ -2929,7 +2962,7 @@ export class App {
     if (this.initialUrlState?.mode) return this.initialUrlState.mode;
     const stored = localStorage.getItem(this.MAP_MODE_STORAGE_KEY);
     if (stored === '3d' || stored === '2d') return stored;
-    return SITE_VARIANT === 'cloud' || SITE_VARIANT === 'ai' ? '3d' : '2d';
+    return getSiteVariant() === 'cloud' || getSiteVariant() === 'ai' ? '3d' : '2d';
   }
 
   private applyInitialUrlState(): void {
@@ -3029,7 +3062,7 @@ export class App {
     }
     return {
       getState: () => ({
-        variant: SITE_VARIANT,
+        variant: getSiteVariant(),
         timeRange: this.currentTimeRange,
         mapMode: this.map?.getProjectionMode(),
         region: this.map?.getState().view,
@@ -3288,22 +3321,101 @@ export class App {
   }
 
   // The single variant-switch path (header tabs + analyst set_variant both route
-  // here). SITE_VARIANT is an import-time const woven through ~30 modules, so a
-  // true zero-reload in-place swap is out of scope for this release (see report).
-  // The pragmatic switch instead makes the reload feel like only the panels
-  // changed: it FLUSHES the exact live map view (camera + 2D/3D mode + layers +
-  // time range) into the URL synchronously — closing the 250ms URL-sync debounce
-  // gap — and stamps ?variant, so the post-reload restore is pixel-for-pixel and
-  // the URL is shareable. PWA-precached, content-hashed assets keep the reload
-  // sub-second.
+  // here). It switches IN PLACE — no page reload — so the deck.gl WebGL context,
+  // ML workers, and video iframes are never torn down (that cold-start churn was
+  // the tab-switch freeze). It mirrors the intra-variant panel toggle: recompute
+  // the target's config and re-apply it live. The heavy singletons stay warm; only
+  // the panel set, map layers, feeds, tabs and URL change.
   private setSiteVariant(variant: string): boolean {
-    if (!['full', 'tech', 'finance', 'cloud', 'hanzo', 'saas', 'ai', 'crypto'].includes(variant)) return false;
-    if (variant === SITE_VARIANT) return true;
-    localStorage.setItem('worldmonitor-variant', variant); // survives even a trimmed URL
-    const u = new URL(this.getShareUrl() ?? window.location.href);
-    u.searchParams.set('variant', variant);
-    window.location.href = u.toString();
+    const prev = getSiteVariant();
+    const target = setSiteVariantRuntime(variant); // canonicalizes saas/hanzo → cloud
+    if (!target) return false; // unknown variant — no-op
+    if (target === prev) return true;
+
+    const cfg = variantConfig(target);
+    // Perf probe: the in-place switch must stay cheap (a few ms) — the whole point is
+    // that it does NOT cold-start. We record the synchronous cost on window for the
+    // e2e to assert against directly (immune to boot/GL contention that pollutes
+    // wall-clock), and it doubles as a live diagnostic for the perf work.
+    const swT: Record<string, number> = ((window as unknown as { __switchT?: Record<string, number> }).__switchT = {});
+    const swAll = performance.now();
+    const step = (k: string, fn: () => void): void => { const s = performance.now(); fn(); swT[k] = Math.round(performance.now() - s); };
+
+    // 1) Instantiate the target variant's panels (lazy, deduped, appended live).
+    step('ensurePanels', () => this.ensureVariantPanels(target));
+
+    // 2) Reset panel + layer settings to the target's defaults — the SAME semantics
+    //    as a boot-time variant change (see the App constructor), minus the reload.
+    //    Panel prefs are stored under one shared key, so a switch resets them just
+    //    as the reload path did — but the panels that live OUTSIDE any variant (the
+    //    analyst, desktop config, and user custom feeds) are carried forward so a
+    //    switch never drops them (keep-alive, matching the reload's re-mount).
+    localStorage.removeItem(this.PANEL_ORDER_KEY);
+    const prevSettings = this.panelSettings;
+    const nextSettings: Record<string, PanelConfig> = { ...cfg.DEFAULT_PANELS };
+    for (const [key, entry] of Object.entries(prevSettings)) {
+      if (key.startsWith('custom:') || key === 'ai-analyst' || key === 'runtime-config') nextSettings[key] = entry;
+    }
+    if (!nextSettings['ai-analyst']) nextSettings['ai-analyst'] = { name: 'AI analyst', enabled: true, priority: 2 };
+    if (this.isDesktopApp) nextSettings['runtime-config'] = { name: 'Desktop Configuration', enabled: true, priority: 2 };
+    this.panelSettings = nextSettings;
+    saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
+
+    this.mapLayers = { ...(this.isMobile ? cfg.MOBILE_DEFAULT_MAP_LAYERS : cfg.DEFAULT_MAP_LAYERS) };
+    saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
+    step('setLayers', () => this.map?.setLayers(this.mapLayers));
+
+    // 3) Place any newly-needed panels into the grid, in the target's default order;
+    //    panels already mounted keep their slot (keep-alive). Then heal the map anchor.
+    step('appendPanels', () => this.appendPanelsInOrder(Object.keys(cfg.DEFAULT_PANELS).filter((k) => k !== 'map')));
+    step('healAnchor', () => this.healMapAnchor());
+
+    // 4) Apply visibility (shows the new set, hides the previous variant's panels)
+    //    and refresh the Panels menu to match. On cloud, (re-)mount the admin-only
+    //    console panels — idempotent, admin-gated, re-asserts their settings.
+    step('applySettings', () => this.applyPanelSettings());
+    step('renderToggles', () => this.renderPanelToggles());
+    step('adminPanels', () => { void this.mountAdminCloudPanels(); });
+
+    // 5) Re-point the tab active state and the shareable URL — no reload.
+    step('tabsActive', () => this.updateVariantTabsActive());
+    const share = this.getShareUrl();
+    if (share) history.replaceState(null, '', share);
+    swT.total = Math.round(performance.now() - swAll);
+
+    // 6) Load the target variant's data (feeds resolve to feedsFor(getSiteVariant()),
+    //    layer data to the new mapLayers). loadAllData is in-flight-guarded.
+    void this.loadAllData();
     return true;
+  }
+
+  // Append the given panel keys to the grid IN ORDER, skipping any already placed
+  // (they keep their live slot). Used by the in-place variant switch to add the
+  // target variant's panels without disturbing the shared ones. live-news keeps its
+  // must-be-first slot via the same rule createPanels uses.
+  private appendPanelsInOrder(order: string[]): void {
+    const grid = document.getElementById('panelsGrid');
+    if (!grid) return;
+    const keys = order.includes('live-news') ? ['live-news', ...order.filter((k) => k !== 'live-news')] : order;
+    keys.forEach((key) => {
+      const panel = this.panels[key];
+      if (!panel) return;
+      const el = panel.getElement();
+      if (el.parentElement === grid) return; // already placed — keep-alive
+      this.makeDraggable(el, key);
+      grid.appendChild(el);
+    });
+  }
+
+  // Re-point the header tab active state to the live variant (used after an
+  // in-place switch; the boot render sets it from the load-time value).
+  private updateVariantTabsActive(): void {
+    const active = getSiteVariant();
+    this.container.querySelectorAll<HTMLElement>('.variant-option').forEach((el) => {
+      const on = el.dataset.variant === active;
+      el.classList.toggle('active', on);
+      el.setAttribute('aria-selected', String(on));
+    });
   }
 
   private resetPanelLayout(): void {
@@ -3547,9 +3659,11 @@ export class App {
     this.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
       link.addEventListener('click', (e) => {
         const variant = link.dataset.variant;
-        if (variant && variant !== SITE_VARIANT) {
-          e.preventDefault();
-          this.setSiteVariant(variant); // one switch path: exact map-state restore + ?variant
+        // Always preventDefault: the switch is in-place, so the <a href="?variant=…">
+        // must never navigate (a navigation is the reload we are eliminating).
+        e.preventDefault();
+        if (variant && variant !== getSiteVariant()) {
+          this.setSiteVariant(variant); // one switch path: in-place, no reload
         }
       });
     });
@@ -3570,7 +3684,7 @@ export class App {
       // Restore: reopen if previously opened; also open when the current view is NOT
       // the Hanzo default, so a deep-linked visitor can still reach the switcher.
       const stored = (() => { try { return localStorage.getItem('worldmonitor-hanzo-mode'); } catch { return null; } })();
-      setMode(stored === '1' || (stored === null && SITE_VARIANT !== 'cloud'));
+      setMode(stored === '1' || (stored === null && getSiteVariant() !== 'cloud'));
       hanzoToggle.addEventListener('click', (e) => {
         e.preventDefault();
         setMode(!header?.classList.contains('hanzo-mode'));
@@ -3949,7 +4063,7 @@ export class App {
 
   private getAllSourceNames(): string[] {
     const sources = new Set<string>();
-    Object.values(FEEDS).forEach(feeds => {
+    Object.values(feedsFor(getSiteVariant())).forEach(feeds => {
       if (feeds) feeds.forEach(f => sources.add(f.name));
     });
     INTEL_SOURCES.forEach(f => sources.add(f.name));
@@ -4037,16 +4151,16 @@ export class App {
   }
 
   private applyPanelSettings(): void {
-    Object.entries(this.panelSettings).forEach(([key, config]) => {
-      if (key === 'map') {
-        const mapSection = document.getElementById('mapSection');
-        if (mapSection) {
-          mapSection.classList.toggle('hidden', !config.enabled);
-        }
-        return;
-      }
-      const panel = this.panels[key];
-      panel?.toggle(config.enabled);
+    // The map section toggles on its own settings entry.
+    const mapSection = document.getElementById('mapSection');
+    if (mapSection) mapSection.classList.toggle('hidden', this.panelSettings['map']?.enabled === false);
+
+    // Authoritative over EVERY mounted panel: visible iff its settings say enabled.
+    // A panel that belongs only to another variant has no settings entry after an
+    // in-place switch, so it is hidden — this is what makes the switch swap panel
+    // sets (the same keep-alive CSS toggle the intra-variant Panels menu uses).
+    Object.entries(this.panels).forEach(([key, panel]) => {
+      panel.toggle(this.panelSettings[key]?.enabled ?? false);
     });
   }
 
@@ -4085,24 +4199,24 @@ export class App {
 
     // Load intelligence signals for CII calculation (protests, military, outages)
     // Only for geopolitical variant - tech variant doesn't need CII/focal points
-    if (SITE_VARIANT === 'full') {
+    if (getSiteVariant() === 'full') {
       tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
     }
 
     // Conditionally load non-intelligence layers
     // NOTE: outages, protests, military are handled by loadIntelligenceSignals() above
     // They update the map when layers are enabled, so no duplicate tasks needed here
-    if (SITE_VARIANT === 'full') tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
+    if (getSiteVariant() === 'full') tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
     if (this.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (this.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
     if (this.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
     if (this.mapLayers.cables) tasks.push({ name: 'cables', task: runGuarded('cables', () => this.loadCableActivity()) });
     if (this.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
     if (CYBER_LAYER_ENABLED && this.mapLayers.cyberThreats) tasks.push({ name: 'cyberThreats', task: runGuarded('cyberThreats', () => this.loadCyberThreats()) });
-    if (this.mapLayers.techEvents || SITE_VARIANT === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
+    if (this.mapLayers.techEvents || getSiteVariant() === 'tech') tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
 
     // Tech Readiness panel (tech + ai variants — every variant that registers it)
-    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai') {
+    if (getSiteVariant() === 'tech' || getSiteVariant() === 'ai') {
       tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
     }
 
@@ -4399,7 +4513,7 @@ export class App {
 
   private async loadNews(): Promise<void> {
     // Build categories dynamically from whatever feeds the current variant exports
-    const categories = Object.entries(FEEDS)
+    const categories = Object.entries(feedsFor(getSiteVariant()))
       .filter((entry): entry is [string, typeof FEEDS[keyof typeof FEEDS]] => Array.isArray(entry[1]) && entry[1].length > 0)
       .map(([key, feeds]) => ({ key, feeds }));
 
@@ -4407,7 +4521,7 @@ export class App {
     // With the server-side feeds-batch each category costs ~1 request, so a
     // wide pipeline no longer bursts upstream APIs (the old per-feed path
     // remains the fallback and still honors the per-feed batches below).
-    const maxCategoryConcurrency = SITE_VARIANT === 'finance' ? 4 : 12;
+    const maxCategoryConcurrency = getSiteVariant() === 'finance' ? 4 : 12;
     const categoryConcurrency = Math.max(1, Math.min(maxCategoryConcurrency, categories.length));
     const categoryResults: PromiseSettledResult<NewsItem[]>[] = [];
     for (let i = 0; i < categories.length; i += categoryConcurrency) {
@@ -4429,7 +4543,7 @@ export class App {
     });
 
     // Intel (uses different source) - full variant only (defense/military news)
-    if (SITE_VARIANT === 'full') {
+    if (getSiteVariant() === 'full') {
       const enabledIntelSources = INTEL_SOURCES.filter(f => !this.disabledSources.has(f.name));
       const intelPanel = this.newsPanels['intel'];
       if (enabledIntelSources.length === 0) {
@@ -4621,9 +4735,9 @@ export class App {
   }
 
   private async loadTechEvents(): Promise<void> {
-    console.log('[loadTechEvents] Called. SITE_VARIANT:', SITE_VARIANT, 'techEvents layer:', this.mapLayers.techEvents);
+    console.log('[loadTechEvents] Called. variant:', getSiteVariant(), 'techEvents layer:', this.mapLayers.techEvents);
     // Only load for tech variant or if techEvents layer is enabled
-    if (SITE_VARIANT !== 'tech' && !this.mapLayers.techEvents) {
+    if (getSiteVariant() !== 'tech' && !this.mapLayers.techEvents) {
       console.log('[loadTechEvents] Skipping - not tech variant and layer disabled');
       return;
     }
@@ -4663,7 +4777,7 @@ export class App {
       this.statusPanel?.updateFeed('Tech Events', { status: 'ok', itemCount: mapEvents.length });
 
       // Register tech events as searchable source
-      if (SITE_VARIANT === 'tech' && this.searchModal) {
+      if (getSiteVariant() === 'tech' && this.searchModal) {
         this.searchModal.registerSource('techevent', mapEvents.map((e: { id: string; title: string; location: string; startDate: string }) => ({
           id: e.id,
           title: e.title,
@@ -5527,7 +5641,7 @@ export class App {
 
     // Refresh intelligence signals for CII (geopolitical variant only)
     // This handles outages, protests, military - updates map when layers enabled
-    if (SITE_VARIANT === 'full') {
+    if (getSiteVariant() === 'full') {
       this.scheduleRefresh('intelligence', () => {
         this.intelligenceCache = {}; // Clear cache to force fresh fetch
         return this.loadIntelligenceSignals();

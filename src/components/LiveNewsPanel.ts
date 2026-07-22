@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
-import { SITE_VARIANT } from '@/config';
+import { getSiteVariant } from '@/config';
 
 // YouTube IFrame Player API types
 type YouTubePlayer = {
@@ -70,10 +70,12 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'nasa', name: 'NASA TV', handle: '@NASA', fallbackVideoId: 'fO9e9jnhYK8', useFallbackOnly: true },
 ];
 
-// tech + ai + saas → tech/business channels; crypto/finance/full → world+finance set.
-const LIVE_CHANNELS = (SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai' || SITE_VARIANT === 'saas')
-  ? TECH_LIVE_CHANNELS
-  : FULL_LIVE_CHANNELS;
+// tech + ai → tech/business channels; crypto/finance/cloud/full → world+finance set.
+// Read live (getSiteVariant) so the channel set reflects the current variant.
+function liveChannels(): LiveChannel[] {
+  const v = getSiteVariant();
+  return v === 'tech' || v === 'ai' ? TECH_LIVE_CHANNELS : FULL_LIVE_CHANNELS;
+}
 
 // Never-crash default: if a variant ever ships an empty channel list, the panel
 // still constructs (activeChannel stays a valid object) and renders a clean
@@ -84,14 +86,19 @@ const EMPTY_CHANNEL: LiveChannel = { id: 'none', name: '—', handle: '', useFal
 // The variant's primary live channel, reused by the immersive video background so
 // the "live-news YouTube embed" is defined in exactly one place (this channel list).
 export function getDefaultLiveChannel(): { handle: string; videoId: string; name: string } {
-  const c = LIVE_CHANNELS[0] ?? EMPTY_CHANNEL;
+  const c = liveChannels()[0] ?? EMPTY_CHANNEL;
   return { handle: c.handle, videoId: c.fallbackVideoId ?? '', name: c.name };
 }
 
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
-  private activeChannel: LiveChannel = LIVE_CHANNELS[0] ?? EMPTY_CHANNEL;
+  private activeChannel: LiveChannel = liveChannels()[0] ?? EMPTY_CHANNEL;
   private channelSwitcher: HTMLElement | null = null;
+  // Pause the embed while the panel is off-screen (hidden by a variant switch, or
+  // scrolled away) so it stops decoding — mirrors LiveWebcamsPanel. Starts true so
+  // a panel that is never observed still plays.
+  private observer: IntersectionObserver | null = null;
+  private isIntersecting = true;
   private isMuted = true;
   private isPlaying = true;
   private wasPlayingBeforeIdle = true;
@@ -136,6 +143,27 @@ export class LiveNewsPanel extends Panel {
     this.setupBridgeMessageListener();
     this.renderPlayer();
     this.setupIdleDetection();
+    this.setupIntersectionObserver();
+  }
+
+  // Pause playback when the panel isn't intersecting the viewport, resume when it
+  // is. Same approach as LiveWebcamsPanel — it doesn't touch isPlaying (the user's
+  // intent); syncPlayerState honors that intent when the panel returns to view.
+  private setupIntersectionObserver(): void {
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        const wasIntersecting = this.isIntersecting;
+        this.isIntersecting = entries.some((e) => e.isIntersecting);
+        if (this.isIntersecting && !wasIntersecting) {
+          this.syncPlayerState();
+        } else if (!this.isIntersecting && wasIntersecting) {
+          this.player?.pauseVideo?.();
+          if (this.useDesktopEmbedProxy) this.postToEmbed({ type: 'pause' });
+        }
+      },
+      { threshold: 0.1 },
+    );
+    this.observer.observe(this.element);
   }
 
   private get embedOrigin(): string {
@@ -361,7 +389,7 @@ export class LiveNewsPanel extends Panel {
     this.channelSwitcher = document.createElement('div');
     this.channelSwitcher.className = 'live-news-switcher';
 
-    LIVE_CHANNELS.forEach(channel => {
+    liveChannels().forEach(channel => {
       const btn = document.createElement('button');
       btn.className = `live-channel-btn ${channel.id === this.activeChannel.id ? 'active' : ''}`;
       btn.dataset.channelId = channel.id;
@@ -743,6 +771,8 @@ export class LiveNewsPanel extends Panel {
       this.idleTimeout = null;
     }
 
+    this.observer?.disconnect();
+    this.observer = null;
     document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
     window.removeEventListener('message', this.boundMessageHandler);
     ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {

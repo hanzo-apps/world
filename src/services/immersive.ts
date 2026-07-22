@@ -12,7 +12,7 @@
 
 import { getDefaultLiveChannel } from '@/components/LiveNewsPanel';
 import { fetchLiveVideoId } from '@/services/live-news';
-import { SITE_VARIANT } from '@/config/variant';
+import { getSiteVariant } from '@/config/variant';
 
 export type ImmersiveBackground = 'map' | 'video';
 
@@ -63,7 +63,7 @@ export class ImmersiveController {
       // Never chosen: the flagship Cloud view opens on the immersive globe — the
       // full-viewport 3D dot map is the hero, panels float over it — instead of
       // demoting it to a corner tile in the grid. Other variants still default to grid.
-      return SITE_VARIANT === 'cloud';
+      return getSiteVariant() === 'cloud';
     } catch { return false; }
   }
 

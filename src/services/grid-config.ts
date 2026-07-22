@@ -13,7 +13,7 @@
 // panel-drag.ts, which reads getLayoutMode()/getCellSize() and calls back here to
 // persist. Grid mode is left byte-for-byte untouched so it can never regress.
 
-import { SITE_VARIANT } from '../config/variant';
+import { getSiteVariant } from '../config/variant';
 
 export type LayoutMode = 'grid' | 'free';
 
@@ -42,7 +42,11 @@ interface LayoutState {
 }
 
 // Per-variant so the tech / finance / full dashboards each keep their own layout.
-const STORAGE_KEY = `worldmonitor-layout:${SITE_VARIANT}`;
+// Read live (getSiteVariant) so an in-place variant switch persists under the key
+// of the variant currently on screen.
+function layoutKey(): string {
+  return `worldmonitor-layout:${getSiteVariant()}`;
+}
 
 // px — the grid column-track floor, exposed to CSS as `--panel-col-min` (the
 // variable the base .panels-grid rule and the footer dock already read). 160
@@ -72,7 +76,7 @@ const GRID_SELECTOR = '.panels-grid';
 function readState(): LayoutState {
   const base: LayoutState = { mode: 'grid', userSet: false, cellSize: DEFAULT_CELL_SIZE, free: {}, gridCols: {} };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(layoutKey());
     if (!raw) return base;
     const parsed = JSON.parse(raw) as Partial<LayoutState>;
     return {
@@ -92,7 +96,7 @@ function readState(): LayoutState {
 
 function writeState(next: LayoutState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(layoutKey(), JSON.stringify(next));
   } catch {
     /* private mode — layout simply won't persist */
   }
@@ -215,7 +219,7 @@ export function setCellSize(px: number): void {
 /** Clear every layout-engine customization (mode, cell size, free + grid geometry). */
 export function resetLayout(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(layoutKey());
   } catch {
     /* ignore */
   }
