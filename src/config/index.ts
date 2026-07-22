@@ -4,7 +4,7 @@
 // VITE_VARIANT=full → worldmonitor.app (geopolitical)
 // VITE_VARIANT=finance → finance.worldmonitor.app (markets/trading)
 
-export { SITE_VARIANT, isHanzoBrandHost, isLuxFundHost } from './variant';
+export { SITE_VARIANT, getSiteVariant, setSiteVariantRuntime, isHanzoBrandHost, isLuxFundHost } from './variant';
 
 // Shared base configuration (always included)
 export {
@@ -41,6 +41,7 @@ export {
   DEFAULT_PANELS,
   DEFAULT_MAP_LAYERS,
   MOBILE_DEFAULT_MAP_LAYERS,
+  variantConfig,
 } from './panels';
 
 // ============================================
@@ -52,6 +53,8 @@ export {
 // These are large data files that should be tree-shaken in tech builds
 export {
   FEEDS,
+  feedsFor,
+  ALL_FEED_KEYS,
   INTEL_SOURCES,
 } from './feeds';
 
