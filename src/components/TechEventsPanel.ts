@@ -70,12 +70,7 @@ export class TechEventsPanel extends Panel {
 
   protected render(): void {
     if (this.loading) {
-      this.content.innerHTML = `
-        <div class="tech-events-loading">
-          <div class="loading-spinner"></div>
-          <span>${t('components.techEvents.loading')}</span>
-        </div>
-      `;
+      this.showLoading(t('components.techEvents.loading'));
       return;
     }
 
@@ -94,14 +89,23 @@ export class TechEventsPanel extends Panel {
     const upcomingConferences = this.events.filter(e => e.type === 'conference' && new Date(e.startDate) >= new Date());
     const mappableCount = upcomingConferences.filter(e => e.coords && !e.coords.virtual).length;
 
+    const tabsHtml = this.renderTabs(
+      [
+        { key: 'upcoming', label: 'Upcoming' },
+        { key: 'conferences', label: 'Conferences' },
+        { key: 'earnings', label: 'Earnings' },
+        { key: 'all', label: 'All' },
+      ],
+      this.viewMode,
+      (key) => {
+        this.viewMode = key as ViewMode;
+        this.render();
+      },
+    );
+
     this.content.innerHTML = `
       <div class="tech-events-panel">
-        <div class="tech-events-tabs">
-          <button class="tab ${this.viewMode === 'upcoming' ? 'active' : ''}" data-view="upcoming">Upcoming</button>
-          <button class="tab ${this.viewMode === 'conferences' ? 'active' : ''}" data-view="conferences">Conferences</button>
-          <button class="tab ${this.viewMode === 'earnings' ? 'active' : ''}" data-view="earnings">Earnings</button>
-          <button class="tab ${this.viewMode === 'all' ? 'active' : ''}" data-view="all">All</button>
-        </div>
+        ${tabsHtml}
         <div class="tech-events-stats">
           <span class="stat">📅 ${upcomingConferences.length} conferences</span>
           <span class="stat">📍 ${mappableCount} on map</span>
@@ -110,22 +114,11 @@ export class TechEventsPanel extends Panel {
         <div class="tech-events-list">
           ${filteredEvents.length > 0
         ? filteredEvents.map(e => this.renderEvent(e)).join('')
-        : `<div class="empty-state">${t('components.techEvents.noEvents')}</div>`
+        : this.emptyStateHtml(t('components.techEvents.noEvents'))
       }
         </div>
       </div>
     `;
-
-    // Add tab listeners
-    this.content.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', (e) => {
-        const view = (e.target as HTMLElement).dataset.view as ViewMode;
-        if (view) {
-          this.viewMode = view;
-          this.render();
-        }
-      });
-    });
 
     // Add map link listeners
     this.content.querySelectorAll('.event-map-link').forEach(link => {
