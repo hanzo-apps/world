@@ -17,6 +17,13 @@ type Settings struct {
 	db *sql.DB // nil in degraded mode
 }
 
+// SharedSub is the reserved user_sub of an ORG-WIDE settings row — a doc owned by
+// the org itself (its published default), independent of any user. No IAM subject
+// equals it (subs are real IAM identifiers, never this sentinel), so a shared doc
+// lives in the SAME table without ever colliding with a user's own row. Get/Put
+// treat it like any identity — the org-scoped doc is just a row keyed by the org.
+const SharedSub = "*org-shared*"
+
 // Identity keys a settings row. Project defaults to "default" upstream so a
 // user's single dashboard has a stable key.
 type Identity struct {
