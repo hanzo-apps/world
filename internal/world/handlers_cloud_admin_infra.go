@@ -123,7 +123,7 @@ func (s *Server) handleCloudClusters(w http.ResponseWriter, r *http.Request) {
 		Clusters []wireCluster `json:"clusters"`
 	}
 	if err := s.getJSON(ctx, base+"/v1/k8s/clusters", hdr, &list); err != nil {
-		writeJSON(w, http.StatusOK, "", cloudClusters{Available: false, UpdatedAt: nowRFC(),
+		writeJSON(w, http.StatusOK, "private, no-store", cloudClusters{Available: false, UpdatedAt: nowRFC(),
 			Note: "Kubernetes cluster inventory (visor) is unavailable right now."})
 		return
 	}
@@ -157,7 +157,7 @@ func (s *Server) handleCloudClusters(w http.ResponseWriter, r *http.Request) {
 		return out.Clusters[i].Nodes > out.Clusters[j].Nodes
 	})
 	out.Note = "Live DOKS + BYO clusters from visor, grouped by cluster with node pools and worker-node status."
-	writeJSON(w, http.StatusOK, "", out)
+	writeJSON(w, http.StatusOK, "private, no-store", out)
 }
 
 // clusterGroup resolves one cluster to its group view. It fetches the cluster
@@ -297,7 +297,7 @@ func (s *Server) handleCloudQueue(w http.ResponseWriter, r *http.Request) {
 		Activities []wireActivity `json:"activities"`
 	}
 	if err := s.getJSON(ctx, base+"/v1/tasks/namespaces/"+gpuJobsNamespace+"/activities", hdr, &acts); err != nil {
-		writeJSON(w, http.StatusOK, "", cloudQueue{Available: false, UpdatedAt: nowRFC(), Namespace: gpuJobsNamespace,
+		writeJSON(w, http.StatusOK, "private, no-store", cloudQueue{Available: false, UpdatedAt: nowRFC(), Namespace: gpuJobsNamespace,
 			Note: "GPU job queue (tasks) is unavailable right now."})
 		return
 	}
@@ -374,7 +374,7 @@ func (s *Server) handleCloudQueue(w http.ResponseWriter, r *http.Request) {
 		out.Recent = out.Recent[:12]
 	}
 	out.Note = "Live GPU job queue (gpu-jobs) — pending + running work by service, and what each worker is serving."
-	writeJSON(w, http.StatusOK, "", out)
+	writeJSON(w, http.StatusOK, "private, no-store", out)
 }
 
 // jobService is the dispatching service of a job type: the segment before the

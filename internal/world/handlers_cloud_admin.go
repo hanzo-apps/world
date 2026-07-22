@@ -109,7 +109,7 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 		} `json:"machines"`
 	}
 	if err := s.getJSON(ctx, base+"/v1/machines", hdr, &machines); err != nil {
-		writeJSON(w, http.StatusOK, "", cloudFleet{Available: false, UpdatedAt: nowRFC(), Note: "Fleet inventory (visor) is unavailable right now."})
+		writeJSON(w, http.StatusOK, "private, no-store", cloudFleet{Available: false, UpdatedAt: nowRFC(), Note: "Fleet inventory (visor) is unavailable right now."})
 		return
 	}
 	var gpus struct {
@@ -218,7 +218,7 @@ func (s *Server) handleCloudFleet(w http.ResponseWriter, r *http.Request) {
 
 	f.Note = "Live fleet from visor (DO / GCP / AWS / BYO), grouped by provider and region."
 	f.UtilNote = "Live GPU utilization, memory-used and temperature are not yet instrumented in the fleet data plane — only inventory, status and (BYO) VRAM total are reported."
-	writeJSON(w, http.StatusOK, "", f)
+	writeJSON(w, http.StatusOK, "private, no-store", f)
 }
 
 func isRealVRAM(s string) bool {
@@ -299,7 +299,7 @@ func (s *Server) handleCloudServices(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out.Note = "Per-subsystem health from o11y (live probe) fused with RED metrics over the last hour."
-	writeJSON(w, http.StatusOK, "", out)
+	writeJSON(w, http.StatusOK, "private, no-store", out)
 }
 
 // livenessURL maps a cloud subsystem to a real reachability endpoint, used to
@@ -466,7 +466,7 @@ func (s *Server) handleCloudAnalytics(w http.ResponseWriter, r *http.Request) {
 		} `json:"data"`
 	}
 	if err := s.getJSON(ctx, base+"/v1/analytics/websites", hdr, &sites); err != nil || len(sites.Data) == 0 {
-		writeJSON(w, http.StatusOK, "", cloudAnalytics{Available: false, UpdatedAt: nowRFC(), Window: "24h",
+		writeJSON(w, http.StatusOK, "private, no-store", cloudAnalytics{Available: false, UpdatedAt: nowRFC(), Window: "24h",
 			Note: "Web analytics (analytics.hanzo.ai) has no websites registered or is unreachable."})
 		return
 	}
@@ -529,7 +529,7 @@ func (s *Server) handleCloudAnalytics(w http.ResponseWriter, r *http.Request) {
 	out.TopReferrers = topMetrics(refs, 8)
 	out.TopCountries = topMetrics(countries, 8)
 	out.Note = "Live web analytics across all registered Hanzo sites (analytics.hanzo.ai), last 24h."
-	writeJSON(w, http.StatusOK, "", out)
+	writeJSON(w, http.StatusOK, "private, no-store", out)
 }
 
 func mergeMetric(ctx context.Context, s *Server, base, id, typ, q string, hdr map[string]string, into map[string]int64, mu *sync.Mutex) {
@@ -583,7 +583,7 @@ func (s *Server) handleCloudLLM(w http.ResponseWriter, r *http.Request) {
 
 	body, status, err := s.get(ctx, apiHost()+"/v1/admin/o11y?range="+rng, map[string]string{"Authorization": bearer})
 	if err != nil || status < 200 || status >= 300 {
-		writeJSON(w, http.StatusOK, "", map[string]any{
+		writeJSON(w, http.StatusOK, "private, no-store", map[string]any{
 			"available": false, "updatedAt": nowRFC(), "range": rng,
 			"note": "Platform LLM observability requires a cloud global-admin token; not available for this session.",
 		})
@@ -591,10 +591,10 @@ func (s *Server) handleCloudLLM(w http.ResponseWriter, r *http.Request) {
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		writeJSON(w, http.StatusOK, "", map[string]any{"available": false, "range": rng, "note": "LLM observability response was unreadable."})
+		writeJSON(w, http.StatusOK, "private, no-store", map[string]any{"available": false, "range": rng, "note": "LLM observability response was unreadable."})
 		return
 	}
-	writeJSON(w, http.StatusOK, "", map[string]any{"available": true, "updatedAt": nowRFC(), "range": rng, "data": payload})
+	writeJSON(w, http.StatusOK, "private, no-store", map[string]any{"available": true, "updatedAt": nowRFC(), "range": rng, "data": payload})
 }
 
 // ── small shared helpers ─────────────────────────────────────────────────────

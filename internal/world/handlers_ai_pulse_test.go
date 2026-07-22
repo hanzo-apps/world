@@ -177,6 +177,7 @@ func TestAIPulseAdminPoll(t *testing.T) {
 	t.Setenv("HANZO_CLOUD_PULSE_TOKEN", "") // no service token — the admin's bearer drives it
 	t.Setenv("HANZO_API_BASE", up.URL)
 	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
+	t.Setenv("WORLD_ADMIN_ORGS", "hanzo") // operator org resolves via deploy env, not code
 
 	s := NewServer()
 	mux := http.NewServeMux()
