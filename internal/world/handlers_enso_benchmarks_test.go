@@ -16,7 +16,8 @@ func getEnsoBenchmarks(t *testing.T, iamStatus int, iamBody, bearer string) (*ht
 	t.Helper()
 	iam := iamStub(t, iamStatus, iamBody)
 	t.Setenv("HANZO_IAM_ISSUER", iam.URL)
-	t.Setenv("ENSO_BENCH_URL", "") // force the embedded snapshot
+	t.Setenv("WORLD_ADMIN_ORGS", "hanzo") // operator org resolves via deploy env, not code
+	t.Setenv("ENSO_BENCH_URL", "")        // force the embedded snapshot
 
 	s := NewServer()
 	mux := http.NewServeMux()
