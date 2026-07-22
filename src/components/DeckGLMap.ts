@@ -495,6 +495,7 @@ export class DeckGLMap {
   private renderPaused = false;
   private renderPending = false;
   private webglLost = false;
+  private gpuParked = false;
   private resizeObserver: ResizeObserver | null = null;
 
   private layerCache: Map<string, Layer> = new Map();
@@ -3959,6 +3960,38 @@ export class DeckGLMap {
       this.renderPending = false;
       this.render();
     }
+  }
+
+  // Free the mapbox WebGL context while the tab is backgrounded, and restore it on show.
+  // On the native globe, mapbox is only PARKED (frozen in mercator behind the deck.gl
+  // GlobeView — see GlobeNative) yet still holds a full WebGL context. With several
+  // world.hanzo.ai tabs open, those parked contexts are what push Safari past its
+  // GPU/context ceiling → the "a problem occurred" crash-reload (and a black globe after
+  // it). We drop mapbox's context via WEBGL_lose_context when hidden and restore it on
+  // show: this reuses the existing webglcontextlost/restored handlers (mapbox-gl and
+  // deck.gl both rebuild their GPU resources on restore), so nothing is re-wired. Worst
+  // case — a restore that doesn't repaint — is the same state the crash already produced,
+  // but with one fewer live context: strictly less GPU pressure, never worse.
+  public parkGPU(): void {
+    if (this.gpuParked || this.webglLost) return;
+    const ext = this.mapGL()?.getExtension('WEBGL_lose_context');
+    if (!ext) return;
+    this.gpuParked = true;
+    ext.loseContext(); // fires 'webglcontextlost' → webglLost = true (render already gated)
+  }
+
+  public restoreGPU(): void {
+    if (!this.gpuParked) return;
+    this.gpuParked = false;
+    this.mapGL()?.getExtension('WEBGL_lose_context')?.restoreContext(); // fires 'webglcontextrestored'
+  }
+
+  // The mapbox canvas' live GL context (idempotent getContext returns the existing one).
+  private mapGL(): WebGLRenderingContext | WebGL2RenderingContext | null {
+    const canvas = this.mapboxMap?.getCanvas();
+    if (!canvas) return null;
+    return (canvas.getContext('webgl2') as WebGL2RenderingContext | null)
+      ?? (canvas.getContext('webgl') as WebGLRenderingContext | null);
   }
 
   private updateLayers(): void {
