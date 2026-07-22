@@ -4,6 +4,7 @@ import { REFRESH_INTERVALS } from '@/config';
 import type { MarketData } from '@/types';
 import { universeGroups } from '@/config/market-universe';
 import { quoteRow, groupBlock, changeDir, absFromPct } from '@/utils/market-format';
+import { signedPct } from '@/utils/cloud-format';
 
 // Commodities & futures — grouped metals / energy / ags, Bloomberg-dense and
 // strictly monochrome (bright = up, dim = down; no red/green). Self-polling off
@@ -64,7 +65,7 @@ export class CommoditiesPanel extends Panel {
               name: it.name,
               sub: it.symbol,
               valueText: fmtNum(q.price),
-              changeText: `${abs >= 0 ? '+' : ''}${fmtNum(abs)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
+              changeText: `${abs >= 0 ? '+' : ''}${fmtNum(abs)} (${signedPct(pct)})`,
               dir: changeDir(q.change),
               sparkline: q.sparkline,
             });

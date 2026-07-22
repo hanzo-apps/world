@@ -38,7 +38,7 @@ export class CustomFeedPanel extends Panel {
   private renderXml(xml: string): void {
     const items = parseFeedItems(xml);
     if (!items.length) {
-      this.setContent('<div class="empty-state">No items</div>');
+      this.showEmpty('No items');
       this.setCount(0);
       return;
     }
