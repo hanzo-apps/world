@@ -58,6 +58,11 @@ export interface ChinaMacroSnapshot {
 
 const CHINA_MACRO_URL = '/v1/world/china-macro';
 
+// A blocked upstream (OECD/NBS/ChinaMoney) can make the backend burn its full
+// server-side deadline; cap the browser wait so a slow snapshot aborts and
+// degrades to an honest empty state instead of hanging the panel.
+const CHINA_MACRO_TIMEOUT_MS = 10_000;
+
 function emptySnapshot(): ChinaMacroSnapshot {
   return {
     countryCode: 'CN', generatedAt: '', status: 'unavailable', launchReady: false,
@@ -75,7 +80,7 @@ export function isChinaLaunchReady(snapshot: ChinaMacroSnapshot | null): boolean
 
 export async function fetchChinaMacro(): Promise<ChinaMacroSnapshot> {
   try {
-    const response = await fetchWithProxy(CHINA_MACRO_URL);
+    const response = await fetchWithProxy(CHINA_MACRO_URL, undefined, CHINA_MACRO_TIMEOUT_MS);
     if (!response.ok) return emptySnapshot();
     const data = (await response.json()) as Partial<ChinaMacroSnapshot>;
     if (!data || typeof data !== 'object') return emptySnapshot();
