@@ -5,7 +5,17 @@ import type { CountryScore } from '@/services/country-instability';
 import type { PredictionMarket, NewsItem } from '@/types';
 import type { AssetType } from '@/types';
 import type { CountryBriefSignals } from '@/App';
-import type { StockIndexData } from '@/components/CountryIntelModal';
+// Local to its only consumer now that the superseded CountryIntelModal is gone.
+export interface StockIndexData {
+  available: boolean;
+  code: string;
+  symbol: string;
+  indexName: string;
+  price: string;
+  weekChangePercent: string;
+  currency: string;
+  cached?: boolean;
+}
 import { getNearbyInfrastructure, haversineDistanceKm } from '@/services/related-assets';
 import { PORTS } from '@/config/ports';
 import type { Port } from '@/config/ports';
