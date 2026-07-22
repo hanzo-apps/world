@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
+import { sparkline } from '@/utils/market-format';
 
 interface MacroSignalData {
   timestamp: string;
@@ -21,16 +22,7 @@ interface MacroSignalData {
 }
 
 function sparklineSvg(data: number[], width = 80, height = 24, color = '#4fc3f7'): string {
-  if (!data || data.length < 2) return '';
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((v - min) / range) * (height - 2) - 1;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="signal-sparkline"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return sparkline(data, { w: width, h: height, className: 'signal-sparkline', stroke: color, strokeWidth: 1.5, preserveAspectRatio: false, ariaHidden: false });
 }
 
 function donutGaugeSvg(value: number | null, size = 48): string {

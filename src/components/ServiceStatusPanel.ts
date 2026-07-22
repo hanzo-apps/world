@@ -101,12 +101,7 @@ export class ServiceStatusPanel extends Panel {
 
   protected render(): void {
     if (this.loading) {
-      this.content.innerHTML = `
-        <div class="service-status-loading">
-          <div class="loading-spinner"></div>
-          <span>Checking services...</span>
-        </div>
-      `;
+      this.showLoading('Checking services...');
       return;
     }
 

@@ -139,7 +139,7 @@ export class CascadePanel extends Panel {
             ${c.affectedCapacity > 0 ? `<span class="cascade-capacity">${t('components.cascade.capacityPercent', { percent: String(Math.round(c.affectedCapacity * 100)) })}</span>` : ''}
           </div>
         `).join('')
-      : `<div class="empty-state">${t('components.cascade.noCountryImpacts')}</div>`;
+      : this.emptyStateHtml(t('components.cascade.noCountryImpacts'));
 
     const redundanciesHtml = redundancies && redundancies.length > 0
       ? `

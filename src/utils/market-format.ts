@@ -12,9 +12,37 @@ export function changeDir(change: number | null | undefined): Dir {
   return change > 0 ? 'up' : 'down';
 }
 
-/** Minimal monochrome sparkline — stroke inherits currentColor so the row tints it. */
-export function monoSparkline(data: number[] | undefined, w = 54, h = 16): string {
+export interface SparklineOpts {
+  /** Viewbox + rendered width/height (px). */
+  w?: number;
+  h?: number;
+  /** SVG class — carries the CSS (row tint, sizing). */
+  className?: string;
+  /** Stroke paint: 'currentColor' (monochrome, inherits the row tint) or an explicit colour. */
+  stroke?: string;
+  strokeWidth?: number;
+  /** Emit preserveAspectRatio="none" (stretch to fill when CSS resizes the svg). */
+  preserveAspectRatio?: boolean;
+  /** Emit aria-hidden="true". */
+  ariaHidden?: boolean;
+}
+
+/**
+ * The one sparkline: shared point math + SVG for every dense value series. The
+ * defaults are the finance monochrome look (mkt-spark, currentColor, 1.2). Callers
+ * vary only size, class and stroke — never the geometry. Returns '' for <2 points.
+ */
+export function sparkline(data: number[] | undefined, opts: SparklineOpts = {}): string {
   if (!data || data.length < 2) return '';
+  const {
+    w = 54,
+    h = 16,
+    className = 'mkt-spark',
+    stroke = 'currentColor',
+    strokeWidth = 1.2,
+    preserveAspectRatio = true,
+    ariaHidden = true,
+  } = opts;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -25,7 +53,14 @@ export function monoSparkline(data: number[] | undefined, w = 54, h = 16): strin
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(' ');
-  return `<svg class="mkt-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const par = preserveAspectRatio ? ' preserveAspectRatio="none"' : '';
+  const aria = ariaHidden ? ' aria-hidden="true"' : '';
+  return `<svg class="${className}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"${par}${aria}><polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+/** Minimal monochrome sparkline — stroke inherits currentColor so the row tints it. */
+export function monoSparkline(data: number[] | undefined, w = 54, h = 16): string {
+  return sparkline(data, { w, h });
 }
 
 export interface QuoteRow {
