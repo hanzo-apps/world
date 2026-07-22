@@ -13,9 +13,19 @@ import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 // learn about the server — they just use localStorage. Blobs are opaque (each value
 // stored verbatim); this module never interprets them, and they hold layout/usage
 // state only — NEVER secrets. Signed out, everything stays local (no server state).
+//
+// SCOPES: the dashboard has an optional ORG-SHARED default (sharedEndpoint) an org
+// admin publishes for the whole org. On boot the org default is hydrated FIRST (the
+// base), then the user's own doc is overlaid on top (the user always wins) — so a
+// fresh member sees the org's published layout and their own tweaks override it.
+// publishOrgDashboard() PUTs the current layout to the shared endpoint (admin-only,
+// enforced server-side).
 
 interface SyncGroup {
   endpoint: string;
+  // Optional org-wide default, hydrated BEFORE (under) the per-user endpoint. Writes
+  // never go here automatically — only the explicit publishOrgDashboard() verb does.
+  sharedEndpoint?: string;
   fixed: string[];
   prefix?: string;
   timer: ReturnType<typeof setTimeout> | null;
@@ -25,6 +35,7 @@ interface SyncGroup {
 const GROUPS: SyncGroup[] = [
   {
     endpoint: '/v1/world/dashboard',
+    sharedEndpoint: '/v1/world/dashboard/shared',
     fixed: [
       'panel-order',
       'worldmonitor-panels',
@@ -120,25 +131,66 @@ export async function initDashboardSync(): Promise<void> {
   install();
 }
 
-async function hydrate(g: SyncGroup): Promise<void> {
+// GET a scope's blob. Returns the config object (possibly empty) on success, or null
+// when the server can't be reached / refuses (offline, 401/403 on the shared scope).
+async function fetchDoc(endpoint: string): Promise<SyncDoc | null> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(`${base()}${g.endpoint}`, { headers: await orgHeaders(), signal: ctrl.signal });
+    const res = await fetch(`${base()}${endpoint}`, { headers: await orgHeaders(), signal: ctrl.signal });
     clearTimeout(timer);
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const data = (await res.json()) as { config?: SyncDoc };
-    const server = data.config ?? {};
-    if (isEmpty(server)) {
-      // Nothing on the server yet — adopt whatever this device already has (first
-      // sign-in) rather than leaving it stranded in localStorage only.
-      const local = snapshot(g);
-      if (!isEmpty(local)) void put(g, local);
-      return;
-    }
-    apply(g, server);
+    return data.config ?? {};
   } catch {
-    /* offline / slow — boot from local, and the first change re-syncs */
+    return null;
+  }
+}
+
+// One hydrate pass, scope-parameterized. The org-shared default (if the group has
+// one) is applied FIRST as the base, then the user's own doc is overlaid on top so
+// the user always wins. Both scopes are fetched concurrently (boot stays bounded by
+// one timeout) but applied in precedence order. Writes only ever target the per-user
+// endpoint — the shared default changes solely via publishOrgDashboard().
+async function hydrate(g: SyncGroup): Promise<void> {
+  const local = snapshot(g); // this device's pre-hydrate (anonymous) layout
+  const [shared, user] = await Promise.all([
+    g.sharedEndpoint ? fetchDoc(g.sharedEndpoint) : Promise.resolve<SyncDoc | null>(null),
+    fetchDoc(g.endpoint),
+  ]);
+  // Base layer: the org default (lowest precedence). Absent/empty/forbidden → skipped.
+  if (shared && !isEmpty(shared)) apply(g, shared);
+  if (user === null) return; // couldn't reach the user scope — boot local, first change re-syncs
+  if (isEmpty(user)) {
+    // No per-user doc yet. Keep the org default applied, but migrate any pre-existing
+    // anonymous layout (first sign-in) so it isn't stranded — and let it win.
+    if (!isEmpty(local)) {
+      apply(g, local);
+      void put(g, local);
+    }
+    return;
+  }
+  apply(g, user); // the user's own doc overrides the org default
+}
+
+/**
+ * Publish the user's CURRENT dashboard as the ORG default — the "make my layout the
+ * team default" verb. Admin-only on the server (a non-admin gets 403 and nothing
+ * changes), so callers should only surface the trigger to admins. Snapshots the live
+ * dashboard group and PUTs it to the shared endpoint. Returns whether it was accepted.
+ */
+export async function publishOrgDashboard(): Promise<boolean> {
+  const g = GROUPS.find((x) => x.sharedEndpoint);
+  if (!g?.sharedEndpoint || !isAuthenticated()) return false;
+  try {
+    const res = await fetch(`${base()}${g.sharedEndpoint}`, {
+      method: 'PUT',
+      headers: await orgHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(snapshot(g)),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
