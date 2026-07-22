@@ -1,11 +1,16 @@
 // Alternative-asset feed panel (art auctions, luxury real estate).
 //
-// Sotheby's / collectibles auctions and JamesEdition luxury listings have no
-// CORS-open public API, so the live data is served by the world backend
-// (world-gw) which scrapes + caches them server-side. This panel fetches that
-// endpoint and renders real items; if the backend hasn't been provisioned yet
-// (or is unreachable) it shows an honest "live feed connecting" state rather
-// than any fabricated listing. One component, configured per feed — DRY.
+// High-end auction results and luxury real-estate listings have no CORS-open
+// public API, so the live data is served by the world backend (world-gw =
+// cmd/world) which scrapes + caches the real public source hourly, server-side.
+// Auctions come from Christie's public "results" (realized sale totals) —
+// Sotheby's gates realized prices behind a login, so the public major house is
+// the honest source. Luxury real estate comes from LuxuryEstate.com — JamesEdition
+// sits behind a Cloudflare challenge that blocks datacenter egress, so it can't
+// be fetched from the pod. This panel fetches the endpoint and renders real
+// items; if the backend hasn't been provisioned yet (or is unreachable) it shows
+// an honest "live feed connecting" state rather than any fabricated listing.
+// One component, configured per feed — DRY.
 
 import { escapeHtml } from '@/utils/sanitize';
 
@@ -93,9 +98,9 @@ export class AuctionsPanel {
   private p = new AltFeedPanel({
     title: 'Art & Collectibles — Auctions',
     endpoint: '/v1/world/auctions',
-    sourceUrl: 'https://www.sothebys.com/en/results',
-    sourceLabel: "Sotheby's",
-    emptyHint: 'Recent Sotheby’s / major-house results stream in here once the world auctions feed is live.',
+    sourceUrl: 'https://www.christies.com/en/results',
+    sourceLabel: "Christie's",
+    emptyHint: 'Recent Christie’s / major-house realized results stream in here once the world auctions feed is live.',
   });
   getElement(): HTMLElement { return this.p.getElement(); }
 }
@@ -104,9 +109,9 @@ export class LuxuryRealEstatePanel {
   private p = new AltFeedPanel({
     title: 'Luxury Real Estate',
     endpoint: '/v1/world/luxury-realestate',
-    sourceUrl: 'https://www.jamesedition.com/real_estate',
-    sourceLabel: 'JamesEdition',
-    emptyHint: 'Featured JamesEdition luxury listings stream in here once the world real-estate feed is live.',
+    sourceUrl: 'https://www.luxuryestate.com/',
+    sourceLabel: 'LuxuryEstate',
+    emptyHint: 'Featured LuxuryEstate luxury listings stream in here once the world real-estate feed is live.',
   });
   getElement(): HTMLElement { return this.p.getElement(); }
 }
