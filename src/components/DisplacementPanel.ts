@@ -51,12 +51,17 @@ export class DisplacementPanel extends Panel {
       </div>`
     ).join('');
 
-    const tabsHtml = `
-      <div class="disp-tabs">
-        <button class="disp-tab ${this.activeTab === 'origins' ? 'disp-tab-active' : ''}" data-tab="origins">${t('components.displacement.origins')}</button>
-        <button class="disp-tab ${this.activeTab === 'hosts' ? 'disp-tab-active' : ''}" data-tab="hosts">${t('components.displacement.hosts')}</button>
-      </div>
-    `;
+    const tabsHtml = this.renderTabs(
+      [
+        { key: 'origins', label: t('components.displacement.origins') },
+        { key: 'hosts', label: t('components.displacement.hosts') },
+      ],
+      this.activeTab,
+      (key) => {
+        this.activeTab = key as DisplacementTab;
+        this.renderContent();
+      },
+    );
 
     let countries: CountryDisplacement[];
     if (this.activeTab === 'origins') {
@@ -73,7 +78,7 @@ export class DisplacementPanel extends Panel {
     let tableHtml: string;
 
     if (displayed.length === 0) {
-      tableHtml = `<div class="panel-empty">${t('common.noDataShort')}</div>`;
+      tableHtml = this.emptyStateHtml(t('common.noDataShort'));
     } else {
       const rows = displayed.map(c => {
         const hostTotal = c.hostTotal || 0;
@@ -127,10 +132,6 @@ export class DisplacementPanel extends Panel {
         .disp-stat-asylum .disp-stat-value { color: var(--threat-high); }
         .disp-stat-idps .disp-stat-value { color: var(--threat-medium); }
         .disp-stat-total .disp-stat-value { color: var(--accent); }
-        .disp-tabs { display: flex; gap: 2px; margin-bottom: 6px; }
-        .disp-tab { background: transparent; border: 1px solid var(--border-strong); color: var(--text-dim); padding: 4px 14px; font-size: 11px; cursor: pointer; border-radius: 3px; transition: all 0.15s; }
-        .disp-tab:hover { border-color: var(--text-faint); color: var(--text-secondary); }
-        .disp-tab-active { background: color-mix(in srgb, var(--threat-critical) 10%, transparent); border-color: var(--threat-critical); color: var(--threat-critical); }
         .disp-table { width: 100%; border-collapse: collapse; }
         .disp-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid var(--border); }
         .disp-table th:nth-child(3) { text-align: right; }
@@ -146,13 +147,6 @@ export class DisplacementPanel extends Panel {
         .disp-count { text-align: right; font-variant-numeric: tabular-nums; }
       </style>
     `);
-
-    this.content.querySelectorAll('.disp-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.activeTab = (btn as HTMLElement).dataset.tab as DisplacementTab;
-        this.renderContent();
-      });
-    });
 
     this.content.querySelectorAll('.disp-row').forEach(el => {
       el.addEventListener('click', () => {

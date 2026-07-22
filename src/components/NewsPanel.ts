@@ -284,7 +284,7 @@ export class NewsPanel extends Panel {
     this.setCount(0);
     this.relatedAssetContext.clear();
     this.currentHeadlines = [];
-    this.setContent(`<div class="panel-empty">${escapeHtml(message)}</div>`);
+    this.showEmpty(message);
   }
 
   private async renderClustersAsync(items: NewsItem[]): Promise<void> {

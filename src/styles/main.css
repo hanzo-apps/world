@@ -2066,7 +2066,10 @@ body.panel-drag-active .map-container {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-.webcam-live-dot {
+/* Tile-chrome live dot — one rule for the webcam and stations wall tile labels
+   (both 6px red, live-blink); the header live badge is Panel.setDataBadge. */
+.webcam-live-dot,
+.stations-live-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -2166,15 +2169,6 @@ body.panel-drag-active .map-container {
 .stations-tile:hover .stations-label,
 .stations-tile.stations-audio-on .stations-label {
   opacity: 1;
-}
-
-.stations-live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--red);
-  animation: live-blink 1.5s ease-in-out infinite;
-  flex-shrink: 0;
 }
 
 .stations-name {
@@ -16144,7 +16138,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-usage-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-usage-when { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
 .cloud-usage-amt { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
-.cloud-bill-link, .cloud-empty a {
+.cloud-bill-link, .cloud-empty a, .panel-empty a {
   display: inline-block;
   margin-top: 12px;
   font-size: 11px;
@@ -16152,8 +16146,30 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   text-decoration: none;
   border-bottom: 1px dotted var(--text-muted);
 }
-.cloud-bill-link:hover, .cloud-empty a:hover { color: var(--text); }
+.cloud-bill-link:hover, .cloud-empty a:hover, .panel-empty a:hover { color: var(--text); }
 .cloud-empty { font-size: 12px; color: var(--text-dim); padding: 12px 2px; }
+/* Canonical empty state — every panel's "no data" line (Panel.showEmpty). */
+.panel-empty { font-size: 12px; color: var(--text-dim); padding: 12px 2px; }
+
+/* Canonical tab bar — Panel.renderTabs. One segmented-tab look for every panel. */
+.panel-tabs { display: flex; gap: 2px; margin-bottom: 6px; flex-wrap: wrap; }
+.panel-tab {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+.panel-tab:hover { border-color: var(--text-faint); color: var(--text-secondary); }
+.panel-tab.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.panel-tab-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* Model Improvement (flywheel) panel — reward-rate chart + ticking cost-saved hero.
    Monochrome to match the cloud panels; one restrained green marks a gate-passed
@@ -17538,7 +17554,6 @@ body.layout-free .panels-grid::after {
 .wq-story-head { padding: 6px 8px; }
 .wq-story-link { color: var(--text); font-size: 12px; text-decoration: none; }
 .wq-story-link:hover { text-decoration: underline; }
-.wq-empty { padding: 16px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
 .wq-stage-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .wq-stage-meta { display: flex; flex-direction: column; min-width: 0; }
 .wq-src { color: var(--text-dim); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }

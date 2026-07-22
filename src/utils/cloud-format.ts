@@ -29,6 +29,11 @@ export function fmtPct(n: number, digits = 2): string {
   return `${n.toFixed(digits)}%`;
 }
 
+/** Signed percent — the signed sibling of fmtPct: "+1.20%", "-0.50%", "+0.00%". */
+export function signedPct(n: number, digits = 2): string {
+  return `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`;
+}
+
 /** A dense stat tile: big mono value + label, optional sub. */
 export function statTile(value: string, label: string, sub?: string): string {
   return `<div class="cloud-stat">

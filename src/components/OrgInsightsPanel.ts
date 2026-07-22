@@ -94,7 +94,7 @@ export class OrgInsightsPanel extends Panel {
     const evs = this.events;
     if (evs === null) {
       this.setDataBadge('unavailable');
-      this.setContent('<div class="cloud-empty">Insights is not available for this account yet.</div>');
+      this.showEmpty('Insights is not available for this account yet.');
       return;
     }
     if (evs.length === 0) {
@@ -102,7 +102,7 @@ export class OrgInsightsPanel extends Panel {
       this.setContent(`
         <div class="cloud-overview">
           <div class="cloud-overview-head"><span class="cloud-scope">your org</span></div>
-          <div class="cloud-empty">No product events captured yet — instrument @hanzo/insights (PostHog-compatible) and your active users, top events and trend will appear here.</div>
+          ${this.emptyStateHtml('No product events captured yet — instrument @hanzo/insights (PostHog-compatible) and your active users, top events and trend will appear here.')}
         </div>
       `);
       return;

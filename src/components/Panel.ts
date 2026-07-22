@@ -19,6 +19,13 @@ export interface PanelOptions {
   infoTooltip?: string;
 }
 
+export interface PanelTab {
+  key: string;
+  label: string;
+  /** Optional trailing count chip (e.g. per-category event counts). */
+  count?: number;
+}
+
 const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
 
 // Row-span (height) persistence + class mapping. Exported so non-Panel grid
@@ -86,6 +93,8 @@ export class Panel {
   protected newBadgeEl: HTMLElement | null = null;
   protected panelId: string;
   private tooltipCloseHandler: (() => void) | null = null;
+  private tabSelectHandler: ((key: string) => void) | null = null;
+  private tabsWired = false;
   private resizeHandle: HTMLElement | null = null;
   private colResizeHandle: HTMLElement | null = null;
   private cornerResizeHandle: HTMLElement | null = null;
@@ -342,6 +351,47 @@ export class Panel {
 
   public showError(message = t('common.failedToLoad')): void {
     this.content.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+  }
+
+  /**
+   * The canonical empty-state markup: ONE `.panel-empty` line for every "no data"
+   * message. Returns the string so it composes inside larger bodies (tabbed
+   * lists, stat columns); `showEmpty` sets it as the whole panel body. Message is
+   * escaped — pass plain text, never markup.
+   */
+  protected emptyStateHtml(message: string): string {
+    return `<div class="panel-empty">${escapeHtml(message)}</div>`;
+  }
+
+  /** Render the canonical empty state as the entire panel body. */
+  public showEmpty(message: string): void {
+    this.content.innerHTML = this.emptyStateHtml(message);
+  }
+
+  /**
+   * The one tab bar: `.panel-tab`/`.panel-tab.active` buttons wired to
+   * `onSelect(key)`. Returns the bar HTML — drop it into the panel body. Clicks
+   * ride a single delegated listener on the panel content, so wiring survives
+   * every re-render; call this on each render with the current `activeKey`.
+   */
+  protected renderTabs(tabs: PanelTab[], activeKey: string, onSelect: (key: string) => void): string {
+    this.tabSelectHandler = onSelect;
+    if (!this.tabsWired) {
+      this.tabsWired = true;
+      this.content.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLElement>('.panel-tab');
+        if (!btn || !this.content.contains(btn)) return;
+        const key = btn.dataset.tab;
+        if (key != null) this.tabSelectHandler?.(key);
+      });
+    }
+    const buttons = tabs
+      .map(
+        (tb) =>
+          `<button class="panel-tab${tb.key === activeKey ? ' active' : ''}" data-tab="${escapeHtml(tb.key)}">${escapeHtml(tb.label)}${tb.count != null ? ` <span class="panel-tab-count">${tb.count}</span>` : ''}</button>`,
+      )
+      .join('');
+    return `<div class="panel-tabs">${buttons}</div>`;
   }
 
   public showConfigError(message: string): void {
