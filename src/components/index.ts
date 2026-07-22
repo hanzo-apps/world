@@ -2,8 +2,14 @@ export * from './Panel';
 export * from './VirtualList';
 export { MapComponent } from './Map';
 export * from './MapPopup';
-export { DeckGLMap } from './DeckGLMap';
-export { MapContainer, type MapView, type TimeRange, type MapContainerState, type MapProjectionMode } from './MapContainer';
+// DeckGLMap + MapContainer are VALUE-heavy (deck.gl + mapbox-gl ≈ 2.7 MB, with
+// top-level side effects) so their VALUES are NOT re-exported here — doing so
+// dragged the whole map chunk into the eager entry graph (main imported it and
+// Vite modulepreloaded 2.7 MB before first paint). They are imported directly
+// where needed: MapContainer.ts, the App's dynamic import() in mountMap(), and
+// e2e harnesses. The barrel exposes only their TYPES so consumers stay
+// tree-shakeable and the map chunk loads lazily, off the first-paint path.
+export type { MapView, TimeRange, MapContainerState, MapProjectionMode } from './MapContainer';
 export * from './NewsPanel';
 export * from './MarketPanel';
 export * from './CommoditiesPanel';
