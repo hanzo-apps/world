@@ -58,12 +58,27 @@ export function createTvWidget(
   const inner = document.createElement('div');
   inner.className = 'tradingview-widget-container__widget';
   host.appendChild(inner);
+
+  // Themed loading skeleton over the embed slot: TradingView's iframe paints the
+  // browser-default white (with its own blue spinner) until its document loads,
+  // which reads as broken on the dark terminal. A dark panel-matched overlay with
+  // a muted spinner masks that window and is removed the moment the iframe loads.
+  const skeleton = document.createElement('div');
+  skeleton.className = 'fin-tv-skeleton';
+  host.appendChild(skeleton);
   wrap.appendChild(host);
 
   let mounted = false;
   const mount = (): void => {
     if (mounted) return;
     mounted = true;
+    const watch = new MutationObserver(() => {
+      const frame = host.querySelector('iframe');
+      if (!frame) return;
+      watch.disconnect();
+      frame.addEventListener('load', () => skeleton.remove(), { once: true });
+    });
+    watch.observe(host, { childList: true, subtree: true });
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.async = true;
