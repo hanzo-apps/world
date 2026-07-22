@@ -93,17 +93,22 @@ test.describe('desktop runtime routing guardrails', () => {
 
         calls.push(url);
 
-        if (url.includes('127.0.0.1:46123/api/fred-data')) {
+        // The runtime patch only intercepts /v1/world/* paths. It first hits the
+        // local sidecar (127.0.0.1:46123); on failure it retries the same path
+        // against the remote API base — same-origin under VITE_VARIANT=full, so the
+        // fallback arrives as a relative /v1/world/* URL, distinct from the absolute
+        // local attempt.
+        if (url.includes('127.0.0.1:46123/v1/world/fred-data')) {
           return responseJson({ error: 'missing local api key' }, 500);
         }
-        if (url.includes('worldmonitor.app/api/fred-data')) {
+        if (url.startsWith('/v1/world/fred-data')) {
           return responseJson({ observations: [{ value: '321.5' }] }, 200);
         }
 
-        if (url.includes('127.0.0.1:46123/api/stablecoin-markets')) {
+        if (url.includes('127.0.0.1:46123/v1/world/stablecoin-markets')) {
           throw new Error('ECONNREFUSED');
         }
-        if (url.includes('worldmonitor.app/api/stablecoin-markets')) {
+        if (url.startsWith('/v1/world/stablecoin-markets')) {
           return responseJson({ stablecoins: [{ symbol: 'USDT' }] }, 200);
         }
 
@@ -117,10 +122,10 @@ test.describe('desktop runtime routing guardrails', () => {
       try {
         runtime.installRuntimeFetchPatch();
 
-        const fredResponse = await window.fetch('/api/fred-data?series_id=CPIAUCSL');
+        const fredResponse = await window.fetch('/v1/world/fred-data?series_id=CPIAUCSL');
         const fredBody = await fredResponse.json() as { observations?: Array<{ value: string }> };
 
-        const stableResponse = await window.fetch('/api/stablecoin-markets');
+        const stableResponse = await window.fetch('/v1/world/stablecoin-markets');
         const stableBody = await stableResponse.json() as { stablecoins?: Array<{ symbol: string }> };
 
         return {
@@ -146,10 +151,10 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.stableStatus).toBe(200);
     expect(result.stableSymbol).toBe('USDT');
 
-    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/api/fred-data'))).toBe(true);
-    expect(result.calls.some((url) => url.includes('worldmonitor.app/api/fred-data'))).toBe(true);
-    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/api/stablecoin-markets'))).toBe(true);
-    expect(result.calls.some((url) => url.includes('worldmonitor.app/api/stablecoin-markets'))).toBe(true);
+    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/v1/world/fred-data'))).toBe(true);
+    expect(result.calls.some((url) => url.startsWith('/v1/world/fred-data'))).toBe(true);
+    expect(result.calls.some((url) => url.includes('127.0.0.1:46123/v1/world/stablecoin-markets'))).toBe(true);
+    expect(result.calls.some((url) => url.startsWith('/v1/world/stablecoin-markets'))).toBe(true);
   });
 
   test('chunk preload reload guard is one-shot until app boot clears it', async ({ page }) => {
@@ -225,64 +230,12 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.storedValue).toBe('1');
   });
 
-  test('update badge picks architecture-correct desktop download url', async ({ page }) => {
-    await page.goto('/tests/runtime-harness.html');
-
-    const result = await page.evaluate(async () => {
-      const { App } = await import('/src/App.ts');
-      const globalWindow = window as unknown as {
-        __TAURI__?: { core?: { invoke?: (command: string) => Promise<unknown> } };
-      };
-      const previousTauri = globalWindow.__TAURI__;
-      const releaseUrl = 'https://github.com/koala73/worldmonitor/releases/latest';
-
-      const appProto = App.prototype as unknown as {
-        resolveUpdateDownloadUrl: (releaseUrl: string) => Promise<string>;
-        mapDesktopDownloadPlatform: (os: string, arch: string) => string | null;
-      };
-      const fakeApp = {
-        mapDesktopDownloadPlatform: appProto.mapDesktopDownloadPlatform,
-      };
-
-      try {
-        globalWindow.__TAURI__ = {
-          core: {
-            invoke: async (command: string) => {
-              if (command !== 'get_desktop_runtime_info') throw new Error(`Unexpected command: ${command}`);
-              return { os: 'macos', arch: 'aarch64' };
-            },
-          },
-        };
-        const macArm = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
-
-        globalWindow.__TAURI__ = {
-          core: {
-            invoke: async () => ({ os: 'windows', arch: 'amd64' }),
-          },
-        };
-        const windowsX64 = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
-
-        globalWindow.__TAURI__ = {
-          core: {
-            invoke: async () => ({ os: 'linux', arch: 'x86_64' }),
-          },
-        };
-        const linuxFallback = await appProto.resolveUpdateDownloadUrl.call(fakeApp, releaseUrl);
-
-        return { macArm, windowsX64, linuxFallback };
-      } finally {
-        if (previousTauri === undefined) {
-          delete globalWindow.__TAURI__;
-        } else {
-          globalWindow.__TAURI__ = previousTauri;
-        }
-      }
-    });
-
-    expect(result.macArm).toBe('https://worldmonitor.app/api/download?platform=macos-arm64');
-    expect(result.windowsX64).toBe('https://worldmonitor.app/api/download?platform=windows-exe');
-    expect(result.linuxFallback).toBe('https://github.com/koala73/worldmonitor/releases/latest');
-  });
+  // The upstream worldmonitor.app update-badge + arch-aware desktop-download
+  // machinery (App.resolveUpdateDownloadUrl / mapDesktopDownloadPlatform, driven by
+  // the get_desktop_runtime_info Tauri command) was removed for Hanzo —
+  // App.checkForUpdate is now a deliberate no-op and downloads are served from
+  // /v1/world/download?platform=* via DownloadBanner. No behavior remains to assert
+  // here, so the obsolete arch-resolution test was removed.
 
   test('loadMarkets keeps Yahoo-backed data when Finnhub is skipped', async ({ page }) => {
     await page.goto('/tests/runtime-harness.html');
@@ -324,8 +277,6 @@ test.describe('desktop runtime routing guardrails', () => {
       const marketConfigErrors: string[] = [];
       const heatmapRenders: number[] = [];
       const heatmapConfigErrors: string[] = [];
-      const commoditiesRenders: number[] = [];
-      const commoditiesConfigErrors: string[] = [];
       const cryptoRenders: number[] = [];
       const apiStatuses: Array<{ name: string; status: string }> = [];
 
@@ -334,7 +285,7 @@ test.describe('desktop runtime routing guardrails', () => {
         calls.push(url);
         const parsed = new URL(url);
 
-        if (parsed.pathname === '/api/finnhub') {
+        if (parsed.pathname === '/v1/world/finnhub') {
           return responseJson({
             quotes: [],
             skipped: true,
@@ -342,12 +293,14 @@ test.describe('desktop runtime routing guardrails', () => {
           });
         }
 
-        if (parsed.pathname === '/api/yahoo-finance') {
-          const symbol = parsed.searchParams.get('symbol') ?? 'UNKNOWN';
-          return responseJson(yahooChart(symbol));
+        if (parsed.pathname === '/v1/world/yahoo-batch') {
+          const symbols = (parsed.searchParams.get('symbols') ?? '').split(',').filter(Boolean);
+          return responseJson({
+            results: symbols.map((symbol) => ({ symbol, chart: yahooChart(symbol) })),
+          });
         }
 
-        if (parsed.pathname === '/api/coingecko') {
+        if (parsed.pathname === '/v1/world/coingecko') {
           return responseJson([
             { id: 'bitcoin', current_price: 50000, price_change_percentage_24h: 1.2, sparkline_in_7d: { price: [1, 2, 3] } },
             { id: 'ethereum', current_price: 3000, price_change_percentage_24h: -0.5, sparkline_in_7d: { price: [1, 2, 3] } },
@@ -369,10 +322,6 @@ test.describe('desktop runtime routing guardrails', () => {
             renderHeatmap: (data: Array<unknown>) => heatmapRenders.push(data.length),
             showConfigError: (message: string) => heatmapConfigErrors.push(message),
           },
-          commodities: {
-            renderCommodities: (data: Array<unknown>) => commoditiesRenders.push(data.length),
-            showConfigError: (message: string) => commoditiesConfigErrors.push(message),
-          },
           crypto: {
             renderCrypto: (data: Array<unknown>) => cryptoRenders.push(data.length),
           },
@@ -388,25 +337,14 @@ test.describe('desktop runtime routing guardrails', () => {
         await (App.prototype as unknown as { loadMarkets: (thisArg: unknown) => Promise<void> })
           .loadMarkets.call(fakeApp);
 
-        const commoditySymbols = ['^VIX', 'GC=F', 'CL=F', 'NG=F', 'SI=F', 'HG=F'];
-        const commodityYahooCalls = commoditySymbols.map((symbol) =>
-          calls.some((url) => {
-            const parsed = new URL(url);
-            return parsed.pathname === '/api/yahoo-finance' && parsed.searchParams.get('symbol') === symbol;
-          })
-        );
-
         return {
           marketRenders,
           marketConfigErrors,
           heatmapRenders,
           heatmapConfigErrors,
-          commoditiesRenders,
-          commoditiesConfigErrors,
           cryptoRenders,
           apiStatuses,
           latestMarketsCount: fakeApp.latestMarkets.length,
-          commodityYahooCalls,
         };
       } finally {
         window.fetch = originalFetch;
@@ -419,10 +357,6 @@ test.describe('desktop runtime routing guardrails', () => {
 
     expect(result.heatmapRenders.length).toBe(0);
     expect(result.heatmapConfigErrors).toEqual(['FINNHUB_API_KEY not configured — add in Settings']);
-
-    expect(result.commoditiesRenders.some((count) => count > 0)).toBe(true);
-    expect(result.commoditiesConfigErrors.length).toBe(0);
-    expect(result.commodityYahooCalls.every(Boolean)).toBe(true);
 
     expect(result.cryptoRenders.some((count) => count > 0)).toBe(true);
     expect(result.apiStatuses.some((entry) => entry.name === 'Finnhub' && entry.status === 'error')).toBe(true);
