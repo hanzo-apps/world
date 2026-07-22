@@ -47,13 +47,17 @@ import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { buildMapUrl, debounce, loadFromStorage, parseMapUrlState, saveToStorage, ExportPanel, getCircuitBreakerCooldownInfo, isMobileDevice, setTheme, getCurrentTheme, generateId, getCSSColor } from '@/utils';
 import { reverseGeocode } from '@/utils/reverse-geocode';
+import { refreshIntervalScale } from '@/utils/device-tier';
 import { CountryBriefPage } from '@/components/CountryBriefPage';
 import { CountryTimeline, type TimelineEvent } from '@/components/CountryTimeline';
 import { escapeHtml } from '@/utils/sanitize';
 import { getUiScale, setUiScale } from '@/utils/ui-scale';
 import type { ParsedMapUrlState } from '@/utils';
+// MapContainer is a TYPE-only import here — its value is loaded via a dynamic
+// import() in mountMap() so the ~2.7 MB mapbox-gl + deck.gl "map" chunk stays
+// out of the entry bundle and off the first-paint critical path (low-end win).
+import type { MapContainer } from '@/components/MapContainer';
 import {
-  MapContainer,
   type MapView,
   type MapProjectionMode,
   type TimeRange,
@@ -171,6 +175,10 @@ export class App {
   private readonly PANEL_ORDER_KEY = 'panel-order';
   private readonly MAP_MODE_STORAGE_KEY = 'hanzo-world-map-mode';
   private map: MapContainer | null = null;
+  // Resolves once the code-split map chunk has downloaded and the map is mounted.
+  // init() kicks it off after the shell paints and awaits it before any
+  // map-dependent wiring; every other this.map access stays null-guarded.
+  private mapReady: Promise<void> = Promise.resolve();
   private mapResizeObserver: ResizeObserver | null = null;
   private immersive: ImmersiveController | null = null;
   private panels: Record<string, Panel> = {};
@@ -365,6 +373,10 @@ export class App {
     }
 
     this.renderLayout();
+    // Kick off the code-split map load NOW (non-blocking) so the ~2.7 MB map
+    // chunk downloads while the lightweight shell below wires up — the shell
+    // paints without waiting for it. Map-dependent setup awaits mapReady below.
+    this.mapReady = this.mountMap();
     this.startHeaderClock();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
@@ -390,6 +402,9 @@ export class App {
     this.setupTryHanzoMenu();
     this.setupAccountMenu();
     this.setupSearchModal();
+    // The map-dependent wiring below needs the map mounted. Awaiting here lets
+    // the shell paint and become interactive while the map chunk loads in parallel.
+    await this.mapReady;
     this.setupMapLayerHandlers();
     this.setupCountryIntel();
     this.setupEventListeners();
@@ -2402,30 +2417,11 @@ export class App {
   private createPanels(): void {
     const panelsGrid = document.getElementById('panelsGrid')!;
 
-    // Initialize map in the map section
-    // Default to MENA view on mobile for better focus
-    // Uses deck.gl (WebGL) on desktop, falls back to D3/SVG on mobile
-    const mapContainer = document.getElementById('mapContainer') as HTMLElement;
-    this.map = new MapContainer(mapContainer, {
-      // Desktop opens a touch tighter so the 3D globe reads as a cinematic hero that
-      // fills the immersive viewport (the native GlobeView inherits this zoom on
-      // activation); mobile keeps its MENA-focused framing.
-      zoom: this.isMobile ? 2.5 : 1.35,
-      pan: { x: 0, y: 0 },  // Centered view to show full world
-      view: this.isMobile ? 'mena' : 'global',
-      layers: this.mapLayers,
-      timeRange: '7d',
-      mode: this.resolveInitialMapMode(),
-      // Dock the 2D/3D toggle, basemap switcher and time-range pills IN the map
-      // (the standard in-map control cluster) — alongside the zoom, layer toggles
-      // and legend that already overlay it — rather than floating them in the
-      // bottom toolbar. Undefined ⇒ DeckGLMap mounts controls in its own container.
-      controlsHost: undefined,
-    });
-
-    // Initialize escalation service with data getters
-    this.map.initEscalationGetters();
-    this.currentTimeRange = this.map.getTimeRange();
+    // The map (mapbox-gl + deck.gl ≈ 2.7 MB) is code-split and mounted
+    // asynchronously by mountMap() — see init(). createPanels stays synchronous
+    // and map-free so the shell + panels paint before the map chunk downloads
+    // and initialises WebGL: the single biggest first-paint win on a low-end
+    // laptop. Every this.map access is null-guarded until the mount resolves.
 
     // Create all panels
     const politicsPanel = new NewsPanel('politics', t('panels.politics'));
@@ -2811,15 +2807,9 @@ export class App {
     // Restore any analyst-created custom feed panels (appended after the grid loop).
     this.mountCustomFeedPanels();
 
-    this.map.onTimeRangeChanged((range) => {
-      this.currentTimeRange = range;
-      this.applyTimeRangeFilterToNewsPanelsDebounced();
-    });
-
     this.applyPanelSettings();
-    this.applyInitialUrlState();
-    // Heal any stale/saved state that left a panel ahead of the full-width map.
-    this.healMapAnchor();
+    // Map-dependent wiring (onTimeRangeChanged, initial URL state, map anchor
+    // heal) runs in mountMap() once the code-split map has loaded.
 
     // Floating AI analyst launcher — available on every variant, independent of
     // whether the in-grid analyst panel is shown. Same host, same code path.
@@ -2839,6 +2829,42 @@ export class App {
     // Cloud tab: the deep operator panels are admin-org only (server enforces
     // 403). Mount them once, only after the owner claim confirms admin.
     void this.mountAdminCloudPanels();
+  }
+
+  // Code-split map mount. The MapContainer value (→ the ~2.7 MB mapbox-gl +
+  // deck.gl "map" chunk) is loaded via dynamic import() so it never blocks first
+  // paint. init() kicks this off after the shell paints and awaits it before any
+  // map-dependent wiring runs. Idempotent: a second call is a no-op.
+  private async mountMap(): Promise<void> {
+    if (this.map) return;
+    const mapContainer = document.getElementById('mapContainer') as HTMLElement | null;
+    if (!mapContainer) return;
+    const { MapContainer } = await import('@/components/MapContainer');
+    if (this.map || this.isDestroyed) return; // guard against re-entry / teardown during the await
+    this.map = new MapContainer(mapContainer, {
+      // Desktop opens a touch tighter so the 3D globe reads as a cinematic hero
+      // that fills the immersive viewport; mobile keeps its MENA-focused framing.
+      zoom: this.isMobile ? 2.5 : 1.35,
+      pan: { x: 0, y: 0 },  // Centered view to show full world
+      view: this.isMobile ? 'mena' : 'global',
+      layers: this.mapLayers,
+      timeRange: '7d',
+      mode: this.resolveInitialMapMode(),
+      controlsHost: undefined,
+    });
+
+    // Wiring that previously lived at the end of createPanels — it needs the map.
+    this.map.initEscalationGetters();
+    this.currentTimeRange = this.map.getTimeRange();
+    this.map.onTimeRangeChanged((range) => {
+      this.currentTimeRange = range;
+      this.applyTimeRangeFilterToNewsPanelsDebounced();
+    });
+    this.applyInitialUrlState();
+    // Heal any stale/saved state that left a panel ahead of the full-width map.
+    this.healMapAnchor();
+    // Reflect the current hidden/idle state onto the freshly-mounted render loop.
+    this.syncMapRenderActive();
   }
 
   // ── admin-only Cloud console panels ─────────────────────────────────────────
@@ -5422,8 +5448,11 @@ export class App {
     const HIDDEN_REFRESH_MULTIPLIER = 4;
     const JITTER_FRACTION = 0.1;
     const MIN_REFRESH_MS = 1000;
+    // Low-end machines poll less often so background fetch+parse+re-render churn
+    // doesn't starve the UI thread (1× high-tier, up to 2× low-tier).
+    const LOW_END_SCALE = refreshIntervalScale();
     const computeDelay = (baseMs: number, isHidden: boolean) => {
-      const adjusted = baseMs * (isHidden ? HIDDEN_REFRESH_MULTIPLIER : 1);
+      const adjusted = baseMs * (isHidden ? HIDDEN_REFRESH_MULTIPLIER : 1) * LOW_END_SCALE;
       const jitterRange = adjusted * JITTER_FRACTION;
       const jittered = adjusted + (Math.random() * 2 - 1) * jitterRange;
       return Math.max(MIN_REFRESH_MS, Math.round(jittered));
