@@ -15,8 +15,12 @@ export interface EarlyError {
 }
 
 export function initSentry(buffered: EarlyError[] = []): void {
+  // DSN is provisioned at build time from KMS (VITE_SENTRY_DSN). With none set,
+  // stay a no-op rather than POSTing to a stale endpoint (403 on every event).
+  const dsn = import.meta.env.VITE_SENTRY_DSN;
+  if (!dsn) return;
   Sentry.init({
-    dsn: 'https://afc9a1c85c6ba49f8464a43f8de74ccd@o4509927897890816.ingest.us.sentry.io/4510906342113280',
+    dsn,
     release: `hanzo-world@${__APP_VERSION__}`,
     environment: location.hostname === 'world.hanzo.ai' ? 'production'
       : location.hostname.includes('vercel.app') ? 'preview'

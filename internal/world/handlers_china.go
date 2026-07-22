@@ -32,6 +32,8 @@ const (
 	fredDEXCHUSURL    = "https://api.stlouisfed.org/fred/series/observations?series_id=DEXCHUS&file_type=json&sort_order=desc&limit=2"
 	bisPolicyCacheKey = "economic:bis:policy:v1"
 
+	chinaMacroCacheKey = "china:macro:v1"
+
 	nbsCalendarIndexURL    = "https://www.stats.gov.cn/english/PressRelease/ReleaseCalendar/"
 	chinaMoneyLPRURL       = "https://www.chinamoney.com.cn/chinese/bklpr/?tab=2"
 	chinaMoneyLPRNoticeAPI = "https://www.chinamoney.com.cn/ags/ms/cm-s-notice-query/contentsinshorttime"
@@ -691,11 +693,18 @@ func (s *Server) handleChinaMacro(w http.ResponseWriter, r *http.Request) {
 	if preflight(w, r, "GET, OPTIONS") || methodNotGet(w, r) {
 		return
 	}
-	s.cachedJSON(w, "china:macro:v1",
+	s.cachedJSON(w, chinaMacroCacheKey,
 		"public, max-age=1800, s-maxage=1800, stale-while-revalidate=600",
 		30*time.Minute, 6*time.Hour,
 		func(ctx context.Context) (any, error) { return s.chinaMacro(ctx) },
-		func(w http.ResponseWriter, _ error) { writeJSON(w, http.StatusOK, "", chinaUnavailable()) })
+		func(w http.ResponseWriter, _ error) {
+			// Negative-cache the honest unavailable payload briefly (fresh, no stale
+			// window) so repeated cache-misses are served instantly instead of each
+			// re-hanging on the blocked upstream; it re-attempts once the TTL lapses.
+			v := chinaUnavailable()
+			s.cache.Set(chinaMacroCacheKey, v, negativeTTL, 0)
+			writeJSON(w, http.StatusOK, "", v)
+		})
 }
 
 // oecdHeaders carries the Accept-Language the OECD CLI endpoint requires (it
@@ -721,6 +730,11 @@ func chinaReasonFor(err error) string {
 }
 
 func (s *Server) chinaMacro(ctx context.Context) (any, error) {
+	// Fail fast: OECD → NBS → ChinaMoney are fetched sequentially and any one can
+	// be slow/blocked from prod. Cap the whole flow well under the caller's global
+	// deadline so a blocked upstream returns unavailable in ~9s, not ~24s.
+	ctx, cancel := context.WithTimeout(ctx, 9*time.Second)
+	defer cancel()
 	now := time.Now().UTC()
 	checkedAt := now.Format(time.RFC3339)
 	var decisions []chinaSourceDecision
