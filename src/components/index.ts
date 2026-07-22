@@ -73,6 +73,8 @@ export { EnsoFlywheelPanel } from './EnsoFlywheelPanel';
 export { EnsoRouterPanel } from './EnsoRouterPanel';
 // SaaS / cloud — admin-only deep panels
 export { CloudServicesPanel } from './CloudServicesPanel';
+export { ClusterPanel } from './ClusterPanel';
+export { QueuePanel } from './QueuePanel';
 export { HanzoStatusPanel } from './HanzoStatusPanel';
 export { CloudAnalyticsPanel } from './CloudAnalyticsPanel';
 export { LlmUsagePanel } from './LlmUsagePanel';
