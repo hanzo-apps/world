@@ -161,13 +161,45 @@ func (s *Server) handleYahooFinance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upstream := "https://query1.finance.yahoo.com/v8/finance/chart/" + urlQueryEscape(sym)
-	s.passthrough(w, "yahoo:"+sym, upstream, "application/json",
+	cacheKey := "yahoo:" + sym
+	// Forward a validated range/interval so callers can ask for a daily series
+	// (e.g. range=1y&interval=1d) instead of the intraday default. Absent params
+	// keep the prior behavior; the range is part of the cache key so different
+	// spans of the same symbol cache separately.
+	if q := yahooChartQuery(r); q != "" {
+		upstream += "?" + q
+		cacheKey += ":" + q
+	}
+	s.passthrough(w, cacheKey, upstream, "application/json",
 		"public, max-age=60, s-maxage=60, stale-while-revalidate=30",
 		map[string]string{"User-Agent": browserUA},
 		60*time.Second, 5*time.Minute,
 		func(w http.ResponseWriter, err error) {
 			writeError(w, http.StatusOK, "Failed to fetch data")
 		})
+}
+
+var yahooRanges = map[string]bool{
+	"1d": true, "5d": true, "1mo": true, "3mo": true, "6mo": true,
+	"1y": true, "2y": true, "5y": true, "10y": true, "ytd": true, "max": true,
+}
+var yahooIntervals = map[string]bool{
+	"1m": true, "2m": true, "5m": true, "15m": true, "30m": true, "60m": true,
+	"90m": true, "1h": true, "1d": true, "5d": true, "1wk": true, "1mo": true, "3mo": true,
+}
+
+// yahooChartQuery returns a validated range/interval query string for Yahoo's
+// chart endpoint, or "" when the caller supplies neither (preserving the intraday
+// default). Only whitelisted values pass through.
+func yahooChartQuery(r *http.Request) string {
+	parts := make([]string, 0, 2)
+	if rng := lower(trimSpace(r.URL.Query().Get("range"))); yahooRanges[rng] {
+		parts = append(parts, "range="+rng)
+	}
+	if itv := lower(trimSpace(r.URL.Query().Get("interval"))); yahooIntervals[itv] {
+		parts = append(parts, "interval="+itv)
+	}
+	return strings.Join(parts, "&")
 }
 
 func validateSymbol(sym string) string {
