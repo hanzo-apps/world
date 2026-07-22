@@ -1,11 +1,14 @@
 package world
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html/charset"
 )
 
 // Insider activity from SEC EDGAR: the live feed of Form 4 filings (an insider's
@@ -80,11 +83,15 @@ type atomFeed struct {
 	} `xml:"entry"`
 }
 
-// parseEdgarAtom pulls entries out of an EDGAR getcurrent atom feed. Malformed
-// input yields an empty slice, never a panic.
+// parseEdgarAtom pulls entries out of an EDGAR getcurrent atom feed. The live
+// feed is served as ISO-8859-1 (not UTF-8), so the decoder carries a
+// CharsetReader — plain xml.Unmarshal errors out on any declared non-UTF-8
+// charset. Malformed input yields an empty slice, never a panic.
 func parseEdgarAtom(body []byte) []edgarEntry {
 	var f atomFeed
-	if err := xml.Unmarshal(body, &f); err != nil {
+	dec := xml.NewDecoder(bytes.NewReader(body))
+	dec.CharsetReader = charset.NewReaderLabel
+	if err := dec.Decode(&f); err != nil {
 		return nil
 	}
 	out := make([]edgarEntry, 0, len(f.Entries))

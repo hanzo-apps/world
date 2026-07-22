@@ -36,22 +36,28 @@ func TestParseEdgarAtomMalformed(t *testing.T) {
 }
 
 func TestParseEdgarAtomWellFormed(t *testing.T) {
-	body := []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry>
-    <title>4 - ACME CORP (0001234567) (Issuer)</title>
-    <updated>2026-07-21T14:30:00-04:00</updated>
-    <link href="https://www.sec.gov/Archives/edgar/data/1234567/x.htm"/>
-  </entry>
-  <entry>
-    <title>4 - Smith John A (0009876543) (Reporting)</title>
-    <updated>2026-07-21T14:25:00-04:00</updated>
-    <link href="https://www.sec.gov/Archives/edgar/data/9876543/y.htm"/>
-  </entry>
-</feed>`)
+	// The LIVE SEC feed is served as ISO-8859-1, not UTF-8 — the byte 0xE9 below
+	// is a Latin-1 'é'. Plain xml.Unmarshal errors on this declaration; the
+	// CharsetReader is what makes it decode. This fixture guards that path.
+	body := []byte("<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>\n" +
+		"<feed xmlns=\"http://www.w3.org/2005/Atom\">\n" +
+		"  <entry>\n" +
+		"    <title>4 - ACME CORP (0001234567) (Issuer)</title>\n" +
+		"    <updated>2026-07-21T14:30:00-04:00</updated>\n" +
+		"    <link href=\"https://www.sec.gov/Archives/edgar/data/1234567/x.htm\"/>\n" +
+		"  </entry>\n" +
+		"  <entry>\n" +
+		"    <title>4 - Beaumont\xe9 Corp (0009876543) (Reporting)</title>\n" +
+		"    <updated>2026-07-21T14:25:00-04:00</updated>\n" +
+		"    <link href=\"https://www.sec.gov/Archives/edgar/data/9876543/y.htm\"/>\n" +
+		"  </entry>\n" +
+		"</feed>")
 	got := parseEdgarAtom(body)
 	if len(got) != 2 {
-		t.Fatalf("want 2 entries, got %d", len(got))
+		t.Fatalf("want 2 entries, got %d (ISO-8859-1 charset must decode)", len(got))
+	}
+	if got[1].Title != "4 - Beaumonté Corp (0009876543) (Reporting)" {
+		t.Errorf("Latin-1 byte not decoded to é: entry[1] title = %q", got[1].Title)
 	}
 	if got[0].Title != "4 - ACME CORP (0001234567) (Issuer)" {
 		t.Errorf("entry[0] title = %q", got[0].Title)
@@ -63,7 +69,7 @@ func TestParseEdgarAtomWellFormed(t *testing.T) {
 		t.Errorf("entry[1] updated = %q", got[1].Updated)
 	}
 	name, role := splitFormTitle(got[1].Title)
-	if name != "Smith John A" || role != "Reporting" {
+	if name != "Beaumonté Corp" || role != "Reporting" {
 		t.Errorf("split entry[1] = (%q,%q)", name, role)
 	}
 }
