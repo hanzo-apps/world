@@ -6,6 +6,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/hanzoai/sqlite v0.3.2
 	github.com/redis/go-redis/v9 v9.20.0
+	golang.org/x/net v0.54.0
 )
 
 require (
@@ -25,4 +26,5 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
