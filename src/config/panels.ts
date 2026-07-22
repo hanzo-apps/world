@@ -698,9 +698,38 @@ const CRYPTO_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : SITE_VARIANT === 'fund' ? FUND_PANELS : SITE_VARIANT === 'cloud' ? CLOUD_PANELS : SITE_VARIANT === 'ai' ? AI_PANELS : SITE_VARIANT === 'crypto' ? CRYPTO_PANELS : FULL_PANELS;
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : SITE_VARIANT === 'fund' ? FUND_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MAP_LAYERS : FULL_MAP_LAYERS;
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : SITE_VARIANT === 'fund' ? FUND_MOBILE_MAP_LAYERS : SITE_VARIANT === 'cloud' ? CLOUD_MOBILE_MAP_LAYERS : SITE_VARIANT === 'ai' ? AI_MOBILE_MAP_LAYERS : SITE_VARIANT === 'crypto' ? CRYPTO_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
+// variantConfig resolves a variant name to its full config triple (by-name, not
+// load-time-fixed) so an in-place variant switch can apply the target's panels +
+// map layers without a reload. The boot-time exports below are just this called
+// with the load-time variant — one lookup, one source of truth.
+export interface VariantPanelConfig {
+  DEFAULT_PANELS: Record<string, PanelConfig>;
+  DEFAULT_MAP_LAYERS: MapLayers;
+  MOBILE_DEFAULT_MAP_LAYERS: MapLayers;
+}
+
+export function variantConfig(variant: string): VariantPanelConfig {
+  switch (variant) {
+    case 'tech':
+      return { DEFAULT_PANELS: TECH_PANELS, DEFAULT_MAP_LAYERS: TECH_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: TECH_MOBILE_MAP_LAYERS };
+    case 'finance':
+      return { DEFAULT_PANELS: FINANCE_PANELS, DEFAULT_MAP_LAYERS: FINANCE_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: FINANCE_MOBILE_MAP_LAYERS };
+    case 'fund':
+      return { DEFAULT_PANELS: FUND_PANELS, DEFAULT_MAP_LAYERS: FUND_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: FUND_MOBILE_MAP_LAYERS };
+    case 'cloud':
+      return { DEFAULT_PANELS: CLOUD_PANELS, DEFAULT_MAP_LAYERS: CLOUD_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: CLOUD_MOBILE_MAP_LAYERS };
+    case 'ai':
+      return { DEFAULT_PANELS: AI_PANELS, DEFAULT_MAP_LAYERS: AI_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: AI_MOBILE_MAP_LAYERS };
+    case 'crypto':
+      return { DEFAULT_PANELS: CRYPTO_PANELS, DEFAULT_MAP_LAYERS: CRYPTO_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: CRYPTO_MOBILE_MAP_LAYERS };
+    default:
+      return { DEFAULT_PANELS: FULL_PANELS, DEFAULT_MAP_LAYERS: FULL_MAP_LAYERS, MOBILE_DEFAULT_MAP_LAYERS: FULL_MOBILE_MAP_LAYERS };
+  }
+}
+
+export const DEFAULT_PANELS = variantConfig(SITE_VARIANT).DEFAULT_PANELS;
+export const DEFAULT_MAP_LAYERS = variantConfig(SITE_VARIANT).DEFAULT_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = variantConfig(SITE_VARIANT).MOBILE_DEFAULT_MAP_LAYERS;
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)
 export const MONITOR_COLORS = [

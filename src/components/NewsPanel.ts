@@ -6,7 +6,7 @@ import { formatTime, getCSSColor } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { analysisWorker, enrichWithVelocity, enrichWithVelocityML, getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
-import { SITE_VARIANT } from '@/config';
+import { getSiteVariant } from '@/config';
 import { t, getCurrentLanguage } from '@/services/i18n';
 
 /** Threshold for enabling virtual scrolling */
@@ -138,7 +138,7 @@ export class NewsPanel extends Panel {
 
     // Check cache first (include variant, version, and language)
     const currentLang = getCurrentLanguage();
-    const cacheKey = `panel_summary_v3_${SITE_VARIANT}_${this.panelId}_${currentLang}`;
+    const cacheKey = `panel_summary_v3_${getSiteVariant()}_${this.panelId}_${currentLang}`;
     const cached = this.getCachedSummary(cacheKey);
     if (cached) {
       this.showSummary(cached);

@@ -1,7 +1,7 @@
 import type { MapLayers } from '@/types';
 import type { MapView, TimeRange } from '@/components/Map';
 import type { MapProjectionMode } from '@/components/MapContainer';
-import { SITE_VARIANT } from '@/config/variant';
+import { getSiteVariant } from '@/config/variant';
 
 const LAYER_KEYS: (keyof MapLayers)[] = [
   'conflicts',
@@ -139,8 +139,9 @@ export function buildMapUrl(
   // shares the same builder) would strip ?variant= and silently drop a crypto/
   // finance/tech/ai/saas viewer back to the default 'full' dashboard on reload.
   // 'full' is the canonical default and needs no param — keeps default URLs clean.
-  if (SITE_VARIANT && SITE_VARIANT !== 'full') {
-    params.set('variant', SITE_VARIANT);
+  const variant = getSiteVariant();
+  if (variant && variant !== 'full') {
+    params.set('variant', variant);
   }
 
   if (state.center) {

@@ -70,7 +70,7 @@ import {
   STRATEGIC_WATERWAYS,
   ECONOMIC_CENTERS,
   AI_DATA_CENTERS,
-  SITE_VARIANT,
+  getSiteVariant,
   STARTUP_HUBS,
   ACCELERATORS,
   TECH_HQS,
@@ -1097,8 +1097,8 @@ export class DeckGLMap {
     const boundsKey = `${bbox[0].toFixed(4)}:${bbox[1].toFixed(4)}:${bbox[2].toFixed(4)}:${bbox[3].toFixed(4)}`;
     const layers = this.state.layers;
     const useProtests = layers.protests && this.protestSuperclusterSource.length > 0;
-    const useTechHQ = SITE_VARIANT === 'tech' && layers.techHQs;
-    const useTechEvents = SITE_VARIANT === 'tech' && layers.techEvents && this.techEvents.length > 0;
+    const useTechHQ = getSiteVariant() === 'tech' && layers.techHQs;
+    const useTechEvents = getSiteVariant() === 'tech' && layers.techEvents && this.techEvents.length > 0;
     const useDatacenterClusters = layers.datacenters && zoom < 5;
     const layerMask = `${Number(useProtests)}${Number(useTechHQ)}${Number(useTechEvents)}${Number(useDatacenterClusters)}`;
     if (zoom === this.lastSCZoom && boundsKey === this.lastSCBoundsKey && layerMask === this.lastSCMask) return;
@@ -1507,7 +1507,7 @@ export class DeckGLMap {
     }
 
     // APT Groups layer (geopolitical variant only - always shown, no toggle)
-    if (SITE_VARIANT !== 'tech') {
+    if (getSiteVariant() !== 'tech') {
       layers.push(this.createAPTGroupsLayer());
     }
 
@@ -1530,7 +1530,7 @@ export class DeckGLMap {
     }
 
     // Tech variant layers (Supercluster-based deck.gl layers for HQs and events)
-    if (SITE_VARIANT === 'tech') {
+    if (getSiteVariant() === 'tech') {
       if (mapLayers.startupHubs) {
         layers.push(this.createStartupHubsLayer());
       }
@@ -3438,7 +3438,7 @@ export class DeckGLMap {
     toggles.className = 'layer-toggles deckgl-layer-toggles';
     this.layerPanelEl = toggles;
 
-    const layerConfig = SITE_VARIANT === 'tech'
+    const layerConfig = getSiteVariant() === 'tech'
       ? [
         { key: 'startupHubs', label: t('components.deckgl.layers.startupHubs'), icon: '&#128640;' },
         { key: 'techHQs', label: t('components.deckgl.layers.techHQs'), icon: '&#127970;' },
@@ -3452,7 +3452,7 @@ export class DeckGLMap {
         { key: 'natural', label: t('components.deckgl.layers.naturalEvents'), icon: '&#127755;' },
         { key: 'fires', label: t('components.deckgl.layers.fires'), icon: '&#128293;' },
       ]
-      : SITE_VARIANT === 'finance'
+      : getSiteVariant() === 'finance'
       ? [
           { key: 'stockExchanges', label: t('components.deckgl.layers.stockExchanges'), icon: '&#127963;' },
           { key: 'financialCenters', label: t('components.deckgl.layers.financialCenters'), icon: '&#128176;' },
@@ -3826,9 +3826,9 @@ export class DeckGLMap {
       </div>
     `;
 
-    popup.innerHTML = SITE_VARIANT === 'tech'
+    popup.innerHTML = getSiteVariant() === 'tech'
       ? techHelpContent
-      : SITE_VARIANT === 'finance'
+      : getSiteVariant() === 'finance'
       ? financeHelpContent
       : fullHelpContent;
 
@@ -3856,6 +3856,9 @@ export class DeckGLMap {
   }
 
   private createLegend(): void {
+    // Idempotent: an in-place variant switch re-runs this (via setLayers) to swap
+    // the legend to the new variant's data classes, so drop any prior legend first.
+    this.container.querySelector('.map-legend.deckgl-legend')?.remove();
     const legend = document.createElement('div');
     legend.className = 'map-legend deckgl-legend';
 
@@ -3874,7 +3877,7 @@ export class DeckGLMap {
     // Cloud (flagship) legend MUST match what the globe plots — the Hanzo Cloud data
     // classes, not the geopolitical default (which would mislabel traffic dots as
     // "high alert" etc.). Order mirrors visual prominence on the globe.
-    const legendItems = SITE_VARIANT === 'cloud'
+    const legendItems = getSiteVariant() === 'cloud'
       ? [
           { shape: shapes.heat(), label: 'Request origin · volume' },
           { shape: shapes.circle('rgb(0, 200, 255)'), label: 'Validator node' },
@@ -3882,7 +3885,7 @@ export class DeckGLMap {
           { shape: shapes.circle('rgb(150, 100, 255)'), label: 'Cloud region' },
           { shape: shapes.square('rgb(136, 68, 255)'), label: 'Datacenter · PoP' },
         ]
-      : SITE_VARIANT === 'tech'
+      : getSiteVariant() === 'tech'
       ? [
           { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
           { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
@@ -3890,7 +3893,7 @@ export class DeckGLMap {
           { shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') },
           { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
         ]
-      : SITE_VARIANT === 'finance'
+      : getSiteVariant() === 'finance'
       ? [
           { shape: shapes.circle('rgb(255, 215, 80)'), label: t('components.deckgl.legend.stockExchange') },
           { shape: shapes.circle('rgb(0, 220, 150)'), label: t('components.deckgl.legend.financialCenter') },
@@ -4338,6 +4341,9 @@ export class DeckGLMap {
   public setLayers(layers: MapLayers): void {
     this.state.layers = layers;
     this.render(); // Debounced
+    // Refresh the legend — its data classes are variant-dependent, and an in-place
+    // variant switch re-points layers through here.
+    this.createLegend();
 
     // Update toggle checkboxes
     Object.entries(layers).forEach(([key, value]) => {

@@ -1,5 +1,5 @@
 import type { Feed, NewsItem } from '@/types';
-import { SITE_VARIANT } from '@/config';
+import { SITE_VARIANT, getSiteVariant } from '@/config';
 import { chunkArray, fetchWithProxy } from '@/utils';
 import { classifyByKeyword, classifyWithAI } from './threat-classifier';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
@@ -250,7 +250,7 @@ function storeFeedItems(feed: Feed, feedScope: string, raws: RawFeedItem[]): New
     // The Go backend classifies and geo-locates (internal/world/enrich.go, proven
     // identical to the old browser code). Falling back to the local classifier
     // keeps a feed usable if it ever arrives unenriched.
-    const threat = (srvThreat as NewsItem['threat']) ?? classifyByKeyword(title, SITE_VARIANT);
+    const threat = (srvThreat as NewsItem['threat']) ?? classifyByKeyword(title, getSiteVariant());
     const isAlert = threat!.level === 'critical' || threat!.level === 'high';
     return {
       source: feed.name,
@@ -281,7 +281,7 @@ function storeFeedItems(feed: Feed, feedScope: string, raws: RawFeedItem[]): New
 
   for (const item of aiCandidates) {
     if (!canQueueAiClassification(item.title)) continue;
-    classifyWithAI(item.title, SITE_VARIANT).then((aiResult) => {
+    classifyWithAI(item.title, getSiteVariant()).then((aiResult) => {
       if (aiResult && aiResult.confidence > item.threat.confidence) {
         item.threat = aiResult;
         item.isAlert = aiResult.level === 'critical' || aiResult.level === 'high';
@@ -350,7 +350,7 @@ async function fetchFeedsViaBatch(feeds: Feed[]): Promise<NewsItem[][]> {
     const res = await fetchWithProxy('/v1/world/feeds-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: group.map(p => p.url), variant: SITE_VARIANT }),
+      body: JSON.stringify({ urls: group.map(p => p.url), variant: getSiteVariant() }),
     }, 28_000);
     if (!res.ok) throw new Error(`feeds-batch HTTP ${res.status}`);
     const data = await res.json() as {

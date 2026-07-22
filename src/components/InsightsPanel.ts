@@ -8,7 +8,7 @@ import { ingestNewsForCII } from '@/services/country-instability';
 import { getTheaterPostureSummaries } from '@/services/military-surge';
 import { isMobileDevice } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { SITE_VARIANT } from '@/config';
+import { getSiteVariant } from '@/config';
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import { t } from '@/services/i18n';
 import type { ClusteredEvent, FocalPoint, MilitaryFlight } from '@/types';
@@ -277,7 +277,7 @@ export class InsightsPanel extends Panel {
       let signalSummary: ReturnType<typeof signalAggregator.getSummary>;
       let focalSummary: ReturnType<typeof focalPointDetector.analyze>;
 
-      if (SITE_VARIANT === 'full') {
+      if (getSiteVariant() === 'full') {
         signalSummary = signalAggregator.getSummary();
         this.lastConvergenceZones = signalSummary.convergenceZones;
         if (signalSummary.totalSignals > 0) {
@@ -341,8 +341,8 @@ export class InsightsPanel extends Panel {
 
         // Pass focal point context + theater posture to AI for correlation-aware summarization
         // Tech variant: no geopolitical context, just tech news summarization
-        const theaterContext = SITE_VARIANT === 'full' ? this.getTheaterPostureContext() : '';
-        const geoContext = SITE_VARIANT === 'full'
+        const theaterContext = getSiteVariant() === 'full' ? this.getTheaterPostureContext() : '';
+        const geoContext = getSiteVariant() === 'full'
           ? (focalSummary.aiContext || signalSummary.aiContext) + theaterContext
           : '';
         const result = await generateSummary(titles, (_step, _total, msg) => {
@@ -406,7 +406,7 @@ export class InsightsPanel extends Panel {
   private renderWorldBrief(brief: string): string {
     return `
       <div class="insights-brief">
-        <div class="insights-section-title">${SITE_VARIANT === 'tech' ? '🚀 TECH BRIEF' : '🌍 WORLD BRIEF'}</div>
+        <div class="insights-section-title">${getSiteVariant() === 'tech' ? '🚀 TECH BRIEF' : '🌍 WORLD BRIEF'}</div>
         <div class="insights-brief-text">${escapeHtml(brief)}</div>
       </div>
     `;
