@@ -39,7 +39,7 @@ export class CloudAnalyticsPanel extends Panel {
           <span class="cloud-an-bar">${shareBar(r.y / max)}</span>
           <span class="cloud-an-val">${fmtCompact(r.y)}</span>
         </div>`).join('')
-      : '<div class="cloud-empty">No data yet.</div>';
+      : this.emptyStateHtml('No data yet.');
     return `<div class="cloud-an-col">
       <div class="cloud-subhead">${icon(ic, 12)} ${escapeHtml(title)}</div>
       ${items}
@@ -56,7 +56,7 @@ export class CloudAnalyticsPanel extends Panel {
     const d = this.data;
     if (!d.available) {
       this.setDataBadge('unavailable', 'no data');
-      this.setContent(`<div class="cloud-empty">${escapeHtml(d.note || 'Analytics unavailable.')}</div>`);
+      this.showEmpty(d.note || 'Analytics unavailable.');
       return;
     }
     this.setDataBadge('live', `${d.sites.length} sites`);
