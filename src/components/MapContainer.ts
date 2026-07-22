@@ -669,6 +669,18 @@ export class MapContainer {
     }
   }
 
+  // Free / restore the (parked) mapbox WebGL context while the tab is backgrounded — the
+  // multi-tab GPU pressure that crashes Safari. Delegates to DeckGLMap (which owns the
+  // mapbox context); the native GlobeView keeps its own context but is render-paused when
+  // hidden. No-op on the SVG fallback (no WebGL).
+  public parkGPU(): void {
+    this.deckGLMap?.parkGPU();
+  }
+
+  public restoreGPU(): void {
+    this.deckGLMap?.restoreGPU();
+  }
+
   // Utility methods
   public isDeckGLMode(): boolean {
     return this.useDeckGL;
