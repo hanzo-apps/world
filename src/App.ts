@@ -189,6 +189,10 @@ export class App {
   // init() kicks it off after the shell paints and awaits it before any
   // map-dependent wiring; every other this.map access stays null-guarded.
   private mapReady: Promise<void> = Promise.resolve();
+  // Frees the parked mapbox WebGL context after the tab has been hidden a while (see the
+  // visibilitychange handler) — the multi-tab GPU pressure that crashes Safari.
+  private mapGpuParkTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly MAP_GPU_PARK_MS = 30_000;
   // The mounted finance terminal (finance variant only) — kept so the in-place
   // variant switch can mount/unmount it, not just the initial load.
   private financeTerminal: FinanceTerminal | null = null;
@@ -2416,6 +2420,10 @@ export class App {
       document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
       this.boundVisibilityHandler = null;
     }
+    if (this.mapGpuParkTimer) {
+      clearTimeout(this.mapGpuParkTimer);
+      this.mapGpuParkTimer = null;
+    }
 
     // Clean up idle detection
     if (this.idleTimeoutId) {
@@ -3778,7 +3786,20 @@ export class App {
       document.body.classList.toggle('animations-paused', document.hidden);
       if (document.hidden) {
         mlWorker.unloadOptionalModels();
+        // Drop the parked mapbox WebGL context after a grace period (not on every quick
+        // tab flip) so backgrounded world.hanzo.ai tabs stop holding a GPU context each —
+        // the pile-up that pushes Safari past its ceiling into the crash-reload + black
+        // globe. Restored the instant the tab is shown again (below).
+        if (this.mapGpuParkTimer) clearTimeout(this.mapGpuParkTimer);
+        this.mapGpuParkTimer = setTimeout(() => {
+          if (document.hidden) this.map?.parkGPU();
+        }, this.MAP_GPU_PARK_MS);
       } else {
+        if (this.mapGpuParkTimer) {
+          clearTimeout(this.mapGpuParkTimer);
+          this.mapGpuParkTimer = null;
+        }
+        this.map?.restoreGPU();
         this.resetIdleTimer();
       }
       this.syncMapRenderActive();
