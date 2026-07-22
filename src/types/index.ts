@@ -519,6 +519,7 @@ export interface MapLayers {
   bases: boolean;
   cables: boolean;
   pipelines: boolean;
+  flows: boolean; // animated global comms + trade flow corridors
   hotspots: boolean;
   ais: boolean;
   nuclear: boolean;

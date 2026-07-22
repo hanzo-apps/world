@@ -55,7 +55,8 @@ import {
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { icon } from '@/utils/icons';
-import { maxDevicePixelRatio, isLowEndDevice } from '@/utils/device-tier';
+import { maxDevicePixelRatio, isLowEndDevice, maxFlowArcs } from '@/utils/device-tier';
+import { GLOBAL_FLOWS, type GlobalFlow } from '@/config/global-flows';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
 import {
@@ -546,7 +547,7 @@ export class DeckGLMap {
   private pulseDirty = { news: false, cloud: false };
   private rafUpdatePulse: () => void;
   private static readonly NEWS_PULSE_LAYER_IDS = ['news-pulse-layer', 'hotspots-pulse', 'protest-clusters-pulse'];
-  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs', 'traffic'];
+  private static readonly CLOUD_PULSE_LAYER_IDS = ['chainNodes', 'trafficArcs', 'traffic', 'globalFlows'];
 
   // Chain-node dots derive from chainNetworks; cache them by source reference so
   // the cloud-pulse breathe (a radiusScale-only change) reuses the same data
@@ -1568,6 +1569,11 @@ export class DeckGLMap {
     if (mapLayers.traffic && this.trafficPoints.length > 0) {
       layers.push(this.createTrafficLayer());
     }
+    // Global flow corridors — animated comms + trade arcs ("where everything is
+    // going"). Great-circle on the globe, travelling pulse via the cloud clock.
+    if (mapLayers.flows) {
+      layers.push(this.createGlobalFlowsLayer());
+    }
 
     // News geo-locations (always shown if data exists)
     if (this.newsLocations.length > 0) {
@@ -1616,6 +1622,7 @@ export class DeckGLMap {
       case 'chainNodes': return this.createChainNodesLayer();
       case 'trafficArcs': return this.createTrafficArcsLayer();
       case 'traffic': return this.createTrafficLayer();
+      case 'globalFlows': return this.createGlobalFlowsLayer();
       default: return null;
     }
   }
@@ -3446,6 +3453,7 @@ export class DeckGLMap {
         { key: 'cloudRegions', label: t('components.deckgl.layers.cloudRegions'), icon: '&#9729;' },
         { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },
         { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
+        { key: 'flows', label: t('components.deckgl.layers.globalFlows', { defaultValue: 'Global flows' }), icon: '&#8644;' },
         { key: 'outages', label: t('components.deckgl.layers.internetOutages'), icon: '&#128225;' },
         { key: 'cyberThreats', label: t('components.deckgl.layers.cyberThreats'), icon: '&#128737;' },
         { key: 'techEvents', label: t('components.deckgl.layers.techEvents'), icon: '&#128197;' },
@@ -3480,6 +3488,7 @@ export class DeckGLMap {
         { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
         { key: 'pipelines', label: t('components.deckgl.layers.pipelines'), icon: '&#128738;' },
         { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },
+        { key: 'flows', label: t('components.deckgl.layers.globalFlows', { defaultValue: 'Global flows' }), icon: '&#8644;' },
         { key: 'military', label: t('components.deckgl.layers.militaryActivity'), icon: '&#9992;' },
         { key: 'ais', label: t('components.deckgl.layers.shipTraffic'), icon: '&#128674;' },
         { key: 'flights', label: t('components.deckgl.layers.flightDelays'), icon: '&#9992;' },
@@ -4253,10 +4262,10 @@ export class DeckGLMap {
   // when the tab is hidden, so that case needs no extra handling.
   private cloudPulseGateOpen(): boolean {
     if (this.renderPaused || this.webglLost || this.prefersReducedMotion()) return false;
-    const { trafficArcs, chainNodes } = this.state.layers;
+    const { trafficArcs, chainNodes, flows } = this.state.layers;
     const arcsLive = trafficArcs && this.trafficArcsData.length > 0;
     const nodesLive = chainNodes && this.chainNetworks.length > 0;
-    return Boolean(arcsLive || nodesLive);
+    return Boolean(arcsLive || nodesLive || flows);
   }
 
   private maybeStartCloudPulse(): void {
@@ -4619,6 +4628,47 @@ export class DeckGLMap {
         getSourceColor: this.trafficArcsData.length,
         getTargetColor: this.trafficArcsData.length,
         getWidth: this.trafficArcsData.length,
+      },
+    });
+  }
+
+  // Global comms + trade flow corridors as animated great-circle arcs. Comms are
+  // a cool cyan, trade a warm amber; alpha + width scale with each corridor's
+  // representative weight, and a low-end device draws only the heaviest arcs
+  // (device tier) so the overlay never tanks a weak GPU. Animated by the shared
+  // cloud-pulse clock (coef), like the traffic arcs.
+  private createGlobalFlowsLayer(): AnimatedArcLayer<GlobalFlow> {
+    const cap = maxFlowArcs();
+    const data = GLOBAL_FLOWS.length > cap
+      ? [...GLOBAL_FLOWS].sort((a, b) => b.weight - a.weight).slice(0, cap)
+      : GLOBAL_FLOWS;
+    const commsColor: [number, number, number] = [56, 189, 248];  // cyan
+    const tradeColor: [number, number, number] = [251, 146, 60];  // amber
+    const alpha = (w: number): number => Math.round(90 + Math.min(1, w / 100) * 165);
+    return new AnimatedArcLayer<GlobalFlow>({
+      id: 'globalFlows',
+      data,
+      coef: this.cloudPulseCoef,
+      greatCircle: this.onGlobe,
+      getHeight: this.onGlobe ? 0 : 0.3,
+      getSourcePosition: (d) => d.from,
+      getTargetPosition: (d) => d.to,
+      getSourceColor: (d) => {
+        const c = d.kind === 'comms' ? commsColor : tradeColor;
+        return [c[0], c[1], c[2], alpha(d.weight)] as [number, number, number, number];
+      },
+      getTargetColor: (d) => {
+        const c = d.kind === 'comms' ? commsColor : tradeColor;
+        return [c[0], c[1], c[2], Math.round(alpha(d.weight) * 0.5)] as [number, number, number, number];
+      },
+      getWidth: (d) => 1 + Math.min(1, d.weight / 100) * 2.5,
+      widthMinPixels: 1,
+      widthMaxPixels: 3.5,
+      pickable: true,
+      updateTriggers: {
+        getSourceColor: data.length,
+        getTargetColor: data.length,
+        getWidth: data.length,
       },
     });
   }
