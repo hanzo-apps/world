@@ -62,6 +62,9 @@ import type { ParsedMapUrlState } from '@/utils';
 // import() in mountMap() so the ~2.7 MB mapbox-gl + deck.gl "map" chunk stays
 // out of the entry bundle and off the first-paint critical path (low-end win).
 import type { MapContainer } from '@/components/MapContainer';
+// Type-only — the value is dynamically imported in syncFinanceTerminal() so the
+// terminal's TradingView embeds stay code-split out of the entry bundle.
+import type { FinanceTerminal } from '@/components/finance/FinanceTerminal';
 import {
   type MapView,
   type MapProjectionMode,
@@ -184,6 +187,9 @@ export class App {
   // init() kicks it off after the shell paints and awaits it before any
   // map-dependent wiring; every other this.map access stays null-guarded.
   private mapReady: Promise<void> = Promise.resolve();
+  // The mounted finance terminal (finance variant only) — kept so the in-place
+  // variant switch can mount/unmount it, not just the initial load.
+  private financeTerminal: FinanceTerminal | null = null;
   private mapResizeObserver: ResizeObserver | null = null;
   private immersive: ImmersiveController | null = null;
   private panels: Record<string, Panel> = {};
@@ -385,7 +391,7 @@ export class App {
     // Finance variant → the Bloomberg-style terminal (charts ≫ news), code-split
     // so its TradingView embeds never bloat the entry bundle. Mounts over the
     // shell; the map is skipped for this variant (mountMap early-returns).
-    if (getSiteVariant() === 'finance') void this.mountFinanceTerminal();
+    void this.syncFinanceTerminal(getSiteVariant());
     this.startHeaderClock();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
@@ -2853,14 +2859,23 @@ export class App {
 
   // Code-split Bloomberg-style finance terminal — dynamic import() so its
   // TradingView embeds + terminal CSS never ship in the entry bundle. Mounts a
-  // full-viewport terminal over the shell for the finance variant.
-  private async mountFinanceTerminal(): Promise<void> {
-    try {
-      const { FinanceTerminal } = await import('@/components/finance/FinanceTerminal');
-      if (this.isDestroyed) return;
-      new FinanceTerminal().mount(this.container);
-    } catch (e) {
-      console.error('[App] finance terminal failed to mount:', e);
+  // full-viewport terminal over the shell for the finance variant and removes it
+  // when leaving, so it works on BOTH the initial ?variant=finance load AND the
+  // in-place tab switch (setSiteVariant) — no page reload either way.
+  private async syncFinanceTerminal(variant: string): Promise<void> {
+    if (variant === 'finance') {
+      if (this.financeTerminal) return;
+      try {
+        const { FinanceTerminal } = await import('@/components/finance/FinanceTerminal');
+        if (this.isDestroyed || getSiteVariant() !== 'finance') return;
+        this.financeTerminal = new FinanceTerminal();
+        this.financeTerminal.mount(this.container);
+      } catch (e) {
+        console.error('[App] finance terminal failed to mount:', e);
+      }
+    } else if (this.financeTerminal) {
+      this.financeTerminal.destroy();
+      this.financeTerminal = null;
     }
   }
 
@@ -3343,6 +3358,9 @@ export class App {
 
     // 1) Instantiate the target variant's panels (lazy, deduped, appended live).
     step('ensurePanels', () => this.ensureVariantPanels(target));
+    // Mount/unmount the Bloomberg finance terminal overlay for an in-place switch
+    // (async import; the overlay covers the dashboard while finance is active).
+    step('financeTerminal', () => { void this.syncFinanceTerminal(target); });
 
     // 2) Reset panel + layer settings to the target's defaults — the SAME semantics
     //    as a boot-time variant change (see the App constructor), minus the reload.
