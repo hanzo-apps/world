@@ -716,6 +716,18 @@ export interface VariantPanelConfig {
   MOBILE_DEFAULT_MAP_LAYERS: MapLayers;
 }
 
+// Canonical key → display-name across ALL variants' panel sets, deduped (first
+// definition wins). The "+ Add widget" palette resolves names through this so any
+// created panel is addable from any view (getLocalizedPanelName layers i18n on top,
+// falling back to this). Variant configs still own each view's DEFAULT enabled set.
+export const PANEL_NAMES: Record<string, string> = (() => {
+  const names: Record<string, string> = {};
+  for (const set of [FULL_PANELS, CLOUD_PANELS, AI_PANELS, CRYPTO_PANELS, FINANCE_PANELS, TECH_PANELS, FUND_PANELS]) {
+    for (const [k, v] of Object.entries(set)) if (!(k in names)) names[k] = v.name;
+  }
+  return names;
+})();
+
 export function variantConfig(variant: string): VariantPanelConfig {
   switch (variant) {
     case 'tech':

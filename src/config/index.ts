@@ -42,6 +42,7 @@ export {
   DEFAULT_MAP_LAYERS,
   MOBILE_DEFAULT_MAP_LAYERS,
   variantConfig,
+  PANEL_NAMES,
 } from './panels';
 
 // ============================================
