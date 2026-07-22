@@ -54,6 +54,13 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/layoffs", s.handleLayoffs)
 	mux.HandleFunc("/v1/world/congress", s.handleCongress)
 
+	// alt assets — art/collectibles auction results (Christie's public realized
+	// sale totals) + luxury real-estate listings (LuxuryEstate). Scraped hourly +
+	// cached; honest empty {items:[]} on a source failure, never fabricated. These
+	// power the finance-terminal AltFeed panels (src/components/finance/AltFeedPanel.ts).
+	mux.HandleFunc("/v1/world/auctions", s.handleAuctions)
+	mux.HandleFunc("/v1/world/luxury-realestate", s.handleLuxuryRealestate)
+
 	// flights / geo / hazards
 	mux.HandleFunc("/v1/world/opensky", s.handleOpenSky)
 	mux.HandleFunc("/v1/world/ais-snapshot", s.handleAISSnapshot)

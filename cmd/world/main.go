@@ -50,6 +50,7 @@ func main() {
 	srv.StartModel(rootCtx)     // continuously-folded world-state engine
 	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
 	srv.StartFund(rootCtx)      // autonomous PAPER-only multi-asset fund brain
+	srv.StartAltAssets(rootCtx) // hourly Christie's auctions + LuxuryEstate warmer
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
