@@ -377,6 +377,10 @@ export class App {
     // chunk downloads while the lightweight shell below wires up — the shell
     // paints without waiting for it. Map-dependent setup awaits mapReady below.
     this.mapReady = this.mountMap();
+    // Finance variant → the Bloomberg-style terminal (charts ≫ news), code-split
+    // so its TradingView embeds never bloat the entry bundle. Mounts over the
+    // shell; the map is skipped for this variant (mountMap early-returns).
+    if (SITE_VARIANT === 'finance') void this.mountFinanceTerminal();
     this.startHeaderClock();
     this.signalModal = new SignalModal();
     this.signalModal.setLocationClickHandler((lat, lon) => {
@@ -2835,8 +2839,24 @@ export class App {
   // deck.gl "map" chunk) is loaded via dynamic import() so it never blocks first
   // paint. init() kicks this off after the shell paints and awaits it before any
   // map-dependent wiring runs. Idempotent: a second call is a no-op.
+  // Code-split Bloomberg-style finance terminal — dynamic import() so its
+  // TradingView embeds + terminal CSS never ship in the entry bundle. Mounts a
+  // full-viewport terminal over the shell for the finance variant.
+  private async mountFinanceTerminal(): Promise<void> {
+    try {
+      const { FinanceTerminal } = await import('@/components/finance/FinanceTerminal');
+      if (this.isDestroyed) return;
+      new FinanceTerminal().mount(this.container);
+    } catch (e) {
+      console.error('[App] finance terminal failed to mount:', e);
+    }
+  }
+
   private async mountMap(): Promise<void> {
     if (this.map) return;
+    // The finance variant renders the terminal (FinanceTerminal), not the globe —
+    // skip the ~2.7 MB map load entirely there.
+    if (SITE_VARIANT === 'finance') return;
     const mapContainer = document.getElementById('mapContainer') as HTMLElement | null;
     if (!mapContainer) return;
     const { MapContainer } = await import('@/components/MapContainer');
