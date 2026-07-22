@@ -88,6 +88,7 @@ import {
   GdeltIntelPanel,
   LiveNewsPanel,
   LiveWebcamsPanel,
+  StationsWallPanel,
   CIIPanel,
   CascadePanel,
   StrategicRiskPanel,
@@ -2647,6 +2648,11 @@ export class App {
 
     const liveWebcamsPanel = new LiveWebcamsPanel();
     this.panels['live-webcams'] = liveWebcamsPanel;
+
+    // News Wall — all live news channels at once, hover a tile for audio focus. Opt-in
+    // (enabled:false in the variant panel config); the grid + its N players build lazily
+    // on first visibility, so it costs nothing until the user toggles it on.
+    this.panels['stations-wall'] = new StationsWallPanel();
 
     // Tech Events Panel (tech variant only - but create for all to allow toggling)
     this.panels['events'] = new TechEventsPanel('events');
