@@ -6,7 +6,8 @@ package world
 // is fail-closed across the full matrix Blue left "network-bound"/untested:
 //   - no token                          → 401
 //   - non-admin owner                   → 403
-//   - empty/missing owner               → 403  (NOT admin, even though isAdminOrg is not env-driven)
+//   - empty/missing owner               → 403  (base predicate is a fixed literal)
+//   - operator org via WORLD_ADMIN_ORGS → gate passes; the same owner 403s without it
 //   - IAM 401 / 500 / non-JSON 200      → 403  (introspection failure)
 //   - admin / built-in owner            → gate PASSES (not 401/403)
 //   - owner with surrounding whitespace → trimmed, PASSES
@@ -52,15 +53,20 @@ func TestRedAdminGateMatrix(t *testing.T) {
 	const adminRoute = "/v1/world/cloud/fleet"
 
 	cases := []struct {
-		name       string
-		iamStatus  int
-		iamBody    string
-		bearer     string // "" = send no Authorization header
-		wantStatus int    // exact status when deterministic
-		gatePass   bool   // true = assert NOT 401 and NOT 403 (downstream may vary)
+		name         string
+		iamStatus    int
+		iamBody      string
+		bearer       string // "" = send no Authorization header
+		adminOrgsEnv string // WORLD_ADMIN_ORGS for this case ("" = base {admin,built-in})
+		wantStatus   int    // exact status when deterministic
+		gatePass     bool   // true = assert NOT 401 and NOT 403 (downstream may vary)
 	}{
 		{name: "no token → 401", bearer: "", wantStatus: http.StatusUnauthorized},
 		{name: "non-admin owner → 403", iamStatus: 200, iamBody: `{"owner":"acme","sub":"u1"}`, bearer: "Bearer good", wantStatus: http.StatusForbidden},
+		// Operator org is opt-in via WORLD_ADMIN_ORGS (deploy env), additive to the
+		// canonical {admin,built-in} base — never hardcoded in the predicate.
+		{name: "operator org via WORLD_ADMIN_ORGS → gate passes", iamStatus: 200, iamBody: `{"owner":"hanzo","sub":"z"}`, bearer: "Bearer good", adminOrgsEnv: "hanzo", gatePass: true},
+		{name: "operator org WITHOUT env → 403", iamStatus: 200, iamBody: `{"owner":"hanzo","sub":"z"}`, bearer: "Bearer good", wantStatus: http.StatusForbidden},
 		{name: "empty owner → 403", iamStatus: 200, iamBody: `{"owner":"","sub":"u1"}`, bearer: "Bearer good", wantStatus: http.StatusForbidden},
 		{name: "missing owner claim → 403", iamStatus: 200, iamBody: `{"sub":"u1"}`, bearer: "Bearer good", wantStatus: http.StatusForbidden},
 		{name: "owner=null → 403", iamStatus: 200, iamBody: `{"owner":null,"sub":"u1"}`, bearer: "Bearer good", wantStatus: http.StatusForbidden},
@@ -81,6 +87,7 @@ func TestRedAdminGateMatrix(t *testing.T) {
 			api := apiStub(t)
 			t.Setenv("HANZO_IAM_ISSUER", iam.URL)
 			t.Setenv("HANZO_API_BASE", api.URL)
+			t.Setenv("WORLD_ADMIN_ORGS", tc.adminOrgsEnv)
 
 			s := NewServer()
 			mux := http.NewServeMux()
@@ -151,16 +158,20 @@ func TestRedSharedCacheNoElevation(t *testing.T) {
 	}
 }
 
-// TestRedIsAdminOrgExact locks the admin-org predicate: only the two hardcoded
-// orgs (trimmed) qualify; empty never does. This is the property that makes the
-// "empty ADMIN_ORG == empty owner" class of bug structurally impossible — there
-// is no env-driven admin org to leave unset.
+// TestRedIsAdminOrgExact locks the admin-org predicate: the canonical base is
+// EXACTLY {admin, built-in} (trimmed), matching cloud's globalAdminOrgs — never
+// case/substring variants, never empty. The base is a fixed literal, NOT
+// env-driven, so the "empty ADMIN_ORG == empty owner" bug class is impossible.
+// An operator org is additive-only via WORLD_ADMIN_ORGS (deploy env): denied by
+// default, admitted when the env names it — config, not a hardcoded widening.
 func TestRedIsAdminOrgExact(t *testing.T) {
+	t.Setenv("WORLD_ADMIN_ORGS", "") // isolate: base predicate only
 	admit := map[string]bool{
 		"admin": true, "built-in": true,
 		" admin ": true, "\tbuilt-in\n": true,
 	}
-	deny := []string{"", " ", "Admin", "ADMIN", "administrator", "built_in", "builtin", "admins", "acme", "\x00admin"}
+	// "hanzo" is the operator org — NOT admin by default (only via WORLD_ADMIN_ORGS).
+	deny := []string{"", " ", "Admin", "ADMIN", "administrator", "built_in", "builtin", "admins", "acme", "hanzo", "\x00admin"}
 	for in, want := range admit {
 		if isAdminOrg(in) != want {
 			t.Fatalf("isAdminOrg(%q) = %v, want %v", in, !want, want)
@@ -169,6 +180,20 @@ func TestRedIsAdminOrgExact(t *testing.T) {
 	for _, in := range deny {
 		if isAdminOrg(in) {
 			t.Fatalf("isAdminOrg(%q) = true, want false", in)
+		}
+	}
+
+	// Env-driven operator org: additive to the base, still exact (no widening of
+	// the case/substring rules, base orgs unaffected).
+	t.Setenv("WORLD_ADMIN_ORGS", "hanzo, ops")
+	for _, in := range []string{"hanzo", "ops", "admin", "built-in", " hanzo "} {
+		if !isAdminOrg(in) {
+			t.Fatalf("with WORLD_ADMIN_ORGS set, isAdminOrg(%q) = false, want true", in)
+		}
+	}
+	for _, in := range []string{"", "Hanzo", "acme", "op"} {
+		if isAdminOrg(in) {
+			t.Fatalf("with WORLD_ADMIN_ORGS set, isAdminOrg(%q) = true, want false", in)
 		}
 	}
 }

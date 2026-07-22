@@ -95,6 +95,9 @@ func TestCloudClustersAdmin(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("admin got %d, want 200 (body=%s)", resp.StatusCode, body)
 	}
+	if cache := resp.Header.Get("Cache-Control"); cache != "private, no-store" {
+		t.Fatalf("admin cluster read must be no-store, got %q", cache)
+	}
 	var cc cloudClusters
 	if err := json.Unmarshal(body, &cc); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -131,6 +134,9 @@ func TestCloudQueueAdmin(t *testing.T) {
 	resp, body := getInfra(t, "/v1/world/cloud/queue", 200, `{"owner":"admin","sub":"z"}`, "Bearer good")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("admin got %d, want 200 (body=%s)", resp.StatusCode, body)
+	}
+	if cache := resp.Header.Get("Cache-Control"); cache != "private, no-store" {
+		t.Fatalf("admin queue read must be no-store, got %q", cache)
 	}
 	var q cloudQueue
 	if err := json.Unmarshal(body, &q); err != nil {
