@@ -2,47 +2,24 @@ import { Panel } from './Panel';
 import { fetchYahooQuotes } from '@/services/markets';
 import { REFRESH_INTERVALS } from '@/config';
 import type { MarketData } from '@/types';
+import { universeGroups } from '@/config/market-universe';
 import { quoteRow, groupBlock, changeDir, absFromPct } from '@/utils/market-format';
 
 // Commodities & futures — grouped metals / energy / ags, Bloomberg-dense and
 // strictly monochrome (bright = up, dim = down; no red/green). Self-polling off
 // the Yahoo passthrough on the shared markets cadence; degrades to a quiet
 // unavailable line per row, never an error wall.
+//
+// The symbol list is DERIVED from the one market-universe (universeGroups) — the
+// same source the Markets Bubble reads — so a commodity is added/reweighted in
+// exactly one place. Grouping + names + order come straight from that list.
 
-interface Item { symbol: string; name: string; display: string }
-
-const GROUPS: Array<{ label: string; items: Item[] }> = [
-  {
-    label: 'Metals',
-    items: [
-      { symbol: 'GC=F', name: 'Gold', display: 'GC=F' },
-      { symbol: 'SI=F', name: 'Silver', display: 'SI=F' },
-      { symbol: 'HG=F', name: 'Copper', display: 'HG=F' },
-      { symbol: 'PL=F', name: 'Platinum', display: 'PL=F' },
-    ],
-  },
-  {
-    label: 'Energy',
-    items: [
-      { symbol: 'CL=F', name: 'WTI crude', display: 'CL=F' },
-      { symbol: 'BZ=F', name: 'Brent crude', display: 'BZ=F' },
-      { symbol: 'NG=F', name: 'Natural gas', display: 'NG=F' },
-    ],
-  },
-  {
-    label: 'Agriculture',
-    items: [
-      { symbol: 'ZW=F', name: 'Wheat', display: 'ZW=F' },
-      { symbol: 'ZC=F', name: 'Corn', display: 'ZC=F' },
-      { symbol: 'ZS=F', name: 'Soybeans', display: 'ZS=F' },
-      { symbol: 'KC=F', name: 'Coffee', display: 'KC=F' },
-      { symbol: 'SB=F', name: 'Sugar', display: 'SB=F' },
-      { symbol: 'CC=F', name: 'Cocoa', display: 'CC=F' },
-    ],
-  },
-];
-
-const ALL: Item[] = GROUPS.flatMap((g) => g.items);
+const GROUPS = universeGroups('commodities');
+const ALL = GROUPS.flatMap((g) => g.items).map((i) => ({
+  symbol: i.symbol,
+  name: i.name,
+  display: i.display ?? i.symbol,
+}));
 
 function fmtNum(n: number, digits = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
