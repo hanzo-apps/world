@@ -22,6 +22,7 @@ export class InsightsPanel extends Panel {
   private lastFocalPoints: FocalPoint[] = [];
   private lastMilitaryFlights: MilitaryFlight[] = [];
   private static readonly BRIEF_COOLDOWN_MS = 120000; // 2 min cooldown (API has limits)
+  private static readonly BRIEF_RENDER_TIMEOUT_MS = 12000; // render stories even if the AI brief stalls
   private static readonly BRIEF_CACHE_KEY = 'summary:world-brief';
 
   constructor() {
@@ -345,10 +346,20 @@ export class InsightsPanel extends Panel {
         const geoContext = getSiteVariant() === 'full'
           ? (focalSummary.aiContext || signalSummary.aiContext) + theaterContext
           : '';
-        const result = await generateSummary(titles, (_step, _total, msg) => {
-          // Show sub-progress for summarization
-          this.setProgress(3, totalSteps, `Generating brief: ${msg}`);
-        }, geoContext);
+        // The AI brief must never hold the panel on a spinner. Race it against
+        // a render deadline: if the summary stalls, we fall through with the
+        // cached (or null) brief and still render the ranked stories.
+        let briefSettled = false;
+        const result = await Promise.race([
+          generateSummary(titles, (_step, _total, msg) => {
+            if (briefSettled) return;
+            this.setProgress(3, totalSteps, `Generating brief: ${msg}`);
+          }, geoContext),
+          new Promise<null>(resolve =>
+            setTimeout(() => resolve(null), InsightsPanel.BRIEF_RENDER_TIMEOUT_MS)
+          ),
+        ]);
+        briefSettled = true;
 
         if (result) {
           worldBrief = result.summary;
