@@ -89,7 +89,7 @@ const layers = {
   bases: false,
   cables: false,
   pipelines: false,
-  hotspots: true,
+  flows: false,  hotspots: true,
   ais: false,
   nuclear: false,
   irradiators: false,
