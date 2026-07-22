@@ -28,6 +28,7 @@ export * from './GdeltIntelPanel';
 export * from './LiveNewsPanel';
 export * from './LiveWebcamsPanel';
 export * from './StationsWallPanel';
+export * from './TradingBubblePanel';
 export * from './CIIPanel';
 export * from './CascadePanel';
 export * from './StrategicRiskPanel';
