@@ -58,6 +58,15 @@ async function appReady(page: Page): Promise<void> {
 
 /** Inject a news-shaped item — the exact data-ctx-* convention NewsPanel emits. */
 async function addNewsItem(page: Page): Promise<void> {
+  // The app defaults to FREE layout (absolutely-positioned panels); a raw injected
+  // panel has no coordinates and stacks at 0,0 under the full-width map, which then
+  // eats the right-click. Pin grid mode so the injected panel flows to the grid end
+  // and is a normal, hit-testable child (real news items are positioned by the
+  // layout engine — only this raw test injection needs the nudge).
+  await page.evaluate(() =>
+    (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'),
+  );
+  await page.waitForTimeout(80);
   await page.evaluate(() => {
     const grid = document.querySelector('#panelsGrid')!;
     const panel = document.createElement('div');
