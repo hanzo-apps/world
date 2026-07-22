@@ -115,6 +115,46 @@ test.describe('dashboard sync (real app)', () => {
     expect(dashPuts.some((b) => b.includes('worldmonitor_recent_searches'))).toBe(false);
   });
 
+  // Org-shared default precedence: the org default is hydrated as the BASE, then the
+  // user's own doc overlays it. One broad route serves both scopes, branching on URL
+  // (the `/shared` GET is the org default; the bare GET is the per-user doc).
+  async function routeDashboardScopes(
+    page: Page,
+    shared: Record<string, string>,
+    user: Record<string, string>,
+  ): Promise<void> {
+    await page.route('**/v1/world/dashboard**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fulfill({ json: { ok: true } });
+        return;
+      }
+      const isShared = route.request().url().includes('/dashboard/shared');
+      await route.fulfill({ json: { config: isShared ? shared : user } });
+    });
+  }
+
+  test('org default hydrates as the base when the user has no doc yet', async ({ page }) => {
+    await fakeAuth(page);
+    // Org published a default; this member has never saved their own → they get it.
+    await routeDashboardScopes(page, { 'hanzo-world-map-mode': '3d' }, {});
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('hanzo-world-map-mode')), { timeout: 8000 })
+      .toBe('3d');
+  });
+
+  test('the per-user doc overrides the org default (user wins)', async ({ page }) => {
+    await fakeAuth(page);
+    // Org default says 3d, the user's own doc says 2d → the user's choice wins.
+    await routeDashboardScopes(page, { 'hanzo-world-map-mode': '3d' }, { 'hanzo-world-map-mode': '2d' });
+    await page.goto('/');
+    await page.waitForSelector(LN, { timeout: 45000 });
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('hanzo-world-map-mode')), { timeout: 8000 })
+      .toBe('2d');
+  });
+
   test('boot hydrates history from /v1/world/history (server precedence)', async ({ page }) => {
     await fakeAuth(page);
     await page.route(DASH, (r) => r.fulfill({ json: { config: {} } }));
