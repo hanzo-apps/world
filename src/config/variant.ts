@@ -67,6 +67,34 @@ export const SITE_VARIANT: string = (() => {
   return build === 'saas' || build === 'hanzo' ? 'cloud' : build || 'full';
 })();
 
+// The LIVE variant. SITE_VARIANT is the load-time snapshot (kept for boot-only
+// reads); currentVariant is the mutable value that an in-place tab switch
+// updates so the app can change view without a page reload. Every read that must
+// reflect the current view calls getSiteVariant() — one value, one source.
+let currentVariant = SITE_VARIANT;
+
+// getSiteVariant returns the live variant. Prefer this over SITE_VARIANT anywhere
+// the value is read at call/render time (it stays correct across an in-place switch).
+export function getSiteVariant(): string {
+  return currentVariant;
+}
+
+// setSiteVariantRuntime switches the live variant in place (no reload). Normalizes
+// via the same canonicalizer as boot (saas/hanzo → cloud), persists the choice so
+// it survives a later navigation, and returns the applied variant — or null when
+// the value is unknown (caller no-ops).
+export function setSiteVariantRuntime(v: string): string | null {
+  const nv = normVariant(v);
+  if (!nv) return null;
+  currentVariant = nv;
+  try {
+    localStorage.setItem('worldmonitor-variant', nv);
+  } catch {
+    /* private mode — the URL still carries the choice */
+  }
+  return nv;
+}
+
 // Default basemap style when the user has not picked one. Every variant opens on
 // the dotted-land "cybermap" globe — the glowing dot lattice is the cinematic hero
 // across all modes. Users can still switch to dark / satellite / terrain via the
