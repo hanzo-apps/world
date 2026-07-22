@@ -89,6 +89,7 @@ import {
   LiveNewsPanel,
   LiveWebcamsPanel,
   StationsWallPanel,
+  TradingBubblePanel,
   CIIPanel,
   CascadePanel,
   StrategicRiskPanel,
@@ -2653,6 +2654,11 @@ export class App {
     // (enabled:false in the variant panel config); the grid + its N players build lazily
     // on first visibility, so it costs nothing until the user toggles it on.
     this.panels['stations-wall'] = new StationsWallPanel();
+
+    // Markets Bubble — the whole market universe as one D3 circle-pack. Fed by the
+    // shared market-universe service; builds lazily on first visibility, so it costs
+    // nothing until it scrolls into view.
+    this.panels['trading-bubble'] = new TradingBubblePanel();
 
     // Tech Events Panel (tech variant only - but create for all to allow toggling)
     this.panels['events'] = new TechEventsPanel('events');
