@@ -46,6 +46,7 @@ type Server struct {
 	ai         *AIClient
 	worldModel *model.Engine
 	mcp        *mcp.Server
+	fund       *fundEngine // autonomous PAPER-only multi-asset fund brain
 
 	// Datastore layer (see datastore.go): kv is the shared hanzo-kv hot cache,
 	// feeds is the two-tier warm feed-body cache in front of it, and store is the
@@ -67,9 +68,19 @@ func NewServer() *Server {
 		mcp:    mcp.New(),
 	}
 	s.worldModel = model.New(s.modelSources(), modelDataDir(), modelInterval())
+	// The fund brain is paper-only by construction: NewPaperBroker is the sole
+	// broker it is ever given. Live execution is a human-authorized action and has
+	// no wiring anywhere in this package (see fund_broker.go).
+	s.fund = newFundEngine(NewPaperBroker())
 	s.initDatastore()
 	return s
 }
+
+// StartFund begins the autonomous paper-fund loop: it recomputes the book on an
+// interval, diffs it against the paper positions, and folds simulated fills into
+// the ledger, until ctx is cancelled. Paper-only — the broker never moves real
+// funds. Call once from main after the server is built.
+func (s *Server) StartFund(ctx context.Context) { s.fund.start(ctx, s) }
 
 // StartModel begins the world-model ingest loop; it folds once immediately then
 // every interval, snapshotting to disk, until ctx is cancelled. Safe to call

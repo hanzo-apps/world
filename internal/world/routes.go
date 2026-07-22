@@ -41,6 +41,12 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/etf-flows", s.handleETFFlows)
 	mux.HandleFunc("/v1/world/macro-signals", s.handleMacroSignals)
 	mux.HandleFunc("/v1/world/rotation", s.handleRotation)
+	// Autonomous multi-asset fund brain (PAPER-only): the full conviction book,
+	// the paper ledger the autonomous engine writes, and a deterministic daily
+	// brief. Exact paths beat the /v1/world/ catch-all. No real orders — ever.
+	mux.HandleFunc("/v1/world/fund", s.handleFund)
+	mux.HandleFunc("/v1/world/fund/ledger", s.handleFundLedger)
+	mux.HandleFunc("/v1/world/fund/brief", s.handleFundBrief)
 	mux.HandleFunc("/v1/world/indicators", s.handleIndicators)
 	mux.HandleFunc("/v1/world/sentiment", s.handleSentiment)
 	mux.HandleFunc("/v1/world/defi", s.handleDefi)
