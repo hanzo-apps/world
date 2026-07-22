@@ -1,5 +1,6 @@
 {
-  "name": "world-monitor",
+  "name": "@hanzo/world",
+  "description": "Hanzo World — real-time global intelligence dashboard.",
   "private": true,
   "version": "2.4.37",
   "type": "module",

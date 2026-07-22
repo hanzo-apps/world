@@ -1,18 +1,20 @@
 <p align="center"><img src=".github/hero.svg" alt="world" width="880"></p>
 
-# World Monitor
+# Hanzo World
 
 **Real-time global intelligence dashboard** — AI-powered news aggregation, geopolitical monitoring, and infrastructure tracking in a unified situational awareness interface.
 
-[![GitHub stars](https://img.shields.io/github/stars/koala73/worldmonitor?style=social)](https://github.com/koala73/worldmonitor/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/koala73/worldmonitor?style=social)](https://github.com/koala73/worldmonitor/network/members)
+> Hanzo World is Hanzo AI, Inc.'s fork of [World Monitor](https://github.com/koala73/worldmonitor) (MIT) by Elie Habib. See [NOTICE](./NOTICE) for provenance and deviations.
+
+[![GitHub stars](https://img.shields.io/github/stars/hanzoai/world?style=social)](https://github.com/hanzoai/world/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/hanzoai/world?style=social)](https://github.com/hanzoai/world/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Last commit](https://img.shields.io/github/last-commit/koala73/worldmonitor)](https://github.com/koala73/worldmonitor/commits/main)
-[![Latest release](https://img.shields.io/github/v/release/koala73/worldmonitor?style=flat)](https://github.com/koala73/worldmonitor/releases/latest)
+[![Last commit](https://img.shields.io/github/last-commit/hanzoai/world)](https://github.com/hanzoai/world/commits/main)
+[![Latest release](https://img.shields.io/github/v/release/hanzoai/world?style=flat)](https://github.com/hanzoai/world/releases/latest)
 
 <p align="center">
-  <a href="https://worldmonitor.app"><img src="https://img.shields.io/badge/Web_App-worldmonitor.app-blue?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Web App"></a>&nbsp;
+  <a href="https://world.hanzo.ai"><img src="https://img.shields.io/badge/Web_App-world.hanzo.ai-blue?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Web App"></a>&nbsp;
   <a href="https://tech.worldmonitor.app"><img src="https://img.shields.io/badge/Tech_Variant-tech.worldmonitor.app-0891b2?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Tech Variant"></a>&nbsp;
   <a href="https://finance.worldmonitor.app"><img src="https://img.shields.io/badge/Finance_Variant-finance.worldmonitor.app-059669?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Finance Variant"></a>
 </p>
@@ -25,14 +27,14 @@
 
 <p align="center">
   <a href="./docs/DOCUMENTATION.md"><strong>Full Documentation</strong></a> &nbsp;·&nbsp;
-  <a href="https://github.com/koala73/worldmonitor/releases/latest"><strong>All Releases</strong></a>
+  <a href="https://github.com/hanzoai/world/releases/latest"><strong>All Releases</strong></a>
 </p>
 
-![World Monitor Dashboard](new-world-monitor.png)
+![Hanzo World Dashboard](new-world-monitor.png)
 
 ---
 
-## Why World Monitor?
+## Why Hanzo World?
 
 | Problem | Solution |
 |---------|----------|
@@ -1092,7 +1094,7 @@ See [full roadmap](./docs/DOCUMENTATION.md#roadmap).
 
 ## Support the Project
 
-If you find World Monitor useful:
+If you find Hanzo World useful:
 
 - **Star this repo** to help others discover it
 - **Share** with colleagues interested in OSINT
@@ -1107,9 +1109,9 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## Author
+## Authors
 
-**Elie Habib** — [GitHub](https://github.com/koala73)
+**Hanzo World** is maintained by **Hanzo AI, Inc.** — fork of the original **World Monitor** by **Elie Habib** ([GitHub](https://github.com/koala73)), used under the MIT License. See [NOTICE](./NOTICE).
 
 ---
 
