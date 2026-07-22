@@ -9,6 +9,7 @@ import {
   MARKET_SYMBOLS,
   REFRESH_INTERVALS,
   DEFAULT_PANELS,
+  PANEL_NAMES,
   DEFAULT_MAP_LAYERS,
   MOBILE_DEFAULT_MAP_LAYERS,
   variantConfig,
@@ -657,16 +658,26 @@ export class App {
     const grid = document.getElementById('addWidgetGrid');
     if (!grid) return;
     const q = filter.trim().toLowerCase();
-    const entries = Object.entries(this.panelSettings)
-      .filter(([key]) => key !== 'map')
-      .filter(([key, cfg]) => !q || cfg.name.toLowerCase().includes(q) || key.toLowerCase().includes(q))
-      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+    // The FULL registry of panels that exist this session (createPanels +
+    // ensureVariantPanels), not just the current variant's set — so ANY panel is
+    // addable from ANY view. panelSettings is only the enabled overlay; names resolve
+    // through PANEL_NAMES (+ i18n). setPanelEnabled creates the settings entry on demand.
+    const keys = new Set<string>([...Object.keys(this.panels), ...Object.keys(this.panelSettings)]);
+    keys.delete('map');
+    const entries = [...keys]
+      .map((key) => ({
+        key,
+        name: this.getLocalizedPanelName(key, PANEL_NAMES[key] ?? this.panelSettings[key]?.name ?? key),
+        enabled: this.panelSettings[key]?.enabled ?? false,
+      }))
+      .filter(({ key, name }) => !q || name.toLowerCase().includes(q) || key.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
     grid.innerHTML = entries.length === 0
       ? `<div class="add-widget-empty">No widgets match “${filter}”.</div>`
-      : entries.map(([key, cfg]) => `
-        <button class="add-widget-item ${cfg.enabled ? 'is-on' : ''}" data-key="${key}">
-          <span class="add-widget-name">${cfg.name}</span>
-          <span class="add-widget-state">${cfg.enabled ? 'Shown' : 'Add'}</span>
+      : entries.map(({ key, name, enabled }) => `
+        <button class="add-widget-item ${enabled ? 'is-on' : ''}" data-key="${key}">
+          <span class="add-widget-name">${name}</span>
+          <span class="add-widget-state">${enabled ? 'Shown' : 'Add'}</span>
         </button>`).join('');
     grid.querySelectorAll<HTMLButtonElement>('.add-widget-item').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -3283,8 +3294,14 @@ export class App {
   }
 
   private setPanelEnabled(key: string, enabled: boolean): boolean {
-    const cfg = this.panelSettings[key];
-    if (!cfg) return false;
+    let cfg = this.panelSettings[key];
+    if (!cfg) {
+      // A panel added from the full-registry palette that this variant didn't default —
+      // create its enabled-overlay entry on demand (the instance already exists in
+      // this.panels). Unknown keys with no instance and no name are rejected.
+      if (!this.panels[key] && !PANEL_NAMES[key]) return false;
+      cfg = this.panelSettings[key] = { name: PANEL_NAMES[key] ?? key, enabled, priority: 2 };
+    }
     cfg.enabled = enabled;
     saveToStorage(STORAGE_KEYS.panels, this.panelSettings);
     this.applyPanelSettings();
