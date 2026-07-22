@@ -73,12 +73,12 @@ test.describe('AI analyst control surface', () => {
     await stubWorldApi(page);
     await appReady(page);
 
-    await page.click('.ai-dock-fab');
-    const prompt = page.locator('.ai-dock-body .ai-analyst-signedout');
+    await page.click('.hzc-fab');
+    const prompt = page.locator('.hzc-body .hzc-signedout');
     await expect(prompt).toBeVisible();
-    await expect(prompt.locator('.ai-analyst-signin')).toHaveText(/sign in/i);
+    await expect(prompt.locator('.hzc-signin')).toHaveText(/sign in/i);
     // No chat composer for anonymous users.
-    await expect(page.locator('.ai-dock-body .ai-analyst-input')).toHaveCount(0);
+    await expect(page.locator('.hzc-body .hzc-input')).toHaveCount(0);
 
     await page.screenshot({ path: `${SCREENS}/analyst-signedout.png` });
   });
@@ -93,23 +93,28 @@ test.describe('AI analyst control surface', () => {
     expect(beforeIdx).toBeGreaterThan(1); // markets starts well down the grid
     await page.screenshot({ path: `${SCREENS}/round-trip-before.png` });
 
-    // Open the analyst dock and confirm the model dropdown populated.
-    await page.click('.ai-dock-fab');
-    const composer = page.locator('.ai-dock-body .ai-analyst-input');
+    // Open the analyst dock and confirm the model picker populated.
+    await page.click('.hzc-fab');
+    const composer = page.locator('.hzc-body .hzc-input');
     await expect(composer).toBeVisible();
-    const modelSelect = page.locator('.ai-dock-body .ai-analyst-model');
-    await expect(modelSelect).toBeVisible();
-    await expect(modelSelect.locator('option')).toHaveCount(3);
-    await expect(modelSelect).toHaveValue('zen5');
+    // The model picker is now a pill that opens a popover listbox (portaled to
+    // <body>), not a native <select>. Its label reflects the default (zen5)…
+    const modelBtn = page.locator('.hzc-body .hzc-model');
+    await expect(modelBtn).toBeVisible();
+    await expect(modelBtn.locator('.hzc-model-name')).toHaveText('Zen 5');
+    // …and opening it lists all three stubbed models.
+    await modelBtn.click();
+    await expect(page.locator('.hzc-model-menu .hzc-model-opt')).toHaveCount(3);
+    await modelBtn.click(); // close the popover
 
     // Send a command-style message; the stub returns the move+theme commands.
     await composer.fill('Move markets to the top and go light');
-    await page.click('.ai-dock-body .ai-analyst-send');
+    await page.click('.hzc-body .hzc-send');
 
     // The prose reply renders…
-    await expect(page.locator('.ai-dock-body .ai-analyst-msg.assistant')).toContainText('moved Markets');
+    await expect(page.locator('.hzc-body .hzc-row.assistant')).toContainText('moved Markets');
     // …and the per-command action log shows a ✓ for the executed move.
-    const log = page.locator('.ai-dock-body .ai-analyst-actionlog .ai-analyst-action.ok');
+    const log = page.locator('.hzc-body .hzc-actionlog .hzc-action.ok');
     await expect(log.first()).toBeVisible();
     await expect(log.first()).toContainText(/moved markets/i);
 

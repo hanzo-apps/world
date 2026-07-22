@@ -42,7 +42,9 @@ test.describe('Enso Live Training — real models only', () => {
     await page.route('**/v1/world/cloud/router-stats*', (r) => r.fulfill({ json: ROUTER_STATS }));
     await page.route('**/v1/world/cloud/models', (r) => r.fulfill({ json: CLOUD_MODELS }));
 
-    await page.goto('/');
+    // Enso Live Training is a Cloud-flagship panel (added only in the cloud
+    // variant); ?variant=cloud wins over the build-time VITE_VARIANT at runtime.
+    await page.goto('/?variant=cloud');
     await page.waitForSelector(ENSO, { timeout: 45000 });
     const panel = page.locator(ENSO);
 
