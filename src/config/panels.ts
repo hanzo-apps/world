@@ -38,6 +38,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   gov: { name: 'Government', enabled: true, priority: 1 },
   thinktanks: { name: 'Think Tanks', enabled: true, priority: 1 },
   markets: { name: 'Markets', enabled: true, priority: 1 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
   finance: { name: 'Financial', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: false, priority: 2 },
   // Every live news channel at once; hover a tile for audio focus. Opt-in (N video
@@ -299,6 +300,7 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
   markets: { name: 'Live Markets', enabled: true, priority: 1 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: true, priority: 2 },
   'markets-news': { name: 'Markets News', enabled: true, priority: 2 },
   forex: { name: 'Forex & Currencies', enabled: true, priority: 1 },
   bonds: { name: 'Fixed Income', enabled: true, priority: 1 },
