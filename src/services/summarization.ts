@@ -5,7 +5,7 @@
  */
 
 import { mlWorker } from './ml-worker';
-import { SITE_VARIANT } from '@/config';
+import { getSiteVariant } from '@/config';
 import { BETA_MODE } from '@/config/beta';
 import { isFeatureAvailable } from './runtime-config';
 
@@ -25,7 +25,7 @@ async function tryGroq(headlines: string[], geoContext?: string, lang?: string):
     const response = await fetch('/v1/world/groq-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: getSiteVariant(), lang }),
     });
 
     if (!response.ok) {
@@ -54,7 +54,7 @@ async function tryOpenRouter(headlines: string[], geoContext?: string, lang?: st
     const response = await fetch('/v1/world/openrouter-summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: SITE_VARIANT, lang }),
+      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: getSiteVariant(), lang }),
     });
 
     if (!response.ok) {

@@ -888,12 +888,23 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
 // security/github/layoffs…); the Crypto variant reuses the finance feed set
 // (crypto/markets/economic/regulation/centralbanks…). Panel selection per
 // variant lives in panels.ts — feeds only supply the underlying data.
-export const FEEDS =
-  SITE_VARIANT === 'tech' || SITE_VARIANT === 'ai'
-    ? TECH_FEEDS
-    : SITE_VARIANT === 'finance' || SITE_VARIANT === 'crypto' || SITE_VARIANT === 'fund'
-      ? FINANCE_FEEDS
-      : FULL_FEEDS;
+// feedsFor resolves a variant name to its feed set (by-name, not load-time-fixed)
+// so an in-place variant switch can re-point the news feeds without a reload.
+export function feedsFor(variant: string): Record<string, Feed[]> {
+  if (variant === 'tech' || variant === 'ai') return TECH_FEEDS;
+  if (variant === 'finance' || variant === 'crypto' || variant === 'fund') return FINANCE_FEEDS;
+  return FULL_FEEDS;
+}
+
+// Load-time snapshot for the initial variant (boot-only reads).
+export const FEEDS = feedsFor(SITE_VARIANT);
+
+// Every feed-category key across all variants. The app creates a NewsPanel per
+// key ONCE at boot so a later in-place switch already has the target variant's
+// feed panels mounted (they only fetch when their category is loaded).
+export const ALL_FEED_KEYS: string[] = [
+  ...new Set([...Object.keys(FULL_FEEDS), ...Object.keys(TECH_FEEDS), ...Object.keys(FINANCE_FEEDS)]),
+];
 
 export const INTEL_SOURCES: Feed[] = [
   // Defense & Security (Tier 1)

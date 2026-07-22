@@ -28,7 +28,7 @@ import {
   PORTS,
   SPACEPORTS,
   CRITICAL_MINERALS,
-  SITE_VARIANT,
+  getSiteVariant,
   // Tech variant data
   STARTUP_HUBS,
   ACCELERATORS,
@@ -373,7 +373,7 @@ export class MapComponent {
       'sanctions', 'economic', 'waterways',               // geopolitical/economic
       'natural', 'weather',                               // natural events
     ];
-    const layers = SITE_VARIANT === 'tech' ? techLayers : SITE_VARIANT === 'finance' ? financeLayers : fullLayers;
+    const layers = getSiteVariant() === 'tech' ? techLayers : getSiteVariant() === 'finance' ? financeLayers : fullLayers;
     const layerLabelKeys: Partial<Record<keyof MapLayers, string>> = {
       hotspots: 'components.deckgl.layers.intelHotspots',
       conflicts: 'components.deckgl.layers.conflictZones',
@@ -544,9 +544,9 @@ export class MapComponent {
       </div>
     `;
 
-    popup.innerHTML = SITE_VARIANT === 'tech'
+    popup.innerHTML = getSiteVariant() === 'tech'
       ? techHelpContent
-      : SITE_VARIANT === 'finance'
+      : getSiteVariant() === 'finance'
       ? financeHelpContent
       : fullHelpContent;
 
@@ -585,7 +585,7 @@ export class MapComponent {
     const legend = document.createElement('div');
     legend.className = 'map-legend';
 
-    if (SITE_VARIANT === 'tech') {
+    if (getSiteVariant() === 'tech') {
       // Tech variant legend
       legend.innerHTML = `
         <div class="map-legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>${escapeHtml(t('components.deckgl.layers.techHQs').toUpperCase())}</div>
@@ -1260,7 +1260,7 @@ export class MapComponent {
     }
 
     // APT groups (geopolitical variant only)
-    if (SITE_VARIANT !== 'tech') {
+    if (getSiteVariant() !== 'tech') {
       this.renderAPTMarkers(projection);
     }
 
@@ -2131,7 +2131,7 @@ export class MapComponent {
     }
 
     // Tech Hub Activity Markers (shows activity heatmap for tech hubs with news activity)
-    if (SITE_VARIANT === 'tech' && this.techActivities.length > 0) {
+    if (getSiteVariant() === 'tech' && this.techActivities.length > 0) {
       this.techActivities.forEach((activity) => {
         const pos = projection([activity.lon, activity.lat]);
         if (!pos) return;
@@ -2173,7 +2173,7 @@ export class MapComponent {
     }
 
     // Geo Hub Activity Markers (shows activity heatmap for geopolitical hubs - full variant)
-    if (SITE_VARIANT === 'full' && this.geoActivities.length > 0) {
+    if (getSiteVariant() === 'full' && this.geoActivities.length > 0) {
       this.geoActivities.forEach((activity) => {
         const pos = projection([activity.lon, activity.lat]);
         if (!pos) return;
