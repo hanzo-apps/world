@@ -13,12 +13,12 @@ interface WebcamFeed {
   fallbackVideoId: string;
 }
 
-// Verified YouTube live stream IDs — validated Feb 2026 via title cross-check.
-// IDs may rotate; update when stale.
+// Curated YouTube live stream IDs, grouped by region. IDs rotate upstream; when a
+// feed's stream dies (YouTube shows "This live stream recording is not available")
+// it is pruned here rather than shipped broken — a dead embed can't be detected
+// cross-origin, so the source list is the single place to keep honest.
 const WEBCAM_FEEDS: WebcamFeed[] = [
-  // Middle East — Jerusalem & Tehran adjacent (conflict hotspots)
-  { id: 'jerusalem', city: 'Jerusalem', country: 'Israel', region: 'middle-east', channelHandle: '@TheWesternWall', fallbackVideoId: 'UyduhBUpO7Q' },
-  { id: 'tehran', city: 'Tehran', country: 'Iran', region: 'middle-east', channelHandle: '@IranHDCams', fallbackVideoId: '-zGuR1qVKrU' },
+  // Middle East
   { id: 'tel-aviv', city: 'Tel Aviv', country: 'Israel', region: 'middle-east', channelHandle: '@IsraelLiveCam', fallbackVideoId: '-VLcYT5QBrY' },
   { id: 'mecca', city: 'Mecca', country: 'Saudi Arabia', region: 'middle-east', channelHandle: '@MakkahLive', fallbackVideoId: 'DEcpmPUbkDQ' },
   // Europe
@@ -28,7 +28,6 @@ const WEBCAM_FEEDS: WebcamFeed[] = [
   { id: 'st-petersburg', city: 'St. Petersburg', country: 'Russia', region: 'europe', channelHandle: '@SPBLiveCam', fallbackVideoId: 'CjtIYbmVfck' },
   { id: 'london', city: 'London', country: 'UK', region: 'europe', channelHandle: '@EarthCam', fallbackVideoId: 'Lxqcg1qt0XU' },
   // Americas
-  { id: 'washington', city: 'Washington DC', country: 'USA', region: 'americas', channelHandle: '@AxisCommunications', fallbackVideoId: '1wV9lLe14aU' },
   { id: 'new-york', city: 'New York', country: 'USA', region: 'americas', channelHandle: '@EarthCam', fallbackVideoId: '4qyZLflp-sI' },
   { id: 'los-angeles', city: 'Los Angeles', country: 'USA', region: 'americas', channelHandle: '@VeniceVHotel', fallbackVideoId: 'EO_1LWqsCNE' },
   { id: 'miami', city: 'Miami', country: 'USA', region: 'americas', channelHandle: '@FloridaLiveCams', fallbackVideoId: '5YCajRjvWCg' },
@@ -48,7 +47,7 @@ type RegionFilter = 'all' | WebcamRegion;
 export class LiveWebcamsPanel extends Panel {
   private viewMode: ViewMode = 'grid';
   private regionFilter: RegionFilter = 'all';
-  private activeFeed: WebcamFeed = WEBCAM_FEEDS[0]!;
+  private activeFeed: WebcamFeed = WEBCAM_FEEDS.find(f => f.id === 'kyiv') ?? WEBCAM_FEEDS[0]!;
   private toolbar: HTMLElement | null = null;
   private iframes: HTMLIFrameElement[] = [];
   private observer: IntersectionObserver | null = null;
@@ -73,7 +72,7 @@ export class LiveWebcamsPanel extends Panel {
     return WEBCAM_FEEDS.filter(f => f.region === this.regionFilter);
   }
 
-  private static readonly ALL_GRID_IDS = ['jerusalem', 'tehran', 'kyiv', 'washington'];
+  private static readonly ALL_GRID_IDS = ['kyiv', 'mecca', 'london', 'new-york'];
 
   private get gridFeeds(): WebcamFeed[] {
     if (this.regionFilter === 'all') {

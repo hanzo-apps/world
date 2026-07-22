@@ -75,8 +75,22 @@
   display: flex; align-items: center; justify-content: space-between;
 }
 :root[data-theme='light'] .fin-tv-title, :root[data-theme='light'] .fin-card-head { color: #16181d; border-bottom-color: rgba(0,0,0,0.07); }
-.fin-tv .tradingview-widget-container { flex: 1; min-height: 0; }
+.fin-tv .tradingview-widget-container { flex: 1; min-height: 0; position: relative; }
 .fin-tv .tradingview-widget-container__widget { height: 100%; }
+.fin-tv-skeleton {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  background: #0b0b0e;
+}
+:root[data-theme='light'] .fin-tv-skeleton { background: #fff; }
+.fin-tv-skeleton::after {
+  content: ''; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(249, 115, 22, 0.55);
+  animation: fin-tv-spin 0.85s linear infinite;
+}
+:root[data-theme='light'] .fin-tv-skeleton::after { border-color: rgba(0, 0, 0, 0.08); border-top-color: rgba(249, 115, 22, 0.6); }
+@keyframes fin-tv-spin { to { transform: rotate(360deg); } }
 
 /* Lux DEX trade card */
 .fin-dex { justify-content: space-between; }
