@@ -1,63 +1,41 @@
 import './styles/main.css';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import * as Sentry from '@sentry/browser';
 import { App } from './App';
+import type { EarlyError } from './bootstrap/sentry';
 
-// Initialize Sentry error tracking (early as possible)
-Sentry.init({
-  dsn: 'https://afc9a1c85c6ba49f8464a43f8de74ccd@o4509927897890816.ingest.us.sentry.io/4510906342113280',
-  release: `hanzo-world@${__APP_VERSION__}`,
-  environment: location.hostname === 'world.hanzo.ai' ? 'production'
-    : location.hostname.includes('vercel.app') ? 'preview'
-    : 'development',
-  enabled: !location.hostname.startsWith('localhost') && !('__TAURI_INTERNALS__' in window),
-  sendDefaultPii: true,
-  tracesSampleRate: 0.1,
-  ignoreErrors: [
-    'Invalid WebGL2RenderingContext',
-    'WebGL context lost',
-    /reading 'imageManager'/,
-    /ResizeObserver loop/,
-    /NotAllowedError/,
-    /InvalidAccessError/,
-    /importScripts/,
-    /^TypeError: Load failed$/,
-    /^TypeError: Failed to fetch( \(.*\))?$/,
-    /^TypeError: cancelled$/,
-    /^TypeError: NetworkError/,
-    /runtime\.sendMessage\(\)/,
-    /Java object is gone/,
-    /^Object captured as promise rejection with keys:/,
-    /Unable to load image/,
-    /Non-Error promise rejection captured with value:/,
-    /Connection to Indexed Database server lost/,
-    /webkit\.messageHandlers/,
-    /unsafe-eval.*Content Security Policy/,
-    /Fullscreen request denied/,
-    /requestFullscreen/,
-    /vc_text_indicators_context/,
-    /Program failed to link: null/,
-    /too much recursion/,
-  ],
-  beforeSend(event) {
-    const msg = event.exception?.values?.[0]?.value ?? '';
-    if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
-    const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
-    // Suppress module-import failures only when originating from browser extensions
-    if (/Importing a module script failed/.test(msg)) {
-      if (frames.some(f => /^(chrome|moz)-extension:/.test(f.filename ?? ''))) return null;
-    }
-    // Suppress maplibre internal null-access crashes (light, placement) only when stack is in map chunk
-    if (/this\.style\._layers|this\.light is null|can't access property "type", \w+ is undefined|Cannot read properties of null \(reading '(id|type)'\)/.test(msg)) {
-      if (frames.some(f => /\/map-[A-Za-z0-9]+\.js/.test(f.filename ?? ''))) return null;
-    }
-    return event;
-  },
-});
+// Telemetry (Sentry — ~460 KB raw / ~130 KB gzip) is code-split out of the entry
+// chunk. On a low-end laptop every eager KB is main-thread parse/compile time
+// before first paint; deferring Sentry keeps the shell + map off the critical
+// path. Error tracking still installs within the first second (whenIdle, below),
+// and a tiny synchronous buffer captures anything thrown before it loads and
+// replays it — so no early boot error is lost.
+const earlyErrors: EarlyError[] = [];
+const bufferError = (e: ErrorEvent | PromiseRejectionEvent): void => {
+  const err = (e as ErrorEvent).error ?? (e as PromiseRejectionEvent).reason ?? (e as ErrorEvent).message;
+  if (err !== undefined && earlyErrors.length < 20) earlyErrors.push({ error: err });
+};
+window.addEventListener('error', bufferError);
+window.addEventListener('unhandledrejection', bufferError);
+
 // Suppress NotAllowedError from YouTube IFrame API's internal play() — browser autoplay policy,
 // not actionable. The YT IFrame API doesn't expose the play() promise so it leaks as unhandled.
 window.addEventListener('unhandledrejection', (e) => {
   if (e.reason?.name === 'NotAllowedError') e.preventDefault();
+});
+
+const whenIdle = (cb: () => void): void => {
+  const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+  if (ric) ric(cb, { timeout: 2000 });
+  else setTimeout(cb, 1200);
+};
+
+// After first paint, load Sentry off the critical path and replay any buffered errors.
+whenIdle(() => {
+  import('./bootstrap/sentry').then(({ initSentry }) => {
+    initSentry(earlyErrors);
+    window.removeEventListener('error', bufferError);
+    window.removeEventListener('unhandledrejection', bufferError);
+    earlyErrors.length = 0;
+  }).catch(() => { /* telemetry is best-effort — never break boot */ });
 });
 
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';

@@ -55,6 +55,7 @@ import {
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
 import { icon } from '@/utils/icons';
+import { maxDevicePixelRatio, isLowEndDevice } from '@/utils/device-tier';
 import { t } from '@/services/i18n';
 import { debounce, rafSchedule, getCurrentTheme } from '@/utils/index';
 import {
@@ -792,10 +793,12 @@ export class DeckGLMap {
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
       onClick: (info: PickingInfo, event) => this.handleClick(info, event as MapClickEvent),
       pickingRadius: 10,
-      // Overlaid deck owns its DPR. Cap at 2 so a HiDPI (DPR 3+) display on a
-      // large window doesn't quadruple the per-frame fill of the second canvas —
-      // the freeze the CTO hit on real hardware. 2× keeps dots/text crisp.
-      useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
+      // Overlaid deck owns its DPR. Cap it so a HiDPI (DPR 3+) display on a large
+      // window doesn't quadruple the per-frame fill of the second canvas — the
+      // freeze the CTO hit on real hardware. High-tier caps at 2× (crisp dots/
+      // text); a low-end laptop drops to 1× — the single biggest per-frame GPU
+      // win on weak hardware — via the device tier.
+      useDevicePixels: Math.min(window.devicePixelRatio || 1, maxDevicePixelRatio()),
       onError: (error: Error) => console.warn('[DeckGLMap] Render error (non-fatal):', error.message),
     });
 
@@ -4219,6 +4222,9 @@ export class DeckGLMap {
       && !this.renderPaused
       && !this.webglLost
       && !this.prefersReducedMotion()
+      // A low-end laptop should not spend a continuous ~30 fps render loop on a
+      // background flourish; the idle globe stays still there (device tier).
+      && !isLowEndDevice()
       && !document.hidden;
   }
 
