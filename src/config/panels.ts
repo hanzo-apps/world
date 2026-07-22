@@ -40,6 +40,9 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   markets: { name: 'Markets', enabled: true, priority: 1 },
   finance: { name: 'Financial', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: false, priority: 2 },
+  // Every live news channel at once; hover a tile for audio focus. Opt-in (N video
+  // decodes) — toggle from the Panels menu, like Live Webcams.
+  'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
   tech: { name: 'Technology', enabled: true, priority: 2 },
   crypto: { name: 'Crypto', enabled: true, priority: 2 },
   heatmap: { name: 'Sector Heatmap', enabled: true, priority: 2 },
