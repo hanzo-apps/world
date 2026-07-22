@@ -21,8 +21,8 @@
   --text: #e8e8e8;
   --text-secondary: #ccc;
   --text-dim: #888;
-  --text-muted: #666;
-  --text-faint: #555;
+  --text-muted: #949494; /* WCAG-AA on the dark surface (was #666 ≈ 2.8:1) */
+  --text-faint: #8a8a8a;  /* was #555 ≈ 2.0:1 */
   --text-ghost: #444;
   --accent: #fff;
   /* Foreground that sits ON --accent (primary buttons). Must be explicit —
@@ -855,6 +855,19 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 .hz-cta:active { transform: translateY(0); }
+/* Global keyboard focus ring — shows on tab-focus only (never mouse), theme-aware via
+   --accent. Low specificity so per-component focus styles still win. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
 .hz-cta:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--overlay-heavy); }
 .hz-cta svg { flex: none; }
 /* Larger, block CTA used inside signed-out panels. */
@@ -3419,7 +3432,7 @@ body.playback-mode .status-dot {
   position: absolute;
   bottom: 40px;
   left: 10px;
-  width: 360px;
+  width: min(360px, calc(100vw - 24px));
   max-height: 70vh;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -5645,7 +5658,7 @@ a.prediction-link:hover {
 /* Map Popups */
 .map-popup {
   position: fixed;
-  width: 380px;
+  width: min(380px, calc(100vw - 24px));
   max-height: calc(100vh - 120px);
   background: var(--bg);
   border: 1px solid var(--red);
@@ -10889,7 +10902,7 @@ a.prediction-link:hover {
   position: absolute;
   top: 100%;
   right: 0;
-  width: 380px;
+  width: min(380px, calc(100vw - 24px));
   background: var(--border-subtle);
   border: 1px solid var(--border);
   border-radius: 6px;
