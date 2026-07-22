@@ -164,6 +164,8 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
 const TECH_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
   'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
+  'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
   'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
@@ -465,6 +467,10 @@ const CLOUD_PANELS: Record<string, PanelConfig> = {
   'my-usage': { name: 'My Usage & Bill', enabled: true, priority: 1 },
   'hanzo-status': { name: 'Hanzo Status', enabled: true, priority: 2 },
   'live-news': { name: 'Live News', enabled: true, priority: 2 },
+  // News Wall (all stations at once, hover for audio) + Markets Bubble (whole market
+  // universe as one D3 circle-pack) — available in every grid view, opt-in.
+  'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -545,6 +551,8 @@ const AI_PANELS: Record<string, PanelConfig> = {
   'ai-compute': { name: 'AI Compute', enabled: true, priority: 1 },
   'enso-flywheel': { name: 'Enso Flywheel', enabled: true, priority: 1 },
   'live-news': { name: 'AI & Tech Headlines', enabled: true, priority: 1 },
+  'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
   ai: { name: 'AI/ML News', enabled: true, priority: 1 },
   tech: { name: 'Technology', enabled: true, priority: 1 },
@@ -627,6 +635,8 @@ const AI_MOBILE_MAP_LAYERS: MapLayers = {
 const CRYPTO_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Crypto Map', enabled: true, priority: 1 },
   'live-news': { name: 'Crypto & Markets Headlines', enabled: true, priority: 1 },
+  'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
+  'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
   crypto: { name: 'Crypto & Digital Assets', enabled: true, priority: 1 },
   chains: { name: 'Chains', enabled: true, priority: 1 },
