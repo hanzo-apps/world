@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Developer API &amp; Open Source Platform | World Monitor</title><meta name="description" content="Build intelligence apps on World Monitor's typed API: 22 services, 92 proto files, 60+ edge functions, and auto-generated TypeScript clients. AGPL-3.0."><meta name="keywords" content="open source intelligence API, OSINT API free, geopolitical data API, intelligence platform developer, proto-first API architecture"><meta name="robots" content="index, follow"><meta name="author" content="Elie Habib"><link rel="canonical" href="https://www.world.hanzo.ai/blog/posts/build-on-worldmonitor-developer-api-open-source/"><meta property="og:type" content="article"><meta property="og:title" content="Developer API &amp; Open Source Platform | World Monitor"><meta property="og:description" content="Build intelligence apps on World Monitor's typed API: 22 services, 92 proto files, 60+ edge functions, and auto-generated TypeScript clients. AGPL-3.0."><meta property="og:url" content="https://www.world.hanzo.ai/blog/posts/build-on-worldmonitor-developer-api-open-source/"><meta property="og:site_name" content="World Monitor Blog"><meta property="og:image" content="/blog/images/blog/build-on-worldmonitor-developer-api-open-source.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:locale" content="en_US"><meta property="og:image:alt" content="Developer API &amp; Open Source Platform | World Monitor"><meta property="article:published_time" content="2026-03-09T00:00:00.000Z"><meta property="article:modified_time" content="2026-03-09T00:00:00.000Z"><meta property="article:publisher" content="https://www.world.hanzo.ai"><meta property="article:section" content="Developers, data engineers, startup builders, academic researchers, open-source contributors"><meta property="article:tag" content="open source intelligence API"><meta property="article:tag" content="OSINT API free"><meta property="article:tag" content="geopolitical data API"><meta property="article:tag" content="intelligence platform developer"><meta property="article:tag" content="proto-first API architecture"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Developer API &amp; Open Source Platform | World Monitor"><meta name="twitter:description" content="Build intelligence apps on World Monitor's typed API: 22 services, 92 proto files, 60+ edge functions, and auto-generated TypeScript clients. AGPL-3.0."><meta name="twitter:image" content="/blog/images/blog/build-on-worldmonitor-developer-api-open-source.jpg"><meta name="twitter:site" content="@hanzoai"><meta name="twitter:creator" content="@hanzoai"><link rel="icon" type="image/x-icon" href="/favico/favicon.ico"><link rel="icon" type="image/png" sizes="32x32" href="/favico/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/favico/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/favico/apple-touch-icon.png"><link rel="alternate" type="application/rss+xml" title="World Monitor Blog" href="/blog/rss.xml"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Developer API & Open Source Platform | World Monitor","description":"Build intelligence apps on World Monitor's typed API: 22 services, 92 proto files, 60+ edge functions, and auto-generated TypeScript clients. AGPL-3.0.","datePublished":"2026-03-09T00:00:00.000Z","dateModified":"2026-03-09T00:00:00.000Z","author":{"@type":"Person","name":"Elie Habib","url":"https://x.com/eliehabib"},"publisher":{"@type":"Organization","name":"World Monitor","url":"https://world.hanzo.ai","logo":{"@type":"ImageObject","url":"https://www.world.hanzo.ai/favico/apple-touch-icon.png"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.world.hanzo.ai/blog/posts/build-on-worldmonitor-developer-api-open-source/"},"image":"/blog/images/blog/build-on-worldmonitor-developer-api-open-source.jpg","url":"https://www.world.hanzo.ai/blog/posts/build-on-worldmonitor-developer-api-open-source/","keywords":"open source intelligence API, OSINT API free, geopolitical data API, intelligence platform developer, proto-first API architecture"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Blog","item":"https://www.world.hanzo.ai/blog/"},{"@type":"ListItem","position":2,"name":"Build on World Monitor: Open APIs, Proto-First Architecture, and the Developer Platform"}]}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is the World Monitor API free to use?","acceptedAnswer":{"@type":"Answer","text":"Yes. World Monitor is AGPL-3.0 open source. You can use the public API at api.world.hanzo.ai or self-host the entire stack. There are no API keys required for public endpoints and no usage fees."}},{"@type":"Question","name":"What languages can I use to consume the API?","acceptedAnswer":{"@type":"Answer","text":"Any language that supports HTTP. The auto-generated OpenAPI spec provides compatibility with Swift, Kotlin, Python, Go, Java, and more. TypeScript clients are generated directly from the proto files for first-class type safety."}},{"@type":"Question","name":"How do I add a custom data source to my self-hosted instance?","acceptedAnswer":{"@type":"Answer","text":"Define your data structures in a proto file, implement a handler function, wire it into the service registry, and add a seed script to populate Redis. The proto-first architecture ensures type safety across the full stack automatically."}}]}</script><script defer src="https://abacus.world.hanzo.ai/script.js" data-website-id="e8800335-c853-46a8-8497-c993ed2f58bc" data-domains="world.hanzo.ai,tech.world.hanzo.ai,finance.world.hanzo.ai,commodity.world.hanzo.ai,happy.world.hanzo.ai"></script><link rel="stylesheet" href="/blog/_astro/Base.DdNIYT18.css"></head> <body> <header class="site-header"> <nav> <a href="/blog/" class="logo"> <img src="/favico/favicon-32x32.png" alt="World Monitor" width="28" height="28" class="logo-icon-img"> <div class="logo-text"> <span class="logo-name">WORLD MONITOR</span> <span class="logo-sub">by Someone.ceo</span> </div> </a> <ul class="nav-links"> <li><a href="/blog/">Blog</a></li> <li><a href="https://www.world.hanzo.ai" target="_blank" rel="noopener noreferrer">Dashboard</a></li> <li><a href="https://www.world.hanzo.ai/pro" target="_blank" rel="noopener noreferrer">Pro</a></li> <li><a href="https://www.world.hanzo.ai/docs" target="_blank" rel="noopener noreferrer">Docs</a></li> <li><a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener noreferrer">GitHub</a></li> </ul> <a href="https://www.world.hanzo.ai/pro#waitlist" class="nav-cta" target="_blank" rel="noopener noreferrer">
+Get Early Access
+</a> </nav> </header> <main>  <article> <div class="article-header"> <a href="/blog/" class="back">&larr; All articles</a> <div class="meta"> <time datetime="2026-03-09T00:00:00.000Z">Mar 8, 2026</time>  <span> &middot; Developers, data engineers, startup builders, academic researchers, open-source contributors</span> </div> </div> <img src="/blog/images/blog/build-on-worldmonitor-developer-api-open-source.jpg" alt="Build on World Monitor: Open APIs, Proto-First Architecture, and the Developer Platform" class="hero-image" width="1200" height="630"> <div class="article-content prose"> <h1>Build on World Monitor: Open APIs, Proto-First Architecture, and the Developer Platform</h1>  <p>Most intelligence platforms are walled gardens. You pay for access, you use their interface, and if you want to build something custom, you’re out of luck. The data is locked behind a UI.</p>
+<p>World Monitor is designed differently. The entire intelligence platform, every data feed, every scoring algorithm, every aggregation pipeline, is built on a <strong>typed API layer</strong> that developers can use, extend, and build upon.</p>
+<h2 id="proto-first-architecture">Proto-First Architecture</h2>
+<p>World Monitor uses <strong>Protocol Buffers (protobuf)</strong> as the single source of truth for all API contracts. The codebase contains:</p>
+<ul>
+<li><strong>92 proto files</strong> defining every data structure and service</li>
+<li><strong>22 typed service domains</strong> covering all intelligence verticals</li>
+<li><strong>Auto-generated TypeScript</strong> clients for type-safe API consumption</li>
+<li><strong>Auto-generated OpenAPI</strong> documentation for REST compatibility</li>
+</ul>
+<p>This means every API endpoint has:</p>
+<ol>
+<li>A proto definition that specifies exact request/response types</li>
+<li>An auto-generated TypeScript client with full type safety</li>
+<li>An OpenAPI spec for language-agnostic access</li>
+<li>Runtime validation that rejects malformed requests</li>
+</ol>
+<h3 id="why-proto-first-matters">Why Proto-First Matters</h3>
+<p>Protocol Buffers enforce a contract between client and server that can’t drift:</p>
+<ul>
+<li><strong>Type safety:</strong> No more guessing what fields an API returns. The proto file is the contract.</li>
+<li><strong>Versioning:</strong> Proto files support backward-compatible evolution. Add fields without breaking clients.</li>
+<li><strong>Code generation:</strong> TypeScript clients are generated, not handwritten. Zero chance of client/server mismatch.</li>
+<li><strong>Documentation:</strong> The proto file IS the documentation. Field names, types, and comments are the API spec.</li>
+</ul>
+<p>For developers building on World Monitor, this means you can trust the API contracts completely. If the proto says a field is <code>int64</code>, it’s <code>int64</code>. If it says <code>repeated string</code>, it’s an array of strings.</p>
+<h2 id="22-service-domains">22 Service Domains</h2>
+<p>World Monitor’s API is organized into domain-specific services:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Domain</th><th>What It Covers</th></tr></thead><tbody><tr><td><strong>Conflict</strong></td><td><a href="https://acleddata.com/">ACLED</a> events, <a href="https://ucdp.uu.se/">UCDP</a> data, hotspot scoring</td></tr><tr><td><strong>Military</strong></td><td>Bases, ADS-B flights, AIS vessels, <a href="https://news.usni.org/">USNI</a> reports</td></tr><tr><td><strong>Market</strong></td><td>Stock quotes, forex, commodities, sector performance</td></tr><tr><td><strong>Crypto</strong></td><td>BTC signals, stablecoin pegs, ETF flows, Fear &#x26; Greed</td></tr><tr><td><strong>Aviation</strong></td><td>Airport delays, flight tracking, airspace data</td></tr><tr><td><strong>Maritime</strong></td><td>Vessel positions, port status, dark vessel detection</td></tr><tr><td><strong>Climate</strong></td><td>Temperature anomalies, precipitation, sea level</td></tr><tr><td><strong>Imagery</strong></td><td>Satellite data via STAC API</td></tr><tr><td><strong>News</strong></td><td>Aggregated RSS feeds, trending keywords</td></tr><tr><td><strong>Intelligence</strong></td><td>CII scores, theater posture, convergence events</td></tr><tr><td><strong>Infrastructure</strong></td><td>Cables, pipelines, nuclear facilities, datacenters</td></tr><tr><td><strong>Prediction</strong></td><td><a href="https://polymarket.com/">Polymarket</a> data, forecast probabilities</td></tr><tr><td><strong>Cyber</strong></td><td>Threat feeds, C2 servers, malware URLs</td></tr><tr><td><strong>Disaster</strong></td><td>Earthquakes, fires, volcanic events</td></tr><tr><td><strong>Displacement</strong></td><td>UNHCR refugee and IDP data</td></tr><tr><td><strong>Travel</strong></td><td>Government advisories, risk levels</td></tr><tr><td><strong>Central Bank</strong></td><td>Policy rates, <a href="https://www.bis.org/">BIS</a> data, REER</td></tr><tr><td><strong>Tech</strong></td><td>AI labs, startups, accelerators, tech hubs</td></tr><tr><td><strong>Commodity</strong></td><td>Mining sites, exchange hubs, energy infrastructure</td></tr><tr><td><strong>Regulation</strong></td><td>AI policy tracking, regulatory changes</td></tr><tr><td><strong>Health</strong></td><td>System health, data freshness, circuit breaker status</td></tr><tr><td><strong>Bootstrap</strong></td><td>Hydration data for initial app load</td></tr></tbody></table>
+<p>Each domain has its own edge function, proto definitions, and TypeScript client.</p>
+<h2 id="60-vercel-edge-functions">60+ Vercel Edge Functions</h2>
+<p>The API layer runs on <strong>Vercel Edge Functions</strong>, providing:</p>
+<ul>
+<li><strong>Global edge deployment:</strong> API responses from the nearest edge node</li>
+<li><strong>~85% cold-start reduction</strong> through per-domain thin entry points</li>
+<li><strong>Circuit breakers</strong> per data source (failing upstream won’t take down the API)</li>
+<li><strong>Cache-Control headers</strong> with ETag support for efficient CDN caching</li>
+<li><strong>Rate limiting</strong> with Cloudflare-aware client IP detection</li>
+</ul>
+<p>API endpoints follow the pattern:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>api.world.hanzo.ai/api/{domain}/v1/{rpc}</span></span></code></pre>
+<p>For example:</p>
+<ul>
+<li><code>api.world.hanzo.ai/api/market/v1/quotes</code> for stock quotes</li>
+<li><code>api.world.hanzo.ai/api/conflict/v1/events</code> for conflict data</li>
+<li><code>api.world.hanzo.ai/api/intelligence/v1/cii</code> for Country Instability Index scores</li>
+</ul>
+<h2 id="building-with-world-monitors-api">Building with World Monitor’s API</h2>
+<h3 id="custom-dashboards">Custom Dashboards</h3>
+<p>Build a domain-specific dashboard that pulls exactly the data you need. Use the typed TypeScript clients for a seamless development experience:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Auto-generated client with full type safety</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> cii</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> intelligenceClient.</span><span style="color:#B392F0">getCII</span><span style="color:#E1E4E8">({ countries: [</span><span style="color:#9ECBFF">'US'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'CN'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'RU'</span><span style="color:#E1E4E8">] });</span></span>
+<span class="line"><span style="color:#6A737D">// cii.scores is typed as CIIScore[] with all fields known at compile time</span></span></code></pre>
+<h3 id="data-pipelines">Data Pipelines</h3>
+<p>Feed World Monitor data into your own analytics:</p>
+<ul>
+<li>Pull conflict events into a data warehouse for historical analysis</li>
+<li>Stream market data alongside geopolitical scores for correlation studies</li>
+<li>Build custom alerting on CII threshold changes</li>
+</ul>
+<h3 id="research-applications">Research Applications</h3>
+<p>Academic researchers can use the API programmatically:</p>
+<ul>
+<li>Study the relationship between news velocity and conflict escalation</li>
+<li>Analyze prediction market accuracy against actual outcomes (see <a href="/blog/posts/prediction-markets-ai-forecasting-geopolitics/">prediction markets and AI forecasting</a>)</li>
+<li>Build custom scoring models using World Monitor’s raw data feeds</li>
+</ul>
+<h3 id="mobile-apps">Mobile Apps</h3>
+<p>Build a mobile app that consumes World Monitor’s API for a custom mobile intelligence experience. The OpenAPI spec makes it accessible from any language (Swift, Kotlin, Python, Go).</p>
+<h3 id="slackteams-bots">Slack/Teams Bots</h3>
+<p>Build alerting bots that post to your team channel when:</p>
+<ul>
+<li>A country’s CII crosses a threshold</li>
+<li>A strategic theater posture changes</li>
+<li>A prediction market probability shifts significantly</li>
+<li>A cyber threat spike is detected in your region of interest</li>
+</ul>
+<h2 id="self-hosting">Self-Hosting</h2>
+<p>World Monitor is AGPL-3.0. You can self-host the entire platform, including <a href="/blog/posts/ai-powered-intelligence-without-the-cloud/">local AI capabilities that run without cloud dependencies</a>:</p>
+<p><strong>Frontend:</strong> React + TypeScript + Vite. Standard <code>npm install &#x26;&#x26; npm run build</code>.</p>
+<p><strong>API:</strong> Vercel Edge Functions. Deploy to Vercel with <code>vercel deploy</code>, or adapt for Cloudflare Workers, Deno Deploy, or any edge runtime.</p>
+<p><strong>Desktop App:</strong> Tauri. Build with <code>cargo tauri build</code> for macOS, Windows, or Linux.</p>
+<p><strong>Data Layer:</strong> Redis for caching, with seed scripts that populate data from public sources.</p>
+<p>Self-hosting gives you:</p>
+<ul>
+<li>Complete control over data flows</li>
+<li>Custom domain deployment</li>
+<li>Network isolation for sensitive environments</li>
+<li>Ability to add proprietary data sources</li>
+</ul>
+<h2 id="contributing">Contributing</h2>
+<p>The open-source codebase welcomes contributions:</p>
+<ul>
+<li><strong>New data sources:</strong> Add proto definitions, implement handlers, wire into the seed pipeline</li>
+<li><strong>New languages:</strong> Add translation JSON files for additional locale support</li>
+<li><strong>Bug fixes:</strong> Standard GitHub PR workflow</li>
+<li><strong>New panels:</strong> Build new visualization panels using the typed data layer</li>
+<li><strong>Performance:</strong> Edge function optimization, caching improvements, bundle size reduction</li>
+</ul>
+<p>The proto-first architecture makes contributing safe: the type system catches contract violations at compile time, and auto-generated clients ensure frontend/backend consistency.</p>
+<h2 id="the-developer-stack">The Developer Stack</h2>
+<p>For reference, World Monitor is built with:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Layer</th><th>Technology</th></tr></thead><tbody><tr><td>Frontend</td><td>React, TypeScript, Vite</td></tr><tr><td>3D Globe</td><td>globe.gl, Three.js</td></tr><tr><td>Flat Map</td><td>deck.gl, MapLibre</td></tr><tr><td>API</td><td>Vercel Edge Functions</td></tr><tr><td>Contracts</td><td>Protocol Buffers (92 files)</td></tr><tr><td>Desktop</td><td>Tauri (Rust)</td></tr><tr><td>Sidecar</td><td>Node.js</td></tr><tr><td>Caching</td><td>Redis</td></tr><tr><td>Browser ML</td><td>Transformers.js, ONNX</td></tr><tr><td>Styling</td><td>CSS Custom Properties</td></tr><tr><td>i18n</td><td>i18next (21 locales)</td></tr><tr><td>Testing</td><td>Vitest, Playwright</td></tr></tbody></table>
+<h2 id="why-build-on-world-monitor">Why Build on World Monitor?</h2>
+<p>The intelligence industry has a consolidation problem. A handful of vendors control the data, the algorithms, and the interfaces. Analysts are locked into ecosystems they can’t customize, audit, or extend. See how World Monitor <a href="/blog/posts/worldmonitor-vs-traditional-intelligence-tools/">compares to traditional intelligence tools</a> in practice.</p>
+<p>World Monitor’s open, typed, proto-first architecture is the alternative:</p>
+<ul>
+<li><strong>Audit everything:</strong> Every scoring algorithm, every data pipeline, every API contract is in the codebase</li>
+<li><strong>Extend anything:</strong> Add data sources, build custom panels, create new service domains</li>
+<li><strong>Trust the types:</strong> Proto-generated clients mean no runtime surprises</li>
+<li><strong>Deploy anywhere:</strong> Edge functions, self-hosted, or desktop</li>
+<li><strong>Own your intelligence:</strong> No vendor lock-in, no API key revocation, no price hikes</li>
+</ul>
+<p>The intelligence platform of the future isn’t a product. It’s an ecosystem. World Monitor is building the foundation.</p>
+<h2 id="frequently-asked-questions">Frequently Asked Questions</h2>
+<p><strong>Is the World Monitor API free to use?</strong>
+Yes. World Monitor is AGPL-3.0 open source. You can use the public API at api.world.hanzo.ai or self-host the entire stack. There are no API keys required for public endpoints and no usage fees.</p>
+<p><strong>What languages can I use to consume the API?</strong>
+Any language that supports HTTP. The auto-generated OpenAPI spec provides compatibility with Swift, Kotlin, Python, Go, Java, and more. TypeScript clients are generated directly from the proto files for first-class type safety.</p>
+<p><strong>How do I add a custom data source to my self-hosted instance?</strong>
+Define your data structures in a proto file, implement a handler function, wire it into the service registry, and add a seed script to populate Redis. The proto-first architecture ensures type safety across the full stack automatically.</p>
+<hr>
+<p><strong>Start building at <a href="https://github.com/koala73/worldmonitor">github.com/koala73/worldmonitor</a>. 22 services, 92 proto files, and a global intelligence dataset waiting for your application.</strong></p>  </div> <div class="cta-banner"> <h3>See the World in Real Time</h3> <p>Markets, geopolitics, conflicts, infrastructure. One dashboard. No login required.</p> <a href="https://world.hanzo.ai" class="btn" target="_blank" rel="noopener noreferrer">Open Dashboard</a> </div> <div class="author-bio"> <img src="https://unavatar.io/github/koala73" alt="Elie Habib" width="48" height="48" class="author-avatar" loading="lazy" onerror="this.src='/favico/apple-touch-icon.png'"> <div class="author-info"> <div class="author-name"> <a href="https://x.com/eliehabib" target="_blank" rel="noopener noreferrer">Elie Habib</a> </div> <div class="author-desc">Founder of World Monitor. Previously co-founder &amp; CEO of Anghami (NASDAQ: ANGH). Building open-source global intelligence infrastructure.</div> </div> </div> </article>  </main> <footer class="site-footer"> <div class="footer-inner"> <div class="footer-brand"> <img src="/favico/favicon-32x32.png" alt="" width="28" height="28" class="footer-icon-img"> <div class="footer-brand-text"> <span class="footer-name">WORLD MONITOR</span> <span class="footer-sub">by Someone.ceo</span> </div> </div> <div class="footer-links"> <a href="https://www.world.hanzo.ai" target="_blank" rel="noopener noreferrer">Dashboard</a> <a href="https://www.world.hanzo.ai/pro" target="_blank" rel="noopener noreferrer">Pro</a> <a href="https://www.world.hanzo.ai/docs" target="_blank" rel="noopener noreferrer">Docs</a> <a href="https://status.world.hanzo.ai/" target="_blank" rel="noopener noreferrer">Status</a> <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener noreferrer">GitHub</a> <a href="https://discord.gg/re63kWKxaz" target="_blank" rel="noopener noreferrer">Discord</a> <a href="https://x.com/hanzoai" target="_blank" rel="noopener noreferrer">X</a> </div> <div class="footer-copy">
+&copy; 2026 World Monitor
+</div> </div> </footer> </body></html>
