@@ -24,20 +24,20 @@ import (
 // or non-admin owner → 403. The caller's bearer is returned to forward upstream,
 // where cloud independently re-verifies — defense in depth.
 
-// adminOrgs is the set of IAM owner claims world treats as a global admin: the
-// base {admin, built-in} (in sync with the cloud deploy's globalAdminOrgs) plus the
-// deployment's OPERATOR org, so the seeded superuser (z@hanzo.ai, owner "hanzo")
-// sees the full internal dashboard. Override per deployment with WORLD_ADMIN_ORGS
-// (comma-separated); unset defaults the operator org to "hanzo". The upstream cloud
-// subsystems independently re-verify the bearer, so this gate only decides which
-// callers world will ATTEMPT the full/admin reads for — never the final authz.
+// adminOrgs is the set of IAM owner claims world treats as a SuperAdmin. The base
+// is EXACTLY cloud's canonical globalAdminOrgs — {admin, built-in} — the SAME
+// predicate cloud's principal.IsSuperAdmin enforces (owner == the reserved admin
+// org). It is ONE source of truth; world never widens it in code. A deployment MAY
+// name its operator org (so the seeded superuser, e.g. z@hanzo.ai / owner "hanzo",
+// keeps dashboard access) via WORLD_ADMIN_ORGS (comma-separated) in the deploy env
+// — additive only. The base is never env-dependent, so an unset/empty
+// WORLD_ADMIN_ORGS resolves to {admin, built-in}, never empty and never "everyone".
+// The upstream cloud subsystems independently re-verify the bearer, so this gate
+// only decides which callers world ATTEMPTS the full/admin reads for — never the
+// final authz.
 func adminOrgs() map[string]bool {
 	m := map[string]bool{"admin": true, "built-in": true}
-	extra := env("WORLD_ADMIN_ORGS")
-	if extra == "" {
-		extra = "hanzo" // operator org: z@hanzo.ai is the seeded superuser
-	}
-	for _, o := range strings.Split(extra, ",") {
+	for _, o := range strings.Split(env("WORLD_ADMIN_ORGS"), ",") {
 		if o = strings.TrimSpace(o); o != "" {
 			m[o] = true
 		}
