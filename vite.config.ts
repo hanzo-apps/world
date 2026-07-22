@@ -419,6 +419,16 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
+          // Vite's __vitePreload helper is a shared runtime module used by every
+          // dynamic import(). Left alone, Rollup co-locates it into the 'map'
+          // manual chunk (a dynamic-import target), so the ENTRY statically
+          // imports 'map' just for that one helper — and Vite then modulepreloads
+          // the whole ~2.7 MB deck.gl + mapbox chunk before first paint. Pin the
+          // helper to its own tiny chunk so the entry never drags 'map' eagerly;
+          // the map then loads lazily via mountMap()'s dynamic import.
+          if (id.includes('vite/preload-helper')) {
+            return 'vite-preload';
+          }
           if (id.includes('node_modules')) {
             if (id.includes('/@xenova/transformers/') || id.includes('/onnxruntime-web/')) {
               return 'ml';
