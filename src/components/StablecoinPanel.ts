@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
+import { fmtPct, signedPct } from '@/utils/cloud-format';
 
 interface StablecoinData {
   id: string;
@@ -118,7 +119,7 @@ export class StablecoinPanel extends Panel {
         <div class="stable-price">$${c.price.toFixed(4)}</div>
         <div class="stable-peg ${pegClass(c.pegStatus)}">
           <span class="peg-badge">${escapeHtml(c.pegStatus)}</span>
-          <span class="peg-dev">${c.deviation.toFixed(2)}%</span>
+          <span class="peg-dev">${fmtPct(c.deviation)}</span>
         </div>
       </div>
     `).join('');
@@ -128,7 +129,7 @@ export class StablecoinPanel extends Panel {
         <span class="stable-symbol">${escapeHtml(c.symbol)}</span>
         <span class="stable-mcap">${formatLargeNum(c.marketCap)}</span>
         <span class="stable-vol">${formatLargeNum(c.volume24h)}</span>
-        <span class="stable-change ${c.change24h >= 0 ? 'change-positive' : 'change-negative'}">${c.change24h >= 0 ? '+' : ''}${c.change24h.toFixed(2)}%</span>
+        <span class="stable-change ${c.change24h >= 0 ? 'change-positive' : 'change-negative'}">${signedPct(c.change24h)}</span>
       </div>
     `).join('');
 
