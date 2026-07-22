@@ -104,6 +104,13 @@ func (s *Server) mount(mux registrar) {
 	// devices. Same per-identity store as settings/monitors, 'dashboard' namespace.
 	mux.HandleFunc("/v1/world/dashboard", s.handleDashboard)
 
+	// org-shared DASHBOARD default — the layout an org ADMIN publishes for the whole
+	// org. GET returns the org default to any signed-in member; PUT publishes it and
+	// is admin-ONLY (403 otherwise). Same opaque-blob contract as the per-user
+	// dashboard, keyed by org; the frontend hydrates it as the default, then the
+	// user's own doc overrides it.
+	mux.HandleFunc("/v1/world/dashboard/shared", s.handleDashboardShared)
+
 	// per-identity USAGE HISTORY — the signed-in user's real actions (recent
 	// searches, watch queue) persisted so they follow them across devices. Same
 	// per-identity store, 'history' namespace; opaque blob, never fabricated.
