@@ -48,6 +48,15 @@ func adminOrgs() map[string]bool {
 // isAdminOrg reports whether an owner claim is one of the admin orgs.
 func isAdminOrg(owner string) bool { return adminOrgs()[strings.TrimSpace(owner)] }
 
+// isOrgAdmin reports whether an identity may PUBLISH its org's shared documents
+// (e.g. the org-shared dashboard default). It is admin iff the owner is a
+// global-admin org (isAdminOrg) OR IAM marks the identity itself an admin owner
+// (id.Admin). Either way the write is always scoped to the caller's OWN org, so
+// this never grants cross-org authority. Reads stay open to every member.
+func (s *Server) isOrgAdmin(id wIdentity) bool {
+	return isAdminOrg(id.Org) || id.Admin
+}
+
 // apiHost returns the api.hanzo.ai origin (no /v1 suffix) that the cloud
 // subsystems are served from. HANZO_AI_BASE may legitimately carry a /v1 suffix
 // (it is the OpenAI-compatible base); strip it so subsystem paths like

@@ -18,6 +18,9 @@
 //   5. Nothing matched → native menu (untouched).
 
 import { setSpanClass, savePanelSpan, currentSpan } from '@/components/Panel';
+import { cachedIsAdmin } from '@/services/iam';
+import { publishOrgDashboard } from '@/services/dashboard';
+import { toast } from '@/utils/toast';
 
 const MENU_ID = 'panelContextMenu';
 
@@ -175,7 +178,7 @@ function workspaceItems(): MenuEntry[] {
     : document.body.classList.contains('layout-free')
       ? 'free'
       : 'grid';
-  return [
+  const items: MenuEntry[] = [
     { label: 'Grid layout', disabled: cur === 'grid', run: () => setWorkspaceMode('grid') },
     { label: 'Free layout', disabled: cur === 'free', run: () => setWorkspaceMode('free') },
     { label: 'Immersive layout', disabled: cur === 'immersive', run: () => setWorkspaceMode('immersive') },
@@ -183,6 +186,22 @@ function workspaceItems(): MenuEntry[] {
     { label: 'Add widget', run: () => (document.getElementById('dockAddWidget') as HTMLElement | null)?.click() },
     { label: 'Reset layout', run: () => document.dispatchEvent(new CustomEvent('panel-reset-layout-request')) },
   ];
+  // Org admins can publish the CURRENT layout as the org-wide default (server
+  // enforces admin; this only reveals the trigger). Everyone in the org then
+  // hydrates this layout as their default, their own tweaks still overriding it.
+  if (cachedIsAdmin()) {
+    items.push({ kind: 'sep' }, { label: 'Publish as org default', run: publishOrgDefault });
+  }
+  return items;
+}
+
+// Publish the current dashboard as the org default, with a brief confirmation.
+// Fire-and-forget from the menu; the promise resolves to whether the server (which
+// re-checks admin) accepted it.
+function publishOrgDefault(): void {
+  void publishOrgDashboard().then((ok) =>
+    toast(ok ? 'Published as the org default layout.' : "Couldn't publish — admin access required."),
+  );
 }
 
 function panelBaseline(panel: HTMLElement): MenuEntry[] {
