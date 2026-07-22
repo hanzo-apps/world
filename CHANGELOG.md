@@ -2,6 +2,15 @@
 
 All notable changes to World Monitor are documented here.
 
+## [2.4.43]
+
+### Added
+
+- **Finance-terminal alt-asset feeds are live** (`?variant=finance`). The "Art & Collectibles — Auctions" and "Luxury Real Estate" panels now render REAL data instead of "live feed pending":
+  - `GET /v1/world/auctions` — Christie's public auction results (realized **sale totals**: title, inferred category, price + currency, sale date, location, image, link). Sotheby's gates realized prices behind a login (its sale-results API returns `401 Not signed in`), so the honest public major house is the source.
+  - `GET /v1/world/luxury-realestate` — LuxuryEstate.com luxury listings (title, location, price + currency, type, image, link). JamesEdition sits behind a Cloudflare JS challenge that blocks datacenter egress, so it cannot be fetched from the pod.
+  - Both are scraped server-side (`internal/world/handlers_altassets.go`) at most **once an hour** and served from cache to every caller (respectful). On a source failure the last-good copy is served; with no cache yet, an honest empty `{items:[]}` (the panel shows "live feed pending") — **never fabricated data**. The payload attributes its source per feed.
+
 ## [2.4.19]
 
 ### Fixed
