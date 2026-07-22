@@ -105,6 +105,15 @@ async function appReady(page: Page): Promise<void> {
 }
 
 async function openCountry(page: Page, code = 'FR', name = 'France'): Promise<void> {
+  // __app is exposed before init() finishes, but countryBriefPage is constructed
+  // later in init() (after loadAllData) — long after #panelsGrid paints. Wait for
+  // the hook so the open isn't raced to a silent early-return; a real map click
+  // only ever fires post-boot anyway.
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __app?: { countryBriefPage?: unknown } }).__app?.countryBriefPage),
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.evaluate(
     ([c, n]) => (window as unknown as { __app: { openCountryBriefByCode(c: string, n: string): Promise<void> } }).__app.openCountryBriefByCode(c, n),
     [code, name],
@@ -132,8 +141,14 @@ test.describe('Country application view', () => {
     // …docked analyst chat on the right (signed-in → composer, model picker present).
     const sidebar = page.locator('.cb-analyst-sidebar');
     await expect(sidebar).toBeVisible();
-    await expect(sidebar.locator('.ai-analyst-input')).toBeVisible();
-    await expect(sidebar.locator('.ai-analyst-model option')).toHaveCount(2);
+    await expect(sidebar.locator('.hzc-input')).toBeVisible();
+    // Model picker is a pill opening a popover listbox (portaled to <body>); wait
+    // for the roster to paint, then open it to confirm the two stubbed models.
+    const modelBtn = sidebar.locator('.hzc-model');
+    await expect(modelBtn.locator('.hzc-model-name')).toHaveText('Zen 5');
+    await modelBtn.click();
+    await expect(page.locator('.hzc-model-menu .hzc-model-opt')).toHaveCount(2);
+    await modelBtn.click(); // close the popover
     // Sidebar is on the right of the intel content.
     const mainBox = await page.locator('.cb-main').boundingBox();
     const sideBox = await sidebar.boundingBox();
@@ -185,7 +200,7 @@ test.describe('Country application view', () => {
     // Open the bottom sheet.
     await page.click('.cb-analyst-fab');
     await expect(brief).not.toHaveClass(/cb-analyst-collapsed/);
-    await expect(page.locator('.cb-analyst-sidebar .ai-analyst-input')).toBeVisible();
+    await expect(page.locator('.cb-analyst-sidebar .hzc-input')).toBeVisible();
     await page.screenshot({ path: `${SCREENS}/country-view-mobile-open.png` });
   });
 
