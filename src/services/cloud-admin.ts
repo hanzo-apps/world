@@ -91,6 +91,9 @@ export interface FleetWorker {
   vram: string;
   capabilities: string[];
   version: string;
+  serving: string[];      // model ids this worker's hanzo-engine advertises (engine.serve)
+  engineStatus: string;   // reachability of that model server ("ready" | "unreachable")
+  jobQueue: string;       // gpu-jobs queue it claims from
 }
 export interface CloudFleet {
   available: boolean;
@@ -215,3 +218,82 @@ export interface CloudLLM {
 
 export const getCloudLLM = (range = '24h'): Promise<CloudLLM | null> =>
   adminGet<CloudLLM>(`/v1/world/cloud/llm?range=${encodeURIComponent(range)}`);
+
+// ── admin: DOKS cluster nodes grouped by cluster ─────────────────────────────
+// Real DOKS + BYO clusters (hanzo-k8s, adnexus-k8s, …) from visor's unified k8s
+// noun, each with its node pools, per-node status, and GPU capacity. `nodesReady`
+// is honest — it counts nodes whose status is a ready state, not the raw count.
+
+export interface ClusterNode {
+  id: string;
+  name: string;
+  status: string;
+  type: string;
+  region: string;
+  gpu: string;
+}
+export interface ClusterPool {
+  name: string;
+  size: string;
+  count: number;
+  autoScale: boolean;
+  minNodes: number;
+  maxNodes: number;
+}
+export interface ClusterGroup {
+  id: string;
+  name: string;
+  region: string;
+  status: string;
+  kind: string; // managed (DOKS) | byo (attached kubeconfig)
+  nodes: number;
+  nodesReady: number;
+  gpus: number;
+  pools: ClusterPool[];
+  nodeList: ClusterNode[];
+}
+export interface CloudClusters {
+  available: boolean;
+  updatedAt: string;
+  note: string;
+  totals: { clusters: number; nodes: number; nodesReady: number; gpus: number };
+  clusters: ClusterGroup[];
+}
+
+export const getCloudClusters = (): Promise<CloudClusters | null> => adminGet<CloudClusters>('/v1/world/cloud/clusters');
+
+// ── admin: GPU job queue (gpu-jobs) ──────────────────────────────────────────
+// The org's GPU work queue the `hanzo gpu connect` workers claim from: depth by
+// status, running + pending jobs (each with the dispatching service, the claiming
+// worker, and the target model), and the online BYO worker count.
+
+export interface QueueJob {
+  id: string;
+  type: string;
+  service: string;
+  status: string; // pending | running | done | failed | canceled
+  worker: string;
+  model: string;
+  attempt: number;
+  startedAt: string;
+  closedAt: string;
+}
+export interface QueueService {
+  service: string;
+  pending: number;
+  running: number;
+}
+export interface CloudQueue {
+  available: boolean;
+  updatedAt: string;
+  note: string;
+  namespace: string;
+  depth: { pending: number; running: number; done: number; failed: number; canceled: number };
+  workers: { online: number; total: number };
+  services: QueueService[];
+  running: QueueJob[];
+  pending: QueueJob[];
+  recent: QueueJob[];
+}
+
+export const getCloudQueue = (): Promise<CloudQueue | null> => adminGet<CloudQueue>('/v1/world/cloud/queue');
