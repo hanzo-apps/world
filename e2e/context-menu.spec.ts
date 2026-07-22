@@ -73,6 +73,13 @@ test.describe('right-click context menus', () => {
     // emits) inside its own panel appended to the grid. A synthetic panel is used
     // so a live panel's periodic re-render can't wipe the item mid-test, and so it
     // is not under the map canvas — the menu code path is identical either way.
+    // The app defaults to FREE layout, where a raw injected panel (no coordinates)
+    // stacks at 0,0 under the full-width map and the map eats the right-click; pin
+    // grid mode so the injected panel flows to the grid end as a hit-testable child.
+    await page.evaluate(() =>
+      (window as unknown as { worldGrid?: { setLayoutMode(m: string): void } }).worldGrid?.setLayoutMode('grid'),
+    );
+    await page.waitForTimeout(80);
     await page.evaluate(() => {
       const grid = document.querySelector('#panelsGrid')!;
       const panel = document.createElement('div');
@@ -151,23 +158,24 @@ test.describe('analyst data-tool traces', () => {
     });
     await appReady(page);
 
-    await page.click('.ai-dock-fab');
-    const composer = page.locator('.ai-dock-body .ai-analyst-input');
+    await page.click('.hzc-fab');
+    const composer = page.locator('.hzc-body .hzc-input');
     await expect(composer).toBeVisible();
     await composer.fill('What is the state of global instability?');
-    await page.click('.ai-dock-body .ai-analyst-send');
+    await page.click('.hzc-body .hzc-send');
 
-    // The collapsed tool trace renders before the reply that cites it.
-    const trace = page.locator('.ai-dock-body .ai-analyst-tool .ai-analyst-tool-summary');
+    // The tool trace renders before the reply that cites it; its summary carries
+    // the tool call (the redesign shows a database glyph, not the 🔧 emoji).
+    const trace = page.locator('.hzc-body .hzc-tool .hzc-tool-summary');
     await expect(trace).toBeVisible();
-    await expect(trace).toContainText('🔧 world_brief(');
+    await expect(trace).toContainText('world_brief(');
 
-    // Expanding it reveals the raw result body.
-    await trace.click();
-    await expect(page.locator('.ai-dock-body .ai-analyst-tool-result')).toContainText('instability');
+    // The detail renders open, so the raw result body — a compact table of the
+    // tool's JSON — is visible inline and carries the returned instability field.
+    await expect(page.locator('.hzc-body .hzc-tool .hzc-table')).toContainText('instability');
 
     // …and the grounded prose reply is shown.
-    await expect(page.locator('.ai-dock-body .ai-analyst-msg.assistant')).toContainText('instability is steady');
+    await expect(page.locator('.hzc-body .hzc-row.assistant')).toContainText('instability is steady');
 
     await page.screenshot({ path: `${SCREENS}/analyst-tool-trace.png` });
   });
