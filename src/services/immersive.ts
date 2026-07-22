@@ -10,7 +10,7 @@
 // element; all visual layout lives in CSS keyed off `body.immersive` and
 // `body[data-immersive-bg]`. Everything downstream (map, panels, drag) is untouched.
 
-import { getDefaultLiveChannel } from '@/components/LiveNewsPanel';
+import { getDefaultLiveChannel } from '@/config/live-channels';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { getSiteVariant } from '@/config/variant';
 
