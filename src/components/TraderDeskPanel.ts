@@ -1,6 +1,8 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
+import { sparkline as baseSparkline } from '@/utils/market-format';
+import { fmtPct } from '@/utils/cloud-format';
 
 // Trader desk — consumes /v1/world/indicators. Dense stat tiles: value + change
 // + tiny sparkline + green/red, grouped into the classic risk suite. Monochrome,
@@ -59,18 +61,7 @@ function chgClass(v: number | null | undefined): string {
 }
 
 function sparkline(data: number[] | undefined, w = 110, h = 22): string {
-  if (!data || data.length < 2) return '';
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const pts = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((v - min) / range) * (h - 2) - 1;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  return `<svg class="td-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  return baseSparkline(data, { w, h, className: 'td-spark', strokeWidth: 1.5, ariaHidden: false });
 }
 
 function tile(name: string, value: string, r1d: number | null | undefined, spark?: number[], sub?: string): string {
@@ -229,7 +220,7 @@ export class TraderDeskPanel extends Panel {
       .map((s) => `<div class="td-sec ${chgClass(s.r1d)}" title="${escapeHtml(s.name || '')} ${signed(s.r1d)}"><span class="td-sec-sym">${escapeHtml(s.symbol || '')}</span><span class="td-sec-chg">${signed(s.r1d, 1)}</span></div>`)
       .join('');
     const breadth = `
-      <div class="td-section-title">Breadth <span class="td-section-sub">${b.advancers}▲ ${b.decliners}▼ · A/D ${adRatio === null ? '—' : (adRatio * 100).toFixed(0) + '%'}</span></div>
+      <div class="td-section-title">Breadth <span class="td-section-sub">${b.advancers}▲ ${b.decliners}▼ · A/D ${adRatio === null ? '—' : fmtPct(adRatio * 100, 0)}</span></div>
       <div class="td-sectors">${sectors || '<div class="td-empty">—</div>'}</div>`;
 
     // ── crypto ──
@@ -240,7 +231,7 @@ export class TraderDeskPanel extends Panel {
       <div class="td-grid">
         ${quoteTile(c.btc, 'BTC')}
         ${tile('BTC dominance', c.btcDominance === null ? '—' : fmt(c.btcDominance, 1) + '%', c.mcapChange24h)}
-        ${tile('Perp funding', funding === null ? '—' : (funding * 100).toFixed(4) + '%', null, undefined, c.fundingAnnualized === null ? c.fundingSource : `${signed(c.fundingAnnualized, 1)} APR · ${c.fundingSource}`)}
+        ${tile('Perp funding', funding === null ? '—' : fmtPct(funding * 100, 4), null, undefined, c.fundingAnnualized === null ? c.fundingSource : `${signed(c.fundingAnnualized, 1)} APR · ${c.fundingSource}`)}
       </div>`;
 
     // ── fx + commodities ──

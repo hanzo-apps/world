@@ -48,8 +48,9 @@ export class WatchQueuePanel extends Panel {
   private renderStage(item: QueueItem | null): void {
     if (!this.stage) return;
     if (!item) {
-      this.stage.innerHTML =
-        '<div class="wq-empty">Nothing queued yet. Videos, AI-surfaced media and stories you monitor collect here to watch through.</div>';
+      this.stage.innerHTML = this.emptyStateHtml(
+        'Nothing queued yet. Videos, AI-surfaced media and stories you monitor collect here to watch through.',
+      );
       return;
     }
     const media = this.renderMedia(item);

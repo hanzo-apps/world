@@ -79,7 +79,7 @@ export class GdeltIntelPanel extends Panel {
 
   private renderArticles(articles: GdeltArticle[]): void {
     if (articles.length === 0) {
-      this.content.innerHTML = `<div class="empty-state">${t('components.gdelt.empty')}</div>`;
+      this.showEmpty(t('components.gdelt.empty'));
       return;
     }
 
