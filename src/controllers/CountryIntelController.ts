@@ -15,6 +15,7 @@ import { reverseGeocode } from '@/utils/reverse-geocode';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { dataFreshness } from '@/services/data-freshness';
 import { mlWorker } from '@/services/ml-worker';
+import { telemetry, EVENTS } from '@/bootstrap/telemetry';
 import { BETA_MODE } from '@/config/beta';
 
 type IntlDisplayNamesCtor = new (
@@ -173,6 +174,9 @@ export class CountryIntelController {
 
   async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
+    // The one funnel every country drill-down passes through (click, deep link,
+    // search, history restore) — the marquee product interaction.
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'country_view', country: code });
     const wasVisible = this.countryBriefPage.isVisible(); // [country-view] push vs replace
     this.deps.getMap()?.setRenderPaused(true);
 
