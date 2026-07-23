@@ -1,6 +1,6 @@
 import { Panel } from './Panel';
 import { isAuthenticated, login } from '@/services/iam';
-import { getInsightsEvents, type InsightsEvent } from '@/services/org-analytics';
+import { getInsightsEvents, type InsightsEvent } from '@/services/analytics';
 import { escapeHtml } from '@/utils/sanitize';
 import { fmtInt, statTile, sparkline, shareBar, fmtAgo } from '@/utils/cloud-format';
 
