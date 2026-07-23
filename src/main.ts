@@ -1,14 +1,16 @@
 import './styles/main.css';
 import { App } from './App';
-import type { EarlyError } from './bootstrap/sentry';
-import { initAnalytics, initGtm } from './bootstrap/analytics';
+import { installTelemetry, telemetry, type EarlyError } from '@/bootstrap/telemetry';
+import { initGtm } from './bootstrap/analytics';
 
-// Telemetry (Sentry — ~460 KB raw / ~130 KB gzip) is code-split out of the entry
-// chunk. On a low-end laptop every eager KB is main-thread parse/compile time
-// before first paint; deferring Sentry keeps the shell + map off the critical
-// path. Error tracking still installs within the first second (whenIdle, below),
-// and a tiny synchronous buffer captures anything thrown before it loads and
-// replays it — so no early boot error is lost.
+// The ONE telemetry client (@hanzo/event): pageviews, product events, and errors
+// all leave through POST /v1/event to Hanzo Cloud, lensed server-side into web
+// analytics, product analytics, and error tracking. It subsumes both the old
+// ~460 KB third-party Sentry client and the direct analytics.hanzo.ai page
+// script — one door, fanned out server-side. It is dependency-free and tiny, so
+// it rides the entry chunk and starts capturing immediately; a synchronous
+// buffer still catches anything thrown before install and replays it, so no
+// early boot error is lost.
 const earlyErrors: EarlyError[] = [];
 const bufferError = (e: ErrorEvent | PromiseRejectionEvent): void => {
   const err = (e as ErrorEvent).error ?? (e as PromiseRejectionEvent).reason ?? (e as ErrorEvent).message;
@@ -29,25 +31,26 @@ const whenIdle = (cb: () => void): void => {
   else setTimeout(cb, 1200);
 };
 
-// After first paint, install telemetry off the critical path: Sentry (heavy, so
-// code-split and dynamically imported here, replaying any buffered errors) and
-// product analytics (tiny — track() is used synchronously by App so it lives in
-// the main chunk; only its script-injecting init is deferred). Both are env-gated
-// no-ops until their IDs are provisioned, and best-effort so they never break boot.
+// Install the ONE telemetry client eagerly — it is dependency-free and tiny, so
+// unlike the old Sentry bundle it need not wait for idle, and installing now
+// captures boot-time errors live. The bearer getter is injected so telemetry
+// stays decoupled from IAM; signed-out visitors are captured anonymously. The
+// synchronous buffer's errors are replayed inside, then its listeners retire.
+installTelemetry({ getToken: accessToken, earlyErrors });
+window.removeEventListener('error', bufferError);
+window.removeEventListener('unhandledrejection', bufferError);
+earlyErrors.length = 0;
+
+// Marketing tags (Google Tag Manager) are an orthogonal, env-gated concern the
+// telemetry client does not cover — defer the external script off first paint.
 whenIdle(() => {
-  import('./bootstrap/sentry').then(({ initSentry }) => {
-    initSentry(earlyErrors);
-    window.removeEventListener('error', bufferError);
-    window.removeEventListener('unhandledrejection', bufferError);
-    earlyErrors.length = 0;
-  }).catch(() => { /* telemetry is best-effort — never break boot */ });
-  try { initAnalytics(); initGtm(); } catch { /* telemetry is best-effort — never break boot */ }
+  try { initGtm(); } catch { /* best-effort — never break boot */ }
 });
 
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch } from '@/services/runtime';
-import { isCallback, handleCallback } from '@/services/iam';
+import { isCallback, handleCallback, accessToken, getUser } from '@/services/iam';
 import { initDashboardSync } from '@/services/dashboard';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
@@ -93,6 +96,15 @@ async function boot(): Promise<void> {
   // before the app reads it (server precedence, cross-device), then observe further
   // changes so they auto-sync. Anonymous is untouched. Best-effort, never blocks boot.
   await initDashboardSync();
+
+  // Bind the signed-in identity to the telemetry stream so product events are
+  // attributed to the person + their org (cached; anonymous stays anonymous).
+  // Best-effort — telemetry never blocks or breaks boot.
+  void getUser().then((u) => {
+    if (!u) return;
+    telemetry.identify(u.sub);
+    if (u.owner) telemetry.group(u.owner);
+  }).catch(() => { /* best effort */ });
 
   const app = new App('app');
   // Dev/e2e observability: expose the running App so tests can drive layout
