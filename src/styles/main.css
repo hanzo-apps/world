@@ -482,7 +482,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
 
 .version {
   font-size: 9px;
-  color: var(--muted);
+  color: var(--text-muted);
   opacity: 0.5;
   margin-left: 6px;
   font-weight: normal;
@@ -551,7 +551,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
 
 .credit-link {
   font-size: 9px;
-  color: var(--muted);
+  color: var(--text-muted);
   opacity: 0.6;
   font-weight: normal;
   letter-spacing: 0.5px;
@@ -1588,7 +1588,7 @@ body.panel-drag-active .map-container {
 }
 
 .panel-summary-error {
-  color: var(--accent-red);
+  color: var(--red);
 }
 
 .panel-info-wrapper {
@@ -2307,7 +2307,7 @@ body.panel-drag-active .map-container {
   display: inline-block;
   padding: 1px 4px;
   border-radius: 2px;
-  background: var(--surface-light);
+  background: var(--surface-hover);
   color: var(--text-dim);
   font-size: 8px;
   font-weight: 500;
@@ -5148,7 +5148,7 @@ a.prediction-link:hover {
 
 .prediction-volume {
   font-size: 9px;
-  color: var(--muted);
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
@@ -9119,11 +9119,11 @@ a.prediction-link:hover {
 }
 
 .gdelt-intel-article.tone-negative {
-  border-left-color: var(--danger);
+  border-left-color: var(--red);
 }
 
 .gdelt-intel-article.tone-positive {
-  border-left-color: var(--success);
+  border-left-color: var(--green);
 }
 
 .gdelt-intel-article .article-header {
@@ -10619,7 +10619,7 @@ a.prediction-link:hover {
 }
 
 .history-event.cyclical {
-  color: var(--warning);
+  color: var(--yellow);
   font-style: italic;
 }
 
@@ -11147,7 +11147,7 @@ a.prediction-link:hover {
 .findings-modal-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text);
 }
 
 .findings-modal-close {
@@ -11161,7 +11161,7 @@ a.prediction-link:hover {
 }
 
 .findings-modal-close:hover {
-  color: var(--text-primary);
+  color: var(--text);
 }
 
 .findings-modal-content {
@@ -11210,7 +11210,7 @@ a.prediction-link:hover {
 .findings-modal-item-type {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text);
 }
 
 .findings-modal-item-priority {
@@ -11262,7 +11262,7 @@ a.prediction-link:hover {
 .intel-findings-context-menu {
   position: fixed;
   z-index: 10000;
-  background: var(--bg-panel);
+  background: var(--panel-bg-solid);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -11279,7 +11279,7 @@ a.prediction-link:hover {
 }
 
 .context-menu-item:hover {
-  background: var(--bg-hover);
+  background: var(--surface-hover);
 }
 
 /* ===== Tech Events Panel ===== */
@@ -12647,7 +12647,7 @@ body.hide-maplogo .maplibregl-ctrl-logo {
 
 .insight-badge.velocity.elevated {
   background: rgba(251, 146, 60, 0.15);
-  color: var(--orange);
+  color: var(--semantic-high);
 }
 
 .insight-badge.velocity.high {
@@ -12783,7 +12783,7 @@ body.hide-maplogo .maplibregl-ctrl-logo {
 }
 
 .insights-convergence .insights-section-title {
-  color: var(--orange);
+  color: var(--semantic-high);
 }
 
 .convergence-zone {
@@ -12791,7 +12791,7 @@ body.hide-maplogo .maplibregl-ctrl-logo {
   margin-bottom: 8px;
   background: rgba(251, 146, 60, 0.05);
   border-radius: 4px;
-  border-left: 2px solid var(--orange);
+  border-left: 2px solid var(--semantic-high);
 }
 
 .convergence-region {
@@ -12834,12 +12834,12 @@ body.hide-maplogo .maplibregl-ctrl-logo {
 }
 
 .focal-point.elevated {
-  border-left-color: var(--orange);
+  border-left-color: var(--semantic-high);
   background: rgba(251, 146, 60, 0.08);
 }
 
 .focal-point.watch {
-  border-left-color: var(--blue);
+  border-left-color: var(--semantic-info);
   background: rgba(59, 130, 246, 0.05);
 }
 
@@ -12870,12 +12870,12 @@ body.hide-maplogo .maplibregl-ctrl-logo {
 }
 
 .focal-point-urgency.elevated {
-  background: var(--orange);
+  background: var(--semantic-high);
   color: white;
 }
 
 .focal-point-urgency.watch {
-  background: var(--surface-elevated);
+  background: var(--surface-active);
   color: var(--text-dim);
 }
 
