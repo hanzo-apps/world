@@ -170,7 +170,7 @@
   --semantic-high: #ea580c;
   /* Tailwind orange-600 (was #ff8800, 2.27:1) */
   --semantic-elevated: #d97706;
-  /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  /* Tailwind amber-600 (was var(--yellow), 1.81:1) */
   --semantic-normal: #15803d;
   /* Tailwind green-700 (was #44aa44, 2.81:1) */
   --threat-high: #c2410c;
@@ -180,17 +180,17 @@
   --threat-low: #15803d;
   /* Tailwind green-700 (was #22c55e, 2.16:1) */
   --defcon-3: #d97706;
-  /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  /* Tailwind amber-600 (was var(--yellow), 1.81:1) */
   --defcon-4: var(--accent);
   /* Tailwind sky-600 (was #00aaff, 2.43:1) */
   --status-live: #16a34a;
-  /* Tailwind green-600 (was #44ff88, 1.25:1) */
+  /* Tailwind green-600 (was var(--green), 1.25:1) */
   --status-cached: #d97706;
-  /* Tailwind amber-600 (was #ffaa00, 1.81:1) */
+  /* Tailwind amber-600 (was var(--yellow), 1.81:1) */
   --green: #16a34a;
-  /* Tailwind green-600 (was #44ff88) */
+  /* Tailwind green-600 (was var(--green)) */
   --yellow: #d97706;
-  /* Tailwind amber-600 (was #ffaa00) */
+  /* Tailwind amber-600 (was var(--yellow)) */
 
   /* Backgrounds */
   --bg: #f8f9fa;
@@ -6698,7 +6698,7 @@ a.prediction-link:hover {
 }
 
 .mineral-marker.producing .mineral-icon {
-  filter: drop-shadow(0 0 6px var(--status-live)) drop-shadow(0 0 12px #44ff8860);
+  filter: drop-shadow(0 0 6px var(--status-live)) drop-shadow(0 0 12px var(--green)60);
 }
 
 .mineral-marker.developing .mineral-icon {
@@ -7418,7 +7418,7 @@ a.prediction-link:hover {
   border-radius: 3px;
   border: 1px solid currentColor;
 }
-.cn-status--available { color: #44ff88; }
+.cn-status--available { color: var(--green); }
 .cn-status--partial,
 .cn-status--stale { color: #ffcc44; }
 .cn-status--unavailable,
@@ -7456,7 +7456,7 @@ a.prediction-link:hover {
 .cn-release-date { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cn-release-event { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cn-release-status { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
-.cn-release-status--verified { color: #44ff88; }
+.cn-release-status--verified { color: var(--green); }
 .cn-release-status--provisional { color: #ffcc44; }
 .cn-release-status--scheduled { color: var(--text-dim); }
 
