@@ -37,7 +37,7 @@ export * from './IntelligenceGapBadge';
 export * from './TechEventsPanel';
 export * from './ServiceStatusPanel';
 export * from './RuntimeConfigPanel';
-export * from './InsightsPanel';
+export * from './BriefPanel';
 export * from './TechReadinessPanel';
 export * from './SatelliteFiresPanel';
 export * from './MacroSignalsPanel';
@@ -68,7 +68,7 @@ export * from './MyUsagePanel';
 export * from './LiveActivityPanel';
 // Per-org event-platform cards (analytics + insights), org-scoped to the caller.
 export { OrgAnalyticsPanel } from './OrgAnalyticsPanel';
-export { OrgInsightsPanel } from './OrgInsightsPanel';
+export { InsightsPanel } from './InsightsPanel';
 // AI variant — live Hanzo compute + enso training telemetry
 export { AiComputePanel } from './AiComputePanel';
 export { EnsoFlywheelPanel } from './EnsoFlywheelPanel';
