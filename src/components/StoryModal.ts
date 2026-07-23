@@ -2,11 +2,33 @@ import type { StoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { generateStoryDeepLink, getShareUrls, shareTexts } from '@/services/story-share';
 import { t } from '@/services/i18n';
+import { BaseModal } from './BaseModal';
 
 let modalEl: HTMLElement | null = null;
 let currentDataUrl: string | null = null;
 let currentBlob: Blob | null = null;
 let currentData: StoryData | null = null;
+
+// The story modal is an ephemeral, create-on-open overlay. This shell hands
+// BaseModal the cross-cutting behavior (Escape / backdrop close, focus trap)
+// while the functions below own the story-specific rendering and share actions.
+// `modalEl` is created by openStoryModal before open() runs, so mountOverlay
+// just returns it; unmountOverlay tears it (and the cached render) down.
+class StoryModalShell extends BaseModal {
+  protected mountOverlay(): HTMLElement {
+    return modalEl!;
+  }
+
+  protected unmountOverlay(): void {
+    modalEl?.remove();
+    modalEl = null;
+    currentDataUrl = null;
+    currentBlob = null;
+    currentData = null;
+  }
+}
+
+const shell = new StoryModalShell();
 
 export function openStoryModal(data: StoryData): void {
   closeStoryModal();
@@ -50,9 +72,6 @@ export function openStoryModal(data: StoryData): void {
     </div>
   `;
 
-  modalEl.addEventListener('click', (e) => {
-    if (e.target === modalEl) closeStoryModal();
-  });
   modalEl.querySelector('.story-close-x')?.addEventListener('click', closeStoryModal);
   modalEl.querySelector('.story-save')?.addEventListener('click', downloadStory);
   modalEl.querySelector('.story-whatsapp')?.addEventListener('click', () => currentData && shareWhatsApp(currentData));
@@ -61,6 +80,7 @@ export function openStoryModal(data: StoryData): void {
   modalEl.querySelector('.story-copy')?.addEventListener('click', () => currentData && copyDeepLink(currentData));
 
   document.body.appendChild(modalEl);
+  shell.open();
 
   requestAnimationFrame(async () => {
     if (!modalEl) return;
@@ -98,13 +118,7 @@ async function renderAndDisplay(data: StoryData): Promise<void> {
 }
 
 export function closeStoryModal(): void {
-  if (modalEl) {
-    modalEl.remove();
-    modalEl = null;
-    currentDataUrl = null;
-    currentBlob = null;
-    currentData = null;
-  }
+  shell.close();
 }
 
 function downloadStory(): void {

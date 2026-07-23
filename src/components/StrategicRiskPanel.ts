@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { makeActivatable } from '@/utils/a11y';
 import { t } from '@/services/i18n';
 import { getCSSColor } from '@/utils';
 import {
@@ -441,11 +442,11 @@ export class StrategicRiskPanel extends Panel {
     });
 
     // Clickable risk items (convergence zones)
-    const clickableRisks = this.content.querySelectorAll('.risk-item-clickable');
+    const clickableRisks = this.content.querySelectorAll<HTMLElement>('.risk-item-clickable');
     clickableRisks.forEach(item => {
-      item.addEventListener('click', () => {
-        const lat = parseFloat((item as HTMLElement).dataset.lat || '0');
-        const lon = parseFloat((item as HTMLElement).dataset.lon || '0');
+      makeActivatable(item, () => {
+        const lat = parseFloat(item.dataset.lat || '0');
+        const lon = parseFloat(item.dataset.lon || '0');
         if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
           this.onLocationClick(lat, lon);
         }
@@ -453,11 +454,11 @@ export class StrategicRiskPanel extends Panel {
     });
 
     // Clickable alerts with location
-    const clickableAlerts = this.content.querySelectorAll('.risk-alert-clickable');
+    const clickableAlerts = this.content.querySelectorAll<HTMLElement>('.risk-alert-clickable');
     clickableAlerts.forEach(alert => {
-      alert.addEventListener('click', () => {
-        const lat = parseFloat((alert as HTMLElement).dataset.lat || '0');
-        const lon = parseFloat((alert as HTMLElement).dataset.lon || '0');
+      makeActivatable(alert, () => {
+        const lat = parseFloat(alert.dataset.lat || '0');
+        const lon = parseFloat(alert.dataset.lon || '0');
         if (this.onLocationClick && !isNaN(lat) && !isNaN(lon)) {
           this.onLocationClick(lat, lon);
         }
