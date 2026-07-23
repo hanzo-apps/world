@@ -4,6 +4,7 @@ import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
 import { loadYouTubeAPI, type YouTubePlayer } from '@/services/youtube';
 import { liveChannels, EMPTY_CHANNEL, type LiveChannel } from '@/config/live-channels';
+import { embedIframe } from '@/utils/embed';
 
 export class LiveNewsPanel extends Panel {
   private activeChannel: LiveChannel = liveChannels()[0] ?? EMPTY_CHANNEL;
@@ -473,18 +474,14 @@ export class LiveNewsPanel extends Panel {
       return;
     }
 
-    const iframe = document.createElement('iframe');
-    iframe.className = 'live-news-embed-frame';
-    iframe.src = embedUrl;
-    iframe.title = `${this.activeChannel.name} live feed`;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = '0';
-    iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-    iframe.allowFullscreen = true;
-    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
-    iframe.setAttribute('loading', 'eager');
+    // Sizing (100% + border:0) comes from the `.live-news-player iframe` rule.
+    const iframe = embedIframe({
+      className: 'live-news-embed-frame',
+      src: embedUrl,
+      title: `${this.activeChannel.name} live feed`,
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      loading: 'eager',
+    });
 
     this.playerContainer.appendChild(iframe);
     this.desktopEmbedIframe = iframe;
