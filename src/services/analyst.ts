@@ -15,6 +15,7 @@
 
 import { analystTransport, type AnalystLiveHandlers, type AnalystResponse } from './analyst-transport';
 import { commandManifest, type AppHost } from './app-commands';
+import { telemetry, EVENTS } from '@/bootstrap/telemetry';
 import { fetchWithTimeout } from '@/utils';
 import { getTrafficGlobe } from './cloud-map';
 import { getCloudPulse, getMyBilling } from './cloud-pulse';
@@ -36,12 +37,22 @@ export type { AnalystResponse };
  *  to its default when empty. The command manifest travels with every request.
  *  With `live` handlers the answer STREAMS (SSE) when the transport supports it;
  *  the resolved response is identical either way. */
+// Session-scoped: the first askAnalyst opens the chat funnel (CHAT_STARTED once).
+let chatStarted = false;
+
 export async function askAnalyst(
   messages: AnalystMessage[],
   context: string,
   model?: string,
   live?: AnalystLiveHandlers,
 ): Promise<AnalystResponse> {
+  // AI analyst funnel: the first turn opens a chat, every turn is a message. No
+  // prompt content leaves the app — only the turn count + chosen model.
+  if (!chatStarted) {
+    chatStarted = true;
+    telemetry.capture(EVENTS.CHAT_STARTED, { surface: 'analyst' });
+  }
+  telemetry.capture(EVENTS.CHAT_MESSAGE_SENT, { surface: 'analyst', turns: messages.length, model: model || 'default' });
   const t = analystTransport();
   const req = { messages, context, commands: commandManifest(), model };
   return live && t.askStream ? t.askStream(req, live) : t.ask(req);

@@ -57,6 +57,7 @@ import { CountryBriefPage } from '@/components/CountryBriefPage';
 import { CountryTimeline, type TimelineEvent } from '@/components/CountryTimeline';
 import { escapeHtml } from '@/utils/sanitize';
 import { getUiScale, setUiScale } from '@/utils/ui-scale';
+import { telemetry, EVENTS } from '@/bootstrap/telemetry';
 import type { ParsedMapUrlState } from '@/utils';
 // MapContainer is a TYPE-only import here — its value is loaded via a dynamic
 // import() in mountMap() so the ~2.7 MB mapbox-gl + deck.gl "map" chunk stays
@@ -1136,6 +1137,9 @@ export class App {
 
   public async openCountryBriefByCode(code: string, country: string): Promise<void> {
     if (!this.countryBriefPage) return;
+    // The one funnel every country drill-down passes through (click, deep link,
+    // search, history restore) — the marquee product interaction.
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'country_view', country: code });
     const wasVisible = this.countryBriefPage.isVisible(); // [country-view] push vs replace
     this.map?.setRenderPaused(true);
 
@@ -3321,6 +3325,7 @@ export class App {
 
   private setMapLayerEnabled(key: string, on: boolean): boolean {
     if (!(key in this.mapLayers)) return false;
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'map_layer', layer: key, on });
     const layer = key as keyof MapLayers;
     this.mapLayers[layer] = on;
     saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
@@ -3358,6 +3363,7 @@ export class App {
     const target = setSiteVariantRuntime(variant); // canonicalizes saas/hanzo → cloud
     if (!target) return false; // unknown variant — no-op
     if (target === prev) return true;
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'variant', variant: target });
 
     const cfg = variantConfig(target);
     // Perf probe: the in-place switch must stay cheap (a few ms) — the whole point is
@@ -3628,6 +3634,7 @@ export class App {
       const button = document.getElementById('copyLinkBtn');
       try {
         await this.copyToClipboard(shareUrl);
+        telemetry.capture(EVENTS.FEATURE_USED, { feature: 'share_link' });
         this.setCopyLinkFeedback(button, 'Copied!');
       } catch (error) {
         console.warn('Failed to copy share link:', error);
