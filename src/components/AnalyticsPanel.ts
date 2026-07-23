@@ -9,7 +9,7 @@ import { icon } from '@/utils/icons';
 // Umami-style) across every registered site — top pages / referrers / countries,
 // live visitors, pageviews. Admin-only (server enforces 403). Honest empty state
 // when the analytics product has no data yet.
-export class CloudAnalyticsPanel extends Panel {
+export class AnalyticsPanel extends Panel {
   private data: CloudAnalytics | null = null;
   private loaded = false;
   private timer: ReturnType<typeof setInterval> | null = null;

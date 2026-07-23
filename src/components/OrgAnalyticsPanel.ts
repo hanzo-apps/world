@@ -7,7 +7,7 @@ import {
   type AnalyticsOverview,
   type AnalyticsTimeseries,
   type AnalyticsTop,
-} from '@/services/org-analytics';
+} from '@/services/analytics';
 import { escapeHtml } from '@/utils/sanitize';
 import { fmtCompact, fmtInt, fmtPct, fmtUsd, statTile, sparkline, shareBar } from '@/utils/cloud-format';
 

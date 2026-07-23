@@ -22,6 +22,7 @@ import {
   MONITOR_COLORS,
 } from '@/config';
 import { BETA_MODE } from '@/config/beta';
+import { track } from '@/bootstrap/analytics';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchChinaMacro, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { fetchCountryMarkets } from '@/services/polymarket';
 import { mlWorker } from '@/services/ml-worker';
@@ -130,7 +131,7 @@ import {
   ClusterPanel,
   QueuePanel,
   HanzoStatusPanel,
-  CloudAnalyticsPanel,
+  AnalyticsPanel,
   LlmUsagePanel,
   EnsoBenchmarkPanel,
   BlockchainPanel,
@@ -2542,7 +2543,7 @@ export class App {
       ['cloud-clusters', 'Clusters & Nodes', () => new ClusterPanel()],
       ['cloud-queue', 'GPU Queue', () => new QueuePanel()],
       ['llm-usage', 'LLM observability', () => new LlmUsagePanel()],
-      ['cloud-analytics', 'Web analytics', () => new CloudAnalyticsPanel()],
+      ['cloud-analytics', 'Web analytics', () => new AnalyticsPanel()],
       ['enso-benchmarks', 'Enso benchmarks', () => new EnsoBenchmarkPanel()],
     ];
 
@@ -2895,6 +2896,8 @@ export class App {
     const target = setSiteVariantRuntime(variant); // canonicalizes saas/hanzo → cloud
     if (!target) return false; // unknown variant — no-op
     if (target === prev) return true;
+
+    track('variant_view', { variant: target });
 
     const cfg = variantConfig(target);
     // Perf probe: the in-place switch must stay cheap (a few ms) — the whole point is

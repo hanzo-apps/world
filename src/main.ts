@@ -1,6 +1,7 @@
 import './styles/main.css';
 import { App } from './App';
 import type { EarlyError } from './bootstrap/sentry';
+import { initAnalytics, initGtm } from './bootstrap/analytics';
 
 // Telemetry (Sentry — ~460 KB raw / ~130 KB gzip) is code-split out of the entry
 // chunk. On a low-end laptop every eager KB is main-thread parse/compile time
@@ -28,7 +29,11 @@ const whenIdle = (cb: () => void): void => {
   else setTimeout(cb, 1200);
 };
 
-// After first paint, load Sentry off the critical path and replay any buffered errors.
+// After first paint, install telemetry off the critical path: Sentry (heavy, so
+// code-split and dynamically imported here, replaying any buffered errors) and
+// product analytics (tiny — track() is used synchronously by App so it lives in
+// the main chunk; only its script-injecting init is deferred). Both are env-gated
+// no-ops until their IDs are provisioned, and best-effort so they never break boot.
 whenIdle(() => {
   import('./bootstrap/sentry').then(({ initSentry }) => {
     initSentry(earlyErrors);
@@ -36,6 +41,7 @@ whenIdle(() => {
     window.removeEventListener('unhandledrejection', bufferError);
     earlyErrors.length = 0;
   }).catch(() => { /* telemetry is best-effort — never break boot */ });
+  try { initAnalytics(); initGtm(); } catch { /* telemetry is best-effort — never break boot */ }
 });
 
 import { debugInjectTestEvents, debugGetCells, getCellCount } from '@/services/geo-convergence';
