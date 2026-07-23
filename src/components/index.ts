@@ -78,7 +78,7 @@ export { CloudServicesPanel } from './CloudServicesPanel';
 export { ClusterPanel } from './ClusterPanel';
 export { QueuePanel } from './QueuePanel';
 export { HanzoStatusPanel } from './HanzoStatusPanel';
-export { CloudAnalyticsPanel } from './CloudAnalyticsPanel';
+export { AnalyticsPanel } from './AnalyticsPanel';
 export { LlmUsagePanel } from './LlmUsagePanel';
 export { EnsoBenchmarkPanel } from './EnsoBenchmarkPanel';
 export { BlockchainPanel } from './BlockchainPanel';
