@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { makeActivatable } from '@/utils/a11y';
 import type { UnhcrSummary, CountryDisplacement } from '@/types';
 import { formatPopulation } from '@/services/unhcr';
 import { t } from '@/services/i18n';
@@ -148,10 +149,10 @@ export class DisplacementPanel extends Panel {
       </style>
     `);
 
-    this.content.querySelectorAll('.disp-row').forEach(el => {
-      el.addEventListener('click', () => {
-        const lat = Number((el as HTMLElement).dataset.lat);
-        const lon = Number((el as HTMLElement).dataset.lon);
+    this.content.querySelectorAll<HTMLElement>('.disp-row').forEach(el => {
+      makeActivatable(el, () => {
+        const lat = Number(el.dataset.lat);
+        const lon = Number(el.dataset.lon);
         if (Number.isFinite(lat) && Number.isFinite(lon)) this.onCountryClick?.(lat, lon);
       });
     });

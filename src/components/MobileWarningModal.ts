@@ -1,12 +1,14 @@
 import { t } from '@/services/i18n';
 import { isMobileDevice } from '@/utils';
+import { BaseModal } from './BaseModal';
 
 const STORAGE_KEY = 'mobile-warning-dismissed';
 
-export class MobileWarningModal {
+export class MobileWarningModal extends BaseModal {
   private element: HTMLElement;
 
   constructor() {
+    super();
     this.element = document.createElement('div');
     this.element.className = 'mobile-warning-overlay';
     this.element.innerHTML = `
@@ -35,29 +37,31 @@ export class MobileWarningModal {
 
   private setupEventListeners(): void {
     this.element.querySelector('.mobile-warning-btn')?.addEventListener('click', () => {
-      this.dismiss();
+      this.hide();
     });
-
-    this.element.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('mobile-warning-overlay')) {
-        this.dismiss();
-      }
-    });
-  }
-
-  private dismiss(): void {
-    const checkbox = this.element.querySelector('#mobileWarningRemember') as HTMLInputElement;
-    if (checkbox?.checked) {
-      localStorage.setItem(STORAGE_KEY, 'true');
-    }
-    this.hide();
   }
 
   public show(): void {
-    this.element.classList.add('active');
+    this.open();
   }
 
   public hide(): void {
+    this.close();
+  }
+
+  protected mountOverlay(): HTMLElement {
+    this.element.classList.add('active');
+    return this.element;
+  }
+
+  // Persist the "don't show again" choice on any close (button, backdrop, or
+  // Escape) — the checkbox reflects the user's intent regardless of how they
+  // dismissed the modal.
+  protected unmountOverlay(): void {
+    const checkbox = this.element.querySelector('#mobileWarningRemember') as HTMLInputElement | null;
+    if (checkbox?.checked) {
+      localStorage.setItem(STORAGE_KEY, 'true');
+    }
     this.element.classList.remove('active');
   }
 

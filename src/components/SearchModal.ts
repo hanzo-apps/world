@@ -1,5 +1,6 @@
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
+import { BaseModal } from './BaseModal';
 
 export type SearchResultType = 'country' | 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator' | 'exchange' | 'financialcenter' | 'centralbank' | 'commodityhub';
 
@@ -25,9 +26,8 @@ interface SearchModalOptions {
   hint?: string;
 }
 
-export class SearchModal {
+export class SearchModal extends BaseModal {
   private container: HTMLElement;
-  private overlay: HTMLElement | null = null;
   private input: HTMLInputElement | null = null;
   private resultsList: HTMLElement | null = null;
   private sources: SearchableSource[] = [];
@@ -39,6 +39,7 @@ export class SearchModal {
   private hint: string;
 
   constructor(container: HTMLElement, options?: SearchModalOptions) {
+    super();
     this.container = container;
     this.placeholder = options?.placeholder || t('modals.search.placeholder');
     this.hint = options?.hint || t('modals.search.hint');
@@ -59,9 +60,10 @@ export class SearchModal {
   }
 
   public open(prefill?: string): void {
-    if (this.overlay) return;
-    this.createModal();
-    this.input?.focus();
+    if (this.isOpen()) return;
+    // BaseModal.open() mounts the overlay (createModal), traps focus onto the
+    // input (first focusable) and wires Escape / backdrop close.
+    super.open();
     // Optional prefilled query (used by the AI analyst's `search` command): seed
     // the input and run the same search path a keystroke would.
     if (prefill && prefill.trim() && this.input) {
@@ -72,25 +74,23 @@ export class SearchModal {
     this.showRecentOrEmpty();
   }
 
-  public close(): void {
-    if (this.overlay) {
-      this.overlay.remove();
-      this.overlay = null;
-      this.input = null;
-      this.resultsList = null;
-      this.results = [];
-      this.selectedIndex = 0;
-    }
-  }
-
   public isOpen(): boolean {
     return this.overlay !== null;
   }
 
-  private createModal(): void {
-    this.overlay = document.createElement('div');
-    this.overlay.className = 'search-overlay';
-    this.overlay.innerHTML = `
+  protected unmountOverlay(): void {
+    this.overlay?.remove();
+    this.input = null;
+    this.resultsList = null;
+    this.results = [];
+    this.selectedIndex = 0;
+  }
+
+  protected mountOverlay(): HTMLElement {
+    const overlay = document.createElement('div');
+    overlay.className = 'search-overlay';
+    this.overlay = overlay;
+    overlay.innerHTML = `
       <div class="search-modal">
         <div class="search-header">
           <span class="search-icon">⌘</span>
@@ -106,17 +106,14 @@ export class SearchModal {
       </div>
     `;
 
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay) this.close();
-    });
-
-    this.input = this.overlay.querySelector('.search-input');
-    this.resultsList = this.overlay.querySelector('.search-results');
+    this.input = overlay.querySelector('.search-input');
+    this.resultsList = overlay.querySelector('.search-results');
 
     this.input?.addEventListener('input', () => this.handleSearch());
     this.input?.addEventListener('keydown', (e) => this.handleKeydown(e));
 
-    this.container.appendChild(this.overlay);
+    this.container.appendChild(overlay);
+    return overlay;
   }
 
   private handleSearch(): void {
@@ -194,6 +191,7 @@ export class SearchModal {
       const item = document.createElement('div');
       item.className = `search-result-item recent${i === this.selectedIndex ? ' selected' : ''}`;
       item.dataset.recent = term;
+      item.setAttribute('role', 'button');
 
       const icon = document.createElement('span');
       icon.className = 'search-result-icon';
@@ -268,7 +266,7 @@ export class SearchModal {
     };
 
     this.resultsList.innerHTML = this.results.map((result, i) => `
-      <div class="search-result-item ${i === this.selectedIndex ? 'selected' : ''}" data-index="${i}">
+      <div class="search-result-item ${i === this.selectedIndex ? 'selected' : ''}" data-index="${i}" role="button">
         <span class="search-result-icon">${icons[result.type]}</span>
         <div class="search-result-content">
           <div class="search-result-title">${this.highlightMatch(result.title)}</div>
@@ -310,10 +308,7 @@ export class SearchModal {
         e.preventDefault();
         this.selectResult(this.selectedIndex);
         break;
-      case 'Escape':
-        e.preventDefault();
-        this.close();
-        break;
+      // Escape (and backdrop click) are handled by BaseModal.
     }
   }
 

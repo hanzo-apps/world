@@ -4,6 +4,7 @@ import type { MarketData, CryptoData } from '@/types';
 import { formatPrice, formatChange, getChangeClass, getHeatmapClass } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import { sparkline } from '@/utils/market-format';
+import { makeContextMenuActivatable } from '@/utils/a11y';
 
 function miniSparkline(data: number[] | undefined, change: number | null, w = 50, h = 16): string {
   const color = change != null && change >= 0 ? 'var(--green)' : 'var(--red)';
@@ -42,6 +43,7 @@ export class MarketPanel extends Panel {
       .join('');
 
     this.setContent(html);
+    this.content.querySelectorAll<HTMLElement>('.market-item').forEach(makeContextMenuActivatable);
   }
 }
 
@@ -106,5 +108,6 @@ export class CryptoPanel extends Panel {
       .join('');
 
     this.setContent(html);
+    this.content.querySelectorAll<HTMLElement>('.market-item').forEach(makeContextMenuActivatable);
   }
 }

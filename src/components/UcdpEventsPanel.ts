@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { makeActivatable } from '@/utils/a11y';
 import type { UcdpGeoEvent, UcdpEventType } from '@/types';
 import { t } from '@/services/i18n';
 
@@ -133,10 +134,10 @@ export class UcdpEventsPanel extends Panel {
       </style>
     `);
 
-    this.content.querySelectorAll('.ucdp-row').forEach(el => {
-      el.addEventListener('click', () => {
-        const lat = Number((el as HTMLElement).dataset.lat);
-        const lon = Number((el as HTMLElement).dataset.lon);
+    this.content.querySelectorAll<HTMLElement>('.ucdp-row').forEach(el => {
+      makeActivatable(el, () => {
+        const lat = Number(el.dataset.lat);
+        const lon = Number(el.dataset.lon);
         if (Number.isFinite(lat) && Number.isFinite(lon)) this.onEventClick?.(lat, lon);
       });
     });

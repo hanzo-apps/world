@@ -8,6 +8,7 @@ import type {
   GulfInvestmentStatus,
 } from '@/types';
 import { escapeHtml } from '@/utils/sanitize';
+import { makeActivatable } from '@/utils/a11y';
 import { t } from '@/services/i18n';
 
 interface InvestmentFilters {
@@ -218,7 +219,7 @@ export class InvestmentsPanel extends Panel {
 
     // Row click → fly to map
     content.querySelectorAll<HTMLElement>('.fdi-row').forEach(row => {
-      row.addEventListener('click', () => {
+      makeActivatable(row, () => {
         const inv = GULF_INVESTMENTS.find(i => i.id === row.dataset.id);
         if (inv && this.onInvestmentClick) {
           this.onInvestmentClick(inv);

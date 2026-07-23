@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { escapeHtml, sanitizeUrl } from '../utils/sanitize';
+import { embedIframe } from '../utils/embed';
 import { watchQueue, type QueueItem } from '../services/watch-queue';
 
 // WatchQueuePanel — the view over the one WatchQueue. It plays the current
@@ -74,8 +75,8 @@ export class WatchQueuePanel extends Panel {
     if (item.kind === 'video') {
       const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.ref)}`
         + `?autoplay=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3`;
-      return `<iframe class="wq-frame" src="${src}" title="${escapeHtml(item.title)}" `
-        + `frameborder="0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+      // .outerHTML serialization escapes the title attribute for us.
+      return embedIframe({ className: 'wq-frame', src, title: item.title }).outerHTML;
     }
     if (item.kind === 'image') {
       const url = sanitizeUrl(item.ref);
