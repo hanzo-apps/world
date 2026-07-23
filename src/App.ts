@@ -94,7 +94,7 @@ import {
   TechEventsPanel,
   ServiceStatusPanel,
   RuntimeConfigPanel,
-  InsightsPanel,
+  BriefPanel,
   TechReadinessPanel,
   MacroSignalsPanel,
   RotationScannerPanel,
@@ -121,7 +121,7 @@ import {
   MyUsagePanel,
   LiveActivityPanel,
   OrgAnalyticsPanel,
-  OrgInsightsPanel,
+  InsightsPanel,
   CloudServicesPanel,
   ClusterPanel,
   QueuePanel,
@@ -1793,7 +1793,7 @@ export class App {
     this.panels['trader-desk'] = new TraderDeskPanel();
 
     // AI Insights Panel (desktop only - hides itself on mobile)
-    const insightsPanel = new InsightsPanel();
+    const insightsPanel = new BriefPanel();
     this.panels['insights'] = insightsPanel;
 
     // AI Analyst — chat with live data + agentic control surface (all variants)
@@ -1956,7 +1956,7 @@ export class App {
       // Per-org event-platform cards — the caller's own analytics + product
       // insights (api.hanzo.ai /v1/analytics + /v1/insights, org-scoped by bearer).
       add('org-analytics', () => new OrgAnalyticsPanel());
-      add('org-insights', () => new OrgInsightsPanel());
+      add('org-insights', () => new InsightsPanel());
       add('my-usage', () => new MyUsagePanel());
       // Full Hanzo Cloud status page, embedded from status.hanzo.ai (public — NOT admin-gated).
       add('hanzo-status', () => new HanzoStatusPanel());
@@ -3693,7 +3693,7 @@ export class App {
       {
         // Clusters from either worker feed the panel; never leave it on the
         // boot spinner when clustering yields nothing.
-        const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+        const insightsPanel = this.panels['insights'] as BriefPanel | undefined;
         if (this.latestClusters.length > 0) {
           insightsPanel?.updateInsights(this.latestClusters);
         } else {
@@ -4372,7 +4372,7 @@ export class App {
       this.map?.updateMilitaryForEscalation(flights, vessels);
       // Fetch cached postures for banner (posture panel fetches its own data)
       this.loadCachedPosturesForBanner();
-      const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+      const insightsPanel = this.panels['insights'] as BriefPanel | undefined;
       insightsPanel?.setMilitaryFlights(flights);
       const hasData = flights.length > 0 || vessels.length > 0;
       this.map?.setLayerReady('military', hasData);
@@ -4432,7 +4432,7 @@ export class App {
 
       // Fetch cached postures for banner (posture panel fetches its own data)
       this.loadCachedPosturesForBanner();
-      const insightsPanel = this.panels['insights'] as InsightsPanel | undefined;
+      const insightsPanel = this.panels['insights'] as BriefPanel | undefined;
       insightsPanel?.setMilitaryFlights(flightData.flights);
 
       const hasData = flightData.flights.length > 0 || vesselData.vessels.length > 0;
