@@ -19,6 +19,9 @@ images:
     # env=prod) by hanzoai/ci — the key name IS the build-arg. Never in git.
     build_secrets:
       - VITE_MAPBOX_TOKEN
+      - VITE_SENTRY_DSN
+      - VITE_ANALYTICS_WEBSITE_ID
+      - VITE_GTM_ID
 
 # Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
 # on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
