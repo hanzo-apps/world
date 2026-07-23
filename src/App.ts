@@ -21,7 +21,7 @@ import {
   isLuxFundHost,
   MONITOR_COLORS,
 } from '@/config';
-import { track } from '@/bootstrap/analytics';
+import { telemetry, EVENTS } from '@/bootstrap/telemetry';
 import { fetchCategoryFeeds, getFeedFailures, fetchMultipleStocks, fetchCrypto, fetchPredictions, fetchEarthquakes, fetchWeatherAlerts, fetchFredData, fetchInternetOutages, isOutagesConfigured, fetchAisSignals, initAisStream, getAisStatus, disconnectAisStream, isAisConfigured, fetchCableActivity, fetchProtestEvents, getProtestStatus, fetchFlightDelays, fetchMilitaryFlights, fetchMilitaryVessels, initMilitaryVesselStream, isMilitaryVesselTrackingConfigured, initDB, updateBaseline, calculateDeviation, addToSignalHistory, saveSnapshot, cleanOldSnapshots, analysisWorker, fetchPizzIntStatus, fetchGdeltTensions, fetchNaturalEvents, fetchRecentAwards, fetchOilAnalytics, fetchChinaMacro, fetchCyberThreats, drainTrendingSignals } from '@/services';
 import { mlWorker } from '@/services/ml-worker';
 import { attachPanelDrag, attachPanelResize, attachPanelColResize } from '@/services/panel-drag';
@@ -2371,6 +2371,7 @@ export class App {
 
   private setMapLayerEnabled(key: string, on: boolean): boolean {
     if (!(key in this.mapLayers)) return false;
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'map_layer', layer: key, on });
     const layer = key as keyof MapLayers;
     this.mapLayers[layer] = on;
     saveToStorage(STORAGE_KEYS.mapLayers, this.mapLayers);
@@ -2409,7 +2410,7 @@ export class App {
     if (!target) return false; // unknown variant — no-op
     if (target === prev) return true;
 
-    track('variant_view', { variant: target });
+    telemetry.capture(EVENTS.FEATURE_USED, { feature: 'variant', variant: target });
 
     const cfg = variantConfig(target);
     // Perf probe: the in-place switch must stay cheap (a few ms) — the whole point is
@@ -2680,6 +2681,7 @@ export class App {
       const button = document.getElementById('copyLinkBtn');
       try {
         await this.copyToClipboard(shareUrl);
+        telemetry.capture(EVENTS.FEATURE_USED, { feature: 'share_link' });
         this.setCopyLinkFeedback(button, 'Copied!');
       } catch (error) {
         console.warn('Failed to copy share link:', error);

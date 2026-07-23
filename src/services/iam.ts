@@ -218,6 +218,17 @@ export function isAuthenticated(): boolean {
   return !!localStorage.getItem(K.access);
 }
 
+/** The current access token, read synchronously (no refresh). undefined when
+ *  signed out. For callers that prove tenancy best-effort — a possibly-stale
+ *  token is fine (telemetry) — not for authoritative API calls (use getToken). */
+export function accessToken(): string | undefined {
+  try {
+    return localStorage.getItem(K.access) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 let cachedUser: IamUser | null = null;
 
 /** Fetch the OIDC userinfo (cached for the session). null if signed out. */
