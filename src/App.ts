@@ -148,8 +148,9 @@ import { INTEL_HOTSPOTS, CONFLICT_ZONES } from '@/config/geo';
 import { isDesktopRuntime, canConfigureKeys } from '@/services/runtime';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { getCountryAtCoordinates, hasCountryGeometry, isCoordinateInCountry, preloadCountryGeometry } from '@/services/country-geometry';
-import { initI18n, t, changeLanguage, getCurrentLanguage, LANGUAGES } from '@/services/i18n';
+import { initI18n, t, changeLanguage, LANGUAGES } from '@/services/i18n';
 import { SearchController } from '@/controllers/SearchController';
+import { AnalystCommandHost } from '@/controllers/AnalystCommandHost';
 
 import type { PredictionMarket, MarketData, ClusteredEvent } from '@/types';
 
@@ -210,6 +211,7 @@ export class App {
   private analystOrgs: Array<{ id: string; name: string }> = [];
   private adminCloudMounted = false;
   private search!: SearchController;
+  private analystCommandHost!: AnalystCommandHost;
   private pizzintIndicator: PizzIntIndicator | null = null;
   private latestPredictions: PredictionMarket[] = [];
   private latestMarkets: MarketData[] = [];
@@ -374,6 +376,41 @@ export class App {
       getLatestPredictions: () => this.latestPredictions,
       getLatestMarkets: () => this.latestMarkets,
       openCountryBriefByCode: (code, name) => { void this.openCountryBriefByCode(code, name); },
+    });
+
+    this.analystCommandHost = new AnalystCommandHost({
+      getTimeRange: () => this.currentTimeRange,
+      getMap: () => this.map,
+      getImmersive: () => this.immersive,
+      getLayoutMode: () => this.gridApi().getLayoutMode(),
+      getMonitors: () => this.monitors,
+      getPanelSettings: () => this.panelSettings,
+      getLocalizedPanelName: (key, fallback) => this.getLocalizedPanelName(key, fallback),
+      isDesktopApp: () => this.isDesktopApp,
+      getMapLayers: () => this.mapLayers,
+      getAnalystOrgs: () => this.analystOrgs,
+      setAnalystOrgs: (orgs) => { this.analystOrgs = orgs; },
+      setPanelEnabled: (key, enabled) => this.setPanelEnabled(key, enabled),
+      movePanelInGrid: (key, opts) => this.movePanelInGrid(key, opts),
+      resizePanelInGrid: (key, span) => this.resizePanelInGrid(key, span),
+      setMapLayerEnabled: (key, on) => this.setMapLayerEnabled(key, on),
+      setMapProjection: (mode) => this.setMapProjection(mode),
+      flyMapTo: (lat, lon, zoom) => this.flyMapTo(lat, lon, zoom),
+      setMapRegion: (region) => this.setMapRegion(region),
+      setGlobalTimeRange: (range) => this.setGlobalTimeRange(range),
+      setSiteVariant: (variant) => this.setSiteVariant(variant),
+      setAppTheme: (theme) => this.setAppTheme(theme),
+      runSearch: (query) => this.runSearch(query),
+      resetPanelLayout: () => this.resetPanelLayout(),
+      queueVideoToWatch: (query) => this.queueVideoToWatch(query),
+      setLayoutModeFromCommand: (mode) => this.setLayoutModeFromCommand(mode),
+      setImmersiveBackgroundFromCommand: (bg) => this.setImmersiveBackgroundFromCommand(bg),
+      setLanguageFromCommand: (code) => this.setLanguageFromCommand(code),
+      addMonitorFromCommand: (keywords) => this.addMonitorFromCommand(keywords),
+      removeMonitorFromCommand: (id) => this.removeMonitorFromCommand(id),
+      addCustomFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
+      removeCustomFeedPanel: (name) => this.removeCustomFeedPanel(name),
+      switchActiveOrg: (org) => this.switchActiveOrg(org),
     });
   }
 
@@ -2638,68 +2675,7 @@ export class App {
   // The narrow port the AI analyst drives. All dashboard mutation stays here in
   // App; the analyst services only see this interface.
   private buildAnalystHost(): AnalystHost {
-    // Prime the org snapshot once (async) so listOrgs()/switch_org have real ids.
-    if (isAuthenticated() && !this.analystOrgs.length) {
-      void listOrgs().then((orgs) => {
-        this.analystOrgs = orgs.map((o) => ({ id: o.name, name: o.displayName || o.name }));
-      });
-    }
-    return {
-      getState: () => ({
-        variant: getSiteVariant(),
-        timeRange: this.currentTimeRange,
-        mapMode: this.map?.getProjectionMode(),
-        region: this.map?.getState().view,
-        theme: getCurrentTheme(),
-        authed: isAuthenticated(),
-        layoutMode: this.immersive?.getState().enabled ? 'immersive' : this.gridApi().getLayoutMode(),
-        immersiveBg: this.immersive?.getState().background,
-        language: getCurrentLanguage(),
-        monitors: this.monitors.map((m) => ({ id: m.id, keywords: m.keywords })),
-        queue: {
-          total: watchQueue.length,
-          unwatched: watchQueue.unwatchedCount(),
-          current: watchQueue.current()?.title,
-        },
-      }),
-      listPanels: () =>
-        Object.entries(this.panelSettings)
-          .filter(([k]) => k !== 'runtime-config' || this.isDesktopApp)
-          .map(([key, cfg]) => ({ key, name: this.getLocalizedPanelName(key, cfg.name), enabled: !!cfg.enabled })),
-      listLayers: () => Object.entries(this.mapLayers).map(([key, on]) => ({ key, on: !!on })),
-      listOrgs: () => this.analystOrgs,
-      isAuthed: () => isAuthenticated(),
-      showPanel: (key) => this.setPanelEnabled(key, true),
-      hidePanel: (key) => this.setPanelEnabled(key, false),
-      movePanel: (key, opts) => this.movePanelInGrid(key, opts),
-      resizePanel: (key, span) => this.resizePanelInGrid(key, span),
-      toggleLayer: (key, on) => this.setMapLayerEnabled(key, on),
-      setMapMode: (mode) => this.setMapProjection(mode),
-      flyTo: (lat, lon, zoom) => this.flyMapTo(lat, lon, zoom),
-      setRegion: (region) => this.setMapRegion(region),
-      setTimeRange: (range) => this.setGlobalTimeRange(range),
-      setVariant: (variant) => this.setSiteVariant(variant),
-      setTheme: (theme) => this.setAppTheme(theme),
-      search: (query) => this.runSearch(query),
-      resetLayout: () => this.resetPanelLayout(),
-      queueVideo: (query) => this.queueVideoToWatch(query),
-      setLayoutMode: (mode) => this.setLayoutModeFromCommand(mode),
-      setImmersiveBackground: (bg) => this.setImmersiveBackgroundFromCommand(bg),
-      setLanguage: (code) => this.setLanguageFromCommand(code),
-      addMonitor: (keywords) => this.addMonitorFromCommand(keywords),
-      removeMonitor: (id) => this.removeMonitorFromCommand(id),
-      queueNext: () => {
-        if (!watchQueue.length) return { ok: false };
-        return { ok: true, title: watchQueue.next()?.title };
-      },
-      queuePrev: () => {
-        if (!watchQueue.length) return { ok: false };
-        return { ok: true, title: watchQueue.prev()?.title };
-      },
-      addFeedPanel: (name, url) => this.addCustomFeedPanel(name, url),
-      removeCustomPanel: (name) => this.removeCustomFeedPanel(name),
-      switchOrg: (org) => this.switchActiveOrg(org),
-    };
+    return this.analystCommandHost.build();
   }
 
   // ── New analyst capabilities (drive existing public APIs; no new plumbing) ──
