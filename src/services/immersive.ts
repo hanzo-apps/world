@@ -13,6 +13,7 @@
 import { getDefaultLiveChannel } from '@/config/live-channels';
 import { fetchLiveVideoId } from '@/services/live-news';
 import { getSiteVariant } from '@/config/variant';
+import { embedIframe } from '@/utils/embed';
 
 export type ImmersiveBackground = 'map' | 'video';
 
@@ -145,8 +146,7 @@ export class ImmersiveController {
       const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`
         + `?autoplay=1&mute=1&controls=0&loop=1&playlist=${encodeURIComponent(videoId)}`
         + `&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3`;
-      el.innerHTML = `<iframe class="immersive-video-frame" src="${src}" title="${ch.name} live" `
-        + `frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+      el.replaceChildren(embedIframe({ className: 'immersive-video-frame', src, title: `${ch.name} live` }));
     };
     // Show the fallback immediately, then upgrade to the detected live stream if the
     // backend resolves one — same source of truth the live-news panel uses.

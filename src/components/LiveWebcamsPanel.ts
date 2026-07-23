@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
+import { embedIframe } from '@/utils/embed';
 
 type WebcamRegion = 'middle-east' | 'europe' | 'asia' | 'americas';
 
@@ -163,16 +164,13 @@ export class LiveWebcamsPanel extends Panel {
   }
 
   private createIframe(feed: WebcamFeed): HTMLIFrameElement {
-    const iframe = document.createElement('iframe');
-    iframe.className = 'webcam-iframe';
-    iframe.src = this.buildEmbedUrl(feed.fallbackVideoId);
-    iframe.title = `${feed.city} live webcam`;
-    iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
-    iframe.allowFullscreen = true;
-    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-    iframe.setAttribute('loading', 'lazy');
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
-    return iframe;
+    return embedIframe({
+      className: 'webcam-iframe',
+      src: this.buildEmbedUrl(feed.fallbackVideoId),
+      title: `${feed.city} live webcam`,
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      loading: 'lazy',
+    });
   }
 
   private render(): void {

@@ -5,8 +5,9 @@ import { escapeHtml } from '@/utils/sanitize';
 import { getCSSColor } from '@/utils';
 import { getSignalContext, type SignalType } from '@/utils/analysis-constants';
 import { t } from '@/services/i18n';
+import { BaseModal } from './BaseModal';
 
-export class SignalModal {
+export class SignalModal extends BaseModal {
   private element: HTMLElement;
   private currentSignals: CorrelationSignal[] = [];
   private audioEnabled = true;
@@ -14,6 +15,7 @@ export class SignalModal {
   private onLocationClick?: (lat: number, lon: number) => void;
 
   constructor() {
+    super();
     this.element = document.createElement('div');
     this.element.className = 'signal-modal-overlay';
     this.element.innerHTML = `
@@ -50,12 +52,6 @@ export class SignalModal {
 
     this.element.querySelector('.signal-dismiss-btn')?.addEventListener('click', () => {
       this.hide();
-    });
-
-    this.element.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('signal-modal-overlay')) {
-        this.hide();
-      }
     });
 
     const checkbox = this.element.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -99,14 +95,14 @@ export class SignalModal {
 
     this.currentSignals = [...signals, ...this.currentSignals].slice(0, 50);
     this.renderSignals();
-    this.element.classList.add('active');
+    this.open();
     this.playSound();
   }
 
   public showSignal(signal: CorrelationSignal): void {
     this.currentSignals = [signal];
     this.renderSignals();
-    this.element.classList.add('active');
+    this.open();
   }
 
   public showAlert(alert: UnifiedAlert): void {
@@ -212,7 +208,7 @@ export class SignalModal {
       </div>
     `;
 
-    this.element.classList.add('active');
+    this.open();
   }
 
   public playSound(): void {
@@ -223,6 +219,15 @@ export class SignalModal {
   }
 
   public hide(): void {
+    this.close();
+  }
+
+  protected mountOverlay(): HTMLElement {
+    this.element.classList.add('active');
+    return this.element;
+  }
+
+  protected unmountOverlay(): void {
     this.element.classList.remove('active');
   }
 
