@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { variantConfig } from '@/config';
 import type { MapContainer as MapContainerType } from '@/components/MapContainer';
+import { publishGlobeInstance } from '../hooks/globe-instance';
 
 /**
  * GlobeIsland — the deck.gl globe as a React island.
@@ -40,12 +41,16 @@ export function GlobeIsland({ variant }: { variant: string }): React.JSX.Element
         timeRange: '7d',
         mode: '3d',
       });
+      // Publish the live engine to the React globe registry so sibling surfaces
+      // (country intel drill-down, …) can drive it imperatively — the one seam.
+      publishGlobeInstance(mapRef.current);
     })();
 
     return () => {
       cancelled = true;
       mapRef.current?.destroy();
       mapRef.current = null;
+      publishGlobeInstance(null);
     };
     // Mount-only: the variant-driven layer swap is handled by the effect below so
     // switching a tab never tears down / cold-starts the WebGL context.
