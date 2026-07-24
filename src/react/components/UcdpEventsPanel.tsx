@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { YStack, XStack, SizableText } from '@hanzo/gui';
-import { fetchUcdpEvents } from '@/services/ucdp-events';
+import { fetchUcdpEvents, deduplicateAgainstAcled } from '@/services/ucdp-events';
+import { fetchProtestEvents } from '@/services/protests';
 import { t } from '@/services/i18n';
 import type { UcdpGeoEvent, UcdpEventType } from '@/types';
 import { Panel, PanelLiveDot, type PanelState } from './Panel';
@@ -45,10 +46,25 @@ export function UcdpEventsPanel({ slot }: { slot: PanelSlot }): React.JSX.Elemen
 
     const load = async (): Promise<void> => {
       try {
-        const result = await fetchUcdpEvents();
+        // Fetch UCDP alongside the protest (ACLED/GDELT) set and dedup against it —
+        // mirrors App.ts:4077-4081: many UCDP events are the SAME real-world
+        // incident as an ACLED/protest event already counted, so without this they
+        // double-count. Protests are fetched defensively (a protest-feed failure
+        // must not blank the UCDP panel — the vanilla protestsTask degrades to []).
+        const [result, protestData] = await Promise.all([
+          fetchUcdpEvents(),
+          fetchProtestEvents().catch(() => null),
+        ]);
         if (cancelled) return;
-        setEvents(result.data);
-        setState(result.data.length === 0 ? 'empty' : 'ready');
+        const acledEvents = (protestData?.events ?? []).map((e) => ({
+          latitude: e.lat,
+          longitude: e.lon,
+          event_date: e.time.toISOString(),
+          fatalities: e.fatalities ?? 0,
+        }));
+        const events = deduplicateAgainstAcled(result.data, acledEvents);
+        setEvents(events);
+        setState(events.length === 0 ? 'empty' : 'ready');
       } catch {
         if (!cancelled) setState('error');
       }

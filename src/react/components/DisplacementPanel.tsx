@@ -11,6 +11,7 @@ import type { UnhcrSummary, CountryDisplacement } from '@/types';
 import { Panel, PanelLiveDot, type PanelState } from './Panel';
 import type { PanelTab } from '@/components/Panel';
 import type { PanelSlot } from './PanelGrid';
+import { getGlobeInstance } from '../hooks/globe-instance';
 
 /**
  * DisplacementPanel — the vanilla `DisplacementPanel`
@@ -29,8 +30,11 @@ import type { PanelSlot } from './PanelGrid';
  * longhand primitives. When the service returns `ok:false` (upstream failure /
  * breaker open) it maps to an honest error/empty state, never fabricated data.
  *
- * View-only port: the vanilla panel's optional row → globe fly-to handler
- * (`setCountryClickHandler`) is a globe interaction, not data, and is omitted.
+ * The vanilla panel's optional row → globe fly-to handler (`setCountryClickHandler`)
+ * is a per-row interaction, not data, and is omitted. The displacement-flow ARC
+ * layer, however, IS a data feed: when the displacement map layer is on, the fetched
+ * `topFlows` are pushed to the globe (mirrors App.ts:4103-4104) via the globe-instance
+ * registry, so the arc layer lights up from this panel.
  */
 
 const TABS: readonly PanelTab[] = [
@@ -58,6 +62,16 @@ export function DisplacementPanel({ slot }: { slot: PanelSlot }): React.JSX.Elem
           return;
         }
         setData(result.data);
+        // Feed the globe's displacement-flow arc layer when that map layer is on —
+        // mirrors App.ts:4103-4104 (`if (mapLayers.displacement && data.topFlows)
+        // map.setDisplacementFlows(data.topFlows)`). The live map state is the one
+        // source of truth for the layer's on/off; default-off across variants, so
+        // this no-ops until the user enables the Displacement layer, exactly as
+        // vanilla. Non-fatal: a missing globe just means no arcs this cycle.
+        const map = getGlobeInstance();
+        if (map?.getState().layers.displacement && result.data.topFlows) {
+          map.setDisplacementFlows(result.data.topFlows);
+        }
         setState(result.data.countries.length === 0 ? 'empty' : 'ready');
       } catch {
         if (!cancelled) setState('error');
