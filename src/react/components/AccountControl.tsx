@@ -9,14 +9,14 @@ import { XStack, SizableText } from '@hanzo/gui';
 export function AccountControl(): React.JSX.Element {
   return (
     <XStack
-      tag="button"
-      focusable
+      role="button"
+      tabIndex={0}
       cursor="pointer"
       width={32}
       height={32}
       borderRadius={999}
-      ai="center"
-      jc="center"
+      alignItems="center"
+      justifyContent="center"
       borderWidth={1}
       borderColor="rgba(255,255,255,0.2)"
       backgroundColor="rgba(255,255,255,0.06)"
