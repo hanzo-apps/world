@@ -277,6 +277,28 @@ var feedCategories = map[string][]string{
 // feedCategoryNames is the ordered enum for the feeds tool schema (deterministic).
 var feedCategoryNames = []string{"world", "tech", "markets", "security", "ai"}
 
+// FeedCategories returns a copy of the curated category→feed-URL map so
+// same-binary callers (the AI-plane /v1/world/{news,feeds} handlers) read the
+// EXACT curated list the feeds tool exposes — one source of truth, no second
+// feed table. Copied so a caller can never mutate the registry.
+func FeedCategories() map[string][]string {
+	out := make(map[string][]string, len(feedCategories))
+	for k, v := range feedCategories {
+		cp := make([]string, len(v))
+		copy(cp, v)
+		out[k] = cp
+	}
+	return out
+}
+
+// FeedCategoryNames returns the ordered category enum (a copy) for the same
+// callers, so the /v1/world/feeds catalog lists categories in registry order.
+func FeedCategoryNames() []string {
+	out := make([]string, len(feedCategoryNames))
+	copy(out, feedCategoryNames)
+	return out
+}
+
 // ── schema + argument helpers ────────────────────────────────────────────────
 
 func objectSchema(required []string, props map[string]any) map[string]any {
