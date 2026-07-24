@@ -473,6 +473,13 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, q eventQue
 		writeError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
+	// The server's global WriteTimeout (60s, cmd/world) would sever this long-lived
+	// stream mid-flight (the gw ingester saw "unexpected EOF" every cycle and had to
+	// reconnect). Clear the per-request deadlines for THIS response only — every other
+	// handler keeps the global timeout.
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+	_ = rc.SetReadDeadline(time.Time{})
 	h := w.Header()
 	h.Set("Content-Type", "application/x-ndjson")
 	h.Set("Cache-Control", "no-store")
