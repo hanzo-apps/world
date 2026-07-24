@@ -23,6 +23,18 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/version", s.handleVersion)
 	mux.HandleFunc("/v1/world/download", s.handleDownload)
 
+	// AI plane — the aggregate + single-domain read surface the world-gw MCP/ZAP
+	// gateway (world-zap) proxies. /events is both the snapshot poll and (?stream=1)
+	// the long-lived NDJSON topic stream; the rest are thin reshapes over the same
+	// producers / sources. All PUBLIC reads (see handlers_events.go, handlers_worldgw.go).
+	mux.HandleFunc("/v1/world/events", s.handleEvents)
+	mux.HandleFunc("/v1/world/conflicts", s.handleConflicts)
+	mux.HandleFunc("/v1/world/infra", s.handleInfra)
+	mux.HandleFunc("/v1/world/vessel", s.handleVessel)
+	mux.HandleFunc("/v1/world/news", s.handleNews)
+	mux.HandleFunc("/v1/world/markets", s.handleMarkets)
+	mux.HandleFunc("/v1/world/feeds", s.handleFeeds)
+
 	// conflict
 	mux.HandleFunc("/v1/world/acled", s.handleACLED)
 	mux.HandleFunc("/v1/world/acled-conflict", s.handleACLEDConflict)
