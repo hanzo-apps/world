@@ -35,6 +35,10 @@ COPY . .
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
 RUN npm run build
+# The @hanzo/gui (Tamagui) React rewrite, built to /app/dist-react as the opt-in
+# canary surface. Served only to sessions that pass ?react (see cmd/world:
+# canaryHandler); the vanilla dist above stays the default.
+RUN npm run build:react
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
 # go 1.26: go.mod requires >= 1.26.4 (github.com/hanzoai/sqlite drop-in). The
@@ -68,6 +72,7 @@ RUN apk add --no-cache ca-certificates tzdata \
   && adduser -D -H -u 10001 world
 COPY --from=gobuild /out/world /usr/local/bin/world
 COPY --from=web /app/dist /srv
+COPY --from=web /app/dist-react /srv-react
 USER world
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/world", "--root=/srv", "--addr=:3000"]
+ENTRYPOINT ["/usr/local/bin/world", "--root=/srv", "--react-root=/srv-react", "--addr=:3000"]
