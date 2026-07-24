@@ -1,0 +1,39 @@
+/*
+ * Brand theming for the React surface. @hanzo/brand's variables.css supplies the
+ * canonical Hanzo token set (monochrome ramp, spacing, radii); world is the
+ * monochrome surface, so the accent collapses to white — one knob, set here.
+ * Imported once by the React entry so both the unified shell (HanzoAppHeader,
+ * which reads --hanzo-* / accent tokens) and our own React islands theme
+ * identically.
+ */
+@import '@hanzo/brand/styles/variables.css';
+
+:root {
+  /* World is monochrome: the accent is white. This is the single brand knob the
+     shell + islands read; everything else inherits the brand ramp above. */
+  --hanzo-accent: #fff;
+  --hanzo-accent-rgb: 255, 255, 255;
+}
+
+/* The React foundation renders full-viewport, dark, no page scroll — the globe is
+   the hero and panels float over it, matching the vanilla surface. */
+html,
+body,
+#react-root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #000;
+  color: #fff;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  overflow: hidden;
+}
+
+#react-root {
+  display: flex;
+  flex-direction: column;
+}
