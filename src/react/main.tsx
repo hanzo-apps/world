@@ -2,6 +2,7 @@ import './theme.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GuiProvider } from '@hanzo/gui';
+import { initI18n } from '@/services/i18n';
 import guiConfig from './gui.config';
 import { App } from './App';
 
@@ -18,10 +19,15 @@ import { App } from './App';
 const host = document.getElementById('react-root');
 if (!host) throw new Error('[world/react] #react-root mount node missing');
 
-createRoot(host).render(
-  <StrictMode>
-    <GuiProvider config={guiConfig} defaultTheme="dark">
-      <App />
-    </GuiProvider>
-  </StrictMode>,
-);
+// Init the SHARED i18n layer before first paint so the panel chassis' default
+// loading / empty / error copy (the same common.* keys the vanilla base uses)
+// resolves to real strings rather than raw keys. Reuse, not re-author.
+void initI18n().finally(() => {
+  createRoot(host).render(
+    <StrictMode>
+      <GuiProvider config={guiConfig} defaultTheme="dark">
+        <App />
+      </GuiProvider>
+    </StrictMode>,
+  );
+});

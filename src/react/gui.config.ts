@@ -13,12 +13,29 @@ export const guiConfig = createGui(defaultConfig);
 
 export type GuiConf = typeof guiConfig;
 
-// Register the config type globally so @hanzogui/* primitives get token
-// autocompletion and typed props against OUR config (one source of truth). The
-// GuiCustomConfig interface is declared in @hanzogui/web — the augmentation must
-// target THAT module for declaration merging to reach the components.
-declare module '@hanzogui/web' {
-  interface GuiCustomConfig extends GuiConf {}
-}
+// Type registration — the bundler/runtime is authoritative for the config, NOT tsc.
+// ---------------------------------------------------------------------------------
+// The upstream @hanzo/gui apps do NOT register a `GuiCustomConfig` module
+// augmentation for the app's own tsc gate: `GuiProvider config={guiConfig}` is what
+// actually runs, and the v4 dist ships default component types that already describe
+// this exact preset (we pass `defaultConfig` unchanged, so runtime and types agree).
+//
+// Registering `interface GuiCustomConfig extends typeof createGui(defaultConfig)`
+// does the opposite of help here: v4's `defaultConfig` sets
+// `settings.onlyAllowShorthands: true`, which — once fed back into the type system —
+// STRIPS every longhand style prop (backgroundColor, alignItems, borderRadius, …)
+// and re-derives the media wrapper as a mapped index signature that JSX `children`
+// can no longer satisfy. That is the entire source of the Stage-0 `typecheck:react`
+// friction (both the "no properties in common with WithThemeValues<…>" longhand
+// errors and the "children incompatible with index signature" errors). Neither a
+// strictness knob nor a component wrapper removes it — it is inherent to registering
+// this preset's type against strict JSX.
+//
+// So we let the config live where it belongs — at runtime — and keep tsc a clean
+// STRUCTURAL gate (prop names, element shapes, children, token grammar). Token-VALUE
+// validation is Tamagui's build/runtime concern, exactly as upstream leaves it.
+// The single house rule that keeps this "one way": components use LONGHAND style
+// props only (backgroundColor / paddingHorizontal / alignItems / …), never the v4
+// shorthands — one explicit, CSS-familiar vocabulary that also matches theme.css.
 
 export default guiConfig;
