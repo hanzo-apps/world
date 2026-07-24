@@ -57,7 +57,11 @@ async function signIn(page: Page): Promise<void> {
 }
 
 async function appReady(page: Page): Promise<void> {
-  await page.goto('/');
+  // Pin the World variant: localhost's DEFAULT is the cloud view (isCloudDefaultHost
+  // includes localhost), where the `markets` panel this spec drives stays hidden —
+  // goto('/') therefore times out on visibility. The command surface under test is
+  // variant-independent; markets is enabled-by-default on `full`.
+  await page.goto('/?variant=full');
   await page.waitForSelector('#panelsGrid', { timeout: 60_000 });
   await page.waitForSelector('[data-panel="markets"]', { timeout: 60_000 });
 }
