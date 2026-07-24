@@ -38,7 +38,7 @@ func writeTree(t *testing.T) string {
 
 func TestStaticGzipAndCache(t *testing.T) {
 	root := writeTree(t)
-	srv := httptest.NewServer(gzipStatic(newSPAHandler(root)))
+	srv := httptest.NewServer(gzipStatic(newSPAHandler(root, "index.html")))
 	defer srv.Close()
 
 	get := func(path, ae string) *http.Response {
@@ -118,6 +118,96 @@ func TestStaticGzipAndCache(t *testing.T) {
 		}
 		if resp.Header.Get("Content-Encoding") != "gzip" {
 			t.Fatalf("index should be gzipped, got %q", resp.Header.Get("Content-Encoding"))
+		}
+	})
+}
+
+// writeReactTree lays out a minimal dist-react (its index is index.react.html).
+func writeReactTree(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "index.react.html"),
+		[]byte("<!doctype html><title>world-react</title>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func TestCanarySurfaceSelection(t *testing.T) {
+	vanilla := writeTree(t)
+	react := writeReactTree(t)
+	h := newCanaryHandler(vanilla, react)
+
+	// A client that does NOT follow redirects and keeps no cookies, so each call
+	// is explicit about what it sends.
+	do := func(target string, cookie *http.Cookie) *http.Response {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Result()
+	}
+
+	t.Run("default is vanilla", func(t *testing.T) {
+		resp := do("/", nil)
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "world</title>") || strings.Contains(string(body), "world-react") {
+			t.Fatalf("default surface should be vanilla, got %q", body)
+		}
+	})
+
+	t.Run("?react sets the cookie and redirects to a clean URL", func(t *testing.T) {
+		resp := do("/?react=1&keep=me", nil)
+		if resp.StatusCode != http.StatusFound {
+			t.Fatalf("status = %d, want 302", resp.StatusCode)
+		}
+		loc := resp.Header.Get("Location")
+		if strings.Contains(loc, "react") || !strings.Contains(loc, "keep=me") {
+			t.Fatalf("Location %q should drop the toggle and keep other query", loc)
+		}
+		var set *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == surfaceCookie {
+				set = c
+			}
+		}
+		if set == nil || set.Value != "react" || set.MaxAge <= 0 {
+			t.Fatalf("expected a sticky %s=react cookie, got %+v", surfaceCookie, set)
+		}
+	})
+
+	t.Run("cookie=react serves the React surface", func(t *testing.T) {
+		resp := do("/", &http.Cookie{Name: surfaceCookie, Value: "react"})
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "world-react") {
+			t.Fatalf("cookie=react should serve React index, got %q", body)
+		}
+	})
+
+	t.Run("?react=0 clears the cookie", func(t *testing.T) {
+		resp := do("/?react=0", &http.Cookie{Name: surfaceCookie, Value: "react"})
+		var cleared bool
+		for _, c := range resp.Cookies() {
+			if c.Name == surfaceCookie && c.MaxAge < 0 {
+				cleared = true
+			}
+		}
+		if !cleared {
+			t.Fatalf("?react=0 should expire the %s cookie", surfaceCookie)
+		}
+	})
+
+	t.Run("no react root → always vanilla, even with the cookie", func(t *testing.T) {
+		vanillaOnly := newCanaryHandler(vanilla, "")
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: surfaceCookie, Value: "react"})
+		rec := httptest.NewRecorder()
+		vanillaOnly.ServeHTTP(rec, req)
+		body, _ := io.ReadAll(rec.Result().Body)
+		if !strings.Contains(string(body), "world</title>") || strings.Contains(string(body), "world-react") {
+			t.Fatalf("with no react root the cookie must be ignored, got %q", body)
 		}
 	})
 }
