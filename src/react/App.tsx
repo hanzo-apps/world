@@ -6,6 +6,46 @@ import { GlobeIsland } from './components/GlobeIsland';
 import { VariantTabs } from './components/VariantTabs';
 import { PanelGrid, type PanelGridItem } from './components/PanelGrid';
 import { MarketsPanel } from './components/MarketsPanel';
+import { AiComputePanel } from './components/AiComputePanel';
+import { CloudOverviewPanel } from './components/CloudOverviewPanel';
+import { CommoditiesPanel } from './components/CommoditiesPanel';
+import { EnsoTrainingPanel } from './components/EnsoTrainingPanel';
+import { FxPanel } from './components/FxPanel';
+import { InsightsPanel } from './components/InsightsPanel';
+import { LiveActivityPanel } from './components/LiveActivityPanel';
+import { LlmUsagePanel } from './components/LlmUsagePanel';
+import { MacroSignalsPanel } from './components/MacroSignalsPanel';
+import { ModelImprovementPanel } from './components/ModelImprovementPanel';
+import { OrgAnalyticsPanel } from './components/OrgAnalyticsPanel';
+import { SentimentPanel } from './components/SentimentPanel';
+import { TraderDeskPanel } from './components/TraderDeskPanel';
+import { YieldsPanel } from './components/YieldsPanel';
+import { DisplacementPanel } from './components/DisplacementPanel';
+import { UcdpEventsPanel } from './components/UcdpEventsPanel';
+import { TechEventsPanel } from './components/TechEventsPanel';
+import { AnalyticsPanel } from './components/AnalyticsPanel';
+import { BlockchainPanel } from './components/BlockchainPanel';
+import { CloudServicesPanel } from './components/CloudServicesPanel';
+import { ClusterPanel } from './components/ClusterPanel';
+import { EnsoBenchmarkPanel } from './components/EnsoBenchmarkPanel';
+import { EnsoFlywheelPanel } from './components/EnsoFlywheelPanel';
+import { EnsoRouterPanel } from './components/EnsoRouterPanel';
+import { ETFFlowsPanel } from './components/ETFFlowsPanel';
+import { FleetPanel } from './components/FleetPanel';
+import { HanzoStatusPanel } from './components/HanzoStatusPanel';
+import { LuxBookPanel } from './components/LuxBookPanel';
+import { ModelUsagePanel } from './components/ModelUsagePanel';
+import { MyUsagePanel } from './components/MyUsagePanel';
+import { QueuePanel } from './components/QueuePanel';
+import { RotationScannerPanel } from './components/RotationScannerPanel';
+import { StablecoinPanel } from './components/StablecoinPanel';
+import { ServiceStatusPanel } from './components/ServiceStatusPanel';
+import { TechReadinessPanel } from './components/TechReadinessPanel';
+import { TrafficGlobePanel } from './components/TrafficGlobePanel';
+import { TradingBubblePanel } from './components/TradingBubblePanel';
+import { StrategicPosturePanel } from './components/StrategicPosturePanel';
+import { CIIPanel } from './components/CIIPanel';
+import { GdeltIntelPanel } from './components/GdeltIntelPanel';
 import { AccountControl } from './components/AccountControl';
 
 /**
@@ -39,7 +79,49 @@ export function App(): React.JSX.Element {
   // The rail's panels. One item today (the wired proof); the bulk Stage-2 ports
   // append here, each rendering through the same chassis + PanelGrid slot.
   const panels = useMemo<PanelGridItem[]>(
-    () => [{ id: 'markets', render: (slot) => <MarketsPanel slot={slot} /> }],
+    () => [
+      { id: 'markets', render: (slot) => <MarketsPanel slot={slot} /> },
+      { id: 'ai-compute', render: (slot) => <AiComputePanel slot={slot} /> },
+      { id: 'cloud-overview', render: (slot) => <CloudOverviewPanel slot={slot} /> },
+      { id: 'commodities', render: (slot) => <CommoditiesPanel slot={slot} /> },
+      { id: 'enso-training', render: (slot) => <EnsoTrainingPanel slot={slot} /> },
+      { id: 'fx', render: (slot) => <FxPanel slot={slot} /> },
+      { id: 'org-insights', render: (slot) => <InsightsPanel slot={slot} /> },
+      { id: 'live-activity', render: (slot) => <LiveActivityPanel slot={slot} /> },
+      { id: 'llm-usage', render: (slot) => <LlmUsagePanel slot={slot} /> },
+      { id: 'macro-signals', render: (slot) => <MacroSignalsPanel slot={slot} /> },
+      { id: 'model-improvement', render: (slot) => <ModelImprovementPanel slot={slot} /> },
+      { id: 'org-analytics', render: (slot) => <OrgAnalyticsPanel slot={slot} /> },
+      { id: 'sentiment', render: (slot) => <SentimentPanel slot={slot} /> },
+      { id: 'trader-desk', render: (slot) => <TraderDeskPanel slot={slot} /> },
+      { id: 'yields', render: (slot) => <YieldsPanel slot={slot} /> },
+      { id: 'displacement', render: (slot) => <DisplacementPanel slot={slot} /> },
+      { id: 'ucdp-events', render: (slot) => <UcdpEventsPanel slot={slot} /> },
+      { id: 'tech-events', render: (slot) => <TechEventsPanel slot={slot} /> },
+      { id: 'cloud-analytics', render: (slot) => <AnalyticsPanel slot={slot} /> },
+      { id: 'chains', render: (slot) => <BlockchainPanel slot={slot} /> },
+      { id: 'cloud-services', render: (slot) => <CloudServicesPanel slot={slot} /> },
+      { id: 'cloud-clusters', render: (slot) => <ClusterPanel slot={slot} /> },
+      { id: 'enso-benchmarks', render: (slot) => <EnsoBenchmarkPanel slot={slot} /> },
+      { id: 'enso-flywheel', render: (slot) => <EnsoFlywheelPanel slot={slot} /> },
+      { id: 'enso-router', render: (slot) => <EnsoRouterPanel slot={slot} /> },
+      { id: 'etf-flows', render: (slot) => <ETFFlowsPanel slot={slot} /> },
+      { id: 'fleet', render: (slot) => <FleetPanel slot={slot} /> },
+      { id: 'hanzo-status', render: (slot) => <HanzoStatusPanel slot={slot} /> },
+      { id: 'lux-book', render: (slot) => <LuxBookPanel slot={slot} /> },
+      { id: 'model-usage', render: (slot) => <ModelUsagePanel slot={slot} /> },
+      { id: 'my-usage', render: (slot) => <MyUsagePanel slot={slot} /> },
+      { id: 'cloud-queue', render: (slot) => <QueuePanel slot={slot} /> },
+      { id: 'rotation', render: (slot) => <RotationScannerPanel slot={slot} /> },
+      { id: 'stablecoins', render: (slot) => <StablecoinPanel slot={slot} /> },
+      { id: 'service-status', render: (slot) => <ServiceStatusPanel slot={slot} /> },
+      { id: 'tech-readiness', render: (slot) => <TechReadinessPanel slot={slot} /> },
+      { id: 'traffic-globe', render: (slot) => <TrafficGlobePanel slot={slot} /> },
+      { id: 'trading-bubble', render: (slot) => <TradingBubblePanel slot={slot} /> },
+      { id: 'strategic-posture', render: (slot) => <StrategicPosturePanel slot={slot} /> },
+      { id: 'cii', render: (slot) => <CIIPanel slot={slot} /> },
+      { id: 'gdelt-intel', render: (slot) => <GdeltIntelPanel slot={slot} /> },
+    ],
     [],
   );
 
