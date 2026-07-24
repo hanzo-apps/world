@@ -47,6 +47,12 @@ import { StrategicPosturePanel } from './components/StrategicPosturePanel';
 import { CIIPanel } from './components/CIIPanel';
 import { GdeltIntelPanel } from './components/GdeltIntelPanel';
 import { AccountControl } from './components/AccountControl';
+import { FinanceTerminal } from './components/FinanceTerminal';
+import { AnalystDock } from './components/AnalystDock';
+import { CountryIntelPanel } from './components/CountryIntelPanel';
+import { useCountryIntel } from './hooks/useCountryIntel';
+import { SearchProvider, useSearch } from './hooks/useSearch';
+import { getGlobeInstance } from './hooks/globe-instance';
 
 /**
  * The React + @hanzo/gui foundation for world.hanzo.ai.
@@ -63,7 +69,27 @@ import { AccountControl } from './components/AccountControl';
  * Style props are LONGHAND-only (see gui.config.ts) — one explicit vocabulary.
  */
 export function App(): React.JSX.Element {
+  // SearchProvider is the ⌘K search boundary (mounts the vanilla SearchController
+  // once, owns its modal host). Placed at the top so the header's search onClick
+  // can consume the hook. `getMap` is wired through the globe-instance registry
+  // GlobeIsland publishes into — so search result fly-to routes to the live globe
+  // (all STATIC sources work immediately; DYNAMIC sources activate when a React
+  // news/markets store lands).
+  return (
+    <SearchProvider deps={{ getMap: getGlobeInstance }}>
+      <AppShell />
+    </SearchProvider>
+  );
+}
+
+function AppShell(): React.JSX.Element {
+  const { open, updateSearchIndex } = useSearch();
   const [variant, setVariant] = useState<string>(() => getSiteVariant());
+
+  // App-scoped country drill-down: the vanilla CountryIntelController wires itself
+  // to the globe the moment it mounts (via the globe-instance registry) and owns
+  // the fullscreen brief overlay; stays live even when the companion panel hides.
+  useCountryIntel();
 
   // One switch path: canonicalize + persist through the config layer, then reflect
   // it in React state and the shareable URL. Mirrors the vanilla in-place switch.
@@ -121,6 +147,7 @@ export function App(): React.JSX.Element {
       { id: 'strategic-posture', render: (slot) => <StrategicPosturePanel slot={slot} /> },
       { id: 'cii', render: (slot) => <CIIPanel slot={slot} /> },
       { id: 'gdelt-intel', render: (slot) => <GdeltIntelPanel slot={slot} /> },
+      { id: 'country-intel', render: (slot) => <CountryIntelPanel slot={slot} /> },
     ],
     [],
   );
@@ -130,7 +157,13 @@ export function App(): React.JSX.Element {
       <HanzoAppHeader
         productId="world"
         org={{ id: 'hanzo', label: 'Hanzo' }}
-        search={{ placeholder: 'Search or ask Hanzo…' }}
+        search={{
+          placeholder: 'Search or ask Hanzo…',
+          onClick: () => {
+            updateSearchIndex();
+            open();
+          },
+        }}
         account={<AccountControl />}
       />
 
@@ -145,12 +178,23 @@ export function App(): React.JSX.Element {
         <VariantTabs active={variant} onSelect={handleSelect} />
       </XStack>
 
-      {/* Stage: the globe fills the viewport; the panel rail floats over it. */}
+      {/* Stage: the globe + floating panel rail, OR — in the finance variant —
+          the full-viewport finance terminal (mirrors the vanilla mountMap
+          early-return: the terminal is position:fixed z-index:40 and covers the
+          globe, so the z-index:20 rail is intentionally not rendered there).
+          The AnalystDock is the agentic copilot, available over every stage. */}
       <YStack flex={1} position="relative" overflow="hidden">
-        <GlobeIsland variant={variant} />
-        <YStack position="absolute" top="$3" right="$3" zIndex={20}>
-          <PanelGrid items={panels} />
-        </YStack>
+        {variant === 'finance' ? (
+          <FinanceTerminal />
+        ) : (
+          <>
+            <GlobeIsland variant={variant} />
+            <YStack position="absolute" top="$3" right="$3" zIndex={20}>
+              <PanelGrid items={panels} />
+            </YStack>
+          </>
+        )}
+        <AnalystDock onVariantChange={handleSelect} />
       </YStack>
     </YStack>
   );
