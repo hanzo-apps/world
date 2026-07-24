@@ -164,35 +164,41 @@ func (s *Server) handleServiceStatus(w http.ResponseWriter, r *http.Request) {
 	category := r.URL.Query().Get("category")
 	s.cachedJSON(w, "service-status:"+category, "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
 		time.Minute, 10*time.Minute,
-		func(ctx context.Context) (any, error) {
-			var services []statusService
-			for _, svc := range statusServices {
-				if category == "" || category == "all" || svc.category == category {
-					services = append(services, svc)
-				}
-			}
-			results := make([]map[string]any, len(services))
-			var wg sync.WaitGroup
-			for i, svc := range services {
-				wg.Add(1)
-				go func(i int, svc statusService) {
-					defer wg.Done()
-					status, desc := s.checkStatusPage(ctx, svc)
-					results[i] = map[string]any{"id": svc.id, "name": svc.name, "category": svc.category, "status": status, "description": desc}
-				}(i, svc)
-			}
-			wg.Wait()
-			order := map[string]int{"outage": 0, "degraded": 1, "unknown": 2, "operational": 3}
-			sort.SliceStable(results, func(i, j int) bool { return order[asString(results[i]["status"])] < order[asString(results[j]["status"])] })
-			summary := map[string]int{"operational": 0, "degraded": 0, "outage": 0, "unknown": 0}
-			for _, r := range results {
-				summary[asString(r["status"])]++
-			}
-			return map[string]any{"success": true, "timestamp": nowISO(), "summary": summary, "services": results}, nil
-		},
+		func(ctx context.Context) (any, error) { return s.serviceStatusBoard(ctx, category) },
 		func(w http.ResponseWriter, err error) {
 			writeJSON(w, http.StatusOK, "", map[string]any{"success": false, "services": []any{}, "error": err.Error()})
 		})
+}
+
+// serviceStatusBoard checks every provider status page in the requested category
+// ("" / "all" = every category) and returns the sorted board + summary. Extracted
+// so both /v1/world/service-status and the AI-plane /v1/world/infra project the
+// SAME real provider-health data through one fetcher.
+func (s *Server) serviceStatusBoard(ctx context.Context, category string) (any, error) {
+	var services []statusService
+	for _, svc := range statusServices {
+		if category == "" || category == "all" || svc.category == category {
+			services = append(services, svc)
+		}
+	}
+	results := make([]map[string]any, len(services))
+	var wg sync.WaitGroup
+	for i, svc := range services {
+		wg.Add(1)
+		go func(i int, svc statusService) {
+			defer wg.Done()
+			status, desc := s.checkStatusPage(ctx, svc)
+			results[i] = map[string]any{"id": svc.id, "name": svc.name, "category": svc.category, "status": status, "description": desc}
+		}(i, svc)
+	}
+	wg.Wait()
+	order := map[string]int{"outage": 0, "degraded": 1, "unknown": 2, "operational": 3}
+	sort.SliceStable(results, func(i, j int) bool { return order[asString(results[i]["status"])] < order[asString(results[j]["status"])] })
+	summary := map[string]int{"operational": 0, "degraded": 0, "outage": 0, "unknown": 0}
+	for _, r := range results {
+		summary[asString(r["status"])]++
+	}
+	return map[string]any{"success": true, "timestamp": nowISO(), "summary": summary, "services": results}, nil
 }
 
 func (s *Server) checkStatusPage(ctx context.Context, svc statusService) (string, string) {
