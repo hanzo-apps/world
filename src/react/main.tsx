@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { GuiProvider } from '@hanzo/gui';
 import { initI18n } from '@/services/i18n';
 import guiConfig from './gui.config';
+import { initTelemetry } from './telemetry';
 import { App } from './App';
 
 /**
@@ -16,6 +17,11 @@ import { App } from './App';
  * (gui.config.ts). Everything below it can use @hanzogui/* primitives and the
  * unified shell.
  */
+// Wire the ONE @hanzo/event telemetry client (reused verbatim from the vanilla
+// bootstrap) into the React root before first paint, so pageviews + errors are
+// captured from boot. Idempotent, IAM-decoupled, and inert off the deployed site.
+initTelemetry();
+
 const host = document.getElementById('react-root');
 if (!host) throw new Error('[world/react] #react-root mount node missing');
 
