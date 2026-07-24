@@ -51,6 +51,33 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: resolve(__dirname, 'index.react.html'),
+      output: {
+        // Split ONLY the always-eager runtime vendors out of the entry chunk. The
+        // entry had crossed ~402 kB gz because React + the Tamagui/react-native-web
+        // runtime (what @hanzo/gui is built on) were inlined into it; hoisting them
+        // into sibling eager chunks shrinks the entry file below target without
+        // changing load order (these are imported by main/GuiProvider regardless).
+        //
+        // CRITICAL: name ONLY these vendors. manualChunks force-hoists a module into
+        // the named chunk even when it is reached solely via dynamic import — so the
+        // heavy islands (deck.gl/mapbox behind GlobeIsland, TradingView behind
+        // FinanceTerminal) are deliberately NOT named here. They stay in Rollup's
+        // automatic async chunks, keeping the island lazy-load intact.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+            return 'react-vendor';
+          }
+          if (
+            /[\\/]node_modules[\\/](react-native-web|@tamagui|tamagui|@hanzo[\\/]gui|@hanzogui)[\\/]/.test(
+              id,
+            )
+          ) {
+            return 'gui-vendor';
+          }
+          return undefined;
+        },
+      },
     },
   },
 
