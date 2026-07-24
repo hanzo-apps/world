@@ -18,13 +18,13 @@ export function VariantTabs({
   return (
     <XStack
       gap="$1"
-      ai="center"
+      alignItems="center"
       role="tablist"
       aria-label="View switcher"
       borderRadius="$10"
       borderWidth={1}
       borderColor="rgba(255,255,255,0.12)"
-      p="$1"
+      padding="$1"
     >
       {VARIANT_TABS.map((tab) => {
         const on = tab.id === active;
@@ -33,13 +33,12 @@ export function VariantTabs({
             key={tab.id}
             role="tab"
             aria-selected={on}
-            tag="button"
-            focusable
+            tabIndex={0}
             cursor="pointer"
-            ai="center"
+            alignItems="center"
             gap="$1.5"
-            px="$2.5"
-            py="$1.5"
+            paddingHorizontal="$2.5"
+            paddingVertical="$1.5"
             borderRadius="$8"
             backgroundColor={on ? 'rgba(255,255,255,0.14)' : 'transparent'}
             hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
