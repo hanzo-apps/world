@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -30,8 +31,9 @@ import (
 
 func main() {
 	var (
-		addr = flag.String("addr", envOr("WORLD_ADDR", ":"+envOr("PORT", "3000")), "listen address")
-		root = flag.String("root", envOr("WORLD_STATIC_ROOT", "dist"), "static SPA root directory")
+		addr      = flag.String("addr", envOr("WORLD_ADDR", ":"+envOr("PORT", "3000")), "listen address")
+		root      = flag.String("root", envOr("WORLD_STATIC_ROOT", "dist"), "static SPA root directory")
+		reactRoot = flag.String("react-root", envOr("WORLD_REACT_ROOT", "dist-react"), "canary React SPA root, served only to sessions that opted in via ?react")
 	)
 	flag.Parse()
 
@@ -55,9 +57,12 @@ func main() {
 	srv.Mount(mux) // /v1/world/* routes
 
 	// Static SPA + fallback handles everything not matched by an /api route.
-	// gzipStatic wraps ONLY this handler — /v1/world/* keeps its streaming
-	// endpoints unbuffered.
-	mux.Handle("/", gzipStatic(newSPAHandler(*root)))
+	// The vanilla Vite build (--root) is the default surface; the React rewrite
+	// (--react-root) is served ONLY to a session that opted in via ?react, sticky
+	// per a first-party cookie — so shipping this changes nothing until we flip
+	// the default. gzipStatic wraps ONLY this handler — /v1/world/* keeps its
+	// streaming endpoints unbuffered.
+	mux.Handle("/", gzipStatic(newCanaryHandler(*root, *reactRoot)))
 
 	httpSrv := &http.Server{
 		Addr:              *addr,
@@ -92,7 +97,7 @@ type spaHandler struct {
 	fileSrv   http.Handler
 }
 
-func newSPAHandler(root string) http.Handler {
+func newSPAHandler(root, indexName string) *spaHandler {
 	// Honor the same CSP env the prior hanzoai/static image used, so the world
 	// CR needs no change on cutover; WORLD_CSP is an explicit alias.
 	h := &spaHandler{
@@ -100,12 +105,92 @@ func newSPAHandler(root string) http.Handler {
 		fileSrv: http.FileServer(http.Dir(root)),
 		csp:     envOr("HANZO_STATIC_CSP", envOr("WORLD_CSP", "")),
 	}
-	if b, err := os.ReadFile(filepath.Join(root, "index.html")); err == nil {
+	if b, err := os.ReadFile(filepath.Join(root, indexName)); err == nil {
 		h.indexHTML = b
 	} else {
-		log.Printf("world: warning: no index.html under %q: %v", root, err)
+		log.Printf("world: warning: no %s under %q: %v", indexName, root, err)
 	}
 	return h
+}
+
+// surfaceCookie pins a browser session to the vanilla ("") or React ("react")
+// world surface; ?react / ?gui toggles it. Readable by the client (not HttpOnly)
+// so the app can show which surface it is on.
+const surfaceCookie = "world_surface"
+
+// canaryHandler routes each request to the vanilla SPA (default) or the React
+// rewrite (opt-in). A visitor opts in with ?react (or ?gui=react): that sets the
+// sticky cookie and redirects to a clean URL, so every following request (HTML,
+// content-hashed assets, client routes) is served consistently from the React
+// root for that session. ?react=0 / ?gui=vanilla opts back out. With no cookie
+// the default surface is served — so this is a true canary: nothing changes for
+// anyone until we flip the default.
+type canaryHandler struct {
+	vanilla *spaHandler
+	react   *spaHandler // nil when no react root is present → always vanilla
+}
+
+func newCanaryHandler(root, reactRoot string) http.Handler {
+	c := &canaryHandler{vanilla: newSPAHandler(root, "index.html")}
+	if reactRoot != "" {
+		// Only enable the canary if the React build actually shipped in the image
+		// (its index loaded); otherwise fall through to vanilla, never 404.
+		if r := newSPAHandler(reactRoot, "index.react.html"); r.indexHTML != nil {
+			c.react = r
+		}
+	}
+	return c
+}
+
+func (c *canaryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Honor an explicit toggle on a navigation: set/clear the sticky cookie, then
+	// redirect to the same path without the toggle query so the address bar and
+	// shared links stay clean and the reload is served from the chosen root.
+	if (r.Method == http.MethodGet || r.Method == http.MethodHead) && hasToggle(r.URL.Query()) {
+		q := r.URL.Query()
+		want := wantsReact(q)
+		ck := &http.Cookie{Name: surfaceCookie, Path: "/", SameSite: http.SameSiteLaxMode}
+		if want {
+			ck.Value, ck.MaxAge = "react", 30*24*3600
+		} else {
+			ck.Value, ck.MaxAge = "", -1
+		}
+		http.SetCookie(w, ck)
+		q.Del("react")
+		q.Del("gui")
+		u := *r.URL
+		u.RawQuery = q.Encode()
+		http.Redirect(w, r, u.RequestURI(), http.StatusFound)
+		return
+	}
+	if c.react != nil && surfaceFromCookie(r) == "react" {
+		c.react.ServeHTTP(w, r)
+		return
+	}
+	c.vanilla.ServeHTTP(w, r)
+}
+
+func hasToggle(q url.Values) bool { return q.Has("react") || q.Has("gui") }
+
+// wantsReact reads the toggle intent: ?react (bare or =1/true/on/react) or
+// ?gui=react opts in; ?react=0/false/off or ?gui=<anything-else> opts out.
+func wantsReact(q url.Values) bool {
+	if q.Has("gui") {
+		return strings.EqualFold(strings.TrimSpace(q.Get("gui")), "react")
+	}
+	switch strings.ToLower(strings.TrimSpace(q.Get("react"))) {
+	case "", "1", "true", "on", "react":
+		return true
+	default:
+		return false
+	}
+}
+
+func surfaceFromCookie(r *http.Request) string {
+	if ck, err := r.Cookie(surfaceCookie); err == nil {
+		return ck.Value
+	}
+	return ""
 }
 
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
