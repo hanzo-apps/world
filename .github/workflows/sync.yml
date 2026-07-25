@@ -1,9 +1,22 @@
 name: Sync to git.hanzo.ai
-# hanzoai/world is NATIVE on git.hanzo.ai (hanzoai/git) — canonical repo + where CI/CD
-# runs: build/test/release from .hanzo/workflows/ on the Hanzo git-runner. GitHub is the
-# DOWNSTREAM MIRROR. The mirror App already syncs on push; this is the explicit,
-# self-documenting belt-and-suspenders — its presence in .github/ signals
-# "this repo migrated to git.hanzo.ai."
+# DIRECTION (measured 2026-07-25, do not copy the previous claim): hanzoai/world on
+# git.hanzo.ai is a PULL MIRROR (is_mirror=true) fetching github.com/hanzoai/world. So
+# TODAY **GitHub is upstream and git.hanzo.ai is downstream** — the opposite of what this
+# header used to assert. The giveaway is in this file's own next paragraph: mirror-sync
+# tells Gitea to PULL, which only makes sense if GitHub is the source.
+#
+# This matters beyond labeling: a pull mirror force-updates its refs from upstream on every
+# fetch, so anything committed directly on git.hanzo.ai is DISCARDED on the next sync. Do
+# not treat the mirror as writable, and do not propagate a "native on git.hanzo.ai" comment
+# into other repos — it was nearly copied into 200+ of them.
+#
+# What IS true: CI/CD runs on git.hanzo.ai — arcd executes .hanzo/workflows/ on the Hanzo
+# git-runner. The intended end state (git.hanzo.ai canonical) requires converting this repo
+# pull-mirror -> native and flipping the write path; that is an ops migration, not a config
+# edit, and it has not happened yet.
+#
+# So this nudge is a LATENCY fix, not a canonicality one: it asks Gitea to pull now instead
+# of waiting out the ~10-minute mirror interval, so arcd sees the new commit sooner.
 #
 # IDEMPOTENT: mirror-sync just tells Gitea to pull HEAD, so N nudges == 1 (same latest
 # state); concurrency coalesces a burst of pushes to a single in-flight sync. FAST: no
