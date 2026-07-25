@@ -35,6 +35,11 @@ concurrency:
 
 jobs:
   sync:
+    # `.github/workflows` is also on Gitea's WORKFLOW_DIRS, so with Actions enabled on
+    # the mirror this file runs THERE too on every sync — where asking git.hanzo.ai to
+    # pull is circular. github.server_url is setting.AppURL on Gitea
+    # (services/actions/context.go:89), so this is the exact test for "am I upstream".
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
