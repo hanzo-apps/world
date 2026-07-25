@@ -1,14 +1,23 @@
 name: Release
-# Cuts a release of ghcr.io/hanzoai/world — the static SPA frontend image (Vite ->
-# hanzoai/static) the operator CR pins. Mirrors hanzoai/app/release.yml:
-#     a git tag v<X.Y.Z>  ⇔  an image ghcr.io/hanzoai/world:v<X.Y.Z>
-# Builds on the git.hanzo.ai native runner (git-runner). ghcr auth via GH_PAT / user
-# hanzo-dev.
+# THE build+publish pipeline for ghcr.io/hanzoai/world — the one image the operator
+# CR (universe: infra/k8s/operator/crs/world.yaml) pins. Runs on the git.hanzo.ai
+# runner pool; ghcr auth via the hanzoai org secret GH_PAT (user hanzo-dev).
 #
-# ADDITIVE MIGRATION NOTE: the legacy .github lane (docker-build.yml) does NOT cut
-# v-tags — it only REACTS to `tags: ['v*']` to build+deploy. So there is no
-# competing tag-cutter and no version runaway. paths-ignore below keeps this native
-# release from re-firing on .github/** or doc-only edits.
+# THE INVARIANT, measured against the live registry and the live CR (2026-07-25):
+#     a git tag v<X.Y.Z>  ⇔  an image ghcr.io/hanzoai/world:<X.Y.Z>   (NO v on the image)
+# Every published image tag is bare — 2.4.42 … 2.4.51 — and the CR pins `tag: 2.4.51`.
+# A `v`-prefixed image would be a tag nobody pins.
+#
+# WHY THIS IS THE ONLY BUILDER. `.github/workflows/cicd.yml` (hanzoai/ci reusable,
+# driven by hanzo.yml) cut every image up to 2.4.51 and was neutralized to a no-op
+# on 2026-07-24 — before anything native had ever run, because hanzoai/world is a
+# Gitea PULL MIRROR whose Actions were disabled. Result: 2.4.51 was the last image
+# and three commits shipped nothing. Actions are now enabled on the mirror; this
+# file is the replacement, and it is the only thing that builds world.
+#
+# ROLLOUT IS NOT HERE. This cuts an image + a git tag. Deploying is a reviewed pin
+# bump in hanzoai/universe, applied by cd.hanzo.ai — the App CR is ArgoCD-managed
+# (selfHeal), so a `kubectl patch` from CI is reverted on the next poll.
 on:
   push:
     branches: [main]
@@ -16,6 +25,7 @@ on:
     # trigger; use workflow_dispatch to force.
     paths-ignore:
       - '.github/**'
+      - '.hanzo/workflows/**'
       - '**.md'
   workflow_dispatch:
 permissions:
@@ -72,6 +82,8 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
             echo "::error::computed v${version} already exists — aborting to avoid collision"; exit 1
           fi
+          # Two spellings of ONE value: the git tag carries the v, the image does not.
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "version_v=v${version}" >> "$GITHUB_OUTPUT"
           echo "Next release: v${version} (git_max='${git_max:-none}' container_max='${cont_max:-none}')"
       - name: Set up Docker Buildx
@@ -92,25 +104,41 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/hanzoai/world:${{ steps.ver.outputs.version_v }}
+          tags: ghcr.io/hanzoai/world:${{ steps.ver.outputs.version }}
           provenance: false
+          # hanzo.yml declares four build_secrets, but VITE_MAPBOX_TOKEN is the only
+          # one the Dockerfile actually takes as an ARG (the other three are dead
+          # config: Sentry/Umami were replaced by @hanzo/event, and VITE_GTM_ID has
+          # no ARG). Carried here so the capability survives the port. Unset today —
+          # the live 2.4.51 bundle contains no pk.* token either, so an empty value
+          # is faithful, not a regression; set the repo secret to start baking it.
+          build-args: |
+            VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
       - name: Verify the pushed image is pullable (guard the image ⇔ tag invariant)
         # build-push-action can exit 0 while the manifest isn't yet resolvable at the
         # registry. Prove the image resolves BEFORE creating the git tag, so a bad push
         # fails the run instead of leaving a phantom tag → ImagePullBackOff.
         run: |
           set -euo pipefail
-          v="${{ steps.ver.outputs.version_v }}"
+          t="${{ steps.ver.outputs.version }}"
           for i in 1 2 3 4 5 6; do
-            if docker manifest inspect "ghcr.io/hanzoai/world:${v}" >/dev/null 2>&1; then
-              echo "image ${v} is resolvable — safe to tag"; exit 0
+            if docker manifest inspect "ghcr.io/hanzoai/world:${t}" >/dev/null 2>&1; then
+              echo "image ${t} is resolvable — safe to tag"; exit 0
             fi
-            echo "ghcr manifest ${v} not visible yet (attempt ${i}/6) — retrying"; sleep 5
+            echo "ghcr manifest ${t} not visible yet (attempt ${i}/6) — retrying"; sleep 5
           done
-          echo "::error::image ${v} not pullable after push — refusing to tag git (prevents ImagePullBackOff)"; exit 1
-      - name: Tag the release (image ⇔ tag invariant)
+          echo "::error::image ${t} not pullable after push — refusing to tag git (prevents ImagePullBackOff)"; exit 1
+      - name: Tag the release on GitHub (image ⇔ tag invariant)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        # The tag goes UPSTREAM, not to `origin`. hanzoai/world on git.hanzo.ai is a
+        # pull mirror: it force-updates its refs from GitHub on every fetch and
+        # rejects pushes, so `git push origin` here can only fail (and would fail
+        # AFTER the image is already published, breaking the invariant this job
+        # exists to hold). GitHub is upstream; the mirror pulls the tag back.
         run: |
           set -euo pipefail
           git tag "${{ steps.ver.outputs.version_v }}"
-          git push origin "${{ steps.ver.outputs.version_v }}"
-          echo "Pushed image + tag ${{ steps.ver.outputs.version_v }} — bump the operator CR to deploy."
+          git push "https://x-access-token:${GH_PAT}@github.com/hanzoai/world.git" \
+            "refs/tags/${{ steps.ver.outputs.version_v }}"
+          echo "Pushed image ${{ steps.ver.outputs.version }} + tag ${{ steps.ver.outputs.version_v }} — bump the operator CR (universe: crs/world.yaml) to deploy."
